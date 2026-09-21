@@ -29,6 +29,9 @@ Schedule::command('turnouno:generar-agenda')->dailyAt('00:30');
 // Expira las ofertas de lista de espera vencidas y re-ofrece el cupo (R7).
 Schedule::command('turnouno:expirar-ofertas')->everyMinute()->withoutOverlapping();
 
+// Libera las reservas pago-para-reservar (citas) no pagadas a tiempo (R-citas).
+Schedule::command('turnouno:expirar-reservas-pago')->everyMinute()->withoutOverlapping();
+
 // Cobra las renovaciones recurrentes vencidas y reintenta a los morosos (Etapa 2).
 // Antes de escalar el dunning, para dar oportunidad a los reintentos del día.
 Schedule::command('turnouno:cobrar-suscripciones')->dailyAt('00:45')->withoutOverlapping();

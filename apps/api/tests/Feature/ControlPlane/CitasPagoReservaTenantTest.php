@@ -38,6 +38,19 @@ function estadoReservaTenant(array $e, string $ulid): string
     return $reserva instanceof ReservaTenant ? $reserva->estado->value : '';
 }
 
+/**
+ * Antigüedad artificial de una reserva (para probar la expiración del pendiente).
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ */
+function backdatearReservaTenant(array $e, string $ulid, int $minutos): void
+{
+    $estudio = Estudio::query()->where('slug', $e['slug'])->firstOrFail();
+    app(GestorDeConexionTenant::class)->conectar($estudio);
+    ReservaTenant::query()->where('ulid', $ulid)->update(['created_at' => now()->subMinutes($minutos)]);
+    app(GestorDeConexionTenant::class)->desconectar();
+}
+
 it('reserva pendiente de pago retiene el cupo y se confirma al pagar', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $sede = agendaSemilla($e);
@@ -82,4 +95,28 @@ it('sin pago no se confirma: la reserva sigue pendiente y el cupo sigue retenido
 
     // Sin pagar, sigue pendiente.
     expect(estadoReservaTenant($e, $r['id']))->toBe('pendiente_pago');
+});
+
+it('expira una reserva pendiente no pagada a tiempo y libera el cupo', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sede = agendaSemilla($e);
+    $this->putJson("/api/v1/app/{$e['slug']}/ofertas/{$sede['oferta']}", [
+        'lugares' => 0, 'politica_reserva' => 'pago', 'precio_clase_minor' => 25000,
+    ], conBearer($e['bearer']))->assertOk();
+    $sesion = crearSesionTenant($e, $sede, 1);
+
+    $a = alumnoConSesion($e, 'Ana', 'ana@correo.mx');
+    $b = alumnoConSesion($e, 'Beto', 'beto@correo.mx');
+
+    $r = $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas", ['sesion_id' => $sesion], conBearer($a['bearer']))
+        ->assertCreated()->json('data');
+
+    // La reserva lleva > 30 min sin pagar → el relay debe liberarla.
+    backdatearReservaTenant($e, $r['id'], 31);
+    $this->artisan('turnouno:expirar-reservas-pago')->assertSuccessful();
+
+    // Quedó cancelada y el cupo se liberó: Beto ya puede reservar.
+    expect(estadoReservaTenant($e, $r['id']))->toBe('cancelada');
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas", ['sesion_id' => $sesion], conBearer($b['bearer']))
+        ->assertCreated();
 });

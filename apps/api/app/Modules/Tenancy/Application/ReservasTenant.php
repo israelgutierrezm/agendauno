@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Creditos\Exceptions\SaldoInsuficiente;
 use App\Modules\Creditos\OrigenMovimiento;
+use App\Modules\Ordenes\EstadoOrden;
 use App\Modules\Reservas\EstadoReserva;
 use App\Modules\Reservas\Exceptions\CupoLleno;
 use App\Modules\Reservas\Exceptions\FueraDeVentana;
@@ -18,6 +19,7 @@ use App\Modules\Reservas\Exceptions\TransferenciaInvalida;
 use App\Modules\Reservas\Exceptions\YaReservado;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReglaCapacidadCanalTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -40,6 +42,9 @@ class ReservasTenant
 
     // Ventana (min) para aceptar una oferta de lista de espera antes de que expire (R7).
     private const VENTANA_OFERTA_MIN = 30;
+
+    // Ventana (min) para pagar una reserva pago-para-reservar antes de liberar el cupo.
+    private const VENTANA_PAGO_MIN = 30;
 
     public function __construct(
         private readonly ResolverDerechoTenant $resolver,
@@ -583,6 +588,48 @@ class ReservasTenant
                     $expiradas++;
 
                     // El cupo liberado se re-ofrece al siguiente de la lista.
+                    $this->promover($sesion);
+                });
+            });
+
+        return $expiradas;
+    }
+
+    /**
+     * Expira las reservas PENDIENTES DE PAGO (citas) que no se pagaron dentro de la
+     * ventana: las cancela (libera el cupo retenido), cancela su orden pendiente y
+     * promueve la lista de espera. Idempotente (revalida bajo lock). Debe correr con la
+     * conexión del tenant activa (ver el comando que lo orquesta).
+     */
+    public function expirarReservasPendientes(): int
+    {
+        $limite = now()->subMinutes(self::VENTANA_PAGO_MIN);
+        $expiradas = 0;
+
+        ReservaTenant::query()
+            ->where('estado', EstadoReserva::PendientePago->value)
+            ->where('created_at', '<', $limite)
+            ->orderBy('id')
+            ->pluck('id')
+            ->each(function ($id) use (&$expiradas): void {
+                DB::connection('tenant')->transaction(function () use ($id, &$expiradas): void {
+                    $reserva = ReservaTenant::query()->whereKey($id)->lockForUpdate()->first();
+                    if (! $reserva instanceof ReservaTenant || $reserva->estado !== EstadoReserva::PendientePago) {
+                        return;
+                    }
+
+                    // Libera el cupo bajo el lock de la sesión (para promover con seguridad).
+                    $sesion = SesionTenant::query()->whereKey($reserva->sesion_id)->lockForUpdate()->firstOrFail();
+
+                    $reserva->update(['estado' => EstadoReserva::Cancelada->value]);
+                    if ($reserva->orden_id !== null) {
+                        OrdenTenant::query()->whereKey($reserva->orden_id)
+                            ->where('estado', EstadoOrden::Pendiente->value)
+                            ->update(['estado' => EstadoOrden::Cancelada->value]);
+                    }
+                    $expiradas++;
+
+                    // El cupo liberado se ofrece al siguiente en lista de espera.
                     $this->promover($sesion);
                 });
             });
