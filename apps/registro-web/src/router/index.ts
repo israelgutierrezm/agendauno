@@ -99,6 +99,12 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      path: '/cobranza',
+      name: 'cobranza',
+      component: () => import('@/views/CobranzaView.vue'),
+      meta: { requiereSesion: true },
+    },
+    {
       path: '/renta',
       name: 'renta',
       component: () => import('@/views/RentaView.vue'),

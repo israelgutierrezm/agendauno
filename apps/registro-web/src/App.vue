@@ -56,6 +56,7 @@ const MENU: MenuItem[] = [
       { clave: 'promociones', etiqueta: 'nav.promociones', icono: 'promociones', ruta: 'promociones', permiso: 'promociones.gestionar' },
       { clave: 'lealtad', etiqueta: 'nav.lealtad', icono: 'lealtad', ruta: 'lealtad', permiso: 'lealtad.ver' },
       { clave: 'facturas', etiqueta: 'nav.facturas', icono: 'facturas', ruta: 'facturas', permiso: 'ordenes.ver' },
+      { clave: 'cobranza', etiqueta: 'nav.cobranza', icono: 'facturas', ruta: 'cobranza', permiso: 'facturacion.ver' },
       { clave: 'reportes', etiqueta: 'nav.reportes', icono: 'reportes', ruta: 'reportes', permiso: 'facturacion.ver' },
       { clave: 'pasarelas', etiqueta: 'nav.pasarelas', icono: 'pasarelas', ruta: 'pasarelas', permiso: 'pagos.configurar' },
     ],
@@ -149,7 +150,11 @@ function alternar(clave: string): void {
     compacto.value = false
   }
   const s = new Set(abiertos.value)
-  s.has(clave) ? s.delete(clave) : s.add(clave)
+  if (s.has(clave)) {
+    s.delete(clave)
+  } else {
+    s.add(clave)
+  }
   abiertos.value = s
 }
 
