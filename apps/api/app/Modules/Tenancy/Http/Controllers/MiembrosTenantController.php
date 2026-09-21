@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Application\PoliticaAlumnosActivosV1;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Http\Requests\CrearMiembroRequest;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -28,7 +29,20 @@ class MiembrosTenantController
 {
     private const LIMITE = 100;
 
-    public function __construct(private readonly RegistrarAuditoria $auditoria) {}
+    public function __construct(
+        private readonly RegistrarAuditoria $auditoria,
+        private readonly ResolverAccesoTenant $acceso,
+    ) {}
+
+    /**
+     * Usuario tenant-local que hace la petición (para el scope por sucursal R19).
+     */
+    private function actor(Request $request): ?Usuario
+    {
+        $actor = $request->attributes->get('usuario_tenant');
+
+        return $actor instanceof Usuario ? $actor : null;
+    }
 
     public function index(Request $request): JsonResponse
     {
@@ -46,6 +60,16 @@ class MiembrosTenantController
                 ->orWhere('primer_apellido', 'like', "%{$busqueda}%")
                 ->orWhere('segundo_apellido', 'like', "%{$busqueda}%")
                 ->orWhere('email', 'like', "%{$busqueda}%")));
+
+        // Alcance por sucursal (R19): el staff acotado a sedes solo ve a los alumnos de
+        // SUS sucursales (el propietario/admin y el staff sin asignación ven todos).
+        $actor = $this->actor($request);
+        if ($actor !== null) {
+            $permitidas = $this->acceso->sucursalesPermitidas($actor);
+            if ($permitidas !== null) {
+                $consulta->whereIn('sucursal_id', $permitidas);
+            }
+        }
 
         // Filtros del padrón: estado facturable y activo.
         $facturable = (string) $request->query('facturable', '');
@@ -128,6 +152,11 @@ class MiembrosTenantController
 
     public function store(CrearMiembroRequest $request): JsonResponse
     {
+        $sucursalId = $this->resolverSucursalDeAlta(
+            $this->actor($request),
+            $this->sucursalIdDe((string) $request->validated('sucursal_id', '')),
+        );
+
         $persona = PersonaTenant::query()->create([
             'nombre' => (string) $request->validated('nombre'),
             'segundo_nombre' => $request->validated('segundo_nombre'),
@@ -138,10 +167,34 @@ class MiembrosTenantController
             'activo' => true,
             'es_facturable' => (bool) $request->validated('es_facturable', true),
             'archivado' => false,
-            'sucursal_id' => $this->sucursalIdDe((string) $request->validated('sucursal_id', '')),
+            'sucursal_id' => $sucursalId,
         ]);
 
         return response()->json(['data' => $this->presentar($persona->load('sucursal'))], 201);
+    }
+
+    /**
+     * Resuelve la sucursal de alta respetando el scope (R19): un usuario ACOTADO solo da
+     * de alta en SU sucursal — si no indica una, usa la suya; si indica otra, 403.
+     */
+    private function resolverSucursalDeAlta(?Usuario $actor, ?int $sucursalId): ?int
+    {
+        if ($actor === null || ! $this->acceso->esAcotadoPorSucursal($actor)) {
+            return $sucursalId;
+        }
+
+        $permitidas = $this->acceso->sucursalesAsignadas($actor);
+        if ($sucursalId === null) {
+            return $permitidas[0] ?? null;
+        }
+
+        abort_unless(
+            in_array($sucursalId, $permitidas, true),
+            403,
+            'No puedes dar de alta en una sucursal que no te corresponde.',
+        );
+
+        return $sucursalId;
     }
 
     /**
@@ -152,6 +205,14 @@ class MiembrosTenantController
     public function actualizar(Request $request): JsonResponse
     {
         $persona = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+
+        $actor = $this->actor($request);
+        // Alcance por sucursal (R19): un acotado no edita a alumnos de otra sede.
+        abort_unless(
+            $actor === null || $this->acceso->permiteSucursal($actor, $persona->sucursal_id !== null ? (int) $persona->sucursal_id : null),
+            403,
+            'No puedes editar a un alumno de otra sucursal.',
+        );
 
         $validado = $request->validate([
             'nombre' => ['sometimes', 'string', 'max:255'],
@@ -175,7 +236,14 @@ class MiembrosTenantController
             }
         }
         if ($request->has('sucursal_id')) {
-            $cambios['sucursal_id'] = $this->sucursalIdDe((string) ($validado['sucursal_id'] ?? ''));
+            $nueva = $this->sucursalIdDe((string) ($validado['sucursal_id'] ?? ''));
+            // Un acotado tampoco mueve a un alumno a una sede que no es la suya.
+            abort_unless(
+                $actor === null || $this->acceso->permiteSucursal($actor, $nueva),
+                403,
+                'No puedes mover a un alumno a una sucursal que no te corresponde.',
+            );
+            $cambios['sucursal_id'] = $nueva;
         }
         if ($cambios !== []) {
             $persona->update($cambios);

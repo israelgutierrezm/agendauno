@@ -54,4 +54,47 @@ class ResolverAccesoTenant
             ->map(fn ($id): int => (int) $id)
             ->all();
     }
+
+    /**
+     * ¿El usuario está ACOTADO por sucursal? Lo está cuando NO es propietario/admin
+     * (roles que gestionan todo el estudio) y tiene asignaciones de sucursal explícitas.
+     * Sin asignaciones = NO acotado: ve todo (compatible con estudios de una sola
+     * sucursal y con el staff ya existente que no se ha asignado a ninguna sede).
+     */
+    public function esAcotadoPorSucursal(Usuario $usuario): bool
+    {
+        if (array_intersect(['propietario', 'admin'], $usuario->rolesEfectivos()) !== []) {
+            return false;
+        }
+
+        return $this->sucursalesAsignadas($usuario) !== [];
+    }
+
+    /**
+     * Sucursales (ids) a las que el usuario está ACOTADO, o `null` si ve TODAS. Úsalo
+     * para filtrar consultas: `null` → sin filtro; lista → `whereIn('sucursal_id', ...)`.
+     *
+     * @return list<int>|null
+     */
+    public function sucursalesPermitidas(Usuario $usuario): ?array
+    {
+        return $this->esAcotadoPorSucursal($usuario)
+            ? $this->sucursalesAsignadas($usuario)
+            : null;
+    }
+
+    /**
+     * ¿El usuario puede ver/operar sobre la sucursal dada? Los NO acotados pueden con
+     * cualquiera (incluida `null`); un acotado solo con las suyas (un recurso sin
+     * sucursal, `null`, no pertenece a ninguna sede asignada → denegado).
+     */
+    public function permiteSucursal(Usuario $usuario, ?int $sucursalId): bool
+    {
+        $permitidas = $this->sucursalesPermitidas($usuario);
+        if ($permitidas === null) {
+            return true;
+        }
+
+        return $sucursalId !== null && in_array($sucursalId, $permitidas, true);
+    }
 }
