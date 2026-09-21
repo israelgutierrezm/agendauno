@@ -77,6 +77,16 @@ interface Tendencias {
   por_producto: { producto: string; ingresos_minor: number; unidades: number }[]
   totales: { ingresos_minor: number; ordenes: number; ticket_promedio_minor: number | null }
 }
+interface Cohorte {
+  mes: string
+  tamano: number
+  retencion: (number | null)[]
+}
+interface Cohortes {
+  meses: number
+  cohortes: Cohorte[]
+  conversion: { registrados: number; compraron: number; activos: number }
+}
 
 const sesion = useSesionTenantStore()
 const base = computed(() => `/api/v1/app/${sesion.slug}`)
@@ -99,6 +109,18 @@ const demanda = ref<Demanda | null>(null)
 const tendencias = ref<Tendencias | null>(null)
 const agrupacion = ref<'dia' | 'semana' | 'mes'>('dia')
 const exportando = ref(false)
+const cohortes = ref<Cohortes | null>(null)
+
+// Etiqueta corta del mes de una cohorte ('2026-09' → 'sep 26').
+function mesCorto(iso: string): string {
+  const [y, m] = iso.split('-').map(Number)
+  return new Intl.DateTimeFormat('es-MX', { month: 'short', year: '2-digit' }).format(new Date(y, m - 1, 1))
+}
+// % de conversión de un paso respecto a los registrados.
+function pctConv(n: number): string {
+  const base = cohortes.value?.conversion.registrados ?? 0
+  return base > 0 ? `${Math.round((n / base) * 100)}%` : '—'
+}
 const cargando = ref(true)
 const error = ref<string | null>(null)
 
@@ -230,6 +252,16 @@ async function exportarTendencias(): Promise<void> {
   }
 }
 
+async function cargarCohortes(): Promise<void> {
+  error.value = null
+  try {
+    const { data } = await api.get<{ data: Cohortes }>(`${base.value}/reportes/cohortes`, { params: { meses: 6 } })
+    cohortes.value = data.data
+  } catch (e) {
+    error.value = mensajeDeError(e)
+  }
+}
+
 async function cargar(): Promise<void> {
   cargando.value = true
   try {
@@ -239,6 +271,7 @@ async function cargar(): Promise<void> {
       cargarRentabilidad(),
       cargarDemanda(),
       cargarTendencias(),
+      cargarCohortes(),
     ])
     sucursales.value = s.data.data
   } catch (e) {
@@ -368,6 +401,55 @@ onMounted(cargar)
             </tbody>
           </table>
         </div>
+      </template>
+
+      <!-- Conversión + cohortes de retención (Etapa 2) -->
+      <template v-if="cohortes">
+        <h2 class="mt-8 font-bold text-lg">{{ $t('reportes.conversion.titulo') }}</h2>
+        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">{{ $t('reportes.conversion.subtitulo', { n: cohortes.meses }) }}</p>
+        <div class="mt-3 grid grid-cols-3 gap-3">
+          <div class="tu-card p-4 text-center">
+            <div class="text-2xl font-extrabold">{{ cohortes.conversion.registrados }}</div>
+            <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">{{ $t('reportes.conversion.registrados') }}</div>
+          </div>
+          <div class="tu-card p-4 text-center">
+            <div class="text-2xl font-extrabold">{{ cohortes.conversion.compraron }}</div>
+            <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">{{ $t('reportes.conversion.compraron') }} · {{ pctConv(cohortes.conversion.compraron) }}</div>
+          </div>
+          <div class="tu-card p-4 text-center">
+            <div class="text-2xl font-extrabold">{{ cohortes.conversion.activos }}</div>
+            <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">{{ $t('reportes.conversion.activos') }} · {{ pctConv(cohortes.conversion.activos) }}</div>
+          </div>
+        </div>
+
+        <h3 class="mt-6 font-semibold">{{ $t('reportes.cohortes.titulo') }}</h3>
+        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">{{ $t('reportes.cohortes.subtitulo') }}</p>
+        <div class="mt-3 tu-card overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-center" :style="{ color: 'var(--texto-suave)' }">
+                <th class="px-3 py-2 font-medium text-left">{{ $t('reportes.cohortes.colCohorte') }}</th>
+                <th class="px-2 py-2 font-medium text-right">{{ $t('reportes.cohortes.colAltas') }}</th>
+                <th v-for="k in cohortes.meses" :key="k" class="px-2 py-2 font-medium">{{ $t('reportes.cohortes.mesN', { n: k - 1 }) }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in cohortes.cohortes" :key="c.mes" class="border-t" :style="{ borderColor: 'var(--borde)' }">
+                <td class="px-3 py-1.5 font-semibold whitespace-nowrap">{{ mesCorto(c.mes) }}</td>
+                <td class="px-2 py-1.5 text-right">{{ c.tamano }}</td>
+                <td v-for="(r, i) in c.retencion" :key="i" class="px-1 py-1 text-center">
+                  <div
+                    v-if="r !== null && c.tamano > 0"
+                    class="rounded-lg py-1.5 text-xs font-semibold"
+                    :style="{ background: colorOcupacion(r) }"
+                  >{{ r }}%</div>
+                  <span v-else :style="{ color: 'var(--borde)' }">·</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">{{ $t('reportes.cohortes.leyenda') }}</p>
       </template>
 
       <!-- Por sucursal -->

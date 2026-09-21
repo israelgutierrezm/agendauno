@@ -1077,6 +1077,21 @@ export default {
       colUnidades: 'Unidades',
       colIngresos: 'Ingresos',
     },
+    conversion: {
+      titulo: 'Conversión',
+      subtitulo: 'De las altas de los últimos {n} meses: cuántas compraron y cuántas se activaron.',
+      registrados: 'Registrados',
+      compraron: 'Compraron',
+      activos: 'Activos',
+    },
+    cohortes: {
+      titulo: 'Retención por cohorte',
+      subtitulo: 'De cada mes de alta, qué % siguió asistiendo en los meses siguientes.',
+      colCohorte: 'Alta',
+      colAltas: 'Altas',
+      mesN: 'Mes {n}',
+      leyenda: 'Cada celda es el % de esa cohorte que asistió ese mes. El color marca la intensidad.',
+    },
     rentabilidad: {
       titulo: 'Rentabilidad por clase',
       vacio: 'No hay clases con asistencia en el periodo.',

@@ -93,6 +93,7 @@ use App\Modules\Tenancy\Http\Controllers\RecursosTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReembolsosTenantController;
 use App\Modules\Tenancy\Http\Controllers\RegistroAlumnoController;
 use App\Modules\Tenancy\Http\Controllers\RegistroEstudioController;
+use App\Modules\Tenancy\Http\Controllers\ReporteCohortesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteDemandaTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteNegocioTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteRentabilidadTenantController;
@@ -327,6 +328,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/reportes/demanda', ReporteDemandaTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.demanda');
             // Tendencias de ingresos (Etapa 2): serie temporal (dia/semana/mes) + desglose por producto. `?formato=csv`.
             Route::get('/reportes/tendencias', ReporteTendenciasTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.tendencias');
+            // Cohortes de retención + embudo de conversión (Etapa 2): triángulo por mes de alta.
+            Route::get('/reportes/cohortes', ReporteCohortesTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.cohortes');
             // Retención (Etapa 2): radar de membresías por vencer / vencidas para renovar.
             // Es operativo (recepción hace la gestión), por eso `miembros.ver`. `?formato=csv`.
             Route::get('/retencion/por-vencer', [RetencionTenantController::class, 'porVencer'])->middleware('puede:miembros.ver')->name('retencion.por-vencer');
