@@ -99,6 +99,7 @@ use App\Modules\Tenancy\Http\Controllers\ReporteSucursalesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReservasTenantController;
 use App\Modules\Tenancy\Http\Controllers\RespuestasFormularioController;
 use App\Modules\Tenancy\Http\Controllers\ResumenMiembroTenantController;
+use App\Modules\Tenancy\Http\Controllers\RetencionTenantController;
 use App\Modules\Tenancy\Http\Controllers\StaffTenantController;
 use App\Modules\Tenancy\Http\Controllers\TareasTenantController;
 use App\Modules\Tenancy\Http\Controllers\TiposDocumentoController;
@@ -322,6 +323,9 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/reportes/rentabilidad', ReporteRentabilidadTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.rentabilidad');
             // Analitica de demanda (R31): mapa dia x hora + por actividad (ocupacion y espera).
             Route::get('/reportes/demanda', ReporteDemandaTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.demanda');
+            // Retención (Etapa 2): radar de membresías por vencer / vencidas para renovar.
+            // Es operativo (recepción hace la gestión), por eso `miembros.ver`. `?formato=csv`.
+            Route::get('/retencion/por-vencer', [RetencionTenantController::class, 'porVencer'])->middleware('puede:miembros.ver')->name('retencion.por-vencer');
 
             // Agenda (data plane del tenant): materializa una Oferta en una Sucursal
             // a una hora concreta. La hora local (zona de la sucursal) se guarda en UTC

@@ -28,6 +28,7 @@ const MENU: MenuItem[] = [
     icono: 'personas',
     hijos: [
       { clave: 'miembros', etiqueta: 'nav.miembros', icono: 'miembros', ruta: 'miembros', permiso: 'miembros.ver' },
+      { clave: 'retencion', etiqueta: 'nav.retencion', icono: 'reportes', ruta: 'retencion', permiso: 'miembros.ver' },
       { clave: 'instructores', etiqueta: 'nav.instructores', icono: 'instructores', ruta: 'instructores', permiso: 'agenda.gestionar' },
       { clave: 'usuarios', etiqueta: 'nav.usuarios', icono: 'usuarios', ruta: 'usuarios', permiso: 'usuarios.gestionar' },
     ],
