@@ -342,6 +342,9 @@ Route::prefix('v1')->group(function (): void {
             // Smart-fill (R32): clases proximas con lugares libres (oportunidades de llenado).
             // Ruta literal ANTES de cualquier /sesiones/{sesion} para no ser sombreada.
             Route::get('/sesiones/oportunidades', [AgendaTenantController::class, 'oportunidades'])->middleware('puede:agenda.ver')->name('sesiones.oportunidades');
+            // Verifica conflictos (instructor/sala/recurso) SIN guardar (rework Agenda).
+            // Literal antes de /sesiones/{sesion} para no ser sombreada.
+            Route::post('/sesiones/verificar', [AgendaTenantController::class, 'verificar'])->middleware('puede:agenda.gestionar')->name('sesiones.verificar');
             Route::post('/sesiones', [AgendaTenantController::class, 'crearSesion'])->middleware('puede:agenda.gestionar')->name('sesiones.store');
             Route::post('/sesiones/{sesion}/cancelar', [AgendaTenantController::class, 'cancelar'])->middleware('puede:agenda.gestionar')->name('sesiones.cancelar');
 

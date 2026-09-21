@@ -1325,6 +1325,7 @@ export default {
       sinInstructor: 'Sin asignar',
       crear: 'Programar clase',
       creando: 'Programando…',
+      conflictos: 'Hay un conflicto de horario:',
       sinOfertas: 'Primero crea una oferta (en Configurar mi estudio).',
       sinSucursales: 'Primero crea una sucursal.',
       repetir: 'Repetir cada semana',

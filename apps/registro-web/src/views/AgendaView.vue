@@ -667,6 +667,43 @@ const form = ref({
 })
 const creando = ref(false)
 
+// Conflictos (instructor/sala/recurso) verificados ANTES de guardar (rework Agenda).
+interface Conflicto {
+  tipo: string
+  campo: string
+  mensaje: string
+  sesion: string | null
+}
+const conflictos = ref<Conflicto[]>([])
+let tempConf: ReturnType<typeof setTimeout> | undefined
+
+async function verificarConflictos(): Promise<void> {
+  conflictos.value = []
+  // La recurrencia (varias fechas) no se pre-verifica; la validación dura ocurre al guardar.
+  if (form.value.sucursalId === '' || form.value.fecha === '' || form.value.repetir) {
+    return
+  }
+  try {
+    const { data } = await api.post<{ data: { conflictos: Conflicto[] } }>(`${base.value}/sesiones/verificar`, {
+      sucursal_id: form.value.sucursalId,
+      instructor_id: form.value.instructorId !== '' ? form.value.instructorId : null,
+      inicia_en_local: form.value.fecha.replace('T', ' ') + ':00',
+      duracion_minutos: Number(form.value.duracion),
+    })
+    conflictos.value = data.data.conflictos
+  } catch {
+    // Silencioso: si la verificación falla, la validación al guardar sigue protegiendo.
+  }
+}
+
+watch(
+  () => [form.value.sucursalId, form.value.instructorId, form.value.fecha, form.value.duracion, form.value.repetir],
+  () => {
+    clearTimeout(tempConf)
+    tempConf = setTimeout(verificarConflictos, 350)
+  },
+)
+
 // Días de la semana en ISO (1 = lunes … 7 = domingo) para el selector de recurrencia.
 const DIAS_SEMANA = [
   { n: 1, etiqueta: 'L' },
@@ -1326,12 +1363,20 @@ onMounted(async () => {
             </div>
           </div>
 
+          <!-- Conflictos detectados ANTES de guardar (instructor/sala ocupados). -->
+          <div v-if="conflictos.length > 0" class="sm:col-span-2 rounded-lg p-3 text-sm" :style="{ background: 'var(--aviso-suave)', color: 'var(--aviso)' }">
+            <p class="font-semibold">⚠ {{ $t('agenda.nueva.conflictos') }}</p>
+            <ul class="mt-1 list-disc pl-5">
+              <li v-for="(c, i) in conflictos" :key="i">{{ c.mensaje }}</li>
+            </ul>
+          </div>
+
           <div class="sm:col-span-2 flex justify-end gap-2">
             <button type="button" class="tu-btn tu-btn-fantasma" @click="mostrarNueva = false">{{ $t('comun.cancelar') }}</button>
             <button
               class="tu-btn tu-btn-primario"
               type="submit"
-              :disabled="creando || form.ofertaId === '' || form.sucursalId === '' || form.fecha === ''"
+              :disabled="creando || form.ofertaId === '' || form.sucursalId === '' || form.fecha === '' || conflictos.length > 0"
             >
               {{ creando ? $t('agenda.nueva.creando') : $t('agenda.nueva.crear') }}
             </button>
