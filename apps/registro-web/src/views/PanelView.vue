@@ -3,6 +3,7 @@ import { isAxiosError } from 'axios'
 import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
+import EnlaceEstudio from '@/components/EnlaceEstudio.vue'
 import { api, mensajeDeError } from '@/lib/api'
 import { useSesionTenantStore } from '@/stores/sesionTenant'
 
@@ -100,6 +101,9 @@ onMounted(cargar)
         {{ $t('panel.estado') }}: {{ sesion.estudio?.estado }}
       </span>
     </div>
+
+    <!-- Enlace público del estudio (turnouno.com/mi-estudio) + QR para compartir -->
+    <EnlaceEstudio class="mt-6" />
 
     <!-- Quickstart (R36): guía de activación mientras falte configuración esencial -->
     <div v-if="quickstart && !quickstart.listo" class="mt-6 tu-card p-5">

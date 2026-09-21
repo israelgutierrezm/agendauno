@@ -235,6 +235,13 @@ const router = createRouter({
       name: 'plataforma',
       component: () => import('@/views/PlataformaView.vue'),
     },
+    {
+      // Enlace corto público del estudio (turnouno.com/mi-estudio). Va al FINAL, antes
+      // del catch-all: solo captura rutas de UN segmento que no sean una ruta con nombre.
+      path: '/:slug',
+      name: 'estudio-corto',
+      component: () => import('@/views/EstudioPublicoView.vue'),
+    },
     { path: '/:pathMatch(.*)*', redirect: { name: 'inicio' } },
   ],
 })

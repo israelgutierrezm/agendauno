@@ -160,3 +160,29 @@ it('el slug se verifica por disponibilidad y no se repite', function (): void {
         'contacto_email' => 'x@y.mx', 'contacto_telefono' => '5512345678', 'acepta_terminos' => true,
     ])->assertStatus(422);
 });
+
+it('genera el enlace público automáticamente desde el nombre (el registrante no lo captura)', function (): void {
+    $resp = $this->postJson('/api/v1/registro', [
+        'nombre' => 'Pole House',
+        'contacto_nombre' => 'Ana', 'contacto_primer_apellido' => 'García',
+        'contacto_email' => 'ana@correo.mx', 'contacto_telefono' => '5512345678',
+        'acepta_terminos' => true,
+    ])->assertCreated();
+
+    // El slug se deriva del nombre sin que el registrante lo escriba.
+    $resp->assertJsonPath('data.estudio.slug', 'pole-house');
+    expect((string) $resp->json('data.estudio.url'))->toEndWith('/app/pole-house');
+});
+
+it('desambigua el enlace autogenerado cuando el nombre ya existe (sin error para el registrante)', function (): void {
+    $this->postJson('/api/v1/registro', [
+        'nombre' => 'Pole House', 'contacto_nombre' => 'Ana', 'contacto_primer_apellido' => 'García',
+        'contacto_email' => 'ana@correo.mx', 'contacto_telefono' => '5512345678', 'acepta_terminos' => true,
+    ])->assertCreated()->assertJsonPath('data.estudio.slug', 'pole-house');
+
+    // Un segundo "Pole House" NO falla: recibe pole-house-2 automáticamente.
+    $this->postJson('/api/v1/registro', [
+        'nombre' => 'Pole House', 'contacto_nombre' => 'Beto', 'contacto_primer_apellido' => 'Luna',
+        'contacto_email' => 'beto@correo.mx', 'contacto_telefono' => '5598765432', 'acepta_terminos' => true,
+    ])->assertCreated()->assertJsonPath('data.estudio.slug', 'pole-house-2');
+});

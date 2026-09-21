@@ -36,7 +36,10 @@ class RegistrarEstudioRequest extends FormRequest
         return [
             // Paso 1: el lugar.
             'nombre' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[a-z0-9-]+$/', 'unique:estudios,slug'],
+            // El enlace público (turnouno.com/mi-estudio) se genera AUTOMÁTICAMENTE a
+            // partir del nombre; el registrante no lo captura. Se acepta opcional por
+            // compatibilidad (p. ej. un slug ya elegido), validado si viene.
+            'slug' => ['nullable', 'string', 'min:3', 'max:50', 'regex:/^[a-z0-9-]+$/', 'unique:estudios,slug'],
             'perfil_negocio' => ['nullable', Rule::enum(PerfilNegocio::class)],
             // Paso 2: el nombre del propietario (desglosado; apellido materno y segundo nombre opcionales).
             'contacto_nombre' => ['required', 'string', 'max:120'],

@@ -527,6 +527,15 @@ export default {
     colAsunto: 'Asunto',
     colTotal: 'Destinatarios',
   },
+  enlace: {
+    titulo: 'Comparte tu estudio',
+    subtitulo: 'Este es tu enlace público. Compártelo o imprime el QR para que te encuentren.',
+    asiTeEncuentran: 'Así te encontrarán:',
+    qrAlt: 'Código QR del enlace de tu estudio',
+    copiar: 'Copiar enlace',
+    copiado: '¡Copiado!',
+    descargar: 'Descargar QR',
+  },
   retencion: {
     titulo: 'Retención',
     subtitulo: 'Alumnos con membresía por vencer o vencida: renuévalos antes de perderlos.',
