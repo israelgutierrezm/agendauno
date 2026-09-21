@@ -247,6 +247,23 @@ function conBearer(string $bearer): array
 }
 
 /**
+ * Registra un alumno por el embudo público (self-signup) y devuelve su bearer
+ * tenant-local. El estudio recién registrado ya está en el directorio.
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ * @return array{slug: string, bearer: string}
+ */
+function alumnoConSesion(array $e, string $nombre = 'Vale', string $email = 'vale@correo.mx'): array
+{
+    $token = (string) test()->postJson("/api/v1/app/{$e['slug']}/registro-alumno", [
+        'nombre' => $nombre, 'email' => $email,
+        'password' => 'secreto123', 'password_confirmation' => 'secreto123',
+    ])->assertCreated()->json('data.token');
+
+    return ['slug' => $e['slug'], 'bearer' => $token];
+}
+
+/**
  * Invita, activa e inicia sesión como personal con un rol; devuelve el bearer.
  */
 function personalConSesion(string $slug, string $ownerBearer, string $email, string $rol): string

@@ -15,22 +15,6 @@ afterEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
 });
 
-/**
- * Registra un alumno por el embudo público y devuelve su bearer tenant-local.
- *
- * @param  array{slug: string, bearer: string}  $e
- * @return array{slug: string, bearer: string}
- */
-function alumnoConSesion(array $e, string $nombre = 'Vale', string $email = 'vale@correo.mx'): array
-{
-    $token = (string) test()->postJson("/api/v1/app/{$e['slug']}/registro-alumno", [
-        'nombre' => $nombre, 'email' => $email,
-        'password' => 'secreto123', 'password_confirmation' => 'secreto123',
-    ])->assertCreated()->json('data.token');
-
-    return ['slug' => $e['slug'], 'bearer' => $token];
-}
-
 it('el alumno ve el catálogo y compra un pack (orden pendiente)', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $pack = crearPackTenant($e, 8000);
