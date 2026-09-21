@@ -21,18 +21,6 @@ afterEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
 });
 
-/**
- * Crea un miembro en una sucursal concreta (como propietario) y devuelve su ulid.
- *
- * @param  array{slug: string, bearer: string}  $e
- */
-function crearMiembroEnSucursal(array $e, string $nombre, string $sucursalUlid): string
-{
-    return (string) test()->postJson("/api/v1/app/{$e['slug']}/miembros", [
-        'nombre' => $nombre, 'tipo' => 'miembro', 'sucursal_id' => $sucursalUlid,
-    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-}
-
 it('un recepcionista asignado a una sucursal solo ve a los alumnos de esa sede', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $sedeA = agendaSemilla($e);

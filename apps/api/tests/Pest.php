@@ -418,6 +418,18 @@ function asignarSucursal(array $e, string $usuarioId, string $sucursalUlid, stri
 }
 
 /**
+ * Crea un miembro en una sucursal concreta (como propietario) y devuelve su ulid. R19.
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ */
+function crearMiembroEnSucursal(array $e, string $nombre, string $sucursalUlid): string
+{
+    return (string) test()->postJson("/api/v1/app/{$e['slug']}/miembros", [
+        'nombre' => $nombre, 'tipo' => 'miembro', 'sucursal_id' => $sucursalUlid,
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+}
+
+/**
  * Cabecera Authorization con el token de administración de plataforma.
  *
  * @return array<string, string>

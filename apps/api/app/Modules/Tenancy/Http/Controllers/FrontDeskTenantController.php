@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Asistencia\EstadoAsistencia;
 use App\Modules\Reservas\EstadoReserva;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
@@ -24,7 +25,10 @@ use Illuminate\Support\Collection;
  */
 class FrontDeskTenantController
 {
-    public function __construct(private readonly AccesoSesionTenant $acceso) {}
+    public function __construct(
+        private readonly AccesoSesionTenant $acceso,
+        private readonly ResolverAccesoTenant $resolver,
+    ) {}
 
     public function dia(Request $request): JsonResponse
     {
@@ -49,6 +53,8 @@ class FrontDeskTenantController
 
         $usuario = $request->attributes->get('usuario_tenant');
         $usuario = $usuario instanceof Usuario ? $usuario : null;
+        // Alcance por sucursal (R19): el staff acotado solo ve el día de SUS sedes.
+        $permitidas = $usuario !== null ? $this->resolver->sucursalesPermitidas($usuario) : null;
 
         $sesiones = SesionTenant::query()
             ->with(['oferta', 'sucursal', 'instructor'])
@@ -57,6 +63,7 @@ class FrontDeskTenantController
             ->when($sucursal !== null, fn ($q) => $q->where('sucursal_id', $sucursal->getKey()))
             // Un instructor solo ve sus sesiones asignadas.
             ->when($this->acceso->esInstructorAcotado($usuario), fn ($q) => $q->where('instructor_id', $usuario?->getKey()))
+            ->when($permitidas !== null, fn ($q) => $q->whereIn('sucursal_id', $permitidas))
             ->orderBy('inicia_en')
             ->get();
 

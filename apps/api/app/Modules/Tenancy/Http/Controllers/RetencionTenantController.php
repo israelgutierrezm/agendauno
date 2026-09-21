@@ -6,9 +6,11 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Asistencia\EstadoAsistencia;
 use App\Modules\Membresias\EstadoAcuerdo;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -29,6 +31,8 @@ class RetencionTenantController
 
     // Días hacia atrás para considerar una membresía "vencida recuperable".
     private const GRACIA_VENCIDAS = 14;
+
+    public function __construct(private readonly ResolverAccesoTenant $acceso) {}
 
     public function porVencer(Request $request): Response
     {
@@ -63,11 +67,16 @@ class RetencionTenantController
             return $this->responder([], $dias, $request);
         }
 
-        // Solo alumnos vigentes en el padrón (no archivados).
+        // Solo alumnos vigentes en el padrón (no archivados). Alcance por sucursal (R19):
+        // el staff acotado solo ve el radar de SUS sedes.
+        $actor = $request->attributes->get('usuario_tenant');
+        $permitidas = $actor instanceof Usuario ? $this->acceso->sucursalesPermitidas($actor) : null;
+
         $personas = PersonaTenant::query()
             ->whereIn('id', array_keys($ventana))
             ->where('tipo', TipoPersonaTenant::Miembro->value)
             ->where('archivado', false)
+            ->when($permitidas !== null, fn ($q) => $q->whereIn('sucursal_id', $permitidas))
             ->get()
             ->keyBy('id');
 
