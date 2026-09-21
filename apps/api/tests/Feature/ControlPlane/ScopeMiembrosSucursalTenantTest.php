@@ -22,22 +22,6 @@ afterEach(function (): void {
 });
 
 /**
- * @param  array{slug: string, bearer: string}  $e
- */
-function usuarioIdPorEmail(array $e, string $email): string
-{
-    $usuarios = test()->getJson("/api/v1/app/{$e['slug']}/usuarios", conBearer($e['bearer']))
-        ->assertOk()->json('data');
-    foreach ($usuarios as $u) {
-        if (($u['email'] ?? null) === $email) {
-            return (string) $u['id'];
-        }
-    }
-
-    return '';
-}
-
-/**
  * Crea un miembro en una sucursal concreta (como propietario) y devuelve su ulid.
  *
  * @param  array{slug: string, bearer: string}  $e
@@ -47,18 +31,6 @@ function crearMiembroEnSucursal(array $e, string $nombre, string $sucursalUlid):
     return (string) test()->postJson("/api/v1/app/{$e['slug']}/miembros", [
         'nombre' => $nombre, 'tipo' => 'miembro', 'sucursal_id' => $sucursalUlid,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
-}
-
-/**
- * Asigna a un usuario un rol en una sucursal (lo ACOTA a esa sede).
- *
- * @param  array{slug: string, bearer: string}  $e
- */
-function asignarSucursal(array $e, string $usuarioId, string $sucursalUlid, string $rol = 'recepcionista'): void
-{
-    test()->putJson("/api/v1/app/{$e['slug']}/asignaciones-personal", [
-        'usuario_id' => $usuarioId, 'sucursal_id' => $sucursalUlid, 'rol' => $rol,
-    ], conBearer($e['bearer']))->assertCreated();
 }
 
 it('un recepcionista asignado a una sucursal solo ve a los alumnos de esa sede', function (): void {

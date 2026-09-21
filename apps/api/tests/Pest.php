@@ -388,6 +388,36 @@ function crearSesionTenant(array $e, array $semilla, ?int $capacidad = null, str
 }
 
 /**
+ * ULID del usuario tenant-local con ese correo (para asignarlo a una sucursal, R19).
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ */
+function usuarioIdPorEmail(array $e, string $email): string
+{
+    $usuarios = test()->getJson("/api/v1/app/{$e['slug']}/usuarios", conBearer($e['bearer']))
+        ->assertOk()->json('data');
+    foreach ($usuarios as $u) {
+        if (($u['email'] ?? null) === $email) {
+            return (string) $u['id'];
+        }
+    }
+
+    return '';
+}
+
+/**
+ * Asigna a un usuario un rol EN una sucursal (lo ACOTA a esa sede). R19.
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ */
+function asignarSucursal(array $e, string $usuarioId, string $sucursalUlid, string $rol = 'recepcionista'): void
+{
+    test()->putJson("/api/v1/app/{$e['slug']}/asignaciones-personal", [
+        'usuario_id' => $usuarioId, 'sucursal_id' => $sucursalUlid, 'rol' => $rol,
+    ], conBearer($e['bearer']))->assertCreated();
+}
+
+/**
  * Cabecera Authorization con el token de administración de plataforma.
  *
  * @return array<string, string>

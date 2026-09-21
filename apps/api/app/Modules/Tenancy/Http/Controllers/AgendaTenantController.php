@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Application\ReservasTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\VerificarAgendaTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -16,6 +17,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -33,7 +35,25 @@ class AgendaTenantController
         private readonly AccesoSesionTenant $acceso,
         private readonly ReservasTenant $reservas,
         private readonly VerificarAgendaTenant $agenda,
+        private readonly ResolverAccesoTenant $resolver,
     ) {}
+
+    /**
+     * Alcance por sucursal (R19) sobre una consulta de sesiones: el staff ACOTADO a
+     * sedes solo ve las clases de SUS sucursales (los demás, todas).
+     *
+     * @param  Builder<SesionTenant>  $consulta
+     */
+    private function scopeSucursal(Builder $consulta, ?Usuario $usuario): void
+    {
+        if (! $usuario instanceof Usuario) {
+            return;
+        }
+        $permitidas = $this->resolver->sucursalesPermitidas($usuario);
+        if ($permitidas !== null) {
+            $consulta->whereIn('sucursal_id', $permitidas);
+        }
+    }
 
     public function crearSesion(Request $request): JsonResponse
     {
@@ -175,6 +195,8 @@ class AgendaTenantController
         if ($this->acceso->esInstructorAcotado($usuario)) {
             $consulta->where('instructor_id', $usuario?->getKey());
         }
+        // Alcance por sucursal (R19): el staff acotado solo ve las clases de sus sedes.
+        $this->scopeSucursal($consulta, $usuario);
 
         if (is_string($request->query('sucursal_id')) && $request->query('sucursal_id') !== '') {
             $sucursal = SucursalTenant::query()->where('ulid', $request->query('sucursal_id'))->first();
@@ -233,6 +255,8 @@ class AgendaTenantController
         if ($this->acceso->esInstructorAcotado($usuario)) {
             $consulta->where('instructor_id', $usuario?->getKey());
         }
+        // Alcance por sucursal (R19): el staff acotado solo ve oportunidades de sus sedes.
+        $this->scopeSucursal($consulta, $usuario);
 
         if (is_string($request->query('sucursal_id')) && $request->query('sucursal_id') !== '') {
             $sucursal = SucursalTenant::query()->where('ulid', $request->query('sucursal_id'))->first();
