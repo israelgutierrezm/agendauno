@@ -10,6 +10,7 @@ use App\Modules\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
+use App\Modules\Tenancy\Models\SesionTenant;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -82,6 +83,23 @@ class OrdenesTenant
 
             return $orden;
         });
+    }
+
+    /**
+     * Crea una orden PENDIENTE por una SESIÓN (pago-para-reservar, citas): sin líneas de
+     * producto. Al pagarla, el fulfillment CONFIRMA la reserva ligada (no concede un
+     * derecho). La reserva se crea aparte (ver {@see ReservasTenant::reservarConPago()}).
+     */
+    public function crearPorSesion(PersonaTenant $comprador, SesionTenant $sesion, int $montoMinor, string $moneda, ?int $sucursalId = null): OrdenTenant
+    {
+        return OrdenTenant::query()->create([
+            'persona_id' => $comprador->getKey(),
+            'sucursal_id' => $sucursalId,
+            'sesion_id' => $sesion->getKey(),
+            'estado' => EstadoOrden::Pendiente->value,
+            'total_minor' => $montoMinor,
+            'moneda' => $moneda,
+        ]);
     }
 
     /**

@@ -17,4 +17,7 @@ enum EstadoReserva: string
     case Ofrecida = 'ofrecida';
     case Expirada = 'expirada';
     case Cancelada = 'cancelada';
+    // Pago-para-reservar (citas): reservada pero pendiente de pago; RETIENE el cupo
+    // hasta que se paga (→ confirmada) o expira (→ cancelada, libera el cupo).
+    case PendientePago = 'pendiente_pago';
 }

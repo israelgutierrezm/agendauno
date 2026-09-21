@@ -46,7 +46,67 @@ class ReservasTenant
         private readonly CreditosTenant $creditos,
         private readonly ResolverPoliticaCancelacionTenant $politicas,
         private readonly RegistrarEventoTenant $eventos,
+        private readonly OrdenesTenant $ordenes,
     ) {}
+
+    /**
+     * Reserva-y-paga (citas, pago-para-reservar): crea una reserva PENDIENTE DE PAGO que
+     * RETIENE el cupo + una orden por la sesión, atómicamente y bajo lock (no-sobreventa).
+     * Al pagar esa orden, el fulfillment confirma la reserva. Devuelve la reserva (con
+     * `orden_id`); el cobro/checkout lo dispara el controlador con el motor de pago que
+     * ya existe. No resuelve un derecho: el acceso lo habilita el PAGO, no una membresía.
+     */
+    public function reservarConPago(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId = null, string $canal = 'directo'): ReservaTenant
+    {
+        return DB::connection('tenant')->transaction(function () use ($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal): ReservaTenant {
+            $bloqueada = SesionTenant::query()->whereKey($sesion->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($bloqueada->estado !== EstadoSesionTenant::Programada) {
+                throw new SesionNoReservable('La sesion no admite reservas.');
+            }
+            if ($bloqueada->inicia_en->isPast()) {
+                throw new FueraDeVentana('La sesion ya inicio.');
+            }
+
+            $duplicada = ReservaTenant::query()
+                ->where('sesion_id', $bloqueada->getKey())
+                ->where('persona_id', $persona->getKey())
+                ->whereIn('estado', [
+                    EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
+                    EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value,
+                ])
+                ->exists();
+            if ($duplicada) {
+                throw new YaReservado('Ya existe una reserva para esta sesion.');
+            }
+
+            if ($bloqueada->capacidad !== null && $this->disponiblesParaCanal($bloqueada, $canal) <= 0) {
+                throw new CupoLleno('La sesion esta llena.');
+            }
+
+            // Orden por la sesión (pendiente) + reserva pendiente de pago que la retiene.
+            $orden = $this->ordenes->crearPorSesion($persona, $bloqueada, $montoMinor, $moneda, $sucursalId);
+
+            $politica = $this->politicas->paraSesion($bloqueada);
+
+            $reserva = ReservaTenant::query()->create([
+                'sesion_id' => $bloqueada->getKey(),
+                'persona_id' => $persona->getKey(),
+                'orden_id' => $orden->getKey(),
+                'estado' => EstadoReserva::PendientePago->value,
+                'canal' => $canal,
+                'unidades' => 0,
+                'costo_unidades' => 0,
+                'horas_limite' => $politica->horasLimite,
+                'penaliza_tarde' => $politica->penalizaTarde,
+                'penaliza_no_show' => $politica->penalizaNoShow,
+            ]);
+
+            $this->emitirCreada($reserva, $bloqueada, $persona);
+
+            return $reserva;
+        });
+    }
 
     public function crear(SesionTenant $sesion, PersonaTenant $persona, ?string $idempotencyKey = null, bool $permitirEspera = false, ?int $unidades = null, string $canal = 'directo', ?int $lugar = null): ReservaTenant
     {
@@ -586,7 +646,9 @@ class ReservasTenant
     {
         return ReservaTenant::query()
             ->where('sesion_id', $sesion->getKey())
-            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value])
+            // Una reserva pendiente de pago (citas) RETIENE el cupo mientras se paga,
+            // igual que una confirmada/ofrecida (no-sobreventa).
+            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::PendientePago->value])
             ->count();
     }
 

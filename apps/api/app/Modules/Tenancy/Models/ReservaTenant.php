@@ -23,7 +23,7 @@ class ReservaTenant extends Model
     protected $table = 'reservas';
 
     protected $fillable = [
-        'sesion_id', 'persona_id', 'derecho_id', 'retencion_id',
+        'sesion_id', 'persona_id', 'derecho_id', 'retencion_id', 'orden_id',
         'estado', 'canal', 'lugar', 'unidades', 'costo_unidades', 'idempotency_key',
         'horas_limite', 'penaliza_tarde', 'penaliza_no_show', 'oferta_expira_en',
     ];
@@ -72,6 +72,16 @@ class ReservaTenant extends Model
     public function retencion(): BelongsTo
     {
         return $this->belongsTo(RetencionCreditoTenant::class, 'retencion_id');
+    }
+
+    /**
+     * Orden de pago-para-reservar (citas) ligada a la reserva pendiente de pago.
+     *
+     * @return BelongsTo<OrdenTenant, $this>
+     */
+    public function orden(): BelongsTo
+    {
+        return $this->belongsTo(OrdenTenant::class, 'orden_id');
     }
 
     /**

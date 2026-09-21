@@ -21,6 +21,7 @@ use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\WaiverTenant;
+use App\Modules\Tenancy\PoliticaReservaTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -155,7 +156,25 @@ class MiTenantController
             'esperar' => ['boolean'],
         ]);
 
-        $sesion = SesionTenant::query()->where('ulid', $validado['sesion_id'])->firstOrFail();
+        $sesion = SesionTenant::query()->where('ulid', $validado['sesion_id'])->with('oferta')->firstOrFail();
+
+        // Citas (pago-para-reservar): si la oferta EXIGE pago, se crea una reserva
+        // pendiente (retiene el cupo) + una orden por la sesión; el miembro paga esa
+        // orden (checkout con las pasarelas) para CONFIRMAR. Si no, flujo por membresía.
+        if ($sesion->oferta?->politica_reserva === PoliticaReservaTenant::Pago) {
+            $monto = (int) ($sesion->oferta->precio_clase_minor ?? 0);
+            abort_if($monto <= 0, 422, 'Esta clase requiere pago pero no tiene precio configurado.');
+            $reserva = $this->reservas->reservarConPago(
+                $sesion,
+                $persona,
+                $monto,
+                'MXN',
+                $sesion->sucursal_id !== null ? (int) $sesion->sucursal_id : null,
+            );
+
+            return response()->json(['data' => $this->presentarReserva($reserva->load(['sesion.oferta', 'orden']))], 201);
+        }
+
         $reserva = $this->reservas->crear($sesion, $persona, null, (bool) ($validado['esperar'] ?? false));
 
         return response()->json(['data' => $this->presentarReserva($reserva->load('sesion.oferta'))], 201);
@@ -231,6 +250,8 @@ class MiTenantController
             'zona_horaria' => $reserva->sesion?->zona_horaria,
             // Vencimiento de la oferta de lista de espera (si la reserva está ofrecida).
             'oferta_expira_en' => $reserva->oferta_expira_en?->toIso8601String(),
+            // Pago-para-reservar (citas): orden a pagar para confirmar (si aplica).
+            'orden_id' => $reserva->orden?->ulid,
         ];
     }
 

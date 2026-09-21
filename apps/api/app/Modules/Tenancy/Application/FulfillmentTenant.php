@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Ordenes\EstadoOrden;
+use App\Modules\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
+use App\Modules\Tenancy\Models\ReservaTenant;
 
 /**
  * Fulfillment de una orden tenant-local: la marca pagada y concede un derecho por
@@ -26,6 +28,18 @@ class FulfillmentTenant
         }
 
         $orden->update(['estado' => EstadoOrden::Pagada->value, 'pagada_en' => now()]);
+
+        // Orden de RESERVA (pago-para-reservar, citas): confirma la reserva pendiente
+        // ligada (que ya retiene el cupo) en vez de conceder un producto. Si la reserva
+        // ya no está pendiente (expiró/canceló), no confirma nada (guard por estado).
+        if ($orden->sesion_id !== null) {
+            ReservaTenant::query()
+                ->where('orden_id', $orden->getKey())
+                ->where('estado', EstadoReserva::PendientePago->value)
+                ->update(['estado' => EstadoReserva::Confirmada->value]);
+
+            return;
+        }
 
         // Orden de RENOVACIÓN (cobro recurrente): solo cobra; el entitlement lo mantiene
         // el motor de ciclos sobre el acuerdo existente. No se crea un acuerdo nuevo.
