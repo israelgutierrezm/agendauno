@@ -8,7 +8,11 @@ use App\Modules\Asistencia\EstadoAsistencia;
 use App\Modules\Reservas\CanalReserva;
 use App\Modules\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Application\ReservasTenant;
+use App\Modules\Tenancy\Application\WaiversTenant;
+use App\Modules\Tenancy\EstadoDunning;
+use App\Modules\Tenancy\Models\AceptacionWaiverTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -28,6 +32,7 @@ class ReservasTenantController
     public function __construct(
         private readonly ReservasTenant $reservas,
         private readonly AccesoSesionTenant $acceso,
+        private readonly WaiversTenant $waivers,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -45,13 +50,68 @@ class ReservasTenantController
             ->orderBy('id')
             ->get();
 
-        // First-timer (R14): quiénes del roster ya asistieron alguna vez (para marcar
-        // "primera vez"), en un solo query.
-        $yaAsistieron = $this->personasQueAsistieron($reservas->pluck('persona_id')->filter()->unique()->all());
+        // Señales 360° del roster (recepción actúa sin salir del panel), en bloque para
+        // evitar N+1: quién ya asistió (primera vez), quién tiene adeudo (dunning) y
+        // cuántos documentos/waivers debe cada quién.
+        $personaIds = $reservas->pluck('persona_id')->filter()->unique()->map(fn ($v): int => (int) $v)->all();
+        $yaAsistieron = $this->personasQueAsistieron($personaIds);
+        $conAdeudo = $this->personasConAdeudo($personaIds);
+        $docsPendientes = $this->documentosPendientesPorPersona($personaIds);
 
         return response()->json([
-            'data' => $reservas->map(fn (ReservaTenant $reserva): array => $this->presentar($reserva, $yaAsistieron))->all(),
+            'data' => $reservas->map(fn (ReservaTenant $reserva): array => $this->presentar($reserva, $yaAsistieron, $conAdeudo, $docsPendientes))->all(),
         ]);
+    }
+
+    /**
+     * De un conjunto de personas, cuáles tienen un proceso de dunning abierto (adeudo).
+     *
+     * @param  list<int>  $personaIds
+     * @return list<int>
+     */
+    private function personasConAdeudo(array $personaIds): array
+    {
+        if ($personaIds === []) {
+            return [];
+        }
+
+        return ProcesoDunningTenant::query()
+            ->join('acuerdos', 'acuerdos.id', '=', 'procesos_dunning.acuerdo_id')
+            ->whereIn('procesos_dunning.estado', [EstadoDunning::EnMora->value, EstadoDunning::Suspendido->value])
+            ->whereIn('acuerdos.persona_id', $personaIds)
+            ->distinct()
+            ->pluck('acuerdos.persona_id')
+            ->map(fn ($v): int => (int) $v)
+            ->all();
+    }
+
+    /**
+     * Documentos/waivers vigentes pendientes por persona (total vigentes − aceptados).
+     *
+     * @param  list<int>  $personaIds
+     * @return array<int, int>
+     */
+    private function documentosPendientesPorPersona(array $personaIds): array
+    {
+        $vigentes = $this->waivers->vigentes()->pluck('id')->map(fn ($v): int => (int) $v)->all();
+        if ($personaIds === [] || $vigentes === []) {
+            return [];
+        }
+
+        $aceptados = AceptacionWaiverTenant::query()
+            ->whereIn('persona_id', $personaIds)
+            ->whereIn('waiver_id', $vigentes)
+            ->get(['persona_id', 'waiver_id'])
+            ->groupBy('persona_id')
+            ->map(fn ($grupo): int => $grupo->pluck('waiver_id')->unique()->count());
+
+        $total = count($vigentes);
+        $mapa = [];
+        foreach ($personaIds as $pid) {
+            $mapa[$pid] = $total - (int) ($aceptados[$pid] ?? 0);
+        }
+
+        return $mapa;
     }
 
     /**
@@ -181,9 +241,11 @@ class ReservasTenantController
 
     /**
      * @param  list<int>|null  $yaAsistieron  personas con asistencia previa (roster); null = calcular por persona
+     * @param  list<int>  $conAdeudo  personas con dunning abierto (roster 360°)
+     * @param  array<int, int>  $docsPendientes  documentos pendientes por persona (roster 360°)
      * @return array<string, mixed>
      */
-    private function presentar(ReservaTenant $reserva, ?array $yaAsistieron = null): array
+    private function presentar(ReservaTenant $reserva, ?array $yaAsistieron = null, array $conAdeudo = [], array $docsPendientes = []): array
     {
         $reserva->loadMissing(['persona', 'sesion', 'asistencia']);
         $persona = $reserva->persona;
@@ -198,8 +260,12 @@ class ReservasTenantController
             'estado' => $reserva->estado->value,
             'canal' => $reserva->canal,
             'lugar' => $reserva->lugar,
+            'persona_id' => $persona?->ulid,
             'persona' => $persona?->nombreCompleto(),
             'primera_vez' => $primeraVez,
+            // Señales 360° para la recepción (solo pobladas en el roster).
+            'adeudo' => in_array($personaId, $conAdeudo, true),
+            'documentos_pendientes' => (int) ($docsPendientes[$personaId] ?? 0),
             'inicia_en' => $reserva->sesion?->inicia_en->toIso8601String(),
             'unidades' => $reserva->unidades,
             'asistencia' => $reserva->asistencia?->estado->value,

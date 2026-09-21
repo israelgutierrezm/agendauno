@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 
 import { api, mensajeDeError } from '@/lib/api'
 import { useSesionTenantStore } from '@/stores/sesionTenant'
@@ -10,8 +11,11 @@ interface Reserva {
   estado: string
   canal: string
   lugar: number | null
+  persona_id: string | null
   persona: string | null
   primera_vez: boolean
+  adeudo: boolean
+  documentos_pendientes: number
   unidades: number
   asistencia: string | null
 }
@@ -237,9 +241,12 @@ watch(() => props.sesion.id, cargar, { immediate: true })
             <li v-for="r in enSala" :key="r.id" class="tu-card p-3">
               <div class="flex items-center justify-between gap-2">
                 <span class="flex flex-wrap items-center gap-1.5 min-w-0">
-                  <span class="font-medium truncate">{{ r.persona ?? '—' }}</span>
+                  <RouterLink v-if="r.persona_id" :to="{ name: 'ficha-miembro', params: { id: r.persona_id } }" class="font-medium truncate tu-enlace">{{ r.persona ?? '—' }}</RouterLink>
+                  <span v-else class="font-medium truncate">{{ r.persona ?? '—' }}</span>
                   <span v-if="r.estado === 'ofrecida'" class="tu-badge tu-badge-aviso">{{ $t('agenda.roster.ofrecida') }}</span>
                   <span v-if="r.primera_vez" class="tu-badge tu-badge-aviso" :title="$t('agenda.roster.primeraVezAyuda')">{{ $t('agenda.roster.primeraVez') }}</span>
+                  <span v-if="r.adeudo" class="tu-badge" :style="{ background: 'var(--error-suave)', color: 'var(--error)' }">{{ $t('agenda.roster.adeudo') }}</span>
+                  <span v-if="r.documentos_pendientes > 0" class="tu-badge tu-badge-aviso" :title="$t('agenda.roster.documentosAyuda')">{{ $t('agenda.roster.documentos') }}</span>
                   <span v-if="r.asistencia === 'presente'" class="tu-badge tu-badge-exito">{{ $t('agenda.roster.presente') }}</span>
                   <span v-else-if="r.asistencia === 'ausente'" class="tu-badge">{{ $t('agenda.roster.ausente') }}</span>
                 </span>

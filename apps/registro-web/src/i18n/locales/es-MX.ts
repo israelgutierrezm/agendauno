@@ -1409,6 +1409,9 @@ export default {
       confirmarTransfer: 'Transferir',
       primeraVez: '1ª vez',
       primeraVezAyuda: 'Es su primera clase: dale la bienvenida.',
+      adeudo: 'Adeudo',
+      documentos: 'Documentos',
+      documentosAyuda: 'Tiene documentos o consentimientos pendientes de firmar.',
     },
   },
   pasarelas: {
