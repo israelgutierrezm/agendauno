@@ -22,6 +22,8 @@ interface Sesion {
   oferta_precio_clase: number | null
   instructor: string | null
   instructor_id: string | null
+  sala: string | null
+  recurso_id: string | null
   inicia_en: string
   termina_en: string
   zona_horaria: string
@@ -29,6 +31,12 @@ interface Sesion {
   ocupados: number
   en_espera: number
   estado: string
+}
+interface Recurso {
+  id: string
+  nombre: string
+  sucursal_id: string | null
+  activo: boolean
 }
 interface Miembro {
   id: string
@@ -75,6 +83,7 @@ const sucursales = ref<Sucursal[]>([])
 const sesiones = ref<Sesion[]>([])
 const miembros = ref<Miembro[]>([])
 const instructores = ref<{ id: string; nombre: string }[]>([])
+const recursos = ref<Recurso[]>([])
 const cargando = ref(true)
 const cargandoSesiones = ref(false)
 const error = ref<string | null>(null)
@@ -305,8 +314,12 @@ async function cargarReferencias(): Promise<void> {
     sucursales.value = s.data.data
     miembros.value = m.data.data
     if (puedeGestionar.value) {
-      const i = await api.get<{ data: { id: string; nombre: string }[] }>(`${base.value}/instructores`)
+      const [i, r] = await Promise.all([
+        api.get<{ data: { id: string; nombre: string }[] }>(`${base.value}/instructores`),
+        api.get<{ data: Recurso[] }>(`${base.value}/recursos`),
+      ])
       instructores.value = i.data.data
+      recursos.value = r.data.data.filter((x) => x.activo)
     }
   } catch (e) {
     error.value = mensajeDeError(e)
@@ -658,6 +671,7 @@ const form = ref({
   ofertaId: '',
   sucursalId: '',
   instructorId: '',
+  recursoId: '',
   fecha: '',
   duracion: '60',
   capacidad: '',
@@ -665,6 +679,12 @@ const form = ref({
   dias: [] as number[],
   repetirHasta: '',
 })
+// Recursos/salas de la sucursal elegida (para asignar sala a la clase).
+const recursosDeSucursal = computed(() =>
+  form.value.sucursalId === ''
+    ? recursos.value
+    : recursos.value.filter((r) => r.sucursal_id === null || r.sucursal_id === form.value.sucursalId),
+)
 const creando = ref(false)
 
 // Conflictos (instructor/sala/recurso) verificados ANTES de guardar (rework Agenda).
@@ -687,6 +707,7 @@ async function verificarConflictos(): Promise<void> {
     const { data } = await api.post<{ data: { conflictos: Conflicto[] } }>(`${base.value}/sesiones/verificar`, {
       sucursal_id: form.value.sucursalId,
       instructor_id: form.value.instructorId !== '' ? form.value.instructorId : null,
+      recurso_id: form.value.recursoId !== '' ? form.value.recursoId : null,
       inicia_en_local: form.value.fecha.replace('T', ' ') + ':00',
       duracion_minutos: Number(form.value.duracion),
     })
@@ -697,7 +718,7 @@ async function verificarConflictos(): Promise<void> {
 }
 
 watch(
-  () => [form.value.sucursalId, form.value.instructorId, form.value.fecha, form.value.duracion, form.value.repetir],
+  () => [form.value.sucursalId, form.value.instructorId, form.value.recursoId, form.value.fecha, form.value.duracion, form.value.repetir],
   () => {
     clearTimeout(tempConf)
     tempConf = setTimeout(verificarConflictos, 350)
@@ -747,6 +768,7 @@ async function crearSesion(): Promise<void> {
         oferta_id: form.value.ofertaId,
         sucursal_id: form.value.sucursalId,
         instructor_id: form.value.instructorId !== '' ? form.value.instructorId : null,
+        recurso_id: form.value.recursoId !== '' ? form.value.recursoId : null,
         inicia_en_local: form.value.fecha.replace('T', ' ') + ':00',
         duracion_minutos: Number(form.value.duracion),
         capacidad: form.value.capacidad !== '' ? Number(form.value.capacidad) : null,
@@ -754,6 +776,7 @@ async function crearSesion(): Promise<void> {
     }
     form.value.fecha = ''
     form.value.capacidad = ''
+    form.value.recursoId = ''
     form.value.repetir = false
     form.value.dias = []
     form.value.repetirHasta = ''
@@ -965,7 +988,7 @@ onMounted(async () => {
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                   <div class="font-semibold">{{ horaCorta(s.inicia_en, s.zona_horaria) }} · {{ s.oferta ?? '—' }}</div>
-                  <div v-if="s.instructor" class="text-sm truncate" :style="{ color: 'var(--texto-suave)' }">{{ s.instructor }}</div>
+                  <div v-if="s.instructor || s.sala" class="text-sm truncate" :style="{ color: 'var(--texto-suave)' }">{{ [s.instructor, s.sala].filter(Boolean).join(' · ') }}</div>
                 </div>
                 <span class="flex flex-col items-end gap-1 shrink-0">
                   <span class="tu-badge" :style="{ background: `color-mix(in srgb, ${COLOR_ESTADO[estadoAgenda(s)]} 16%, transparent)`, color: COLOR_ESTADO[estadoAgenda(s)] }">
@@ -1000,6 +1023,7 @@ onMounted(async () => {
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
               {{ horaCorta(detalle.inicia_en, detalle.zona_horaria) }}–{{ horaCorta(detalle.termina_en, detalle.zona_horaria) }}
               <span v-if="detalle.instructor"> · {{ detalle.instructor }}</span>
+              <span v-if="detalle.sala"> · {{ detalle.sala }}</span>
             </p>
             <span class="tu-badge mt-1 inline-block" :class="completo(detalle) ? 'tu-badge-aviso' : 'tu-badge-exito'">
               {{ detalle.capacidad !== null ? `${detalle.ocupados}/${detalle.capacidad}` : `${detalle.ocupados}` }}
@@ -1326,6 +1350,13 @@ onMounted(async () => {
             <select id="ai" v-model="form.instructorId" class="tu-input">
               <option value="">{{ $t('agenda.nueva.sinInstructor') }}</option>
               <option v-for="i in instructores" :key="i.id" :value="i.id">{{ i.nombre }}</option>
+            </select>
+          </div>
+          <div v-if="recursosDeSucursal.length > 0" class="sm:col-span-2">
+            <label class="tu-label" for="arec">{{ $t('agenda.nueva.sala') }}</label>
+            <select id="arec" v-model="form.recursoId" class="tu-input">
+              <option value="">{{ $t('agenda.nueva.sinSala') }}</option>
+              <option v-for="r in recursosDeSucursal" :key="r.id" :value="r.id">{{ r.nombre }}</option>
             </select>
           </div>
 

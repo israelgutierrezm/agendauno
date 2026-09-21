@@ -51,6 +51,16 @@ class SesionTenant extends Model
     }
 
     /**
+     * Recurso/sala asignado a la sesión (opcional).
+     *
+     * @return BelongsTo<RecursoTenant, $this>
+     */
+    public function recurso(): BelongsTo
+    {
+        return $this->belongsTo(RecursoTenant::class, 'recurso_id');
+    }
+
+    /**
      * Instructor asignado (usuario tenant-local), opcional.
      *
      * @return BelongsTo<Usuario, $this>

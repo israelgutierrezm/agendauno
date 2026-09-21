@@ -74,7 +74,7 @@ class AgendaTenantController
             'estado' => EstadoSesionTenant::Programada->value,
         ]);
 
-        return response()->json(['data' => $this->presentar($sesion->load(['oferta', 'instructor']))], 201);
+        return response()->json(['data' => $this->presentar($sesion->load(['oferta', 'instructor', 'recurso']))], 201);
     }
 
     /**
@@ -125,7 +125,7 @@ class AgendaTenantController
 
         $sesion->update(['instructor_id' => $instructorId]);
 
-        return response()->json(['data' => $this->presentar($sesion->refresh()->load(['oferta', 'instructor']))]);
+        return response()->json(['data' => $this->presentar($sesion->refresh()->load(['oferta', 'instructor', 'recurso']))]);
     }
 
     /**
@@ -160,7 +160,7 @@ class AgendaTenantController
     public function sesiones(Request $request): JsonResponse
     {
         $consulta = SesionTenant::query()
-            ->with(['oferta', 'sucursal', 'instructor'])
+            ->with(['oferta', 'sucursal', 'instructor', 'recurso'])
             // Ocupacion = reservas que toman un lugar (confirmadas + ofrecidas); mas
             // cuantos esperan (para el estado "lista de espera" en la agenda).
             ->withCount([
@@ -272,6 +272,8 @@ class AgendaTenantController
             'oferta_precio_clase' => $sesion->oferta?->precio_clase_minor,
             'instructor' => $sesion->instructor?->name,
             'instructor_id' => $sesion->instructor?->ulid,
+            'sala' => $sesion->recurso?->nombre,
+            'recurso_id' => $sesion->recurso?->ulid,
             'inicia_en' => $sesion->inicia_en->toIso8601String(),
             'termina_en' => $sesion->termina_en->toIso8601String(),
             'zona_horaria' => $sesion->zona_horaria,

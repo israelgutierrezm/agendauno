@@ -1323,6 +1323,8 @@ export default {
       capacidad: 'Cupo (opcional)',
       instructor: 'Instructor (opcional)',
       sinInstructor: 'Sin asignar',
+      sala: 'Sala / recurso',
+      sinSala: 'Sin sala',
       crear: 'Programar clase',
       creando: 'Programando…',
       conflictos: 'Hay un conflicto de horario:',

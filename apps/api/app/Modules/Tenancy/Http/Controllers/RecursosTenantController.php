@@ -68,6 +68,7 @@ class RecursosTenantController
         return [
             'id' => $recurso->ulid,
             'sucursal' => $recurso->sucursal?->nombre,
+            'sucursal_id' => $recurso->sucursal?->ulid,
             'nombre' => $recurso->nombre,
             'tipo' => $recurso->tipo,
             'modo' => $recurso->modo->value,
