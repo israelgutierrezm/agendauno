@@ -65,6 +65,18 @@ interface Demanda {
   matriz: DemandaCelda[]
   actividades: DemandaActividad[]
 }
+interface PuntoSerie {
+  fecha: string
+  ingresos_minor: number
+  ordenes: number
+}
+interface Tendencias {
+  agrupacion: string
+  moneda: string
+  serie: PuntoSerie[]
+  por_producto: { producto: string; ingresos_minor: number; unidades: number }[]
+  totales: { ingresos_minor: number; ordenes: number; ticket_promedio_minor: number | null }
+}
 
 const sesion = useSesionTenantStore()
 const base = computed(() => `/api/v1/app/${sesion.slug}`)
@@ -84,8 +96,23 @@ const negocio = ref<Negocio | null>(null)
 const sucursales = ref<SucursalReporte[]>([])
 const rentabilidad = ref<Rentabilidad | null>(null)
 const demanda = ref<Demanda | null>(null)
+const tendencias = ref<Tendencias | null>(null)
+const agrupacion = ref<'dia' | 'semana' | 'mes'>('dia')
+const exportando = ref(false)
 const cargando = ref(true)
 const error = ref<string | null>(null)
+
+// Altura de cada barra (0..100%) relativa al ingreso máximo de la serie.
+const maxIngreso = computed(() => Math.max(1, ...(tendencias.value?.serie.map((p) => p.ingresos_minor) ?? [0])))
+function barra(p: PuntoSerie): string {
+  return `${Math.round((p.ingresos_minor / maxIngreso.value) * 100)}%`
+}
+function fechaBucket(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`)
+  return agrupacion.value === 'mes'
+    ? new Intl.DateTimeFormat('es-MX', { month: 'short', year: '2-digit' }).format(d)
+    : new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' }).format(d)
+}
 
 // Etiquetas de días (lun..dom) desde i18n; el índice 0 corresponde a `dia = 1`.
 const diasSemana = computed(() => t('reportes.demanda.dias').split(','))
@@ -168,6 +195,41 @@ async function cargarDemanda(): Promise<void> {
   }
 }
 
+async function cargarTendencias(): Promise<void> {
+  error.value = null
+  try {
+    const { data } = await api.get<{ data: Tendencias }>(`${base.value}/reportes/tendencias`, {
+      params: { desde: desde.value, hasta: hasta.value, agrupacion: agrupacion.value },
+    })
+    tendencias.value = data.data
+  } catch (e) {
+    error.value = mensajeDeError(e)
+  }
+}
+
+async function exportarTendencias(): Promise<void> {
+  exportando.value = true
+  error.value = null
+  try {
+    const { data } = await api.get<Blob>(`${base.value}/reportes/tendencias`, {
+      params: { desde: desde.value, hasta: hasta.value, agrupacion: agrupacion.value, formato: 'csv' },
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(data)
+    const enlace = document.createElement('a')
+    enlace.href = url
+    enlace.download = `tendencias-${sesion.slug}.csv`
+    document.body.appendChild(enlace)
+    enlace.click()
+    document.body.removeChild(enlace)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    error.value = mensajeDeError(e)
+  } finally {
+    exportando.value = false
+  }
+}
+
 async function cargar(): Promise<void> {
   cargando.value = true
   try {
@@ -176,6 +238,7 @@ async function cargar(): Promise<void> {
       api.get<{ data: SucursalReporte[] }>(`${base.value}/reportes/sucursales`),
       cargarRentabilidad(),
       cargarDemanda(),
+      cargarTendencias(),
     ])
     sucursales.value = s.data.data
   } catch (e) {
@@ -194,7 +257,9 @@ watch([desde, hasta], () => {
   void cargarNegocio()
   void cargarRentabilidad()
   void cargarDemanda()
+  void cargarTendencias()
 })
+watch(agrupacion, () => void cargarTendencias())
 
 onMounted(cargar)
 </script>
@@ -224,11 +289,86 @@ onMounted(cargar)
     <template v-else>
       <!-- Métricas del negocio -->
       <div class="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div v-for="t in tarjetas" :key="t.clave" class="tu-card p-4 text-center">
-          <div class="text-xl font-extrabold">{{ t.valor }}</div>
-          <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">{{ $t(`reportes.metricas.${t.clave}`) }}</div>
+        <div v-for="card in tarjetas" :key="card.clave" class="tu-card p-4 text-center">
+          <div class="text-xl font-extrabold">{{ card.valor }}</div>
+          <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">{{ $t(`reportes.metricas.${card.clave}`) }}</div>
         </div>
       </div>
+
+      <!-- Tendencias de ingresos (Etapa 2) -->
+      <div class="mt-8 flex flex-wrap items-center gap-3">
+        <h2 class="font-bold text-lg">{{ $t('reportes.tendencias.titulo') }}</h2>
+        <div class="ml-auto flex items-center gap-2">
+          <select v-model="agrupacion" class="tu-input w-auto" :aria-label="$t('reportes.tendencias.agrupacion')">
+            <option value="dia">{{ $t('reportes.tendencias.dia') }}</option>
+            <option value="semana">{{ $t('reportes.tendencias.semana') }}</option>
+            <option value="mes">{{ $t('reportes.tendencias.mes') }}</option>
+          </select>
+          <button class="tu-btn tu-btn-fantasma" type="button" :disabled="exportando || !tendencias || tendencias.serie.length === 0" @click="exportarTendencias">
+            {{ exportando ? $t('reportes.tendencias.exportando') : $t('reportes.tendencias.exportar') }}
+          </button>
+        </div>
+      </div>
+
+      <template v-if="tendencias">
+        <!-- Totales del periodo -->
+        <div class="mt-3 grid grid-cols-3 gap-3">
+          <div class="tu-card p-4 text-center">
+            <div class="text-xl font-extrabold">{{ dinero(tendencias.totales.ingresos_minor, tendencias.moneda) }}</div>
+            <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">{{ $t('reportes.tendencias.ingresos') }}</div>
+          </div>
+          <div class="tu-card p-4 text-center">
+            <div class="text-xl font-extrabold">{{ tendencias.totales.ordenes }}</div>
+            <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">{{ $t('reportes.tendencias.ordenes') }}</div>
+          </div>
+          <div class="tu-card p-4 text-center">
+            <div class="text-xl font-extrabold">{{ dinero(tendencias.totales.ticket_promedio_minor, tendencias.moneda) }}</div>
+            <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">{{ $t('reportes.tendencias.ticket') }}</div>
+          </div>
+        </div>
+
+        <!-- Barras de ingresos por bucket -->
+        <div class="mt-4 tu-card p-5">
+          <p v-if="tendencias.totales.ingresos_minor === 0" class="text-sm" :style="{ color: 'var(--texto-suave)' }">{{ $t('reportes.tendencias.vacio') }}</p>
+          <template v-else>
+            <div class="flex items-end gap-1 h-40 border-b" :style="{ borderColor: 'var(--borde)' }">
+              <div
+                v-for="p in tendencias.serie"
+                :key="p.fecha"
+                class="flex-1 min-w-[2px] rounded-t transition-all"
+                :style="{ height: barra(p), background: 'var(--primario)', minHeight: p.ingresos_minor > 0 ? '3px' : '0' }"
+                :title="`${fechaBucket(p.fecha)} · ${dinero(p.ingresos_minor, tendencias.moneda)} · ${p.ordenes} órd.`"
+              />
+            </div>
+            <div class="flex justify-between text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
+              <span>{{ fechaBucket(tendencias.serie[0].fecha) }}</span>
+              <span>{{ fechaBucket(tendencias.serie[tendencias.serie.length - 1].fecha) }}</span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Desglose por producto -->
+        <h3 class="mt-6 font-semibold">{{ $t('reportes.tendencias.porProducto') }}</h3>
+        <p v-if="tendencias.por_producto.length === 0" class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">{{ $t('reportes.tendencias.sinProducto') }}</p>
+        <div v-else class="mt-3 tu-card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
+                <th class="px-4 py-2 font-medium">{{ $t('reportes.tendencias.colProducto') }}</th>
+                <th class="px-4 py-2 font-medium text-right">{{ $t('reportes.tendencias.colUnidades') }}</th>
+                <th class="px-4 py-2 font-medium text-right">{{ $t('reportes.tendencias.colIngresos') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in tendencias.por_producto" :key="p.producto" class="border-t" :style="{ borderColor: 'var(--borde)' }">
+                <td class="px-4 py-2 font-semibold">{{ p.producto }}</td>
+                <td class="px-4 py-2 text-right">{{ p.unidades }}</td>
+                <td class="px-4 py-2 text-right">{{ dinero(p.ingresos_minor, tendencias.moneda) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
 
       <!-- Por sucursal -->
       <h2 class="mt-8 font-bold text-lg">{{ $t('reportes.porSucursal') }}</h2>
