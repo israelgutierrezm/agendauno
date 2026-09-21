@@ -55,6 +55,7 @@ const MENU: MenuItem[] = [
       { clave: 'ventas', etiqueta: 'nav.ventas', icono: 'ventas', ruta: 'ventas', permiso: 'productos.ver' },
       { clave: 'pos', etiqueta: 'nav.pos', icono: 'pos', ruta: 'pos', permiso: 'inventario.ver' },
       { clave: 'promociones', etiqueta: 'nav.promociones', icono: 'promociones', ruta: 'promociones', permiso: 'promociones.gestionar' },
+      { clave: 'comunicaciones', etiqueta: 'nav.comunicaciones', icono: 'reportes', ruta: 'comunicaciones', permiso: 'comunicaciones.gestionar' },
       { clave: 'lealtad', etiqueta: 'nav.lealtad', icono: 'lealtad', ruta: 'lealtad', permiso: 'lealtad.ver' },
       { clave: 'facturas', etiqueta: 'nav.facturas', icono: 'facturas', ruta: 'facturas', permiso: 'ordenes.ver' },
       { clave: 'cobranza', etiqueta: 'nav.cobranza', icono: 'facturas', ruta: 'cobranza', permiso: 'facturacion.ver' },

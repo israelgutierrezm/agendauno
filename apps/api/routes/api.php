@@ -54,6 +54,7 @@ use App\Modules\Tenancy\Http\Controllers\CatalogoTenantController;
 use App\Modules\Tenancy\Http\Controllers\CheckinsTenantController;
 use App\Modules\Tenancy\Http\Controllers\CreditosTenantController;
 use App\Modules\Tenancy\Http\Controllers\DatosFiscalesTenantController;
+use App\Modules\Tenancy\Http\Controllers\DifusionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\DirectorioController;
 use App\Modules\Tenancy\Http\Controllers\DocumentosController;
 use App\Modules\Tenancy\Http\Controllers\DunningTenantController;
@@ -518,6 +519,13 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/plantillas-mensaje', [PlantillasMensajeTenantController::class, 'guardar'])->middleware('puede:comunicaciones.gestionar')->name('plantillas-mensaje.guardar');
             Route::delete('/plantillas-mensaje/{plantilla}', [PlantillasMensajeTenantController::class, 'eliminar'])->middleware('puede:comunicaciones.gestionar')->name('plantillas-mensaje.eliminar');
             Route::get('/mensajes', [MensajesTenantController::class, 'index'])->middleware('puede:comunicaciones.ver')->name('mensajes.index');
+
+            // Comunicaciones segmentadas (difusiones): audiencia dinámica (todos/por
+            // vencer/vencidos/primerizos) + envío puntual que encola un mensaje por
+            // destinatario (lo entrega el relay R28) + historial.
+            Route::get('/comunicaciones/segmentos', [DifusionesTenantController::class, 'segmentos'])->middleware('puede:comunicaciones.ver')->name('difusiones.segmentos');
+            Route::get('/comunicaciones/difusiones', [DifusionesTenantController::class, 'index'])->middleware('puede:comunicaciones.ver')->name('difusiones.index');
+            Route::post('/comunicaciones/difusiones', [DifusionesTenantController::class, 'difundir'])->middleware('puede:comunicaciones.gestionar')->name('difusiones.store');
             Route::post('/checkins', [CheckinsTenantController::class, 'registrar'])->middleware('puede:checkins.registrar')->name('checkins.store');
             Route::get('/sesiones/{sesion}/checkins', [CheckinsTenantController::class, 'index'])->middleware('puede:checkins.registrar')->name('sesiones.checkins.index');
 

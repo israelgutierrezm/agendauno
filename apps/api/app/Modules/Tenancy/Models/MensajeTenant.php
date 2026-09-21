@@ -24,7 +24,7 @@ class MensajeTenant extends Model
     protected $table = 'mensajes';
 
     protected $fillable = [
-        'persona_id', 'plantilla_id', 'canal', 'destinatario', 'asunto', 'cuerpo',
+        'persona_id', 'plantilla_id', 'difusion_id', 'canal', 'destinatario', 'asunto', 'cuerpo',
         'estado', 'intentos', 'ultimo_error', 'evento_ulid', 'enviado_en',
     ];
 
@@ -44,5 +44,13 @@ class MensajeTenant extends Model
     public function persona(): BelongsTo
     {
         return $this->belongsTo(PersonaTenant::class, 'persona_id');
+    }
+
+    /**
+     * @return BelongsTo<DifusionTenant, $this>
+     */
+    public function difusion(): BelongsTo
+    {
+        return $this->belongsTo(DifusionTenant::class, 'difusion_id');
     }
 }

@@ -123,6 +123,12 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      path: '/comunicaciones',
+      name: 'comunicaciones',
+      component: () => import('@/views/ComunicacionesView.vue'),
+      meta: { requiereSesion: true },
+    },
+    {
       path: '/datos-fiscales',
       name: 'datos-fiscales',
       component: () => import('@/views/DatosFiscalesView.vue'),
