@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Inventario\Exceptions\StockInsuficiente;
 use App\Modules\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Application\InventarioTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -20,15 +21,19 @@ use Illuminate\Http\Request;
  */
 class InventarioTenantController
 {
-    public function __construct(private readonly InventarioTenant $inventario) {}
+    public function __construct(
+        private readonly InventarioTenant $inventario,
+        private readonly ResolverAccesoTenant $acceso,
+    ) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $articulos = ArticuloTenant::query()->orderByDesc('id')->get();
         $sucursales = $this->mapaSucursales();
+        $permitidas = $this->permitidas($request);
 
         return response()->json([
-            'data' => $articulos->map(fn (ArticuloTenant $a): array => $this->presentar($a, $sucursales))->all(),
+            'data' => $articulos->map(fn (ArticuloTenant $a): array => $this->presentar($a, $sucursales, $permitidas))->all(),
         ]);
     }
 
@@ -36,7 +41,7 @@ class InventarioTenantController
     {
         $articulo = ArticuloTenant::query()->create($this->validar($request));
 
-        return response()->json(['data' => $this->presentar($articulo, $this->mapaSucursales())], 201);
+        return response()->json(['data' => $this->presentar($articulo, $this->mapaSucursales(), $this->permitidas($request))], 201);
     }
 
     public function actualizar(Request $request): JsonResponse
@@ -44,7 +49,7 @@ class InventarioTenantController
         $articulo = $this->resolver($request);
         $articulo->update($this->validar($request));
 
-        return response()->json(['data' => $this->presentar($articulo->refresh(), $this->mapaSucursales())]);
+        return response()->json(['data' => $this->presentar($articulo->refresh(), $this->mapaSucursales(), $this->permitidas($request))]);
     }
 
     /**
@@ -63,6 +68,14 @@ class InventarioTenantController
         $sucursalId = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->value('id');
         abort_if($sucursalId === null, 404);
         $sucursalId = (int) $sucursalId;
+
+        // Alcance por sucursal (R19): un acotado no mueve inventario en una sede ajena.
+        $actor = $this->actor($request);
+        abort_unless(
+            $actor === null || $this->acceso->permiteSucursal($actor, $sucursalId),
+            403,
+            'No puedes mover inventario en una sucursal que no te corresponde.',
+        );
 
         $tipo = TipoMovimientoInventario::from($validado['tipo']);
         $cantidad = (int) $validado['cantidad'];
@@ -112,6 +125,18 @@ class InventarioTenantController
     }
 
     /**
+     * Sucursales a las que el actor está acotado, o `null` (todas). R19.
+     *
+     * @return list<int>|null
+     */
+    private function permitidas(Request $request): ?array
+    {
+        $actor = $this->actor($request);
+
+        return $actor !== null ? $this->acceso->sucursalesPermitidas($actor) : null;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function validar(Request $request): array
@@ -135,18 +160,25 @@ class InventarioTenantController
 
     /**
      * @param  array<int, array{ulid: string, nombre: string}>  $sucursales
+     * @param  list<int>|null  $permitidas  sucursales visibles para el actor (null = todas)
      * @return array<string, mixed>
      */
-    private function presentar(ArticuloTenant $articulo, array $sucursales): array
+    private function presentar(ArticuloTenant $articulo, array $sucursales, ?array $permitidas = null): array
     {
         $porSucursal = $this->inventario->stockPorSucursal($articulo->getKey());
         $existencias = [];
+        $total = 0;
         foreach ($porSucursal as $sucursalId => $stock) {
+            // Alcance por sucursal (R19): un acotado no ve el stock de otras sedes.
+            if ($permitidas !== null && ! in_array((int) $sucursalId, $permitidas, true)) {
+                continue;
+            }
             $existencias[] = [
                 'sucursal_id' => $sucursales[$sucursalId]['ulid'] ?? null,
                 'sucursal' => $sucursales[$sucursalId]['nombre'] ?? '—',
                 'stock' => $stock,
             ];
+            $total += $stock;
         }
 
         return [
@@ -156,7 +188,7 @@ class InventarioTenantController
             'precio_minor' => $articulo->precio_minor,
             'moneda' => $articulo->moneda,
             'activo' => $articulo->activo,
-            'stock_total' => array_sum($porSucursal),
+            'stock_total' => $total,
             'existencias' => $existencias,
         ];
     }
