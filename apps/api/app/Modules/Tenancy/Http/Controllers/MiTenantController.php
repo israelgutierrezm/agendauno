@@ -299,7 +299,9 @@ class MiTenantController
             $items[] = ['producto' => $producto, 'cantidad' => (int) $item['cantidad'], 'beneficiario' => null];
         }
 
-        $orden = $this->ordenes->crear($persona, $items, $validado['codigo_promo'] ?? null);
+        // Sucursal (R19): la compra del alumno se atribuye a su sede de casa.
+        $sucursalId = $persona->sucursal_id !== null ? (int) $persona->sucursal_id : null;
+        $orden = $this->ordenes->crear($persona, $items, $validado['codigo_promo'] ?? null, $sucursalId);
 
         return response()->json(['data' => $this->presentarOrden($orden->refresh())], 201);
     }

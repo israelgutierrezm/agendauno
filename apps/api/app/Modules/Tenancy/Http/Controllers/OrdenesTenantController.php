@@ -7,10 +7,12 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Pagos\MetodoPago;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -30,16 +32,29 @@ class OrdenesTenantController
     public function __construct(
         private readonly OrdenesTenant $ordenes,
         private readonly CobrarOrdenTenant $cobrar,
+        private readonly ResolverAccesoTenant $acceso,
     ) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        // Alcance por sucursal (R19): el staff acotado solo ve las órdenes de SUS sedes.
+        $actor = $this->actor($request);
+        $permitidas = $actor !== null ? $this->acceso->sucursalesPermitidas($actor) : null;
+
         $ordenes = OrdenTenant::query()->with(['persona', 'lineas.producto', 'lineas.beneficiario'])
+            ->when($permitidas !== null, fn ($q) => $q->whereIn('sucursal_id', $permitidas))
             ->orderByDesc('id')->limit(self::LIMITE)->get();
 
         return response()->json([
             'data' => $ordenes->map(fn (OrdenTenant $orden): array => $this->presentar($orden))->all(),
         ]);
+    }
+
+    private function actor(Request $request): ?Usuario
+    {
+        $actor = $request->attributes->get('usuario_tenant');
+
+        return $actor instanceof Usuario ? $actor : null;
     }
 
     public function crear(Request $request): JsonResponse
@@ -55,6 +70,18 @@ class OrdenesTenantController
 
         $comprador = PersonaTenant::query()->where('ulid', $validado['comprador_id'])->firstOrFail();
 
+        // Alcance por sucursal (R19): un acotado solo crea órdenes para alumnos de SU
+        // sede; la orden se atribuye a la sede del comprador (o a la del vendedor acotado).
+        $actor = $this->actor($request);
+        $compradorSucursal = $comprador->sucursal_id !== null ? (int) $comprador->sucursal_id : null;
+        abort_unless(
+            $actor === null || $this->acceso->permiteSucursal($actor, $compradorSucursal),
+            403,
+            'No puedes crear órdenes para un alumno de otra sucursal.',
+        );
+        $permitidas = $actor !== null ? $this->acceso->sucursalesPermitidas($actor) : null;
+        $sucursalId = $compradorSucursal ?? ($permitidas[0] ?? null);
+
         $items = [];
         foreach ($validado['items'] as $item) {
             $producto = ProductoTenant::query()->where('ulid', $item['producto_id'])->firstOrFail();
@@ -69,7 +96,7 @@ class OrdenesTenantController
             ];
         }
 
-        $orden = $this->ordenes->crear($comprador, $items, $validado['codigo_promo'] ?? null);
+        $orden = $this->ordenes->crear($comprador, $items, $validado['codigo_promo'] ?? null, $sucursalId);
 
         return response()->json(['data' => $this->presentar($orden->refresh())], 201);
     }

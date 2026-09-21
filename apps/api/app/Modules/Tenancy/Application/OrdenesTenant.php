@@ -29,7 +29,7 @@ class OrdenesTenant
     /**
      * @param  list<array{producto: ProductoTenant, cantidad: int, beneficiario?: PersonaTenant|null}>  $items
      */
-    public function crear(PersonaTenant $comprador, array $items, ?string $codigoPromo = null): OrdenTenant
+    public function crear(PersonaTenant $comprador, array $items, ?string $codigoPromo = null, ?int $sucursalId = null): OrdenTenant
     {
         $moneda = $items[0]['producto']->moneda; // Una sola moneda por orden.
 
@@ -39,11 +39,13 @@ class OrdenesTenant
             }
         }
 
-        return DB::connection('tenant')->transaction(function () use ($comprador, $items, $moneda, $codigoPromo): OrdenTenant {
+        return DB::connection('tenant')->transaction(function () use ($comprador, $items, $moneda, $codigoPromo, $sucursalId): OrdenTenant {
             $subtotal = 0;
 
             $orden = OrdenTenant::query()->create([
                 'persona_id' => $comprador->getKey(),
+                // Sucursal (R19): sede del vendedor acotado o, si no, la de casa del comprador.
+                'sucursal_id' => $sucursalId,
                 'estado' => EstadoOrden::Pendiente->value,
                 'total_minor' => 0,
                 'moneda' => $moneda,
