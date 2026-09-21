@@ -26,6 +26,15 @@ interface Pago {
   reembolsado_minor: number
   reembolsable_minor: number
 }
+interface Suscripcion {
+  id: string
+  persona: string | null
+  producto: string | null
+  precio_minor: number | null
+  moneda: string | null
+  proxima_cobro_en: string | null
+  estado: string
+}
 
 const sesion = useSesionTenantStore()
 const base = computed(() => `/api/v1/app/${sesion.slug}`)
@@ -34,6 +43,7 @@ const puedeReembolsar = computed(() => sesion.puede('pagos.reembolsar'))
 
 const morosos = ref<Moroso[]>([])
 const pagos = ref<Pago[]>([])
+const suscripciones = ref<Suscripcion[]>([])
 const cargando = ref(true)
 const error = ref<string | null>(null)
 const accionando = ref<string | null>(null)
@@ -58,19 +68,23 @@ function fecha(iso: string | null): string {
   if (iso === null) {
     return '—'
   }
-  return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium' }).format(new Date(iso))
+  // Fecha-solo (YYYY-MM-DD) en hora local para no restar un día; datetime tal cual.
+  const d = iso.includes('T') ? new Date(iso) : new Date(`${iso}T00:00:00`)
+  return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium' }).format(d)
 }
 
 async function cargar(): Promise<void> {
   cargando.value = true
   error.value = null
   try {
-    const [d, p] = await Promise.all([
+    const [d, p, s] = await Promise.all([
       api.get<{ data: Moroso[] }>(`${base.value}/dunning`),
       api.get<{ data: Pago[] }>(`${base.value}/pagos`),
+      api.get<{ data: Suscripcion[] }>(`${base.value}/suscripciones`),
     ])
     morosos.value = d.data.data
     pagos.value = p.data.data
+    suscripciones.value = s.data.data
   } catch (e) {
     error.value = mensajeDeError(e)
   } finally {
@@ -203,6 +217,32 @@ onMounted(cargar)
                 <button v-if="puedeReembolsar && p.reembolsable_minor > 0" class="tu-enlace text-sm" type="button" @click="abrirReembolso(p)">
                   {{ $t('cobranza.reembolsar') }}
                 </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- Próximas renovaciones (cobro recurrente) -->
+      <h2 class="mt-8 font-bold text-lg">{{ $t('cobranza.renovaciones') }}</h2>
+      <p v-if="suscripciones.length === 0" class="mt-3 tu-card p-6 text-sm" :style="{ color: 'var(--texto-suave)' }">{{ $t('cobranza.sinRenovaciones') }}</p>
+      <div v-else class="mt-3 tu-card overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
+              <th class="px-4 py-2 font-medium">{{ $t('cobranza.colAlumno') }}</th>
+              <th class="px-4 py-2 font-medium hidden sm:table-cell">{{ $t('cobranza.colMembresia') }}</th>
+              <th class="px-4 py-2 font-medium text-right">{{ $t('cobranza.colMonto') }}</th>
+              <th class="px-4 py-2 font-medium">{{ $t('cobranza.colProxima') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="s in suscripciones" :key="s.id" class="border-t" :style="{ borderColor: 'var(--borde)' }">
+              <td class="px-4 py-2 font-semibold">{{ s.persona ?? '—' }}</td>
+              <td class="px-4 py-2 hidden sm:table-cell" :style="{ color: 'var(--texto-suave)' }">{{ s.producto ?? '—' }}</td>
+              <td class="px-4 py-2 text-right">{{ s.precio_minor !== null ? dinero(s.precio_minor, s.moneda ?? 'MXN') : '—' }}</td>
+              <td class="px-4 py-2">
+                {{ fecha(s.proxima_cobro_en) }}
+                <span v-if="s.estado !== 'activo'" class="tu-badge ml-1" :style="{ background: 'var(--error-suave)', color: 'var(--error)' }">{{ $t(`cobranza.estados.${s.estado}`, s.estado) }}</span>
               </td>
             </tr>
           </tbody>

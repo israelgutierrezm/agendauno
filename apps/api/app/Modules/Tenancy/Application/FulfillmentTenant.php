@@ -26,6 +26,13 @@ class FulfillmentTenant
         }
 
         $orden->update(['estado' => EstadoOrden::Pagada->value, 'pagada_en' => now()]);
+
+        // Orden de RENOVACIÓN (cobro recurrente): solo cobra; el entitlement lo mantiene
+        // el motor de ciclos sobre el acuerdo existente. No se crea un acuerdo nuevo.
+        if ($orden->renueva_acuerdo_id !== null) {
+            return;
+        }
+
         $orden->loadMissing(['lineas.producto', 'lineas.beneficiario', 'persona']);
 
         foreach ($orden->lineas as $linea) {

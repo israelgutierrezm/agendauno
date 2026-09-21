@@ -26,7 +26,12 @@ class GestionarDunningTenant
 {
     private const GRACIA_DIAS = 7;
 
-    private const REINTENTO_DIAS = 3;
+    /**
+     * Backoff de reintentos (días desde el fallo) según el número de intento.
+     *
+     * @var list<int>
+     */
+    private const REINTENTOS_DIAS = [1, 3, 7];
 
     public function __construct(private readonly RegistrarEventoTenant $eventos) {}
 
@@ -44,7 +49,7 @@ class GestionarDunningTenant
                     'estado' => EstadoDunning::EnMora->value,
                     'intentos' => 1,
                     'gracia_hasta' => Carbon::now()->addDays(self::GRACIA_DIAS),
-                    'proximo_intento_en' => Carbon::now()->addDays(self::REINTENTO_DIAS),
+                    'proximo_intento_en' => $this->proximoIntento(1),
                     'ultimo_motivo' => $motivo,
                 ]);
 
@@ -55,7 +60,7 @@ class GestionarDunningTenant
 
             $proceso->intentos++;
             $proceso->ultimo_motivo = $motivo;
-            $proceso->proximo_intento_en = Carbon::now()->addDays(self::REINTENTO_DIAS);
+            $proceso->proximo_intento_en = $this->proximoIntento($proceso->intentos);
 
             $suspendeAhora = $proceso->estado === EstadoDunning::EnMora && $proceso->gracia_hasta->isPast();
             if ($suspendeAhora) {
@@ -147,6 +152,16 @@ class GestionarDunningTenant
         if ($acuerdo->estado !== EstadoAcuerdo::Cancelado) {
             $acuerdo->update(['estado' => EstadoAcuerdo::Suspendido->value]);
         }
+    }
+
+    /**
+     * Fecha del próximo reintento según el intento (backoff creciente, con tope).
+     */
+    private function proximoIntento(int $intento): Carbon
+    {
+        $dias = self::REINTENTOS_DIAS[min($intento, count(self::REINTENTOS_DIAS)) - 1];
+
+        return Carbon::now()->addDays($dias);
     }
 
     private function procesoAbierto(AcuerdoTenant $acuerdo, bool $bloquear = false): ?ProcesoDunningTenant

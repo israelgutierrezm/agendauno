@@ -118,13 +118,6 @@ class MembresiasTenant
         return DB::connection('tenant')->transaction(function () use ($persona, $producto, $fechaInicio, $actor): AcuerdoTenant {
             $inicio = $fechaInicio ?? Carbon::now()->toDateString();
 
-            $acuerdo = AcuerdoTenant::query()->create([
-                'persona_id' => $persona->getKey(),
-                'producto_comercial_id' => $producto->getKey(),
-                'fecha_inicio' => $inicio,
-                'estado' => 'activo',
-            ]);
-
             $politicaReset = $producto->politica_reset ?? PoliticaReset::Ninguno;
             $politicaRollover = $producto->politica_rollover ?? PoliticaRollover::Ninguno;
 
@@ -132,6 +125,16 @@ class MembresiasTenant
             [$cicloInicio, $cicloFin] = $recurrente
                 ? $this->ventanaCiclo($politicaReset, $inicio)
                 : [null, null];
+
+            $acuerdo = AcuerdoTenant::query()->create([
+                'persona_id' => $persona->getKey(),
+                'producto_comercial_id' => $producto->getKey(),
+                'fecha_inicio' => $inicio,
+                // Recurrente: el próximo cobro vence al cerrar el primer ciclo (el
+                // scheduler lo cobrará). No recurrente (pack/pase): no se renueva.
+                'proxima_cobro_en' => $recurrente && $cicloFin !== null ? Carbon::parse($cicloFin)->addDay()->toDateString() : null,
+                'estado' => 'activo',
+            ]);
 
             // Vigencia del producto → ventana de validez del derecho (feed del radar de
             // retención y del control de acceso). Sin vigencia, no expira por fecha.
