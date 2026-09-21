@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\ModalidadOfertaTenant;
+use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,7 +21,7 @@ class OfertaTenant extends Model
 
     protected $table = 'ofertas';
 
-    protected $fillable = ['actividad_id', 'nombre', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor'];
+    protected $fillable = ['actividad_id', 'nombre', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva'];
 
     /**
      * @var array<string, string>
@@ -30,6 +31,7 @@ class OfertaTenant extends Model
         'capacidad' => 'integer',
         'lugares' => 'integer',
         'precio_clase_minor' => 'integer',
+        'politica_reserva' => PoliticaReservaTenant::class,
     ];
 
     /**

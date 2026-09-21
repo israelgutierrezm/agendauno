@@ -8,6 +8,7 @@ use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\ActividadTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\ProgramaTenant;
+use App\Modules\Tenancy\PoliticaReservaTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -86,6 +87,9 @@ class CatalogoTenantController
             'modalidad' => ['required', Rule::enum(ModalidadOfertaTenant::class)],
             'capacidad' => ['nullable', 'integer', 'min:1'],
             'lugares' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            // Política de reserva (citas): entitlement (default) o pago-para-reservar.
+            'politica_reserva' => ['nullable', Rule::enum(PoliticaReservaTenant::class)],
+            'precio_clase_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
         ]);
 
         $oferta = $actividad->ofertas()->create([
@@ -93,6 +97,8 @@ class CatalogoTenantController
             'modalidad' => $validado['modalidad'],
             'capacidad' => $validado['capacidad'] ?? null,
             'lugares' => (int) ($validado['lugares'] ?? 0),
+            'politica_reserva' => $validado['politica_reserva'] ?? PoliticaReservaTenant::Entitlement->value,
+            'precio_clase_minor' => isset($validado['precio_clase_minor']) ? (int) $validado['precio_clase_minor'] : null,
         ]);
 
         return response()->json(['data' => $this->presentarOferta($oferta)], 201);
@@ -107,12 +113,16 @@ class CatalogoTenantController
         $validado = $request->validate([
             'lugares' => ['required', 'integer', 'min:0', 'max:1000'],
             'precio_clase_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
+            'politica_reserva' => ['nullable', Rule::enum(PoliticaReservaTenant::class)],
         ]);
 
         $cambios = ['lugares' => (int) $validado['lugares']];
-        // El precio por clase (R30) solo se toca si viene en la petición (null lo limpia).
+        // El precio por clase (R30/citas) solo se toca si viene en la petición (null lo limpia).
         if ($request->has('precio_clase_minor')) {
             $cambios['precio_clase_minor'] = $validado['precio_clase_minor'] !== null ? (int) $validado['precio_clase_minor'] : null;
+        }
+        if (isset($validado['politica_reserva'])) {
+            $cambios['politica_reserva'] = $validado['politica_reserva'];
         }
         $oferta->update($cambios);
 
@@ -148,6 +158,7 @@ class CatalogoTenantController
             'capacidad' => $oferta->capacidad,
             'lugares' => $oferta->lugares,
             'precio_clase_minor' => $oferta->precio_clase_minor,
+            'politica_reserva' => $oferta->politica_reserva->value,
         ];
     }
 }
