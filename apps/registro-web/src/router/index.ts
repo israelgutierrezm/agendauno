@@ -75,6 +75,12 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      path: '/importar',
+      name: 'importar',
+      component: () => import('@/views/ImportarMiembrosView.vue'),
+      meta: { requiereSesion: true },
+    },
+    {
       path: '/instructores',
       name: 'instructores',
       component: () => import('@/views/InstructoresView.vue'),
