@@ -196,6 +196,12 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/mi/reservas/{reserva}/aceptar', [MiTenantController::class, 'aceptar'])->name('mi.reservas.aceptar');
             Route::get('/mi/waivers', [MiTenantController::class, 'waiversPendientes'])->name('mi.waivers.index');
             Route::post('/mi/waivers/{waiver}/aceptar', [MiTenantController::class, 'aceptarWaiver'])->name('mi.waivers.aceptar');
+            // Ciclo comercial del alumno (P0 #4): comprar packs/membresías y pagarlos en
+            // línea desde su portal. El fulfillment (créditos) lo confirma el webhook.
+            Route::get('/mi/productos', [MiTenantController::class, 'productos'])->name('mi.productos.index');
+            Route::get('/mi/ordenes', [MiTenantController::class, 'ordenes'])->name('mi.ordenes.index');
+            Route::post('/mi/ordenes', [MiTenantController::class, 'comprar'])->name('mi.ordenes.store');
+            Route::post('/mi/ordenes/{orden}/cobrar', [MiTenantController::class, 'cobrar'])->name('mi.ordenes.cobrar');
 
             // Invitación de personal (crea usuario tenant-local con rol + activación).
             Route::post('/usuarios/invitar', [UsuariosTenantController::class, 'invitar'])->middleware('puede:usuarios.invitar')->name('usuarios.invitar');

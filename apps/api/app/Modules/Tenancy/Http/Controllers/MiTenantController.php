@@ -4,13 +4,19 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Pagos\MetodoPago;
 use App\Modules\Reservas\EstadoReserva;
+use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
+use App\Modules\Tenancy\Application\OrdenesTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
+use App\Modules\Tenancy\Models\LineaOrdenTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\PoliticaCancelacionTenant;
+use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -18,6 +24,8 @@ use App\Modules\Tenancy\Models\WaiverTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Autoservicio del miembro (data plane del tenant): opera SOLO sobre la persona del
@@ -30,6 +38,8 @@ class MiTenantController
         private readonly ReservasTenant $reservas,
         private readonly LibroMayorTenant $libro,
         private readonly WaiversTenant $waivers,
+        private readonly OrdenesTenant $ordenes,
+        private readonly CobrarOrdenTenant $cobrarOrden,
     ) {}
 
     /**
@@ -89,7 +99,7 @@ class MiTenantController
         $reservas = ReservaTenant::query()
             ->where('persona_id', $persona->getKey())
             ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::EnEspera->value])
-            ->with(['sesion.oferta'])
+            ->with(['sesion.oferta', 'sesion.sucursal'])
             ->get()
             ->filter(fn (ReservaTenant $r): bool => $r->sesion !== null && ! $r->sesion->inicia_en->isPast())
             ->map(fn (ReservaTenant $r): array => $this->presentarReserva($r))
@@ -211,10 +221,150 @@ class MiTenantController
     {
         return [
             'id' => $reserva->ulid,
+            // `sesion_id` + sucursal identifican la clase exacta: dos clases iguales en
+            // distinta sucursal ya no se confunden (antes se relacionaban por oferta+hora).
+            'sesion_id' => $reserva->sesion?->ulid,
             'estado' => $reserva->estado->value,
             'oferta' => $reserva->sesion?->oferta?->nombre,
+            'sucursal' => $reserva->sesion?->sucursal?->nombre,
             'inicia_en' => $reserva->sesion?->inicia_en->toIso8601String(),
             'zona_horaria' => $reserva->sesion?->zona_horaria,
+            // Vencimiento de la oferta de lista de espera (si la reserva está ofrecida).
+            'oferta_expira_en' => $reserva->oferta_expira_en?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Catálogo de productos que el alumno puede comprar desde su portal.
+     */
+    public function productos(): JsonResponse
+    {
+        $productos = ProductoTenant::query()->orderBy('precio_minor')->get();
+
+        return response()->json([
+            'data' => $productos->map(static fn (ProductoTenant $p): array => [
+                'id' => $p->ulid,
+                'nombre' => $p->nombre,
+                'tipo' => $p->tipo->value,
+                'precio_minor' => $p->precio_minor,
+                'moneda' => $p->moneda,
+                'ilimitado' => $p->ilimitado,
+                'creditos_incluidos' => $p->creditos_incluidos,
+            ])->all(),
+        ]);
+    }
+
+    /**
+     * Historial de compras del alumno (sus órdenes), para ver pagos/estado.
+     */
+    public function ordenes(Request $request): JsonResponse
+    {
+        $persona = $this->persona($request);
+        if (! $persona instanceof PersonaTenant) {
+            return response()->json(['data' => []]);
+        }
+
+        $ordenes = OrdenTenant::query()
+            ->where('persona_id', $persona->getKey())
+            ->with('lineas.producto')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'data' => $ordenes->map(fn (OrdenTenant $o): array => $this->presentarOrden($o))->all(),
+        ]);
+    }
+
+    /**
+     * El alumno compra para SÍ MISMO: crea una orden pendiente (precio congelado). El
+     * fulfillment (créditos) ocurre al pagarla en línea (webhook) o en el estudio.
+     */
+    public function comprar(Request $request): JsonResponse
+    {
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+
+        $validado = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.producto_id' => ['required', 'string'],
+            'items.*.cantidad' => ['required', 'integer', 'min:1'],
+            'codigo_promo' => ['nullable', 'string', 'max:64'],
+        ]);
+
+        $items = [];
+        foreach ($validado['items'] as $item) {
+            $producto = ProductoTenant::query()->where('ulid', $item['producto_id'])->firstOrFail();
+            // El alumno compra para sí: beneficiario = comprador (sin beneficiario explícito).
+            $items[] = ['producto' => $producto, 'cantidad' => (int) $item['cantidad'], 'beneficiario' => null];
+        }
+
+        $orden = $this->ordenes->crear($persona, $items, $validado['codigo_promo'] ?? null);
+
+        return response()->json(['data' => $this->presentarOrden($orden->refresh())], 201);
+    }
+
+    /**
+     * El alumno paga EN LÍNEA su propia orden. Solo pasarelas en línea reales: el cobro
+     * manual/efectivo es de ventanilla (staff) — un alumno no puede auto-aprobarse
+     * créditos gratis. El fulfillment lo confirma el webhook de la pasarela.
+     */
+    public function cobrar(Request $request): JsonResponse
+    {
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+
+        $orden = OrdenTenant::query()->where('ulid', (string) $request->route('orden'))->firstOrFail();
+        abort_unless((int) $orden->persona_id === (int) $persona->getKey(), 403, 'Esta orden no es tuya.');
+
+        $validado = $request->validate([
+            'proveedor' => ['required', 'string'],
+            'metodo' => ['nullable', Rule::enum(MetodoPago::class)],
+            'idempotency_key' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        // El autoservicio solo admite pasarelas en línea (no ventanilla/manual/efectivo).
+        if (in_array($validado['proveedor'], ['manual', 'efectivo'], true)) {
+            throw ValidationException::withMessages([
+                'proveedor' => ['El pago en efectivo o ventanilla se registra en el estudio.'],
+            ]);
+        }
+
+        $metodo = isset($validado['metodo']) ? MetodoPago::from($validado['metodo']) : null;
+        $key = ($validado['idempotency_key'] ?? '') !== '' ? $validado['idempotency_key'] : null;
+
+        $pago = $this->cobrarOrden->ejecutar($orden, $validado['proveedor'], $metodo, $key);
+
+        return response()->json(['data' => [
+            'pago' => $pago->ulid,
+            'proveedor' => $pago->proveedor,
+            'estado' => $pago->estado->value,
+            'checkout' => $pago->checkout,
+            'orden' => $this->presentarOrden($orden->refresh()),
+        ]], 201);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentarOrden(OrdenTenant $orden): array
+    {
+        $orden->loadMissing('lineas.producto');
+
+        return [
+            'id' => $orden->ulid,
+            'estado' => $orden->estado->value,
+            'total_minor' => $orden->total_minor,
+            'descuento_minor' => (int) ($orden->descuento_minor ?? 0),
+            'moneda' => $orden->moneda,
+            'metodo_pago' => $orden->metodo_pago,
+            'fecha' => $orden->created_at?->toIso8601String(),
+            'pagada_en' => $orden->pagada_en?->toIso8601String(),
+            'lineas' => $orden->lineas->map(static fn (LineaOrdenTenant $l): array => [
+                'producto' => $l->producto?->nombre,
+                'cantidad' => $l->cantidad,
+                'subtotal_minor' => $l->subtotal_minor,
+            ])->all(),
         ];
     }
 }

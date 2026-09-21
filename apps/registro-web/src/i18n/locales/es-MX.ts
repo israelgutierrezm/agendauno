@@ -1403,6 +1403,27 @@ export default {
     waiversTitulo: 'Consentimientos pendientes',
     aceptarWaiver: 'Acepto',
     politica: 'Puedes cancelar hasta {horas} h antes; después puede aplicar penalización.',
+    comprar: {
+      titulo: 'Comprar',
+      subtitulo: 'Compra un paquete o membresía para reservar tus clases.',
+      comprar: 'Comprar',
+      comprando: 'Creando…',
+      creada: 'Compra creada. Completa el pago para activar tus créditos.',
+      creditos: '{n} créditos',
+      tipos: {
+        membresia: 'Membresía',
+        paquete: 'Paquete',
+        pase_dia: 'Pase del día',
+        sesion_individual: 'Sesión individual',
+        add_on: 'Extra',
+        taller: 'Taller',
+      },
+    },
+    compras: {
+      titulo: 'Mis compras',
+      nota: 'Las compras pendientes se activan al completar el pago (en línea o en el estudio).',
+      estados: { pendiente: 'Pendiente de pago', pagada: 'Pagada', cancelada: 'Cancelada' },
+    },
   },
   integraciones: {
     titulo: 'Integraciones de bienestar',
