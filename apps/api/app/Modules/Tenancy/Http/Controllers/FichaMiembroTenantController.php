@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\LibroMayorTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -24,7 +26,10 @@ class FichaMiembroTenantController
     // Cuántos registros recientes de historial mostrar (reservas y órdenes).
     private const HISTORIAL = 20;
 
-    public function __construct(private readonly LibroMayorTenant $libro) {}
+    public function __construct(
+        private readonly LibroMayorTenant $libro,
+        private readonly ResolverAccesoTenant $acceso,
+    ) {}
 
     public function __invoke(Request $request): JsonResponse
     {
@@ -32,6 +37,13 @@ class FichaMiembroTenantController
             ->with('sucursal')
             ->where('ulid', (string) $request->route('persona'))
             ->firstOrFail();
+
+        // Alcance por sucursal (R19): un acotado no abre la ficha de un alumno de otra sede.
+        $actor = $request->attributes->get('usuario_tenant');
+        abort_unless(
+            ! $actor instanceof Usuario || $this->acceso->permiteSucursal($actor, $persona->sucursal_id !== null ? (int) $persona->sucursal_id : null),
+            403,
+        );
 
         return response()->json(['data' => [
             'persona' => [

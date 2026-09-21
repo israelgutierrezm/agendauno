@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Asistencia\EstadoAsistencia;
 use App\Modules\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\EstadoSesionTenant;
@@ -14,6 +15,7 @@ use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,11 +34,20 @@ class ResumenMiembroTenantController
     public function __construct(
         private readonly LibroMayorTenant $libro,
         private readonly WaiversTenant $waivers,
+        private readonly ResolverAccesoTenant $acceso,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
     {
         $persona = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+
+        // Alcance por sucursal (R19): un acotado no ve el resumen de un alumno de otra sede.
+        $actor = $request->attributes->get('usuario_tenant');
+        abort_unless(
+            ! $actor instanceof Usuario || $this->acceso->permiteSucursal($actor, $persona->sucursal_id !== null ? (int) $persona->sucursal_id : null),
+            403,
+        );
+
         $hoy = CarbonImmutable::now()->startOfDay();
         $ahora = CarbonImmutable::now();
 
