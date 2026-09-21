@@ -149,6 +149,32 @@ export const useSesionTenantStore = defineStore('sesionTenant', () => {
     }
   }
 
+  async function registrarAlumno(
+    slugEstudio: string,
+    datos: { nombre: string; primer_apellido?: string; email: string; password: string; passwordConfirmation: string },
+  ): Promise<void> {
+    cargando.value = true
+    error.value = null
+    try {
+      const { data } = await api.post<{ data: RespuestaAuth }>(
+        `/api/v1/app/${slugEstudio}/registro-alumno`,
+        {
+          nombre: datos.nombre,
+          primer_apellido: datos.primer_apellido || null,
+          email: datos.email,
+          password: datos.password,
+          password_confirmation: datos.passwordConfirmation,
+        },
+      )
+      establecer(data.data)
+    } catch (e) {
+      error.value = mensajeDeError(e, 'No se pudo crear la cuenta.')
+      throw e
+    } finally {
+      cargando.value = false
+    }
+  }
+
   async function cargarYo(): Promise<void> {
     if (slug.value === null || bearer.value === null) {
       return
@@ -206,6 +232,7 @@ export const useSesionTenantStore = defineStore('sesionTenant', () => {
     iniciarSesion,
     iniciarSesionConGoogle,
     activar,
+    registrarAlumno,
     cargarYo,
     verificarSesion,
     cerrarSesion,

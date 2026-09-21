@@ -33,8 +33,8 @@ async function cargar(): Promise<void> {
   }
 }
 
-function entrar(slug: string): void {
-  void router.push({ name: 'entrar', query: { estudio: slug } })
+function verEstudio(slug: string): void {
+  void router.push({ name: 'estudio-publico', params: { slug } })
 }
 
 function iniciales(nombre: string): string {
@@ -103,8 +103,8 @@ onMounted(cargar)
             </p>
           </div>
         </div>
-        <button class="tu-btn tu-btn-fantasma mt-4 w-full" type="button" @click="entrar(e.slug)">
-          {{ $t('directorio.entrar') }}
+        <button class="tu-btn tu-btn-primario mt-4 w-full" type="button" @click="verEstudio(e.slug)">
+          {{ $t('directorio.verEstudio') }}
         </button>
       </li>
     </ul>

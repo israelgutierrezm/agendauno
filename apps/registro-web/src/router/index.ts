@@ -24,6 +24,11 @@ const router = createRouter({
       component: () => import('@/views/DirectorioView.vue'),
     },
     {
+      path: '/estudio/:slug',
+      name: 'estudio-publico',
+      component: () => import('@/views/EstudioPublicoView.vue'),
+    },
+    {
       path: '/activar/:slug?',
       name: 'activar',
       component: () => import('@/views/ActivacionView.vue'),

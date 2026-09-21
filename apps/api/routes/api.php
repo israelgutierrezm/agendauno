@@ -57,6 +57,7 @@ use App\Modules\Tenancy\Http\Controllers\DatosFiscalesTenantController;
 use App\Modules\Tenancy\Http\Controllers\DirectorioController;
 use App\Modules\Tenancy\Http\Controllers\DocumentosController;
 use App\Modules\Tenancy\Http\Controllers\DunningTenantController;
+use App\Modules\Tenancy\Http\Controllers\EscaparateController;
 use App\Modules\Tenancy\Http\Controllers\ExcepcionesHorarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\FacturacionController;
 use App\Modules\Tenancy\Http\Controllers\FacturaRentaController;
@@ -89,6 +90,7 @@ use App\Modules\Tenancy\Http\Controllers\PromocionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\PuntoDeVentaTenantController;
 use App\Modules\Tenancy\Http\Controllers\RecursosTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReembolsosTenantController;
+use App\Modules\Tenancy\Http\Controllers\RegistroAlumnoController;
 use App\Modules\Tenancy\Http\Controllers\RegistroEstudioController;
 use App\Modules\Tenancy\Http\Controllers\ReporteDemandaTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteNegocioTenantController;
@@ -174,6 +176,12 @@ Route::prefix('v1')->group(function (): void {
         // Marca pública (branding): nombre + logo del estudio para la pantalla de
         // acceso (sin auth). Con throttle para mitigar sondeo de slugs.
         Route::get('/marca', [MarcaEstudioController::class, 'mostrar'])->middleware('throttle:60,1')->name('marca');
+
+        // Embudo público (P0 #3): escaparate del estudio (identidad, próximas clases,
+        // precios, instructores, ubicación) y registro público de alumno (self-signup
+        // → auto-login). Sin auth; solo estudios listados en el directorio. Con throttle.
+        Route::get('/escaparate', EscaparateController::class)->middleware('throttle:60,1')->name('escaparate');
+        Route::post('/registro-alumno', RegistroAlumnoController::class)->middleware('throttle:login')->name('registro-alumno');
 
         Route::middleware(['estudio.auth', 'throttle:tenant'])->group(function (): void {
             Route::get('/yo', [AuthTenantController::class, 'yo'])->name('yo');
