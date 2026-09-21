@@ -61,6 +61,7 @@ use App\Modules\Tenancy\Http\Controllers\ExcepcionesHorarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\FacturacionController;
 use App\Modules\Tenancy\Http\Controllers\FacturaRentaController;
 use App\Modules\Tenancy\Http\Controllers\FacturasTenantController;
+use App\Modules\Tenancy\Http\Controllers\FichaMiembroTenantController;
 use App\Modules\Tenancy\Http\Controllers\FormulariosController;
 use App\Modules\Tenancy\Http\Controllers\FrontDeskTenantController;
 use App\Modules\Tenancy\Http\Controllers\GruposTenantController;
@@ -365,6 +366,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/miembros/{persona}/derechos', [MembresiasTenantController::class, 'derechos'])->middleware('puede:derechos.ver')->name('miembros.derechos.index');
             // Resumen operativo del miembro para Recepcion (P0): membresia, saldo, adeudo, alertas.
             Route::get('/miembros/{persona}/resumen', ResumenMiembroTenantController::class)->middleware('puede:miembros.ver')->name('miembros.resumen');
+            // Ficha 360° del alumno (P0 Etapa 1): derechos, historial de reservas y de compras.
+            Route::get('/miembros/{persona}/ficha', FichaMiembroTenantController::class)->middleware('puede:miembros.ver')->name('miembros.ficha');
             Route::post('/derechos/{derecho}/topups', [MembresiasTenantController::class, 'topUp'])->middleware('puede:membresias.gestionar')->name('derechos.topups.store');
 
             // Creditos (data plane del tenant): consumo directo y retenciones (holds)

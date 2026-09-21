@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 
 import { api, mensajeDeError } from '@/lib/api'
 import { useSesionTenantStore } from '@/stores/sesionTenant'
@@ -188,6 +189,12 @@ watch(() => props.personaId, cargar, { immediate: true })
               <dd class="text-right font-medium" :style="{ color: 'var(--aviso)' }">{{ resumen.documentos_pendientes }}</dd>
             </div>
           </dl>
+
+          <RouterLink
+            :to="{ name: 'ficha-miembro', params: { id: personaId } }"
+            class="tu-enlace mt-4 inline-block text-sm"
+            @click="emit('cerrar')"
+          >{{ $t('recepcion.miembro.verFicha') }} →</RouterLink>
 
           <!-- Venta rápida + cobro en ventanilla -->
           <div v-if="puedeVender" class="mt-5 border-t pt-4" :style="{ borderColor: 'var(--borde)' }">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import EncabezadoSeccion from '@/components/EncabezadoSeccion.vue'
 import PanelEditarMiembro, { type MiembroEditable } from '@/components/PanelEditarMiembro.vue'
@@ -232,7 +233,8 @@ onMounted(() => {
                   <td class="px-4 py-2">
                     <div class="flex items-center gap-3">
                       <span class="h-8 w-8 rounded-full inline-flex items-center justify-center text-xs font-bold text-white shrink-0" :style="{ background: 'var(--primario)' }" aria-hidden="true">{{ m.nombre.charAt(0).toUpperCase() }}</span>
-                      <span class="font-semibold">{{ nombreCompleto(m) }}</span>
+                      <RouterLink v-if="tipo === 'miembro'" :to="{ name: 'ficha-miembro', params: { id: m.id } }" class="font-semibold tu-enlace">{{ nombreCompleto(m) }}</RouterLink>
+                      <span v-else class="font-semibold">{{ nombreCompleto(m) }}</span>
                       <span v-if="tipo === 'miembro' && m.primera_vez" class="tu-badge tu-badge-aviso" :title="$t('miembros.nuevoAyuda')">{{ $t('miembros.nuevo') }}</span>
                     </div>
                   </td>
