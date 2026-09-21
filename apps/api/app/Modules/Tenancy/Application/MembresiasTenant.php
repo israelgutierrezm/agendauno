@@ -40,23 +40,71 @@ class MembresiasTenant
         ?int $rolloverMax = null,
         ?int $actividadId = null,
         ?int $sucursalId = null,
+        ?int $vigenciaDias = null,
     ): ProductoTenant {
-        $recurrente = $politicaReset !== PoliticaReset::Ninguno;
-
-        return ProductoTenant::query()->create([
+        return ProductoTenant::query()->create($this->normalizar([
             'nombre' => $nombre,
             'tipo' => $tipo,
             'precio_minor' => $precioMinor,
             'moneda' => $moneda,
             'ilimitado' => $ilimitado,
-            'creditos_incluidos' => $ilimitado ? null : $creditosIncluidos,
+            'creditos_incluidos' => $creditosIncluidos,
+            'vigencia_dias' => $vigenciaDias,
+            'archivado' => false,
             'politica_reset' => $politicaReset,
-            'unidades_por_ciclo' => ($ilimitado || ! $recurrente) ? null : $unidadesPorCiclo,
+            'unidades_por_ciclo' => $unidadesPorCiclo,
             'politica_rollover' => $politicaRollover,
-            'rollover_max' => $politicaRollover === PoliticaRollover::Limitado ? $rolloverMax : null,
+            'rollover_max' => $rolloverMax,
             'actividad_id' => $actividadId,
             'sucursal_id' => $sucursalId,
-        ]);
+        ]));
+    }
+
+    /**
+     * Edita un producto (editor completo). Recibe los atributos ya resueltos (enums,
+     * ids internos) y aplica las mismas reglas de coherencia que el alta. No toca los
+     * acuerdos/derechos ya vendidos: solo cambia la plantilla para ventas futuras.
+     *
+     * @param  array<string, mixed>  $atributos
+     */
+    public function actualizarProducto(ProductoTenant $producto, array $atributos): ProductoTenant
+    {
+        // Base = estado actual del producto; encima, los campos provistos.
+        $fusion = array_merge([
+            'ilimitado' => $producto->ilimitado,
+            'creditos_incluidos' => $producto->creditos_incluidos,
+            'vigencia_dias' => $producto->vigencia_dias,
+            'archivado' => $producto->archivado,
+            'politica_reset' => $producto->politica_reset,
+            'unidades_por_ciclo' => $producto->unidades_por_ciclo,
+            'politica_rollover' => $producto->politica_rollover,
+            'rollover_max' => $producto->rollover_max,
+        ], $atributos);
+
+        $producto->update($this->normalizar($fusion));
+
+        return $producto->refresh();
+    }
+
+    /**
+     * Reglas de coherencia de un producto: ilimitado no lleva créditos ni cupo por
+     * ciclo; sin recurrencia no hay cupo por ciclo; rollover_max solo si es limitado.
+     *
+     * @param  array<string, mixed>  $a
+     * @return array<string, mixed>
+     */
+    private function normalizar(array $a): array
+    {
+        $ilimitado = (bool) ($a['ilimitado'] ?? false);
+        $politicaReset = $a['politica_reset'] ?? PoliticaReset::Ninguno;
+        $politicaRollover = $a['politica_rollover'] ?? PoliticaRollover::Ninguno;
+        $recurrente = $politicaReset !== PoliticaReset::Ninguno;
+
+        $a['creditos_incluidos'] = $ilimitado ? null : ($a['creditos_incluidos'] ?? null);
+        $a['unidades_por_ciclo'] = ($ilimitado || ! $recurrente) ? null : ($a['unidades_por_ciclo'] ?? null);
+        $a['rollover_max'] = $politicaRollover === PoliticaRollover::Limitado ? ($a['rollover_max'] ?? null) : null;
+
+        return $a;
     }
 
     /**
@@ -85,6 +133,12 @@ class MembresiasTenant
                 ? $this->ventanaCiclo($politicaReset, $inicio)
                 : [null, null];
 
+            // Vigencia del producto → ventana de validez del derecho (feed del radar de
+            // retención y del control de acceso). Sin vigencia, no expira por fecha.
+            $validoHasta = $producto->vigencia_dias !== null
+                ? Carbon::parse($inicio)->addDays($producto->vigencia_dias)->toDateString()
+                : null;
+
             $derecho = $acuerdo->derechos()->create([
                 'ambito' => 'general',
                 'actividad_id' => $producto->actividad_id,
@@ -96,6 +150,8 @@ class MembresiasTenant
                 'rollover_max' => $producto->rollover_max,
                 'ciclo_inicio' => $cicloInicio,
                 'ciclo_fin' => $cicloFin,
+                'valido_desde' => $inicio,
+                'valido_hasta' => $validoHasta,
             ]);
 
             if (! $producto->ilimitado) {

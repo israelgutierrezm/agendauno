@@ -379,6 +379,8 @@ Route::prefix('v1')->group(function (): void {
             // ledger. La venta y las mutaciones del ledger son concurrency-safe.
             Route::get('/productos', [MembresiasTenantController::class, 'productos'])->middleware('puede:productos.ver')->name('productos.index');
             Route::post('/productos', [MembresiasTenantController::class, 'crearProducto'])->middleware('puede:productos.gestionar')->name('productos.store');
+            // Editor completo de membresías (Etapa 2): editar plantilla / archivar-reactivar.
+            Route::put('/productos/{producto}', [MembresiasTenantController::class, 'actualizarProducto'])->middleware('puede:productos.gestionar')->name('productos.update');
             Route::post('/acuerdos', [MembresiasTenantController::class, 'vender'])->middleware('puede:membresias.gestionar')->name('acuerdos.store');
             // Dunning (R10): morosidad de la membresia ante fallo de cobro.
             Route::get('/dunning', [DunningTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('dunning.index');

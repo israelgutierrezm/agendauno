@@ -26,8 +26,8 @@ class ProductoTenant extends Model
 
     protected $fillable = [
         'nombre', 'tipo', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos',
-        'actividad_id', 'sucursal_id', 'politica_reset', 'unidades_por_ciclo',
-        'politica_rollover', 'rollover_max',
+        'vigencia_dias', 'archivado', 'actividad_id', 'sucursal_id', 'politica_reset',
+        'unidades_por_ciclo', 'politica_rollover', 'rollover_max',
     ];
 
     /**
@@ -38,6 +38,8 @@ class ProductoTenant extends Model
         'precio_minor' => 'integer',
         'ilimitado' => 'boolean',
         'creditos_incluidos' => 'integer',
+        'vigencia_dias' => 'integer',
+        'archivado' => 'boolean',
         'politica_reset' => PoliticaReset::class,
         'politica_rollover' => PoliticaRollover::class,
         'unidades_por_ciclo' => 'integer',

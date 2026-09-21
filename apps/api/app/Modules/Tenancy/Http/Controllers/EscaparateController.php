@@ -91,6 +91,7 @@ class EscaparateController
     private function productos(): array
     {
         return ProductoTenant::query()
+            ->where('archivado', false)
             ->orderBy('precio_minor')
             ->get()
             ->map(static fn (ProductoTenant $p): array => [

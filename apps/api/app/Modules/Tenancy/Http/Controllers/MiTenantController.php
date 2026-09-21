@@ -239,7 +239,7 @@ class MiTenantController
      */
     public function productos(): JsonResponse
     {
-        $productos = ProductoTenant::query()->orderBy('precio_minor')->get();
+        $productos = ProductoTenant::query()->where('archivado', false)->orderBy('precio_minor')->get();
 
         return response()->json([
             'data' => $productos->map(static fn (ProductoTenant $p): array => [
