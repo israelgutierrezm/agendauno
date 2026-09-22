@@ -90,6 +90,7 @@ use App\Modules\Tenancy\Http\Controllers\PlantillasMensajeTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaController;
 use App\Modules\Tenancy\Http\Controllers\PoliticasCancelacionTenantController;
 use App\Modules\Tenancy\Http\Controllers\PromocionesTenantController;
+use App\Modules\Tenancy\Http\Controllers\PublicoCitasController;
 use App\Modules\Tenancy\Http\Controllers\PuntoDeVentaTenantController;
 use App\Modules\Tenancy\Http\Controllers\RecursosTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReembolsosTenantController;
@@ -189,6 +190,11 @@ Route::prefix('v1')->group(function (): void {
         // → auto-login). Sin auth; solo estudios listados en el directorio. Con throttle.
         Route::get('/escaparate', EscaparateController::class)->middleware('throttle:60,1')->name('escaparate');
         Route::post('/registro-alumno', RegistroAlumnoController::class)->middleware('throttle:login')->name('registro-alumno');
+
+        // Citas públicas (guest, sin cuenta): agendar una cita desde un hueco y pagarla
+        // en línea (el orden_id devuelto es la capacidad para pagar). Solo directorio.
+        Route::post('/citas', [PublicoCitasController::class, 'agendar'])->middleware('throttle:login')->name('citas.agendar');
+        Route::post('/citas/pagar', [PublicoCitasController::class, 'pagar'])->middleware('throttle:login')->name('citas.pagar');
 
         Route::middleware(['estudio.auth', 'throttle:tenant'])->group(function (): void {
             Route::get('/yo', [AuthTenantController::class, 'yo'])->name('yo');
