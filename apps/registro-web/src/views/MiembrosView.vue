@@ -6,6 +6,7 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelEditarMiembro, {
   type MiembroEditable,
 } from "@/components/PanelEditarMiembro.vue";
+import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -161,6 +162,24 @@ const form = ref({
   tipo: "miembro",
 });
 const guardando = ref(false);
+const abiertoAlta = ref(false);
+
+function abrirAlta(): void {
+  form.value = {
+    nombre: "",
+    segundo_nombre: "",
+    primer_apellido: "",
+    segundo_apellido: "",
+    email: "",
+    tipo: tipo.value,
+  };
+  mensaje.value = null;
+  error.value = null;
+  abiertoAlta.value = true;
+}
+function cerrarAlta(): void {
+  abiertoAlta.value = false;
+}
 
 async function crear(): Promise<void> {
   guardando.value = true;
@@ -175,7 +194,7 @@ async function crear(): Promise<void> {
       email: form.value.email || null,
       tipo: form.value.tipo,
     });
-    mensaje.value = "ok";
+    const mismoTipo = form.value.tipo === tipo.value;
     form.value = {
       nombre: "",
       segundo_nombre: "",
@@ -184,7 +203,8 @@ async function crear(): Promise<void> {
       email: "",
       tipo: tipo.value,
     };
-    if (form.value.tipo === tipo.value) {
+    abiertoAlta.value = false;
+    if (mismoTipo) {
       recargarDesde1();
     }
   } catch (e) {
@@ -218,12 +238,22 @@ onMounted(() => {
 
 <template>
   <section class="mx-auto max-w-5xl px-4 py-8">
-    <EncabezadoSeccion
-      icono="miembros"
-      :titulo="$t('miembros.titulo')"
-      :subtitulo="$t('miembros.subtitulo')"
-      :total="meta?.total ?? 0"
-    />
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+      <EncabezadoSeccion
+        icono="miembros"
+        :titulo="$t('miembros.titulo')"
+        :subtitulo="$t('miembros.subtitulo')"
+        :total="meta?.total ?? 0"
+      />
+      <button
+        v-if="puedeGestionar"
+        class="tu-btn tu-btn-primario"
+        type="button"
+        @click="abrirAlta"
+      >
+        + {{ $t("miembros.crear") }}
+      </button>
+    </div>
 
     <!-- Alumnos / instructores -->
     <div
@@ -249,7 +279,7 @@ onMounted(() => {
       </button>
     </div>
 
-    <div class="mt-6 grid gap-6 lg:grid-cols-[1fr_300px]">
+    <div class="mt-6">
       <div class="min-w-0">
         <!-- Búsqueda + filtros -->
         <div class="flex flex-wrap items-center gap-2">
@@ -470,47 +500,63 @@ onMounted(() => {
           </div>
         </template>
       </div>
+    </div>
 
-      <!-- Alta -->
-      <div v-if="puedeGestionar" class="tu-card p-5 h-max">
-        <h2 class="font-bold">{{ $t("miembros.nuevoTitulo") }}</h2>
-        <form class="mt-3 space-y-3" @submit.prevent="crear">
-          <div>
-            <label class="tu-label" for="mn">{{ $t("miembros.nombre") }}</label>
-            <input id="mn" v-model="form.nombre" class="tu-input" required />
-          </div>
-          <div>
-            <label class="tu-label" for="mpa">{{
-              $t("miembros.primerApellido")
-            }}</label>
-            <input id="mpa" v-model="form.primer_apellido" class="tu-input" />
-          </div>
-          <div>
-            <label class="tu-label" for="me">{{ $t("miembros.email") }}</label>
-            <input id="me" v-model="form.email" class="tu-input" type="email" />
-          </div>
-          <div>
-            <label class="tu-label" for="mt">{{ $t("miembros.tipo") }}</label>
-            <select id="mt" v-model="form.tipo" class="tu-input">
-              <option value="miembro">{{ $t("miembros.tipoMiembro") }}</option>
-              <option value="instructor">
-                {{ $t("miembros.tipoInstructor") }}
-              </option>
-            </select>
-          </div>
-          <p v-if="mensaje" class="text-sm" :style="{ color: 'var(--exito)' }">
-            {{ $t("miembros.creado") }}
-          </p>
+    <!-- Alta de miembro (drawer lateral) -->
+    <PanelLateral
+      :abierto="abiertoAlta"
+      :titulo="$t('miembros.nuevoTitulo')"
+      @cerrar="cerrarAlta"
+    >
+      <form class="space-y-4" @submit.prevent="crear">
+        <div>
+          <label class="tu-label" for="mn">{{ $t("miembros.nombre") }}</label>
+          <input id="mn" v-model="form.nombre" class="tu-input" required />
+        </div>
+        <div>
+          <label class="tu-label" for="mpa">{{
+            $t("miembros.primerApellido")
+          }}</label>
+          <input id="mpa" v-model="form.primer_apellido" class="tu-input" />
+        </div>
+        <div>
+          <label class="tu-label" for="me">{{ $t("miembros.email") }}</label>
+          <input id="me" v-model="form.email" class="tu-input" type="email" />
+        </div>
+        <div>
+          <label class="tu-label" for="mt">{{ $t("miembros.tipo") }}</label>
+          <select id="mt" v-model="form.tipo" class="tu-input">
+            <option value="miembro">{{ $t("miembros.tipoMiembro") }}</option>
+            <option value="instructor">
+              {{ $t("miembros.tipoInstructor") }}
+            </option>
+          </select>
+        </div>
+        <p v-if="mensaje" class="text-sm" :style="{ color: 'var(--exito)' }">
+          {{ $t("miembros.creado") }}
+        </p>
+      </form>
+
+      <template #pie>
+        <div class="flex justify-end gap-2">
           <button
-            class="tu-btn tu-btn-primario w-full"
-            type="submit"
-            :disabled="guardando"
+            class="tu-btn tu-btn-fantasma"
+            type="button"
+            @click="cerrarAlta"
+          >
+            {{ $t("comun.cerrar") }}
+          </button>
+          <button
+            class="tu-btn tu-btn-primario"
+            type="button"
+            :disabled="guardando || form.nombre === ''"
+            @click="crear"
           >
             {{ guardando ? $t("miembros.creando") : $t("miembros.crear") }}
           </button>
-        </form>
-      </div>
-    </div>
+        </div>
+      </template>
+    </PanelLateral>
 
     <PanelEditarMiembro
       v-if="editando"

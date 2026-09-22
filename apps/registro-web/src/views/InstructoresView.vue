@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -33,6 +34,17 @@ const hayMultiSucursal = computed(() => sucursales.value.length > 1);
 const form = ref({ nombre: "", email: "", sucursalId: "" });
 const invitando = ref(false);
 const activacion = ref<Activacion | null>(null);
+const abierto = ref(false);
+
+function abrir(): void {
+  form.value = { nombre: "", email: "", sucursalId: "" };
+  activacion.value = null;
+  error.value = null;
+  abierto.value = true;
+}
+function cerrar(): void {
+  abierto.value = false;
+}
 
 async function cargar(): Promise<void> {
   cargando.value = true;
@@ -82,12 +94,22 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-4xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion
-      icono="instructores"
-      :titulo="$t('instructores.titulo')"
-      :subtitulo="$t('instructores.subtitulo')"
-      :total="instructores.length"
-    />
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+      <EncabezadoSeccion
+        icono="instructores"
+        :titulo="$t('instructores.titulo')"
+        :subtitulo="$t('instructores.subtitulo')"
+        :total="instructores.length"
+      />
+      <button
+        v-if="puedeInvitar"
+        class="tu-btn tu-btn-primario"
+        type="button"
+        @click="abrir"
+      >
+        + {{ $t("instructores.invitar.enviar") }}
+      </button>
+    </div>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -97,71 +119,6 @@ onMounted(cargar);
     </p>
 
     <template v-if="!cargando">
-      <!-- Invitar instructor -->
-      <div v-if="puedeInvitar" class="mt-6 tu-card p-6">
-        <h2 class="font-bold text-lg">
-          {{ $t("instructores.invitar.titulo") }}
-        </h2>
-        <form
-          class="mt-3 grid sm:grid-cols-3 gap-3 items-end"
-          @submit.prevent="invitar"
-        >
-          <div>
-            <label class="tu-label" for="in">{{
-              $t("instructores.invitar.nombre")
-            }}</label>
-            <input id="in" v-model="form.nombre" class="tu-input" required />
-          </div>
-          <div>
-            <label class="tu-label" for="ie">{{
-              $t("instructores.invitar.email")
-            }}</label>
-            <input
-              id="ie"
-              v-model="form.email"
-              class="tu-input"
-              type="email"
-              required
-            />
-          </div>
-          <div v-if="hayMultiSucursal">
-            <label class="tu-label" for="is">{{
-              $t("instructores.invitar.sede")
-            }}</label>
-            <select id="is" v-model="form.sucursalId" class="tu-input">
-              <option value="">
-                {{ $t("instructores.invitar.todasSedes") }}
-              </option>
-              <option v-for="s in sucursales" :key="s.id" :value="s.id">
-                {{ s.nombre }}
-              </option>
-            </select>
-          </div>
-          <button
-            class="tu-btn tu-btn-primario"
-            type="submit"
-            :disabled="invitando || form.nombre === '' || form.email === ''"
-          >
-            {{
-              invitando
-                ? $t("instructores.invitar.enviando")
-                : $t("instructores.invitar.enviar")
-            }}
-          </button>
-        </form>
-        <div
-          v-if="activacion"
-          class="mt-3 text-sm rounded-lg p-3"
-          :style="{
-            background: 'var(--primario-suave)',
-            color: 'var(--primario-fuerte)',
-          }"
-        >
-          {{ $t("instructores.invitar.creada", { email: activacion.email }) }}
-          <code class="block mt-1 break-all">{{ activacion.token }}</code>
-        </div>
-      </div>
-
       <!-- Lista -->
       <p
         v-if="instructores.length === 0"
@@ -186,5 +143,77 @@ onMounted(cargar);
         </li>
       </ul>
     </template>
+
+    <!-- Invitar instructor (drawer lateral) -->
+    <PanelLateral
+      :abierto="abierto"
+      :titulo="$t('instructores.invitar.titulo')"
+      @cerrar="cerrar"
+    >
+      <form class="space-y-4" @submit.prevent="invitar">
+        <div>
+          <label class="tu-label" for="in">{{
+            $t("instructores.invitar.nombre")
+          }}</label>
+          <input id="in" v-model="form.nombre" class="tu-input" required />
+        </div>
+        <div>
+          <label class="tu-label" for="ie">{{
+            $t("instructores.invitar.email")
+          }}</label>
+          <input
+            id="ie"
+            v-model="form.email"
+            class="tu-input"
+            type="email"
+            required
+          />
+        </div>
+        <div v-if="hayMultiSucursal">
+          <label class="tu-label" for="is">{{
+            $t("instructores.invitar.sede")
+          }}</label>
+          <select id="is" v-model="form.sucursalId" class="tu-input">
+            <option value="">
+              {{ $t("instructores.invitar.todasSedes") }}
+            </option>
+            <option v-for="s in sucursales" :key="s.id" :value="s.id">
+              {{ s.nombre }}
+            </option>
+          </select>
+        </div>
+      </form>
+      <div
+        v-if="activacion"
+        class="mt-4 text-sm rounded-lg p-3"
+        :style="{
+          background: 'var(--primario-suave)',
+          color: 'var(--primario-fuerte)',
+        }"
+      >
+        {{ $t("instructores.invitar.creada", { email: activacion.email }) }}
+        <code class="block mt-1 break-all">{{ activacion.token }}</code>
+      </div>
+
+      <template #pie>
+        <div class="flex justify-end gap-2">
+          <button class="tu-btn tu-btn-fantasma" type="button" @click="cerrar">
+            {{ $t("comun.cerrar") }}
+          </button>
+          <button
+            class="tu-btn tu-btn-primario"
+            type="button"
+            :disabled="invitando || form.nombre === '' || form.email === ''"
+            @click="invitar"
+          >
+            {{
+              invitando
+                ? $t("instructores.invitar.enviando")
+                : $t("instructores.invitar.enviar")
+            }}
+          </button>
+        </div>
+      </template>
+    </PanelLateral>
   </section>
 </template>

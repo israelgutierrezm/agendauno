@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import PanelLateral from "@/components/PanelLateral.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -315,152 +316,136 @@ onMounted(cargar);
       </template>
     </TablaDatos>
 
-    <!-- Modal: editar roles -->
-    <div
-      v-if="editando"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <!-- Editar roles y sedes (drawer lateral) -->
+    <PanelLateral
+      :abierto="editando !== null"
+      :titulo="$t('usuarios.editarRoles')"
+      @cerrar="cerrarEdicion"
     >
-      <div class="absolute inset-0 bg-black/50" @click="cerrarEdicion" />
-      <div class="relative tu-card w-full max-w-md p-6">
-        <div class="flex items-center justify-between">
-          <h2 class="font-bold text-lg">{{ $t("usuarios.editarRoles") }}</h2>
-          <button
-            class="tu-icono-btn"
-            :aria-label="$t('usuarios.cancelar')"
-            @click="cerrarEdicion"
+      <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+        {{ editando?.nombre }} ·
+        {{ editando?.email ?? $t("usuarios.sinCorreo") }}
+      </p>
+
+      <div class="mt-4 space-y-2">
+        <label
+          v-for="r in rolesDisponibles"
+          :key="r"
+          class="flex items-center gap-3 rounded-lg border p-3 cursor-pointer"
+          :style="{
+            borderColor: seleccion.has(r) ? 'var(--primario)' : 'var(--borde)',
+            opacity: rolBloqueado(r) ? 0.5 : 1,
+          }"
+        >
+          <input
+            type="checkbox"
+            :checked="seleccion.has(r)"
+            :disabled="rolBloqueado(r)"
+            @change="alternarRol(r)"
+          />
+          <span class="font-medium">{{ nombreRol(r) }}</span>
+        </label>
+      </div>
+
+      <!-- Sedes asignadas (RBAC con scope por sucursal, R19): solo con varias sedes. -->
+      <div
+        v-if="hayMultiSucursal"
+        class="mt-5 border-t pt-4"
+        :style="{ borderColor: 'var(--borde)' }"
+      >
+        <h3 class="font-semibold text-sm">
+          {{ $t("usuarios.sedesTitulo") }}
+        </h3>
+        <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("usuarios.sedesAyuda") }}
+        </p>
+
+        <ul v-if="asignacionesDeEditando.length > 0" class="mt-3 space-y-1.5">
+          <li
+            v-for="a in asignacionesDeEditando"
+            :key="a.id"
+            class="flex items-center justify-between gap-2 text-sm"
           >
-            ✕
+            <span>
+              <span class="font-medium">{{ a.sucursal }}</span>
+              <span class="tu-badge ml-2">{{ nombreRol(a.rol) }}</span>
+            </span>
+            <button
+              class="tu-enlace text-sm"
+              style="color: var(--error)"
+              type="button"
+              :disabled="guardandoSede"
+              @click="quitarSede(a)"
+            >
+              {{ $t("usuarios.sedeQuitar") }}
+            </button>
+          </li>
+        </ul>
+        <p v-else class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("usuarios.sedesVacio") }}
+        </p>
+
+        <div
+          v-if="sucursalesDisponibles.length > 0"
+          class="mt-3 flex flex-wrap items-end gap-2"
+        >
+          <div class="flex-1 min-w-[8rem]">
+            <label class="tu-label" for="sede-suc">{{
+              $t("usuarios.sedeSucursal")
+            }}</label>
+            <select
+              id="sede-suc"
+              v-model="nuevaSede.sucursalId"
+              class="tu-input"
+            >
+              <option value="">—</option>
+              <option
+                v-for="s in sucursalesDisponibles"
+                :key="s.id"
+                :value="s.id"
+              >
+                {{ s.nombre }}
+              </option>
+            </select>
+          </div>
+          <div class="min-w-[8rem]">
+            <label class="tu-label" for="sede-rol">{{
+              $t("usuarios.sedeRol")
+            }}</label>
+            <select id="sede-rol" v-model="nuevaSede.rol" class="tu-input">
+              <option v-for="r in ROLES_SEDE" :key="r" :value="r">
+                {{ nombreRol(r) }}
+              </option>
+            </select>
+          </div>
+          <button
+            class="tu-btn tu-btn-fantasma"
+            type="button"
+            :disabled="guardandoSede || nuevaSede.sucursalId === ''"
+            @click="asignarSede"
+          >
+            {{
+              guardandoSede
+                ? $t("usuarios.sedeAsignando")
+                : $t("usuarios.sedeAsignar")
+            }}
           </button>
         </div>
-        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ editando.nombre }} ·
-          {{ editando.email ?? $t("usuarios.sinCorreo") }}
-        </p>
+      </div>
 
-        <div class="mt-4 space-y-2">
-          <label
-            v-for="r in rolesDisponibles"
-            :key="r"
-            class="flex items-center gap-3 rounded-lg border p-3 cursor-pointer"
-            :style="{
-              borderColor: seleccion.has(r)
-                ? 'var(--primario)'
-                : 'var(--borde)',
-              opacity: rolBloqueado(r) ? 0.5 : 1,
-            }"
-          >
-            <input
-              type="checkbox"
-              :checked="seleccion.has(r)"
-              :disabled="rolBloqueado(r)"
-              @change="alternarRol(r)"
-            />
-            <span class="font-medium">{{ nombreRol(r) }}</span>
-          </label>
-        </div>
+      <p
+        v-if="soyDueno === false"
+        class="mt-3 text-xs"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("usuarios.duenoProtegido") }}
+      </p>
+      <p v-if="errorEdicion" class="mt-3 text-sm" style="color: var(--error)">
+        {{ errorEdicion }}
+      </p>
 
-        <!-- Sedes asignadas (RBAC con scope por sucursal, R19): solo con varias sedes. -->
-        <div
-          v-if="hayMultiSucursal"
-          class="mt-5 border-t pt-4"
-          :style="{ borderColor: 'var(--borde)' }"
-        >
-          <h3 class="font-semibold text-sm">
-            {{ $t("usuarios.sedesTitulo") }}
-          </h3>
-          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("usuarios.sedesAyuda") }}
-          </p>
-
-          <ul v-if="asignacionesDeEditando.length > 0" class="mt-3 space-y-1.5">
-            <li
-              v-for="a in asignacionesDeEditando"
-              :key="a.id"
-              class="flex items-center justify-between gap-2 text-sm"
-            >
-              <span>
-                <span class="font-medium">{{ a.sucursal }}</span>
-                <span class="tu-badge ml-2">{{ nombreRol(a.rol) }}</span>
-              </span>
-              <button
-                class="tu-enlace text-sm"
-                style="color: var(--error)"
-                type="button"
-                :disabled="guardandoSede"
-                @click="quitarSede(a)"
-              >
-                {{ $t("usuarios.sedeQuitar") }}
-              </button>
-            </li>
-          </ul>
-          <p
-            v-else
-            class="mt-3 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("usuarios.sedesVacio") }}
-          </p>
-
-          <div
-            v-if="sucursalesDisponibles.length > 0"
-            class="mt-3 flex flex-wrap items-end gap-2"
-          >
-            <div class="flex-1 min-w-[8rem]">
-              <label class="tu-label" for="sede-suc">{{
-                $t("usuarios.sedeSucursal")
-              }}</label>
-              <select
-                id="sede-suc"
-                v-model="nuevaSede.sucursalId"
-                class="tu-input"
-              >
-                <option value="">—</option>
-                <option
-                  v-for="s in sucursalesDisponibles"
-                  :key="s.id"
-                  :value="s.id"
-                >
-                  {{ s.nombre }}
-                </option>
-              </select>
-            </div>
-            <div class="min-w-[8rem]">
-              <label class="tu-label" for="sede-rol">{{
-                $t("usuarios.sedeRol")
-              }}</label>
-              <select id="sede-rol" v-model="nuevaSede.rol" class="tu-input">
-                <option v-for="r in ROLES_SEDE" :key="r" :value="r">
-                  {{ nombreRol(r) }}
-                </option>
-              </select>
-            </div>
-            <button
-              class="tu-btn tu-btn-fantasma"
-              type="button"
-              :disabled="guardandoSede || nuevaSede.sucursalId === ''"
-              @click="asignarSede"
-            >
-              {{
-                guardandoSede
-                  ? $t("usuarios.sedeAsignando")
-                  : $t("usuarios.sedeAsignar")
-              }}
-            </button>
-          </div>
-        </div>
-
-        <p
-          v-if="soyDueno === false"
-          class="mt-3 text-xs"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("usuarios.duenoProtegido") }}
-        </p>
-        <p v-if="errorEdicion" class="mt-3 text-sm" style="color: var(--error)">
-          {{ errorEdicion }}
-        </p>
-
-        <div class="mt-5 flex justify-end gap-2">
+      <template #pie>
+        <div class="flex justify-end gap-2">
           <button
             class="tu-btn tu-btn-fantasma"
             type="button"
@@ -477,7 +462,7 @@ onMounted(cargar);
             {{ guardando ? $t("usuarios.guardando") : $t("usuarios.guardar") }}
           </button>
         </div>
-      </div>
-    </div>
+      </template>
+    </PanelLateral>
   </section>
 </template>
