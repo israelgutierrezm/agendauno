@@ -386,6 +386,7 @@ export default {
     noDisponible: "Este estudio no está disponible por ahora.",
     volverDirectorio: "← Volver a la comunidad",
     reservar: "Reservar primera clase",
+    agendarCita: "Agendar una cita",
     crearCuenta: "Crear cuenta y empezar",
     yaSoyAlumno: "Ya soy alumno · Entrar",
     proximasClases: "Próximas clases",

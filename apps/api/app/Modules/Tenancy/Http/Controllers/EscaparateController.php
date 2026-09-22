@@ -7,10 +7,12 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Reservas\EstadoReserva;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\PoliticaReservaTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,6 +47,10 @@ class EscaparateController
                 'ciudad' => $estudio->ciudad,
                 'pais' => $estudio->pais,
                 'whatsapp' => $estudio->whatsappCompleto(),
+                // ¿Ofrece servicios agendables como cita en línea? (para el CTA de reserva).
+                'tiene_citas' => OfertaTenant::query()
+                    ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
+                    ->exists(),
             ],
             'sucursales' => $this->sucursales(),
             'instructores' => $this->instructores(),

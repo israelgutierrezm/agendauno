@@ -40,6 +40,7 @@ interface Escaparate {
     ciudad: string | null;
     pais: string | null;
     whatsapp: string | null;
+    tiene_citas: boolean;
   };
   sucursales: Sucursal[];
   instructores: string[];
@@ -220,9 +221,24 @@ onMounted(cargar);
           </p>
 
           <div class="mt-7 flex flex-wrap justify-center gap-3">
+            <RouterLink
+              v-if="escaparate.estudio.tiene_citas"
+              :to="{ name: 'agendar-cita', params: { slug } }"
+              class="tu-btn tu-btn-primario px-6"
+              @click="
+                trackEvent('book_appointment_clicked', { source: 'hero' })
+              "
+            >
+              {{ $t("escaparate.agendarCita") }}
+            </RouterLink>
             <button
               type="button"
-              class="tu-btn tu-btn-primario px-6"
+              class="tu-btn px-6"
+              :class="
+                escaparate.estudio.tiene_citas
+                  ? 'tu-btn-fantasma'
+                  : 'tu-btn-primario'
+              "
               @click="abrirRegistro('hero')"
             >
               {{ $t("escaparate.reservar") }}

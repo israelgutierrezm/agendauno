@@ -39,6 +39,19 @@ it('el escaparate público muestra identidad, próximas clases, precios e instru
     expect($data['proximas_sesiones'][0]['clase'])->toBe('Nivel 1');
     expect($data['proximas_sesiones'][0]['lugares_libres'])->toBe(12);
     expect($data['instructores'])->toContain('Personal');
+    // Sin servicios de pago, no hay citas en línea (no se muestra el CTA).
+    expect($data['estudio']['tiene_citas'])->toBeFalse();
+});
+
+it('el escaparate marca tiene_citas cuando hay un servicio de pago', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sede = agendaSemilla($e);
+    $this->putJson("/api/v1/app/{$e['slug']}/ofertas/{$sede['oferta']}", [
+        'lugares' => 0, 'politica_reserva' => 'pago', 'precio_clase_minor' => 25000, 'duracion_minutos' => 30,
+    ], conBearer($e['bearer']))->assertOk();
+
+    $data = $this->getJson("/api/v1/app/{$e['slug']}/escaparate")->assertOk()->json('data');
+    expect($data['estudio']['tiene_citas'])->toBeTrue();
 });
 
 it('el escaparate no expone estudios fuera del directorio (404)', function (): void {
