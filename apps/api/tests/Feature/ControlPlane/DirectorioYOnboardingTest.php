@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Support\Facades\File;
 
 beforeEach(function (): void {
@@ -35,6 +36,36 @@ it('el directorio lista por defecto; el estudio puede optar por salirse o marcar
     expect($slugs)->not->toContain('estudio-privado');
     expect($slugs)->not->toContain('estudio-oculto');
     expect($data[0] ?? [])->not->toHaveKey('id'); // sin IDs internos
+});
+
+it('el directorio permite buscar por ubicación y filtrar por perfil sin exponer datos privados', function (): void {
+    $pilates = estudioConSesion('centro-pilates', 'pilates@correo.mx');
+    $yoga = estudioConSesion('casa-yoga', 'yoga@correo.mx');
+
+    Estudio::query()->where('slug', $pilates['slug'])->update([
+        'nombre' => 'Centro Pilates Norte',
+        'perfil_negocio' => 'pilates',
+        'ciudad' => 'Monterrey',
+        'pais' => 'MX',
+    ]);
+    Estudio::query()->where('slug', $yoga['slug'])->update([
+        'nombre' => 'Casa Yoga Sur',
+        'perfil_negocio' => 'yoga',
+        'ciudad' => 'Puebla',
+        'pais' => 'MX',
+    ]);
+
+    $this->getJson('/api/v1/directorio?q=Monterrey')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.slug', 'centro-pilates')
+        ->assertJsonPath('data.0.perfil', 'pilates')
+        ->assertJsonMissingPath('data.0.contacto_email');
+
+    $this->getJson('/api/v1/directorio?perfil=yoga')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.slug', 'casa-yoga');
 });
 
 it('onboarding: guardar y continuar registra el progreso hasta completarlo', function (): void {
