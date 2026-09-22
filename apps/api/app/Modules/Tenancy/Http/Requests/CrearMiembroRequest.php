@@ -24,6 +24,7 @@ class CrearMiembroRequest extends FormRequest
             'primer_apellido' => ['nullable', 'string', 'max:255'],
             'segundo_apellido' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
+            'celular' => ['nullable', 'string', 'max:40'],
             'tipo' => ['nullable', 'in:miembro,instructor,staff'],
             'es_facturable' => ['nullable', 'boolean'],
             'sucursal_id' => ['nullable', 'string'],

@@ -163,6 +163,7 @@ class MiembrosTenantController
             'primer_apellido' => $request->validated('primer_apellido'),
             'segundo_apellido' => $request->validated('segundo_apellido'),
             'email' => $request->validated('email'),
+            'celular' => $request->validated('celular'),
             'tipo' => (string) $request->validated('tipo', TipoPersonaTenant::Miembro->value),
             'activo' => true,
             'es_facturable' => (bool) $request->validated('es_facturable', true),
@@ -220,17 +221,18 @@ class MiembrosTenantController
             'primer_apellido' => ['nullable', 'string', 'max:255'],
             'segundo_apellido' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
+            'celular' => ['nullable', 'string', 'max:40'],
             'sucursal_id' => ['nullable', 'string'],
             'activo' => ['sometimes', 'boolean'],
             'es_facturable' => ['sometimes', 'boolean'],
             'archivado' => ['sometimes', 'boolean'],
         ]);
 
-        $campos = ['nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email', 'activo', 'es_facturable', 'archivado', 'sucursal_id'];
+        $campos = ['nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email', 'celular', 'activo', 'es_facturable', 'archivado', 'sucursal_id'];
         $antes = $persona->only($campos);
 
         $cambios = [];
-        foreach (['nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email', 'activo', 'es_facturable', 'archivado'] as $campo) {
+        foreach (['nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email', 'celular', 'activo', 'es_facturable', 'archivado'] as $campo) {
             if ($request->has($campo)) {
                 $cambios[$campo] = $validado[$campo] ?? null;
             }
@@ -360,6 +362,7 @@ class MiembrosTenantController
             'segundo_apellido' => $persona->segundo_apellido,
             'nombre_completo' => $persona->nombreCompleto(),
             'email' => $persona->email,
+            'celular' => $persona->celular,
             'tipo' => $persona->tipo->value,
             'activo' => $persona->activo,
             'es_facturable' => $persona->es_facturable,

@@ -44,6 +44,7 @@ class PublicoCitasController
         $validado = $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
+            'celular' => ['nullable', 'string', 'max:40'],
             'oferta_id' => ['required', 'string'],
             'sucursal_id' => ['required', 'string'],
             'instructor_id' => ['required', 'string'],
@@ -126,6 +127,7 @@ class PublicoCitasController
         return PersonaTenant::query()->create([
             'nombre' => (string) $datos['nombre'],
             'email' => $email,
+            'celular' => isset($datos['celular']) && $datos['celular'] !== '' ? (string) $datos['celular'] : null,
             'tipo' => TipoPersonaTenant::Miembro->value,
             'activo' => true,
             'es_facturable' => true,

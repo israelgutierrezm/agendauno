@@ -50,6 +50,7 @@ class FichaMiembroTenantController
                 'id' => $persona->ulid,
                 'nombre_completo' => $persona->nombreCompleto(),
                 'email' => $persona->email,
+                'celular' => $persona->celular,
                 'tipo' => $persona->tipo->value,
                 'activo' => $persona->activo,
                 'es_facturable' => $persona->es_facturable,
