@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { RouterLink } from "vue-router";
 
+import BotonImportar from "@/components/BotonImportar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -103,12 +103,10 @@ onMounted(cargar);
         :total="instructores.length"
       />
       <div v-if="puedeInvitar" class="flex items-center gap-2 flex-wrap">
-        <RouterLink
-          :to="{ name: 'importar-instructores' }"
-          class="tu-btn tu-btn-fantasma"
-        >
-          ↑ {{ $t("nav.importar") }}
-        </RouterLink>
+        <BotonImportar
+          ruta="importar-instructores"
+          :texto="$t('nav.importar')"
+        />
         <button class="tu-btn tu-btn-primario" type="button" @click="abrir">
           + {{ $t("instructores.invitar.enviar") }}
         </button>

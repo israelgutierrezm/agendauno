@@ -6,6 +6,7 @@ import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import IconoNav from "@/components/IconoNav.vue";
 import LogoTurnoUno from "@/components/LogoTurnoUno.vue";
 import NavArbol from "@/components/NavArbol.vue";
+import AppToaster from "@/components/AppToaster.vue";
 import type { MenuItem, NavEstado } from "@/components/nav";
 import { trackEvent } from "@/lib/analytics";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -53,13 +54,6 @@ const MENU: MenuItem[] = [
         icono: "reportes",
         ruta: "retencion",
         permiso: "miembros.ver",
-      },
-      {
-        clave: "importar",
-        etiqueta: "nav.importar",
-        icono: "miembros",
-        ruta: "importar",
-        permiso: "miembros.gestionar",
       },
       {
         clave: "instructores",
@@ -705,7 +699,7 @@ onMounted(() => {
       </header>
 
       <main class="flex-1" :style="{ background: 'var(--fondo)' }">
-        <div class="mx-auto max-w-7xl">
+        <div class="mx-auto max-w-7xl md:px-4 lg:px-8">
           <RouterView />
         </div>
       </main>
@@ -826,6 +820,9 @@ onMounted(() => {
       </div>
     </footer>
   </div>
+
+  <!-- Notificaciones flotantes (toasts), montadas una sola vez para toda la app. -->
+  <AppToaster />
 </template>
 
 <style>

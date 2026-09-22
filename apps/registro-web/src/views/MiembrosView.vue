@@ -5,6 +5,7 @@ import { RouterLink } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import BarraListado from "@/components/BarraListado.vue";
+import BotonImportar from "@/components/BotonImportar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelEditarMiembro, {
@@ -13,8 +14,10 @@ import PanelEditarMiembro, {
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 const { t } = useI18n();
+const toast = useToastStore();
 
 interface Miembro {
   id: string;
@@ -232,6 +235,7 @@ const form = ref({
   primer_apellido: "",
   segundo_apellido: "",
   email: "",
+  celular: "",
   tipo: "miembro",
 });
 const guardando = ref(false);
@@ -244,6 +248,7 @@ function abrirAlta(): void {
     primer_apellido: "",
     segundo_apellido: "",
     email: "",
+    celular: "",
     tipo: tipo.value,
   };
   mensaje.value = null;
@@ -265,15 +270,18 @@ async function crear(): Promise<void> {
       primer_apellido: form.value.primer_apellido || null,
       segundo_apellido: form.value.segundo_apellido || null,
       email: form.value.email || null,
+      celular: form.value.celular || null,
       tipo: form.value.tipo,
     });
     const mismoTipo = form.value.tipo === tipo.value;
+    toast.exito(t("miembros.creado"));
     form.value = {
       nombre: "",
       segundo_nombre: "",
       primer_apellido: "",
       segundo_apellido: "",
       email: "",
+      celular: "",
       tipo: tipo.value,
     };
     abiertoAlta.value = false;
@@ -282,6 +290,7 @@ async function crear(): Promise<void> {
     }
   } catch (e) {
     error.value = mensajeDeError(e);
+    toast.error(error.value);
   } finally {
     guardando.value = false;
   }
@@ -318,13 +327,11 @@ onMounted(() => {
         :subtitulo="$t('miembros.subtitulo')"
         :total="meta?.total ?? 0"
       />
-      <RouterLink
+      <BotonImportar
         v-if="puedeGestionar"
-        :to="{ name: 'importar' }"
-        class="tu-btn tu-btn-fantasma shrink-0"
-      >
-        ↑ {{ $t("nav.importar") }}
-      </RouterLink>
+        ruta="importar"
+        :texto="$t('nav.importar')"
+      />
     </div>
 
     <div class="mt-6">
@@ -512,6 +519,10 @@ onMounted(() => {
         <div>
           <label class="tu-label" for="me">{{ $t("miembros.email") }}</label>
           <input id="me" v-model="form.email" class="tu-input" type="email" />
+        </div>
+        <div>
+          <label class="tu-label" for="mc">{{ $t("miembros.celular") }}</label>
+          <input id="mc" v-model="form.celular" class="tu-input" type="tel" />
         </div>
         <p v-if="mensaje" class="text-sm" :style="{ color: 'var(--exito)' }">
           {{ $t("miembros.creado") }}

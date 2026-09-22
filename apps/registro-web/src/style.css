@@ -37,8 +37,8 @@
   --aviso: #b64400; /* Ember */
   --aviso-suave: #fbe9dd;
   --sombra: none; /* Sin sombras: separación por color + hairline. */
-  --radio-tarjeta: 1.25rem; /* ~20px */
-  --radio-boton: 980px; /* Píldora */
+  --radio-tarjeta: 0.85rem; /* ~14px: redondeado suave, no exagerado */
+  --radio-boton: 0.6rem; /* ~10px: un poco redondeado, ya no píldora */
   color-scheme: light;
 }
 
@@ -226,7 +226,7 @@ h3 {
 
 .tu-nav-link {
   padding: 0.45rem 0.85rem;
-  border-radius: 980px;
+  border-radius: 0.6rem;
   font-weight: 500;
   font-size: 0.9rem;
   color: var(--texto-suave);
