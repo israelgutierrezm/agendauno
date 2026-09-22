@@ -245,6 +245,12 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      path: "/sedes",
+      name: "sedes",
+      component: () => import("@/views/SucursalesView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/documentos",
       name: "documentos",
       component: () => import("@/views/DocumentosView.vue"),

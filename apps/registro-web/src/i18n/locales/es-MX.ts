@@ -58,6 +58,7 @@ export default {
     pasarelas: "Pagos",
     integraciones: "Integraciones",
     configuracion: "Configuracion",
+    sedes: "Sucursales",
     contraer: "Contraer",
     grupos: {
       personas: "Personas",
@@ -1045,6 +1046,24 @@ export default {
     cargando: "Cargando…",
     noDisponible: "Este estudio no está disponible por ahora.",
     volver: "Ver otros negocios",
+  },
+  sedes: {
+    titulo: "Sucursales",
+    subtitulo:
+      "Las sedes de tu negocio. Cada una tiene su zona horaria, moneda e impuestos, y puedes acotar al personal a una.",
+    agregar: "Agregar sucursal",
+    vacio: "Aún no hay sucursales.",
+    editar: "Editar",
+    nueva: "Nueva sucursal",
+    editarTitulo: "Editar sucursal",
+    organizacion: "Organización",
+    nombre: "Nombre",
+    nombrePh: "Ej. Roma Norte",
+    region: "Región / zona",
+    zona: "Zona horaria",
+    moneda: "Moneda",
+    ivaLabel: "IVA (%)",
+    iva: "{n}% IVA",
   },
   usuarios: {
     titulo: "Usuarios",

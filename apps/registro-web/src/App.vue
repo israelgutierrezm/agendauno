@@ -258,6 +258,13 @@ const MENU: MenuItem[] = [
         permiso: "estudio.gestionar",
       },
       {
+        clave: "sedes",
+        etiqueta: "nav.sedes",
+        icono: "recursos",
+        ruta: "sedes",
+        permiso: "sucursales.ver",
+      },
+      {
         clave: "configuracion",
         etiqueta: "nav.configuracion",
         icono: "configuracion",
