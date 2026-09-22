@@ -168,6 +168,12 @@ class SembrarEstudioDemo extends Command
         // Multi-sucursal (R18): la sucursal como unidad de negocio (moneda + IVA 16%).
         $sucursal->fill(['region' => 'Centro', 'moneda' => 'MXN', 'impuesto_tasa_bps' => 1600])->save();
 
+        // Segunda sede: habilita revisar el alcance por sucursal (asignaciones de personal).
+        $organizacion->sucursales()->firstOrCreate(
+            ['nombre' => 'Condesa'],
+            ['zona_horaria' => 'America/Mexico_City', 'region' => 'Centro', 'moneda' => 'MXN', 'impuesto_tasa_bps' => 1600],
+        );
+
         return [$oferta, $sucursal];
     }
 

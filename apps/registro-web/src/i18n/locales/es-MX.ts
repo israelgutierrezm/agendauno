@@ -1064,6 +1064,15 @@ export default {
       instructor: "Instructor",
       miembro: "Miembro",
     },
+    sedesTitulo: "Sedes asignadas",
+    sedesAyuda:
+      "Sin sedes asignadas, esta persona ve todas las sucursales. Asígnale una o más para acotarla a ellas.",
+    sedesVacio: "Sin sedes: ve todas las sucursales.",
+    sedeSucursal: "Sucursal",
+    sedeRol: "Rol en la sede",
+    sedeAsignar: "Asignar",
+    sedeAsignando: "Asignando…",
+    sedeQuitar: "Quitar",
   },
   datosFiscales: {
     titulo: "Datos fiscales",

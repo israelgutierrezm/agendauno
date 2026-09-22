@@ -15,6 +15,20 @@ interface UsuarioRow {
   roles: string[];
   activo: boolean;
 }
+interface Sucursal {
+  id: string;
+  nombre: string;
+}
+interface Asignacion {
+  id: string;
+  usuario_id: string | null;
+  sucursal_id: string | null;
+  sucursal: string | null;
+  rol: string;
+}
+
+// Roles de staff que tienen sentido acotar a una sede (subconjunto de los asignables).
+const ROLES_SEDE = ["recepcionista", "instructor", "admin"] as const;
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -22,8 +36,13 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 const usuarios = ref<UsuarioRow[]>([]);
 const rolesDisponibles = ref<string[]>([]);
+const sucursales = ref<Sucursal[]>([]);
+const asignaciones = ref<Asignacion[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+
+// La asignación por sede solo aplica con varias sucursales (con una, es moot).
+const hayMultiSucursal = computed(() => sucursales.value.length > 1);
 
 // El usuario actual solo puede conceder/quitar el rol de dueño si él mismo lo tiene.
 const soyDueno = computed(() =>
@@ -46,15 +65,30 @@ function nombreRol(rol: string): string {
   return t(`usuarios.rol.${rol}`);
 }
 
+async function cargarAsignaciones(): Promise<void> {
+  const { data } = await api.get<{ data: Asignacion[] }>(
+    `${base.value}/asignaciones-personal`,
+  );
+  asignaciones.value = data.data;
+}
+
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const { data } = await api.get<{ data: UsuarioRow[]; roles: string[] }>(
-      `${base.value}/usuarios`,
-    );
-    usuarios.value = data.data;
-    rolesDisponibles.value = data.roles;
+    const [u, s] = await Promise.all([
+      api.get<{ data: UsuarioRow[]; roles: string[] }>(
+        `${base.value}/usuarios`,
+      ),
+      api.get<{ data: Sucursal[] }>(`${base.value}/sucursales`),
+    ]);
+    usuarios.value = u.data.data;
+    rolesDisponibles.value = u.data.roles;
+    sucursales.value = s.data.data;
+    // Las asignaciones por sede solo importan con varias sucursales.
+    if (hayMultiSucursal.value) {
+      await cargarAsignaciones();
+    }
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -62,9 +96,64 @@ async function cargar(): Promise<void> {
   }
 }
 
+// Asignaciones del usuario que se está editando.
+const asignacionesDeEditando = computed(() =>
+  editando.value === null
+    ? []
+    : asignaciones.value.filter((a) => a.usuario_id === editando.value?.id),
+);
+// Sucursales que aún no tiene asignadas (para el selector de alta).
+const sucursalesDisponibles = computed(() => {
+  const usadas = new Set(
+    asignacionesDeEditando.value.map((a) => a.sucursal_id),
+  );
+  return sucursales.value.filter((s) => !usadas.has(s.id));
+});
+
+const nuevaSede = ref<{ sucursalId: string; rol: string }>({
+  sucursalId: "",
+  rol: "recepcionista",
+});
+const guardandoSede = ref(false);
+
+async function asignarSede(): Promise<void> {
+  if (editando.value === null || nuevaSede.value.sucursalId === "") {
+    return;
+  }
+  guardandoSede.value = true;
+  errorEdicion.value = null;
+  try {
+    await api.put(`${base.value}/asignaciones-personal`, {
+      usuario_id: editando.value.id,
+      sucursal_id: nuevaSede.value.sucursalId,
+      rol: nuevaSede.value.rol,
+    });
+    nuevaSede.value = { sucursalId: "", rol: "recepcionista" };
+    await cargarAsignaciones();
+  } catch (e) {
+    errorEdicion.value = mensajeDeError(e);
+  } finally {
+    guardandoSede.value = false;
+  }
+}
+
+async function quitarSede(a: Asignacion): Promise<void> {
+  guardandoSede.value = true;
+  errorEdicion.value = null;
+  try {
+    await api.delete(`${base.value}/asignaciones-personal/${a.id}`);
+    await cargarAsignaciones();
+  } catch (e) {
+    errorEdicion.value = mensajeDeError(e);
+  } finally {
+    guardandoSede.value = false;
+  }
+}
+
 function abrirEdicion(u: UsuarioRow): void {
   editando.value = u;
   seleccion.value = new Set(u.roles);
+  nuevaSede.value = { sucursalId: "", rol: "recepcionista" };
   errorEdicion.value = null;
 }
 
@@ -268,6 +357,96 @@ onMounted(cargar);
             />
             <span class="font-medium">{{ nombreRol(r) }}</span>
           </label>
+        </div>
+
+        <!-- Sedes asignadas (RBAC con scope por sucursal, R19): solo con varias sedes. -->
+        <div
+          v-if="hayMultiSucursal"
+          class="mt-5 border-t pt-4"
+          :style="{ borderColor: 'var(--borde)' }"
+        >
+          <h3 class="font-semibold text-sm">
+            {{ $t("usuarios.sedesTitulo") }}
+          </h3>
+          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("usuarios.sedesAyuda") }}
+          </p>
+
+          <ul v-if="asignacionesDeEditando.length > 0" class="mt-3 space-y-1.5">
+            <li
+              v-for="a in asignacionesDeEditando"
+              :key="a.id"
+              class="flex items-center justify-between gap-2 text-sm"
+            >
+              <span>
+                <span class="font-medium">{{ a.sucursal }}</span>
+                <span class="tu-badge ml-2">{{ nombreRol(a.rol) }}</span>
+              </span>
+              <button
+                class="tu-enlace text-sm"
+                style="color: var(--error)"
+                type="button"
+                :disabled="guardandoSede"
+                @click="quitarSede(a)"
+              >
+                {{ $t("usuarios.sedeQuitar") }}
+              </button>
+            </li>
+          </ul>
+          <p
+            v-else
+            class="mt-3 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("usuarios.sedesVacio") }}
+          </p>
+
+          <div
+            v-if="sucursalesDisponibles.length > 0"
+            class="mt-3 flex flex-wrap items-end gap-2"
+          >
+            <div class="flex-1 min-w-[8rem]">
+              <label class="tu-label" for="sede-suc">{{
+                $t("usuarios.sedeSucursal")
+              }}</label>
+              <select
+                id="sede-suc"
+                v-model="nuevaSede.sucursalId"
+                class="tu-input"
+              >
+                <option value="">—</option>
+                <option
+                  v-for="s in sucursalesDisponibles"
+                  :key="s.id"
+                  :value="s.id"
+                >
+                  {{ s.nombre }}
+                </option>
+              </select>
+            </div>
+            <div class="min-w-[8rem]">
+              <label class="tu-label" for="sede-rol">{{
+                $t("usuarios.sedeRol")
+              }}</label>
+              <select id="sede-rol" v-model="nuevaSede.rol" class="tu-input">
+                <option v-for="r in ROLES_SEDE" :key="r" :value="r">
+                  {{ nombreRol(r) }}
+                </option>
+              </select>
+            </div>
+            <button
+              class="tu-btn tu-btn-fantasma"
+              type="button"
+              :disabled="guardandoSede || nuevaSede.sucursalId === ''"
+              @click="asignarSede"
+            >
+              {{
+                guardandoSede
+                  ? $t("usuarios.sedeAsignando")
+                  : $t("usuarios.sedeAsignar")
+              }}
+            </button>
+          </div>
         </div>
 
         <p
