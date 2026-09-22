@@ -73,6 +73,7 @@ use App\Modules\Tenancy\Http\Controllers\IntegracionApiTenantController;
 use App\Modules\Tenancy\Http\Controllers\IntegracionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\InventarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\LealtadTenantController;
+use App\Modules\Tenancy\Http\Controllers\LegalesPublicoController;
 use App\Modules\Tenancy\Http\Controllers\LlavesApiTenantController;
 use App\Modules\Tenancy\Http\Controllers\MarcaEstudioController;
 use App\Modules\Tenancy\Http\Controllers\MembresiasTenantController;
@@ -155,6 +156,8 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/registro', [RegistroEstudioController::class, 'store'])->middleware('throttle:login')->name('api.v1.registro');
     Route::get('/registro/slug', [RegistroEstudioController::class, 'disponibilidad'])->middleware('throttle:60,1')->name('api.v1.registro.slug');
     Route::get('/directorio', [DirectorioController::class, 'index'])->middleware('throttle:60,1')->name('api.v1.directorio');
+    // Documentos legales públicos (aviso de privacidad y términos) para el registro.
+    Route::get('/legales', LegalesPublicoController::class)->middleware('throttle:60,1')->name('api.v1.legales');
 
     // Administracion de plataforma (PlatformAdmin): token global, sin tenant. Ve todos
     // los estudios y gestiona credenciales globales (cuenta FacturAPI).
@@ -163,6 +166,9 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/estudios/{estudio}', [PlataformaController::class, 'actualizarEstudio'])->name('estudios.actualizar');
         Route::get('/configuracion', [PlataformaController::class, 'configuracion'])->name('configuracion');
         Route::put('/configuracion', [PlataformaController::class, 'guardarConfiguracion'])->name('configuracion.guardar');
+        // Documentos legales (aviso de privacidad y términos) mostrados en el registro.
+        Route::get('/legales', [PlataformaController::class, 'legales'])->name('legales');
+        Route::put('/legales', [PlataformaController::class, 'guardarLegales'])->name('legales.guardar');
         // Pasarelas de la plataforma (para cobrar la renta del SaaS): on/off + llaves test/prod.
         Route::get('/pasarelas', [PlataformaController::class, 'pasarelas'])->name('pasarelas');
         Route::put('/pasarelas/{proveedor}', [PlataformaController::class, 'guardarPasarela'])->name('pasarelas.guardar');

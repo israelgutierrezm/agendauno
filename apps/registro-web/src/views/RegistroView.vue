@@ -39,6 +39,17 @@ const whatsappNumero = ref("");
 const contactoEmail = ref("");
 const aceptaTerminos = ref(false);
 
+// Documentos legales (aviso de privacidad y terminos) que edita el superadmin y se
+// muestran al dar clic en el enlace correspondiente del registro.
+const legales = ref<{
+  aviso_privacidad: string | null;
+  terminos: string | null;
+}>({ aviso_privacidad: null, terminos: null });
+const legalAbierto = ref<"aviso" | "terminos" | null>(null);
+function verLegal(cual: "aviso" | "terminos"): void {
+  legalAbierto.value = cual;
+}
+
 // Ladas frecuentes (México por defecto).
 const PAISES = [
   { lada: "52", nombre: "México", bandera: "🇲🇽" },
@@ -221,7 +232,19 @@ function irActivar(): void {
   });
 }
 
-onMounted(() => trackEvent("studio_registration_started"));
+onMounted(() => {
+  trackEvent("studio_registration_started");
+  void api
+    .get<{
+      data: { aviso_privacidad: string | null; terminos: string | null };
+    }>("/api/v1/legales")
+    .then(({ data }) => {
+      legales.value = data.data;
+    })
+    .catch(() => {
+      // Sin legales configurados por el superadmin: los enlaces mostraran un aviso.
+    });
+});
 </script>
 
 <template>
@@ -350,6 +373,7 @@ onMounted(() => trackEvent("studio_registration_started"));
                 id="csegnombre"
                 v-model="contactoSegundoNombre"
                 class="tu-input"
+                :placeholder="$t('registro.opcional')"
               />
             </div>
             <div>
@@ -371,6 +395,7 @@ onMounted(() => trackEvent("studio_registration_started"));
                 id="cmaterno"
                 v-model="contactoSegundoApellido"
                 class="tu-input"
+                :placeholder="$t('registro.opcional')"
               />
             </div>
           </div>
@@ -383,7 +408,8 @@ onMounted(() => trackEvent("studio_registration_started"));
             <div class="flex gap-2">
               <select
                 v-model="whatsappPais"
-                class="tu-input w-24 shrink-0"
+                class="tu-input shrink-0"
+                style="width: 6.25rem"
                 :aria-label="$t('registro.whatsappPais')"
               >
                 <option v-for="p in PAISES" :key="p.lada" :value="p.lada">
@@ -418,15 +444,31 @@ onMounted(() => trackEvent("studio_registration_started"));
               {{ $t("registro.correoAyuda") }}
             </p>
           </div>
-          <label class="flex items-start gap-2 text-sm cursor-pointer">
+          <div class="flex items-start gap-2 text-sm">
             <input
+              id="acepta"
               v-model="aceptaTerminos"
               type="checkbox"
-              class="mt-1"
+              class="mt-1 shrink-0"
               required
             />
-            <span>{{ $t("registro.terminos") }}</span>
-          </label>
+            <span>
+              <label for="acepta" class="cursor-pointer">{{
+                $t("registro.aceptoInicio")
+              }}</label>
+              <button
+                type="button"
+                class="tu-enlace"
+                @click="verLegal('terminos')"
+              >
+                {{ $t("registro.terminosEnlace") }}</button
+              ><label for="acepta" class="cursor-pointer">
+                {{ $t("registro.yEl") }} </label
+              ><button type="button" class="tu-enlace" @click="verLegal('aviso')">
+                {{ $t("registro.avisoEnlace") }}</button
+              >.
+            </span>
+          </div>
         </template>
 
         <p v-if="error" class="text-sm" style="color: var(--error)">
@@ -508,6 +550,46 @@ onMounted(() => trackEvent("studio_registration_started"));
       >
         {{ $t("nav.entrar") }}
       </RouterLink>
+    </div>
+
+    <!-- Modal: aviso de privacidad / terminos (contenido del superadmin) -->
+    <div
+      v-if="legalAbierto"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      @click.self="legalAbierto = null"
+    >
+      <div class="absolute inset-0 bg-black/50" @click="legalAbierto = null" />
+      <div
+        class="relative tu-card flex max-h-[80vh] w-full max-w-2xl flex-col p-6"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-lg font-bold">
+            {{
+              legalAbierto === "aviso"
+                ? $t("registro.avisoTitulo")
+                : $t("registro.terminosTitulo")
+            }}
+          </h2>
+          <button
+            class="tu-icono-btn"
+            type="button"
+            :aria-label="$t('comun.cerrar')"
+            @click="legalAbierto = null"
+          >
+            ✕
+          </button>
+        </div>
+        <div
+          class="mt-3 overflow-y-auto whitespace-pre-wrap text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{
+            (legalAbierto === "aviso"
+              ? legales.aviso_privacidad
+              : legales.terminos) || $t("registro.legalVacio")
+          }}
+        </div>
+      </div>
     </div>
   </section>
 </template>

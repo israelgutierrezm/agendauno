@@ -49,6 +49,11 @@ const llaveInput = ref("");
 const guardando = ref(false);
 const mensaje = ref<string | null>(null);
 
+// Documentos legales (aviso de privacidad y términos) mostrados en el registro.
+const legales = ref({ aviso_privacidad: "", terminos: "" });
+const guardandoLegales = ref(false);
+const mensajeLegales = ref<string | null>(null);
+
 // Pasarelas de la plataforma (para cobrar la renta del SaaS).
 interface Pasarela {
   proveedor: string;
@@ -148,7 +153,7 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const [est, cfg, pas] = await Promise.all([
+    const [est, cfg, pas, leg] = await Promise.all([
       cliente.get<{ data: Estudio[] }>(
         "/api/v1/plataforma/estudios",
         encabezados(),
@@ -161,10 +166,17 @@ async function cargar(): Promise<void> {
         "/api/v1/plataforma/pasarelas",
         encabezados(),
       ),
+      cliente.get<{
+        data: { aviso_privacidad: string | null; terminos: string | null };
+      }>("/api/v1/plataforma/legales", encabezados()),
     ]);
     estudios.value = est.data.data;
     facturapiConfigurada.value = cfg.data.data.facturapi_configurada;
     pasarelas.value = pas.data.data;
+    legales.value = {
+      aviso_privacidad: leg.data.data.aviso_privacidad ?? "",
+      terminos: leg.data.data.terminos ?? "",
+    };
     for (const p of pasarelas.value) {
       pasarelaDraft.value[p.proveedor] = {
         activa: p.activa,
@@ -215,6 +227,33 @@ async function guardarLlave(): Promise<void> {
     error.value = t("plataforma.tokenInvalido");
   } finally {
     guardando.value = false;
+  }
+}
+
+async function guardarLegales(): Promise<void> {
+  guardandoLegales.value = true;
+  mensajeLegales.value = null;
+  error.value = null;
+  try {
+    const { data } = await cliente.put<{
+      data: { aviso_privacidad: string | null; terminos: string | null };
+    }>(
+      "/api/v1/plataforma/legales",
+      {
+        aviso_privacidad: legales.value.aviso_privacidad || null,
+        terminos: legales.value.terminos || null,
+      },
+      encabezados(),
+    );
+    legales.value = {
+      aviso_privacidad: data.data.aviso_privacidad ?? "",
+      terminos: data.data.terminos ?? "",
+    };
+    mensajeLegales.value = "ok";
+  } catch {
+    error.value = t("plataforma.tokenInvalido");
+  } finally {
+    guardandoLegales.value = false;
   }
 }
 
@@ -380,6 +419,58 @@ function borrar(): void {
         >
           {{ $t("plataforma.facturapi.guardado") }}
         </p>
+      </div>
+
+      <!-- Documentos legales (aviso de privacidad y términos) -->
+      <div class="mt-6 tu-card p-6">
+        <h2 class="font-bold">{{ $t("plataforma.legales.titulo") }}</h2>
+        <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("plataforma.legales.subtitulo") }}
+        </p>
+        <form class="mt-4 grid gap-4" @submit.prevent="guardarLegales">
+          <div>
+            <label class="tu-label" for="lg-aviso">{{
+              $t("plataforma.legales.aviso")
+            }}</label>
+            <textarea
+              id="lg-aviso"
+              v-model="legales.aviso_privacidad"
+              class="tu-input"
+              rows="6"
+            />
+          </div>
+          <div>
+            <label class="tu-label" for="lg-terminos">{{
+              $t("plataforma.legales.terminos")
+            }}</label>
+            <textarea
+              id="lg-terminos"
+              v-model="legales.terminos"
+              class="tu-input"
+              rows="6"
+            />
+          </div>
+          <div class="flex items-center gap-3">
+            <button
+              class="tu-btn tu-btn-primario"
+              type="submit"
+              :disabled="guardandoLegales"
+            >
+              {{
+                guardandoLegales
+                  ? $t("plataforma.legales.guardando")
+                  : $t("plataforma.legales.guardar")
+              }}
+            </button>
+            <p
+              v-if="mensajeLegales === 'ok'"
+              class="text-sm"
+              :style="{ color: 'var(--exito)' }"
+            >
+              {{ $t("plataforma.legales.guardado") }}
+            </p>
+          </div>
+        </form>
       </div>
 
       <!-- Pasarelas de cobro de la plataforma -->

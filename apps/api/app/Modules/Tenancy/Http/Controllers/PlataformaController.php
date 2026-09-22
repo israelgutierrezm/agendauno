@@ -167,4 +167,29 @@ class PlataformaController
             'facturapi_configurada' => ConfiguracionPlataforma::llaveFacturapi() !== null,
         ]]);
     }
+
+    /**
+     * Documentos legales de la plataforma (aviso de privacidad y términos) que se
+     * muestran en el registro de negocios. Los edita el superadministrador.
+     */
+    public function legales(): JsonResponse
+    {
+        return response()->json(['data' => [
+            'aviso_privacidad' => ConfiguracionPlataforma::obtener('aviso_privacidad'),
+            'terminos' => ConfiguracionPlataforma::obtener('terminos'),
+        ]]);
+    }
+
+    public function guardarLegales(Request $request): JsonResponse
+    {
+        $validado = $request->validate([
+            'aviso_privacidad' => ['nullable', 'string', 'max:50000'],
+            'terminos' => ['nullable', 'string', 'max:50000'],
+        ]);
+
+        ConfiguracionPlataforma::establecer('aviso_privacidad', $validado['aviso_privacidad'] ?? null);
+        ConfiguracionPlataforma::establecer('terminos', $validado['terminos'] ?? null);
+
+        return $this->legales();
+    }
 }

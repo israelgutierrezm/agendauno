@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import CampoContrasena from "@/components/CampoContrasena.vue";
@@ -16,6 +16,17 @@ const token = ref(String(route.query.token ?? ""));
 const password = ref("");
 const passwordConfirm = ref("");
 const errorLocal = ref<string | null>(null);
+
+// Si llegó desde el enlace del correo trae slug+email+token en la URL: no se piden
+// esos datos técnicos, solo definir la contraseña. `manual` los revela si hiciera falta.
+const manual = ref(false);
+const desdeCorreo = computed(
+  () =>
+    !manual.value &&
+    slug.value !== "" &&
+    email.value !== "" &&
+    token.value !== "",
+);
 
 async function enviar(): Promise<void> {
   errorLocal.value = null;
@@ -47,24 +58,45 @@ async function enviar(): Promise<void> {
     </p>
 
     <form class="mt-6 tu-card p-6 space-y-4" @submit.prevent="enviar">
-      <div>
-        <label class="tu-label" for="slug">{{ $t("entrar.slug") }}</label>
-        <input id="slug" v-model="slug" class="tu-input" required />
+      <!-- Llegó desde el enlace del correo: confirma la cuenta y solo pide contraseña. -->
+      <div
+        v-if="desdeCorreo"
+        class="rounded-lg p-3 text-sm"
+        :style="{
+          background: 'var(--primario-suave)',
+          color: 'var(--primario-fuerte)',
+        }"
+      >
+        {{ $t("activacion.desdeCorreo", { email }) }}
+        <button type="button" class="tu-enlace ml-1" @click="manual = true">
+          {{ $t("activacion.otrosDatos") }}
+        </button>
       </div>
-      <div>
-        <label class="tu-label" for="email">{{ $t("activacion.email") }}</label>
-        <input
-          id="email"
-          v-model="email"
-          class="tu-input"
-          type="email"
-          required
-        />
-      </div>
-      <div>
-        <label class="tu-label" for="token">{{ $t("activacion.token") }}</label>
-        <input id="token" v-model="token" class="tu-input" required />
-      </div>
+
+      <template v-if="!desdeCorreo">
+        <div>
+          <label class="tu-label" for="slug">{{ $t("entrar.slug") }}</label>
+          <input id="slug" v-model="slug" class="tu-input" required />
+        </div>
+        <div>
+          <label class="tu-label" for="email">{{
+            $t("activacion.email")
+          }}</label>
+          <input
+            id="email"
+            v-model="email"
+            class="tu-input"
+            type="email"
+            required
+          />
+        </div>
+        <div>
+          <label class="tu-label" for="token">{{
+            $t("activacion.token")
+          }}</label>
+          <input id="token" v-model="token" class="tu-input" required />
+        </div>
+      </template>
       <div>
         <label class="tu-label" for="pass">{{
           $t("activacion.password")

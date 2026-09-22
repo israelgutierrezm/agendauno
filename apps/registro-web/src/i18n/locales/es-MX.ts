@@ -321,6 +321,14 @@ export default {
     contactoEmail: "Tu correo",
     correoAyuda: "Con este correo activaras tu cuenta de propietario.",
     terminos: "Acepto los terminos y el aviso de privacidad",
+    aceptoInicio: "Acepto los",
+    terminosEnlace: "términos",
+    yEl: "y el",
+    avisoEnlace: "aviso de privacidad",
+    avisoTitulo: "Aviso de privacidad",
+    terminosTitulo: "Términos y condiciones",
+    legalVacio:
+      "Este documento aún no ha sido publicado. Escríbenos si tienes dudas.",
     pasoActual: "Paso {n} de 3",
     paso1: "El lugar",
     paso2: "Tus datos",
@@ -338,6 +346,7 @@ export default {
     whatsappPais: "País",
     whatsappNumeroPh: "55 1234 5678",
     whatsappAyuda: "Te contactaremos por aquí para ayudarte a arrancar.",
+    opcional: "Opcional",
     crear: "Crear estudio",
     creando: "Creando…",
     exitoTitulo: "¡Tu estudio esta listo!",
@@ -364,6 +373,8 @@ export default {
     activando: "Activando…",
     exito: "Cuenta activada. Ya puedes entrar.",
     irEntrar: "Entrar",
+    desdeCorreo: "Vas a activar la cuenta {email}. Solo define tu contraseña.",
+    otrosDatos: "Usar otros datos",
   },
   directorio: {
     etiqueta: "Comunidad AgendaUno",
@@ -1205,6 +1216,16 @@ export default {
       guardado: "Configuración guardada.",
       ayuda:
         "Se guarda cifrada y nunca se vuelve a mostrar. Deja vacío para borrarla.",
+    },
+    legales: {
+      titulo: "Documentos legales",
+      subtitulo:
+        "El aviso de privacidad y los términos que ven los negocios al registrarse.",
+      aviso: "Aviso de privacidad",
+      terminos: "Términos y condiciones",
+      guardar: "Guardar documentos",
+      guardando: "Guardando…",
+      guardado: "Documentos guardados.",
     },
     pasarelas: {
       titulo: "Pasarelas de cobro",

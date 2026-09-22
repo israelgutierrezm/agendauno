@@ -132,3 +132,28 @@ it('carga la llave de la cuenta FacturAPI sin devolverla nunca', function (): vo
     test()->getJson('/api/v1/plataforma/configuracion', conTokenPlataforma())
         ->assertOk()->assertJsonPath('data.facturapi_configurada', true);
 });
+
+it('el superadmin guarda aviso y términos y se ven en el endpoint público', function (): void {
+    Config::set('turnouno.plataforma.token', 'token-plataforma');
+
+    test()->putJson('/api/v1/plataforma/legales', [
+        'aviso_privacidad' => 'Nuestro aviso de privacidad.',
+        'terminos' => 'Términos y condiciones del servicio.',
+    ], conTokenPlataforma())
+        ->assertOk()
+        ->assertJsonPath('data.aviso_privacidad', 'Nuestro aviso de privacidad.')
+        ->assertJsonPath('data.terminos', 'Términos y condiciones del servicio.');
+
+    // El endpoint público (sin token) los entrega para el registro.
+    test()->getJson('/api/v1/legales')
+        ->assertOk()
+        ->assertJsonPath('data.aviso_privacidad', 'Nuestro aviso de privacidad.')
+        ->assertJsonPath('data.terminos', 'Términos y condiciones del servicio.');
+});
+
+it('el endpoint público de legales responde vacío si no se han configurado', function (): void {
+    test()->getJson('/api/v1/legales')
+        ->assertOk()
+        ->assertJsonPath('data.aviso_privacidad', null)
+        ->assertJsonPath('data.terminos', null);
+});
