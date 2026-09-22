@@ -54,6 +54,10 @@ class RegistrarEstudioRequest extends FormRequest
             'ciudad' => ['nullable', 'string', 'max:120'],
             'zona_horaria' => ['nullable', 'timezone'],
             'acepta_terminos' => ['accepted'],
+            // Anti-bots: token de reCAPTCHA v3 (se verifica en el controlador) y un
+            // campo trampa (honeypot) que debe llegar vacío; si un bot lo llena, falla.
+            'recaptcha_token' => ['nullable', 'string'],
+            'sitio_web' => ['prohibited'],
         ];
     }
 }

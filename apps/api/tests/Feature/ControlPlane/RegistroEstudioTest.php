@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 
 beforeEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
@@ -185,4 +187,51 @@ it('desambigua el enlace autogenerado cuando el nombre ya existe (sin error para
         'nombre' => 'Pole House', 'contacto_nombre' => 'Beto', 'contacto_primer_apellido' => 'Luna',
         'contacto_email' => 'beto@correo.mx', 'contacto_telefono' => '5598765432', 'acepta_terminos' => true,
     ])->assertCreated()->assertJsonPath('data.estudio.slug', 'pole-house-2');
+});
+
+it('rechaza el registro si el honeypot (sitio_web) viene lleno', function (): void {
+    $resp = test()->postJson('/api/v1/registro', [
+        'nombre' => 'Spam', 'slug' => 'spam-x',
+        'contacto_nombre' => 'Bot', 'contacto_primer_apellido' => 'X',
+        'contacto_email' => 'bot@correo.mx', 'contacto_telefono' => '5512345678',
+        'acepta_terminos' => true,
+        'sitio_web' => 'http://spam.example',
+    ])->assertStatus(422);
+
+    expect($resp->json('meta.errors.sitio_web'))->not->toBeNull();
+    expect(Estudio::query()->where('slug', 'spam-x')->exists())->toBeFalse();
+});
+
+/**
+ * @return array<string, mixed>
+ */
+function datosRegistroCaptcha(string $slug, string $email): array
+{
+    return [
+        'nombre' => 'Estudio', 'slug' => $slug,
+        'contacto_nombre' => 'Dueño', 'contacto_primer_apellido' => 'Demo',
+        'contacto_email' => $email, 'contacto_telefono' => '5512345678',
+        'acepta_terminos' => true, 'recaptcha_token' => 'token-cliente',
+    ];
+}
+
+it('con reCAPTCHA configurado rechaza un puntaje bajo', function (): void {
+    Config::set('turnouno.recaptcha.secret', 'test-secret');
+    Config::set('turnouno.recaptcha.min_score', 0.5);
+    Http::fake(fn () => Http::response(['success' => true, 'score' => 0.1]));
+
+    $resp = test()->postJson('/api/v1/registro', datosRegistroCaptcha('bajo', 'bajo@correo.mx'))
+        ->assertStatus(422);
+    expect($resp->json('meta.errors.recaptcha'))->not->toBeNull();
+    expect(Estudio::query()->where('slug', 'bajo')->exists())->toBeFalse();
+});
+
+it('con reCAPTCHA configurado acepta un puntaje alto', function (): void {
+    Config::set('turnouno.recaptcha.secret', 'test-secret');
+    Config::set('turnouno.recaptcha.min_score', 0.5);
+    Http::fake(fn () => Http::response(['success' => true, 'score' => 0.9]));
+
+    test()->postJson('/api/v1/registro', datosRegistroCaptcha('alto', 'alto@correo.mx'))
+        ->assertCreated();
+    expect(Estudio::query()->where('slug', 'alto')->exists())->toBeTrue();
 });

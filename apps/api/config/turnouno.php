@@ -64,4 +64,14 @@ return [
         'token' => env('PLATFORM_ADMIN_TOKEN'),
     ],
 
+    /*
+    | reCAPTCHA v3 (Google) para el registro público de negocios. Si no hay
+    | `secret` configurado, la verificación se omite (dev/local). Con secret, el
+    | token del cliente se valida contra Google y se rechaza bajo el umbral.
+    */
+    'recaptcha' => [
+        'secret' => env('RECAPTCHA_SECRET'),
+        'min_score' => (float) env('RECAPTCHA_MIN_SCORE', 0.5),
+    ],
+
 ];

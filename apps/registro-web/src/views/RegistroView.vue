@@ -50,6 +50,53 @@ function verLegal(cual: "aviso" | "terminos"): void {
   legalAbierto.value = cual;
 }
 
+// La direccion (slug) se sugiere automaticamente del nombre; «Personalizar» permite
+// cambiarla. Si no se personaliza, se manda vacia y el backend genera una unica.
+const personalizarSlug = ref(false);
+
+// Anti-bots: campo trampa (honeypot, oculto) + token de reCAPTCHA v3 si hay site key.
+const honeypot = ref("");
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as
+  | string
+  | undefined;
+
+let recaptchaCarga: Promise<void> | null = null;
+function cargarRecaptcha(siteKey: string): Promise<void> {
+  recaptchaCarga ??= new Promise<void>((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("recaptcha"));
+    document.head.appendChild(s);
+  });
+  return recaptchaCarga;
+}
+
+interface Grecaptcha {
+  ready: (cb: () => void) => void;
+  execute: (key: string, opts: { action: string }) => Promise<string>;
+}
+async function tokenRecaptcha(): Promise<string | null> {
+  if (RECAPTCHA_SITE_KEY === undefined || RECAPTCHA_SITE_KEY === "") {
+    return null; // Sin site key no se exige captcha (dev).
+  }
+  try {
+    await cargarRecaptcha(RECAPTCHA_SITE_KEY);
+    const grecaptcha = (window as unknown as { grecaptcha: Grecaptcha })
+      .grecaptcha;
+    return await new Promise<string>((resolve, reject) => {
+      grecaptcha.ready(() => {
+        grecaptcha
+          .execute(RECAPTCHA_SITE_KEY, { action: "registro" })
+          .then(resolve, reject);
+      });
+    });
+  } catch {
+    return null;
+  }
+}
+
 // Ladas frecuentes (México por defecto).
 const PAISES = [
   { lada: "52", nombre: "México", bandera: "🇲🇽" },
@@ -129,8 +176,10 @@ const paso1Valido = computed(
     nombre.value.trim() !== "" &&
     perfilNegocio.value !== "" &&
     slug.value.trim().length >= 3 &&
-    slugDisponible.value !== false &&
-    !verificandoSlug.value,
+    // La disponibilidad solo bloquea si el dueno personalizo la direccion; si no,
+    // el backend genera una unica a partir del nombre.
+    (!personalizarSlug.value ||
+      (slugDisponible.value !== false && !verificandoSlug.value)),
 );
 const paso2Valido = computed(
   () =>
@@ -168,6 +217,7 @@ async function enviar(): Promise<void> {
   enviando.value = true;
   error.value = null;
   try {
+    const recaptchaToken = await tokenRecaptcha();
     const { data } = await api.post<{
       data: {
         estudio: { slug: string; nombre: string };
@@ -175,7 +225,11 @@ async function enviar(): Promise<void> {
       };
     }>("/api/v1/registro", {
       nombre: nombre.value,
-      slug: slug.value,
+      // Vacio = el backend genera la direccion unica del nombre; si el dueno la
+      // personalizo, se manda la elegida.
+      slug: personalizarSlug.value ? slug.value : "",
+      recaptcha_token: recaptchaToken,
+      sitio_web: honeypot.value,
       perfil_negocio: perfilNegocio.value,
       contacto_nombre: contactoNombre.value,
       contacto_segundo_nombre: contactoSegundoNombre.value || null,
@@ -322,11 +376,29 @@ onMounted(() => {
           </div>
           <div>
             <label class="tu-label" for="slug">{{ $t("registro.slug") }}</label>
+            <div v-if="!personalizarSlug" class="flex items-center gap-2">
+              <div
+                class="tu-input flex min-w-0 flex-1 items-center"
+                :style="{ background: 'var(--fondo-suave)' }"
+              >
+                <span class="truncate">{{ slug || "tu-negocio" }}</span>
+                <span :style="{ color: 'var(--texto-suave)' }"
+                  >.agendauno.mx</span
+                >
+              </div>
+              <button
+                type="button"
+                class="tu-btn tu-btn-fantasma shrink-0"
+                @click="personalizarSlug = true"
+              >
+                {{ $t("registro.personalizar") }}
+              </button>
+            </div>
             <input
+              v-else
               id="slug"
               :value="slug"
               class="tu-input"
-              required
               @input="editarSlug(($event.target as HTMLInputElement).value)"
             />
             <p
@@ -334,20 +406,34 @@ onMounted(() => {
               :style="{ color: 'var(--texto-suave)' }"
             >
               <span>{{
-                $t("registro.slugAyuda", { slug: slug || "mi-estudio" })
+                $t("registro.slugAyuda", { slug: slug || "tu-negocio" })
               }}</span>
-              <span v-if="verificandoSlug">·</span>
-              <span
-                v-else-if="slugDisponible === true"
-                class="tu-badge tu-badge-exito"
-                >{{ $t("registro.slugLibre") }}</span
-              >
-              <span
-                v-else-if="slugDisponible === false"
-                style="color: var(--error)"
-                >{{ $t("registro.slugOcupado") }}</span
-              >
+              <template v-if="personalizarSlug">
+                <span v-if="verificandoSlug">·</span>
+                <span
+                  v-else-if="slugDisponible === true"
+                  class="tu-badge tu-badge-exito"
+                  >{{ $t("registro.slugLibre") }}</span
+                >
+                <span
+                  v-else-if="slugDisponible === false"
+                  style="color: var(--error)"
+                  >{{ $t("registro.slugOcupado") }}</span
+                >
+              </template>
             </p>
+          </div>
+
+          <!-- Honeypot anti-bots: oculto para humanos; si se llena, es un bot. -->
+          <div class="hidden" aria-hidden="true">
+            <label for="sitio_web">No llenar</label>
+            <input
+              id="sitio_web"
+              v-model="honeypot"
+              type="text"
+              tabindex="-1"
+              autocomplete="off"
+            />
           </div>
         </template>
 

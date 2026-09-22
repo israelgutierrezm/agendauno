@@ -317,6 +317,7 @@ export default {
     slugAyuda: "Asi te encontraran: {slug}.agendauno.mx",
     slugLibre: "Disponible",
     slugOcupado: "No disponible",
+    personalizar: "Personalizar",
     contactoNombre: "Tu nombre",
     contactoEmail: "Tu correo",
     correoAyuda: "Con este correo activaras tu cuenta de propietario.",

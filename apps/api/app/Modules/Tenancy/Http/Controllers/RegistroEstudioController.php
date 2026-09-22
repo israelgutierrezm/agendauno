@@ -7,11 +7,13 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\AprovisionarEstudio;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\RegistrarEstudio;
+use App\Modules\Tenancy\Application\VerificarRecaptcha;
 use App\Modules\Tenancy\Http\Requests\RegistrarEstudioRequest;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Alta pública de un estudio (self-service). Crea el registro central, aprovisiona
@@ -25,6 +27,7 @@ class RegistroEstudioController
         private readonly RegistrarEstudio $registrar,
         private readonly AprovisionarEstudio $aprovisionar,
         private readonly EnviarActivacionTenant $enviarActivacion,
+        private readonly VerificarRecaptcha $recaptcha,
     ) {}
 
     public function disponibilidad(Request $request): JsonResponse
@@ -37,6 +40,13 @@ class RegistroEstudioController
 
     public function store(RegistrarEstudioRequest $request): JsonResponse
     {
+        // Anti-bots: reCAPTCHA v3 (se omite si no hay llaves configuradas).
+        if (! $this->recaptcha->aprobado($request->string('recaptcha_token')->value(), $request->ip())) {
+            throw ValidationException::withMessages([
+                'recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo.'],
+            ]);
+        }
+
         $estudio = $this->registrar->ejecutar([
             'nombre' => (string) $request->validated('nombre'),
             'slug' => (string) $request->validated('slug'),
