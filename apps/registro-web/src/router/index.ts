@@ -43,6 +43,12 @@ const router = createRouter({
       component: () => import("@/views/ReservarCitaView.vue"),
     },
     {
+      // Selector de sucursal (público): raíz del subdominio con varias sedes.
+      path: "/sucursales/:slug",
+      name: "sucursales-estudio",
+      component: () => import("@/views/SucursalesEstudioView.vue"),
+    },
+    {
       path: "/activar/:slug?",
       name: "activar",
       component: () => import("@/views/ActivacionView.vue"),
@@ -290,11 +296,12 @@ router.beforeEach(async (to) => {
   }
 
   // En el subdominio de un estudio (`{slug}.agendauno.mx`), la raíz no es la
-  // landing de marketing: aterriza directo en la página pública de ese estudio.
+  // landing de marketing: pasa por el selector de sucursal, que redirige solo
+  // cuando el estudio tiene una sola sede (o va directo a agendar/su página).
   if (String(to.name) === "inicio") {
     const slug = slugDeContexto();
     if (slug !== null) {
-      return { name: "estudio-publico", params: { slug } };
+      return { name: "sucursales-estudio", params: { slug } };
     }
   }
 

@@ -1034,6 +1034,14 @@ export default {
       "Tu lugar está apartado. El estudio te compartirá cómo completar el pago para confirmarlo.",
     otra: "Agendar otra cita",
   },
+  sucursalesPub: {
+    titulo: "Elige tu sucursal",
+    subtitulo:
+      "Este negocio tiene varias sedes. Selecciona en cuál quieres tu cita.",
+    cargando: "Cargando…",
+    noDisponible: "Este estudio no está disponible por ahora.",
+    volver: "Ver otros negocios",
+  },
   usuarios: {
     titulo: "Usuarios",
     subtitulo:

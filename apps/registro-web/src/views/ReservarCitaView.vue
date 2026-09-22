@@ -132,7 +132,12 @@ async function cargar(): Promise<void> {
       `/api/v1/app/${slug.value}/citas/opciones`,
     );
     opciones.value = data.data;
-    if (data.data.sucursales.length === 1) {
+    // Sede pre-seleccionada desde el selector de sucursal (?sucursal=<ulid>), o
+    // la única si solo hay una.
+    const preSuc = String(route.query.sucursal ?? "");
+    if (preSuc !== "" && data.data.sucursales.some((s) => s.id === preSuc)) {
+      sucursalId.value = preSuc;
+    } else if (data.data.sucursales.length === 1) {
       sucursalId.value = data.data.sucursales[0].id;
     }
   } catch {
