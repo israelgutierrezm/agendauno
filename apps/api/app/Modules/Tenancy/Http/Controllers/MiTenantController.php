@@ -169,7 +169,7 @@ class MiTenantController
                 $persona,
                 $monto,
                 'MXN',
-                $sesion->sucursal_id !== null ? (int) $sesion->sucursal_id : null,
+                (int) $sesion->sucursal_id,
             );
 
             return response()->json(['data' => $this->presentarReserva($reserva->load(['sesion.oferta', 'orden']))], 201);

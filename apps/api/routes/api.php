@@ -56,6 +56,7 @@ use App\Modules\Tenancy\Http\Controllers\CreditosTenantController;
 use App\Modules\Tenancy\Http\Controllers\DatosFiscalesTenantController;
 use App\Modules\Tenancy\Http\Controllers\DifusionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\DirectorioController;
+use App\Modules\Tenancy\Http\Controllers\DisponibilidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\DocumentosController;
 use App\Modules\Tenancy\Http\Controllers\DunningTenantController;
 use App\Modules\Tenancy\Http\Controllers\EscaparateController;
@@ -351,6 +352,12 @@ Route::prefix('v1')->group(function (): void {
 
             // Front desk (R13): vista de un dia en una sucursal con metricas.
             Route::get('/front-desk', [FrontDeskTenantController::class, 'dia'])->middleware('puede:agenda.ver')->name('front-desk.dia');
+
+            // Disponibilidad para citas (F-08): horario de atención del proveedor +
+            // huecos libres para agendar (elegir barbero → disponibilidad → agendar).
+            Route::get('/horarios-atencion', [DisponibilidadTenantController::class, 'horarios'])->middleware('puede:agenda.ver')->name('horarios-atencion.index');
+            Route::put('/horarios-atencion', [DisponibilidadTenantController::class, 'guardarHorarios'])->middleware('puede:agenda.gestionar')->name('horarios-atencion.guardar');
+            Route::get('/disponibilidad', [DisponibilidadTenantController::class, 'disponibilidad'])->middleware('puede:agenda.ver')->name('disponibilidad.index');
 
             // Agenda recurrente (R5): plantillas de horario (materializan sesiones con
             // serie_id), excepciones (feriados/cierres) y generacion bajo demanda.
