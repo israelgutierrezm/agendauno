@@ -92,7 +92,7 @@ onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-4xl px-4 py-10">
+  <section class="mx-auto max-w-6xl px-4 py-10">
     <div class="flex items-start justify-between gap-4 flex-wrap">
       <div>
         <h1 class="text-3xl font-extrabold">

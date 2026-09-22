@@ -116,7 +116,7 @@ onMounted(cargarStaff);
 </script>
 
 <template>
-  <section class="mx-auto max-w-3xl px-4 sm:px-6 py-8">
+  <section class="mx-auto max-w-5xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion
       icono="nomina"
       :titulo="$t('nomina.titulo')"

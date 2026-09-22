@@ -124,7 +124,7 @@ onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-4xl px-4 sm:px-6 py-8">
+  <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion
       icono="reportes"
       :titulo="$t('comunicaciones.titulo')"

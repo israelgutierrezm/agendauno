@@ -278,7 +278,7 @@ function borrar(): void {
 </script>
 
 <template>
-  <section class="mx-auto max-w-4xl px-4 sm:px-6 py-10">
+  <section class="mx-auto max-w-6xl px-4 sm:px-6 py-10">
     <!-- Puerta por token -->
     <div v-if="!autenticado" class="mx-auto max-w-sm tu-card p-6">
       <h1 class="font-bold text-xl">{{ $t("plataforma.titulo") }}</h1>

@@ -173,7 +173,7 @@ watch(personaId, cargar, { immediate: true });
 </script>
 
 <template>
-  <section class="mx-auto max-w-4xl px-4 py-8">
+  <section class="mx-auto max-w-6xl px-4 py-8">
     <RouterLink :to="{ name: 'miembros' }" class="tu-enlace text-sm"
       >← {{ $t("ficha.volver") }}</RouterLink
     >

@@ -310,36 +310,21 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="mx-auto max-w-5xl px-4 py-8">
-    <EncabezadoSeccion
-      icono="miembros"
-      :titulo="$t('miembros.titulo')"
-      :subtitulo="$t('miembros.subtitulo')"
-      :total="meta?.total ?? 0"
-    />
-
-    <!-- Alumnos / instructores -->
-    <div
-      class="mt-6 inline-flex rounded-lg border p-1"
-      :style="{ borderColor: 'var(--borde)' }"
-    >
-      <button
-        v-for="op in ['miembro', 'instructor'] as const"
-        :key="op"
-        type="button"
-        class="px-3 py-1.5 rounded-md text-sm font-semibold"
-        :style="{
-          background: tipo === op ? 'var(--primario)' : 'transparent',
-          color: tipo === op ? 'var(--primario-contraste)' : 'var(--texto)',
-        }"
-        @click="tipo = op"
+  <section class="mx-auto max-w-7xl px-4 py-8">
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+      <EncabezadoSeccion
+        icono="miembros"
+        :titulo="$t('miembros.titulo')"
+        :subtitulo="$t('miembros.subtitulo')"
+        :total="meta?.total ?? 0"
+      />
+      <RouterLink
+        v-if="puedeGestionar"
+        :to="{ name: 'importar' }"
+        class="tu-btn tu-btn-fantasma shrink-0"
       >
-        {{
-          op === "miembro"
-            ? $t("miembros.filtroMiembros")
-            : $t("miembros.filtroInstructores")
-        }}
-      </button>
+        ↑ {{ $t("nav.importar") }}
+      </RouterLink>
     </div>
 
     <div class="mt-6">
@@ -527,15 +512,6 @@ onMounted(() => {
         <div>
           <label class="tu-label" for="me">{{ $t("miembros.email") }}</label>
           <input id="me" v-model="form.email" class="tu-input" type="email" />
-        </div>
-        <div>
-          <label class="tu-label" for="mt">{{ $t("miembros.tipo") }}</label>
-          <select id="mt" v-model="form.tipo" class="tu-input">
-            <option value="miembro">{{ $t("miembros.tipoMiembro") }}</option>
-            <option value="instructor">
-              {{ $t("miembros.tipoInstructor") }}
-            </option>
-          </select>
         </div>
         <p v-if="mensaje" class="text-sm" :style="{ color: 'var(--exito)' }">
           {{ $t("miembros.creado") }}

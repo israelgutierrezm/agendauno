@@ -115,7 +115,7 @@ onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-3xl px-4 py-10">
+  <section class="mx-auto max-w-5xl px-4 py-10">
     <h1 class="text-3xl font-extrabold">{{ $t("pasarelas.titulo") }}</h1>
     <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("pasarelas.subtitulo") }}
