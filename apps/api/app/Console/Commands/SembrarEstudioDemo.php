@@ -14,6 +14,7 @@ use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -22,6 +23,7 @@ use App\Modules\Tenancy\Models\ProgramaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
@@ -99,6 +101,7 @@ class SembrarEstudioDemo extends Command
             $this->asignarSucursalDeCasa($sucursal);
             $this->venderPack($miembroEmail);
             $this->sembrarClases($oferta, $sucursal, $instructorEmail);
+            $this->sembrarCitas($instructorEmail);
         });
 
         $this->componentInfo($estudio, $slug, $password, $ownerEmail, $instructorEmail, $miembroEmail);
@@ -233,6 +236,43 @@ class SembrarEstudioDemo extends Command
                 'capacidad' => $oferta->capacidad,
                 'estado' => EstadoSesionTenant::Programada->value,
             ]);
+        }
+    }
+
+    /**
+     * Servicio de CITA (barbería) + horario de atención del instructor, para poder
+     * revisar el flujo de citas: elegir sede → barbero → hueco → agendar y pagar.
+     * Idempotente (no duplica ni el servicio ni las ventanas de atención).
+     */
+    private function sembrarCitas(string $instructorEmail): void
+    {
+        $instructor = Usuario::query()->where('email', $instructorEmail)->first();
+        if (! $instructor instanceof Usuario) {
+            return;
+        }
+
+        // Servicio agendable como cita: pago-para-reservar, 30 min, MXN 250.
+        $programa = ProgramaTenant::query()->firstOrCreate(['slug' => 'barberia'], ['nombre' => 'Barbería']);
+        $actividad = $programa->actividades()->firstOrCreate(['slug' => 'cortes'], ['nombre' => 'Cortes']);
+        $actividad->ofertas()->firstOrCreate(
+            ['nombre' => 'Corte de cabello'],
+            [
+                'modalidad' => ModalidadOfertaTenant::Individual->value,
+                'capacidad' => 1,
+                'politica_reserva' => PoliticaReservaTenant::Pago->value,
+                'precio_clase_minor' => 25000,
+                'duracion_minutos' => 30,
+            ],
+        );
+
+        // Horario de atención 09:00–18:00 (lun–dom) del instructor en cada sucursal.
+        foreach (SucursalTenant::query()->get() as $sucursal) {
+            for ($dia = 1; $dia <= 7; $dia++) {
+                HorarioAtencionTenant::query()->firstOrCreate(
+                    ['instructor_id' => $instructor->getKey(), 'sucursal_id' => $sucursal->getKey(), 'dia_semana' => $dia],
+                    ['hora_inicio' => '09:00', 'hora_fin' => '18:00'],
+                );
+            }
         }
     }
 
