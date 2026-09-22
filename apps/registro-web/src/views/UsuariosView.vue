@@ -66,6 +66,40 @@ function nombreRol(rol: string): string {
   return t(`usuarios.rol.${rol}`);
 }
 
+// Filtros estilo Acadion para la tabla (rol + estado). La coincidencia se resuelve
+// en `filtrarUsuario` porque el rol vive en un arreglo y el estado es booleano.
+const filtrosDef = computed(() => [
+  {
+    clave: "rol",
+    etiqueta: t("usuarios.colRoles"),
+    opciones: rolesDisponibles.value.map((r) => ({
+      valor: r,
+      texto: nombreRol(r),
+    })),
+  },
+  {
+    clave: "estado",
+    etiqueta: t("usuarios.colEstado"),
+    opciones: [
+      { valor: "activo", texto: t("usuarios.activo") },
+      { valor: "inactivo", texto: t("usuarios.inactivo") },
+    ],
+  },
+]);
+
+function filtrarUsuario(u: UsuarioRow, v: Record<string, string>): boolean {
+  if (v.rol !== undefined && v.rol !== "" && !u.roles.includes(v.rol)) {
+    return false;
+  }
+  if (v.estado === "activo" && !u.activo) {
+    return false;
+  }
+  if (v.estado === "inactivo" && u.activo) {
+    return false;
+  }
+  return true;
+}
+
 async function cargarAsignaciones(): Promise<void> {
   const { data } = await api.get<{ data: Asignacion[] }>(
     `${base.value}/asignaciones-personal`,
@@ -245,6 +279,8 @@ onMounted(cargar);
       :columnas="columnas"
       :filas="usuarios"
       :buscar-en="['nombre', 'email']"
+      :filtros="filtrosDef"
+      :filtrar-fila="filtrarUsuario"
       :vacio="$t('usuarios.vacio')"
     >
       <template #col-nombre="{ fila }">
