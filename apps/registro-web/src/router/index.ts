@@ -36,6 +36,12 @@ const router = createRouter({
       component: () => import("@/views/EstudioPublicoView.vue"),
     },
     {
+      // Agendar cita (público, guest): elegir servicio → persona → hueco → pagar.
+      path: "/agendar/:slug",
+      name: "agendar-cita",
+      component: () => import("@/views/ReservarCitaView.vue"),
+    },
+    {
       path: "/activar/:slug?",
       name: "activar",
       component: () => import("@/views/ActivacionView.vue"),

@@ -15,6 +15,7 @@ interface Oferta {
   lugares: number;
   precio_clase_minor: number | null;
   politica_reserva: Politica;
+  duracion_minutos: number | null;
   actividad: string | null;
 }
 
@@ -28,9 +29,15 @@ const error = ref<string | null>(null);
 
 // Oferta en edición (una a la vez) + su formulario.
 const editandoId = ref<string | null>(null);
-const form = ref<{ politica: Politica; precio: string; lugares: string }>({
+const form = ref<{
+  politica: Politica;
+  precio: string;
+  duracion: string;
+  lugares: string;
+}>({
   politica: "entitlement",
   precio: "",
+  duracion: "",
   lugares: "0",
 });
 const guardando = ref(false);
@@ -46,6 +53,14 @@ function dinero(minor: number | null): string {
 // Para el pago-al-agendar hace falta un precio mayor a 0.
 const precioInvalido = computed(
   () => form.value.politica === "pago" && (Number(form.value.precio) || 0) <= 0,
+);
+// El pago-al-agendar (cita) necesita duración para calcular los huecos.
+const duracionInvalida = computed(
+  () =>
+    form.value.politica === "pago" && (Number(form.value.duracion) || 0) <= 0,
+);
+const formInvalido = computed(
+  () => precioInvalido.value || duracionInvalida.value,
 );
 
 async function cargar(): Promise<void> {
@@ -68,6 +83,7 @@ function configurar(o: Oferta): void {
     politica: o.politica_reserva,
     precio:
       o.precio_clase_minor !== null ? String(o.precio_clase_minor / 100) : "",
+    duracion: o.duracion_minutos !== null ? String(o.duracion_minutos) : "",
     lugares: String(o.lugares),
   };
 }
@@ -76,18 +92,21 @@ function cerrar(): void {
 }
 
 async function guardar(o: Oferta): Promise<void> {
-  if (!puedeGestionar.value || precioInvalido.value) {
+  if (!puedeGestionar.value || formInvalido.value) {
     return;
   }
   guardando.value = true;
   error.value = null;
   try {
     const precioMinor = Math.round((Number(form.value.precio) || 0) * 100);
+    const duracion = Number(form.value.duracion) || 0;
     await api.put(`${base.value}/ofertas/${o.id}`, {
       lugares: Number(form.value.lugares) || 0,
       // Con pago, mandamos el precio; sin precio lo limpiamos (null).
       precio_clase_minor: precioMinor > 0 ? precioMinor : null,
       politica_reserva: form.value.politica,
+      // La duración solo aplica a citas; sin valor la limpiamos (null).
+      duracion_minutos: duracion > 0 ? duracion : null,
     });
     guardadoId.value = o.id;
     editandoId.value = null;
@@ -148,7 +167,10 @@ onMounted(cargar);
                   class="tu-badge tu-badge-aviso"
                 >
                   {{ $t("catalogo.badgePago") }} ·
-                  {{ dinero(o.precio_clase_minor) }}
+                  {{ dinero(o.precio_clase_minor)
+                  }}<template v-if="o.duracion_minutos">
+                    · {{ o.duracion_minutos }} min</template
+                  >
                 </span>
                 <span v-else class="tu-badge">{{
                   $t("catalogo.badgeEntitlement")
@@ -274,6 +296,31 @@ onMounted(cargar);
                   >{{ $t("catalogo.precioReq") }}</span
                 >
               </div>
+              <div v-if="form.politica === 'pago'">
+                <label class="tu-label" :for="`duracion-${o.id}`">{{
+                  $t("catalogo.duracion")
+                }}</label>
+                <input
+                  :id="`duracion-${o.id}`"
+                  v-model="form.duracion"
+                  type="number"
+                  min="5"
+                  step="5"
+                  class="tu-input"
+                  :style="
+                    duracionInvalida ? { borderColor: 'var(--error)' } : {}
+                  "
+                />
+                <span
+                  v-if="duracionInvalida"
+                  class="tu-hint"
+                  style="color: var(--error)"
+                  >{{ $t("catalogo.duracionReq") }}</span
+                >
+                <span v-else class="tu-hint">{{
+                  $t("catalogo.duracionAyuda")
+                }}</span>
+              </div>
               <div>
                 <label class="tu-label" :for="`lugares-${o.id}`">{{
                   $t("catalogo.lugares")
@@ -294,7 +341,7 @@ onMounted(cargar);
               <button
                 class="tu-btn tu-btn-primario"
                 type="button"
-                :disabled="guardando || precioInvalido"
+                :disabled="guardando || formInvalido"
                 @click="guardar(o)"
               >
                 {{
