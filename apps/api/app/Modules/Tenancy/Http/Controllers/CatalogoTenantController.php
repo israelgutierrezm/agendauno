@@ -90,6 +90,8 @@ class CatalogoTenantController
             // Política de reserva (citas): entitlement (default) o pago-para-reservar.
             'politica_reserva' => ['nullable', Rule::enum(PoliticaReservaTenant::class)],
             'precio_clase_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
+            // Duración del servicio como cita (minutos); solo la usan las ofertas de cita.
+            'duracion_minutos' => ['nullable', 'integer', 'min:5', 'max:1440'],
         ]);
 
         $oferta = $actividad->ofertas()->create([
@@ -99,6 +101,7 @@ class CatalogoTenantController
             'lugares' => (int) ($validado['lugares'] ?? 0),
             'politica_reserva' => $validado['politica_reserva'] ?? PoliticaReservaTenant::Entitlement->value,
             'precio_clase_minor' => isset($validado['precio_clase_minor']) ? (int) $validado['precio_clase_minor'] : null,
+            'duracion_minutos' => isset($validado['duracion_minutos']) ? (int) $validado['duracion_minutos'] : null,
         ]);
 
         return response()->json(['data' => $this->presentarOferta($oferta)], 201);
@@ -114,6 +117,7 @@ class CatalogoTenantController
             'lugares' => ['required', 'integer', 'min:0', 'max:1000'],
             'precio_clase_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
             'politica_reserva' => ['nullable', Rule::enum(PoliticaReservaTenant::class)],
+            'duracion_minutos' => ['nullable', 'integer', 'min:5', 'max:1440'],
         ]);
 
         $cambios = ['lugares' => (int) $validado['lugares']];
@@ -123,6 +127,10 @@ class CatalogoTenantController
         }
         if (isset($validado['politica_reserva'])) {
             $cambios['politica_reserva'] = $validado['politica_reserva'];
+        }
+        // La duración de la cita solo se toca si viene (null la limpia).
+        if ($request->has('duracion_minutos')) {
+            $cambios['duracion_minutos'] = $validado['duracion_minutos'] !== null ? (int) $validado['duracion_minutos'] : null;
         }
         $oferta->update($cambios);
 
@@ -159,6 +167,7 @@ class CatalogoTenantController
             'lugares' => $oferta->lugares,
             'precio_clase_minor' => $oferta->precio_clase_minor,
             'politica_reserva' => $oferta->politica_reserva->value,
+            'duracion_minutos' => $oferta->duracion_minutos,
         ];
     }
 }

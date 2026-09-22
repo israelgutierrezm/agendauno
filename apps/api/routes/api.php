@@ -191,8 +191,11 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/escaparate', EscaparateController::class)->middleware('throttle:60,1')->name('escaparate');
         Route::post('/registro-alumno', RegistroAlumnoController::class)->middleware('throttle:login')->name('registro-alumno');
 
-        // Citas públicas (guest, sin cuenta): agendar una cita desde un hueco y pagarla
-        // en línea (el orden_id devuelto es la capacidad para pagar). Solo directorio.
+        // Citas públicas (guest, sin cuenta): opciones (servicios/sucursales/barberos)
+        // y disponibilidad para elegir hueco; luego agendar y pagar en línea (el
+        // orden_id devuelto es la capacidad para pagar). Solo directorio.
+        Route::get('/citas/opciones', [PublicoCitasController::class, 'opciones'])->middleware('throttle:60,1')->name('citas.opciones');
+        Route::get('/citas/disponibilidad', [PublicoCitasController::class, 'disponibilidad'])->middleware('throttle:60,1')->name('citas.disponibilidad');
         Route::post('/citas', [PublicoCitasController::class, 'agendar'])->middleware('throttle:login')->name('citas.agendar');
         Route::post('/citas/pagar', [PublicoCitasController::class, 'pagar'])->middleware('throttle:login')->name('citas.pagar');
 

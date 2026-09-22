@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Ordenes\EstadoOrden;
 use App\Modules\Pagos\MetodoPago;
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
+use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -14,6 +15,7 @@ use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -33,7 +35,93 @@ class PublicoCitasController
     public function __construct(
         private readonly AgendarCitaTenant $agendar,
         private readonly CobrarOrdenTenant $cobrar,
+        private readonly CalcularDisponibilidadTenant $disponibilidad,
     ) {}
+
+    /**
+     * Opciones para agendar una cita (guest): servicios cobrables como cita
+     * (política = pago), sucursales y proveedores (barberos), todos por ULID —
+     * el identificador público. Solo estudios en el directorio.
+     */
+    public function opciones(Request $request): JsonResponse
+    {
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+        abort_unless($estudio->enDirectorio(), 404);
+
+        $servicios = OfertaTenant::query()
+            ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
+            ->orderBy('nombre')
+            ->get()
+            ->map(static fn (OfertaTenant $o): array => [
+                'id' => $o->ulid,
+                'nombre' => $o->nombre,
+                'precio_minor' => $o->precio_clase_minor,
+                'moneda' => 'MXN',
+                'duracion_minutos' => $o->duracion_minutos,
+            ])->all();
+
+        $sucursales = SucursalTenant::query()
+            ->orderBy('nombre')
+            ->get()
+            ->map(static fn (SucursalTenant $s): array => [
+                'id' => $s->ulid,
+                'nombre' => $s->nombre,
+                'zona_horaria' => $s->zona_horaria,
+            ])->all();
+
+        $instructores = Usuario::query()
+            ->whereJsonContains('roles', 'instructor')
+            ->orderBy('name')
+            ->get()
+            ->map(static fn (Usuario $u): array => [
+                'id' => $u->ulid,
+                'nombre' => (string) $u->name,
+            ])->all();
+
+        return response()->json(['data' => [
+            'estudio' => [
+                'slug' => $estudio->slug,
+                'nombre' => $estudio->nombre,
+                'logo_url' => $estudio->logo_url,
+            ],
+            'servicios' => $servicios,
+            'sucursales' => $sucursales,
+            'instructores' => $instructores,
+        ]]);
+    }
+
+    /**
+     * Huecos libres de un proveedor en una fecha (guest), para elegir hora antes de
+     * agendar. Reusa el mismo motor que la vista de staff. Solo directorio.
+     */
+    public function disponibilidad(Request $request): JsonResponse
+    {
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+        abort_unless($estudio->enDirectorio(), 404);
+
+        $validado = $request->validate([
+            'instructor_id' => ['required', 'string'],
+            'sucursal_id' => ['required', 'string'],
+            'fecha' => ['required', 'date_format:Y-m-d'],
+            'duracion_minutos' => ['required', 'integer', 'min:5', 'max:1440'],
+            'paso_minutos' => ['nullable', 'integer', 'min:5', 'max:1440'],
+        ]);
+
+        $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
+        $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
+
+        $slots = $this->disponibilidad->paraFecha(
+            (int) $instructor->getKey(),
+            $sucursal,
+            $validado['fecha'],
+            (int) $validado['duracion_minutos'],
+            isset($validado['paso_minutos']) ? (int) $validado['paso_minutos'] : null,
+        );
+
+        return response()->json(['data' => ['fecha' => $validado['fecha'], 'slots' => $slots]]);
+    }
 
     public function agendar(Request $request): JsonResponse
     {
