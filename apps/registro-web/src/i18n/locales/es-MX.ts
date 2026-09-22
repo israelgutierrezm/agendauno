@@ -32,6 +32,7 @@ export default {
     instructores: "Instructores",
     usuarios: "Usuarios",
     agenda: "Agenda",
+    horarios: "Horarios de atención",
     oportunidades: "Oportunidades",
     tareas: "Tareas",
     recepcion: "Recepción",
@@ -910,6 +911,50 @@ export default {
       enviando: "Invitando…",
       creada:
         "Invitación creada para {email}. Comparte este token de activación:",
+    },
+  },
+  horarios: {
+    titulo: "Horarios de atención",
+    subtitulo:
+      "Define en qué días y a qué horas atiende cada persona en cada sucursal. De aquí salen los huecos que verá tu cliente al agendar una cita.",
+    sucursal: "Sucursal",
+    proveedor: "¿Quién atiende?",
+    elegirSucursal: "Elige una sucursal",
+    elegirProveedor: "Elige a la persona",
+    seleccionaAmbos:
+      "Elige una sucursal y a la persona para configurar su horario de atención.",
+    sinProveedores:
+      "Aún no hay instructores. Invita al primero desde «Instructores» para poder darle horario.",
+    dias: {
+      "1": "Lunes",
+      "2": "Martes",
+      "3": "Miércoles",
+      "4": "Jueves",
+      "5": "Viernes",
+      "6": "Sábado",
+      "7": "Domingo",
+    },
+    desde: "Desde",
+    hasta: "Hasta",
+    agregarFranja: "+ Agregar franja",
+    quitarFranja: "Quitar franja",
+    copiar: "Aplicar a toda la semana",
+    cerrado: "Cerrado",
+    guardar: "Guardar horario",
+    guardando: "Guardando…",
+    guardado: "Horario guardado.",
+    rangoInvalido:
+      "Revisa las franjas: la hora de fin debe ser mayor que la de inicio.",
+    soloLectura: "No tienes permiso para editar horarios.",
+    preview: {
+      titulo: "Vista previa de huecos",
+      ayuda: "Comprueba cómo se verán los huecos disponibles para una cita.",
+      fecha: "Fecha",
+      duracion: "Duración (min)",
+      ver: "Ver huecos",
+      viendo: "Calculando…",
+      vacio: "No hay huecos ese día con esa duración.",
+      total: "{n} huecos disponibles",
     },
   },
   usuarios: {

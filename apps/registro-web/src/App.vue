@@ -90,6 +90,13 @@ const MENU: MenuItem[] = [
         permiso: "agenda.ver",
       },
       {
+        clave: "horarios",
+        etiqueta: "nav.horarios",
+        icono: "agenda",
+        ruta: "horarios",
+        permiso: "agenda.ver",
+      },
+      {
         clave: "oportunidades",
         etiqueta: "nav.oportunidades",
         icono: "oportunidades",
