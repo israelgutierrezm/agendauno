@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 
+import CargadorLogo from "@/components/CargadorLogo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -33,7 +34,7 @@ const pasoActual = computed(() => pasos.value[indice.value] ?? "");
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 // Modelos por paso.
-const logoUrl = ref("");
+const logoUrl = ref<string | null>(sesion.estudio?.logo_url ?? null);
 const suc = ref({ nombre: "", zona: "America/Mexico_City" });
 const act = ref({
   programa: "",
@@ -347,15 +348,13 @@ onMounted(cargar);
           <!-- marca -->
           <template v-if="pasoActual === 'marca'">
             <div>
-              <label class="tu-label" for="logo">{{
-                $t("onboarding.marca.logo")
-              }}</label>
-              <input
-                id="logo"
-                v-model="logoUrl"
-                class="tu-input"
-                placeholder="https://…"
-              />
+              <span class="tu-label">{{ $t("onboarding.marca.logo") }}</span>
+              <div class="mt-1">
+                <CargadorLogo
+                  :logo-url="logoUrl"
+                  @update:logo-url="logoUrl = $event"
+                />
+              </div>
             </div>
             <button
               class="tu-btn tu-btn-primario"
@@ -368,32 +367,53 @@ onMounted(cargar);
 
           <!-- sucursal -->
           <template v-else-if="pasoActual === 'sucursal'">
-            <div>
-              <label class="tu-label" for="sn">{{
-                $t("onboarding.sucursal.nombre")
-              }}</label>
-              <input
-                id="sn"
-                v-model="suc.nombre"
-                class="tu-input"
-                :placeholder="$t('onboarding.sucursal.nombrePh')"
-              />
-            </div>
-            <div>
-              <label class="tu-label" for="sz">{{
-                $t("onboarding.sucursal.zona")
-              }}</label>
-              <select id="sz" v-model="suc.zona" class="tu-input">
-                <option v-for="z in ZONAS" :key="z" :value="z">{{ z }}</option>
-              </select>
-            </div>
-            <button
-              class="tu-btn tu-btn-primario"
-              :disabled="guardando || suc.nombre.trim() === ''"
-              @click="crearSucursal"
-            >
-              {{ $t("onboarding.sucursal.crear") }}
-            </button>
+            <!-- Ya hay al menos una sede: se puede volver a agregar más desde Sucursales. -->
+            <template v-if="completados.has('sucursal')">
+              <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("onboarding.sucursal.yaTienes") }}
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <RouterLink
+                  :to="{ name: 'sedes' }"
+                  class="tu-btn tu-btn-fantasma"
+                >
+                  {{ $t("onboarding.sucursal.gestionar") }}
+                </RouterLink>
+                <button class="tu-btn tu-btn-primario" @click="avanzar">
+                  {{ $t("onboarding.siguiente") }}
+                </button>
+              </div>
+            </template>
+            <template v-else>
+              <div>
+                <label class="tu-label" for="sn">{{
+                  $t("onboarding.sucursal.nombre")
+                }}</label>
+                <input
+                  id="sn"
+                  v-model="suc.nombre"
+                  class="tu-input"
+                  :placeholder="$t('onboarding.sucursal.nombrePh')"
+                />
+              </div>
+              <div>
+                <label class="tu-label" for="sz">{{
+                  $t("onboarding.sucursal.zona")
+                }}</label>
+                <select id="sz" v-model="suc.zona" class="tu-input">
+                  <option v-for="z in ZONAS" :key="z" :value="z">
+                    {{ z }}
+                  </option>
+                </select>
+              </div>
+              <button
+                class="tu-btn tu-btn-primario"
+                :disabled="guardando || suc.nombre.trim() === ''"
+                @click="crearSucursal"
+              >
+                {{ $t("onboarding.sucursal.crear") }}
+              </button>
+            </template>
           </template>
 
           <!-- actividades -->

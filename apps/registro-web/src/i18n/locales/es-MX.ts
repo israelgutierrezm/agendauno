@@ -481,7 +481,7 @@ export default {
     },
     marca: {
       desc: "La identidad de tu estudio. El logo aparece en tu perfil publico.",
-      logo: "URL del logo (opcional)",
+      logo: "Logo (opcional)",
     },
     sucursal: {
       desc: "Crea tu primera sucursal. Su zona horaria define los horarios de clase.",
@@ -490,6 +490,9 @@ export default {
       zona: "Zona horaria",
       crear: "Crear sucursal",
       creada: "Sucursal creada: {nombre}",
+      yaTienes:
+        "Ya tienes tu primera sede. ¿Tienes más? Agrégalas o edítalas cuando quieras.",
+      gestionar: "Gestionar sucursales",
     },
     horarios: {
       desc: "Programa al menos un horario recurrente o una clase para poder recibir reservas.",
