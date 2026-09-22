@@ -106,6 +106,12 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      path: "/catalogo",
+      name: "catalogo",
+      component: () => import("@/views/CatalogoView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/facturas",
       name: "facturas",
       component: () => import("@/views/FacturasView.vue"),

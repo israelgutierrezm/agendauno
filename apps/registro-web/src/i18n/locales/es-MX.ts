@@ -41,6 +41,7 @@ export default {
     nomina: "Nómina",
     reportes: "Reportes",
     ventas: "Ventas",
+    catalogo: "Catálogo",
     pos: "Punto de venta",
     promociones: "Promociones",
     comunicaciones: "Comunicación",
@@ -956,6 +957,39 @@ export default {
       vacio: "No hay huecos ese día con esa duración.",
       total: "{n} huecos disponibles",
     },
+  },
+  catalogo: {
+    titulo: "Catálogo",
+    subtitulo:
+      "Tus clases y servicios: cómo se reservan y a qué precio. Marca un servicio como «pago al agendar» para venderlo como cita con cobro en línea.",
+    vacio:
+      "Aún no hay servicios en el catálogo. Créalos desde el onboarding o la agenda.",
+    modalidad: {
+      grupal: "Grupal",
+      privada: "Privada",
+      individual: "Individual",
+    },
+    politica: {
+      etiqueta: "¿Cómo se reserva?",
+      entitlement: "Con créditos o membresía",
+      pago: "Pago al agendar (cita)",
+      entitlementAyuda:
+        "El cliente reserva con su membresía o su paquete de créditos.",
+      pagoAyuda:
+        "El cliente paga en línea al momento de agendar. Ideal para citas: barbería, estética, servicios.",
+    },
+    precio: "Precio por cita",
+    moneda: "MXN",
+    precioReq: "Define un precio mayor a 0 para el pago al agendar.",
+    lugares: "Lugares numerados",
+    lugaresAyuda: "0 = sin numerar. Útil para salas con lugar asignado.",
+    configurar: "Configurar",
+    cerrar: "Cerrar",
+    guardar: "Guardar",
+    guardando: "Guardando…",
+    guardado: "Servicio actualizado.",
+    badgePago: "Cita con pago",
+    badgeEntitlement: "Con membresía",
   },
   usuarios: {
     titulo: "Usuarios",

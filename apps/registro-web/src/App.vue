@@ -146,6 +146,13 @@ const MENU: MenuItem[] = [
         permiso: "productos.ver",
       },
       {
+        clave: "catalogo",
+        etiqueta: "nav.catalogo",
+        icono: "ventas",
+        ruta: "catalogo",
+        permiso: "catalogo.ver",
+      },
+      {
         clave: "pos",
         etiqueta: "nav.pos",
         icono: "pos",
