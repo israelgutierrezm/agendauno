@@ -40,8 +40,13 @@ const q = ref("");
 const facturable = ref("");
 const estado = ref("");
 const archivado = ref("no");
+const sucursalFiltro = ref("");
 const page = ref(1);
 const perPage = 20;
+
+const sucursales = ref<{ id: string; nombre: string }[]>([]);
+// El filtro por sede solo aplica con varias sucursales (R19).
+const hayMultiSucursal = computed(() => sucursales.value.length > 1);
 
 const miembros = ref<Miembro[]>([]);
 const meta = ref<Meta | null>(null);
@@ -66,6 +71,7 @@ async function cargar(): Promise<void> {
           facturable: facturable.value || undefined,
           estado: estado.value || undefined,
           archivado: archivado.value,
+          sucursal_id: sucursalFiltro.value || undefined,
           page: page.value,
           per_page: perPage,
         },
@@ -90,7 +96,7 @@ watch(q, () => {
   clearTimeout(tempQ);
   tempQ = setTimeout(recargarDesde1, 300);
 });
-watch([tipo, facturable, estado, archivado], recargarDesde1);
+watch([tipo, facturable, estado, archivado, sucursalFiltro], recargarDesde1);
 
 function irPagina(n: number): void {
   if (meta.value === null || n < 1 || n > meta.value.ultima_pagina) {
@@ -191,8 +197,21 @@ async function crear(): Promise<void> {
 watch(tipo, () => {
   form.value.tipo = tipo.value;
 });
+async function cargarSucursales(): Promise<void> {
+  try {
+    const { data } = await api.get<{ data: { id: string; nombre: string }[] }>(
+      `${base.value}/sucursales`,
+    );
+    sucursales.value = data.data;
+  } catch {
+    // Sin permiso de sucursales o sin sedes: el filtro simplemente no aparece.
+    sucursales.value = [];
+  }
+}
+
 onMounted(() => {
   form.value.tipo = tipo.value;
+  void cargarSucursales();
   void cargar();
 });
 </script>
@@ -275,6 +294,17 @@ onMounted(() => {
                 {{ $t("miembros.filtros.archivados") }}
               </option>
               <option value="todos">{{ $t("miembros.filtros.todos") }}</option>
+            </select>
+            <select
+              v-if="hayMultiSucursal"
+              v-model="sucursalFiltro"
+              class="tu-input w-auto"
+              :aria-label="$t('miembros.filtros.sede')"
+            >
+              <option value="">{{ $t("miembros.filtros.todasSedes") }}</option>
+              <option v-for="s in sucursales" :key="s.id" :value="s.id">
+                {{ s.nombre }}
+              </option>
             </select>
           </template>
         </div>

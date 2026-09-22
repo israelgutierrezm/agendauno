@@ -607,6 +607,8 @@ export default {
       activos: "Activos",
       archivados: "Archivados",
       todos: "Todos",
+      sede: "Sede",
+      todasSedes: "Todas las sedes",
     },
     editar: {
       abrir: "Editar",
@@ -910,6 +912,8 @@ export default {
       titulo: "Invitar instructor",
       nombre: "Nombre",
       email: "Correo",
+      sede: "Sede",
+      todasSedes: "Todas las sedes",
       enviar: "Invitar",
       enviando: "Invitando…",
       creada:

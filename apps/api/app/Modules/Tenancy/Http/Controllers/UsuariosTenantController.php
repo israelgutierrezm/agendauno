@@ -6,7 +6,9 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
+use App\Modules\Tenancy\Models\AsignacionPersonalTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -66,12 +68,19 @@ class UsuariosTenantController
             'nombre' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
             'rol' => ['required', Rule::in(CatalogoDePermisosTenant::rolesAsignables())],
+            // Sede opcional: si viene, el usuario queda ACOTADO a ella desde el alta (R19).
+            'sucursal_id' => ['nullable', 'string'],
         ]);
 
         // Email único dentro de la BD del tenant.
         if (Usuario::query()->where('email', $validado['email'])->exists()) {
             throw ValidationException::withMessages(['email' => ['Ya existe un usuario con ese correo en este estudio.']]);
         }
+
+        // Si se pide sede, se resuelve ANTES de crear el usuario (falla limpio si no existe).
+        $sucursal = isset($validado['sucursal_id']) && $validado['sucursal_id'] !== ''
+            ? SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail()
+            : null;
 
         $usuario = Usuario::query()->create([
             'name' => $validado['nombre'],
@@ -81,6 +90,15 @@ class UsuariosTenantController
             'activo' => false,
             'password' => null,
         ]);
+
+        // Asignación de sede (acota al usuario a esa sucursal con su rol).
+        if ($sucursal instanceof SucursalTenant) {
+            AsignacionPersonalTenant::query()->create([
+                'usuario_id' => $usuario->getKey(),
+                'sucursal_id' => $sucursal->getKey(),
+                'rol' => $validado['rol'],
+            ]);
+        }
 
         // Genera el token y ENVÍA la invitación por correo.
         $token = $this->enviarActivacion->enviar($this->estudioDe($request), (string) $usuario->email);
