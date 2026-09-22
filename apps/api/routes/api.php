@@ -199,6 +199,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/perfil', [MiTenantController::class, 'perfil'])->name('mi.perfil');
             Route::get('/mi/agenda', [MiTenantController::class, 'agenda'])->name('mi.agenda');
             Route::post('/mi/reservas', [MiTenantController::class, 'reservar'])->name('mi.reservas.store');
+            // Agenda una cita desde un hueco de disponibilidad (F-08): crea la sesión + reserva/pago.
+            Route::post('/mi/citas', [MiTenantController::class, 'agendarCita'])->name('mi.citas.store');
             Route::post('/mi/reservas/{reserva}/cancelar', [MiTenantController::class, 'cancelar'])->name('mi.reservas.cancelar');
             Route::post('/mi/reservas/{reserva}/aceptar', [MiTenantController::class, 'aceptar'])->name('mi.reservas.aceptar');
             Route::get('/mi/waivers', [MiTenantController::class, 'waiversPendientes'])->name('mi.waivers.index');

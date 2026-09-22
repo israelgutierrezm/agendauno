@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Pagos\MetodoPago;
 use App\Modules\Reservas\EstadoReserva;
+use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
@@ -13,12 +14,14 @@ use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
+use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\PoliticaCancelacionTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
+use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\WaiverTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
@@ -178,6 +181,34 @@ class MiTenantController
         $reserva = $this->reservas->crear($sesion, $persona, null, (bool) ($validado['esperar'] ?? false));
 
         return response()->json(['data' => $this->presentarReserva($reserva->load('sesion.oferta'))], 201);
+    }
+
+    /**
+     * Agenda una CITA desde un hueco de disponibilidad (F-08): elige servicio +
+     * proveedor + hora y crea la sesión + la reserva (pago-para-reservar o membresía).
+     * El miembro paga la `orden_id` devuelta (si es de pago) para confirmar.
+     */
+    public function agendarCita(Request $request, AgendarCitaTenant $agendar): JsonResponse
+    {
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+
+        $validado = $request->validate([
+            'oferta_id' => ['required', 'string'],
+            'sucursal_id' => ['required', 'string'],
+            'instructor_id' => ['required', 'string'],
+            'inicia_en_local' => ['required', 'date'],
+            'duracion_minutos' => ['required', 'integer', 'min:5', 'max:1440'],
+        ]);
+
+        $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
+        $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
+        $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
+        $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sucursal->zona_horaria)->utc();
+
+        $reserva = $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, (int) $validado['duracion_minutos']);
+
+        return response()->json(['data' => $this->presentarReserva($reserva->load(['sesion.oferta', 'orden']))], 201);
     }
 
     public function cancelar(Request $request): JsonResponse
