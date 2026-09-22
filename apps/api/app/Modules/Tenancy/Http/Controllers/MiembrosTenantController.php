@@ -17,6 +17,7 @@ use App\Modules\Tenancy\TipoPersonaTenant;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -220,12 +221,16 @@ class MiembrosTenantController
             'segundo_nombre' => ['nullable', 'string', 'max:255'],
             'primer_apellido' => ['nullable', 'string', 'max:255'],
             'segundo_apellido' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'celular' => ['nullable', 'string', 'max:40'],
+            // Correo y teléfono únicos en el estudio (ignorando a la propia persona).
+            'email' => ['nullable', 'email', 'max:255', Rule::unique(PersonaTenant::class, 'email')->ignore($persona->getKey())],
+            'celular' => ['nullable', 'string', 'max:40', Rule::unique(PersonaTenant::class, 'celular')->ignore($persona->getKey())],
             'sucursal_id' => ['nullable', 'string'],
             'activo' => ['sometimes', 'boolean'],
             'es_facturable' => ['sometimes', 'boolean'],
             'archivado' => ['sometimes', 'boolean'],
+        ], [
+            'email.unique' => 'Ya existe una persona con ese correo en este estudio.',
+            'celular.unique' => 'Ya existe una persona con ese teléfono en este estudio.',
         ]);
 
         $campos = ['nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email', 'celular', 'activo', 'es_facturable', 'archivado', 'sucursal_id'];

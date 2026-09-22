@@ -55,3 +55,43 @@ it('la cita guest guarda el celular del cliente', function (): void {
         ->assertOk()->json('data'));
     expect($miembros->pluck('celular'))->toContain('5533334444');
 });
+
+it('rechaza un miembro con un correo ya usado en el estudio', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+
+    $this->postJson("/api/v1/app/{$e['slug']}/miembros", [
+        'nombre' => 'Ana', 'email' => 'ana@correo.mx',
+    ], conBearer($e['bearer']))->assertCreated();
+
+    $this->postJson("/api/v1/app/{$e['slug']}/miembros", [
+        'nombre' => 'Otra', 'email' => 'ana@correo.mx',
+    ], conBearer($e['bearer']))
+        ->assertStatus(422)
+        ->assertJsonPath('meta.errors.email.0', 'Ya existe una persona con ese correo en este estudio.');
+});
+
+it('rechaza un miembro con un celular ya usado en el estudio', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+
+    $this->postJson("/api/v1/app/{$e['slug']}/miembros", [
+        'nombre' => 'Ana', 'celular' => '5511112222',
+    ], conBearer($e['bearer']))->assertCreated();
+
+    $this->postJson("/api/v1/app/{$e['slug']}/miembros", [
+        'nombre' => 'Otra', 'celular' => '5511112222',
+    ], conBearer($e['bearer']))
+        ->assertStatus(422)
+        ->assertJsonPath('meta.errors.celular.0', 'Ya existe una persona con ese teléfono en este estudio.');
+});
+
+it('permite editar un miembro conservando su propio correo y celular', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+
+    $id = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", [
+        'nombre' => 'Ana', 'email' => 'ana@correo.mx', 'celular' => '5511112222',
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+
+    $this->putJson("/api/v1/app/{$e['slug']}/miembros/{$id}", [
+        'nombre' => 'Ana María', 'email' => 'ana@correo.mx', 'celular' => '5511112222',
+    ], conBearer($e['bearer']))->assertOk();
+});
