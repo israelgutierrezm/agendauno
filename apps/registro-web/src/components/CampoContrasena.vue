@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref } from "vue";
 
 defineProps<{
-  id?: string
-  modelValue: string
-  autocomplete?: string
-  required?: boolean
-  minlength?: number
-  placeholder?: string
-}>()
+  id?: string;
+  modelValue: string;
+  autocomplete?: string;
+  required?: boolean;
+  minlength?: number;
+  placeholder?: string;
+}>();
 
-defineEmits<{ (e: 'update:modelValue', value: string): void }>()
+defineEmits<{ (e: "update:modelValue", value: string): void }>();
 
-const visible = ref(false)
+const visible = ref(false);
 </script>
 
 <template>
@@ -26,13 +26,17 @@ const visible = ref(false)
       :required="required"
       :minlength="minlength"
       :placeholder="placeholder"
-      @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+      @input="
+        $emit('update:modelValue', ($event.target as HTMLInputElement).value)
+      "
     />
     <button
       type="button"
       class="absolute inset-y-0 right-0 flex items-center px-3"
       :style="{ color: 'var(--texto-suave)' }"
-      :aria-label="visible ? $t('comun.ocultarPassword') : $t('comun.verPassword')"
+      :aria-label="
+        visible ? $t('comun.ocultarPassword') : $t('comun.verPassword')
+      "
       :aria-pressed="visible"
       :title="visible ? $t('comun.ocultarPassword') : $t('comun.verPassword')"
       tabindex="-1"

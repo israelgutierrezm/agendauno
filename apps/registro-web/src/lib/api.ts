@@ -1,6 +1,6 @@
-import axios from 'axios'
+import axios from "axios";
 
-import { getCorrelationId } from '@/lib/correlationId'
+import { getCorrelationId } from "@/lib/correlationId";
 
 /**
  * Cliente HTTP del flujo multi-tenant (registro/directorio/login por estudio).
@@ -11,50 +11,53 @@ import { getCorrelationId } from '@/lib/correlationId'
  * lleva un `X-Correlation-ID` para trazabilidad.
  */
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8000",
   headers: {
-    Accept: 'application/json',
+    Accept: "application/json",
   },
-})
+});
 
-let bearer: string | null = null
+let bearer: string | null = null;
 
 /** Fija (o limpia) el bearer tenant-local para las siguientes peticiones. */
 export function fijarBearer(token: string | null): void {
-  bearer = token
+  bearer = token;
 }
 
 api.interceptors.request.use((config) => {
-  config.headers.set('X-Correlation-ID', getCorrelationId())
+  config.headers.set("X-Correlation-ID", getCorrelationId());
 
   if (bearer !== null) {
-    config.headers.set('Authorization', `Bearer ${bearer}`)
+    config.headers.set("Authorization", `Bearer ${bearer}`);
   }
 
-  return config
-})
+  return config;
+});
 
 /**
  * Extrae un mensaje legible del contrato de error de la API
  * `{code, message, meta:{errors}}`. Prefiere el primer error de campo (más
  * específico) cuando la respuesta es de validación; si no, usa `message`.
  */
-export function mensajeDeError(e: unknown, porDefecto = 'Ocurrio un error inesperado.'): string {
+export function mensajeDeError(
+  e: unknown,
+  porDefecto = "Ocurrio un error inesperado.",
+): string {
   if (axios.isAxiosError(e)) {
     const data = e.response?.data as
       | { message?: string; meta?: { errors?: Record<string, string[]> } }
-      | undefined
+      | undefined;
 
-    const errores = data?.meta?.errors
+    const errores = data?.meta?.errors;
     if (errores) {
-      const primero = Object.values(errores)[0]?.[0]
-      if (typeof primero === 'string' && primero !== '') {
-        return primero
+      const primero = Object.values(errores)[0]?.[0];
+      if (typeof primero === "string" && primero !== "") {
+        return primero;
       }
     }
 
-    return data?.message ?? porDefecto
+    return data?.message ?? porDefecto;
   }
 
-  return porDefecto
+  return porDefecto;
 }

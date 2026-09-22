@@ -1,16 +1,95 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-MX">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TurnoUno</title>
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <meta
+      name="description"
+      content="Gestiona agenda, reservas, membresías, cobros y asistencia desde un solo lugar. Prueba TurnoUno gratis durante 14 días, sin tarjeta."
+    />
+    <link rel="canonical" href="https://turnouno.com/" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="TurnoUno" />
+    <meta property="og:title" content="TurnoUno | Software para estudios y academias" />
+    <meta
+      property="og:description"
+      content="Llena tus clases, cobra a tiempo y opera tu estudio sin caos. Prueba TurnoUno gratis durante 14 días."
+    />
+    <meta property="og:url" content="https://turnouno.com/" />
+    <meta property="og:image" content="https://turnouno.com/assets/landing/turnouno-calendar.webp" />
+    <meta property="og:image:alt" content="Agenda visual de clases en TurnoUno" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TurnoUno | Software para estudios y academias" />
+    <meta
+      name="twitter:description"
+      content="Agenda, reservas, membresías, cobros y asistencia en un solo lugar."
+    />
+    <meta name="twitter:image" content="https://turnouno.com/assets/landing/turnouno-calendar.webp" />
+    <title>TurnoUno | Software para estudios y academias</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://turnouno.com/#organization",
+            "name": "TurnoUno",
+            "url": "https://turnouno.com/",
+            "logo": "https://turnouno.com/assets/brand/turnouno-logo.webp"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://turnouno.com/#software",
+            "name": "TurnoUno",
+            "url": "https://turnouno.com/",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "inLanguage": "es-MX",
+            "description": "Software de gestión para estudios y academias con agenda, reservas, membresías, cobros y asistencia.",
+            "publisher": { "@id": "https://turnouno.com/#organization" }
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "¿Necesito tarjeta para la prueba?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. La prueba dura 14 días y no requiere tarjeta."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Cómo se calcula el precio de TurnoUno?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "La renta mensual se calcula por los alumnos activos del estudio; administradores e instructores no se cuentan como alumnos."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Los datos se comparten entre estudios?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Cada estudio opera como un tenant independiente con sus propios usuarios, membresías, precios, paquetes, pagos y datos."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

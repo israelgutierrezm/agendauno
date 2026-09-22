@@ -1,57 +1,59 @@
-import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { defineStore } from "pinia";
+import { computed, ref } from "vue";
 
-import { api, fijarBearer, mensajeDeError } from '@/lib/api'
+import { api, fijarBearer, mensajeDeError } from "@/lib/api";
 
 export interface UsuarioTenant {
-  ulid: string
-  nombre: string
-  email: string
-  rol: string
-  roles?: string[]
-  permisos?: string[]
+  ulid: string;
+  nombre: string;
+  email: string;
+  rol: string;
+  roles?: string[];
+  permisos?: string[];
 }
 
 export interface EstudioSesion {
-  slug: string
-  nombre: string
-  logo_url?: string | null
-  estado: string
-  estado_facturacion?: string
-  trial_termina_en?: string | null
-  publicado?: boolean
-  en_directorio?: boolean
+  slug: string;
+  nombre: string;
+  logo_url?: string | null;
+  estado: string;
+  estado_facturacion?: string;
+  trial_termina_en?: string | null;
+  publicado?: boolean;
+  en_directorio?: boolean;
 }
 
 interface RespuestaAuth {
-  token: string
-  usuario: UsuarioTenant
-  estudio: EstudioSesion
+  token: string;
+  usuario: UsuarioTenant;
+  estudio: EstudioSesion;
 }
 
-const CLAVE_BEARER = 'tu.tenant.bearer'
-const CLAVE_SLUG = 'tu.tenant.slug'
+const CLAVE_BEARER = "tu.tenant.bearer";
+const CLAVE_SLUG = "tu.tenant.slug";
 
 /**
  * Sesion TENANT-LOCAL: no hay login global. Se resuelve el estudio por slug y se
  * guarda un bearer token que se envia en cada peticion a `/app/{slug}/...`. El
  * bearer y el slug se persisten para reanudar la sesion al recargar.
  */
-export const useSesionTenantStore = defineStore('sesionTenant', () => {
-  const slug = ref<string | null>(leer(CLAVE_SLUG))
-  const bearer = ref<string | null>(leer(CLAVE_BEARER))
-  const usuario = ref<UsuarioTenant | null>(null)
-  const estudio = ref<EstudioSesion | null>(null)
-  const cargando = ref(false)
-  const error = ref<string | null>(null)
-  const verificado = ref(false)
+export const useSesionTenantStore = defineStore("sesionTenant", () => {
+  const slug = ref<string | null>(leer(CLAVE_SLUG));
+  const bearer = ref<string | null>(leer(CLAVE_BEARER));
+  const usuario = ref<UsuarioTenant | null>(null);
+  const estudio = ref<EstudioSesion | null>(null);
+  const cargando = ref(false);
+  const error = ref<string | null>(null);
+  const verificado = ref(false);
 
-  const autenticado = computed(() => usuario.value !== null && bearer.value !== null)
+  const autenticado = computed(
+    () => usuario.value !== null && bearer.value !== null,
+  );
 
   /** RBAC de UI: el propietario (`*`) puede todo. El backend es la barrera real. */
   function puede(permiso: string): boolean {
-    const permisos = usuario.value?.permisos ?? []
-    return permisos.includes('*') || permisos.includes(permiso)
+    const permisos = usuario.value?.permisos ?? [];
+    return permisos.includes("*") || permisos.includes(permiso);
   }
 
   /**
@@ -60,69 +62,76 @@ export const useSesionTenantStore = defineStore('sesionTenant', () => {
    * recepción → operación de hoy; instructor → su agenda; alumno → su cuenta.
    */
   const rutaInicio = computed<string>(() => {
-    const u = usuario.value
+    const u = usuario.value;
     if (u === null) {
-      return 'entrar'
+      return "entrar";
     }
-    if (u.rol === 'miembro') {
-      return 'mi-cuenta'
+    if (u.rol === "miembro") {
+      return "mi-cuenta";
     }
-    if (puede('facturacion.ver')) {
-      return 'panel'
+    if (puede("facturacion.ver")) {
+      return "panel";
     }
-    if (u.rol === 'recepcionista' || puede('reservas.gestionar')) {
-      return 'recepcion'
+    if (u.rol === "recepcionista" || puede("reservas.gestionar")) {
+      return "recepcion";
     }
-    if (puede('agenda.ver')) {
-      return 'agenda'
+    if (puede("agenda.ver")) {
+      return "agenda";
     }
-    return 'mi-cuenta'
-  })
+    return "mi-cuenta";
+  });
 
-  fijarBearer(bearer.value)
+  fijarBearer(bearer.value);
 
   function establecer(datos: RespuestaAuth): void {
-    bearer.value = datos.token
-    slug.value = datos.estudio.slug
-    usuario.value = datos.usuario
-    estudio.value = datos.estudio
-    verificado.value = true
-    fijarBearer(datos.token)
-    guardar(CLAVE_BEARER, datos.token)
-    guardar(CLAVE_SLUG, datos.estudio.slug)
+    bearer.value = datos.token;
+    slug.value = datos.estudio.slug;
+    usuario.value = datos.usuario;
+    estudio.value = datos.estudio;
+    verificado.value = true;
+    fijarBearer(datos.token);
+    guardar(CLAVE_BEARER, datos.token);
+    guardar(CLAVE_SLUG, datos.estudio.slug);
   }
 
-  async function iniciarSesion(slugEstudio: string, email: string, password: string): Promise<void> {
-    cargando.value = true
-    error.value = null
+  async function iniciarSesion(
+    slugEstudio: string,
+    email: string,
+    password: string,
+  ): Promise<void> {
+    cargando.value = true;
+    error.value = null;
     try {
       const { data } = await api.post<{ data: RespuestaAuth }>(
         `/api/v1/app/${slugEstudio}/login`,
         { email, password },
-      )
-      establecer(data.data)
+      );
+      establecer(data.data);
     } catch (e) {
-      error.value = mensajeDeError(e, 'No se pudo iniciar sesion.')
-      throw e
+      error.value = mensajeDeError(e, "No se pudo iniciar sesion.");
+      throw e;
     } finally {
-      cargando.value = false
+      cargando.value = false;
     }
   }
 
-  async function iniciarSesionConGoogle(slugEstudio: string, credential: string): Promise<void> {
-    cargando.value = true
-    error.value = null
+  async function iniciarSesionConGoogle(
+    slugEstudio: string,
+    credential: string,
+  ): Promise<void> {
+    cargando.value = true;
+    error.value = null;
     try {
       const { data } = await api.post<{ data: RespuestaAuth }>(
         `/api/v1/app/${slugEstudio}/auth/google`,
         { credential },
-      )
-      establecer(data.data)
+      );
+      establecer(data.data);
     } catch (e) {
-      error.value = mensajeDeError(e, 'No se pudo iniciar sesion con Google.')
-      throw e
+      error.value = mensajeDeError(e, "No se pudo iniciar sesion con Google.");
+      throw e;
     } finally {
-      cargando.value = false
+      cargando.value = false;
     }
   }
 
@@ -133,28 +142,34 @@ export const useSesionTenantStore = defineStore('sesionTenant', () => {
     password: string,
     passwordConfirmation: string,
   ): Promise<void> {
-    cargando.value = true
-    error.value = null
+    cargando.value = true;
+    error.value = null;
     try {
       const { data } = await api.post<{ data: RespuestaAuth }>(
         `/api/v1/app/${slugEstudio}/activar`,
         { email, token, password, password_confirmation: passwordConfirmation },
-      )
-      establecer(data.data)
+      );
+      establecer(data.data);
     } catch (e) {
-      error.value = mensajeDeError(e, 'No se pudo activar la cuenta.')
-      throw e
+      error.value = mensajeDeError(e, "No se pudo activar la cuenta.");
+      throw e;
     } finally {
-      cargando.value = false
+      cargando.value = false;
     }
   }
 
   async function registrarAlumno(
     slugEstudio: string,
-    datos: { nombre: string; primer_apellido?: string; email: string; password: string; passwordConfirmation: string },
+    datos: {
+      nombre: string;
+      primer_apellido?: string;
+      email: string;
+      password: string;
+      passwordConfirmation: string;
+    },
   ): Promise<void> {
-    cargando.value = true
-    error.value = null
+    cargando.value = true;
+    error.value = null;
     try {
       const { data } = await api.post<{ data: RespuestaAuth }>(
         `/api/v1/app/${slugEstudio}/registro-alumno`,
@@ -165,58 +180,58 @@ export const useSesionTenantStore = defineStore('sesionTenant', () => {
           password: datos.password,
           password_confirmation: datos.passwordConfirmation,
         },
-      )
-      establecer(data.data)
+      );
+      establecer(data.data);
     } catch (e) {
-      error.value = mensajeDeError(e, 'No se pudo crear la cuenta.')
-      throw e
+      error.value = mensajeDeError(e, "No se pudo crear la cuenta.");
+      throw e;
     } finally {
-      cargando.value = false
+      cargando.value = false;
     }
   }
 
   async function cargarYo(): Promise<void> {
     if (slug.value === null || bearer.value === null) {
-      return
+      return;
     }
-    const { data } = await api.get<{ data: { usuario: UsuarioTenant; estudio: EstudioSesion } }>(
-      `/api/v1/app/${slug.value}/yo`,
-    )
-    usuario.value = data.data.usuario
-    estudio.value = data.data.estudio
+    const { data } = await api.get<{
+      data: { usuario: UsuarioTenant; estudio: EstudioSesion };
+    }>(`/api/v1/app/${slug.value}/yo`);
+    usuario.value = data.data.usuario;
+    estudio.value = data.data.estudio;
   }
 
   async function verificarSesion(): Promise<void> {
     if (verificado.value) {
-      return
+      return;
     }
     try {
-      await cargarYo()
+      await cargarYo();
     } catch {
-      limpiar()
+      limpiar();
     } finally {
-      verificado.value = true
+      verificado.value = true;
     }
   }
 
   async function cerrarSesion(): Promise<void> {
     try {
       if (slug.value !== null && bearer.value !== null) {
-        await api.post(`/api/v1/app/${slug.value}/logout`)
+        await api.post(`/api/v1/app/${slug.value}/logout`);
       }
     } catch {
       // Aunque falle en el servidor, limpiamos localmente.
     } finally {
-      limpiar()
+      limpiar();
     }
   }
 
   function limpiar(): void {
-    bearer.value = null
-    usuario.value = null
-    estudio.value = null
-    fijarBearer(null)
-    borrar(CLAVE_BEARER)
+    bearer.value = null;
+    usuario.value = null;
+    estudio.value = null;
+    fijarBearer(null);
+    borrar(CLAVE_BEARER);
   }
 
   return {
@@ -236,26 +251,26 @@ export const useSesionTenantStore = defineStore('sesionTenant', () => {
     cargarYo,
     verificarSesion,
     cerrarSesion,
-  }
-})
+  };
+});
 
 function leer(clave: string): string | null {
   try {
-    return localStorage.getItem(clave)
+    return localStorage.getItem(clave);
   } catch {
-    return null
+    return null;
   }
 }
 function guardar(clave: string, valor: string): void {
   try {
-    localStorage.setItem(clave, valor)
+    localStorage.setItem(clave, valor);
   } catch {
     // Ignora si no hay localStorage.
   }
 }
 function borrar(clave: string): void {
   try {
-    localStorage.removeItem(clave)
+    localStorage.removeItem(clave);
   } catch {
     // Ignora.
   }

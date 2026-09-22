@@ -1,60 +1,66 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref } from "vue";
 
-import { api, mensajeDeError } from '@/lib/api'
-import { useSesionTenantStore } from '@/stores/sesionTenant'
+import { api, mensajeDeError } from "@/lib/api";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 export interface MiembroEditable {
-  id: string
-  nombre: string
-  segundo_nombre: string | null
-  primer_apellido: string | null
-  segundo_apellido: string | null
-  email: string | null
-  activo: boolean
-  es_facturable: boolean
-  archivado: boolean
+  id: string;
+  nombre: string;
+  segundo_nombre: string | null;
+  primer_apellido: string | null;
+  segundo_apellido: string | null;
+  email: string | null;
+  activo: boolean;
+  es_facturable: boolean;
+  archivado: boolean;
 }
 
-const props = defineProps<{ miembro: MiembroEditable }>()
-const emit = defineEmits<{ (e: 'cerrar'): void; (e: 'guardado', m: MiembroEditable): void }>()
+const props = defineProps<{ miembro: MiembroEditable }>();
+const emit = defineEmits<{
+  (e: "cerrar"): void;
+  (e: "guardado", m: MiembroEditable): void;
+}>();
 
-const sesion = useSesionTenantStore()
-const base = `/api/v1/app/${sesion.slug}`
+const sesion = useSesionTenantStore();
+const base = `/api/v1/app/${sesion.slug}`;
 
 const form = reactive({
   nombre: props.miembro.nombre,
-  segundo_nombre: props.miembro.segundo_nombre ?? '',
-  primer_apellido: props.miembro.primer_apellido ?? '',
-  segundo_apellido: props.miembro.segundo_apellido ?? '',
-  email: props.miembro.email ?? '',
+  segundo_nombre: props.miembro.segundo_nombre ?? "",
+  primer_apellido: props.miembro.primer_apellido ?? "",
+  segundo_apellido: props.miembro.segundo_apellido ?? "",
+  email: props.miembro.email ?? "",
   activo: props.miembro.activo,
   es_facturable: props.miembro.es_facturable,
   archivado: props.miembro.archivado,
-})
-const guardando = ref(false)
-const error = ref<string | null>(null)
+});
+const guardando = ref(false);
+const error = ref<string | null>(null);
 
 async function guardar(): Promise<void> {
-  guardando.value = true
-  error.value = null
+  guardando.value = true;
+  error.value = null;
   try {
-    const { data } = await api.put<{ data: MiembroEditable }>(`${base}/miembros/${props.miembro.id}`, {
-      nombre: form.nombre,
-      segundo_nombre: form.segundo_nombre || null,
-      primer_apellido: form.primer_apellido || null,
-      segundo_apellido: form.segundo_apellido || null,
-      email: form.email || null,
-      activo: form.activo,
-      es_facturable: form.es_facturable,
-      archivado: form.archivado,
-    })
-    emit('guardado', data.data)
-    emit('cerrar')
+    const { data } = await api.put<{ data: MiembroEditable }>(
+      `${base}/miembros/${props.miembro.id}`,
+      {
+        nombre: form.nombre,
+        segundo_nombre: form.segundo_nombre || null,
+        primer_apellido: form.primer_apellido || null,
+        segundo_apellido: form.segundo_apellido || null,
+        email: form.email || null,
+        activo: form.activo,
+        es_facturable: form.es_facturable,
+        archivado: form.archivado,
+      },
+    );
+    emit("guardado", data.data);
+    emit("cerrar");
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    guardando.value = false
+    guardando.value = false;
   }
 }
 </script>
@@ -66,55 +72,97 @@ async function guardar(): Promise<void> {
       class="relative flex h-full w-full max-w-md flex-col overflow-y-auto"
       :style="{ background: 'var(--superficie)', boxShadow: 'var(--sombra)' }"
     >
-      <header class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b px-5 py-4" :style="{ background: 'var(--superficie)', borderColor: 'var(--borde)' }">
-        <p class="text-lg font-bold truncate">{{ $t('miembros.editar.titulo') }}</p>
-        <button type="button" class="tu-icono-btn shrink-0" :aria-label="$t('recepcion.panel.cerrar')" @click="emit('cerrar')">
+      <header
+        class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b px-5 py-4"
+        :style="{
+          background: 'var(--superficie)',
+          borderColor: 'var(--borde)',
+        }"
+      >
+        <p class="text-lg font-bold truncate">
+          {{ $t("miembros.editar.titulo") }}
+        </p>
+        <button
+          type="button"
+          class="tu-icono-btn shrink-0"
+          :aria-label="$t('recepcion.panel.cerrar')"
+          @click="emit('cerrar')"
+        >
           <span aria-hidden="true">✕</span>
         </button>
       </header>
 
       <form class="flex-1 space-y-4 px-5 py-4" @submit.prevent="guardar">
         <div>
-          <label class="tu-label" for="en">{{ $t('miembros.nombre') }}</label>
+          <label class="tu-label" for="en">{{ $t("miembros.nombre") }}</label>
           <input id="en" v-model="form.nombre" class="tu-input" required />
         </div>
         <div>
-          <label class="tu-label" for="ep">{{ $t('miembros.primerApellido') }}</label>
+          <label class="tu-label" for="ep">{{
+            $t("miembros.primerApellido")
+          }}</label>
           <input id="ep" v-model="form.primer_apellido" class="tu-input" />
         </div>
         <div>
-          <label class="tu-label" for="ee">{{ $t('miembros.email') }}</label>
+          <label class="tu-label" for="ee">{{ $t("miembros.email") }}</label>
           <input id="ee" v-model="form.email" class="tu-input" type="email" />
         </div>
 
-        <div class="border-t pt-4 space-y-3" :style="{ borderColor: 'var(--borde)' }">
-          <p class="text-sm font-semibold">{{ $t('miembros.editar.estado') }}</p>
+        <div
+          class="border-t pt-4 space-y-3"
+          :style="{ borderColor: 'var(--borde)' }"
+        >
+          <p class="text-sm font-semibold">
+            {{ $t("miembros.editar.estado") }}
+          </p>
           <label class="flex items-center justify-between gap-3 text-sm">
             <span>
-              {{ $t('miembros.editar.activo') }}
-              <span class="block text-xs" :style="{ color: 'var(--texto-suave)' }">{{ $t('miembros.editar.activoAyuda') }}</span>
+              {{ $t("miembros.editar.activo") }}
+              <span
+                class="block text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{ $t("miembros.editar.activoAyuda") }}</span
+              >
             </span>
             <input v-model="form.activo" type="checkbox" class="h-5 w-5" />
           </label>
           <label class="flex items-center justify-between gap-3 text-sm">
             <span>
-              {{ $t('miembros.editar.facturable') }}
-              <span class="block text-xs" :style="{ color: 'var(--texto-suave)' }">{{ $t('miembros.editar.facturableAyuda') }}</span>
+              {{ $t("miembros.editar.facturable") }}
+              <span
+                class="block text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{ $t("miembros.editar.facturableAyuda") }}</span
+              >
             </span>
-            <input v-model="form.es_facturable" type="checkbox" class="h-5 w-5" />
+            <input
+              v-model="form.es_facturable"
+              type="checkbox"
+              class="h-5 w-5"
+            />
           </label>
           <label class="flex items-center justify-between gap-3 text-sm">
             <span>
-              {{ $t('miembros.editar.archivado') }}
-              <span class="block text-xs" :style="{ color: 'var(--texto-suave)' }">{{ $t('miembros.editar.archivadoAyuda') }}</span>
+              {{ $t("miembros.editar.archivado") }}
+              <span
+                class="block text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{ $t("miembros.editar.archivadoAyuda") }}</span
+              >
             </span>
             <input v-model="form.archivado" type="checkbox" class="h-5 w-5" />
           </label>
         </div>
 
-        <p v-if="error" class="text-sm" style="color: var(--error)">{{ error }}</p>
-        <button class="tu-btn tu-btn-primario w-full" type="submit" :disabled="guardando">
-          {{ guardando ? $t('comun.guardar') + '…' : $t('comun.guardar') }}
+        <p v-if="error" class="text-sm" style="color: var(--error)">
+          {{ error }}
+        </p>
+        <button
+          class="tu-btn tu-btn-primario w-full"
+          type="submit"
+          :disabled="guardando"
+        >
+          {{ guardando ? $t("comun.guardar") + "…" : $t("comun.guardar") }}
         </button>
       </form>
     </aside>

@@ -1,247 +1,271 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from "vue";
 
-import EncabezadoSeccion from '@/components/EncabezadoSeccion.vue'
-import { api, mensajeDeError } from '@/lib/api'
-import { useSesionTenantStore } from '@/stores/sesionTenant'
+import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import { api, mensajeDeError } from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Oferta {
-  id: string
-  nombre: string
+  id: string;
+  nombre: string;
 }
 interface Sucursal {
-  id: string
-  nombre: string
-  zona_horaria: string
+  id: string;
+  nombre: string;
+  zona_horaria: string;
 }
 interface Sesion {
-  id: string
-  oferta: string | null
-  oferta_id: string | null
-  oferta_lugares: number
-  oferta_precio_clase: number | null
-  instructor: string | null
-  instructor_id: string | null
-  sala: string | null
-  recurso_id: string | null
-  inicia_en: string
-  termina_en: string
-  zona_horaria: string
-  capacidad: number | null
-  ocupados: number
-  en_espera: number
-  estado: string
+  id: string;
+  oferta: string | null;
+  oferta_id: string | null;
+  oferta_lugares: number;
+  oferta_precio_clase: number | null;
+  instructor: string | null;
+  instructor_id: string | null;
+  sala: string | null;
+  recurso_id: string | null;
+  inicia_en: string;
+  termina_en: string;
+  zona_horaria: string;
+  capacidad: number | null;
+  ocupados: number;
+  en_espera: number;
+  estado: string;
 }
 interface Recurso {
-  id: string
-  nombre: string
-  sucursal_id: string | null
-  activo: boolean
+  id: string;
+  nombre: string;
+  sucursal_id: string | null;
+  activo: boolean;
 }
 interface Miembro {
-  id: string
-  nombre: string
-  nombre_completo: string
+  id: string;
+  nombre: string;
+  nombre_completo: string;
 }
 interface Reserva {
-  id: string
-  estado: string
-  canal: string
-  lugar: number | null
-  persona: string | null
-  primera_vez: boolean
-  unidades: number
-  asistencia: string | null
+  id: string;
+  estado: string;
+  canal: string;
+  lugar: number | null;
+  persona: string | null;
+  primera_vez: boolean;
+  unidades: number;
+  asistencia: string | null;
 }
 interface ReglaCanal {
-  id: string
-  canal: string
-  cupos: number
-  liberar_horas_antes: number
-  activa: boolean
+  id: string;
+  canal: string;
+  cupos: number;
+  liberar_horas_antes: number;
+  activa: boolean;
 }
 interface Checkin {
-  id: string
-  proveedor: string
-  usuario: string | null
-  estado: string
-  registrado_en: string
+  id: string;
+  proveedor: string;
+  usuario: string | null;
+  estado: string;
+  registrado_en: string;
 }
 
-const sesion = useSesionTenantStore()
-const base = computed(() => `/api/v1/app/${sesion.slug}`)
-const puedeGestionar = computed(() => sesion.puede('agenda.gestionar'))
-const puedeReservar = computed(() => sesion.puede('reservas.gestionar'))
-const puedeMarcar = computed(() => sesion.puede('asistencia.marcar'))
-const puedeCheckin = computed(() => sesion.puede('checkins.registrar'))
+const sesion = useSesionTenantStore();
+const base = computed(() => `/api/v1/app/${sesion.slug}`);
+const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
+const puedeReservar = computed(() => sesion.puede("reservas.gestionar"));
+const puedeMarcar = computed(() => sesion.puede("asistencia.marcar"));
+const puedeCheckin = computed(() => sesion.puede("checkins.registrar"));
 
 // Canales de reserva (booking source) para R20.
-const CANALES = ['directo', 'wellhub', 'totalpass', 'classpass', 'otro'] as const
+const CANALES = [
+  "directo",
+  "wellhub",
+  "totalpass",
+  "classpass",
+  "otro",
+] as const;
 
-const ofertas = ref<Oferta[]>([])
-const sucursales = ref<Sucursal[]>([])
-const sesiones = ref<Sesion[]>([])
-const miembros = ref<Miembro[]>([])
-const instructores = ref<{ id: string; nombre: string }[]>([])
-const recursos = ref<Recurso[]>([])
-const cargando = ref(true)
-const cargandoSesiones = ref(false)
-const error = ref<string | null>(null)
+const ofertas = ref<Oferta[]>([]);
+const sucursales = ref<Sucursal[]>([]);
+const sesiones = ref<Sesion[]>([]);
+const miembros = ref<Miembro[]>([]);
+const instructores = ref<{ id: string; nombre: string }[]>([]);
+const recursos = ref<Recurso[]>([]);
+const cargando = ref(true);
+const cargandoSesiones = ref(false);
+const error = ref<string | null>(null);
 
 // ---- Calendario (semana / dia) ----
-type Vista = 'semana' | 'dia'
-const vista = ref<Vista>('semana')
-const semanaInicio = ref(lunesDe(new Date()))
-const diaSel = ref(isoDe(new Date()))
-const sucursalFiltro = ref('')
-const instructorFiltro = ref('')
+type Vista = "semana" | "dia";
+const vista = ref<Vista>("semana");
+const semanaInicio = ref(lunesDe(new Date()));
+const diaSel = ref(isoDe(new Date()));
+const sucursalFiltro = ref("");
+const instructorFiltro = ref("");
 
 function pad2(n: number): string {
-  return n < 10 ? `0${n}` : `${n}`
+  return n < 10 ? `0${n}` : `${n}`;
 }
 function isoDe(d: Date): string {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 function lunesDe(d: Date): Date {
-  const base = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-  const dow = (base.getDay() + 6) % 7 // 0 = lunes
-  base.setDate(base.getDate() - dow)
-  return base
+  const base = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dow = (base.getDay() + 6) % 7; // 0 = lunes
+  base.setDate(base.getDate() - dow);
+  return base;
 }
 function sumarDias(d: Date, n: number): Date {
-  const r = new Date(d)
-  r.setDate(r.getDate() + n)
-  return r
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
 }
 
 const dias = computed(() =>
   Array.from({ length: 7 }, (_, i) => {
-    const fecha = sumarDias(semanaInicio.value, i)
+    const fecha = sumarDias(semanaInicio.value, i);
     return {
       fecha,
       iso: isoDe(fecha),
-      nombre: new Intl.DateTimeFormat('es-MX', { weekday: 'short' }).format(fecha),
+      nombre: new Intl.DateTimeFormat("es-MX", { weekday: "short" }).format(
+        fecha,
+      ),
       dia: fecha.getDate(),
       esHoy: isoDe(fecha) === isoDe(new Date()),
-    }
+    };
   }),
-)
+);
 
 const rangoTexto = computed(() => {
-  const a = semanaInicio.value
-  const b = sumarDias(a, 6)
+  const a = semanaInicio.value;
+  const b = sumarDias(a, 6);
   const fmt = (d: Date, opts: Intl.DateTimeFormatOptions): string =>
-    new Intl.DateTimeFormat('es-MX', opts).format(d)
-  return `${fmt(a, { day: 'numeric', month: 'short' })} – ${fmt(b, { day: 'numeric', month: 'short', year: 'numeric' })}`
-})
+    new Intl.DateTimeFormat("es-MX", opts).format(d);
+  return `${fmt(a, { day: "numeric", month: "short" })} – ${fmt(b, { day: "numeric", month: "short", year: "numeric" })}`;
+});
 
 function fechaLocalSesion(iso: string, zona: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone: zona,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(iso))
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
 }
 function horaCorta(iso: string, zona: string): string {
-  return new Intl.DateTimeFormat('es-MX', {
+  return new Intl.DateTimeFormat("es-MX", {
     timeZone: zona,
-    hour: '2-digit',
-    minute: '2-digit',
+    hour: "2-digit",
+    minute: "2-digit",
     hour12: false,
-  }).format(new Date(iso))
+  }).format(new Date(iso));
 }
 function nombreMiembro(m: Miembro): string {
-  return m.nombre_completo || m.nombre
+  return m.nombre_completo || m.nombre;
 }
 
 // Instructor se filtra en cliente (el server ya filtra por sucursal + rango).
 const sesionesVisibles = computed(() =>
-  instructorFiltro.value === ''
+  instructorFiltro.value === ""
     ? sesiones.value
     : sesiones.value.filter((s) => s.instructor_id === instructorFiltro.value),
-)
+);
 function sesionesDe(iso: string): Sesion[] {
   return sesionesVisibles.value
     .filter((s) => fechaLocalSesion(s.inicia_en, s.zona_horaria) === iso)
-    .sort((a, b) => a.inicia_en.localeCompare(b.inicia_en))
+    .sort((a, b) => a.inicia_en.localeCompare(b.inicia_en));
 }
-const diaSelInfo = computed(() => dias.value.find((d) => d.iso === diaSel.value) ?? dias.value[0])
+const diaSelInfo = computed(
+  () => dias.value.find((d) => d.iso === diaSel.value) ?? dias.value[0],
+);
 
 function completo(s: Sesion): boolean {
-  return s.capacidad !== null && s.ocupados >= s.capacidad
+  return s.capacidad !== null && s.ocupados >= s.capacidad;
 }
 
 // ---- Cuadricula horaria (vista semana escritorio) ----
-const HORA_ALTO = 52 // px por hora
+const HORA_ALTO = 52; // px por hora
 
 function minutosLocal(iso: string, zona: string): number {
-  const partes = new Intl.DateTimeFormat('en-GB', {
+  const partes = new Intl.DateTimeFormat("en-GB", {
     timeZone: zona,
-    hour: '2-digit',
-    minute: '2-digit',
+    hour: "2-digit",
+    minute: "2-digit",
     hour12: false,
-  }).formatToParts(new Date(iso))
-  const h = Number(partes.find((p) => p.type === 'hour')?.value ?? '0')
-  const m = Number(partes.find((p) => p.type === 'minute')?.value ?? '0')
-  return h * 60 + m
+  }).formatToParts(new Date(iso));
+  const h = Number(partes.find((p) => p.type === "hour")?.value ?? "0");
+  const m = Number(partes.find((p) => p.type === "minute")?.value ?? "0");
+  return h * 60 + m;
 }
 function duracionMin(s: Sesion): number {
-  return Math.round((new Date(s.termina_en).getTime() - new Date(s.inicia_en).getTime()) / 60000)
+  return Math.round(
+    (new Date(s.termina_en).getTime() - new Date(s.inicia_en).getTime()) /
+      60000,
+  );
 }
 
 // Rango de horas visible: por defecto 8–21, ampliado para abarcar todas las clases.
 const rango = computed(() => {
   const visibles = sesionesVisibles.value.filter((s) =>
-    dias.value.some((d) => d.iso === fechaLocalSesion(s.inicia_en, s.zona_horaria)),
-  )
-  let ini = 8 * 60
-  let fin = 21 * 60
+    dias.value.some(
+      (d) => d.iso === fechaLocalSesion(s.inicia_en, s.zona_horaria),
+    ),
+  );
+  let ini = 8 * 60;
+  let fin = 21 * 60;
   for (const s of visibles) {
-    const desde = minutosLocal(s.inicia_en, s.zona_horaria)
-    const hasta = desde + Math.max(15, duracionMin(s))
-    ini = Math.min(ini, Math.floor(desde / 60) * 60)
-    fin = Math.max(fin, Math.ceil(hasta / 60) * 60)
+    const desde = minutosLocal(s.inicia_en, s.zona_horaria);
+    const hasta = desde + Math.max(15, duracionMin(s));
+    ini = Math.min(ini, Math.floor(desde / 60) * 60);
+    fin = Math.max(fin, Math.ceil(hasta / 60) * 60);
   }
-  return { inicioMin: ini, finMin: Math.min(fin, 24 * 60) }
-})
+  return { inicioMin: ini, finMin: Math.min(fin, 24 * 60) };
+});
 const horas = computed(() => {
-  const out: { min: number; etiqueta: string }[] = []
+  const out: { min: number; etiqueta: string }[] = [];
   for (let m = rango.value.inicioMin; m < rango.value.finMin; m += 60) {
-    out.push({ min: m, etiqueta: `${pad2(Math.floor(m / 60))}:00` })
+    out.push({ min: m, etiqueta: `${pad2(Math.floor(m / 60))}:00` });
   }
-  return out
-})
-const totalAlto = computed(() => ((rango.value.finMin - rango.value.inicioMin) / 60) * HORA_ALTO)
+  return out;
+});
+const totalAlto = computed(
+  () => ((rango.value.finMin - rango.value.inicioMin) / 60) * HORA_ALTO,
+);
 
-type Bloque = { sesion: Sesion; top: number; alto: number; izq: number; ancho: number }
+type Bloque = {
+  sesion: Sesion;
+  top: number;
+  alto: number;
+  izq: number;
+  ancho: number;
+};
 
 // Posiciona las clases de un día y reparte en carriles las que se solapan.
 function bloquesDe(iso: string): Bloque[] {
   const items = sesionesDe(iso)
     .map((s) => {
-      const ini = minutosLocal(s.inicia_en, s.zona_horaria)
-      return { s, ini, fin: ini + Math.max(15, duracionMin(s)) }
+      const ini = minutosLocal(s.inicia_en, s.zona_horaria);
+      return { s, ini, fin: ini + Math.max(15, duracionMin(s)) };
     })
-    .sort((a, b) => a.ini - b.ini || a.fin - b.fin)
+    .sort((a, b) => a.ini - b.ini || a.fin - b.fin);
 
-  const bloques: Bloque[] = []
-  let grupo: { s: Sesion; ini: number; fin: number; carril: number }[] = []
-  let grupoFin = -1
+  const bloques: Bloque[] = [];
+  let grupo: { s: Sesion; ini: number; fin: number; carril: number }[] = [];
+  let grupoFin = -1;
 
   const cerrar = (): void => {
-    const carriles: number[] = [] // fin de la última clase en cada carril
+    const carriles: number[] = []; // fin de la última clase en cada carril
     for (const it of grupo) {
-      let carril = carriles.findIndex((f) => f <= it.ini)
+      let carril = carriles.findIndex((f) => f <= it.ini);
       if (carril === -1) {
-        carril = carriles.length
-        carriles.push(it.fin)
+        carril = carriles.length;
+        carriles.push(it.fin);
       } else {
-        carriles[carril] = it.fin
+        carriles[carril] = it.fin;
       }
-      it.carril = carril
+      it.carril = carril;
     }
-    const n = Math.max(1, carriles.length)
+    const n = Math.max(1, carriles.length);
     for (const it of grupo) {
       bloques.push({
         sesion: it.s,
@@ -249,592 +273,717 @@ function bloquesDe(iso: string): Bloque[] {
         alto: Math.max(22, ((it.fin - it.ini) / 60) * HORA_ALTO - 2),
         izq: (it.carril / n) * 100,
         ancho: (1 / n) * 100,
-      })
+      });
     }
-  }
+  };
 
   for (const it of items) {
     if (grupo.length > 0 && it.ini >= grupoFin) {
-      cerrar()
-      grupo = []
-      grupoFin = -1
+      cerrar();
+      grupo = [];
+      grupoFin = -1;
     }
-    grupo.push({ ...it, carril: 0 })
-    grupoFin = Math.max(grupoFin, it.fin)
+    grupo.push({ ...it, carril: 0 });
+    grupoFin = Math.max(grupoFin, it.fin);
   }
   if (grupo.length > 0) {
-    cerrar()
+    cerrar();
   }
-  return bloques
+  return bloques;
 }
 
 // Estado visual de la clase (color + etiqueta): cancelada / completa / programada.
 // Color estable por TIPO de clase (identidad visual; el color lo lleva la clase,
 // no la decoración). Hash del nombre de la oferta → paleta de acabados.
-const PALETA_TIPO = ['#c8d8e0', '#dddc8c', '#e8d0d0', '#e3e4e5', '#f0e4d3', '#596680', '#2e3642', '#9db8a4'] as const
+const PALETA_TIPO = [
+  "#c8d8e0",
+  "#dddc8c",
+  "#e8d0d0",
+  "#e3e4e5",
+  "#f0e4d3",
+  "#596680",
+  "#2e3642",
+  "#9db8a4",
+] as const;
 function colorTipo(oferta: string | null): string {
-  const s = oferta ?? ''
-  let h = 0
+  const s = oferta ?? "";
+  let h = 0;
   for (let i = 0; i < s.length; i++) {
-    h = (h * 31 + s.charCodeAt(i)) >>> 0
+    h = (h * 31 + s.charCodeAt(i)) >>> 0;
   }
-  return PALETA_TIPO[h % PALETA_TIPO.length]
+  return PALETA_TIPO[h % PALETA_TIPO.length];
 }
 function pctOcupacion(s: Sesion): number | null {
-  return s.capacidad !== null && s.capacidad > 0 ? Math.round((s.ocupados / s.capacidad) * 100) : null
+  return s.capacidad !== null && s.capacidad > 0
+    ? Math.round((s.ocupados / s.capacidad) * 100)
+    : null;
 }
 // Estado perceptible por ocupación: disponible / casi (>=80%) / llena / cancelada.
-function estadoAgenda(s: Sesion): 'cancelada' | 'llena' | 'casi' | 'disponible' {
-  if (s.estado !== 'programada') {
-    return 'cancelada'
+function estadoAgenda(
+  s: Sesion,
+): "cancelada" | "llena" | "casi" | "disponible" {
+  if (s.estado !== "programada") {
+    return "cancelada";
   }
   if (completo(s)) {
-    return 'llena'
+    return "llena";
   }
-  const p = pctOcupacion(s)
-  return p !== null && p >= 80 ? 'casi' : 'disponible'
+  const p = pctOcupacion(s);
+  return p !== null && p >= 80 ? "casi" : "disponible";
 }
 const COLOR_ESTADO: Record<string, string> = {
-  disponible: 'var(--exito)',
-  casi: '#f59e0b',
-  llena: 'var(--error)',
-  cancelada: 'var(--texto-suave)',
-}
+  disponible: "var(--exito)",
+  casi: "#f59e0b",
+  llena: "var(--error)",
+  cancelada: "var(--texto-suave)",
+};
 
 async function cargarReferencias(): Promise<void> {
-  cargando.value = true
-  error.value = null
+  cargando.value = true;
+  error.value = null;
   try {
     const [o, s, m] = await Promise.all([
       api.get<{ data: Oferta[] }>(`${base.value}/ofertas`),
       api.get<{ data: Sucursal[] }>(`${base.value}/sucursales`),
-      api.get<{ data: Miembro[] }>(`${base.value}/miembros`, { params: { tipo: 'miembro' } }),
-    ])
-    ofertas.value = o.data.data
-    sucursales.value = s.data.data
-    miembros.value = m.data.data
+      api.get<{ data: Miembro[] }>(`${base.value}/miembros`, {
+        params: { tipo: "miembro" },
+      }),
+    ]);
+    ofertas.value = o.data.data;
+    sucursales.value = s.data.data;
+    miembros.value = m.data.data;
     if (puedeGestionar.value) {
       const [i, r] = await Promise.all([
-        api.get<{ data: { id: string; nombre: string }[] }>(`${base.value}/instructores`),
+        api.get<{ data: { id: string; nombre: string }[] }>(
+          `${base.value}/instructores`,
+        ),
         api.get<{ data: Recurso[] }>(`${base.value}/recursos`),
-      ])
-      instructores.value = i.data.data
-      recursos.value = r.data.data.filter((x) => x.activo)
+      ]);
+      instructores.value = i.data.data;
+      recursos.value = r.data.data.filter((x) => x.activo);
     }
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    cargando.value = false
+    cargando.value = false;
   }
 }
 
 async function cargarSesiones(): Promise<void> {
-  cargandoSesiones.value = true
-  error.value = null
+  cargandoSesiones.value = true;
+  error.value = null;
   try {
     const params: Record<string, string> = {
       desde: dias.value[0].iso,
       hasta: dias.value[6].iso,
+    };
+    if (sucursalFiltro.value !== "") {
+      params.sucursal_id = sucursalFiltro.value;
     }
-    if (sucursalFiltro.value !== '') {
-      params.sucursal_id = sucursalFiltro.value
-    }
-    const { data } = await api.get<{ data: Sesion[] }>(`${base.value}/sesiones`, { params })
-    sesiones.value = data.data
+    const { data } = await api.get<{ data: Sesion[] }>(
+      `${base.value}/sesiones`,
+      { params },
+    );
+    sesiones.value = data.data;
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    cargandoSesiones.value = false
+    cargandoSesiones.value = false;
   }
 }
 
 // Recarga las sesiones al cambiar de semana o de sucursal.
-watch([semanaInicio, sucursalFiltro], cargarSesiones)
+watch([semanaInicio, sucursalFiltro], cargarSesiones);
 
 function irSemana(delta: number): void {
   // Preserva el día de la semana seleccionado (para que la vista de día en móvil
   // avance al día equivalente de la nueva semana, no se quede en la anterior).
-  const offset = dias.value.findIndex((d) => d.iso === diaSel.value)
-  semanaInicio.value = sumarDias(semanaInicio.value, delta * 7)
-  diaSel.value = isoDe(sumarDias(semanaInicio.value, offset >= 0 ? offset : 0))
+  const offset = dias.value.findIndex((d) => d.iso === diaSel.value);
+  semanaInicio.value = sumarDias(semanaInicio.value, delta * 7);
+  diaSel.value = isoDe(sumarDias(semanaInicio.value, offset >= 0 ? offset : 0));
 }
 function irHoy(): void {
-  semanaInicio.value = lunesDe(new Date())
-  diaSel.value = isoDe(new Date())
+  semanaInicio.value = lunesDe(new Date());
+  diaSel.value = isoDe(new Date());
 }
 
 // ---- Panel de detalle (reservas + asistencia + check-ins) ----
-const detalle = ref<Sesion | null>(null)
-const roster = ref<Reserva[]>([])
-const cargandoRoster = ref(false)
-const reservarModel = ref({ miembroId: '', esperar: false, canal: 'directo', lugar: null as number | null })
+const detalle = ref<Sesion | null>(null);
+const roster = ref<Reserva[]>([]);
+const cargandoRoster = ref(false);
+const reservarModel = ref({
+  miembroId: "",
+  esperar: false,
+  canal: "directo",
+  lugar: null as number | null,
+});
 // Config de la oferta en el drawer: mapa de lugares (R4) + precio de clase (R30).
-const lugaresModel = ref({ lugares: 0, precio: 0 })
-const guardandoLugares = ref(false)
+const lugaresModel = ref({ lugares: 0, precio: 0 });
+const guardandoLugares = ref(false);
 // Transferir (regalar) el lugar de una reserva a otro miembro (R9): selector inline por fila.
-const transferirModel = ref({ reservaId: '', personaId: '' })
+const transferirModel = ref({ reservaId: "", personaId: "" });
 // Cupos por canal / marketplace (R20): reglas de la oferta de la sesion abierta.
-const reglasCanal = ref<ReglaCanal[]>([])
-const reglaCanalModel = ref({ canal: 'wellhub', cupos: 0, liberar_horas_antes: 0 })
-const guardandoCanal = ref(false)
-const accionando = ref(false)
-const checkins = ref<Checkin[]>([])
-const checkinModel = ref({ proveedor: 'wellhub', codigo: '' })
-const registrandoCheckin = ref(false)
-const okCheckin = ref(false)
+const reglasCanal = ref<ReglaCanal[]>([]);
+const reglaCanalModel = ref({
+  canal: "wellhub",
+  cupos: 0,
+  liberar_horas_antes: 0,
+});
+const guardandoCanal = ref(false);
+const accionando = ref(false);
+const checkins = ref<Checkin[]>([]);
+const checkinModel = ref({ proveedor: "wellhub", codigo: "" });
+const registrandoCheckin = ref(false);
+const okCheckin = ref(false);
 
 // Staff de la sesión (R17): asignación con rol y sustitución.
 interface StaffSesion {
-  id: string
-  usuario: string | null
-  rol: string
-  sustituye_a: number | null
+  id: string;
+  usuario: string | null;
+  rol: string;
+  sustituye_a: number | null;
 }
-const staffSesion = ref<StaffSesion[]>([])
-const staffModel = ref({ usuarioId: '', rol: 'instructor', sustituyeA: '' })
-const asignandoStaff = ref(false)
+const staffSesion = ref<StaffSesion[]>([]);
+const staffModel = ref({ usuarioId: "", rol: "instructor", sustituyeA: "" });
+const asignandoStaff = ref(false);
 
 async function abrirDetalle(s: Sesion): Promise<void> {
-  detalle.value = s
-  roster.value = []
-  checkins.value = []
-  staffSesion.value = []
-  reservarModel.value = { miembroId: '', esperar: false, canal: 'directo', lugar: null }
-  lugaresModel.value = { lugares: s.oferta_lugares ?? 0, precio: (s.oferta_precio_clase ?? 0) / 100 }
-  transferirModel.value = { reservaId: '', personaId: '' }
-  reglasCanal.value = []
-  reglaCanalModel.value = { canal: 'wellhub', cupos: 0, liberar_horas_antes: 0 }
-  checkinModel.value = { proveedor: 'wellhub', codigo: '' }
-  staffModel.value = { usuarioId: '', rol: 'instructor', sustituyeA: '' }
-  okCheckin.value = false
-  await cargarRoster(s.id)
+  detalle.value = s;
+  roster.value = [];
+  checkins.value = [];
+  staffSesion.value = [];
+  reservarModel.value = {
+    miembroId: "",
+    esperar: false,
+    canal: "directo",
+    lugar: null,
+  };
+  lugaresModel.value = {
+    lugares: s.oferta_lugares ?? 0,
+    precio: (s.oferta_precio_clase ?? 0) / 100,
+  };
+  transferirModel.value = { reservaId: "", personaId: "" };
+  reglasCanal.value = [];
+  reglaCanalModel.value = {
+    canal: "wellhub",
+    cupos: 0,
+    liberar_horas_antes: 0,
+  };
+  checkinModel.value = { proveedor: "wellhub", codigo: "" };
+  staffModel.value = { usuarioId: "", rol: "instructor", sustituyeA: "" };
+  okCheckin.value = false;
+  await cargarRoster(s.id);
   if (puedeCheckin.value) {
-    await cargarCheckins(s.id)
+    await cargarCheckins(s.id);
   }
   if (puedeGestionar.value) {
-    await cargarStaffSesion(s.id)
+    await cargarStaffSesion(s.id);
     if (s.oferta_id !== null) {
-      await cargarReglasCanal(s.oferta_id)
+      await cargarReglasCanal(s.oferta_id);
     }
   }
 }
 
 async function cargarReglasCanal(ofertaId: string): Promise<void> {
   try {
-    const { data } = await api.get<{ data: ReglaCanal[] }>(`${base.value}/ofertas/${ofertaId}/capacidad-canal`)
-    reglasCanal.value = data.data
+    const { data } = await api.get<{ data: ReglaCanal[] }>(
+      `${base.value}/ofertas/${ofertaId}/capacidad-canal`,
+    );
+    reglasCanal.value = data.data;
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   }
 }
 
 async function guardarReglaCanal(): Promise<void> {
   if (detalle.value === null || detalle.value.oferta_id === null) {
-    return
+    return;
   }
-  guardandoCanal.value = true
-  error.value = null
+  guardandoCanal.value = true;
+  error.value = null;
   try {
-    await api.put(`${base.value}/ofertas/${detalle.value.oferta_id}/capacidad-canal`, {
-      canal: reglaCanalModel.value.canal,
-      cupos: Number(reglaCanalModel.value.cupos) || 0,
-      liberar_horas_antes: Number(reglaCanalModel.value.liberar_horas_antes) || 0,
-    })
-    reglaCanalModel.value = { canal: 'wellhub', cupos: 0, liberar_horas_antes: 0 }
-    await cargarReglasCanal(detalle.value.oferta_id)
+    await api.put(
+      `${base.value}/ofertas/${detalle.value.oferta_id}/capacidad-canal`,
+      {
+        canal: reglaCanalModel.value.canal,
+        cupos: Number(reglaCanalModel.value.cupos) || 0,
+        liberar_horas_antes:
+          Number(reglaCanalModel.value.liberar_horas_antes) || 0,
+      },
+    );
+    reglaCanalModel.value = {
+      canal: "wellhub",
+      cupos: 0,
+      liberar_horas_antes: 0,
+    };
+    await cargarReglasCanal(detalle.value.oferta_id);
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    guardandoCanal.value = false
+    guardandoCanal.value = false;
   }
 }
 
 async function eliminarReglaCanal(r: ReglaCanal): Promise<void> {
   if (detalle.value === null || detalle.value.oferta_id === null) {
-    return
+    return;
   }
-  guardandoCanal.value = true
-  error.value = null
+  guardandoCanal.value = true;
+  error.value = null;
   try {
-    await api.delete(`${base.value}/capacidad-canal/${r.id}`)
-    await cargarReglasCanal(detalle.value.oferta_id)
+    await api.delete(`${base.value}/capacidad-canal/${r.id}`);
+    await cargarReglasCanal(detalle.value.oferta_id);
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    guardandoCanal.value = false
+    guardandoCanal.value = false;
   }
 }
 
 async function cargarStaffSesion(id: string): Promise<void> {
   try {
-    const { data } = await api.get<{ data: StaffSesion[] }>(`${base.value}/sesiones/${id}/staff`)
-    staffSesion.value = data.data
+    const { data } = await api.get<{ data: StaffSesion[] }>(
+      `${base.value}/sesiones/${id}/staff`,
+    );
+    staffSesion.value = data.data;
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   }
 }
 async function asignarStaff(id: string): Promise<void> {
-  if (staffModel.value.usuarioId === '') {
-    return
+  if (staffModel.value.usuarioId === "") {
+    return;
   }
-  asignandoStaff.value = true
-  error.value = null
+  asignandoStaff.value = true;
+  error.value = null;
   try {
     await api.post(`${base.value}/sesiones/${id}/staff`, {
       usuario_id: staffModel.value.usuarioId,
       rol: staffModel.value.rol,
-      sustituye_a: staffModel.value.sustituyeA !== '' ? staffModel.value.sustituyeA : null,
-    })
-    staffModel.value = { usuarioId: '', rol: 'instructor', sustituyeA: '' }
-    await cargarStaffSesion(id)
+      sustituye_a:
+        staffModel.value.sustituyeA !== "" ? staffModel.value.sustituyeA : null,
+    });
+    staffModel.value = { usuarioId: "", rol: "instructor", sustituyeA: "" };
+    await cargarStaffSesion(id);
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    asignandoStaff.value = false
+    asignandoStaff.value = false;
   }
 }
 function cerrarDetalle(): void {
-  detalle.value = null
+  detalle.value = null;
 }
 
 async function cargarRoster(id: string): Promise<void> {
-  cargandoRoster.value = true
+  cargandoRoster.value = true;
   try {
-    const { data } = await api.get<{ data: Reserva[] }>(`${base.value}/sesiones/${id}/reservas`)
-    roster.value = data.data
+    const { data } = await api.get<{ data: Reserva[] }>(
+      `${base.value}/sesiones/${id}/reservas`,
+    );
+    roster.value = data.data;
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    cargandoRoster.value = false
+    cargandoRoster.value = false;
   }
 }
 async function cargarCheckins(id: string): Promise<void> {
   try {
-    const { data } = await api.get<{ data: Checkin[] }>(`${base.value}/sesiones/${id}/checkins`)
-    checkins.value = data.data
+    const { data } = await api.get<{ data: Checkin[] }>(
+      `${base.value}/sesiones/${id}/checkins`,
+    );
+    checkins.value = data.data;
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   }
 }
 
 async function refrescarTras(sesionId: string): Promise<void> {
-  await Promise.all([cargarRoster(sesionId), cargarSesiones()])
+  await Promise.all([cargarRoster(sesionId), cargarSesiones()]);
   // Refresca el encabezado del panel (ocupados/cupo) con la sesion actualizada.
-  const actualizada = sesiones.value.find((s) => s.id === sesionId)
+  const actualizada = sesiones.value.find((s) => s.id === sesionId);
   if (actualizada !== undefined && detalle.value !== null) {
-    detalle.value = actualizada
+    detalle.value = actualizada;
   }
 }
 
 async function reservar(id: string): Promise<void> {
-  accionando.value = true
-  error.value = null
+  accionando.value = true;
+  error.value = null;
   try {
     await api.post(`${base.value}/sesiones/${id}/reservas`, {
       persona_id: reservarModel.value.miembroId,
       esperar: reservarModel.value.esperar,
       canal: reservarModel.value.canal,
       lugar: reservarModel.value.lugar,
-    })
-    reservarModel.value.miembroId = ''
-    reservarModel.value.lugar = null
-    await refrescarTras(id)
+    });
+    reservarModel.value.miembroId = "";
+    reservarModel.value.lugar = null;
+    await refrescarTras(id);
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    accionando.value = false
+    accionando.value = false;
   }
 }
 // Lugares (R4): lugares ya tomados en la sesion (desde el roster cargado).
 const lugaresTomados = computed(() => {
-  const s = new Set<number>()
+  const s = new Set<number>();
   for (const r of roster.value) {
-    if (r.lugar !== null && r.estado !== 'cancelada') {
-      s.add(r.lugar)
+    if (r.lugar !== null && r.estado !== "cancelada") {
+      s.add(r.lugar);
     }
   }
-  return s
-})
+  return s;
+});
 
 async function guardarLugares(): Promise<void> {
   if (detalle.value === null || detalle.value.oferta_id === null) {
-    return
+    return;
   }
-  guardandoLugares.value = true
-  error.value = null
+  guardandoLugares.value = true;
+  error.value = null;
   try {
-    const precioMinor = Math.round((Number(lugaresModel.value.precio) || 0) * 100)
+    const precioMinor = Math.round(
+      (Number(lugaresModel.value.precio) || 0) * 100,
+    );
     await api.put(`${base.value}/ofertas/${detalle.value.oferta_id}`, {
       lugares: Number(lugaresModel.value.lugares) || 0,
       precio_clase_minor: precioMinor > 0 ? precioMinor : null,
-    })
-    detalle.value.oferta_lugares = Number(lugaresModel.value.lugares) || 0
-    detalle.value.oferta_precio_clase = precioMinor > 0 ? precioMinor : null
+    });
+    detalle.value.oferta_lugares = Number(lugaresModel.value.lugares) || 0;
+    detalle.value.oferta_precio_clase = precioMinor > 0 ? precioMinor : null;
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    guardandoLugares.value = false
+    guardandoLugares.value = false;
   }
 }
 
-async function marcar(reservaId: string, estado: 'presente' | 'ausente', sesionId: string): Promise<void> {
-  accionando.value = true
-  error.value = null
+async function marcar(
+  reservaId: string,
+  estado: "presente" | "ausente",
+  sesionId: string,
+): Promise<void> {
+  accionando.value = true;
+  error.value = null;
   try {
-    await api.post(`${base.value}/reservas/${reservaId}/asistencia`, { estado })
-    await cargarRoster(sesionId)
+    await api.post(`${base.value}/reservas/${reservaId}/asistencia`, {
+      estado,
+    });
+    await cargarRoster(sesionId);
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    accionando.value = false
+    accionando.value = false;
   }
 }
 async function aceptar(reservaId: string, sesionId: string): Promise<void> {
-  accionando.value = true
-  error.value = null
+  accionando.value = true;
+  error.value = null;
   try {
-    await api.post(`${base.value}/reservas/${reservaId}/aceptar`, {})
-    await refrescarTras(sesionId)
+    await api.post(`${base.value}/reservas/${reservaId}/aceptar`, {});
+    await refrescarTras(sesionId);
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    accionando.value = false
+    accionando.value = false;
   }
 }
-async function cancelarReserva(reservaId: string, sesionId: string): Promise<void> {
-  accionando.value = true
-  error.value = null
+async function cancelarReserva(
+  reservaId: string,
+  sesionId: string,
+): Promise<void> {
+  accionando.value = true;
+  error.value = null;
   try {
-    await api.post(`${base.value}/reservas/${reservaId}/cancelar`, {})
-    await refrescarTras(sesionId)
+    await api.post(`${base.value}/reservas/${reservaId}/cancelar`, {});
+    await refrescarTras(sesionId);
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    accionando.value = false
+    accionando.value = false;
   }
 }
 function abrirTransferir(reservaId: string): void {
-  transferirModel.value = { reservaId, personaId: '' }
+  transferirModel.value = { reservaId, personaId: "" };
 }
 async function transferir(reservaId: string, sesionId: string): Promise<void> {
-  if (transferirModel.value.personaId === '') {
-    return
+  if (transferirModel.value.personaId === "") {
+    return;
   }
-  accionando.value = true
-  error.value = null
+  accionando.value = true;
+  error.value = null;
   try {
-    await api.post(`${base.value}/reservas/${reservaId}/transferir`, { persona_id: transferirModel.value.personaId })
-    transferirModel.value = { reservaId: '', personaId: '' }
-    await cargarRoster(sesionId)
+    await api.post(`${base.value}/reservas/${reservaId}/transferir`, {
+      persona_id: transferirModel.value.personaId,
+    });
+    transferirModel.value = { reservaId: "", personaId: "" };
+    await cargarRoster(sesionId);
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    accionando.value = false
+    accionando.value = false;
   }
 }
 async function cancelarSesion(id: string): Promise<void> {
-  accionando.value = true
-  error.value = null
+  accionando.value = true;
+  error.value = null;
   try {
-    await api.post(`${base.value}/sesiones/${id}/cancelar`, {})
-    cerrarDetalle()
-    await cargarSesiones()
+    await api.post(`${base.value}/sesiones/${id}/cancelar`, {});
+    cerrarDetalle();
+    await cargarSesiones();
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    accionando.value = false
+    accionando.value = false;
   }
 }
 async function registrarCheckin(id: string): Promise<void> {
-  registrandoCheckin.value = true
-  okCheckin.value = false
-  error.value = null
+  registrandoCheckin.value = true;
+  okCheckin.value = false;
+  error.value = null;
   try {
     await api.post(`${base.value}/checkins`, {
       proveedor: checkinModel.value.proveedor,
       sesion_id: id,
       codigo: checkinModel.value.codigo,
-    })
-    checkinModel.value.codigo = ''
-    okCheckin.value = true
-    await cargarCheckins(id)
+    });
+    checkinModel.value.codigo = "";
+    okCheckin.value = true;
+    await cargarCheckins(id);
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    registrandoCheckin.value = false
+    registrandoCheckin.value = false;
   }
 }
 
 // ---- Nueva clase (modal) ----
-const mostrarNueva = ref(false)
+const mostrarNueva = ref(false);
 const form = ref({
-  ofertaId: '',
-  sucursalId: '',
-  instructorId: '',
-  recursoId: '',
-  fecha: '',
-  duracion: '60',
-  capacidad: '',
+  ofertaId: "",
+  sucursalId: "",
+  instructorId: "",
+  recursoId: "",
+  fecha: "",
+  duracion: "60",
+  capacidad: "",
   repetir: false,
   dias: [] as number[],
-  repetirHasta: '',
-})
+  repetirHasta: "",
+});
 // Recursos/salas de la sucursal elegida (para asignar sala a la clase).
 const recursosDeSucursal = computed(() =>
-  form.value.sucursalId === ''
+  form.value.sucursalId === ""
     ? recursos.value
-    : recursos.value.filter((r) => r.sucursal_id === null || r.sucursal_id === form.value.sucursalId),
-)
-const creando = ref(false)
+    : recursos.value.filter(
+        (r) =>
+          r.sucursal_id === null || r.sucursal_id === form.value.sucursalId,
+      ),
+);
+const creando = ref(false);
 
 // Conflictos (instructor/sala/recurso) verificados ANTES de guardar (rework Agenda).
 interface Conflicto {
-  tipo: string
-  campo: string
-  mensaje: string
-  sesion: string | null
+  tipo: string;
+  campo: string;
+  mensaje: string;
+  sesion: string | null;
 }
-const conflictos = ref<Conflicto[]>([])
-let tempConf: ReturnType<typeof setTimeout> | undefined
+const conflictos = ref<Conflicto[]>([]);
+let tempConf: ReturnType<typeof setTimeout> | undefined;
 
 async function verificarConflictos(): Promise<void> {
-  conflictos.value = []
+  conflictos.value = [];
   // La recurrencia (varias fechas) no se pre-verifica; la validación dura ocurre al guardar.
-  if (form.value.sucursalId === '' || form.value.fecha === '' || form.value.repetir) {
-    return
+  if (
+    form.value.sucursalId === "" ||
+    form.value.fecha === "" ||
+    form.value.repetir
+  ) {
+    return;
   }
   try {
-    const { data } = await api.post<{ data: { conflictos: Conflicto[] } }>(`${base.value}/sesiones/verificar`, {
-      sucursal_id: form.value.sucursalId,
-      instructor_id: form.value.instructorId !== '' ? form.value.instructorId : null,
-      recurso_id: form.value.recursoId !== '' ? form.value.recursoId : null,
-      inicia_en_local: form.value.fecha.replace('T', ' ') + ':00',
-      duracion_minutos: Number(form.value.duracion),
-    })
-    conflictos.value = data.data.conflictos
+    const { data } = await api.post<{ data: { conflictos: Conflicto[] } }>(
+      `${base.value}/sesiones/verificar`,
+      {
+        sucursal_id: form.value.sucursalId,
+        instructor_id:
+          form.value.instructorId !== "" ? form.value.instructorId : null,
+        recurso_id: form.value.recursoId !== "" ? form.value.recursoId : null,
+        inicia_en_local: form.value.fecha.replace("T", " ") + ":00",
+        duracion_minutos: Number(form.value.duracion),
+      },
+    );
+    conflictos.value = data.data.conflictos;
   } catch {
     // Silencioso: si la verificación falla, la validación al guardar sigue protegiendo.
   }
 }
 
 watch(
-  () => [form.value.sucursalId, form.value.instructorId, form.value.recursoId, form.value.fecha, form.value.duracion, form.value.repetir],
+  () => [
+    form.value.sucursalId,
+    form.value.instructorId,
+    form.value.recursoId,
+    form.value.fecha,
+    form.value.duracion,
+    form.value.repetir,
+  ],
   () => {
-    clearTimeout(tempConf)
-    tempConf = setTimeout(verificarConflictos, 350)
+    clearTimeout(tempConf);
+    tempConf = setTimeout(verificarConflictos, 350);
   },
-)
+);
 
 // Días de la semana en ISO (1 = lunes … 7 = domingo) para el selector de recurrencia.
 const DIAS_SEMANA = [
-  { n: 1, etiqueta: 'L' },
-  { n: 2, etiqueta: 'M' },
-  { n: 3, etiqueta: 'M' },
-  { n: 4, etiqueta: 'J' },
-  { n: 5, etiqueta: 'V' },
-  { n: 6, etiqueta: 'S' },
-  { n: 7, etiqueta: 'D' },
-]
+  { n: 1, etiqueta: "L" },
+  { n: 2, etiqueta: "M" },
+  { n: 3, etiqueta: "M" },
+  { n: 4, etiqueta: "J" },
+  { n: 5, etiqueta: "V" },
+  { n: 6, etiqueta: "S" },
+  { n: 7, etiqueta: "D" },
+];
 function diaIsoDe(ymd: string): number {
-  const [a, m, d] = ymd.split('-').map(Number)
-  return ((new Date(a, m - 1, d).getDay() + 6) % 7) + 1
+  const [a, m, d] = ymd.split("-").map(Number);
+  return ((new Date(a, m - 1, d).getDay() + 6) % 7) + 1;
 }
 function alternarDia(n: number): void {
-  const i = form.value.dias.indexOf(n)
+  const i = form.value.dias.indexOf(n);
   if (i === -1) {
-    form.value.dias.push(n)
+    form.value.dias.push(n);
   } else {
-    form.value.dias.splice(i, 1)
+    form.value.dias.splice(i, 1);
   }
 }
 // Al activar "repetir", prefija el día de la semana de la fecha elegida.
 watch(
   () => form.value.repetir,
   (v) => {
-    if (v && form.value.dias.length === 0 && form.value.fecha !== '') {
-      form.value.dias = [diaIsoDe(form.value.fecha.slice(0, 10))]
+    if (v && form.value.dias.length === 0 && form.value.fecha !== "") {
+      form.value.dias = [diaIsoDe(form.value.fecha.slice(0, 10))];
     }
   },
-)
+);
 
 async function crearSesion(): Promise<void> {
-  creando.value = true
-  error.value = null
+  creando.value = true;
+  error.value = null;
   try {
     if (form.value.repetir) {
-      await crearRecurrente()
+      await crearRecurrente();
     } else {
       await api.post(`${base.value}/sesiones`, {
         oferta_id: form.value.ofertaId,
         sucursal_id: form.value.sucursalId,
-        instructor_id: form.value.instructorId !== '' ? form.value.instructorId : null,
-        recurso_id: form.value.recursoId !== '' ? form.value.recursoId : null,
-        inicia_en_local: form.value.fecha.replace('T', ' ') + ':00',
+        instructor_id:
+          form.value.instructorId !== "" ? form.value.instructorId : null,
+        recurso_id: form.value.recursoId !== "" ? form.value.recursoId : null,
+        inicia_en_local: form.value.fecha.replace("T", " ") + ":00",
         duracion_minutos: Number(form.value.duracion),
-        capacidad: form.value.capacidad !== '' ? Number(form.value.capacidad) : null,
-      })
+        capacidad:
+          form.value.capacidad !== "" ? Number(form.value.capacidad) : null,
+      });
     }
-    form.value.fecha = ''
-    form.value.capacidad = ''
-    form.value.recursoId = ''
-    form.value.repetir = false
-    form.value.dias = []
-    form.value.repetirHasta = ''
-    mostrarNueva.value = false
-    await cargarSesiones()
+    trackEvent("class_schedule_created", { recurring: form.value.repetir });
+    form.value.fecha = "";
+    form.value.capacidad = "";
+    form.value.recursoId = "";
+    form.value.repetir = false;
+    form.value.dias = [];
+    form.value.repetirHasta = "";
+    mostrarNueva.value = false;
+    await cargarSesiones();
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    creando.value = false
+    creando.value = false;
   }
 }
 
 // Crea una plantilla de horario recurrente y materializa sus sesiones del rango.
 async function crearRecurrente(): Promise<void> {
-  const fechaYmd = form.value.fecha.slice(0, 10)
-  const hora = form.value.fecha.slice(11, 16)
-  const dias = form.value.dias.length > 0 ? [...form.value.dias].sort((a, b) => a - b) : [diaIsoDe(fechaYmd)]
-  const hasta = form.value.repetirHasta !== '' ? form.value.repetirHasta : isoDe(sumarDias(new Date(`${fechaYmd}T00:00:00`), 56))
+  const fechaYmd = form.value.fecha.slice(0, 10);
+  const hora = form.value.fecha.slice(11, 16);
+  const dias =
+    form.value.dias.length > 0
+      ? [...form.value.dias].sort((a, b) => a - b)
+      : [diaIsoDe(fechaYmd)];
+  const hasta =
+    form.value.repetirHasta !== ""
+      ? form.value.repetirHasta
+      : isoDe(sumarDias(new Date(`${fechaYmd}T00:00:00`), 56));
 
-  const { data } = await api.post<{ data: { id: string } }>(`${base.value}/plantillas-horario`, {
-    oferta_id: form.value.ofertaId,
-    sucursal_id: form.value.sucursalId,
-    instructor_id: form.value.instructorId !== '' ? form.value.instructorId : null,
-    dias_semana: dias,
-    hora_local: hora,
-    duracion_minutos: Number(form.value.duracion),
-    capacidad: form.value.capacidad !== '' ? Number(form.value.capacidad) : null,
-    vigente_desde: fechaYmd,
-    vigente_hasta: form.value.repetirHasta !== '' ? form.value.repetirHasta : null,
-  })
+  const { data } = await api.post<{ data: { id: string } }>(
+    `${base.value}/plantillas-horario`,
+    {
+      oferta_id: form.value.ofertaId,
+      sucursal_id: form.value.sucursalId,
+      instructor_id:
+        form.value.instructorId !== "" ? form.value.instructorId : null,
+      dias_semana: dias,
+      hora_local: hora,
+      duracion_minutos: Number(form.value.duracion),
+      capacidad:
+        form.value.capacidad !== "" ? Number(form.value.capacidad) : null,
+      vigente_desde: fechaYmd,
+      vigente_hasta:
+        form.value.repetirHasta !== "" ? form.value.repetirHasta : null,
+    },
+  );
 
-  await api.post(`${base.value}/plantillas-horario/${data.data.id}/generar`, { desde: fechaYmd, hasta })
+  await api.post(`${base.value}/plantillas-horario/${data.data.id}/generar`, {
+    desde: fechaYmd,
+    hasta,
+  });
 }
 
 onMounted(async () => {
-  await cargarReferencias()
-  await cargarSesiones()
-})
+  await cargarReferencias();
+  await cargarSesiones();
+});
 </script>
 
 <template>
   <section class="px-4 sm:px-6 py-8">
     <div class="flex items-start justify-between gap-3 flex-wrap">
-      <EncabezadoSeccion icono="agenda" :titulo="$t('agenda.titulo')" :subtitulo="$t('agenda.subtitulo')" />
-      <button v-if="puedeGestionar" class="tu-btn tu-btn-primario" @click="mostrarNueva = true">
-        + {{ $t('agenda.nuevaClase') }}
+      <EncabezadoSeccion
+        icono="agenda"
+        :titulo="$t('agenda.titulo')"
+        :subtitulo="$t('agenda.subtitulo')"
+      />
+      <button
+        v-if="puedeGestionar"
+        class="tu-btn tu-btn-primario"
+        @click="mostrarNueva = true"
+      >
+        + {{ $t("agenda.nuevaClase") }}
       </button>
     </div>
 
-    <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">{{ $t('comun.cargando') }}</p>
-    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">{{ error }}</p>
+    <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
+      {{ $t("comun.cargando") }}
+    </p>
+    <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+      {{ error }}
+    </p>
 
     <template v-if="!cargando">
       <!-- Barra de herramientas: filtros + navegacion + vista -->
       <div class="mt-6 flex flex-wrap items-center gap-2 sm:gap-3">
-        <select v-model="sucursalFiltro" class="tu-input w-auto" :aria-label="$t('agenda.nueva.sucursal')">
-          <option value="">{{ $t('agenda.todasSucursales') }}</option>
-          <option v-for="s in sucursales" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+        <select
+          v-model="sucursalFiltro"
+          class="tu-input w-auto"
+          :aria-label="$t('agenda.nueva.sucursal')"
+        >
+          <option value="">{{ $t("agenda.todasSucursales") }}</option>
+          <option v-for="s in sucursales" :key="s.id" :value="s.id">
+            {{ s.nombre }}
+          </option>
         </select>
         <select
           v-if="instructores.length > 0"
@@ -842,71 +991,162 @@ onMounted(async () => {
           class="tu-input w-auto"
           :aria-label="$t('agenda.nueva.instructor')"
         >
-          <option value="">{{ $t('agenda.todosInstructores') }}</option>
-          <option v-for="i in instructores" :key="i.id" :value="i.id">{{ i.nombre }}</option>
+          <option value="">{{ $t("agenda.todosInstructores") }}</option>
+          <option v-for="i in instructores" :key="i.id" :value="i.id">
+            {{ i.nombre }}
+          </option>
         </select>
 
         <div class="flex items-center gap-1 ml-auto">
-          <button class="tu-icono-btn" :aria-label="$t('agenda.semanaAnterior')" @click="irSemana(-1)">‹</button>
-          <button class="tu-btn tu-btn-fantasma px-3 py-1.5" @click="irHoy">{{ $t('agenda.hoy') }}</button>
-          <button class="tu-icono-btn" :aria-label="$t('agenda.semanaSiguiente')" @click="irSemana(1)">›</button>
-          <span class="text-sm font-medium ml-1 hidden sm:inline" :style="{ color: 'var(--texto-suave)' }">{{ rangoTexto }}</span>
+          <button
+            class="tu-icono-btn"
+            :aria-label="$t('agenda.semanaAnterior')"
+            @click="irSemana(-1)"
+          >
+            ‹
+          </button>
+          <button class="tu-btn tu-btn-fantasma px-3 py-1.5" @click="irHoy">
+            {{ $t("agenda.hoy") }}
+          </button>
+          <button
+            class="tu-icono-btn"
+            :aria-label="$t('agenda.semanaSiguiente')"
+            @click="irSemana(1)"
+          >
+            ›
+          </button>
+          <span
+            class="text-sm font-medium ml-1 hidden sm:inline"
+            :style="{ color: 'var(--texto-suave)' }"
+            >{{ rangoTexto }}</span
+          >
         </div>
 
         <!-- Alternar vista (solo escritorio; movil siempre es dia) -->
-        <div class="hidden lg:inline-flex rounded-xl overflow-hidden border" :style="{ borderColor: 'var(--borde)' }">
+        <div
+          class="hidden lg:inline-flex rounded-xl overflow-hidden border"
+          :style="{ borderColor: 'var(--borde)' }"
+        >
           <button
             class="px-3 py-1.5 text-sm"
-            :style="vista === 'semana' ? { background: 'var(--primario)', color: '#fff' } : {}"
+            :style="
+              vista === 'semana'
+                ? { background: 'var(--primario)', color: '#fff' }
+                : {}
+            "
             @click="vista = 'semana'"
           >
-            {{ $t('agenda.vistaSemana') }}
+            {{ $t("agenda.vistaSemana") }}
           </button>
           <button
             class="px-3 py-1.5 text-sm"
-            :style="vista === 'dia' ? { background: 'var(--primario)', color: '#fff' } : {}"
+            :style="
+              vista === 'dia'
+                ? { background: 'var(--primario)', color: '#fff' }
+                : {}
+            "
             @click="vista = 'dia'"
           >
-            {{ $t('agenda.vistaDia') }}
+            {{ $t("agenda.vistaDia") }}
           </button>
         </div>
       </div>
 
-      <p v-if="cargandoSesiones" class="mt-4 text-sm" :style="{ color: 'var(--texto-suave)' }">{{ $t('comun.cargando') }}</p>
+      <p
+        v-if="cargandoSesiones"
+        class="mt-4 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("comun.cargando") }}
+      </p>
 
       <!-- ===== Vista SEMANA (escritorio): cuadricula horaria ===== -->
       <div v-if="vista === 'semana'" class="mt-4 hidden lg:block">
         <!-- Leyenda: el color del bloque = tipo de clase; el punto = estado de ocupación. -->
-        <div class="flex flex-wrap items-center gap-4 mb-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
-          <span class="inline-flex items-center gap-1.5"><span class="tu-estado-dot" :style="{ background: COLOR_ESTADO.disponible }" />{{ $t('agenda.estados.disponible') }}</span>
-          <span class="inline-flex items-center gap-1.5"><span class="tu-estado-dot" :style="{ background: COLOR_ESTADO.casi }" />{{ $t('agenda.estados.casi') }}</span>
-          <span class="inline-flex items-center gap-1.5"><span class="tu-estado-dot" :style="{ background: COLOR_ESTADO.llena }" />{{ $t('agenda.estados.llena') }}</span>
-          <span class="inline-flex items-center gap-1.5"><span class="tu-espera-dot" />{{ $t('agenda.estados.espera') }}</span>
+        <div
+          class="flex flex-wrap items-center gap-4 mb-2 text-xs"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          <span class="inline-flex items-center gap-1.5"
+            ><span
+              class="tu-estado-dot"
+              :style="{ background: COLOR_ESTADO.disponible }"
+            />{{ $t("agenda.estados.disponible") }}</span
+          >
+          <span class="inline-flex items-center gap-1.5"
+            ><span
+              class="tu-estado-dot"
+              :style="{ background: COLOR_ESTADO.casi }"
+            />{{ $t("agenda.estados.casi") }}</span
+          >
+          <span class="inline-flex items-center gap-1.5"
+            ><span
+              class="tu-estado-dot"
+              :style="{ background: COLOR_ESTADO.llena }"
+            />{{ $t("agenda.estados.llena") }}</span
+          >
+          <span class="inline-flex items-center gap-1.5"
+            ><span class="tu-espera-dot" />{{
+              $t("agenda.estados.espera")
+            }}</span
+          >
         </div>
 
-        <div class="rounded-xl border overflow-hidden" :style="{ borderColor: 'var(--borde)', background: 'var(--superficie)' }">
+        <div
+          class="rounded-xl border overflow-hidden"
+          :style="{
+            borderColor: 'var(--borde)',
+            background: 'var(--superficie)',
+          }"
+        >
           <!-- Encabezado de dias -->
-          <div class="grid" style="grid-template-columns: 3.5rem repeat(7, minmax(0, 1fr))">
+          <div
+            class="grid"
+            style="grid-template-columns: 3.5rem repeat(7, minmax(0, 1fr))"
+          >
             <div class="border-b" :style="{ borderColor: 'var(--borde)' }" />
             <div
               v-for="d in dias"
               :key="d.iso"
               class="px-1 py-2 text-center border-b border-l"
-              :style="{ borderColor: 'var(--borde)', background: d.esHoy ? 'var(--primario-suave)' : 'transparent' }"
+              :style="{
+                borderColor: 'var(--borde)',
+                background: d.esHoy ? 'var(--primario-suave)' : 'transparent',
+              }"
             >
-              <div class="text-[11px] uppercase" :style="{ color: 'var(--texto-suave)' }">{{ d.nombre }}</div>
-              <div class="text-base font-bold" :style="{ color: d.esHoy ? 'var(--primario-fuerte)' : 'var(--texto)' }">{{ d.dia }}</div>
+              <div
+                class="text-[11px] uppercase"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ d.nombre }}
+              </div>
+              <div
+                class="text-base font-bold"
+                :style="{
+                  color: d.esHoy ? 'var(--primario-fuerte)' : 'var(--texto)',
+                }"
+              >
+                {{ d.dia }}
+              </div>
             </div>
           </div>
           <!-- Cuerpo: eje de horas + 7 columnas -->
-          <div class="grid" style="grid-template-columns: 3.5rem repeat(7, minmax(0, 1fr))">
+          <div
+            class="grid"
+            style="grid-template-columns: 3.5rem repeat(7, minmax(0, 1fr))"
+          >
             <div class="relative" :style="{ height: totalAlto + 'px' }">
               <div
                 v-for="h in horas"
                 :key="h.min"
                 class="absolute right-1.5 text-[11px]"
-                :style="{ top: ((h.min - rango.inicioMin) / 60 * HORA_ALTO) + 'px', color: 'var(--texto-suave)' }"
-              >{{ h.etiqueta }}</div>
+                :style="{
+                  top: ((h.min - rango.inicioMin) / 60) * HORA_ALTO + 'px',
+                  color: 'var(--texto-suave)',
+                }"
+              >
+                {{ h.etiqueta }}
+              </div>
             </div>
             <div
               v-for="d in dias"
@@ -915,38 +1155,72 @@ onMounted(async () => {
               :style="{
                 borderColor: 'var(--borde)',
                 height: totalAlto + 'px',
-                background: d.esHoy ? 'color-mix(in srgb, var(--primario) 6%, transparent)' : 'transparent',
+                background: d.esHoy
+                  ? 'color-mix(in srgb, var(--primario) 6%, transparent)'
+                  : 'transparent',
               }"
             >
               <div
                 v-for="h in horas"
                 :key="h.min"
                 class="absolute left-0 right-0 border-t"
-                :style="{ top: ((h.min - rango.inicioMin) / 60 * HORA_ALTO) + 'px', borderColor: 'var(--borde)', opacity: 0.5 }"
+                :style="{
+                  top: ((h.min - rango.inicioMin) / 60) * HORA_ALTO + 'px',
+                  borderColor: 'var(--borde)',
+                  opacity: 0.5,
+                }"
               />
               <button
                 v-for="b in bloquesDe(d.iso)"
                 :key="b.sesion.id"
                 class="tu-bloque"
-                :class="{ 'tu-bloque--cancelada': estadoAgenda(b.sesion) === 'cancelada' }"
+                :class="{
+                  'tu-bloque--cancelada':
+                    estadoAgenda(b.sesion) === 'cancelada',
+                }"
                 :style="{
                   top: b.top + 'px',
                   height: b.alto + 'px',
                   left: `calc(${b.izq}% + 2px)`,
                   width: `calc(${b.ancho}% - 4px)`,
-                  background: estadoAgenda(b.sesion) === 'cancelada' ? 'var(--superficie-2)' : `color-mix(in srgb, ${colorTipo(b.sesion.oferta)} 22%, var(--superficie))`,
+                  background:
+                    estadoAgenda(b.sesion) === 'cancelada'
+                      ? 'var(--superficie-2)'
+                      : `color-mix(in srgb, ${colorTipo(b.sesion.oferta)} 22%, var(--superficie))`,
                   borderLeft: `3px solid ${estadoAgenda(b.sesion) === 'cancelada' ? 'var(--texto-suave)' : colorTipo(b.sesion.oferta)}`,
                 }"
                 @click="abrirDetalle(b.sesion)"
               >
                 <div class="flex items-center gap-1">
-                  <span class="font-semibold text-[11px] leading-tight">{{ horaCorta(b.sesion.inicia_en, b.sesion.zona_horaria) }}</span>
-                  <span v-if="b.sesion.en_espera > 0" class="tu-espera-dot" :title="$t('agenda.estados.espera')"></span>
+                  <span class="font-semibold text-[11px] leading-tight">{{
+                    horaCorta(b.sesion.inicia_en, b.sesion.zona_horaria)
+                  }}</span>
+                  <span
+                    v-if="b.sesion.en_espera > 0"
+                    class="tu-espera-dot"
+                    :title="$t('agenda.estados.espera')"
+                  ></span>
                 </div>
-                <div class="text-[12px] font-medium leading-tight truncate">{{ b.sesion.oferta ?? '—' }}</div>
-                <div class="text-[10px] leading-tight truncate flex items-center gap-1" :style="{ opacity: 0.85 }">
-                  <span class="tu-estado-dot" :style="{ background: COLOR_ESTADO[estadoAgenda(b.sesion)] }"></span>
-                  {{ b.sesion.capacidad !== null ? `${b.sesion.ocupados}/${b.sesion.capacidad}` : b.sesion.ocupados }}<span v-if="b.sesion.instructor"> · {{ b.sesion.instructor }}</span>
+                <div class="text-[12px] font-medium leading-tight truncate">
+                  {{ b.sesion.oferta ?? "—" }}
+                </div>
+                <div
+                  class="text-[10px] leading-tight truncate flex items-center gap-1"
+                  :style="{ opacity: 0.85 }"
+                >
+                  <span
+                    class="tu-estado-dot"
+                    :style="{
+                      background: COLOR_ESTADO[estadoAgenda(b.sesion)],
+                    }"
+                  ></span>
+                  {{
+                    b.sesion.capacidad !== null
+                      ? `${b.sesion.ocupados}/${b.sesion.capacidad}`
+                      : b.sesion.ocupados
+                  }}<span v-if="b.sesion.instructor">
+                    · {{ b.sesion.instructor }}</span
+                  >
                 </div>
               </button>
             </div>
@@ -964,8 +1238,15 @@ onMounted(async () => {
             class="flex-1 min-w-[3rem] rounded-xl border py-2 text-center"
             :style="
               diaSel === d.iso
-                ? { background: 'var(--primario)', color: '#fff', borderColor: 'var(--primario)' }
-                : { borderColor: 'var(--borde)', background: 'var(--superficie)' }
+                ? {
+                    background: 'var(--primario)',
+                    color: '#fff',
+                    borderColor: 'var(--primario)',
+                  }
+                : {
+                    borderColor: 'var(--borde)',
+                    background: 'var(--superficie)',
+                  }
             "
             @click="diaSel = d.iso"
           >
@@ -975,37 +1256,76 @@ onMounted(async () => {
         </div>
 
         <ul class="mt-3 space-y-2">
-          <li
-            v-for="s in sesionesDe(diaSelInfo.iso)"
-            :key="s.id"
-          >
+          <li v-for="s in sesionesDe(diaSelInfo.iso)" :key="s.id">
             <button
               class="tu-card w-full text-left p-3"
               :class="{ 'opacity-60': s.estado !== 'programada' }"
-              :style="{ borderLeft: `4px solid ${estadoAgenda(s) === 'cancelada' ? 'var(--texto-suave)' : colorTipo(s.oferta)}` }"
+              :style="{
+                borderLeft: `4px solid ${estadoAgenda(s) === 'cancelada' ? 'var(--texto-suave)' : colorTipo(s.oferta)}`,
+              }"
               @click="abrirDetalle(s)"
             >
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <div class="font-semibold">{{ horaCorta(s.inicia_en, s.zona_horaria) }} · {{ s.oferta ?? '—' }}</div>
-                  <div v-if="s.instructor || s.sala" class="text-sm truncate" :style="{ color: 'var(--texto-suave)' }">{{ [s.instructor, s.sala].filter(Boolean).join(' · ') }}</div>
+                  <div class="font-semibold">
+                    {{ horaCorta(s.inicia_en, s.zona_horaria) }} ·
+                    {{ s.oferta ?? "—" }}
+                  </div>
+                  <div
+                    v-if="s.instructor || s.sala"
+                    class="text-sm truncate"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    {{ [s.instructor, s.sala].filter(Boolean).join(" · ") }}
+                  </div>
                 </div>
                 <span class="flex flex-col items-end gap-1 shrink-0">
-                  <span class="tu-badge" :style="{ background: `color-mix(in srgb, ${COLOR_ESTADO[estadoAgenda(s)]} 16%, transparent)`, color: COLOR_ESTADO[estadoAgenda(s)] }">
+                  <span
+                    class="tu-badge"
+                    :style="{
+                      background: `color-mix(in srgb, ${COLOR_ESTADO[estadoAgenda(s)]} 16%, transparent)`,
+                      color: COLOR_ESTADO[estadoAgenda(s)],
+                    }"
+                  >
                     {{ $t(`agenda.estados.${estadoAgenda(s)}`) }}
                   </span>
-                  <span v-if="s.en_espera > 0" class="text-[11px]" :style="{ color: 'var(--aviso)' }">{{ $t('agenda.estados.esperaN', { n: s.en_espera }) }}</span>
+                  <span
+                    v-if="s.en_espera > 0"
+                    class="text-[11px]"
+                    :style="{ color: 'var(--aviso)' }"
+                    >{{
+                      $t("agenda.estados.esperaN", { n: s.en_espera })
+                    }}</span
+                  >
                 </span>
               </div>
-              <div v-if="pctOcupacion(s) !== null" class="mt-2 flex items-center gap-2">
-                <div class="tu-ocupa flex-1"><span :style="{ width: Math.min(100, pctOcupacion(s) ?? 0) + '%', background: COLOR_ESTADO[estadoAgenda(s)] }"></span></div>
-                <span class="text-xs shrink-0" :style="{ color: 'var(--texto-suave)' }">{{ s.ocupados }}/{{ s.capacidad }}</span>
+              <div
+                v-if="pctOcupacion(s) !== null"
+                class="mt-2 flex items-center gap-2"
+              >
+                <div class="tu-ocupa flex-1">
+                  <span
+                    :style="{
+                      width: Math.min(100, pctOcupacion(s) ?? 0) + '%',
+                      background: COLOR_ESTADO[estadoAgenda(s)],
+                    }"
+                  ></span>
+                </div>
+                <span
+                  class="text-xs shrink-0"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ s.ocupados }}/{{ s.capacidad }}</span
+                >
               </div>
             </button>
           </li>
         </ul>
-        <p v-if="sesionesDe(diaSelInfo.iso).length === 0" class="mt-6 text-center text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t('agenda.sinClasesDia') }}
+        <p
+          v-if="sesionesDe(diaSelInfo.iso).length === 0"
+          class="mt-6 text-center text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("agenda.sinClasesDia") }}
         </p>
       </div>
     </template>
@@ -1019,18 +1339,35 @@ onMounted(async () => {
       >
         <div class="flex items-start justify-between gap-3">
           <div>
-            <h2 class="text-lg font-bold">{{ detalle.oferta ?? '—' }}</h2>
+            <h2 class="text-lg font-bold">{{ detalle.oferta ?? "—" }}</h2>
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ horaCorta(detalle.inicia_en, detalle.zona_horaria) }}–{{ horaCorta(detalle.termina_en, detalle.zona_horaria) }}
+              {{ horaCorta(detalle.inicia_en, detalle.zona_horaria) }}–{{
+                horaCorta(detalle.termina_en, detalle.zona_horaria)
+              }}
               <span v-if="detalle.instructor"> · {{ detalle.instructor }}</span>
               <span v-if="detalle.sala"> · {{ detalle.sala }}</span>
             </p>
-            <span class="tu-badge mt-1 inline-block" :class="completo(detalle) ? 'tu-badge-aviso' : 'tu-badge-exito'">
-              {{ detalle.capacidad !== null ? `${detalle.ocupados}/${detalle.capacidad}` : `${detalle.ocupados}` }}
-              <span v-if="completo(detalle)"> · {{ $t('agenda.completo') }}</span>
+            <span
+              class="tu-badge mt-1 inline-block"
+              :class="completo(detalle) ? 'tu-badge-aviso' : 'tu-badge-exito'"
+            >
+              {{
+                detalle.capacidad !== null
+                  ? `${detalle.ocupados}/${detalle.capacidad}`
+                  : `${detalle.ocupados}`
+              }}
+              <span v-if="completo(detalle)">
+                · {{ $t("agenda.completo") }}</span
+              >
             </span>
           </div>
-          <button class="tu-icono-btn" :aria-label="$t('agenda.cerrarDetalle')" @click="cerrarDetalle">✕</button>
+          <button
+            class="tu-icono-btn"
+            :aria-label="$t('agenda.cerrarDetalle')"
+            @click="cerrarDetalle"
+          >
+            ✕
+          </button>
         </div>
 
         <div v-if="detalle.estado === 'programada'" class="mt-4">
@@ -1041,69 +1378,134 @@ onMounted(async () => {
             @submit.prevent="reservar(detalle.id)"
           >
             <div class="flex-1 min-w-[160px]">
-              <label class="tu-label" for="rm">{{ $t('agenda.reservar.miembro') }}</label>
-              <select id="rm" v-model="reservarModel.miembroId" class="tu-input" required>
-                <option value="" disabled>{{ $t('agenda.reservar.elegir') }}</option>
-                <option v-for="m in miembros" :key="m.id" :value="m.id">{{ nombreMiembro(m) }}</option>
+              <label class="tu-label" for="rm">{{
+                $t("agenda.reservar.miembro")
+              }}</label>
+              <select
+                id="rm"
+                v-model="reservarModel.miembroId"
+                class="tu-input"
+                required
+              >
+                <option value="" disabled>
+                  {{ $t("agenda.reservar.elegir") }}
+                </option>
+                <option v-for="m in miembros" :key="m.id" :value="m.id">
+                  {{ nombreMiembro(m) }}
+                </option>
               </select>
             </div>
             <div class="min-w-[120px]">
-              <label class="tu-label" for="rcanal">{{ $t('agenda.reservar.canal') }}</label>
-              <select id="rcanal" v-model="reservarModel.canal" class="tu-input">
-                <option v-for="c in CANALES" :key="c" :value="c">{{ $t(`agenda.canales.${c}`) }}</option>
+              <label class="tu-label" for="rcanal">{{
+                $t("agenda.reservar.canal")
+              }}</label>
+              <select
+                id="rcanal"
+                v-model="reservarModel.canal"
+                class="tu-input"
+              >
+                <option v-for="c in CANALES" :key="c" :value="c">
+                  {{ $t(`agenda.canales.${c}`) }}
+                </option>
               </select>
             </div>
             <label class="flex items-center gap-1.5 text-sm pb-2.5">
               <input v-model="reservarModel.esperar" type="checkbox" />
-              {{ $t('agenda.reservar.esperar') }}
+              {{ $t("agenda.reservar.esperar") }}
             </label>
             <!-- Mapa de lugares (R4): elige el lugar si la clase los asigna -->
             <div v-if="detalle.oferta_lugares > 0" class="w-full">
-              <label class="tu-label">{{ $t('agenda.lugares.elige') }}</label>
+              <label class="tu-label">{{ $t("agenda.lugares.elige") }}</label>
               <div class="flex flex-wrap gap-1.5">
                 <button
                   v-for="n in detalle.oferta_lugares"
                   :key="n"
                   type="button"
                   class="h-9 w-9 rounded-md border text-sm font-semibold transition disabled:opacity-40"
-                  :style="reservarModel.lugar === n
-                    ? { background: 'var(--primario)', color: '#fff', borderColor: 'var(--primario)' }
-                    : { borderColor: 'var(--borde)' }"
+                  :style="
+                    reservarModel.lugar === n
+                      ? {
+                          background: 'var(--primario)',
+                          color: '#fff',
+                          borderColor: 'var(--primario)',
+                        }
+                      : { borderColor: 'var(--borde)' }
+                  "
                   :disabled="lugaresTomados.has(n)"
-                  :title="lugaresTomados.has(n) ? $t('agenda.lugares.ocupado') : ''"
-                  @click="reservarModel.lugar = reservarModel.lugar === n ? null : n"
-                >{{ n }}</button>
+                  :title="
+                    lugaresTomados.has(n) ? $t('agenda.lugares.ocupado') : ''
+                  "
+                  @click="
+                    reservarModel.lugar = reservarModel.lugar === n ? null : n
+                  "
+                >
+                  {{ n }}
+                </button>
               </div>
             </div>
-            <button class="tu-btn tu-btn-primario" type="submit" :disabled="accionando || reservarModel.miembroId === ''">
-              {{ $t('agenda.reservar.reservar') }}
+            <button
+              class="tu-btn tu-btn-primario"
+              type="submit"
+              :disabled="accionando || reservarModel.miembroId === ''"
+            >
+              {{ $t("agenda.reservar.reservar") }}
             </button>
           </form>
         </div>
 
         <!-- Roster -->
-        <div class="mt-4 border-t pt-4" :style="{ borderColor: 'var(--borde)' }">
-          <h3 class="font-semibold text-sm">{{ $t('agenda.sesion.reservas') }}</h3>
-          <p v-if="cargandoRoster" class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">{{ $t('comun.cargando') }}</p>
-          <p v-else-if="roster.length === 0" class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t('agenda.roster.vacio') }}
+        <div
+          class="mt-4 border-t pt-4"
+          :style="{ borderColor: 'var(--borde)' }"
+        >
+          <h3 class="font-semibold text-sm">
+            {{ $t("agenda.sesion.reservas") }}
+          </h3>
+          <p
+            v-if="cargandoRoster"
+            class="mt-2 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("comun.cargando") }}
+          </p>
+          <p
+            v-else-if="roster.length === 0"
+            class="mt-2 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("agenda.roster.vacio") }}
           </p>
           <ul v-else class="mt-2 space-y-2">
             <li v-for="r in roster" :key="r.id" class="text-sm">
               <div class="flex items-center justify-between gap-2">
                 <span class="flex items-center gap-2 min-w-0">
-                  <span class="truncate">{{ r.persona ?? '—' }}</span>
+                  <span class="truncate">{{ r.persona ?? "—" }}</span>
                   <span
                     class="tu-badge"
                     :class="{
                       'tu-badge-exito': r.estado === 'confirmada',
-                      'tu-badge-aviso': r.estado === 'en_espera' || r.estado === 'ofrecida',
+                      'tu-badge-aviso':
+                        r.estado === 'en_espera' || r.estado === 'ofrecida',
                     }"
-                  >{{ $t(`agenda.roster.${r.estado}`) }}</span>
-                  <span v-if="r.asistencia" class="tu-badge">{{ $t(`agenda.roster.${r.asistencia}`) }}</span>
-                  <span v-if="r.canal && r.canal !== 'directo'" class="tu-badge">{{ $t(`agenda.canales.${r.canal}`) }}</span>
-                  <span v-if="r.primera_vez" class="tu-badge tu-badge-aviso" :title="$t('agenda.roster.primeraVezAyuda')">{{ $t('agenda.roster.primeraVez') }}</span>
-                  <span v-if="r.lugar" class="tu-badge">{{ $t('agenda.lugares.lugarN', { n: r.lugar }) }}</span>
+                    >{{ $t(`agenda.roster.${r.estado}`) }}</span
+                  >
+                  <span v-if="r.asistencia" class="tu-badge">{{
+                    $t(`agenda.roster.${r.asistencia}`)
+                  }}</span>
+                  <span
+                    v-if="r.canal && r.canal !== 'directo'"
+                    class="tu-badge"
+                    >{{ $t(`agenda.canales.${r.canal}`) }}</span
+                  >
+                  <span
+                    v-if="r.primera_vez"
+                    class="tu-badge tu-badge-aviso"
+                    :title="$t('agenda.roster.primeraVezAyuda')"
+                    >{{ $t("agenda.roster.primeraVez") }}</span
+                  >
+                  <span v-if="r.lugar" class="tu-badge">{{
+                    $t("agenda.lugares.lugarN", { n: r.lugar })
+                  }}</span>
                 </span>
                 <span class="flex items-center gap-2 shrink-0">
                   <button
@@ -1112,23 +1514,38 @@ onMounted(async () => {
                     :disabled="accionando"
                     @click="aceptar(r.id, detalle.id)"
                   >
-                    {{ $t('agenda.roster.aceptar') }}
+                    {{ $t("agenda.roster.aceptar") }}
                   </button>
                   <template v-if="r.estado === 'confirmada'">
-                    <button v-if="puedeMarcar" class="tu-enlace" :disabled="accionando" @click="marcar(r.id, 'presente', detalle.id)">
-                      {{ $t('agenda.roster.marcarPresente') }}
+                    <button
+                      v-if="puedeMarcar"
+                      class="tu-enlace"
+                      :disabled="accionando"
+                      @click="marcar(r.id, 'presente', detalle.id)"
+                    >
+                      {{ $t("agenda.roster.marcarPresente") }}
                     </button>
-                    <button v-if="puedeMarcar" class="tu-enlace" :disabled="accionando" @click="marcar(r.id, 'ausente', detalle.id)">
-                      {{ $t('agenda.roster.marcarAusente') }}
+                    <button
+                      v-if="puedeMarcar"
+                      class="tu-enlace"
+                      :disabled="accionando"
+                      @click="marcar(r.id, 'ausente', detalle.id)"
+                    >
+                      {{ $t("agenda.roster.marcarAusente") }}
                     </button>
                   </template>
                   <button
-                    v-if="puedeReservar && !r.asistencia && (r.estado === 'confirmada' || r.estado === 'ofrecida') && miembros.length > 0"
+                    v-if="
+                      puedeReservar &&
+                      !r.asistencia &&
+                      (r.estado === 'confirmada' || r.estado === 'ofrecida') &&
+                      miembros.length > 0
+                    "
                     class="tu-enlace"
                     :disabled="accionando"
                     @click="abrirTransferir(r.id)"
                   >
-                    {{ $t('agenda.roster.transferir') }}
+                    {{ $t("agenda.roster.transferir") }}
                   </button>
                   <button
                     v-if="puedeReservar && r.estado !== 'cancelada'"
@@ -1137,7 +1554,7 @@ onMounted(async () => {
                     :disabled="accionando"
                     @click="cancelarReserva(r.id, detalle.id)"
                   >
-                    {{ $t('agenda.roster.cancelarReserva') }}
+                    {{ $t("agenda.roster.cancelarReserva") }}
                   </button>
                 </span>
               </div>
@@ -1149,17 +1566,37 @@ onMounted(async () => {
                 @submit.prevent="transferir(r.id, detalle.id)"
               >
                 <div class="min-w-0 grow">
-                  <label class="tu-label" :for="`tr-${r.id}`">{{ $t('agenda.roster.transferirA') }}</label>
-                  <select :id="`tr-${r.id}`" v-model="transferirModel.personaId" class="tu-input" required>
-                    <option value="" disabled>{{ $t('agenda.reservar.elegir') }}</option>
-                    <option v-for="m in miembros" :key="m.id" :value="m.id">{{ nombreMiembro(m) }}</option>
+                  <label class="tu-label" :for="`tr-${r.id}`">{{
+                    $t("agenda.roster.transferirA")
+                  }}</label>
+                  <select
+                    :id="`tr-${r.id}`"
+                    v-model="transferirModel.personaId"
+                    class="tu-input"
+                    required
+                  >
+                    <option value="" disabled>
+                      {{ $t("agenda.reservar.elegir") }}
+                    </option>
+                    <option v-for="m in miembros" :key="m.id" :value="m.id">
+                      {{ nombreMiembro(m) }}
+                    </option>
                   </select>
                 </div>
-                <button class="tu-btn tu-btn-primario" type="submit" :disabled="accionando || transferirModel.personaId === ''">
-                  {{ $t('agenda.roster.confirmarTransfer') }}
+                <button
+                  class="tu-btn tu-btn-primario"
+                  type="submit"
+                  :disabled="accionando || transferirModel.personaId === ''"
+                >
+                  {{ $t("agenda.roster.confirmarTransfer") }}
                 </button>
-                <button class="tu-btn tu-btn-fantasma" type="button" :disabled="accionando" @click="transferirModel = { reservaId: '', personaId: '' }">
-                  {{ $t('comun.cancelar') }}
+                <button
+                  class="tu-btn tu-btn-fantasma"
+                  type="button"
+                  :disabled="accionando"
+                  @click="transferirModel = { reservaId: '', personaId: '' }"
+                >
+                  {{ $t("comun.cancelar") }}
                 </button>
               </form>
             </li>
@@ -1167,95 +1604,249 @@ onMounted(async () => {
         </div>
 
         <!-- Cupos por canal / marketplace (R20) -->
-        <div v-if="puedeGestionar && detalle.oferta_id" class="mt-4 border-t pt-4" :style="{ borderColor: 'var(--borde)' }">
-          <h3 class="font-semibold text-sm">{{ $t('agenda.cuposCanal.titulo') }}</h3>
-          <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">{{ $t('agenda.cuposCanal.ayuda') }}</p>
+        <div
+          v-if="puedeGestionar && detalle.oferta_id"
+          class="mt-4 border-t pt-4"
+          :style="{ borderColor: 'var(--borde)' }"
+        >
+          <h3 class="font-semibold text-sm">
+            {{ $t("agenda.cuposCanal.titulo") }}
+          </h3>
+          <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("agenda.cuposCanal.ayuda") }}
+          </p>
 
           <ul v-if="reglasCanal.length > 0" class="mt-2 space-y-1">
-            <li v-for="rc in reglasCanal" :key="rc.id" class="flex items-center justify-between gap-2 text-sm">
+            <li
+              v-for="rc in reglasCanal"
+              :key="rc.id"
+              class="flex items-center justify-between gap-2 text-sm"
+            >
               <span>
-                <span class="tu-badge">{{ $t(`agenda.canales.${rc.canal}`) }}</span>
-                {{ $t('agenda.cuposCanal.cupos', { n: rc.cupos }) }}
-                <span v-if="rc.liberar_horas_antes > 0" :style="{ color: 'var(--texto-suave)' }">· {{ $t('agenda.cuposCanal.libera', { h: rc.liberar_horas_antes }) }}</span>
+                <span class="tu-badge">{{
+                  $t(`agenda.canales.${rc.canal}`)
+                }}</span>
+                {{ $t("agenda.cuposCanal.cupos", { n: rc.cupos }) }}
+                <span
+                  v-if="rc.liberar_horas_antes > 0"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >·
+                  {{
+                    $t("agenda.cuposCanal.libera", {
+                      h: rc.liberar_horas_antes,
+                    })
+                  }}</span
+                >
               </span>
-              <button class="tu-enlace" style="color: var(--error)" type="button" :disabled="guardandoCanal" @click="eliminarReglaCanal(rc)">
-                {{ $t('comun.eliminar') }}
+              <button
+                class="tu-enlace"
+                style="color: var(--error)"
+                type="button"
+                :disabled="guardandoCanal"
+                @click="eliminarReglaCanal(rc)"
+              >
+                {{ $t("comun.eliminar") }}
               </button>
             </li>
           </ul>
 
-          <form class="mt-2 flex flex-wrap items-end gap-2" @submit.prevent="guardarReglaCanal">
+          <form
+            class="mt-2 flex flex-wrap items-end gap-2"
+            @submit.prevent="guardarReglaCanal"
+          >
             <div class="min-w-[110px]">
-              <label class="tu-label" for="rc-canal">{{ $t('agenda.reservar.canal') }}</label>
-              <select id="rc-canal" v-model="reglaCanalModel.canal" class="tu-input">
-                <option v-for="c in CANALES.filter((x) => x !== 'directo')" :key="c" :value="c">{{ $t(`agenda.canales.${c}`) }}</option>
+              <label class="tu-label" for="rc-canal">{{
+                $t("agenda.reservar.canal")
+              }}</label>
+              <select
+                id="rc-canal"
+                v-model="reglaCanalModel.canal"
+                class="tu-input"
+              >
+                <option
+                  v-for="c in CANALES.filter((x) => x !== 'directo')"
+                  :key="c"
+                  :value="c"
+                >
+                  {{ $t(`agenda.canales.${c}`) }}
+                </option>
               </select>
             </div>
             <div class="w-20">
-              <label class="tu-label" for="rc-cupos">{{ $t('agenda.cuposCanal.campoCupos') }}</label>
-              <input id="rc-cupos" v-model.number="reglaCanalModel.cupos" type="number" min="0" class="tu-input" />
+              <label class="tu-label" for="rc-cupos">{{
+                $t("agenda.cuposCanal.campoCupos")
+              }}</label>
+              <input
+                id="rc-cupos"
+                v-model.number="reglaCanalModel.cupos"
+                type="number"
+                min="0"
+                class="tu-input"
+              />
             </div>
             <div class="w-24">
-              <label class="tu-label" for="rc-libera">{{ $t('agenda.cuposCanal.campoLibera') }}</label>
-              <input id="rc-libera" v-model.number="reglaCanalModel.liberar_horas_antes" type="number" min="0" class="tu-input" />
+              <label class="tu-label" for="rc-libera">{{
+                $t("agenda.cuposCanal.campoLibera")
+              }}</label>
+              <input
+                id="rc-libera"
+                v-model.number="reglaCanalModel.liberar_horas_antes"
+                type="number"
+                min="0"
+                class="tu-input"
+              />
             </div>
-            <button class="tu-btn tu-btn-fantasma" type="submit" :disabled="guardandoCanal">{{ $t('agenda.cuposCanal.guardar') }}</button>
+            <button
+              class="tu-btn tu-btn-fantasma"
+              type="submit"
+              :disabled="guardandoCanal"
+            >
+              {{ $t("agenda.cuposCanal.guardar") }}
+            </button>
           </form>
         </div>
 
         <!-- Mapa de lugares por clase (R4) -->
-        <div v-if="puedeGestionar && detalle.oferta_id" class="mt-4 border-t pt-4" :style="{ borderColor: 'var(--borde)' }">
-          <h3 class="font-semibold text-sm">{{ $t('agenda.lugares.titulo') }}</h3>
-          <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">{{ $t('agenda.lugares.ayuda') }}</p>
-          <form class="mt-2 flex flex-wrap items-end gap-2" @submit.prevent="guardarLugares">
+        <div
+          v-if="puedeGestionar && detalle.oferta_id"
+          class="mt-4 border-t pt-4"
+          :style="{ borderColor: 'var(--borde)' }"
+        >
+          <h3 class="font-semibold text-sm">
+            {{ $t("agenda.lugares.titulo") }}
+          </h3>
+          <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("agenda.lugares.ayuda") }}
+          </p>
+          <form
+            class="mt-2 flex flex-wrap items-end gap-2"
+            @submit.prevent="guardarLugares"
+          >
             <div class="w-28">
-              <label class="tu-label" for="lug-n">{{ $t('agenda.lugares.numero') }}</label>
-              <input id="lug-n" v-model.number="lugaresModel.lugares" type="number" min="0" class="tu-input" />
+              <label class="tu-label" for="lug-n">{{
+                $t("agenda.lugares.numero")
+              }}</label>
+              <input
+                id="lug-n"
+                v-model.number="lugaresModel.lugares"
+                type="number"
+                min="0"
+                class="tu-input"
+              />
             </div>
             <div class="w-32">
-              <label class="tu-label" for="lug-precio">{{ $t('agenda.lugares.precio') }}</label>
-              <input id="lug-precio" v-model.number="lugaresModel.precio" type="number" min="0" step="1" class="tu-input" :placeholder="$t('agenda.lugares.precioPh')" />
+              <label class="tu-label" for="lug-precio">{{
+                $t("agenda.lugares.precio")
+              }}</label>
+              <input
+                id="lug-precio"
+                v-model.number="lugaresModel.precio"
+                type="number"
+                min="0"
+                step="1"
+                class="tu-input"
+                :placeholder="$t('agenda.lugares.precioPh')"
+              />
             </div>
-            <button class="tu-btn tu-btn-fantasma" type="submit" :disabled="guardandoLugares">{{ $t('agenda.lugares.guardar') }}</button>
+            <button
+              class="tu-btn tu-btn-fantasma"
+              type="submit"
+              :disabled="guardandoLugares"
+            >
+              {{ $t("agenda.lugares.guardar") }}
+            </button>
           </form>
-          <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">{{ $t('agenda.lugares.precioAyuda') }}</p>
+          <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("agenda.lugares.precioAyuda") }}
+          </p>
         </div>
 
         <!-- Check-ins de bienestar -->
-        <div v-if="puedeCheckin" class="mt-4 border-t pt-4" :style="{ borderColor: 'var(--borde)' }">
-          <h3 class="font-semibold text-sm">{{ $t('checkins.titulo') }}</h3>
-          <form class="mt-2 flex flex-wrap items-end gap-2" @submit.prevent="registrarCheckin(detalle.id)">
+        <div
+          v-if="puedeCheckin"
+          class="mt-4 border-t pt-4"
+          :style="{ borderColor: 'var(--borde)' }"
+        >
+          <h3 class="font-semibold text-sm">{{ $t("checkins.titulo") }}</h3>
+          <form
+            class="mt-2 flex flex-wrap items-end gap-2"
+            @submit.prevent="registrarCheckin(detalle.id)"
+          >
             <div class="min-w-[130px]">
-              <label class="tu-label" for="cp">{{ $t('checkins.proveedor') }}</label>
+              <label class="tu-label" for="cp">{{
+                $t("checkins.proveedor")
+              }}</label>
               <select id="cp" v-model="checkinModel.proveedor" class="tu-input">
-                <option value="wellhub">{{ $t('integraciones.proveedores.wellhub') }}</option>
-                <option value="totalpass">{{ $t('integraciones.proveedores.totalpass') }}</option>
+                <option value="wellhub">
+                  {{ $t("integraciones.proveedores.wellhub") }}
+                </option>
+                <option value="totalpass">
+                  {{ $t("integraciones.proveedores.totalpass") }}
+                </option>
               </select>
             </div>
             <div class="flex-1 min-w-[150px]">
-              <label class="tu-label" for="cc">{{ $t('checkins.codigo') }}</label>
-              <input id="cc" v-model="checkinModel.codigo" class="tu-input" autocomplete="off" required />
+              <label class="tu-label" for="cc">{{
+                $t("checkins.codigo")
+              }}</label>
+              <input
+                id="cc"
+                v-model="checkinModel.codigo"
+                class="tu-input"
+                autocomplete="off"
+                required
+              />
             </div>
-            <button class="tu-btn tu-btn-primario" type="submit" :disabled="registrandoCheckin || checkinModel.codigo === ''">
-              {{ registrandoCheckin ? $t('checkins.registrando') : $t('checkins.registrar') }}
+            <button
+              class="tu-btn tu-btn-primario"
+              type="submit"
+              :disabled="registrandoCheckin || checkinModel.codigo === ''"
+            >
+              {{
+                registrandoCheckin
+                  ? $t("checkins.registrando")
+                  : $t("checkins.registrar")
+              }}
             </button>
           </form>
-          <p v-if="okCheckin" class="mt-2 text-sm" :style="{ color: 'var(--exito)' }">{{ $t('checkins.ok') }}</p>
+          <p
+            v-if="okCheckin"
+            class="mt-2 text-sm"
+            :style="{ color: 'var(--exito)' }"
+          >
+            {{ $t("checkins.ok") }}
+          </p>
           <ul v-if="checkins.length > 0" class="mt-3 space-y-2">
-            <li v-for="c in checkins" :key="c.id" class="flex items-center justify-between gap-2 text-sm">
-              <span class="truncate">{{ c.usuario ?? '—' }}</span>
-              <span class="tu-badge tu-badge-exito shrink-0">{{ $t(`checkins.${c.estado}`) }}</span>
+            <li
+              v-for="c in checkins"
+              :key="c.id"
+              class="flex items-center justify-between gap-2 text-sm"
+            >
+              <span class="truncate">{{ c.usuario ?? "—" }}</span>
+              <span class="tu-badge tu-badge-exito shrink-0">{{
+                $t(`checkins.${c.estado}`)
+              }}</span>
             </li>
           </ul>
         </div>
 
         <!-- Staff / sustituciones (R17) -->
-        <div v-if="puedeGestionar" class="mt-4 border-t pt-4" :style="{ borderColor: 'var(--borde)' }">
-          <h3 class="font-semibold text-sm">{{ $t('agenda.staff.titulo') }}</h3>
+        <div
+          v-if="puedeGestionar"
+          class="mt-4 border-t pt-4"
+          :style="{ borderColor: 'var(--borde)' }"
+        >
+          <h3 class="font-semibold text-sm">{{ $t("agenda.staff.titulo") }}</h3>
           <ul v-if="staffSesion.length > 0" class="mt-2 space-y-1.5">
-            <li v-for="a in staffSesion" :key="a.id" class="flex items-center gap-2 text-sm">
-              <span>{{ a.usuario ?? '—' }}</span>
-              <span class="tu-badge">{{ $t(`agenda.staff.rol.${a.rol}`) }}</span>
+            <li
+              v-for="a in staffSesion"
+              :key="a.id"
+              class="flex items-center gap-2 text-sm"
+            >
+              <span>{{ a.usuario ?? "—" }}</span>
+              <span class="tu-badge">{{
+                $t(`agenda.staff.rol.${a.rol}`)
+              }}</span>
             </li>
           </ul>
           <form
@@ -1264,111 +1855,221 @@ onMounted(async () => {
             @submit.prevent="asignarStaff(detalle.id)"
           >
             <div class="col-span-2">
-              <label class="tu-label" for="stu">{{ $t('agenda.staff.persona') }}</label>
-              <select id="stu" v-model="staffModel.usuarioId" class="tu-input" required>
-                <option value="" disabled>{{ $t('agenda.reservar.elegir') }}</option>
-                <option v-for="i in instructores" :key="i.id" :value="i.id">{{ i.nombre }}</option>
+              <label class="tu-label" for="stu">{{
+                $t("agenda.staff.persona")
+              }}</label>
+              <select
+                id="stu"
+                v-model="staffModel.usuarioId"
+                class="tu-input"
+                required
+              >
+                <option value="" disabled>
+                  {{ $t("agenda.reservar.elegir") }}
+                </option>
+                <option v-for="i in instructores" :key="i.id" :value="i.id">
+                  {{ i.nombre }}
+                </option>
               </select>
             </div>
             <div>
-              <label class="tu-label" for="srol">{{ $t('agenda.staff.rolLabel') }}</label>
+              <label class="tu-label" for="srol">{{
+                $t("agenda.staff.rolLabel")
+              }}</label>
               <select id="srol" v-model="staffModel.rol" class="tu-input">
-                <option value="instructor">{{ $t('agenda.staff.rol.instructor') }}</option>
-                <option value="asistente">{{ $t('agenda.staff.rol.asistente') }}</option>
-                <option value="sustituto">{{ $t('agenda.staff.rol.sustituto') }}</option>
+                <option value="instructor">
+                  {{ $t("agenda.staff.rol.instructor") }}
+                </option>
+                <option value="asistente">
+                  {{ $t("agenda.staff.rol.asistente") }}
+                </option>
+                <option value="sustituto">
+                  {{ $t("agenda.staff.rol.sustituto") }}
+                </option>
               </select>
             </div>
             <div v-if="staffModel.rol === 'sustituto'">
-              <label class="tu-label" for="ssub">{{ $t('agenda.staff.sustituye') }}</label>
-              <select id="ssub" v-model="staffModel.sustituyeA" class="tu-input">
+              <label class="tu-label" for="ssub">{{
+                $t("agenda.staff.sustituye")
+              }}</label>
+              <select
+                id="ssub"
+                v-model="staffModel.sustituyeA"
+                class="tu-input"
+              >
                 <option value="">—</option>
-                <option v-for="i in instructores" :key="i.id" :value="i.id">{{ i.nombre }}</option>
+                <option v-for="i in instructores" :key="i.id" :value="i.id">
+                  {{ i.nombre }}
+                </option>
               </select>
             </div>
             <div class="col-span-2 flex justify-end">
-              <button class="tu-btn tu-btn-fantasma text-sm" type="submit" :disabled="asignandoStaff || staffModel.usuarioId === ''">
-                {{ $t('agenda.staff.asignar') }}
+              <button
+                class="tu-btn tu-btn-fantasma text-sm"
+                type="submit"
+                :disabled="asignandoStaff || staffModel.usuarioId === ''"
+              >
+                {{ $t("agenda.staff.asignar") }}
               </button>
             </div>
           </form>
         </div>
 
         <!-- Cancelar clase -->
-        <div v-if="puedeGestionar && detalle.estado === 'programada'" class="mt-5 border-t pt-4" :style="{ borderColor: 'var(--borde)' }">
-          <button class="tu-enlace text-sm" style="color: var(--error)" :disabled="accionando" @click="cancelarSesion(detalle.id)">
-            {{ $t('agenda.sesion.cancelar') }}
+        <div
+          v-if="puedeGestionar && detalle.estado === 'programada'"
+          class="mt-5 border-t pt-4"
+          :style="{ borderColor: 'var(--borde)' }"
+        >
+          <button
+            class="tu-enlace text-sm"
+            style="color: var(--error)"
+            :disabled="accionando"
+            @click="cancelarSesion(detalle.id)"
+          >
+            {{ $t("agenda.sesion.cancelar") }}
           </button>
         </div>
       </aside>
     </div>
 
     <!-- ===== Modal Nueva clase ===== -->
-    <div v-if="mostrarNueva" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      v-if="mostrarNueva"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    >
       <div class="absolute inset-0 bg-black/50" @click="mostrarNueva = false" />
       <div class="relative tu-card w-full max-w-lg p-6">
         <div class="flex items-center justify-between">
-          <h2 class="font-bold text-lg">{{ $t('agenda.nueva.titulo') }}</h2>
-          <button class="tu-icono-btn" :aria-label="$t('agenda.cerrarDetalle')" @click="mostrarNueva = false">✕</button>
+          <h2 class="font-bold text-lg">{{ $t("agenda.nueva.titulo") }}</h2>
+          <button
+            class="tu-icono-btn"
+            :aria-label="$t('agenda.cerrarDetalle')"
+            @click="mostrarNueva = false"
+          >
+            ✕
+          </button>
         </div>
-        <p v-if="ofertas.length === 0" class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t('agenda.nueva.sinOfertas') }}
+        <p
+          v-if="ofertas.length === 0"
+          class="mt-2 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("agenda.nueva.sinOfertas") }}
         </p>
-        <p v-else-if="sucursales.length === 0" class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t('agenda.nueva.sinSucursales') }}
+        <p
+          v-else-if="sucursales.length === 0"
+          class="mt-2 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("agenda.nueva.sinSucursales") }}
         </p>
-        <form v-else class="mt-3 grid sm:grid-cols-2 gap-3" @submit.prevent="crearSesion">
+        <form
+          v-else
+          class="mt-3 grid sm:grid-cols-2 gap-3"
+          @submit.prevent="crearSesion"
+        >
           <div>
-            <label class="tu-label" for="ao">{{ $t('agenda.nueva.oferta') }}</label>
+            <label class="tu-label" for="ao">{{
+              $t("agenda.nueva.oferta")
+            }}</label>
             <select id="ao" v-model="form.ofertaId" class="tu-input" required>
-              <option value="" disabled>{{ $t('agenda.reservar.elegir') }}</option>
-              <option v-for="o in ofertas" :key="o.id" :value="o.id">{{ o.nombre }}</option>
+              <option value="" disabled>
+                {{ $t("agenda.reservar.elegir") }}
+              </option>
+              <option v-for="o in ofertas" :key="o.id" :value="o.id">
+                {{ o.nombre }}
+              </option>
             </select>
           </div>
           <div>
-            <label class="tu-label" for="as">{{ $t('agenda.nueva.sucursal') }}</label>
+            <label class="tu-label" for="as">{{
+              $t("agenda.nueva.sucursal")
+            }}</label>
             <select id="as" v-model="form.sucursalId" class="tu-input" required>
-              <option value="" disabled>{{ $t('agenda.reservar.elegir') }}</option>
-              <option v-for="s in sucursales" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+              <option value="" disabled>
+                {{ $t("agenda.reservar.elegir") }}
+              </option>
+              <option v-for="s in sucursales" :key="s.id" :value="s.id">
+                {{ s.nombre }}
+              </option>
             </select>
           </div>
           <div>
-            <label class="tu-label" for="af">{{ $t('agenda.nueva.fecha') }}</label>
-            <input id="af" v-model="form.fecha" class="tu-input" type="datetime-local" required />
+            <label class="tu-label" for="af">{{
+              $t("agenda.nueva.fecha")
+            }}</label>
+            <input
+              id="af"
+              v-model="form.fecha"
+              class="tu-input"
+              type="datetime-local"
+              required
+            />
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="tu-label" for="ad">{{ $t('agenda.nueva.duracion') }}</label>
-              <input id="ad" v-model="form.duracion" class="tu-input" type="number" min="1" />
+              <label class="tu-label" for="ad">{{
+                $t("agenda.nueva.duracion")
+              }}</label>
+              <input
+                id="ad"
+                v-model="form.duracion"
+                class="tu-input"
+                type="number"
+                min="1"
+              />
             </div>
             <div>
-              <label class="tu-label" for="ac">{{ $t('agenda.nueva.capacidad') }}</label>
-              <input id="ac" v-model="form.capacidad" class="tu-input" type="number" min="1" />
+              <label class="tu-label" for="ac">{{
+                $t("agenda.nueva.capacidad")
+              }}</label>
+              <input
+                id="ac"
+                v-model="form.capacidad"
+                class="tu-input"
+                type="number"
+                min="1"
+              />
             </div>
           </div>
           <div v-if="instructores.length > 0" class="sm:col-span-2">
-            <label class="tu-label" for="ai">{{ $t('agenda.nueva.instructor') }}</label>
+            <label class="tu-label" for="ai">{{
+              $t("agenda.nueva.instructor")
+            }}</label>
             <select id="ai" v-model="form.instructorId" class="tu-input">
-              <option value="">{{ $t('agenda.nueva.sinInstructor') }}</option>
-              <option v-for="i in instructores" :key="i.id" :value="i.id">{{ i.nombre }}</option>
+              <option value="">{{ $t("agenda.nueva.sinInstructor") }}</option>
+              <option v-for="i in instructores" :key="i.id" :value="i.id">
+                {{ i.nombre }}
+              </option>
             </select>
           </div>
           <div v-if="recursosDeSucursal.length > 0" class="sm:col-span-2">
-            <label class="tu-label" for="arec">{{ $t('agenda.nueva.sala') }}</label>
+            <label class="tu-label" for="arec">{{
+              $t("agenda.nueva.sala")
+            }}</label>
             <select id="arec" v-model="form.recursoId" class="tu-input">
-              <option value="">{{ $t('agenda.nueva.sinSala') }}</option>
-              <option v-for="r in recursosDeSucursal" :key="r.id" :value="r.id">{{ r.nombre }}</option>
+              <option value="">{{ $t("agenda.nueva.sinSala") }}</option>
+              <option v-for="r in recursosDeSucursal" :key="r.id" :value="r.id">
+                {{ r.nombre }}
+              </option>
             </select>
           </div>
 
           <!-- Recurrencia: "crear una clase todos los martes" (R5). -->
-          <div class="sm:col-span-2 rounded-lg border p-3" :style="{ borderColor: 'var(--borde)' }">
+          <div
+            class="sm:col-span-2 rounded-lg border p-3"
+            :style="{ borderColor: 'var(--borde)' }"
+          >
             <label class="flex items-center gap-2 text-sm font-medium">
               <input v-model="form.repetir" type="checkbox" />
-              {{ $t('agenda.nueva.repetir') }}
+              {{ $t("agenda.nueva.repetir") }}
             </label>
             <div v-if="form.repetir" class="mt-3 space-y-3">
               <div>
-                <span class="tu-label">{{ $t('agenda.nueva.diasSemana') }}</span>
+                <span class="tu-label">{{
+                  $t("agenda.nueva.diasSemana")
+                }}</span>
                 <div class="flex gap-1 mt-1">
                   <button
                     v-for="d in DIAS_SEMANA"
@@ -1378,7 +2079,10 @@ onMounted(async () => {
                     :style="
                       form.dias.includes(d.n)
                         ? { background: 'var(--primario)', color: '#fff' }
-                        : { background: 'var(--superficie-2)', color: 'var(--texto)' }
+                        : {
+                            background: 'var(--superficie-2)',
+                            color: 'var(--texto)',
+                          }
                     "
                     @click="alternarDia(d.n)"
                   >
@@ -1387,29 +2091,59 @@ onMounted(async () => {
                 </div>
               </div>
               <div>
-                <label class="tu-label" for="arh">{{ $t('agenda.nueva.repetirHasta') }}</label>
-                <input id="arh" v-model="form.repetirHasta" class="tu-input" type="date" />
-                <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">{{ $t('agenda.nueva.repetirAyuda') }}</p>
+                <label class="tu-label" for="arh">{{
+                  $t("agenda.nueva.repetirHasta")
+                }}</label>
+                <input
+                  id="arh"
+                  v-model="form.repetirHasta"
+                  class="tu-input"
+                  type="date"
+                />
+                <p
+                  class="mt-1 text-xs"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ $t("agenda.nueva.repetirAyuda") }}
+                </p>
               </div>
             </div>
           </div>
 
           <!-- Conflictos detectados ANTES de guardar (instructor/sala ocupados). -->
-          <div v-if="conflictos.length > 0" class="sm:col-span-2 rounded-lg p-3 text-sm" :style="{ background: 'var(--aviso-suave)', color: 'var(--aviso)' }">
-            <p class="font-semibold">⚠ {{ $t('agenda.nueva.conflictos') }}</p>
+          <div
+            v-if="conflictos.length > 0"
+            class="sm:col-span-2 rounded-lg p-3 text-sm"
+            :style="{ background: 'var(--aviso-suave)', color: 'var(--aviso)' }"
+          >
+            <p class="font-semibold">⚠ {{ $t("agenda.nueva.conflictos") }}</p>
             <ul class="mt-1 list-disc pl-5">
               <li v-for="(c, i) in conflictos" :key="i">{{ c.mensaje }}</li>
             </ul>
           </div>
 
           <div class="sm:col-span-2 flex justify-end gap-2">
-            <button type="button" class="tu-btn tu-btn-fantasma" @click="mostrarNueva = false">{{ $t('comun.cancelar') }}</button>
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma"
+              @click="mostrarNueva = false"
+            >
+              {{ $t("comun.cancelar") }}
+            </button>
             <button
               class="tu-btn tu-btn-primario"
               type="submit"
-              :disabled="creando || form.ofertaId === '' || form.sucursalId === '' || form.fecha === '' || conflictos.length > 0"
+              :disabled="
+                creando ||
+                form.ofertaId === '' ||
+                form.sucursalId === '' ||
+                form.fecha === '' ||
+                conflictos.length > 0
+              "
             >
-              {{ creando ? $t('agenda.nueva.creando') : $t('agenda.nueva.crear') }}
+              {{
+                creando ? $t("agenda.nueva.creando") : $t("agenda.nueva.crear")
+              }}
             </button>
           </div>
         </form>

@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { inject } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { RouterLink } from 'vue-router'
+import { inject } from "vue";
+import { useI18n } from "vue-i18n";
+import { RouterLink } from "vue-router";
 
-import IconoNav from '@/components/IconoNav.vue'
-import type { MenuItem, NavEstado } from '@/components/nav'
+import IconoNav from "@/components/IconoNav.vue";
+import type { MenuItem, NavEstado } from "@/components/nav";
 
-defineProps<{ items: MenuItem[]; nivel: number }>()
+defineProps<{ items: MenuItem[]; nivel: number }>();
 
-const { t } = useI18n()
-const estado = inject<NavEstado>('navEstado')
+const { t } = useI18n();
+const estado = inject<NavEstado>("navEstado");
 
 function abierto(clave: string): boolean {
-  return estado?.abiertos.value.has(clave) ?? false
+  return estado?.abiertos.value.has(clave) ?? false;
 }
-const compacto = (): boolean => estado?.compacto.value ?? false
+const compacto = (): boolean => estado?.compacto.value ?? false;
 </script>
 
 <template>
@@ -29,7 +29,9 @@ const compacto = (): boolean => estado?.compacto.value ?? false
         @click="estado?.alternar(item.clave)"
       >
         <IconoNav :nombre="item.icono ?? 'punto'" :tam="20" class="shrink-0" />
-        <span v-show="!compacto()" class="truncate flex-1 text-left">{{ t(item.etiqueta) }}</span>
+        <span v-show="!compacto()" class="truncate flex-1 text-left">{{
+          t(item.etiqueta)
+        }}</span>
         <IconoNav
           v-show="!compacto()"
           nombre="chevron"
@@ -56,7 +58,11 @@ const compacto = (): boolean => estado?.compacto.value ?? false
       :title="compacto() ? t(item.etiqueta) : undefined"
       @click="estado?.cerrarCajon()"
     >
-      <IconoNav :nombre="item.icono ?? 'punto'" :tam="nivel > 1 ? 18 : 20" class="shrink-0" />
+      <IconoNav
+        :nombre="item.icono ?? 'punto'"
+        :tam="nivel > 1 ? 18 : 20"
+        class="shrink-0"
+      />
       <span v-show="!compacto()" class="truncate">{{ t(item.etiqueta) }}</span>
     </RouterLink>
   </template>

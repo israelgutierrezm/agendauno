@@ -1,136 +1,171 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from "vue";
+import { RouterLink, useRouter } from "vue-router";
 
-import { api, mensajeDeError } from '@/lib/api'
+import { api, mensajeDeError } from "@/lib/api";
+import { trackEvent } from "@/lib/analytics";
 
-const router = useRouter()
+const router = useRouter();
 
 // Alta por pasos: filtra interesados reales y captura datos de contacto útiles.
-const paso = ref(1)
+const paso = ref(1);
 
 // Paso 1: el lugar.
-const nombre = ref('')
-const slug = ref('')
-const slugTocado = ref(false)
+const nombre = ref("");
+const slug = ref("");
+const slugTocado = ref(false);
+const perfilNegocio = ref("");
+
+const PERFILES = [
+  "pilates",
+  "pole",
+  "yoga",
+  "danza",
+  "gimnasio",
+  "natacion",
+  "academia",
+  "general",
+] as const;
 
 // Paso 2: quién eres.
-const contactoNombre = ref('')
-const contactoSegundoNombre = ref('')
-const contactoPrimerApellido = ref('')
-const contactoSegundoApellido = ref('')
+const contactoNombre = ref("");
+const contactoSegundoNombre = ref("");
+const contactoPrimerApellido = ref("");
+const contactoSegundoApellido = ref("");
 
 // Paso 3: contacto.
-const whatsappPais = ref('52')
-const whatsappNumero = ref('')
-const contactoEmail = ref('')
-const aceptaTerminos = ref(false)
+const whatsappPais = ref("52");
+const whatsappNumero = ref("");
+const contactoEmail = ref("");
+const aceptaTerminos = ref(false);
 
 // Ladas frecuentes (México por defecto).
 const PAISES = [
-  { lada: '52', nombre: 'México', bandera: '🇲🇽' },
-  { lada: '1', nombre: 'EE. UU. / Canadá', bandera: '🇺🇸' },
-  { lada: '57', nombre: 'Colombia', bandera: '🇨🇴' },
-  { lada: '54', nombre: 'Argentina', bandera: '🇦🇷' },
-  { lada: '56', nombre: 'Chile', bandera: '🇨🇱' },
-  { lada: '51', nombre: 'Perú', bandera: '🇵🇪' },
-  { lada: '34', nombre: 'España', bandera: '🇪🇸' },
-]
+  { lada: "52", nombre: "México", bandera: "🇲🇽" },
+  { lada: "1", nombre: "EE. UU. / Canadá", bandera: "🇺🇸" },
+  { lada: "57", nombre: "Colombia", bandera: "🇨🇴" },
+  { lada: "54", nombre: "Argentina", bandera: "🇦🇷" },
+  { lada: "56", nombre: "Chile", bandera: "🇨🇱" },
+  { lada: "51", nombre: "Perú", bandera: "🇵🇪" },
+  { lada: "34", nombre: "España", bandera: "🇪🇸" },
+];
 
-const slugDisponible = ref<boolean | null>(null)
-const verificandoSlug = ref(false)
-const enviando = ref(false)
-const error = ref<string | null>(null)
+const slugDisponible = ref<boolean | null>(null);
+const verificandoSlug = ref(false);
+const enviando = ref(false);
+const error = ref<string | null>(null);
 
-const creado = ref<{ slug: string; nombre: string } | null>(null)
-const activacion = ref<{ email: string; token: string } | null>(null)
-const correo = ref('')
-const reenviando = ref(false)
-const reenviado = ref(false)
+const creado = ref<{ slug: string; nombre: string } | null>(null);
+const activacion = ref<{ email: string; token: string } | null>(null);
+const correo = ref("");
+const reenviando = ref(false);
+const reenviado = ref(false);
 
 function aSlug(valor: string): string {
   return valor
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .normalize("NFD")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 watch(nombre, (v) => {
   if (!slugTocado.value) {
-    slug.value = aSlug(v)
+    slug.value = aSlug(v);
   }
-})
+});
 
-let temporizador: ReturnType<typeof setTimeout> | null = null
+let temporizador: ReturnType<typeof setTimeout> | null = null;
 watch(slug, (v) => {
-  slugDisponible.value = null
+  slugDisponible.value = null;
   if (temporizador !== null) {
-    clearTimeout(temporizador)
+    clearTimeout(temporizador);
   }
-  if (v.trim() === '') {
-    return
+  if (v.trim() === "") {
+    return;
   }
-  verificandoSlug.value = true
+  verificandoSlug.value = true;
   temporizador = setTimeout(async () => {
     try {
-      const { data } = await api.get<{ data: { slug: string; disponible: boolean } }>(
-        '/api/v1/registro/slug',
-        { params: { slug: v } },
-      )
+      const { data } = await api.get<{
+        data: { slug: string; disponible: boolean };
+      }>("/api/v1/registro/slug", { params: { slug: v } });
       if (data.data.slug === aSlug(v)) {
-        slugDisponible.value = data.data.disponible
+        slugDisponible.value = data.data.disponible;
       }
     } catch {
-      slugDisponible.value = null
+      slugDisponible.value = null;
     } finally {
-      verificandoSlug.value = false
+      verificandoSlug.value = false;
     }
-  }, 400)
-})
+  }, 400);
+});
 
 function editarSlug(valor: string): void {
-  slugTocado.value = true
-  slug.value = aSlug(valor)
+  slugTocado.value = true;
+  slug.value = aSlug(valor);
 }
 
-const emailValido = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactoEmail.value.trim()))
-const whatsappValido = computed(() => /^[0-9 \-]{7,15}$/.test(whatsappNumero.value.trim()))
+const emailValido = computed(() =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactoEmail.value.trim()),
+);
+const whatsappValido = computed(() =>
+  /^[0-9 -]{7,15}$/.test(whatsappNumero.value.trim()),
+);
 
 const paso1Valido = computed(
-  () => nombre.value.trim() !== '' && slug.value.trim().length >= 3 && slugDisponible.value !== false && !verificandoSlug.value,
-)
-const paso2Valido = computed(() => contactoNombre.value.trim() !== '' && contactoPrimerApellido.value.trim() !== '')
-const paso3Valido = computed(() => whatsappValido.value && emailValido.value && aceptaTerminos.value)
+  () =>
+    nombre.value.trim() !== "" &&
+    perfilNegocio.value !== "" &&
+    slug.value.trim().length >= 3 &&
+    slugDisponible.value !== false &&
+    !verificandoSlug.value,
+);
+const paso2Valido = computed(
+  () =>
+    contactoNombre.value.trim() !== "" &&
+    contactoPrimerApellido.value.trim() !== "",
+);
+const paso3Valido = computed(
+  () => whatsappValido.value && emailValido.value && aceptaTerminos.value,
+);
 
-const pasoValido = computed(() => (paso.value === 1 ? paso1Valido.value : paso.value === 2 ? paso2Valido.value : paso3Valido.value))
+const pasoValido = computed(() =>
+  paso.value === 1
+    ? paso1Valido.value
+    : paso.value === 2
+      ? paso2Valido.value
+      : paso3Valido.value,
+);
 
 function siguiente(): void {
   if (paso.value < 3 && pasoValido.value) {
-    paso.value++
+    trackEvent("studio_registration_step_completed", { step: paso.value });
+    paso.value++;
   }
 }
 function atras(): void {
   if (paso.value > 1) {
-    paso.value--
+    paso.value--;
   }
 }
 
 async function enviar(): Promise<void> {
   if (!paso3Valido.value) {
-    return
+    return;
   }
-  enviando.value = true
-  error.value = null
+  enviando.value = true;
+  error.value = null;
   try {
     const { data } = await api.post<{
       data: {
-        estudio: { slug: string; nombre: string }
-        activacion: { email: string; token: string } | null
-      }
-    }>('/api/v1/registro', {
+        estudio: { slug: string; nombre: string };
+        activacion: { email: string; token: string } | null;
+      };
+    }>("/api/v1/registro", {
       nombre: nombre.value,
       slug: slug.value,
+      perfil_negocio: perfilNegocio.value,
       contacto_nombre: contactoNombre.value,
       contacto_segundo_nombre: contactoSegundoNombre.value || null,
       contacto_primer_apellido: contactoPrimerApellido.value,
@@ -139,84 +174,156 @@ async function enviar(): Promise<void> {
       contacto_telefono: whatsappNumero.value,
       contacto_email: contactoEmail.value,
       acepta_terminos: aceptaTerminos.value,
-    })
-    creado.value = data.data.estudio
-    activacion.value = data.data.activacion
-    correo.value = contactoEmail.value
+    });
+    creado.value = data.data.estudio;
+    activacion.value = data.data.activacion;
+    correo.value = contactoEmail.value;
+    trackEvent("tenant_created", { business_profile: perfilNegocio.value });
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
+    trackEvent("studio_registration_failed", { step: paso.value });
     // Si el backend rechaza el slug (carrera), regresa al paso 1.
-    paso.value = 1
+    paso.value = 1;
   } finally {
-    enviando.value = false
+    enviando.value = false;
   }
 }
 
 async function reenviar(): Promise<void> {
   if (creado.value === null) {
-    return
+    return;
   }
-  reenviando.value = true
-  reenviado.value = false
+  reenviando.value = true;
+  reenviado.value = false;
   try {
-    await api.post(`/api/v1/app/${creado.value.slug}/reenviar-activacion`, { email: correo.value })
-    reenviado.value = true
+    await api.post(`/api/v1/app/${creado.value.slug}/reenviar-activacion`, {
+      email: correo.value,
+    });
+    reenviado.value = true;
   } catch (e) {
-    error.value = mensajeDeError(e)
+    error.value = mensajeDeError(e);
   } finally {
-    reenviando.value = false
+    reenviando.value = false;
   }
 }
 
 function irActivar(): void {
   if (creado.value === null) {
-    return
+    return;
   }
   void router.push({
-    name: 'activar',
+    name: "activar",
     params: { slug: creado.value.slug },
-    query: activacion.value !== null ? { email: activacion.value.email, token: activacion.value.token } : {},
-  })
+    query:
+      activacion.value !== null
+        ? { email: activacion.value.email, token: activacion.value.token }
+        : {},
+  });
 }
+
+onMounted(() => trackEvent("studio_registration_started"));
 </script>
 
 <template>
   <section class="mx-auto max-w-lg px-4 py-10">
     <template v-if="creado === null">
-      <h1 class="text-3xl font-extrabold">{{ $t('registro.titulo') }}</h1>
+      <h1 class="text-3xl font-extrabold">{{ $t("registro.titulo") }}</h1>
 
       <!-- Indicador de pasos -->
       <div class="mt-4 flex items-center gap-2">
         <template v-for="n in 3" :key="n">
           <div
             class="h-1.5 flex-1 rounded-full transition"
-            :style="{ background: n <= paso ? 'var(--primario)' : 'var(--fondo-suave)' }"
+            :style="{
+              background: n <= paso ? 'var(--primario)' : 'var(--fondo-suave)',
+            }"
           />
         </template>
       </div>
       <p class="mt-2 text-sm font-medium">
-        {{ $t('registro.pasoActual', { n: paso }) }} ·
-        {{ paso === 1 ? $t('registro.paso1') : paso === 2 ? $t('registro.paso2') : $t('registro.paso3') }}
+        {{ $t("registro.pasoActual", { n: paso }) }} ·
+        {{
+          paso === 1
+            ? $t("registro.paso1")
+            : paso === 2
+              ? $t("registro.paso2")
+              : $t("registro.paso3")
+        }}
       </p>
       <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-        {{ paso === 1 ? $t('registro.intro1') : paso === 2 ? $t('registro.intro2') : $t('registro.intro3') }}
+        {{
+          paso === 1
+            ? $t("registro.intro1")
+            : paso === 2
+              ? $t("registro.intro2")
+              : $t("registro.intro3")
+        }}
       </p>
 
-      <form class="mt-5 tu-card p-6 space-y-4" @submit.prevent="paso === 3 ? enviar() : siguiente()">
+      <form
+        class="mt-5 tu-card p-6 space-y-4"
+        @submit.prevent="paso === 3 ? enviar() : siguiente()"
+      >
         <!-- ===== Paso 1: el lugar ===== -->
         <template v-if="paso === 1">
           <div>
-            <label class="tu-label" for="nombre">{{ $t('registro.nombre') }}</label>
-            <input id="nombre" v-model="nombre" class="tu-input" :placeholder="$t('registro.nombrePh')" required />
+            <label class="tu-label" for="nombre">{{
+              $t("registro.nombre")
+            }}</label>
+            <input
+              id="nombre"
+              v-model="nombre"
+              class="tu-input"
+              :placeholder="$t('registro.nombrePh')"
+              required
+            />
           </div>
           <div>
-            <label class="tu-label" for="slug">{{ $t('registro.slug') }}</label>
-            <input id="slug" :value="slug" class="tu-input" required @input="editarSlug(($event.target as HTMLInputElement).value)" />
-            <p class="mt-1 text-xs flex items-center gap-2" :style="{ color: 'var(--texto-suave)' }">
-              <span>{{ $t('registro.slugAyuda', { slug: slug || 'mi-estudio' }) }}</span>
+            <label class="tu-label" for="perfil">{{
+              $t("registro.perfil")
+            }}</label>
+            <select
+              id="perfil"
+              v-model="perfilNegocio"
+              class="tu-input"
+              required
+            >
+              <option value="" disabled>{{ $t("registro.perfilPh") }}</option>
+              <option v-for="perfil in PERFILES" :key="perfil" :value="perfil">
+                {{ $t(`registro.perfiles.${perfil}`) }}
+              </option>
+            </select>
+            <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("registro.perfilAyuda") }}
+            </p>
+          </div>
+          <div>
+            <label class="tu-label" for="slug">{{ $t("registro.slug") }}</label>
+            <input
+              id="slug"
+              :value="slug"
+              class="tu-input"
+              required
+              @input="editarSlug(($event.target as HTMLInputElement).value)"
+            />
+            <p
+              class="mt-1 text-xs flex items-center gap-2"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              <span>{{
+                $t("registro.slugAyuda", { slug: slug || "mi-estudio" })
+              }}</span>
               <span v-if="verificandoSlug">·</span>
-              <span v-else-if="slugDisponible === true" class="tu-badge tu-badge-exito">{{ $t('registro.slugLibre') }}</span>
-              <span v-else-if="slugDisponible === false" style="color: var(--error)">{{ $t('registro.slugOcupado') }}</span>
+              <span
+                v-else-if="slugDisponible === true"
+                class="tu-badge tu-badge-exito"
+                >{{ $t("registro.slugLibre") }}</span
+              >
+              <span
+                v-else-if="slugDisponible === false"
+                style="color: var(--error)"
+                >{{ $t("registro.slugOcupado") }}</span
+              >
             </p>
           </div>
         </template>
@@ -225,20 +332,46 @@ function irActivar(): void {
         <template v-else-if="paso === 2">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="tu-label" for="cnombre">{{ $t('registro.contactoNombre') }}</label>
-              <input id="cnombre" v-model="contactoNombre" class="tu-input" required />
+              <label class="tu-label" for="cnombre">{{
+                $t("registro.contactoNombre")
+              }}</label>
+              <input
+                id="cnombre"
+                v-model="contactoNombre"
+                class="tu-input"
+                required
+              />
             </div>
             <div>
-              <label class="tu-label" for="csegnombre">{{ $t('registro.contactoSegundoNombre') }}</label>
-              <input id="csegnombre" v-model="contactoSegundoNombre" class="tu-input" />
+              <label class="tu-label" for="csegnombre">{{
+                $t("registro.contactoSegundoNombre")
+              }}</label>
+              <input
+                id="csegnombre"
+                v-model="contactoSegundoNombre"
+                class="tu-input"
+              />
             </div>
             <div>
-              <label class="tu-label" for="cpaterno">{{ $t('registro.contactoPrimerApellido') }}</label>
-              <input id="cpaterno" v-model="contactoPrimerApellido" class="tu-input" required />
+              <label class="tu-label" for="cpaterno">{{
+                $t("registro.contactoPrimerApellido")
+              }}</label>
+              <input
+                id="cpaterno"
+                v-model="contactoPrimerApellido"
+                class="tu-input"
+                required
+              />
             </div>
             <div>
-              <label class="tu-label" for="cmaterno">{{ $t('registro.contactoSegundoApellido') }}</label>
-              <input id="cmaterno" v-model="contactoSegundoApellido" class="tu-input" />
+              <label class="tu-label" for="cmaterno">{{
+                $t("registro.contactoSegundoApellido")
+              }}</label>
+              <input
+                id="cmaterno"
+                v-model="contactoSegundoApellido"
+                class="tu-input"
+              />
             </div>
           </div>
         </template>
@@ -246,10 +379,16 @@ function irActivar(): void {
         <!-- ===== Paso 3: contacto ===== -->
         <template v-else>
           <div>
-            <label class="tu-label">{{ $t('registro.whatsapp') }}</label>
+            <label class="tu-label">{{ $t("registro.whatsapp") }}</label>
             <div class="flex gap-2">
-              <select v-model="whatsappPais" class="tu-input w-24 shrink-0" :aria-label="$t('registro.whatsappPais')">
-                <option v-for="p in PAISES" :key="p.lada" :value="p.lada">{{ p.bandera }} +{{ p.lada }}</option>
+              <select
+                v-model="whatsappPais"
+                class="tu-input w-24 shrink-0"
+                :aria-label="$t('registro.whatsappPais')"
+              >
+                <option v-for="p in PAISES" :key="p.lada" :value="p.lada">
+                  {{ p.bandera }} +{{ p.lada }}
+                </option>
               </select>
               <input
                 v-model="whatsappNumero"
@@ -260,31 +399,66 @@ function irActivar(): void {
                 required
               />
             </div>
-            <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">{{ $t('registro.whatsappAyuda') }}</p>
+            <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("registro.whatsappAyuda") }}
+            </p>
           </div>
           <div>
-            <label class="tu-label" for="cemail">{{ $t('registro.contactoEmail') }}</label>
-            <input id="cemail" v-model="contactoEmail" class="tu-input" type="email" required />
-            <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">{{ $t('registro.correoAyuda') }}</p>
+            <label class="tu-label" for="cemail">{{
+              $t("registro.contactoEmail")
+            }}</label>
+            <input
+              id="cemail"
+              v-model="contactoEmail"
+              class="tu-input"
+              type="email"
+              required
+            />
+            <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("registro.correoAyuda") }}
+            </p>
           </div>
           <label class="flex items-start gap-2 text-sm cursor-pointer">
-            <input v-model="aceptaTerminos" type="checkbox" class="mt-1" required />
-            <span>{{ $t('registro.terminos') }}</span>
+            <input
+              v-model="aceptaTerminos"
+              type="checkbox"
+              class="mt-1"
+              required
+            />
+            <span>{{ $t("registro.terminos") }}</span>
           </label>
         </template>
 
-        <p v-if="error" class="text-sm" style="color: var(--error)">{{ error }}</p>
+        <p v-if="error" class="text-sm" style="color: var(--error)">
+          {{ error }}
+        </p>
 
         <!-- Navegación -->
         <div class="flex gap-2 pt-1">
-          <button v-if="paso > 1" class="tu-btn tu-btn-fantasma" type="button" :disabled="enviando" @click="atras">
-            {{ $t('registro.atras') }}
+          <button
+            v-if="paso > 1"
+            class="tu-btn tu-btn-fantasma"
+            type="button"
+            :disabled="enviando"
+            @click="atras"
+          >
+            {{ $t("registro.atras") }}
           </button>
-          <button v-if="paso < 3" class="tu-btn tu-btn-primario flex-1" type="submit" :disabled="!pasoValido">
-            {{ $t('registro.siguiente') }}
+          <button
+            v-if="paso < 3"
+            class="tu-btn tu-btn-primario flex-1"
+            type="submit"
+            :disabled="!pasoValido"
+          >
+            {{ $t("registro.siguiente") }}
           </button>
-          <button v-else class="tu-btn tu-btn-primario flex-1" type="submit" :disabled="enviando || !paso3Valido">
-            {{ enviando ? $t('registro.creando') : $t('registro.crear') }}
+          <button
+            v-else
+            class="tu-btn tu-btn-primario flex-1"
+            type="submit"
+            :disabled="enviando || !paso3Valido"
+          >
+            {{ enviando ? $t("registro.creando") : $t("registro.crear") }}
           </button>
         </div>
       </form>
@@ -292,17 +466,27 @@ function irActivar(): void {
 
     <div v-else class="tu-card p-8 text-center">
       <div class="text-5xl" aria-hidden="true">📬</div>
-      <h1 class="mt-3 text-2xl font-extrabold">{{ $t('registro.pendienteTitulo') }}</h1>
+      <h1 class="mt-3 text-2xl font-extrabold">
+        {{ $t("registro.pendienteTitulo") }}
+      </h1>
       <p class="mt-2" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t('registro.pendienteDesc', { email: correo }) }}
+        {{ $t("registro.pendienteDesc", { email: correo }) }}
       </p>
 
       <div class="mt-5">
-        <button class="tu-btn tu-btn-fantasma" :disabled="reenviando" @click="reenviar">
-          {{ reenviando ? $t('registro.reenviando') : $t('registro.reenviar') }}
+        <button
+          class="tu-btn tu-btn-fantasma"
+          :disabled="reenviando"
+          @click="reenviar"
+        >
+          {{ reenviando ? $t("registro.reenviando") : $t("registro.reenviar") }}
         </button>
-        <p v-if="reenviado" class="mt-2 text-sm" :style="{ color: 'var(--exito)' }">
-          {{ $t('registro.reenviado', { email: correo }) }}
+        <p
+          v-if="reenviado"
+          class="mt-2 text-sm"
+          :style="{ color: 'var(--exito)' }"
+        >
+          {{ $t("registro.reenviado", { email: correo }) }}
         </p>
       </div>
 
@@ -311,15 +495,18 @@ function irActivar(): void {
         class="mt-5 rounded-lg p-3 text-left text-sm break-all"
         :style="{ background: 'var(--superficie-2)' }"
       >
-        <p class="font-semibold mb-1">{{ $t('registro.tokenDev') }}</p>
+        <p class="font-semibold mb-1">{{ $t("registro.tokenDev") }}</p>
         <code>{{ activacion.token }}</code>
         <button class="tu-btn tu-btn-primario w-full mt-3" @click="irActivar">
-          {{ $t('registro.irActivar') }}
+          {{ $t("registro.irActivar") }}
         </button>
       </div>
 
-      <RouterLink class="tu-enlace inline-block mt-4 text-sm" :to="{ name: 'entrar' }">
-        {{ $t('nav.entrar') }}
+      <RouterLink
+        class="tu-enlace inline-block mt-4 text-sm"
+        :to="{ name: 'entrar' }"
+      >
+        {{ $t("nav.entrar") }}
       </RouterLink>
     </div>
   </section>

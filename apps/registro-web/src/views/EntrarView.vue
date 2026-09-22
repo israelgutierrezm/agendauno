@@ -1,88 +1,91 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { onMounted, ref, watch } from "vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 
-import CampoContrasena from '@/components/CampoContrasena.vue'
-import { api } from '@/lib/api'
-import { clientIdGoogle, renderizarBotonGoogle } from '@/lib/google'
-import { useSesionTenantStore } from '@/stores/sesionTenant'
+import CampoContrasena from "@/components/CampoContrasena.vue";
+import { api } from "@/lib/api";
+import { clientIdGoogle, renderizarBotonGoogle } from "@/lib/google";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Marca {
-  nombre: string
-  logo_url: string | null
+  nombre: string;
+  logo_url: string | null;
 }
 
-const route = useRoute()
-const router = useRouter()
-const sesion = useSesionTenantStore()
+const route = useRoute();
+const router = useRouter();
+const sesion = useSesionTenantStore();
 
-const slug = ref(String(route.query.estudio ?? ''))
-const email = ref('')
-const password = ref('')
-const avisoGoogle = ref(false)
-const marca = ref<Marca | null>(null)
+const slug = ref(String(route.query.estudio ?? ""));
+const email = ref("");
+const password = ref("");
+const avisoGoogle = ref(false);
+const marca = ref<Marca | null>(null);
 
-const hayGoogle = clientIdGoogle() !== undefined
-const contenedorGoogle = ref<HTMLElement | null>(null)
+const hayGoogle = clientIdGoogle() !== undefined;
+const contenedorGoogle = ref<HTMLElement | null>(null);
 
 // Cada rol entra a su inicio: alumno→su cuenta, dueño/admin→panel, recepción→
 // operación de hoy, instructor→su agenda (ver store: rutaInicio).
 function destino(): { name: string } {
-  return { name: sesion.rutaInicio }
+  return { name: sesion.rutaInicio };
 }
 
 // Marca (branding) publica del estudio: para mostrar su logo antes de entrar.
 async function cargarMarca(valor: string): Promise<void> {
-  const s = valor.trim()
-  if (s === '') {
-    marca.value = null
-    return
+  const s = valor.trim();
+  if (s === "") {
+    marca.value = null;
+    return;
   }
   try {
-    const { data } = await api.get<{ data: Marca }>(`/api/v1/app/${s}/marca`)
-    marca.value = data.data
+    const { data } = await api.get<{ data: Marca }>(`/api/v1/app/${s}/marca`);
+    marca.value = data.data;
   } catch {
     // Estudio inexistente o no operativo: se muestra el logo de TurnoUno.
-    marca.value = null
+    marca.value = null;
   }
 }
 
-let temporizador: ReturnType<typeof setTimeout> | undefined
+let temporizador: ReturnType<typeof setTimeout> | undefined;
 watch(slug, (valor) => {
-  clearTimeout(temporizador)
-  temporizador = setTimeout(() => void cargarMarca(valor), 400)
-})
+  clearTimeout(temporizador);
+  temporizador = setTimeout(() => void cargarMarca(valor), 400);
+});
 
 async function enviar(): Promise<void> {
   try {
-    await sesion.iniciarSesion(slug.value.trim(), email.value, password.value)
-    void router.push(destino())
+    await sesion.iniciarSesion(slug.value.trim(), email.value, password.value);
+    void router.push(destino());
   } catch {
     // El error queda en sesion.error.
   }
 }
 
 async function entrarConGoogle(credential: string): Promise<void> {
-  if (slug.value.trim() === '') {
-    sesion.error = 'Escribe primero la direccion de tu estudio.'
-    return
+  if (slug.value.trim() === "") {
+    sesion.error = "Escribe primero la direccion de tu estudio.";
+    return;
   }
   try {
-    await sesion.iniciarSesionConGoogle(slug.value.trim(), credential)
-    void router.push(destino())
+    await sesion.iniciarSesionConGoogle(slug.value.trim(), credential);
+    void router.push(destino());
   } catch {
     // El error queda en sesion.error.
   }
 }
 
 onMounted(() => {
-  if (slug.value.trim() !== '') {
-    void cargarMarca(slug.value)
+  if (slug.value.trim() !== "") {
+    void cargarMarca(slug.value);
   }
   if (hayGoogle && contenedorGoogle.value !== null) {
-    void renderizarBotonGoogle(contenedorGoogle.value, (c) => void entrarConGoogle(c))
+    void renderizarBotonGoogle(
+      contenedorGoogle.value,
+      (c) => void entrarConGoogle(c),
+    );
   }
-})
+});
 </script>
 
 <template>
@@ -95,16 +98,27 @@ onMounted(() => {
       class="h-16 w-16 rounded-2xl object-cover"
       :style="{ boxShadow: 'var(--sombra)' }"
     />
-    <img v-else src="/assets/brand/turnouno-logo.webp" alt="TurnoUno" class="h-20 w-auto" />
+    <img
+      v-else
+      src="/assets/brand/turnouno-logo.webp"
+      alt="TurnoUno"
+      class="h-20 w-auto"
+    />
 
     <h1 class="mt-4 text-2xl font-extrabold text-center">
-      {{ marca?.nombre ? $t('entrar.tituloEstudio', { nombre: marca.nombre }) : $t('entrar.titulo') }}
+      {{
+        marca?.nombre
+          ? $t("entrar.tituloEstudio", { nombre: marca.nombre })
+          : $t("entrar.titulo")
+      }}
     </h1>
-    <p class="mt-1 text-center" :style="{ color: 'var(--texto-suave)' }">{{ $t('entrar.subtitulo') }}</p>
+    <p class="mt-1 text-center" :style="{ color: 'var(--texto-suave)' }">
+      {{ $t("entrar.subtitulo") }}
+    </p>
 
     <form class="mt-6 w-full tu-card p-6 space-y-4" @submit.prevent="enviar">
       <div>
-        <label class="tu-label" for="slug">{{ $t('entrar.slug') }}</label>
+        <label class="tu-label" for="slug">{{ $t("entrar.slug") }}</label>
         <input
           id="slug"
           v-model="slug"
@@ -114,29 +128,65 @@ onMounted(() => {
         />
       </div>
       <div>
-        <label class="tu-label" for="email">{{ $t('entrar.email') }}</label>
-        <input id="email" v-model="email" class="tu-input" type="email" required />
+        <label class="tu-label" for="email">{{ $t("entrar.email") }}</label>
+        <input
+          id="email"
+          v-model="email"
+          class="tu-input"
+          type="email"
+          required
+        />
       </div>
       <div>
-        <label class="tu-label" for="password">{{ $t('entrar.password') }}</label>
-        <CampoContrasena id="password" v-model="password" autocomplete="current-password" :required="true" />
+        <label class="tu-label" for="password">{{
+          $t("entrar.password")
+        }}</label>
+        <CampoContrasena
+          id="password"
+          v-model="password"
+          autocomplete="current-password"
+          :required="true"
+        />
       </div>
 
-      <p v-if="sesion.error" class="text-sm" style="color: var(--error)">{{ sesion.error }}</p>
+      <p v-if="sesion.error" class="text-sm" style="color: var(--error)">
+        {{ sesion.error }}
+      </p>
 
-      <button class="tu-btn tu-btn-primario w-full" type="submit" :disabled="sesion.cargando">
-        {{ sesion.cargando ? $t('entrar.entrando') : $t('entrar.entrar') }}
+      <button
+        class="tu-btn tu-btn-primario w-full"
+        type="submit"
+        :disabled="sesion.cargando"
+      >
+        {{ sesion.cargando ? $t("entrar.entrando") : $t("entrar.entrar") }}
       </button>
 
-      <div class="flex items-center gap-3 text-xs" :style="{ color: 'var(--texto-suave)' }">
-        <span class="flex-1 border-t" :style="{ borderColor: 'var(--borde)' }" />
+      <div
+        class="flex items-center gap-3 text-xs"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        <span
+          class="flex-1 border-t"
+          :style="{ borderColor: 'var(--borde)' }"
+        />
         <span>o</span>
-        <span class="flex-1 border-t" :style="{ borderColor: 'var(--borde)' }" />
+        <span
+          class="flex-1 border-t"
+          :style="{ borderColor: 'var(--borde)' }"
+        />
       </div>
 
-      <div v-if="hayGoogle" ref="contenedorGoogle" class="flex justify-center"></div>
+      <div
+        v-if="hayGoogle"
+        ref="contenedorGoogle"
+        class="flex justify-center"
+      ></div>
       <template v-else>
-        <button class="tu-btn tu-btn-fantasma w-full" type="button" @click="avisoGoogle = true">
+        <button
+          class="tu-btn tu-btn-fantasma w-full"
+          type="button"
+          @click="avisoGoogle = true"
+        >
           <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
             <path
               fill="#EA4335"
@@ -155,17 +205,26 @@ onMounted(() => {
               d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
             />
           </svg>
-          {{ $t('entrar.google') }}
+          {{ $t("entrar.google") }}
         </button>
-        <p v-if="avisoGoogle" class="text-xs text-center" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t('entrar.googlePronto') }}
+        <p
+          v-if="avisoGoogle"
+          class="text-xs text-center"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("entrar.googlePronto") }}
         </p>
       </template>
     </form>
 
-    <p class="mt-4 text-sm text-center" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t('entrar.sinCuenta') }}
-      <RouterLink class="tu-enlace" :to="{ name: 'registro' }">{{ $t('entrar.registrar') }}</RouterLink>
+    <p
+      class="mt-4 text-sm text-center"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
+      {{ $t("entrar.sinCuenta") }}
+      <RouterLink class="tu-enlace" :to="{ name: 'registro' }">{{
+        $t("entrar.registrar")
+      }}</RouterLink>
     </p>
   </section>
 </template>

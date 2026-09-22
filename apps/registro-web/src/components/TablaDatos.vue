@@ -1,71 +1,87 @@
 <script setup lang="ts" generic="T extends Record<string, unknown>">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch } from "vue";
 
 interface Columna {
-  clave: string
-  etiqueta: string
-  alinear?: 'izquierda' | 'derecha'
+  clave: string;
+  etiqueta: string;
+  alinear?: "izquierda" | "derecha";
 }
 
 const props = withDefaults(
   defineProps<{
-    columnas: Columna[]
-    filas: T[]
+    columnas: Columna[];
+    filas: T[];
     // Claves de texto por las que filtra el buscador; si se omite, usa todas las de tipo string.
-    buscarEn?: string[]
-    buscar?: boolean
-    porPagina?: number
-    vacio?: string
+    buscarEn?: string[];
+    buscar?: boolean;
+    porPagina?: number;
+    vacio?: string;
   }>(),
   { buscar: true, porPagina: 10, buscarEn: undefined, vacio: undefined },
-)
+);
 
-const q = ref('')
-const pagina = ref(1)
+const q = ref("");
+const pagina = ref(1);
 
-const clavesBusqueda = computed(() =>
-  props.buscarEn ?? props.columnas.map((c) => c.clave),
-)
+const clavesBusqueda = computed(
+  () => props.buscarEn ?? props.columnas.map((c) => c.clave),
+);
 
 const filtradas = computed(() => {
-  const termino = q.value.trim().toLowerCase()
-  if (termino === '') {
-    return props.filas
+  const termino = q.value.trim().toLowerCase();
+  if (termino === "") {
+    return props.filas;
   }
   return props.filas.filter((fila) =>
     clavesBusqueda.value.some((clave) => {
-      const valor = fila[clave]
-      return typeof valor === 'string' && valor.toLowerCase().includes(termino)
+      const valor = fila[clave];
+      return typeof valor === "string" && valor.toLowerCase().includes(termino);
     }),
-  )
-})
+  );
+});
 
-const totalPaginas = computed(() => Math.max(1, Math.ceil(filtradas.value.length / props.porPagina)))
+const totalPaginas = computed(() =>
+  Math.max(1, Math.ceil(filtradas.value.length / props.porPagina)),
+);
 
-const paginaSegura = computed(() => Math.min(pagina.value, totalPaginas.value))
+const paginaSegura = computed(() => Math.min(pagina.value, totalPaginas.value));
 
 const desde = computed(() =>
-  filtradas.value.length === 0 ? 0 : (paginaSegura.value - 1) * props.porPagina + 1,
-)
-const hasta = computed(() => Math.min(paginaSegura.value * props.porPagina, filtradas.value.length))
+  filtradas.value.length === 0
+    ? 0
+    : (paginaSegura.value - 1) * props.porPagina + 1,
+);
+const hasta = computed(() =>
+  Math.min(paginaSegura.value * props.porPagina, filtradas.value.length),
+);
 
 const paginadas = computed(() =>
-  filtradas.value.slice((paginaSegura.value - 1) * props.porPagina, paginaSegura.value * props.porPagina),
-)
+  filtradas.value.slice(
+    (paginaSegura.value - 1) * props.porPagina,
+    paginaSegura.value * props.porPagina,
+  ),
+);
 
 // Al cambiar el filtro o los datos, vuelve a la primera pagina.
 watch([q, () => props.filas], () => {
-  pagina.value = 1
-})
+  pagina.value = 1;
+});
 
 function ir(delta: number): void {
-  pagina.value = Math.min(totalPaginas.value, Math.max(1, paginaSegura.value + delta))
+  pagina.value = Math.min(
+    totalPaginas.value,
+    Math.max(1, paginaSegura.value + delta),
+  );
 }
 </script>
 
 <template>
   <div class="tu-card overflow-hidden">
-    <div v-if="buscar" class="p-3 border-b" :style="{ borderColor: 'var(--borde)' }">
+    <div
+      v-if="buscar"
+      class="p-3 border-b"
+      :style="{ borderColor: 'var(--borde)' }"
+    >
       <input
         v-model="q"
         class="tu-input"
@@ -78,7 +94,12 @@ function ir(delta: number): void {
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
-          <tr :style="{ background: 'color-mix(in srgb, var(--texto-suave) 6%, var(--superficie))' }">
+          <tr
+            :style="{
+              background:
+                'color-mix(in srgb, var(--texto-suave) 6%, var(--superficie))',
+            }"
+          >
             <th
               v-for="c in columnas"
               :key="c.clave"
@@ -98,7 +119,7 @@ function ir(delta: number): void {
               class="px-4 py-8 text-center"
               :style="{ color: 'var(--texto-suave)' }"
             >
-              {{ vacio ?? $t('tabla.vacio') }}
+              {{ vacio ?? $t("tabla.vacio") }}
             </td>
           </tr>
           <tr
@@ -112,7 +133,11 @@ function ir(delta: number): void {
               class="px-4 py-2.5 align-middle"
               :class="c.alinear === 'derecha' ? 'text-right' : 'text-left'"
             >
-              <slot :name="`col-${c.clave}`" :fila="fila" :valor="fila[c.clave]">
+              <slot
+                :name="`col-${c.clave}`"
+                :fila="fila"
+                :valor="fila[c.clave]"
+              >
                 {{ fila[c.clave] }}
               </slot>
             </td>
@@ -127,22 +152,26 @@ function ir(delta: number): void {
       class="flex items-center justify-between gap-3 p-3 border-t text-sm"
       :style="{ borderColor: 'var(--borde)', color: 'var(--texto-suave)' }"
     >
-      <span>{{ $t('tabla.mostrando', { desde, hasta, total: filtradas.length }) }}</span>
+      <span>{{
+        $t("tabla.mostrando", { desde, hasta, total: filtradas.length })
+      }}</span>
       <div class="flex items-center gap-2">
         <button
           class="tu-btn tu-btn-fantasma px-3 py-1.5"
           :disabled="paginaSegura <= 1"
           @click="ir(-1)"
         >
-          {{ $t('tabla.anterior') }}
+          {{ $t("tabla.anterior") }}
         </button>
-        <span>{{ $t('tabla.pagina', { n: paginaSegura, total: totalPaginas }) }}</span>
+        <span>{{
+          $t("tabla.pagina", { n: paginaSegura, total: totalPaginas })
+        }}</span>
         <button
           class="tu-btn tu-btn-fantasma px-3 py-1.5"
           :disabled="paginaSegura >= totalPaginas"
           @click="ir(1)"
         >
-          {{ $t('tabla.siguiente') }}
+          {{ $t("tabla.siguiente") }}
         </button>
       </div>
     </div>

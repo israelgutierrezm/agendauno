@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 /* Modo oscuro por clase en <html> (lo controla el store de tema). */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -73,10 +73,10 @@
 html {
   font-size: 16px;
 }
-html[data-densidad='compacta'] {
+html[data-densidad="compacta"] {
   font-size: 14px;
 }
-html[data-densidad='comoda'] {
+html[data-densidad="comoda"] {
   font-size: 18px;
 }
 
@@ -87,8 +87,8 @@ body {
   /* En dispositivos Apple resuelve a SF Pro (la fuente de referencia); Inter es el
      sustituto en el resto, con Segoe UI/Roboto como respaldo del sistema. */
   font-family:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', ui-sans-serif, system-ui,
-    'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", ui-sans-serif,
+    system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   letter-spacing: -0.011em; /* tracking negativo sutil, estilo SF */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

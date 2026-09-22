@@ -1,105 +1,286 @@
 <script setup lang="ts">
-import { computed, onMounted, provide, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, provide, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 
-import IconoNav from '@/components/IconoNav.vue'
-import LogoTurnoUno from '@/components/LogoTurnoUno.vue'
-import NavArbol from '@/components/NavArbol.vue'
-import type { MenuItem, NavEstado } from '@/components/nav'
-import { useSesionTenantStore } from '@/stores/sesionTenant'
-import { ACENTOS, useTemaStore } from '@/stores/tema'
+import IconoNav from "@/components/IconoNav.vue";
+import LogoTurnoUno from "@/components/LogoTurnoUno.vue";
+import NavArbol from "@/components/NavArbol.vue";
+import type { MenuItem, NavEstado } from "@/components/nav";
+import { trackEvent } from "@/lib/analytics";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { ACENTOS, useTemaStore } from "@/stores/tema";
 
-const { t } = useI18n()
-const tema = useTemaStore()
-const sesion = useSesionTenantStore()
-const router = useRouter()
-const route = useRoute()
+const { t } = useI18n();
+const tema = useTemaStore();
+const sesion = useSesionTenantStore();
+const router = useRouter();
+const route = useRoute();
 
-tema.inicializar()
+tema.inicializar();
 
 // Menu lateral en ARBOL (3 niveles): grupos por area -> secciones -> sub-secciones.
 const MENU: MenuItem[] = [
-  { clave: 'mi-cuenta', etiqueta: 'nav.miCuenta', icono: 'mi-cuenta', ruta: 'mi-cuenta', soloMiembro: true },
-  { clave: 'panel', etiqueta: 'nav.panel', icono: 'panel', ruta: 'panel', permiso: 'facturacion.ver' },
   {
-    clave: 'personas',
-    etiqueta: 'nav.grupos.personas',
-    icono: 'personas',
+    clave: "mi-cuenta",
+    etiqueta: "nav.miCuenta",
+    icono: "mi-cuenta",
+    ruta: "mi-cuenta",
+    soloMiembro: true,
+  },
+  {
+    clave: "panel",
+    etiqueta: "nav.panel",
+    icono: "panel",
+    ruta: "panel",
+    permiso: "facturacion.ver",
+  },
+  {
+    clave: "personas",
+    etiqueta: "nav.grupos.personas",
+    icono: "personas",
     hijos: [
-      { clave: 'miembros', etiqueta: 'nav.miembros', icono: 'miembros', ruta: 'miembros', permiso: 'miembros.ver' },
-      { clave: 'retencion', etiqueta: 'nav.retencion', icono: 'reportes', ruta: 'retencion', permiso: 'miembros.ver' },
-      { clave: 'importar', etiqueta: 'nav.importar', icono: 'miembros', ruta: 'importar', permiso: 'miembros.gestionar' },
-      { clave: 'instructores', etiqueta: 'nav.instructores', icono: 'instructores', ruta: 'instructores', permiso: 'agenda.gestionar' },
-      { clave: 'usuarios', etiqueta: 'nav.usuarios', icono: 'usuarios', ruta: 'usuarios', permiso: 'usuarios.gestionar' },
+      {
+        clave: "miembros",
+        etiqueta: "nav.miembros",
+        icono: "miembros",
+        ruta: "miembros",
+        permiso: "miembros.ver",
+      },
+      {
+        clave: "retencion",
+        etiqueta: "nav.retencion",
+        icono: "reportes",
+        ruta: "retencion",
+        permiso: "miembros.ver",
+      },
+      {
+        clave: "importar",
+        etiqueta: "nav.importar",
+        icono: "miembros",
+        ruta: "importar",
+        permiso: "miembros.gestionar",
+      },
+      {
+        clave: "instructores",
+        etiqueta: "nav.instructores",
+        icono: "instructores",
+        ruta: "instructores",
+        permiso: "agenda.gestionar",
+      },
+      {
+        clave: "usuarios",
+        etiqueta: "nav.usuarios",
+        icono: "usuarios",
+        ruta: "usuarios",
+        permiso: "usuarios.gestionar",
+      },
     ],
   },
   {
-    clave: 'operacion',
-    etiqueta: 'nav.grupos.operacion',
-    icono: 'operacion',
+    clave: "operacion",
+    etiqueta: "nav.grupos.operacion",
+    icono: "operacion",
     hijos: [
-      { clave: 'agenda', etiqueta: 'nav.agenda', icono: 'agenda', ruta: 'agenda', permiso: 'agenda.ver' },
-      { clave: 'oportunidades', etiqueta: 'nav.oportunidades', icono: 'oportunidades', ruta: 'oportunidades', permiso: 'reservas.gestionar' },
-      { clave: 'tareas', etiqueta: 'nav.tareas', icono: 'tareas', ruta: 'tareas', permiso: 'tareas.ver' },
-      { clave: 'recepcion', etiqueta: 'nav.recepcion', icono: 'recepcion', ruta: 'recepcion', permiso: 'agenda.ver' },
-      { clave: 'grupos', etiqueta: 'nav.cursos', icono: 'grupos', ruta: 'grupos', permiso: 'agenda.ver' },
-      { clave: 'recursos', etiqueta: 'nav.recursos', icono: 'recursos', ruta: 'recursos', permiso: 'agenda.ver' },
+      {
+        clave: "agenda",
+        etiqueta: "nav.agenda",
+        icono: "agenda",
+        ruta: "agenda",
+        permiso: "agenda.ver",
+      },
+      {
+        clave: "oportunidades",
+        etiqueta: "nav.oportunidades",
+        icono: "oportunidades",
+        ruta: "oportunidades",
+        permiso: "reservas.gestionar",
+      },
+      {
+        clave: "tareas",
+        etiqueta: "nav.tareas",
+        icono: "tareas",
+        ruta: "tareas",
+        permiso: "tareas.ver",
+      },
+      {
+        clave: "recepcion",
+        etiqueta: "nav.recepcion",
+        icono: "recepcion",
+        ruta: "recepcion",
+        permiso: "agenda.ver",
+      },
+      {
+        clave: "grupos",
+        etiqueta: "nav.cursos",
+        icono: "grupos",
+        ruta: "grupos",
+        permiso: "agenda.ver",
+      },
+      {
+        clave: "recursos",
+        etiqueta: "nav.recursos",
+        icono: "recursos",
+        ruta: "recursos",
+        permiso: "agenda.ver",
+      },
     ],
   },
   {
-    clave: 'comercio',
-    etiqueta: 'nav.grupos.comercio',
-    icono: 'comercio',
+    clave: "comercio",
+    etiqueta: "nav.grupos.comercio",
+    icono: "comercio",
     hijos: [
-      { clave: 'ventas', etiqueta: 'nav.ventas', icono: 'ventas', ruta: 'ventas', permiso: 'productos.ver' },
-      { clave: 'pos', etiqueta: 'nav.pos', icono: 'pos', ruta: 'pos', permiso: 'inventario.ver' },
-      { clave: 'promociones', etiqueta: 'nav.promociones', icono: 'promociones', ruta: 'promociones', permiso: 'promociones.gestionar' },
-      { clave: 'comunicaciones', etiqueta: 'nav.comunicaciones', icono: 'reportes', ruta: 'comunicaciones', permiso: 'comunicaciones.gestionar' },
-      { clave: 'lealtad', etiqueta: 'nav.lealtad', icono: 'lealtad', ruta: 'lealtad', permiso: 'lealtad.ver' },
-      { clave: 'facturas', etiqueta: 'nav.facturas', icono: 'facturas', ruta: 'facturas', permiso: 'ordenes.ver' },
-      { clave: 'cobranza', etiqueta: 'nav.cobranza', icono: 'facturas', ruta: 'cobranza', permiso: 'facturacion.ver' },
-      { clave: 'reportes', etiqueta: 'nav.reportes', icono: 'reportes', ruta: 'reportes', permiso: 'facturacion.ver' },
-      { clave: 'pasarelas', etiqueta: 'nav.pasarelas', icono: 'pasarelas', ruta: 'pasarelas', permiso: 'pagos.configurar' },
+      {
+        clave: "ventas",
+        etiqueta: "nav.ventas",
+        icono: "ventas",
+        ruta: "ventas",
+        permiso: "productos.ver",
+      },
+      {
+        clave: "pos",
+        etiqueta: "nav.pos",
+        icono: "pos",
+        ruta: "pos",
+        permiso: "inventario.ver",
+      },
+      {
+        clave: "promociones",
+        etiqueta: "nav.promociones",
+        icono: "promociones",
+        ruta: "promociones",
+        permiso: "promociones.gestionar",
+      },
+      {
+        clave: "comunicaciones",
+        etiqueta: "nav.comunicaciones",
+        icono: "reportes",
+        ruta: "comunicaciones",
+        permiso: "comunicaciones.gestionar",
+      },
+      {
+        clave: "lealtad",
+        etiqueta: "nav.lealtad",
+        icono: "lealtad",
+        ruta: "lealtad",
+        permiso: "lealtad.ver",
+      },
+      {
+        clave: "facturas",
+        etiqueta: "nav.facturas",
+        icono: "facturas",
+        ruta: "facturas",
+        permiso: "ordenes.ver",
+      },
+      {
+        clave: "cobranza",
+        etiqueta: "nav.cobranza",
+        icono: "facturas",
+        ruta: "cobranza",
+        permiso: "facturacion.ver",
+      },
+      {
+        clave: "reportes",
+        etiqueta: "nav.reportes",
+        icono: "reportes",
+        ruta: "reportes",
+        permiso: "facturacion.ver",
+      },
+      {
+        clave: "pasarelas",
+        etiqueta: "nav.pasarelas",
+        icono: "pasarelas",
+        ruta: "pasarelas",
+        permiso: "pagos.configurar",
+      },
     ],
   },
   {
-    clave: 'contenido',
-    etiqueta: 'nav.grupos.contenido',
-    icono: 'contenido',
+    clave: "contenido",
+    etiqueta: "nav.grupos.contenido",
+    icono: "contenido",
     hijos: [
-      { clave: 'documentos', etiqueta: 'nav.documentos', icono: 'documentos', ruta: 'documentos', permiso: 'documentos.subir' },
-      { clave: 'formularios', etiqueta: 'nav.formularios', icono: 'formularios', ruta: 'formularios', permiso: 'formularios.responder' },
+      {
+        clave: "documentos",
+        etiqueta: "nav.documentos",
+        icono: "documentos",
+        ruta: "documentos",
+        permiso: "documentos.subir",
+      },
+      {
+        clave: "formularios",
+        etiqueta: "nav.formularios",
+        icono: "formularios",
+        ruta: "formularios",
+        permiso: "formularios.responder",
+      },
     ],
   },
   {
-    clave: 'ajustes',
-    etiqueta: 'nav.grupos.ajustes',
-    icono: 'ajustes',
+    clave: "ajustes",
+    etiqueta: "nav.grupos.ajustes",
+    icono: "ajustes",
     hijos: [
-      { clave: 'nomina', etiqueta: 'nav.nomina', icono: 'nomina', ruta: 'nomina', permiso: 'estudio.gestionar' },
-      { clave: 'integraciones', etiqueta: 'nav.integraciones', icono: 'integraciones', ruta: 'integraciones', permiso: 'integraciones.configurar' },
-      { clave: 'datos-fiscales', etiqueta: 'nav.datosFiscales', icono: 'datosFiscales', ruta: 'datos-fiscales', permiso: 'estudio.gestionar' },
-      { clave: 'configuracion', etiqueta: 'nav.configuracion', icono: 'configuracion', ruta: 'configuracion', permiso: 'estudio.gestionar' },
+      {
+        clave: "nomina",
+        etiqueta: "nav.nomina",
+        icono: "nomina",
+        ruta: "nomina",
+        permiso: "estudio.gestionar",
+      },
+      {
+        clave: "integraciones",
+        etiqueta: "nav.integraciones",
+        icono: "integraciones",
+        ruta: "integraciones",
+        permiso: "integraciones.configurar",
+      },
+      {
+        clave: "datos-fiscales",
+        etiqueta: "nav.datosFiscales",
+        icono: "datosFiscales",
+        ruta: "datos-fiscales",
+        permiso: "estudio.gestionar",
+      },
+      {
+        clave: "configuracion",
+        etiqueta: "nav.configuracion",
+        icono: "configuracion",
+        ruta: "configuracion",
+        permiso: "estudio.gestionar",
+      },
     ],
   },
   // Pagos del SaaS (lo que el dueño le paga a TurnoUno): separado de la operación/venta del estudio.
   {
-    clave: 'suscripcion',
-    etiqueta: 'nav.grupos.suscripcion',
-    icono: 'renta',
+    clave: "suscripcion",
+    etiqueta: "nav.grupos.suscripcion",
+    icono: "renta",
     hijos: [
-      { clave: 'renta', etiqueta: 'nav.renta', icono: 'renta', ruta: 'renta', permiso: 'facturacion.ver' },
-      { clave: 'padron', etiqueta: 'nav.padron', icono: 'facturas', ruta: 'padron', permiso: 'facturacion.ver' },
+      {
+        clave: "renta",
+        etiqueta: "nav.renta",
+        icono: "renta",
+        ruta: "renta",
+        permiso: "facturacion.ver",
+      },
+      {
+        clave: "padron",
+        etiqueta: "nav.padron",
+        icono: "facturas",
+        ruta: "padron",
+        permiso: "facturacion.ver",
+      },
     ],
   },
-]
+];
 
 function visible(item: MenuItem): boolean {
   if (item.soloMiembro === true) {
-    return sesion.usuario?.rol === 'miembro'
+    return sesion.usuario?.rol === "miembro";
   }
-  return item.permiso === undefined || sesion.puede(item.permiso)
+  return item.permiso === undefined || sesion.puede(item.permiso);
 }
 
 // Filtra el arbol por permisos: una hoja se ve si pasa su permiso; un grupo, si le
@@ -108,122 +289,129 @@ function filtrar(items: MenuItem[]): MenuItem[] {
   return items
     .map((item): MenuItem | null => {
       if (item.hijos !== undefined) {
-        const hijos = filtrar(item.hijos)
-        return hijos.length > 0 ? { ...item, hijos } : null
+        const hijos = filtrar(item.hijos);
+        return hijos.length > 0 ? { ...item, hijos } : null;
       }
-      return visible(item) ? item : null
+      return visible(item) ? item : null;
     })
-    .filter((item): item is MenuItem => item !== null)
+    .filter((item): item is MenuItem => item !== null);
 }
 
-const menuVisible = computed(() => filtrar(MENU))
+const menuVisible = computed(() => filtrar(MENU));
 
-const hogar = computed(() => ({ name: sesion.rutaInicio }))
+const hogar = computed(() => ({ name: sesion.rutaInicio }));
 
-const puedeConfigurar = computed(() => sesion.puede('estudio.gestionar'))
+const puedeConfigurar = computed(() => sesion.puede("estudio.gestionar"));
 
 // Aplana las hojas para localizar la seccion activa (titulo + icono del encabezado).
 function hojas(items: MenuItem[]): MenuItem[] {
-  return items.flatMap((i) => (i.hijos !== undefined ? hojas(i.hijos) : [i]))
+  return items.flatMap((i) => (i.hijos !== undefined ? hojas(i.hijos) : [i]));
 }
-const enlaceActivo = computed(() => hojas(MENU).find((e) => e.ruta === route.name) ?? null)
+const enlaceActivo = computed(
+  () => hojas(MENU).find((e) => e.ruta === route.name) ?? null,
+);
 const tituloSeccion = computed(() =>
-  enlaceActivo.value !== null ? t(enlaceActivo.value.etiqueta) : (sesion.estudio?.nombre ?? ''),
-)
+  enlaceActivo.value !== null
+    ? t(enlaceActivo.value.etiqueta)
+    : (sesion.estudio?.nombre ?? ""),
+);
 
 // ---- Estado del arbol (expandir/colapsar grupos) ----
-const abiertos = ref<Set<string>>(new Set())
+const abiertos = ref<Set<string>>(new Set());
 
 // La clave del grupo que contiene la ruta activa (para auto-expandirlo).
 function grupoDe(ruta: string, items: MenuItem[] = MENU): string | null {
   for (const item of items) {
     if (item.hijos !== undefined) {
-      if (item.hijos.some((h) => h.ruta === ruta) || grupoDe(ruta, item.hijos) !== null) {
-        return item.clave
+      if (
+        item.hijos.some((h) => h.ruta === ruta) ||
+        grupoDe(ruta, item.hijos) !== null
+      ) {
+        return item.clave;
       }
     }
   }
-  return null
+  return null;
 }
 
 function alternar(clave: string): void {
   // En modo rail, expandir un grupo primero descompacta la barra.
   if (compacto.value) {
-    compacto.value = false
+    compacto.value = false;
   }
-  const s = new Set(abiertos.value)
+  const s = new Set(abiertos.value);
   if (s.has(clave)) {
-    s.delete(clave)
+    s.delete(clave);
   } else {
-    s.add(clave)
+    s.add(clave);
   }
-  abiertos.value = s
+  abiertos.value = s;
 }
 
 function abrirGrupoActivo(): void {
-  const g = grupoDe(String(route.name))
+  const g = grupoDe(String(route.name));
   if (g !== null) {
-    abiertos.value = new Set(abiertos.value).add(g)
+    abiertos.value = new Set(abiertos.value).add(g);
   }
 }
 
-watch(() => route.name, abrirGrupoActivo)
+watch(() => route.name, abrirGrupoActivo);
 
 const navEstado: NavEstado = {
   abiertos,
   compacto: computed(() => compactoEfectivo.value),
   alternar,
   cerrarCajon: () => {
-    menuLateral.value = false
+    menuLateral.value = false;
   },
-}
-provide('navEstado', navEstado)
+};
+provide("navEstado", navEstado);
 
 function siglas(nombre: string | undefined): string {
   return (
-    (nombre ?? '')
-      .split(' ')
+    (nombre ?? "")
+      .split(" ")
       .slice(0, 2)
       .map((p) => p.charAt(0))
-      .join('')
-      .toUpperCase() || '·'
-  )
+      .join("")
+      .toUpperCase() || "·"
+  );
 }
-const inicialesEstudio = computed(() => siglas(sesion.estudio?.nombre))
-const inicialesUsuario = computed(() => siglas(sesion.usuario?.nombre))
+const inicialesEstudio = computed(() => siglas(sesion.estudio?.nombre));
+const inicialesUsuario = computed(() => siglas(sesion.usuario?.nombre));
 
 // Estado de la interfaz.
-const menuLateral = ref(false) // cajón en móvil
-const compacto = ref(false) // barra contraída (solo iconos) en escritorio
-const menuPerfil = ref(false)
-const menuApariencia = ref(false)
+const menuLateral = ref(false); // cajón en móvil
+const compacto = ref(false); // barra contraída (solo iconos) en escritorio
+const menuPerfil = ref(false);
+const menuApariencia = ref(false);
 
 // La contracción solo aplica en escritorio; con el cajón abierto se ve completo.
-const compactoEfectivo = computed(() => compacto.value && !menuLateral.value)
+const compactoEfectivo = computed(() => compacto.value && !menuLateral.value);
 
 function alternarCompacto(): void {
-  compacto.value = !compacto.value
+  compacto.value = !compacto.value;
   try {
-    localStorage.setItem('tu.barra.compacta', compacto.value ? '1' : '0')
+    localStorage.setItem("tu.barra.compacta", compacto.value ? "1" : "0");
   } catch {
     // Ignora si no hay localStorage.
   }
 }
 
 async function salir(): Promise<void> {
-  menuPerfil.value = false
-  await sesion.cerrarSesion()
-  void router.push({ name: 'inicio' })
+  menuPerfil.value = false;
+  await sesion.cerrarSesion();
+  void router.push({ name: "inicio" });
 }
 
 onMounted(() => {
   try {
-    compacto.value = localStorage.getItem('tu.barra.compacta') === '1'
+    compacto.value = localStorage.getItem("tu.barra.compacta") === "1";
   } catch {
     // Ignora.
   }
-  abrirGrupoActivo()
-})
+  abrirGrupoActivo();
+});
 </script>
 
 <template>
@@ -267,9 +455,11 @@ onMounted(() => {
         >
         <span v-show="!compactoEfectivo" class="min-w-0">
           <span class="block text-sm font-semibold text-white truncate">{{
-            sesion.estudio?.nombre ?? $t('marca')
+            sesion.estudio?.nombre ?? $t("marca")
           }}</span>
-          <span class="block text-[11px] opacity-60 truncate">{{ $t('marca') }}</span>
+          <span class="block text-[11px] opacity-60 truncate">{{
+            $t("marca")
+          }}</span>
         </span>
       </RouterLink>
 
@@ -279,7 +469,10 @@ onMounted(() => {
       </nav>
 
       <!-- Contraer (solo escritorio) -->
-      <div class="hidden lg:block p-3 border-t" :style="{ borderColor: 'var(--barra-borde)' }">
+      <div
+        class="hidden lg:block p-3 border-t"
+        :style="{ borderColor: 'var(--barra-borde)' }"
+      >
         <button
           type="button"
           class="tu-side-link w-full"
@@ -287,8 +480,10 @@ onMounted(() => {
           :title="$t('nav.contraer')"
           @click="alternarCompacto"
         >
-          <span class="shrink-0" aria-hidden="true">{{ compacto ? '»' : '«' }}</span>
-          <span v-show="!compactoEfectivo">{{ $t('nav.contraer') }}</span>
+          <span class="shrink-0" aria-hidden="true">{{
+            compacto ? "»" : "«"
+          }}</span>
+          <span v-show="!compactoEfectivo">{{ $t("nav.contraer") }}</span>
         </button>
       </div>
     </aside>
@@ -315,7 +510,10 @@ onMounted(() => {
           <span
             v-if="enlaceActivo"
             class="hidden sm:inline-flex h-9 w-9 rounded-xl items-center justify-center shrink-0"
-            :style="{ background: 'var(--primario-suave)', color: 'var(--primario-fuerte)' }"
+            :style="{
+              background: 'var(--primario-suave)',
+              color: 'var(--primario-fuerte)',
+            }"
             aria-hidden="true"
           >
             <IconoNav :nombre="enlaceActivo.icono ?? 'punto'" :tam="18" />
@@ -331,7 +529,10 @@ onMounted(() => {
               class="tu-icono-btn"
               :aria-label="$t('tema.apariencia')"
               :title="$t('tema.apariencia')"
-              @click="menuApariencia = !menuApariencia; menuPerfil = false"
+              @click="
+                menuApariencia = !menuApariencia;
+                menuPerfil = false;
+              "
             >
               <IconoNav nombre="configuracion" :tam="18" />
             </button>
@@ -340,38 +541,58 @@ onMounted(() => {
               class="absolute right-0 top-full mt-2 w-64 tu-card p-4 z-50 space-y-4"
             >
               <div>
-                <p class="tu-label">{{ $t('tema.modo') }}</p>
+                <p class="tu-label">{{ $t("tema.modo") }}</p>
                 <div class="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     class="tu-btn"
-                    :class="!tema.esOscuro ? 'tu-btn-primario' : 'tu-btn-fantasma'"
+                    :class="
+                      !tema.esOscuro ? 'tu-btn-primario' : 'tu-btn-fantasma'
+                    "
                     @click="tema.esOscuro && tema.alternarModo()"
                   >
-                    ☀ {{ $t('tema.claroCorto') }}
+                    ☀ {{ $t("tema.claroCorto") }}
                   </button>
                   <button
                     type="button"
                     class="tu-btn"
-                    :class="tema.esOscuro ? 'tu-btn-primario' : 'tu-btn-fantasma'"
+                    :class="
+                      tema.esOscuro ? 'tu-btn-primario' : 'tu-btn-fantasma'
+                    "
                     @click="!tema.esOscuro && tema.alternarModo()"
                   >
-                    ☾ {{ $t('tema.oscuroCorto') }}
+                    ☾ {{ $t("tema.oscuroCorto") }}
                   </button>
                 </div>
               </div>
 
               <div>
-                <p class="tu-label">{{ $t('tema.densidad') }}</p>
+                <p class="tu-label">{{ $t("tema.densidad") }}</p>
                 <div class="flex items-center gap-2">
-                  <button type="button" class="tu-btn tu-btn-fantasma flex-1" @click="tema.ajustarDensidad(-1)">−</button>
-                  <span class="text-sm" :style="{ color: 'var(--texto-suave)' }">{{ tema.densidad }}</span>
-                  <button type="button" class="tu-btn tu-btn-fantasma flex-1" @click="tema.ajustarDensidad(1)">+</button>
+                  <button
+                    type="button"
+                    class="tu-btn tu-btn-fantasma flex-1"
+                    @click="tema.ajustarDensidad(-1)"
+                  >
+                    −
+                  </button>
+                  <span
+                    class="text-sm"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ tema.densidad }}</span
+                  >
+                  <button
+                    type="button"
+                    class="tu-btn tu-btn-fantasma flex-1"
+                    @click="tema.ajustarDensidad(1)"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
 
               <div>
-                <p class="tu-label">{{ $t('tema.acento') }}</p>
+                <p class="tu-label">{{ $t("tema.acento") }}</p>
                 <div class="flex items-center gap-2">
                   <button
                     v-for="a in ACENTOS"
@@ -380,7 +601,8 @@ onMounted(() => {
                     class="h-6 w-6 rounded-full border-2 transition-transform hover:scale-110"
                     :style="{
                       background: a.hex ?? '#0071e3',
-                      borderColor: tema.acento === a.hex ? 'var(--texto)' : 'transparent',
+                      borderColor:
+                        tema.acento === a.hex ? 'var(--texto)' : 'transparent',
                     }"
                     :title="a.nombre"
                     :aria-label="a.nombre"
@@ -397,7 +619,10 @@ onMounted(() => {
               type="button"
               class="flex items-center gap-2 rounded-xl p-1 pr-2 hover:bg-black/5"
               :aria-expanded="menuPerfil"
-              @click="menuPerfil = !menuPerfil; menuApariencia = false"
+              @click="
+                menuPerfil = !menuPerfil;
+                menuApariencia = false;
+              "
             >
               <span
                 class="h-8 w-8 rounded-lg inline-flex items-center justify-center text-white text-xs font-bold shrink-0"
@@ -406,17 +631,34 @@ onMounted(() => {
                 >{{ inicialesUsuario }}</span
               >
               <span class="hidden sm:block text-left leading-tight">
-                <span class="block text-[13px] font-semibold truncate max-w-[8rem]">{{ sesion.usuario?.nombre }}</span>
-                <span class="block text-[11px] truncate" :style="{ color: 'var(--texto-suave)' }">{{ sesion.usuario?.rol }}</span>
+                <span
+                  class="block text-[13px] font-semibold truncate max-w-[8rem]"
+                  >{{ sesion.usuario?.nombre }}</span
+                >
+                <span
+                  class="block text-[11px] truncate"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ sesion.usuario?.rol }}</span
+                >
               </span>
             </button>
             <div
               v-if="menuPerfil"
               class="absolute right-0 top-full mt-2 w-60 tu-card p-1.5 z-50"
             >
-              <div class="px-2.5 py-2 border-b" :style="{ borderColor: 'var(--borde)' }">
-                <p class="text-sm font-semibold truncate">{{ sesion.usuario?.nombre }}</p>
-                <p class="text-xs truncate" :style="{ color: 'var(--texto-suave)' }">{{ sesion.usuario?.email }}</p>
+              <div
+                class="px-2.5 py-2 border-b"
+                :style="{ borderColor: 'var(--borde)' }"
+              >
+                <p class="text-sm font-semibold truncate">
+                  {{ sesion.usuario?.nombre }}
+                </p>
+                <p
+                  class="text-xs truncate"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ sesion.usuario?.email }}
+                </p>
               </div>
               <RouterLink
                 v-if="puedeConfigurar"
@@ -425,11 +667,16 @@ onMounted(() => {
                 @click="menuPerfil = false"
               >
                 <IconoNav nombre="configuracion" :tam="16" />
-                {{ $t('nav.configuracion') }}
+                {{ $t("nav.configuracion") }}
               </RouterLink>
-              <button type="button" class="tu-menu-item" style="color: var(--error)" @click="salir">
+              <button
+                type="button"
+                class="tu-menu-item"
+                style="color: var(--error)"
+                @click="salir"
+              >
                 <span aria-hidden="true">⎋</span>
-                {{ $t('panel.salir') }}
+                {{ $t("panel.salir") }}
               </button>
             </div>
           </div>
@@ -447,25 +694,42 @@ onMounted(() => {
     <div
       v-if="menuPerfil || menuApariencia"
       class="fixed inset-0 z-20"
-      @click="menuPerfil = false; menuApariencia = false"
+      @click="
+        menuPerfil = false;
+        menuApariencia = false;
+      "
     />
   </div>
 
   <!-- ===================== APP PÚBLICA ===================== -->
   <div v-else class="min-h-screen flex flex-col">
     <header class="tu-public-nav">
-      <div class="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between gap-4">
-        <RouterLink :to="{ name: 'inicio' }" class="flex items-center gap-2 font-bold text-lg shrink-0">
+      <div
+        class="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between gap-4"
+      >
+        <RouterLink
+          :to="{ name: 'inicio' }"
+          class="flex items-center gap-2 font-bold text-lg shrink-0"
+        >
           <LogoTurnoUno :tam="32" />
-          <span class="hidden sm:inline">{{ $t('marca') }}</span>
+          <span class="hidden sm:inline">{{ $t("marca") }}</span>
         </RouterLink>
 
         <nav class="flex items-center gap-1 sm:gap-2 shrink-0">
-          <RouterLink class="tu-btn tu-btn-fantasma tu-public-community" :to="{ name: 'directorio' }">
-            {{ $t('nav.directorio') }}
+          <RouterLink
+            class="tu-btn tu-btn-fantasma tu-public-community"
+            :to="{ name: 'directorio' }"
+            @click="
+              trackEvent('marketing_cta_clicked', {
+                placement: 'navigation',
+                destination: 'directory',
+              })
+            "
+          >
+            {{ $t("nav.directorio") }}
           </RouterLink>
           <RouterLink class="tu-btn tu-btn-fantasma" :to="{ name: 'entrar' }">
-            {{ $t('nav.entrar') }}
+            {{ $t("nav.entrar") }}
           </RouterLink>
           <button
             type="button"
@@ -474,16 +738,50 @@ onMounted(() => {
             :aria-label="tema.esOscuro ? $t('tema.claro') : $t('tema.oscuro')"
             @click="tema.alternarModo()"
           >
-            <svg v-if="tema.esOscuro" aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <svg
+              v-if="tema.esOscuro"
+              aria-hidden="true"
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            >
               <circle cx="12" cy="12" r="4" />
-              <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42" />
+              <path
+                d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"
+              />
             </svg>
-            <svg v-else aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20.5 15.2A8.5 8.5 0 0 1 8.8 3.5 8.5 8.5 0 1 0 20.5 15.2Z" />
+            <svg
+              v-else
+              aria-hidden="true"
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M20.5 15.2A8.5 8.5 0 0 1 8.8 3.5 8.5 8.5 0 1 0 20.5 15.2Z"
+              />
             </svg>
           </button>
-          <RouterLink class="tu-btn tu-btn-primario" :to="{ name: 'registro' }">
-            {{ $t('nav.registrar') }}
+          <RouterLink
+            class="tu-btn tu-btn-primario"
+            :to="{ name: 'registro' }"
+            @click="
+              trackEvent('marketing_cta_clicked', {
+                placement: 'navigation',
+                destination: 'register',
+              })
+            "
+          >
+            {{ $t("nav.registrar") }}
           </RouterLink>
         </nav>
       </div>
@@ -493,10 +791,17 @@ onMounted(() => {
       <RouterView />
     </main>
 
-    <footer class="text-sm" :style="{ color: 'var(--texto-suave)', background: 'var(--fondo)' }">
-      <div class="mx-auto max-w-6xl px-4 py-8 flex items-center justify-between">
-        <span>© {{ new Date().getFullYear() }} {{ $t('marca') }}</span>
-        <RouterLink class="tu-enlace" :to="{ name: 'directorio' }">{{ $t('nav.directorio') }}</RouterLink>
+    <footer
+      class="text-sm"
+      :style="{ color: 'var(--texto-suave)', background: 'var(--fondo)' }"
+    >
+      <div
+        class="mx-auto max-w-6xl px-4 py-8 flex items-center justify-between"
+      >
+        <span>© {{ new Date().getFullYear() }} {{ $t("marca") }}</span>
+        <RouterLink class="tu-enlace" :to="{ name: 'directorio' }">{{
+          $t("nav.directorio")
+        }}</RouterLink>
       </div>
     </footer>
   </div>
