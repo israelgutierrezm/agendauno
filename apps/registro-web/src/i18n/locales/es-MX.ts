@@ -2026,6 +2026,9 @@ export default {
     logoSubir: "Subir logo",
     logoSubiendo: "Subiendo…",
     logoQuitar: "Quitar",
+    logoArrastra: "Arrastra tu logo aquí o haz clic para elegir",
+    logoTipo: "Usa una imagen PNG, JPG o WebP.",
+    logoPeso: "La imagen no debe pesar más de 2 MB.",
     logoAyuda: "PNG, JPG o WEBP, hasta 2 MB. Idealmente cuadrado.",
     directorioTitulo: "Aparecer en la Comunidad de AgendaUno",
     directorioDesc:
