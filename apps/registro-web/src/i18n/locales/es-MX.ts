@@ -19,6 +19,8 @@ export default {
     siguiente: "Siguiente",
     pagina: "Pagina {n} de {total}",
     mostrando: "{desde}–{hasta} de {total}",
+    filtros: "Filtros",
+    limpiar: "Limpiar",
   },
   nav: {
     inicio: "Inicio",

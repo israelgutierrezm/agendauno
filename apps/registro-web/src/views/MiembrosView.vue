@@ -2,13 +2,19 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 
+import { useI18n } from "vue-i18n";
+
+import BarraListado from "@/components/BarraListado.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelEditarMiembro, {
   type MiembroEditable,
 } from "@/components/PanelEditarMiembro.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+
+const { t } = useI18n();
 
 interface Miembro {
   id: string;
@@ -48,6 +54,73 @@ const perPage = 20;
 const sucursales = ref<{ id: string; nombre: string }[]>([]);
 // El filtro por sede solo aplica con varias sucursales (R19).
 const hayMultiSucursal = computed(() => sucursales.value.length > 1);
+
+// Definición de filtros para la BarraListado (estilo Acadion). Solo para alumnos.
+const filtrosDef = computed(() => {
+  if (tipo.value !== "miembro") {
+    return [];
+  }
+  const defs = [
+    {
+      clave: "estado",
+      etiqueta: t("miembros.colEstado"),
+      opciones: [
+        { valor: "activo", texto: t("miembros.activo") },
+        { valor: "inactivo", texto: t("miembros.suspendido") },
+      ],
+    },
+    {
+      clave: "facturable",
+      etiqueta: t("miembros.editar.facturable"),
+      opciones: [
+        { valor: "si", texto: t("miembros.filtros.facturableSi") },
+        { valor: "no", texto: t("miembros.filtros.facturableNo") },
+      ],
+    },
+    {
+      clave: "archivado",
+      etiqueta: t("miembros.editar.archivado"),
+      opciones: [
+        { valor: "si", texto: t("miembros.filtros.archivados") },
+        { valor: "todos", texto: t("miembros.filtros.todos") },
+      ],
+    },
+  ];
+  if (hayMultiSucursal.value) {
+    defs.push({
+      clave: "sucursal_id",
+      etiqueta: t("miembros.filtros.sede"),
+      opciones: sucursales.value.map((s) => ({ valor: s.id, texto: s.nombre })),
+    });
+  }
+  return defs;
+});
+
+const valoresFiltro = computed<Record<string, string>>(() => ({
+  estado: estado.value,
+  facturable: facturable.value,
+  archivado: archivado.value,
+  sucursal_id: sucursalFiltro.value,
+}));
+
+function cambioFiltro(clave: string, valor: string): void {
+  if (clave === "estado") {
+    estado.value = valor;
+  } else if (clave === "facturable") {
+    facturable.value = valor;
+  } else if (clave === "archivado") {
+    archivado.value = valor === "" ? "no" : valor;
+  } else if (clave === "sucursal_id") {
+    sucursalFiltro.value = valor;
+  }
+}
+
+function limpiarFiltros(): void {
+  estado.value = "";
+  facturable.value = "";
+  archivado.value = "no";
+  sucursalFiltro.value = "";
+}
 
 const miembros = ref<Miembro[]>([]);
 const meta = ref<Meta | null>(null);
@@ -238,22 +311,12 @@ onMounted(() => {
 
 <template>
   <section class="mx-auto max-w-5xl px-4 py-8">
-    <div class="flex items-start justify-between gap-3 flex-wrap">
-      <EncabezadoSeccion
-        icono="miembros"
-        :titulo="$t('miembros.titulo')"
-        :subtitulo="$t('miembros.subtitulo')"
-        :total="meta?.total ?? 0"
-      />
-      <button
-        v-if="puedeGestionar"
-        class="tu-btn tu-btn-primario"
-        type="button"
-        @click="abrirAlta"
-      >
-        + {{ $t("miembros.crear") }}
-      </button>
-    </div>
+    <EncabezadoSeccion
+      icono="miembros"
+      :titulo="$t('miembros.titulo')"
+      :subtitulo="$t('miembros.subtitulo')"
+      :total="meta?.total ?? 0"
+    />
 
     <!-- Alumnos / instructores -->
     <div
@@ -281,63 +344,18 @@ onMounted(() => {
 
     <div class="mt-6">
       <div class="min-w-0">
-        <!-- Búsqueda + filtros -->
-        <div class="flex flex-wrap items-center gap-2">
-          <input
-            v-model="q"
-            type="search"
-            class="tu-input flex-1 min-w-[12rem]"
-            :placeholder="$t('miembros.buscar')"
-          />
-          <template v-if="tipo === 'miembro'">
-            <select
-              v-model="estado"
-              class="tu-input w-auto"
-              :aria-label="$t('miembros.colEstado')"
-            >
-              <option value="">{{ $t("miembros.filtros.estadoTodos") }}</option>
-              <option value="activo">{{ $t("miembros.activo") }}</option>
-              <option value="inactivo">{{ $t("miembros.suspendido") }}</option>
-            </select>
-            <select
-              v-model="facturable"
-              class="tu-input w-auto"
-              :aria-label="$t('miembros.editar.facturable')"
-            >
-              <option value="">
-                {{ $t("miembros.filtros.facturableTodos") }}
-              </option>
-              <option value="si">
-                {{ $t("miembros.filtros.facturableSi") }}
-              </option>
-              <option value="no">
-                {{ $t("miembros.filtros.facturableNo") }}
-              </option>
-            </select>
-            <select
-              v-model="archivado"
-              class="tu-input w-auto"
-              :aria-label="$t('miembros.editar.archivado')"
-            >
-              <option value="no">{{ $t("miembros.filtros.activos") }}</option>
-              <option value="si">
-                {{ $t("miembros.filtros.archivados") }}
-              </option>
-              <option value="todos">{{ $t("miembros.filtros.todos") }}</option>
-            </select>
-            <select
-              v-if="hayMultiSucursal"
-              v-model="sucursalFiltro"
-              class="tu-input w-auto"
-              :aria-label="$t('miembros.filtros.sede')"
-            >
-              <option value="">{{ $t("miembros.filtros.todasSedes") }}</option>
-              <option v-for="s in sucursales" :key="s.id" :value="s.id">
-                {{ s.nombre }}
-              </option>
-            </select>
-          </template>
-        </div>
+        <!-- Buscador + filtros + «Agregar» (estilo Acadion). -->
+        <BarraListado
+          v-model:busqueda="q"
+          :filtros="filtrosDef"
+          :valores="valoresFiltro"
+          :placeholder="$t('miembros.buscar')"
+          :puede-crear="puedeGestionar"
+          :nuevo-texto="$t('miembros.crear')"
+          @cambio-filtro="cambioFiltro"
+          @limpiar="limpiarFiltros"
+          @nuevo="abrirAlta"
+        />
 
         <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
           {{ error }}
@@ -469,34 +487,14 @@ onMounted(() => {
                 </tr>
               </tbody>
             </table>
-          </div>
-
-          <!-- Paginación -->
-          <div
-            v-if="meta && meta.ultima_pagina > 1"
-            class="mt-3 flex items-center justify-between gap-3 text-sm"
-          >
-            <span :style="{ color: 'var(--texto-suave)' }">{{
-              $t("tabla.pagina", { n: meta.page, total: meta.ultima_pagina })
-            }}</span>
-            <div class="flex gap-2">
-              <button
-                class="tu-btn tu-btn-fantasma"
-                type="button"
-                :disabled="meta.page <= 1"
-                @click="irPagina(meta.page - 1)"
-              >
-                {{ $t("tabla.anterior") }}
-              </button>
-              <button
-                class="tu-btn tu-btn-fantasma"
-                type="button"
-                :disabled="meta.page >= meta.ultima_pagina"
-                @click="irPagina(meta.page + 1)"
-              >
-                {{ $t("tabla.siguiente") }}
-              </button>
-            </div>
+            <PaginacionListado
+              v-if="meta"
+              :page="meta.page"
+              :ultima-pagina="meta.ultima_pagina"
+              :total="meta.total"
+              :per-page="meta.per_page"
+              @ir="irPagina"
+            />
           </div>
         </template>
       </div>
