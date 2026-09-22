@@ -5,6 +5,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import { api } from "@/lib/api";
 import { clientIdGoogle, renderizarBotonGoogle } from "@/lib/google";
+import { enSubdominioDeEstudio, slugDeContexto } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Marca {
@@ -16,7 +17,10 @@ const route = useRoute();
 const router = useRouter();
 const sesion = useSesionTenantStore();
 
-const slug = ref(String(route.query.estudio ?? ""));
+// El estudio en contexto viene del subdominio (`{slug}.agendauno.mx`) o, en dev,
+// de `?estudio=`. En un subdominio real el estudio es fijo (no editable).
+const slug = ref(slugDeContexto() ?? String(route.query.estudio ?? ""));
+const estudioFijo = enSubdominioDeEstudio();
 const email = ref("");
 const password = ref("");
 const avisoGoogle = ref(false);
@@ -124,8 +128,13 @@ onMounted(() => {
           v-model="slug"
           class="tu-input"
           :placeholder="$t('entrar.slugPh')"
+          :readonly="estudioFijo"
+          :style="estudioFijo ? { background: 'var(--superficie-2)' } : {}"
           required
         />
+        <span v-if="estudioFijo" class="tu-hint">{{
+          $t("entrar.estudioFijo")
+        }}</span>
       </div>
       <div>
         <label class="tu-label" for="email">{{ $t("entrar.email") }}</label>

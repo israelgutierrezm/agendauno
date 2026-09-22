@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import LandingView from "@/views/LandingView.vue";
 import { trackPageView } from "@/lib/analytics";
 import { DEFAULT_SEO, updateSeo } from "@/lib/seo";
+import { slugDeContexto } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 declare module "vue-router" {
@@ -286,6 +287,15 @@ router.beforeEach(async (to) => {
     ["inicio", "entrar", "registro"].includes(String(to.name))
   ) {
     return { name: sesion.rutaInicio };
+  }
+
+  // En el subdominio de un estudio (`{slug}.agendauno.mx`), la raíz no es la
+  // landing de marketing: aterriza directo en la página pública de ese estudio.
+  if (String(to.name) === "inicio") {
+    const slug = slugDeContexto();
+    if (slug !== null) {
+      return { name: "estudio-publico", params: { slug } };
+    }
   }
 
   return true;

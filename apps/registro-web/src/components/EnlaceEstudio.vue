@@ -2,17 +2,14 @@
 import QRCode from "qrcode";
 import { computed, onMounted, ref, watch } from "vue";
 
+import { urlPublicaEstudio } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const sesion = useSesionTenantStore();
 
-// Dominio público del estudio; configurable para staging, por defecto agendauno.mx.
-const dominio =
-  (import.meta.env.VITE_DOMINIO_PUBLICO as string | undefined) ??
-  "agendauno.mx";
-
 // El enlace se DERIVA del slug (no se captura en ningún lado): así te encontrarán.
-const enlaceCorto = computed(() => `${dominio}/${sesion.slug ?? ""}`);
+// Forma subdominio `{slug}.agendauno.mx` — el backend resuelve el estudio por el host.
+const enlaceCorto = computed(() => urlPublicaEstudio(sesion.slug ?? ""));
 const url = computed(() => `https://${enlaceCorto.value}`);
 
 const qr = ref<string>("");
