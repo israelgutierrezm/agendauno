@@ -226,9 +226,9 @@ async function enviar(): Promise<void> {
       };
     }>("/api/v1/registro", {
       nombre: nombre.value,
-      // Vacio = el backend genera la direccion unica del nombre; si el dueno la
-      // personalizo, se manda la elegida.
-      slug: personalizarSlug.value ? slug.value : "",
+      // Si no se personaliza se OMITE el slug (undefined -> axios no lo manda) y el
+      // backend genera la direccion unica del nombre; si se personalizo, va la elegida.
+      slug: personalizarSlug.value ? slug.value : undefined,
       recaptcha_token: recaptchaToken,
       sitio_web: honeypot.value,
       perfil_negocio: perfilNegocio.value,
