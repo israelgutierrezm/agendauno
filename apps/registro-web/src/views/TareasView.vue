@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -351,62 +352,69 @@ onMounted(cargarTareas);
         <button
           class="tu-btn tu-btn-primario"
           type="button"
-          @click="mostrarNueva = !mostrarNueva"
+          @click="mostrarNueva = true"
         >
           {{ $t("tareas.nueva") }}
         </button>
       </div>
 
-      <form
-        v-if="mostrarNueva"
-        class="mt-4 tu-card p-4 grid gap-3 sm:grid-cols-2"
-        @submit.prevent="crearTarea"
+      <!-- Nueva tarea (drawer lateral) -->
+      <PanelLateral
+        :abierto="mostrarNueva"
+        :titulo="$t('tareas.nueva')"
+        @cerrar="mostrarNueva = false"
       >
-        <div class="sm:col-span-2">
-          <label class="tu-label" for="t-titulo">{{
-            $t("tareas.campos.titulo")
-          }}</label>
-          <input
-            id="t-titulo"
-            v-model="nueva.titulo"
-            class="tu-input"
-            required
-          />
-        </div>
-        <div>
-          <label class="tu-label" for="t-detalle">{{
-            $t("tareas.campos.detalle")
-          }}</label>
-          <input id="t-detalle" v-model="nueva.detalle" class="tu-input" />
-        </div>
-        <div>
-          <label class="tu-label" for="t-vence">{{
-            $t("tareas.campos.vence")
-          }}</label>
-          <input
-            id="t-vence"
-            v-model="nueva.vence_en"
-            type="date"
-            class="tu-input"
-          />
-        </div>
-        <div class="sm:col-span-2 flex gap-2">
-          <button
-            class="tu-btn tu-btn-primario"
-            type="submit"
-            :disabled="accionando || nueva.titulo.trim() === ''"
-          >
-            {{ $t("tareas.guardar") }}
-          </button>
-          <button
-            class="tu-btn tu-btn-fantasma"
-            type="button"
-            @click="mostrarNueva = false"
-          >
-            {{ $t("tareas.cancelar") }}
-          </button>
-        </div>
-      </form>
+        <form class="grid gap-4" @submit.prevent="crearTarea">
+          <div>
+            <label class="tu-label" for="t-titulo">{{
+              $t("tareas.campos.titulo")
+            }}</label>
+            <input
+              id="t-titulo"
+              v-model="nueva.titulo"
+              class="tu-input"
+              required
+            />
+          </div>
+          <div>
+            <label class="tu-label" for="t-detalle">{{
+              $t("tareas.campos.detalle")
+            }}</label>
+            <input id="t-detalle" v-model="nueva.detalle" class="tu-input" />
+          </div>
+          <div>
+            <label class="tu-label" for="t-vence">{{
+              $t("tareas.campos.vence")
+            }}</label>
+            <input
+              id="t-vence"
+              v-model="nueva.vence_en"
+              type="date"
+              class="tu-input"
+            />
+          </div>
+        </form>
+
+        <template #pie>
+          <div class="flex justify-end gap-2">
+            <button
+              class="tu-btn tu-btn-fantasma"
+              type="button"
+              @click="mostrarNueva = false"
+            >
+              {{ $t("tareas.cancelar") }}
+            </button>
+            <button
+              class="tu-btn tu-btn-primario"
+              type="button"
+              :disabled="accionando || nueva.titulo.trim() === ''"
+              @click="crearTarea"
+            >
+              {{ $t("tareas.guardar") }}
+            </button>
+          </div>
+        </template>
+      </PanelLateral>
 
       <p
         v-if="cargandoTareas"
@@ -502,111 +510,124 @@ onMounted(cargarTareas);
         </button>
       </div>
 
-      <form
-        v-if="mostrarRegla"
-        class="mt-4 tu-card p-4 grid gap-3 sm:grid-cols-2"
-        @submit.prevent="guardarRegla"
+      <!-- Nueva / editar regla (drawer lateral) -->
+      <PanelLateral
+        :abierto="mostrarRegla"
+        :titulo="
+          editandoId !== null
+            ? $t('tareas.reglas.editar')
+            : $t('tareas.reglas.nueva')
+        "
+        @cerrar="mostrarRegla = false"
       >
-        <div>
-          <label class="tu-label" for="r-nombre">{{
-            $t("tareas.reglas.nombre")
-          }}</label>
-          <input
-            id="r-nombre"
-            v-model="regla.nombre"
-            class="tu-input"
-            required
-          />
-        </div>
-        <div>
-          <label class="tu-label" for="r-evento">{{
-            $t("tareas.reglas.evento")
-          }}</label>
-          <select id="r-evento" v-model="regla.evento" class="tu-input">
-            <option v-for="ev in eventos" :key="ev" :value="ev">
-              {{ etiquetaEvento(ev) }}
-            </option>
-          </select>
-        </div>
-        <div>
-          <label class="tu-label" for="r-ccampo">{{
-            $t("tareas.reglas.condicionCampo")
-          }}</label>
-          <input
-            id="r-ccampo"
-            v-model="regla.condicionCampo"
-            class="tu-input"
-            placeholder="estado"
-          />
-        </div>
-        <div>
-          <label class="tu-label" for="r-cvalor">{{
-            $t("tareas.reglas.condicionValor")
-          }}</label>
-          <input
-            id="r-cvalor"
-            v-model="regla.condicionValor"
-            class="tu-input"
-            placeholder="confirmada"
-          />
-        </div>
-        <div class="sm:col-span-2">
-          <label class="tu-label" for="r-titulo">{{
-            $t("tareas.reglas.tituloTarea")
-          }}</label>
-          <input
-            id="r-titulo"
-            v-model="regla.titulo_plantilla"
-            class="tu-input"
-            required
-          />
-          <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("tareas.reglas.ayudaPlantilla") }}
-          </p>
-        </div>
-        <div>
-          <label class="tu-label" for="r-detalle">{{
-            $t("tareas.reglas.detalleTarea")
-          }}</label>
-          <input
-            id="r-detalle"
-            v-model="regla.detalle_plantilla"
-            class="tu-input"
-          />
-        </div>
-        <div>
-          <label class="tu-label" for="r-delay">{{
-            $t("tareas.reglas.retraso")
-          }}</label>
-          <input
-            id="r-delay"
-            v-model.number="regla.delay_minutos"
-            type="number"
-            min="0"
-            class="tu-input"
-          />
-        </div>
-        <label class="sm:col-span-2 flex items-center gap-2 text-sm">
-          <input v-model="regla.activa" type="checkbox" />
-          {{ $t("tareas.reglas.activa") }}
-        </label>
-        <div class="sm:col-span-2 flex gap-2">
-          <button
-            class="tu-btn tu-btn-primario"
-            type="submit"
-            :disabled="accionando"
-          >
-            {{ $t("tareas.reglas.guardar") }}
-          </button>
-          <button
-            class="tu-btn tu-btn-fantasma"
-            type="button"
-            @click="mostrarRegla = false"
-          >
-            {{ $t("tareas.cancelar") }}
-          </button>
-        </div>
-      </form>
+        <form class="grid gap-4" @submit.prevent="guardarRegla">
+          <div>
+            <label class="tu-label" for="r-nombre">{{
+              $t("tareas.reglas.nombre")
+            }}</label>
+            <input
+              id="r-nombre"
+              v-model="regla.nombre"
+              class="tu-input"
+              required
+            />
+          </div>
+          <div>
+            <label class="tu-label" for="r-evento">{{
+              $t("tareas.reglas.evento")
+            }}</label>
+            <select id="r-evento" v-model="regla.evento" class="tu-input">
+              <option v-for="ev in eventos" :key="ev" :value="ev">
+                {{ etiquetaEvento(ev) }}
+              </option>
+            </select>
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label class="tu-label" for="r-ccampo">{{
+                $t("tareas.reglas.condicionCampo")
+              }}</label>
+              <input
+                id="r-ccampo"
+                v-model="regla.condicionCampo"
+                class="tu-input"
+                placeholder="estado"
+              />
+            </div>
+            <div>
+              <label class="tu-label" for="r-cvalor">{{
+                $t("tareas.reglas.condicionValor")
+              }}</label>
+              <input
+                id="r-cvalor"
+                v-model="regla.condicionValor"
+                class="tu-input"
+                placeholder="confirmada"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="tu-label" for="r-titulo">{{
+              $t("tareas.reglas.tituloTarea")
+            }}</label>
+            <input
+              id="r-titulo"
+              v-model="regla.titulo_plantilla"
+              class="tu-input"
+              required
+            />
+            <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("tareas.reglas.ayudaPlantilla") }}
+            </p>
+          </div>
+          <div>
+            <label class="tu-label" for="r-detalle">{{
+              $t("tareas.reglas.detalleTarea")
+            }}</label>
+            <input
+              id="r-detalle"
+              v-model="regla.detalle_plantilla"
+              class="tu-input"
+            />
+          </div>
+          <div>
+            <label class="tu-label" for="r-delay">{{
+              $t("tareas.reglas.retraso")
+            }}</label>
+            <input
+              id="r-delay"
+              v-model.number="regla.delay_minutos"
+              type="number"
+              min="0"
+              class="tu-input"
+            />
+          </div>
+          <label class="flex items-center gap-2 text-sm">
+            <input v-model="regla.activa" type="checkbox" />
+            {{ $t("tareas.reglas.activa") }}
+          </label>
+        </form>
+
+        <template #pie>
+          <div class="flex justify-end gap-2">
+            <button
+              class="tu-btn tu-btn-fantasma"
+              type="button"
+              @click="mostrarRegla = false"
+            >
+              {{ $t("tareas.cancelar") }}
+            </button>
+            <button
+              class="tu-btn tu-btn-primario"
+              type="button"
+              :disabled="accionando"
+              @click="guardarRegla"
+            >
+              {{ $t("tareas.reglas.guardar") }}
+            </button>
+          </div>
+        </template>
+      </PanelLateral>
 
       <p
         v-if="cargandoReglas"

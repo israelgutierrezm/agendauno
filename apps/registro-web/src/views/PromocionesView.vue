@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -171,111 +172,125 @@ onMounted(cargar);
       </button>
     </div>
 
-    <form
-      v-if="mostrarForm"
-      class="mt-6 tu-card p-4 grid gap-3 sm:grid-cols-2"
-      @submit.prevent="guardar"
+    <!-- Alta / edición (drawer lateral) -->
+    <PanelLateral
+      :abierto="mostrarForm"
+      :titulo="
+        editandoId !== null ? $t('promociones.editar') : $t('promociones.nueva')
+      "
+      @cerrar="mostrarForm = false"
     >
-      <div>
-        <label class="tu-label" for="p-codigo">{{
-          $t("promociones.campos.codigo")
-        }}</label>
-        <input
-          id="p-codigo"
-          v-model="form.codigo"
-          class="tu-input uppercase"
-          required
-        />
-      </div>
-      <div>
-        <label class="tu-label" for="p-tipo">{{
-          $t("promociones.campos.tipo")
-        }}</label>
-        <select id="p-tipo" v-model="form.tipo" class="tu-input">
-          <option value="porcentaje">
-            {{ $t("promociones.tipos.porcentaje") }}
-          </option>
-          <option value="monto_fijo">
-            {{ $t("promociones.tipos.monto_fijo") }}
-          </option>
-        </select>
-      </div>
-      <div>
-        <label class="tu-label" for="p-valor">
-          {{
-            form.tipo === "porcentaje"
-              ? $t("promociones.campos.valorPorcentaje")
-              : $t("promociones.campos.valorMonto")
-          }}
+      <form class="grid gap-4" @submit.prevent="guardar">
+        <div>
+          <label class="tu-label" for="p-codigo">{{
+            $t("promociones.campos.codigo")
+          }}</label>
+          <input
+            id="p-codigo"
+            v-model="form.codigo"
+            class="tu-input uppercase"
+            required
+          />
+        </div>
+        <div>
+          <label class="tu-label" for="p-tipo">{{
+            $t("promociones.campos.tipo")
+          }}</label>
+          <select id="p-tipo" v-model="form.tipo" class="tu-input">
+            <option value="porcentaje">
+              {{ $t("promociones.tipos.porcentaje") }}
+            </option>
+            <option value="monto_fijo">
+              {{ $t("promociones.tipos.monto_fijo") }}
+            </option>
+          </select>
+        </div>
+        <div>
+          <label class="tu-label" for="p-valor">
+            {{
+              form.tipo === "porcentaje"
+                ? $t("promociones.campos.valorPorcentaje")
+                : $t("promociones.campos.valorMonto")
+            }}
+          </label>
+          <input
+            id="p-valor"
+            v-model.number="form.valor"
+            type="number"
+            min="1"
+            step="0.01"
+            class="tu-input"
+            required
+          />
+        </div>
+        <div>
+          <label class="tu-label" for="p-min">{{
+            $t("promociones.campos.minimo")
+          }}</label>
+          <input
+            id="p-min"
+            v-model="form.minimo"
+            type="number"
+            min="0"
+            step="0.01"
+            class="tu-input"
+          />
+        </div>
+        <div>
+          <label class="tu-label" for="p-usos">{{
+            $t("promociones.campos.usosMaximos")
+          }}</label>
+          <input
+            id="p-usos"
+            v-model="form.usosMaximos"
+            type="number"
+            min="1"
+            class="tu-input"
+          />
+        </div>
+        <div>
+          <label class="tu-label" for="p-vence">{{
+            $t("promociones.campos.vence")
+          }}</label>
+          <input
+            id="p-vence"
+            v-model="form.vence"
+            type="date"
+            class="tu-input"
+          />
+        </div>
+        <div>
+          <label class="tu-label" for="p-desc">{{
+            $t("promociones.campos.descripcion")
+          }}</label>
+          <input id="p-desc" v-model="form.descripcion" class="tu-input" />
+        </div>
+        <label class="flex items-center gap-2 text-sm">
+          <input v-model="form.activa" type="checkbox" />
+          {{ $t("promociones.campos.activa") }}
         </label>
-        <input
-          id="p-valor"
-          v-model.number="form.valor"
-          type="number"
-          min="1"
-          step="0.01"
-          class="tu-input"
-          required
-        />
-      </div>
-      <div>
-        <label class="tu-label" for="p-min">{{
-          $t("promociones.campos.minimo")
-        }}</label>
-        <input
-          id="p-min"
-          v-model="form.minimo"
-          type="number"
-          min="0"
-          step="0.01"
-          class="tu-input"
-        />
-      </div>
-      <div>
-        <label class="tu-label" for="p-usos">{{
-          $t("promociones.campos.usosMaximos")
-        }}</label>
-        <input
-          id="p-usos"
-          v-model="form.usosMaximos"
-          type="number"
-          min="1"
-          class="tu-input"
-        />
-      </div>
-      <div>
-        <label class="tu-label" for="p-vence">{{
-          $t("promociones.campos.vence")
-        }}</label>
-        <input id="p-vence" v-model="form.vence" type="date" class="tu-input" />
-      </div>
-      <div class="sm:col-span-2">
-        <label class="tu-label" for="p-desc">{{
-          $t("promociones.campos.descripcion")
-        }}</label>
-        <input id="p-desc" v-model="form.descripcion" class="tu-input" />
-      </div>
-      <label class="sm:col-span-2 flex items-center gap-2 text-sm">
-        <input v-model="form.activa" type="checkbox" />
-        {{ $t("promociones.campos.activa") }}
-      </label>
-      <div class="sm:col-span-2 flex gap-2">
-        <button
-          class="tu-btn tu-btn-primario"
-          type="submit"
-          :disabled="accionando || form.codigo.trim() === ''"
-        >
-          {{ $t("promociones.guardar") }}
-        </button>
-        <button
-          class="tu-btn tu-btn-fantasma"
-          type="button"
-          @click="mostrarForm = false"
-        >
-          {{ $t("promociones.cancelar") }}
-        </button>
-      </div>
-    </form>
+      </form>
+
+      <template #pie>
+        <div class="flex justify-end gap-2">
+          <button
+            class="tu-btn tu-btn-fantasma"
+            type="button"
+            @click="mostrarForm = false"
+          >
+            {{ $t("promociones.cancelar") }}
+          </button>
+          <button
+            class="tu-btn tu-btn-primario"
+            type="button"
+            :disabled="accionando || form.codigo.trim() === ''"
+            @click="guardar"
+          >
+            {{ $t("promociones.guardar") }}
+          </button>
+        </div>
+      </template>
+    </PanelLateral>
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
