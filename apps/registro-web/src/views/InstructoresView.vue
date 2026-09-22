@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { RouterLink } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
@@ -101,14 +102,17 @@ onMounted(cargar);
         :subtitulo="$t('instructores.subtitulo')"
         :total="instructores.length"
       />
-      <button
-        v-if="puedeInvitar"
-        class="tu-btn tu-btn-primario"
-        type="button"
-        @click="abrir"
-      >
-        + {{ $t("instructores.invitar.enviar") }}
-      </button>
+      <div v-if="puedeInvitar" class="flex items-center gap-2 flex-wrap">
+        <RouterLink
+          :to="{ name: 'importar-instructores' }"
+          class="tu-btn tu-btn-fantasma"
+        >
+          ↑ {{ $t("nav.importar") }}
+        </RouterLink>
+        <button class="tu-btn tu-btn-primario" type="button" @click="abrir">
+          + {{ $t("instructores.invitar.enviar") }}
+        </button>
+      </div>
     </div>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">

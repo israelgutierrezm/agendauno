@@ -246,6 +246,9 @@ Route::prefix('v1')->group(function (): void {
             // Importacion CSV de miembros (R37): preview (valida) e import (todo-o-nada).
             Route::post('/importaciones/miembros/preview', [ImportacionesTenantController::class, 'previewMiembros'])->middleware('puede:miembros.gestionar')->name('importaciones.miembros.preview');
             Route::post('/importaciones/miembros', [ImportacionesTenantController::class, 'importarMiembros'])->middleware('puede:miembros.gestionar')->name('importaciones.miembros.store');
+            // Importacion CSV de instructores (R37): crea cuentas de usuario rol instructor + activacion.
+            Route::post('/importaciones/instructores/preview', [ImportacionesTenantController::class, 'previewInstructores'])->middleware('puede:usuarios.invitar')->name('importaciones.instructores.preview');
+            Route::post('/importaciones/instructores', [ImportacionesTenantController::class, 'importarInstructores'])->middleware('puede:usuarios.invitar')->name('importaciones.instructores.store');
 
             // Tareas de seguimiento (R16): bandeja de pendientes del staff (manuales o automaticas).
             Route::get('/tareas', [TareasTenantController::class, 'index'])->middleware('puede:tareas.ver')->name('tareas.index');

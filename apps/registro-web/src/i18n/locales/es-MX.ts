@@ -661,6 +661,15 @@ export default {
     creados: "{n} miembros importados",
     verMiembros: "Ver miembros",
   },
+  importarInstructores: {
+    titulo: "Importar instructores",
+    subtitulo: "Sube un CSV para dar de alta a tus instructores en bloque.",
+    instrucciones:
+      "Sube un archivo CSV con una fila por instructor (nombre y correo). Primero validamos todo; si está correcto, creamos las cuentas y les enviamos la invitación para activar su acceso.",
+    importar: "Importar {n} instructores",
+    creados: "{n} instructores importados",
+    verInstructores: "Ver instructores",
+  },
   comunicaciones: {
     titulo: "Comunicación",
     subtitulo:

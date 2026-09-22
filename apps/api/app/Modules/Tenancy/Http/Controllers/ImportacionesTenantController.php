@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\ImportarInstructoresTenant;
 use App\Modules\Tenancy\Application\ImportarMiembrosTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -12,36 +14,66 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Importación masiva por CSV (R37), tenant-local. Ofrece PREVIEW (valida sin
- * escribir, con errores por fila) e IMPORT (todo-o-nada con rollback). Primer
- * recurso: miembros. Opera sobre la BD del estudio resuelto.
+ * escribir, con errores por fila) e IMPORT (todo-o-nada con rollback). Recursos:
+ * miembros (personas) e instructores (usuarios con rol instructor). Opera sobre la
+ * BD del estudio resuelto.
  */
 class ImportacionesTenantController
 {
-    public function __construct(private readonly ImportarMiembrosTenant $importador) {}
+    public function __construct(
+        private readonly ImportarMiembrosTenant $miembros,
+        private readonly ImportarInstructoresTenant $instructores,
+    ) {}
 
     public function previewMiembros(Request $request): JsonResponse
     {
-        $filas = $this->parsear($request);
+        $filas = $this->parsear($request, ['nombre'], ImportarMiembrosTenant::MAX_FILAS);
 
-        return response()->json(['data' => $this->importador->analizar($filas)]);
+        return response()->json(['data' => $this->miembros->analizar($filas)]);
     }
 
     public function importarMiembros(Request $request): JsonResponse
     {
-        $filas = $this->parsear($request);
+        $filas = $this->parsear($request, ['nombre'], ImportarMiembrosTenant::MAX_FILAS);
 
-        $resultado = $this->importador->importar($filas);
+        $resultado = $this->miembros->importar($filas);
 
         // Todo-o-nada: si hubo filas inválidas no se escribió nada (rollback) -> 422.
         return response()->json(['data' => $resultado], $resultado['ok'] ? 201 : 422);
     }
 
+    public function previewInstructores(Request $request): JsonResponse
+    {
+        $filas = $this->parsear($request, ['nombre', 'email'], ImportarInstructoresTenant::MAX_FILAS);
+
+        return response()->json(['data' => $this->instructores->analizar($filas)]);
+    }
+
+    public function importarInstructores(Request $request): JsonResponse
+    {
+        $filas = $this->parsear($request, ['nombre', 'email'], ImportarInstructoresTenant::MAX_FILAS);
+
+        $resultado = $this->instructores->importar($filas, $this->estudioDe($request));
+
+        // Todo-o-nada: si hubo filas inválidas no se creó ninguna cuenta -> 422.
+        return response()->json(['data' => $resultado], $resultado['ok'] ? 201 : 422);
+    }
+
+    private function estudioDe(Request $request): Estudio
+    {
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+
+        return $estudio;
+    }
+
     /**
      * Lee el CSV subido en `archivo` a filas asociativas por su encabezado.
      *
+     * @param  list<string>  $requeridas  Columnas que el encabezado debe traer.
      * @return list<array<string, string>>
      */
-    private function parsear(Request $request): array
+    private function parsear(Request $request, array $requeridas, int $max): array
     {
         $request->validate([
             'archivo' => ['required', 'file', 'max:2048'],
@@ -62,8 +94,12 @@ class ImportacionesTenantController
             }
 
             $columnas = array_map($this->normalizarEncabezado(...), $encabezado);
-            if (! in_array('nombre', $columnas, true)) {
-                throw ValidationException::withMessages(['archivo' => ['Falta la columna obligatoria "nombre".']]);
+            foreach ($requeridas as $requerida) {
+                if (! in_array($requerida, $columnas, true)) {
+                    throw ValidationException::withMessages([
+                        'archivo' => ["Falta la columna obligatoria \"{$requerida}\"."],
+                    ]);
+                }
             }
 
             $filas = [];
@@ -73,9 +109,9 @@ class ImportacionesTenantController
                     continue;
                 }
 
-                if (count($filas) >= ImportarMiembrosTenant::MAX_FILAS) {
+                if (count($filas) >= $max) {
                     throw ValidationException::withMessages([
-                        'archivo' => ['El archivo excede el máximo de '.ImportarMiembrosTenant::MAX_FILAS.' filas.'],
+                        'archivo' => ['El archivo excede el máximo de '.$max.' filas.'],
                     ]);
                 }
 
