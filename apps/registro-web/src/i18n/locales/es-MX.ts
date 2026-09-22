@@ -1761,11 +1761,14 @@ export default {
       conflictos: "Hay un conflicto de horario:",
       sinOfertas: "Primero crea una oferta (en Configurar mi estudio).",
       sinSucursales: "Primero crea una sucursal.",
+      modoUna: "Una sola clase",
+      modoVarias: "Varias que se repiten",
+      primeraClase: "Primera clase (fecha y hora)",
       repetir: "Repetir cada semana",
-      diasSemana: "Días",
+      diasSemana: "¿Qué días se repite?",
       repetirHasta: "Repetir hasta (opcional)",
       repetirAyuda:
-        "Si lo dejas vacío, se programan las próximas 8 semanas y se extiende solo.",
+        "Si lo dejas vacío, se programan las clases hasta el 31 de diciembre de {anio}.",
     },
     vacio: "Aun no hay clases programadas.",
     sesion: {

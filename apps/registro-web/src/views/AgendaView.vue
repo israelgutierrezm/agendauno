@@ -762,6 +762,10 @@ async function registrarCheckin(id: string): Promise<void> {
 
 // ---- Nueva clase (modal) ----
 const mostrarNueva = ref(false);
+// El usuario elige primero el tipo de carga; según eso se muestra el formulario
+// correcto (una sola clase vs. varias que se repiten cada semana).
+const modo = ref<"una" | "varias">("una");
+const esRecurrente = computed(() => modo.value === "varias");
 const form = ref({
   ofertaId: "",
   sucursalId: "",
@@ -770,10 +774,15 @@ const form = ref({
   fecha: "",
   duracion: "60",
   capacidad: "",
-  repetir: false,
   dias: [] as number[],
   repetirHasta: "",
 });
+// Año de la fecha elegida: por defecto la recurrencia llega hasta el 31-dic de ese año.
+const anioRecurrente = computed(() =>
+  form.value.fecha !== ""
+    ? form.value.fecha.slice(0, 4)
+    : String(new Date().getFullYear()),
+);
 // Recursos/salas de la sucursal elegida (para asignar sala a la clase).
 const recursosDeSucursal = computed(() =>
   form.value.sucursalId === ""
@@ -801,7 +810,7 @@ async function verificarConflictos(): Promise<void> {
   if (
     form.value.sucursalId === "" ||
     form.value.fecha === "" ||
-    form.value.repetir
+    esRecurrente.value
   ) {
     return;
   }
@@ -830,7 +839,7 @@ watch(
     form.value.recursoId,
     form.value.fecha,
     form.value.duracion,
-    form.value.repetir,
+    esRecurrente.value,
   ],
   () => {
     clearTimeout(tempConf);
@@ -860,21 +869,22 @@ function alternarDia(n: number): void {
     form.value.dias.splice(i, 1);
   }
 }
-// Al activar "repetir", prefija el día de la semana de la fecha elegida.
-watch(
-  () => form.value.repetir,
-  (v) => {
-    if (v && form.value.dias.length === 0 && form.value.fecha !== "") {
-      form.value.dias = [diaIsoDe(form.value.fecha.slice(0, 10))];
-    }
-  },
-);
+// Al pasar a "varias", prefija el día de la semana de la fecha elegida.
+watch(modo, () => {
+  if (
+    esRecurrente.value &&
+    form.value.dias.length === 0 &&
+    form.value.fecha !== ""
+  ) {
+    form.value.dias = [diaIsoDe(form.value.fecha.slice(0, 10))];
+  }
+});
 
 async function crearSesion(): Promise<void> {
   creando.value = true;
   error.value = null;
   try {
-    if (form.value.repetir) {
+    if (esRecurrente.value) {
       await crearRecurrente();
     } else {
       await api.post(`${base.value}/sesiones`, {
@@ -889,11 +899,11 @@ async function crearSesion(): Promise<void> {
           form.value.capacidad !== "" ? Number(form.value.capacidad) : null,
       });
     }
-    trackEvent("class_schedule_created", { recurring: form.value.repetir });
+    trackEvent("class_schedule_created", { recurring: esRecurrente.value });
     form.value.fecha = "";
     form.value.capacidad = "";
     form.value.recursoId = "";
-    form.value.repetir = false;
+    modo.value = "una";
     form.value.dias = [];
     form.value.repetirHasta = "";
     mostrarNueva.value = false;
@@ -913,10 +923,11 @@ async function crearRecurrente(): Promise<void> {
     form.value.dias.length > 0
       ? [...form.value.dias].sort((a, b) => a - b)
       : [diaIsoDe(fechaYmd)];
+  // Por defecto (sin fecha final) se generan las clases hasta el 31-dic del año
+  // de la fecha elegida y la plantilla queda acotada ahí (no se extiende sola).
+  const finAnio = `${fechaYmd.slice(0, 4)}-12-31`;
   const hasta =
-    form.value.repetirHasta !== ""
-      ? form.value.repetirHasta
-      : isoDe(sumarDias(new Date(`${fechaYmd}T00:00:00`), 56));
+    form.value.repetirHasta !== "" ? form.value.repetirHasta : finAnio;
 
   const { data } = await api.post<{ data: { id: string } }>(
     `${base.value}/plantillas-horario`,
@@ -931,8 +942,7 @@ async function crearRecurrente(): Promise<void> {
       capacidad:
         form.value.capacidad !== "" ? Number(form.value.capacidad) : null,
       vigente_desde: fechaYmd,
-      vigente_hasta:
-        form.value.repetirHasta !== "" ? form.value.repetirHasta : null,
+      vigente_hasta: hasta,
     },
   );
 
@@ -1969,6 +1979,30 @@ onMounted(async () => {
           class="mt-3 grid sm:grid-cols-2 gap-3"
           @submit.prevent="crearSesion"
         >
+          <!-- Tipo de carga: primero se elige, y según eso cambia el formulario. -->
+          <div
+            class="sm:col-span-2 inline-flex rounded-lg border p-1"
+            :style="{ borderColor: 'var(--borde)' }"
+          >
+            <button
+              v-for="op in ['una', 'varias'] as const"
+              :key="op"
+              type="button"
+              class="px-3 py-1.5 rounded-md text-sm font-semibold"
+              :style="{
+                background: modo === op ? 'var(--primario)' : 'transparent',
+                color:
+                  modo === op ? 'var(--primario-contraste)' : 'var(--texto)',
+              }"
+              @click="modo = op"
+            >
+              {{
+                op === "una"
+                  ? $t("agenda.nueva.modoUna")
+                  : $t("agenda.nueva.modoVarias")
+              }}
+            </button>
+          </div>
           <div>
             <label class="tu-label" for="ao">{{
               $t("agenda.nueva.oferta")
@@ -1997,7 +2031,9 @@ onMounted(async () => {
           </div>
           <div>
             <label class="tu-label" for="af">{{
-              $t("agenda.nueva.fecha")
+              esRecurrente
+                ? $t("agenda.nueva.primeraClase")
+                : $t("agenda.nueva.fecha")
             }}</label>
             <input
               id="af"
@@ -2056,57 +2092,47 @@ onMounted(async () => {
             </select>
           </div>
 
-          <!-- Recurrencia: "crear una clase todos los martes" (R5). -->
+          <!-- Recurrencia (solo en modo "varias"): "una clase todos los martes" (R5). -->
           <div
-            class="sm:col-span-2 rounded-lg border p-3"
+            v-if="esRecurrente"
+            class="sm:col-span-2 rounded-lg border p-3 space-y-3"
             :style="{ borderColor: 'var(--borde)' }"
           >
-            <label class="flex items-center gap-2 text-sm font-medium">
-              <input v-model="form.repetir" type="checkbox" />
-              {{ $t("agenda.nueva.repetir") }}
-            </label>
-            <div v-if="form.repetir" class="mt-3 space-y-3">
-              <div>
-                <span class="tu-label">{{
-                  $t("agenda.nueva.diasSemana")
-                }}</span>
-                <div class="flex gap-1 mt-1">
-                  <button
-                    v-for="d in DIAS_SEMANA"
-                    :key="d.n"
-                    type="button"
-                    class="h-9 w-9 rounded-full text-sm font-semibold"
-                    :style="
-                      form.dias.includes(d.n)
-                        ? { background: 'var(--primario)', color: '#fff' }
-                        : {
-                            background: 'var(--superficie-2)',
-                            color: 'var(--texto)',
-                          }
-                    "
-                    @click="alternarDia(d.n)"
-                  >
-                    {{ d.etiqueta }}
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label class="tu-label" for="arh">{{
-                  $t("agenda.nueva.repetirHasta")
-                }}</label>
-                <input
-                  id="arh"
-                  v-model="form.repetirHasta"
-                  class="tu-input"
-                  type="date"
-                />
-                <p
-                  class="mt-1 text-xs"
-                  :style="{ color: 'var(--texto-suave)' }"
+            <div>
+              <span class="tu-label">{{ $t("agenda.nueva.diasSemana") }}</span>
+              <div class="flex gap-1 mt-1">
+                <button
+                  v-for="d in DIAS_SEMANA"
+                  :key="d.n"
+                  type="button"
+                  class="h-9 w-9 rounded-full text-sm font-semibold"
+                  :style="
+                    form.dias.includes(d.n)
+                      ? { background: 'var(--primario)', color: '#fff' }
+                      : {
+                          background: 'var(--superficie-2)',
+                          color: 'var(--texto)',
+                        }
+                  "
+                  @click="alternarDia(d.n)"
                 >
-                  {{ $t("agenda.nueva.repetirAyuda") }}
-                </p>
+                  {{ d.etiqueta }}
+                </button>
               </div>
+            </div>
+            <div>
+              <label class="tu-label" for="arh">{{
+                $t("agenda.nueva.repetirHasta")
+              }}</label>
+              <input
+                id="arh"
+                v-model="form.repetirHasta"
+                class="tu-input"
+                type="date"
+              />
+              <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("agenda.nueva.repetirAyuda", { anio: anioRecurrente }) }}
+              </p>
             </div>
           </div>
 
@@ -2138,6 +2164,7 @@ onMounted(async () => {
                 form.ofertaId === '' ||
                 form.sucursalId === '' ||
                 form.fecha === '' ||
+                (esRecurrente && form.dias.length === 0) ||
                 conflictos.length > 0
               "
             >
