@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -43,6 +44,16 @@ const error = ref<string | null>(null);
 
 const nuevo = ref({ nombre: "", plantillaId: "" });
 const creando = ref(false);
+const abierto = ref(false);
+
+function abrir(): void {
+  nuevo.value = { nombre: "", plantillaId: "" };
+  error.value = null;
+  abierto.value = true;
+}
+function cerrar(): void {
+  abierto.value = false;
+}
 
 const seleccionado = ref<Grupo | null>(null);
 const inscripciones = ref<Inscripcion[]>([]);
@@ -91,7 +102,7 @@ async function crear(): Promise<void> {
       nombre: nuevo.value.nombre,
       plantilla_id: nuevo.value.plantillaId,
     });
-    nuevo.value = { nombre: "", plantillaId: "" };
+    abierto.value = false;
     await cargar();
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -143,12 +154,22 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-4xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion
-      icono="grupos"
-      :titulo="$t('cursos.titulo')"
-      :subtitulo="$t('cursos.subtitulo')"
-      :total="grupos.length"
-    />
+    <div class="flex items-start justify-between gap-3 flex-wrap">
+      <EncabezadoSeccion
+        icono="grupos"
+        :titulo="$t('cursos.titulo')"
+        :subtitulo="$t('cursos.subtitulo')"
+        :total="grupos.length"
+      />
+      <button
+        v-if="puedeGestionar && plantillas.length > 0"
+        class="tu-btn tu-btn-primario"
+        type="button"
+        @click="abrir"
+      >
+        + {{ $t("cursos.crear") }}
+      </button>
+    </div>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -158,51 +179,6 @@ onMounted(cargar);
     </p>
 
     <template v-if="!cargando">
-      <!-- Nuevo grupo -->
-      <div v-if="puedeGestionar" class="mt-6 tu-card p-5">
-        <h2 class="font-bold">{{ $t("cursos.nuevo") }}</h2>
-        <p
-          v-if="plantillas.length === 0"
-          class="mt-2 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("cursos.sinHorarios") }}
-        </p>
-        <form
-          v-else
-          class="mt-3 grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end"
-          @submit.prevent="crear"
-        >
-          <div>
-            <label class="tu-label" for="gn">{{ $t("cursos.nombre") }}</label>
-            <input id="gn" v-model="nuevo.nombre" class="tu-input" required />
-          </div>
-          <div>
-            <label class="tu-label" for="gp">{{ $t("cursos.horario") }}</label>
-            <select
-              id="gp"
-              v-model="nuevo.plantillaId"
-              class="tu-input"
-              required
-            >
-              <option value="" disabled>{{ $t("cursos.horario") }}</option>
-              <option v-for="p in plantillas" :key="p.id" :value="p.id">
-                {{ etiquetaPlantilla(p) }}
-              </option>
-            </select>
-          </div>
-          <button
-            class="tu-btn tu-btn-primario"
-            type="submit"
-            :disabled="
-              creando || nuevo.nombre === '' || nuevo.plantillaId === ''
-            "
-          >
-            {{ creando ? $t("cursos.creando") : $t("cursos.crear") }}
-          </button>
-        </form>
-      </div>
-
       <!-- Lista de grupos -->
       <p
         v-if="grupos.length === 0"
@@ -296,5 +272,46 @@ onMounted(cargar);
         </p>
       </div>
     </template>
+
+    <!-- Nuevo grupo (drawer lateral) -->
+    <PanelLateral
+      :abierto="abierto"
+      :titulo="$t('cursos.nuevo')"
+      @cerrar="cerrar"
+    >
+      <form class="space-y-4" @submit.prevent="crear">
+        <div>
+          <label class="tu-label" for="gn">{{ $t("cursos.nombre") }}</label>
+          <input id="gn" v-model="nuevo.nombre" class="tu-input" required />
+        </div>
+        <div>
+          <label class="tu-label" for="gp">{{ $t("cursos.horario") }}</label>
+          <select id="gp" v-model="nuevo.plantillaId" class="tu-input" required>
+            <option value="" disabled>{{ $t("cursos.horario") }}</option>
+            <option v-for="p in plantillas" :key="p.id" :value="p.id">
+              {{ etiquetaPlantilla(p) }}
+            </option>
+          </select>
+        </div>
+      </form>
+
+      <template #pie>
+        <div class="flex justify-end gap-2">
+          <button class="tu-btn tu-btn-fantasma" type="button" @click="cerrar">
+            {{ $t("comun.cancelar") }}
+          </button>
+          <button
+            class="tu-btn tu-btn-primario"
+            type="button"
+            :disabled="
+              creando || nuevo.nombre === '' || nuevo.plantillaId === ''
+            "
+            @click="crear"
+          >
+            {{ creando ? $t("cursos.creando") : $t("cursos.crear") }}
+          </button>
+        </div>
+      </template>
+    </PanelLateral>
   </section>
 </template>

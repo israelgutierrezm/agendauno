@@ -379,20 +379,27 @@ onMounted(() => {
           <div v-else class="mt-4 tu-card overflow-hidden">
             <table class="w-full text-sm">
               <thead>
-                <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                  <th class="px-4 py-2 font-medium">
+                <tr
+                  class="text-left text-xs font-semibold uppercase tracking-wider"
+                  :style="{
+                    color: 'var(--texto-suave)',
+                    background:
+                      'color-mix(in srgb, var(--texto-suave) 6%, var(--superficie))',
+                  }"
+                >
+                  <th class="px-4 py-3 whitespace-nowrap">
                     {{ $t("miembros.colNombre") }}
                   </th>
-                  <th class="px-4 py-2 font-medium hidden sm:table-cell">
+                  <th class="px-4 py-3 whitespace-nowrap hidden sm:table-cell">
                     {{ $t("miembros.colCorreo") }}
                   </th>
-                  <th class="px-4 py-2 font-medium">
+                  <th class="px-4 py-3 whitespace-nowrap">
                     {{ $t("miembros.colEstado") }}
                   </th>
-                  <th class="px-4 py-2 font-medium text-right"></th>
+                  <th class="px-4 py-3 text-right"></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody class="tu-tabla-cuerpo">
                 <tr
                   v-for="m in miembros"
                   :key="m.id"
@@ -564,3 +571,12 @@ onMounted(() => {
     />
   </section>
 </template>
+
+<style scoped>
+.tu-tabla-cuerpo tr {
+  transition: background-color 0.12s ease;
+}
+.tu-tabla-cuerpo tr:hover {
+  background: color-mix(in srgb, var(--primario) 5%, transparent);
+}
+</style>
