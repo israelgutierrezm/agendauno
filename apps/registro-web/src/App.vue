@@ -266,7 +266,7 @@ const MENU: MenuItem[] = [
       },
     ],
   },
-  // Pagos del SaaS (lo que el dueño le paga a TurnoUno): separado de la operación/venta del estudio.
+  // Pagos del SaaS (lo que el dueño le paga a AgendaUno): separado de la operación/venta del estudio.
   {
     clave: "suscripcion",
     etiqueta: "nav.grupos.suscripcion",

@@ -16,7 +16,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Emite (timbra) el CFDI de un cargo de renta del SaaS: TurnoUno es el emisor (llave
+ * Emite (timbra) el CFDI de un cargo de renta del SaaS: AgendaUno es el emisor (llave
  * FacturAPI de plataforma) y el estudio el receptor. Reusa {@see ClienteFacturacion}.
  * A diferencia del CFDI tenant (precio + IVA por encima), aquí el `monto_minor` del
  * cargo es el TOTAL ya cobrado (IVA incluido): se desglosa hacia atrás para que el CFDI
@@ -114,7 +114,7 @@ class EmitirFacturaPlataforma
             'items' => [[
                 'quantity' => 1,
                 'product' => [
-                    'description' => "Suscripción TurnoUno {$cargo->periodo}",
+                    'description' => "Suscripción AgendaUno {$cargo->periodo}",
                     'product_key' => (string) config('turnouno.facturapi.renta.clave_prod_serv'),
                     'unit_key' => (string) config('turnouno.facturapi.renta.clave_unidad'),
                     // El precio es IVA incluido: FacturAPI extrae el impuesto para cuadrar con lo cobrado.

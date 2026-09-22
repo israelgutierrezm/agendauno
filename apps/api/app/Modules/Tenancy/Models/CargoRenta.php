@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Cargo de renta del SaaS a un estudio por periodo (control plane). Es el cobro de
- * TurnoUno al dueño (plataforma→dueño), separado de los pagos alumno→estudio.
+ * AgendaUno al dueño (plataforma→dueño), separado de los pagos alumno→estudio.
  *
  * @property int $estudio_id
  * @property int $monto_minor

@@ -26,7 +26,7 @@ class RegistrarEstudio
      */
     public function ejecutar(array $datos): Estudio
     {
-        // El enlace público (turnouno.com/mi-estudio) se genera AUTOMÁTICAMENTE desde el
+        // El enlace público (agendauno.mx/mi-estudio) se genera AUTOMÁTICAMENTE desde el
         // nombre cuando el registrante no captura un slug (lo normal). Si viene uno
         // (compatibilidad/avanzado), se respeta.
         $slugManual = Str::slug($datos['slug']);

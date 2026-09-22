@@ -3,7 +3,7 @@ withDefaults(defineProps<{ tam?: number }>(), { tam: 64 });
 </script>
 
 <template>
-  <!-- Isotipo TurnoUno: "u" + punto + sonrisa. SVG transparente (sin recuadro),
+  <!-- Isotipo AgendaUno: "u" + punto + sonrisa. SVG transparente (sin recuadro),
        escalable y a prueba de modo claro/oscuro. -->
   <svg
     :width="tam"

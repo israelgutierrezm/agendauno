@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
 
 /**
  * Estado de facturación SaaS del estudio: plan, precio por alumno, estado de la
- * suscripción, trial y uso del periodo. Es facturación de TurnoUno (control plane),
+ * suscripción, trial y uso del periodo. Es facturación de AgendaUno (control plane),
  * SEPARADA de los pagos que los alumnos hacen al estudio (esos viven en la BD del
  * tenant con las pasarelas del propio estudio). El conteo se hace en vivo sobre la
  * BD del tenant ya resuelta; aquí no se cobra nada (el pago de la renta lo maneja

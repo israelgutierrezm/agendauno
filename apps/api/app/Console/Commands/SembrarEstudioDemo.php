@@ -160,7 +160,7 @@ class SembrarEstudioDemo extends Command
             ['modalidad' => ModalidadOfertaTenant::Grupal->value, 'capacidad' => 10],
         );
 
-        $organizacion = OrganizacionTenant::query()->firstOrCreate(['nombre' => 'TurnoUno Demo']);
+        $organizacion = OrganizacionTenant::query()->firstOrCreate(['nombre' => 'AgendaUno Demo']);
         $sucursal = $organizacion->sucursales()->firstOrCreate(
             ['nombre' => 'Roma Norte'],
             ['zona_horaria' => 'America/Mexico_City'],

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Data plane (BD del tenant): WEBHOOKS SALIENTES (R40), primer consumidor del outbox
- * (R39). El estudio registra endpoints firmados a los que TurnoUno entrega sus
+ * (R39). El estudio registra endpoints firmados a los que AgendaUno entrega sus
  * eventos de dominio; cada intento de entrega se registra en `entregas_webhook`
  * (at-least-once, con reintentos). El `secreto` (HMAC) se guarda cifrado y solo se
  * muestra al crearlo. Sin `tenant_id`: aislamiento por base.

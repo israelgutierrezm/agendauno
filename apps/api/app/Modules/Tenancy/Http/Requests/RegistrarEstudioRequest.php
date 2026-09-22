@@ -36,7 +36,7 @@ class RegistrarEstudioRequest extends FormRequest
         return [
             // Paso 1: el lugar.
             'nombre' => ['required', 'string', 'max:255'],
-            // El enlace público (turnouno.com/mi-estudio) se genera AUTOMÁTICAMENTE a
+            // El enlace público (agendauno.mx/mi-estudio) se genera AUTOMÁTICAMENTE a
             // partir del nombre; el registrante no lo captura. Se acepta opcional por
             // compatibilidad (p. ej. un slug ya elegido), validado si viene.
             'slug' => ['nullable', 'string', 'min:3', 'max:50', 'regex:/^[a-z0-9-]+$/', 'unique:estudios,slug'],

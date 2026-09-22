@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://turnouno.com/sitemap.xml
+Sitemap: https://agendauno.mx/sitemap.xml

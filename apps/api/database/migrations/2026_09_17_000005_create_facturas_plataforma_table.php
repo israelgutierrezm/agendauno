@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Control plane: facturas (CFDI) que LA PLATAFORMA emite al dueño por la renta del
- * SaaS. TurnoUno es el emisor (llave FacturAPI de plataforma) y el estudio el receptor.
+ * SaaS. AgendaUno es el emisor (llave FacturAPI de plataforma) y el estudio el receptor.
  * Se timbra al liquidarse un cargo de renta.
  *
  * - Dinero en unidades menores (nunca float); total = subtotal + IVA.

@@ -119,7 +119,7 @@ async function cargar(): Promise<void> {
     const estudio = data.data.estudio;
     const lugar = [estudio.ciudad, estudio.pais].filter(Boolean).join(", ");
     updateSeo({
-      title: `${estudio.nombre} | Horarios y precios en TurnoUno`,
+      title: `${estudio.nombre} | Horarios y precios en AgendaUno`,
       description: `Consulta próximas clases, instructores y precios de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}.`,
       path: `/estudio/${estudio.slug}`,
       image: estudio.logo_url ?? undefined,
@@ -128,7 +128,7 @@ async function cargar(): Promise<void> {
         "@context": "https://schema.org",
         "@type": "LocalBusiness",
         name: estudio.nombre,
-        url: `https://turnouno.com/estudio/${estudio.slug}`,
+        url: `https://agendauno.mx/estudio/${estudio.slug}`,
         image: estudio.logo_url ?? undefined,
         address: lugar || undefined,
       },

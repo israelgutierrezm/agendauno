@@ -464,7 +464,7 @@ class MigradorLegacyATenant
             'estado' => EstadoEstudio::Provisioning->value,
             'estado_facturacion' => EstadoFacturacion::Trial->value,
             'contacto_nombre' => $legacy->name,
-            'contacto_email' => 'migrado+'.$legacy->slug.'@turnouno.com',
+            'contacto_email' => 'migrado+'.$legacy->slug.'@agendauno.mx',
             'zona_horaria' => 'America/Mexico_City',
             'db_driver' => $driver,
             'db_database' => $dbDatabase,

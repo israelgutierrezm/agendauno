@@ -9,7 +9,7 @@ use App\Modules\Tenancy\Models\CargoRenta;
 
 /**
  * Pasarela de pago de LA PLATAFORMA: cobra la renta del SaaS al dueño usando las
- * llaves globales de TurnoUno (no las del estudio). Espejo, a nivel plataforma, de
+ * llaves globales de AgendaUno (no las del estudio). Espejo, a nivel plataforma, de
  * {@see PasarelaTenant}. El cobro en linea es ASINCRONO: devuelve `pendiente` con la
  * referencia del intento; el webhook de la plataforma confirma despues.
  */

@@ -6,9 +6,10 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const sesion = useSesionTenantStore();
 
-// Dominio público del estudio; configurable para staging, por defecto turnouno.com.
+// Dominio público del estudio; configurable para staging, por defecto agendauno.mx.
 const dominio =
-  (import.meta.env.VITE_DOMINIO_PUBLICO as string | undefined) ?? "turnouno.com";
+  (import.meta.env.VITE_DOMINIO_PUBLICO as string | undefined) ??
+  "agendauno.mx";
 
 // El enlace se DERIVA del slug (no se captura en ningún lado): así te encontrarán.
 const enlaceCorto = computed(() => `${dominio}/${sesion.slug ?? ""}`);
@@ -89,9 +90,7 @@ onMounted(generarQr);
           class="tu-enlace font-semibold break-all"
           >{{ enlaceCorto }}</a
         >
-        <div
-          class="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start"
-        >
+        <div class="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
           <button type="button" class="tu-btn tu-btn-fantasma" @click="copiar">
             {{ copiado ? $t("enlace.copiado") : $t("enlace.copiar") }}
           </button>

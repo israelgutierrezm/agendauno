@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Control plane: cargos de renta del SaaS (la suscripción que TurnoUno cobra a cada
+ * Control plane: cargos de renta del SaaS (la suscripción que AgendaUno cobra a cada
  * estudio por periodo). Se genera uno por (estudio, periodo) con el monto según el modo
  * de cobro (activos × precio, o cuota fija) congelado al cerrar el periodo. El dueño lo
  * ve en su apartado de renta y lo paga por la pasarela de la plataforma (fase posterior).

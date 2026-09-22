@@ -7,7 +7,7 @@ interface SeoOptions {
   jsonLd?: Record<string, unknown> | null;
 }
 
-const SITE_URL = "https://turnouno.com";
+const SITE_URL = "https://agendauno.mx";
 const DEFAULT_IMAGE = `${SITE_URL}/assets/landing/turnouno-calendar.webp`;
 
 function upsertMeta(
@@ -100,7 +100,7 @@ export function updateSeo(options: SeoOptions): void {
 }
 
 export const DEFAULT_SEO = {
-  title: "TurnoUno | Software para estudios y academias",
+  title: "AgendaUno | Software para estudios y academias",
   description:
-    "Gestiona agenda, reservas, membresías, cobros y asistencia desde un solo lugar. Prueba TurnoUno gratis durante 14 días, sin tarjeta.",
+    "Gestiona agenda, reservas, membresías, cobros y asistencia desde un solo lugar. Prueba AgendaUno gratis durante 14 días, sin tarjeta.",
 } as const;

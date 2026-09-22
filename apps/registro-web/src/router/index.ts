@@ -261,7 +261,7 @@ const router = createRouter({
       component: () => import("@/views/PlataformaView.vue"),
     },
     {
-      // Enlace corto público del estudio (turnouno.com/mi-estudio). Va al FINAL, antes
+      // Enlace corto público del estudio (agendauno.mx/mi-estudio). Va al FINAL, antes
       // del catch-all: solo captura rutas de UN segmento que no sean una ruta con nombre.
       path: "/:slug",
       name: "estudio-corto",
@@ -294,23 +294,23 @@ router.beforeEach(async (to) => {
 const PUBLIC_SEO: Record<string, { title: string; description: string }> = {
   inicio: DEFAULT_SEO,
   registro: {
-    title: "Crea tu estudio gratis | TurnoUno",
+    title: "Crea tu estudio gratis | AgendaUno",
     description:
-      "Configura tu estudio en TurnoUno y prueba agenda, reservas, membresías y cobros durante 14 días sin tarjeta.",
+      "Configura tu estudio en AgendaUno y prueba agenda, reservas, membresías y cobros durante 14 días sin tarjeta.",
   },
   directorio: {
-    title: "Encuentra clases y estudios | TurnoUno",
+    title: "Encuentra clases y estudios | AgendaUno",
     description:
       "Descubre estudios, gimnasios y academias, consulta sus próximas clases y crea tu cuenta directamente con cada estudio.",
   },
   "estudio-publico": {
-    title: "Clases y estudios en TurnoUno",
+    title: "Clases y estudios en AgendaUno",
     description:
-      "Consulta horarios, instructores y precios de este estudio en TurnoUno.",
+      "Consulta horarios, instructores y precios de este estudio en AgendaUno.",
   },
   entrar: {
-    title: "Entrar a tu estudio | TurnoUno",
-    description: "Accede a la cuenta independiente de tu estudio en TurnoUno.",
+    title: "Entrar a tu estudio | AgendaUno",
+    description: "Accede a la cuenta independiente de tu estudio en AgendaUno.",
   },
 };
 

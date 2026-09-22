@@ -42,7 +42,7 @@ async function cargarMarca(valor: string): Promise<void> {
     const { data } = await api.get<{ data: Marca }>(`/api/v1/app/${s}/marca`);
     marca.value = data.data;
   } catch {
-    // Estudio inexistente o no operativo: se muestra el logo de TurnoUno.
+    // Estudio inexistente o no operativo: se muestra el logo de AgendaUno.
     marca.value = null;
   }
 }
@@ -90,7 +90,7 @@ onMounted(() => {
 
 <template>
   <section class="mx-auto flex max-w-md flex-col items-center px-4 py-14">
-    <!-- Branding: logo del estudio si lo tiene; si no, el de TurnoUno -->
+    <!-- Branding: logo del estudio si lo tiene; si no, el de AgendaUno -->
     <img
       v-if="marca?.logo_url"
       :src="marca.logo_url"
@@ -101,7 +101,7 @@ onMounted(() => {
     <img
       v-else
       src="/assets/brand/turnouno-logo.webp"
-      alt="TurnoUno"
+      alt="AgendaUno"
       class="h-20 w-auto"
     />
 

@@ -1,5 +1,5 @@
 export default {
-  marca: "TurnoUno",
+  marca: "AgendaUno",
   comun: {
     cargando: "Cargando…",
     volver: "Volver",
@@ -146,7 +146,7 @@ export default {
       reportesDesc: "Mira qué clases dejan más y toma mejores decisiones.",
     },
     producto: {
-      etiqueta: "TurnoUno en acción",
+      etiqueta: "AgendaUno en acción",
       titulo: "Claro para ti y para todo tu equipo",
       subtitulo:
         "Una interfaz visual diseñada para aprenderse rápidamente y operar sin perder contexto.",
@@ -180,7 +180,7 @@ export default {
       etiqueta: "Un precio que acompaña tu crecimiento",
       titulo: "Paga por el estudio que realmente operas.",
       subtitulo:
-        "La renta mensual de TurnoUno se calcula con los alumnos activos del periodo. Tu equipo, instructores y administradores no inflan la cuenta.",
+        "La renta mensual de AgendaUno se calcula con los alumnos activos del periodo. Tu equipo, instructores y administradores no inflan la cuenta.",
       badge: "{dias} días gratis",
       modelo: "Después de la prueba",
       valor: "Por alumno activo",
@@ -224,7 +224,7 @@ export default {
       etiqueta: "Hecho para tu comunidad",
       titulo: "Empieza con tu disciplina. Crece sin cambiar de sistema.",
       subtitulo:
-        "Cada disciplina se vive distinto. TurnoUno adapta la agenda, los cupos, las membresías y los cobros a tu forma de trabajar.",
+        "Cada disciplina se vive distinto. AgendaUno adapta la agenda, los cupos, las membresías y los cobros a tu forma de trabajar.",
       incluye: "Agenda · pagos · comunidad",
       disciplinas: {
         pilates: {
@@ -281,7 +281,7 @@ export default {
       a4: "Sí. Manejas varias sucursales, con su agenda, inventario y personal por sede.",
       q5: "¿Mi información está segura?",
       a5: "Cada estudio mantiene sus datos, usuarios, membresías, paquetes y pagos dentro de su propio tenant. La autorización se valida también en el servidor.",
-      q6: "¿Cómo se calcula el precio de TurnoUno?",
+      q6: "¿Cómo se calcula el precio de AgendaUno?",
       a6: "Después de la prueba, la renta se calcula mensualmente con base en los alumnos activos del periodo. El padrón y el cargo estimado se muestran en tu panel.",
       q7: "¿Mis instructores o administradores generan cargos?",
       a7: "No como alumnos activos. El cobro por uso considera a los alumnos facturables, no a las cuentas de tu equipo.",
@@ -311,7 +311,7 @@ export default {
       general: "Otro negocio de clases",
     },
     slug: "Direccion",
-    slugAyuda: "Asi te encontraran: turnouno.com/{slug}",
+    slugAyuda: "Asi te encontraran: agendauno.mx/{slug}",
     slugLibre: "Disponible",
     slugOcupado: "No disponible",
     contactoNombre: "Tu nombre",
@@ -363,7 +363,7 @@ export default {
     irEntrar: "Entrar",
   },
   directorio: {
-    etiqueta: "Comunidad TurnoUno",
+    etiqueta: "Comunidad AgendaUno",
     titulo: "Encuentra tu próxima clase.",
     subtitulo:
       "Descubre estudios, gimnasios y academias, consulta sus horarios y crea una cuenta directamente con el lugar que elijas.",
@@ -621,7 +621,7 @@ export default {
   },
   padron: {
     titulo: "Padrón facturable",
-    subtitulo: "Los alumnos por los que se calcula tu renta de TurnoUno.",
+    subtitulo: "Los alumnos por los que se calcula tu renta de AgendaUno.",
     alumnosFacturables: "Alumnos facturables",
     exportar: "Exportar CSV",
     exportando: "Exportando…",
@@ -1131,9 +1131,9 @@ export default {
   },
   plataforma: {
     titulo: "Administración de plataforma",
-    subtitulo: "Todos los estudios y la configuración global de TurnoUno.",
+    subtitulo: "Todos los estudios y la configuración global de AgendaUno.",
     token: "Token de operador",
-    tokenAyuda: "Solo para el equipo de TurnoUno.",
+    tokenAyuda: "Solo para el equipo de AgendaUno.",
     entrar: "Entrar",
     salir: "Salir",
     tokenInvalido: "Token inválido o sin acceso.",
@@ -1393,7 +1393,7 @@ export default {
     },
   },
   renta: {
-    titulo: "Suscripción a TurnoUno",
+    titulo: "Suscripción a AgendaUno",
     subtitulo: "Tu renta del SaaS y su historial de pagos.",
     modo: {
       titulo: "Cómo se cobra tu plan",
@@ -1432,7 +1432,7 @@ export default {
       timbrada: "Factura emitida. Ya puedes descargar tu CFDI (PDF/XML).",
     },
     pagoNota:
-      "El pago se procesa de forma segura con la pasarela de TurnoUno. Tu factura (CFDI) se emite con tus datos fiscales.",
+      "El pago se procesa de forma segura con la pasarela de AgendaUno. Tu factura (CFDI) se emite con tus datos fiscales.",
   },
   reportes: {
     titulo: "Reportes",
@@ -2000,12 +2000,12 @@ export default {
     subtitulo: "Ajustes del estudio.",
     logoTitulo: "Logo del estudio",
     logoDesc:
-      "Se muestra en la pantalla de acceso de tu estudio. Si no subes uno, se usa el logo de TurnoUno.",
+      "Se muestra en la pantalla de acceso de tu estudio. Si no subes uno, se usa el logo de AgendaUno.",
     logoSubir: "Subir logo",
     logoSubiendo: "Subiendo…",
     logoQuitar: "Quitar",
     logoAyuda: "PNG, JPG o WEBP, hasta 2 MB. Idealmente cuadrado.",
-    directorioTitulo: "Aparecer en la Comunidad de TurnoUno",
+    directorioTitulo: "Aparecer en la Comunidad de AgendaUno",
     directorioDesc:
       "Si esta activo, cualquier persona puede descubrir tu estudio en la pagina publica de la Comunidad. Si lo desactivas, tu estudio solo sera accesible con el enlace directo (compartelo en tu sitio o redes).",
     directorioActivo: "Tu estudio aparece en la Comunidad.",

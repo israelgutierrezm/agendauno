@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 
 /**
  * Endpoints de webhooks salientes del estudio (R40): el propietario registra URLs a
- * las que TurnoUno entrega sus eventos de dominio, firmados. El `secreto` (HMAC) se
+ * las que AgendaUno entrega sus eventos de dominio, firmados. El `secreto` (HMAC) se
  * genera al crear y se devuelve UNA sola vez; nunca se vuelve a exponer. Opera SIEMPRE
  * sobre la BD del estudio resuelto.
  */

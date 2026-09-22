@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Endpoint de webhook saliente del estudio (R40): URL a la que TurnoUno entrega,
+ * Endpoint de webhook saliente del estudio (R40): URL a la que AgendaUno entrega,
  * firmados, sus eventos de dominio. `secreto` (clave HMAC) cifrado en reposo; `eventos`
  * es la lista de tipos suscritos (NULL = todos).
  */

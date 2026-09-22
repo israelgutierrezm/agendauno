@@ -19,7 +19,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Facturación (CFDI) de la RENTA del SaaS al dueño: emite el CFDI de un cargo pagado y
- * entrega el PDF/XML. TurnoUno es el emisor (llave de plataforma) y el estudio el
+ * entrega el PDF/XML. AgendaUno es el emisor (llave de plataforma) y el estudio el
  * receptor (sus datos fiscales tenant-locales, que ya usa para facturar a sus alumnos).
  */
 class FacturaRentaController

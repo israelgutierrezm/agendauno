@@ -17,12 +17,12 @@ return [
     'dias_trial' => (int) env('TRIAL_DIAS', 14),
 
     /*
-    | Dominio base para resolver el estudio por subdominio: `{slug}.turnouno.com`.
+    | Dominio base para resolver el estudio por subdominio: `{slug}.agendauno.mx`.
     | Las rutas del tenant se montan además bajo este dominio (aparte del acceso
     | por ruta `/app/{estudio}`). Ajustable por entorno (p. ej. un dominio de
     | staging o `lvh.me` para desarrollo local con subdominios).
     */
-    'dominio_base' => env('APP_TENANT_DOMAIN', 'turnouno.com'),
+    'dominio_base' => env('APP_TENANT_DOMAIN', 'agendauno.mx'),
 
     /*
     | URL base del panel web (SPA registro-web) para armar enlaces en correos
@@ -44,7 +44,7 @@ return [
 
         /*
         | CFDI de la RENTA del SaaS (plataforma -> dueño). Claves SAT por defecto para
-        | el concepto "suscripción TurnoUno"; ajustables por entorno sin tocar código.
+        | el concepto "suscripción AgendaUno"; ajustables por entorno sin tocar código.
         */
         'renta' => [
             'clave_prod_serv' => env('FACTURAPI_RENTA_CLAVE_PROD_SERV', '81112100'), // Servicios de sistemas de información
@@ -55,7 +55,7 @@ return [
     ],
 
     /*
-    | Administración de plataforma (PlatformAdmin): el operador de TurnoUno ve
+    | Administración de plataforma (PlatformAdmin): el operador de AgendaUno ve
     | todos los estudios y carga credenciales globales (p. ej. la cuenta
     | FacturAPI). Se autentica con un token dedicado (env). Sin token, el apartado
     | queda deshabilitado (todas sus rutas responden 401).

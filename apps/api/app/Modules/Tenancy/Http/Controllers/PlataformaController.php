@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * Administración de plataforma (PlatformAdmin): el operador de TurnoUno ve todos los
+ * Administración de plataforma (PlatformAdmin): el operador de AgendaUno ve todos los
  * estudios y gestiona la configuración global (p. ej. la cuenta FacturAPI usada para
  * timbrar por todos). Opera sobre el control plane (BD compartida); autenticado por
  * token de plataforma. Nunca devuelve secretos.

@@ -170,7 +170,7 @@ Route::prefix('v1')->group(function (): void {
 
     /*
     | Rutas tenant-local. Se montan de dos formas equivalentes: por RUTA
-    | (/app/{estudio}/...) y por SUBDOMINIO ({slug}.turnouno.com/...). En ambos
+    | (/app/{estudio}/...) y por SUBDOMINIO ({slug}.agendauno.mx/...). En ambos
     | casos `estudio.resolver` lee el param `{estudio}` (de la ruta o del dominio)
     | y activa la conexión del data plane. Ver docs/CONTROL_PLANE.md.
     */
@@ -266,7 +266,7 @@ Route::prefix('v1')->group(function (): void {
             // + checkout; el webhook de la plataforma confirma). El dueño paga su suscripcion.
             Route::post('/renta/cargos/{cargo}/pagar', [PagoRentaController::class, 'pagar'])->middleware('puede:facturacion.ver')->name('renta.pagar');
             // Factura (CFDI) de la renta del SaaS: emite el CFDI de un cargo pagado y
-            // entrega el PDF/XML (TurnoUno emisor, el estudio receptor).
+            // entrega el PDF/XML (AgendaUno emisor, el estudio receptor).
             Route::post('/renta/cargos/{cargo}/factura', [FacturaRentaController::class, 'emitir'])->middleware('puede:facturacion.ver')->name('renta.factura');
             Route::get('/renta/facturas/{factura}/{formato}', [FacturaRentaController::class, 'descargar'])->middleware('puede:facturacion.ver')->name('renta.factura.descargar');
 
@@ -564,7 +564,7 @@ Route::prefix('v1')->group(function (): void {
     // Acceso por ruta: /api/v1/app/{estudio}/...
     Route::prefix('app/{estudio}')->middleware('estudio.resolver')->name('api.v1.app.')->group($rutasTenant);
 
-    // Acceso por subdominio: {slug}.turnouno.com/api/v1/... (mismo comportamiento).
+    // Acceso por subdominio: {slug}.agendauno.mx/api/v1/... (mismo comportamiento).
     Route::domain('{estudio}.'.config('turnouno.dominio_base'))
         ->middleware('estudio.resolver')
         ->name('api.v1.sub.')

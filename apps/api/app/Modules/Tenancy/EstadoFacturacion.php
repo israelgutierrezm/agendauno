@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy;
 
 /**
- * Estado de la suscripción del estudio con TurnoUno (facturación SaaS, control
+ * Estado de la suscripción del estudio con AgendaUno (facturación SaaS, control
  * plane). Independiente de los pagos que los alumnos hacen al estudio.
  */
 enum EstadoFacturacion: string

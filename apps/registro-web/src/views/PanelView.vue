@@ -121,7 +121,7 @@ onMounted(cargar);
       </span>
     </div>
 
-    <!-- Enlace público del estudio (turnouno.com/mi-estudio) + QR para compartir -->
+    <!-- Enlace público del estudio (agendauno.mx/mi-estudio) + QR para compartir -->
     <EnlaceEstudio class="mt-6" />
 
     <!-- Quickstart (R36): guía de activación mientras falte configuración esencial -->

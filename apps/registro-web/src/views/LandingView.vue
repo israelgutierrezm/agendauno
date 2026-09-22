@@ -352,7 +352,7 @@ onBeforeUnmount(() => observador?.disconnect());
             <span
               class="ml-3 text-xs font-semibold"
               :style="{ color: 'var(--texto-suave)' }"
-              >{{ $t("landing.producto.barra") }} · TurnoUno</span
+              >{{ $t("landing.producto.barra") }} · AgendaUno</span
             >
             <span
               class="ml-auto text-[10px] uppercase tracking-wide"
