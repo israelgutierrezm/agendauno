@@ -283,12 +283,24 @@ watch(() => props.personaId, cargar, { immediate: true });
         </div>
       </dl>
 
-      <RouterLink
-        :to="{ name: 'ficha-miembro', params: { id: personaId } }"
-        class="tu-enlace mt-4 inline-block text-sm"
-        @click="emit('cerrar')"
-        >{{ $t("recepcion.miembro.verFicha") }} →</RouterLink
-      >
+      <p class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        <RouterLink
+          :to="{ name: 'ficha-miembro', params: { id: personaId } }"
+          class="tu-enlace"
+          @click="emit('cerrar')"
+          >{{ $t("recepcion.miembro.verFicha") }} →</RouterLink
+        >
+        <RouterLink
+          :to="{
+            name: 'ficha-miembro',
+            params: { id: personaId },
+            query: { seccion: 'expediente' },
+          }"
+          class="tu-enlace"
+          @click="emit('cerrar')"
+          >{{ $t("expediente.titulo") }} →</RouterLink
+        >
+      </p>
 
       <!-- Venta rápida + cobro en ventanilla -->
       <div

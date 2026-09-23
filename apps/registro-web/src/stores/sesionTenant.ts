@@ -13,6 +13,14 @@ export interface UsuarioTenant {
   permisos?: string[];
   // Tema y colores propios guardados en la cuenta.
   apariencia?: Apariencia;
+  // "Mi perfil": partes del nombre, forma corta (primer nombre + apellido
+  // paterno) y foto.
+  nombre_pila?: string | null;
+  primer_apellido?: string | null;
+  segundo_apellido?: string | null;
+  nombre_corto?: string;
+  foto_url?: string | null;
+  tiene_contrasena?: boolean;
 }
 
 /** Cómo atiende el negocio: clases con cupo o citas 1 a 1 con un profesional. */
@@ -246,6 +254,11 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     useAparienciaStore().activar(data.data.usuario.apariencia);
   }
 
+  /** Tras editar "Mi perfil": la API devuelve el usuario ya actualizado. */
+  function actualizarUsuario(datos: UsuarioTenant): void {
+    usuario.value = datos;
+  }
+
   async function verificarSesion(): Promise<void> {
     if (verificado.value) {
       return;
@@ -299,6 +312,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     activar,
     registrarAlumno,
     cargarYo,
+    actualizarUsuario,
     verificarSesion,
     cerrarSesion,
   };

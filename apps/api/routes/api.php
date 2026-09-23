@@ -62,6 +62,7 @@ use App\Modules\Tenancy\Http\Controllers\DocumentosController;
 use App\Modules\Tenancy\Http\Controllers\DunningTenantController;
 use App\Modules\Tenancy\Http\Controllers\EscaparateController;
 use App\Modules\Tenancy\Http\Controllers\ExcepcionesHorarioTenantController;
+use App\Modules\Tenancy\Http\Controllers\ExpedienteTenantController;
 use App\Modules\Tenancy\Http\Controllers\FacturacionController;
 use App\Modules\Tenancy\Http\Controllers\FacturaRentaController;
 use App\Modules\Tenancy\Http\Controllers\FacturasTenantController;
@@ -87,6 +88,7 @@ use App\Modules\Tenancy\Http\Controllers\OrganizacionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\PagoRentaController;
 use App\Modules\Tenancy\Http\Controllers\PagosTenantController;
 use App\Modules\Tenancy\Http\Controllers\PasarelasTenantController;
+use App\Modules\Tenancy\Http\Controllers\PerfilTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasHorarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasMensajeTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaController;
@@ -217,6 +219,11 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/apariencia', [AparienciaTenantController::class, 'elegir'])->name('apariencia.elegir');
             Route::put('/apariencia/color', [AparienciaTenantController::class, 'personalizar'])->name('apariencia.color');
             Route::delete('/apariencia/personalizacion', [AparienciaTenantController::class, 'restablecer'])->name('apariencia.restablecer');
+            // Mi perfil: cada quien ajusta su nombre, su foto y su contraseña.
+            Route::put('/yo/perfil', [PerfilTenantController::class, 'actualizar'])->name('yo.perfil');
+            Route::put('/yo/contrasena', [PerfilTenantController::class, 'cambiarContrasena'])->name('yo.contrasena');
+            Route::post('/yo/foto', [PerfilTenantController::class, 'subirFoto'])->name('yo.foto.store');
+            Route::delete('/yo/foto', [PerfilTenantController::class, 'eliminarFoto'])->name('yo.foto.destroy');
             Route::post('/logout', [AuthTenantController::class, 'destroy'])->name('logout');
 
             // Autoservicio del miembro: opera solo sobre su propia persona (sin
@@ -242,6 +249,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/usuarios/{usuario}/reenviar', [UsuariosTenantController::class, 'reenviar'])->middleware('puede:usuarios.invitar')->name('usuarios.reenviar');
             // Solo id + nombre: recepción lo necesita para la agenda por profesional.
             Route::get('/instructores', [UsuariosTenantController::class, 'instructores'])->middleware('puede:agenda.ver')->name('instructores.index');
+            Route::get('/instructores/{usuario}', [UsuariosTenantController::class, 'instructor'])->middleware('puede:usuarios.gestionar')->name('instructores.show');
 
             // Apartado Usuarios: multi-rol por cuenta (rol de dueño protegido).
             Route::get('/usuarios', [UsuariosTenantController::class, 'index'])->middleware('puede:usuarios.gestionar')->name('usuarios.index');
@@ -443,6 +451,9 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/miembros/{persona}/resumen', ResumenMiembroTenantController::class)->middleware('puede:miembros.ver')->name('miembros.resumen');
             // Ficha 360° del alumno (P0 Etapa 1): derechos, historial de reservas y de compras.
             Route::get('/miembros/{persona}/ficha', FichaMiembroTenantController::class)->middleware('puede:miembros.ver')->name('miembros.ficha');
+            // Expediente de una persona (miembro o instructor): documentos, consentimientos
+            // y formularios. El de personal exige además usuarios.gestionar (en el controlador).
+            Route::get('/personas/{persona}/expediente', [ExpedienteTenantController::class, 'show'])->middleware('puede:miembros.ver')->name('personas.expediente');
             Route::post('/derechos/{derecho}/topups', [MembresiasTenantController::class, 'topUp'])->middleware('puede:membresias.gestionar')->name('derechos.topups.store');
 
             // Creditos (data plane del tenant): consumo directo y retenciones (holds)

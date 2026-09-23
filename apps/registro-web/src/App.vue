@@ -57,11 +57,19 @@ const MENU: MenuItem[] = [
         termino: "miembro",
       },
       {
+        // Seguimiento comercial (quién está por vencer): no es del instructor.
         clave: "retencion",
         etiqueta: "nav.retencion",
-        icono: "reportes",
+        icono: "pulso",
         ruta: "retencion",
-        permiso: "miembros.ver",
+        permiso: "miembros.gestionar",
+      },
+      {
+        clave: "comunicaciones",
+        etiqueta: "nav.comunicaciones",
+        icono: "mensaje",
+        ruta: "comunicaciones",
+        permiso: "comunicaciones.gestionar",
       },
       {
         clave: "instructores",
@@ -70,6 +78,13 @@ const MENU: MenuItem[] = [
         ruta: "instructores",
         permiso: "agenda.gestionar",
         termino: "instructor",
+      },
+      {
+        clave: "nomina",
+        etiqueta: "nav.nomina",
+        icono: "nomina",
+        ruta: "nomina",
+        permiso: "estudio.gestionar",
       },
       {
         clave: "usuarios",
@@ -93,11 +108,21 @@ const MENU: MenuItem[] = [
         permiso: "agenda.ver",
       },
       {
+        // Mostrador del día (llegadas, ventas, lista de espera): para quien atiende.
+        clave: "recepcion",
+        etiqueta: "nav.recepcion",
+        icono: "recepcion",
+        ruta: "recepcion",
+        permiso: "reservas.gestionar",
+      },
+      {
+        // Horarios de atención de cada profesional: definen los huecos para citas.
         clave: "horarios",
         etiqueta: "nav.horarios",
-        icono: "agenda",
+        icono: "reloj",
         ruta: "horarios",
         permiso: "agenda.ver",
+        modalidad: "citas",
       },
       {
         clave: "oportunidades",
@@ -109,20 +134,6 @@ const MENU: MenuItem[] = [
         modalidad: "clases",
       },
       {
-        clave: "tareas",
-        etiqueta: "nav.tareas",
-        icono: "tareas",
-        ruta: "tareas",
-        permiso: "tareas.ver",
-      },
-      {
-        clave: "recepcion",
-        etiqueta: "nav.recepcion",
-        icono: "recepcion",
-        ruta: "recepcion",
-        permiso: "agenda.ver",
-      },
-      {
         clave: "grupos",
         etiqueta: "nav.cursos",
         icono: "grupos",
@@ -131,11 +142,19 @@ const MENU: MenuItem[] = [
         flag: "grupos",
       },
       {
+        clave: "tareas",
+        etiqueta: "nav.tareas",
+        icono: "tareas",
+        ruta: "tareas",
+        permiso: "tareas.ver",
+      },
+      {
+        // Salas y equipo: se configuran, no se operan.
         clave: "recursos",
         etiqueta: "nav.recursos",
         icono: "recursos",
         ruta: "recursos",
-        permiso: "agenda.ver",
+        permiso: "agenda.gestionar",
       },
     ],
   },
@@ -152,13 +171,6 @@ const MENU: MenuItem[] = [
         permiso: "productos.ver",
       },
       {
-        clave: "catalogo",
-        etiqueta: "nav.catalogo",
-        icono: "ventas",
-        ruta: "catalogo",
-        permiso: "catalogo.ver",
-      },
-      {
         clave: "pos",
         etiqueta: "nav.pos",
         icono: "pos",
@@ -166,18 +178,19 @@ const MENU: MenuItem[] = [
         permiso: "inventario.ver",
       },
       {
+        // Cómo se reservan las clases/servicios y a qué precio: configuración.
+        clave: "catalogo",
+        etiqueta: "nav.catalogo",
+        icono: "etiqueta",
+        ruta: "catalogo",
+        permiso: "catalogo.gestionar",
+      },
+      {
         clave: "promociones",
         etiqueta: "nav.promociones",
         icono: "promociones",
         ruta: "promociones",
         permiso: "promociones.gestionar",
-      },
-      {
-        clave: "comunicaciones",
-        etiqueta: "nav.comunicaciones",
-        icono: "reportes",
-        ruta: "comunicaciones",
-        permiso: "comunicaciones.gestionar",
       },
       {
         clave: "lealtad",
@@ -207,13 +220,6 @@ const MENU: MenuItem[] = [
         ruta: "reportes",
         permiso: "facturacion.ver",
       },
-      {
-        clave: "pasarelas",
-        etiqueta: "nav.pasarelas",
-        icono: "pasarelas",
-        ruta: "pasarelas",
-        permiso: "pagos.configurar",
-      },
     ],
   },
   {
@@ -229,11 +235,12 @@ const MENU: MenuItem[] = [
         permiso: "documentos.subir",
       },
       {
+        // Se llenan por persona: además hace falta ver miembros (un alumno no).
         clave: "formularios",
         etiqueta: "nav.formularios",
         icono: "formularios",
         ruta: "formularios",
-        permiso: "formularios.responder",
+        permiso: ["formularios.responder", "miembros.ver"],
       },
     ],
   },
@@ -243,18 +250,18 @@ const MENU: MenuItem[] = [
     icono: "ajustes",
     hijos: [
       {
-        clave: "nomina",
-        etiqueta: "nav.nomina",
-        icono: "nomina",
-        ruta: "nomina",
+        clave: "configuracion",
+        etiqueta: "nav.configuracion",
+        icono: "configuracion",
+        ruta: "configuracion",
         permiso: "estudio.gestionar",
       },
       {
-        clave: "integraciones",
-        etiqueta: "nav.integraciones",
-        icono: "integraciones",
-        ruta: "integraciones",
-        permiso: "integraciones.configurar",
+        clave: "sedes",
+        etiqueta: "nav.sedes",
+        icono: "ubicacion",
+        ruta: "sedes",
+        permiso: "sucursales.gestionar",
       },
       {
         clave: "datos-fiscales",
@@ -264,18 +271,18 @@ const MENU: MenuItem[] = [
         permiso: "estudio.gestionar",
       },
       {
-        clave: "sedes",
-        etiqueta: "nav.sedes",
-        icono: "recursos",
-        ruta: "sedes",
-        permiso: "sucursales.ver",
+        clave: "pasarelas",
+        etiqueta: "nav.pasarelas",
+        icono: "pasarelas",
+        ruta: "pasarelas",
+        permiso: "pagos.configurar",
       },
       {
-        clave: "configuracion",
-        etiqueta: "nav.configuracion",
-        icono: "configuracion",
-        ruta: "configuracion",
-        permiso: "estudio.gestionar",
+        clave: "integraciones",
+        etiqueta: "nav.integraciones",
+        icono: "integraciones",
+        ruta: "integraciones",
+        permiso: "integraciones.configurar",
       },
     ],
   },
@@ -319,7 +326,11 @@ function visible(item: MenuItem): boolean {
   ) {
     return false;
   }
-  return item.permiso === undefined || sesion.puede(item.permiso);
+  if (item.permiso === undefined) {
+    return true;
+  }
+  const permisos = Array.isArray(item.permiso) ? item.permiso : [item.permiso];
+  return permisos.every((p) => sesion.puede(p));
 }
 
 // Filtra el arbol por permisos: una hoja se ve si pasa su permiso; un grupo, si le
@@ -329,6 +340,10 @@ function filtrar(items: MenuItem[]): MenuItem[] {
     .map((item): MenuItem | null => {
       if (item.hijos !== undefined) {
         const hijos = filtrar(item.hijos);
+        // Un grupo con una sola opción visible es esa opción (sin carpeta de más).
+        if (hijos.length === 1) {
+          return hijos[0];
+        }
         return hijos.length > 0 ? { ...item, hijos } : null;
       }
       if (!visible(item)) {
@@ -609,7 +624,14 @@ onMounted(() => {
                 menuApariencia = false;
               "
             >
+              <img
+                v-if="sesion.usuario?.foto_url"
+                :src="sesion.usuario.foto_url"
+                alt=""
+                class="h-8 w-8 rounded-full object-cover shrink-0"
+              />
               <span
+                v-else
                 class="h-8 w-8 rounded-full inline-flex items-center justify-center text-xs font-semibold shrink-0"
                 :style="{
                   background: 'var(--superficie-2)',
@@ -621,7 +643,9 @@ onMounted(() => {
               <span class="hidden sm:block text-left leading-tight">
                 <span
                   class="block text-[13px] font-semibold truncate max-w-[8rem]"
-                  >{{ sesion.usuario?.nombre }}</span
+                  >{{
+                    sesion.usuario?.nombre_corto ?? sesion.usuario?.nombre
+                  }}</span
                 >
                 <span
                   class="block text-[11px] truncate"
@@ -653,8 +677,16 @@ onMounted(() => {
                 </p>
               </div>
               <RouterLink
-                v-if="puedeConfigurar"
                 class="tu-menu-item mt-1"
+                :to="{ name: 'mi-perfil' }"
+                @click="menuPerfil = false"
+              >
+                <IconoNav nombre="miembros" :tam="16" />
+                {{ $t("miPerfil.titulo") }}
+              </RouterLink>
+              <RouterLink
+                v-if="puedeConfigurar"
+                class="tu-menu-item"
                 :to="{ name: 'configuracion' }"
                 @click="menuPerfil = false"
               >
@@ -667,7 +699,7 @@ onMounted(() => {
                 style="color: var(--error)"
                 @click="salir"
               >
-                <span aria-hidden="true">⎋</span>
+                <IconoNav nombre="salir" :tam="16" />
                 {{ $t("panel.salir") }}
               </button>
             </div>

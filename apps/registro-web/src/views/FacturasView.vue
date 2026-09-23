@@ -160,6 +160,7 @@ onMounted(cargar);
         :filas="facturas"
         :buscar="false"
         :vacio="$t('facturas.vacio')"
+        clave-vista="facturas"
       >
         <template #col-receptor="{ fila }">
           <div class="font-semibold">

@@ -12,7 +12,9 @@ export interface MenuItem {
   etiqueta: string; // clave i18n
   icono?: string;
   ruta?: string; // nombre de ruta (hoja)
-  permiso?: string; // permiso requerido para verlo
+  // Permiso requerido para verlo; con varios, hacen falta todos (p. ej. la
+  // pantalla también carga datos que exigen otro permiso).
+  permiso?: string | string[];
   soloMiembro?: boolean;
   // Solo se muestra en negocios de esta modalidad (clases con cupo o citas 1 a 1).
   modalidad?: ModalidadServicio;

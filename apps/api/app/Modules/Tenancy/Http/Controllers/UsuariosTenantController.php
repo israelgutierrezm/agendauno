@@ -6,10 +6,12 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
+use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Models\AsignacionPersonalTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\TipoPersonaTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -28,7 +30,10 @@ use Illuminate\Validation\ValidationException;
  */
 class UsuariosTenantController
 {
-    public function __construct(private readonly EnviarActivacionTenant $enviarActivacion) {}
+    public function __construct(
+        private readonly EnviarActivacionTenant $enviarActivacion,
+        private readonly PersonaDeUsuarioTenant $personas,
+    ) {}
 
     /**
      * Lista los instructores del estudio (usuarios con el rol instructor) para poder
@@ -39,14 +44,42 @@ class UsuariosTenantController
         $instructores = Usuario::query()
             ->whereJsonContains('roles', 'instructor')
             ->orderBy('name')
-            ->get(['ulid', 'name']);
+            ->get(['id', 'ulid', 'name', 'nombre', 'primer_apellido', 'foto_ruta']);
 
         return response()->json([
             'data' => $instructores->map(static fn (Usuario $u): array => [
                 'id' => $u->ulid,
                 'nombre' => $u->name,
+                // Para ubicarlo (tarjetas): primer nombre + apellido paterno y foto.
+                'nombre_corto' => $u->nombreCorto(),
+                'foto_url' => $u->fotoUrl(),
             ])->all(),
         ]);
+    }
+
+    /**
+     * Perfil de un instructor para quien administra al equipo: quién es y la
+     * persona a la que se cuelga su expediente (se crea la primera vez, sin
+     * contar como alumno). Sin correo ni teléfono.
+     */
+    public function instructor(Request $request): JsonResponse
+    {
+        $usuario = Usuario::query()
+            ->where('ulid', (string) $request->route('usuario'))
+            ->whereJsonContains('roles', 'instructor')
+            ->firstOrFail();
+
+        $persona = $this->personas->asegurar($usuario, TipoPersonaTenant::Instructor);
+
+        return response()->json(['data' => [
+            'id' => $usuario->ulid,
+            'nombre' => $usuario->name,
+            'nombre_corto' => $usuario->nombreCorto(),
+            'foto_url' => $usuario->fotoUrl(),
+            'activo' => $usuario->activo,
+            'desde' => $usuario->created_at?->toDateString(),
+            'persona_id' => $persona->ulid,
+        ]]);
     }
 
     /**
@@ -213,6 +246,8 @@ class UsuariosTenantController
         return [
             'id' => $usuario->ulid,
             'nombre' => $usuario->name,
+            'nombre_corto' => $usuario->nombreCorto(),
+            'foto_url' => $usuario->fotoUrl(),
             'email' => $usuario->email,
             'rol' => CatalogoDePermisosTenant::rolPrincipal($roles),
             'roles' => $roles,

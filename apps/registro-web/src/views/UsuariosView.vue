@@ -12,6 +12,7 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 interface UsuarioRow {
   id: string;
   nombre: string;
+  foto_url: string | null;
   email: string | null;
   rol: string;
   roles: string[];
@@ -281,10 +282,15 @@ onMounted(cargar);
       :filtros="filtrosDef"
       :filtrar-fila="filtrarUsuario"
       :vacio="$t('usuarios.vacio')"
+      clave-vista="usuarios"
     >
       <template #col-nombre="{ fila }">
         <div class="flex items-center gap-3">
-          <AvatarIniciales :nombre="(fila as UsuarioRow).nombre" tam="md" />
+          <AvatarIniciales
+            :nombre="(fila as UsuarioRow).nombre"
+            :foto="(fila as UsuarioRow).foto_url"
+            tam="md"
+          />
           <div class="min-w-0">
             <div class="font-semibold truncate">
               {{ (fila as UsuarioRow).nombre }}

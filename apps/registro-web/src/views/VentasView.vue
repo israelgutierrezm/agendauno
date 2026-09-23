@@ -455,6 +455,7 @@ onMounted(cargar);
         :buscar-en="['comprador']"
         :por-pagina="8"
         :vacio="$t('ventas.ordenes.vacio')"
+        clave-vista="ventas"
       >
         <template #col-comprador="{ valor }">
           <span class="font-medium">{{ valor ?? "—" }}</span>

@@ -576,6 +576,7 @@ function borrar(): void {
         :filas="estudios"
         :buscar-en="['slug', 'nombre', 'ciudad']"
         :vacio="$t('plataforma.estudios.vacio')"
+        clave-vista="plataforma-estudios"
       >
         <template #col-slug="{ valor }">
           <span class="font-mono text-sm">{{ valor }}</span>

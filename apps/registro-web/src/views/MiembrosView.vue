@@ -17,6 +17,7 @@ import PanelMiembro from "@/components/PanelMiembro.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useAnchoMinimo } from "@/lib/pantalla";
 import { plural } from "@/lib/terminologia";
+import { useVistaListado } from "@/lib/vistaListado";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -135,6 +136,8 @@ const miembros = ref<Miembro[]>([]);
 const conDetalle = useAnchoMinimo(1280);
 const seleccionado = ref<Miembro | null>(null);
 // Con el resumen a un lado el correo ya se ve ahí: la tabla deja esa columna.
+// Lista (tabla) o cuadrícula de tarjetas; se recuerda en este navegador.
+const vista = useVistaListado("miembros");
 const resumenAlLado = computed(
   () => conDetalle.value && tipo.value === "miembro",
 );
@@ -360,6 +363,7 @@ onMounted(() => {
         <!-- Buscador + filtros + «Agregar» (estilo Acadion). -->
         <BarraListado
           v-model:busqueda="q"
+          v-model:vista="vista"
           :filtros="filtrosDef"
           :valores="valoresFiltro"
           :placeholder="$t('miembros.buscar')"
@@ -397,7 +401,54 @@ onMounted(() => {
             }"
           >
             <div class="min-w-0">
-              <table class="w-full text-sm">
+              <!-- Cuadrícula: una tarjeta por persona (tocarla muestra su resumen) -->
+              <ul
+                v-if="vista === 'cuadricula'"
+                class="grid gap-3 p-4 sm:grid-cols-2"
+                :class="resumenAlLado ? '' : 'lg:grid-cols-3'"
+              >
+                <li v-for="m in miembros" :key="m.id">
+                  <div
+                    class="mb-tarjeta"
+                    :class="{ 'mb-tarjeta-activa': seleccionado?.id === m.id }"
+                    @click="elegir(m, $event)"
+                  >
+                    <AvatarIniciales :nombre="m.nombre" tam="lg" />
+                    <div class="min-w-0">
+                      <RouterLink
+                        v-if="tipo === 'miembro'"
+                        :to="{ name: 'ficha-miembro', params: { id: m.id } }"
+                        class="block font-medium truncate hover:underline"
+                        >{{ nombreCompleto(m) }}</RouterLink
+                      >
+                      <span v-else class="block font-medium truncate">{{
+                        nombreCompleto(m)
+                      }}</span>
+                      <p class="mt-0.5 text-xs">
+                        <span
+                          :style="{
+                            color: m.activo
+                              ? 'var(--texto-suave)'
+                              : 'var(--aviso)',
+                          }"
+                          >{{
+                            m.activo
+                              ? $t("miembros.activo")
+                              : $t("miembros.suspendido")
+                          }}</span
+                        >
+                        <span
+                          v-if="tipo === 'miembro' && m.primera_vez"
+                          class="ml-1.5 font-medium"
+                          :style="{ color: 'var(--aviso)' }"
+                          >{{ $t("miembros.nuevo") }}</span
+                        >
+                      </p>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+              <table v-else class="w-full text-sm">
                 <thead>
                   <tr
                     class="text-left text-xs font-semibold uppercase tracking-wider"
@@ -636,6 +687,27 @@ onMounted(() => {
 }
 .tu-tabla-cuerpo tr:hover {
   background: color-mix(in srgb, var(--primario) 5%, transparent);
+}
+/* Tarjeta de la vista en cuadrícula. */
+.mb-tarjeta {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.8rem;
+  background: var(--superficie);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+.mb-tarjeta:hover {
+  border-color: color-mix(in srgb, var(--primario) 40%, var(--borde));
+}
+.mb-tarjeta-activa {
+  border-color: var(--primario);
+  background: color-mix(in srgb, var(--primario) 6%, var(--superficie));
 }
 /* Fila elegida (su resumen está a un lado), como la clase activa en Recepción. */
 .tu-tabla-cuerpo tr.mb-activa {

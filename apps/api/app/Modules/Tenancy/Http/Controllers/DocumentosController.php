@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AccesoExpedienteTenant;
 use App\Modules\Tenancy\EstadoDocumento;
 use App\Modules\Tenancy\Models\Documento;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\TipoDocumento;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\TipoPersonaTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -20,7 +22,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * Documentos de personas (miembros/instructores) del estudio, tenant-local. Se
  * cargan por persona, el staff los valida (aprobar/rechazar) y se descargan de un
  * disco privado con nombre no enumerable, namespaced por estudio. Todo aislado por
- * tenant (opera sobre la BD del estudio resuelto).
+ * tenant (opera sobre la BD del estudio resuelto). Los documentos del personal
+ * (instructores) solo los ve quien administra al equipo (AccesoExpedienteTenant).
  */
 class DocumentosController
 {
@@ -36,6 +39,9 @@ class DocumentosController
             })
             ->when($request->query('estado'), function ($consulta, $estado): void {
                 $consulta->where('estado', $estado);
+            })
+            ->when(! $this->usuario($request)->puede('usuarios.gestionar'), function ($consulta): void {
+                $consulta->whereHas('persona', fn ($p) => $p->where('tipo', TipoPersonaTenant::Miembro->value));
             })
             ->orderByDesc('id')
             ->limit(self::LIMITE)
@@ -57,6 +63,7 @@ class DocumentosController
 
         $estudio = $this->estudio($request);
         $persona = PersonaTenant::query()->where('ulid', $validado['persona_id'])->firstOrFail();
+        abort_unless(AccesoExpedienteTenant::puedeVer($this->usuario($request), $persona), 403);
         $tipoId = $this->resolverTipo($validado['tipo_documento_id'] ?? null);
 
         $archivo = $request->file('archivo');
@@ -84,12 +91,13 @@ class DocumentosController
         ]);
 
         $modelo = Documento::query()->where('ulid', (string) $request->route('documento'))->firstOrFail();
-        $usuario = $request->attributes->get('usuario_tenant');
+        $usuario = $this->usuario($request);
+        $this->autorizar($usuario, $modelo);
 
         $modelo->update([
             'estado' => $validado['estado'],
             'motivo' => $validado['estado'] === EstadoDocumento::Rechazado->value ? ($validado['motivo'] ?? null) : null,
-            'validado_por' => $usuario instanceof Usuario ? $usuario->getKey() : null,
+            'validado_por' => $usuario->getKey(),
             'validado_en' => now(),
         ]);
 
@@ -99,8 +107,23 @@ class DocumentosController
     public function ver(Request $request): StreamedResponse
     {
         $modelo = Documento::query()->where('ulid', (string) $request->route('documento'))->firstOrFail();
+        $this->autorizar($this->usuario($request), $modelo);
 
         return Storage::disk('local')->download($modelo->ruta, $modelo->nombre);
+    }
+
+    private function autorizar(Usuario $usuario, Documento $documento): void
+    {
+        $persona = $documento->persona;
+        abort_unless($persona instanceof PersonaTenant && AccesoExpedienteTenant::puedeVer($usuario, $persona), 403);
+    }
+
+    private function usuario(Request $request): Usuario
+    {
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($usuario instanceof Usuario, 401);
+
+        return $usuario;
     }
 
     private function resolverTipo(mixed $ulid): ?int

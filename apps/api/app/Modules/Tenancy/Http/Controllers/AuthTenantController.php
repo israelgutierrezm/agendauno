@@ -7,11 +7,10 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\ActivacionPropietario;
 use App\Modules\Tenancy\Application\AutenticacionGoogleTenant;
 use App\Modules\Tenancy\Application\AutenticacionTenant;
-use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
-use App\Modules\Tenancy\CatalogoTemas;
 use App\Modules\Tenancy\Http\Requests\ActivarTenantRequest;
 use App\Modules\Tenancy\Http\Requests\LoginTenantRequest;
+use App\Modules\Tenancy\Http\UsuarioTenantPresenter;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
@@ -66,7 +65,7 @@ class AuthTenantController
 
         return response()->json(['data' => [
             'token' => $this->auth->emitir($usuario),
-            'usuario' => $this->presentarUsuario($usuario),
+            'usuario' => UsuarioTenantPresenter::datos($usuario),
             'estudio' => $this->presentarEstudio($estudio),
         ]]);
     }
@@ -81,7 +80,7 @@ class AuthTenantController
 
         return response()->json(['data' => [
             'token' => $this->auth->emitir($usuario),
-            'usuario' => $this->presentarUsuario($usuario),
+            'usuario' => UsuarioTenantPresenter::datos($usuario),
             'estudio' => $this->presentarEstudio($estudio),
         ]]);
     }
@@ -99,7 +98,7 @@ class AuthTenantController
 
         return response()->json(['data' => [
             'token' => $this->auth->emitir($usuario),
-            'usuario' => $this->presentarUsuario($usuario),
+            'usuario' => UsuarioTenantPresenter::datos($usuario),
             'estudio' => $this->presentarEstudio($estudio),
         ]], 201);
     }
@@ -110,7 +109,7 @@ class AuthTenantController
         abort_unless($usuario instanceof Usuario, 401);
 
         return response()->json(['data' => [
-            'usuario' => $this->presentarUsuario($usuario),
+            'usuario' => UsuarioTenantPresenter::datos($usuario),
             'estudio' => $this->presentarEstudio($this->estudioDe($request)),
         ]]);
     }
@@ -138,25 +137,6 @@ class AuthTenantController
         abort_unless($estudio instanceof Estudio, 404);
 
         return $estudio;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function presentarUsuario(Usuario $usuario): array
-    {
-        $roles = $usuario->rolesEfectivos();
-
-        return [
-            'ulid' => $usuario->ulid,
-            'nombre' => $usuario->name,
-            'email' => $usuario->email,
-            'rol' => CatalogoDePermisosTenant::rolPrincipal($roles),
-            'roles' => $roles,
-            'permisos' => CatalogoDePermisosTenant::permisosDe($roles),
-            // Tema y colores propios: el front los aplica al entrar (ver /apariencia).
-            'apariencia' => CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion),
-        ];
     }
 
     /**

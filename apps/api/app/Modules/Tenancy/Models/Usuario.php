@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Usuario tenant-local: identidad operativa que vive en la BD del propio tenant
@@ -23,6 +24,10 @@ use Illuminate\Notifications\Notifiable;
  * @property list<string>|null $roles
  * @property string|null $tema
  * @property array<string, string>|null $tema_personalizacion
+ * @property string|null $nombre
+ * @property string|null $primer_apellido
+ * @property string|null $segundo_apellido
+ * @property string|null $foto_ruta
  */
 class Usuario extends Authenticatable
 {
@@ -33,7 +38,10 @@ class Usuario extends Authenticatable
 
     protected $table = 'users';
 
-    protected $fillable = ['name', 'email', 'password', 'google_id', 'activo', 'activation_token', 'rol', 'roles', 'tema', 'tema_personalizacion'];
+    protected $fillable = [
+        'name', 'email', 'password', 'google_id', 'activo', 'activation_token', 'rol', 'roles',
+        'tema', 'tema_personalizacion', 'nombre', 'primer_apellido', 'segundo_apellido', 'foto_ruta',
+    ];
 
     /**
      * ¿El usuario tiene el permiso dado por CUALQUIERA de sus roles (unión)?
@@ -60,6 +68,39 @@ class Usuario extends Authenticatable
         }
 
         return $this->rol !== null && $this->rol !== '' ? [(string) $this->rol] : [];
+    }
+
+    /**
+     * Primer nombre y apellido paterno ("María López"), para ubicar a alguien sin
+     * mostrar su nombre completo. Con los campos del perfil es exacto; si solo hay
+     * `name`, se toma el primer nombre y el penúltimo tramo (orden mexicano:
+     * nombres, apellido paterno, apellido materno).
+     */
+    public function nombreCorto(): string
+    {
+        $nombre = trim((string) $this->nombre);
+        if ($nombre !== '') {
+            $primero = explode(' ', $nombre)[0];
+
+            return trim($primero.' '.trim((string) $this->primer_apellido));
+        }
+
+        $partes = preg_split('/\s+/', trim((string) $this->name)) ?: [];
+        $partes = array_values(array_filter($partes, static fn (string $p): bool => $p !== ''));
+
+        return count($partes) >= 3
+            ? $partes[0].' '.$partes[count($partes) - 2]
+            : implode(' ', $partes);
+    }
+
+    /**
+     * URL pública de la foto de perfil (o null si no tiene).
+     */
+    public function fotoUrl(): ?string
+    {
+        return $this->foto_ruta !== null && $this->foto_ruta !== ''
+            ? Storage::disk('public')->url($this->foto_ruta)
+            : null;
     }
 
     /**

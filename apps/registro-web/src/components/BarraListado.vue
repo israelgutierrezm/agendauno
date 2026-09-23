@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 
+import IconoNav from "@/components/IconoNav.vue";
+import type { VistaListado } from "@/lib/vistaListado";
+
 /**
  * Barra de encabezado de un listado (estilo Acadion): buscador + botón de
  * filtros colapsables + botón «Agregar». Orden homólogo en toda la app. El
@@ -41,6 +44,10 @@ const emit = defineEmits<{
 }>();
 
 const busqueda = defineModel<string>("busqueda", { default: "" });
+// Lista o cuadrícula: solo se muestra el selector si el listado lo ofrece (v-model:vista).
+const vista = defineModel<VistaListado | undefined>("vista", {
+  default: undefined,
+});
 
 // Cuántos filtros están aplicados ahora (para el contador del botón).
 const activos = computed(
@@ -113,6 +120,30 @@ function esActivo(clave: string): boolean {
       />
 
       <div class="ms-auto flex items-center gap-2">
+        <div
+          v-if="vista !== undefined"
+          class="tu-segmentado shrink-0"
+          role="group"
+        >
+          <button
+            type="button"
+            :aria-pressed="vista === 'lista'"
+            :aria-label="$t('listados.verLista')"
+            :title="$t('listados.verLista')"
+            @click="vista = 'lista'"
+          >
+            <IconoNav nombre="lista" :tam="16" />
+          </button>
+          <button
+            type="button"
+            :aria-pressed="vista === 'cuadricula'"
+            :aria-label="$t('listados.verCuadricula')"
+            :title="$t('listados.verCuadricula')"
+            @click="vista = 'cuadricula'"
+          >
+            <IconoNav nombre="cuadricula" :tam="16" />
+          </button>
+        </div>
         <slot name="acciones" />
         <button
           v-if="puedeCrear"

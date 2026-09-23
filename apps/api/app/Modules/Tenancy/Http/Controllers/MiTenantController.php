@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
+use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
@@ -46,6 +47,7 @@ class MiTenantController
         private readonly WaiversTenant $waivers,
         private readonly OrdenesTenant $ordenes,
         private readonly CobrarOrdenTenant $cobrarOrden,
+        private readonly PersonaDeUsuarioTenant $personas,
     ) {}
 
     /**
@@ -257,25 +259,8 @@ class MiTenantController
     private function persona(Request $request): ?PersonaTenant
     {
         $usuario = $request->attributes->get('usuario_tenant');
-        if (! $usuario instanceof Usuario) {
-            return null;
-        }
 
-        $persona = PersonaTenant::query()->where('usuario_id', $usuario->getKey())->first();
-        if ($persona instanceof PersonaTenant) {
-            return $persona;
-        }
-
-        // Enlace diferido: una persona sin usuario con el mismo correo.
-        $porCorreo = PersonaTenant::query()
-            ->whereNull('usuario_id')
-            ->where('email', $usuario->email)
-            ->first();
-        if ($porCorreo instanceof PersonaTenant) {
-            $porCorreo->update(['usuario_id' => $usuario->getKey()]);
-        }
-
-        return $porCorreo;
+        return $usuario instanceof Usuario ? $this->personas->buscar($usuario) : null;
     }
 
     /**

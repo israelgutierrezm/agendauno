@@ -113,6 +113,13 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Perfil de un profesional con su expediente (quien administra al equipo).
+      path: "/instructores/:id",
+      name: "ficha-instructor",
+      component: () => import("@/views/FichaInstructorView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/usuarios",
       name: "usuarios",
       component: () => import("@/views/UsuariosView.vue"),
@@ -272,6 +279,13 @@ const router = createRouter({
       path: "/mi-cuenta",
       name: "mi-cuenta",
       component: () => import("@/views/MiCuentaView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      // Mi perfil: foto, nombre y contraseña de quien tiene la sesión (todo rol).
+      path: "/mi-perfil",
+      name: "mi-perfil",
+      component: () => import("@/views/MiPerfilView.vue"),
       meta: { requiereSesion: true },
     },
     {
