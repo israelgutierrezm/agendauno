@@ -756,7 +756,9 @@ onMounted(() => {
     </header>
 
     <main class="flex-1">
-      <RouterView />
+      <!-- Al cerrar sesión la ruta privada sigue activa un instante (hasta el
+           redirect): no se monta aquí, o pediría sus datos ya sin sesión. -->
+      <RouterView v-if="route.meta.requiereSesion !== true" />
     </main>
 
     <footer
