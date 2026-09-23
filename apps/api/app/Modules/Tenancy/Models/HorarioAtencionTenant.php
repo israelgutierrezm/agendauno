@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Models;
 
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Ventana semanal de atención de un proveedor (citas, F-08): un instructor/barbero
@@ -30,4 +31,20 @@ class HorarioAtencionTenant extends Model
     protected $casts = [
         'dia_semana' => 'integer',
     ];
+
+    /**
+     * @return BelongsTo<Usuario, $this>
+     */
+    public function instructor(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'instructor_id');
+    }
+
+    /**
+     * @return BelongsTo<SucursalTenant, $this>
+     */
+    public function sucursal(): BelongsTo
+    {
+        return $this->belongsTo(SucursalTenant::class, 'sucursal_id');
+    }
 }

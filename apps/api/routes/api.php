@@ -230,7 +230,8 @@ Route::prefix('v1')->group(function (): void {
             // Invitación de personal (crea usuario tenant-local con rol + activación).
             Route::post('/usuarios/invitar', [UsuariosTenantController::class, 'invitar'])->middleware('puede:usuarios.invitar')->name('usuarios.invitar');
             Route::post('/usuarios/{usuario}/reenviar', [UsuariosTenantController::class, 'reenviar'])->middleware('puede:usuarios.invitar')->name('usuarios.reenviar');
-            Route::get('/instructores', [UsuariosTenantController::class, 'instructores'])->middleware('puede:agenda.gestionar')->name('instructores.index');
+            // Solo id + nombre: recepción lo necesita para la agenda por profesional.
+            Route::get('/instructores', [UsuariosTenantController::class, 'instructores'])->middleware('puede:agenda.ver')->name('instructores.index');
 
             // Apartado Usuarios: multi-rol por cuenta (rol de dueño protegido).
             Route::get('/usuarios', [UsuariosTenantController::class, 'index'])->middleware('puede:usuarios.gestionar')->name('usuarios.index');
@@ -369,6 +370,9 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/sesiones/verificar', [AgendaTenantController::class, 'verificar'])->middleware('puede:agenda.gestionar')->name('sesiones.verificar');
             Route::post('/sesiones', [AgendaTenantController::class, 'crearSesion'])->middleware('puede:agenda.gestionar')->name('sesiones.store');
             Route::post('/sesiones/{sesion}/cancelar', [AgendaTenantController::class, 'cancelar'])->middleware('puede:agenda.gestionar')->name('sesiones.cancelar');
+            // El negocio agenda una cita para un cliente (recepción/teléfono): confirmada,
+            // se cobra en caja. Quien gestiona reservas puede agendar.
+            Route::post('/agenda/citas', [AgendaTenantController::class, 'agendarCita'])->middleware('puede:reservas.gestionar')->name('agenda.citas.store');
 
             // Front desk (R13): vista de un dia en una sucursal con metricas.
             Route::get('/front-desk', [FrontDeskTenantController::class, 'dia'])->middleware('puede:agenda.ver')->name('front-desk.dia');

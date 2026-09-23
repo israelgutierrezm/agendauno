@@ -20,12 +20,20 @@ class DisponibilidadTenantController
 {
     public function __construct(private readonly CalcularDisponibilidadTenant $disponibilidad) {}
 
+    /**
+     * Ventanas de atención de un proveedor (`instructor_id`) o, sin él, de TODOS los
+     * proveedores (la agenda por profesional sombrea lo que queda fuera de horario).
+     */
     public function horarios(Request $request): JsonResponse
     {
-        $instructor = Usuario::query()->where('ulid', (string) $request->query('instructor_id'))->firstOrFail();
+        $instructorUlid = $request->query('instructor_id');
+        $instructor = is_string($instructorUlid) && $instructorUlid !== ''
+            ? Usuario::query()->where('ulid', $instructorUlid)->firstOrFail()
+            : null;
 
         $horarios = HorarioAtencionTenant::query()
-            ->where('instructor_id', $instructor->getKey())
+            ->with(['instructor', 'sucursal'])
+            ->when($instructor instanceof Usuario, fn ($q) => $q->where('instructor_id', $instructor?->getKey()))
             ->when(
                 is_string($request->query('sucursal_id')) && $request->query('sucursal_id') !== '',
                 function ($q) use ($request): void {
@@ -106,6 +114,8 @@ class DisponibilidadTenantController
     {
         return [
             'id' => $horario->ulid,
+            'instructor_id' => $horario->instructor?->ulid,
+            'sucursal_id' => $horario->sucursal?->ulid,
             'dia_semana' => $horario->dia_semana,
             'hora_inicio' => $horario->hora_inicio,
             'hora_fin' => $horario->hora_fin,

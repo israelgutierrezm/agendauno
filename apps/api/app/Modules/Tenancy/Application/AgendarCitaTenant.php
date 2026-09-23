@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
+use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -39,10 +40,11 @@ class AgendarCitaTenant
         ?int $instructorId,
         CarbonImmutable $inicia,
         int $duracionMin,
+        bool $porNegocio = false,
     ): ReservaTenant {
         $termina = $inicia->addMinutes($duracionMin);
 
-        return DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $persona, $instructorId, $inicia, $termina): ReservaTenant {
+        return DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio): ReservaTenant {
             // El hueco debe seguir libre (el proveedor no puede tener dos cosas a la vez).
             if ($this->agenda->conflictos($instructorId, null, $inicia, $termina) !== []) {
                 throw new SesionNoReservable('Ese horario ya no está disponible.');
@@ -57,9 +59,22 @@ class AgendarCitaTenant
                 'zona_horaria' => $sucursal->zona_horaria,
                 'capacidad' => 1,
                 'estado' => EstadoSesionTenant::Programada->value,
+                'tipo' => TipoSesionTenant::Cita->value,
             ]);
 
             if ($oferta->politica_reserva === PoliticaReservaTenant::Pago) {
+                // El negocio agenda y cobra en caja (confirmada); el cliente en línea
+                // paga para confirmar (pendiente de pago, expira si no paga).
+                if ($porNegocio) {
+                    return $this->reservas->reservarPorNegocio(
+                        $sesion,
+                        $persona,
+                        (int) ($oferta->precio_clase_minor ?? 0),
+                        'MXN',
+                        (int) $sucursal->getKey(),
+                    );
+                }
+
                 return $this->reservas->reservarConPago(
                     $sesion,
                     $persona,

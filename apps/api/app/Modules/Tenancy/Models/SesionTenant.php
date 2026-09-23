@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\TipoSesionTenant;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,7 +23,14 @@ class SesionTenant extends Model
 
     protected $table = 'sesiones';
 
-    protected $fillable = ['oferta_id', 'sucursal_id', 'serie_id', 'recurso_id', 'instructor_id', 'inicia_en', 'termina_en', 'zona_horaria', 'capacidad', 'estado'];
+    protected $fillable = ['oferta_id', 'sucursal_id', 'serie_id', 'recurso_id', 'instructor_id', 'inicia_en', 'termina_en', 'zona_horaria', 'capacidad', 'estado', 'tipo'];
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'tipo' => 'clase',
+    ];
 
     /**
      * @var array<string, string>
@@ -32,7 +40,16 @@ class SesionTenant extends Model
         'termina_en' => 'datetime',
         'capacidad' => 'integer',
         'estado' => EstadoSesionTenant::class,
+        'tipo' => TipoSesionTenant::class,
     ];
+
+    /**
+     * ¿Es una cita privada (materializada para una persona)?
+     */
+    public function esCita(): bool
+    {
+        return $this->tipo === TipoSesionTenant::Cita;
+    }
 
     /**
      * @return BelongsTo<OfertaTenant, $this>

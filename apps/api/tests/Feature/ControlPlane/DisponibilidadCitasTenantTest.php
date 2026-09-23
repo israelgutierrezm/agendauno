@@ -78,3 +78,22 @@ it('excluye los huecos que chocan con una clase/cita del proveedor', function ()
     // Quedan 9–10 y 11–12; 10–11 ocupado.
     expect(slotsDisponibles($e, $coachId, $sede['sucursal'], $fecha))->toHaveCount(2);
 });
+
+it('sin proveedor, lista las ventanas de atención de todos (agenda por profesional)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sede = agendaSemilla($e);
+    personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
+    personalConSesion($e['slug'], $e['bearer'], 'coach2@correo.mx', 'instructor');
+    $ids = collect($this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
+        ->assertOk()->json('data'))->pluck('id')->all();
+
+    fijarHorarioAtencion($e, $ids[0], $sede['sucursal'], 1);
+    fijarHorarioAtencion($e, $ids[1], $sede['sucursal'], 2);
+
+    $ventanas = $this->getJson("/api/v1/app/{$e['slug']}/horarios-atencion", conBearer($e['bearer']))
+        ->assertOk()->json('data');
+
+    expect($ventanas)->toHaveCount(2);
+    expect(collect($ventanas)->pluck('instructor_id')->sort()->values()->all())->toBe(collect($ids)->sort()->values()->all());
+    expect($ventanas[0]['sucursal_id'])->toBe($sede['sucursal']);
+});

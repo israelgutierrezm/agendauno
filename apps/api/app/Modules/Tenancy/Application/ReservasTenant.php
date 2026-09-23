@@ -63,7 +63,27 @@ class ReservasTenant
      */
     public function reservarConPago(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId = null, string $canal = 'directo'): ReservaTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal): ReservaTenant {
+        return $this->reservarConOrden($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal, EstadoReserva::PendientePago);
+    }
+
+    /**
+     * Cita agendada POR EL NEGOCIO (recepción, teléfono, mostrador) de un servicio de
+     * pago: la reserva nace CONFIRMADA — no expira, porque se cobra en caja (casi
+     * siempre al terminar el servicio) — y la orden por la sesión queda pendiente de
+     * cobro. Atómico y bajo lock, igual que el pago en línea.
+     */
+    public function reservarPorNegocio(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId = null): ReservaTenant
+    {
+        return $this->reservarConOrden($sesion, $persona, $montoMinor, $moneda, $sucursalId, 'directo', EstadoReserva::Confirmada);
+    }
+
+    /**
+     * Reserva ligada a una orden por la sesión: `PendientePago` (retiene el cupo hasta
+     * pagar en línea o expirar) o `Confirmada` (el negocio cobra en caja).
+     */
+    private function reservarConOrden(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId, string $canal, EstadoReserva $estado): ReservaTenant
+    {
+        return DB::connection('tenant')->transaction(function () use ($sesion, $persona, $montoMinor, $moneda, $sucursalId, $canal, $estado): ReservaTenant {
             $bloqueada = SesionTenant::query()->whereKey($sesion->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueada->estado !== EstadoSesionTenant::Programada) {
@@ -89,7 +109,7 @@ class ReservasTenant
                 throw new CupoLleno('La sesion esta llena.');
             }
 
-            // Orden por la sesión (pendiente) + reserva pendiente de pago que la retiene.
+            // Orden por la sesión (pendiente de cobro) + la reserva que retiene el cupo.
             $orden = $this->ordenes->crearPorSesion($persona, $bloqueada, $montoMinor, $moneda, $sucursalId);
 
             $politica = $this->politicas->paraSesion($bloqueada);
@@ -98,7 +118,7 @@ class ReservasTenant
                 'sesion_id' => $bloqueada->getKey(),
                 'persona_id' => $persona->getKey(),
                 'orden_id' => $orden->getKey(),
-                'estado' => EstadoReserva::PendientePago->value,
+                'estado' => $estado->value,
                 'canal' => $canal,
                 'unidades' => 0,
                 'costo_unidades' => 0,
@@ -424,8 +444,12 @@ class ReservasTenant
             }
 
             $bloqueada->update(['estado' => EstadoReserva::Cancelada->value]);
+            // Si su orden (cita de pago) seguía sin cobrar, ya no se entregará: se cancela.
+            $this->cancelarOrdenPendiente($bloqueada);
 
-            $this->promover($sesion);
+            if (! $this->liberarCita($sesion)) {
+                $this->promover($sesion);
+            }
 
             return $bloqueada;
         });
@@ -622,15 +646,14 @@ class ReservasTenant
                     $sesion = SesionTenant::query()->whereKey($reserva->sesion_id)->lockForUpdate()->firstOrFail();
 
                     $reserva->update(['estado' => EstadoReserva::Cancelada->value]);
-                    if ($reserva->orden_id !== null) {
-                        OrdenTenant::query()->whereKey($reserva->orden_id)
-                            ->where('estado', EstadoOrden::Pendiente->value)
-                            ->update(['estado' => EstadoOrden::Cancelada->value]);
-                    }
+                    $this->cancelarOrdenPendiente($reserva);
                     $expiradas++;
 
-                    // El cupo liberado se ofrece al siguiente en lista de espera.
-                    $this->promover($sesion);
+                    // Una cita sin pagar libera el horario del profesional; en una clase,
+                    // el cupo liberado se ofrece al siguiente en lista de espera.
+                    if (! $this->liberarCita($sesion)) {
+                        $this->promover($sesion);
+                    }
                 });
             });
 
@@ -654,7 +677,10 @@ class ReservasTenant
 
             $reservas = ReservaTenant::query()
                 ->where('sesion_id', $bloqueada->getKey())
-                ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::EnEspera->value])
+                ->whereIn('estado', [
+                    EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
+                    EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value,
+                ])
                 ->with('retencion')
                 ->lockForUpdate()
                 ->get();
@@ -665,10 +691,54 @@ class ReservasTenant
                 }
 
                 $reserva->update(['estado' => EstadoReserva::Cancelada->value]);
+                $this->cancelarOrdenPendiente($reserva);
             }
 
             $bloqueada->update(['estado' => EstadoSesionTenant::Cancelada->value]);
         });
+    }
+
+    /**
+     * Una CITA es la sesión de una sola persona: cuando su reserva termina (cancelada o
+     * sin pagar a tiempo) la sesión se cancela para liberar el horario del profesional
+     * (si no, quedaría una "clase" de cupo 1 huérfana que bloquea la disponibilidad).
+     * Debe llamarse con la sesión ya bloqueada. Devuelve si la liberó.
+     */
+    private function liberarCita(SesionTenant $sesion): bool
+    {
+        if (! $sesion->esCita() || $sesion->estado !== EstadoSesionTenant::Programada) {
+            return false;
+        }
+
+        $activas = ReservaTenant::query()
+            ->where('sesion_id', $sesion->getKey())
+            ->whereIn('estado', [
+                EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
+                EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value,
+            ])
+            ->exists();
+        if ($activas) {
+            return false;
+        }
+
+        $sesion->update(['estado' => EstadoSesionTenant::Cancelada->value]);
+
+        return true;
+    }
+
+    /**
+     * Cancela la orden pendiente de una reserva de pago-para-reservar, para que no se
+     * pueda pagar algo que ya no se va a entregar. Una orden ya pagada no se toca.
+     */
+    private function cancelarOrdenPendiente(ReservaTenant $reserva): void
+    {
+        if ($reserva->orden_id === null) {
+            return;
+        }
+
+        OrdenTenant::query()->whereKey($reserva->orden_id)
+            ->where('estado', EstadoOrden::Pendiente->value)
+            ->update(['estado' => EstadoOrden::Cancelada->value]);
     }
 
     /**

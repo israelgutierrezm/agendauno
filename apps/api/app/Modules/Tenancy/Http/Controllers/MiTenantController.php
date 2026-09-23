@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Pagos\MetodoPago;
 use App\Modules\Reservas\EstadoReserva;
+use App\Modules\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
@@ -25,6 +26,7 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\WaiverTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
+use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -102,8 +104,12 @@ class MiTenantController
 
         $reservas = ReservaTenant::query()
             ->where('persona_id', $persona->getKey())
-            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::EnEspera->value])
-            ->with(['sesion.oferta', 'sesion.sucursal'])
+            // Incluye las citas pendientes de pago: el miembro debe verlas para pagarlas.
+            ->whereIn('estado', [
+                EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
+                EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value,
+            ])
+            ->with(['sesion.oferta', 'sesion.sucursal', 'orden'])
             ->get()
             ->filter(fn (ReservaTenant $r): bool => $r->sesion !== null && ! $r->sesion->inicia_en->isPast())
             ->map(fn (ReservaTenant $r): array => $this->presentarReserva($r))
@@ -128,10 +134,13 @@ class MiTenantController
     {
         $sesiones = SesionTenant::query()
             ->where('estado', 'programada')
+            // Solo clases abiertas: las citas son privadas de su titular.
+            ->where('tipo', TipoSesionTenant::Clase->value)
             ->where('inicia_en', '>=', CarbonImmutable::now())
             ->with(['oferta', 'sucursal'])
-            // Cupo ocupado = reservas que toman lugar (confirmadas + ofrecidas).
-            ->withCount(['reservas as ocupados' => fn ($q) => $q->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value])])
+            // Cupo ocupado = reservas que toman lugar (confirmadas, ofrecidas y
+            // pendientes de pago, que retienen el cupo mientras se pagan).
+            ->withCount(['reservas as ocupados' => fn ($q) => $q->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::PendientePago->value])])
             ->orderBy('inicia_en')
             ->limit(100)
             ->get();
@@ -160,6 +169,11 @@ class MiTenantController
         ]);
 
         $sesion = SesionTenant::query()->where('ulid', $validado['sesion_id'])->with('oferta')->firstOrFail();
+
+        // Una cita es de su titular: nadie más puede reservarla ni esperar su lugar.
+        if ($sesion->esCita()) {
+            throw new SesionNoReservable('Esta cita es privada.');
+        }
 
         // Citas (pago-para-reservar): si la oferta EXIGE pago, se crea una reserva
         // pendiente (retiene el cupo) + una orden por la sesión; el miembro paga esa

@@ -79,3 +79,13 @@ Support:
 - optional priority tiers
 - auto-book or timed offer
 - expiration and next-candidate promotion
+
+## Appointments (citas)
+
+A session is either an open `clase` (bookable by anyone entitled) or a private
+`cita` materialized for one person from an availability slot. Citas are hidden
+from other members and the public storefront, cannot be booked or waitlisted by
+anyone else, and release the professional's slot when their booking ends
+(cancelled or unpaid). Paid services booked online start `pendiente_pago` and
+expire; booked by the business they start confirmed with an order to collect at
+the counter. See ADR 0018.

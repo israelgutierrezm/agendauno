@@ -43,10 +43,13 @@ const accionando = ref(false);
 const error = ref<string | null>(null);
 const aviso = ref<string | null>(null);
 
-// Confirmadas + ofrecidas (ambas ocupan lugar); en espera aparte.
+// Confirmadas, ofrecidas y pendientes de pago (todas ocupan lugar); en espera aparte.
 const enSala = computed(() =>
   roster.value.filter(
-    (r) => r.estado === "confirmada" || r.estado === "ofrecida",
+    (r) =>
+      r.estado === "confirmada" ||
+      r.estado === "ofrecida" ||
+      r.estado === "pendiente_pago",
   ),
 );
 const enEspera = computed(() =>
@@ -346,6 +349,11 @@ watch(() => props.sesion.id, cargar, { immediate: true });
                     v-if="r.estado === 'ofrecida'"
                     class="tu-badge tu-badge-aviso"
                     >{{ $t("agenda.roster.ofrecida") }}</span
+                  >
+                  <span
+                    v-if="r.estado === 'pendiente_pago'"
+                    class="tu-badge tu-badge-aviso"
+                    >{{ $t("agenda.roster.pendiente_pago") }}</span
                   >
                   <span
                     v-if="r.primera_vez"

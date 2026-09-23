@@ -59,6 +59,7 @@ class IntegracionApiTenantController
                 'termina_en' => $s->termina_en->toIso8601String(),
                 'capacidad' => $s->capacidad,
                 'estado' => $s->estado->value,
+                'tipo' => $s->tipo->value,
             ])->all(),
         ]);
     }

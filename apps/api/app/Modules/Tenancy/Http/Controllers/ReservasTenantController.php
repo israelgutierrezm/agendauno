@@ -45,7 +45,11 @@ class ReservasTenantController
 
         $reservas = ReservaTenant::query()
             ->where('sesion_id', $sesion->getKey())
-            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::EnEspera->value])
+            // Las pendientes de pago también ocupan lugar: recepción debe verlas para cobrar.
+            ->whereIn('estado', [
+                EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
+                EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value,
+            ])
             ->with(['persona', 'sesion', 'asistencia'])
             ->orderBy('id')
             ->get();

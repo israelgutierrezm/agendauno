@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\PoliticaReservaTenant;
+use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -119,6 +120,8 @@ class EscaparateController
     {
         $sesiones = SesionTenant::query()
             ->where('estado', EstadoSesionTenant::Programada->value)
+            // Las citas son privadas: el escaparate solo muestra clases abiertas.
+            ->where('tipo', TipoSesionTenant::Clase->value)
             ->where('inicia_en', '>=', CarbonImmutable::now())
             ->withCount(['reservas as confirmadas' => fn ($q) => $q->where('estado', EstadoReserva::Confirmada->value)])
             ->with(['oferta', 'sucursal', 'instructor'])

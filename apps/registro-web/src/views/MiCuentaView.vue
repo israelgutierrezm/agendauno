@@ -327,7 +327,9 @@ onMounted(cargar);
                   :class="{
                     'tu-badge-exito': r.estado === 'confirmada',
                     'tu-badge-aviso':
-                      r.estado === 'ofrecida' || r.estado === 'en_espera',
+                      r.estado === 'ofrecida' ||
+                      r.estado === 'en_espera' ||
+                      r.estado === 'pendiente_pago',
                   }"
                   >{{ $t(`miCuenta.${r.estado}`) }}</span
                 >
