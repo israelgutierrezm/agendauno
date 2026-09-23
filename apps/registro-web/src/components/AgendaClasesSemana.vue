@@ -228,7 +228,7 @@ const franjas = computed(() => [
             >
               <path :d="f.icono" />
             </svg>
-            <span class="text-xs font-extrabold">{{ f.etiqueta }}</span>
+            <span class="text-xs font-semibold">{{ f.etiqueta }}</span>
             <span
               class="text-[0.68rem]"
               :style="{ color: 'var(--texto-suave)' }"
@@ -256,7 +256,7 @@ const franjas = computed(() => [
               @click="emit('abrir', tj.sesion)"
             >
               <span class="flex items-center gap-1.5 min-w-0">
-                <span class="text-xs font-extrabold flex-1">{{
+                <span class="text-xs font-semibold flex-1">{{
                   tj.hora.slice(0, 5)
                 }}</span>
                 <span
@@ -289,7 +289,7 @@ const franjas = computed(() => [
                     }"
                   ></span>
                 </span>
-                <span class="text-[0.7rem] font-extrabold">{{ tj.cupo }}</span>
+                <span class="text-[0.7rem] font-semibold">{{ tj.cupo }}</span>
               </span>
             </button>
           </div>

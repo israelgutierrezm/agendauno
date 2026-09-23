@@ -1968,6 +1968,7 @@ export default {
     esperar: "Lista de espera",
     listaEspera: "Lista de espera",
     reservado: "Reservado.",
+    reservada: "Reservada",
     enListaEspera: "Te anotamos en la lista de espera.",
     confirmada: "Confirmada",
     en_espera: "En espera",

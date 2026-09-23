@@ -264,7 +264,7 @@ onMounted(cargar);
         <!-- Cómo te cobramos -->
         <div class="tu-card p-5 lg:col-span-2">
           <h2 class="font-bold">{{ $t("cobro.modo.titulo") }}</h2>
-          <p class="mt-2 text-lg font-extrabold">
+          <p class="mt-2 text-lg font-semibold">
             {{
               renta.modo_cobro === "fijo"
                 ? $t("cobro.modo.fijo")
@@ -297,7 +297,7 @@ onMounted(cargar);
           </h2>
           <div class="mt-2 flex items-end justify-between gap-4 flex-wrap">
             <div>
-              <div class="text-3xl font-extrabold">
+              <div class="text-3xl font-semibold">
                 {{ dinero(renta.actual.cargo_estimado_minor, renta.moneda) }}
               </div>
               <div
@@ -308,7 +308,7 @@ onMounted(cargar);
               </div>
             </div>
             <div class="text-right">
-              <div class="text-2xl font-extrabold">
+              <div class="text-2xl font-semibold">
                 {{ renta.actual.cantidad }}
               </div>
               <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
@@ -366,8 +366,8 @@ onMounted(cargar);
                 {{ dinero(renta.actual.desglose.iva_minor, renta.moneda) }}
               </dd>
             </template>
-            <dt class="font-extrabold">{{ $t("cobro.desglose.total") }}</dt>
-            <dd class="font-extrabold">
+            <dt class="font-semibold">{{ $t("cobro.desglose.total") }}</dt>
+            <dd class="font-semibold">
               {{ dinero(renta.actual.desglose.total_minor, renta.moneda) }}
             </dd>
           </dl>

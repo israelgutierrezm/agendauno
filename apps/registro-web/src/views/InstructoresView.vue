@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 
+import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import BotonImportar from "@/components/BotonImportar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
@@ -134,12 +135,7 @@ onMounted(cargar);
           :key="i.id"
           class="tu-card p-4 flex items-center gap-3"
         >
-          <span
-            class="h-9 w-9 rounded-xl inline-flex items-center justify-center text-white text-sm font-bold shrink-0"
-            :style="{ background: 'var(--primario)' }"
-            aria-hidden="true"
-            >{{ i.nombre.charAt(0).toUpperCase() }}</span
-          >
+          <AvatarIniciales :nombre="i.nombre" tam="md" />
           <span class="font-medium">{{ i.nombre }}</span>
         </li>
       </ul>

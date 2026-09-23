@@ -74,7 +74,7 @@ onMounted(cargar);
 
     <div class="mt-6 flex flex-wrap items-center gap-3">
       <div class="tu-card px-5 py-3">
-        <div class="text-2xl font-extrabold">{{ total }}</div>
+        <div class="text-2xl font-semibold">{{ total }}</div>
         <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("padron.alumnosFacturables") }}
         </div>

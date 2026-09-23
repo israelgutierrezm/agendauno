@@ -205,13 +205,28 @@ h3 {
   background: var(--superficie-2);
   color: var(--texto-suave);
 }
-.tu-badge-exito {
-  background: var(--exito-suave);
-  color: var(--exito);
-}
+/* Estados (al corriente / requiere atención): punto de color + texto, sin caja.
+   La píldora gris queda para etiquetas neutras. */
+.tu-badge-exito,
 .tu-badge-aviso {
-  background: var(--aviso-suave);
-  color: var(--aviso);
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+  color: var(--texto);
+}
+.tu-badge-exito::before,
+.tu-badge-aviso::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.tu-badge-exito::before {
+  background: var(--exito);
+}
+.tu-badge-aviso::before {
+  background: var(--aviso);
 }
 
 /* Enlaces de texto: azul de enlace, subrayado solo en hover (sin fondo ni caja). */

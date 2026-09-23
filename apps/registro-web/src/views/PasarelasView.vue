@@ -116,7 +116,7 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-5xl px-4 py-10">
-    <h1 class="text-3xl font-extrabold">{{ $t("pasarelas.titulo") }}</h1>
+    <h1 class="text-xl font-semibold">{{ $t("pasarelas.titulo") }}</h1>
     <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("pasarelas.subtitulo") }}
     </p>
@@ -166,7 +166,7 @@ onMounted(cargar);
               <span
                 v-if="estaConfigurada(p.proveedor, llave)"
                 class="tu-badge tu-badge-exito ml-1"
-                >✓ {{ $t("pasarelas.configurada") }}</span
+                >{{ $t("pasarelas.configurada") }}</span
               >
             </label>
             <input

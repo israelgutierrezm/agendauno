@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 
 import CargadorLogo from "@/components/CargadorLogo.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -262,7 +263,7 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-6xl px-4 py-10">
-    <h1 class="text-3xl font-extrabold">{{ $t("onboarding.titulo") }}</h1>
+    <h1 class="text-xl font-semibold">{{ $t("onboarding.titulo") }}</h1>
     <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("onboarding.subtitulo") }}
     </p>
@@ -293,7 +294,11 @@ onMounted(cargar);
                   : 'var(--superficie-2)',
                 color: completados.has(p) ? '#fff' : 'var(--texto-suave)',
               }"
-              >{{ completados.has(p) ? "✓" : i + 1 }}</span
+              ><IconoNav
+                v-if="completados.has(p)"
+                nombre="hecho"
+                :tam="12"
+              /><template v-else>{{ i + 1 }}</template></span
             >
             <span>{{ $t(`onboarding.pasos.${p}`) }}</span>
           </button>
@@ -323,7 +328,7 @@ onMounted(cargar);
           <span
             v-if="completados.has(pasoActual)"
             class="tu-badge tu-badge-exito"
-            >✓ {{ $t("onboarding.hecho") }}</span
+            >{{ $t("onboarding.hecho") }}</span
           >
         </div>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -777,7 +782,7 @@ onMounted(cargar);
             class="tu-enlace text-sm"
             @click="avanzar"
           >
-            {{ $t("onboarding.omitir") }} →
+            {{ $t("onboarding.omitir") }}
           </button>
         </div>
       </div>

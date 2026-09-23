@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
@@ -283,12 +284,7 @@ onMounted(cargar);
     >
       <template #col-nombre="{ fila }">
         <div class="flex items-center gap-3">
-          <span
-            class="h-8 w-8 rounded-full inline-flex items-center justify-center text-xs font-bold text-white shrink-0"
-            :style="{ background: 'var(--primario)' }"
-            aria-hidden="true"
-            >{{ (fila as UsuarioRow).nombre.charAt(0).toUpperCase() }}</span
-          >
+          <AvatarIniciales :nombre="(fila as UsuarioRow).nombre" tam="md" />
           <div class="min-w-0">
             <div class="font-semibold truncate">
               {{ (fila as UsuarioRow).nombre }}
@@ -304,21 +300,15 @@ onMounted(cargar);
       </template>
 
       <template #col-roles="{ fila }">
-        <div class="flex flex-wrap gap-1">
-          <span
-            v-for="r in (fila as UsuarioRow).roles"
-            :key="r"
-            class="tu-badge"
-            :class="r === 'propietario' ? 'tu-badge-exito' : ''"
-          >
-            {{ nombreRol(r) }}
-          </span>
-        </div>
+        {{ (fila as UsuarioRow).roles.map(nombreRol).join(", ") }}
       </template>
 
       <template #col-activo="{ valor }">
-        <span class="tu-badge" :class="valor ? 'tu-badge-exito' : ''">
-          {{ valor ? $t("usuarios.activo") : $t("usuarios.inactivo") }}
+        <span v-if="valor" class="tu-badge tu-badge-exito">
+          {{ $t("usuarios.activo") }}
+        </span>
+        <span v-else :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("usuarios.inactivo") }}
         </span>
       </template>
 

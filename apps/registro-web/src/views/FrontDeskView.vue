@@ -250,15 +250,20 @@ onMounted(async () => {
       {{ error }}
     </p>
 
-    <!-- Métricas del día -->
-    <div class="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      <div v-for="t in tarjetas" :key="t.clave" class="tu-card p-4 text-center">
-        <div class="text-2xl font-extrabold">{{ t.valor }}</div>
-        <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
+    <!-- Métricas del día: una sola franja, no una tarjeta por número -->
+    <dl
+      v-if="tarjetas.length > 0"
+      class="mt-6 tu-card px-5 py-4 grid grid-cols-3 lg:grid-cols-6 gap-4"
+    >
+      <div v-for="t in tarjetas" :key="t.clave">
+        <dt class="text-xs" :style="{ color: 'var(--texto-suave)' }">
           {{ $t(`recepcion.metricas.${t.clave}`) }}
-        </div>
+        </dt>
+        <dd class="mt-0.5 text-xl font-semibold tabular-nums">
+          {{ t.valor }}
+        </dd>
       </div>
-    </div>
+    </dl>
 
     <!-- Clases del día -->
     <p

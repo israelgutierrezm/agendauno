@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 
+import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import PanelEditarMiembro, {
   type MiembroEditable,
 } from "@/components/PanelEditarMiembro.vue";
@@ -115,11 +116,9 @@ function fecha(iso: string | null): string {
   }).format(new Date(iso));
 }
 
-// Chip ámbar para "por vencer"; rojo para el resto de alertas.
-function estiloAlerta(codigo: string): Record<string, string> {
-  return codigo === "membresia_por_vencer"
-    ? { background: "var(--aviso-suave)", color: "var(--aviso)" }
-    : { background: "var(--error-suave)", color: "var(--error)" };
+// Ámbar para "por vencer"; rojo para el resto de alertas.
+function colorAlerta(codigo: string): string {
+  return codigo === "membresia_por_vencer" ? "var(--aviso)" : "var(--error)";
 }
 
 async function cargar(): Promise<void> {
@@ -194,14 +193,9 @@ watch(personaId, cargar, { immediate: true });
       <header class="mt-4 tu-card p-5">
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="flex items-center gap-4 min-w-0">
-            <span
-              class="h-14 w-14 rounded-full inline-flex items-center justify-center text-xl font-bold text-white shrink-0"
-              :style="{ background: 'var(--primario)' }"
-              aria-hidden="true"
-              >{{ ficha.persona.nombre_completo.charAt(0).toUpperCase() }}</span
-            >
+            <AvatarIniciales :nombre="ficha.persona.nombre_completo" tam="lg" />
             <div class="min-w-0">
-              <h1 class="text-2xl font-extrabold truncate">
+              <h1 class="text-xl font-semibold truncate">
                 {{ ficha.persona.nombre_completo }}
               </h1>
               <p
@@ -211,7 +205,10 @@ watch(personaId, cargar, { immediate: true });
               >
                 {{ ficha.persona.email }}
               </p>
-              <div class="mt-2 flex flex-wrap gap-1.5">
+              <p
+                class="mt-1 flex flex-wrap items-center gap-1.5 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
                 <span
                   class="tu-badge"
                   :class="
@@ -223,13 +220,13 @@ watch(personaId, cargar, { immediate: true });
                       : $t("miembros.suspendido")
                   }}</span
                 >
-                <span v-if="!ficha.persona.es_facturable" class="tu-badge">{{
-                  $t("miembros.noFacturable")
-                }}</span>
-                <span v-if="ficha.persona.archivado" class="tu-badge">{{
-                  $t("miembros.archivado")
-                }}</span>
-              </div>
+                <span v-if="!ficha.persona.es_facturable"
+                  >· {{ $t("miembros.noFacturable") }}</span
+                >
+                <span v-if="ficha.persona.archivado"
+                  >· {{ $t("miembros.archivado") }}</span
+                >
+              </p>
             </div>
           </div>
           <div class="flex gap-2">
@@ -260,9 +257,14 @@ watch(personaId, cargar, { immediate: true });
           <span
             v-for="a in resumen.alertas"
             :key="a"
-            class="tu-badge"
-            :style="estiloAlerta(a)"
-            >{{ $t(`recepcion.alertas.${a}`) }}</span
+            class="inline-flex items-center gap-1.5 text-sm font-medium"
+            :style="{ color: colorAlerta(a) }"
+          >
+            <span
+              class="h-1.5 w-1.5 rounded-full"
+              :style="{ background: colorAlerta(a) }"
+              aria-hidden="true"
+            />{{ $t(`recepcion.alertas.${a}`) }}</span
           >
         </div>
 
@@ -290,7 +292,8 @@ watch(personaId, cargar, { immediate: true });
               {{ resumen.asistencias }}
               <span
                 v-if="resumen.primera_vez"
-                class="tu-badge tu-badge-aviso ml-1"
+                class="ml-1 text-xs font-medium"
+                :style="{ color: 'var(--aviso)' }"
                 >{{ $t("miembros.nuevo") }}</span
               >
             </dd>
@@ -306,16 +309,13 @@ watch(personaId, cargar, { immediate: true });
         </dl>
       </header>
 
-      <!-- Tarjetas resumen -->
-      <div class="mt-4 grid gap-4 sm:grid-cols-3">
-        <div class="tu-card p-4">
-          <p
-            class="text-xs uppercase tracking-wide"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
+      <!-- Resumen: membresía, saldo y próxima reserva -->
+      <div class="mt-4 tu-card p-5 grid gap-5 sm:grid-cols-3">
+        <div>
+          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("ficha.membresia") }}
           </p>
-          <p class="mt-1 text-lg font-bold">
+          <p class="mt-0.5 font-semibold">
             {{ $t(`recepcion.membresia.${resumen.membresia.estado}`) }}
           </p>
           <p
@@ -330,26 +330,20 @@ watch(personaId, cargar, { immediate: true });
             }}
           </p>
         </div>
-        <div class="tu-card p-4">
-          <p
-            class="text-xs uppercase tracking-wide"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
+        <div>
+          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("ficha.saldo") }}
           </p>
-          <p class="mt-1 text-lg font-bold">
+          <p class="mt-0.5 font-semibold">
             {{ $t("ficha.creditos", { n: resumen.saldo_creditos }) }}
           </p>
         </div>
-        <div class="tu-card p-4">
-          <p
-            class="text-xs uppercase tracking-wide"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
+        <div>
+          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("ficha.proxima") }}
           </p>
           <template v-if="resumen.proxima_reserva">
-            <p class="mt-1 text-lg font-bold truncate">
+            <p class="mt-0.5 font-semibold truncate">
               {{ resumen.proxima_reserva.clase ?? "—" }}
             </p>
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -373,7 +367,7 @@ watch(personaId, cargar, { immediate: true });
 
       <!-- Membresías y paquetes (derechos) -->
       <section class="mt-6">
-        <h2 class="font-bold">{{ $t("ficha.derechos.titulo") }}</h2>
+        <h2 class="font-semibold">{{ $t("ficha.derechos.titulo") }}</h2>
         <p
           v-if="ficha.derechos.length === 0"
           class="tu-card mt-3 p-4 text-sm"
@@ -433,7 +427,7 @@ watch(personaId, cargar, { immediate: true });
       <div class="mt-6 grid gap-6 lg:grid-cols-2">
         <!-- Historial de reservas -->
         <section>
-          <h2 class="font-bold">{{ $t("ficha.reservas.titulo") }}</h2>
+          <h2 class="font-semibold">{{ $t("ficha.reservas.titulo") }}</h2>
           <p
             v-if="ficha.reservas.length === 0"
             class="tu-card mt-3 p-4 text-sm"
@@ -476,7 +470,7 @@ watch(personaId, cargar, { immediate: true });
 
         <!-- Historial de compras -->
         <section>
-          <h2 class="font-bold">{{ $t("ficha.ordenes.titulo") }}</h2>
+          <h2 class="font-semibold">{{ $t("ficha.ordenes.titulo") }}</h2>
           <p
             v-if="ficha.ordenes.length === 0"
             class="tu-card mt-3 p-4 text-sm"

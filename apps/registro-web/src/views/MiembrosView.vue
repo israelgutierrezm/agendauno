@@ -4,6 +4,7 @@ import { RouterLink } from "vue-router";
 
 import { useI18n } from "vue-i18n";
 
+import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import BarraListado from "@/components/BarraListado.vue";
 import BotonImportar from "@/components/BotonImportar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -399,15 +400,7 @@ onMounted(() => {
                 >
                   <td class="px-4 py-2">
                     <div class="flex items-center gap-3">
-                      <span
-                        class="h-8 w-8 rounded-full inline-flex items-center justify-center text-xs font-semibold shrink-0"
-                        :style="{
-                          background: 'var(--superficie-2)',
-                          color: 'var(--texto-suave)',
-                        }"
-                        aria-hidden="true"
-                        >{{ m.nombre.charAt(0).toUpperCase() }}</span
-                      >
+                      <AvatarIniciales :nombre="m.nombre" tam="md" />
                       <RouterLink
                         v-if="tipo === 'miembro'"
                         :to="{ name: 'ficha-miembro', params: { id: m.id } }"

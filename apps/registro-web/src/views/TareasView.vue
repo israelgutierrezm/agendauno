@@ -457,16 +457,14 @@ onMounted(cargarTareas);
               {{ t.detalle }}
             </p>
             <div
-              class="flex items-center gap-3 mt-1 text-xs"
+              class="flex items-center gap-1.5 mt-1 text-xs"
               :style="{ color: 'var(--texto-suave)' }"
             >
-              <span v-if="t.persona">👤 {{ t.persona }}</span>
-              <span
-                >📅
-                {{
-                  t.vence_en ? fecha(t.vence_en) : $t("tareas.sinVencimiento")
-                }}</span
-              >
+              <span v-if="t.persona">{{ t.persona }}</span>
+              <span v-if="t.persona" aria-hidden="true">·</span>
+              <span>{{
+                t.vence_en ? fecha(t.vence_en) : $t("tareas.sinVencimiento")
+              }}</span>
             </div>
           </div>
           <button

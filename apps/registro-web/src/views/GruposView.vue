@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -252,13 +253,7 @@ onMounted(cargar);
             :key="i.id"
             class="flex items-center gap-2 text-sm"
           >
-            <span
-              class="h-7 w-7 rounded-full inline-flex items-center justify-center text-xs font-bold text-white shrink-0"
-              :style="{ background: 'var(--primario)' }"
-              aria-hidden="true"
-            >
-              {{ (i.persona ?? "?").charAt(0).toUpperCase() }}
-            </span>
+            <AvatarIniciales :nombre="i.persona" tam="sm" />
             <span>{{ i.persona ?? "—" }}</span>
           </li>
         </ul>

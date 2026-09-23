@@ -153,6 +153,7 @@ const RUTAS: Record<string, string[]> = {
   ],
   chevron: ["M9 6l6 6-6 6"],
   cerrar: ["M6 6l12 12", "M18 6 6 18"],
+  hecho: ["M4.5 12.75l6 6 9-13.5"],
   punto: ["M12 12h.01"],
 };
 </script>

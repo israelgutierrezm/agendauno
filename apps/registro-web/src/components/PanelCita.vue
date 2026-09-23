@@ -186,7 +186,7 @@ function cancelar(): void {
           >{{ iniciales(cita?.cliente ?? null) || "?" }}</span
         >
         <div class="min-w-0">
-          <p class="text-xl font-extrabold truncate">
+          <p class="text-xl font-semibold truncate">
             {{ cita?.cliente ?? $t("agendaVisual.profesionales.sinCliente") }}
           </p>
           <p
@@ -212,7 +212,7 @@ function cancelar(): void {
         <dd>{{ sesion.instructor ?? "—" }}</dd>
         <template v-if="precio">
           <dt>{{ $t("agendaVisual.cita.precio") }}</dt>
-          <dd class="font-extrabold">{{ precio }}</dd>
+          <dd class="font-semibold">{{ precio }}</dd>
         </template>
         <dt>{{ $t("agendaVisual.cita.pago") }}</dt>
         <dd>{{ pago }}</dd>

@@ -126,7 +126,7 @@ onMounted(cargar);
               <span
                 v-if="configurada(i.proveedor, llave)"
                 class="tu-badge tu-badge-exito ml-1"
-                >✓ {{ $t("integraciones.configurada") }}</span
+                >{{ $t("integraciones.configurada") }}</span
               >
             </label>
             <input

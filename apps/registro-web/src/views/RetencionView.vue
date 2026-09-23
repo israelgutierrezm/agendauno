@@ -116,7 +116,7 @@ onMounted(cargar);
 
     <div class="mt-6 flex flex-wrap items-center gap-3">
       <div class="tu-card px-5 py-3">
-        <div class="text-2xl font-extrabold" :style="{ color: 'var(--aviso)' }">
+        <div class="text-2xl font-semibold" :style="{ color: 'var(--aviso)' }">
           {{ resumen?.por_vencer ?? 0 }}
         </div>
         <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
@@ -124,7 +124,7 @@ onMounted(cargar);
         </div>
       </div>
       <div class="tu-card px-5 py-3">
-        <div class="text-2xl font-extrabold" :style="{ color: 'var(--error)' }">
+        <div class="text-2xl font-semibold" :style="{ color: 'var(--error)' }">
           {{ resumen?.vencidas ?? 0 }}
         </div>
         <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">

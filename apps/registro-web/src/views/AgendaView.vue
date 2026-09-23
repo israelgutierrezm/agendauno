@@ -2490,7 +2490,7 @@ onMounted(async () => {
             class="sm:col-span-2 rounded-lg p-3 text-sm"
             :style="{ background: 'var(--aviso-suave)', color: 'var(--aviso)' }"
           >
-            <p class="font-semibold">⚠ {{ $t("agenda.nueva.conflictos") }}</p>
+            <p class="font-semibold">{{ $t("agenda.nueva.conflictos") }}</p>
             <ul class="mt-1 list-disc pl-5">
               <li v-for="(c, i) in conflictos" :key="i">{{ c.mensaje }}</li>
             </ul>

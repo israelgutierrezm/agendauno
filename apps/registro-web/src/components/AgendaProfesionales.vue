@@ -491,7 +491,7 @@ watch(() => props.fecha, enfocar);
             </template>
             <template v-else>
               <span class="ag-linea1">
-                <span class="truncate flex-1 font-extrabold">{{
+                <span class="truncate flex-1 font-semibold">{{
                   tj.titulo
                 }}</span>
                 <span

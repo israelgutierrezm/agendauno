@@ -230,7 +230,7 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-6xl px-4 py-10">
-    <h1 class="text-3xl font-extrabold">{{ $t("miCuenta.titulo") }}</h1>
+    <h1 class="text-xl font-semibold">{{ $t("miCuenta.titulo") }}</h1>
     <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("miCuenta.subtitulo") }}
     </p>
@@ -396,7 +396,7 @@ onMounted(cargar);
               $t(`miCuenta.comprar.tipos.${p.tipo}`)
             }}</span>
             <p class="mt-2 font-semibold">{{ p.nombre }}</p>
-            <p class="mt-1 text-xl font-extrabold">
+            <p class="mt-1 text-xl font-semibold">
               {{ dinero(p.precio_minor, p.moneda) }}
             </p>
             <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
@@ -480,7 +480,9 @@ onMounted(cargar);
                   {{ $t("miCuenta.listaEspera") }}
                 </button>
               </template>
-              <span v-else class="tu-badge tu-badge-exito">✓</span>
+              <span v-else class="tu-badge tu-badge-exito">{{
+                $t("miCuenta.reservada")
+              }}</span>
             </span>
           </li>
         </ul>

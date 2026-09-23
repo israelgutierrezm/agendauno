@@ -387,13 +387,9 @@ onMounted(cargar);
 
     <template v-else>
       <!-- Métricas del negocio -->
-      <div class="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div
-          v-for="card in tarjetas"
-          :key="card.clave"
-          class="tu-card p-4 text-center"
-        >
-          <div class="text-xl font-extrabold">{{ card.valor }}</div>
+      <div class="mt-6 tu-card px-5 py-4 grid grid-cols-3 lg:grid-cols-6 gap-4">
+        <div v-for="card in tarjetas" :key="card.clave">
+          <div class="text-xl font-semibold tabular-nums">{{ card.valor }}</div>
           <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
             {{ $t(`reportes.metricas.${card.clave}`) }}
           </div>
@@ -436,25 +432,25 @@ onMounted(cargar);
 
       <template v-if="tendencias">
         <!-- Totales del periodo -->
-        <div class="mt-3 grid grid-cols-3 gap-3">
-          <div class="tu-card p-4 text-center">
-            <div class="text-xl font-extrabold">
+        <div class="mt-3 tu-card px-5 py-4 grid grid-cols-3 gap-4">
+          <div>
+            <div class="text-xl font-semibold tabular-nums">
               {{ dinero(tendencias.totales.ingresos_minor, tendencias.moneda) }}
             </div>
             <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
               {{ $t("reportes.tendencias.ingresos") }}
             </div>
           </div>
-          <div class="tu-card p-4 text-center">
-            <div class="text-xl font-extrabold">
+          <div>
+            <div class="text-xl font-semibold tabular-nums">
               {{ tendencias.totales.ordenes }}
             </div>
             <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
               {{ $t("reportes.tendencias.ordenes") }}
             </div>
           </div>
-          <div class="tu-card p-4 text-center">
-            <div class="text-xl font-extrabold">
+          <div>
+            <div class="text-xl font-semibold tabular-nums">
               {{
                 dinero(
                   tendencias.totales.ticket_promedio_minor,
@@ -558,17 +554,17 @@ onMounted(cargar);
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("reportes.conversion.subtitulo", { n: cohortes.meses }) }}
         </p>
-        <div class="mt-3 grid grid-cols-3 gap-3">
-          <div class="tu-card p-4 text-center">
-            <div class="text-2xl font-extrabold">
+        <div class="mt-3 tu-card px-5 py-4 grid grid-cols-3 gap-4">
+          <div>
+            <div class="text-xl font-semibold tabular-nums">
               {{ cohortes.conversion.registrados }}
             </div>
             <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
               {{ $t("reportes.conversion.registrados") }}
             </div>
           </div>
-          <div class="tu-card p-4 text-center">
-            <div class="text-2xl font-extrabold">
+          <div>
+            <div class="text-xl font-semibold tabular-nums">
               {{ cohortes.conversion.compraron }}
             </div>
             <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
@@ -576,8 +572,8 @@ onMounted(cargar);
               {{ pctConv(cohortes.conversion.compraron) }}
             </div>
           </div>
-          <div class="tu-card p-4 text-center">
-            <div class="text-2xl font-extrabold">
+          <div>
+            <div class="text-xl font-semibold tabular-nums">
               {{ cohortes.conversion.activos }}
             </div>
             <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">

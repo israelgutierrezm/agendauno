@@ -372,7 +372,7 @@ onMounted(cargar);
           <template v-if="miembroSel !== '' && saldo !== null">
             <div class="mt-4 flex items-end justify-between">
               <div>
-                <div class="text-3xl font-extrabold">{{ saldo }}</div>
+                <div class="text-3xl font-semibold">{{ saldo }}</div>
                 <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
                   {{ $t("lealtad.miembro.saldo") }}
                 </div>

@@ -256,7 +256,7 @@ onMounted(cargarStaff);
               <td class="py-2 font-bold" colspan="3">
                 {{ $t("nomina.totalPeriodo") }}
               </td>
-              <td class="py-2 text-right font-extrabold">
+              <td class="py-2 text-right font-semibold">
                 {{ dinero(totalPeriodo, monedaPeriodo) }}
               </td>
             </tr>

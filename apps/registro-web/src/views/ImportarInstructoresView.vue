@@ -121,8 +121,8 @@ function descargarPlantilla(): void {
 
     <!-- Éxito -->
     <div v-if="creados !== null" class="mt-6 tu-card p-6 text-center">
-      <p class="text-2xl font-extrabold" :style="{ color: 'var(--exito)' }">
-        ✓ {{ $t("importarInstructores.creados", { n: creados }) }}
+      <p class="text-2xl font-semibold" :style="{ color: 'var(--exito)' }">
+        {{ $t("importarInstructores.creados", { n: creados }) }}
       </p>
       <RouterLink
         :to="{ name: 'instructores' }"
@@ -184,7 +184,7 @@ function descargarPlantilla(): void {
       <template v-if="preview">
         <div class="mt-6 grid grid-cols-3 gap-3">
           <div class="tu-card p-4 text-center">
-            <div class="text-xl font-extrabold">
+            <div class="text-xl font-semibold">
               {{ preview.resumen.total }}
             </div>
             <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
@@ -193,7 +193,7 @@ function descargarPlantilla(): void {
           </div>
           <div class="tu-card p-4 text-center">
             <div
-              class="text-xl font-extrabold"
+              class="text-xl font-semibold"
               :style="{ color: 'var(--exito)' }"
             >
               {{ preview.resumen.validas }}
@@ -204,7 +204,7 @@ function descargarPlantilla(): void {
           </div>
           <div class="tu-card p-4 text-center">
             <div
-              class="text-xl font-extrabold"
+              class="text-xl font-semibold"
               :style="{
                 color:
                   preview.resumen.invalidas > 0

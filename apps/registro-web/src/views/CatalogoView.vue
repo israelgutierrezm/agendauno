@@ -149,37 +149,30 @@ onMounted(cargar);
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <h3 class="font-semibold">{{ o.nombre }}</h3>
+              <!-- Una sola línea de datos: actividad · modalidad · cómo se reserva -->
               <p
-                v-if="o.actividad"
-                class="text-sm truncate"
+                class="mt-0.5 text-sm"
                 :style="{ color: 'var(--texto-suave)' }"
               >
-                {{ o.actividad }}
-              </p>
-              <div class="mt-2 flex flex-wrap items-center gap-2">
-                <span class="tu-badge">{{
-                  $t(`catalogo.modalidad.${o.modalidad}`)
-                }}</span>
-                <span
-                  v-if="o.politica_reserva === 'pago'"
-                  class="tu-badge tu-badge-aviso"
-                >
-                  {{ $t("catalogo.badgePago") }} ·
+                <template v-if="o.actividad">{{ o.actividad }} · </template
+                >{{ $t(`catalogo.modalidad.${o.modalidad}`) }} ·
+                <template v-if="o.politica_reserva === 'pago'"
+                  >{{ $t("catalogo.badgePago") }}
                   {{ dinero(o.precio_clase_minor)
                   }}<template v-if="o.duracion_minutos">
                     · {{ o.duracion_minutos }} min</template
-                  >
-                </span>
-                <span v-else class="tu-badge">{{
+                  ></template
+                >
+                <template v-else>{{
                   $t("catalogo.badgeEntitlement")
-                }}</span>
+                }}</template>
                 <span
                   v-if="guardadoId === o.id"
-                  class="text-sm"
+                  class="ml-2"
                   :style="{ color: 'var(--exito)' }"
                   >{{ $t("catalogo.guardado") }}</span
                 >
-              </div>
+              </p>
             </div>
             <button
               v-if="puedeGestionar && editandoId !== o.id"
