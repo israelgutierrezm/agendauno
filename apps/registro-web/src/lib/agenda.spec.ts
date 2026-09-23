@@ -9,7 +9,6 @@ import {
   kpisCitas,
   kpisClases,
   minutosLocal,
-  nivelCupo,
   PALETA_SERVICIO,
   tonoServicio,
   type SesionAgenda,
@@ -97,13 +96,6 @@ describe("agenda / colores y cupo", () => {
     expect(tonoServicio("zzz", catalogo)).toEqual(
       tonoServicio("zzz", catalogo),
     );
-  });
-
-  it("clasifica el cupo por umbrales", () => {
-    expect(nivelCupo(100)).toBe("alto");
-    expect(nivelCupo(90)).toBe("alto");
-    expect(nivelCupo(60)).toBe("medio");
-    expect(nivelCupo(20)).toBe("bajo");
   });
 
   it("toma las iniciales de nombre y apellido", () => {

@@ -6,6 +6,7 @@ import AgendaClasesSemana from "@/components/AgendaClasesSemana.vue";
 import AgendaKpis from "@/components/AgendaKpis.vue";
 import AgendaProfesionales from "@/components/AgendaProfesionales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import PanelCita from "@/components/PanelCita.vue";
 import PanelNuevaCita from "@/components/PanelNuevaCita.vue";
 import {
@@ -207,6 +208,45 @@ function sesionesDe(iso: string): Sesion[] {
 const diaSelInfo = computed(
   () => dias.value.find((d) => d.iso === diaSel.value) ?? dias.value[0],
 );
+
+/**
+ * Datos de una reserva del roster en una línea: el estado solo si no es el normal
+ * (confirmada), en ámbar si pide atención; lo demás en gris.
+ */
+function lineaRoster(r: Reserva): { texto: string; color: string }[] {
+  const out: { texto: string; color: string }[] = [];
+  if (r.estado !== "confirmada") {
+    out.push({
+      texto: t(`agenda.roster.${r.estado}`),
+      color:
+        r.estado === "en_espera" || r.estado === "ofrecida"
+          ? "var(--aviso)"
+          : "var(--texto-suave)",
+    });
+  }
+  if (r.asistencia) {
+    out.push({
+      texto: t(`agenda.roster.${r.asistencia}`),
+      color: "var(--texto-suave)",
+    });
+  }
+  if (r.canal && r.canal !== "directo") {
+    out.push({
+      texto: t(`agenda.canales.${r.canal}`),
+      color: "var(--texto-suave)",
+    });
+  }
+  if (r.primera_vez) {
+    out.push({ texto: t("agenda.roster.primeraVez"), color: "var(--aviso)" });
+  }
+  if (r.lugar) {
+    out.push({
+      texto: t("agenda.lugares.lugarN", { n: r.lugar }),
+      color: "var(--texto-suave)",
+    });
+  }
+  return out;
+}
 
 function completo(s: Sesion): boolean {
   return s.capacidad !== null && s.ocupados >= s.capacidad;
@@ -490,40 +530,12 @@ const profesionalesVisibles = computed(() =>
     ? instructores.value
     : instructores.value.filter((i) => i.id === instructorFiltro.value),
 );
-const ICONOS_KPI = {
-  calendario:
-    "M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z",
-  llego: "M14 4h5v16h-5M3 12h11M10 8l4 4-4 4",
-  pago: "M12 3v18M16.5 7.5c0-1.9-2-3-4.5-3s-4.5 1.2-4.5 3.2c0 4.3 9 2.3 9 6.6 0 2-2 3.2-4.5 3.2S7.5 18.3 7.5 16.5",
-  ausente: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9 9l6 6M15 9l-6 6",
-  ocupacion: "M21 12a9 9 0 1 1-9-9v9z",
-  check: "M5 12.5l4.2 4.2L19 7",
-  espera: "M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z",
-  mas: "M12 5v14M5 12h14",
-};
 function dineroMx(minor: number): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
     currency: "MXN",
     maximumFractionDigits: 0,
   }).format(minor / 100);
-}
-function kpi(
-  clave: string,
-  valor: string,
-  etiqueta: string,
-  icono: string,
-  fondo: string,
-  tinta: string,
-): {
-  clave: string;
-  valor: string;
-  etiqueta: string;
-  icono: string;
-  fondo: string;
-  tinta: string;
-} {
-  return { clave, valor, etiqueta, icono, fondo, tinta };
 }
 const tarjetasKpi = computed(() => {
   const ahora = new Date();
@@ -537,82 +549,55 @@ const tarjetasKpi = computed(() => {
       ahora,
     );
     return [
-      kpi(
-        "citas",
-        String(k.citas),
-        t("agendaVisual.kpis.citas"),
-        ICONOS_KPI.calendario,
-        "#E3EDFF",
-        "#0059CC",
-      ),
-      kpi(
-        "local",
-        String(k.enLocal),
-        t("agendaVisual.kpis.enLocal"),
-        ICONOS_KPI.llego,
-        "#EDE7FF",
-        "#5B21B6",
-      ),
-      kpi(
-        "cobrar",
-        dineroMx(k.porCobrarMinor),
-        t("agendaVisual.kpis.porCobrar", { n: k.pendientesPago }),
-        ICONOS_KPI.pago,
-        "#FFF1CC",
-        "#7A5200",
-      ),
-      kpi(
-        "ausentes",
-        String(k.noAsistieron),
-        t("agendaVisual.kpis.noAsistieron"),
-        ICONOS_KPI.ausente,
-        "#FDE6E6",
-        "#A11B1B",
-      ),
+      {
+        clave: "citas",
+        valor: String(k.citas),
+        etiqueta: t("agendaVisual.kpis.citas"),
+      },
+      {
+        clave: "local",
+        valor: String(k.enLocal),
+        etiqueta: t("agendaVisual.kpis.enLocal"),
+      },
+      {
+        clave: "cobrar",
+        valor: dineroMx(k.porCobrarMinor),
+        etiqueta: t("agendaVisual.kpis.porCobrar", { n: k.pendientesPago }),
+      },
+      {
+        clave: "ausentes",
+        valor: String(k.noAsistieron),
+        etiqueta: t("agendaVisual.kpis.noAsistieron"),
+      },
     ];
   }
   const k = kpisClases(sesionesVisibles.value, ahora);
   return [
-    kpi(
-      "clases",
-      String(k.clases),
-      t("agendaVisual.kpis.clases"),
-      ICONOS_KPI.calendario,
-      "#E3EDFF",
-      "#0059CC",
-    ),
-    kpi(
-      "ocupacion",
-      k.ocupacionPct !== null ? `${k.ocupacionPct}%` : "—",
-      t("agendaVisual.kpis.ocupacion"),
-      ICONOS_KPI.ocupacion,
-      "#E3F5EB",
-      "#0F6B3E",
-    ),
-    kpi(
-      "reservados",
-      String(k.reservados),
-      t("agendaVisual.kpis.reservados"),
-      ICONOS_KPI.check,
-      "#D6F2EA",
-      "#0A5A47",
-    ),
-    kpi(
-      "espera",
-      String(k.enEspera),
-      t("agendaVisual.kpis.enEspera"),
-      ICONOS_KPI.espera,
-      "#EDE7FF",
-      "#5B21B6",
-    ),
-    kpi(
-      "libres",
-      String(k.libresPorLlenar),
-      t("agendaVisual.kpis.libres"),
-      ICONOS_KPI.mas,
-      "#FEF0C7",
-      "#93370D",
-    ),
+    {
+      clave: "clases",
+      valor: String(k.clases),
+      etiqueta: t("agendaVisual.kpis.clases"),
+    },
+    {
+      clave: "ocupacion",
+      valor: k.ocupacionPct !== null ? `${k.ocupacionPct}%` : "—",
+      etiqueta: t("agendaVisual.kpis.ocupacion"),
+    },
+    {
+      clave: "reservados",
+      valor: String(k.reservados),
+      etiqueta: t("agendaVisual.kpis.reservados"),
+    },
+    {
+      clave: "espera",
+      valor: String(k.enEspera),
+      etiqueta: t("agendaVisual.kpis.enEspera"),
+    },
+    {
+      clave: "libres",
+      valor: String(k.libresPorLlenar),
+      etiqueta: t("agendaVisual.kpis.libres"),
+    },
   ];
 });
 
@@ -1398,7 +1383,6 @@ onMounted(async () => {
           :dias="dias"
           :sesiones="sesionesVisibles"
           :catalogo="catalogo"
-          :profesionales="instructores"
           :seleccionada="citaAbierta?.id ?? detalle?.id ?? null"
           @abrir="abrirDesdeAgenda"
         />
@@ -1461,14 +1445,11 @@ onMounted(async () => {
                 background: d.esHoy ? 'var(--primario-suave)' : 'transparent',
               }"
             >
-              <div
-                class="text-[11px] uppercase"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
+              <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
                 {{ d.nombre }}
               </div>
               <div
-                class="text-base font-bold"
+                class="text-base font-semibold"
                 :style="{
                   color: d.esHoy ? 'var(--primario-fuerte)' : 'var(--texto)',
                 }"
@@ -1604,8 +1585,8 @@ onMounted(async () => {
             "
             @click="diaSel = d.iso"
           >
-            <div class="text-[11px] uppercase opacity-80">{{ d.nombre }}</div>
-            <div class="text-base font-bold">{{ d.dia }}</div>
+            <div class="text-xs opacity-80">{{ d.nombre }}</div>
+            <div class="text-base font-semibold">{{ d.dia }}</div>
           </button>
         </div>
 
@@ -1638,13 +1619,11 @@ onMounted(async () => {
                   </div>
                 </div>
                 <span class="flex flex-col items-end gap-1 shrink-0">
-                  <span
-                    class="tu-badge"
-                    :style="{
-                      background: `color-mix(in srgb, ${COLOR_ESTADO[estadoAgenda(s)]} 16%, transparent)`,
-                      color: COLOR_ESTADO[estadoAgenda(s)],
-                    }"
-                  >
+                  <span class="inline-flex items-center gap-1.5 text-xs">
+                    <span
+                      class="tu-estado-dot"
+                      :style="{ background: COLOR_ESTADO[estadoAgenda(s)] }"
+                    ></span>
                     {{ $t(`agenda.estados.${estadoAgenda(s)}`) }}
                   </span>
                   <span
@@ -1692,12 +1671,14 @@ onMounted(async () => {
     <div v-if="detalle" class="fixed inset-0 z-50 flex justify-end">
       <div class="absolute inset-0 bg-black/50" @click="cerrarDetalle" />
       <aside
-        class="relative w-full max-w-md h-full overflow-y-auto p-5 shadow-xl"
+        class="relative w-full max-w-md h-full overflow-y-auto p-5"
         :style="{ background: 'var(--superficie)' }"
       >
         <div class="flex items-start justify-between gap-3">
           <div>
-            <h2 class="text-lg font-bold">{{ detalle.oferta ?? "—" }}</h2>
+            <h2 class="text-lg font-semibold">
+              {{ detalle.oferta ?? "—" }}
+            </h2>
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
               {{ horaCorta(detalle.inicia_en, detalle.zona_horaria) }}–{{
                 horaCorta(detalle.termina_en, detalle.zona_horaria)
@@ -1724,7 +1705,7 @@ onMounted(async () => {
             :aria-label="$t('agenda.cerrarDetalle')"
             @click="cerrarDetalle"
           >
-            ✕
+            <IconoNav nombre="cerrar" :tam="18" />
           </button>
         </div>
 
@@ -1836,34 +1817,18 @@ onMounted(async () => {
           <ul v-else class="mt-2 space-y-2">
             <li v-for="r in roster" :key="r.id" class="text-sm">
               <div class="flex items-center justify-between gap-2">
-                <span class="flex items-center gap-2 min-w-0">
-                  <span class="truncate">{{ r.persona ?? "—" }}</span>
-                  <span
-                    class="tu-badge"
-                    :class="{
-                      'tu-badge-exito': r.estado === 'confirmada',
-                      'tu-badge-aviso':
-                        r.estado === 'en_espera' || r.estado === 'ofrecida',
-                    }"
-                    >{{ $t(`agenda.roster.${r.estado}`) }}</span
-                  >
-                  <span v-if="r.asistencia" class="tu-badge">{{
-                    $t(`agenda.roster.${r.asistencia}`)
+                <span class="min-w-0">
+                  <span class="block truncate font-medium">{{
+                    r.persona ?? "—"
                   }}</span>
-                  <span
-                    v-if="r.canal && r.canal !== 'directo'"
-                    class="tu-badge"
-                    >{{ $t(`agenda.canales.${r.canal}`) }}</span
-                  >
-                  <span
-                    v-if="r.primera_vez"
-                    class="tu-badge tu-badge-aviso"
-                    :title="$t('agenda.roster.primeraVezAyuda')"
-                    >{{ $t("agenda.roster.primeraVez") }}</span
-                  >
-                  <span v-if="r.lugar" class="tu-badge">{{
-                    $t("agenda.lugares.lugarN", { n: r.lugar })
-                  }}</span>
+                  <span v-if="lineaRoster(r).length > 0" class="block text-xs">
+                    <span
+                      v-for="(d, i) in lineaRoster(r)"
+                      :key="d.texto"
+                      :style="{ color: d.color }"
+                      >{{ i > 0 ? " · " : "" }}{{ d.texto }}</span
+                    >
+                  </span>
                 </span>
                 <span class="flex items-center gap-2 shrink-0">
                   <button

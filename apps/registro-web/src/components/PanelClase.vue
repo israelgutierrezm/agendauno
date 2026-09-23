@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -62,6 +63,43 @@ const libres = computed(() => {
   const cap = props.sesion.capacidad;
   return cap === null ? null : Math.max(0, cap - enSala.value.length);
 });
+
+/**
+ * Avisos de un alumno en una sola línea de texto: en ámbar lo que hay que atender
+ * (o saber, como la primera visita) y el adeudo en rojo; sin píldoras.
+ */
+function avisos(
+  r: Reserva,
+): { texto: string; color: string; ayuda?: string }[] {
+  const out: { texto: string; color: string; ayuda?: string }[] = [];
+  if (r.estado === "ofrecida") {
+    out.push({ texto: t("agenda.roster.ofrecida"), color: "var(--aviso)" });
+  }
+  if (r.estado === "pendiente_pago") {
+    out.push({
+      texto: t("agenda.roster.pendiente_pago"),
+      color: "var(--aviso)",
+    });
+  }
+  if (r.adeudo) {
+    out.push({ texto: t("agenda.roster.adeudo"), color: "var(--error)" });
+  }
+  if (r.documentos_pendientes > 0) {
+    out.push({
+      texto: t("agenda.roster.documentos"),
+      color: "var(--aviso)",
+      ayuda: t("agenda.roster.documentosAyuda"),
+    });
+  }
+  if (r.primera_vez) {
+    out.push({
+      texto: t("agenda.roster.primeraVez"),
+      color: "var(--aviso)",
+      ayuda: t("agenda.roster.primeraVezAyuda"),
+    });
+  }
+  return out;
+}
 
 function hora(iso: string, zona: string): string {
   return new Intl.DateTimeFormat("es-MX", {
@@ -217,7 +255,9 @@ watch(() => props.sesion.id, cargar, { immediate: true });
       >
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <p class="text-lg font-bold truncate">{{ sesion.oferta ?? "—" }}</p>
+            <p class="text-lg font-semibold truncate">
+              {{ sesion.oferta ?? "—" }}
+            </p>
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
               {{ hora(sesion.inicia_en, sesion.zona_horaria) }}
               <template v-if="sesion.instructor">
@@ -231,24 +271,22 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             :aria-label="$t('recepcion.panel.cerrar')"
             @click="emit('cerrar')"
           >
-            <span aria-hidden="true">✕</span>
+            <IconoNav nombre="cerrar" :tam="18" />
           </button>
         </div>
-        <!-- Resumen -->
-        <div class="mt-3 flex flex-wrap gap-2 text-xs">
-          <span class="tu-badge">{{
-            $t("recepcion.panel.presentes", { n: presentes })
-          }}</span>
-          <span class="tu-badge tu-badge-exito">{{
-            $t("recepcion.panel.enSala", { n: enSala.length })
-          }}</span>
-          <span v-if="libres !== null" class="tu-badge">{{
-            $t("recepcion.panel.libres", { n: libres })
-          }}</span>
-          <span v-if="enEspera.length > 0" class="tu-badge tu-badge-aviso">{{
-            $t("recepcion.panel.espera", { n: enEspera.length })
-          }}</span>
-        </div>
+        <!-- Resumen en una línea -->
+        <p class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("recepcion.panel.enSala", { n: enSala.length }) }} ·
+          {{ $t("recepcion.panel.presentes", { n: presentes })
+          }}<template v-if="libres !== null">
+            · {{ $t("recepcion.panel.libres", { n: libres }) }}</template
+          ><template v-if="enEspera.length > 0">
+            ·
+            <span :style="{ color: 'var(--aviso)' }">{{
+              $t("recepcion.panel.espera", { n: enEspera.length })
+            }}</span></template
+          >
+        </p>
       </header>
 
       <div class="flex-1 px-5 py-4">
@@ -329,64 +367,48 @@ watch(() => props.sesion.id, cargar, { immediate: true });
           </p>
 
           <!-- En sala: confirmadas + ofrecidas (check-in) -->
-          <ul v-if="enSala.length > 0" class="space-y-2">
-            <li v-for="r in enSala" :key="r.id" class="tu-card p-3">
-              <div class="flex items-center justify-between gap-2">
-                <span class="flex flex-wrap items-center gap-1.5 min-w-0">
+          <ul v-if="enSala.length > 0">
+            <li
+              v-for="r in enSala"
+              :key="r.id"
+              class="border-t py-3 first:border-t-0 first:pt-0"
+              :style="{ borderColor: 'var(--borde)' }"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
                   <RouterLink
                     v-if="r.persona_id"
                     :to="{
                       name: 'ficha-miembro',
                       params: { id: r.persona_id },
                     }"
-                    class="font-medium truncate tu-enlace"
+                    class="block font-medium truncate hover:underline"
                     >{{ r.persona ?? "—" }}</RouterLink
                   >
-                  <span v-else class="font-medium truncate">{{
+                  <span v-else class="block font-medium truncate">{{
                     r.persona ?? "—"
                   }}</span>
-                  <span
-                    v-if="r.estado === 'ofrecida'"
-                    class="tu-badge tu-badge-aviso"
-                    >{{ $t("agenda.roster.ofrecida") }}</span
-                  >
-                  <span
-                    v-if="r.estado === 'pendiente_pago'"
-                    class="tu-badge tu-badge-aviso"
-                    >{{ $t("agenda.roster.pendiente_pago") }}</span
-                  >
-                  <span
-                    v-if="r.primera_vez"
-                    class="tu-badge tu-badge-aviso"
-                    :title="$t('agenda.roster.primeraVezAyuda')"
-                    >{{ $t("agenda.roster.primeraVez") }}</span
-                  >
-                  <span
-                    v-if="r.adeudo"
-                    class="tu-badge"
-                    :style="{
-                      background: 'var(--error-suave)',
-                      color: 'var(--error)',
-                    }"
-                    >{{ $t("agenda.roster.adeudo") }}</span
-                  >
-                  <span
-                    v-if="r.documentos_pendientes > 0"
-                    class="tu-badge tu-badge-aviso"
-                    :title="$t('agenda.roster.documentosAyuda')"
-                    >{{ $t("agenda.roster.documentos") }}</span
-                  >
-                  <span
-                    v-if="r.asistencia === 'presente'"
-                    class="tu-badge tu-badge-exito"
-                    >{{ $t("agenda.roster.presente") }}</span
-                  >
-                  <span
-                    v-else-if="r.asistencia === 'ausente'"
-                    class="tu-badge"
-                    >{{ $t("agenda.roster.ausente") }}</span
-                  >
-                </span>
+                  <p v-if="avisos(r).length > 0" class="text-xs">
+                    <span
+                      v-for="(a, i) in avisos(r)"
+                      :key="a.texto"
+                      :style="{ color: a.color }"
+                      :title="a.ayuda"
+                      >{{ i > 0 ? " · " : "" }}{{ a.texto }}</span
+                    >
+                  </p>
+                </div>
+                <span
+                  v-if="r.asistencia === 'presente'"
+                  class="tu-badge tu-badge-exito shrink-0"
+                  >{{ $t("agenda.roster.presente") }}</span
+                >
+                <span
+                  v-else-if="r.asistencia === 'ausente'"
+                  class="text-xs shrink-0"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ $t("agenda.roster.ausente") }}</span
+                >
               </div>
               <div class="mt-2 flex flex-wrap items-center gap-2">
                 <button

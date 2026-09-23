@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -105,10 +106,8 @@ async function vender(): Promise<void> {
 }
 
 // Chip ámbar para "por vencer"; roja para el resto de alertas.
-function estiloAlerta(codigo: string): Record<string, string> {
-  return codigo === "membresia_por_vencer"
-    ? { background: "var(--aviso-suave)", color: "var(--aviso)" }
-    : { background: "var(--error-suave)", color: "var(--error)" };
+function colorAlerta(codigo: string): string {
+  return codigo === "membresia_por_vencer" ? "var(--aviso)" : "var(--error)";
 }
 
 function fecha(iso: string, zona: string | null): string {
@@ -156,7 +155,7 @@ watch(() => props.personaId, cargar, { immediate: true });
       >
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <p class="text-lg font-bold truncate">
+            <p class="text-lg font-semibold truncate">
               {{ resumen?.nombre_completo ?? nombre }}
             </p>
             <p
@@ -173,7 +172,7 @@ watch(() => props.personaId, cargar, { immediate: true });
             :aria-label="$t('recepcion.panel.cerrar')"
             @click="emit('cerrar')"
           >
-            <span aria-hidden="true">✕</span>
+            <IconoNav nombre="cerrar" :tam="18" />
           </button>
         </div>
       </header>
@@ -201,9 +200,14 @@ watch(() => props.personaId, cargar, { immediate: true });
             <span
               v-for="a in resumen.alertas"
               :key="a"
-              class="tu-badge"
-              :style="estiloAlerta(a)"
-              >{{ $t(`recepcion.alertas.${a}`) }}</span
+              class="inline-flex items-center gap-1.5 text-sm font-medium"
+              :style="{ color: colorAlerta(a) }"
+            >
+              <span
+                class="h-1.5 w-1.5 rounded-full"
+                :style="{ background: colorAlerta(a) }"
+                aria-hidden="true"
+              />{{ $t(`recepcion.alertas.${a}`) }}</span
             >
           </div>
 
@@ -265,7 +269,8 @@ watch(() => props.personaId, cargar, { immediate: true });
                 {{ resumen.asistencias }}
                 <span
                   v-if="resumen.primera_vez"
-                  class="tu-badge tu-badge-aviso ml-1"
+                  class="ml-1 text-xs font-medium"
+                  :style="{ color: 'var(--aviso)' }"
                   >{{ $t("agenda.roster.primeraVez") }}</span
                 >
               </dd>

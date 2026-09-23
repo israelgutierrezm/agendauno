@@ -119,17 +119,6 @@ export const PALETA_SERVICIO: readonly Tono[] = [
 ];
 
 /** Colores sólidos para identificar a cada profesional (avatar, columna). */
-export const PALETA_PROFESIONAL: readonly string[] = [
-  "#2563EB",
-  "#0B8468",
-  "#C2410C",
-  "#7C3AED",
-  "#DB2777",
-  "#0E7490",
-  "#4D7C0F",
-  "#B45309",
-];
-
 function hash(texto: string): number {
   let h = 0;
   for (let i = 0; i < texto.length; i++) {
@@ -152,13 +141,6 @@ export function tonoServicio(
   return PALETA_SERVICIO[idx % PALETA_SERVICIO.length];
 }
 
-export function colorProfesional(indice: number): string {
-  return PALETA_PROFESIONAL[
-    ((indice % PALETA_PROFESIONAL.length) + PALETA_PROFESIONAL.length) %
-      PALETA_PROFESIONAL.length
-  ];
-}
-
 export function iniciales(nombre: string | null): string {
   const partes = (nombre ?? "").trim().split(/\s+/).filter(Boolean);
   return partes
@@ -177,6 +159,20 @@ export type EstadoCita =
   | "completada"
   | "no_asistio"
   | "cancelada";
+
+/**
+ * Color del punto de estado de una cita (variables del tema). La tarjeta lleva el
+ * color del servicio; el del estado es solo un punto, para no competir con él.
+ */
+export const COLOR_ESTADO_CITA: Record<EstadoCita, string> = {
+  confirmada: "var(--exito)",
+  pendiente_pago: "var(--aviso)",
+  llego: "var(--acento)",
+  en_servicio: "var(--acento)",
+  completada: "var(--texto-suave)",
+  no_asistio: "var(--error)",
+  cancelada: "var(--texto-suave)",
+};
 
 /**
  * Estado operativo de una cita a la hora `ahora`: la reserva dice si está pagada y la
@@ -203,22 +199,12 @@ export function estadoCita(s: SesionAgenda, ahora: Date): EstadoCita {
 
 // ------------------------------------------------------------ cupo clase
 
-export type NivelCupo = "alto" | "medio" | "bajo";
-
 export function pctCupo(
   s: Pick<SesionAgenda, "capacidad" | "ocupados">,
 ): number | null {
   return s.capacidad !== null && s.capacidad > 0
     ? Math.round((s.ocupados / s.capacidad) * 100)
     : null;
-}
-
-/** 90% o más = alto (verde), 40–89% = medio (azul), menos de 40% = bajo (ámbar). */
-export function nivelCupo(pct: number): NivelCupo {
-  if (pct >= 90) {
-    return "alto";
-  }
-  return pct >= 40 ? "medio" : "bajo";
 }
 
 // --------------------------------------------------------------- carriles

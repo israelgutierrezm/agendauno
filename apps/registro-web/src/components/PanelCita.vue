@@ -2,12 +2,13 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import {
   aHora,
+  COLOR_ESTADO_CITA,
   duracionMin,
   estadoCita,
-  iniciales,
   minutosLocal,
   tonoServicio,
   type SesionAgenda,
@@ -166,25 +167,8 @@ function cancelar(): void {
     @cerrar="emit('cerrar')"
   >
     <div v-if="sesion !== null" class="space-y-5 p-5">
-      <div class="flex items-center gap-2 flex-wrap">
-        <span class="tu-badge font-bold" :class="`pc-estado-${estado}`">{{
-          $t(`agendaVisual.estadosCita.${estado}`)
-        }}</span>
-        <span
-          v-if="porCobrar"
-          class="tu-badge font-bold"
-          :style="{ background: '#FFF1CC', color: '#7A5200' }"
-          >{{ $t("agendaVisual.cita.porCobrar") }}</span
-        >
-      </div>
-
       <div class="flex items-center gap-3">
-        <span
-          class="pc-avatar"
-          :style="{ background: tono?.fondo, color: tono?.tinta }"
-          aria-hidden="true"
-          >{{ iniciales(cita?.cliente ?? null) || "?" }}</span
-        >
+        <AvatarIniciales :nombre="cita?.cliente" tam="lg" />
         <div class="min-w-0">
           <p class="text-xl font-semibold truncate">
             {{ cita?.cliente ?? $t("agendaVisual.profesionales.sinCliente") }}
@@ -194,6 +178,19 @@ function cancelar(): void {
             :style="{ color: 'var(--texto-suave)' }"
           >
             {{ horario }}
+          </p>
+          <p class="mt-1 flex flex-wrap items-center gap-x-3 text-sm">
+            <span class="inline-flex items-center gap-1.5">
+              <span
+                class="h-2 w-2 rounded-full"
+                :style="{ background: COLOR_ESTADO_CITA[estado] }"
+                aria-hidden="true"
+              ></span
+              >{{ $t(`agendaVisual.estadosCita.${estado}`) }}</span
+            >
+            <span v-if="porCobrar" class="tu-badge tu-badge-aviso">{{
+              $t("agendaVisual.cita.porCobrar")
+            }}</span>
           </p>
         </div>
       </div>
@@ -277,17 +274,6 @@ function cancelar(): void {
 </template>
 
 <style scoped>
-.pc-avatar {
-  width: 3.25rem;
-  height: 3.25rem;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 1.1rem;
-  flex-shrink: 0;
-}
 .pc-datos {
   display: grid;
   grid-template-columns: 6.5rem minmax(0, 1fr);
@@ -300,30 +286,9 @@ function cancelar(): void {
 }
 .pc-datos dt {
   color: var(--texto-suave);
-  font-weight: 600;
 }
 .pc-datos dd {
   margin: 0;
-  font-weight: 700;
-}
-.pc-estado-confirmada {
-  background: #e3f5eb;
-  color: #0f6b3e;
-}
-.pc-estado-pendiente_pago {
-  background: #fff1cc;
-  color: #7a5200;
-}
-.pc-estado-llego {
-  background: #e3edff;
-  color: #0b4fd1;
-}
-.pc-estado-en_servicio {
-  background: #ede7ff;
-  color: #5b21b6;
-}
-.pc-estado-no_asistio {
-  background: #fde6e6;
-  color: #a11b1b;
+  font-weight: 500;
 }
 </style>

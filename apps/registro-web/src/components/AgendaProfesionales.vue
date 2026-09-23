@@ -9,17 +9,17 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import {
   aHora,
   aMinutos,
   carriles,
-  colorProfesional,
+  COLOR_ESTADO_CITA,
   diaIso,
   duracionMin,
   estadoCita,
   fechaLocal,
   fueraDeHorario,
-  iniciales,
   minutosLocal,
   tonoServicio,
   type EstadoCita,
@@ -103,48 +103,6 @@ const horas = computed(() => {
   return out;
 });
 
-const ESTADO_ESTILO: Record<
-  EstadoCita,
-  { fondo: string; tinta: string; icono: string }
-> = {
-  confirmada: {
-    fondo: "#E3F5EB",
-    tinta: "#0F6B3E",
-    icono: "M5 12.5l4.2 4.2L19 7",
-  },
-  pendiente_pago: {
-    fondo: "#FFF1CC",
-    tinta: "#7A5200",
-    icono:
-      "M12 3v18M16.5 7.5c0-1.9-2-3-4.5-3s-4.5 1.2-4.5 3.2c0 4.3 9 2.3 9 6.6 0 2-2 3.2-4.5 3.2S7.5 18.3 7.5 16.5",
-  },
-  llego: {
-    fondo: "#E3EDFF",
-    tinta: "#0B4FD1",
-    icono: "M14 4h5v16h-5M3 12h11M10 8l4 4-4 4",
-  },
-  en_servicio: {
-    fondo: "#EDE7FF",
-    tinta: "#5B21B6",
-    icono: "M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z",
-  },
-  completada: {
-    fondo: "#EEF0F4",
-    tinta: "#475063",
-    icono: "M2 12.5l4 4L15 7M9 16.5l1 1L22 7",
-  },
-  no_asistio: {
-    fondo: "#FDE6E6",
-    tinta: "#A11B1B",
-    icono: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9 9l6 6M15 9l-6 6",
-  },
-  cancelada: {
-    fondo: "#EEF0F4",
-    tinta: "#667085",
-    icono: "M6 6l12 12M18 6L6 18",
-  },
-};
-
 interface Tarjeta {
   sesion: SesionAgenda;
   top: number;
@@ -163,8 +121,6 @@ interface Tarjeta {
 interface Columna {
   id: string | null;
   nombre: string;
-  color: string;
-  iniciales: string;
   tarjetas: Tarjeta[];
   fuera: { top: number; alto: number; etiqueta: string }[];
   resumen: string;
@@ -210,7 +166,7 @@ function tarjetasDe(sesiones: SesionAgenda[]): Tarjeta[] {
 }
 
 const columnas = computed<Columna[]>(() => {
-  const cols: Columna[] = props.profesionales.map((p, i) => {
+  const cols: Columna[] = props.profesionales.map((p) => {
     const propias = delDia.value.filter((s) => s.instructor_id === p.id);
     const ventanas = ventanasDelDia.value
       .filter((v) => v.instructor_id === p.id)
@@ -236,8 +192,6 @@ const columnas = computed<Columna[]>(() => {
     return {
       id: p.id,
       nombre: p.nombre,
-      color: colorProfesional(i),
-      iniciales: iniciales(p.nombre),
       tarjetas: tarjetasDe(propias),
       fuera: fuera.map((f) => ({
         top: y(f.ini),
@@ -264,8 +218,6 @@ const columnas = computed<Columna[]>(() => {
     cols.push({
       id: null,
       nombre: t("agendaVisual.profesionales.sinAsignar"),
-      color: "#667085",
-      iniciales: "?",
       tarjetas: tarjetasDe(sinAsignar),
       fuera: [],
       resumen: t(
@@ -359,17 +311,11 @@ watch(() => props.fecha, enfocar);
           :key="`h-${c.id ?? 'x'}`"
           class="ag-cabecera"
         >
-          <span
-            class="ag-avatar"
-            :style="{
-              background: c.color,
-              boxShadow: `0 0 0 3px var(--superficie), 0 0 0 4px ${c.color}55`,
-            }"
-            aria-hidden="true"
-            >{{ c.iniciales }}</span
-          >
+          <AvatarIniciales :nombre="c.nombre" tam="md" />
           <span class="min-w-0 flex-1">
-            <span class="block font-bold text-sm truncate">{{ c.nombre }}</span>
+            <span class="block font-semibold text-sm truncate">{{
+              c.nombre
+            }}</span>
             <span class="block text-xs" :style="{ color: 'var(--texto-suave)' }"
               >{{ c.resumen
               }}<template v-if="c.ocupacion !== null">
@@ -386,9 +332,7 @@ watch(() => props.fecha, enfocar);
               class="ag-barra"
               aria-hidden="true"
             >
-              <span
-                :style="{ width: `${c.ocupacion}%`, background: c.color }"
-              ></span>
+              <span :style="{ width: `${c.ocupacion}%` }"></span>
             </span>
           </span>
         </div>
@@ -485,7 +429,7 @@ watch(() => props.fecha, enfocar);
                 <span
                   v-if="tj.estado"
                   class="ag-punto"
-                  :style="{ background: ESTADO_ESTILO[tj.estado].tinta }"
+                  :style="{ background: COLOR_ESTADO_CITA[tj.estado] }"
                 ></span>
               </span>
             </template>
@@ -496,51 +440,18 @@ watch(() => props.fecha, enfocar);
                 }}</span>
                 <span
                   v-if="tj.estado && tj.alto < 72"
-                  class="ag-icono-estado"
-                  :style="{
-                    background: ESTADO_ESTILO[tj.estado].fondo,
-                    color: ESTADO_ESTILO[tj.estado].tinta,
-                  }"
-                >
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="3"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path :d="ESTADO_ESTILO[tj.estado].icono" />
-                  </svg>
-                </span>
+                  class="ag-punto"
+                  :style="{ background: COLOR_ESTADO_CITA[tj.estado] }"
+                ></span>
               </span>
               <span class="ag-linea2 truncate"
                 >{{ tj.hora }} · {{ tj.servicio }}</span
               >
-              <span
-                v-if="tj.estado && tj.alto >= 72"
-                class="ag-chip"
-                :style="{
-                  background: ESTADO_ESTILO[tj.estado].fondo,
-                  color: ESTADO_ESTILO[tj.estado].tinta,
-                }"
-              >
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="3"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path :d="ESTADO_ESTILO[tj.estado].icono" />
-                </svg>
+              <span v-if="tj.estado && tj.alto >= 72" class="ag-estado">
+                <span
+                  class="ag-punto"
+                  :style="{ background: COLOR_ESTADO_CITA[tj.estado] }"
+                ></span>
                 {{ $t(`agendaVisual.estadosCita.${tj.estado}`) }}
               </span>
             </template>
@@ -589,18 +500,6 @@ watch(() => props.fecha, enfocar);
   padding: 0.7rem 0.75rem;
   border-left: 1px solid var(--borde);
 }
-.ag-avatar {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 999px;
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 0.8rem;
-  flex-shrink: 0;
-}
 .ag-barra {
   display: block;
   height: 4px;
@@ -613,6 +512,7 @@ watch(() => props.fecha, enfocar);
   display: block;
   height: 100%;
   border-radius: 999px;
+  background: var(--texto-suave);
 }
 .ag-eje {
   position: relative;
@@ -623,8 +523,9 @@ watch(() => props.fecha, enfocar);
   right: 0.5rem;
   transform: translateY(-50%);
   font-size: 0.68rem;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--texto-suave);
+  font-variant-numeric: tabular-nums;
 }
 .ag-hora:first-child {
   transform: translateY(0.2rem);
@@ -638,7 +539,7 @@ watch(() => props.fecha, enfocar);
   background: #e5484d;
   color: #fff;
   font-size: 0.66rem;
-  font-weight: 800;
+  font-weight: 600;
   display: flex;
   align-items: center;
   z-index: 5;
@@ -676,7 +577,7 @@ watch(() => props.fecha, enfocar);
   justify-content: center;
   padding-top: 0.5rem;
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--texto-suave);
   pointer-events: none;
 }
@@ -690,7 +591,7 @@ watch(() => props.fecha, enfocar);
   background: color-mix(in srgb, var(--acento) 8%, transparent);
   color: var(--acento);
   font-size: 0.75rem;
-  font-weight: 800;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -711,14 +612,10 @@ watch(() => props.fecha, enfocar);
   gap: 0.15rem;
   overflow: hidden;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgb(16 24 40 / 8%);
-  transition:
-    transform 0.1s ease,
-    box-shadow 0.15s ease;
+  transition: filter 0.15s ease;
 }
 .ag-tarjeta:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgb(16 24 40 / 14%);
+  filter: brightness(0.97);
   z-index: 4;
 }
 .ag-tarjeta:focus-visible {
@@ -730,9 +627,7 @@ watch(() => props.fecha, enfocar);
   justify-content: center;
 }
 .ag-sel {
-  box-shadow:
-    0 0 0 2px var(--acento),
-    0 8px 18px color-mix(in srgb, var(--acento) 28%, transparent);
+  box-shadow: 0 0 0 2px var(--acento);
   z-index: 4;
 }
 .ag-tenue {
@@ -744,12 +639,12 @@ watch(() => props.fecha, enfocar);
   gap: 0.35rem;
   min-width: 0;
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
 }
 .ag-linea2 {
   font-size: 0.7rem;
-  font-weight: 600;
+  font-weight: 500;
   opacity: 0.85;
 }
 .ag-punto {
@@ -758,25 +653,13 @@ watch(() => props.fecha, enfocar);
   border-radius: 999px;
   flex-shrink: 0;
 }
-.ag-icono-estado {
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
+.ag-estado {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.ag-chip {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-top: 0.15rem;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 500;
 }
 /* Posicionada en el área de la fila 2 (las columnas): top relativo a esa área. */
 .ag-ahora {

@@ -3,12 +3,9 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import {
-  colorProfesional,
   duracionMin,
   fechaLocal,
-  iniciales,
   minutosLocal,
-  nivelCupo,
   pctCupo,
   tonoServicio,
   aHora,
@@ -17,14 +14,13 @@ import {
 
 /**
  * Semana de CLASES en dos franjas (mañana / tarde) × días: cada clase es una tarjeta
- * con el color de su tipo, quién la imparte, la sala y una barra de cupo con su
- * semáforo (lleno, medio, bajo) y avisos (llena, en espera, quedan pocos).
+ * con el color de su tipo (el único color de la agenda), quién la imparte, la sala,
+ * una barra de cupo y, solo si hace falta, un aviso en texto (llena, en espera…).
  */
 const props = defineProps<{
   dias: { iso: string; nombre: string; dia: number; esHoy: boolean }[];
   sesiones: SesionAgenda[];
   catalogo: string[];
-  profesionales: { id: string; nombre: string }[];
   seleccionada: string | null;
 }>();
 
@@ -43,23 +39,16 @@ onBeforeUnmount(() => window.clearInterval(reloj));
 
 const CORTE_TARDE = 14 * 60;
 
-const COLOR_CUPO = {
-  alto: "#079455",
-  medio: "#0070FF",
-  bajo: "#DC6803",
-} as const;
-
 interface Tarjeta {
   sesion: SesionAgenda;
   hora: string;
   nombre: string;
   detalle: string;
-  iniciales: string;
-  colorInstructor: string;
   cupo: string;
   pct: number;
-  colorBarra: string;
-  chip: { texto: string; fondo: string; tinta: string } | null;
+  // Aviso en texto; `urgente` (en curso / cancelada) va en rojo, el resto en la
+  // tinta de la tarjeta.
+  aviso: { texto: string; urgente: boolean } | null;
   pasada: boolean;
   enCurso: boolean;
   fondo: string;
@@ -77,47 +66,26 @@ function tarjeta(s: SesionAgenda): Tarjeta {
   const pct = pctCupo(s) ?? 0;
   const libres =
     s.capacidad !== null ? Math.max(0, s.capacidad - s.ocupados) : null;
-  const iInstructor = props.profesionales.findIndex(
-    (p) => p.id === s.instructor_id,
-  );
 
-  let chip: Tarjeta["chip"] = null;
+  let aviso: Tarjeta["aviso"] = null;
   if (cancelada) {
-    chip = {
-      texto: t("agendaVisual.semana.cancelada"),
-      fondo: "#FDE6E6",
-      tinta: "#A11B1B",
-    };
+    aviso = { texto: t("agendaVisual.semana.cancelada"), urgente: true };
   } else if (enCurso) {
-    chip = {
-      texto: t("agendaVisual.semana.enCurso"),
-      fondo: "#D92D20",
-      tinta: "#FFFFFF",
-    };
+    aviso = { texto: t("agendaVisual.semana.enCurso"), urgente: true };
   } else if (!pasada && s.en_espera > 0) {
-    chip = {
+    aviso = {
       texto: t("agendaVisual.semana.enEspera", { n: s.en_espera }),
-      fondo: "#FFFFFF",
-      tinta: "#5B21B6",
+      urgente: false,
     };
   } else if (!pasada && libres === 0) {
-    chip = {
-      texto: t("agendaVisual.semana.llena"),
-      fondo: "#FFFFFF",
-      tinta: "#0F6B3E",
-    };
+    aviso = { texto: t("agendaVisual.semana.llena"), urgente: false };
   } else if (!pasada && libres !== null && libres <= 2) {
-    chip = {
+    aviso = {
       texto: t("agendaVisual.semana.quedan", { n: libres }),
-      fondo: "#FFFFFF",
-      tinta: "#0B4FD1",
+      urgente: false,
     };
   } else if (!pasada && s.capacidad !== null && pct < 40) {
-    chip = {
-      texto: t("agendaVisual.semana.baja"),
-      fondo: "#FFFFFF",
-      tinta: "#B54708",
-    };
+    aviso = { texto: t("agendaVisual.semana.baja"), urgente: false };
   }
 
   const inicio = minutosLocal(s.inicia_en, s.zona_horaria);
@@ -126,14 +94,10 @@ function tarjeta(s: SesionAgenda): Tarjeta {
     hora: `${aHora(inicio)}–${aHora(inicio + duracionMin(s))}`,
     nombre: s.oferta ?? "—",
     detalle: [s.instructor?.split(" ")[0], s.sala].filter(Boolean).join(" · "),
-    iniciales: iniciales(s.instructor),
-    colorInstructor:
-      iInstructor >= 0 ? colorProfesional(iInstructor) : "#667085",
     cupo:
       s.capacidad !== null ? `${s.ocupados}/${s.capacidad}` : `${s.ocupados}`,
     pct: Math.min(100, pct),
-    colorBarra: COLOR_CUPO[nivelCupo(pct)],
-    chip,
+    aviso,
     pasada: pasada || cancelada,
     enCurso,
     fondo: tono.fondo,
@@ -177,16 +141,11 @@ const franjas = computed(() => [
     clave: "manana" as const,
     etiqueta: t("agendaVisual.semana.manana"),
     rango: t("agendaVisual.semana.rangoManana"),
-    icono:
-      "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4",
-    color: "#DC6803",
   },
   {
     clave: "tarde" as const,
     etiqueta: t("agendaVisual.semana.tarde"),
     rango: t("agendaVisual.semana.rangoTarde"),
-    icono: "M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z",
-    color: "#4A2A8F",
   },
 ]);
 </script>
@@ -215,20 +174,7 @@ const franjas = computed(() => [
 
         <template v-for="f in franjas" :key="f.clave">
           <div class="cs-franja">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              :stroke="f.color"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path :d="f.icono" />
-            </svg>
-            <span class="text-xs font-semibold">{{ f.etiqueta }}</span>
+            <span class="text-xs font-medium">{{ f.etiqueta }}</span>
             <span
               class="text-[0.68rem]"
               :style="{ color: 'var(--texto-suave)' }"
@@ -260,36 +206,25 @@ const franjas = computed(() => [
                   tj.hora.slice(0, 5)
                 }}</span>
                 <span
-                  v-if="tj.chip"
-                  class="cs-chip"
-                  :style="{ background: tj.chip.fondo, color: tj.chip.tinta }"
-                  >{{ tj.chip.texto }}</span
+                  v-if="tj.aviso"
+                  class="cs-aviso"
+                  :class="{ 'cs-aviso-urgente': tj.aviso.urgente }"
+                  >{{ tj.aviso.texto }}</span
                 >
               </span>
               <span class="cs-nombre truncate">{{ tj.nombre }}</span>
               <span
-                v-if="tj.detalle !== '' || tj.iniciales !== ''"
-                class="flex items-center gap-1.5 min-w-0 text-[0.7rem] font-semibold"
+                v-if="tj.detalle !== ''"
+                class="truncate text-[0.7rem] cs-suave"
+                >{{ tj.detalle }}</span
               >
-                <span
-                  v-if="tj.iniciales !== ''"
-                  class="cs-avatar"
-                  :style="{ background: tj.colorInstructor }"
-                  aria-hidden="true"
-                  >{{ tj.iniciales }}</span
-                >
-                <span class="truncate cs-suave">{{ tj.detalle }}</span>
-              </span>
               <span class="flex items-center gap-2">
                 <span class="cs-barra" aria-hidden="true">
-                  <span
-                    :style="{
-                      width: `${tj.pct}%`,
-                      background: tj.pasada ? 'currentColor' : tj.colorBarra,
-                    }"
-                  ></span>
+                  <span :style="{ width: `${tj.pct}%` }"></span>
                 </span>
-                <span class="text-[0.7rem] font-semibold">{{ tj.cupo }}</span>
+                <span class="text-[0.7rem] font-medium tabular-nums">{{
+                  tj.cupo
+                }}</span>
               </span>
             </button>
           </div>
@@ -321,10 +256,7 @@ const franjas = computed(() => [
   border-left: 1px solid var(--borde);
 }
 .cs-dia-nombre {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 0.75rem;
   color: var(--texto-suave);
 }
 .cs-dia-num {
@@ -336,7 +268,7 @@ const franjas = computed(() => [
   align-items: center;
   justify-content: center;
   font-size: 0.95rem;
-  font-weight: 800;
+  font-weight: 600;
 }
 .cs-dia-num-hoy {
   background: var(--acento);
@@ -350,9 +282,8 @@ const franjas = computed(() => [
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.3rem;
+  gap: 0.15rem;
   padding: 0.75rem 0.25rem;
-  background: var(--superficie-2);
   border-bottom: 1px solid var(--borde);
 }
 .cs-celda {
@@ -377,23 +308,17 @@ const franjas = computed(() => [
   flex-direction: column;
   gap: 0.2rem;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgb(16 24 40 / 8%);
-  transition:
-    transform 0.1s ease,
-    box-shadow 0.15s ease;
+  transition: filter 0.15s ease;
 }
 .cs-tarjeta:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgb(16 24 40 / 14%);
+  filter: brightness(0.97);
 }
 .cs-tarjeta:focus-visible {
   outline: 2px solid var(--acento);
   outline-offset: 2px;
 }
 .cs-sel {
-  box-shadow:
-    0 0 0 2px var(--acento),
-    0 8px 18px color-mix(in srgb, var(--acento) 25%, transparent);
+  box-shadow: 0 0 0 2px var(--acento);
 }
 .cs-en-curso {
   box-shadow: 0 0 0 2px #d92d20;
@@ -403,37 +328,24 @@ const franjas = computed(() => [
 }
 .cs-nombre {
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
 }
 .cs-suave {
   opacity: 0.85;
 }
-.cs-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.05rem 0.45rem;
-  border-radius: 999px;
-  font-size: 0.62rem;
-  font-weight: 800;
+.cs-aviso {
+  font-size: 0.66rem;
+  font-weight: 600;
   white-space: nowrap;
   flex-shrink: 0;
 }
-.cs-avatar {
-  width: 1.15rem;
-  height: 1.15rem;
-  border-radius: 999px;
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.52rem;
-  font-weight: 800;
-  flex-shrink: 0;
+.cs-aviso-urgente {
+  color: var(--error);
 }
 .cs-barra {
   flex: 1;
-  height: 6px;
+  height: 4px;
   border-radius: 999px;
   background: rgb(255 255 255 / 75%);
   overflow: hidden;
@@ -442,6 +354,7 @@ const franjas = computed(() => [
   display: block;
   height: 100%;
   border-radius: 999px;
+  background: currentColor;
 }
 :global(.dark) .cs-tarjeta {
   background: color-mix(in srgb, var(--tf) 20%, var(--superficie));
