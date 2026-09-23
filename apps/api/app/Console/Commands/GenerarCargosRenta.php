@@ -19,13 +19,13 @@ use Illuminate\Support\Carbon;
  */
 class GenerarCargosRenta extends Command
 {
-    protected $signature = 'turnouno:generar-cargos-renta {--periodo= : Periodo YYYY-MM (por defecto el mes actual)}';
+    protected $signature = 'turnouno:generar-cargos-renta {--periodo= : Periodo YYYY-MM (por defecto el mes anterior: cobro mes vencido)}';
 
     protected $description = 'Genera los cargos de renta del SaaS por estudio para un periodo';
 
     public function handle(GenerarCargoRenta $generar, GestorDeConexionTenant $gestor): int
     {
-        $periodo = (string) ($this->option('periodo') ?: Carbon::now()->format('Y-m'));
+        $periodo = (string) ($this->option('periodo') ?: Carbon::now()->subMonthNoOverflow()->format('Y-m'));
         $generados = 0;
 
         Estudio::query()

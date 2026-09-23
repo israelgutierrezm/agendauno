@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy;
 
-use App\Modules\Tenancy\Application\PoliticaAlumnosActivos;
-use App\Modules\Tenancy\Application\PoliticaAlumnosActivosV1;
 use App\Modules\Tenancy\Application\VerificadorGoogle;
 use App\Modules\Tenancy\Application\VerificadorGoogleTokeninfo;
 use App\Modules\Tenancy\Context\TenantContext;
@@ -33,10 +31,6 @@ class TenancyServiceProvider extends ServiceProvider
         // Gestor de conexión del data plane: un estado activo por request/job para
         // que no se filtre la conexión de un tenant a otro (control plane nuevo).
         $this->app->scoped(GestorDeConexionTenant::class);
-
-        // Definición de "alumno activo" (versionada); intercambiable sin reescribir
-        // mediciones históricas.
-        $this->app->bind(PoliticaAlumnosActivos::class, PoliticaAlumnosActivosV1::class);
 
         // Verificador de ID token de Google (SSO tenant-local); intercambiable en
         // pruebas por un doble que devuelve una identidad conocida.

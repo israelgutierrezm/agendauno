@@ -31,4 +31,15 @@ enum ModalidadServicio: string
     {
         return in_array($perfil->value, self::PERFILES_CITAS, true) ? self::Citas : self::Clases;
     }
+
+    /**
+     * Qué se mide para cobrar el SaaS en esta modalidad.
+     */
+    public function metrica(): string
+    {
+        return match ($this) {
+            self::Clases => 'alumnos_activos',
+            self::Citas => 'profesionales_activos',
+        };
+    }
 }

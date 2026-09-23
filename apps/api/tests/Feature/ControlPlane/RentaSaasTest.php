@@ -24,10 +24,11 @@ afterEach(function (): void {
 it('el comando genera el cargo de renta y el dueño lo ve en su apartado', function (): void {
     Config::set('turnouno.plataforma.token', 'token-plataforma');
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    terminarPrueba($e);
 
-    // El admin pone cuota fija (monto determinista, sin depender de alumnos activos).
+    // El admin pone cuota fija (monto determinista, sin depender del uso).
     $this->putJson('/api/v1/plataforma/estudios/estudio-a', [
-        'modo_cobro' => 'fijo', 'precio_por_alumno_minor' => 0, 'cuota_fija_minor' => 149900,
+        'modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900,
     ], conPlataforma())->assertOk();
 
     $periodo = Carbon::now()->format('Y-m');

@@ -48,6 +48,7 @@ it('con el token correcto lista todos los estudios (control plane)', function ()
 it('un estudio nuevo entra en cobro por activos; el admin lo cambia a fijo y el cargo lo refleja', function (): void {
     Config::set('turnouno.plataforma.token', 'token-plataforma');
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    terminarPrueba($e);
 
     // Por defecto: cobro por alumnos activos.
     test()->getJson('/api/v1/plataforma/estudios', conTokenPlataforma())
@@ -55,7 +56,7 @@ it('un estudio nuevo entra en cobro por activos; el admin lo cambia a fijo y el 
 
     // El admin de plataforma lo cambia a cuota fija mensual.
     test()->putJson('/api/v1/plataforma/estudios/estudio-a', [
-        'modo_cobro' => 'fijo', 'precio_por_alumno_minor' => 0, 'cuota_fija_minor' => 149900,
+        'modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900,
     ], conTokenPlataforma())->assertOk()->assertJsonPath('data.modo_cobro', 'fijo');
 
     // El cargo que ve el dueño ahora es la cuota fija (sin importar los alumnos activos).
@@ -71,7 +72,7 @@ it('el cambio de facturación de un estudio exige token de plataforma', function
     estudioConSesion('estudio-a', 'a@correo.mx');
 
     test()->putJson('/api/v1/plataforma/estudios/estudio-a', [
-        'modo_cobro' => 'fijo', 'precio_por_alumno_minor' => 0, 'cuota_fija_minor' => 1000,
+        'modo_cobro' => 'fijo', 'cuota_fija_minor' => 1000,
     ], conTokenPlataforma('otro'))->assertUnauthorized();
 });
 

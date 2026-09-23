@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\TarifaSaas;
 use App\Modules\Tenancy\Models\Usuario;
 
 /**
@@ -22,6 +23,7 @@ use App\Modules\Tenancy\Models\Usuario;
  */
 class AprovisionarEstudio
 {
+    // Si aún no hay tarifa publicada para la modalidad.
     private const DIAS_TRIAL = 14;
 
     public function __construct(private readonly GestorDeConexionTenant $gestor) {}
@@ -51,7 +53,7 @@ class AprovisionarEstudio
             'estado' => EstadoEstudio::Trialing->value,
             'estado_facturacion' => EstadoFacturacion::Trial->value,
             'trial_inicia_en' => now()->toDateString(),
-            'trial_termina_en' => now()->addDays(self::DIAS_TRIAL)->toDateString(),
+            'trial_termina_en' => now()->addDays(TarifaSaas::vigente($estudio->modalidad())?->diasPrueba() ?? self::DIAS_TRIAL)->toDateString(),
             'aprovisionado_en' => now(),
             'paso_aprovisionamiento' => null,
         ]);

@@ -31,9 +31,11 @@ class PlataformaController
                 'nombre' => $e->nombre,
                 'estado' => $e->estado->value,
                 'estado_facturacion' => $e->estado_facturacion->value,
+                'perfil' => $e->perfil_negocio->value,
+                'modalidad' => $e->modalidad()->value,
                 'modo_cobro' => $e->modo_cobro->value,
-                'precio_por_alumno_minor' => $e->precio_por_alumno_minor,
                 'cuota_fija_minor' => $e->cuota_fija_minor,
+                'trial_termina_en' => $e->trial_termina_en?->toDateString(),
                 'moneda' => $e->moneda,
                 'publicado' => (bool) $e->publicado,
                 'pais' => $e->pais,
@@ -45,8 +47,9 @@ class PlataformaController
     }
 
     /**
-     * Ajusta la facturación SaaS de un estudio: modo de cobro (activos/fijo), precio por
-     * alumno, cuota fija y estado de facturación. Solo el admin de la plataforma.
+     * Ajusta la facturación SaaS de un estudio: modo de cobro (por uso según su
+     * modalidad, o cuota fija pactada) y estado de facturación. Solo el admin de la
+     * plataforma. Los precios por uso viven en las tarifas versionadas.
      */
     public function actualizarEstudio(Request $request, string $estudio): JsonResponse
     {
@@ -54,14 +57,12 @@ class PlataformaController
 
         $validado = $request->validate([
             'modo_cobro' => ['required', Rule::enum(ModoCobroSaas::class)],
-            'precio_por_alumno_minor' => ['required', 'integer', 'min:0'],
             'cuota_fija_minor' => ['required', 'integer', 'min:0'],
             'estado_facturacion' => ['nullable', Rule::enum(EstadoFacturacion::class)],
         ]);
 
         $modelo->update([
             'modo_cobro' => $validado['modo_cobro'],
-            'precio_por_alumno_minor' => (int) $validado['precio_por_alumno_minor'],
             'cuota_fija_minor' => (int) $validado['cuota_fija_minor'],
             'estado_facturacion' => $validado['estado_facturacion'] ?? $modelo->estado_facturacion->value,
         ]);
@@ -69,7 +70,6 @@ class PlataformaController
         return response()->json(['data' => [
             'slug' => $modelo->slug,
             'modo_cobro' => $modelo->modo_cobro->value,
-            'precio_por_alumno_minor' => $modelo->precio_por_alumno_minor,
             'cuota_fija_minor' => $modelo->cuota_fija_minor,
             'estado_facturacion' => $modelo->estado_facturacion->value,
         ]]);

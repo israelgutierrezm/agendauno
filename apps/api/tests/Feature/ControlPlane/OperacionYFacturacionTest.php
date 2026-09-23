@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Modules\Tenancy\Application\MedirAlumnosActivos;
+use App\Modules\Tenancy\Application\MedirUsoSaas;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Support\Facades\File;
@@ -28,50 +28,67 @@ it('el alta de alumno es tenant-local y aislada entre estudios', function (): vo
     $this->getJson("/api/v1/app/{$b['slug']}/miembros", conBearer($b['bearer']))->assertOk()->assertJsonCount(0, 'data');
 });
 
-it('la medición cuenta alumnos activos DISTINTOS y solo guarda el agregado en el control plane', function (): void {
+it('la medición cuenta alumnos con actividad en el mes y solo guarda el agregado en el control plane', function (): void {
     $a = estudioConSesion('estudio-a', 'ana@correo.mx');
 
+    // Cuentan: alumnos que pagaron una compra este mes.
     foreach (['M1', 'M2', 'M3'] as $nombre) {
-        $this->postJson("/api/v1/app/{$a['slug']}/miembros", ['nombre' => $nombre], conBearer($a['bearer']))->assertCreated();
+        compraPagadaTenant($a, crearMiembroTenant($a, $nombre));
     }
-    // No cuentan: no facturable e instructor.
-    $this->postJson("/api/v1/app/{$a['slug']}/miembros", ['nombre' => 'Cortesía', 'es_facturable' => false], conBearer($a['bearer']))->assertCreated();
+    // No cuentan: sin actividad, no facturable (aunque compre) e instructor.
+    crearMiembroTenant($a, 'Sin actividad');
+    $cortesia = (string) $this->postJson("/api/v1/app/{$a['slug']}/miembros", ['nombre' => 'Cortesía', 'es_facturable' => false], conBearer($a['bearer']))
+        ->assertCreated()->json('data.id');
+    compraPagadaTenant($a, $cortesia);
     $this->postJson("/api/v1/app/{$a['slug']}/miembros", ['nombre' => 'Coach', 'tipo' => 'instructor'], conBearer($a['bearer']))->assertCreated();
 
     $estudio = Estudio::query()->where('slug', $a['slug'])->firstOrFail();
-    $medicion = app(MedirAlumnosActivos::class)->ejecutar($estudio, '2026-09');
+    $periodo = periodoActual();
+    $medicion = app(MedirUsoSaas::class)->ejecutar($estudio, $periodo);
 
     expect($medicion->cantidad)->toBe(3);
 
     // El control plane guarda SOLO el agregado (cantidad + regla), nunca las personas.
     $this->assertDatabaseHas('mediciones_uso', [
-        'estudio_id' => $estudio->id, 'periodo' => '2026-09', 'cantidad' => 3, 'regla_version' => 'v1',
+        'estudio_id' => $estudio->id, 'periodo' => $periodo, 'cantidad' => 3,
+        'metrica' => 'alumnos_activos', 'regla_version' => 'alumnos-v2',
     ]);
 });
 
 it('la facturación SaaS muestra plan, estado y uso del periodo', function (): void {
     $a = estudioConSesion('estudio-a', 'ana@correo.mx');
-    $this->postJson("/api/v1/app/{$a['slug']}/miembros", ['nombre' => 'Rosa'], conBearer($a['bearer']))->assertCreated();
+    compraPagadaTenant($a, crearMiembroTenant($a, 'Rosa'));
 
     $this->getJson("/api/v1/app/{$a['slug']}/facturacion", conBearer($a['bearer']))
         ->assertOk()
         ->assertJsonPath('data.estado_facturacion', 'trial')
-        ->assertJsonPath('data.uso.alumnos_activos', 1)
-        ->assertJsonPath('data.uso.regla', 'v1');
+        ->assertJsonPath('data.modalidad', 'clases')
+        ->assertJsonPath('data.uso.metrica', 'alumnos_activos')
+        ->assertJsonPath('data.uso.cantidad', 1)
+        ->assertJsonPath('data.uso.regla', 'alumnos-v2');
 });
 
 it('una medición congelada no se recalcula (no cambia una factura emitida)', function (): void {
     $a = estudioConSesion('estudio-a', 'ana@correo.mx');
-    $this->postJson("/api/v1/app/{$a['slug']}/miembros", ['nombre' => 'Rosa'], conBearer($a['bearer']))->assertCreated();
+    compraPagadaTenant($a, crearMiembroTenant($a, 'Rosa'));
 
     $estudio = Estudio::query()->where('slug', $a['slug'])->firstOrFail();
-    $medir = app(MedirAlumnosActivos::class);
+    $medir = app(MedirUsoSaas::class);
+    $periodo = periodoActual();
 
-    $medir->congelar($estudio, '2026-09'); // cantidad 1, congelada
+    $medir->congelar($estudio, $periodo); // cantidad 1, congelada
 
-    // Alta de otro alumno tras congelar.
-    $this->postJson("/api/v1/app/{$a['slug']}/miembros", ['nombre' => 'Luis'], conBearer($a['bearer']))->assertCreated();
+    // Otra alumna con actividad tras congelar.
+    compraPagadaTenant($a, crearMiembroTenant($a, 'Luis'));
 
     // Re-medir no cambia el periodo congelado.
-    expect($medir->ejecutar($estudio, '2026-09')->cantidad)->toBe(1);
+    expect($medir->ejecutar($estudio, $periodo)->cantidad)->toBe(1);
 });
+
+/**
+ * Periodo (YYYY-MM) en curso en la zona de los estudios de prueba.
+ */
+function periodoActual(): string
+{
+    return now('America/Mexico_City')->format('Y-m');
+}

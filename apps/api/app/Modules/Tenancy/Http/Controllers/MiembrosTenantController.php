@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Asistencia\EstadoAsistencia;
-use App\Modules\Tenancy\Application\PoliticaAlumnosActivosV1;
+use App\Modules\Tenancy\Application\MedirUsoSaas;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Http\Requests\CrearMiembroRequest;
@@ -270,8 +270,8 @@ class MiembrosTenantController
     }
 
     /**
-     * Padrón facturable: alumnos activos, facturables y no archivados — la base que la
-     * renta SaaS cuenta ({@see PoliticaAlumnosActivosV1}).
+     * Padrón facturable: alumnos activos, facturables y no archivados. La renta SaaS
+     * cobra solo a quienes además tuvieron actividad en el mes ({@see MedirUsoSaas}).
      * Con `?formato=csv` descarga el padrón para conciliar/aclarar.
      */
     public function padron(Request $request): Response

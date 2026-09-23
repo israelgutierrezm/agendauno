@@ -17,13 +17,14 @@ class MedicionUso extends Model
 
     protected $table = 'mediciones_uso';
 
-    protected $fillable = ['estudio_id', 'periodo', 'regla_version', 'cantidad', 'evidencia', 'calculada_en', 'congelada'];
+    protected $fillable = ['estudio_id', 'periodo', 'metrica', 'regla_version', 'cantidad', 'detalle', 'evidencia', 'calculada_en', 'congelada'];
 
     /**
      * @var array<string, string>
      */
     protected $casts = [
         'cantidad' => 'integer',
+        'detalle' => 'array',
         'evidencia' => 'array',
         'calculada_en' => 'datetime',
         'congelada' => 'boolean',

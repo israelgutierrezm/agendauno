@@ -12,4 +12,6 @@ enum EstadoCargoRenta: string
 {
     case Pendiente = 'pendiente';
     case Pagado = 'pagado';
+    // Periodo sin nada que cobrar (sin actividad o cubierto por la prueba gratis).
+    case SinCargo = 'sin_cargo';
 }

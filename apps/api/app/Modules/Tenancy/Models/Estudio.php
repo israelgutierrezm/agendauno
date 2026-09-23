@@ -108,17 +108,6 @@ class Estudio extends Model
     }
 
     /**
-     * Cargo de la suscripción SaaS del periodo según el modo de cobro: cuota fija, o
-     * alumnos activos × precio por alumno. Dinero en minor.
-     */
-    public function cargoDelPeriodo(int $alumnosActivos): int
-    {
-        return $this->modo_cobro === ModoCobroSaas::Fijo
-            ? (int) $this->cuota_fija_minor
-            : $alumnosActivos * (int) $this->precio_por_alumno_minor;
-    }
-
-    /**
      * Nombre completo del contacto propietario, compuesto de sus partes (omite vacías).
      * `contacto_nombre` es el primer nombre; el resto es opcional.
      */

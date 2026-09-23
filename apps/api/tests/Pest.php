@@ -19,6 +19,7 @@ use App\Modules\Personas\Models\Persona;
 use App\Modules\Tenancy\Application\CrearTenant;
 use App\Modules\Tenancy\Application\VincularUsuarioATenant;
 use App\Modules\Tenancy\Context\TenantContext;
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -448,9 +449,10 @@ function conPlataforma(string $token = 'token-plataforma'): array
 function cargoRentaPendiente(array $e): string
 {
     Config::set('turnouno.plataforma.token', 'token-plataforma');
+    terminarPrueba($e);
 
     test()->putJson('/api/v1/plataforma/estudios/'.$e['slug'], [
-        'modo_cobro' => 'fijo', 'precio_por_alumno_minor' => 0, 'cuota_fija_minor' => 149900,
+        'modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900,
     ], conPlataforma())->assertOk();
 
     $periodo = Carbon::now()->format('Y-m');
@@ -488,4 +490,32 @@ function cargarDatosFiscales(array $e): void
         'regimen_fiscal' => '601',
         'codigo_postal' => '06700',
     ], conBearer($e['bearer']))->assertOk();
+}
+
+/**
+ * Da por terminada la prueba gratis del estudio (hace dos meses): su renta ya se cobra
+ * completa en el periodo actual.
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ */
+function terminarPrueba(array $e): void
+{
+    Estudio::query()->where('slug', $e['slug'])->update(['trial_termina_en' => now()->subMonths(2)->toDateString()]);
+}
+
+/**
+ * Registra una compra PAGADA (en ventanilla) de un pack para la persona: actividad del
+ * mes que la hace contar como alumna activa en el cobro del SaaS.
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ */
+function compraPagadaTenant(array $e, string $personaUlid): void
+{
+    $producto = crearPackTenant($e);
+    $orden = (string) test()->postJson("/api/v1/app/{$e['slug']}/ordenes", [
+        'comprador_id' => $personaUlid, 'items' => [['producto_id' => $producto, 'cantidad' => 1]],
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+
+    test()->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))
+        ->assertOk();
 }

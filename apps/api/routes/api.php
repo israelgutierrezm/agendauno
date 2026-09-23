@@ -110,6 +110,7 @@ use App\Modules\Tenancy\Http\Controllers\RetencionTenantController;
 use App\Modules\Tenancy\Http\Controllers\StaffTenantController;
 use App\Modules\Tenancy\Http\Controllers\SuscripcionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\TareasTenantController;
+use App\Modules\Tenancy\Http\Controllers\TarifasPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\TiposDocumentoController;
 use App\Modules\Tenancy\Http\Controllers\UsuariosTenantController;
 use App\Modules\Tenancy\Http\Controllers\WaiversTenantController;
@@ -172,6 +173,9 @@ Route::prefix('v1')->group(function (): void {
         // Pasarelas de la plataforma (para cobrar la renta del SaaS): on/off + llaves test/prod.
         Route::get('/pasarelas', [PlataformaController::class, 'pasarelas'])->name('pasarelas');
         Route::put('/pasarelas/{proveedor}', [PlataformaController::class, 'guardarPasarela'])->name('pasarelas.guardar');
+        // Tarifas del SaaS por modalidad (versionadas): consultar y publicar una versión nueva.
+        Route::get('/tarifas', [TarifasPlataformaController::class, 'index'])->name('tarifas');
+        Route::post('/tarifas/{modalidad}', [TarifasPlataformaController::class, 'publicar'])->name('tarifas.publicar');
     });
 
     /*
@@ -272,6 +276,8 @@ Route::prefix('v1')->group(function (): void {
             // Facturación SaaS del estudio (control plane; separada de pagos de alumnos).
             Route::get('/facturacion', [FacturacionController::class, 'show'])->middleware('puede:facturacion.ver')->name('facturacion');
             Route::get('/renta', [FacturacionController::class, 'renta'])->middleware('puede:facturacion.ver')->name('renta');
+            // Transparencia del cobro: a quién se contó en el periodo (alumnos o profesionales).
+            Route::get('/renta/quien-cuenta', [FacturacionController::class, 'quienCuenta'])->middleware('puede:facturacion.ver')->name('renta.quien-cuenta');
             // Pago de la renta del SaaS con la pasarela de la plataforma (async -> pendiente
             // + checkout; el webhook de la plataforma confirma). El dueño paga su suscripcion.
             Route::post('/renta/cargos/{cargo}/pagar', [PagoRentaController::class, 'pagar'])->middleware('puede:facturacion.ver')->name('renta.pagar');

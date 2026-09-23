@@ -25,7 +25,7 @@ class CargoRenta extends Model
     protected $table = 'cargos_renta';
 
     protected $fillable = [
-        'estudio_id', 'periodo', 'modo_cobro', 'alumnos_activos', 'monto_minor',
+        'estudio_id', 'periodo', 'modo_cobro', 'metrica', 'alumnos_activos', 'tarifa_version', 'desglose', 'monto_minor',
         'moneda', 'estado', 'vence_en', 'pagado_en', 'metodo_pago', 'referencia_pago',
     ];
 
@@ -44,6 +44,8 @@ class CargoRenta extends Model
         'modo_cobro' => ModoCobroSaas::class,
         'estado' => EstadoCargoRenta::class,
         'alumnos_activos' => 'integer',
+        'tarifa_version' => 'integer',
+        'desglose' => 'array',
         'monto_minor' => 'integer',
         'vence_en' => 'date',
         'pagado_en' => 'datetime',
