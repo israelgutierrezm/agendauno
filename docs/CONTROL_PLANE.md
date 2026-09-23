@@ -35,6 +35,26 @@ actual mientras se migra el plano de datos operativo (fases siguientes).
   conexión, falla 404 seguro) y `AutenticarTenant` (Bearer contra la BD del
   tenant).
 
+## Migraciones de los estudios (despliegue)
+
+Un estudio nuevo nace con su esquema al día (lo migra el aprovisionamiento). Los
+estudios **existentes** reciben las migraciones nuevas de `database/migrations/tenant`
+con:
+
+```bash
+php artisan migrate --force                              # control plane
+php artisan turnouno:migrar-estudios --force --isolated  # BD de cada estudio
+```
+
+- Recorre todos los estudios (`--estudio=slug` para uno solo); se salta los que se
+  están aprovisionando y los que no tienen BD.
+- Un estudio que falla no frena a los demás: se reporta (`report()`) y el comando
+  termina con código de error para que el pipeline lo note. Es idempotente, así que
+  basta con volver a correrlo.
+- `estudios.version_migraciones` guarda la última migración aplicada a cada estudio
+  (la anota `GestorDeConexionTenant::migrar()`, que usan también el
+  aprovisionamiento, el demo y la migración legacy).
+
 ## Rutas
 
 - `POST /api/v1/registro` — alta pública de estudio (self-service).

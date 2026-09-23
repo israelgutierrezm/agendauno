@@ -34,9 +34,9 @@ class AprovisionarEstudio
             return $estudio; // ya aprovisionado
         }
 
-        // 1. BD del tenant + migraciones (crear-si-falta).
+        // 1. BD del tenant + migraciones (crear-si-falta); anota la versión del esquema.
         $this->gestor->aprovisionarBaseDeDatos($estudio);
-        $estudio->update(['paso_aprovisionamiento' => 'migrado', 'version_migraciones' => '2026_09_15_000001']);
+        $estudio->update(['paso_aprovisionamiento' => 'migrado']);
 
         // 2. Propietario tenant-local (idempotente por email dentro de la BD del tenant).
         $this->gestor->ejecutarEn($estudio, function () use ($estudio): void {

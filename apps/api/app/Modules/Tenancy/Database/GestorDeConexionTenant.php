@@ -9,6 +9,7 @@ use Closure;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Gestiona la conexión `tenant` (data plane) apuntándola a la BD física de cada
@@ -120,13 +121,53 @@ class GestorDeConexionTenant
             DB::statement("CREATE DATABASE IF NOT EXISTS `{$nombre}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
         }
 
-        $this->ejecutarEn($estudio, static function (): void {
+        $this->migrar($estudio);
+    }
+
+    /**
+     * Corre las migraciones pendientes en la BD (ya existente) del estudio y anota
+     * en el control plane la versión resultante de su esquema (`version_migraciones`
+     * = última migración aplicada). Si ya está al día no hace nada.
+     *
+     * @return array{aplicadas: int, version: string|null}
+     */
+    public function migrar(Estudio $estudio): array
+    {
+        $resultado = $this->ejecutarEn($estudio, static function (): array {
+            $antes = self::migracionesCorridas();
+
             Artisan::call('migrate', [
                 '--database' => self::CONEXION,
                 '--path' => 'database/migrations/tenant',
                 '--force' => true,
             ]);
+
+            $despues = self::migracionesCorridas();
+
+            return [
+                'aplicadas' => count($despues) - count($antes),
+                'version' => $despues === [] ? null : max($despues),
+            ];
         });
+
+        if ($resultado['version'] !== $estudio->version_migraciones) {
+            $estudio->update(['version_migraciones' => $resultado['version']]);
+        }
+
+        return $resultado;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function migracionesCorridas(): array
+    {
+        if (! Schema::connection(self::CONEXION)->hasTable('migrations')) {
+            return [];
+        }
+
+        /** @var list<string> */
+        return DB::connection(self::CONEXION)->table('migrations')->pluck('migration')->all();
     }
 
     /**
