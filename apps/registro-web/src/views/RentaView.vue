@@ -7,6 +7,19 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
+interface LineaDesglose {
+  concepto: string;
+  detalle: string;
+  importe_minor: number;
+}
+interface Desglose {
+  lineas: LineaDesglose[];
+  subtotal_minor: number;
+  iva_porcentaje: number;
+  iva_minor: number;
+  total_minor: number;
+  prorrateo?: { dias_cobrables: number; dias_periodo: number };
+}
 interface FacturaCargo {
   id: string;
   estado: string;
@@ -16,7 +29,9 @@ interface Cargo {
   id: string;
   periodo: string;
   modo_cobro: string;
-  alumnos_activos: number;
+  metrica: string;
+  cantidad: number;
+  desglose: Desglose | null;
   monto_minor: number;
   moneda: string;
   estado: string;
@@ -24,19 +39,34 @@ interface Cargo {
   pagado_en: string | null;
   factura: FacturaCargo | null;
 }
+interface Uso {
+  periodo: string;
+  metrica: string;
+  cantidad: number;
+  detalle: { fte_milesimas?: number; personas_fuera_de_cita?: number };
+  desglose: Desglose;
+  cargo_estimado_minor: number;
+}
 interface Renta {
+  modalidad: "clases" | "citas";
   modo_cobro: string;
   moneda: string;
-  precio_por_alumno_minor: number;
   cuota_fija_minor: number;
-  actual: {
-    periodo: string;
-    alumnos_activos: number;
-    cargo_estimado_minor: number;
-  };
+  trial_termina_en: string | null;
+  actual: Uso;
   cargos: Cargo[];
 }
-
+interface QuienCuenta {
+  metrica: string;
+  descripcion: string | null;
+  cantidad: number;
+  quienes: {
+    id: string;
+    nombre: string;
+    sesiones?: number;
+    medio_tiempo?: boolean;
+  }[];
+}
 interface RespuestaPago {
   estado: string;
   checkout?: { tipo?: string; url?: string };
@@ -55,12 +85,46 @@ const facturando = ref<string | null>(null);
 const avisoPago = ref<string | null>(null);
 const errorPago = ref<string | null>(null);
 
+const quien = ref<QuienCuenta | null>(null);
+const cargandoQuien = ref(false);
+const expandido = ref<string | null>(null);
+
 function dinero(minor: number, moneda: string): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
     currency: moneda,
   }).format(minor / 100);
 }
+function fecha(iso: string): string {
+  const [a, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(
+    new Date(a, m - 1, d),
+  );
+}
+function equivalentes(milesimas: number): string {
+  return (milesimas / 1000).toLocaleString("es-MX", {
+    maximumFractionDigits: 1,
+  });
+}
+
+const enPrueba = computed(() => {
+  const fin = renta.value?.trial_termina_en;
+  return fin != null && fin >= new Date().toISOString().slice(0, 10);
+});
+const ayudaModo = computed(() => {
+  const r = renta.value;
+  if (r === null) {
+    return "";
+  }
+  if (r.modo_cobro === "fijo") {
+    return t("cobro.modo.ayudaFijo", {
+      monto: dinero(r.cuota_fija_minor, r.moneda),
+    });
+  }
+  return r.modalidad === "citas"
+    ? t("cobro.modo.ayudaCitas")
+    : t("cobro.modo.ayudaClases");
+});
 
 async function cargar(): Promise<void> {
   cargando.value = true;
@@ -72,6 +136,24 @@ async function cargar(): Promise<void> {
     error.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
+  }
+}
+
+async function alternarQuien(): Promise<void> {
+  if (quien.value !== null) {
+    quien.value = null;
+    return;
+  }
+  cargandoQuien.value = true;
+  try {
+    const { data } = await api.get<{ data: QuienCuenta }>(
+      `${base.value}/renta/quien-cuenta`,
+    );
+    quien.value = data.data;
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    cargandoQuien.value = false;
   }
 }
 
@@ -182,36 +264,42 @@ onMounted(cargar);
     </p>
 
     <template v-else-if="renta">
-      <div class="mt-6 grid gap-4 sm:grid-cols-2">
-        <!-- Modo de cobro -->
-        <div class="tu-card p-5">
-          <h2 class="font-bold">{{ $t("renta.modo.titulo") }}</h2>
+      <div class="mt-6 grid gap-4 lg:grid-cols-5">
+        <!-- Cómo te cobramos -->
+        <div class="tu-card p-5 lg:col-span-2">
+          <h2 class="font-bold">{{ $t("cobro.modo.titulo") }}</h2>
           <p class="mt-2 text-lg font-extrabold">
             {{
               renta.modo_cobro === "fijo"
-                ? $t("renta.modo.fijo")
-                : $t("renta.modo.activos")
+                ? $t("cobro.modo.fijo")
+                : $t(`cobro.modo.${renta.modalidad}`)
             }}
           </p>
           <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+            {{ ayudaModo }}
+          </p>
+          <p class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("cobro.modo.mesVencido") }}
+          </p>
+          <p
+            v-if="enPrueba && renta.trial_termina_en"
+            class="mt-3 text-sm rounded-lg px-3 py-2 font-semibold"
+            :style="{ background: 'var(--exito-suave)', color: 'var(--exito)' }"
+          >
             {{
-              renta.modo_cobro === "fijo"
-                ? $t("renta.modo.cuota", {
-                    monto: dinero(renta.cuota_fija_minor, renta.moneda),
-                  })
-                : $t("renta.modo.porAlumno", {
-                    monto: dinero(renta.precio_por_alumno_minor, renta.moneda),
-                  })
+              $t("cobro.modo.pruebaHasta", {
+                fecha: fecha(renta.trial_termina_en),
+              })
             }}
           </p>
         </div>
 
-        <!-- Periodo en curso -->
-        <div class="tu-card p-5">
+        <!-- Mes en curso con su desglose -->
+        <div class="tu-card p-5 lg:col-span-3">
           <h2 class="font-bold">
-            {{ $t("renta.actual.titulo") }} · {{ renta.actual.periodo }}
+            {{ $t("cobro.actual.titulo") }} · {{ renta.actual.periodo }}
           </h2>
-          <div class="mt-2 flex items-end justify-between">
+          <div class="mt-2 flex items-end justify-between gap-4 flex-wrap">
             <div>
               <div class="text-3xl font-extrabold">
                 {{ dinero(renta.actual.cargo_estimado_minor, renta.moneda) }}
@@ -220,20 +308,138 @@ onMounted(cargar);
                 class="text-xs mt-1"
                 :style="{ color: 'var(--texto-suave)' }"
               >
-                {{ $t("renta.actual.estimado") }}
+                {{ $t("cobro.actual.estimado") }}
               </div>
             </div>
             <div class="text-right">
-              <div class="text-xl font-bold">
-                {{ renta.actual.alumnos_activos }}
+              <div class="text-2xl font-extrabold">
+                {{ renta.actual.cantidad }}
+              </div>
+              <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t(`cobro.actual.${renta.actual.metrica}`) }}
               </div>
               <div
-                class="text-xs mt-1"
+                v-if="renta.actual.detalle.fte_milesimas !== undefined"
+                class="text-xs"
                 :style="{ color: 'var(--texto-suave)' }"
               >
-                {{ $t("renta.actual.activos") }}
+                {{
+                  $t("cobro.actual.equivalentes", {
+                    n: equivalentes(renta.actual.detalle.fte_milesimas),
+                  })
+                }}
+              </div>
+              <div
+                v-if="(renta.actual.detalle.personas_fuera_de_cita ?? 0) > 0"
+                class="text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{
+                  $t("cobro.actual.fueraDeCita", {
+                    n: renta.actual.detalle.personas_fuera_de_cita,
+                  })
+                }}
               </div>
             </div>
+          </div>
+
+          <dl
+            v-if="renta.actual.desglose.lineas.length > 0"
+            class="rt-desglose mt-4"
+          >
+            <template v-for="(l, i) in renta.actual.desglose.lineas" :key="i">
+              <dt>
+                <span class="font-semibold">{{ l.concepto }}</span>
+                <span class="block text-xs rt-suave">{{ l.detalle }}</span>
+              </dt>
+              <dd>{{ dinero(l.importe_minor, renta.moneda) }}</dd>
+            </template>
+            <dt class="rt-suave">{{ $t("cobro.desglose.subtotal") }}</dt>
+            <dd class="rt-suave">
+              {{ dinero(renta.actual.desglose.subtotal_minor, renta.moneda) }}
+            </dd>
+            <template v-if="renta.actual.desglose.iva_porcentaje > 0">
+              <dt class="rt-suave">
+                {{
+                  $t("cobro.desglose.iva", {
+                    pct: renta.actual.desglose.iva_porcentaje,
+                  })
+                }}
+              </dt>
+              <dd class="rt-suave">
+                {{ dinero(renta.actual.desglose.iva_minor, renta.moneda) }}
+              </dd>
+            </template>
+            <dt class="font-extrabold">{{ $t("cobro.desglose.total") }}</dt>
+            <dd class="font-extrabold">
+              {{ dinero(renta.actual.desglose.total_minor, renta.moneda) }}
+            </dd>
+          </dl>
+          <p
+            v-else
+            class="mt-4 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("cobro.actual.sinCargo") }}
+          </p>
+          <p
+            v-if="renta.actual.desglose.prorrateo"
+            class="mt-2 text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{
+              $t("cobro.desglose.prorrateo", {
+                dias: renta.actual.desglose.prorrateo.dias_cobrables,
+                total: renta.actual.desglose.prorrateo.dias_periodo,
+              })
+            }}
+          </p>
+
+          <!-- Transparencia: a quién se contó -->
+          <button
+            v-if="renta.modo_cobro !== 'fijo'"
+            type="button"
+            class="tu-enlace text-sm mt-4"
+            :disabled="cargandoQuien"
+            @click="alternarQuien"
+          >
+            {{ quien ? $t("cobro.quien.ocultar") : $t("cobro.quien.ver") }}
+          </button>
+          <div v-if="quien" class="mt-3">
+            <p class="text-sm font-bold">{{ $t("cobro.quien.titulo") }}</p>
+            <p
+              v-if="quien.descripcion"
+              class="text-xs mt-1"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ quien.descripcion }}
+            </p>
+            <p
+              v-if="quien.quienes.length === 0"
+              class="text-sm mt-2"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("cobro.quien.nadie") }}
+            </p>
+            <ul v-else class="mt-2 flex flex-wrap gap-2">
+              <li
+                v-for="p in quien.quienes"
+                :key="p.id"
+                class="tu-badge"
+                :style="{
+                  background: 'var(--superficie-2)',
+                  color: 'var(--texto)',
+                }"
+              >
+                {{ p.nombre }}
+                <span v-if="p.medio_tiempo" class="rt-suave">
+                  · {{ $t("cobro.quien.medioTiempo") }}</span
+                >
+                <span v-if="p.sesiones !== undefined" class="rt-suave">
+                  · {{ $t("cobro.quien.sesiones", { n: p.sesiones }) }}</span
+                >
+              </li>
+            </ul>
           </div>
         </div>
       </div>
@@ -255,7 +461,7 @@ onMounted(cargar);
                 {{ $t("renta.colPeriodo") }}
               </th>
               <th class="px-4 py-2 font-medium text-right hidden sm:table-cell">
-                {{ $t("renta.colAlumnos") }}
+                {{ $t("cobro.historial.uso") }}
               </th>
               <th class="px-4 py-2 font-medium text-right">
                 {{ $t("renta.colMonto") }}
@@ -270,86 +476,143 @@ onMounted(cargar);
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="c in renta.cargos"
-              :key="c.id"
-              class="border-t"
-              :style="{ borderColor: 'var(--borde)' }"
-            >
-              <td class="px-4 py-2 font-semibold">{{ c.periodo }}</td>
-              <td class="px-4 py-2 text-right hidden sm:table-cell">
-                {{ c.modo_cobro === "fijo" ? "—" : c.alumnos_activos }}
-              </td>
-              <td class="px-4 py-2 text-right font-semibold">
-                {{ dinero(c.monto_minor, c.moneda) }}
-              </td>
-              <td class="px-4 py-2">
-                <span
-                  class="tu-badge"
-                  :class="
-                    c.estado === 'pagado' ? 'tu-badge-exito' : 'tu-badge-aviso'
-                  "
-                >
-                  {{ $t(`renta.estados.${c.estado}`) }}
-                </span>
-              </td>
-              <td
-                class="px-4 py-2 hidden sm:table-cell"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{ c.vence_en ?? "—" }}
-              </td>
-              <td class="px-4 py-2 text-right">
-                <!-- Pendiente: pagar la renta -->
-                <button
-                  v-if="c.estado === 'pendiente'"
-                  type="button"
-                  class="tu-btn tu-btn-primario whitespace-nowrap"
-                  :disabled="pagando === c.id"
-                  @click="pagar(c)"
-                >
-                  {{
-                    pagando === c.id ? $t("renta.pagando") : $t("renta.pagar")
-                  }}
-                </button>
-                <!-- Pagado y timbrado: descargar CFDI -->
-                <span
-                  v-else-if="c.factura && c.factura.estado === 'timbrada'"
-                  class="inline-flex gap-2 justify-end"
-                >
+            <template v-for="c in renta.cargos" :key="c.id">
+              <tr class="border-t" :style="{ borderColor: 'var(--borde)' }">
+                <td class="px-4 py-2 font-semibold">
+                  {{ c.periodo }}
                   <button
+                    v-if="c.desglose && c.desglose.lineas.length > 0"
+                    type="button"
+                    class="tu-enlace text-xs ml-2 font-normal"
+                    @click="expandido = expandido === c.id ? null : c.id"
+                  >
+                    {{
+                      expandido === c.id
+                        ? $t("cobro.desglose.ocultar")
+                        : $t("cobro.desglose.ver")
+                    }}
+                  </button>
+                </td>
+                <td class="px-4 py-2 text-right hidden sm:table-cell">
+                  {{
+                    c.modo_cobro === "fijo"
+                      ? "—"
+                      : `${c.cantidad} ${$t(`cobro.actual.${c.metrica}`)}`
+                  }}
+                </td>
+                <td class="px-4 py-2 text-right font-semibold">
+                  {{ dinero(c.monto_minor, c.moneda) }}
+                </td>
+                <td class="px-4 py-2">
+                  <span
+                    class="tu-badge"
+                    :class="{
+                      'tu-badge-exito': c.estado === 'pagado',
+                      'tu-badge-aviso': c.estado === 'pendiente',
+                    }"
+                  >
+                    {{ $t(`cobro.estados.${c.estado}`) }}
+                  </span>
+                </td>
+                <td
+                  class="px-4 py-2 hidden sm:table-cell"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ c.estado === "sin_cargo" ? "—" : (c.vence_en ?? "—") }}
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <!-- Pendiente: pagar la renta -->
+                  <button
+                    v-if="c.estado === 'pendiente'"
+                    type="button"
+                    class="tu-btn tu-btn-primario whitespace-nowrap"
+                    :disabled="pagando === c.id"
+                    @click="pagar(c)"
+                  >
+                    {{
+                      pagando === c.id ? $t("renta.pagando") : $t("renta.pagar")
+                    }}
+                  </button>
+                  <!-- Sin cargo: nada que pagar ni facturar -->
+                  <span
+                    v-else-if="c.estado === 'sin_cargo'"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >—</span
+                  >
+                  <!-- Pagado y timbrado: descargar CFDI -->
+                  <span
+                    v-else-if="c.factura && c.factura.estado === 'timbrada'"
+                    class="inline-flex gap-2 justify-end"
+                  >
+                    <button
+                      type="button"
+                      class="tu-btn tu-btn-fantasma whitespace-nowrap"
+                      @click="descargarFactura(c, 'pdf')"
+                    >
+                      {{ $t("renta.factura.pdf") }}
+                    </button>
+                    <button
+                      type="button"
+                      class="tu-btn tu-btn-fantasma whitespace-nowrap"
+                      @click="descargarFactura(c, 'xml')"
+                    >
+                      {{ $t("renta.factura.xml") }}
+                    </button>
+                  </span>
+                  <!-- Pagado sin factura (o con error): emitir/reintentar -->
+                  <button
+                    v-else
                     type="button"
                     class="tu-btn tu-btn-fantasma whitespace-nowrap"
-                    @click="descargarFactura(c, 'pdf')"
+                    :disabled="facturando === c.id"
+                    @click="facturar(c)"
                   >
-                    {{ $t("renta.factura.pdf") }}
+                    {{
+                      facturando === c.id
+                        ? $t("renta.factura.procesando")
+                        : c.factura?.estado === "error"
+                          ? $t("renta.factura.reintentar")
+                          : $t("renta.factura.facturar")
+                    }}
                   </button>
-                  <button
-                    type="button"
-                    class="tu-btn tu-btn-fantasma whitespace-nowrap"
-                    @click="descargarFactura(c, 'xml')"
-                  >
-                    {{ $t("renta.factura.xml") }}
-                  </button>
-                </span>
-                <!-- Pagado sin factura (o con error): emitir/reintentar -->
-                <button
-                  v-else
-                  type="button"
-                  class="tu-btn tu-btn-fantasma whitespace-nowrap"
-                  :disabled="facturando === c.id"
-                  @click="facturar(c)"
-                >
-                  {{
-                    facturando === c.id
-                      ? $t("renta.factura.procesando")
-                      : c.factura?.estado === "error"
-                        ? $t("renta.factura.reintentar")
-                        : $t("renta.factura.facturar")
-                  }}
-                </button>
-              </td>
-            </tr>
+                </td>
+              </tr>
+              <tr v-if="expandido === c.id && c.desglose">
+                <td colspan="6" class="px-4 pb-4">
+                  <dl class="rt-desglose">
+                    <template v-for="(l, i) in c.desglose.lineas" :key="i">
+                      <dt>
+                        <span class="font-semibold">{{ l.concepto }}</span>
+                        <span class="block text-xs rt-suave">{{
+                          l.detalle
+                        }}</span>
+                      </dt>
+                      <dd>{{ dinero(l.importe_minor, c.moneda) }}</dd>
+                    </template>
+                    <template v-if="c.desglose.iva_porcentaje > 0">
+                      <dt class="rt-suave">
+                        {{
+                          $t("cobro.desglose.iva", {
+                            pct: c.desglose.iva_porcentaje,
+                          })
+                        }}
+                      </dt>
+                      <dd class="rt-suave">
+                        {{ dinero(c.desglose.iva_minor, c.moneda) }}
+                      </dd>
+                    </template>
+                  </dl>
+                  <p v-if="c.desglose.prorrateo" class="mt-1 text-xs rt-suave">
+                    {{
+                      $t("cobro.desglose.prorrateo", {
+                        dias: c.desglose.prorrateo.dias_cobrables,
+                        total: c.desglose.prorrateo.dias_periodo,
+                      })
+                    }}
+                  </p>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -365,3 +628,24 @@ onMounted(cargar);
     </template>
   </section>
 </template>
+
+<style scoped>
+.rt-desglose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem 1rem;
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--superficie-2);
+  font-size: 0.875rem;
+}
+.rt-desglose dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.rt-suave {
+  color: var(--texto-suave);
+}
+</style>

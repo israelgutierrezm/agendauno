@@ -11,11 +11,12 @@ interface Facturacion {
   plan: string | null;
   estado_facturacion: string;
   trial_termina_en: string | null;
-  precio_por_alumno_minor: number;
   moneda: string;
   uso: {
     periodo: string;
-    alumnos_activos: number;
+    // Alumnos activos (clases) o profesionales activos (citas).
+    metrica: string;
+    cantidad: number;
     regla: string;
     cargo_estimado_minor: number;
   };
@@ -229,10 +230,10 @@ onMounted(cargar);
         </h2>
         <div class="mt-3 flex items-end gap-2">
           <span class="text-4xl font-extrabold">{{
-            facturacion.uso.alumnos_activos
+            facturacion.uso.cantidad
           }}</span>
           <span class="mb-1 text-sm" :style="{ color: 'var(--texto-suave)' }">{{
-            $t("panel.alumnosActivos")
+            $t(`cobro.actual.${facturacion.uso.metrica}`)
           }}</span>
         </div>
         <p class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">

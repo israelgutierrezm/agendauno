@@ -4,15 +4,17 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import TablaDatos from "@/components/TablaDatos.vue";
+import TarifasPlataforma from "@/components/TarifasPlataforma.vue";
 
 interface Estudio {
   slug: string;
   nombre: string;
   estado: string;
   estado_facturacion: string;
+  modalidad: "clases" | "citas";
   modo_cobro: string;
-  precio_por_alumno_minor: number;
   cuota_fija_minor: number;
+  trial_termina_en: string | null;
   moneda: string;
   publicado: boolean;
   pais: string | null;
@@ -87,11 +89,11 @@ const columnas = computed(() => [
   { clave: "acciones", etiqueta: "" },
 ]);
 
-// Edición de facturación por tenant (precio/cuota en unidades de la moneda).
+// Edición de facturación por tenant (cuota en unidades de la moneda). El cobro por
+// uso sale de las tarifas versionadas de su modalidad.
 const editando = ref<Estudio | null>(null);
 const edit = ref({
   modo_cobro: "activos",
-  precio: "0",
   cuota: "0",
   estado_facturacion: "trial",
 });
@@ -106,14 +108,15 @@ function dinero(minor: number, moneda: string): string {
 function cobroLegible(e: Estudio): string {
   return e.modo_cobro === "fijo"
     ? `${dinero(e.cuota_fija_minor, e.moneda)} / mes`
-    : `${dinero(e.precio_por_alumno_minor, e.moneda)} / alumno`;
+    : e.modalidad === "citas"
+      ? t("cobro.modo.citas")
+      : t("cobro.modo.clases");
 }
 
 function abrirEdicion(e: Estudio): void {
   editando.value = e;
   edit.value = {
     modo_cobro: e.modo_cobro,
-    precio: String(e.precio_por_alumno_minor / 100),
     cuota: String(e.cuota_fija_minor / 100),
     estado_facturacion: e.estado_facturacion,
   };
@@ -130,7 +133,6 @@ async function guardarEstudio(): Promise<void> {
       `/api/v1/plataforma/estudios/${editando.value.slug}`,
       {
         modo_cobro: edit.value.modo_cobro,
-        precio_por_alumno_minor: Math.round(Number(edit.value.precio) * 100),
         cuota_fija_minor: Math.round(Number(edit.value.cuota) * 100),
         estado_facturacion: edit.value.estado_facturacion,
       },
@@ -553,6 +555,9 @@ function borrar(): void {
         </p>
       </div>
 
+      <!-- Tarifas del SaaS por modalidad (versionadas) -->
+      <TarifasPlataforma class="mt-8" :api-url="apiUrl" :token="token" />
+
       <!-- Estudios -->
       <h2 class="mt-8 font-bold text-lg">
         {{ $t("plataforma.estudios.titulo") }} · {{ estudios.length }}
@@ -578,7 +583,7 @@ function borrar(): void {
         <template #col-cobro="{ fila }">
           <span class="text-sm">
             <span class="tu-badge">{{
-              $t(`plataforma.estudios.modo.${(fila as Estudio).modo_cobro}`)
+              $t(`cobro.modalidad.${(fila as Estudio).modalidad}`)
             }}</span>
             {{ cobroLegible(fila as Estudio) }}
           </span>
@@ -639,19 +644,17 @@ function borrar(): void {
               </option>
             </select>
           </div>
-          <div v-if="edit.modo_cobro === 'activos'">
-            <label class="tu-label" for="pa">{{
-              $t("plataforma.estudios.precioAlumno")
-            }}</label>
-            <input
-              id="pa"
-              v-model="edit.precio"
-              type="number"
-              min="0"
-              step="0.01"
-              class="tu-input"
-            />
-          </div>
+          <p
+            v-if="edit.modo_cobro === 'activos'"
+            class="text-sm self-end"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{
+              editando.modalidad === "citas"
+                ? $t("cobro.modo.ayudaCitas")
+                : $t("cobro.modo.ayudaClases")
+            }}
+          </p>
           <div v-else>
             <label class="tu-label" for="cf">{{
               $t("plataforma.estudios.cuotaFija")

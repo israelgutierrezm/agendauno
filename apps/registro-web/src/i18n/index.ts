@@ -1,6 +1,7 @@
 import { createI18n } from "vue-i18n";
 
 import agendaVisual from "./locales/agendaVisual.es-MX";
+import cobro from "./locales/cobro.es-MX";
 import esMX from "./locales/es-MX";
 
 export const i18n = createI18n({
@@ -8,6 +9,6 @@ export const i18n = createI18n({
   locale: "es-MX",
   fallbackLocale: "es-MX",
   messages: {
-    "es-MX": { ...esMX, agendaVisual },
+    "es-MX": { ...esMX, agendaVisual, cobro },
   },
 });

@@ -292,6 +292,8 @@ const MENU: MenuItem[] = [
         icono: "facturas",
         ruta: "padron",
         permiso: "facturacion.ver",
+        // En citas se cobra por profesional (ver Renta → quién cuenta).
+        modalidad: "clases",
       },
     ],
   },
