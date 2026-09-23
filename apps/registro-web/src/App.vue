@@ -675,6 +675,14 @@ onMounted(() => {
     />
   </div>
 
+  <!-- Sesión guardada aún sin confirmar (recarga): ni panel ni cara pública. -->
+  <div
+    v-else-if="sesion.validando"
+    class="min-h-screen"
+    :style="{ background: 'var(--fondo)' }"
+    aria-busy="true"
+  />
+
   <!-- ===================== APP PÚBLICA ===================== -->
   <div v-else class="min-h-screen flex flex-col">
     <header class="tu-public-nav">

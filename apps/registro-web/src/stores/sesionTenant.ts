@@ -76,6 +76,8 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
   const autenticado = computed(
     () => usuario.value !== null && bearer.value !== null,
   );
+  // Hay un token guardado pero aún no se confirma con /yo (al recargar la página).
+  const validando = computed(() => bearer.value !== null && !verificado.value);
 
   /** RBAC de UI: el propietario (`*`) puede todo. El backend es la barrera real. */
   function puede(permiso: string): boolean {
@@ -150,7 +152,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
       );
       establecer(data.data);
     } catch (e) {
-      error.value = mensajeDeError(e, "No se pudo iniciar sesion.");
+      error.value = mensajeDeError(e, "No se pudo iniciar sesión.");
       throw e;
     } finally {
       cargando.value = false;
@@ -170,7 +172,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
       );
       establecer(data.data);
     } catch (e) {
-      error.value = mensajeDeError(e, "No se pudo iniciar sesion con Google.");
+      error.value = mensajeDeError(e, "No se pudo iniciar sesión con Google.");
       throw e;
     } finally {
       cargando.value = false;
@@ -286,6 +288,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     cargando,
     error,
     autenticado,
+    validando,
     puede,
     rutaInicio,
     modalidad,
