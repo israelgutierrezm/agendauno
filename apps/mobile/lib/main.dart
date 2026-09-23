@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/auth/application/sesion_controller.dart';
 import 'core/network/auth_token.dart';
 import 'core/storage/almacen_sesion.dart';
+import 'core/theme/tema_agendauno.dart';
 import 'features/agenda/presentation/agenda_screen.dart';
 import 'features/auth/data/sesion.dart';
 import 'features/auth/presentation/login_screen.dart';
@@ -51,13 +52,15 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
     final sesion = ref.watch(sesionProvider);
     final Widget inicio = sesion == null
         ? const LoginScreen()
-        : (sesion.rol == 'miembro' ? const CuentaScreen() : const AgendaScreen());
+        : (sesion.rol == 'miembro'
+              ? const CuentaScreen()
+              : const AgendaScreen());
 
     return MaterialApp(
       title: 'AgendaUno',
       debugShowCheckedModeBanner: false,
-      // Azul de marca AgendaUno (#0070FF).
-      theme: ThemeData(colorSchemeSeed: const Color(0xFF0070FF), useMaterial3: true),
+      // El mismo tema claro de la web (tokens de AgendaUno).
+      theme: TemaAgendaUno.claro(),
       home: inicio,
     );
   }

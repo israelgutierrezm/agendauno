@@ -7,7 +7,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// iOS, Keystore en Android) para no pedir iniciar sesión cada vez que se abre la
 /// app. Guarda un mapa JSON; `core` no conoce el modelo de la sesión.
 class AlmacenSesion {
-  AlmacenSesion([FlutterSecureStorage? almacen]) : _almacen = almacen ?? const FlutterSecureStorage();
+  AlmacenSesion([FlutterSecureStorage? almacen])
+    : _almacen = almacen ?? const FlutterSecureStorage();
 
   static const _clave = 'agendauno.sesion';
 
@@ -27,7 +28,8 @@ class AlmacenSesion {
     }
   }
 
-  Future<void> guardar(Map<String, dynamic> datos) => _almacen.write(key: _clave, value: jsonEncode(datos));
+  Future<void> guardar(Map<String, dynamic> datos) =>
+      _almacen.write(key: _clave, value: jsonEncode(datos));
 
   Future<void> borrar() => _almacen.delete(key: _clave);
 }

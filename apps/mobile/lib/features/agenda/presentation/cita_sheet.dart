@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/sesion_controller.dart';
 import '../application/agenda_controller.dart';
 import '../data/agenda_models.dart';
 import 'agenda_screen.dart';
@@ -48,6 +49,11 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
   @override
   Widget build(BuildContext context) {
     final agenda = ref.watch(agendaProvider).value;
+    // Solo se ofrece lo que el servidor permitiría (un instructor no cobra ni cancela).
+    final sesion = ref.watch(sesionProvider);
+    final puedeCobrar = sesion?.puede('ordenes.gestionar') ?? false;
+    final puedeMarcar = sesion?.puede('asistencia.marcar') ?? false;
+    final puedeCancelar = sesion?.puede('reservas.gestionar') ?? false;
     final s = agenda?.sesiones.where((x) => x.id == widget.sesionId).firstOrNull;
     if (s == null || s.cita == null) {
       return const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()));
@@ -125,7 +131,7 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
             ),
             if (activa) ...[
               const SizedBox(height: 16),
-              if (s.porCobrar)
+              if (s.porCobrar && puedeCobrar)
                 Row(
                   children: [
                     DropdownButton<String>(
@@ -147,9 +153,10 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                   ],
                 ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  if (s.cita!.asistencia != 'presente')
+              if (puedeMarcar)
+                Row(
+                  children: [
+                    if (s.cita!.asistencia != 'presente')
                     Expanded(
                       child: FilledButton.tonal(
                         onPressed: _ocupado ? null : () => _hacer((c) => c.marcarLlegada(s), 'Llegada registrada.'),
@@ -167,10 +174,11 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                   ),
                 ],
               ),
-              TextButton(
-                onPressed: _ocupado
-                    ? null
-                    : () => _hacer((c) => c.cancelar(s), 'Cita cancelada; el horario quedó libre.'),
+              if (puedeCancelar)
+                TextButton(
+                  onPressed: _ocupado
+                      ? null
+                      : () => _hacer((c) => c.cancelar(s), 'Cita cancelada; el horario quedó libre.'),
                 style: TextButton.styleFrom(foregroundColor: const Color(0xFFB42318)),
                 child: const Text('Cancelar cita'),
               ),

@@ -15,29 +15,120 @@ class CuentaRepository {
 
   String get _base => '/api/v1/app/$_slug';
 
-  Future<MiCuenta> cargar() async {
-    final perfil = await _dio.get<Map<String, dynamic>>('$_base/mi/perfil');
-    final agenda = await _dio.get<Map<String, dynamic>>('$_base/mi/agenda');
+  Future<MiCuenta> cargar({required bool conClases}) async {
+    final respuestas = await Future.wait([
+      _dio.get<Map<String, dynamic>>('$_base/mi/perfil'),
+      _dio.get<Map<String, dynamic>>('$_base/mi/waivers'),
+      if (conClases) _dio.get<Map<String, dynamic>>('$_base/mi/agenda'),
+    ]);
 
-    final data = (perfil.data?['data'] ?? {}) as Map<String, dynamic>;
+    final data = (respuestas[0].data?['data'] ?? {}) as Map<String, dynamic>;
     final derechos = ((data['derechos'] ?? []) as List)
         .map((e) => DerechoMiembro.desdeJson(e as Map<String, dynamic>))
         .toList();
     final reservas = ((data['reservas'] ?? []) as List)
         .map((e) => ReservaMiembro.desdeJson(e as Map<String, dynamic>))
         .toList();
-    final clases = ((agenda.data?['data'] ?? []) as List)
-        .map((e) => ClaseMiembro.desdeJson(e as Map<String, dynamic>))
+    final consentimientos = ((respuestas[1].data?['data'] ?? []) as List)
+        .map(
+          (e) => ConsentimientoPendiente.desdeJson(e as Map<String, dynamic>),
+        )
         .toList();
+    final clases = conClases
+        ? ((respuestas[2].data?['data'] ?? []) as List)
+              .map((e) => ClaseMiembro.desdeJson(e as Map<String, dynamic>))
+              .toList()
+        : <ClaseMiembro>[];
 
-    return MiCuenta(derechos: derechos, reservas: reservas, clases: clases);
+    return MiCuenta(
+      derechos: derechos,
+      reservas: reservas,
+      clases: clases,
+      consentimientos: consentimientos,
+    );
   }
 
-  Future<void> reservar(String sesionId) =>
-      _dio.post<Map<String, dynamic>>('$_base/mi/reservas', data: {'sesion_id': sesionId});
+  /// Reserva un lugar, o se anota en la lista de espera si la clase está llena.
+  Future<void> reservar(String sesionId, {bool esperar = false}) =>
+      _dio.post<Map<String, dynamic>>(
+        '$_base/mi/reservas',
+        data: {'sesion_id': sesionId, 'esperar': esperar},
+      );
 
   Future<void> cancelar(String reservaId) =>
       _dio.post<Map<String, dynamic>>('$_base/mi/reservas/$reservaId/cancelar');
+
+  /// Acepta el lugar que le ofreció la lista de espera.
+  Future<void> aceptarLugar(String reservaId) =>
+      _dio.post<Map<String, dynamic>>('$_base/mi/reservas/$reservaId/aceptar');
+
+  Future<void> firmar(String consentimientoId) =>
+      _dio.post<Map<String, dynamic>>(
+        '$_base/mi/waivers/$consentimientoId/aceptar',
+      );
+
+  Future<OpcionesCita> opcionesCita() async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/citas/opciones',
+    );
+    final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
+    List<OpcionCita> lista(String clave) => ((data[clave] ?? []) as List)
+        .map((e) => OpcionCita.desdeJson(e as Map<String, dynamic>))
+        .toList();
+
+    return OpcionesCita(
+      servicios: lista('servicios'),
+      sucursales: lista('sucursales'),
+      profesionales: lista('instructores'),
+    );
+  }
+
+  /// Horarios libres (inicio en ISO UTC) de un profesional en una fecha (AAAA-MM-DD).
+  Future<List<String>> horariosLibres({
+    required String profesionalId,
+    required String sucursalId,
+    required String fecha,
+    required int duracionMinutos,
+  }) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/citas/disponibilidad',
+      queryParameters: {
+        'instructor_id': profesionalId,
+        'sucursal_id': sucursalId,
+        'fecha': fecha,
+        'duracion_minutos': duracionMinutos,
+      },
+    );
+    final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
+
+    return ((data['slots'] ?? []) as List)
+        .map((s) => ((s as Map<String, dynamic>)['inicia'] ?? '') as String)
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  /// Agenda la cita; devuelve su estado (`pendiente_pago` si se paga para reservar).
+  Future<String> agendarCita({
+    required String servicioId,
+    required String sucursalId,
+    required String profesionalId,
+    required String iniciaEnLocal,
+    required int duracionMinutos,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/mi/citas',
+      data: {
+        'oferta_id': servicioId,
+        'sucursal_id': sucursalId,
+        'instructor_id': profesionalId,
+        'inicia_en_local': iniciaEnLocal,
+        'duracion_minutos': duracionMinutos,
+      },
+    );
+
+    return (((res.data?['data'] ?? {}) as Map<String, dynamic>)['estado'] ?? '')
+        as String;
+  }
 }
 
 /// Repositorio ligado a la sesion activa (null si no hay sesion).

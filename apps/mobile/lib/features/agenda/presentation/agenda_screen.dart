@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
+import '../../perfil/presentation/perfil_screen.dart';
 import '../application/agenda_controller.dart';
 import '../data/agenda_models.dart';
 import 'cita_sheet.dart';
@@ -65,9 +66,10 @@ class AgendaScreen extends ConsumerWidget {
             onPressed: () => ref.invalidate(agendaProvider),
           ),
           IconButton(
-            tooltip: 'Cerrar sesión',
-            icon: const Icon(Icons.logout),
-            onPressed: () => ref.read(sesionProvider.notifier).cerrar(),
+            tooltip: 'Mi perfil',
+            icon: const Icon(Icons.person_outline),
+            onPressed: () =>
+                Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PerfilScreen())),
           ),
         ],
       ),

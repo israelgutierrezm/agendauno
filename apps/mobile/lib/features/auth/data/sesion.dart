@@ -5,18 +5,27 @@ enum Modalidad {
   clases,
   citas;
 
-  static Modalidad desde(Object? valor) => valor == 'citas' ? Modalidad.citas : Modalidad.clases;
+  static Modalidad desde(Object? valor) =>
+      valor == 'citas' ? Modalidad.citas : Modalidad.clases;
 }
 
 /// Terminología del perfil de negocio (p. ej. Cita / Cliente / Barbero).
 class Terminologia {
-  const Terminologia({this.sesion = 'Clase', this.miembro = 'Miembro', this.instructor = 'Instructor'});
+  const Terminologia({
+    this.sesion = 'Clase',
+    this.miembro = 'Miembro',
+    this.instructor = 'Instructor',
+  });
 
   final String sesion;
   final String miembro;
   final String instructor;
 
-  Map<String, dynamic> aJson() => {'sesion': sesion, 'miembro': miembro, 'instructor': instructor};
+  Map<String, dynamic> aJson() => {
+    'sesion': sesion,
+    'miembro': miembro,
+    'instructor': instructor,
+  };
 
   factory Terminologia.desdeJson(Map<String, dynamic>? json) {
     if (json == null) {
@@ -30,7 +39,8 @@ class Terminologia {
   }
 }
 
-/// Sesion tenant-local activa: el estudio (slug), el usuario autenticado y cómo
+/// Sesion tenant-local activa: el estudio (slug), el usuario autenticado (con sus
+/// roles y permisos, para no ofrecer acciones que el servidor rechazaría) y cómo
 /// opera el negocio (modalidad + terminología de su perfil).
 class Sesion {
   const Sesion({
@@ -38,6 +48,14 @@ class Sesion {
     required this.bearer,
     required this.nombre,
     required this.rol,
+    this.roles = const [],
+    this.permisos = const [],
+    this.nombrePila,
+    this.primerApellido,
+    this.segundoApellido,
+    this.email,
+    this.fotoUrl,
+    this.tieneContrasena = true,
     this.modalidad = Modalidad.clases,
     this.terminologia = const Terminologia(),
   });
@@ -46,10 +64,25 @@ class Sesion {
   final String bearer;
   final String nombre;
   final String rol;
+  final List<String> roles;
+  final List<String> permisos;
+  final String? nombrePila;
+  final String? primerApellido;
+  final String? segundoApellido;
+  final String? email;
+  final String? fotoUrl;
+  final bool tieneContrasena;
   final Modalidad modalidad;
   final Terminologia terminologia;
 
   bool get esCitas => modalidad == Modalidad.citas;
+
+  /// También es alumno/cliente aunque su rol principal sea otro.
+  bool get esAlumno => rol == 'miembro' || roles.contains('miembro');
+
+  /// ¿Tiene el permiso? (el propietario los tiene todos).
+  bool puede(String permiso) =>
+      permisos.contains('*') || permisos.contains(permiso);
 
   /// Forma guardada en el almacén cifrado del dispositivo.
   Map<String, dynamic> aJson() => {
@@ -57,6 +90,14 @@ class Sesion {
     'bearer': bearer,
     'nombre': nombre,
     'rol': rol,
+    'roles': roles,
+    'permisos': permisos,
+    'nombre_pila': nombrePila,
+    'primer_apellido': primerApellido,
+    'segundo_apellido': segundoApellido,
+    'email': email,
+    'foto_url': fotoUrl,
+    'tiene_contrasena': tieneContrasena,
     'modalidad': modalidad.name,
     'terminologia': terminologia.aJson(),
   };
@@ -65,7 +106,10 @@ class Sesion {
   static Sesion? desdeAlmacen(Map<String, dynamic> datos) {
     final slug = datos['slug'];
     final bearer = datos['bearer'];
-    if (slug is! String || bearer is! String || slug.isEmpty || bearer.isEmpty) {
+    if (slug is! String ||
+        bearer is! String ||
+        slug.isEmpty ||
+        bearer.isEmpty) {
       return null;
     }
     return Sesion(
@@ -73,20 +117,70 @@ class Sesion {
       bearer: bearer,
       nombre: (datos['nombre'] ?? '') as String,
       rol: (datos['rol'] ?? '') as String,
+      roles: _textos(datos['roles']),
+      permisos: _textos(datos['permisos']),
+      nombrePila: datos['nombre_pila'] as String?,
+      primerApellido: datos['primer_apellido'] as String?,
+      segundoApellido: datos['segundo_apellido'] as String?,
+      email: datos['email'] as String?,
+      fotoUrl: datos['foto_url'] as String?,
+      tieneContrasena: (datos['tiene_contrasena'] ?? true) as bool,
       modalidad: Modalidad.desde(datos['modalidad']),
-      terminologia: Terminologia.desdeJson(datos['terminologia'] as Map<String, dynamic>?),
+      terminologia: Terminologia.desdeJson(
+        datos['terminologia'] as Map<String, dynamic>?,
+      ),
     );
   }
 
-  factory Sesion.desdeJson(String slug, String bearer, Map<String, dynamic> usuario, [Map<String, dynamic>? estudio]) {
+  factory Sesion.desdeJson(
+    String slug,
+    String bearer,
+    Map<String, dynamic> usuario, [
+    Map<String, dynamic>? estudio,
+  ]) {
     final config = estudio?['perfil_config'] as Map<String, dynamic>?;
     return Sesion(
       slug: slug,
       bearer: bearer,
       nombre: (usuario['nombre'] ?? '') as String,
       rol: (usuario['rol'] ?? '') as String,
+      roles: _textos(usuario['roles']),
+      permisos: _textos(usuario['permisos']),
+      nombrePila: usuario['nombre_pila'] as String?,
+      primerApellido: usuario['primer_apellido'] as String?,
+      segundoApellido: usuario['segundo_apellido'] as String?,
+      email: usuario['email'] as String?,
+      fotoUrl: usuario['foto_url'] as String?,
+      tieneContrasena: (usuario['tiene_contrasena'] ?? true) as bool,
       modalidad: Modalidad.desde(config?['modalidad']),
-      terminologia: Terminologia.desdeJson(config?['terminologia'] as Map<String, dynamic>?),
+      terminologia: Terminologia.desdeJson(
+        config?['terminologia'] as Map<String, dynamic>?,
+      ),
     );
   }
+
+  /// La misma sesión con los datos de usuario que devuelve el servidor (p. ej. tras
+  /// editar el perfil), conservando el estudio y la configuración del negocio.
+  Sesion conUsuario(Map<String, dynamic> usuario) => Sesion(
+    slug: slug,
+    bearer: bearer,
+    nombre: (usuario['nombre'] ?? nombre) as String,
+    rol: (usuario['rol'] ?? rol) as String,
+    roles: usuario.containsKey('roles') ? _textos(usuario['roles']) : roles,
+    permisos: usuario.containsKey('permisos')
+        ? _textos(usuario['permisos'])
+        : permisos,
+    nombrePila: usuario['nombre_pila'] as String? ?? nombrePila,
+    primerApellido: usuario['primer_apellido'] as String?,
+    segundoApellido: usuario['segundo_apellido'] as String?,
+    email: usuario['email'] as String? ?? email,
+    fotoUrl: usuario['foto_url'] as String?,
+    tieneContrasena: (usuario['tiene_contrasena'] ?? tieneContrasena) as bool,
+    modalidad: modalidad,
+    terminologia: terminologia,
+  );
+
+  static List<String> _textos(Object? valor) => valor is List
+      ? valor.whereType<String>().toList(growable: false)
+      : const [];
 }

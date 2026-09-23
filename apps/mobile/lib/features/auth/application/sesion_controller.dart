@@ -43,10 +43,17 @@ class SesionController extends Notifier<Sesion?> {
       return;
     }
     try {
-      final res = await ref.read(dioProvider).get<Map<String, dynamic>>('/api/v1/app/${actual.slug}/yo');
+      final res = await ref
+          .read(dioProvider)
+          .get<Map<String, dynamic>>('/api/v1/app/${actual.slug}/yo');
       final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
       final usuario = (data['usuario'] ?? {}) as Map<String, dynamic>;
-      state = Sesion.desdeJson(actual.slug, actual.bearer, usuario, data['estudio'] as Map<String, dynamic>?);
+      state = Sesion.desdeJson(
+        actual.slug,
+        actual.bearer,
+        usuario,
+        data['estudio'] as Map<String, dynamic>?,
+      );
       await ref.read(almacenSesionProvider).guardar(state!.aJson());
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
@@ -55,11 +62,80 @@ class SesionController extends Notifier<Sesion?> {
     }
   }
 
+  /// Guarda el nombre (Mi perfil) y refleja lo que devuelve el servidor.
+  Future<void> guardarPerfil({
+    required String nombre,
+    String? primerApellido,
+    String? segundoApellido,
+  }) async {
+    final actual = state;
+    if (actual == null) {
+      return;
+    }
+    final res = await ref
+        .read(dioProvider)
+        .put<Map<String, dynamic>>(
+          '/api/v1/app/${actual.slug}/yo/perfil',
+          data: {
+            'nombre': nombre,
+            'primer_apellido': primerApellido,
+            'segundo_apellido': segundoApellido,
+          },
+        );
+    final usuario =
+        ((res.data?['data'] ?? {}) as Map<String, dynamic>)['usuario']
+            as Map<String, dynamic>?;
+    if (usuario != null) {
+      state = actual.conUsuario(usuario);
+      await ref.read(almacenSesionProvider).guardar(state!.aJson());
+    }
+  }
+
+  /// Cambia la contraseña (la actual se pide si ya tenía una).
+  Future<void> cambiarContrasena({
+    String? actualContrasena,
+    required String nueva,
+    required String confirmacion,
+  }) async {
+    final actual = state;
+    if (actual == null) {
+      return;
+    }
+    await ref
+        .read(dioProvider)
+        .put<Map<String, dynamic>>(
+          '/api/v1/app/${actual.slug}/yo/contrasena',
+          data: {
+            'actual': actualContrasena,
+            'password': nueva,
+            'password_confirmation': confirmacion,
+          },
+        );
+    if (!actual.tieneContrasena) {
+      state = actual.conUsuario({'tiene_contrasena': true});
+      await ref.read(almacenSesionProvider).guardar(state!.aJson());
+    }
+  }
+
+  /// Cierra la sesión: revoca el token en el servidor (si hay red) y la borra del
+  /// dispositivo.
   Future<void> cerrar() async {
+    final actual = state;
+    if (actual != null) {
+      try {
+        await ref
+            .read(dioProvider)
+            .post<Map<String, dynamic>>('/api/v1/app/${actual.slug}/logout');
+      } on DioException {
+        // Sin red o token ya revocado: se cierra igual en el dispositivo.
+      }
+    }
     ref.read(authTokenProvider.notifier).establecer(null);
     state = null;
     await ref.read(almacenSesionProvider).borrar();
   }
 }
 
-final sesionProvider = NotifierProvider<SesionController, Sesion?>(SesionController.new);
+final sesionProvider = NotifierProvider<SesionController, Sesion?>(
+  SesionController.new,
+);
