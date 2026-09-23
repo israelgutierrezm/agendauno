@@ -1,7 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
+import AgendaClasesSemana from "@/components/AgendaClasesSemana.vue";
+import AgendaKpis from "@/components/AgendaKpis.vue";
+import AgendaProfesionales from "@/components/AgendaProfesionales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import PanelCita from "@/components/PanelCita.vue";
+import PanelNuevaCita from "@/components/PanelNuevaCita.vue";
+import {
+  kpisCitas,
+  kpisClases,
+  tonoServicio,
+  type CitaTitular,
+  type SesionAgenda,
+  type VentanaAtencion,
+} from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -9,6 +23,9 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 interface Oferta {
   id: string;
   nombre: string;
+  precio_clase_minor?: number | null;
+  politica_reserva?: string;
+  duracion_minutos?: number | null;
 }
 interface Sucursal {
   id: string;
@@ -32,6 +49,9 @@ interface Sesion {
   ocupados: number;
   en_espera: number;
   estado: string;
+  // Cita 1 a 1: a quién se atiende y en qué va (null en clases).
+  tipo?: "clase" | "cita";
+  cita?: CitaTitular | null;
 }
 interface Recurso {
   id: string;
@@ -70,6 +90,7 @@ interface Checkin {
 }
 
 const sesion = useSesionTenantStore();
+const { t } = useI18n();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
 const puedeReservar = computed(() => sesion.puede("reservas.gestionar"));
@@ -91,13 +112,20 @@ const sesiones = ref<Sesion[]>([]);
 const miembros = ref<Miembro[]>([]);
 const instructores = ref<{ id: string; nombre: string }[]>([]);
 const recursos = ref<Recurso[]>([]);
+// Horario de atención de cada profesional (sombrea lo que queda fuera en citas).
+const ventanas = ref<VentanaAtencion[]>([]);
 const cargando = ref(true);
 const cargandoSesiones = ref(false);
 const error = ref<string | null>(null);
 
-// ---- Calendario (semana / dia) ----
-type Vista = "semana" | "dia";
-const vista = ref<Vista>("semana");
+// ---- Calendario (semana / dia / por profesional) ----
+// Citas: el día en columnas por profesional (o la semana). Clases: la semana con
+// cupos (o la lista del día).
+type Vista = "semana" | "dia" | "profesionales";
+const opcionesVista = computed<Vista[]>(() =>
+  sesion.esCitas ? ["profesionales", "semana"] : ["semana", "dia"],
+);
+const vista = ref<Vista>(sesion.esCitas ? "profesionales" : "semana");
 const semanaInicio = ref(lunesDe(new Date()));
 const diaSel = ref(isoDe(new Date()));
 const sucursalFiltro = ref("");
@@ -352,14 +380,19 @@ async function cargarReferencias(): Promise<void> {
     ofertas.value = o.data.data;
     sucursales.value = s.data.data;
     miembros.value = m.data.data;
+    // Profesionales (id + nombre) para filtrar y para las columnas por profesional.
+    const i = await api.get<{ data: { id: string; nombre: string }[] }>(
+      `${base.value}/instructores`,
+    );
+    instructores.value = i.data.data;
+    if (sesion.esCitas) {
+      const v = await api.get<{ data: VentanaAtencion[] }>(
+        `${base.value}/horarios-atencion`,
+      );
+      ventanas.value = v.data.data;
+    }
     if (puedeGestionar.value) {
-      const [i, r] = await Promise.all([
-        api.get<{ data: { id: string; nombre: string }[] }>(
-          `${base.value}/instructores`,
-        ),
-        api.get<{ data: Recurso[] }>(`${base.value}/recursos`),
-      ]);
-      instructores.value = i.data.data;
+      const r = await api.get<{ data: Recurso[] }>(`${base.value}/recursos`);
       recursos.value = r.data.data.filter((x) => x.activo);
     }
   } catch (e) {
@@ -406,6 +439,181 @@ function irHoy(): void {
   semanaInicio.value = lunesDe(new Date());
   diaSel.value = isoDe(new Date());
 }
+// Por profesional se navega por DÍA (cambia de semana al cruzarla).
+function irDia(delta: number): void {
+  const [a, m, d] = diaSel.value.split("-").map(Number);
+  const nuevo = new Date(a, m - 1, d + delta);
+  if (isoDe(lunesDe(nuevo)) !== isoDe(semanaInicio.value)) {
+    semanaInicio.value = lunesDe(nuevo);
+  }
+  diaSel.value = isoDe(nuevo);
+}
+function irPaso(delta: number): void {
+  if (vista.value === "profesionales") {
+    irDia(delta);
+  } else {
+    irSemana(delta);
+  }
+}
+const diaTexto = computed(() => {
+  const [a, m, d] = diaSel.value.split("-").map(Number);
+  return new Intl.DateTimeFormat("es-MX", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date(a, m - 1, d));
+});
+
+// ---- Agenda visual: catálogo (colores), zona, profesionales e indicadores ----
+const catalogo = computed(() => ofertas.value.map((o) => o.id));
+const zonaAgenda = computed(
+  () =>
+    sucursales.value.find((s) => s.id === sucursalFiltro.value)?.zona_horaria ??
+    sesiones.value[0]?.zona_horaria ??
+    sucursales.value[0]?.zona_horaria ??
+    "America/Mexico_City",
+);
+// Leyenda: solo los servicios/clases que aparecen en lo que se está viendo.
+const leyenda = computed(() => {
+  const presentes = new Set(sesionesVisibles.value.map((s) => s.oferta_id));
+  return ofertas.value
+    .filter((o) => presentes.has(o.id))
+    .map((o) => ({
+      id: o.id,
+      nombre: o.nombre,
+      ...tonoServicio(o.id, catalogo.value),
+    }));
+});
+const profesionalesVisibles = computed(() =>
+  instructorFiltro.value === ""
+    ? instructores.value
+    : instructores.value.filter((i) => i.id === instructorFiltro.value),
+);
+const ICONOS_KPI = {
+  calendario:
+    "M7 3v3M17 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z",
+  llego: "M14 4h5v16h-5M3 12h11M10 8l4 4-4 4",
+  pago: "M12 3v18M16.5 7.5c0-1.9-2-3-4.5-3s-4.5 1.2-4.5 3.2c0 4.3 9 2.3 9 6.6 0 2-2 3.2-4.5 3.2S7.5 18.3 7.5 16.5",
+  ausente: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9 9l6 6M15 9l-6 6",
+  ocupacion: "M21 12a9 9 0 1 1-9-9v9z",
+  check: "M5 12.5l4.2 4.2L19 7",
+  espera: "M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z",
+  mas: "M12 5v14M5 12h14",
+};
+function dineroMx(minor: number): string {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  }).format(minor / 100);
+}
+function kpi(
+  clave: string,
+  valor: string,
+  etiqueta: string,
+  icono: string,
+  fondo: string,
+  tinta: string,
+): {
+  clave: string;
+  valor: string;
+  etiqueta: string;
+  icono: string;
+  fondo: string;
+  tinta: string;
+} {
+  return { clave, valor, etiqueta, icono, fondo, tinta };
+}
+const tarjetasKpi = computed(() => {
+  const ahora = new Date();
+  if (sesion.esCitas) {
+    const k = kpisCitas(
+      sesionesVisibles.value.filter(
+        (s) =>
+          s.tipo === "cita" &&
+          fechaLocalSesion(s.inicia_en, s.zona_horaria) === diaSel.value,
+      ),
+      ahora,
+    );
+    return [
+      kpi(
+        "citas",
+        String(k.citas),
+        t("agendaVisual.kpis.citas"),
+        ICONOS_KPI.calendario,
+        "#E3EDFF",
+        "#0059CC",
+      ),
+      kpi(
+        "local",
+        String(k.enLocal),
+        t("agendaVisual.kpis.enLocal"),
+        ICONOS_KPI.llego,
+        "#EDE7FF",
+        "#5B21B6",
+      ),
+      kpi(
+        "cobrar",
+        dineroMx(k.porCobrarMinor),
+        t("agendaVisual.kpis.porCobrar", { n: k.pendientesPago }),
+        ICONOS_KPI.pago,
+        "#FFF1CC",
+        "#7A5200",
+      ),
+      kpi(
+        "ausentes",
+        String(k.noAsistieron),
+        t("agendaVisual.kpis.noAsistieron"),
+        ICONOS_KPI.ausente,
+        "#FDE6E6",
+        "#A11B1B",
+      ),
+    ];
+  }
+  const k = kpisClases(sesionesVisibles.value, ahora);
+  return [
+    kpi(
+      "clases",
+      String(k.clases),
+      t("agendaVisual.kpis.clases"),
+      ICONOS_KPI.calendario,
+      "#E3EDFF",
+      "#0059CC",
+    ),
+    kpi(
+      "ocupacion",
+      k.ocupacionPct !== null ? `${k.ocupacionPct}%` : "—",
+      t("agendaVisual.kpis.ocupacion"),
+      ICONOS_KPI.ocupacion,
+      "#E3F5EB",
+      "#0F6B3E",
+    ),
+    kpi(
+      "reservados",
+      String(k.reservados),
+      t("agendaVisual.kpis.reservados"),
+      ICONOS_KPI.check,
+      "#D6F2EA",
+      "#0A5A47",
+    ),
+    kpi(
+      "espera",
+      String(k.enEspera),
+      t("agendaVisual.kpis.enEspera"),
+      ICONOS_KPI.espera,
+      "#EDE7FF",
+      "#5B21B6",
+    ),
+    kpi(
+      "libres",
+      String(k.libresPorLlenar),
+      t("agendaVisual.kpis.libres"),
+      ICONOS_KPI.mas,
+      "#FEF0C7",
+      "#93370D",
+    ),
+  ];
+});
 
 // ---- Panel de detalle (reservas + asistencia + check-ins) ----
 const detalle = ref<Sesion | null>(null);
@@ -571,6 +779,56 @@ async function asignarStaff(id: string): Promise<void> {
     asignandoStaff.value = false;
   }
 }
+// ---- Nueva cita (negocios de citas): desde el botón o un hueco de la agenda ----
+const mostrarNuevaCita = ref(false);
+const inicialCita = ref({
+  fecha: "",
+  hora: "",
+  instructorId: null as string | null,
+  sucursalId: null as string | null,
+});
+function abrirNuevaCita(datos?: {
+  instructorId: string | null;
+  hora: string;
+}): void {
+  const ahora = new Date();
+  const minutos =
+    Math.ceil((ahora.getHours() * 60 + ahora.getMinutes()) / 15) * 15;
+  inicialCita.value = {
+    fecha: diaSel.value,
+    hora:
+      datos?.hora ??
+      `${pad2(Math.floor(minutos / 60) % 24)}:${pad2(minutos % 60)}`,
+    instructorId: datos?.instructorId ?? (instructorFiltro.value || null),
+    sucursalId: sucursalFiltro.value || null,
+  };
+  mostrarNuevaCita.value = true;
+}
+async function alAgendarCita(): Promise<void> {
+  mostrarNuevaCita.value = false;
+  await cargarSesiones();
+}
+
+// Detalle: una cita abre su panel (llegó, cobrar, cancelar); una clase, el de clase.
+const citaAbierta = ref<Sesion | null>(null);
+const puedeCobrar = computed(() => sesion.puede("ordenes.gestionar"));
+function abrirDesdeAgenda(s: SesionAgenda): void {
+  const original = sesiones.value.find((x) => x.id === s.id);
+  if (original === undefined) {
+    return;
+  }
+  if (original.tipo === "cita") {
+    citaAbierta.value = original;
+  } else {
+    void abrirDetalle(original);
+  }
+}
+async function alCambiarCita(): Promise<void> {
+  const id = citaAbierta.value?.id;
+  await cargarSesiones();
+  citaAbierta.value = sesiones.value.find((x) => x.id === id) ?? null;
+}
+
 function cerrarDetalle(): void {
   detalle.value = null;
 }
@@ -936,6 +1194,8 @@ async function crearRecurrente(): Promise<void> {
       sucursal_id: form.value.sucursalId,
       instructor_id:
         form.value.instructorId !== "" ? form.value.instructorId : null,
+      // La sala elegida también aplica a las clases que se repiten.
+      recurso_id: form.value.recursoId !== "" ? form.value.recursoId : null,
       dias_semana: dias,
       hora_local: hora,
       duracion_minutos: Number(form.value.duracion),
@@ -966,8 +1226,16 @@ onMounted(async () => {
         :titulo="$t('agenda.titulo')"
         :subtitulo="$t('agenda.subtitulo')"
       />
+      <!-- Citas: el negocio agenda al cliente. Clases: se programa una clase. -->
       <button
-        v-if="puedeGestionar"
+        v-if="sesion.esCitas && puedeReservar"
+        class="tu-btn tu-btn-primario"
+        @click="abrirNuevaCita()"
+      >
+        + {{ $t("agendaVisual.nuevaCita.boton") }}
+      </button>
+      <button
+        v-else-if="!sesion.esCitas && puedeGestionar"
         class="tu-btn tu-btn-primario"
         @click="mostrarNueva = true"
       >
@@ -1011,7 +1279,7 @@ onMounted(async () => {
           <button
             class="tu-icono-btn"
             :aria-label="$t('agenda.semanaAnterior')"
-            @click="irSemana(-1)"
+            @click="irPaso(-1)"
           >
             ‹
           </button>
@@ -1021,45 +1289,69 @@ onMounted(async () => {
           <button
             class="tu-icono-btn"
             :aria-label="$t('agenda.semanaSiguiente')"
-            @click="irSemana(1)"
+            @click="irPaso(1)"
           >
             ›
           </button>
           <span
-            class="text-sm font-medium ml-1 hidden sm:inline"
+            class="text-sm font-medium ml-1 hidden sm:inline first-letter:uppercase"
             :style="{ color: 'var(--texto-suave)' }"
-            >{{ rangoTexto }}</span
+            >{{ vista === "profesionales" ? diaTexto : rangoTexto }}</span
           >
         </div>
 
-        <!-- Alternar vista (solo escritorio; movil siempre es dia) -->
+        <!-- Alternar vista según la modalidad (citas: por profesional / semana;
+             clases: semana / día). En móvil, las clases siempre se ven por día. -->
         <div
-          class="hidden lg:inline-flex rounded-xl overflow-hidden border"
+          class="inline-flex rounded-xl overflow-hidden border"
+          :class="{ 'hidden lg:inline-flex': !sesion.esCitas }"
           :style="{ borderColor: 'var(--borde)' }"
+          role="group"
         >
           <button
+            v-for="op in opcionesVista"
+            :key="op"
             class="px-3 py-1.5 text-sm"
+            :aria-pressed="vista === op"
             :style="
-              vista === 'semana'
+              vista === op
                 ? { background: 'var(--primario)', color: '#fff' }
                 : {}
             "
-            @click="vista = 'semana'"
+            @click="vista = op"
           >
-            {{ $t("agenda.vistaSemana") }}
-          </button>
-          <button
-            class="px-3 py-1.5 text-sm"
-            :style="
-              vista === 'dia'
-                ? { background: 'var(--primario)', color: '#fff' }
-                : {}
-            "
-            @click="vista = 'dia'"
-          >
-            {{ $t("agenda.vistaDia") }}
+            {{ $t(`agendaVisual.vistas.${op}`) }}
           </button>
         </div>
+      </div>
+
+      <!-- Indicadores del día (citas) o de la semana (clases). -->
+      <AgendaKpis class="mt-4" :tarjetas="tarjetasKpi" />
+
+      <!-- Leyenda: el color identifica el servicio o la clase. -->
+      <div
+        v-if="leyenda.length > 0"
+        class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        <span class="font-bold" :style="{ color: 'var(--texto)' }">{{
+          sesion.esCitas
+            ? $t("agendaVisual.leyendaServicios")
+            : $t("agendaVisual.leyendaClases")
+        }}</span>
+        <span
+          v-for="l in leyenda"
+          :key="l.id"
+          class="inline-flex items-center gap-1.5 font-semibold"
+          ><span
+            class="inline-block w-3 h-3 rounded"
+            :style="{
+              background: l.fondo,
+              boxShadow: `inset 0 0 0 1.5px ${l.tinta}55`,
+            }"
+          ></span
+          >{{ l.nombre }}</span
+        >
       </div>
 
       <p
@@ -1070,8 +1362,42 @@ onMounted(async () => {
         {{ $t("comun.cargando") }}
       </p>
 
-      <!-- ===== Vista SEMANA (escritorio): cuadricula horaria ===== -->
-      <div v-if="vista === 'semana'" class="mt-4 hidden lg:block">
+      <!-- ===== Vista POR PROFESIONAL (citas): el día en columnas ===== -->
+      <AgendaProfesionales
+        v-if="vista === 'profesionales'"
+        class="mt-4"
+        :fecha="diaSel"
+        :zona="zonaAgenda"
+        :sesiones="sesionesVisibles"
+        :profesionales="profesionalesVisibles"
+        :ventanas="ventanas"
+        :catalogo="catalogo"
+        :seleccionada="citaAbierta?.id ?? detalle?.id ?? null"
+        :puede-crear="puedeReservar"
+        @abrir="abrirDesdeAgenda"
+        @crear="abrirNuevaCita"
+      />
+
+      <!-- ===== Vista SEMANA de clases: franjas con cupos ===== -->
+      <div
+        v-if="vista === 'semana' && !sesion.esCitas"
+        class="mt-4 hidden lg:block"
+      >
+        <AgendaClasesSemana
+          :dias="dias"
+          :sesiones="sesionesVisibles"
+          :catalogo="catalogo"
+          :profesionales="instructores"
+          :seleccionada="citaAbierta?.id ?? detalle?.id ?? null"
+          @abrir="abrirDesdeAgenda"
+        />
+      </div>
+
+      <!-- ===== Vista SEMANA de citas (escritorio): cuadricula horaria ===== -->
+      <div
+        v-if="vista === 'semana' && sesion.esCitas"
+        class="mt-4 hidden lg:block"
+      >
         <!-- Leyenda: el color del bloque = tipo de clase; el punto = estado de ocupación. -->
         <div
           class="flex flex-wrap items-center gap-4 mb-2 text-xs"
@@ -1199,7 +1525,7 @@ onMounted(async () => {
                       : `color-mix(in srgb, ${colorTipo(b.sesion.oferta)} 22%, var(--superficie))`,
                   borderLeft: `3px solid ${estadoAgenda(b.sesion) === 'cancelada' ? 'var(--texto-suave)' : colorTipo(b.sesion.oferta)}`,
                 }"
-                @click="abrirDetalle(b.sesion)"
+                @click="abrirDesdeAgenda(b.sesion)"
               >
                 <div class="flex items-center gap-1">
                   <span class="font-semibold text-[11px] leading-tight">{{
@@ -1212,7 +1538,11 @@ onMounted(async () => {
                   ></span>
                 </div>
                 <div class="text-[12px] font-medium leading-tight truncate">
-                  {{ b.sesion.oferta ?? "—" }}
+                  {{
+                    b.sesion.tipo === "cita"
+                      ? (b.sesion.cita?.cliente ?? "—")
+                      : (b.sesion.oferta ?? "—")
+                  }}
                 </div>
                 <div
                   class="text-[10px] leading-tight truncate flex items-center gap-1"
@@ -1239,7 +1569,10 @@ onMounted(async () => {
       </div>
 
       <!-- ===== Vista DIA (movil siempre; escritorio si vista dia) ===== -->
-      <div :class="vista === 'dia' ? 'mt-4' : 'mt-4 lg:hidden'">
+      <div
+        v-if="vista !== 'profesionales'"
+        :class="vista === 'dia' ? 'mt-4' : 'mt-4 lg:hidden'"
+      >
         <!-- Tira de dias -->
         <div class="flex gap-1.5 overflow-x-auto pb-2">
           <button
@@ -1273,13 +1606,17 @@ onMounted(async () => {
               :style="{
                 borderLeft: `4px solid ${estadoAgenda(s) === 'cancelada' ? 'var(--texto-suave)' : colorTipo(s.oferta)}`,
               }"
-              @click="abrirDetalle(s)"
+              @click="abrirDesdeAgenda(s)"
             >
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                   <div class="font-semibold">
                     {{ horaCorta(s.inicia_en, s.zona_horaria) }} ·
-                    {{ s.oferta ?? "—" }}
+                    {{
+                      s.tipo === "cita"
+                        ? `${s.cita?.cliente ?? "—"} · ${s.oferta ?? "—"}`
+                        : (s.oferta ?? "—")
+                    }}
                   </div>
                   <div
                     v-if="s.instructor || s.sala"
@@ -2176,6 +2513,30 @@ onMounted(async () => {
         </form>
       </div>
     </div>
+
+    <PanelCita
+      :abierto="citaAbierta !== null"
+      :base="base"
+      :sesion="citaAbierta"
+      :catalogo="catalogo"
+      :puede-marcar="puedeMarcar"
+      :puede-cobrar="puedeCobrar"
+      :puede-cancelar="puedeReservar"
+      @cerrar="citaAbierta = null"
+      @cambiada="alCambiarCita"
+    />
+    <PanelNuevaCita
+      v-if="sesion.esCitas"
+      :abierto="mostrarNuevaCita"
+      :base="base"
+      :ofertas="ofertas"
+      :sucursales="sucursales"
+      :profesionales="instructores"
+      :clientes="miembros"
+      :inicial="inicialCita"
+      @cerrar="mostrarNuevaCita = false"
+      @agendada="alAgendarCita"
+    />
   </section>
 </template>
 
