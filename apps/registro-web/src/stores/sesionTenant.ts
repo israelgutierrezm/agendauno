@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 
+import { i18n } from "@/i18n";
 import { api, fijarBearer, mensajeDeError } from "@/lib/api";
 import { useAparienciaStore, type Apariencia } from "@/stores/apariencia";
 
@@ -115,7 +116,8 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     if (puede("agenda.ver")) {
       return "agenda";
     }
-    return "mi-cuenta";
+    // Sin pantallas de trabajo: su cuenta de alumno si también lo es; si no, su perfil.
+    return (u.roles ?? []).includes("miembro") ? "mi-cuenta" : "mi-perfil";
   });
 
   /**
@@ -160,7 +162,10 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
       );
       establecer(data.data);
     } catch (e) {
-      error.value = mensajeDeError(e, "No se pudo iniciar sesión.");
+      error.value = mensajeDeError(
+        e,
+        i18n.global.t("validacion.sesion.entrar"),
+      );
       throw e;
     } finally {
       cargando.value = false;
@@ -180,7 +185,10 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
       );
       establecer(data.data);
     } catch (e) {
-      error.value = mensajeDeError(e, "No se pudo iniciar sesión con Google.");
+      error.value = mensajeDeError(
+        e,
+        i18n.global.t("validacion.sesion.google"),
+      );
       throw e;
     } finally {
       cargando.value = false;
@@ -203,7 +211,10 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
       );
       establecer(data.data);
     } catch (e) {
-      error.value = mensajeDeError(e, "No se pudo activar la cuenta.");
+      error.value = mensajeDeError(
+        e,
+        i18n.global.t("validacion.sesion.activar"),
+      );
       throw e;
     } finally {
       cargando.value = false;
@@ -235,7 +246,10 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
       );
       establecer(data.data);
     } catch (e) {
-      error.value = mensajeDeError(e, "No se pudo crear la cuenta.");
+      error.value = mensajeDeError(
+        e,
+        i18n.global.t("validacion.sesion.registrar"),
+      );
       throw e;
     } finally {
       cargando.value = false;

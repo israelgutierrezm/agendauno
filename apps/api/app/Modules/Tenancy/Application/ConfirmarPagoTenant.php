@@ -43,7 +43,7 @@ class ConfirmarPagoTenant
                 $this->fulfillment->cumplir($orden);
                 // Evento de dominio (outbox): habilita acumular puntos de lealtad por compra.
                 $this->eventos->registrar('orden.pagada', 'orden', $orden->ulid, [
-                    'persona_id' => $orden->persona_id,
+                    'persona_id' => $orden->persona?->ulid,
                     'total_minor' => $orden->total_minor,
                     'orden_id' => $orden->ulid,
                 ]);

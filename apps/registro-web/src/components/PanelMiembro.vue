@@ -33,13 +33,45 @@ const props = defineProps<{
   personaId: string;
   nombre: string;
   incrustado?: boolean;
+  // Sede donde se registra la entrada (la que se está atendiendo en recepción).
+  sucursalId?: string;
 }>();
 const emit = defineEmits<{ (e: "cerrar"): void }>();
 
 const { t } = useI18n();
 const sesionStore = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesionStore.slug}`);
-const puedeVender = computed(() => sesionStore.puede("ordenes.gestionar"));
+// Vender también lista los productos: hacen falta los dos permisos.
+const puedeVender = computed(
+  () =>
+    sesionStore.puede("ordenes.gestionar") &&
+    sesionStore.puede("productos.ver"),
+);
+const puedeRegistrarEntrada = computed(() =>
+  sesionStore.puede("checkins.registrar"),
+);
+
+// Control de acceso: la entrada se permite por reserva vigente o acceso libre.
+const entrada = ref<{ permitido: boolean; codigo: string } | null>(null);
+const registrandoEntrada = ref(false);
+async function registrarEntrada(): Promise<void> {
+  registrandoEntrada.value = true;
+  error.value = null;
+  try {
+    const { data } = await api.post<{
+      data: { permitido: boolean; codigo: string };
+    }>(`${base.value}/accesos`, {
+      persona_id: props.personaId,
+      metodo: "manual",
+      sucursal_id: props.sucursalId || null,
+    });
+    entrada.value = data.data;
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    registrandoEntrada.value = false;
+  }
+}
 
 const resumen = ref<Resumen | null>(null);
 const cargando = ref(true);
@@ -165,7 +197,14 @@ async function cargar(): Promise<void> {
   }
 }
 
-watch(() => props.personaId, cargar, { immediate: true });
+watch(
+  () => props.personaId,
+  () => {
+    entrada.value = null;
+    void cargar();
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -301,6 +340,37 @@ watch(() => props.personaId, cargar, { immediate: true });
           >{{ $t("expediente.titulo") }} →</RouterLink
         >
       </p>
+
+      <!-- Entrada (control de acceso) -->
+      <div
+        v-if="puedeRegistrarEntrada"
+        class="mt-5 border-t pt-4"
+        :style="{ borderColor: 'var(--borde)' }"
+      >
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma w-full text-sm"
+          :disabled="registrandoEntrada"
+          @click="registrarEntrada"
+        >
+          {{ $t("accesoRecepcion.registrar") }}
+        </button>
+        <p
+          v-if="entrada"
+          class="mt-2 text-sm"
+          role="status"
+          :style="{
+            color: entrada.permitido ? 'var(--exito)' : 'var(--error)',
+          }"
+        >
+          <span class="font-medium">{{
+            entrada.permitido
+              ? $t("accesoRecepcion.permitido")
+              : $t("accesoRecepcion.denegado")
+          }}</span>
+          · {{ $t(`accesoRecepcion.codigos.${entrada.codigo}`) }}
+        </p>
+      </div>
 
       <!-- Venta rápida + cobro en ventanilla -->
       <div

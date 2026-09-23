@@ -8,8 +8,11 @@ use App\Modules\Pagos\MetodoPago;
 use App\Modules\Reservas\EstadoReserva;
 use App\Modules\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
+use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
+use App\Modules\Tenancy\Application\FormulariosDePersonaTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
+use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
@@ -26,6 +29,7 @@ use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\WaiverTenant;
+use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
@@ -48,7 +52,24 @@ class MiTenantController
         private readonly OrdenesTenant $ordenes,
         private readonly CobrarOrdenTenant $cobrarOrden,
         private readonly PersonaDeUsuarioTenant $personas,
+        private readonly RegistroDePasarelasTenant $pasarelas,
+        private readonly FormulariosDePersonaTenant $formularios,
     ) {}
+
+    /**
+     * Los formularios que le tocan al alumno, con lo que ya respondió. Los responde
+     * él mismo (POST /formularios/{formulario}/respuestas con su persona_id).
+     */
+    public function formularios(Request $request): JsonResponse
+    {
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+
+        return response()->json(['data' => [
+            'persona_id' => $persona->ulid,
+            'formularios' => $this->formularios->de($persona),
+        ]]);
+    }
 
     /**
      * Waivers/consentimientos que el miembro tiene pendientes de aceptar (incluye
@@ -122,6 +143,8 @@ class MiTenantController
 
         return response()->json(['data' => [
             'persona' => ['nombre' => $persona->nombreCompleto(), 'email' => $persona->email],
+            // Si el estudio cobra en línea, el alumno puede pagar aquí sus compras.
+            'pago_en_linea' => $this->pasarelas->enLinea() !== null,
             'derechos' => $derechos,
             'reservas' => $reservas,
             'politica_cancelacion' => $politica instanceof PoliticaCancelacionTenant ? [
@@ -204,6 +227,40 @@ class MiTenantController
      * proveedor + hora y crea la sesión + la reserva (pago-para-reservar o membresía).
      * El miembro paga la `orden_id` devuelta (si es de pago) para confirmar.
      */
+    /**
+     * Servicios, sedes y profesionales para agendar una cita desde la cuenta (también
+     * en negocios que no están en el directorio).
+     */
+    public function opcionesCita(Request $request, OpcionesCitaTenant $opciones): JsonResponse
+    {
+        abort_unless($this->persona($request) instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+
+        return response()->json(['data' => $opciones->listar()]);
+    }
+
+    /**
+     * Horarios libres de un profesional en una fecha, para elegir la hora de la cita.
+     */
+    public function disponibilidadCita(Request $request, CalcularDisponibilidadTenant $disponibilidad): JsonResponse
+    {
+        abort_unless($this->persona($request) instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+
+        $validado = $request->validate([
+            'instructor_id' => ['required', 'string'],
+            'sucursal_id' => ['required', 'string'],
+            'fecha' => ['required', 'date_format:Y-m-d'],
+            'duracion_minutos' => ['required', 'integer', 'min:5', 'max:1440'],
+        ]);
+
+        $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
+        $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
+
+        return response()->json(['data' => [
+            'fecha' => $validado['fecha'],
+            'slots' => $disponibilidad->paraFecha((int) $instructor->getKey(), $sucursal, $validado['fecha'], (int) $validado['duracion_minutos']),
+        ]]);
+    }
+
     public function agendarCita(Request $request, AgendarCitaTenant $agendar): JsonResponse
     {
         $persona = $this->persona($request);
@@ -371,10 +428,17 @@ class MiTenantController
         abort_unless((int) $orden->persona_id === (int) $persona->getKey(), 403, 'Esta orden no es tuya.');
 
         $validado = $request->validate([
-            'proveedor' => ['required', 'string'],
+            'proveedor' => ['nullable', 'string'],
             'metodo' => ['nullable', Rule::enum(MetodoPago::class)],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
         ]);
+        // Sin proveedor, la pasarela en línea con la que cobra el estudio.
+        $validado['proveedor'] = ($validado['proveedor'] ?? '') !== '' ? $validado['proveedor'] : $this->pasarelas->enLinea();
+        if ($validado['proveedor'] === null) {
+            throw ValidationException::withMessages([
+                'proveedor' => ['Este negocio todavía no cobra en línea; paga en el estudio.'],
+            ]);
+        }
 
         // El autoservicio solo admite pasarelas en línea (no ventanilla/manual/efectivo).
         if (in_array($validado['proveedor'], ['manual', 'efectivo'], true)) {

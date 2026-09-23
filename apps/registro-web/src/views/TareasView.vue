@@ -9,6 +9,14 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const { t } = useI18n();
 
+// Los marcadores van como parámetros: `{{ }}` en la plantilla sería interpolación.
+const ayudaPlantilla = computed(() =>
+  t("tareas.reglas.ayudaPlantilla", {
+    a: "{{persona_nombre}}",
+    b: "{{estado}}",
+  }),
+);
+
 interface Tarea {
   id: string;
   titulo: string;
@@ -432,8 +440,8 @@ onMounted(cargarTareas);
       </p>
       <ul v-else class="mt-4 space-y-2">
         <li
-          v-for="t in tareas"
-          :key="t.id"
+          v-for="tarea in tareas"
+          :key="tarea.id"
           class="tu-card p-3 flex items-start justify-between gap-3"
         >
           <div class="min-w-0">
@@ -441,38 +449,40 @@ onMounted(cargarTareas);
               <span
                 class="font-semibold"
                 :class="{
-                  'line-through opacity-60': t.estado === 'completada',
+                  'line-through opacity-60': tarea.estado === 'completada',
                 }"
-                >{{ t.titulo }}</span
+                >{{ tarea.titulo }}</span
               >
-              <span v-if="t.automatica" class="tu-badge">{{
+              <span v-if="tarea.automatica" class="tu-badge">{{
                 $t("tareas.automatica")
               }}</span>
             </div>
             <p
-              v-if="t.detalle"
+              v-if="tarea.detalle"
               class="text-sm mt-1"
               :style="{ color: 'var(--texto-suave)' }"
             >
-              {{ t.detalle }}
+              {{ tarea.detalle }}
             </p>
             <div
               class="flex items-center gap-1.5 mt-1 text-xs"
               :style="{ color: 'var(--texto-suave)' }"
             >
-              <span v-if="t.persona">{{ t.persona }}</span>
-              <span v-if="t.persona" aria-hidden="true">·</span>
+              <span v-if="tarea.persona">{{ tarea.persona }}</span>
+              <span v-if="tarea.persona" aria-hidden="true">·</span>
               <span>{{
-                t.vence_en ? fecha(t.vence_en) : $t("tareas.sinVencimiento")
+                tarea.vence_en
+                  ? fecha(tarea.vence_en)
+                  : $t("tareas.sinVencimiento")
               }}</span>
             </div>
           </div>
           <button
-            v-if="t.estado === 'pendiente'"
+            v-if="tarea.estado === 'pendiente'"
             class="tu-btn tu-btn-fantasma shrink-0"
             type="button"
             :disabled="accionando"
-            @click="completar(t)"
+            @click="completar(tarea)"
           >
             {{ $t("tareas.completar") }}
           </button>
@@ -481,7 +491,7 @@ onMounted(cargarTareas);
             class="tu-enlace shrink-0"
             type="button"
             :disabled="accionando"
-            @click="reabrir(t)"
+            @click="reabrir(tarea)"
           >
             {{ $t("tareas.reabrir") }}
           </button>
@@ -571,7 +581,7 @@ onMounted(cargarTareas);
               required
             />
             <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("tareas.reglas.ayudaPlantilla") }}
+              {{ ayudaPlantilla }}
             </p>
           </div>
           <div>

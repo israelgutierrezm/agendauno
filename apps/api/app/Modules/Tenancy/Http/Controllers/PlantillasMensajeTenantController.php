@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Comunicaciones\CanalComunicacion;
+use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Models\PlantillaMensajeTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,13 +24,14 @@ class PlantillasMensajeTenantController
 
         return response()->json([
             'data' => $plantillas->map(fn (PlantillaMensajeTenant $p): array => $this->presentar($p))->all(),
+            'eventos_disponibles' => EventoDeDominioTenant::TIPOS,
         ]);
     }
 
     public function guardar(Request $request): JsonResponse
     {
         $validado = $request->validate([
-            'clave' => ['required', 'string', 'max:100'],
+            'clave' => ['required', Rule::in(EventoDeDominioTenant::TIPOS)],
             'canal' => ['required', Rule::enum(CanalComunicacion::class)],
             'asunto' => ['required', 'string', 'max:255'],
             'cuerpo' => ['required', 'string', 'max:5000'],

@@ -486,7 +486,9 @@ function borrar(): void {
         <div class="mt-3 grid gap-3 sm:grid-cols-3">
           <div v-for="p in pasarelas" :key="p.proveedor" class="tu-card p-4">
             <div class="flex items-center justify-between gap-2">
-              <span class="font-bold capitalize">{{ p.proveedor }}</span>
+              <span class="font-bold">{{
+                $t(`pasarelas.proveedores.${p.proveedor}`)
+              }}</span>
               <label class="flex items-center gap-1.5 text-xs">
                 <input
                   v-model="pasarelaDraft[p.proveedor].activa"
@@ -581,6 +583,9 @@ function borrar(): void {
         <template #col-slug="{ valor }">
           <span class="font-mono text-sm">{{ valor }}</span>
         </template>
+        <template #col-estado_facturacion="{ valor }">
+          <span class="text-sm">{{ $t(`panel.estados.${valor}`) }}</span>
+        </template>
         <template #col-cobro="{ fila }">
           <span class="text-sm">
             <span class="tu-badge">{{
@@ -641,7 +646,7 @@ function borrar(): void {
             }}</label>
             <select id="ef" v-model="edit.estado_facturacion" class="tu-input">
               <option v-for="s in ESTADOS_FACT" :key="s" :value="s">
-                {{ s }}
+                {{ $t(`panel.estados.${s}`) }}
               </option>
             </select>
           </div>

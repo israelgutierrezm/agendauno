@@ -43,6 +43,22 @@ class RegistroDePasarelasTenant
     }
 
     /**
+     * La pasarela en línea con la que cobra el estudio (la primera activa), o null
+     * si solo cobra en el estudio.
+     */
+    public function enLinea(): ?string
+    {
+        $proveedor = ConfiguracionPasarelaTenant::query()
+            ->where('activa', true)
+            ->whereNotIn('proveedor', self::INTEGRADAS)
+            ->orderByRaw("case when proveedor = 'stripe' then 0 else 1 end")
+            ->orderBy('id')
+            ->value('proveedor');
+
+        return is_string($proveedor) ? $proveedor : null;
+    }
+
+    /**
      * Llaves (descifradas) del proveedor en el estudio, o vacio.
      *
      * @return array<string, string>

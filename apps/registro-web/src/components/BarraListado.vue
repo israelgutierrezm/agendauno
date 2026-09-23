@@ -30,9 +30,9 @@ const props = withDefaults(
   {
     filtros: () => [],
     valores: () => ({}),
-    placeholder: "Buscar…",
+    placeholder: undefined,
     puedeCrear: false,
-    nuevoTexto: "Agregar",
+    nuevoTexto: undefined,
     sinBuscador: false,
   },
 );
@@ -115,7 +115,7 @@ function esActivo(clave: string): boolean {
         v-if="!sinBuscador"
         v-model="busqueda"
         type="search"
-        :placeholder="placeholder"
+        :placeholder="placeholder ?? $t('tabla.buscar')"
         class="tu-input min-w-0 flex-1 sm:min-w-52"
       />
 
@@ -151,7 +151,7 @@ function esActivo(clave: string): boolean {
           type="button"
           @click="emit('nuevo')"
         >
-          {{ nuevoTexto }}
+          {{ nuevoTexto ?? $t("listados.agregar") }}
         </button>
       </div>
     </div>

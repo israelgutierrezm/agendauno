@@ -150,3 +150,27 @@ it('el staff ve en su agenda a quién atiende cada cita y la cuenta como ocupada
     $this->getJson("/api/v1/app/{$ctx['e']['slug']}/sesiones/{$cita['sesion_id']}/reservas", conBearer($ctx['e']['bearer']))
         ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.estado', 'pendiente_pago');
 });
+
+it('el cliente agenda desde su cuenta: ve servicios y horarios libres aunque el negocio no esté en el directorio', function (): void {
+    $ctx = estudioConServicioDeCitas();
+    $e = $ctx['e'];
+    $this->putJson("/api/v1/app/{$e['slug']}/horarios-atencion", [
+        'instructor_id' => $ctx['pro'],
+        'sucursal_id' => $ctx['sede']['sucursal'],
+        'horarios' => [['dia_semana' => (int) now()->addDays(3)->isoWeekday(), 'hora_inicio' => '09:00', 'hora_fin' => '12:00']],
+    ], conBearer($e['bearer']))->assertCreated();
+    $cliente = alumnoConSesion($e);
+
+    $opciones = $this->getJson("/api/v1/app/{$e['slug']}/mi/citas/opciones", conBearer($cliente['bearer']))
+        ->assertOk()->json('data');
+    expect(collect($opciones['servicios'])->pluck('id'))->toContain($ctx['sede']['oferta'])
+        ->and(collect($opciones['instructores'])->pluck('id'))->toContain($ctx['pro']);
+
+    $fecha = now()->addDays(3)->format('Y-m-d');
+    $slots = $this->getJson("/api/v1/app/{$e['slug']}/mi/citas/disponibilidad?instructor_id={$ctx['pro']}&sucursal_id={$ctx['sede']['sucursal']}&fecha={$fecha}&duracion_minutos=30", conBearer($cliente['bearer']))
+        ->assertOk()->json('data.slots');
+    expect($slots)->not->toBeEmpty();
+
+    // El personal sin perfil de alumno no usa estas rutas.
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/citas/opciones", conBearer($e['bearer']))->assertForbidden();
+});

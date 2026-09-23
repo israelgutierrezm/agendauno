@@ -136,3 +136,34 @@ it('el historial del alumno lista sus compras', function (): void {
     expect($historial->first()['total_minor'])->toBe(89900);
     expect($historial->first()['lineas'][0]['producto'])->toBe('Pack 8 clases');
 });
+
+it('sin pasarela en línea el alumno no puede pagar aquí; con Stripe activo paga sin elegir pasarela', function (): void {
+    Http::fake([
+        'api.stripe.com/*' => Http::response([
+            'id' => 'pi_alumno_2', 'status' => 'requires_payment_method', 'client_secret' => 'pi_alumno_2_secret',
+        ], 200),
+    ]);
+
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $pack = crearPackTenant($e, 8000);
+    $a = alumnoConSesion($e);
+    $orden = (string) $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes", [
+        'items' => [['producto_id' => $pack, 'cantidad' => 1]],
+    ], conBearer($a['bearer']))->assertCreated()->json('data.id');
+
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/perfil", conBearer($a['bearer']))
+        ->assertOk()->assertJsonPath('data.pago_en_linea', false);
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes/{$orden}/cobrar", [], conBearer($a['bearer']))
+        ->assertStatus(422);
+
+    $this->putJson("/api/v1/app/{$e['slug']}/pasarelas/stripe", [
+        'activa' => true, 'modo' => 'test', 'credenciales' => ['secret_key' => 'sk_test_x'],
+    ], conBearer($e['bearer']))->assertOk();
+
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/perfil", conBearer($a['bearer']))
+        ->assertOk()->assertJsonPath('data.pago_en_linea', true);
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes/{$orden}/cobrar", ['metodo' => 'tarjeta'], conBearer($a['bearer']))
+        ->assertCreated()
+        ->assertJsonPath('data.proveedor', 'stripe')
+        ->assertJsonPath('data.checkout.client_secret', 'pi_alumno_2_secret');
+});

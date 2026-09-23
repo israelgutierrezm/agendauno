@@ -86,4 +86,5 @@ export const profesional = {
 export const listados = {
   verLista: "Ver como lista",
   verCuadricula: "Ver como cuadrícula",
+  agregar: "Agregar",
 };

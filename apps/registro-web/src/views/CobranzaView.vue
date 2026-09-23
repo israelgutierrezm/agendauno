@@ -114,6 +114,35 @@ async function regularizar(m: Moroso): Promise<void> {
   }
 }
 
+// Reembolsos ya hechos de un pago (quién, cuánto, cuándo y por qué).
+interface Reembolso {
+  id: string;
+  monto_minor: number;
+  moneda: string;
+  estado: string;
+  motivo: string | null;
+  revirtio_creditos: boolean;
+  actor: string | null;
+  fecha: string | null;
+}
+const reembolsosDe = ref<string | null>(null);
+const reembolsos = ref<Reembolso[]>([]);
+async function verReembolsos(p: Pago): Promise<void> {
+  if (reembolsosDe.value === p.id) {
+    reembolsosDe.value = null;
+    return;
+  }
+  try {
+    const { data } = await api.get<{ data: Reembolso[] }>(
+      `${base.value}/pagos/${p.id}/reembolsos`,
+    );
+    reembolsos.value = data.data;
+    reembolsosDe.value = p.id;
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
+
 function abrirReembolso(p: Pago): void {
   reembolsando.value = p;
   rMonto.value = String(p.reembolsable_minor / 100);
@@ -291,50 +320,111 @@ onMounted(cargar);
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="p in pagos"
-              :key="p.id"
-              class="border-t"
-              :style="{ borderColor: 'var(--borde)' }"
-            >
-              <td
-                class="px-4 py-2 whitespace-nowrap"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{ fechaHora(p.fecha) }}
-              </td>
-              <td class="px-4 py-2 font-semibold">{{ p.persona ?? "—" }}</td>
-              <td class="px-4 py-2 text-right">
-                {{ dinero(p.monto_minor, p.moneda) }}
-                <span
-                  v-if="p.reembolsado_minor > 0"
-                  class="block text-xs"
+            <template v-for="p in pagos" :key="p.id">
+              <tr class="border-t" :style="{ borderColor: 'var(--borde)' }">
+                <td
+                  class="px-4 py-2 whitespace-nowrap"
                   :style="{ color: 'var(--texto-suave)' }"
-                  >−{{ dinero(p.reembolsado_minor, p.moneda) }}</span
                 >
-              </td>
-              <td class="px-4 py-2">
-                <span
-                  class="tu-badge"
-                  :class="
-                    p.estado === 'aprobado'
-                      ? 'tu-badge-exito'
-                      : 'tu-badge-aviso'
-                  "
-                  >{{ $t(`cobranza.pagoEstados.${p.estado}`) }}</span
-                >
-              </td>
-              <td class="px-4 py-2 text-right">
-                <button
-                  v-if="puedeReembolsar && p.reembolsable_minor > 0"
-                  class="tu-enlace text-sm"
-                  type="button"
-                  @click="abrirReembolso(p)"
-                >
-                  {{ $t("cobranza.reembolsar") }}
-                </button>
-              </td>
-            </tr>
+                  {{ fechaHora(p.fecha) }}
+                </td>
+                <td class="px-4 py-2 font-semibold">{{ p.persona ?? "—" }}</td>
+                <td class="px-4 py-2 text-right">
+                  {{ dinero(p.monto_minor, p.moneda) }}
+                  <button
+                    v-if="p.reembolsado_minor > 0"
+                    type="button"
+                    class="block ml-auto text-xs underline-offset-2 hover:underline"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    :aria-expanded="reembolsosDe === p.id"
+                    :title="
+                      reembolsosDe === p.id
+                        ? $t('reembolsosPago.ocultar')
+                        : $t('reembolsosPago.ver')
+                    "
+                    @click="verReembolsos(p)"
+                  >
+                    −{{ dinero(p.reembolsado_minor, p.moneda) }}
+                  </button>
+                </td>
+                <td class="px-4 py-2">
+                  <span
+                    class="tu-badge"
+                    :class="
+                      p.estado === 'aprobado'
+                        ? 'tu-badge-exito'
+                        : 'tu-badge-aviso'
+                    "
+                    >{{ $t(`cobranza.pagoEstados.${p.estado}`) }}</span
+                  >
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <button
+                    v-if="puedeReembolsar && p.reembolsable_minor > 0"
+                    class="tu-enlace text-sm"
+                    type="button"
+                    @click="abrirReembolso(p)"
+                  >
+                    {{ $t("cobranza.reembolsar") }}
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="reembolsosDe === p.id">
+                <td colspan="5" class="px-4 pb-3">
+                  <div
+                    class="rounded-xl border px-4 text-xs"
+                    :style="{
+                      borderColor: 'var(--borde)',
+                      background: 'var(--fondo)',
+                    }"
+                  >
+                    <div
+                      v-for="r in reembolsos"
+                      :key="r.id"
+                      class="flex items-center justify-between gap-3 border-t py-2 first:border-t-0"
+                      :style="{ borderColor: 'var(--borde)' }"
+                    >
+                      <span class="min-w-0">
+                        <span class="block font-medium">{{
+                          r.motivo ?? "—"
+                        }}</span>
+                        <span
+                          class="block"
+                          :style="{ color: 'var(--texto-suave)' }"
+                          >{{ fechaHora(r.fecha) }}
+                          <template v-if="r.actor">
+                            ·
+                            {{
+                              $t("reembolsosPago.por", { actor: r.actor })
+                            }}</template
+                          >
+                          <template v-if="r.revirtio_creditos">
+                            ·
+                            {{
+                              $t("reembolsosPago.creditosRevertidos")
+                            }}</template
+                          ></span
+                        >
+                      </span>
+                      <span class="flex items-center gap-2 shrink-0">
+                        <span class="font-semibold tabular-nums">{{
+                          dinero(r.monto_minor, r.moneda)
+                        }}</span>
+                        <span
+                          class="tu-badge"
+                          :class="
+                            r.estado === 'aprobado'
+                              ? 'tu-badge-exito'
+                              : 'tu-badge-aviso'
+                          "
+                          >{{ $t(`reembolsosPago.estados.${r.estado}`) }}</span
+                        >
+                      </span>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>

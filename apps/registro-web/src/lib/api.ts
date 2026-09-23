@@ -41,7 +41,7 @@ api.interceptors.request.use((config) => {
  */
 export function mensajeDeError(
   e: unknown,
-  porDefecto = "Ocurrio un error inesperado.",
+  porDefecto = "Ocurrió un error inesperado.",
 ): string {
   if (axios.isAxiosError(e)) {
     const data = e.response?.data as

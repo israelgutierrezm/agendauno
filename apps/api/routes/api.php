@@ -232,11 +232,14 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/agenda', [MiTenantController::class, 'agenda'])->name('mi.agenda');
             Route::post('/mi/reservas', [MiTenantController::class, 'reservar'])->name('mi.reservas.store');
             // Agenda una cita desde un hueco de disponibilidad (F-08): crea la sesión + reserva/pago.
+            Route::get('/mi/citas/opciones', [MiTenantController::class, 'opcionesCita'])->name('mi.citas.opciones');
+            Route::get('/mi/citas/disponibilidad', [MiTenantController::class, 'disponibilidadCita'])->name('mi.citas.disponibilidad');
             Route::post('/mi/citas', [MiTenantController::class, 'agendarCita'])->name('mi.citas.store');
             Route::post('/mi/reservas/{reserva}/cancelar', [MiTenantController::class, 'cancelar'])->name('mi.reservas.cancelar');
             Route::post('/mi/reservas/{reserva}/aceptar', [MiTenantController::class, 'aceptar'])->name('mi.reservas.aceptar');
             Route::get('/mi/waivers', [MiTenantController::class, 'waiversPendientes'])->name('mi.waivers.index');
             Route::post('/mi/waivers/{waiver}/aceptar', [MiTenantController::class, 'aceptarWaiver'])->name('mi.waivers.aceptar');
+            Route::get('/mi/formularios', [MiTenantController::class, 'formularios'])->name('mi.formularios.index');
             // Ciclo comercial del alumno (P0 #4): comprar packs/membresías y pagarlos en
             // línea desde su portal. El fulfillment (créditos) lo confirma el webhook.
             Route::get('/mi/productos', [MiTenantController::class, 'productos'])->name('mi.productos.index');
@@ -330,6 +333,7 @@ Route::prefix('v1')->group(function (): void {
             // acepta por autoservicio (grupo /mi).
             Route::get('/waivers', [WaiversTenantController::class, 'index'])->middleware('puede:documentos.gestionar')->name('waivers.index');
             Route::post('/waivers', [WaiversTenantController::class, 'publicar'])->middleware('puede:documentos.gestionar')->name('waivers.store');
+            Route::post('/waivers/{waiver}/retirar', [WaiversTenantController::class, 'retirar'])->middleware('puede:documentos.gestionar')->name('waivers.retirar');
             Route::get('/miembros/{persona}/waivers', [WaiversTenantController::class, 'pendientesDePersona'])->middleware('puede:miembros.ver')->name('miembros.waivers.index');
 
             // Formularios dinámicos: el admin define formularios/campos; miembros e

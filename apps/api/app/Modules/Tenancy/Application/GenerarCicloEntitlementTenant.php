@@ -63,7 +63,7 @@ class GenerarCicloEntitlementTenant
 
                 $cupo = $bloqueado->unidades_por_ciclo ?? 0;
                 if ($cupo > 0) {
-                    $this->libro->registrar($bloqueado, TipoMovimiento::Concesion, $cupo, 'Concesion de ciclo', ContextoMovimiento::para(OrigenMovimiento::Ciclo));
+                    $this->libro->registrar($bloqueado, TipoMovimiento::Concesion, $cupo, 'Concesión de ciclo', ContextoMovimiento::para(OrigenMovimiento::Ciclo));
                 }
 
                 $bloqueado->refresh();

@@ -58,7 +58,7 @@ it('el comando renueva los ciclos vencidos de un derecho recurrente en el plano 
         $derecho = DerechoTenant::query()->whereKey($derechoId)->firstOrFail();
 
         expect(app(LibroMayorTenant::class)->saldo($derecho))->toBe(4000);
-        expect($derecho->movimientos()->where('descripcion', 'Concesion de ciclo')->exists())->toBeTrue();
+        expect($derecho->movimientos()->where('descripcion', 'Concesión de ciclo')->exists())->toBeTrue();
         expect($derecho->movimientos()->where('descripcion', 'Expiracion de ciclo')->exists())->toBeTrue();
         expect($derecho->ciclo_fin->gte(now()->startOfDay()))->toBeTrue();
     });

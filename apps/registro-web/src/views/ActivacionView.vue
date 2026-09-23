@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import { trackEvent } from "@/lib/analytics";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const sesion = useSesionTenantStore();
@@ -31,7 +33,7 @@ const desdeCorreo = computed(
 async function enviar(): Promise<void> {
   errorLocal.value = null;
   if (password.value !== passwordConfirm.value) {
-    errorLocal.value = "Las contrasenas no coinciden.";
+    errorLocal.value = t("validacion.contrasenasNoCoinciden");
     return;
   }
   try {

@@ -67,7 +67,7 @@ class CobrarOrdenTenant
                 $this->fulfillment->cumplir($bloqueada);
                 // Evento de dominio (outbox): habilita acumular puntos de lealtad por compra.
                 $this->eventos->registrar('orden.pagada', 'orden', $bloqueada->ulid, [
-                    'persona_id' => $bloqueada->persona_id,
+                    'persona_id' => $bloqueada->persona?->ulid,
                     'total_minor' => $bloqueada->total_minor,
                     'orden_id' => $bloqueada->ulid,
                 ]);

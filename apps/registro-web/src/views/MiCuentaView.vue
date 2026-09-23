@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 
+import AgendarCitaCuenta from "@/components/AgendarCitaCuenta.vue";
+import ListaFormularios from "@/components/ListaFormularios.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import type { FormularioPersona } from "@/lib/formularios";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Derecho {
@@ -19,6 +22,7 @@ interface Reserva {
   inicia_en: string | null;
   zona_horaria: string | null;
   oferta_expira_en: string | null;
+  orden_id: string | null;
 }
 interface Producto {
   id: string;
@@ -72,6 +76,11 @@ const waivers = ref<Waiver[]>([]);
 const productos = ref<Producto[]>([]);
 const ordenes = ref<Orden[]>([]);
 const politica = ref<Politica | null>(null);
+const formularios = ref<FormularioPersona[]>([]);
+const personaId = ref<string | null>(null);
+// ¿El negocio cobra en línea? Entonces el alumno paga aquí lo pendiente.
+const pagoEnLinea = ref(false);
+const pagando = ref<string | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const mensaje = ref<string | null>(null);
@@ -107,8 +116,9 @@ function lugares(c: Clase): string {
     : String(c.ocupados);
 }
 
-async function cargar(): Promise<void> {
-  cargando.value = true;
+// `silencioso`: recarga sin ocultar la pantalla (p. ej. tras agendar una cita).
+async function cargar(silencioso = false): Promise<void> {
+  cargando.value = !silencioso;
   error.value = null;
   try {
     const [p, a, w, pr, o] = await Promise.all([
@@ -117,6 +127,7 @@ async function cargar(): Promise<void> {
           derechos: Derecho[];
           reservas: Reserva[];
           politica_cancelacion: Politica | null;
+          pago_en_linea?: boolean;
         };
       }>(`${base.value}/mi/perfil`),
       api.get<{ data: Clase[] }>(`${base.value}/mi/agenda`),
@@ -127,6 +138,7 @@ async function cargar(): Promise<void> {
     derechos.value = p.data.data.derechos;
     reservas.value = p.data.data.reservas;
     politica.value = p.data.data.politica_cancelacion;
+    pagoEnLinea.value = p.data.data.pago_en_linea === true;
     clases.value = a.data.data;
     waivers.value = w.data.data;
     productos.value = pr.data.data;
@@ -135,6 +147,47 @@ async function cargar(): Promise<void> {
     error.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
+  }
+  await cargarFormularios();
+}
+
+async function cargarFormularios(): Promise<void> {
+  try {
+    const { data } = await api.get<{
+      data: { persona_id: string; formularios: FormularioPersona[] };
+    }>(`${base.value}/mi/formularios`);
+    personaId.value = data.data.persona_id;
+    formularios.value = data.data.formularios;
+  } catch {
+    // Sin perfil de alumno: no hay formularios que llenar.
+    formularios.value = [];
+  }
+}
+
+// Paga en línea una orden propia (compra o cita apartada). Con pasarela de
+// redirección se va al checkout; si no, el pago queda en proceso.
+async function pagar(ordenId: string): Promise<void> {
+  pagando.value = ordenId;
+  error.value = null;
+  mensaje.value = null;
+  try {
+    const { data } = await api.post<{
+      data: { checkout?: { tipo?: string; url?: string } | null };
+    }>(`${base.value}/mi/ordenes/${ordenId}/cobrar`, { metodo: "tarjeta" });
+    const checkout = data.data.checkout ?? {};
+    if (
+      checkout.tipo === "redirect" &&
+      typeof checkout.url === "string" &&
+      checkout.url !== ""
+    ) {
+      window.location.href = checkout.url;
+      return;
+    }
+    mensaje.value = "pago";
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    pagando.value = null;
   }
 }
 
@@ -148,7 +201,7 @@ async function reservar(clase: Clase, esperar: boolean): Promise<void> {
       esperar,
     });
     mensaje.value = esperar ? "espera" : "ok";
-    await cargar();
+    await cargar(true);
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -161,7 +214,7 @@ async function cancelar(r: Reserva): Promise<void> {
   error.value = null;
   try {
     await api.post(`${base.value}/mi/reservas/${r.id}/cancelar`, {});
-    await cargar();
+    await cargar(true);
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -174,7 +227,7 @@ async function aceptar(r: Reserva): Promise<void> {
   error.value = null;
   try {
     await api.post(`${base.value}/mi/reservas/${r.id}/aceptar`, {});
-    await cargar();
+    await cargar(true);
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -187,7 +240,7 @@ async function aceptarWaiver(w: Waiver): Promise<void> {
   error.value = null;
   try {
     await api.post(`${base.value}/mi/waivers/${w.id}/aceptar`, {});
-    await cargar();
+    await cargar(true);
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -206,7 +259,7 @@ async function comprar(p: Producto): Promise<void> {
       items: [{ producto_id: p.id, cantidad: 1 }],
     });
     mensaje.value = "comprado";
-    await cargar();
+    await cargar(true);
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -225,7 +278,7 @@ const reservadas = computed(
     ),
 );
 
-onMounted(cargar);
+onMounted(() => cargar());
 </script>
 
 <template>
@@ -240,6 +293,14 @@ onMounted(cargar);
     </p>
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
+    </p>
+    <p
+      v-if="mensaje === 'pago'"
+      class="mt-4 text-sm"
+      role="status"
+      :style="{ color: 'var(--exito)' }"
+    >
+      {{ $t("miCuentaExtra.pagoEnProceso") }}
     </p>
 
     <template v-if="!cargando">
@@ -344,6 +405,22 @@ onMounted(cargar);
                   {{ $t("miCuenta.aceptarPlaza") }}
                 </button>
                 <button
+                  v-if="
+                    r.estado === 'pendiente_pago' &&
+                    r.orden_id !== null &&
+                    pagoEnLinea
+                  "
+                  class="tu-btn tu-btn-primario"
+                  :disabled="pagando !== null"
+                  @click="pagar(r.orden_id)"
+                >
+                  {{
+                    pagando === r.orden_id
+                      ? $t("miCuentaExtra.pagando")
+                      : $t("miCuentaExtra.pagar")
+                  }}
+                </button>
+                <button
                   class="tu-enlace"
                   style="color: var(--error)"
                   :disabled="accionando"
@@ -424,8 +501,14 @@ onMounted(cargar);
         </ul>
       </div>
 
+      <!-- Agendar una cita (negocios de citas) -->
+      <div v-if="sesion.esCitas" class="mt-6 tu-card p-6">
+        <h2 class="font-bold text-lg">{{ $t("citaCuenta.titulo") }}</h2>
+        <AgendarCitaCuenta class="mt-3" @agendada="cargar(true)" />
+      </div>
+
       <!-- Proximas clases -->
-      <div class="mt-6 tu-card p-6">
+      <div v-else class="mt-6 tu-card p-6">
         <h2 class="font-bold text-lg">{{ $t("miCuenta.agenda") }}</h2>
         <p
           v-if="mensaje === 'ok'"
@@ -491,6 +574,21 @@ onMounted(cargar);
         </p>
       </div>
 
+      <!-- Mis formularios -->
+      <div
+        v-if="formularios.length > 0 && personaId !== null"
+        class="mt-6 tu-card p-6"
+      >
+        <h2 class="font-bold text-lg">{{ $t("miCuentaExtra.formularios") }}</h2>
+        <ListaFormularios
+          class="mt-2"
+          :formularios="formularios"
+          :persona-id="personaId"
+          :puede-responder="true"
+          @guardado="cargarFormularios"
+        />
+      </div>
+
       <!-- Mis compras (historial) -->
       <div v-if="ordenes.length > 0" class="mt-6 tu-card p-6">
         <h2 class="font-bold text-lg">{{ $t("miCuenta.compras.titulo") }}</h2>
@@ -522,6 +620,18 @@ onMounted(cargar);
                 "
                 >{{ $t(`miCuenta.compras.estados.${o.estado}`) }}</span
               >
+              <button
+                v-if="o.estado === 'pendiente' && pagoEnLinea"
+                class="tu-btn tu-btn-primario text-sm"
+                :disabled="pagando !== null"
+                @click="pagar(o.id)"
+              >
+                {{
+                  pagando === o.id
+                    ? $t("miCuentaExtra.pagando")
+                    : $t("miCuentaExtra.pagar")
+                }}
+              </button>
             </span>
           </li>
         </ul>

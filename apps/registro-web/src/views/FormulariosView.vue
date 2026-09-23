@@ -1,9 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+
+/**
+ * Constructor de formularios dinámicos y sus respuestas. Se llenan desde el
+ * expediente de cada persona; aquí se diseñan y se consultan todas juntas.
+ */
+const { t } = useI18n();
 
 interface Campo {
   id: string;
@@ -21,23 +28,25 @@ interface Formulario {
   activo: boolean;
   campos: Campo[];
 }
-interface Miembro {
+type Valor = string | number | boolean | null;
+interface Respuesta {
   id: string;
-  nombre: string;
-  nombre_completo: string;
+  persona: string | null;
+  persona_id: string | null;
+  persona_tipo: "miembro" | "instructor" | null;
+  usuario_id: string | null;
+  respondido_en: string | null;
+  valores: Record<string, Valor>;
 }
 
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("formularios.gestionar"));
-const puedeResponder = computed(() => sesion.puede("formularios.responder"));
 
 const formularios = ref<Formulario[]>([]);
-const miembros = ref<Miembro[]>([]);
 const seleccionadoId = ref<string | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
-const mensaje = ref<string | null>(null);
 
 const nuevo = ref({ nombre: "", aplica_a: "miembro" });
 const creando = ref(false);
@@ -50,37 +59,57 @@ const nuevoCampo = ref({
 });
 const agregandoCampo = ref(false);
 
-const respuesta = reactive<{
-  persona: string;
-  texto: Record<string, string>;
-  bool: Record<string, boolean>;
-}>({
-  persona: "",
-  texto: {},
-  bool: {},
-});
-const guardando = ref(false);
+const respuestas = ref<Respuesta[]>([]);
+const cargandoRespuestas = ref(false);
+const abierta = ref<string | null>(null);
 
 const seleccionado = computed(
   () => formularios.value.find((f) => f.id === seleccionadoId.value) ?? null,
 );
 
-function nombreMiembro(m: Miembro): string {
-  return m.nombre_completo || m.nombre;
+function fecha(iso: string | null): string {
+  if (iso === null) {
+    return "—";
+  }
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
+function valor(c: Campo, v: Valor | undefined): string {
+  if (v === undefined || v === null || v === "") {
+    return t("expediente.sinValor");
+  }
+  if (c.tipo === "booleano") {
+    return v === true ? t("expediente.si") : t("expediente.no");
+  }
+  if (c.tipo === "fecha" && typeof v === "string") {
+    return fecha(`${v}T12:00:00`);
+  }
+  return String(v);
+}
+
+/** El expediente de la persona: la ficha del alumno o la del profesional. */
+function expediente(r: Respuesta): string | null {
+  if (r.persona_tipo === "miembro" && r.persona_id !== null) {
+    return `/miembros/${r.persona_id}?seccion=expediente`;
+  }
+  if (r.usuario_id !== null) {
+    return `/instructores/${r.usuario_id}?seccion=expediente`;
+  }
+  return null;
 }
 
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const [f, m] = await Promise.all([
-      api.get<{ data: Formulario[] }>(`${base.value}/formularios`),
-      api.get<{ data: Miembro[] }>(`${base.value}/miembros`, {
-        params: { tipo: "miembro" },
-      }),
-    ]);
+    const f = await api.get<{ data: Formulario[] }>(
+      `${base.value}/formularios`,
+    );
     formularios.value = f.data.data;
-    miembros.value = m.data.data;
     if (seleccionadoId.value === null && formularios.value.length > 0) {
       seleccionadoId.value = formularios.value[0].id;
     }
@@ -149,41 +178,25 @@ async function agregarCampo(): Promise<void> {
   }
 }
 
-async function enviarRespuesta(): Promise<void> {
-  if (seleccionado.value === null || respuesta.persona === "") {
+async function cargarRespuestas(): Promise<void> {
+  respuestas.value = [];
+  abierta.value = null;
+  if (!puedeGestionar.value || seleccionadoId.value === null) {
     return;
   }
-  guardando.value = true;
-  error.value = null;
-  mensaje.value = null;
+  cargandoRespuestas.value = true;
   try {
-    const valores: Record<string, string | number | boolean> = {};
-    for (const c of seleccionado.value.campos) {
-      if (c.tipo === "booleano") {
-        valores[c.id] = respuesta.bool[c.id] ?? false;
-      } else {
-        const v = respuesta.texto[c.id];
-        if (v !== undefined && v !== "") {
-          valores[c.id] = c.tipo === "numero" ? Number(v) : v;
-        }
-      }
-    }
-    await api.post(
-      `${base.value}/formularios/${seleccionado.value.id}/respuestas`,
-      {
-        persona_id: respuesta.persona,
-        valores,
-      },
+    const { data } = await api.get<{ data: Respuesta[] }>(
+      `${base.value}/formularios/${seleccionadoId.value}/respuestas`,
     );
-    mensaje.value = "ok";
-    respuesta.texto = {};
-    respuesta.bool = {};
+    respuestas.value = data.data;
   } catch (e) {
-    error.value = mensajeDeError(e);
+    error.value = mensajeDeError(e, t("formulariosRespuestas.cargarError"));
   } finally {
-    guardando.value = false;
+    cargandoRespuestas.value = false;
   }
 }
+watch(seleccionadoId, cargarRespuestas);
 
 onMounted(cargar);
 </script>
@@ -281,9 +294,9 @@ onMounted(cargar);
               <span class="tu-badge">{{
                 $t(`formularios.tipos.${c.tipo}`)
               }}</span>
-              <span v-if="c.obligatorio" class="tu-badge tu-badge-aviso"
-                >obligatorio</span
-              >
+              <span v-if="c.obligatorio" class="tu-badge tu-badge-aviso">{{
+                $t("formularios.campos.obligatorio")
+              }}</span>
             </li>
           </ul>
           <p
@@ -344,104 +357,89 @@ onMounted(cargar);
           </form>
         </div>
 
-        <!-- Responder (renderizado dinamico) -->
-        <div v-if="puedeResponder" class="tu-card p-6">
+        <!-- Respuestas: se llenan desde el expediente de cada persona -->
+        <div class="tu-card p-6">
           <h2 class="font-bold text-lg">
-            {{ $t("formularios.responder.titulo") }}
+            {{ $t("formularios.respuestas.titulo") }}
+            <span
+              v-if="puedeGestionar && respuestas.length > 0"
+              class="ml-1 font-normal tabular-nums"
+              :style="{ color: 'var(--texto-suave)' }"
+              >{{ respuestas.length }}</span
+            >
           </h2>
-          <p
-            v-if="seleccionado.campos.length === 0"
-            class="mt-2 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("formularios.responder.sinCampos") }}
+          <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("formulariosRespuestas.comoLlenar") }}
           </p>
-          <form v-else class="mt-3 space-y-3" @submit.prevent="enviarRespuesta">
-            <div>
-              <label class="tu-label" for="rp">{{
-                $t("formularios.responder.persona")
-              }}</label>
-              <select
-                id="rp"
-                v-model="respuesta.persona"
-                class="tu-input"
-                required
-              >
-                <option value="" disabled>
-                  {{ $t("formularios.responder.elegir") }}
-                </option>
-                <option v-for="m in miembros" :key="m.id" :value="m.id">
-                  {{ nombreMiembro(m) }}
-                </option>
-              </select>
-            </div>
-
-            <div v-for="c in seleccionado.campos" :key="c.id">
-              <label class="tu-label" :for="`c-${c.id}`">
-                {{ c.etiqueta
-                }}<span v-if="c.obligatorio" style="color: var(--error)">
-                  *</span
-                >
-              </label>
-              <textarea
-                v-if="c.tipo === 'textarea'"
-                :id="`c-${c.id}`"
-                v-model="respuesta.texto[c.id]"
-                class="tu-input"
-                rows="2"
-              />
-              <select
-                v-else-if="c.tipo === 'seleccion'"
-                :id="`c-${c.id}`"
-                v-model="respuesta.texto[c.id]"
-                class="tu-input"
-              >
-                <option value="">—</option>
-                <option v-for="o in c.opciones ?? []" :key="o" :value="o">
-                  {{ o }}
-                </option>
-              </select>
-              <label
-                v-else-if="c.tipo === 'booleano'"
-                class="flex items-center gap-2 text-sm"
-              >
-                <input
-                  :id="`c-${c.id}`"
-                  v-model="respuesta.bool[c.id]"
-                  type="checkbox"
-                />
-                {{ c.etiqueta }}
-              </label>
-              <input
-                v-else
-                :id="`c-${c.id}`"
-                v-model="respuesta.texto[c.id]"
-                class="tu-input"
-                :type="
-                  c.tipo === 'numero'
-                    ? 'number'
-                    : c.tipo === 'fecha'
-                      ? 'date'
-                      : 'text'
-                "
-              />
-            </div>
-
+          <template v-if="puedeGestionar">
             <p
-              v-if="mensaje"
-              class="text-sm"
-              :style="{ color: 'var(--exito)' }"
+              v-if="cargandoRespuestas"
+              class="mt-4 text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
             >
-              {{ $t("formularios.responder.guardado") }}
+              {{ $t("comun.cargando") }}
             </p>
-            <button
-              class="tu-btn tu-btn-primario"
-              type="submit"
-              :disabled="guardando || respuesta.persona === ''"
+            <p
+              v-else-if="respuestas.length === 0"
+              class="mt-4 text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
             >
-              {{ $t("formularios.responder.guardar") }}
-            </button>
-          </form>
+              {{ $t("formulariosRespuestas.vacio") }}
+            </p>
+            <ul v-else class="mt-3">
+              <li v-for="r in respuestas" :key="r.id" class="form-fila">
+                <div class="flex w-full items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    class="min-w-0 text-left"
+                    :aria-expanded="abierta === r.id"
+                    @click="abierta = abierta === r.id ? null : r.id"
+                  >
+                    <span class="block font-medium truncate">{{
+                      r.persona ?? "—"
+                    }}</span>
+                    <span
+                      class="block text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{
+                        $t("formulariosRespuestas.respondio", {
+                          fecha: fecha(r.respondido_en),
+                        })
+                      }}</span
+                    >
+                  </button>
+                  <RouterLink
+                    v-if="expediente(r)"
+                    :to="expediente(r) ?? ''"
+                    class="tu-enlace shrink-0 text-sm"
+                  >
+                    {{ $t("formulariosRespuestas.abrirExpediente") }}
+                  </RouterLink>
+                </div>
+                <dl
+                  v-if="abierta === r.id"
+                  class="mt-3 w-full rounded-xl border px-4 text-sm divide-y divide-[var(--borde)]"
+                  :style="{
+                    borderColor: 'var(--borde)',
+                    background: 'var(--fondo)',
+                  }"
+                >
+                  <div
+                    v-for="c in seleccionado.campos"
+                    :key="c.id"
+                    class="flex items-baseline justify-between gap-4 py-2"
+                  >
+                    <dt :style="{ color: 'var(--texto-suave)' }">
+                      {{ c.etiqueta }}
+                    </dt>
+                    <dd class="text-right font-medium">
+                      {{ valor(c, r.valores[c.id]) }}
+                    </dd>
+                  </div>
+                </dl>
+              </li>
+            </ul>
+          </template>
         </div>
       </div>
       <div
@@ -454,3 +452,13 @@ onMounted(cargar);
     </div>
   </section>
 </template>
+
+<style scoped>
+.form-fila {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--borde);
+}
+.form-fila:first-child {
+  border-top: 0;
+}
+</style>

@@ -200,7 +200,7 @@ onMounted(cargar);
             id="rt"
             v-model="form.tipo"
             class="tu-input"
-            placeholder="Sala, cancha, carril…"
+            :placeholder="$t('validacion.recursoTipoPh')"
           />
         </div>
         <div>

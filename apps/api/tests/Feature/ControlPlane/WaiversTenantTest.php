@@ -91,3 +91,21 @@ it('publicar waivers exige documentos.gestionar (un recepcionista no puede)', fu
     $this->postJson("/api/v1/app/{$e['slug']}/waivers", ['clave' => 'terminos', 'titulo' => 'T', 'contenido' => 'x'], conBearer($recep))
         ->assertStatus(403);
 });
+
+it('el listado trae el texto vigente y cuántos lo firmaron; retirarlo deja de pedirlo', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $persona = crearMiembroTenant($e, 'Ana');
+    crearMiembroTenant($e, 'Beto');
+    $this->postJson("/api/v1/app/{$e['slug']}/waivers", ['clave' => 'terminos', 'titulo' => 'Terminos', 'contenido' => 'Acepto el reglamento'], conBearer($e['bearer']))->assertCreated();
+    aceptarVigente($e, $persona);
+
+    $vigente = $this->getJson("/api/v1/app/{$e['slug']}/waivers", conBearer($e['bearer']))->assertOk()->json('data.0');
+    expect($vigente['contenido'])->toBe('Acepto el reglamento')
+        ->and($vigente['firmas'])->toBe(1)
+        ->and($vigente['publicado_en'])->not->toBeNull();
+
+    $this->postJson("/api/v1/app/{$e['slug']}/waivers/{$vigente['id']}/retirar", [], conBearer($e['bearer']))->assertNoContent();
+
+    expect($this->getJson("/api/v1/app/{$e['slug']}/waivers", conBearer($e['bearer']))->json('data'))->toHaveCount(0);
+    expect($this->getJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/waivers", conBearer($e['bearer']))->json('data'))->toHaveCount(0);
+});

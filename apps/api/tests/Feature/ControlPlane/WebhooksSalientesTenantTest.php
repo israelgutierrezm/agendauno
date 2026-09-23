@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
@@ -123,4 +124,17 @@ it('el secreto solo se devuelve al crear (no se expone en el listado) y la gesti
     $recep = personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista');
     $this->getJson("/api/v1/app/{$e['slug']}/webhooks-salientes", conBearer($recep))->assertStatus(403);
     $this->postJson("/api/v1/app/{$e['slug']}/webhooks-salientes", ['url' => 'https://ejemplo.test/otro'], conBearer($recep))->assertStatus(403);
+});
+
+it('ofrece el catálogo de eventos y rechaza suscribirse a uno que no existe', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+
+    $this->getJson("/api/v1/app/{$e['slug']}/webhooks-salientes", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonFragment(['eventos_disponibles' => EventoDeDominioTenant::TIPOS]);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/webhooks-salientes", [
+        'url' => 'https://ejemplo.mx/hook',
+        'eventos' => ['reserva.inventada'],
+    ], conBearer($e['bearer']))->assertStatus(422);
 });

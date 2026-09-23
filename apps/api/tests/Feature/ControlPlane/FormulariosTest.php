@@ -73,8 +73,38 @@ it('las respuestas son una por persona (upsert) y aisladas entre estudios', func
     $this->getJson("/api/v1/app/{$a['slug']}/formularios/{$form}/respuestas", conBearer($a['bearer']))
         ->assertOk()
         ->assertJsonCount(1, 'data')
-        ->assertJsonPath("data.0.valores.{$campo}", 'adios');
+        ->assertJsonPath("data.0.valores.{$campo}", 'adios')
+        ->assertJsonPath('data.0.persona_id', $persona)
+        ->assertJsonPath('data.0.persona_tipo', 'miembro')
+        ->assertJsonPath('data.0.usuario_id', null);
 
     // El estudio B no ve los formularios de A.
     $this->getJson("/api/v1/app/{$b['slug']}/formularios", conBearer($b['bearer']))->assertOk()->assertJsonCount(0, 'data');
+});
+
+it('el alumno ve sus formularios y responde los suyos, pero no los de otra persona', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $form = (string) $this->postJson("/api/v1/app/{$e['slug']}/formularios", ['nombre' => 'Ficha de salud'], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+    $campo = (string) $this->postJson("/api/v1/app/{$e['slug']}/formularios/{$form}/campos", [
+        'etiqueta' => 'Alergias', 'tipo' => 'texto', 'obligatorio' => true,
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $otra = (string) $this->postJson("/api/v1/app/{$e['slug']}/miembros", ['nombre' => 'Rosa'], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+    $a = alumnoConSesion($e);
+
+    $mios = $this->getJson("/api/v1/app/{$e['slug']}/mi/formularios", conBearer($a['bearer']))->assertOk()->json('data');
+    expect($mios['formularios'])->toHaveCount(1)
+        ->and($mios['formularios'][0]['campos'][0]['etiqueta'])->toBe('Alergias');
+
+    $this->postJson("/api/v1/app/{$e['slug']}/formularios/{$form}/respuestas", [
+        'persona_id' => $mios['persona_id'], 'valores' => [$campo => 'Ninguna'],
+    ], conBearer($a['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/formularios/{$form}/respuestas", [
+        'persona_id' => $otra, 'valores' => [$campo => 'Ninguna'],
+    ], conBearer($a['bearer']))->assertForbidden();
+
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/formularios", conBearer($a['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.formularios.0.campos.0.valor', 'Ninguna');
 });

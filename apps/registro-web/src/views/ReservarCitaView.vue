@@ -31,9 +31,6 @@ interface Slot {
   termina: string;
 }
 
-// Pasarela a intentar para el cobro en línea (redirección cuando la pasarela la usa).
-const PROVEEDOR = "stripe";
-
 const route = useRoute();
 const slug = computed(() => String(route.params.slug));
 
@@ -223,8 +220,8 @@ async function pagar(): Promise<void> {
     const { data } = await api.post<{
       data: { checkout?: { tipo?: string; url?: string } | null };
     }>(`/api/v1/app/${slug.value}/citas/pagar`, {
+      // Sin proveedor: el API usa la pasarela en línea con la que cobra el negocio.
       orden_id: resultado.value.orden_id,
-      proveedor: PROVEEDOR,
       metodo: "tarjeta",
     });
     const checkout = data.data.checkout ?? {};

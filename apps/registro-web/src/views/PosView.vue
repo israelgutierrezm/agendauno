@@ -60,7 +60,13 @@ const carrito = ref<
 const mostrarNuevo = ref(false);
 const nuevo = ref({ nombre: "", sku: "", precio: "" });
 const restockDe = ref<string | null>(null);
-const restock = ref({ sucursal_id: "", cantidad: "" });
+const restock = ref<{
+  sucursal_id: string;
+  cantidad: string;
+  tipo: "entrada" | "ajuste";
+}>({ sucursal_id: "", cantidad: "", tipo: "entrada" });
+const editandoDe = ref<string | null>(null);
+const edicion = ref({ nombre: "", sku: "", precio: "", activo: true });
 
 function dinero(minor: number, moneda = "MXN"): string {
   return new Intl.NumberFormat("es-MX", {
@@ -177,7 +183,12 @@ async function crearArticulo(): Promise<void> {
 
 function abrirRestock(articuloId: string): void {
   restockDe.value = articuloId;
-  restock.value = { sucursal_id: sucursales.value[0]?.id ?? "", cantidad: "" };
+  editandoDe.value = null;
+  restock.value = {
+    sucursal_id: sucursales.value[0]?.id ?? "",
+    cantidad: "",
+    tipo: "entrada",
+  };
 }
 
 async function guardarRestock(articuloId: string): Promise<void> {
@@ -189,10 +200,42 @@ async function guardarRestock(articuloId: string): Promise<void> {
   try {
     await api.post(`${base.value}/articulos/${articuloId}/movimientos`, {
       sucursal_id: restock.value.sucursal_id,
-      tipo: "entrada",
+      tipo: restock.value.tipo,
       cantidad: Number(restock.value.cantidad),
     });
     restockDe.value = null;
+    await cargar();
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    accionando.value = false;
+  }
+}
+
+function abrirEdicion(a: Articulo): void {
+  restockDe.value = null;
+  editandoDe.value = a.id;
+  edicion.value = {
+    nombre: a.nombre,
+    sku: a.sku ?? "",
+    precio: String(a.precio_minor / 100),
+    activo: a.activo,
+  };
+}
+
+async function guardarEdicion(a: Articulo): Promise<void> {
+  accionando.value = true;
+  error.value = null;
+  try {
+    await api.put(`${base.value}/articulos/${a.id}`, {
+      nombre: edicion.value.nombre,
+      sku: edicion.value.sku !== "" ? edicion.value.sku : null,
+      precio_minor: Math.round(Number(edicion.value.precio) * 100),
+      moneda: a.moneda,
+      activo: edicion.value.activo,
+    });
+    editandoDe.value = null;
+    exito.value = t("inventarioExtra.guardado");
     await cargar();
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -449,7 +492,14 @@ onMounted(cargar);
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
-                  <span class="font-semibold">{{ a.nombre }}</span>
+                  <span
+                    class="font-semibold"
+                    :style="a.activo ? {} : { color: 'var(--texto-suave)' }"
+                    >{{ a.nombre }}</span
+                  >
+                  <span v-if="!a.activo" class="tu-badge">{{
+                    $t("inventarioExtra.inactivo")
+                  }}</span>
                   <span class="tu-badge">{{
                     dinero(a.precio_minor, a.moneda)
                   }}</span>
@@ -474,14 +524,83 @@ onMounted(cargar);
                   }}
                 </div>
               </div>
-              <button
-                class="tu-enlace shrink-0"
-                type="button"
-                @click="abrirRestock(a.id)"
-              >
-                {{ $t("pos.inventario.reabastecer") }}
-              </button>
+              <span class="flex items-center gap-3 shrink-0">
+                <button
+                  class="tu-enlace"
+                  type="button"
+                  @click="abrirEdicion(a)"
+                >
+                  {{ $t("inventarioExtra.editar") }}
+                </button>
+                <button
+                  class="tu-enlace"
+                  type="button"
+                  @click="abrirRestock(a.id)"
+                >
+                  {{ $t("pos.inventario.reabastecer") }}
+                </button>
+              </span>
             </div>
+            <form
+              v-if="editandoDe === a.id"
+              class="mt-2 flex flex-wrap items-end gap-2 rounded-md p-2"
+              :style="{ background: 'var(--fondo-suave)' }"
+              @submit.prevent="guardarEdicion(a)"
+            >
+              <div class="min-w-[10rem] flex-1">
+                <label class="tu-label" :for="`en-${a.id}`">{{
+                  $t("pos.inventario.nombre")
+                }}</label>
+                <input
+                  :id="`en-${a.id}`"
+                  v-model="edicion.nombre"
+                  class="tu-input"
+                  required
+                />
+              </div>
+              <div class="w-32">
+                <label class="tu-label" :for="`es-${a.id}`">{{
+                  $t("pos.inventario.sku")
+                }}</label>
+                <input
+                  :id="`es-${a.id}`"
+                  v-model="edicion.sku"
+                  class="tu-input"
+                />
+              </div>
+              <div class="w-28">
+                <label class="tu-label" :for="`ep-${a.id}`">{{
+                  $t("pos.inventario.precio")
+                }}</label>
+                <input
+                  :id="`ep-${a.id}`"
+                  v-model="edicion.precio"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  class="tu-input"
+                  required
+                />
+              </div>
+              <label class="flex items-center gap-2 pb-2 text-sm">
+                <input v-model="edicion.activo" type="checkbox" />
+                {{ $t("inventarioExtra.activo") }}
+              </label>
+              <button
+                class="tu-btn tu-btn-primario"
+                type="submit"
+                :disabled="accionando"
+              >
+                {{ $t("pos.inventario.guardar") }}
+              </button>
+              <button
+                class="tu-btn tu-btn-fantasma"
+                type="button"
+                @click="editandoDe = null"
+              >
+                {{ $t("pos.inventario.cancelar") }}
+              </button>
+            </form>
             <form
               v-if="restockDe === a.id"
               class="mt-2 flex flex-wrap items-end gap-2 rounded-md p-2"
@@ -502,6 +621,23 @@ onMounted(cargar);
                   </option>
                 </select>
               </div>
+              <div>
+                <label class="tu-label" :for="`rt-${a.id}`">{{
+                  $t("inventarioExtra.movimiento")
+                }}</label>
+                <select
+                  :id="`rt-${a.id}`"
+                  v-model="restock.tipo"
+                  class="tu-input w-auto"
+                >
+                  <option value="entrada">
+                    {{ $t("inventarioExtra.entrada") }}
+                  </option>
+                  <option value="ajuste">
+                    {{ $t("inventarioExtra.ajuste") }}
+                  </option>
+                </select>
+              </div>
               <div class="w-24">
                 <label class="tu-label" :for="`rc-${a.id}`">{{
                   $t("pos.inventario.cantidad")
@@ -510,7 +646,12 @@ onMounted(cargar);
                   :id="`rc-${a.id}`"
                   v-model="restock.cantidad"
                   type="number"
-                  min="1"
+                  :min="restock.tipo === 'entrada' ? 1 : undefined"
+                  :title="
+                    restock.tipo === 'ajuste'
+                      ? $t('inventarioExtra.ajusteAyuda')
+                      : undefined
+                  "
                   class="tu-input"
                 />
               </div>

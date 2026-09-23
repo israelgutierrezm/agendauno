@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
@@ -10,6 +11,7 @@ import PanelEditarMiembro, {
 import PanelMiembro from "@/components/PanelMiembro.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 // El resumen operativo (membresía/saldo/adeudo/alertas/próxima) lo entrega el mismo
 // endpoint que usa Recepción; la ficha añade el historial (derechos/reservas/compras).
@@ -38,6 +40,15 @@ interface Derecho {
   saldo_unidades: number | null;
   disponible_unidades: number | null;
   valido_hasta: string | null;
+}
+interface Movimiento {
+  id: string;
+  tipo: string;
+  unidades: number;
+  saldo_posterior: number;
+  descripcion: string | null;
+  actor: string | null;
+  fecha: string | null;
 }
 interface Reserva {
   id: string;
@@ -73,6 +84,7 @@ interface Ficha {
   ordenes: Orden[];
 }
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 // Actividad (membresías, reservas, compras) o Expediente (documentos, formularios,
@@ -90,6 +102,60 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const personaId = computed(() => String(route.params.id));
 const puedeGestionar = computed(() => sesion.puede("miembros.gestionar"));
 const puedeVender = computed(() => sesion.puede("ordenes.gestionar"));
+const puedeRecargar = computed(() => sesion.puede("membresias.gestionar"));
+const toast = useToastStore();
+
+// Movimientos del ledger de un derecho (1000 unidades = 1 crédito) y recarga manual.
+const movimientosDe = ref<string | null>(null);
+const movimientos = ref<Movimiento[]>([]);
+const recargando = ref<string | null>(null);
+const recarga = ref({ creditos: 1, motivo: "" });
+const guardandoRecarga = ref(false);
+
+function creditos(unidades: number): string {
+  return (unidades / 1000).toLocaleString("es-MX", {
+    maximumFractionDigits: 3,
+  });
+}
+
+async function verMovimientos(d: Derecho): Promise<void> {
+  if (movimientosDe.value === d.id) {
+    movimientosDe.value = null;
+    return;
+  }
+  try {
+    const { data } = await api.get<{ data: Movimiento[] }>(
+      `${base.value}/derechos/${d.id}/movimientos`,
+    );
+    movimientos.value = data.data;
+    movimientosDe.value = d.id;
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  }
+}
+
+function abrirRecarga(d: Derecho): void {
+  recarga.value = { creditos: 1, motivo: "" };
+  recargando.value = recargando.value === d.id ? null : d.id;
+}
+
+async function recargar(d: Derecho): Promise<void> {
+  guardandoRecarga.value = true;
+  try {
+    await api.post(`${base.value}/derechos/${d.id}/topups`, {
+      unidades: Math.round(recarga.value.creditos * 1000),
+      descripcion: recarga.value.motivo,
+    });
+    toast.exito(t("creditosFicha.agregados"));
+    recargando.value = null;
+    movimientosDe.value = null;
+    await cargar();
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    guardandoRecarga.value = false;
+  }
+}
 
 const resumen = ref<Resumen | null>(null);
 const ficha = ref<Ficha | null>(null);
@@ -359,6 +425,135 @@ watch(personaId, cargar, { immediate: true });
                           }}
                         </p>
                       </template>
+                    </div>
+                    <div
+                      v-if="!d.ilimitado"
+                      class="flex w-full items-center gap-4 text-sm"
+                    >
+                      <button
+                        type="button"
+                        class="tu-enlace"
+                        :aria-expanded="movimientosDe === d.id"
+                        @click="verMovimientos(d)"
+                      >
+                        {{
+                          movimientosDe === d.id
+                            ? $t("creditosFicha.ocultar")
+                            : $t("creditosFicha.movimientos")
+                        }}
+                      </button>
+                      <button
+                        v-if="puedeRecargar"
+                        type="button"
+                        class="tu-enlace"
+                        @click="abrirRecarga(d)"
+                      >
+                        {{ $t("creditosFicha.agregar") }}
+                      </button>
+                    </div>
+                    <form
+                      v-if="recargando === d.id"
+                      class="flex w-full flex-wrap items-end gap-3 rounded-xl border p-4"
+                      :style="{
+                        borderColor: 'var(--borde)',
+                        background: 'var(--fondo)',
+                      }"
+                      @submit.prevent="recargar(d)"
+                    >
+                      <div>
+                        <label class="tu-label" :for="`rc-${d.id}`">{{
+                          $t("creditosFicha.creditos")
+                        }}</label>
+                        <input
+                          :id="`rc-${d.id}`"
+                          v-model.number="recarga.creditos"
+                          class="tu-input w-24"
+                          type="number"
+                          min="0.5"
+                          step="0.5"
+                          required
+                        />
+                      </div>
+                      <div class="min-w-[12rem] flex-1">
+                        <label class="tu-label" :for="`rm-${d.id}`">{{
+                          $t("creditosFicha.motivo")
+                        }}</label>
+                        <input
+                          :id="`rm-${d.id}`"
+                          v-model="recarga.motivo"
+                          class="tu-input"
+                          maxlength="255"
+                          :placeholder="$t('creditosFicha.motivoPh')"
+                          required
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        class="tu-btn tu-btn-primario text-sm"
+                        :disabled="guardandoRecarga || recarga.creditos <= 0"
+                      >
+                        {{ $t("creditosFicha.confirmar") }}
+                      </button>
+                    </form>
+                    <div
+                      v-if="movimientosDe === d.id"
+                      class="w-full rounded-xl border px-4 text-xs"
+                      :style="{
+                        borderColor: 'var(--borde)',
+                        background: 'var(--fondo)',
+                      }"
+                    >
+                      <p
+                        v-if="movimientos.length === 0"
+                        class="py-3"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        {{ $t("creditosFicha.sinMovimientos") }}
+                      </p>
+                      <div
+                        v-for="m in movimientos"
+                        :key="m.id"
+                        class="flex items-center justify-between gap-3 border-t py-2 first:border-t-0"
+                        :style="{ borderColor: 'var(--borde)' }"
+                      >
+                        <span class="min-w-0">
+                          <span class="block font-medium">{{
+                            $t(`creditosFicha.tipos.${m.tipo}`)
+                          }}</span>
+                          <span
+                            class="block truncate"
+                            :style="{ color: 'var(--texto-suave)' }"
+                            >{{ fecha(m.fecha) }}
+                            <template v-if="m.descripcion">
+                              · {{ m.descripcion }}</template
+                            >
+                            <template v-if="m.actor">
+                              ·
+                              {{
+                                $t("creditosFicha.por", { actor: m.actor })
+                              }}</template
+                            ></span
+                          >
+                        </span>
+                        <span class="shrink-0 text-right tabular-nums">
+                          <span
+                            class="block font-semibold"
+                            :style="{
+                              color:
+                                m.unidades < 0
+                                  ? 'var(--error)'
+                                  : 'var(--exito)',
+                            }"
+                            >{{ m.unidades > 0 ? "+" : ""
+                            }}{{ creditos(m.unidades) }}</span
+                          >
+                          <span :style="{ color: 'var(--texto-suave)' }">{{
+                            $t("creditosFicha.saldo", {
+                              n: creditos(m.saldo_posterior),
+                            })
+                          }}</span>
+                        </span>
+                      </div>
                     </div>
                   </li>
                 </ul>

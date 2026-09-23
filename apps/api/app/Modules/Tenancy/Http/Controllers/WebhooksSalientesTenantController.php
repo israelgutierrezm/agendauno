@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Models\EntregaWebhookTenant;
 use App\Modules\Tenancy\Models\WebhookSalienteTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 /**
  * Endpoints de webhooks salientes del estudio (R40): el propietario registra URLs a
@@ -26,6 +28,7 @@ class WebhooksSalientesTenantController
 
         return response()->json([
             'data' => $webhooks->map(fn (WebhookSalienteTenant $w): array => $this->presentar($w))->all(),
+            'eventos_disponibles' => EventoDeDominioTenant::TIPOS,
         ]);
     }
 
@@ -34,7 +37,7 @@ class WebhooksSalientesTenantController
         $validado = $request->validate([
             'url' => ['required', 'url', 'max:2048'],
             'eventos' => ['nullable', 'array'],
-            'eventos.*' => ['string', 'max:100'],
+            'eventos.*' => ['string', Rule::in(EventoDeDominioTenant::TIPOS)],
             'activo' => ['boolean'],
         ]);
 

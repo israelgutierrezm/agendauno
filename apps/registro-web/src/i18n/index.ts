@@ -10,6 +10,23 @@ import {
   profesional,
 } from "./locales/equipo.es-MX";
 import esMX from "./locales/es-MX";
+import {
+  accesoRecepcion,
+  bitacora,
+  citaCuenta,
+  comunicacionesAuto,
+  conexiones,
+  consentimientos,
+  creditosFicha,
+  documentosTabs,
+  formulariosRespuestas,
+  instructorClase,
+  inventarioExtra,
+  miCuentaExtra,
+  reembolsosPago,
+  reglasAgenda,
+  validacion,
+} from "./locales/gestion.es-MX";
 import recepcionVisual from "./locales/recepcionVisual.es-MX";
 
 export const i18n = createI18n({
@@ -27,6 +44,21 @@ export const i18n = createI18n({
       expediente,
       profesional,
       listados,
+      consentimientos,
+      documentosTabs,
+      formulariosRespuestas,
+      conexiones,
+      comunicacionesAuto,
+      reglasAgenda,
+      creditosFicha,
+      inventarioExtra,
+      accesoRecepcion,
+      bitacora,
+      citaCuenta,
+      miCuentaExtra,
+      reembolsosPago,
+      validacion,
+      instructorClase,
     },
   },
 });

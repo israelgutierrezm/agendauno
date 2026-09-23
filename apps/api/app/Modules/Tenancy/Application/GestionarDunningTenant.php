@@ -183,7 +183,7 @@ class GestionarDunningTenant
 
         $this->eventos->registrar($tipo, 'acuerdo', $acuerdo->ulid, [
             'acuerdo' => $acuerdo->ulid,
-            'persona' => $acuerdo->persona?->ulid,
+            'persona_id' => $acuerdo->persona?->ulid,
             'dunning' => $proceso->ulid,
             'estado' => $proceso->estado->value,
             'intentos' => $proceso->intentos,

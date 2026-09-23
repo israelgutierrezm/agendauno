@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 
 import LandingView from "@/views/LandingView.vue";
 import { trackPageView } from "@/lib/analytics";
+import { puedeEntrar } from "@/lib/menu";
 import { DEFAULT_SEO, updateSeo } from "@/lib/seo";
 import { slugDeContexto } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -246,6 +247,18 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      path: "/reglas-agenda",
+      name: "reglas-agenda",
+      component: () => import("@/views/ReglasAgendaView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      path: "/bitacora",
+      name: "bitacora",
+      component: () => import("@/views/BitacoraView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/integraciones",
       name: "integraciones",
       component: () => import("@/views/IntegracionesView.vue"),
@@ -310,6 +323,16 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiereSesion === true && !sesion.autenticado) {
     return { name: "entrar" };
+  }
+
+  // Pantallas con permiso: el menú ya no las muestra a quien no lo tiene; esto
+  // cubre la URL escrita a mano. El inicio de cada quien siempre se permite.
+  if (
+    to.meta.requiereSesion === true &&
+    to.name !== sesion.rutaInicio &&
+    !puedeEntrar(String(to.name), sesion)
+  ) {
+    return { name: sesion.rutaInicio };
   }
 
   // Un usuario autenticado no debe quedarse en las páginas públicas de acceso

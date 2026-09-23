@@ -97,3 +97,18 @@ it('sin proveedor, lista las ventanas de atención de todos (agenda por profesio
     expect(collect($ventanas)->pluck('instructor_id')->sort()->values()->all())->toBe(collect($ids)->sort()->values()->all());
     expect($ventanas[0]['sucursal_id'])->toBe($sede['sucursal']);
 });
+
+it('un día cerrado del negocio no ofrece huecos de cita', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sede = agendaSemilla($e);
+    personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
+    $coachId = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
+        ->assertOk()->json('data.0.id');
+
+    $fecha = '2026-10-05';
+    fijarHorarioAtencion($e, $coachId, $sede['sucursal'], (int) CarbonImmutable::parse($fecha)->isoWeekday());
+    $this->postJson("/api/v1/app/{$e['slug']}/excepciones-horario", ['fecha' => $fecha, 'motivo' => 'Feriado'], conBearer($e['bearer']))
+        ->assertCreated();
+
+    expect(slotsDisponibles($e, $coachId, $sede['sucursal'], $fecha))->toBe([]);
+});

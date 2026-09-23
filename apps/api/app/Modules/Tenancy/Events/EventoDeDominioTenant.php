@@ -18,6 +18,23 @@ class EventoDeDominioTenant
     use Dispatchable;
 
     /**
+     * Los eventos que publican los módulos del estudio. Sirven de catálogo para
+     * quien se suscribe (webhooks salientes, mensajes automáticos).
+     */
+    public const TIPOS = [
+        'reserva.creada',
+        'reserva.ofrecida',
+        'asistencia.marcada',
+        'acceso.registrado',
+        'orden.pagada',
+        'pago.reembolsado',
+        'cobro.fallido',
+        'membresia.suspendida',
+        'membresia.regularizada',
+        'factura.timbrada',
+    ];
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     public function __construct(

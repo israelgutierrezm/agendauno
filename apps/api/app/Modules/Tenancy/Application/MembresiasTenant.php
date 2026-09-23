@@ -167,7 +167,7 @@ class MembresiasTenant
                         $derecho,
                         TipoMovimiento::Concesion,
                         $concesion,
-                        $recurrente ? 'Concesion de ciclo' : 'Concesion inicial',
+                        $recurrente ? 'Concesión de ciclo' : 'Concesión inicial',
                         ContextoMovimiento::para(OrigenMovimiento::Venta, 'acuerdo', $acuerdo->ulid, $actor),
                     );
                 }

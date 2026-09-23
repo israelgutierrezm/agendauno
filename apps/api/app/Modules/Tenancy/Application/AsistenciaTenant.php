@@ -41,7 +41,7 @@ class AsistenciaTenant
 
             // Evento de dominio (outbox): habilita acumular puntos de lealtad al asistir.
             $this->eventos->registrar('asistencia.marcada', 'asistencia', $asistencia->ulid, [
-                'persona_id' => $reserva->persona_id,
+                'persona_id' => $reserva->persona?->ulid,
                 'estado' => $estado->value,
                 'reserva_id' => $reserva->ulid,
             ]);

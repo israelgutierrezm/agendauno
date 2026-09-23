@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Listeners;
 use App\Modules\Lealtad\OrigenPuntos;
 use App\Modules\Tenancy\Application\PuntosTenant;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
+use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProgramaLealtadTenant;
 
 /**
@@ -31,7 +32,10 @@ class AcumularPuntos
         }
 
         $payload = $evento->payload;
-        $personaId = isset($payload['persona_id']) ? (int) $payload['persona_id'] : 0;
+        $ulid = $payload['persona_id'] ?? null;
+        $personaId = is_string($ulid) && $ulid !== ''
+            ? (int) PersonaTenant::query()->where('ulid', $ulid)->value('id')
+            : 0;
         if ($personaId <= 0) {
             return;
         }

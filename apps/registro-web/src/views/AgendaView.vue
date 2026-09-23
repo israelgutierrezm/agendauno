@@ -95,6 +95,8 @@ const sesion = useSesionTenantStore();
 const { t } = useI18n();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
+// Lugares y precio por clase viven en la oferta: los edita quien gestiona el catálogo.
+const puedeCatalogo = computed(() => sesion.puede("catalogo.gestionar"));
 const puedeReservar = computed(() => sesion.puede("reservas.gestionar"));
 const puedeMarcar = computed(() => sesion.puede("asistencia.marcar"));
 const puedeCheckin = computed(() => sesion.puede("checkins.registrar"));
@@ -730,6 +732,30 @@ async function cargarStaffSesion(id: string): Promise<void> {
     error.value = mensajeDeError(e);
   }
 }
+// Instructor principal de la clase (cuenta para choques de agenda y nómina).
+const cambiandoInstructor = ref(false);
+async function cambiarInstructor(instructorId: string): Promise<void> {
+  if (detalle.value === null) {
+    return;
+  }
+  cambiandoInstructor.value = true;
+  error.value = null;
+  try {
+    const { data } = await api.put<{
+      data: { instructor: string | null; instructor_id: string | null };
+    }>(`${base.value}/sesiones/${detalle.value.id}/instructor`, {
+      instructor_id: instructorId !== "" ? instructorId : null,
+    });
+    detalle.value.instructor = data.data.instructor;
+    detalle.value.instructor_id = data.data.instructor_id;
+    await cargarSesiones();
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    cambiandoInstructor.value = false;
+  }
+}
+
 async function asignarStaff(id: string): Promise<void> {
   if (staffModel.value.usuarioId === "") {
     return;
@@ -2008,7 +2034,7 @@ onMounted(async () => {
 
         <!-- Mapa de lugares por clase (R4) -->
         <div
-          v-if="puedeGestionar && detalle.oferta_id"
+          v-if="puedeCatalogo && detalle.oferta_id"
           class="mt-4 border-t pt-4"
           :style="{ borderColor: 'var(--borde)' }"
         >
@@ -2136,6 +2162,25 @@ onMounted(async () => {
           class="mt-4 border-t pt-4"
           :style="{ borderColor: 'var(--borde)' }"
         >
+          <div v-if="detalle.estado === 'programada'" class="mb-4">
+            <label class="tu-label" for="inst-clase">{{
+              $t("instructorClase.titulo")
+            }}</label>
+            <select
+              id="inst-clase"
+              class="tu-input"
+              :value="detalle.instructor_id ?? ''"
+              :disabled="cambiandoInstructor"
+              @change="
+                cambiarInstructor(($event.target as HTMLSelectElement).value)
+              "
+            >
+              <option value="">{{ $t("instructorClase.ninguno") }}</option>
+              <option v-for="i in instructores" :key="i.id" :value="i.id">
+                {{ i.nombre }}
+              </option>
+            </select>
+          </div>
           <h3 class="font-semibold text-sm">{{ $t("agenda.staff.titulo") }}</h3>
           <ul v-if="staffSesion.length > 0" class="mt-2 space-y-1.5">
             <li

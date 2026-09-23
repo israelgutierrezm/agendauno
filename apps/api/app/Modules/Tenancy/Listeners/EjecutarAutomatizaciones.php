@@ -103,7 +103,7 @@ class EjecutarAutomatizaciones
      */
     private function resolverPersona(array $payload): ?PersonaTenant
     {
-        $ulid = $payload['persona_id'] ?? $payload['persona'] ?? null;
+        $ulid = $payload['persona_id'] ?? null;
 
         if (! is_string($ulid) || $ulid === '') {
             return null;

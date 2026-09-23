@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Models\ExcepcionHorarioTenant;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use Carbon\CarbonImmutable;
@@ -24,6 +25,11 @@ class CalcularDisponibilidadTenant
      */
     public function paraFecha(int $instructorId, SucursalTenant $sucursal, string $fecha, int $duracionMin, ?int $pasoMin = null): array
     {
+        // Día cerrado del negocio (feriado, cierre): no se ofrecen citas.
+        if (ExcepcionHorarioTenant::query()->whereDate('fecha', $fecha)->exists()) {
+            return [];
+        }
+
         $paso = $pasoMin !== null && $pasoMin > 0 ? $pasoMin : $duracionMin;
         $zona = (string) ($sucursal->zona_horaria ?? config('app.timezone', 'UTC'));
         $diaSemana = (int) CarbonImmutable::parse($fecha, $zona)->isoWeekday();

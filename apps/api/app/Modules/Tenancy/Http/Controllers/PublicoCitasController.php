@@ -9,13 +9,14 @@ use App\Modules\Pagos\MetodoPago;
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
+use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
-use App\Modules\Tenancy\PoliticaReservaTenant;
+use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -36,6 +37,8 @@ class PublicoCitasController
         private readonly AgendarCitaTenant $agendar,
         private readonly CobrarOrdenTenant $cobrar,
         private readonly CalcularDisponibilidadTenant $disponibilidad,
+        private readonly OpcionesCitaTenant $opciones,
+        private readonly RegistroDePasarelasTenant $pasarelas,
     ) {}
 
     /**
@@ -49,45 +52,13 @@ class PublicoCitasController
         abort_unless($estudio instanceof Estudio, 404);
         abort_unless($estudio->enDirectorio(), 404);
 
-        $servicios = OfertaTenant::query()
-            ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
-            ->orderBy('nombre')
-            ->get()
-            ->map(static fn (OfertaTenant $o): array => [
-                'id' => $o->ulid,
-                'nombre' => $o->nombre,
-                'precio_minor' => $o->precio_clase_minor,
-                'moneda' => 'MXN',
-                'duracion_minutos' => $o->duracion_minutos,
-            ])->all();
-
-        $sucursales = SucursalTenant::query()
-            ->orderBy('nombre')
-            ->get()
-            ->map(static fn (SucursalTenant $s): array => [
-                'id' => $s->ulid,
-                'nombre' => $s->nombre,
-                'zona_horaria' => $s->zona_horaria,
-            ])->all();
-
-        $instructores = Usuario::query()
-            ->whereJsonContains('roles', 'instructor')
-            ->orderBy('name')
-            ->get()
-            ->map(static fn (Usuario $u): array => [
-                'id' => $u->ulid,
-                'nombre' => (string) $u->name,
-            ])->all();
-
         return response()->json(['data' => [
             'estudio' => [
                 'slug' => $estudio->slug,
                 'nombre' => $estudio->nombre,
                 'logo_url' => $estudio->logo_url,
             ],
-            'servicios' => $servicios,
-            'sucursales' => $sucursales,
-            'instructores' => $instructores,
+            ...$this->opciones->listar(),
         ]]);
     }
 
@@ -166,10 +137,18 @@ class PublicoCitasController
 
         $validado = $request->validate([
             'orden_id' => ['required', 'string'],
-            'proveedor' => ['required', 'string'],
+            'proveedor' => ['nullable', 'string'],
             'metodo' => ['nullable', Rule::enum(MetodoPago::class)],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
         ]);
+
+        // Sin proveedor, la pasarela en línea con la que cobra el estudio.
+        $validado['proveedor'] = ($validado['proveedor'] ?? '') !== '' ? $validado['proveedor'] : $this->pasarelas->enLinea();
+        if ($validado['proveedor'] === null) {
+            throw ValidationException::withMessages([
+                'proveedor' => ['Este negocio todavía no cobra en línea; paga en el estudio.'],
+            ]);
+        }
 
         // El pago público solo admite pasarelas en línea (no efectivo/ventanilla/manual).
         if (in_array($validado['proveedor'], ['manual', 'efectivo', 'ventanilla'], true)) {

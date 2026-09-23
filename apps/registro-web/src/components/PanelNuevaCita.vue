@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
 /**
@@ -50,6 +51,9 @@ const form = ref({
 });
 const busqueda = ref("");
 const nuevo = ref(false);
+const puedeCrearCliente = computed(() =>
+  useSesionTenantStore().puede("miembros.gestionar"),
+);
 const nuevoCliente = ref({ nombre: "", celular: "" });
 const guardando = ref(false);
 const error = ref<string | null>(null);
@@ -231,6 +235,7 @@ async function agendar(): Promise<void> {
             </li>
           </ul>
           <button
+            v-if="puedeCrearCliente"
             type="button"
             class="tu-enlace text-sm mt-2"
             @click="nuevo = true"

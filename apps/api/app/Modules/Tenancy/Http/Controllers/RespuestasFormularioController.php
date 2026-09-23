@@ -26,6 +26,10 @@ class RespuestasFormularioController
 {
     private const LIMITE = 200;
 
+    /**
+     * Las respuestas de un formulario, con quién respondió y cuándo; el id de su
+     * usuario (instructores) sirve para abrir su expediente desde la lista.
+     */
     public function index(Request $request): JsonResponse
     {
         $formulario = Formulario::query()->where('ulid', (string) $request->route('formulario'))->firstOrFail();
@@ -33,16 +37,24 @@ class RespuestasFormularioController
         $respuestas = RespuestaFormulario::query()
             ->with('persona')
             ->where('formulario_id', $formulario->id)
-            ->orderByDesc('id')
+            ->orderByDesc('updated_at')
             ->limit(self::LIMITE)
             ->get();
+
+        $usuarios = Usuario::query()
+            ->whereIn('id', $respuestas->pluck('persona.usuario_id')->filter()->unique()->all())
+            ->pluck('ulid', 'id');
 
         return response()->json([
             'data' => $respuestas->map(static fn (RespuestaFormulario $respuesta): array => [
                 'id' => $respuesta->ulid,
-                'persona' => $respuesta->persona !== null
-                    ? $respuesta->persona->nombreCompleto()
+                'persona' => $respuesta->persona?->nombreCompleto(),
+                'persona_id' => $respuesta->persona?->ulid,
+                'persona_tipo' => $respuesta->persona?->tipo->value,
+                'usuario_id' => $respuesta->persona?->usuario_id !== null
+                    ? $usuarios->get($respuesta->persona->usuario_id)
                     : null,
+                'respondido_en' => $respuesta->updated_at?->toIso8601String(),
                 'valores' => $respuesta->valores,
             ])->all(),
         ]);

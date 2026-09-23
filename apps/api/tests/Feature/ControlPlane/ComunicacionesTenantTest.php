@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Comunicaciones\Mail\MensajeMailable;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
 
@@ -125,4 +126,38 @@ it('gestionar plantillas exige comunicaciones.gestionar; un recepcionista solo v
 
     // ...pero SI puede ver el historial de mensajes.
     $this->getJson("/api/v1/app/{$e['slug']}/mensajes", conBearer($recep))->assertOk();
+});
+
+it('los eventos de asistencia identifican a la persona por su ULID (plantillas y webhooks la encuentran)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    guardarPlantilla($e, [
+        'clave' => 'asistencia.marcada', 'canal' => 'interno',
+        'asunto' => 'Gracias por venir, {{persona_nombre}}', 'cuerpo' => 'Asistencia: {{estado}}',
+    ]);
+
+    $vp = venderPackAMiembroTenant($e, 8000); // persona "Ana"
+    $sesion = crearSesionTenant($e, agendaSemilla($e), 5);
+    $reserva = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $vp['persona']], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/asistencia", ['estado' => 'presente'], conBearer($e['bearer']))
+        ->assertCreated();
+
+    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+
+    $mensajes = $this->getJson("/api/v1/app/{$e['slug']}/mensajes", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($mensajes)->toHaveCount(1)
+        ->and($mensajes[0]['asunto'])->toBe('Gracias por venir, Ana')
+        ->and($mensajes[0]['persona'])->toBe('Ana');
+});
+
+it('los mensajes automáticos ofrecen el catálogo de eventos y rechazan uno inexistente', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+
+    $this->getJson("/api/v1/app/{$e['slug']}/plantillas-mensaje", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonFragment(['eventos_disponibles' => EventoDeDominioTenant::TIPOS]);
+
+    $this->putJson("/api/v1/app/{$e['slug']}/plantillas-mensaje", [
+        'clave' => 'reserva.inventada', 'canal' => 'interno', 'asunto' => 'x', 'cuerpo' => 'y',
+    ], conBearer($e['bearer']))->assertStatus(422);
 });

@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AccesoExpedienteTenant;
+use App\Modules\Tenancy\Application\FormulariosDePersonaTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Models\AceptacionWaiverTenant;
-use App\Modules\Tenancy\Models\CampoFormulario;
 use App\Modules\Tenancy\Models\Documento;
-use App\Modules\Tenancy\Models\Formulario;
 use App\Modules\Tenancy\Models\PersonaTenant;
-use App\Modules\Tenancy\Models\RespuestaFormulario;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\WaiverTenant;
 use App\Modules\Tenancy\TipoPersonaTenant;
@@ -26,7 +24,10 @@ use Illuminate\Http\Request;
  */
 class ExpedienteTenantController
 {
-    public function __construct(private readonly WaiversTenant $waivers) {}
+    public function __construct(
+        private readonly WaiversTenant $waivers,
+        private readonly FormulariosDePersonaTenant $formularios,
+    ) {}
 
     public function show(Request $request): JsonResponse
     {
@@ -42,7 +43,7 @@ class ExpedienteTenantController
             ],
             'documentos' => $this->documentos($persona),
             'consentimientos' => $this->consentimientos($persona),
-            'formularios' => $this->formularios($persona),
+            'formularios' => $this->formularios->de($persona),
         ]]);
     }
 
@@ -97,54 +98,6 @@ class ExpedienteTenantController
                     'aceptado_en' => $aceptacion instanceof AceptacionWaiverTenant
                         ? $aceptacion->aceptado_en->toIso8601String()
                         : null,
-                ];
-            })
-            ->values()
-            ->all();
-    }
-
-    /**
-     * Formularios activos que aplican a su tipo (miembro/instructor) con su respuesta.
-     *
-     * @return list<array<string, mixed>>
-     */
-    private function formularios(PersonaTenant $persona): array
-    {
-        $respuestas = RespuestaFormulario::query()
-            ->where('persona_id', $persona->getKey())
-            ->get()
-            ->keyBy('formulario_id');
-
-        return Formulario::query()
-            ->with('campos')
-            ->where('activo', true)
-            ->whereIn('aplica_a', [$persona->tipo->value, 'todos'])
-            ->orderBy('nombre')
-            ->get()
-            ->map(static function (Formulario $f) use ($respuestas): array {
-                $respuesta = $respuestas->get($f->getKey());
-                $valores = $respuesta instanceof RespuestaFormulario ? ($respuesta->valores ?? []) : [];
-
-                return [
-                    'id' => $f->ulid,
-                    'nombre' => $f->nombre,
-                    'descripcion' => $f->descripcion,
-                    'respondido_en' => $respuesta instanceof RespuestaFormulario
-                        ? $respuesta->updated_at?->toIso8601String()
-                        : null,
-                    // La definición de cada campo con su valor: sirve para leer las
-                    // respuestas y para llenarlas desde el expediente.
-                    'campos' => $f->campos
-                        ->map(static fn (CampoFormulario $c): array => [
-                            'id' => $c->ulid,
-                            'etiqueta' => $c->etiqueta,
-                            'tipo' => $c->tipo->value,
-                            'obligatorio' => $c->obligatorio,
-                            'opciones' => $c->opciones,
-                            'valor' => $valores[$c->ulid] ?? null,
-                        ])
-                        ->values()
-                        ->all(),
                 ];
             })
             ->values()

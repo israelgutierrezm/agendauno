@@ -479,6 +479,7 @@ onMounted(async () => {
       v-if="miembroActivo"
       :persona-id="miembroActivo.id"
       :nombre="miembroActivo.nombre"
+      :sucursal-id="sucursalFiltro || undefined"
       @cerrar="miembroActivo = null"
     />
   </section>

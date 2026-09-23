@@ -154,7 +154,7 @@ class CatalogoTenantController
         return response()->json([
             'data' => $ofertas->map(fn (OfertaTenant $oferta): array => array_merge(
                 $this->presentarOferta($oferta),
-                ['actividad' => $oferta->actividad?->nombre],
+                ['actividad' => $oferta->actividad?->nombre, 'actividad_id' => $oferta->actividad?->ulid],
             ))->all(),
         ]);
     }
