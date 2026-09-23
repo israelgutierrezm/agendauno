@@ -5,9 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// `core` para que la red no dependa de una feature.
 class AuthToken extends Notifier<String?> {
   @override
-  String? build() => null;
+  String? build() => ref.read(tokenInicialProvider);
 
   void establecer(String? token) => state = token;
 }
 
 final authTokenProvider = NotifierProvider<AuthToken, String?>(AuthToken.new);
+
+/// Token de una sesión restaurada al abrir la app (lo fija `main`).
+final tokenInicialProvider = Provider<String?>((ref) => null);

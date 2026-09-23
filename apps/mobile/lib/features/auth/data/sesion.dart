@@ -16,6 +16,8 @@ class Terminologia {
   final String miembro;
   final String instructor;
 
+  Map<String, dynamic> aJson() => {'sesion': sesion, 'miembro': miembro, 'instructor': instructor};
+
   factory Terminologia.desdeJson(Map<String, dynamic>? json) {
     if (json == null) {
       return const Terminologia();
@@ -48,6 +50,33 @@ class Sesion {
   final Terminologia terminologia;
 
   bool get esCitas => modalidad == Modalidad.citas;
+
+  /// Forma guardada en el almacén cifrado del dispositivo.
+  Map<String, dynamic> aJson() => {
+    'slug': slug,
+    'bearer': bearer,
+    'nombre': nombre,
+    'rol': rol,
+    'modalidad': modalidad.name,
+    'terminologia': terminologia.aJson(),
+  };
+
+  /// Restaura una sesión guardada (null si le falta lo esencial).
+  static Sesion? desdeAlmacen(Map<String, dynamic> datos) {
+    final slug = datos['slug'];
+    final bearer = datos['bearer'];
+    if (slug is! String || bearer is! String || slug.isEmpty || bearer.isEmpty) {
+      return null;
+    }
+    return Sesion(
+      slug: slug,
+      bearer: bearer,
+      nombre: (datos['nombre'] ?? '') as String,
+      rol: (datos['rol'] ?? '') as String,
+      modalidad: Modalidad.desde(datos['modalidad']),
+      terminologia: Terminologia.desdeJson(datos['terminologia'] as Map<String, dynamic>?),
+    );
+  }
 
   factory Sesion.desdeJson(String slug, String bearer, Map<String, dynamic> usuario, [Map<String, dynamic>? estudio]) {
     final config = estudio?['perfil_config'] as Map<String, dynamic>?;
