@@ -22,9 +22,10 @@ class SesionController extends Notifier<Sesion?> {
     final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
     final bearer = (data['token'] ?? '') as String;
     final usuario = (data['usuario'] ?? {}) as Map<String, dynamic>;
+    final estudio = data['estudio'] as Map<String, dynamic>?;
 
     ref.read(authTokenProvider.notifier).establecer(bearer);
-    state = Sesion.desdeJson(slug, bearer, usuario);
+    state = Sesion.desdeJson(slug, bearer, usuario, estudio);
   }
 
   void cerrar() {

@@ -2,27 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/auth/application/sesion_controller.dart';
+import 'features/agenda/presentation/agenda_screen.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/cuenta/presentation/cuenta_screen.dart';
 
 void main() {
-  runApp(const ProviderScope(child: TurnoUnoApp()));
+  runApp(const ProviderScope(child: AgendaUnoApp()));
 }
 
-class TurnoUnoApp extends ConsumerWidget {
-  const TurnoUnoApp({super.key});
+class AgendaUnoApp extends ConsumerWidget {
+  const AgendaUnoApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Sin login global: si hay una sesion tenant-local, se muestra Mi cuenta; si
-    // no, el acceso por estudio.
-    final autenticado = ref.watch(sesionProvider) != null;
+    // Sin login global: con sesion tenant-local, el personal ve su agenda y el
+    // cliente su cuenta; sin sesion, el acceso por negocio.
+    final sesion = ref.watch(sesionProvider);
+    final Widget inicio = sesion == null
+        ? const LoginScreen()
+        : (sesion.rol == 'miembro' ? const CuentaScreen() : const AgendaScreen());
 
     return MaterialApp(
-      title: 'TurnoUno',
+      title: 'AgendaUno',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
-      home: autenticado ? const CuentaScreen() : const LoginScreen(),
+      // Azul de marca AgendaUno (#0070FF).
+      theme: ThemeData(colorSchemeSeed: const Color(0xFF0070FF), useMaterial3: true),
+      home: inicio,
     );
   }
 }

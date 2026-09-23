@@ -54,5 +54,21 @@ void main() {
     expect(s.bearer, '1|abc');
     expect(s.nombre, 'Ana');
     expect(s.rol, 'miembro');
+    // Sin perfil del estudio: clases con la terminología por defecto.
+    expect(s.modalidad, Modalidad.clases);
+    expect(s.terminologia.sesion, 'Clase');
+  });
+
+  test('Sesion toma la modalidad y la terminología del perfil del estudio', () {
+    final s = Sesion.desdeJson('barberia', '1|abc', {'nombre': 'Beto', 'rol': 'recepcionista'}, {
+      'perfil_config': {
+        'modalidad': 'citas',
+        'terminologia': {'sesion': 'Cita', 'miembro': 'Cliente', 'instructor': 'Barbero'},
+      },
+    });
+
+    expect(s.esCitas, isTrue);
+    expect(s.terminologia.miembro, 'Cliente');
+    expect(s.terminologia.instructor, 'Barbero');
   });
 }

@@ -66,11 +66,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('TurnoUno',
+                  Text('AgendaUno',
                       style: Theme.of(context).textTheme.headlineMedium,
                       textAlign: TextAlign.center),
                   const SizedBox(height: 4),
-                  Text('Entra a tu estudio',
+                  Text('Entra a tu negocio',
                       style: Theme.of(context).textTheme.bodyMedium,
                       textAlign: TextAlign.center),
                   const SizedBox(height: 24),

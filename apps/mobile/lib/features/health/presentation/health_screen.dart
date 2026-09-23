@@ -12,7 +12,7 @@ class HealthScreen extends ConsumerWidget {
     final health = ref.watch(healthProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('TurnoUno')),
+      appBar: AppBar(title: const Text('AgendaUno')),
       body: Center(
         child: health.when(
           loading: () => const CircularProgressIndicator(),

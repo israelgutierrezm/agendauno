@@ -2,7 +2,7 @@
 class AppConfig {
   const AppConfig._();
 
-  /// Base URL of the TurnoUno API.
+  /// Base URL of the AgendaUno API.
   ///
   /// Web and the iOS simulator reach the host at `localhost`; the Android
   /// emulator reaches the host machine at `10.0.2.2`. Override at run time with:
