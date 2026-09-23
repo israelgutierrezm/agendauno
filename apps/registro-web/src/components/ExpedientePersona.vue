@@ -32,11 +32,21 @@ interface Consentimiento {
   version: number;
   aceptado_en: string | null;
 }
+type ValorCampo = string | number | boolean | null;
+interface CampoFormulario {
+  id: string;
+  etiqueta: string;
+  tipo: "texto" | "textarea" | "numero" | "fecha" | "booleano" | "seleccion";
+  obligatorio: boolean;
+  opciones: string[] | null;
+  valor: ValorCampo;
+}
 interface FormularioExpediente {
   id: string;
   nombre: string;
+  descripcion: string | null;
   respondido_en: string | null;
-  respuestas: { campo: string; valor: string | number | boolean | null }[];
+  campos: CampoFormulario[];
 }
 interface Expediente {
   documentos: Documento[];
@@ -56,6 +66,7 @@ const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeSubir = computed(() => sesion.puede("documentos.subir"));
 const puedeValidar = computed(() => sesion.puede("documentos.gestionar"));
+const puedeResponder = computed(() => sesion.puede("formularios.responder"));
 
 const expediente = ref<Expediente | null>(null);
 const cargando = ref(true);
@@ -182,7 +193,7 @@ async function subir(): Promise<void> {
   }
 }
 
-// ---- Formularios: respuestas desplegables ----
+// ---- Formularios: ver respuestas o llenarlas aquí mismo ----
 const abiertos = ref<Set<string>>(new Set());
 function alternar(id: string): void {
   const copia = new Set(abiertos.value);
@@ -193,11 +204,65 @@ function alternar(id: string): void {
   }
   abiertos.value = copia;
 }
-function valor(v: string | number | boolean | null): string {
-  if (v === null || v === "") {
+function valor(c: CampoFormulario): string {
+  if (c.valor === null || c.valor === "") {
     return t("expediente.sinValor");
   }
-  return String(v);
+  if (c.tipo === "booleano") {
+    return c.valor === true ? t("expediente.si") : t("expediente.no");
+  }
+  if (c.tipo === "fecha" && typeof c.valor === "string") {
+    return fecha(`${c.valor}T12:00:00`);
+  }
+  return String(c.valor);
+}
+
+// Formulario que se está llenando (uno a la vez) y sus valores por campo.
+const llenando = ref<string | null>(null);
+// Texto de cada campo (los inputs trabajan con texto) y las casillas sí/no.
+const borrador = ref<Record<string, string>>({});
+const casillas = ref<Record<string, boolean>>({});
+const guardandoForm = ref(false);
+function llenar(f: FormularioExpediente): void {
+  llenando.value = f.id;
+  borrador.value = Object.fromEntries(
+    f.campos
+      .filter((c) => c.tipo !== "booleano")
+      .map((c) => [c.id, c.valor === null ? "" : String(c.valor)]),
+  );
+  casillas.value = Object.fromEntries(
+    f.campos
+      .filter((c) => c.tipo === "booleano")
+      .map((c) => [c.id, c.valor === true]),
+  );
+}
+async function guardarFormulario(f: FormularioExpediente): Promise<void> {
+  guardandoForm.value = true;
+  try {
+    const valores: Record<string, ValorCampo> = {};
+    for (const c of f.campos) {
+      if (c.tipo === "booleano") {
+        valores[c.id] = casillas.value[c.id] === true;
+        continue;
+      }
+      const v = borrador.value[c.id] ?? "";
+      if (v !== "") {
+        valores[c.id] = c.tipo === "numero" ? Number(v) : v;
+      }
+    }
+    await api.post(`${base.value}/formularios/${f.id}/respuestas`, {
+      persona_id: props.personaId,
+      valores,
+    });
+    toast.exito(t("expediente.formularioGuardado"));
+    llenando.value = null;
+    await cargar();
+    abiertos.value = new Set(abiertos.value).add(f.id);
+  } catch (e) {
+    toast.error(mensajeDeError(e, t("expediente.error")));
+  } finally {
+    guardandoForm.value = false;
+  }
 }
 </script>
 
@@ -429,22 +494,131 @@ function valor(v: string | number | boolean | null): string {
                   }}
                 </p>
               </div>
-              <button
-                v-if="f.respondido_en"
-                type="button"
-                class="tu-enlace text-sm shrink-0"
-                :aria-expanded="abiertos.has(f.id)"
-                @click="alternar(f.id)"
+              <div
+                v-if="llenando !== f.id"
+                class="flex items-center gap-3 shrink-0 text-sm"
               >
-                {{
-                  abiertos.has(f.id)
-                    ? $t("expediente.ocultarRespuestas")
-                    : $t("expediente.verRespuestas")
-                }}
-              </button>
+                <button
+                  v-if="f.respondido_en"
+                  type="button"
+                  class="tu-enlace"
+                  :aria-expanded="abiertos.has(f.id)"
+                  @click="alternar(f.id)"
+                >
+                  {{
+                    abiertos.has(f.id)
+                      ? $t("expediente.ocultarRespuestas")
+                      : $t("expediente.verRespuestas")
+                  }}
+                </button>
+                <button
+                  v-if="puedeResponder && f.campos.length > 0"
+                  type="button"
+                  class="tu-btn tu-btn-fantasma px-3 py-1.5 text-sm"
+                  @click="llenar(f)"
+                >
+                  {{
+                    f.respondido_en
+                      ? $t("expediente.editarRespuestas")
+                      : $t("expediente.llenar")
+                  }}
+                </button>
+              </div>
             </div>
+
+            <!-- Llenar / editar respuestas -->
+            <form
+              v-if="llenando === f.id"
+              class="mt-3 w-full rounded-xl border p-4 space-y-4"
+              :style="{
+                borderColor: 'var(--borde)',
+                background: 'var(--fondo)',
+              }"
+              @submit.prevent="guardarFormulario(f)"
+            >
+              <p
+                v-if="f.descripcion"
+                class="text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ f.descripcion }}
+              </p>
+              <div v-for="c in f.campos" :key="c.id">
+                <label
+                  v-if="c.tipo === 'booleano'"
+                  class="flex items-center gap-2 text-sm"
+                >
+                  <input
+                    v-model="casillas[c.id]"
+                    type="checkbox"
+                    class="h-4 w-4"
+                  />
+                  {{ c.etiqueta }}
+                </label>
+                <template v-else>
+                  <label class="tu-label" :for="`ex-c-${c.id}`"
+                    >{{ c.etiqueta
+                    }}<span v-if="c.obligatorio" aria-hidden="true">
+                      *</span
+                    ></label
+                  >
+                  <textarea
+                    v-if="c.tipo === 'textarea'"
+                    :id="`ex-c-${c.id}`"
+                    v-model="borrador[c.id]"
+                    class="tu-input"
+                    rows="3"
+                    :required="c.obligatorio"
+                  />
+                  <select
+                    v-else-if="c.tipo === 'seleccion'"
+                    :id="`ex-c-${c.id}`"
+                    v-model="borrador[c.id]"
+                    class="tu-input"
+                    :required="c.obligatorio"
+                  >
+                    <option value="">{{ $t("expediente.elegir") }}</option>
+                    <option v-for="o in c.opciones ?? []" :key="o" :value="o">
+                      {{ o }}
+                    </option>
+                  </select>
+                  <input
+                    v-else
+                    :id="`ex-c-${c.id}`"
+                    v-model="borrador[c.id]"
+                    class="tu-input"
+                    :type="
+                      c.tipo === 'numero'
+                        ? 'number'
+                        : c.tipo === 'fecha'
+                          ? 'date'
+                          : 'text'
+                    "
+                    :required="c.obligatorio"
+                  />
+                </template>
+              </div>
+              <div class="flex gap-2">
+                <button
+                  type="submit"
+                  class="tu-btn tu-btn-primario text-sm"
+                  :disabled="guardandoForm"
+                >
+                  {{ $t("expediente.guardarRespuestas") }}
+                </button>
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-fantasma text-sm"
+                  :disabled="guardandoForm"
+                  @click="llenando = null"
+                >
+                  {{ $t("comun.cancelar") }}
+                </button>
+              </div>
+            </form>
+
             <dl
-              v-if="abiertos.has(f.id)"
+              v-else-if="abiertos.has(f.id)"
               class="mt-3 w-full rounded-xl border px-4 text-sm divide-y divide-[var(--borde)]"
               :style="{
                 borderColor: 'var(--borde)',
@@ -452,12 +626,14 @@ function valor(v: string | number | boolean | null): string {
               }"
             >
               <div
-                v-for="(r, i) in f.respuestas"
-                :key="i"
+                v-for="c in f.campos"
+                :key="c.id"
                 class="flex items-baseline justify-between gap-4 py-2"
               >
-                <dt :style="{ color: 'var(--texto-suave)' }">{{ r.campo }}</dt>
-                <dd class="text-right font-medium">{{ valor(r.valor) }}</dd>
+                <dt :style="{ color: 'var(--texto-suave)' }">
+                  {{ c.etiqueta }}
+                </dt>
+                <dd class="text-right font-medium">{{ valor(c) }}</dd>
               </div>
             </dl>
           </li>

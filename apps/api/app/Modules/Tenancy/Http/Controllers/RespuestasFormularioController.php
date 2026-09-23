@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AccesoExpedienteTenant;
 use App\Modules\Tenancy\Models\CampoFormulario;
 use App\Modules\Tenancy\Models\Formulario;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\RespuestaFormulario;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\TipoCampo;
+use DateTimeImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -50,6 +53,20 @@ class RespuestasFormularioController
         $formulario = Formulario::query()->with('campos')->where('ulid', (string) $request->route('formulario'))->firstOrFail();
 
         $persona = PersonaTenant::query()->where('ulid', (string) $request->input('persona_id'))->firstOrFail();
+
+        // Se responde por alguien cuyo expediente se puede ver (o por uno mismo), y
+        // solo formularios que le aplican (miembro / instructor / todos).
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless(
+            $usuario instanceof Usuario
+                && ($persona->usuario_id === $usuario->getKey() || AccesoExpedienteTenant::puedeVer($usuario, $persona)),
+            403,
+        );
+        if (! in_array($formulario->aplica_a, [$persona->tipo->value, 'todos'], true)) {
+            throw ValidationException::withMessages([
+                'persona_id' => ['Este formulario no aplica a esta persona.'],
+            ]);
+        }
 
         /** @var array<string, mixed> $entrada */
         $entrada = is_array($request->input('valores')) ? $request->input('valores') : [];
@@ -99,6 +116,24 @@ class RespuestasFormularioController
                 throw ValidationException::withMessages([
                     $campo->ulid => ["'{$campo->etiqueta}' debe ser numérico."],
                 ]);
+            }
+
+            if ($campo->tipo === TipoCampo::Booleano) {
+                $valor = filter_var($valor, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($valor === null) {
+                    throw ValidationException::withMessages([
+                        $campo->ulid => ["'{$campo->etiqueta}' debe ser sí o no."],
+                    ]);
+                }
+            }
+
+            if ($campo->tipo === TipoCampo::Fecha) {
+                $fecha = is_string($valor) ? DateTimeImmutable::createFromFormat('!Y-m-d', $valor) : false;
+                if ($fecha === false || $fecha->format('Y-m-d') !== $valor) {
+                    throw ValidationException::withMessages([
+                        $campo->ulid => ["'{$campo->etiqueta}' debe ser una fecha (AAAA-MM-DD)."],
+                    ]);
+                }
             }
 
             $valores[$campo->ulid] = $valor;

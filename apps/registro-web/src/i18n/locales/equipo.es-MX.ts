@@ -66,6 +66,13 @@ export const expediente = {
   verRespuestas: "Ver respuestas",
   ocultarRespuestas: "Ocultar",
   sinValor: "—",
+  si: "Sí",
+  no: "No",
+  llenar: "Llenar",
+  editarRespuestas: "Editar respuestas",
+  guardarRespuestas: "Guardar respuestas",
+  formularioGuardado: "Respuestas guardadas.",
+  elegir: "Elige…",
   error: "No se pudo cargar el expediente.",
 };
 

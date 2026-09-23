@@ -54,8 +54,9 @@ it('reúne documentos, consentimientos y formularios del miembro', function (): 
         ->assertJsonCount(1, 'data.documentos')
         ->assertJsonPath('data.documentos.0.estado', 'pendiente')
         ->assertJsonPath('data.formularios.0.nombre', 'Ficha médica')
-        ->assertJsonPath('data.formularios.0.respuestas.0.campo', 'Tipo de sangre')
-        ->assertJsonPath('data.formularios.0.respuestas.0.valor', 'O+')
+        ->assertJsonPath('data.formularios.0.campos.0.etiqueta', 'Tipo de sangre')
+        ->assertJsonPath('data.formularios.0.campos.0.tipo', 'texto')
+        ->assertJsonPath('data.formularios.0.campos.0.valor', 'O+')
         ->json('data.consentimientos');
 
     $porTitulo = collect($exp)->keyBy('titulo');
@@ -102,4 +103,32 @@ it('el expediente de un instructor solo lo ve quien administra al equipo', funct
     // El de un miembro sí lo ve recepción.
     $ana = crearMiembroTenant($e, 'Ana');
     $this->getJson("/api/v1/app/{$e['slug']}/personas/{$ana}/expediente", conBearer($recep))->assertOk();
+});
+
+it('se llenan formularios desde el expediente: tipos validados y solo los que aplican', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $recep = personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista');
+    $rosa = crearMiembroTenant($e, 'Rosa');
+
+    $form = (string) $this->postJson("/api/v1/app/{$e['slug']}/formularios", ['nombre' => 'Ingreso'], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $fecha = (string) $this->postJson("/api/v1/app/{$e['slug']}/formularios/{$form}/campos", ['etiqueta' => 'Nacimiento', 'tipo' => 'fecha', 'obligatorio' => true], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $acepta = (string) $this->postJson("/api/v1/app/{$e['slug']}/formularios/{$form}/campos", ['etiqueta' => 'Acepta fotos', 'tipo' => 'booleano'], conBearer($e['bearer']))->assertCreated()->json('data.id');
+
+    // Recepción llena el de un miembro; la fecha y el sí/no se validan.
+    $this->postJson("/api/v1/app/{$e['slug']}/formularios/{$form}/respuestas", ['persona_id' => $rosa, 'valores' => [$fecha => '31/12/1990']], conBearer($recep))->assertStatus(422);
+    $this->postJson("/api/v1/app/{$e['slug']}/formularios/{$form}/respuestas", ['persona_id' => $rosa, 'valores' => [$fecha => '1990-12-31', $acepta => 'quizá']], conBearer($recep))->assertStatus(422);
+    $this->postJson("/api/v1/app/{$e['slug']}/formularios/{$form}/respuestas", ['persona_id' => $rosa, 'valores' => [$fecha => '1990-12-31', $acepta => true]], conBearer($recep))->assertCreated();
+
+    $this->getJson("/api/v1/app/{$e['slug']}/personas/{$rosa}/expediente", conBearer($recep))
+        ->assertOk()
+        ->assertJsonPath('data.formularios.0.campos.0.valor', '1990-12-31')
+        ->assertJsonPath('data.formularios.0.campos.1.valor', true);
+
+    // Un formulario de miembros no se llena para un instructor; y recepción no
+    // responde por el personal.
+    personalConSesion($e['slug'], $e['bearer'], 'profe@correo.mx', 'instructor');
+    $instructor = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    $persona = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores/{$instructor}", conBearer($e['bearer']))->json('data.persona_id');
+    $this->postJson("/api/v1/app/{$e['slug']}/formularios/{$form}/respuestas", ['persona_id' => $persona, 'valores' => [$fecha => '1990-12-31']], conBearer($e['bearer']))->assertStatus(422);
+    $this->postJson("/api/v1/app/{$e['slug']}/formularios/{$form}/respuestas", ['persona_id' => $persona, 'valores' => [$fecha => '1990-12-31']], conBearer($recep))->assertForbidden();
 });

@@ -128,12 +128,19 @@ class ExpedienteTenantController
                 return [
                     'id' => $f->ulid,
                     'nombre' => $f->nombre,
+                    'descripcion' => $f->descripcion,
                     'respondido_en' => $respuesta instanceof RespuestaFormulario
                         ? $respuesta->updated_at?->toIso8601String()
                         : null,
-                    'respuestas' => $f->campos
+                    // La definición de cada campo con su valor: sirve para leer las
+                    // respuestas y para llenarlas desde el expediente.
+                    'campos' => $f->campos
                         ->map(static fn (CampoFormulario $c): array => [
-                            'campo' => $c->etiqueta,
+                            'id' => $c->ulid,
+                            'etiqueta' => $c->etiqueta,
+                            'tipo' => $c->tipo->value,
+                            'obligatorio' => $c->obligatorio,
+                            'opciones' => $c->opciones,
                             'valor' => $valores[$c->ulid] ?? null,
                         ])
                         ->values()
