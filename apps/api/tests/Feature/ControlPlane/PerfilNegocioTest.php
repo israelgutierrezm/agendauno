@@ -59,6 +59,34 @@ it('cambiar el perfil actualiza la terminologia y los flags en la sesion', funct
     expect($estudio['perfil_config']['flags']['grupos'])->toBeTrue();
 });
 
+it('barberia usa citas, clientes y barberos sin crear un dominio separado', function (): void {
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
+
+    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.perfil', 'barberia');
+
+    $estudio = $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
+        ->assertOk()->json('data.estudio');
+
+    expect($estudio['perfil_config']['terminologia'])
+        ->toMatchArray(['sesion' => 'Cita', 'miembro' => 'Cliente', 'instructor' => 'Barbero']);
+    expect($estudio['perfil_config']['flags']['grupos'])->toBeFalse();
+});
+
+it('salud usa citas y pacientes sin ofrecer funciones clinicas', function (): void {
+    $e = estudioConSesion('consultorio-a', 'dueno@consultorio.mx');
+
+    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'salud'], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.perfil', 'salud');
+
+    $estudio = $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
+        ->assertOk()->json('data.estudio');
+
+    expect($estudio['perfil_config']['terminologia'])
+        ->toMatchArray(['sesion' => 'Cita', 'miembro' => 'Paciente', 'instructor' => 'Profesional']);
+    expect($estudio['perfil_config']['flags']['grupos'])->toBeFalse();
+});
+
 it('cambiar el perfil exige estudio.gestionar', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $recep = personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista');

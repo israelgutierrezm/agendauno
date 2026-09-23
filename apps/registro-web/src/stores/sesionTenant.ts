@@ -12,6 +12,22 @@ export interface UsuarioTenant {
   permisos?: string[];
 }
 
+/** Cómo atiende el negocio: clases con cupo o citas 1 a 1 con un profesional. */
+export type ModalidadServicio = "clases" | "citas";
+
+export interface Terminologia {
+  sesion: string;
+  miembro: string;
+  instructor: string;
+}
+
+/** Configuración del perfil de negocio: adapta etiquetas y opciones sin forks. */
+export interface PerfilConfig {
+  terminologia: Terminologia;
+  flags: { grupos: boolean; niveles: boolean; acceso_abierto: boolean };
+  modalidad: ModalidadServicio;
+}
+
 export interface EstudioSesion {
   slug: string;
   nombre: string;
@@ -21,7 +37,15 @@ export interface EstudioSesion {
   trial_termina_en?: string | null;
   publicado?: boolean;
   en_directorio?: boolean;
+  perfil?: string;
+  perfil_config?: PerfilConfig;
 }
+
+const TERMINOLOGIA_DEFAULT: Terminologia = {
+  sesion: "Clase",
+  miembro: "Miembro",
+  instructor: "Instructor",
+};
 
 interface RespuestaAuth {
   token: string;
@@ -80,6 +104,20 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     }
     return "mi-cuenta";
   });
+
+  /**
+   * Modalidad de servicio del negocio (derivada de su perfil). La agenda, el menú, la
+   * terminología y el cobro se adaptan a ella; por defecto, clases.
+   */
+  const modalidad = computed<ModalidadServicio>(
+    () => estudio.value?.perfil_config?.modalidad ?? "clases",
+  );
+  const esCitas = computed(() => modalidad.value === "citas");
+
+  /** Terminología del perfil (p. ej. Cita / Cliente / Barbero). */
+  const terminologia = computed<Terminologia>(
+    () => estudio.value?.perfil_config?.terminologia ?? TERMINOLOGIA_DEFAULT,
+  );
 
   fijarBearer(bearer.value);
 
@@ -244,6 +282,9 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     autenticado,
     puede,
     rutaInicio,
+    modalidad,
+    esCitas,
+    terminologia,
     iniciarSesion,
     iniciarSesionConGoogle,
     activar,

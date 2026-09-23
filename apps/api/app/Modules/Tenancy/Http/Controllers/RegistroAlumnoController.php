@@ -117,7 +117,7 @@ class RegistroAlumnoController
             'publicado' => $estudio->publicado,
             'en_directorio' => $estudio->enDirectorio(),
             'perfil' => $estudio->perfil_negocio->value,
-            'perfil_config' => $estudio->perfil_negocio->configuracion(),
+            'perfil_config' => $estudio->perfilConfig(),
         ];
     }
 }

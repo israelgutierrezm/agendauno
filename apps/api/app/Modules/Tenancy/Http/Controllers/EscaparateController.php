@@ -43,7 +43,7 @@ class EscaparateController
                 'nombre' => $estudio->nombre,
                 'logo_url' => $estudio->logo_url,
                 'perfil' => $estudio->perfil_negocio->value,
-                'perfil_config' => $estudio->perfil_negocio->configuracion(),
+                'perfil_config' => $estudio->perfilConfig(),
                 'ciudad' => $estudio->ciudad,
                 'pais' => $estudio->pais,
                 'whatsapp' => $estudio->whatsappCompleto(),

@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\ModoCobroSaas;
 use App\Modules\Tenancy\PerfilNegocio;
 use App\Support\Concerns\HasPublicId;
@@ -84,6 +85,26 @@ class Estudio extends Model
     public function enDirectorio(): bool
     {
         return $this->publicado && ! $this->privado && $this->estado->operativo();
+    }
+
+    /**
+     * Modalidad de servicio del estudio (clases con cupo vs citas 1 a 1), derivada de
+     * su perfil de negocio.
+     */
+    public function modalidad(): ModalidadServicio
+    {
+        return ModalidadServicio::paraPerfil($this->perfil_negocio);
+    }
+
+    /**
+     * Configuración que el frontend usa para adaptarse sin forks: terminología y
+     * feature-flags del perfil, más la modalidad de servicio.
+     *
+     * @return array{terminologia: array<string, string>, flags: array<string, bool>, modalidad: string}
+     */
+    public function perfilConfig(): array
+    {
+        return $this->perfil_negocio->configuracion() + ['modalidad' => $this->modalidad()->value];
     }
 
     /**

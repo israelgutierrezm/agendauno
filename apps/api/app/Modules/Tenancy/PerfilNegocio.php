@@ -20,6 +20,11 @@ enum PerfilNegocio: string
     case Danza = 'danza';
     case Yoga = 'yoga';
     case Academia = 'academia';
+    case Barberia = 'barberia';
+    case Estetica = 'estetica';
+    case Salon = 'salon';
+    case Spa = 'spa';
+    case Salud = 'salud';
 
     /**
      * Terminologia + feature-flags por defecto del perfil.
@@ -48,6 +53,22 @@ enum PerfilNegocio: string
             self::Gimnasio => [
                 'terminologia' => ['sesion' => 'Clase', 'miembro' => 'Miembro', 'instructor' => 'Coach'],
                 'flags' => ['grupos' => false, 'niveles' => false, 'acceso_abierto' => true],
+            ],
+            self::Barberia => [
+                'terminologia' => ['sesion' => 'Cita', 'miembro' => 'Cliente', 'instructor' => 'Barbero'],
+                'flags' => ['grupos' => false, 'niveles' => false, 'acceso_abierto' => false],
+            ],
+            self::Estetica, self::Salon => [
+                'terminologia' => ['sesion' => 'Cita', 'miembro' => 'Cliente', 'instructor' => 'Profesional'],
+                'flags' => ['grupos' => false, 'niveles' => false, 'acceso_abierto' => false],
+            ],
+            self::Spa => [
+                'terminologia' => ['sesion' => 'Cita', 'miembro' => 'Cliente', 'instructor' => 'Terapeuta'],
+                'flags' => ['grupos' => false, 'niveles' => false, 'acceso_abierto' => false],
+            ],
+            self::Salud => [
+                'terminologia' => ['sesion' => 'Cita', 'miembro' => 'Paciente', 'instructor' => 'Profesional'],
+                'flags' => ['grupos' => false, 'niveles' => false, 'acceso_abierto' => false],
             ],
             self::General => [
                 'terminologia' => ['sesion' => 'Clase', 'miembro' => 'Miembro', 'instructor' => 'Instructor'],
