@@ -189,13 +189,17 @@ watch(personaId, cargar, { immediate: true });
     </p>
 
     <template v-else-if="ficha && resumen">
-      <!-- Encabezado del alumno -->
-      <header class="mt-4 tu-card p-5">
-        <div class="flex flex-wrap items-start justify-between gap-4">
+      <!-- Una sola tarjeta (como la demo de la landing): la cabecera arriba, el
+           historial a la izquierda y el resumen a un lado sobre fondo gris. -->
+      <div class="mt-4 tu-card overflow-hidden">
+        <header
+          class="flex flex-wrap items-start justify-between gap-4 p-5 border-b"
+          :style="{ borderColor: 'var(--borde)' }"
+        >
           <div class="flex items-center gap-4 min-w-0">
             <AvatarIniciales :nombre="ficha.persona.nombre_completo" tam="lg" />
             <div class="min-w-0">
-              <h1 class="text-xl font-semibold truncate">
+              <h1 class="text-xl font-semibold tracking-tight truncate">
                 {{ ficha.persona.nombre_completo }}
               </h1>
               <p
@@ -247,262 +251,276 @@ watch(personaId, cargar, { immediate: true });
               {{ $t("ficha.editar") }}
             </button>
           </div>
-        </div>
+        </header>
 
-        <!-- Alertas -->
-        <div
-          v-if="resumen.alertas.length > 0"
-          class="mt-4 flex flex-wrap gap-2"
-        >
-          <span
-            v-for="a in resumen.alertas"
-            :key="a"
-            class="inline-flex items-center gap-1.5 text-sm font-medium"
-            :style="{ color: colorAlerta(a) }"
-          >
-            <span
-              class="h-1.5 w-1.5 rounded-full"
-              :style="{ background: colorAlerta(a) }"
-              aria-hidden="true"
-            />{{ $t(`recepcion.alertas.${a}`) }}</span
-          >
-        </div>
-
-        <!-- Datos meta -->
-        <dl
-          class="mt-4 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4"
-        >
-          <div>
-            <dt :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("ficha.alta") }}
-            </dt>
-            <dd class="font-medium">{{ fecha(ficha.persona.alta) }}</dd>
-          </div>
-          <div v-if="ficha.persona.sucursal">
-            <dt :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("ficha.sucursal") }}
-            </dt>
-            <dd class="font-medium">{{ ficha.persona.sucursal }}</dd>
-          </div>
-          <div>
-            <dt :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("ficha.asistencias") }}
-            </dt>
-            <dd class="font-medium">
-              {{ resumen.asistencias }}
-              <span
-                v-if="resumen.primera_vez"
-                class="ml-1 text-xs font-medium"
-                :style="{ color: 'var(--aviso)' }"
-                >{{ $t("miembros.nuevo") }}</span
+        <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div class="min-w-0">
+            <!-- Membresías y paquetes (derechos) -->
+            <section class="px-5 py-5">
+              <h2 class="text-sm font-semibold">
+                {{ $t("ficha.derechos.titulo") }}
+              </h2>
+              <p
+                v-if="ficha.derechos.length === 0"
+                class="mt-2 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
               >
-            </dd>
-          </div>
-          <div v-if="resumen.documentos_pendientes > 0">
-            <dt :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("ficha.documentos") }}
-            </dt>
-            <dd class="font-medium" :style="{ color: 'var(--aviso)' }">
-              {{ resumen.documentos_pendientes }}
-            </dd>
-          </div>
-        </dl>
-      </header>
+                {{ $t("ficha.derechos.vacio") }}
+              </p>
+              <ul v-else class="mt-1">
+                <li
+                  v-for="d in ficha.derechos"
+                  :key="d.id"
+                  class="fi-fila"
+                  :style="{ borderColor: 'var(--borde)' }"
+                >
+                  <div class="min-w-0">
+                    <p class="font-medium truncate">{{ d.producto ?? "—" }}</p>
+                    <p
+                      class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                    >
+                      <span
+                        v-if="d.estado"
+                        class="tu-badge"
+                        :class="
+                          d.estado === 'activo'
+                            ? 'tu-badge-exito'
+                            : 'tu-badge-aviso'
+                        "
+                        >{{ $t(`ficha.acuerdo.${d.estado}`) }}</span
+                      >
+                      <span>{{
+                        d.valido_hasta
+                          ? $t("ficha.derechos.vence", {
+                              fecha: fecha(d.valido_hasta),
+                            })
+                          : $t("ficha.derechos.sinVence")
+                      }}</span>
+                    </p>
+                  </div>
+                  <div class="text-right shrink-0">
+                    <p v-if="d.ilimitado" class="text-sm font-medium">
+                      {{ $t("ficha.derechos.ilimitado") }}
+                    </p>
+                    <template v-else>
+                      <p class="font-semibold tabular-nums">
+                        {{ $t("ficha.creditos", { n: d.saldo_creditos ?? 0 }) }}
+                      </p>
+                      <p
+                        class="text-xs"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        {{
+                          $t("ficha.derechos.disponible", {
+                            n: (d.disponible_unidades ?? 0) / 1000,
+                          })
+                        }}
+                      </p>
+                    </template>
+                  </div>
+                </li>
+              </ul>
+            </section>
 
-      <!-- Resumen: membresía, saldo y próxima reserva -->
-      <div class="mt-4 tu-card p-5 grid gap-5 sm:grid-cols-3">
-        <div>
-          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("ficha.membresia") }}
-          </p>
-          <p class="mt-0.5 font-semibold">
-            {{ $t(`recepcion.membresia.${resumen.membresia.estado}`) }}
-          </p>
-          <p
-            v-if="resumen.membresia.valido_hasta"
-            class="text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
+            <!-- Historial de reservas -->
+            <section
+              class="px-5 py-5 border-t"
+              :style="{ borderColor: 'var(--borde)' }"
+            >
+              <h2 class="text-sm font-semibold">
+                {{ $t("ficha.reservas.titulo") }}
+              </h2>
+              <p
+                v-if="ficha.reservas.length === 0"
+                class="mt-2 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("ficha.reservas.vacio") }}
+              </p>
+              <ul v-else class="mt-1">
+                <li
+                  v-for="r in ficha.reservas"
+                  :key="r.id"
+                  class="fi-fila"
+                  :style="{ borderColor: 'var(--borde)' }"
+                >
+                  <div class="min-w-0">
+                    <p class="font-medium truncate">{{ r.clase ?? "—" }}</p>
+                    <p
+                      class="mt-0.5 text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                    >
+                      {{ fechaHora(r.inicia_en, r.zona_horaria) }}
+                    </p>
+                  </div>
+                  <span
+                    v-if="r.asistencia === 'presente'"
+                    class="tu-badge tu-badge-exito shrink-0"
+                    >{{ $t("agenda.roster.presente") }}</span
+                  >
+                  <span
+                    v-else
+                    class="text-xs shrink-0"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ $t(`agenda.roster.${r.asistencia ?? r.estado}`) }}</span
+                  >
+                </li>
+              </ul>
+            </section>
+
+            <!-- Historial de compras -->
+            <section
+              class="px-5 py-5 border-t"
+              :style="{ borderColor: 'var(--borde)' }"
+            >
+              <h2 class="text-sm font-semibold">
+                {{ $t("ficha.ordenes.titulo") }}
+              </h2>
+              <p
+                v-if="ficha.ordenes.length === 0"
+                class="mt-2 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("ficha.ordenes.vacio") }}
+              </p>
+              <ul v-else class="mt-1">
+                <li
+                  v-for="o in ficha.ordenes"
+                  :key="o.id"
+                  class="fi-fila"
+                  :style="{ borderColor: 'var(--borde)' }"
+                >
+                  <div class="min-w-0">
+                    <p class="font-medium tabular-nums">
+                      {{ dinero(o.total_minor, o.moneda) }}
+                    </p>
+                    <p
+                      class="mt-0.5 text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                    >
+                      {{ fecha(o.fecha)
+                      }}<span v-if="o.metodo_pago"> · {{ o.metodo_pago }}</span>
+                    </p>
+                  </div>
+                  <span
+                    class="tu-badge shrink-0"
+                    :class="
+                      o.estado === 'pagada'
+                        ? 'tu-badge-exito'
+                        : 'tu-badge-aviso'
+                    "
+                    >{{ $t(`ficha.ordenes.estados.${o.estado}`) }}</span
+                  >
+                </li>
+              </ul>
+            </section>
+          </div>
+
+          <!-- Resumen a un lado, sobre fondo gris -->
+          <aside
+            class="border-t lg:border-t-0 lg:border-l px-5 py-6"
+            :style="{ borderColor: 'var(--borde)', background: 'var(--fondo)' }"
           >
-            {{
-              $t("ficha.derechos.vence", {
-                fecha: fecha(resumen.membresia.valido_hasta),
-              })
-            }}
-          </p>
-        </div>
-        <div>
-          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("ficha.saldo") }}
-          </p>
-          <p class="mt-0.5 font-semibold">
-            {{ $t("ficha.creditos", { n: resumen.saldo_creditos }) }}
-          </p>
-        </div>
-        <div>
-          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("ficha.proxima") }}
-          </p>
-          <template v-if="resumen.proxima_reserva">
-            <p class="mt-0.5 font-semibold truncate">
-              {{ resumen.proxima_reserva.clase ?? "—" }}
+            <p class="fi-etiqueta">{{ $t("ficha.membresia") }}</p>
+            <p class="mt-1 text-lg font-semibold tracking-tight">
+              {{ $t(`recepcion.membresia.${resumen.membresia.estado}`) }}
             </p>
-            <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+            <p
+              v-if="resumen.membresia.valido_hasta"
+              class="text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
               {{
-                fechaHora(
-                  resumen.proxima_reserva.inicia_en,
-                  resumen.proxima_reserva.zona_horaria,
-                )
+                $t("ficha.derechos.vence", {
+                  fecha: fecha(resumen.membresia.valido_hasta),
+                })
               }}
             </p>
-          </template>
-          <p
-            v-else
-            class="mt-1 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("ficha.sinProxima") }}
-          </p>
-        </div>
-      </div>
 
-      <!-- Membresías y paquetes (derechos) -->
-      <section class="mt-6">
-        <h2 class="font-semibold">{{ $t("ficha.derechos.titulo") }}</h2>
-        <p
-          v-if="ficha.derechos.length === 0"
-          class="tu-card mt-3 p-4 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("ficha.derechos.vacio") }}
-        </p>
-        <ul v-else class="mt-3 space-y-2">
-          <li
-            v-for="d in ficha.derechos"
-            :key="d.id"
-            class="tu-card flex flex-wrap items-center justify-between gap-3 p-4"
-          >
-            <div class="min-w-0">
-              <p class="font-semibold truncate">{{ d.producto ?? "—" }}</p>
-              <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-                <span
-                  v-if="d.estado"
-                  class="tu-badge mr-2"
-                  :class="
-                    d.estado === 'activo' ? 'tu-badge-exito' : 'tu-badge-aviso'
-                  "
-                  >{{ $t(`ficha.acuerdo.${d.estado}`) }}</span
-                >
-                <span>{{
-                  d.valido_hasta
-                    ? $t("ficha.derechos.vence", {
-                        fecha: fecha(d.valido_hasta),
-                      })
-                    : $t("ficha.derechos.sinVence")
-                }}</span>
-              </p>
-            </div>
-            <div class="text-right shrink-0">
-              <template v-if="d.ilimitado">
-                <span class="tu-badge tu-badge-exito">{{
-                  $t("ficha.derechos.ilimitado")
-                }}</span>
-              </template>
-              <template v-else>
-                <p class="font-bold">
-                  {{ $t("ficha.creditos", { n: d.saldo_creditos ?? 0 }) }}
-                </p>
-                <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-                  {{
-                    $t("ficha.derechos.disponible", {
-                      n: (d.disponible_unidades ?? 0) / 1000,
-                    })
-                  }}
-                </p>
-              </template>
-            </div>
-          </li>
-        </ul>
-      </section>
-
-      <div class="mt-6 grid gap-6 lg:grid-cols-2">
-        <!-- Historial de reservas -->
-        <section>
-          <h2 class="font-semibold">{{ $t("ficha.reservas.titulo") }}</h2>
-          <p
-            v-if="ficha.reservas.length === 0"
-            class="tu-card mt-3 p-4 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("ficha.reservas.vacio") }}
-          </p>
-          <ul v-else class="mt-3 tu-card overflow-hidden">
-            <li
-              v-for="(r, i) in ficha.reservas"
-              :key="r.id"
-              class="flex items-center justify-between gap-3 px-4 py-3"
-              :class="i > 0 ? 'border-t' : ''"
-              :style="{ borderColor: 'var(--borde)' }"
+            <p
+              v-if="resumen.alertas.length > 0"
+              class="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-sm"
             >
-              <div class="min-w-0">
-                <p class="font-medium truncate">{{ r.clase ?? "—" }}</p>
-                <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-                  {{ fechaHora(r.inicia_en, r.zona_horaria) }}
-                </p>
-              </div>
-              <div class="flex items-center gap-1.5 shrink-0">
-                <span
-                  v-if="r.asistencia"
-                  class="tu-badge"
-                  :class="
-                    r.asistencia === 'presente'
-                      ? 'tu-badge-exito'
-                      : 'tu-badge-aviso'
-                  "
-                  >{{ $t(`agenda.roster.${r.asistencia}`) }}</span
-                >
-                <span v-else class="tu-badge">{{
-                  $t(`agenda.roster.${r.estado}`)
-                }}</span>
-              </div>
-            </li>
-          </ul>
-        </section>
-
-        <!-- Historial de compras -->
-        <section>
-          <h2 class="font-semibold">{{ $t("ficha.ordenes.titulo") }}</h2>
-          <p
-            v-if="ficha.ordenes.length === 0"
-            class="tu-card mt-3 p-4 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("ficha.ordenes.vacio") }}
-          </p>
-          <ul v-else class="mt-3 tu-card overflow-hidden">
-            <li
-              v-for="(o, i) in ficha.ordenes"
-              :key="o.id"
-              class="flex items-center justify-between gap-3 px-4 py-3"
-              :class="i > 0 ? 'border-t' : ''"
-              :style="{ borderColor: 'var(--borde)' }"
-            >
-              <div class="min-w-0">
-                <p class="font-medium">{{ dinero(o.total_minor, o.moneda) }}</p>
-                <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-                  {{ fecha(o.fecha)
-                  }}<span v-if="o.metodo_pago"> · {{ o.metodo_pago }}</span>
-                </p>
-              </div>
               <span
-                class="tu-badge shrink-0"
-                :class="
-                  o.estado === 'pagada' ? 'tu-badge-exito' : 'tu-badge-aviso'
-                "
-                >{{ $t(`ficha.ordenes.estados.${o.estado}`) }}</span
+                v-for="a in resumen.alertas"
+                :key="a"
+                class="inline-flex items-center gap-1.5 font-medium"
+                :style="{ color: colorAlerta(a) }"
               >
-            </li>
-          </ul>
-        </section>
+                <span
+                  class="h-1.5 w-1.5 rounded-full"
+                  :style="{ background: colorAlerta(a) }"
+                  aria-hidden="true"
+                />{{ $t(`recepcion.alertas.${a}`) }}</span
+              >
+            </p>
+
+            <dl
+              class="mt-5 rounded-xl border px-4 text-sm divide-y divide-[var(--borde)]"
+              :style="{
+                background: 'var(--superficie)',
+                borderColor: 'var(--borde)',
+              }"
+            >
+              <div class="fi-dato">
+                <dt>{{ $t("ficha.saldo") }}</dt>
+                <dd>
+                  {{ $t("ficha.creditos", { n: resumen.saldo_creditos }) }}
+                </dd>
+              </div>
+              <div class="fi-dato">
+                <dt>{{ $t("ficha.proxima") }}</dt>
+                <dd v-if="resumen.proxima_reserva">
+                  {{ resumen.proxima_reserva.clase ?? "—" }}
+                  <span
+                    class="block text-xs font-normal"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{
+                      fechaHora(
+                        resumen.proxima_reserva.inicia_en,
+                        resumen.proxima_reserva.zona_horaria,
+                      )
+                    }}</span
+                  >
+                </dd>
+                <dd
+                  v-else
+                  class="font-normal"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ $t("ficha.sinProxima") }}
+                </dd>
+              </div>
+              <div class="fi-dato">
+                <dt>{{ $t("ficha.alta") }}</dt>
+                <dd>{{ fecha(ficha.persona.alta) }}</dd>
+              </div>
+              <div v-if="ficha.persona.sucursal" class="fi-dato">
+                <dt>{{ $t("ficha.sucursal") }}</dt>
+                <dd>{{ ficha.persona.sucursal }}</dd>
+              </div>
+              <div class="fi-dato">
+                <dt>{{ $t("ficha.asistencias") }}</dt>
+                <dd>
+                  {{ resumen.asistencias }}
+                  <span
+                    v-if="resumen.primera_vez"
+                    class="ml-1 text-xs"
+                    :style="{ color: 'var(--aviso)' }"
+                    >{{ $t("miembros.nuevo") }}</span
+                  >
+                </dd>
+              </div>
+              <div v-if="resumen.documentos_pendientes > 0" class="fi-dato">
+                <dt>{{ $t("ficha.documentos") }}</dt>
+                <dd :style="{ color: 'var(--aviso)' }">
+                  {{ resumen.documentos_pendientes }}
+                </dd>
+              </div>
+            </dl>
+          </aside>
+        </div>
       </div>
     </template>
 
@@ -520,3 +538,40 @@ watch(personaId, cargar, { immediate: true });
     />
   </section>
 </template>
+
+<style scoped>
+/* Etiqueta pequeña del resumen, como en la columna de detalle de la demo. */
+.fi-etiqueta {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+.fi-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid;
+}
+.fi-fila:first-child {
+  border-top: 0;
+}
+.fi-dato {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+}
+.fi-dato dt {
+  color: var(--texto-suave);
+}
+.fi-dato dd {
+  text-align: right;
+  font-weight: 500;
+}
+</style>

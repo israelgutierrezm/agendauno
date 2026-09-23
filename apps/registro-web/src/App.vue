@@ -352,9 +352,15 @@ const puedeConfigurar = computed(() => sesion.puede("estudio.gestionar"));
 function hojas(items: MenuItem[]): MenuItem[] {
   return items.flatMap((i) => (i.hijos !== undefined ? hojas(i.hijos) : [i]));
 }
-const enlaceActivo = computed(
-  () => hojas(MENU).find((e) => e.ruta === route.name) ?? null,
-);
+const enlaceActivo = computed(() => {
+  const exacta = hojas(MENU).find((e) => e.ruta === route.name);
+  if (exacta !== undefined) {
+    return exacta;
+  }
+  // Subpáginas (p. ej. la ficha /miembros/:id): su sección es la del primer tramo.
+  const seccion = router.resolve(`/${route.path.split("/")[1] ?? ""}`).name;
+  return hojas(MENU).find((e) => e.ruta === seccion) ?? null;
+});
 const tituloSeccion = computed(() =>
   enlaceActivo.value !== null
     ? t(enlaceActivo.value.etiqueta)

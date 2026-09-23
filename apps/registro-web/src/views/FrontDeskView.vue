@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import PanelClase from "@/components/PanelClase.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { useAnchoMinimo } from "@/lib/pantalla";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Sucursal {
@@ -36,13 +39,18 @@ interface SesionDia {
   ausentes: number;
 }
 
+const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
+// En escritorio el detalle de la clase va junto a la lista; en móvil, como panel.
+const esEscritorio = useAnchoMinimo(1024);
 
-function isoHoy(): string {
-  const d = new Date();
+function iso(d: Date): string {
   const p = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function isoHoy(): string {
+  return iso(new Date());
 }
 
 const fecha = ref(isoHoy());
@@ -56,6 +64,34 @@ const sesionActiva = ref<SesionDia | null>(null);
 
 function abrir(s: SesionDia): void {
   sesionActiva.value = s;
+}
+
+/** "Jueves, 24 de septiembre" */
+const diaTexto = computed(() => {
+  const texto = new Intl.DateTimeFormat("es-MX", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date(`${fecha.value}T12:00:00`));
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+});
+function moverDia(dias: number): void {
+  const d = new Date(`${fecha.value}T12:00:00`);
+  d.setDate(d.getDate() + dias);
+  fecha.value = iso(d);
+}
+// El día en texto abre el calendario nativo (el <input type="date"> va oculto).
+const selectorFecha = ref<HTMLInputElement | null>(null);
+function elegirFecha(): void {
+  const campo = selectorFecha.value;
+  if (campo === null) {
+    return;
+  }
+  if (typeof campo.showPicker === "function") {
+    campo.showPicker();
+  } else {
+    campo.focus();
+  }
 }
 
 // Buscador global de alumno (server-side): encuentra a cualquiera, no solo a los
@@ -109,6 +145,28 @@ function horaCorta(iso: string, zona: string): string {
   }).format(new Date(iso));
 }
 
+function lugares(s: SesionDia): string {
+  return s.capacidad !== null
+    ? t("recepcionVisual.lugares", {
+        ocupados: s.confirmadas,
+        capacidad: s.capacidad,
+      })
+    : t("recepcionVisual.reservados", { n: s.confirmadas });
+}
+
+/** La clase en curso o la siguiente; si ya pasaron todas, la primera del día. */
+function claseInicial(): SesionDia | null {
+  const hace1h = Date.now() - 60 * 60 * 1000;
+  return (
+    sesiones.value.find(
+      (s) =>
+        s.estado === "programada" && new Date(s.inicia_en).getTime() >= hace1h,
+    ) ??
+    sesiones.value[0] ??
+    null
+  );
+}
+
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
@@ -123,6 +181,11 @@ async function cargar(): Promise<void> {
     }>(`${base.value}/front-desk`, { params });
     metricas.value = data.metricas;
     sesiones.value = data.sesiones;
+    // En escritorio siempre hay una clase a la vista (la que sigue).
+    if (esEscritorio.value) {
+      const misma = sesiones.value.find((s) => s.id === sesionActiva.value?.id);
+      sesionActiva.value = misma ?? claseInicial();
+    }
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -165,14 +228,25 @@ onMounted(async () => {
 
 <template>
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion :titulo="$t('recepcion.titulo')" />
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+      <EncabezadoSeccion :titulo="$t('recepcion.titulo')" />
+      <RouterLink class="tu-btn tu-btn-fantasma" :to="{ name: 'agenda' }">{{
+        $t("recepcion.abrirAgenda")
+      }}</RouterLink>
+    </div>
 
     <!-- Buscador global de alumno -->
-    <div class="relative mt-6">
+    <div class="relative mt-5">
+      <IconoNav
+        nombre="buscar"
+        :tam="18"
+        class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2"
+        :style="{ color: 'var(--texto-suave)' }"
+      />
       <input
         v-model="busqueda"
         type="search"
-        class="tu-input"
+        class="tu-input pl-10"
         :placeholder="$t('recepcion.buscarMiembro')"
       />
       <div
@@ -214,156 +288,189 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Controles -->
-    <div class="mt-6 flex flex-wrap items-center gap-3">
-      <input
-        v-model="fecha"
-        type="date"
-        class="tu-input w-auto"
-        :aria-label="$t('recepcion.fecha')"
-      />
-      <button
-        class="tu-btn tu-btn-fantasma"
-        type="button"
-        @click="fecha = isoHoy()"
-      >
-        {{ $t("recepcion.hoy") }}
-      </button>
-      <select
-        v-model="sucursalFiltro"
-        class="tu-input w-auto"
-        :aria-label="$t('recepcion.todasSucursales')"
-      >
-        <option value="">{{ $t("recepcion.todasSucursales") }}</option>
-        <option v-for="s in sucursales" :key="s.id" :value="s.id">
-          {{ s.nombre }}
-        </option>
-      </select>
-      <RouterLink
-        class="tu-btn tu-btn-fantasma ml-auto"
-        :to="{ name: 'agenda' }"
-        >{{ $t("recepcion.abrirAgenda") }}</RouterLink
-      >
-    </div>
-
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
     </p>
 
-    <!-- Métricas del día: una sola franja, no una tarjeta por número -->
-    <dl
-      v-if="tarjetas.length > 0"
-      class="mt-6 tu-card px-5 py-4 grid grid-cols-3 lg:grid-cols-6 gap-4"
-    >
-      <div v-for="t in tarjetas" :key="t.clave">
-        <dt class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t(`recepcion.metricas.${t.clave}`) }}
-        </dt>
-        <dd class="mt-0.5 text-xl font-semibold tabular-nums">
-          {{ t.valor }}
-        </dd>
+    <!-- El día: navegación, indicadores y clases con su detalle a un lado -->
+    <div class="mt-5 tu-card overflow-hidden">
+      <div
+        class="flex flex-wrap items-center gap-1.5 px-4 py-3 border-b"
+        :style="{ borderColor: 'var(--borde)' }"
+      >
+        <button
+          type="button"
+          class="tu-icono-btn"
+          :aria-label="$t('recepcionVisual.diaAnterior')"
+          @click="moverDia(-1)"
+        >
+          <IconoNav nombre="chevron" :tam="18" class="rotate-180" />
+        </button>
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma px-3 py-1.5 text-sm"
+          @click="fecha = isoHoy()"
+        >
+          {{ $t("recepcion.hoy") }}
+        </button>
+        <button
+          type="button"
+          class="tu-icono-btn"
+          :aria-label="$t('recepcionVisual.diaSiguiente')"
+          @click="moverDia(1)"
+        >
+          <IconoNav nombre="chevron" :tam="18" />
+        </button>
+        <button
+          type="button"
+          class="fd-dia"
+          :title="$t('recepcionVisual.elegirFecha')"
+          @click="elegirFecha"
+        >
+          {{ diaTexto }}
+        </button>
+        <input
+          ref="selectorFecha"
+          v-model="fecha"
+          type="date"
+          class="sr-only"
+          tabindex="-1"
+          :aria-label="$t('recepcion.fecha')"
+        />
+        <select
+          v-if="sucursales.length > 1"
+          v-model="sucursalFiltro"
+          class="tu-input w-auto ml-auto py-1.5 text-sm"
+          :aria-label="$t('recepcion.todasSucursales')"
+        >
+          <option value="">{{ $t("recepcion.todasSucursales") }}</option>
+          <option v-for="s in sucursales" :key="s.id" :value="s.id">
+            {{ s.nombre }}
+          </option>
+        </select>
       </div>
-    </dl>
 
-    <!-- Clases del día -->
-    <p
-      v-if="!cargando && sesiones.length > 0"
-      class="mt-5 text-xs"
-      :style="{ color: 'var(--texto-suave)' }"
-    >
-      {{ $t("recepcion.tocaClase") }}
-    </p>
-    <p
-      v-if="cargando"
-      class="mt-6 text-sm"
-      :style="{ color: 'var(--texto-suave)' }"
-    >
-      {{ $t("comun.cargando") }}
-    </p>
-    <p
-      v-else-if="sesiones.length === 0"
-      class="mt-8 text-center text-sm"
-      :style="{ color: 'var(--texto-suave)' }"
-    >
-      {{ $t("recepcion.vacio") }}
-    </p>
-    <div v-else class="mt-6 tu-card overflow-hidden">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-            <th class="px-4 py-2 font-medium">{{ $t("recepcion.colHora") }}</th>
-            <th class="px-4 py-2 font-medium">
-              {{ $t("recepcion.colClase") }}
-            </th>
-            <th class="px-4 py-2 font-medium hidden sm:table-cell">
-              {{ $t("recepcion.colInstructor") }}
-            </th>
-            <th class="px-4 py-2 font-medium text-right">
-              {{ $t("recepcion.colOcupacion") }}
-            </th>
-            <th class="px-4 py-2 font-medium text-right">
-              {{ $t("recepcion.colEspera") }}
-            </th>
-            <th class="px-4 py-2 font-medium text-right">
-              {{ $t("recepcion.colAsistencia") }}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="s in sesiones"
-            :key="s.id"
-            class="border-t cursor-pointer transition-colors hover:brightness-95"
-            :style="{
-              borderColor: 'var(--borde)',
-              opacity: s.estado !== 'programada' ? 0.55 : 1,
-            }"
-            @click="abrir(s)"
+      <!-- Métricas del día en una franja -->
+      <dl
+        v-if="tarjetas.length > 0"
+        class="grid grid-cols-3 lg:grid-cols-6 gap-4 px-5 py-4 border-b"
+        :style="{ borderColor: 'var(--borde)' }"
+      >
+        <div v-for="k in tarjetas" :key="k.clave">
+          <dt class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t(`recepcion.metricas.${k.clave}`) }}
+          </dt>
+          <dd class="mt-0.5 text-xl font-semibold tabular-nums">
+            {{ k.valor }}
+          </dd>
+        </div>
+      </dl>
+
+      <div
+        class="lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_24rem]"
+      >
+        <!-- Clases del día -->
+        <div class="min-w-0">
+          <p
+            v-if="cargando"
+            class="px-5 py-6 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
           >
-            <td class="px-4 py-2 font-semibold">
-              {{ horaCorta(s.inicia_en, s.zona_horaria) }}
-            </td>
-            <td class="px-4 py-2">
-              {{ s.oferta ?? "—" }}
-              <span v-if="s.estado !== 'programada'" class="tu-badge ml-1">{{
-                $t("recepcion.cancelada")
-              }}</span>
-            </td>
-            <td
-              class="px-4 py-2 hidden sm:table-cell"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{ s.instructor ?? "—" }}
-            </td>
-            <td class="px-4 py-2 text-right">
-              <span
-                class="tu-badge"
-                :class="
-                  s.capacidad !== null && s.confirmadas >= s.capacidad
-                    ? 'tu-badge-aviso'
-                    : 'tu-badge-exito'
-                "
+            {{ $t("comun.cargando") }}
+          </p>
+          <p
+            v-else-if="sesiones.length === 0"
+            class="px-5 py-12 text-center text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("recepcion.vacio") }}
+          </p>
+          <ul v-else>
+            <li v-for="s in sesiones" :key="s.id">
+              <button
+                type="button"
+                class="fd-clase"
+                :class="{
+                  'fd-activa': sesionActiva?.id === s.id,
+                  'fd-cancelada': s.estado !== 'programada',
+                }"
+                :aria-pressed="sesionActiva?.id === s.id"
+                @click="abrir(s)"
               >
-                {{
-                  s.capacidad !== null
-                    ? `${s.confirmadas}/${s.capacidad}`
-                    : s.confirmadas
-                }}
-              </span>
-            </td>
-            <td class="px-4 py-2 text-right">{{ s.en_espera }}</td>
-            <td class="px-4 py-2 text-right">
-              <span :style="{ color: 'var(--exito)' }">{{ s.presentes }}</span>
-              /
-              <span style="color: var(--error)">{{ s.ausentes }}</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                <span class="fd-hora">{{
+                  horaCorta(s.inicia_en, s.zona_horaria)
+                }}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="block font-semibold truncate"
+                    >{{ s.oferta ?? "—"
+                    }}<span
+                      v-if="s.estado !== 'programada'"
+                      class="ml-1.5 text-xs font-normal"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >· {{ $t("recepcion.cancelada") }}</span
+                    ></span
+                  >
+                  <span
+                    class="block text-xs truncate"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{
+                      [s.instructor, lugares(s)].filter(Boolean).join(" · ")
+                    }}</span
+                  >
+                </span>
+                <span class="shrink-0 text-right text-xs">
+                  <span
+                    v-if="s.en_espera > 0"
+                    class="block font-medium"
+                    :style="{ color: 'var(--aviso)' }"
+                    >{{
+                      $t("recepcionVisual.enEspera", { n: s.en_espera })
+                    }}</span
+                  >
+                  <span
+                    v-if="s.confirmadas > 0"
+                    class="block"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{
+                      $t("recepcionVisual.llegaron", {
+                        n: s.presentes,
+                        total: s.confirmadas,
+                      })
+                    }}</span
+                  >
+                </span>
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Detalle de la clase (escritorio): al lado, sobre fondo gris -->
+        <div
+          v-if="esEscritorio"
+          class="border-l"
+          :style="{ borderColor: 'var(--borde)', background: 'var(--fondo)' }"
+        >
+          <PanelClase
+            v-if="sesionActiva"
+            :sesion="sesionActiva"
+            incrustado
+            @cerrar="sesionActiva = null"
+            @cambio="cargar"
+          />
+          <p
+            v-else
+            class="px-6 py-10 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("recepcionVisual.seleccionaClase") }}
+          </p>
+        </div>
+      </div>
     </div>
 
+    <!-- Móvil: el detalle como panel -->
     <PanelClase
-      v-if="sesionActiva"
+      v-if="sesionActiva && !esEscritorio"
       :sesion="sesionActiva"
       @cerrar="sesionActiva = null"
       @cambio="cargar"
@@ -376,3 +483,49 @@ onMounted(async () => {
     />
   </section>
 </template>
+
+<style scoped>
+.fd-dia {
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.fd-dia:hover {
+  background: var(--superficie-2);
+}
+.fd-clase {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--borde);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+li:first-child > .fd-clase {
+  border-top: 0;
+}
+.fd-clase:hover {
+  background: color-mix(in srgb, var(--primario) 4%, var(--superficie));
+}
+.fd-activa,
+.fd-activa:hover {
+  background: color-mix(in srgb, var(--primario) 7%, var(--superficie));
+  box-shadow: inset 3px 0 0 var(--primario);
+}
+.fd-cancelada {
+  opacity: 0.55;
+}
+.fd-hora {
+  width: 3rem;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+</style>

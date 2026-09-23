@@ -13,7 +13,9 @@ import PanelEditarMiembro, {
   type MiembroEditable,
 } from "@/components/PanelEditarMiembro.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import PanelMiembro from "@/components/PanelMiembro.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { useAnchoMinimo } from "@/lib/pantalla";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -128,6 +130,21 @@ function limpiarFiltros(): void {
 }
 
 const miembros = ref<Miembro[]>([]);
+// Resumen de la persona elegida: a un lado de la tabla en pantallas anchas (como la
+// demo de la landing) y como panel en las angostas.
+const conDetalle = useAnchoMinimo(1280);
+const seleccionado = ref<Miembro | null>(null);
+// Con el resumen a un lado el correo ya se ve ahí: la tabla deja esa columna.
+const resumenAlLado = computed(
+  () => conDetalle.value && tipo.value === "miembro",
+);
+function elegir(m: Miembro, e: MouseEvent): void {
+  // El nombre (ficha) y las acciones de la fila conservan su propio clic.
+  if ((e.target as HTMLElement).closest("a, button")) {
+    return;
+  }
+  seleccionado.value = m;
+}
 const meta = ref<Meta | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
@@ -157,6 +174,10 @@ async function cargar(): Promise<void> {
       },
     );
     miembros.value = data.data;
+    if (conDetalle.value && tipo.value === "miembro") {
+      const mismo = miembros.value.find((m) => m.id === seleccionado.value?.id);
+      seleccionado.value = mismo ?? miembros.value[0] ?? null;
+    }
     meta.value = data.meta;
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -368,135 +389,184 @@ onMounted(() => {
           >
             {{ $t("miembros.vacio") }}
           </p>
-          <div v-else class="mt-4 tu-card overflow-hidden">
-            <table class="w-full text-sm">
-              <thead>
-                <tr
-                  class="text-left text-xs font-semibold uppercase tracking-wider"
-                  :style="{
-                    color: 'var(--texto-suave)',
-                    background:
-                      'color-mix(in srgb, var(--texto-suave) 6%, var(--superficie))',
-                  }"
-                >
-                  <th class="px-4 py-3 whitespace-nowrap">
-                    {{ $t("miembros.colNombre") }}
-                  </th>
-                  <th class="px-4 py-3 whitespace-nowrap hidden sm:table-cell">
-                    {{ $t("miembros.colCorreo") }}
-                  </th>
-                  <th class="px-4 py-3 whitespace-nowrap">
-                    {{ $t("miembros.colEstado") }}
-                  </th>
-                  <th class="px-4 py-3 text-right"></th>
-                </tr>
-              </thead>
-              <tbody class="tu-tabla-cuerpo">
-                <tr
-                  v-for="m in miembros"
-                  :key="m.id"
-                  class="border-t"
-                  :style="{ borderColor: 'var(--borde)' }"
-                >
-                  <td class="px-4 py-2">
-                    <div class="flex items-center gap-3">
-                      <AvatarIniciales :nombre="m.nombre" tam="md" />
-                      <RouterLink
-                        v-if="tipo === 'miembro'"
-                        :to="{ name: 'ficha-miembro', params: { id: m.id } }"
-                        class="font-medium hover:underline"
-                        >{{ nombreCompleto(m) }}</RouterLink
-                      >
-                      <span v-else class="font-medium">{{
-                        nombreCompleto(m)
-                      }}</span>
-                      <span
-                        v-if="tipo === 'miembro' && m.primera_vez"
-                        class="text-xs font-medium"
-                        :style="{ color: 'var(--aviso)' }"
-                        :title="$t('miembros.nuevoAyuda')"
-                        >{{ $t("miembros.nuevo") }}</span
-                      >
-                    </div>
-                  </td>
-                  <td
-                    class="px-4 py-2 hidden sm:table-cell"
-                    :style="{ color: 'var(--texto-suave)' }"
+          <div
+            v-else
+            class="mt-4 tu-card overflow-hidden"
+            :class="{
+              'xl:grid xl:grid-cols-[minmax(0,1fr)_22rem]': resumenAlLado,
+            }"
+          >
+            <div class="min-w-0">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr
+                    class="text-left text-xs font-semibold uppercase tracking-wider"
+                    :style="{
+                      color: 'var(--texto-suave)',
+                      background:
+                        'color-mix(in srgb, var(--texto-suave) 6%, var(--superficie))',
+                    }"
                   >
-                    {{ m.email ?? "—" }}
-                  </td>
-                  <!-- Estado en texto: lo normal (activo) en gris; lo que requiere atención, en color. -->
-                  <td class="px-4 py-2">
-                    <span
-                      :style="{
-                        color: m.activo ? 'var(--texto-suave)' : 'var(--aviso)',
-                      }"
-                      >{{
-                        m.activo
-                          ? $t("miembros.activo")
-                          : $t("miembros.suspendido")
-                      }}</span
+                    <th class="px-4 py-3 whitespace-nowrap">
+                      {{ $t("miembros.colNombre") }}
+                    </th>
+                    <th
+                      class="px-4 py-3 whitespace-nowrap hidden"
+                      :class="{ 'sm:table-cell': !resumenAlLado }"
                     >
-                    <span
-                      v-if="tipo === 'miembro' && !m.es_facturable"
+                      {{ $t("miembros.colCorreo") }}
+                    </th>
+                    <th class="px-4 py-3 whitespace-nowrap">
+                      {{ $t("miembros.colEstado") }}
+                    </th>
+                    <th class="px-4 py-3 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody class="tu-tabla-cuerpo">
+                  <tr
+                    v-for="m in miembros"
+                    :key="m.id"
+                    class="border-t cursor-pointer"
+                    :class="{ 'mb-activa': seleccionado?.id === m.id }"
+                    :style="{ borderColor: 'var(--borde)' }"
+                    @click="elegir(m, $event)"
+                  >
+                    <td class="px-4 py-2">
+                      <div class="flex items-center gap-3 whitespace-nowrap">
+                        <AvatarIniciales :nombre="m.nombre" tam="md" />
+                        <RouterLink
+                          v-if="tipo === 'miembro'"
+                          :to="{ name: 'ficha-miembro', params: { id: m.id } }"
+                          class="font-medium hover:underline"
+                          >{{ nombreCompleto(m) }}</RouterLink
+                        >
+                        <span v-else class="font-medium">{{
+                          nombreCompleto(m)
+                        }}</span>
+                        <span
+                          v-if="tipo === 'miembro' && m.primera_vez"
+                          class="text-xs font-medium"
+                          :style="{ color: 'var(--aviso)' }"
+                          :title="$t('miembros.nuevoAyuda')"
+                          >{{ $t("miembros.nuevo") }}</span
+                        >
+                      </div>
+                    </td>
+                    <td
+                      class="px-4 py-2 hidden"
+                      :class="{ 'sm:table-cell': !resumenAlLado }"
                       :style="{ color: 'var(--texto-suave)' }"
                     >
-                      · {{ $t("miembros.noFacturable") }}</span
-                    >
-                    <span
-                      v-if="m.archivado"
-                      :style="{ color: 'var(--texto-suave)' }"
-                    >
-                      · {{ $t("miembros.archivado") }}</span
-                    >
-                  </td>
-                  <td class="px-4 py-2 text-right whitespace-nowrap">
-                    <button
-                      v-if="
-                        puedeInvitar &&
-                        tipo === 'miembro' &&
-                        m.email &&
-                        !invitados.has(m.id)
-                      "
-                      class="tu-enlace text-sm mr-3"
-                      type="button"
-                      :disabled="invitandoId === m.id"
-                      @click="invitar(m)"
-                    >
-                      {{
-                        invitandoId === m.id
-                          ? $t("miembros.invitando")
-                          : $t("miembros.invitar")
-                      }}
-                    </button>
-                    <span
-                      v-else-if="invitados.has(m.id)"
-                      class="text-sm mr-3"
-                      :style="{ color: 'var(--texto-suave)' }"
-                      >{{ $t("miembros.invitado") }}</span
-                    >
-                    <button
-                      v-if="puedeGestionar"
-                      class="tu-enlace text-sm"
-                      type="button"
-                      @click="abrirEditar(m)"
-                    >
-                      {{ $t("miembros.editar.abrir") }}
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <PaginacionListado
-              v-if="meta"
-              :page="meta.page"
-              :ultima-pagina="meta.ultima_pagina"
-              :total="meta.total"
-              :per-page="meta.per_page"
-              @ir="irPagina"
-            />
+                      {{ m.email ?? "—" }}
+                    </td>
+                    <!-- Estado en texto: lo normal (activo) en gris; lo que requiere atención, en color. -->
+                    <td class="px-4 py-2">
+                      <span
+                        :style="{
+                          color: m.activo
+                            ? 'var(--texto-suave)'
+                            : 'var(--aviso)',
+                        }"
+                        >{{
+                          m.activo
+                            ? $t("miembros.activo")
+                            : $t("miembros.suspendido")
+                        }}</span
+                      >
+                      <span
+                        v-if="tipo === 'miembro' && !m.es_facturable"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        · {{ $t("miembros.noFacturable") }}</span
+                      >
+                      <span
+                        v-if="m.archivado"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        · {{ $t("miembros.archivado") }}</span
+                      >
+                    </td>
+                    <td class="px-4 py-2 text-right whitespace-nowrap">
+                      <button
+                        v-if="
+                          puedeInvitar &&
+                          tipo === 'miembro' &&
+                          m.email &&
+                          !invitados.has(m.id)
+                        "
+                        class="tu-enlace text-sm mr-3"
+                        type="button"
+                        :disabled="invitandoId === m.id"
+                        @click="invitar(m)"
+                      >
+                        {{
+                          invitandoId === m.id
+                            ? $t("miembros.invitando")
+                            : $t("miembros.invitar")
+                        }}
+                      </button>
+                      <span
+                        v-else-if="invitados.has(m.id)"
+                        class="text-sm mr-3"
+                        :style="{ color: 'var(--texto-suave)' }"
+                        >{{ $t("miembros.invitado") }}</span
+                      >
+                      <button
+                        v-if="puedeGestionar"
+                        class="tu-enlace text-sm"
+                        type="button"
+                        @click="abrirEditar(m)"
+                      >
+                        {{ $t("miembros.editar.abrir") }}
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <PaginacionListado
+                v-if="meta"
+                :page="meta.page"
+                :ultima-pagina="meta.ultima_pagina"
+                :total="meta.total"
+                :per-page="meta.per_page"
+                @ir="irPagina"
+              />
+            </div>
+
+            <!-- Resumen de la persona elegida, sobre fondo gris -->
+            <div
+              v-if="resumenAlLado"
+              class="border-l"
+              :style="{
+                borderColor: 'var(--borde)',
+                background: 'var(--fondo)',
+              }"
+            >
+              <PanelMiembro
+                v-if="seleccionado"
+                :persona-id="seleccionado.id"
+                :nombre="nombreCompleto(seleccionado)"
+                incrustado
+                @cerrar="seleccionado = null"
+              />
+              <p
+                v-else
+                class="px-6 py-10 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("recepcionVisual.seleccionaPersona") }}
+              </p>
+            </div>
           </div>
         </template>
+
+        <!-- Pantallas angostas: el resumen como panel -->
+        <PanelMiembro
+          v-if="seleccionado && !conDetalle"
+          :persona-id="seleccionado.id"
+          :nombre="nombreCompleto(seleccionado)"
+          @cerrar="seleccionado = null"
+        />
       </div>
     </div>
 
@@ -566,5 +636,10 @@ onMounted(() => {
 }
 .tu-tabla-cuerpo tr:hover {
   background: color-mix(in srgb, var(--primario) 5%, transparent);
+}
+/* Fila elegida (su resumen está a un lado), como la clase activa en Recepción. */
+.tu-tabla-cuerpo tr.mb-activa {
+  background: color-mix(in srgb, var(--primario) 7%, var(--superficie));
+  box-shadow: inset 3px 0 0 var(--primario);
 }
 </style>

@@ -4,12 +4,13 @@ import agendaVisual from "./locales/agendaVisual.es-MX";
 import apariencia from "./locales/apariencia.es-MX";
 import cobro from "./locales/cobro.es-MX";
 import esMX from "./locales/es-MX";
+import recepcionVisual from "./locales/recepcionVisual.es-MX";
 
 export const i18n = createI18n({
   legacy: false,
   locale: "es-MX",
   fallbackLocale: "es-MX",
   messages: {
-    "es-MX": { ...esMX, agendaVisual, apariencia, cobro },
+    "es-MX": { ...esMX, agendaVisual, apariencia, cobro, recepcionVisual },
   },
 });

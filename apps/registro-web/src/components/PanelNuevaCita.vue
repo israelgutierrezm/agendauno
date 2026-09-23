@@ -216,7 +216,10 @@ async function agendar(): Promise<void> {
             :placeholder="$t('agendaVisual.nuevaCita.buscarCliente')"
             :aria-label="$t('agendaVisual.nuevaCita.buscarCliente')"
           />
-          <ul v-if="coincidencias.length > 0" class="mt-1 tu-card divide-y">
+          <ul
+            v-if="coincidencias.length > 0"
+            class="mt-1 tu-card divide-y divide-[var(--borde)]"
+          >
             <li v-for="c in coincidencias" :key="c.id">
               <button
                 type="button"
