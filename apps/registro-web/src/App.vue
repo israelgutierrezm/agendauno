@@ -9,6 +9,7 @@ import NavArbol from "@/components/NavArbol.vue";
 import AppToaster from "@/components/AppToaster.vue";
 import type { MenuItem, NavEstado } from "@/components/nav";
 import { trackEvent } from "@/lib/analytics";
+import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { ACENTOS, useTemaStore } from "@/stores/tema";
 
@@ -47,6 +48,7 @@ const MENU: MenuItem[] = [
         icono: "miembros",
         ruta: "miembros",
         permiso: "miembros.ver",
+        termino: "miembro",
       },
       {
         clave: "retencion",
@@ -61,6 +63,7 @@ const MENU: MenuItem[] = [
         icono: "instructores",
         ruta: "instructores",
         permiso: "agenda.gestionar",
+        termino: "instructor",
       },
       {
         clave: "usuarios",
@@ -96,6 +99,8 @@ const MENU: MenuItem[] = [
         icono: "oportunidades",
         ruta: "oportunidades",
         permiso: "reservas.gestionar",
+        // Llenar lugares libres de una clase: no aplica a citas 1 a 1.
+        modalidad: "clases",
       },
       {
         clave: "tareas",
@@ -117,6 +122,7 @@ const MENU: MenuItem[] = [
         icono: "grupos",
         ruta: "grupos",
         permiso: "agenda.ver",
+        flag: "grupos",
       },
       {
         clave: "recursos",
@@ -295,6 +301,16 @@ function visible(item: MenuItem): boolean {
   if (item.soloMiembro === true) {
     return sesion.usuario?.rol === "miembro";
   }
+  // Congruencia por modalidad y perfil: solo lo que le sirve a este negocio.
+  if (item.modalidad !== undefined && item.modalidad !== sesion.modalidad) {
+    return false;
+  }
+  if (
+    item.flag !== undefined &&
+    sesion.estudio?.perfil_config?.flags[item.flag] !== true
+  ) {
+    return false;
+  }
   return item.permiso === undefined || sesion.puede(item.permiso);
 }
 
@@ -307,7 +323,13 @@ function filtrar(items: MenuItem[]): MenuItem[] {
         const hijos = filtrar(item.hijos);
         return hijos.length > 0 ? { ...item, hijos } : null;
       }
-      return visible(item) ? item : null;
+      if (!visible(item)) {
+        return null;
+      }
+      // Rótulo con la terminología del perfil (p. ej. Barberos en vez de Instructores).
+      return item.termino !== undefined
+        ? { ...item, texto: plural(sesion.terminologia[item.termino]) }
+        : item;
     })
     .filter((item): item is MenuItem => item !== null);
 }

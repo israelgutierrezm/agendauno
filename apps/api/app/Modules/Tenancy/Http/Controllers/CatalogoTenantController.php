@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\ModalidadOfertaTenant;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\ActividadTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\ProgramaTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
@@ -94,14 +96,22 @@ class CatalogoTenantController
             'duracion_minutos' => ['nullable', 'integer', 'min:5', 'max:1440'],
         ]);
 
+        // Defaults por modalidad: en un negocio de citas el servicio se agenda y se paga
+        // (pago-para-reservar, 30 min); en uno de clases se reserva con la membresía.
+        $estudio = $request->attributes->get('estudio');
+        $esCitas = $estudio instanceof Estudio && $estudio->modalidad() === ModalidadServicio::Citas;
+
         $oferta = $actividad->ofertas()->create([
             'nombre' => $validado['nombre'],
             'modalidad' => $validado['modalidad'],
             'capacidad' => $validado['capacidad'] ?? null,
             'lugares' => (int) ($validado['lugares'] ?? 0),
-            'politica_reserva' => $validado['politica_reserva'] ?? PoliticaReservaTenant::Entitlement->value,
+            'politica_reserva' => $validado['politica_reserva']
+                ?? ($esCitas ? PoliticaReservaTenant::Pago->value : PoliticaReservaTenant::Entitlement->value),
             'precio_clase_minor' => isset($validado['precio_clase_minor']) ? (int) $validado['precio_clase_minor'] : null,
-            'duracion_minutos' => isset($validado['duracion_minutos']) ? (int) $validado['duracion_minutos'] : null,
+            'duracion_minutos' => isset($validado['duracion_minutos'])
+                ? (int) $validado['duracion_minutos']
+                : ($esCitas ? 30 : null),
         ]);
 
         return response()->json(['data' => $this->presentarOferta($oferta)], 201);

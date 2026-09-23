@@ -1,5 +1,7 @@
 import type { Ref } from "vue";
 
+import type { ModalidadServicio } from "@/stores/sesionTenant";
+
 /**
  * Item del menu lateral. Un item con `hijos` es un GRUPO colapsable (nivel 1/2); un
  * item con `ruta` es una hoja navegable. La estructura es recursiva (admite 3+
@@ -12,6 +14,14 @@ export interface MenuItem {
   ruta?: string; // nombre de ruta (hoja)
   permiso?: string; // permiso requerido para verlo
   soloMiembro?: boolean;
+  // Solo se muestra en negocios de esta modalidad (clases con cupo o citas 1 a 1).
+  modalidad?: ModalidadServicio;
+  // Solo se muestra si el perfil de negocio activa este flag.
+  flag?: "grupos" | "niveles" | "acceso_abierto";
+  // La etiqueta es el plural del término del perfil (p. ej. Barberos, Clientes).
+  termino?: "miembro" | "instructor";
+  // Etiqueta ya resuelta; sustituye a la clave i18n.
+  texto?: string;
   hijos?: MenuItem[];
 }
 

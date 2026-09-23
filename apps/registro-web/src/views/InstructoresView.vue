@@ -5,6 +5,7 @@ import BotonImportar from "@/components/BotonImportar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Instructor {
@@ -98,7 +99,7 @@ onMounted(cargar);
     <div class="flex items-start justify-between gap-3 flex-wrap">
       <EncabezadoSeccion
         icono="instructores"
-        :titulo="$t('instructores.titulo')"
+        :titulo="plural(sesion.terminologia.instructor)"
         :subtitulo="$t('instructores.subtitulo')"
         :total="instructores.length"
       />

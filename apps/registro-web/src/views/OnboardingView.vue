@@ -244,8 +244,9 @@ const guardarPolitica = () =>
   });
 
 // Horarios: se crean en la Agenda; se abre la pantalla y al volver el paso continúa.
+// En citas, "horarios" es cuándo atiende cada profesional; en clases, la agenda.
 function irAgenda(): void {
-  void router.push({ name: "agenda" });
+  void router.push({ name: sesion.esCitas ? "horarios" : "agenda" });
 }
 
 const mensajeTexto = computed(() => {
@@ -658,7 +659,11 @@ onMounted(cargar);
               {{ $t("onboarding.horarios.listo") }}
             </div>
             <p v-else class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("onboarding.horarios.ayuda") }}
+              {{
+                sesion.esCitas
+                  ? $t("agendaVisual.onboarding.horariosAyuda")
+                  : $t("onboarding.horarios.ayuda")
+              }}
             </p>
             <div class="flex flex-wrap gap-2">
               <button
@@ -667,7 +672,11 @@ onMounted(cargar);
                 type="button"
                 @click="irAgenda"
               >
-                {{ $t("onboarding.horarios.abrirAgenda") }}
+                {{
+                  sesion.esCitas
+                    ? $t("agendaVisual.onboarding.abrirHorarios")
+                    : $t("onboarding.horarios.abrirAgenda")
+                }}
               </button>
               <button
                 class="tu-btn tu-btn-primario"

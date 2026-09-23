@@ -25,12 +25,12 @@ const compacto = (): boolean => estado?.compacto.value ?? false;
         type="button"
         class="tu-side-link w-full"
         :class="{ 'lg:justify-center': compacto() }"
-        :title="compacto() ? t(item.etiqueta) : undefined"
+        :title="compacto() ? (item.texto ?? t(item.etiqueta)) : undefined"
         @click="estado?.alternar(item.clave)"
       >
         <IconoNav :nombre="item.icono ?? 'punto'" :tam="20" class="shrink-0" />
         <span v-show="!compacto()" class="truncate flex-1 text-left">{{
-          t(item.etiqueta)
+          item.texto ?? t(item.etiqueta)
         }}</span>
         <IconoNav
           v-show="!compacto()"
@@ -55,7 +55,7 @@ const compacto = (): boolean => estado?.compacto.value ?? false;
       class="tu-side-link"
       :class="{ 'lg:justify-center': compacto() }"
       :to="{ name: item.ruta }"
-      :title="compacto() ? t(item.etiqueta) : undefined"
+      :title="compacto() ? (item.texto ?? t(item.etiqueta)) : undefined"
       @click="estado?.cerrarCajon()"
     >
       <IconoNav
@@ -63,7 +63,9 @@ const compacto = (): boolean => estado?.compacto.value ?? false;
         :tam="nivel > 1 ? 18 : 20"
         class="shrink-0"
       />
-      <span v-show="!compacto()" class="truncate">{{ t(item.etiqueta) }}</span>
+      <span v-show="!compacto()" class="truncate">{{
+        item.texto ?? t(item.etiqueta)
+      }}</span>
     </RouterLink>
   </template>
 </template>

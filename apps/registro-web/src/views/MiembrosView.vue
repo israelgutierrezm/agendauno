@@ -13,6 +13,7 @@ import PanelEditarMiembro, {
 } from "@/components/PanelEditarMiembro.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -323,7 +324,7 @@ onMounted(() => {
     <div class="flex items-start justify-between gap-3 flex-wrap">
       <EncabezadoSeccion
         icono="miembros"
-        :titulo="$t('miembros.titulo')"
+        :titulo="plural(sesion.terminologia.miembro)"
         :subtitulo="$t('miembros.subtitulo')"
         :total="meta?.total ?? 0"
       />

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
@@ -30,7 +32,8 @@ class OnboardingController
     /**
      * @var list<string>
      */
-    private const PASOS = ['marca', 'sucursal', 'horarios', 'actividades', 'productos', 'politicas', 'pasarela', 'personal', 'publicacion'];
+    // Primero lo que se ofrece (actividades/servicios) y luego cuándo (horarios).
+    private const PASOS = ['marca', 'sucursal', 'actividades', 'horarios', 'productos', 'politicas', 'pasarela', 'personal', 'publicacion'];
 
     public function show(Request $request): JsonResponse
     {
@@ -43,7 +46,7 @@ class OnboardingController
             // Estado REAL de la config que ciertos pasos exigen, para que el asistente
             // guíe (no deje callejones) en vez de fallar con "siguiente".
             'config' => [
-                'horarios' => PlantillaHorarioTenant::query()->exists() || SesionTenant::query()->exists(),
+                'horarios' => $this->horariosListos($estudio),
                 'politicas' => PoliticaCancelacionTenant::query()->exists(),
             ],
         ]]);
@@ -59,12 +62,15 @@ class OnboardingController
         $estudio = $this->estudio($request);
 
         // [clave, hecho, requerido, ruta] — el estado sale de datos reales del tenant.
+        // En citas, el horario es el de atención de los profesionales y los paquetes son
+        // opcionales (cada servicio ya tiene precio); en clases, la agenda y la membresía.
+        $esCitas = $estudio->modalidad() === ModalidadServicio::Citas;
         $tareas = [
             ['clave' => 'sucursal', 'hecho' => SucursalTenant::query()->exists(), 'requerido' => true, 'ruta' => 'onboarding'],
             ['clave' => 'catalogo', 'hecho' => OfertaTenant::query()->exists(), 'requerido' => true, 'ruta' => 'onboarding'],
-            ['clave' => 'horarios', 'hecho' => PlantillaHorarioTenant::query()->exists() || SesionTenant::query()->exists(), 'requerido' => true, 'ruta' => 'agenda'],
+            ['clave' => 'horarios', 'hecho' => $this->horariosListos($estudio), 'requerido' => true, 'ruta' => $esCitas ? 'horarios' : 'agenda'],
             ['clave' => 'politica', 'hecho' => PoliticaCancelacionTenant::query()->exists(), 'requerido' => true, 'ruta' => 'onboarding'],
-            ['clave' => 'productos', 'hecho' => ProductoTenant::query()->exists(), 'requerido' => true, 'ruta' => 'ventas'],
+            ['clave' => 'productos', 'hecho' => ProductoTenant::query()->exists(), 'requerido' => ! $esCitas, 'ruta' => 'ventas'],
             ['clave' => 'miembros', 'hecho' => PersonaTenant::query()->where('tipo', TipoPersonaTenant::Miembro->value)->exists(), 'requerido' => false, 'ruta' => 'miembros'],
             ['clave' => 'publicado', 'hecho' => (bool) $estudio->publicado, 'requerido' => false, 'ruta' => 'configuracion'],
         ];
@@ -90,7 +96,7 @@ class OnboardingController
 
         // No marcar como listos los pasos que requieren configuración real solo con
         // "siguiente": deben existir los datos del módulo en la BD del tenant.
-        $this->exigirConfiguracion((string) $validado['paso']);
+        $this->exigirConfiguracion((string) $validado['paso'], $estudio);
 
         $completados = $estudio->onboarding_pasos ?? [];
         $completados[(string) $validado['paso']] = $validado['datos'] ?? true;
@@ -108,13 +114,13 @@ class OnboardingController
      * Los pasos "horarios" y "politicas" no se pueden dar por terminados sin haberlos
      * configurado de verdad (no basta un "siguiente").
      */
-    private function exigirConfiguracion(string $paso): void
+    private function exigirConfiguracion(string $paso, Estudio $estudio): void
     {
-        if ($paso === 'horarios'
-            && ! PlantillaHorarioTenant::query()->exists()
-            && ! SesionTenant::query()->exists()) {
+        if ($paso === 'horarios' && ! $this->horariosListos($estudio)) {
             throw ValidationException::withMessages([
-                'paso' => ['Programa al menos un horario recurrente o una clase antes de continuar.'],
+                'paso' => [$estudio->modalidad() === ModalidadServicio::Citas
+                    ? 'Define el horario de atención de al menos un profesional antes de continuar.'
+                    : 'Programa al menos un horario recurrente o una clase antes de continuar.'],
             ]);
         }
 
@@ -164,6 +170,17 @@ class OnboardingController
             'perfil' => $estudio->perfil_negocio->value,
             'perfil_config' => $estudio->perfilConfig(),
         ]]);
+    }
+
+    /**
+     * ¿Ya hay horarios? En citas: el horario de atención de algún profesional. En
+     * clases: una plantilla recurrente o alguna clase programada.
+     */
+    private function horariosListos(Estudio $estudio): bool
+    {
+        return $estudio->modalidad() === ModalidadServicio::Citas
+            ? HorarioAtencionTenant::query()->exists()
+            : PlantillaHorarioTenant::query()->exists() || SesionTenant::query()->exists();
     }
 
     private function estudio(Request $request): Estudio
