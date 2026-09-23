@@ -18,6 +18,7 @@ import {
 } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
+import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Oferta {
@@ -1224,7 +1225,11 @@ onMounted(async () => {
       <EncabezadoSeccion
         icono="agenda"
         :titulo="$t('agenda.titulo')"
-        :subtitulo="$t('agenda.subtitulo')"
+        :subtitulo="
+          sesion.esCitas
+            ? $t('agendaVisual.subtituloCitas')
+            : $t('agenda.subtitulo')
+        "
       />
       <!-- Citas: el negocio agenda al cliente. Clases: se programa una clase. -->
       <button
@@ -1269,7 +1274,13 @@ onMounted(async () => {
           class="tu-input w-auto"
           :aria-label="$t('agenda.nueva.instructor')"
         >
-          <option value="">{{ $t("agenda.todosInstructores") }}</option>
+          <option value="">
+            {{
+              $t("agendaVisual.todosLos", {
+                grupo: plural(sesion.terminologia.instructor).toLowerCase(),
+              })
+            }}
+          </option>
           <option v-for="i in instructores" :key="i.id" :value="i.id">
             {{ i.nombre }}
           </option>
@@ -1278,7 +1289,11 @@ onMounted(async () => {
         <div class="flex items-center gap-1 ml-auto">
           <button
             class="tu-icono-btn"
-            :aria-label="$t('agenda.semanaAnterior')"
+            :aria-label="
+              vista === 'profesionales'
+                ? $t('agendaVisual.diaAnterior')
+                : $t('agenda.semanaAnterior')
+            "
             @click="irPaso(-1)"
           >
             ‹
@@ -1288,7 +1303,11 @@ onMounted(async () => {
           </button>
           <button
             class="tu-icono-btn"
-            :aria-label="$t('agenda.semanaSiguiente')"
+            :aria-label="
+              vista === 'profesionales'
+                ? $t('agendaVisual.diaSiguiente')
+                : $t('agenda.semanaSiguiente')
+            "
             @click="irPaso(1)"
           >
             ›

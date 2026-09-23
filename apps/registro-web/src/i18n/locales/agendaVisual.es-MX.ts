@@ -32,7 +32,7 @@ export default {
     sinProfesionales:
       "Aún no hay profesionales. Invita a tu equipo para ver su agenda en columnas.",
     sinAsignar: "Sin asignar",
-    citasN: "{n} citas",
+    citasN: "{n} cita | {n} citas",
     ocupadoPct: "{n}% ocupado",
     noTrabaja: "No atiende este día",
     fueraHorario: "Fuera de horario",
@@ -46,7 +46,7 @@ export default {
     tarde: "Tarde",
     rangoManana: "hasta 14 h",
     rangoTarde: "desde 14 h",
-    resumenDia: "{n} clases · {pct}% lleno",
+    resumenDia: "{n} clase · {pct}% lleno | {n} clases · {pct}% lleno",
     sinClasesDia: "Sin clases",
     llena: "Llena",
     enEspera: "{n} en espera",
@@ -111,6 +111,10 @@ export default {
       "Define qué días y a qué horas atiende cada profesional: con eso tus clientes ven los huecos libres para agendar.",
     abrirHorarios: "Definir horarios de atención",
   },
+  subtituloCitas: "Agenda a tus clientes y sigue cada cita del día.",
+  todosLos: "Todos los {grupo}",
+  diaAnterior: "Día anterior",
+  diaSiguiente: "Día siguiente",
   leyendaServicios: "Servicios",
   leyendaClases: "Clases",
 };

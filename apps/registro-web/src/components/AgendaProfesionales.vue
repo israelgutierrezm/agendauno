@@ -247,7 +247,7 @@ const columnas = computed<Columna[]>(() => {
             ? t("agendaVisual.profesionales.noTrabaja")
             : t("agendaVisual.profesionales.fueraHorario"),
       })),
-      resumen: t("agendaVisual.profesionales.citasN", { n: citas }),
+      resumen: t("agendaVisual.profesionales.citasN", { n: citas }, citas),
       ocupacion:
         minutosAtencion > 0
           ? Math.min(100, Math.round((minutosOcupados / minutosAtencion) * 100))
@@ -268,9 +268,11 @@ const columnas = computed<Columna[]>(() => {
       iniciales: "?",
       tarjetas: tarjetasDe(sinAsignar),
       fuera: [],
-      resumen: t("agendaVisual.profesionales.citasN", {
-        n: sinAsignar.length,
-      }),
+      resumen: t(
+        "agendaVisual.profesionales.citasN",
+        { n: sinAsignar.length },
+        sinAsignar.length,
+      ),
       ocupacion: null,
     });
   }

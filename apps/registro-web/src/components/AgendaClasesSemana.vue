@@ -154,10 +154,14 @@ const columnas = computed(() =>
       resumen:
         delDia.length === 0
           ? t("agendaVisual.semana.sinClasesDia")
-          : t("agendaVisual.semana.resumenDia", {
-              n: programadas.length,
-              pct: cap > 0 ? Math.round((ocup / cap) * 100) : 0,
-            }),
+          : t(
+              "agendaVisual.semana.resumenDia",
+              {
+                n: programadas.length,
+                pct: cap > 0 ? Math.round((ocup / cap) * 100) : 0,
+              },
+              programadas.length,
+            ),
       manana: delDia
         .filter((s) => minutosLocal(s.inicia_en, s.zona_horaria) < CORTE_TARDE)
         .map(tarjeta),
