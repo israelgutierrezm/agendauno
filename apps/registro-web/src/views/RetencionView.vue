@@ -112,11 +112,7 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion
-      icono="reportes"
-      :titulo="$t('retencion.titulo')"
-      :subtitulo="$t('retencion.subtitulo')"
-    />
+    <EncabezadoSeccion :titulo="$t('retencion.titulo')" />
 
     <div class="mt-6 flex flex-wrap items-center gap-3">
       <div class="tu-card px-5 py-3">

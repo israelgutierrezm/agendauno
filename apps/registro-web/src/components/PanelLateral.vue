@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, watch } from "vue";
 
+import IconoNav from "@/components/IconoNav.vue";
+
 /**
  * Panel lateral deslizante (drawer) anclado a la DERECHA, para altas/ediciones
  * sin salir de la lista. Se cierra con la tecla Escape o tocando el fondo, y
@@ -55,7 +57,7 @@ onBeforeUnmount(() => {
               :aria-label="$t('comun.cerrar')"
               @click="emit('cerrar')"
             >
-              ✕
+              <IconoNav nombre="cerrar" :tam="18" />
             </button>
           </header>
 

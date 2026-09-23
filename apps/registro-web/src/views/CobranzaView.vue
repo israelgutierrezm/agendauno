@@ -148,11 +148,7 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion
-      icono="facturas"
-      :titulo="$t('cobranza.titulo')"
-      :subtitulo="$t('cobranza.subtitulo')"
-    />
+    <EncabezadoSeccion :titulo="$t('cobranza.titulo')" />
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}

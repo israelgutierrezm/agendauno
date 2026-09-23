@@ -125,11 +125,7 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion
-      icono="reportes"
-      :titulo="$t('comunicaciones.titulo')"
-      :subtitulo="$t('comunicaciones.subtitulo')"
-    />
+    <EncabezadoSeccion :titulo="$t('comunicaciones.titulo')" />
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
@@ -162,7 +158,10 @@ onMounted(cargar);
           class="text-left rounded-2xl border p-4 transition"
           :style="
             form.segmento === s.clave
-              ? { borderColor: 'var(--primario)', background: 'var(--superficie-2)' }
+              ? {
+                  borderColor: 'var(--primario)',
+                  background: 'var(--superficie-2)',
+                }
               : { borderColor: 'var(--borde)' }
           "
           @click="form.segmento = s.clave"

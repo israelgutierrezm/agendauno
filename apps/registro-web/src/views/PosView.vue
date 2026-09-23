@@ -206,11 +206,7 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion
-      icono="pos"
-      :titulo="$t('pos.titulo')"
-      :subtitulo="$t('pos.subtitulo')"
-    />
+    <EncabezadoSeccion :titulo="$t('pos.titulo')" />
 
     <div
       class="mt-6 flex gap-1 border-b"

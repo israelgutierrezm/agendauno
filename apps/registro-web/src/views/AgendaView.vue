@@ -1222,29 +1222,21 @@ onMounted(async () => {
 <template>
   <section class="px-4 sm:px-6 py-8">
     <div class="flex items-start justify-between gap-3 flex-wrap">
-      <EncabezadoSeccion
-        icono="agenda"
-        :titulo="$t('agenda.titulo')"
-        :subtitulo="
-          sesion.esCitas
-            ? $t('agendaVisual.subtituloCitas')
-            : $t('agenda.subtitulo')
-        "
-      />
+      <EncabezadoSeccion :titulo="$t('agenda.titulo')" />
       <!-- Citas: el negocio agenda al cliente. Clases: se programa una clase. -->
       <button
         v-if="sesion.esCitas && puedeReservar"
         class="tu-btn tu-btn-primario"
         @click="abrirNuevaCita()"
       >
-        + {{ $t("agendaVisual.nuevaCita.boton") }}
+        {{ $t("agendaVisual.nuevaCita.boton") }}
       </button>
       <button
         v-else-if="!sesion.esCitas && puedeGestionar"
         class="tu-btn tu-btn-primario"
         @click="mostrarNueva = true"
       >
-        + {{ $t("agenda.nuevaClase") }}
+        {{ $t("agenda.nuevaClase") }}
       </button>
     </div>
 

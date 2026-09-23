@@ -117,11 +117,7 @@ onMounted(cargarStaff);
 
 <template>
   <section class="mx-auto max-w-5xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion
-      icono="nomina"
-      :titulo="$t('nomina.titulo')"
-      :subtitulo="$t('nomina.subtitulo')"
-    />
+    <EncabezadoSeccion :titulo="$t('nomina.titulo')" />
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}

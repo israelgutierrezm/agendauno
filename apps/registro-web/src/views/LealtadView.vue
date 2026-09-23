@@ -205,11 +205,7 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion
-      icono="lealtad"
-      :titulo="$t('lealtad.titulo')"
-      :subtitulo="$t('lealtad.subtitulo')"
-    />
+    <EncabezadoSeccion :titulo="$t('lealtad.titulo')" />
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}

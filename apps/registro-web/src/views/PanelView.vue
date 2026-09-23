@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { isAxiosError } from "axios";
-import { onMounted, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { computed, onMounted, ref } from "vue";
+import { RouterLink } from "vue-router";
 
+import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EnlaceEstudio from "@/components/EnlaceEstudio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -22,7 +23,6 @@ interface Facturacion {
   };
 }
 
-const router = useRouter();
 const sesion = useSesionTenantStore();
 
 interface Quickstart {
@@ -47,6 +47,26 @@ function dinero(minor: number, moneda: string): string {
     currency: moneda,
   }).format(minor / 100);
 }
+
+/** "2026-10-07" → "7 de octubre" (fecha de calendario, sin zona). */
+function diaMes(fecha: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "long",
+  }).format(new Date(`${fecha}T12:00:00`));
+}
+
+/** "2026-09" → "Septiembre". */
+const mesDelPeriodo = computed(() => {
+  const periodo = facturacion.value?.uso.periodo;
+  if (!periodo) {
+    return "";
+  }
+  const mes = new Intl.DateTimeFormat("es-MX", { month: "long" }).format(
+    new Date(`${periodo}-15T12:00:00`),
+  );
+  return mes.charAt(0).toUpperCase() + mes.slice(1);
+});
 
 async function cargar(): Promise<void> {
   if (sesion.slug === null) {
@@ -84,63 +104,33 @@ async function cargar(): Promise<void> {
   }
 }
 
-async function salir(): Promise<void> {
-  await sesion.cerrarSesion();
-  void router.push({ name: "inicio" });
-}
-
 onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 py-10">
-    <div class="flex items-start justify-between gap-4 flex-wrap">
-      <div>
-        <h1 class="text-3xl font-extrabold">
-          {{ $t("panel.hola", { nombre: sesion.usuario?.nombre ?? "" }) }}
-        </h1>
-        <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
-          {{
-            $t("panel.bienvenida", { estudio: sesion.estudio?.nombre ?? "" })
-          }}
-        </p>
-      </div>
-      <button class="tu-btn tu-btn-fantasma" @click="salir">
-        {{ $t("panel.salir") }}
-      </button>
-    </div>
-
-    <div class="mt-6 flex flex-wrap gap-2">
-      <span class="tu-badge"
-        >{{ $t("panel.rol") }}: {{ sesion.usuario?.rol }}</span
-      >
-      <span
-        class="tu-badge"
-        :class="{ 'tu-badge-exito': sesion.estudio?.estado === 'active' }"
-      >
-        {{ $t("panel.estado") }}: {{ sesion.estudio?.estado }}
-      </span>
-    </div>
-
-    <!-- Enlace público del estudio (agendauno.mx/mi-estudio) + QR para compartir -->
-    <EnlaceEstudio class="mt-6" />
+  <section class="mx-auto max-w-6xl px-4 py-8">
+    <EncabezadoSeccion :titulo="sesion.estudio?.nombre ?? $t('nav.panel')" />
 
     <!-- Quickstart (R36): guía de activación mientras falte configuración esencial -->
     <div v-if="quickstart && !quickstart.listo" class="mt-6 tu-card p-5">
-      <div class="flex items-center justify-between gap-3">
-        <h2 class="font-bold text-lg">{{ $t("quickstart.titulo") }}</h2>
-        <span class="tu-badge"
-          >{{ quickstart.progreso.hechas }}/{{
-            quickstart.progreso.total
-          }}</span
-        >
+      <div class="flex items-baseline justify-between gap-3">
+        <h2 class="font-semibold">
+          {{ $t("quickstart.titulo") }}
+          <span
+            class="ml-1 font-normal text-sm tabular-nums"
+            :style="{ color: 'var(--texto-suave)' }"
+            >{{ quickstart.progreso.hechas }}/{{
+              quickstart.progreso.total
+            }}</span
+          >
+        </h2>
+        <RouterLink :to="{ name: 'onboarding' }" class="tu-enlace text-sm">
+          {{ $t("quickstart.guiada") }}
+        </RouterLink>
       </div>
-      <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("quickstart.subtitulo") }}
-      </p>
       <div
-        class="mt-3 h-2 rounded-full overflow-hidden"
-        :style="{ background: 'var(--fondo-suave)' }"
+        class="mt-3 h-1.5 rounded-full overflow-hidden"
+        :style="{ background: 'var(--superficie-2)' }"
       >
         <div
           class="h-full rounded-full"
@@ -150,31 +140,39 @@ onMounted(cargar);
           }"
         />
       </div>
-      <ul class="mt-4 space-y-2">
+      <ul class="mt-4 space-y-2.5">
         <li
           v-for="t in quickstart.tareas"
           :key="t.clave"
           class="flex items-center justify-between gap-3 text-sm"
         >
-          <span class="flex items-center gap-2 min-w-0">
-            <span
-              class="h-5 w-5 rounded-full inline-flex items-center justify-center text-xs shrink-0"
-              :style="
-                t.hecho
-                  ? { background: 'var(--exito)', color: '#fff' }
-                  : {
-                      border: '1.5px solid var(--borde)',
-                      color: 'var(--texto-suave)',
-                    }
-              "
-              >{{ t.hecho ? "✓" : "" }}</span
+          <span
+            class="flex items-center gap-2.5 min-w-0"
+            :style="t.hecho ? { color: 'var(--texto-suave)' } : {}"
+          >
+            <svg
+              v-if="t.hecho"
+              class="h-4 w-4 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              :style="{ color: 'var(--exito)' }"
+              aria-hidden="true"
             >
-            <span :class="{ 'line-through opacity-60': t.hecho }">
+              <path d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+            <span
+              v-else
+              class="h-4 w-4 shrink-0 rounded-full"
+              :style="{ border: '1.5px solid var(--borde)' }"
+              aria-hidden="true"
+            />
+            <span>
               {{ $t(`quickstart.tareas.${t.clave}`) }}
-              <span
-                v-if="!t.requerido"
-                class="text-xs"
-                :style="{ color: 'var(--texto-suave)' }"
+              <span v-if="!t.requerido" :style="{ color: 'var(--texto-suave)' }"
                 >· {{ $t("quickstart.opcional") }}</span
               >
             </span>
@@ -199,64 +197,58 @@ onMounted(cargar);
       </button>
     </div>
 
-    <div v-else-if="facturacion" class="mt-6 grid gap-4 sm:grid-cols-2">
-      <div class="tu-card p-6">
-        <h2 class="font-bold text-lg">{{ $t("panel.facturacion") }}</h2>
-        <dl class="mt-3 space-y-2 text-sm">
-          <div class="flex justify-between">
-            <dt :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("panel.plan") }}
-            </dt>
-            <dd class="font-semibold">{{ facturacion.plan ?? "—" }}</dd>
-          </div>
-          <div class="flex justify-between">
-            <dt :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("panel.estado") }}
-            </dt>
-            <dd class="font-semibold">{{ facturacion.estado_facturacion }}</dd>
-          </div>
-          <div v-if="facturacion.trial_termina_en" class="flex justify-between">
-            <dt :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("panel.trial") }}
-            </dt>
-            <dd class="font-semibold">{{ facturacion.trial_termina_en }}</dd>
-          </div>
-        </dl>
+    <!-- Suscripción a AgendaUno: estado y lo que va del mes -->
+    <div v-else-if="facturacion" class="mt-6 tu-card p-5">
+      <div class="flex items-baseline justify-between gap-3">
+        <h2 class="font-semibold">{{ $t("panel.suscripcion") }}</h2>
+        <RouterLink :to="{ name: 'renta' }" class="tu-enlace text-sm">
+          {{ $t("panel.verDetalle") }}
+        </RouterLink>
       </div>
-
-      <div class="tu-card p-6">
-        <h2 class="font-bold text-lg">
-          {{ $t("panel.periodo") }} {{ facturacion.uso.periodo }}
-        </h2>
-        <div class="mt-3 flex items-end gap-2">
-          <span class="text-4xl font-extrabold">{{
-            facturacion.uso.cantidad
-          }}</span>
-          <span class="mb-1 text-sm" :style="{ color: 'var(--texto-suave)' }">{{
-            $t(`cobro.actual.${facturacion.uso.metrica}`)
-          }}</span>
+      <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+        {{ $t(`panel.estados.${facturacion.estado_facturacion}`)
+        }}<template
+          v-if="
+            facturacion.estado_facturacion === 'trial' &&
+            facturacion.trial_termina_en
+          "
+        >
+          ·
+          {{
+            $t("panel.pruebaHasta", {
+              fecha: diaMes(facturacion.trial_termina_en),
+            })
+          }}</template
+        >
+      </p>
+      <dl class="mt-4 grid grid-cols-2 gap-4 max-w-md">
+        <div>
+          <dt class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+            {{ mesDelPeriodo }}
+          </dt>
+          <dd class="mt-0.5 text-2xl font-semibold tabular-nums">
+            {{ facturacion.uso.cantidad }}
+            <span
+              class="text-sm font-normal"
+              :style="{ color: 'var(--texto-suave)' }"
+              >{{ $t(`cobro.actual.${facturacion.uso.metrica}`) }}</span
+            >
+          </dd>
         </div>
-        <p class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("panel.cargoEstimado") }}:
-          <span class="font-semibold" :style="{ color: 'var(--texto)' }">{{
-            dinero(facturacion.uso.cargo_estimado_minor, facturacion.moneda)
-          }}</span>
-        </p>
-      </div>
+        <div>
+          <dt class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("panel.cargoEstimado") }}
+          </dt>
+          <dd class="mt-0.5 text-2xl font-semibold tabular-nums">
+            {{
+              dinero(facturacion.uso.cargo_estimado_minor, facturacion.moneda)
+            }}
+          </dd>
+        </div>
+      </dl>
     </div>
 
-    <div
-      class="mt-6 tu-card p-6 flex items-center justify-between gap-4 flex-wrap"
-    >
-      <div>
-        <h2 class="font-bold text-lg">{{ $t("panel.proximos") }}</h2>
-        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("panel.proximosDesc") }}
-        </p>
-      </div>
-      <RouterLink class="tu-btn tu-btn-primario" :to="{ name: 'onboarding' }">
-        {{ $t("panel.irOnboarding") }}
-      </RouterLink>
-    </div>
+    <!-- Enlace público del estudio + QR para compartir -->
+    <EnlaceEstudio class="mt-6" />
   </section>
 </template>

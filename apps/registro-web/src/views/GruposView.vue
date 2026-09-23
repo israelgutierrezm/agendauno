@@ -155,19 +155,14 @@ onMounted(cargar);
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
     <div class="flex items-start justify-between gap-3 flex-wrap">
-      <EncabezadoSeccion
-        icono="grupos"
-        :titulo="$t('cursos.titulo')"
-        :subtitulo="$t('cursos.subtitulo')"
-        :total="grupos.length"
-      />
+      <EncabezadoSeccion :titulo="$t('cursos.titulo')" :total="grupos.length" />
       <button
         v-if="puedeGestionar && plantillas.length > 0"
         class="tu-btn tu-btn-primario"
         type="button"
         @click="abrir"
       >
-        + {{ $t("cursos.crear") }}
+        {{ $t("cursos.crear") }}
       </button>
     </div>
 

@@ -550,19 +550,18 @@ onMounted(() => {
             :aria-label="$t('nav.menu')"
             @click="menuLateral = true"
           >
-            <span aria-hidden="true">☰</span>
+            <svg
+              class="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
           </button>
-          <span
-            v-if="enlaceActivo"
-            class="hidden sm:inline-flex h-9 w-9 rounded-xl items-center justify-center shrink-0"
-            :style="{
-              background: 'var(--primario-suave)',
-              color: 'var(--primario-fuerte)',
-            }"
-            aria-hidden="true"
-          >
-            <IconoNav :nombre="enlaceActivo.icono ?? 'punto'" :tam="18" />
-          </span>
           <h1 class="text-base font-semibold truncate">{{ tituloSeccion }}</h1>
         </div>
 
@@ -593,8 +592,11 @@ onMounted(() => {
               "
             >
               <span
-                class="h-8 w-8 rounded-lg inline-flex items-center justify-center text-white text-xs font-bold shrink-0"
-                :style="{ background: 'var(--primario)' }"
+                class="h-8 w-8 rounded-full inline-flex items-center justify-center text-xs font-semibold shrink-0"
+                :style="{
+                  background: 'var(--superficie-2)',
+                  color: 'var(--texto)',
+                }"
                 aria-hidden="true"
                 >{{ inicialesUsuario }}</span
               >
@@ -606,7 +608,11 @@ onMounted(() => {
                 <span
                   class="block text-[11px] truncate"
                   :style="{ color: 'var(--texto-suave)' }"
-                  >{{ sesion.usuario?.rol }}</span
+                  >{{
+                    $te(`usuarios.rol.${sesion.usuario?.rol}`)
+                      ? $t(`usuarios.rol.${sesion.usuario?.rol}`)
+                      : sesion.usuario?.rol
+                  }}</span
                 >
               </span>
             </button>

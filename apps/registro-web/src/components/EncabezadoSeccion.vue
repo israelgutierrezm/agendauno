@@ -1,53 +1,27 @@
 <script setup lang="ts">
-import IconoNav from "@/components/IconoNav.vue";
-
+/**
+ * Encabezado de una pantalla del panel: el título (con su total, si aplica) y las
+ * acciones a la derecha. Sin ícono ni texto explicativo: la pantalla se explica
+ * sola y la barra superior ya dice dónde estás.
+ */
 defineProps<{
-  icono?: string;
   titulo: string;
-  subtitulo?: string;
   total?: number | string;
 }>();
 </script>
 
 <template>
-  <div class="flex items-start justify-between gap-4 flex-wrap">
-    <div class="flex items-center gap-3 min-w-0">
+  <div class="flex items-center justify-between gap-4 flex-wrap">
+    <h1 class="text-xl font-semibold leading-tight min-w-0">
+      {{ titulo }}
       <span
-        v-if="icono"
-        class="h-11 w-11 rounded-xl inline-flex items-center justify-center shrink-0"
-        :style="{
-          background: 'color-mix(in srgb, var(--acento) 12%, transparent)',
-          color: 'var(--acento)',
-        }"
-        aria-hidden="true"
+        v-if="total !== undefined"
+        class="ml-1 font-normal tabular-nums"
+        :style="{ color: 'var(--texto-suave)' }"
+        >{{ total }}</span
       >
-        <IconoNav :nombre="icono" :tam="22" />
-      </span>
-      <div class="min-w-0">
-        <h1
-          class="text-xl font-bold leading-tight flex items-center gap-2 flex-wrap"
-        >
-          {{ titulo }}
-          <span
-            v-if="total !== undefined"
-            class="tu-badge"
-            :style="{
-              background: 'var(--superficie-2)',
-              color: 'var(--texto-suave)',
-            }"
-            >{{ total }}</span
-          >
-        </h1>
-        <p
-          v-if="subtitulo"
-          class="mt-0.5 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ subtitulo }}
-        </p>
-      </div>
-    </div>
-    <div class="flex items-center gap-2 shrink-0">
+    </h1>
+    <div v-if="$slots.acciones" class="flex items-center gap-2 shrink-0">
       <slot name="acciones" />
     </div>
   </div>

@@ -158,11 +158,7 @@ onMounted(cargar);
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
     <div class="flex items-start justify-between gap-3">
-      <EncabezadoSeccion
-        icono="promociones"
-        :titulo="$t('promociones.titulo')"
-        :subtitulo="$t('promociones.subtitulo')"
-      />
+      <EncabezadoSeccion :titulo="$t('promociones.titulo')" />
       <button
         class="tu-btn tu-btn-primario shrink-0"
         type="button"

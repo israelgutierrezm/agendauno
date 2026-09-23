@@ -267,7 +267,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             class="tu-btn tu-btn-fantasma text-xs px-3 py-1.5"
             @click="agregando = true"
           >
-            + {{ $t("recepcion.panel.agregar") }}
+            {{ $t("recepcion.panel.agregar") }}
           </button>
           <div v-else class="relative">
             <input

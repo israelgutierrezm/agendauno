@@ -190,11 +190,7 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-6xl px-4 py-10">
-    <EncabezadoSeccion
-      icono="formularios"
-      :titulo="$t('formularios.titulo')"
-      :subtitulo="$t('formularios.subtitulo')"
-    />
+    <EncabezadoSeccion :titulo="$t('formularios.titulo')" />
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}

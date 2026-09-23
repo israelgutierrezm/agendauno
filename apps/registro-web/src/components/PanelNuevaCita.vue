@@ -232,7 +232,7 @@ async function agendar(): Promise<void> {
             class="tu-enlace text-sm mt-2"
             @click="nuevo = true"
           >
-            + {{ $t("agendaVisual.nuevaCita.nuevoCliente") }}
+            {{ $t("agendaVisual.nuevaCita.nuevoCliente") }}
           </button>
         </template>
         <div v-else class="space-y-2 tu-card p-3">

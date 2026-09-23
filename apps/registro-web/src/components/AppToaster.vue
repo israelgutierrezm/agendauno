@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconoNav from "@/components/IconoNav.vue";
 import { useToastStore, type TipoToast } from "@/stores/toast";
 
 const toast = useToastStore();
@@ -60,7 +61,7 @@ const ICONO: Record<TipoToast, string> = {
             :aria-label="$t('comun.cerrar')"
             @click="toast.quitar(t.id)"
           >
-            ✕
+            <IconoNav nombre="cerrar" :tam="18" />
           </button>
         </div>
       </TransitionGroup>

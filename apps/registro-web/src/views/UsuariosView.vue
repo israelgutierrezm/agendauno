@@ -260,9 +260,7 @@ onMounted(cargar);
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion
-      icono="usuarios"
       :titulo="$t('usuarios.titulo')"
-      :subtitulo="$t('usuarios.subtitulo')"
       :total="usuarios.length"
     />
 

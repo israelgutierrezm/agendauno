@@ -453,21 +453,19 @@ export default {
     registrar: "Crea el tuyo",
   },
   panel: {
-    hola: "Hola, {nombre}",
-    bienvenida: "Este es el panel de {estudio}.",
-    estado: "Estado",
-    facturacion: "Facturacion",
-    plan: "Plan",
-    alumnosActivos: "Alumnos activos",
-    periodo: "Periodo",
+    salir: "Cerrar sesión",
+    suscripcion: "Suscripción",
+    verDetalle: "Ver detalle",
+    estados: {
+      trial: "En prueba",
+      active: "Al corriente",
+      past_due: "Pago pendiente",
+      grace_period: "Periodo de gracia",
+      suspended: "Suspendida",
+      cancelled: "Cancelada",
+    },
+    pruebaHasta: "gratis hasta el {fecha}",
     cargoEstimado: "Cargo estimado",
-    trial: "Prueba termina",
-    salir: "Cerrar sesion",
-    rol: "Rol",
-    proximos: "Siguientes pasos",
-    proximosDesc:
-      "Completa la configuracion guiada de tu estudio: sucursal, actividades, productos y publicacion.",
-    irOnboarding: "Configurar mi estudio",
   },
   onboarding: {
     titulo: "Configura tu estudio",
@@ -585,7 +583,6 @@ export default {
   },
   miembros: {
     titulo: "Miembros",
-    subtitulo: "Los alumnos e instructores de tu estudio.",
     nuevoTitulo: "Nuevo miembro",
     nombre: "Nombre",
     segundoNombre: "Segundo nombre",
@@ -643,7 +640,6 @@ export default {
   },
   padron: {
     titulo: "Padrón facturable",
-    subtitulo: "Los alumnos por los que se calcula tu renta de AgendaUno.",
     alumnosFacturables: "Alumnos facturables",
     exportar: "Exportar CSV",
     exportando: "Exportando…",
@@ -656,7 +652,6 @@ export default {
   },
   importar: {
     titulo: "Importar miembros",
-    subtitulo: "Sube un CSV para dar de alta a tus alumnos en bloque.",
     instrucciones:
       "Sube un archivo CSV con una fila por alumno. Primero validamos todo (sin guardar) y te mostramos los errores; solo importamos si todo está correcto.",
     columnas: "Columnas",
@@ -679,7 +674,6 @@ export default {
   },
   importarInstructores: {
     titulo: "Importar instructores",
-    subtitulo: "Sube un CSV para dar de alta a tus instructores en bloque.",
     instrucciones:
       "Sube un archivo CSV con una fila por instructor (nombre y correo). Primero validamos todo; si está correcto, creamos las cuentas y les enviamos la invitación para activar su acceso.",
     importar: "Importar {n} instructores",
@@ -688,8 +682,6 @@ export default {
   },
   comunicaciones: {
     titulo: "Comunicación",
-    subtitulo:
-      "Manda un mensaje a un grupo de alumnos: elige a quién, redacta y envía.",
     segmentoLabel: "¿A quién le escribes?",
     canalLabel: "Canal",
     canalInterno: "Bandeja del alumno",
@@ -713,19 +705,14 @@ export default {
     colTotal: "Destinatarios",
   },
   enlace: {
-    titulo: "Comparte tu estudio",
-    subtitulo:
-      "Este es tu enlace público. Compártelo o imprime el QR para que te encuentren.",
-    asiTeEncuentran: "Así te encontrarán:",
+    titulo: "Enlace público",
     qrAlt: "Código QR del enlace de tu estudio",
     copiar: "Copiar enlace",
-    copiado: "¡Copiado!",
+    copiado: "Copiado",
     descargar: "Descargar QR",
   },
   retencion: {
     titulo: "Retención",
-    subtitulo:
-      "Alumnos con membresía por vencer o vencida: renuévalos antes de perderlos.",
     porVencer: "Por vencer",
     vencidas: "Vencidas",
     ventana: "Próximos {n} días",
@@ -750,7 +737,6 @@ export default {
   },
   cobranza: {
     titulo: "Cobranza",
-    subtitulo: "Alumnos en mora y reembolsos de pagos.",
     morosos: "En mora",
     sinMorosos: "Nadie en mora. Todo al corriente.",
     pagos: "Pagos",
@@ -876,7 +862,6 @@ export default {
   },
   ventas: {
     titulo: "Ventas",
-    subtitulo: "Vende paquetes y membresias a tus alumnos.",
     vender: {
       titulo: "Vender",
       miembro: "Alumno",
@@ -934,7 +919,6 @@ export default {
   },
   instructores: {
     titulo: "Instructores",
-    subtitulo: "El equipo que imparte las clases.",
     vacio: "Aún no hay instructores. Invita al primero.",
     invitar: {
       titulo: "Invitar instructor",
@@ -950,8 +934,6 @@ export default {
   },
   horarios: {
     titulo: "Horarios de atención",
-    subtitulo:
-      "Define en qué días y a qué horas atiende cada persona en cada sucursal. De aquí salen los huecos que verá tu cliente al agendar una cita.",
     sucursal: "Sucursal",
     proveedor: "¿Quién atiende?",
     elegirSucursal: "Elige una sucursal",
@@ -971,7 +953,7 @@ export default {
     },
     desde: "Desde",
     hasta: "Hasta",
-    agregarFranja: "+ Agregar franja",
+    agregarFranja: "Agregar franja",
     quitarFranja: "Quitar franja",
     copiar: "Aplicar a toda la semana",
     cerrado: "Cerrado",
@@ -994,8 +976,6 @@ export default {
   },
   catalogo: {
     titulo: "Catálogo",
-    subtitulo:
-      "Tus clases y servicios: cómo se reservan y a qué precio. Marca un servicio como «pago al agendar» para venderlo como cita con cobro en línea.",
     vacio:
       "Aún no hay servicios en el catálogo. Créalos desde el onboarding o la agenda.",
     modalidad: {
@@ -1076,8 +1056,6 @@ export default {
   },
   sedes: {
     titulo: "Sucursales",
-    subtitulo:
-      "Las sedes de tu negocio. Cada una tiene su zona horaria, moneda e impuestos, y puedes acotar al personal a una.",
     agregar: "Agregar sucursal",
     vacio: "Aún no hay sucursales.",
     editar: "Editar",
@@ -1094,8 +1072,6 @@ export default {
   },
   usuarios: {
     titulo: "Usuarios",
-    subtitulo:
-      "Todas las cuentas del estudio y sus roles. Una persona puede tener varios roles.",
     buscar: "Buscar por nombre o correo…",
     vacio: "Aún no hay usuarios.",
     colUsuario: "Usuario",
@@ -1134,7 +1110,6 @@ export default {
   },
   datosFiscales: {
     titulo: "Datos fiscales",
-    subtitulo: "Los datos del emisor para tus facturas (CFDI).",
     razonSocial: "Razón social",
     rfc: "RFC",
     regimenFiscal: "Régimen fiscal (clave SAT)",
@@ -1161,7 +1136,6 @@ export default {
   },
   facturas: {
     titulo: "Facturas",
-    subtitulo: "Emite y consulta tus CFDI.",
     buscar: "Buscar por receptor, RFC o folio…",
     vacio: "Aún no has emitido facturas.",
     colReceptor: "Receptor",
@@ -1265,8 +1239,6 @@ export default {
   },
   tareas: {
     titulo: "Tareas",
-    subtitulo:
-      "Pendientes del equipo: manuales y generadas por automatización.",
     tabPendientes: "Pendientes",
     tabReglas: "Automatización",
     nueva: "Nueva tarea",
@@ -1321,7 +1293,6 @@ export default {
   },
   promociones: {
     titulo: "Promociones",
-    subtitulo: "Cupones de descuento para aplicar al vender.",
     nueva: "Nueva promoción",
     editar: "Editar",
     eliminar: "Eliminar",
@@ -1355,7 +1326,6 @@ export default {
   },
   pos: {
     titulo: "Punto de venta",
-    subtitulo: "Vende artículos y controla el inventario por sucursal.",
     tabVender: "Vender",
     tabInventario: "Inventario",
     sucursal: "Sucursal",
@@ -1403,7 +1373,7 @@ export default {
   },
   quickstart: {
     titulo: "Pon tu estudio en marcha",
-    subtitulo: "Completa estos pasos para empezar a operar.",
+    guiada: "Configuración guiada",
     ir: "Ir",
     opcional: "opcional",
     tareas: {
@@ -1418,7 +1388,6 @@ export default {
   },
   lealtad: {
     titulo: "Lealtad",
-    subtitulo: "Puntos que tus miembros ganan y canjean por recompensas.",
     puntos: "puntos",
     guardado: "Programa actualizado.",
     canjeado: "Recompensa canjeada.",
@@ -1472,7 +1441,6 @@ export default {
   },
   renta: {
     titulo: "Suscripción a AgendaUno",
-    subtitulo: "Tu renta del SaaS y su historial de pagos.",
     modo: {
       titulo: "Cómo se cobra tu plan",
       activos: "Por alumnos activos",
@@ -1514,7 +1482,6 @@ export default {
   },
   reportes: {
     titulo: "Reportes",
-    subtitulo: "Métricas del negocio por periodo y desempeño por sucursal.",
     desde: "Desde",
     hasta: "Hasta",
     esteMes: "Este mes",
@@ -1602,8 +1569,6 @@ export default {
   },
   oportunidades: {
     titulo: "Oportunidades",
-    subtitulo:
-      "Clases próximas con lugares libres. Ofrece los cupos a quien está en lista de espera.",
     horizonte: "Horizonte",
     dias: "Próximos {n} días",
     vacio: "No hay clases próximas con lugares libres.",
@@ -1616,8 +1581,6 @@ export default {
   },
   recursos: {
     titulo: "Recursos",
-    subtitulo:
-      "Salas, canchas, carriles o equipos que la agenda no puede sobre-reservar.",
     nuevo: "Nuevo recurso",
     nombre: "Nombre",
     sucursal: "Sucursal",
@@ -1635,7 +1598,6 @@ export default {
   },
   nomina: {
     titulo: "Nómina",
-    subtitulo: "Esquemas de pago del staff y cálculo por periodo.",
     esquemas: "Esquemas de pago",
     staff: "Miembro del staff",
     tipo: "Tipo",
@@ -1658,8 +1620,6 @@ export default {
   },
   cursos: {
     titulo: "Grupos",
-    subtitulo:
-      "Cursos que siguen un horario recurrente; inscribir auto-reserva las clases.",
     nuevo: "Nuevo grupo",
     nombre: "Nombre del grupo",
     horario: "Horario recurrente",
@@ -1679,8 +1639,6 @@ export default {
   },
   recepcion: {
     titulo: "Recepción",
-    subtitulo:
-      "La operación del día: pasa lista, gestiona el cupo y la lista de espera.",
     fecha: "Fecha",
     hoy: "Hoy",
     todasSucursales: "Todas las sucursales",
@@ -1751,7 +1709,6 @@ export default {
   },
   agenda: {
     titulo: "Agenda",
-    subtitulo: "Programa clases y gestiona sus reservas.",
     buscar: "Buscar por clase, instructor o fecha…",
     vistaSemana: "Semana",
     vistaDia: "Día",
@@ -1914,8 +1871,6 @@ export default {
   },
   documentos: {
     titulo: "Documentos",
-    subtitulo:
-      "Define que documentos pides y valida los que suben tus alumnos e instructores.",
     tipos: {
       titulo: "Documentos requeridos",
       nuevo: "Nuevo requisito",
@@ -1954,8 +1909,6 @@ export default {
   },
   formularios: {
     titulo: "Formularios",
-    subtitulo:
-      "Pide informacion a tus alumnos e instructores con formularios a tu medida.",
     nuevo: "Nuevo formulario",
     nombre: "Nombre",
     nombrePh: "Ficha medica",
@@ -2053,8 +2006,6 @@ export default {
   },
   integraciones: {
     titulo: "Integraciones de bienestar",
-    subtitulo:
-      "Conecta Wellhub o TotalPass para aceptar check-ins de sus usuarios (la plataforma cubre la clase).",
     activa: "Activa",
     guardar: "Guardar",
     guardando: "Guardando…",
@@ -2080,7 +2031,6 @@ export default {
   },
   configuracion: {
     titulo: "Configuracion",
-    subtitulo: "Ajustes del estudio.",
     logoTitulo: "Logo del estudio",
     logoDesc:
       "Se muestra en la pantalla de acceso de tu estudio. Si no subes uno, se usa el logo de AgendaUno.",

@@ -23,10 +23,6 @@ const props = withDefaults(
     puedeCrear?: boolean;
     nuevoTexto?: string;
     sinBuscador?: boolean;
-    titulo?: string;
-    descripcion?: string;
-    /** `d` de un <path> SVG (viewBox 0 0 24 24, trazo). */
-    icono?: string;
   }>(),
   {
     filtros: () => [],
@@ -35,9 +31,6 @@ const props = withDefaults(
     puedeCrear: false,
     nuevoTexto: "Agregar",
     sinBuscador: false,
-    titulo: "",
-    descripcion: "",
-    icono: "",
   },
 );
 
@@ -70,47 +63,6 @@ function esActivo(clave: string): boolean {
 
 <template>
   <section class="tu-card p-3 sm:p-4 space-y-3">
-    <!-- Encabezado opcional (ícono + título + descripción + conteo). -->
-    <div
-      v-if="titulo || $slots.conteo"
-      class="flex items-center justify-between gap-3 border-b pb-3"
-      :style="{ borderColor: 'var(--borde)' }"
-    >
-      <div class="flex items-center gap-3 min-w-0">
-        <span
-          v-if="icono"
-          class="grid h-9 w-9 shrink-0 place-items-center rounded-full"
-          :style="{
-            background: 'color-mix(in srgb, var(--primario) 14%, transparent)',
-            color: 'var(--primario-fuerte)',
-          }"
-        >
-          <svg
-            class="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.7"
-            stroke="currentColor"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" :d="icono" />
-          </svg>
-        </span>
-        <div class="min-w-0">
-          <h2 v-if="titulo" class="text-sm font-semibold">{{ titulo }}</h2>
-          <p
-            v-if="descripcion"
-            class="text-xs"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ descripcion }}
-          </p>
-        </div>
-      </div>
-      <div v-if="$slots.conteo" class="shrink-0">
-        <slot name="conteo" />
-      </div>
-    </div>
-
     <!-- Fila 1: filtros + buscador + extra + «Agregar». -->
     <div class="flex flex-wrap items-center gap-2 sm:gap-3">
       <button
@@ -168,7 +120,7 @@ function esActivo(clave: string): boolean {
           type="button"
           @click="emit('nuevo')"
         >
-          + {{ nuevoTexto }}
+          {{ nuevoTexto }}
         </button>
       </div>
     </div>

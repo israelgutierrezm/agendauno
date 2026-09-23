@@ -165,11 +165,7 @@ onMounted(async () => {
 
 <template>
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion
-      icono="recepcion"
-      :titulo="$t('recepcion.titulo')"
-      :subtitulo="$t('recepcion.subtitulo')"
-    />
+    <EncabezadoSeccion :titulo="$t('recepcion.titulo')" />
 
     <!-- Buscador global de alumno -->
     <div class="relative mt-6">

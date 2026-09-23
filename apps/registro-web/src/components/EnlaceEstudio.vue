@@ -60,31 +60,25 @@ onMounted(generarQr);
 </script>
 
 <template>
-  <div v-if="sesion.slug" class="tu-card p-6">
-    <h2 class="font-bold text-lg">{{ $t("enlace.titulo") }}</h2>
-    <p class="text-sm mt-1" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t("enlace.subtitulo") }}
-    </p>
+  <div v-if="sesion.slug" class="tu-card p-5">
+    <h2 class="font-semibold">{{ $t("enlace.titulo") }}</h2>
 
     <div class="mt-4 flex flex-col sm:flex-row sm:items-center gap-5">
       <img
         v-if="qr"
         :src="qr"
         :alt="$t('enlace.qrAlt')"
-        width="150"
-        height="150"
-        class="rounded-xl border self-center"
+        width="120"
+        height="120"
+        class="rounded-lg border self-center sm:self-auto"
         :style="{ borderColor: 'var(--borde)' }"
       />
       <div class="flex-1 min-w-0 text-center sm:text-left">
-        <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("enlace.asiTeEncuentran") }}
-        </div>
         <a
           :href="url"
           target="_blank"
           rel="noopener"
-          class="tu-enlace font-semibold break-all"
+          class="tu-enlace break-all"
           >{{ enlaceCorto }}</a
         >
         <div class="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start">

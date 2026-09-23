@@ -145,9 +145,7 @@ onMounted(cargar);
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion
-      icono="facturas"
       :titulo="$t('facturas.titulo')"
-      :subtitulo="$t('facturas.subtitulo')"
       :total="facturas.length"
     />
 
@@ -309,7 +307,7 @@ onMounted(cargar);
               class="tu-btn tu-btn-fantasma text-sm"
               @click="agregarConcepto"
             >
-              + {{ $t("facturas.nueva.agregarConcepto") }}
+              {{ $t("facturas.nueva.agregarConcepto") }}
             </button>
           </div>
 

@@ -117,11 +117,7 @@ function descargarPlantilla(): void {
 
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion
-      icono="miembros"
-      :titulo="$t('importar.titulo')"
-      :subtitulo="$t('importar.subtitulo')"
-    />
+    <EncabezadoSeccion :titulo="$t('importar.titulo')" />
 
     <!-- Éxito -->
     <div v-if="creados !== null" class="mt-6 tu-card p-6 text-center">

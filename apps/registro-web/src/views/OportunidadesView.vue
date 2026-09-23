@@ -91,11 +91,7 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion
-      icono="oportunidades"
-      :titulo="$t('oportunidades.titulo')"
-      :subtitulo="$t('oportunidades.subtitulo')"
-    />
+    <EncabezadoSeccion :titulo="$t('oportunidades.titulo')" />
 
     <!-- Horizonte -->
     <div class="mt-6 flex flex-wrap items-end gap-3">

@@ -60,7 +60,7 @@ export default {
     sinTope: "Sin tope (techo)",
     monto: "Precio mensual",
     unitario: "Precio por profesional",
-    agregar: "+ Agregar escalón",
+    agregar: "Agregar escalón",
     quitar: "Quitar",
     diasPrueba: "Días de prueba",
     iva: "IVA %",

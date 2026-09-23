@@ -112,9 +112,7 @@ onMounted(cargar);
   <section class="mx-auto max-w-5xl px-4 sm:px-6 py-8">
     <div class="flex items-start justify-between gap-3 flex-wrap">
       <EncabezadoSeccion
-        icono="recursos"
         :titulo="$t('recursos.titulo')"
-        :subtitulo="$t('recursos.subtitulo')"
         :total="recursos.length"
       />
       <button
@@ -123,7 +121,7 @@ onMounted(cargar);
         type="button"
         @click="abrir"
       >
-        + {{ $t("recursos.crear") }}
+        {{ $t("recursos.crear") }}
       </button>
     </div>
 

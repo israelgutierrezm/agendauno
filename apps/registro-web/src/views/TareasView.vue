@@ -297,11 +297,7 @@ onMounted(cargarTareas);
 
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion
-      icono="tareas"
-      :titulo="$t('tareas.titulo')"
-      :subtitulo="$t('tareas.subtitulo')"
-    />
+    <EncabezadoSeccion :titulo="$t('tareas.titulo')" />
 
     <!-- Tabs -->
     <div

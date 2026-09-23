@@ -98,9 +98,7 @@ onMounted(cargar);
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
     <div class="flex items-start justify-between gap-3 flex-wrap">
       <EncabezadoSeccion
-        icono="instructores"
         :titulo="plural(sesion.terminologia.instructor)"
-        :subtitulo="$t('instructores.subtitulo')"
         :total="instructores.length"
       />
       <div v-if="puedeInvitar" class="flex items-center gap-2 flex-wrap">
@@ -109,7 +107,7 @@ onMounted(cargar);
           :texto="$t('nav.importar')"
         />
         <button class="tu-btn tu-btn-primario" type="button" @click="abrir">
-          + {{ $t("instructores.invitar.enviar") }}
+          {{ $t("instructores.invitar.enviar") }}
         </button>
       </div>
     </div>

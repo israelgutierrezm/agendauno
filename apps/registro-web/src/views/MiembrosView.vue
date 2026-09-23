@@ -323,9 +323,7 @@ onMounted(() => {
   <section class="mx-auto max-w-7xl px-4 py-8">
     <div class="flex items-start justify-between gap-3 flex-wrap">
       <EncabezadoSeccion
-        icono="miembros"
         :titulo="plural(sesion.terminologia.miembro)"
-        :subtitulo="$t('miembros.subtitulo')"
         :total="meta?.total ?? 0"
       />
       <BotonImportar
@@ -402,23 +400,27 @@ onMounted(() => {
                   <td class="px-4 py-2">
                     <div class="flex items-center gap-3">
                       <span
-                        class="h-8 w-8 rounded-full inline-flex items-center justify-center text-xs font-bold text-white shrink-0"
-                        :style="{ background: 'var(--primario)' }"
+                        class="h-8 w-8 rounded-full inline-flex items-center justify-center text-xs font-semibold shrink-0"
+                        :style="{
+                          background: 'var(--superficie-2)',
+                          color: 'var(--texto-suave)',
+                        }"
                         aria-hidden="true"
                         >{{ m.nombre.charAt(0).toUpperCase() }}</span
                       >
                       <RouterLink
                         v-if="tipo === 'miembro'"
                         :to="{ name: 'ficha-miembro', params: { id: m.id } }"
-                        class="font-semibold tu-enlace"
+                        class="font-medium hover:underline"
                         >{{ nombreCompleto(m) }}</RouterLink
                       >
-                      <span v-else class="font-semibold">{{
+                      <span v-else class="font-medium">{{
                         nombreCompleto(m)
                       }}</span>
                       <span
                         v-if="tipo === 'miembro' && m.primera_vez"
-                        class="tu-badge tu-badge-aviso"
+                        class="text-xs font-medium"
+                        :style="{ color: 'var(--aviso)' }"
                         :title="$t('miembros.nuevoAyuda')"
                         >{{ $t("miembros.nuevo") }}</span
                       >
@@ -430,26 +432,30 @@ onMounted(() => {
                   >
                     {{ m.email ?? "—" }}
                   </td>
+                  <!-- Estado en texto: lo normal (activo) en gris; lo que requiere atención, en color. -->
                   <td class="px-4 py-2">
-                    <span class="flex flex-wrap gap-1">
-                      <span
-                        class="tu-badge"
-                        :class="m.activo ? 'tu-badge-exito' : 'tu-badge-aviso'"
-                        >{{
-                          m.activo
-                            ? $t("miembros.activo")
-                            : $t("miembros.suspendido")
-                        }}</span
-                      >
-                      <span
-                        v-if="tipo === 'miembro' && !m.es_facturable"
-                        class="tu-badge"
-                        >{{ $t("miembros.noFacturable") }}</span
-                      >
-                      <span v-if="m.archivado" class="tu-badge">{{
-                        $t("miembros.archivado")
-                      }}</span>
-                    </span>
+                    <span
+                      :style="{
+                        color: m.activo ? 'var(--texto-suave)' : 'var(--aviso)',
+                      }"
+                      >{{
+                        m.activo
+                          ? $t("miembros.activo")
+                          : $t("miembros.suspendido")
+                      }}</span
+                    >
+                    <span
+                      v-if="tipo === 'miembro' && !m.es_facturable"
+                      :style="{ color: 'var(--texto-suave)' }"
+                    >
+                      · {{ $t("miembros.noFacturable") }}</span
+                    >
+                    <span
+                      v-if="m.archivado"
+                      :style="{ color: 'var(--texto-suave)' }"
+                    >
+                      · {{ $t("miembros.archivado") }}</span
+                    >
                   </td>
                   <td class="px-4 py-2 text-right whitespace-nowrap">
                     <button
@@ -472,7 +478,8 @@ onMounted(() => {
                     </button>
                     <span
                       v-else-if="invitados.has(m.id)"
-                      class="tu-badge tu-badge-exito mr-3"
+                      class="text-sm mr-3"
+                      :style="{ color: 'var(--texto-suave)' }"
                       >{{ $t("miembros.invitado") }}</span
                     >
                     <button

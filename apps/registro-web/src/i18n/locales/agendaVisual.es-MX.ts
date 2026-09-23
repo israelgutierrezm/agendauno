@@ -111,7 +111,6 @@ export default {
       "Define qué días y a qué horas atiende cada profesional: con eso tus clientes ven los huecos libres para agendar.",
     abrirHorarios: "Definir horarios de atención",
   },
-  subtituloCitas: "Agenda a tus clientes y sigue cada cita del día.",
   todosLos: "Todos los {grupo}",
   diaAnterior: "Día anterior",
   diaSiguiente: "Día siguiente",
