@@ -270,6 +270,8 @@ function restablecer(): void {
 .pa-muestra-barra {
   width: 32%;
   height: 100%;
+  /* Una barra clara (blanca) necesita su orilla para distinguirse del fondo. */
+  box-shadow: inset -1px 0 0 rgb(0 0 0 / 10%);
 }
 .pa-muestra-cuerpo {
   flex: 1;

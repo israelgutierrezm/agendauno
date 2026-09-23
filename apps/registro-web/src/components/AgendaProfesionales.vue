@@ -512,7 +512,7 @@ watch(() => props.fecha, enfocar);
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: var(--texto-suave);
+  background: var(--primario);
 }
 .ag-eje {
   position: relative;
@@ -597,15 +597,18 @@ watch(() => props.fecha, enfocar);
   justify-content: center;
   pointer-events: none;
 }
+/* Como en la demo de la landing: tinte muy suave del servicio y su color en el
+   borde izquierdo; el texto en el color normal. */
 .ag-tarjeta {
   position: absolute;
   z-index: 3;
   box-sizing: border-box;
   border: none;
-  border-radius: 10px;
+  border-left: 3px solid var(--tt);
+  border-radius: 0.55rem;
   padding: 0.4rem 0.55rem;
-  background: var(--tf);
-  color: var(--tt);
+  background: color-mix(in srgb, var(--tt) 11%, var(--superficie));
+  color: var(--texto);
   text-align: left;
   display: flex;
   flex-direction: column;
@@ -644,8 +647,7 @@ watch(() => props.fecha, enfocar);
 }
 .ag-linea2 {
   font-size: 0.7rem;
-  font-weight: 500;
-  opacity: 0.85;
+  color: var(--texto-suave);
 }
 .ag-punto {
   width: 7px;
@@ -683,7 +685,7 @@ watch(() => props.fecha, enfocar);
   background: #e5484d;
 }
 :global(.dark) .ag-tarjeta {
-  background: color-mix(in srgb, var(--tf) 20%, var(--superficie));
-  color: var(--tf);
+  background: color-mix(in srgb, var(--tf) 18%, var(--superficie));
+  border-left-color: var(--tf);
 }
 </style>

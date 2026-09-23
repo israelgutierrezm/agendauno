@@ -2,8 +2,8 @@
 import { computed } from "vue";
 
 /**
- * Inicial de una persona en un círculo neutro. Sin color de acento: el color de la
- * app queda para las acciones, y una lista de avatares azules satura la vista.
+ * Inicial de una persona en un círculo de tinte suave (azul muy claro con la letra
+ * en el tono fuerte): se distingue sin competir con las acciones.
  */
 const props = withDefaults(
   defineProps<{
@@ -28,7 +28,10 @@ const clases: Record<"sm" | "md" | "lg", string> = {
   <span
     class="rounded-full inline-flex items-center justify-center font-semibold shrink-0"
     :class="clases[tam]"
-    :style="{ background: 'var(--superficie-2)', color: 'var(--texto-suave)' }"
+    :style="{
+      background: 'var(--primario-suave)',
+      color: 'var(--primario-fuerte)',
+    }"
     aria-hidden="true"
     >{{ inicial || "?" }}</span
   >

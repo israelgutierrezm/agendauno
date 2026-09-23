@@ -364,23 +364,9 @@ function bloquesDe(iso: string): Bloque[] {
 // Estado visual de la clase (color + etiqueta): cancelada / completa / programada.
 // Color estable por TIPO de clase (identidad visual; el color lo lleva la clase,
 // no la decoración). Hash del nombre de la oferta → paleta de acabados.
-const PALETA_TIPO = [
-  "#c8d8e0",
-  "#dddc8c",
-  "#e8d0d0",
-  "#e3e4e5",
-  "#f0e4d3",
-  "#596680",
-  "#2e3642",
-  "#9db8a4",
-] as const;
-function colorTipo(oferta: string | null): string {
-  const s = oferta ?? "";
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  }
-  return PALETA_TIPO[h % PALETA_TIPO.length];
+// Color del servicio: el mismo en todas las vistas de la agenda.
+function colorTipo(s: Sesion): string {
+  return tonoServicio(s.oferta_id, catalogo.value, s.oferta).tinta;
 }
 function pctOcupacion(s: Sesion): number | null {
   return s.capacidad !== null && s.capacidad > 0
@@ -1273,7 +1259,7 @@ onMounted(async () => {
             "
             @click="irPaso(-1)"
           >
-            ‹
+            <IconoNav nombre="chevron" :tam="18" class="rotate-180" />
           </button>
           <button class="tu-btn tu-btn-fantasma px-3 py-1.5" @click="irHoy">
             {{ $t("agenda.hoy") }}
@@ -1287,7 +1273,7 @@ onMounted(async () => {
             "
             @click="irPaso(1)"
           >
-            ›
+            <IconoNav nombre="chevron" :tam="18" />
           </button>
           <span
             class="text-sm font-medium ml-1 hidden sm:inline first-letter:uppercase"
@@ -1299,21 +1285,15 @@ onMounted(async () => {
         <!-- Alternar vista según la modalidad (citas: por profesional / semana;
              clases: semana / día). En móvil, las clases siempre se ven por día. -->
         <div
-          class="inline-flex rounded-xl overflow-hidden border"
+          class="tu-segmentado"
           :class="{ 'hidden lg:inline-flex': !sesion.esCitas }"
-          :style="{ borderColor: 'var(--borde)' }"
           role="group"
         >
           <button
             v-for="op in opcionesVista"
             :key="op"
-            class="px-3 py-1.5 text-sm"
+            type="button"
             :aria-pressed="vista === op"
-            :style="
-              vista === op
-                ? { background: 'var(--primario)', color: '#fff' }
-                : {}
-            "
             @click="vista = op"
           >
             {{ $t(`agendaVisual.vistas.${op}`) }}
@@ -1330,7 +1310,7 @@ onMounted(async () => {
         class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"
         :style="{ color: 'var(--texto-suave)' }"
       >
-        <span class="font-bold" :style="{ color: 'var(--texto)' }">{{
+        <span class="font-medium" :style="{ color: 'var(--texto)' }">{{
           sesion.esCitas
             ? $t("agendaVisual.leyendaServicios")
             : $t("agendaVisual.leyendaClases")
@@ -1338,13 +1318,10 @@ onMounted(async () => {
         <span
           v-for="l in leyenda"
           :key="l.id"
-          class="inline-flex items-center gap-1.5 font-semibold"
+          class="inline-flex items-center gap-1.5"
           ><span
-            class="inline-block w-3 h-3 rounded"
-            :style="{
-              background: l.fondo,
-              boxShadow: `inset 0 0 0 1.5px ${l.tinta}55`,
-            }"
+            class="inline-block w-2.5 h-2.5 rounded-full"
+            :style="{ background: l.tinta }"
           ></span
           >{{ l.nombre }}</span
         >
@@ -1514,8 +1491,8 @@ onMounted(async () => {
                   background:
                     estadoAgenda(b.sesion) === 'cancelada'
                       ? 'var(--superficie-2)'
-                      : `color-mix(in srgb, ${colorTipo(b.sesion.oferta)} 22%, var(--superficie))`,
-                  borderLeft: `3px solid ${estadoAgenda(b.sesion) === 'cancelada' ? 'var(--texto-suave)' : colorTipo(b.sesion.oferta)}`,
+                      : `color-mix(in srgb, ${colorTipo(b.sesion)} 11%, var(--superficie))`,
+                  borderLeft: `3px solid ${estadoAgenda(b.sesion) === 'cancelada' ? 'var(--texto-suave)' : colorTipo(b.sesion)}`,
                 }"
                 @click="abrirDesdeAgenda(b.sesion)"
               >
@@ -1596,7 +1573,7 @@ onMounted(async () => {
               class="tu-card w-full text-left p-3"
               :class="{ 'opacity-60': s.estado !== 'programada' }"
               :style="{
-                borderLeft: `4px solid ${estadoAgenda(s) === 'cancelada' ? 'var(--texto-suave)' : colorTipo(s.oferta)}`,
+                borderLeft: `4px solid ${estadoAgenda(s) === 'cancelada' ? 'var(--texto-suave)' : colorTipo(s)}`,
               }"
               @click="abrirDesdeAgenda(s)"
             >

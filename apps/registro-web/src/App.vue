@@ -476,7 +476,11 @@ onMounted(() => {
         compacto ? 'lg:w-16' : 'lg:w-64',
         menuLateral ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
       ]"
-      :style="{ background: 'var(--barra)', color: 'var(--barra-texto)' }"
+      :style="{
+        background: 'var(--barra)',
+        color: 'var(--barra-texto)',
+        borderRight: '1px solid var(--barra-borde)',
+      }"
     >
       <!-- Marca -->
       <RouterLink
@@ -493,15 +497,20 @@ onMounted(() => {
         />
         <span
           v-else
-          class="h-9 w-9 rounded-xl inline-flex items-center justify-center text-white text-sm font-bold shrink-0"
-          :style="{ background: 'var(--barra-activo)' }"
+          class="h-9 w-9 rounded-xl inline-flex items-center justify-center text-sm font-semibold shrink-0"
+          :style="{
+            background: 'var(--barra-activo)',
+            color: 'var(--barra-activo-texto)',
+          }"
           aria-hidden="true"
           >{{ inicialesEstudio }}</span
         >
         <span v-show="!compactoEfectivo" class="min-w-0">
-          <span class="block text-sm font-semibold text-white truncate">{{
-            sesion.estudio?.nombre ?? $t("marca")
-          }}</span>
+          <span
+            class="block text-sm font-semibold truncate"
+            :style="{ color: 'var(--barra-titulo, #ffffff)' }"
+            >{{ sesion.estudio?.nombre ?? $t("marca") }}</span
+          >
           <span class="block text-[11px] opacity-60 truncate">{{
             $t("marca")
           }}</span>
@@ -525,9 +534,12 @@ onMounted(() => {
           :title="$t('nav.contraer')"
           @click="alternarCompacto"
         >
-          <span class="shrink-0" aria-hidden="true">{{
-            compacto ? "»" : "«"
-          }}</span>
+          <IconoNav
+            nombre="chevron"
+            :tam="18"
+            class="shrink-0 transition-transform"
+            :class="{ 'rotate-180': !compacto }"
+          />
           <span v-show="!compactoEfectivo">{{ $t("nav.contraer") }}</span>
         </button>
       </div>
@@ -821,7 +833,7 @@ onMounted(() => {
   }
 }
 
-/* Enlaces del sidebar OSCURO (estilo panel). */
+/* Enlaces de la barra lateral (clara u oscura según el tema). */
 .tu-side-link {
   display: flex;
   align-items: center;
@@ -840,7 +852,7 @@ onMounted(() => {
 }
 .tu-side-link:hover {
   background: var(--barra-suave);
-  color: #ffffff;
+  color: var(--barra-titulo, #ffffff);
 }
 .tu-side-link.router-link-active {
   background: var(--barra-activo);

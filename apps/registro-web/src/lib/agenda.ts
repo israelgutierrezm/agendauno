@@ -1,6 +1,6 @@
 /**
  * Lógica pura de la agenda visual (sin Vue): fechas locales por zona, colores por
- * servicio, estado de una cita, nivel de cupo de una clase, carriles para sesiones
+ * servicio, estado de una cita, cupo de una clase, carriles para sesiones
  * que se solapan y los indicadores (KPIs) de cada modalidad.
  */
 
@@ -104,21 +104,22 @@ export interface Tono {
 }
 
 /**
- * Paleta de servicios/clases: fondos claros con tinta oscura del mismo matiz
- * (contraste AA). El color identifica el SERVICIO; el estado va en una etiqueta.
+ * Paleta de servicios/clases. `tinta` es un tono medio (el de la demo de la
+ * landing): va en el borde izquierdo del evento y, al 11 %, en su fondo; el texto
+ * del evento usa el color normal. `fondo` es el pastel para el modo oscuro. El
+ * color identifica el SERVICIO; el estado va aparte.
  */
 export const PALETA_SERVICIO: readonly Tono[] = [
-  { fondo: "#DCE9FF", tinta: "#0B3A8C" },
-  { fondo: "#D6F2EA", tinta: "#0A5A47" },
-  { fondo: "#FCE0EB", tinta: "#8A1747" },
-  { fondo: "#EBE3FF", tinta: "#4A2A8F" },
-  { fondo: "#FDE7D6", tinta: "#7A3708" },
-  { fondo: "#FFF1CC", tinta: "#6B4700" },
-  { fondo: "#DFF3FB", tinta: "#0B5470" },
-  { fondo: "#E6F4D7", tinta: "#3B5A12" },
+  { fondo: "#DCE9FF", tinta: "#0070FF" },
+  { fondo: "#D6F2EA", tinta: "#12A68B" },
+  { fondo: "#EBE3FF", tinta: "#9673DE" },
+  { fondo: "#FCE0EB", tinta: "#D6457F" },
+  { fondo: "#FDE7D6", tinta: "#E07A2E" },
+  { fondo: "#DFF3FB", tinta: "#1C9BC7" },
+  { fondo: "#FFF1CC", tinta: "#C28A12" },
+  { fondo: "#E6F4D7", tinta: "#5E9B2A" },
 ];
 
-/** Colores sólidos para identificar a cada profesional (avatar, columna). */
 function hash(texto: string): number {
   let h = 0;
   for (let i = 0; i < texto.length; i++) {

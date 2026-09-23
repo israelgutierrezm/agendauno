@@ -39,6 +39,8 @@
   --sombra: none; /* Sin sombras: separación por color + hairline. */
   --radio-tarjeta: 0.85rem; /* ~14px: redondeado suave, no exagerado */
   --radio-boton: 0.6rem; /* ~10px: un poco redondeado, ya no píldora */
+  --sombra-tarjeta:
+    0 1px 2px rgb(16 24 40 / 4%), 0 14px 32px -22px rgb(0 70 160 / 22%);
   color-scheme: light;
 }
 
@@ -67,192 +69,224 @@
   --aviso: #ff9f0a;
   --aviso-suave: #2a1e0a;
   --sombra: none;
+  --sombra-tarjeta: none;
   color-scheme: dark;
 }
 
-html {
-  font-size: 16px;
-}
-html[data-densidad="compacta"] {
-  font-size: 14px;
-}
-html[data-densidad="comoda"] {
-  font-size: 18px;
-}
+/* Base y componentes propios en capas de Tailwind v4: así las utilidades
+   (w-auto, px-3, text-xs…) pueden ajustarlos, como se espera. */
+@layer base {
+  html {
+    font-size: 16px;
+  }
+  html[data-densidad="compacta"] {
+    font-size: 14px;
+  }
+  html[data-densidad="comoda"] {
+    font-size: 18px;
+  }
 
-body {
-  margin: 0;
-  background: var(--fondo);
-  color: var(--texto);
-  /* En dispositivos Apple resuelve a SF Pro (la fuente de referencia); Inter es el
+  body {
+    margin: 0;
+    background: var(--fondo);
+    color: var(--texto);
+    /* En dispositivos Apple resuelve a SF Pro (la fuente de referencia); Inter es el
      sustituto en el resto, con Segoe UI/Roboto como respaldo del sistema. */
-  font-family:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", ui-sans-serif,
-    system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  letter-spacing: -0.011em; /* tracking negativo sutil, estilo SF */
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
+    font-family:
+      -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", ui-sans-serif,
+      system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing: -0.011em; /* tracking negativo sutil, estilo SF */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
+  }
+
+  /* Títulos con voz "SF Pro Display": peso alto y tracking negativo marcado. */
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.021em;
+  }
 }
 
-/* Títulos con voz "SF Pro Display": peso alto y tracking negativo marcado. */
-h1,
-h2,
-h3 {
-  letter-spacing: -0.021em;
-}
+@layer components {
+  /* Tarjetas: borde tenue y una sombra muy difusa (en oscuro, planas). */
+  .tu-card {
+    background: var(--superficie);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio-tarjeta);
+    box-shadow: var(--sombra-tarjeta);
+  }
 
-/* Tarjetas: muy redondeadas y PLANAS (sin sombra); separación por color/hairline. */
-.tu-card {
-  background: var(--superficie);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-tarjeta);
-  box-shadow: none;
-}
+  /* Botones: forma píldora (Apple). */
+  .tu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    border-radius: var(--radio-boton);
+    border: 1px solid transparent;
+    padding: 0.55rem 1.1rem;
+    font-weight: 500;
+    font-size: 0.94rem;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      opacity 0.15s ease,
+      transform 0.05s ease;
+  }
+  .tu-btn:active {
+    transform: translateY(0.5px);
+  }
+  .tu-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .tu-btn-primario {
+    background: var(--primario);
+    color: var(--primario-contraste);
+  }
+  .tu-btn-primario:hover:not(:disabled) {
+    background: var(--primario-fuerte);
+  }
+  .tu-btn-fantasma {
+    background: transparent;
+    color: var(--texto);
+    border-color: var(--borde);
+  }
+  .tu-btn-fantasma:hover:not(:disabled) {
+    background: var(--superficie-2);
+  }
 
-/* Botones: forma píldora (Apple). */
-.tu-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  border-radius: var(--radio-boton);
-  border: 1px solid transparent;
-  padding: 0.55rem 1.1rem;
-  font-weight: 500;
-  font-size: 0.94rem;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    opacity 0.15s ease,
-    transform 0.05s ease;
-}
-.tu-btn:active {
-  transform: translateY(0.5px);
-}
-.tu-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.tu-btn-primario {
-  background: var(--primario);
-  color: var(--primario-contraste);
-}
-.tu-btn-primario:hover:not(:disabled) {
-  background: var(--primario-fuerte);
-}
-.tu-btn-fantasma {
-  background: transparent;
-  color: var(--texto);
-  border-color: var(--borde);
-}
-.tu-btn-fantasma:hover:not(:disabled) {
-  background: var(--superficie-2);
-}
+  /* Campos: redondeo generoso, anillo de foco azul. */
+  .tu-input {
+    width: 100%;
+    background: var(--superficie);
+    border: 1px solid var(--borde);
+    border-radius: 0.75rem;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.94rem;
+    color: var(--texto);
+    outline: none;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .tu-input:focus {
+    border-color: var(--acento);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--acento) 18%, transparent);
+  }
 
-/* Campos: redondeo generoso, anillo de foco azul. */
-.tu-input {
-  width: 100%;
-  background: var(--superficie);
-  border: 1px solid var(--borde);
-  border-radius: 0.75rem;
-  padding: 0.6rem 0.85rem;
-  font-size: 0.94rem;
-  color: var(--texto);
-  outline: none;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-.tu-input:focus {
-  border-color: var(--acento);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--acento) 18%, transparent);
-}
+  /* Texto de ayuda debajo de un campo. */
+  .tu-hint {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--texto-suave);
+    margin-top: 0.3rem;
+  }
+  .tu-input::placeholder {
+    color: var(--texto-suave);
+  }
 
-/* Texto de ayuda debajo de un campo. */
-.tu-hint {
-  display: block;
-  font-size: 0.75rem;
-  color: var(--texto-suave);
-  margin-top: 0.3rem;
-}
-.tu-input::placeholder {
-  color: var(--texto-suave);
-}
+  .tu-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--texto-suave);
+    margin-bottom: 0.35rem;
+    letter-spacing: -0.006em;
+  }
 
-.tu-label {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--texto-suave);
-  margin-bottom: 0.35rem;
-  letter-spacing: -0.006em;
-}
-
-.tu-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  border-radius: 980px;
-  padding: 0.18rem 0.65rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  background: var(--superficie-2);
-  color: var(--texto-suave);
-}
-/* Estados (al corriente / requiere atención): punto de color + texto, sin caja.
+  .tu-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 980px;
+    padding: 0.18rem 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: var(--superficie-2);
+    color: var(--texto-suave);
+  }
+  /* Estados (al corriente / requiere atención): punto de color + texto, sin caja.
    La píldora gris queda para etiquetas neutras. */
-.tu-badge-exito,
-.tu-badge-aviso {
-  background: transparent;
-  padding-left: 0;
-  padding-right: 0;
-  color: var(--texto);
-}
-.tu-badge-exito::before,
-.tu-badge-aviso::before {
-  content: "";
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-.tu-badge-exito::before {
-  background: var(--exito);
-}
-.tu-badge-aviso::before {
-  background: var(--aviso);
-}
+  .tu-badge-exito,
+  .tu-badge-aviso {
+    background: transparent;
+    padding-left: 0;
+    padding-right: 0;
+    color: var(--texto);
+  }
+  .tu-badge-exito::before,
+  .tu-badge-aviso::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+  .tu-badge-exito::before {
+    background: var(--exito);
+  }
+  .tu-badge-aviso::before {
+    background: var(--aviso);
+  }
 
-/* Enlaces de texto: azul de enlace, subrayado solo en hover (sin fondo ni caja). */
-.tu-enlace {
-  color: var(--enlace);
-  font-weight: 500;
-  text-decoration: none;
-}
-.tu-enlace:hover {
-  text-decoration: underline;
-}
+  /* Enlaces de texto: azul de enlace, subrayado solo en hover (sin fondo ni caja). */
+  .tu-enlace {
+    color: var(--enlace);
+    font-weight: 500;
+    text-decoration: none;
+  }
+  .tu-enlace:hover {
+    text-decoration: underline;
+  }
 
-.tu-nav-link {
-  padding: 0.45rem 0.85rem;
-  border-radius: 0.6rem;
-  font-weight: 500;
-  font-size: 0.9rem;
-  color: var(--texto-suave);
-  white-space: nowrap;
-  text-decoration: none;
-}
-.tu-nav-link:hover {
-  background: var(--superficie-2);
-  color: var(--texto);
-}
-.tu-nav-link.router-link-active {
-  background: var(--primario-suave);
-  color: var(--primario);
+  .tu-nav-link {
+    padding: 0.45rem 0.85rem;
+    border-radius: 0.6rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--texto-suave);
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .tu-nav-link:hover {
+    background: var(--superficie-2);
+    color: var(--texto);
+  }
+  .tu-nav-link.router-link-active {
+    background: var(--primario-suave);
+    color: var(--primario);
+  }
+
+  /* Control segmentado (Semana | Día…): riel gris y la opción activa en blanco. */
+  .tu-segmentado {
+    display: inline-flex;
+    gap: 0.2rem;
+    padding: 0.2rem;
+    border-radius: 0.7rem;
+    background: var(--superficie-2);
+  }
+  .tu-segmentado > button {
+    padding: 0.4rem 0.8rem;
+    border: 0;
+    border-radius: 0.55rem;
+    background: transparent;
+    color: var(--texto-suave);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tu-segmentado > button[aria-pressed="true"] {
+    background: var(--superficie);
+    color: var(--primario-fuerte);
+    box-shadow: 0 1px 3px rgb(16 24 40 / 8%);
+  }
 }

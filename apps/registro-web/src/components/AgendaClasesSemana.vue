@@ -295,14 +295,17 @@ const franjas = computed(() => [
   border-left: 1px solid var(--borde);
   border-bottom: 1px solid var(--borde);
 }
+/* Como en la demo de la landing: tinte muy suave del servicio y su color en el
+   borde izquierdo; el texto en el color normal. */
 .cs-tarjeta {
   width: 100%;
   box-sizing: border-box;
   border: none;
-  border-radius: 11px;
+  border-left: 3px solid var(--tt);
+  border-radius: 0.55rem;
   padding: 0.5rem 0.55rem;
-  background: var(--tf);
-  color: var(--tt);
+  background: color-mix(in srgb, var(--tt) 11%, var(--superficie));
+  color: var(--texto);
   text-align: left;
   display: flex;
   flex-direction: column;
@@ -332,11 +335,12 @@ const franjas = computed(() => [
   line-height: 1.2;
 }
 .cs-suave {
-  opacity: 0.85;
+  color: var(--texto-suave);
 }
 .cs-aviso {
   font-size: 0.66rem;
   font-weight: 600;
+  color: var(--tt);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -354,11 +358,11 @@ const franjas = computed(() => [
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: currentColor;
+  background: var(--tt);
 }
 :global(.dark) .cs-tarjeta {
-  background: color-mix(in srgb, var(--tf) 20%, var(--superficie));
-  color: var(--tf);
+  background: color-mix(in srgb, var(--tf) 18%, var(--superficie));
+  border-left-color: var(--tf);
 }
 :global(.dark) .cs-barra {
   background: rgb(255 255 255 / 12%);

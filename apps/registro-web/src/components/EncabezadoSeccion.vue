@@ -12,7 +12,7 @@ defineProps<{
 
 <template>
   <div class="flex items-center justify-between gap-4 flex-wrap">
-    <h1 class="text-xl font-semibold leading-tight min-w-0">
+    <h1 class="text-2xl font-semibold tracking-tight leading-tight min-w-0">
       {{ titulo }}
       <span
         v-if="total !== undefined"
