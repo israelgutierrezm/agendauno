@@ -39,3 +39,7 @@ apps/mobile/.pub/
 coverage/
 .phpunit.result.cache
 .phpunit.cache/
+
+# === Investigación de mercado (notas y reportes locales, no se versionan) ===
+/reports/
+/research_notes/
