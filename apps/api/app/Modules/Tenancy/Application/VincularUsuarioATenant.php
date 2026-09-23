@@ -42,7 +42,9 @@ class VincularUsuarioATenant
             ['tenant_id' => $tenant->id, 'user_id' => $user->id],
             [
                 'nombre' => $persona['nombre'] ?? $user->name,
-                'primer_apellido' => $persona['apellidos'] ?? null,
+                // Persona del control plane (legacy): su columna es `apellidos`; el
+                // desglose (primer_apellido…) solo existe en la persona del tenant.
+                'apellidos' => $persona['apellidos'] ?? null,
                 'email' => $persona['email'] ?? $user->email,
             ],
         );
