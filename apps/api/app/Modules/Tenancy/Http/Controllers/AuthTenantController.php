@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\AutenticacionGoogleTenant;
 use App\Modules\Tenancy\Application\AutenticacionTenant;
 use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
+use App\Modules\Tenancy\CatalogoTemas;
 use App\Modules\Tenancy\Http\Requests\ActivarTenantRequest;
 use App\Modules\Tenancy\Http\Requests\LoginTenantRequest;
 use App\Modules\Tenancy\Models\Estudio;
@@ -153,6 +154,8 @@ class AuthTenantController
             'rol' => CatalogoDePermisosTenant::rolPrincipal($roles),
             'roles' => $roles,
             'permisos' => CatalogoDePermisosTenant::permisosDe($roles),
+            // Tema y colores propios: el front los aplica al entrar (ver /apariencia).
+            'apariencia' => CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion),
         ];
     }
 

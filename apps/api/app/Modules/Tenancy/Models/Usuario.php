@@ -21,6 +21,8 @@ use Illuminate\Notifications\Notifiable;
  *
  * @property string|null $rol
  * @property list<string>|null $roles
+ * @property string|null $tema
+ * @property array<string, string>|null $tema_personalizacion
  */
 class Usuario extends Authenticatable
 {
@@ -31,7 +33,7 @@ class Usuario extends Authenticatable
 
     protected $table = 'users';
 
-    protected $fillable = ['name', 'email', 'password', 'google_id', 'activo', 'activation_token', 'rol', 'roles'];
+    protected $fillable = ['name', 'email', 'password', 'google_id', 'activo', 'activation_token', 'rol', 'roles', 'tema', 'tema_personalizacion'];
 
     /**
      * ¿El usuario tiene el permiso dado por CUALQUIERA de sus roles (unión)?
@@ -83,6 +85,7 @@ class Usuario extends Authenticatable
             'password' => 'hashed',
             'activo' => 'boolean',
             'roles' => 'array',
+            'tema_personalizacion' => 'array',
         ];
     }
 }

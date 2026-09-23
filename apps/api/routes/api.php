@@ -44,6 +44,7 @@ use App\Modules\Recursos\Http\Controllers\RecursoController;
 use App\Modules\Reservas\Http\Controllers\ReservaController;
 use App\Modules\Tenancy\Http\Controllers\AccesosTenantController;
 use App\Modules\Tenancy\Http\Controllers\AgendaTenantController;
+use App\Modules\Tenancy\Http\Controllers\AparienciaTenantController;
 use App\Modules\Tenancy\Http\Controllers\AsignacionesPersonalTenantController;
 use App\Modules\Tenancy\Http\Controllers\AsistenciaTenantController;
 use App\Modules\Tenancy\Http\Controllers\AuditoriaController;
@@ -211,6 +212,11 @@ Route::prefix('v1')->group(function (): void {
 
         Route::middleware(['estudio.auth', 'throttle:tenant'])->group(function (): void {
             Route::get('/yo', [AuthTenantController::class, 'yo'])->name('yo');
+            // Apariencia personal (tema y colores propios), guardada en la cuenta.
+            Route::get('/apariencia', [AparienciaTenantController::class, 'show'])->name('apariencia');
+            Route::put('/apariencia', [AparienciaTenantController::class, 'elegir'])->name('apariencia.elegir');
+            Route::put('/apariencia/color', [AparienciaTenantController::class, 'personalizar'])->name('apariencia.color');
+            Route::delete('/apariencia/personalizacion', [AparienciaTenantController::class, 'restablecer'])->name('apariencia.restablecer');
             Route::post('/logout', [AuthTenantController::class, 'destroy'])->name('logout');
 
             // Autoservicio del miembro: opera solo sobre su propia persona (sin

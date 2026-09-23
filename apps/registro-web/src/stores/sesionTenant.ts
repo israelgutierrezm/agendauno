@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 
 import { api, fijarBearer, mensajeDeError } from "@/lib/api";
+import { useAparienciaStore, type Apariencia } from "@/stores/apariencia";
 
 export interface UsuarioTenant {
   ulid: string;
@@ -10,6 +11,8 @@ export interface UsuarioTenant {
   rol: string;
   roles?: string[];
   permisos?: string[];
+  // Tema y colores propios guardados en la cuenta.
+  apariencia?: Apariencia;
 }
 
 /** Cómo atiende el negocio: clases con cupo o citas 1 a 1 con un profesional. */
@@ -126,6 +129,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     slug.value = datos.estudio.slug;
     usuario.value = datos.usuario;
     estudio.value = datos.estudio;
+    useAparienciaStore().activar(datos.usuario.apariencia);
     verificado.value = true;
     fijarBearer(datos.token);
     guardar(CLAVE_BEARER, datos.token);
@@ -237,6 +241,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     }>(`/api/v1/app/${slug.value}/yo`);
     usuario.value = data.data.usuario;
     estudio.value = data.data.estudio;
+    useAparienciaStore().activar(data.data.usuario.apariencia);
   }
 
   async function verificarSesion(): Promise<void> {
@@ -270,6 +275,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     estudio.value = null;
     fijarBearer(null);
     borrar(CLAVE_BEARER);
+    useAparienciaStore().desactivar();
   }
 
   return {

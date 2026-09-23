@@ -7,11 +7,13 @@ import IconoNav from "@/components/IconoNav.vue";
 import LogoTurnoUno from "@/components/LogoTurnoUno.vue";
 import NavArbol from "@/components/NavArbol.vue";
 import AppToaster from "@/components/AppToaster.vue";
+import PanelApariencia from "@/components/PanelApariencia.vue";
 import type { MenuItem, NavEstado } from "@/components/nav";
 import { trackEvent } from "@/lib/analytics";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
-import { ACENTOS, useTemaStore } from "@/stores/tema";
+import { useAparienciaStore } from "@/stores/apariencia";
+import { useTemaStore } from "@/stores/tema";
 
 const { t } = useI18n();
 const tema = useTemaStore();
@@ -20,6 +22,10 @@ const router = useRouter();
 const route = useRoute();
 
 tema.inicializar();
+// Con sesión guardada, su tema se pinta desde el primer cuadro (lo confirma /yo).
+if (sesion.bearer !== null) {
+  useAparienciaStore().restaurar();
+}
 
 // Menu lateral en ARBOL (3 niveles): grupos por area -> secciones -> sub-secciones.
 const MENU: MenuItem[] = [
@@ -561,96 +567,19 @@ onMounted(() => {
         </div>
 
         <div class="flex items-center gap-1 sm:gap-2 shrink-0">
-          <!-- Apariencia -->
-          <div class="relative">
-            <button
-              type="button"
-              class="tu-icono-btn"
-              :aria-label="$t('tema.apariencia')"
-              :title="$t('tema.apariencia')"
-              @click="
-                menuApariencia = !menuApariencia;
-                menuPerfil = false;
-              "
-            >
-              <IconoNav nombre="configuracion" :tam="18" />
-            </button>
-            <div
-              v-if="menuApariencia"
-              class="absolute right-0 top-full mt-2 w-64 tu-card p-4 z-50 space-y-4"
-            >
-              <div>
-                <p class="tu-label">{{ $t("tema.modo") }}</p>
-                <div class="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    class="tu-btn"
-                    :class="
-                      !tema.esOscuro ? 'tu-btn-primario' : 'tu-btn-fantasma'
-                    "
-                    @click="tema.esOscuro && tema.alternarModo()"
-                  >
-                    ☀ {{ $t("tema.claroCorto") }}
-                  </button>
-                  <button
-                    type="button"
-                    class="tu-btn"
-                    :class="
-                      tema.esOscuro ? 'tu-btn-primario' : 'tu-btn-fantasma'
-                    "
-                    @click="!tema.esOscuro && tema.alternarModo()"
-                  >
-                    ☾ {{ $t("tema.oscuroCorto") }}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <p class="tu-label">{{ $t("tema.densidad") }}</p>
-                <div class="flex items-center gap-2">
-                  <button
-                    type="button"
-                    class="tu-btn tu-btn-fantasma flex-1"
-                    @click="tema.ajustarDensidad(-1)"
-                  >
-                    −
-                  </button>
-                  <span
-                    class="text-sm"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{ tema.densidad }}</span
-                  >
-                  <button
-                    type="button"
-                    class="tu-btn tu-btn-fantasma flex-1"
-                    @click="tema.ajustarDensidad(1)"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <p class="tu-label">{{ $t("tema.acento") }}</p>
-                <div class="flex items-center gap-2">
-                  <button
-                    v-for="a in ACENTOS"
-                    :key="a.nombre"
-                    type="button"
-                    class="h-6 w-6 rounded-full border-2 transition-transform hover:scale-110"
-                    :style="{
-                      background: a.hex ?? '#0071e3',
-                      borderColor:
-                        tema.acento === a.hex ? 'var(--texto)' : 'transparent',
-                    }"
-                    :title="a.nombre"
-                    :aria-label="a.nombre"
-                    @click="tema.fijarAcento(a.hex)"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+          <!-- Apariencia: tema y colores propios (panel lateral) -->
+          <button
+            type="button"
+            class="tu-icono-btn"
+            :aria-label="$t('tema.apariencia')"
+            :title="$t('tema.apariencia')"
+            @click="
+              menuApariencia = true;
+              menuPerfil = false;
+            "
+          >
+            <IconoNav nombre="configuracion" :tam="18" />
+          </button>
 
           <!-- Perfil -->
           <div class="relative">
@@ -847,6 +776,7 @@ onMounted(() => {
 
   <!-- Notificaciones flotantes (toasts), montadas una sola vez para toda la app. -->
   <AppToaster />
+  <PanelApariencia :abierto="menuApariencia" @cerrar="menuApariencia = false" />
 </template>
 
 <style>
@@ -898,7 +828,7 @@ onMounted(() => {
 }
 .tu-side-link.router-link-active {
   background: var(--barra-activo);
-  color: #ffffff;
+  color: var(--barra-activo-texto, #ffffff);
   font-weight: 600;
 }
 
