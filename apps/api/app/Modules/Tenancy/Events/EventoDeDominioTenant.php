@@ -24,6 +24,8 @@ class EventoDeDominioTenant
     public const TIPOS = [
         'reserva.creada',
         'reserva.ofrecida',
+        'reserva.recordatorio_24h',
+        'reserva.recordatorio_2h',
         'asistencia.marcada',
         'acceso.registrado',
         'orden.pagada',

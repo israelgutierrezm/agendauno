@@ -40,6 +40,8 @@ class ReservaTenant extends Model
         'penaliza_tarde' => 'boolean',
         'penaliza_no_show' => 'boolean',
         'oferta_expira_en' => 'datetime',
+        'recordatorio_24h_en' => 'datetime',
+        'recordatorio_2h_en' => 'datetime',
     ];
 
     /**

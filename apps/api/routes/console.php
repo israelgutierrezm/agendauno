@@ -29,6 +29,10 @@ Schedule::command('turnouno:generar-agenda')->dailyAt('00:30');
 // Expira las ofertas de lista de espera vencidas y re-ofrece el cupo (R7).
 Schedule::command('turnouno:expirar-ofertas')->everyMinute()->withoutOverlapping();
 
+// Recordatorios de clases y citas (24 h y 2 h antes): emite el evento; el mensaje
+// sale por las plantillas activas en los siguientes minutos.
+Schedule::command('turnouno:enviar-recordatorios')->everyFiveMinutes()->withoutOverlapping();
+
 // Libera las reservas pago-para-reservar (citas) no pagadas a tiempo (R-citas).
 Schedule::command('turnouno:expirar-reservas-pago')->everyMinute()->withoutOverlapping();
 

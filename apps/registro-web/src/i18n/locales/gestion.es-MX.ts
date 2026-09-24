@@ -108,6 +108,8 @@ export const conexiones = {
       reserva: {
         creada: "Reserva creada",
         ofrecida: "Lugar ofrecido (lista de espera)",
+        recordatorio_24h: "Recordatorio 24 h antes",
+        recordatorio_2h: "Recordatorio 2 h antes",
       },
       asistencia: { marcada: "Asistencia marcada" },
       acceso: { registrado: "Acceso registrado" },
@@ -128,7 +130,7 @@ export const comunicacionesAuto = {
   automaticos: "Automáticos",
   salida: "Bandeja de salida",
   ayuda:
-    "Un mensaje automático se envía solo cuando pasa algo: una reserva, una asistencia, una compra…",
+    "Un mensaje automático se envía solo: cuando pasa algo (una reserva, una asistencia, una compra…) o antes de una clase o cita, como recordatorio.",
   configurar: "Configurar",
   activo: "Activo",
   sinConfigurar: "Sin mensaje",
@@ -138,6 +140,7 @@ export const comunicacionesAuto = {
   cuerpo: "Mensaje",
   marcadores:
     "Puedes usar {a} y {b}, además de los datos del evento (por ejemplo {c}).",
+  marcadoresRecordatorio: "Puedes usar {lista}.",
   guardar: "Guardar mensaje",
   guardado: "Mensaje automático guardado.",
   eliminar: "Quitar mensaje",

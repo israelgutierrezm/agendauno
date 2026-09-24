@@ -169,12 +169,27 @@ const borrador = ref<{
 }>({ canal: "interno", asunto: "", cuerpo: "", activo: true });
 const guardandoPlantilla = ref(false);
 
+// Los recordatorios traen los datos de la clase o cita; el resto, los del evento.
+const MARCADORES_RECORDATORIO = [
+  "persona_nombre",
+  "actividad",
+  "fecha",
+  "hora",
+  "sucursal",
+  "con",
+  "negocio",
+];
+
 const marcadoresAuto = computed(() =>
-  t("comunicacionesAuto.marcadores", {
-    a: "{{persona_nombre}}",
-    b: "{{persona_email}}",
-    c: "{{estado}}",
-  }),
+  editor.value.clave.startsWith("reserva.recordatorio")
+    ? t("comunicacionesAuto.marcadoresRecordatorio", {
+        lista: MARCADORES_RECORDATORIO.map((m) => `{{${m}}}`).join(", "),
+      })
+    : t("comunicacionesAuto.marcadores", {
+        a: "{{persona_nombre}}",
+        b: "{{persona_email}}",
+        c: "{{estado}}",
+      }),
 );
 
 function plantillaDe(clave: string, canal: Canal): Plantilla | undefined {
