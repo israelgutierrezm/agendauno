@@ -57,9 +57,7 @@ it('el alumno no puede auto-cobrarse en efectivo/ventanilla (sin créditos grati
 it('el alumno paga en línea; el webhook confirma, otorga créditos y ya puede reservar', function (): void {
     Http::fake([
         'api.stripe.com/*' => Http::response([
-            'id' => 'pi_alumno_1',
-            'status' => 'requires_payment_method',
-            'client_secret' => 'pi_alumno_1_secret',
+            'id' => 'cs_alumno_1', 'url' => 'https://checkout.stripe.com/c/pay/cs_alumno_1',
         ], 200),
     ]);
 
@@ -82,7 +80,8 @@ it('el alumno paga en línea; el webhook confirma, otorga créditos y ya puede r
     ], conBearer($a['bearer']))
         ->assertCreated()
         ->assertJsonPath('data.estado', 'pendiente')
-        ->assertJsonPath('data.checkout.client_secret', 'pi_alumno_1_secret');
+        ->assertJsonPath('data.checkout.url', 'https://checkout.stripe.com/c/pay/cs_alumno_1');
+    Http::assertSent(fn ($r): bool => str_ends_with($r['success_url'], '/mi-cuenta?pago=exito'));
 
     // Antes de reservar no hay derecho.
     $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas", ['sesion_id' => $sesion], conBearer($a['bearer']))
@@ -90,8 +89,8 @@ it('el alumno paga en línea; el webhook confirma, otorga créditos y ya puede r
 
     // El webhook confirma el pago -> fulfillment.
     $this->postJson("/api/v1/webhooks/tenant/{$e['slug']}/stripe", [
-        'type' => 'payment_intent.succeeded',
-        'data' => ['object' => ['id' => 'pi_alumno_1']],
+        'type' => 'checkout.session.completed',
+        'data' => ['object' => ['id' => 'cs_alumno_1', 'payment_status' => 'paid']],
     ])->assertOk();
 
     $perfil = $this->getJson("/api/v1/app/{$e['slug']}/mi/perfil", conBearer($a['bearer']))->assertOk()->json('data');
@@ -140,7 +139,7 @@ it('el historial del alumno lista sus compras', function (): void {
 it('sin pasarela en línea el alumno no puede pagar aquí; con Stripe activo paga sin elegir pasarela', function (): void {
     Http::fake([
         'api.stripe.com/*' => Http::response([
-            'id' => 'pi_alumno_2', 'status' => 'requires_payment_method', 'client_secret' => 'pi_alumno_2_secret',
+            'id' => 'cs_alumno_2', 'url' => 'https://checkout.stripe.com/c/pay/cs_alumno_2',
         ], 200),
     ]);
 
@@ -165,5 +164,5 @@ it('sin pasarela en línea el alumno no puede pagar aquí; con Stripe activo pag
     $this->postJson("/api/v1/app/{$e['slug']}/mi/ordenes/{$orden}/cobrar", ['metodo' => 'tarjeta'], conBearer($a['bearer']))
         ->assertCreated()
         ->assertJsonPath('data.proveedor', 'stripe')
-        ->assertJsonPath('data.checkout.client_secret', 'pi_alumno_2_secret');
+        ->assertJsonPath('data.checkout.url', 'https://checkout.stripe.com/c/pay/cs_alumno_2');
 });

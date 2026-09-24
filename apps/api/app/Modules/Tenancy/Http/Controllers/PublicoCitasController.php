@@ -166,7 +166,7 @@ class PublicoCitasController
 
         $metodo = isset($validado['metodo']) ? MetodoPago::from((string) $validado['metodo']) : null;
         $key = ($validado['idempotency_key'] ?? '') !== '' ? (string) $validado['idempotency_key'] : null;
-        $pago = $this->cobrar->ejecutar($orden, (string) $validado['proveedor'], $metodo, $key);
+        $pago = $this->cobrar->ejecutar($orden, (string) $validado['proveedor'], $metodo, $key, '/agendar/'.$estudio->slug);
 
         return response()->json(['data' => [
             'pago' => $pago->ulid,

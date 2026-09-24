@@ -48,7 +48,7 @@ function estudioGuestCitas(): array
 it('un cliente sin cuenta agenda una cita y paga en línea; el webhook la confirma', function (): void {
     Http::fake([
         'api.stripe.com/*' => Http::response([
-            'id' => 'pi_cita_1', 'status' => 'requires_payment_method', 'client_secret' => 'pi_cita_1_secret',
+            'id' => 'cs_cita_1', 'url' => 'https://checkout.stripe.com/c/pay/cs_cita_1',
         ], 200),
     ]);
     ['e' => $e, 'sede' => $sede, 'coach' => $coach] = estudioGuestCitas();
@@ -66,11 +66,13 @@ it('un cliente sin cuenta agenda una cita y paga en línea; el webhook la confir
     // Guest paga en línea (sin cuenta) → pendiente + checkout de Stripe.
     $this->postJson("/api/v1/app/{$e['slug']}/citas/pagar", [
         'orden_id' => $r['orden_id'], 'proveedor' => 'stripe', 'metodo' => 'tarjeta',
-    ])->assertCreated()->assertJsonPath('data.checkout.client_secret', 'pi_cita_1_secret');
+    ])->assertCreated()->assertJsonPath('data.checkout.url', 'https://checkout.stripe.com/c/pay/cs_cita_1');
+    // Al terminar regresa a la página pública de citas del negocio.
+    Http::assertSent(fn ($r): bool => str_ends_with($r['success_url'], "/agendar/{$e['slug']}?pago=exito"));
 
     // El webhook de Stripe confirma el pago → la reserva pasa a confirmada.
     $this->postJson("/api/v1/webhooks/tenant/{$e['slug']}/stripe", [
-        'type' => 'payment_intent.succeeded', 'data' => ['object' => ['id' => 'pi_cita_1']],
+        'type' => 'checkout.session.completed', 'data' => ['object' => ['id' => 'cs_cita_1', 'payment_status' => 'paid']],
     ])->assertOk();
 
     // La reserva quedó confirmada (fulfillment del webhook sobre la orden de la sesión).

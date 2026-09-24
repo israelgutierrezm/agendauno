@@ -66,7 +66,12 @@ class WebhookPlataformaController
         $objeto = $payload['data']['object'] ?? [];
         $referencia = is_array($objeto) && isset($objeto['id']) ? (string) $objeto['id'] : '';
 
-        if ($tipo === 'payment_intent.succeeded' && $referencia !== '') {
+        // Checkout: la sesión pagada (tarjeta al momento; OXXO cuando se paga en tienda).
+        // PaymentIntent: cobros creados antes de usar Checkout.
+        $sesionPagada = ($tipo === 'checkout.session.completed' && is_array($objeto) && ($objeto['payment_status'] ?? '') === 'paid')
+            || $tipo === 'checkout.session.async_payment_succeeded';
+
+        if (($sesionPagada || $tipo === 'payment_intent.succeeded') && $referencia !== '') {
             $this->confirmar->porReferencia($referencia, 'stripe');
         }
 

@@ -429,3 +429,11 @@ export const recuperarContrasena = {
   sinEnlace:
     "Este enlace está incompleto. Pide uno nuevo desde la pantalla de inicio de sesión.",
 };
+
+export const pagoEnLinea = {
+  exito: "¡Gracias! Recibimos tu pago. Se confirma en unos segundos.",
+  cancelado: "El pago no se completó. Puedes intentarlo de nuevo.",
+  citaExito: "¡Listo! Recibimos tu pago. Tu cita se confirma en unos segundos.",
+  rentaExito:
+    "¡Gracias! Recibimos el pago de tu renta. Se confirma en unos segundos.",
+};

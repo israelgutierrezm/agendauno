@@ -450,7 +450,7 @@ class MiTenantController
         $metodo = isset($validado['metodo']) ? MetodoPago::from($validado['metodo']) : null;
         $key = ($validado['idempotency_key'] ?? '') !== '' ? $validado['idempotency_key'] : null;
 
-        $pago = $this->cobrarOrden->ejecutar($orden, $validado['proveedor'], $metodo, $key);
+        $pago = $this->cobrarOrden->ejecutar($orden, $validado['proveedor'], $metodo, $key, '/mi-cuenta');
 
         return response()->json(['data' => [
             'pago' => $pago->ulid,

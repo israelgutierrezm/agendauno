@@ -31,15 +31,23 @@ class PasarelaStripePlataforma implements PasarelaPlataforma
             return ResultadoPago::pendiente('stripe_sim_'.Str::lower(Str::random(24)));
         }
 
-        $intent = (new ClienteStripe($secretKey))->crearPaymentIntent(
+        $retorno = RetornoPago::urls($cargo->retorno ?? '/renta');
+        $cargo->loadMissing('estudio');
+
+        $sesion = (new ClienteStripe($secretKey))->crearSesionCheckout(
             $cargo->monto_minor,
             $cargo->moneda,
+            'Renta de AgendaUno · '.$cargo->periodo,
+            $retorno['exito'],
+            $retorno['cancelado'],
             'tarjeta',
+            $cargo->estudio?->contacto_email,
+            ['cargo_renta' => (string) $cargo->ulid],
         );
 
-        return ResultadoPago::pendiente($intent['id'], [
-            'tipo' => 'client_secret',
-            'client_secret' => $intent['client_secret'],
+        return ResultadoPago::pendiente($sesion['id'], [
+            'tipo' => 'redirect',
+            'url' => $sesion['url'],
         ]);
     }
 }

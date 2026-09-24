@@ -38,6 +38,12 @@ class PagoTenant extends Model
     public array $checkout = [];
 
     /**
+     * Pantalla de la web a la que vuelve el cliente al pagar en línea (p. ej.
+     * `/mi-cuenta`). No se persiste: la fija quien inicia el cobro.
+     */
+    public ?string $retorno = null;
+
+    /**
      * @var array<string, string>
      */
     protected $casts = [

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { useRetornoPago } from "@/lib/retornoPago";
 
 interface Servicio {
   id: string;
@@ -32,6 +33,8 @@ interface Slot {
 }
 
 const route = useRoute();
+// Al volver de la página de pago: avisa cómo quedó.
+const retornoPago = useRetornoPago();
 const slug = computed(() => String(route.params.slug));
 
 const opciones = ref<Opciones | null>(null);
@@ -288,6 +291,24 @@ onMounted(cargar);
     </section>
 
     <section v-else-if="opciones" class="mx-auto max-w-2xl px-4 py-10">
+      <p
+        v-if="retornoPago"
+        class="mb-4 rounded-xl p-3 text-sm"
+        role="status"
+        :style="{
+          background:
+            retornoPago === 'exito'
+              ? 'var(--exito-suave)'
+              : 'var(--superficie-2)',
+          color: retornoPago === 'exito' ? 'var(--exito)' : 'var(--texto)',
+        }"
+      >
+        {{
+          retornoPago === "exito"
+            ? $t("pagoEnLinea.citaExito")
+            : $t("pagoEnLinea.cancelado")
+        }}
+      </p>
       <!-- Encabezado con marca del estudio -->
       <header class="flex items-center gap-3">
         <img

@@ -5,6 +5,7 @@ import AgendarCitaCuenta from "@/components/AgendarCitaCuenta.vue";
 import ListaFormularios from "@/components/ListaFormularios.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import type { FormularioPersona } from "@/lib/formularios";
+import { useRetornoPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Derecho {
@@ -164,6 +165,13 @@ async function cargarFormularios(): Promise<void> {
   }
 }
 
+// Al volver de la página de pago: aviso y, poco después, se recarga para ver los
+// créditos (el webhook de la pasarela confirma el pago en segundos).
+const retornoPago = useRetornoPago();
+if (retornoPago.value === "exito") {
+  window.setTimeout(() => void cargar(true), 4000);
+}
+
 // Paga en línea una orden propia (compra o cita apartada). Con pasarela de
 // redirección se va al checkout; si no, el pago queda en proceso.
 async function pagar(ordenId: string): Promise<void> {
@@ -293,6 +301,16 @@ onMounted(() => cargar());
     </p>
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
+    </p>
+    <p
+      v-if="retornoPago"
+      class="mt-4 text-sm"
+      role="status"
+      :style="{
+        color: retornoPago === 'exito' ? 'var(--exito)' : 'var(--aviso)',
+      }"
+    >
+      {{ $t(`pagoEnLinea.${retornoPago}`) }}
     </p>
     <p
       v-if="mensaje === 'pago'"

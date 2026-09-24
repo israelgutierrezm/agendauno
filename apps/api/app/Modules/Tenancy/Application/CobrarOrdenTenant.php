@@ -29,7 +29,7 @@ class CobrarOrdenTenant
         private readonly RegistrarEventoTenant $eventos,
     ) {}
 
-    public function ejecutar(OrdenTenant $orden, string $proveedor, ?MetodoPago $metodo = null, ?string $idempotencyKey = null): PagoTenant
+    public function ejecutar(OrdenTenant $orden, string $proveedor, ?MetodoPago $metodo = null, ?string $idempotencyKey = null, ?string $retorno = null): PagoTenant
     {
         if ($idempotencyKey !== null) {
             $previo = PagoTenant::query()->where('idempotency_key', $idempotencyKey)->first();
@@ -42,7 +42,7 @@ class CobrarOrdenTenant
             throw new PasarelaNoDisponible('La pasarela no esta activa en este estudio.');
         }
 
-        return DB::connection('tenant')->transaction(function () use ($orden, $proveedor, $metodo, $idempotencyKey): PagoTenant {
+        return DB::connection('tenant')->transaction(function () use ($orden, $proveedor, $metodo, $idempotencyKey, $retorno): PagoTenant {
             $bloqueada = OrdenTenant::query()->whereKey($orden->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueada->estado !== EstadoOrden::Pendiente) {
@@ -59,6 +59,7 @@ class CobrarOrdenTenant
                 'idempotency_key' => $idempotencyKey,
             ]);
 
+            $pago->retorno = $retorno;
             $resultado = $this->registro->resolver($proveedor)->cobrar($pago, $this->registro->llaves($proveedor));
             $pago->checkout = $resultado->datos;
 

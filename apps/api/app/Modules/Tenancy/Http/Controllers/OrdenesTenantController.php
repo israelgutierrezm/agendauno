@@ -121,7 +121,7 @@ class OrdenesTenantController
         $metodo = isset($validado['metodo']) ? MetodoPago::from($validado['metodo']) : null;
         $key = ($validado['idempotency_key'] ?? '') !== '' ? $validado['idempotency_key'] : null;
 
-        $pago = $this->cobrar->ejecutar($orden, $validado['proveedor'], $metodo, $key);
+        $pago = $this->cobrar->ejecutar($orden, $validado['proveedor'], $metodo, $key, '/ventas');
 
         return response()->json(['data' => [
             'pago' => $pago->ulid,

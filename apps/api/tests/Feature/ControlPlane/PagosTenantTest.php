@@ -68,12 +68,10 @@ it('rechaza cobrar con una pasarela no activa (GATEWAY_UNAVAILABLE)', function (
         ->assertStatus(409)->assertJsonPath('code', 'GATEWAY_UNAVAILABLE');
 });
 
-it('cobro Stripe con llaves crea intento pendiente y el webhook confirma -> fulfillment', function (): void {
+it('cobro Stripe con llaves abre la página de pago de Stripe y el webhook confirma -> fulfillment', function (): void {
     Http::fake([
         'api.stripe.com/*' => Http::response([
-            'id' => 'pi_prueba_123',
-            'status' => 'requires_payment_method',
-            'client_secret' => 'pi_prueba_123_secret_abc',
+            'id' => 'cs_prueba_123', 'url' => 'https://checkout.stripe.com/c/pay/cs_prueba_123',
         ], 200),
     ]);
 
@@ -85,25 +83,64 @@ it('cobro Stripe con llaves crea intento pendiente y el webhook confirma -> fulf
 
     $o = ordenPendiente($e);
 
-    // Cobro en linea -> pendiente + checkout con client_secret; la orden sigue pendiente.
+    // Cobro en linea -> pendiente + redirección a Stripe Checkout; la orden sigue pendiente.
     test()->postJson("/api/v1/app/{$e['slug']}/ordenes/{$o['orden']}/cobrar", [
         'proveedor' => 'stripe', 'metodo' => 'tarjeta',
     ], conBearer($e['bearer']))
         ->assertCreated()
         ->assertJsonPath('data.estado', 'pendiente')
-        ->assertJsonPath('data.checkout.tipo', 'client_secret')
-        ->assertJsonPath('data.checkout.client_secret', 'pi_prueba_123_secret_abc')
+        ->assertJsonPath('data.checkout.tipo', 'redirect')
+        ->assertJsonPath('data.checkout.url', 'https://checkout.stripe.com/c/pay/cs_prueba_123')
         ->assertJsonPath('data.orden.estado', 'pendiente');
+
+    // La sesión cobra el total y regresa a Ventas con el resultado.
+    Http::assertSent(fn ($r): bool => str_ends_with($r->url(), '/checkout/sessions')
+        && $r['line_items'][0]['price_data']['unit_amount'] === 89900
+        && str_ends_with($r['success_url'], '/ventas?pago=exito')
+        && str_ends_with($r['cancel_url'], '/ventas?pago=cancelado'));
 
     expect(saldoComprador($e, $o['comprador']))->toBe(0); // aun sin fulfillment
 
-    // Webhook de Stripe (sin webhook_secret -> sin firma) confirma el intento.
+    // Webhook de Stripe (sin webhook_secret -> sin firma): la sesión pagada confirma.
     test()->postJson("/api/v1/webhooks/tenant/{$e['slug']}/stripe", [
-        'type' => 'payment_intent.succeeded',
-        'data' => ['object' => ['id' => 'pi_prueba_123']],
+        'type' => 'checkout.session.completed',
+        'data' => ['object' => ['id' => 'cs_prueba_123', 'payment_status' => 'paid']],
     ])->assertOk();
 
     expect(saldoComprador($e, $o['comprador']))->toBe(8000); // fulfillment tras confirmar
+});
+
+it('con OXXO la sesión se completa sin pagar y solo se entrega al pagar en tienda', function (): void {
+    Http::fake([
+        'api.stripe.com/*' => Http::response([
+            'id' => 'cs_oxxo_1', 'url' => 'https://checkout.stripe.com/c/pay/cs_oxxo_1',
+        ], 200),
+    ]);
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    test()->putJson("/api/v1/app/{$e['slug']}/pasarelas/stripe", [
+        'activa' => true, 'modo' => 'test', 'credenciales' => ['secret_key' => 'sk_test_x'],
+    ], conBearer($e['bearer']))->assertOk();
+    $o = ordenPendiente($e);
+
+    test()->postJson("/api/v1/app/{$e['slug']}/ordenes/{$o['orden']}/cobrar", [
+        'proveedor' => 'stripe', 'metodo' => 'oxxo',
+    ], conBearer($e['bearer']))->assertCreated();
+    Http::assertSent(fn ($r): bool => str_ends_with($r->url(), '/checkout/sessions')
+        && $r['payment_method_types'] === ['oxxo']);
+
+    // Generó su ficha OXXO pero aún no paga: no se entrega nada.
+    test()->postJson("/api/v1/webhooks/tenant/{$e['slug']}/stripe", [
+        'type' => 'checkout.session.completed',
+        'data' => ['object' => ['id' => 'cs_oxxo_1', 'payment_status' => 'unpaid']],
+    ])->assertOk();
+    expect(saldoComprador($e, $o['comprador']))->toBe(0);
+
+    // Pagó en tienda.
+    test()->postJson("/api/v1/webhooks/tenant/{$e['slug']}/stripe", [
+        'type' => 'checkout.session.async_payment_succeeded',
+        'data' => ['object' => ['id' => 'cs_oxxo_1', 'payment_status' => 'paid']],
+    ])->assertOk();
+    expect(saldoComprador($e, $o['comprador']))->toBe(8000);
 });
 
 it('el webhook de Stripe con webhook_secret rechaza firma invalida (400)', function (): void {

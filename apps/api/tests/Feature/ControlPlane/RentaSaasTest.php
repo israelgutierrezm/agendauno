@@ -76,9 +76,7 @@ it('el apartado de renta exige permiso de facturación', function (): void {
 it('el dueño paga su renta con Stripe y el webhook de la plataforma lo confirma', function (): void {
     Http::fake([
         'api.stripe.com/*' => Http::response([
-            'id' => 'pi_renta_123',
-            'status' => 'requires_payment_method',
-            'client_secret' => 'pi_renta_123_secret_abc',
+            'id' => 'cs_renta_123', 'url' => 'https://checkout.stripe.com/c/pay/cs_renta_123',
         ], 200),
     ]);
 
@@ -86,22 +84,23 @@ it('el dueño paga su renta con Stripe y el webhook de la plataforma lo confirma
     activarStripePlataforma(['secret_key' => 'sk_test_plat']); // sin webhook_secret -> webhook sin firma en dev
     $cargo = cargoRentaPendiente($e);
 
-    // El dueño paga en linea -> pendiente + checkout con client_secret; sigue pendiente.
+    // El dueño paga en linea -> pendiente + página de pago de Stripe; sigue pendiente.
     $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/pagar", [
         'proveedor' => 'stripe',
     ], conBearer($e['bearer']))
         ->assertCreated()
         ->assertJsonPath('data.estado', 'pendiente')
-        ->assertJsonPath('data.checkout.tipo', 'client_secret')
-        ->assertJsonPath('data.checkout.client_secret', 'pi_renta_123_secret_abc');
+        ->assertJsonPath('data.checkout.tipo', 'redirect')
+        ->assertJsonPath('data.checkout.url', 'https://checkout.stripe.com/c/pay/cs_renta_123');
+    Http::assertSent(fn ($r): bool => str_ends_with($r['success_url'], '/renta?pago=exito'));
 
     $this->getJson("/api/v1/app/{$e['slug']}/renta", conBearer($e['bearer']))
         ->assertOk()->assertJsonPath('data.cargos.0.estado', 'pendiente');
 
     // El webhook de la plataforma confirma el intento -> pagado.
     $this->postJson('/api/v1/webhooks/plataforma/stripe', [
-        'type' => 'payment_intent.succeeded',
-        'data' => ['object' => ['id' => 'pi_renta_123']],
+        'type' => 'checkout.session.completed',
+        'data' => ['object' => ['id' => 'cs_renta_123', 'payment_status' => 'paid']],
     ])->assertOk();
 
     $this->getJson("/api/v1/app/{$e['slug']}/renta", conBearer($e['bearer']))

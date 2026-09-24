@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { useRetornoPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface LineaDesglose {
@@ -241,7 +242,18 @@ async function descargarFactura(
   }
 }
 
-onMounted(cargar);
+// Al volver de la página de pago de la renta: aviso y recarga tras la confirmación.
+const retornoPago = useRetornoPago();
+
+onMounted(() => {
+  void cargar();
+  if (retornoPago.value === "exito") {
+    avisoPago.value = t("pagoEnLinea.rentaExito");
+    window.setTimeout(() => void cargar(), 4000);
+  } else if (retornoPago.value === "cancelado") {
+    errorPago.value = t("pagoEnLinea.cancelado");
+  }
+});
 </script>
 
 <template>

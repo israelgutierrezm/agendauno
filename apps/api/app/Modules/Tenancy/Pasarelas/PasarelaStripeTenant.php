@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Pasarelas;
 
+use App\Modules\Tenancy\Models\LineaOrdenTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Pasarelas\Stripe\ClienteStripe;
 use Illuminate\Support\Str;
@@ -31,15 +33,42 @@ class PasarelaStripeTenant implements PasarelaTenant
             return ResultadoPago::pendiente('stripe_sim_'.Str::lower(Str::random(24)));
         }
 
-        $intent = (new ClienteStripe($secretKey))->crearPaymentIntent(
+        $orden = $pago->orden()->with(['lineas.producto', 'persona'])->first();
+        $retorno = RetornoPago::urls($pago->retorno);
+
+        $sesion = (new ClienteStripe($secretKey))->crearSesionCheckout(
             $pago->monto_minor,
             $pago->moneda,
+            self::concepto($orden),
+            $retorno['exito'],
+            $retorno['cancelado'],
             $pago->metodo?->value,
+            $orden?->persona?->email,
+            ['pago' => (string) $pago->ulid],
         );
 
-        return ResultadoPago::pendiente($intent['id'], [
-            'tipo' => 'client_secret',
-            'client_secret' => $intent['client_secret'],
+        return ResultadoPago::pendiente($sesion['id'], [
+            'tipo' => 'redirect',
+            'url' => $sesion['url'],
         ]);
+    }
+
+    /**
+     * Lo que ve el cliente en la página de pago: los productos de la orden, o que es
+     * una cita.
+     */
+    private static function concepto(?OrdenTenant $orden): string
+    {
+        $nombres = $orden?->lineas
+            ->map(static fn (LineaOrdenTenant $l): ?string => $l->producto?->nombre)
+            ->filter()
+            ->unique()
+            ->implode(', ');
+
+        if (is_string($nombres) && $nombres !== '') {
+            return Str::limit($nombres, 120);
+        }
+
+        return $orden?->sesion_id !== null ? 'Cita' : 'Compra';
     }
 }
