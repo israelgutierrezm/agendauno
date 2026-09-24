@@ -95,4 +95,51 @@ class ClienteStripe
             'client_secret' => (string) ($json['client_secret'] ?? ''),
         ];
     }
+
+    /**
+     * El PaymentIntent (cobro) que generó una sesión de Checkout ya pagada.
+     */
+    public function paymentIntentDeSesion(string $sesionId): ?string
+    {
+        /** @var array{payment_intent?: string|array{id?: string}|null} $json */
+        $json = Http::withToken($this->secretKey)
+            ->get(self::BASE.'/checkout/sessions/'.rawurlencode($sesionId))
+            ->throw()
+            ->json();
+
+        $intent = $json['payment_intent'] ?? null;
+        if (is_array($intent)) {
+            $intent = $intent['id'] ?? null;
+        }
+
+        return is_string($intent) && $intent !== '' ? $intent : null;
+    }
+
+    /**
+     * Devuelve dinero de un cobro. `status`: succeeded | pending | requires_action |
+     * failed | canceled (lo pendiente lo resuelve después el webhook `refund.*`).
+     *
+     * @param  array<string, string>  $metadata
+     * @return array{id: string, status: string}
+     */
+    public function crearReembolso(string $paymentIntent, int $montoMinor, string $idempotencia, array $metadata = []): array
+    {
+        $respuesta = Http::withToken($this->secretKey)
+            ->withHeaders(['Idempotency-Key' => $idempotencia])
+            ->asForm()
+            ->post(self::BASE.'/refunds', [
+                'payment_intent' => $paymentIntent,
+                'amount' => $montoMinor,
+                'metadata' => $metadata,
+            ])
+            ->throw();
+
+        /** @var array{id?: string, status?: string} $json */
+        $json = $respuesta->json();
+
+        return [
+            'id' => (string) ($json['id'] ?? ''),
+            'status' => (string) ($json['status'] ?? ''),
+        ];
+    }
 }

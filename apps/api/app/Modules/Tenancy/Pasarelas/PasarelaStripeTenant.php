@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Pasarelas;
 
+use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -17,7 +18,7 @@ use Illuminate\Support\Str;
  * SIN llave devuelve un intento simulado pendiente: el flujo queda listo para
  * activarse en cuanto el estudio cargue sus llaves.
  */
-class PasarelaStripeTenant implements PasarelaTenant
+class PasarelaStripeTenant implements PasarelaReembolsable, PasarelaTenant
 {
     public function nombre(): string
     {
@@ -51,6 +52,38 @@ class PasarelaStripeTenant implements PasarelaTenant
             'tipo' => 'redirect',
             'url' => $sesion['url'],
         ]);
+    }
+
+    /**
+     * Devuelve dinero del cobro en Stripe. La referencia del pago es la sesión de
+     * Checkout (cs_…) o, en cobros anteriores, el PaymentIntent (pi_…).
+     */
+    public function reembolsar(PagoTenant $pago, int $montoMinor, array $llaves): ResultadoPago
+    {
+        $secretKey = $llaves['secret_key'] ?? '';
+        if ($secretKey === '') {
+            throw new PasarelaNoDisponible('Stripe no tiene llaves configuradas.');
+        }
+
+        $cliente = new ClienteStripe($secretKey);
+        $referencia = (string) $pago->referencia_externa;
+        $intent = str_starts_with($referencia, 'cs_') ? $cliente->paymentIntentDeSesion($referencia) : $referencia;
+        if (! is_string($intent) || ! str_starts_with($intent, 'pi_')) {
+            throw new PasarelaNoDisponible('No se encontró el cobro en Stripe.');
+        }
+
+        $reembolso = $cliente->crearReembolso(
+            $intent,
+            $montoMinor,
+            'reembolso_'.$pago->ulid.'_'.Str::lower((string) Str::ulid()),
+            ['pago' => (string) $pago->ulid],
+        );
+
+        return match ($reembolso['status']) {
+            'succeeded' => ResultadoPago::aprobado($reembolso['id']),
+            'pending', 'requires_action' => ResultadoPago::pendiente($reembolso['id']),
+            default => ResultadoPago::rechazado('Stripe rechazó la devolución ('.$reembolso['status'].').'),
+        };
     }
 
     /**

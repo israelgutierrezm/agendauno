@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\ConfirmarPagoTenant;
+use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\Pasarelas\Stripe\VerificarFirmaStripe;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +22,7 @@ class WebhookTenantController
     public function __construct(
         private readonly ConfirmarPagoTenant $confirmar,
         private readonly RegistroDePasarelasTenant $registro,
+        private readonly ReembolsarPagoTenant $reembolsos,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -74,6 +76,14 @@ class WebhookTenantController
 
         if (($sesionPagada || $tipo === 'payment_intent.succeeded') && $referencia !== '') {
             $this->confirmar->porReferencia($referencia);
+        }
+
+        // Devoluciones que quedaron pendientes: Stripe avisa cómo terminaron.
+        if (in_array($tipo, ['refund.updated', 'refund.failed', 'charge.refund.updated'], true) && is_array($objeto)) {
+            $estado = (string) ($objeto['status'] ?? '');
+            if (in_array($estado, ['succeeded', 'failed', 'canceled'], true)) {
+                $this->reembolsos->conciliar($referencia, $estado === 'succeeded');
+            }
         }
 
         return response()->json(['data' => ['ok' => true]]);

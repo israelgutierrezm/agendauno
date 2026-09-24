@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -36,6 +37,7 @@ interface Suscripcion {
   estado: string;
 }
 
+const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeRegularizar = computed(() => sesion.puede("ordenes.gestionar"));
@@ -53,7 +55,11 @@ const reembolsando = ref<Pago | null>(null);
 const rMonto = ref("");
 const rMotivo = ref("");
 const rRevertir = ref(true);
+// Pago en línea cuyo dinero el negocio ya devolvió por fuera (no se pide a la pasarela).
+const rManual = ref(false);
 const rProcesando = ref(false);
+const PASARELAS_EN_LINEA = ["stripe", "openpay", "mercadopago"];
+const avisoReembolso = ref<string | null>(null);
 
 function dinero(minor: number, moneda: string): string {
   return new Intl.NumberFormat("es-MX", {
@@ -122,6 +128,7 @@ interface Reembolso {
   estado: string;
   motivo: string | null;
   revirtio_creditos: boolean;
+  via?: string | null;
   actor: string | null;
   fecha: string | null;
 }
@@ -148,6 +155,7 @@ function abrirReembolso(p: Pago): void {
   rMonto.value = String(p.reembolsable_minor / 100);
   rMotivo.value = "";
   rRevertir.value = true;
+  rManual.value = false;
 }
 
 async function reembolsar(): Promise<void> {
@@ -158,11 +166,17 @@ async function reembolsar(): Promise<void> {
   rProcesando.value = true;
   error.value = null;
   try {
-    await api.post(`${base.value}/pagos/${p.id}/reembolsos`, {
-      monto_minor: Math.round(Number(rMonto.value) * 100),
-      motivo: rMotivo.value.trim(),
-      revertir_creditos: rRevertir.value,
-    });
+    const { data } = await api.post<{ data: { estado: string } }>(
+      `${base.value}/pagos/${p.id}/reembolsos`,
+      {
+        monto_minor: Math.round(Number(rMonto.value) * 100),
+        motivo: rMotivo.value.trim(),
+        revertir_creditos: rRevertir.value,
+        manual: rManual.value,
+      },
+    );
+    avisoReembolso.value =
+      data.data.estado === "pendiente" ? t("reembolsosPago.enProceso") : null;
     reembolsando.value = null;
     await cargar();
   } catch (e) {
@@ -179,6 +193,14 @@ onMounted(cargar);
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion :titulo="$t('cobranza.titulo')" />
 
+    <p
+      v-if="avisoReembolso"
+      class="mt-4 text-sm"
+      role="status"
+      style="color: var(--aviso)"
+    >
+      {{ avisoReembolso }}
+    </p>
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
     </p>
@@ -398,6 +420,10 @@ onMounted(cargar);
                               $t("reembolsosPago.por", { actor: r.actor })
                             }}</template
                           >
+                          <template v-if="r.via">
+                            ·
+                            {{ $t(`reembolsosPago.via.${r.via}`) }}</template
+                          >
                           <template v-if="r.revirtio_creditos">
                             ·
                             {{
@@ -565,6 +591,20 @@ onMounted(cargar);
               >
             </span>
             <input v-model="rRevertir" type="checkbox" class="h-5 w-5" />
+          </label>
+          <label
+            v-if="PASARELAS_EN_LINEA.includes(reembolsando.proveedor ?? '')"
+            class="flex items-center justify-between gap-3 text-sm"
+          >
+            <span>
+              {{ $t("reembolsosPago.manual") }}
+              <span
+                class="block text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{ $t("reembolsosPago.manualAyuda") }}</span
+              >
+            </span>
+            <input v-model="rManual" type="checkbox" class="h-5 w-5" />
           </label>
           <button
             class="tu-btn tu-btn-primario w-full"

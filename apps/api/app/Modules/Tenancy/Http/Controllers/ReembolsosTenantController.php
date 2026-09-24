@@ -45,6 +45,8 @@ class ReembolsosTenantController
             'monto_minor' => ['nullable', 'integer', 'min:1'],
             'motivo' => ['required', 'string', 'max:255'],
             'revertir_creditos' => ['boolean'],
+            // Pago en línea cuyo dinero el negocio ya devolvió por fuera.
+            'manual' => ['boolean'],
         ]);
 
         $actor = $request->attributes->get('usuario_tenant');
@@ -52,7 +54,7 @@ class ReembolsosTenantController
         $monto = isset($validado['monto_minor']) ? (int) $validado['monto_minor'] : null;
         $revertir = (bool) ($validado['revertir_creditos'] ?? true);
 
-        $reembolso = $this->reembolsos->ejecutar($pago, $monto, $validado['motivo'], $actorUsuario, $revertir);
+        $reembolso = $this->reembolsos->ejecutar($pago, $monto, $validado['motivo'], $actorUsuario, $revertir, (bool) ($validado['manual'] ?? false));
 
         $this->auditoria->registrar(
             $actorUsuario,
@@ -63,6 +65,7 @@ class ReembolsosTenantController
             [
                 'monto_minor' => $reembolso->monto_minor,
                 'estado' => $reembolso->estado->value,
+                'via' => $reembolso->metadata['via'] ?? null,
                 'revirtio_creditos' => $reembolso->revirtio_creditos,
             ],
             $validado['motivo'],
@@ -81,6 +84,8 @@ class ReembolsosTenantController
             'monto_minor' => $reembolso->monto_minor,
             'moneda' => $reembolso->moneda,
             'estado' => $reembolso->estado->value,
+            // pasarela (devuelto en línea) | manual (devuelto por fuera) | caja
+            'via' => $reembolso->metadata['via'] ?? null,
             'proveedor' => $reembolso->proveedor,
             'motivo' => $reembolso->motivo,
             'revirtio_creditos' => $reembolso->revirtio_creditos,

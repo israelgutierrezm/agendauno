@@ -300,6 +300,16 @@ export const reembolsosPago = {
     aprobado: "Reembolsado",
     fallido: "Falló",
   },
+  via: {
+    pasarela: "devuelto en línea",
+    manual: "devuelto por otro medio",
+    caja: "devuelto en caja",
+  },
+  manual: "Ya devolví el dinero por otro medio",
+  manualAyuda:
+    "Transferencia o efectivo. Si no la marcas, la devolución se pide a la pasarela de pago.",
+  enProceso:
+    "La devolución quedó en proceso: se confirma cuando la pasarela de pago responda.",
 };
 
 export const validacion = {
