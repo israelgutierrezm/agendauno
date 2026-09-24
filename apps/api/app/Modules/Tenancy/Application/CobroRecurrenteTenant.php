@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoDunning;
+use App\Modules\Tenancy\Exceptions\CobroNoConcluyente;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
+use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
@@ -36,6 +39,10 @@ use Illuminate\Support\Carbon;
  * vence sin pago, se suspende; al pagar se regulariza. La orden de renovación NO
  * concede un acuerdo nuevo (el entitlement lo mantiene el motor de ciclos).
  *
+ * Con pago automático (domiciliación) el periodo se cobra a la tarjeta autorizada,
+ * sin el cliente presente; si el banco lo rechaza, entra la mora con el motivo y el
+ * enlace para pagar a mano, y los reintentos vuelven a intentar la tarjeta.
+ *
  * @phpstan-type Resumen array{cobrados: int, pendientes: int, fallidos: int}
  */
 class CobroRecurrenteTenant
@@ -44,6 +51,7 @@ class CobroRecurrenteTenant
         private readonly OrdenesTenant $ordenes,
         private readonly CobrarOrdenTenant $cobrar,
         private readonly GestionarDunningTenant $dunning,
+        private readonly DomiciliacionesTenant $domiciliaciones,
     ) {}
 
     /**
@@ -63,6 +71,11 @@ class CobroRecurrenteTenant
 
         $orden = $this->deudaDelPeriodo($acuerdo, $persona, $producto);
 
+        $domiciliacion = $acuerdo->domiciliacion()->first();
+        if ($domiciliacion instanceof DomiciliacionTenant) {
+            return $this->cargoAutomatico($acuerdo, $orden, $domiciliacion);
+        }
+
         try {
             $pago = $this->cobrar->ejecutar($orden, $proveedor);
         } catch (PasarelaNoDisponible|OrdenNoLiquidable $e) {
@@ -79,12 +92,56 @@ class CobroRecurrenteTenant
         if ($pago->estado === EstadoPago::Pendiente) {
             // Falta que el cliente complete el pago: la fecha NO avanza, la deuda queda
             // y la mora da seguimiento (aviso, reintentos, suspensión si no paga).
-            $this->dunning->registrarFallo($acuerdo, 'Falta que el cliente complete el pago en línea.');
+            $this->dunning->registrarFallo($acuerdo, 'Falta completar el pago en línea.');
 
             return 'pendiente';
         }
 
-        $this->dunning->registrarFallo($acuerdo, 'Cobro recurrente rechazado');
+        $this->dunning->registrarFallo($acuerdo, 'El cobro fue rechazado.');
+
+        return 'fallido';
+    }
+
+    /**
+     * Cobra el periodo a la tarjeta domiciliada. Un rechazo del banco abre/avanza la
+     * mora (con el motivo, para que el cliente sepa qué pasó); si la pasarela no
+     * respondió, no es culpa del cliente: se reintenta en la siguiente corrida.
+     */
+    private function cargoAutomatico(AcuerdoTenant $acuerdo, OrdenTenant $orden, DomiciliacionTenant $domiciliacion): string
+    {
+        // El banco aún procesa el cargo anterior: se espera su resultado (webhook).
+        $enProceso = PagoTenant::query()
+            ->where('orden_id', $orden->getKey())
+            ->whereNotNull('domiciliacion_id')
+            ->where('estado', EstadoPago::Pendiente->value)
+            ->exists();
+        if ($enProceso) {
+            return 'pendiente';
+        }
+
+        try {
+            $pago = $this->cobrar->domiciliado($orden, $domiciliacion);
+        } catch (CobroNoConcluyente) {
+            return 'fallido';
+        } catch (PasarelaNoDisponible|OrdenNoLiquidable $e) {
+            $this->dunning->registrarFallo($acuerdo, $e->getMessage());
+
+            return 'fallido';
+        }
+
+        if ($pago->estado === EstadoPago::Aprobado) {
+            $this->domiciliaciones->registrarCargo($domiciliacion, null);
+
+            return 'cobrado';
+        }
+        if ($pago->estado === EstadoPago::Pendiente) {
+            return 'pendiente';
+        }
+
+        $motivo = $pago->motivo ?? 'El banco rechazó el cargo.';
+        $this->domiciliaciones->registrarCargo($domiciliacion, $motivo);
+        $tarjeta = trim(ucfirst((string) $domiciliacion->marca).' terminación '.$domiciliacion->ultimos4);
+        $this->dunning->registrarFallo($acuerdo, "No pudimos cobrar tu pago automático a la tarjeta {$tarjeta}: {$motivo}");
 
         return 'fallido';
     }

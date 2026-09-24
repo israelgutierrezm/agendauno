@@ -9,9 +9,13 @@ interface Pasarela {
   activa: boolean;
   modo: string;
   llaves_configuradas: string[];
-  // ¿Existe de verdad? (OpenPay y Mercado Pago aún no) y ¿ya cobra?
+  // ¿Existe de verdad? y ¿ya cobra?
   disponible?: boolean;
   lista?: boolean;
+  // A dónde manda sus avisos la pasarela (se registra en su tablero).
+  webhook_url?: string | null;
+  // OpenPay: el código que manda al registrar el webhook.
+  codigo_verificacion?: string | null;
 }
 
 // Llaves que pide cada proveedor (para el formulario).
@@ -36,6 +40,19 @@ const cargando = ref(true);
 const error = ref<string | null>(null);
 const guardando = ref<string | null>(null);
 const guardado = ref<string | null>(null);
+const copiada = ref<string | null>(null);
+
+async function copiar(p: Pasarela): Promise<void> {
+  if (!p.webhook_url) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(p.webhook_url);
+    copiada.value = p.proveedor;
+  } catch {
+    copiada.value = null;
+  }
+}
 
 // Modelo editable por proveedor: activa, modo y llaves nuevas (write-only).
 const edicion = reactive<
@@ -187,6 +204,39 @@ onMounted(cargar);
               <option value="live">{{ $t("pasarelas.live") }}</option>
             </select>
           </div>
+        </div>
+
+        <div v-if="p.webhook_url" class="mt-3 text-sm">
+          <p class="tu-label">{{ $t("pasarelasEstado.webhook") }}</p>
+          <div class="flex flex-wrap items-center gap-2">
+            <code
+              class="rounded px-2 py-1 text-xs break-all"
+              :style="{ background: 'var(--superficie-2)' }"
+              >{{ p.webhook_url }}</code
+            >
+            <button type="button" class="tu-enlace text-xs" @click="copiar(p)">
+              {{
+                copiada === p.proveedor
+                  ? $t("pasarelasEstado.copiada")
+                  : $t("pasarelasEstado.copiar")
+              }}
+            </button>
+          </div>
+          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t(`pasarelasEstado.ayudaWebhook.${p.proveedor}`) }}
+          </p>
+          <p
+            v-if="p.codigo_verificacion"
+            class="mt-1 text-xs"
+            role="status"
+            style="color: var(--aviso)"
+          >
+            {{
+              $t("pasarelasEstado.codigoVerificacion", {
+                codigo: p.codigo_verificacion,
+              })
+            }}
+          </p>
         </div>
 
         <div

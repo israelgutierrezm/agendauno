@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\ConfirmarPagoTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
+use App\Modules\Tenancy\Pasarelas\Stripe\TarjetasStripe;
 use App\Modules\Tenancy\Pasarelas\Stripe\VerificarFirmaStripe;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class WebhookTenantController
         private readonly ConfirmarPagoTenant $confirmar,
         private readonly RegistroDePasarelasTenant $registro,
         private readonly ReembolsarPagoTenant $reembolsos,
+        private readonly TarjetasStripe $tarjetas,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -76,6 +78,18 @@ class WebhookTenantController
 
         if (($sesionPagada || $tipo === 'payment_intent.succeeded') && $referencia !== '') {
             $this->confirmar->porReferencia($referencia);
+        }
+
+        // Tarjeta autorizada para pagos automáticos: desde la cuenta del alumno (modo
+        // setup) o al pagar una compra con domiciliación (tras concederla, arriba).
+        if ($tipo === 'checkout.session.completed' && is_array($objeto)
+            && (($objeto['mode'] ?? '') === 'setup' || $sesionPagada)) {
+            $this->tarjetas->sesionCompletada($objeto);
+        }
+
+        // Un cargo automático que el banco procesaba terminó rechazado.
+        if ($tipo === 'payment_intent.payment_failed' && $referencia !== '') {
+            $this->confirmar->rechazarPorReferencia($referencia);
         }
 
         // Devoluciones que quedaron pendientes: Stripe avisa cómo terminaron.

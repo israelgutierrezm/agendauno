@@ -35,6 +35,13 @@ interface Suscripcion {
   moneda: string | null;
   proxima_cobro_en: string | null;
   estado: string;
+  // Pago automático: la tarjeta con la que se cobra sola (y el último rechazo).
+  pago_automatico: {
+    marca: string | null;
+    ultimos4: string | null;
+    expira: string | null;
+    error: string | null;
+  } | null;
 }
 
 const { t } = useI18n();
@@ -46,6 +53,8 @@ const puedeReembolsar = computed(() => sesion.puede("pagos.reembolsar"));
 const morosos = ref<Moroso[]>([]);
 const pagos = ref<Pago[]>([]);
 const suscripciones = ref<Suscripcion[]>([]);
+const pagoAutomaticoDisponible = ref(false);
+const avisoRenovacion = ref<string | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const accionando = ref<string | null>(null);
@@ -92,15 +101,56 @@ async function cargar(): Promise<void> {
     const [d, p, s] = await Promise.all([
       api.get<{ data: Moroso[] }>(`${base.value}/dunning`),
       api.get<{ data: Pago[] }>(`${base.value}/pagos`),
-      api.get<{ data: Suscripcion[] }>(`${base.value}/suscripciones`),
+      api.get<{ data: Suscripcion[]; pago_automatico_disponible?: boolean }>(
+        `${base.value}/suscripciones`,
+      ),
     ]);
     morosos.value = d.data.data;
     pagos.value = p.data.data;
     suscripciones.value = s.data.data;
+    pagoAutomaticoDisponible.value = s.data.pago_automatico_disponible === true;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
+  }
+}
+
+function marca(m: string | null): string {
+  return m ? m.charAt(0).toUpperCase() + m.slice(1) : "";
+}
+
+// Correo al alumno con el enlace para activar su pago automático.
+async function invitarPagoAutomatico(s: Suscripcion): Promise<void> {
+  accionando.value = s.id;
+  error.value = null;
+  avisoRenovacion.value = null;
+  try {
+    await api.post(
+      `${base.value}/suscripciones/${s.id}/pago-automatico/solicitar`,
+      {},
+    );
+    avisoRenovacion.value = t("pagoAutomatico.invitado");
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    accionando.value = null;
+  }
+}
+
+async function quitarPagoAutomatico(s: Suscripcion): Promise<void> {
+  if (!window.confirm(t("pagoAutomatico.confirmarQuitarNegocio"))) {
+    return;
+  }
+  accionando.value = s.id;
+  error.value = null;
+  try {
+    await api.delete(`${base.value}/suscripciones/${s.id}/pago-automatico`);
+    await cargar();
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    accionando.value = null;
   }
 }
 
@@ -457,6 +507,14 @@ onMounted(cargar);
       <!-- Próximas renovaciones (cobro recurrente) -->
       <h2 class="mt-8 font-light text-lg">{{ $t("cobranza.renovaciones") }}</h2>
       <p
+        v-if="avisoRenovacion"
+        class="mt-2 text-sm"
+        role="status"
+        :style="{ color: 'var(--exito)' }"
+      >
+        {{ avisoRenovacion }}
+      </p>
+      <p
         v-if="suscripciones.length === 0"
         class="mt-3 tu-card p-6 text-sm"
         :style="{ color: 'var(--texto-suave)' }"
@@ -478,6 +536,9 @@ onMounted(cargar);
               </th>
               <th class="px-4 py-2 font-medium">
                 {{ $t("cobranza.colProxima") }}
+              </th>
+              <th class="px-4 py-2 font-medium">
+                {{ $t("pagoAutomatico.colCobro") }}
               </th>
             </tr>
           </thead>
@@ -513,6 +574,46 @@ onMounted(cargar);
                   }"
                   >{{ $t(`cobranza.estados.${s.estado}`, s.estado) }}</span
                 >
+              </td>
+              <td class="px-4 py-2">
+                <template v-if="s.pago_automatico">
+                  <span class="tu-badge tu-badge-exito">{{
+                    $t("pagoAutomatico.tarjeta", {
+                      marca: marca(s.pago_automatico.marca),
+                      ultimos4: s.pago_automatico.ultimos4 ?? "····",
+                    })
+                  }}</span>
+                  <button
+                    v-if="puedeRegularizar"
+                    type="button"
+                    class="tu-enlace ml-2 text-xs"
+                    :disabled="accionando !== null"
+                    @click="quitarPagoAutomatico(s)"
+                  >
+                    {{ $t("pagoAutomatico.quitar") }}
+                  </button>
+                  <p
+                    v-if="s.pago_automatico.error"
+                    class="text-xs"
+                    style="color: var(--error)"
+                  >
+                    {{ s.pago_automatico.error }}
+                  </p>
+                </template>
+                <template v-else>
+                  <span :style="{ color: 'var(--texto-suave)' }">{{
+                    $t("pagoAutomatico.pagoManual")
+                  }}</span>
+                  <button
+                    v-if="puedeRegularizar && pagoAutomaticoDisponible"
+                    type="button"
+                    class="tu-enlace ml-2 text-xs"
+                    :disabled="accionando !== null"
+                    @click="invitarPagoAutomatico(s)"
+                  >
+                    {{ $t("pagoAutomatico.invitar") }}
+                  </button>
+                </template>
               </td>
             </tr>
           </tbody>

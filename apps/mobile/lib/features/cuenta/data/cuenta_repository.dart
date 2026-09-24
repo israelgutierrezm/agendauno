@@ -46,7 +46,62 @@ class CuentaRepository {
       clases: clases,
       consentimientos: consentimientos,
       pagoEnLinea: (data['pago_en_linea'] ?? false) as bool,
+      pagoAutomatico: (data['pago_automatico'] ?? false) as bool,
     );
+  }
+
+  /// Sus membresías que se renuevan y cuáles se cobran solas (pago automático).
+  Future<PagoAutomatico> pagoAutomatico() async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/pago-automatico',
+    );
+    final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
+    final tarjeta = data['tarjeta'];
+    return PagoAutomatico(
+      disponible: (data['disponible'] ?? false) as bool,
+      tarjeta: tarjeta is Map<String, dynamic>
+          ? TarjetaDomiciliada.desdeJson(tarjeta)
+          : null,
+      membresias: ((data['membresias'] ?? []) as List)
+          .map((e) => MembresiaRenovable.desdeJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  /// Activa el pago automático de una membresía. Devuelve la página de la pasarela
+  /// para autorizar la tarjeta, o null si ya quedó activo (ya había tarjeta).
+  /// Lanza [RequiereWeb] si la pasarela captura la tarjeta con su formulario
+  /// web (OpenPay.js), que no hay en la app.
+  Future<String?> activarPagoAutomatico(String membresiaId) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/mi/pago-automatico/$membresiaId',
+    );
+    final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
+    if (data['estado'] == 'formulario') {
+      throw const RequiereWeb();
+    }
+    return _urlDeCheckout(res.data);
+  }
+
+  Future<void> quitarPagoAutomatico(String membresiaId) => _dio
+      .delete<Map<String, dynamic>>('$_base/mi/pago-automatico/$membresiaId');
+
+  /// Página de la pasarela para autorizar otra tarjeta.
+  Future<String?> cambiarTarjeta() async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/mi/pago-automatico/tarjeta',
+    );
+    return _urlDeCheckout(res.data);
+  }
+
+  String? _urlDeCheckout(Map<String, dynamic>? respuesta) {
+    final checkout =
+        ((respuesta?['data'] ?? {}) as Map<String, dynamic>)['checkout'];
+    if (checkout is Map && checkout['tipo'] == 'redirect') {
+      final url = checkout['url'];
+      return url is String && url.isNotEmpty ? url : null;
+    }
+    return null;
   }
 
   /// Abre el pago en línea de una orden (p. ej. una cita apartada): devuelve la URL
@@ -189,3 +244,8 @@ final cuentaRepositoryProvider = Provider<CuentaRepository?>((ref) {
 
   return CuentaRepository(ref.watch(dioProvider), sesion.slug);
 });
+
+/// La acción se completa en la web (p. ej. capturar la tarjeta con OpenPay.js).
+class RequiereWeb implements Exception {
+  const RequiereWeb();
+}

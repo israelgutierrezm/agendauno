@@ -57,6 +57,7 @@ class ReembolsarPagoTenant
         private readonly LibroMayorTenant $libro,
         private readonly RegistroDePasarelasTenant $registro,
         private readonly RegistrarEventoTenant $eventos,
+        private readonly DomiciliacionesTenant $domiciliaciones,
     ) {}
 
     /**
@@ -259,6 +260,8 @@ class ReembolsarPagoTenant
                 }
             }
             $acuerdo->update(['estado' => EstadoAcuerdo::Cancelado->value]);
+            // Cancelada ya no se renueva: sin pago automático.
+            $this->domiciliaciones->desactivar($acuerdo);
         }
     }
 

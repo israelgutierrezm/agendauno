@@ -39,6 +39,7 @@ class BajaDePersonaTenant
         private readonly AutenticacionTenant $auth,
         private readonly RegistrarEventoTenant $eventos,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly DomiciliacionesTenant $domiciliaciones,
     ) {}
 
     public function solicitar(PersonaTenant $persona, ?string $motivo): SolicitudPrivacidadTenant
@@ -155,6 +156,9 @@ class BajaDePersonaTenant
             ]);
             $this->auditoria->registrar($actor, 'privacidad.baja_atendida', 'persona', (string) $persona->ulid);
         });
+
+        // Sin membresías vigentes no hay nada que cobrar: se desligan sus tarjetas.
+        $this->domiciliaciones->desactivarDePersona($persona);
 
         // Los archivos se borran ya fuera de la transacción (no se pueden deshacer).
         foreach ($archivos as $ruta) {

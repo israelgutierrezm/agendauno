@@ -31,6 +31,8 @@ import {
   pasarelasEstado,
   privacidadNegocio,
   resenas,
+  pagoAutomatico,
+  pagoTienda,
   pausaMembresia,
   plataformaAdmin,
   recuperarContrasena,
@@ -81,6 +83,8 @@ export const i18n = createI18n({
       miPrivacidad,
       privacidadNegocio,
       resenas,
+      pagoAutomatico,
+      pagoTienda,
     },
   },
 });

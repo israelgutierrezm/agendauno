@@ -8,6 +8,7 @@ import type { FormularioPersona } from "@/lib/formularios";
 import CalificarClases from "@/components/CalificarClases.vue";
 import MiPrivacidad from "@/components/MiPrivacidad.vue";
 import MisDocumentos from "@/components/MisDocumentos.vue";
+import PagoAutomatico from "@/components/PagoAutomatico.vue";
 import PaseEntrada from "@/components/PaseEntrada.vue";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -46,6 +47,8 @@ interface Orden {
   total_minor: number;
   moneda: string;
   fecha: string | null;
+  // Se renueva: al pagarla se puede dejar el pago automático.
+  recurrente?: boolean;
   lineas: {
     producto: string | null;
     cantidad: number;
@@ -87,6 +90,17 @@ const formularios = ref<FormularioPersona[]>([]);
 const personaId = ref<string | null>(null);
 // ¿El negocio cobra en línea? Entonces el alumno paga aquí lo pendiente.
 const pagoEnLinea = ref(false);
+// ¿La pasarela admite pago automático? Al pagar una membresía se puede domiciliar.
+const pagoAutomatico = ref(false);
+const domiciliar = ref<Record<string, boolean>>({});
+// Pago en tienda (OXXO con OpenPay): la referencia y el recibo para ir a pagar.
+interface Voucher {
+  referencia?: string;
+  codigo_barras?: string;
+  recibo?: string;
+  vence?: string;
+}
+const voucher = ref<Voucher | null>(null);
 const pagando = ref<string | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
@@ -135,6 +149,7 @@ async function cargar(silencioso = false): Promise<void> {
           reservas: Reserva[];
           politica_cancelacion: Politica | null;
           pago_en_linea?: boolean;
+          pago_automatico?: boolean;
         };
       }>(`${base.value}/mi/perfil`),
       api.get<{ data: Clase[] }>(`${base.value}/mi/agenda`),
@@ -146,6 +161,7 @@ async function cargar(silencioso = false): Promise<void> {
     reservas.value = p.data.data.reservas;
     politica.value = p.data.data.politica_cancelacion;
     pagoEnLinea.value = p.data.data.pago_en_linea === true;
+    pagoAutomatico.value = p.data.data.pago_automatico === true;
     clases.value = a.data.data;
     waivers.value = w.data.data;
     productos.value = pr.data.data;
@@ -179,16 +195,31 @@ if (retornoPago.value === "exito") {
 }
 
 // Paga en línea una orden propia (compra o cita apartada). Con pasarela de
-// redirección se va al checkout; si no, el pago queda en proceso.
-async function pagar(ordenId: string): Promise<void> {
+// redirección se va al checkout; con pago en tienda se muestra la referencia; si
+// no, el pago queda en proceso.
+async function pagar(
+  ordenId: string,
+  metodo: "tarjeta" | "oxxo" = "tarjeta",
+): Promise<void> {
   pagando.value = ordenId;
   error.value = null;
   mensaje.value = null;
+  voucher.value = null;
   try {
     const { data } = await api.post<{
-      data: { checkout?: { tipo?: string; url?: string } | null };
-    }>(`${base.value}/mi/ordenes/${ordenId}/cobrar`, { metodo: "tarjeta" });
+      data: {
+        checkout?: ({ tipo?: string; url?: string } & Voucher) | null;
+      };
+    }>(`${base.value}/mi/ordenes/${ordenId}/cobrar`, {
+      metodo,
+      // Solo con tarjeta se puede dejar el pago automático.
+      domiciliar: metodo === "tarjeta" && domiciliar.value[ordenId] === true,
+    });
     const checkout = data.data.checkout ?? {};
+    if (checkout.tipo === "voucher") {
+      voucher.value = checkout;
+      return;
+    }
     if (
       checkout.tipo === "redirect" &&
       typeof checkout.url === "string" &&
@@ -326,6 +357,40 @@ onMounted(() => cargar());
     >
       {{ $t("miCuentaExtra.pagoEnProceso") }}
     </p>
+    <div v-if="voucher" class="mt-4 tu-card p-5 text-sm" role="status">
+      <p class="font-medium">{{ $t("pagoTienda.titulo") }}</p>
+      <p class="mt-1">
+        {{ $t("pagoTienda.referencia", { referencia: voucher.referencia }) }}
+      </p>
+      <img
+        v-if="voucher.codigo_barras"
+        :src="voucher.codigo_barras"
+        alt=""
+        class="mt-2 h-12 max-w-full"
+      />
+      <p
+        v-if="voucher.vence"
+        class="mt-1"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{
+          $t("pagoTienda.vence", {
+            fecha: horaLocal(voucher.vence, null),
+          })
+        }}
+      </p>
+      <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
+        {{ $t("pagoTienda.ayuda") }}
+      </p>
+      <a
+        v-if="voucher.recibo"
+        :href="voucher.recibo"
+        target="_blank"
+        rel="noopener"
+        class="tu-enlace mt-2 inline-block"
+        >{{ $t("pagoTienda.recibo") }}</a
+      >
+    </div>
 
     <template v-if="!cargando">
       <!-- Consentimientos pendientes -->
@@ -406,6 +471,9 @@ onMounted(() => cargar());
 
         <!-- Pase de entrada (QR) -->
         <PaseEntrada v-if="personaId !== null" />
+
+        <!-- Pago automático de sus membresías -->
+        <PagoAutomatico v-if="personaId !== null" />
 
         <!-- Documentos que pide el negocio -->
         <MisDocumentos v-if="personaId !== null" />
@@ -672,6 +740,16 @@ onMounted(() => cargar());
                 "
                 >{{ $t(`miCuenta.compras.estados.${o.estado}`) }}</span
               >
+              <label
+                v-if="
+                  o.estado === 'pendiente' && pagoAutomatico && o.recurrente
+                "
+                class="flex items-center gap-1.5 text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                <input v-model="domiciliar[o.id]" type="checkbox" />
+                {{ $t("pagoAutomatico.alPagar") }}
+              </label>
               <button
                 v-if="o.estado === 'pendiente' && pagoEnLinea"
                 class="tu-btn tu-btn-primario text-sm"
@@ -683,6 +761,15 @@ onMounted(() => cargar());
                     ? $t("miCuentaExtra.pagando")
                     : $t("miCuentaExtra.pagar")
                 }}
+              </button>
+              <button
+                v-if="o.estado === 'pendiente' && pagoEnLinea"
+                type="button"
+                class="tu-enlace text-xs"
+                :disabled="pagando !== null"
+                @click="pagar(o.id, 'oxxo')"
+              >
+                {{ $t("pagoTienda.pagarOxxo") }}
               </button>
             </span>
           </li>

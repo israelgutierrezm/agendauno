@@ -66,6 +66,18 @@ class AcuerdoTenant extends Model
     }
 
     /**
+     * El pago automático vigente de la membresía, si lo tiene.
+     *
+     * @return HasOne<DomiciliacionTenant, $this>
+     */
+    public function domiciliacion(): HasOne
+    {
+        return $this->hasOne(DomiciliacionTenant::class, 'acuerdo_id')
+            ->where('estado', DomiciliacionTenant::ACTIVA)
+            ->latest('id');
+    }
+
+    /**
      * La pausa en curso (a lo más una a la vez).
      *
      * @return HasOne<PausaAcuerdoTenant, $this>

@@ -40,6 +40,7 @@ class EventoDeDominioTenant
         'cuenta.creada',
         'privacidad.baja_solicitada',
         'resena.creada',
+        'pago_automatico.solicitado',
     ];
 
     /**

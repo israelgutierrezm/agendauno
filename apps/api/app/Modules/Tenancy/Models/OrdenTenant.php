@@ -25,7 +25,7 @@ class OrdenTenant extends Model
 
     protected $fillable = [
         'persona_id', 'sucursal_id', 'sesion_id', 'renueva_acuerdo_id', 'estado', 'total_minor', 'descuento_minor', 'promocion_id', 'moneda',
-        'metodo_pago', 'referencia_pago', 'pagada_en',
+        'metodo_pago', 'referencia_pago', 'pagada_en', 'domiciliar',
     ];
 
     /**
@@ -36,6 +36,7 @@ class OrdenTenant extends Model
         'total_minor' => 'integer',
         'descuento_minor' => 'integer',
         'pagada_en' => 'datetime',
+        'domiciliar' => 'boolean',
     ];
 
     /**

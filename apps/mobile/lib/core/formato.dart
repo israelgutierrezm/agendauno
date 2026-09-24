@@ -35,5 +35,38 @@ abstract final class Formato {
   /// "2026-09-25".
   static String iso(DateTime f) => '${f.year}-${_dos(f.month)}-${_dos(f.day)}';
 
+  /// "\$1,299.00" a partir de centavos (sin punto flotante).
+  static String dinero(int minor) {
+    final pesos = (minor ~/ 100).toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+$)'),
+      (m) => '${m[1]},',
+    );
+    return '\$$pesos.${_dos(minor % 100)}';
+  }
+
+  /// "24 de octubre" a partir de "2026-10-24".
+  static String fechaLarga(String? fecha) {
+    final f = fecha == null ? null : DateTime.tryParse(fecha);
+    if (f == null) {
+      return '—';
+    }
+    return '${f.day} de ${_mesesLargos[f.month - 1]}';
+  }
+
+  static const _mesesLargos = [
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
+  ];
+
   static String _dos(int n) => n.toString().padLeft(2, '0');
 }

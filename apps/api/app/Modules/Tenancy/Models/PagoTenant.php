@@ -26,7 +26,7 @@ class PagoTenant extends Model
 
     protected $fillable = [
         'orden_id', 'proveedor', 'metodo', 'estado', 'monto_minor', 'moneda',
-        'referencia_externa', 'idempotency_key',
+        'referencia_externa', 'idempotency_key', 'domiciliacion_id',
     ];
 
     /**
@@ -44,6 +44,12 @@ class PagoTenant extends Model
     public ?string $retorno = null;
 
     /**
+     * Por qué la pasarela rechazó el cobro (p. ej. un cargo automático), para
+     * avisarlo. No se persiste.
+     */
+    public ?string $motivo = null;
+
+    /**
      * @var array<string, string>
      */
     protected $casts = [
@@ -51,6 +57,16 @@ class PagoTenant extends Model
         'metodo' => MetodoPago::class,
         'monto_minor' => 'integer',
     ];
+
+    /**
+     * El pago automático con el que se hizo el cargo (si fue domiciliado).
+     *
+     * @return BelongsTo<DomiciliacionTenant, $this>
+     */
+    public function domiciliacion(): BelongsTo
+    {
+        return $this->belongsTo(DomiciliacionTenant::class, 'domiciliacion_id');
+    }
 
     /**
      * @return BelongsTo<OrdenTenant, $this>

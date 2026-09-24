@@ -11,6 +11,7 @@ use Illuminate\Http\File as ArchivoHttp;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -174,14 +175,18 @@ class RespaldosEstudio
         }
     }
 
+    /**
+     * Ruta para un archivo de trabajo (el archivo aún no existe), con nombre
+     * impredecible dentro de `storage` (no en el temporal compartido del sistema).
+     */
     private function temporal(): string
     {
-        $ruta = tempnam(sys_get_temp_dir(), 'respaldo_');
-        if ($ruta === false) {
-            throw new RuntimeException('No se pudo crear un archivo temporal.');
+        $carpeta = storage_path('app/respaldos-temp');
+        if (! is_dir($carpeta) && ! mkdir($carpeta, 0700, true) && ! is_dir($carpeta)) {
+            throw new RuntimeException('No se pudo crear la carpeta temporal.');
         }
 
-        return $ruta;
+        return $carpeta.DIRECTORY_SEPARATOR.'respaldo_'.Str::lower((string) Str::ulid());
     }
 
     private function carpeta(Estudio $estudio): string

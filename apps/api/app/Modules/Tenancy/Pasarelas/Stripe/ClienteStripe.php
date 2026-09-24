@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Pasarelas\Stripe;
 
+use App\Modules\Tenancy\Exceptions\CobroNoConcluyente;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -33,6 +35,8 @@ class ClienteStripe
         ?string $metodo = null,
         ?string $email = null,
         array $metadata = [],
+        ?string $cliente = null,
+        bool $guardarTarjeta = false,
     ): array {
         $datos = [
             'mode' => 'payment',
@@ -49,8 +53,16 @@ class ClienteStripe
             'cancel_url' => $cancelado,
             'metadata' => $metadata,
         ];
-        if ($email !== null && $email !== '') {
+        if ($cliente !== null && $cliente !== '') {
+            $datos['customer'] = $cliente;
+        } elseif ($email !== null && $email !== '') {
             $datos['customer_email'] = $email;
+        }
+        if ($guardarTarjeta) {
+            // La tarjeta queda autorizada para los cargos automáticos de cada periodo
+            // (solo tarjeta: OXXO no se puede domiciliar).
+            $datos['payment_method_types'] = ['card'];
+            $datos['payment_intent_data'] = ['setup_future_usage' => 'off_session'];
         }
 
         $respuesta = Http::withToken($this->secretKey)
@@ -65,6 +77,206 @@ class ClienteStripe
             'id' => (string) ($json['id'] ?? ''),
             'url' => (string) ($json['url'] ?? ''),
         ];
+    }
+
+    /**
+     * Crea el cliente de una persona en la cuenta Stripe del negocio (a él se ligan
+     * sus tarjetas guardadas). Devuelve su id (`cus_…`).
+     *
+     * @param  array<string, string>  $metadata
+     */
+    public function crearCliente(string $nombre, ?string $email, string $idempotencia, array $metadata = []): string
+    {
+        $datos = ['name' => $nombre, 'metadata' => $metadata];
+        if ($email !== null && $email !== '') {
+            $datos['email'] = $email;
+        }
+
+        /** @var array{id?: string} $json */
+        $json = Http::withToken($this->secretKey)
+            ->withHeaders(['Idempotency-Key' => $idempotencia])
+            ->asForm()
+            ->post(self::BASE.'/customers', $datos)
+            ->throw()
+            ->json();
+
+        return (string) ($json['id'] ?? '');
+    }
+
+    /**
+     * Sesión de Checkout en modo `setup`: el cliente autoriza su tarjeta para los
+     * cargos automáticos, sin pagar nada ahora.
+     *
+     * @param  array<string, string>  $metadata
+     * @return array{id: string, url: string}
+     */
+    public function crearSesionGuardado(string $cliente, string $exito, string $cancelado, array $metadata = []): array
+    {
+        /** @var array{id?: string, url?: string} $json */
+        $json = Http::withToken($this->secretKey)
+            ->asForm()
+            ->post(self::BASE.'/checkout/sessions', [
+                'mode' => 'setup',
+                'customer' => $cliente,
+                'payment_method_types' => ['card'],
+                'success_url' => $exito,
+                'cancel_url' => $cancelado,
+                'metadata' => $metadata,
+                'setup_intent_data' => ['metadata' => $metadata],
+            ])
+            ->throw()
+            ->json();
+
+        return [
+            'id' => (string) ($json['id'] ?? ''),
+            'url' => (string) ($json['url'] ?? ''),
+        ];
+    }
+
+    /**
+     * La tarjeta que el cliente dejó autorizada en una sesión de Checkout: en modo
+     * `setup`, o al pagar con `setup_future_usage`. Null si la sesión no guardó una.
+     *
+     * @return array{metadata: array<string, mixed>, cliente: string, metodo: string, marca: string|null, ultimos4: string|null, expira_mes: int|null, expira_anio: int|null}|null
+     */
+    public function tarjetaDeSesion(string $sesionId): ?array
+    {
+        /** @var array<string, mixed> $sesion */
+        $sesion = Http::withToken($this->secretKey)
+            ->get(self::BASE.'/checkout/sessions/'.rawurlencode($sesionId), [
+                'expand' => ['setup_intent.payment_method', 'payment_intent.payment_method'],
+            ])
+            ->throw()
+            ->json();
+
+        $setup = ($sesion['mode'] ?? '') === 'setup';
+        $intent = $setup ? ($sesion['setup_intent'] ?? null) : ($sesion['payment_intent'] ?? null);
+        if (! is_array($intent)) {
+            return null;
+        }
+        // Un pago normal no deja la tarjeta autorizada para cobrar después.
+        if (! $setup && ($intent['setup_future_usage'] ?? null) !== 'off_session') {
+            return null;
+        }
+
+        $metodo = $intent['payment_method'] ?? null;
+        $cliente = $sesion['customer'] ?? ($intent['customer'] ?? null);
+        if (is_array($cliente)) {
+            $cliente = $cliente['id'] ?? null;
+        }
+        if (! is_array($metodo) || ! is_string($metodo['id'] ?? null) || ! is_string($cliente) || $cliente === '') {
+            return null;
+        }
+        $tarjeta = is_array($metodo['card'] ?? null) ? $metodo['card'] : [];
+
+        return [
+            'metadata' => is_array($sesion['metadata'] ?? null) ? $sesion['metadata'] : [],
+            'cliente' => $cliente,
+            'metodo' => $metodo['id'],
+            'marca' => isset($tarjeta['brand']) ? (string) $tarjeta['brand'] : null,
+            'ultimos4' => isset($tarjeta['last4']) ? (string) $tarjeta['last4'] : null,
+            'expira_mes' => isset($tarjeta['exp_month']) ? (int) $tarjeta['exp_month'] : null,
+            'expira_anio' => isset($tarjeta['exp_year']) ? (int) $tarjeta['exp_year'] : null,
+        ];
+    }
+
+    /**
+     * Cargo automático: cobra sin el cliente presente a su tarjeta guardada. Un
+     * rechazo del banco (402) no lanza: vuelve con `status` = `fallido` y su código
+     * (`card_declined`, `insufficient_funds`, `authentication_required`…).
+     *
+     * @param  array<string, string>  $metadata
+     * @return array{id: string, status: string, codigo: string|null}
+     *
+     * @throws CobroNoConcluyente si Stripe no respondió (se reintenta con la misma llave)
+     */
+    public function cobrarGuardado(
+        int $montoMinor,
+        string $moneda,
+        string $cliente,
+        string $metodo,
+        string $concepto,
+        string $idempotencia,
+        array $metadata = [],
+    ): array {
+        try {
+            $respuesta = Http::withToken($this->secretKey)
+                ->withHeaders(['Idempotency-Key' => $idempotencia])
+                ->asForm()
+                ->timeout(40)
+                ->post(self::BASE.'/payment_intents', [
+                    'amount' => $montoMinor,
+                    'currency' => strtolower($moneda),
+                    'customer' => $cliente,
+                    'payment_method' => $metodo,
+                    'off_session' => 'true',
+                    'confirm' => 'true',
+                    'description' => $concepto,
+                    'metadata' => $metadata,
+                ]);
+        } catch (ConnectionException $e) {
+            throw new CobroNoConcluyente('Stripe no respondió.', previous: $e);
+        }
+
+        if ($respuesta->serverError() || $respuesta->status() === 429) {
+            throw new CobroNoConcluyente('Stripe no respondió.');
+        }
+
+        /** @var array<string, mixed> $json */
+        $json = $respuesta->json() ?? [];
+        if ($respuesta->successful()) {
+            return [
+                'id' => (string) ($json['id'] ?? ''),
+                'status' => (string) ($json['status'] ?? ''),
+                'codigo' => null,
+            ];
+        }
+
+        $error = is_array($json['error'] ?? null) ? $json['error'] : [];
+        $intent = is_array($error['payment_intent'] ?? null) ? $error['payment_intent'] : [];
+
+        return [
+            'id' => (string) ($intent['id'] ?? ''),
+            'status' => 'fallido',
+            'codigo' => (string) ($error['decline_code'] ?? $error['code'] ?? 'rechazado'),
+        ];
+    }
+
+    /**
+     * Desliga una tarjeta del cliente: ya no se le puede cobrar. Si ya estaba
+     * desligada, no hay nada que hacer.
+     */
+    public function desligarMetodo(string $metodo): void
+    {
+        Http::withToken($this->secretKey)
+            ->asForm()
+            ->post(self::BASE.'/payment_methods/'.rawurlencode($metodo).'/detach');
+    }
+
+    /**
+     * Anula un cargo (PaymentIntent) aún sin cobrar. Devuelve false si ya se cobró o
+     * el banco lo está procesando.
+     */
+    public function anularIntent(string $intentId): bool
+    {
+        /** @var array{status?: string} $json */
+        $json = Http::withToken($this->secretKey)
+            ->get(self::BASE.'/payment_intents/'.rawurlencode($intentId))
+            ->throw()
+            ->json();
+
+        $estado = (string) ($json['status'] ?? '');
+        if (in_array($estado, ['succeeded', 'processing', 'requires_capture'], true)) {
+            return false;
+        }
+        if ($estado !== 'canceled') {
+            Http::withToken($this->secretKey)
+                ->asForm()
+                ->post(self::BASE.'/payment_intents/'.rawurlencode($intentId).'/cancel')
+                ->throw();
+        }
+
+        return true;
     }
 
     /**

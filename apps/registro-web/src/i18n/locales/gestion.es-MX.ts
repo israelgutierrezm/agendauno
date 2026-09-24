@@ -125,6 +125,9 @@ export const conexiones = {
       },
       factura: { timbrada: "Factura timbrada" },
       cuenta: { creada: "Cuenta creada (bienvenida)" },
+      privacidad: { baja_solicitada: "Baja de datos solicitada" },
+      resena: { creada: "Reseña recibida" },
+      pago_automatico: { solicitado: "Invitación a pago automático" },
     },
   },
 };
@@ -488,10 +491,32 @@ export const paseEntrada = {
 
 export const pasarelasEstado = {
   proximamente: "Próximamente",
-  noDisponible:
-    "Aún no está disponible. Por ahora el cobro en línea es con Stripe.",
-  faltaLlave: "Falta la llave secreta: sin ella no se cobra en línea.",
+  noDisponible: "Aún no está disponible.",
+  faltaLlave: "Faltan llaves: sin ellas no se cobra en línea.",
   lista: "Lista para cobrar",
+  webhook: "URL para avisos (webhook)",
+  copiar: "Copiar",
+  copiada: "Copiada",
+  ayudaWebhook: {
+    stripe:
+      "Regístrala en Stripe → Desarrolladores → Webhooks con los eventos checkout.session.*, payment_intent.* y refund.*, y pega aquí su clave de firma (webhook_secret).",
+    mercadopago:
+      "Regístrala en Mercado Pago → Tus integraciones → Webhooks con los temas Pagos y Planes y suscripciones, y pega aquí la clave secreta (webhook_secret).",
+    openpay:
+      "Regístrala en el tablero de OpenPay → Webhooks con autenticación HTTP Basic: el usuario y la contraseña son los que guardes aquí (webhook_user y webhook_password).",
+  },
+  codigoVerificacion:
+    "Código de verificación que envió OpenPay: {codigo}. Captúralo en el tablero de OpenPay para activar el webhook.",
+};
+
+export const pagoTienda = {
+  pagarOxxo: "o paga en efectivo en OXXO",
+  titulo: "Paga en tienda",
+  referencia: "Referencia: {referencia}",
+  vence: "Vence el {fecha}",
+  recibo: "Ver recibo para imprimir",
+  ayuda:
+    "Presenta la referencia en la caja. Tu compra se confirma sola cuando la tienda reporta el pago.",
 };
 
 export const misDocumentos = {
@@ -564,4 +589,39 @@ export const resenas = {
   oculta: "oculta del público",
   ocultar: "Ocultar del público",
   mostrar: "Mostrar al público",
+};
+
+export const pagoAutomatico = {
+  titulo: "Pago automático",
+  ayuda:
+    "Tu membresía se renueva sola: se cobra a tu tarjeta en la fecha de renovación y te avisamos si algo falla. Tu tarjeta la autoriza directamente la pasarela de pago; AgendaUno nunca la ve ni la guarda.",
+  tarjeta: "{marca} terminación {ultimos4}",
+  vence: "vence {fecha}",
+  cambiarTarjeta: "Cambiar tarjeta",
+  renueva: "Se renueva el {fecha} · {monto}",
+  automatico: "Cobro automático",
+  manual: "Te avisamos para pagar",
+  activar: "Activar",
+  quitar: "Quitar",
+  confirmarQuitar:
+    "¿Quitar el pago automático? Cada renovación te avisaremos para que la pagues.",
+  tarjetaExito:
+    "Tarjeta autorizada. En unos segundos verás el pago automático activo.",
+  tarjetaCancelado: "No se autorizó la tarjeta; puedes intentarlo de nuevo.",
+  alPagar: "Cobrar automáticamente cada renovación",
+  // Cobranza (negocio)
+  colCobro: "Cobro",
+  pagoManual: "Pago manual",
+  invitar: "Invitar a activarlo",
+  invitado: "Le enviamos el correo para activar el pago automático.",
+  confirmarQuitarNegocio:
+    "¿Quitar el pago automático de esta membresía? La renovación se le avisará para que la pague.",
+  porAutorizar: "Falta autorizarlo en la pasarela",
+  numeroTarjeta: "Número de tarjeta",
+  titular: "Nombre del titular",
+  mes: "Mes",
+  anio: "Año",
+  seguridadOpenPay:
+    "Tu tarjeta se envía cifrada directamente a OpenPay; AgendaUno no la ve ni la guarda.",
+  autorizar: "Autorizar tarjeta",
 };

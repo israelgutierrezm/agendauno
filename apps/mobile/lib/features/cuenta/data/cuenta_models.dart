@@ -178,10 +178,14 @@ class MiCuenta {
     required this.clases,
     this.consentimientos = const [],
     this.pagoEnLinea = false,
+    this.pagoAutomatico = false,
   });
 
   /// ¿El negocio cobra en línea? Entonces puede pagar aquí lo pendiente.
   final bool pagoEnLinea;
+
+  /// ¿La pasarela admite pago automático (domiciliar sus membresías)?
+  final bool pagoAutomatico;
   final List<DerechoMiembro> derechos;
   final List<ReservaMiembro> reservas;
   final List<ClaseMiembro> clases;
@@ -235,4 +239,80 @@ class RequisitoDocumento {
       motivo: documento?['motivo'] as String?,
     );
   }
+}
+
+/// Tarjeta con la que se cobran los pagos automáticos (nunca el número completo).
+class TarjetaDomiciliada {
+  const TarjetaDomiciliada({this.marca, this.ultimos4, this.expira});
+
+  final String? marca;
+  final String? ultimos4;
+  final String? expira;
+
+  String get texto {
+    final m = marca == null || marca!.isEmpty
+        ? 'Tarjeta'
+        : '${marca![0].toUpperCase()}${marca!.substring(1)}';
+    return '$m terminación ${ultimos4 ?? '····'}';
+  }
+
+  factory TarjetaDomiciliada.desdeJson(Map<String, dynamic> j) =>
+      TarjetaDomiciliada(
+        marca: j['marca'] as String?,
+        ultimos4: j['ultimos4'] as String?,
+        expira: j['expira'] as String?,
+      );
+}
+
+/// Membresía que se renueva: si se cobra sola (pago automático) y el último rechazo.
+class MembresiaRenovable {
+  const MembresiaRenovable({
+    required this.id,
+    required this.automatico,
+    this.pendiente = false,
+    this.producto,
+    this.montoMinor,
+    this.proximaCobroEn,
+    this.error,
+    this.tarjeta,
+  });
+
+  final String id;
+  final bool automatico;
+
+  /// Suscripción creada en la pasarela que falta autorizar.
+  final bool pendiente;
+
+  /// Con qué tarjeta se cobra (en suscripciones, una por membresía).
+  final TarjetaDomiciliada? tarjeta;
+  final String? producto;
+  final int? montoMinor;
+  final String? proximaCobroEn;
+  final String? error;
+
+  factory MembresiaRenovable.desdeJson(Map<String, dynamic> j) =>
+      MembresiaRenovable(
+        id: (j['id'] ?? '') as String,
+        automatico: (j['automatico'] ?? false) as bool,
+        pendiente: (j['pendiente'] ?? false) as bool,
+        tarjeta: j['tarjeta'] is Map<String, dynamic>
+            ? TarjetaDomiciliada.desdeJson(j['tarjeta'] as Map<String, dynamic>)
+            : null,
+        producto: j['producto'] as String?,
+        montoMinor: j['monto_minor'] as int?,
+        proximaCobroEn: j['proxima_cobro_en'] as String?,
+        error: j['error'] as String?,
+      );
+}
+
+class PagoAutomatico {
+  const PagoAutomatico({
+    required this.disponible,
+    required this.membresias,
+    this.tarjeta,
+  });
+
+  final bool disponible;
+  final TarjetaDomiciliada? tarjeta;
+  final List<MembresiaRenovable> membresias;
 }

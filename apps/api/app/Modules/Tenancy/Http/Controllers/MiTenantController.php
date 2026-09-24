@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
+use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\FormulariosDePersonaTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
@@ -15,6 +16,7 @@ use App\Modules\Tenancy\Application\PaseAccesoTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
+use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -27,6 +29,7 @@ use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\WaiverTenant;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
@@ -55,6 +58,7 @@ class MiTenantController
         private readonly PersonaDeUsuarioTenant $personas,
         private readonly RegistroDePasarelasTenant $pasarelas,
         private readonly FormulariosDePersonaTenant $formularios,
+        private readonly DomiciliacionesTenant $domiciliaciones,
     ) {}
 
     /**
@@ -149,6 +153,8 @@ class MiTenantController
             'persona' => ['nombre' => $persona->nombreCompleto(), 'email' => $persona->email],
             // Si el estudio cobra en línea, el alumno puede pagar aquí sus compras.
             'pago_en_linea' => $this->pasarelas->enLinea() !== null,
+            // La pasarela admite pago automático (domiciliar membresías al pagarlas).
+            'pago_automatico' => $this->domiciliaciones->proveedor() !== null,
             'derechos' => $derechos,
             'reservas' => $reservas,
             'politica_cancelacion' => $politica instanceof PoliticaCancelacionTenant ? [
@@ -452,6 +458,7 @@ class MiTenantController
             'proveedor' => ['nullable', 'string'],
             'metodo' => ['nullable', Rule::enum(MetodoPago::class)],
             'idempotency_key' => ['nullable', 'string', 'max:255'],
+            'domiciliar' => ['sometimes', 'boolean'],
         ]);
         // Sin proveedor, la pasarela en línea con la que cobra el estudio.
         $validado['proveedor'] = ($validado['proveedor'] ?? '') !== '' ? $validado['proveedor'] : $this->pasarelas->enLinea();
@@ -466,6 +473,18 @@ class MiTenantController
             throw ValidationException::withMessages([
                 'proveedor' => ['El pago en efectivo o ventanilla se registra en el estudio.'],
             ]);
+        }
+
+        // Pago automático: al pagar se autoriza la tarjeta para cobrar sola la membresía
+        // cada periodo. Solo para lo que se renueva y con una pasarela que lo admite.
+        $domiciliar = $request->boolean('domiciliar');
+        if ($domiciliar && ($this->domiciliaciones->proveedor() !== $validado['proveedor'] || ! self::seRenueva($orden))) {
+            throw ValidationException::withMessages([
+                'domiciliar' => ['Esta compra no admite pago automático.'],
+            ]);
+        }
+        if ($orden->estado === EstadoOrden::Pendiente && $orden->domiciliar !== $domiciliar) {
+            $orden->update(['domiciliar' => $domiciliar]);
         }
 
         $metodo = isset($validado['metodo']) ? MetodoPago::from($validado['metodo']) : null;
@@ -498,11 +517,28 @@ class MiTenantController
             'metodo_pago' => $orden->metodo_pago,
             'fecha' => $orden->created_at?->toIso8601String(),
             'pagada_en' => $orden->pagada_en?->toIso8601String(),
+            // Se renueva (membresía o su renovación): se puede pagar con pago automático.
+            'recurrente' => self::seRenueva($orden),
             'lineas' => $orden->lineas->map(static fn (LineaOrdenTenant $l): array => [
                 'producto' => $l->producto?->nombre,
                 'cantidad' => $l->cantidad,
                 'subtotal_minor' => $l->subtotal_minor,
             ])->all(),
         ];
+    }
+
+    /**
+     * ¿La orden es de algo que se renueva (una membresía o su renovación)?
+     */
+    private static function seRenueva(OrdenTenant $orden): bool
+    {
+        if ($orden->renueva_acuerdo_id !== null) {
+            return true;
+        }
+        $orden->loadMissing('lineas.producto');
+
+        return $orden->lineas->contains(
+            static fn (LineaOrdenTenant $l): bool => ($l->producto->politica_reset ?? PoliticaReset::Ninguno) !== PoliticaReset::Ninguno,
+        );
     }
 }

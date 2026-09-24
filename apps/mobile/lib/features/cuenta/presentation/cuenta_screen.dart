@@ -12,6 +12,7 @@ import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
 import 'agendar_cita_sheet.dart';
 import 'mis_documentos_screen.dart';
+import 'pago_automatico_screen.dart';
 import 'pase_sheet.dart';
 
 /// Autoservicio del alumno o cliente: consentimientos por firmar, créditos,
@@ -96,6 +97,20 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
                   ),
                 ),
               ),
+              if (cuenta.pagoAutomatico)
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.autorenew),
+                    title: const Text('Pago automático'),
+                    subtitle: const Text('Tu membresía se cobra sola'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const PagoAutomaticoScreen(),
+                      ),
+                    ),
+                  ),
+                ),
               const _Titulo('Mis créditos'),
               _Creditos(cuenta.derechos),
               const _Titulo('Mis reservas'),
