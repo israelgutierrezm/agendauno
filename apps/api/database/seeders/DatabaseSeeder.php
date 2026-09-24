@@ -6,16 +6,11 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 
+/**
+ * Sin datos globales que sembrar: cada estudio vive en su propia base y se crea al
+ * registrarse. Los estudios demo se siembran con `php artisan turnouno:sembrar-demo`.
+ */
 class DatabaseSeeder extends Seeder
 {
-    public function run(): void
-    {
-        // Datos canónicos (permisos), seguros para cualquier entorno.
-        $this->call(PermisosSeeder::class);
-
-        // Los datos demo (propietarios con contraseña conocida) NUNCA en producción (SEC-02).
-        if (! app()->environment('production')) {
-            $this->call(DemoSeeder::class);
-        }
-    }
+    public function run(): void {}
 }

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Support\Http;
 
-use App\Modules\Creditos\Exceptions\SaldoInsuficiente;
-use App\Modules\Inventario\Exceptions\InventarioException;
-use App\Modules\Ordenes\Exceptions\OrdenException;
-use App\Modules\Pagos\Exceptions\PagoException;
-use App\Modules\Reservas\Exceptions\ReservaException;
+use App\Modules\Tenancy\Creditos\Exceptions\SaldoInsuficiente;
 use App\Modules\Tenancy\Exceptions\TenancyException;
+use App\Modules\Tenancy\Inventario\Exceptions\InventarioException;
+use App\Modules\Tenancy\Ordenes\Exceptions\OrdenException;
+use App\Modules\Tenancy\Pagos\Exceptions\PagoException;
+use App\Modules\Tenancy\Reservas\Exceptions\ReservaException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;

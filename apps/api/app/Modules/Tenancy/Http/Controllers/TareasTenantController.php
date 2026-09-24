@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Automatizacion\EstadoTarea;
 use App\Modules\Tenancy\Application\GestionarTareasTenant;
+use App\Modules\Tenancy\Automatizacion\EstadoTarea;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\TareaTenant;
 use App\Modules\Tenancy\Models\Usuario;

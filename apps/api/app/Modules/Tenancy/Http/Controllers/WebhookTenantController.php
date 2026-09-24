@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Pagos\Pasarelas\Stripe\VerificarFirmaStripe;
 use App\Modules\Tenancy\Application\ConfirmarPagoTenant;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
+use App\Modules\Tenancy\Pasarelas\Stripe\VerificarFirmaStripe;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

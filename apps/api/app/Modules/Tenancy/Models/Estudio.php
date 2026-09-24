@@ -25,7 +25,6 @@ class Estudio extends Model
     protected $table = 'estudios';
 
     protected $fillable = [
-        'tenant_legacy_id',
         'nombre',
         'slug',
         'perfil_negocio',

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
-use App\Modules\Acceso\MetodoAcceso;
-use App\Modules\Acceso\ResultadoAcceso;
+use App\Modules\Tenancy\Acceso\MetodoAcceso;
+use App\Modules\Tenancy\Acceso\ResultadoAcceso;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

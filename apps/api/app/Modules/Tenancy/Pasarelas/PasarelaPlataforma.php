@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Pasarelas;
 
-use App\Modules\Pagos\Pasarelas\ResultadoPago;
 use App\Modules\Tenancy\Models\CargoRenta;
 
 /**

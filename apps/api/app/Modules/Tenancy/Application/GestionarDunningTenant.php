@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\EstadoDunning;
+use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use Illuminate\Support\Carbon;

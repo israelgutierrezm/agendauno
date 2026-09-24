@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Comunicaciones\CanalComunicacion;
-use App\Modules\Comunicaciones\SegmentoComunicacion;
 use App\Modules\Tenancy\Application\DifundirComunicacionTenant;
 use App\Modules\Tenancy\Application\ResolverSegmentoTenant;
+use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
+use App\Modules\Tenancy\Comunicaciones\SegmentoComunicacion;
 use App\Modules\Tenancy\Models\DifusionTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaTenant;
+use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;

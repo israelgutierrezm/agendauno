@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Application\ContextoMovimiento;
 use App\Modules\Tenancy\Application\CreditosTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
+use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\RetencionCreditoTenant;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Comunicaciones\CanalComunicacion;
+use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Models\PlantillaMensajeTenant;
 use Illuminate\Http\JsonResponse;

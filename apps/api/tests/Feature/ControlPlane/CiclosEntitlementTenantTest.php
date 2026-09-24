@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Modules\Membresias\PoliticaReset;
-use App\Modules\Membresias\PoliticaRollover;
-use App\Modules\Membresias\TipoProducto;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\MembresiasTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Membresias\PoliticaReset;
+use App\Modules\Tenancy\Membresias\PoliticaRollover;
+use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;

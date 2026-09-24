@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Acceso\MetodoAcceso;
-use App\Modules\Acceso\ResultadoAcceso;
+use App\Modules\Tenancy\Acceso\MetodoAcceso;
+use App\Modules\Tenancy\Acceso\ResultadoAcceso;
 use App\Modules\Tenancy\Models\AccesoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use Carbon\CarbonInterface;

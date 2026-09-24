@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
-use App\Modules\Creditos\EstadoRetencion;
+use App\Modules\Tenancy\Creditos\EstadoRetencion;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

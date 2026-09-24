@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Creditos\EstadoRetencion;
-use App\Modules\Creditos\TipoMovimiento;
+use App\Modules\Tenancy\Creditos\EstadoRetencion;
+use App\Modules\Tenancy\Creditos\TipoMovimiento;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 

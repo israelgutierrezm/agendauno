@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Creditos\OrigenMovimiento;
+use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 

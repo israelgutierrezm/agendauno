@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Acceso\MetodoAcceso;
+use App\Modules\Tenancy\Acceso\MetodoAcceso;
 use App\Modules\Tenancy\Application\RegistrarAccesoTenant;
 use App\Modules\Tenancy\Models\AccesoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;

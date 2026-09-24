@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Lealtad\OrigenPuntos;
-use App\Modules\Lealtad\TipoMovimientoPuntos;
+use App\Modules\Tenancy\Lealtad\OrigenPuntos;
+use App\Modules\Tenancy\Lealtad\TipoMovimientoPuntos;
 use App\Modules\Tenancy\Models\MovimientoPuntosTenant;
 use App\Modules\Tenancy\Models\Usuario;
 

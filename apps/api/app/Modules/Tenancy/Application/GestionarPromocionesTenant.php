@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Ordenes\Exceptions\PromocionInvalida;
 use App\Modules\Tenancy\Models\PromocionTenant;
+use App\Modules\Tenancy\Ordenes\Exceptions\PromocionInvalida;
 
 /**
  * Promociones / cupones tenant-local (R22): alta y edición de códigos, y su aplicación

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Modules\Comunicaciones\Mail\MensajeMailable;
+use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use Illuminate\Support\Facades\File;

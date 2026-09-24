@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Inventario\Exceptions\StockInsuficiente;
-use App\Modules\Inventario\TipoMovimientoInventario;
+use App\Modules\Tenancy\Inventario\Exceptions\StockInsuficiente;
+use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;

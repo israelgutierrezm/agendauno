@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Creditos\EstadoRetencion;
-use App\Modules\Creditos\Exceptions\SaldoInsuficiente;
-use App\Modules\Creditos\TipoMovimiento;
+use App\Modules\Tenancy\Creditos\EstadoRetencion;
+use App\Modules\Tenancy\Creditos\Exceptions\SaldoInsuficiente;
+use App\Modules\Tenancy\Creditos\TipoMovimiento;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\RetencionCreditoTenant;

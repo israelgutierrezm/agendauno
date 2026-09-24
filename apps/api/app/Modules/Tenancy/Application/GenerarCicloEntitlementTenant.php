@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Creditos\OrigenMovimiento;
-use App\Modules\Creditos\TipoMovimiento;
-use App\Modules\Membresias\Application\GenerarCicloEntitlement;
-use App\Modules\Membresias\EstadoAcuerdo;
-use App\Modules\Membresias\PoliticaReset;
-use App\Modules\Membresias\PoliticaRollover;
+use App\Modules\Tenancy\Creditos\OrigenMovimiento;
+use App\Modules\Tenancy\Creditos\TipoMovimiento;
+use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
+use App\Modules\Tenancy\Membresias\PoliticaReset;
+use App\Modules\Tenancy\Membresias\PoliticaRollover;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -18,10 +17,7 @@ use Illuminate\Support\Facades\DB;
  * Avanza los ciclos vencidos de un derecho recurrente TENANT-LOCAL: al cerrar cada
  * ciclo aplica el rollover (lo no acarreado se EXPIRA en el ledger), abre el ciclo
  * siguiente y concede su cupo. Idempotente (solo avanza si el ciclo actual venció) y
- * con `lockForUpdate` en la conexión del tenant. Es la versión por-estudio de
- * {@see GenerarCicloEntitlement}; antes ese motor
- * solo operaba sobre el esquema legacy, por lo que las membresías recurrentes NO se
- * renovaban en el plano activo.
+ * con `lockForUpdate` en la conexión del tenant.
  */
 class GenerarCicloEntitlementTenant
 {

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
-use App\Modules\Lealtad\OrigenPuntos;
-use App\Modules\Lealtad\TipoMovimientoPuntos;
+use App\Modules\Tenancy\Lealtad\OrigenPuntos;
+use App\Modules\Tenancy\Lealtad\TipoMovimientoPuntos;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

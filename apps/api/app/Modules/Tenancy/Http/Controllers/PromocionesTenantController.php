@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Ordenes\TipoPromocion;
 use App\Modules\Tenancy\Application\GestionarPromocionesTenant;
 use App\Modules\Tenancy\Models\PromocionTenant;
+use App\Modules\Tenancy\Ordenes\TipoPromocion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;

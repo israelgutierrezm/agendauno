@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Listeners;
 
-use App\Modules\Lealtad\OrigenPuntos;
 use App\Modules\Tenancy\Application\PuntosTenant;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
+use App\Modules\Tenancy\Lealtad\OrigenPuntos;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProgramaLealtadTenant;
 

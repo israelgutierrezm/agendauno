@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
-use App\Modules\Ordenes\TipoPromocion;
+use App\Modules\Tenancy\Ordenes\TipoPromocion;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 

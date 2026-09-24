@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Listeners;
 
-use App\Modules\Comunicaciones\CanalComunicacion;
-use App\Modules\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\Application\EnviarMensajesTenant;
+use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
+use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;

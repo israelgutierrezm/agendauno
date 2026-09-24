@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Listeners;
 
-use App\Modules\Automatizacion\AccionAutomatizacion;
 use App\Modules\Tenancy\Application\GestionarTareasTenant;
+use App\Modules\Tenancy\Automatizacion\AccionAutomatizacion;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReglaAutomatizacionTenant;

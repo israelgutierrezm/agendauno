@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Asistencia\EstadoAsistencia;
-use App\Modules\Creditos\OrigenMovimiento;
-use App\Modules\Reservas\EstadoReserva;
-use App\Modules\Reservas\Exceptions\ReservaNoConfirmada;
+use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Models\AsistenciaTenant as ModeloAsistenciaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Reservas\EstadoReserva;
+use App\Modules\Tenancy\Reservas\Exceptions\ReservaNoConfirmada;
 use Illuminate\Support\Facades\DB;
 
 /**

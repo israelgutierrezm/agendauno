@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Agenda\Application\GenerarSesiones;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\ExcepcionHorarioTenant;
 use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
@@ -15,8 +14,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Materializa las sesiones de una plantilla de horario tenant-local dentro de un rango
- * de fechas (R5), portando {@see GenerarSesiones}. Por
- * cada dia del rango cuyo dia de semana este en la plantilla (y que no sea una
+ * de fechas (R5). Por cada dia del rango cuyo dia de semana este en la plantilla (y que no sea una
  * excepcion/feriado) crea una sesion con `inicia_en`/`termina_en` en UTC (desde la
  * hora local + zona de la sucursal). Es IDEMPOTENTE (firstOrCreate sobre
  * `(serie_id, inicia_en)` + el indice unico), asi que reejecutar el rango no duplica

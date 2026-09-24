@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Autorizacion\ControlDeAcceso;
 use App\Modules\Tenancy\Models\AsignacionPersonalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 
 /**
- * Control de acceso tenant-local con SCOPE por sucursal (R19), portado de
- * {@see ControlDeAcceso}. Un permiso lo concede el rol
+ * Control de acceso tenant-local con SCOPE por sucursal (R19). Un permiso lo concede el rol
  * tenant-wide del usuario (en cualquier sucursal) O, en su ausencia, el rol que el
  * usuario tenga asignado EN esa sucursal (aditivo). Opera sobre la BD del tenant
  * resuelto.

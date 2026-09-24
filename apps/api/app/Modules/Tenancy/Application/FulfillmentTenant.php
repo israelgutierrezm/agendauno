@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Ordenes\EstadoOrden;
-use App\Modules\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Reservas\EstadoReserva;
 
 /**
  * Fulfillment de una orden tenant-local: la marca pagada y concede un derecho por

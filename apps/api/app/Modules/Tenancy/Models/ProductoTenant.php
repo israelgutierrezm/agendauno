@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
-use App\Modules\Membresias\PoliticaReset;
-use App\Modules\Membresias\PoliticaRollover;
-use App\Modules\Membresias\TipoProducto;
+use App\Modules\Tenancy\Membresias\PoliticaReset;
+use App\Modules\Tenancy\Membresias\PoliticaRollover;
+use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

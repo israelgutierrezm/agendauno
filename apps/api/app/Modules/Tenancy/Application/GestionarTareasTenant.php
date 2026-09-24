@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Automatizacion\EstadoTarea;
+use App\Modules\Tenancy\Automatizacion\EstadoTarea;
 use App\Modules\Tenancy\Models\TareaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Support\Carbon;

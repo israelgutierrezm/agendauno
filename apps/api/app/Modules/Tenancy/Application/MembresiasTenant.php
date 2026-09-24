@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Creditos\OrigenMovimiento;
-use App\Modules\Creditos\TipoMovimiento;
-use App\Modules\Membresias\PoliticaReset;
-use App\Modules\Membresias\PoliticaRollover;
-use App\Modules\Membresias\TipoProducto;
+use App\Modules\Tenancy\Creditos\OrigenMovimiento;
+use App\Modules\Tenancy\Creditos\TipoMovimiento;
+use App\Modules\Tenancy\Membresias\PoliticaReset;
+use App\Modules\Tenancy\Membresias\PoliticaRollover;
+use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Automatizacion\AccionAutomatizacion;
-use App\Modules\Automatizacion\EventoAutomatizacion;
+use App\Modules\Tenancy\Automatizacion\AccionAutomatizacion;
+use App\Modules\Tenancy\Automatizacion\EventoAutomatizacion;
 use App\Modules\Tenancy\Models\ReglaAutomatizacionTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

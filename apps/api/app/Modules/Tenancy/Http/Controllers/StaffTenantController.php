@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Nomina\TipoPago;
 use App\Modules\Tenancy\Application\CalcularNominaTenant;
 use App\Modules\Tenancy\Models\AsignacionSesionTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Nomina\TipoPago;
 use App\Modules\Tenancy\RolSesionTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

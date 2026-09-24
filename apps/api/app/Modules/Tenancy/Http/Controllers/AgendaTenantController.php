@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Ordenes\EstadoOrden;
-use App\Modules\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
@@ -18,6 +16,8 @@ use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;

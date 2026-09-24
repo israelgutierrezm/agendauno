@@ -7,10 +7,8 @@ use App\Modules\Tenancy\Http\Middleware\AlcanceLlaveApi;
 use App\Modules\Tenancy\Http\Middleware\AutenticarLlaveApi;
 use App\Modules\Tenancy\Http\Middleware\AutenticarPlataforma;
 use App\Modules\Tenancy\Http\Middleware\AutenticarTenant;
-use App\Modules\Tenancy\Http\Middleware\EnsureTenantContext;
 use App\Modules\Tenancy\Http\Middleware\PermisoTenant;
 use App\Modules\Tenancy\Http\Middleware\ResolverEstudio;
-use App\Modules\Tenancy\Http\Middleware\ResolveTenantContext;
 use App\Support\Http\ApiExceptionRenderer;
 use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -35,17 +33,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // First-party SPA (admin/portal) cookie authentication via Sanctum.
-        $middleware->statefulApi();
-
         // Correlation id runs first so every log line for the request is tagged.
         $middleware->api(prepend: [
             CorrelationId::class,
         ]);
 
         $middleware->alias([
-            'tenant.resolve' => ResolveTenantContext::class,
-            'tenant.require' => EnsureTenantContext::class,
             // Control plane nuevo (identidad tenant-local por BD): resuelve el
             // estudio por slug y autentica contra su propia base.
             'estudio.resolver' => ResolverEstudio::class,
@@ -70,8 +63,6 @@ return Application::configure(basePath: dirname(__DIR__))
             ThrottleRequests::class,
             ThrottleRequestsWithRedis::class,
             AuthenticatesSessions::class,
-            ResolveTenantContext::class,
-            EnsureTenantContext::class,
             SubstituteBindings::class,
             Authorize::class,
         ]);

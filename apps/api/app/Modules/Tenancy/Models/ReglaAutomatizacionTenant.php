@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
-use App\Modules\Automatizacion\AccionAutomatizacion;
+use App\Modules\Tenancy\Automatizacion\AccionAutomatizacion;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 

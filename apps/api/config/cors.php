@@ -5,16 +5,13 @@ declare(strict_types=1);
 return [
 
     /*
-    | Paths that accept cross-origin requests. Includes the Sanctum CSRF cookie
-    | and login/logout so the first-party SPAs can perform cookie auth.
+    | Paths that accept cross-origin requests. Los fronts se autentican por bearer.
     */
-    'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout'],
+    'paths' => ['api/*'],
 
     'allowed_methods' => ['*'],
 
     'allowed_origins' => array_values(array_filter([
-        env('FRONTEND_ADMIN_URL', 'http://localhost:5173'),
-        env('FRONTEND_PORTAL_URL', 'http://localhost:5174'),
         // Flujo multi-tenant (registro/directorio/login por estudio). Autenticacion
         // por bearer token, no por cookie, por lo que no necesita dominio stateful.
         env('FRONTEND_REGISTRO_URL', 'http://localhost:5175'),

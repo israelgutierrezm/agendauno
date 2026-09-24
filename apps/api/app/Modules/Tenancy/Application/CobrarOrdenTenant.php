@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Ordenes\EstadoOrden;
-use App\Modules\Ordenes\Exceptions\OrdenNoLiquidable;
-use App\Modules\Pagos\EstadoPago;
-use App\Modules\Pagos\MetodoPago;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
+use App\Modules\Tenancy\Pagos\EstadoPago;
+use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use Illuminate\Support\Facades\DB;
 

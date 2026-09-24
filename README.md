@@ -15,8 +15,7 @@ conserva el **inglés** para framework y estándares técnicos (Controller, Requ
 | Ruta | Stack | Propósito |
 |------|-------|-----------|
 | `apps/api` | Laravel 13 · PHP 8.3 · MySQL · Redis | API REST (modular monolith) |
-| `apps/admin-web` | Vue 3 · TS · Vite · Tailwind · Pinia · Router | SPA de administración |
-| `apps/portal-web` | Vue 3 · TS · Vite · Tailwind | Portal de miembro / tutor |
+| `apps/registro-web` | Vue 3 · TS · Vite · Tailwind · Pinia · Router | Web de AgendaUno: landing, registro y panel de cada negocio |
 | `apps/mobile` | Flutter · Riverpod · Dio | App de miembro / tutor / instructor |
 | `docs/` | — | Arquitectura y producto (**fuente de verdad**) |
 | `infra/docker/` | Docker Compose | Redis local (MySQL desde WAMP) |
@@ -60,14 +59,14 @@ composer test       # Pest
 
 - Salud: `GET http://localhost:8000/api/v1/health`
 - OpenAPI (Scramble): `http://localhost:8000/docs/api`
-- Acceso demo: `owner@turnouno.test` / `password`
+- Estudios demo: `php artisan turnouno:sembrar-demo` → `demo@turnouno.mx` / `secreto123` (negocio `demo`)
 
-### 3. Admin y Portal
+### 3. Web
 
 ```bash
-cd apps/admin-web         # o apps/portal-web
+cd apps/registro-web
 npm install
-npm run dev               # admin :5173 · portal :5174
+npm run dev               # :5175
 npm run lint && npm run build && npm run test
 ```
 

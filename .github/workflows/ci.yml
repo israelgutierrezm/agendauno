@@ -75,48 +75,6 @@ jobs:
       - name: Tests (Pest)
         run: php artisan test
 
-  admin-web:
-    name: Admin · Vue
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/admin-web
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: apps/admin-web/package-lock.json
-
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run build
-      - run: npm run test
-
-  portal-web:
-    name: Portal · Vue
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/portal-web
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: apps/portal-web/package-lock.json
-
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run build
-      - run: npm run test
-
   registro-web:
     name: Registro · Vue
     runs-on: ubuntu-latest

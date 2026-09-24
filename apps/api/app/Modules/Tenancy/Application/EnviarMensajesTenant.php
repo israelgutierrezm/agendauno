@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Comunicaciones\CanalComunicacion;
-use App\Modules\Comunicaciones\EstadoMensaje;
-use App\Modules\Comunicaciones\Mail\MensajeMailable;
+use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
+use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
+use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;

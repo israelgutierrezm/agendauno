@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Ordenes\EstadoOrden;
-use App\Modules\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\ModalidadServicio;
@@ -16,6 +14,8 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\TarifaSaas;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Pagos\EstadoPago;
 use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Pagos\EstadoPago;
 use Illuminate\Support\Facades\DB;
 
 /**

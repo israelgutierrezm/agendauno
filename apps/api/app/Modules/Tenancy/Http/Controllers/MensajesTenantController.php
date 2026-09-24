@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Comunicaciones\EstadoMensaje;
+use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
