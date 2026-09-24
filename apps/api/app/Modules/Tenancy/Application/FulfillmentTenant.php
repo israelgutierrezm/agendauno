@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Comunicaciones\DatosDeOrden;
+use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
@@ -25,6 +26,7 @@ class FulfillmentTenant
         private readonly MembresiasTenant $membresias,
         private readonly RegistrarEventoTenant $eventos,
         private readonly EmitirReservaConfirmadaTenant $confirmada,
+        private readonly RenovacionPagadaTenant $renovacion,
     ) {}
 
     public function cumplir(OrdenTenant $orden): void
@@ -52,9 +54,15 @@ class FulfillmentTenant
             return;
         }
 
-        // Orden de RENOVACIÓN (cobro recurrente): solo cobra; el entitlement lo mantiene
-        // el motor de ciclos sobre el acuerdo existente. No se crea un acuerdo nuevo.
+        // Orden de RENOVACIÓN (la deuda del periodo): no crea un acuerdo nuevo (el
+        // entitlement lo mantiene el motor de ciclos); pagada, la fecha de renovación
+        // pasa al siguiente periodo y se cierra la mora.
         if ($orden->renueva_acuerdo_id !== null) {
+            $acuerdo = AcuerdoTenant::query()->whereKey($orden->renueva_acuerdo_id)->lockForUpdate()->first();
+            if ($acuerdo instanceof AcuerdoTenant) {
+                $this->renovacion->registrar($acuerdo);
+            }
+
             return;
         }
 

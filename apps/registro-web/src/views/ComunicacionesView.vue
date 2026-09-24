@@ -196,6 +196,7 @@ const MARCADORES_POR_EVENTO: Record<string, string[]> = {
   "cuenta.creada": ["persona_nombre", "enlace", "negocio"],
   "membresia.pausada": ["persona_nombre", "producto", "hasta", "negocio"],
   "membresia.reanudada": ["persona_nombre", "producto", "negocio"],
+  "cobro.fallido": ["persona_nombre", "producto", "enlace", "negocio"],
 };
 
 const marcadoresAuto = computed(() => {

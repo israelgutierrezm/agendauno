@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
@@ -33,7 +34,10 @@ class GestionarDunningTenant
      */
     private const REINTENTOS_DIAS = [1, 3, 7];
 
-    public function __construct(private readonly RegistrarEventoTenant $eventos) {}
+    public function __construct(
+        private readonly RegistrarEventoTenant $eventos,
+        private readonly GestorDeConexionTenant $gestor,
+    ) {}
 
     /**
      * Registra un fallo de cobro de la membresía: abre o avanza su proceso de dunning.
@@ -180,7 +184,8 @@ class GestionarDunningTenant
 
     private function emitir(string $tipo, AcuerdoTenant $acuerdo, ProcesoDunningTenant $proceso): void
     {
-        $acuerdo->loadMissing('persona');
+        $acuerdo->loadMissing(['persona', 'producto']);
+        $slug = (string) $this->gestor->actual()?->slug;
 
         $this->eventos->registrar($tipo, 'acuerdo', $acuerdo->ulid, [
             'acuerdo' => $acuerdo->ulid,
@@ -188,6 +193,10 @@ class GestionarDunningTenant
             'dunning' => $proceso->ulid,
             'estado' => $proceso->estado->value,
             'intentos' => $proceso->intentos,
+            // Para el aviso al cliente: qué debe y dónde pagarlo (su cuenta).
+            'producto' => (string) $acuerdo->producto?->nombre,
+            'motivo' => (string) $proceso->ultimo_motivo,
+            'enlace' => rtrim((string) config('turnouno.url_app'), '/').'/entrar?estudio='.rawurlencode($slug),
         ]);
     }
 }
