@@ -493,3 +493,22 @@ export const pasarelasEstado = {
   faltaLlave: "Falta la llave secreta: sin ella no se cobra en línea.",
   lista: "Lista para cobrar",
 };
+
+export const misDocumentos = {
+  titulo: "Mis documentos",
+  ayuda:
+    "Los que te pide el negocio. Lo que subas queda en revisión hasta que el equipo lo valide.",
+  obligatorio: "obligatorio",
+  falta: "Falta subirlo",
+  estados: {
+    pendiente: "En revisión",
+    aprobado: "Aprobado",
+    rechazado: "Rechazado",
+  },
+  subir: "Subir",
+  reemplazar: "Subir otro",
+  subiendo: "Subiendo…",
+  ver: "Ver",
+  subido: "Documento enviado. Queda en revisión.",
+  error: "No se pudo subir el documento.",
+};

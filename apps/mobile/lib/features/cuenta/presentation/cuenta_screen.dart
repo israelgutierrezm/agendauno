@@ -11,6 +11,7 @@ import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
 import 'agendar_cita_sheet.dart';
+import 'mis_documentos_screen.dart';
 import 'pase_sheet.dart';
 
 /// Autoservicio del alumno o cliente: consentimientos por firmar, créditos,
@@ -79,6 +80,19 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
                     context: context,
                     showDragHandle: true,
                     builder: (_) => const PaseSheet(),
+                  ),
+                ),
+              ),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.description_outlined),
+                  title: const Text('Mis documentos'),
+                  subtitle: const Text('Los que te pide el negocio'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const MisDocumentosScreen(),
+                    ),
                   ),
                 ),
               ),

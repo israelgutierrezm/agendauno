@@ -5,6 +5,7 @@ import AgendarCitaCuenta from "@/components/AgendarCitaCuenta.vue";
 import ListaFormularios from "@/components/ListaFormularios.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import type { FormularioPersona } from "@/lib/formularios";
+import MisDocumentos from "@/components/MisDocumentos.vue";
 import PaseEntrada from "@/components/PaseEntrada.vue";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -400,6 +401,9 @@ onMounted(() => cargar());
 
         <!-- Pase de entrada (QR) -->
         <PaseEntrada v-if="personaId !== null" />
+
+        <!-- Documentos que pide el negocio -->
+        <MisDocumentos v-if="personaId !== null" />
 
         <!-- Mis reservas -->
         <div class="tu-card p-6">

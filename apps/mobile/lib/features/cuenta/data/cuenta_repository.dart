@@ -65,6 +65,30 @@ class CuentaRepository {
     return null;
   }
 
+  /// Los documentos que pide el negocio y cómo va cada uno.
+  Future<List<RequisitoDocumento>> misDocumentos() async {
+    final res = await _dio.get<Map<String, dynamic>>('$_base/mi/documentos');
+    final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
+    return ((data['requisitos'] ?? []) as List)
+        .map((e) => RequisitoDocumento.desdeJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Sube la foto del documento; queda en revisión.
+  Future<void> subirDocumento(
+    String tipoId,
+    List<int> bytes,
+    String nombreArchivo,
+  ) async {
+    await _dio.post<Map<String, dynamic>>(
+      '$_base/mi/documentos',
+      data: FormData.fromMap({
+        'tipo_documento_id': tipoId,
+        'archivo': MultipartFile.fromBytes(bytes, filename: nombreArchivo),
+      }),
+    );
+  }
+
   /// Código del pase de entrada (QR firmado que vence en minutos).
   Future<String> pase() async {
     final res = await _dio.get<Map<String, dynamic>>('$_base/mi/pase');

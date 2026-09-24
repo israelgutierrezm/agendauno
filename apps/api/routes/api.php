@@ -42,6 +42,7 @@ use App\Modules\Tenancy\Http\Controllers\MarcaEstudioController;
 use App\Modules\Tenancy\Http\Controllers\MembresiasTenantController;
 use App\Modules\Tenancy\Http\Controllers\MensajesTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiembrosTenantController;
+use App\Modules\Tenancy\Http\Controllers\MisDocumentosTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiTenantController;
 use App\Modules\Tenancy\Http\Controllers\OnboardingController;
 use App\Modules\Tenancy\Http\Controllers\OrdenesTenantController;
@@ -204,6 +205,10 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/waivers', [MiTenantController::class, 'waiversPendientes'])->name('mi.waivers.index');
             Route::post('/mi/waivers/{waiver}/aceptar', [MiTenantController::class, 'aceptarWaiver'])->name('mi.waivers.aceptar');
             Route::get('/mi/formularios', [MiTenantController::class, 'formularios'])->name('mi.formularios.index');
+            // Mis documentos: los que pide el negocio, subir el propio y descargarlo.
+            Route::get('/mi/documentos', [MisDocumentosTenantController::class, 'index'])->name('mi.documentos.index');
+            Route::post('/mi/documentos', [MisDocumentosTenantController::class, 'subir'])->name('mi.documentos.subir');
+            Route::get('/mi/documentos/{documento}', [MisDocumentosTenantController::class, 'ver'])->name('mi.documentos.ver');
             // Ciclo comercial del alumno (P0 #4): comprar packs/membresías y pagarlos en
             // línea desde su portal. El fulfillment (créditos) lo confirma el webhook.
             Route::get('/mi/productos', [MiTenantController::class, 'productos'])->name('mi.productos.index');

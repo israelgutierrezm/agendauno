@@ -1,3 +1,7 @@
+import 'package:flutter/material.dart';
+
+import '../../../core/theme/tema_agendauno.dart';
+
 /// Modelos del autoservicio del miembro (Mi cuenta).
 class DerechoMiembro {
   const DerechoMiembro({
@@ -186,4 +190,49 @@ class MiCuenta {
   /// Las clases que ya reservó (o en las que espera), para no ofrecerlas de nuevo.
   Set<String> get sesionesReservadas =>
       reservas.map((r) => r.sesionId).whereType<String>().toSet();
+}
+
+/// Documento que pide el negocio y cómo va el del alumno.
+class RequisitoDocumento {
+  const RequisitoDocumento({
+    required this.tipoId,
+    required this.nombre,
+    this.obligatorio = false,
+    this.estado,
+    this.motivo,
+  });
+
+  final String tipoId;
+  final String nombre;
+  final bool obligatorio;
+
+  /// null (falta) | pendiente | aprobado | rechazado.
+  final String? estado;
+  final String? motivo;
+
+  String get estadoTexto => switch (estado) {
+    'pendiente' => 'En revisión',
+    'aprobado' => 'Aprobado',
+    'rechazado' => motivo != null ? 'Rechazado · $motivo' : 'Rechazado',
+    _ => 'Falta subirlo',
+  };
+
+  Color get color => switch (estado) {
+    'pendiente' => TemaAgendaUno.aviso,
+    'aprobado' => TemaAgendaUno.exito,
+    'rechazado' => TemaAgendaUno.error,
+    _ => TemaAgendaUno.textoSuave,
+  };
+
+  factory RequisitoDocumento.desdeJson(Map<String, dynamic> j) {
+    final tipo = (j['tipo'] ?? {}) as Map<String, dynamic>;
+    final documento = j['documento'] as Map<String, dynamic>?;
+    return RequisitoDocumento(
+      tipoId: (tipo['id'] ?? '') as String,
+      nombre: (tipo['nombre'] ?? '') as String,
+      obligatorio: (tipo['obligatorio'] ?? false) as bool,
+      estado: documento?['estado'] as String?,
+      motivo: documento?['motivo'] as String?,
+    );
+  }
 }
