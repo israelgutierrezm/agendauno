@@ -234,6 +234,20 @@ class SesionController extends Notifier<Sesion?> {
     await _reflejarUsuario(actual, res.data);
   }
 
+  /// Enlace `webcal://` de su calendario personal (clases y citas) para suscribirse
+  /// desde la app de calendario del teléfono.
+  Future<String?> enlaceCalendario() async {
+    final actual = state;
+    if (actual == null) {
+      return null;
+    }
+    final res = await ref
+        .read(dioProvider)
+        .get<Map<String, dynamic>>('/api/v1/app/${actual.slug}/yo/calendario');
+    return ((res.data?['data'] ?? {}) as Map<String, dynamic>)['webcal']
+        as String?;
+  }
+
   /// Cierra la sesión: revoca el token en el servidor (si hay red) y la borra del
   /// dispositivo.
   Future<void> cerrar() async {

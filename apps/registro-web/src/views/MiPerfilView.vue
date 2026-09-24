@@ -153,6 +153,38 @@ async function cambiarClave(): Promise<void> {
   }
 }
 
+// ---- Calendario (iCal) ----
+const calendario = ref<{ url: string; webcal: string } | null>(null);
+const cargandoCalendario = ref(false);
+async function obtenerCalendario(nuevo = false): Promise<void> {
+  cargandoCalendario.value = true;
+  try {
+    const { data } = nuevo
+      ? await api.post<{ data: { url: string; webcal: string } }>(
+          `${base.value}/yo/calendario/regenerar`,
+        )
+      : await api.get<{ data: { url: string; webcal: string } }>(
+          `${base.value}/yo/calendario`,
+        );
+    calendario.value = data.data;
+  } catch (err) {
+    toast.error(mensajeDeError(err, t("miPerfil.error")));
+  } finally {
+    cargandoCalendario.value = false;
+  }
+}
+async function copiarCalendario(): Promise<void> {
+  if (calendario.value === null) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(calendario.value.url);
+    toast.exito(t("miPerfil.calendarioCopiado"));
+  } catch {
+    // Sin permiso del portapapeles: el enlace sigue visible para copiarlo a mano.
+  }
+}
+
 const aparienciaAbierta = ref(false);
 </script>
 
@@ -402,6 +434,59 @@ const aparienciaAbierta = ref(false);
           </button>
         </div>
       </form>
+
+      <!-- Calendario -->
+      <div class="mp-fila">
+        <div>
+          <h2 class="mp-titulo">{{ $t("miPerfil.calendario") }}</h2>
+          <p class="mp-ayuda">{{ $t("miPerfil.calendarioAyuda") }}</p>
+        </div>
+        <div class="space-y-3">
+          <button
+            v-if="calendario === null"
+            type="button"
+            class="tu-btn tu-btn-fantasma text-sm"
+            :disabled="cargandoCalendario"
+            @click="obtenerCalendario()"
+          >
+            {{ $t("miPerfil.calendarioObtener") }}
+          </button>
+          <template v-else>
+            <input
+              class="tu-input text-xs"
+              :value="calendario.url"
+              readonly
+              aria-label="URL"
+              @focus="($event.target as HTMLInputElement).select()"
+            />
+            <div class="flex flex-wrap gap-2">
+              <a
+                class="tu-btn tu-btn-primario text-sm"
+                :href="calendario.webcal"
+              >
+                {{ $t("miPerfil.calendarioAbrir") }}
+              </a>
+              <button
+                type="button"
+                class="tu-btn tu-btn-fantasma text-sm"
+                @click="copiarCalendario"
+              >
+                {{ $t("miPerfil.calendarioCopiar") }}
+              </button>
+              <button
+                type="button"
+                class="tu-btn tu-btn-fantasma text-sm"
+                :disabled="cargandoCalendario"
+                @click="obtenerCalendario(true)"
+              >
+                {{ $t("miPerfil.calendarioNuevo") }}
+              </button>
+            </div>
+            <p class="tu-hint">{{ $t("miPerfil.calendarioGoogle") }}</p>
+            <p class="tu-hint">{{ $t("miPerfil.calendarioNuevoAyuda") }}</p>
+          </template>
+        </div>
+      </div>
 
       <!-- Apariencia -->
       <div class="mp-fila">

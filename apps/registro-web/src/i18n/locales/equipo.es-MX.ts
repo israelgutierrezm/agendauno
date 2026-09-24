@@ -39,6 +39,18 @@ export const miPerfil = {
   confirmar: "Confirma la nueva contraseña",
   cambiar: "Cambiar contraseña",
   cambiada: "Contraseña actualizada. Cerramos tus otras sesiones.",
+  calendario: "Calendario",
+  calendarioAyuda:
+    "Tus clases y citas en Google Calendar, Apple u Outlook. Se actualiza solo.",
+  calendarioObtener: "Conectar mi calendario",
+  calendarioAbrir: "Abrir en mi calendario",
+  calendarioCopiar: "Copiar enlace",
+  calendarioCopiado: "Enlace copiado.",
+  calendarioNuevo: "Generar un enlace nuevo",
+  calendarioNuevoAyuda:
+    "Es privado: no lo compartas. Si lo compartiste, genera uno nuevo y el anterior dejará de funcionar.",
+  calendarioGoogle:
+    "En Google Calendar: Otros calendarios → Desde URL, y pega el enlace.",
   apariencia: "Apariencia",
   aparienciaAyuda: "Tema, colores y tamaño de letra.",
   abrirApariencia: "Ajustar apariencia",

@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Http\Controllers\AsistenciaTenantController;
 use App\Modules\Tenancy\Http\Controllers\AuditoriaController;
 use App\Modules\Tenancy\Http\Controllers\AuthTenantController;
 use App\Modules\Tenancy\Http\Controllers\AutomatizacionesTenantController;
+use App\Modules\Tenancy\Http\Controllers\CalendarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\CapacidadCanalTenantController;
 use App\Modules\Tenancy\Http\Controllers\CatalogoTenantController;
 use App\Modules\Tenancy\Http\Controllers\CheckinsTenantController;
@@ -176,8 +177,14 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/citas', [PublicoCitasController::class, 'agendar'])->middleware('throttle:login')->name('citas.agendar');
         Route::post('/citas/pagar', [PublicoCitasController::class, 'pagar'])->middleware('throttle:login')->name('citas.pagar');
 
+        // Calendario personal (iCal) que leen Google Calendar, Apple u Outlook con el
+        // enlace privado de cada quien (sin sesión).
+        Route::get('/calendario/{token}.ics', [CalendarioTenantController::class, 'feed'])->middleware('throttle:60,1')->name('calendario.feed');
+
         Route::middleware(['estudio.auth', 'throttle:tenant'])->group(function (): void {
             Route::get('/yo', [AuthTenantController::class, 'yo'])->name('yo');
+            Route::get('/yo/calendario', [CalendarioTenantController::class, 'enlace'])->name('yo.calendario');
+            Route::post('/yo/calendario/regenerar', [CalendarioTenantController::class, 'regenerar'])->name('yo.calendario.regenerar');
             // Apariencia personal (tema y colores propios), guardada en la cuenta.
             Route::get('/apariencia', [AparienciaTenantController::class, 'show'])->name('apariencia');
             Route::put('/apariencia', [AparienciaTenantController::class, 'elegir'])->name('apariencia.elegir');

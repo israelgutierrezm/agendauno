@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
@@ -246,6 +247,29 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     }
   }
 
+  /// Abre la suscripción al calendario personal (webcal) en la app de calendario.
+  Future<void> _agregarCalendario() async {
+    final messenger = ScaffoldMessenger.of(context);
+    await hacerConAviso(context, () async {
+      final enlace = await ref.read(sesionProvider.notifier).enlaceCalendario();
+      final abierto =
+          enlace != null &&
+          await launchUrl(
+            Uri.parse(enlace),
+            mode: LaunchMode.externalApplication,
+          );
+      if (!abierto) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No encontramos una app de calendario. Conéctalo desde la web en Mi perfil.',
+            ),
+          ),
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final sesion = ref.watch(sesionProvider);
@@ -426,6 +450,16 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                   ),
                 ],
               ),
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.calendar_month_outlined),
+              title: const Text('Agregar a mi calendario'),
+              subtitle: const Text(
+                'Tus clases y citas en el calendario del teléfono; se actualiza solo.',
+              ),
+              onTap: _guardando ? null : _agregarCalendario,
             ),
           ),
           const SizedBox(height: 8),
