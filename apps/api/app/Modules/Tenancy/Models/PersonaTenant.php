@@ -24,6 +24,7 @@ class PersonaTenant extends Model
     protected $fillable = [
         'sucursal_id', 'nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido',
         'email', 'celular', 'tipo', 'activo', 'es_facturable', 'archivado', 'usuario_id',
+        'recibe_promociones',
     ];
 
     /**
@@ -43,6 +44,7 @@ class PersonaTenant extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'recibe_promociones' => 'boolean',
         'tipo' => TipoPersonaTenant::class,
         'activo' => 'boolean',
         'es_facturable' => 'boolean',

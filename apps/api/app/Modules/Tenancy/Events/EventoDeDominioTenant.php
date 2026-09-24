@@ -38,6 +38,7 @@ class EventoDeDominioTenant
         'membresia.reanudada',
         'factura.timbrada',
         'cuenta.creada',
+        'privacidad.baja_solicitada',
     ];
 
     /**

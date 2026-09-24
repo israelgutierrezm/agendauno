@@ -276,6 +276,13 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Solicitudes de baja de datos (derechos ARCO).
+      path: "/privacidad",
+      name: "privacidad",
+      component: () => import("@/views/PrivacidadView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/integraciones",
       name: "integraciones",
       component: () => import("@/views/IntegracionesView.vue"),

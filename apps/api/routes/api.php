@@ -42,6 +42,7 @@ use App\Modules\Tenancy\Http\Controllers\MarcaEstudioController;
 use App\Modules\Tenancy\Http\Controllers\MembresiasTenantController;
 use App\Modules\Tenancy\Http\Controllers\MensajesTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiembrosTenantController;
+use App\Modules\Tenancy\Http\Controllers\MiPrivacidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\MisDocumentosTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiTenantController;
 use App\Modules\Tenancy\Http\Controllers\OnboardingController;
@@ -75,6 +76,7 @@ use App\Modules\Tenancy\Http\Controllers\ReservasTenantController;
 use App\Modules\Tenancy\Http\Controllers\RespuestasFormularioController;
 use App\Modules\Tenancy\Http\Controllers\ResumenMiembroTenantController;
 use App\Modules\Tenancy\Http\Controllers\RetencionTenantController;
+use App\Modules\Tenancy\Http\Controllers\SolicitudesPrivacidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\StaffTenantController;
 use App\Modules\Tenancy\Http\Controllers\SuscripcionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\TareasTenantController;
@@ -205,6 +207,11 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/waivers', [MiTenantController::class, 'waiversPendientes'])->name('mi.waivers.index');
             Route::post('/mi/waivers/{waiver}/aceptar', [MiTenantController::class, 'aceptarWaiver'])->name('mi.waivers.aceptar');
             Route::get('/mi/formularios', [MiTenantController::class, 'formularios'])->name('mi.formularios.index');
+            // Privacidad (ARCO): descargar mis datos, oponerme a promociones, pedir la baja.
+            Route::get('/mi/privacidad', [MiPrivacidadTenantController::class, 'mostrar'])->name('mi.privacidad');
+            Route::put('/mi/privacidad', [MiPrivacidadTenantController::class, 'actualizar'])->name('mi.privacidad.actualizar');
+            Route::get('/mi/datos', [MiPrivacidadTenantController::class, 'datos'])->name('mi.datos');
+            Route::post('/mi/privacidad/baja', [MiPrivacidadTenantController::class, 'solicitarBaja'])->name('mi.privacidad.baja');
             // Mis documentos: los que pide el negocio, subir el propio y descargarlo.
             Route::get('/mi/documentos', [MisDocumentosTenantController::class, 'index'])->name('mi.documentos.index');
             Route::post('/mi/documentos', [MisDocumentosTenantController::class, 'subir'])->name('mi.documentos.subir');
@@ -235,6 +242,10 @@ Route::prefix('v1')->group(function (): void {
 
             // Operación tenant-local: alta de alumnos (data plane del estudio).
             Route::get('/miembros', [MiembrosTenantController::class, 'index'])->middleware('puede:miembros.ver')->name('miembros.index');
+            // Solicitudes de baja de datos (ARCO): el negocio las atiende o rechaza.
+            Route::get('/solicitudes-privacidad', [SolicitudesPrivacidadTenantController::class, 'index'])->middleware('puede:miembros.gestionar')->name('solicitudes-privacidad.index');
+            Route::post('/solicitudes-privacidad/{solicitud}/atender', [SolicitudesPrivacidadTenantController::class, 'atender'])->middleware('puede:miembros.gestionar')->name('solicitudes-privacidad.atender');
+            Route::post('/solicitudes-privacidad/{solicitud}/rechazar', [SolicitudesPrivacidadTenantController::class, 'rechazar'])->middleware('puede:miembros.gestionar')->name('solicitudes-privacidad.rechazar');
             // Padrón facturable (P0): base de la renta SaaS; `?formato=csv` para exportar. Ruta literal antes de {persona}.
             Route::get('/miembros/padron', [MiembrosTenantController::class, 'padron'])->middleware('puede:facturacion.ver')->name('miembros.padron');
             Route::post('/miembros', [MiembrosTenantController::class, 'store'])->middleware('puede:miembros.gestionar')->name('miembros.store');

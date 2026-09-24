@@ -272,6 +272,14 @@ export const MENU: MenuItem[] = [
         permiso: "auditoria.ver",
       },
       {
+        // Derechos ARCO: bajas de datos que pidieron los alumnos.
+        clave: "privacidad",
+        etiqueta: "privacidadNegocio.titulo",
+        icono: "documentos",
+        ruta: "privacidad",
+        permiso: "miembros.gestionar",
+      },
+      {
         clave: "integraciones",
         etiqueta: "nav.integraciones",
         icono: "integraciones",

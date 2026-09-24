@@ -66,7 +66,9 @@ class ResolverSegmentoTenant
     {
         return PersonaTenant::query()
             ->where('tipo', TipoPersonaTenant::Miembro->value)
-            ->where('archivado', false);
+            ->where('archivado', false)
+            // Oposición (ARCO): quien no quiere promociones no entra en las difusiones.
+            ->where('recibe_promociones', true);
     }
 
     /**

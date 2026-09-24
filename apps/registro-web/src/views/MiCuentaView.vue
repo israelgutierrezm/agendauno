@@ -5,6 +5,7 @@ import AgendarCitaCuenta from "@/components/AgendarCitaCuenta.vue";
 import ListaFormularios from "@/components/ListaFormularios.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import type { FormularioPersona } from "@/lib/formularios";
+import MiPrivacidad from "@/components/MiPrivacidad.vue";
 import MisDocumentos from "@/components/MisDocumentos.vue";
 import PaseEntrada from "@/components/PaseEntrada.vue";
 import { useRetornoPago } from "@/lib/retornoPago";
@@ -404,6 +405,9 @@ onMounted(() => cargar());
 
         <!-- Documentos que pide el negocio -->
         <MisDocumentos v-if="personaId !== null" />
+
+        <!-- Privacidad (derechos ARCO) -->
+        <MiPrivacidad v-if="personaId !== null" />
 
         <!-- Mis reservas -->
         <div class="tu-card p-6">

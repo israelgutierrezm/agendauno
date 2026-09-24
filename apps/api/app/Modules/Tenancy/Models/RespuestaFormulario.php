@@ -34,4 +34,12 @@ class RespuestaFormulario extends Model
     {
         return $this->belongsTo(PersonaTenant::class, 'persona_id');
     }
+
+    /**
+     * @return BelongsTo<Formulario, $this>
+     */
+    public function formulario(): BelongsTo
+    {
+        return $this->belongsTo(Formulario::class, 'formulario_id');
+    }
 }

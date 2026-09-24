@@ -512,3 +512,40 @@ export const misDocumentos = {
   subido: "Documento enviado. Queda en revisión.",
   error: "No se pudo subir el documento.",
 };
+
+export const miPrivacidad = {
+  titulo: "Privacidad",
+  promociones: "Recibir promociones",
+  promocionesAyuda:
+    "Ofertas y novedades del negocio. Los avisos de tus reservas y pagos te siguen llegando.",
+  descargar: "Descargar mis datos",
+  baja: "Pedir la baja de mis datos",
+  bajaExplica:
+    "El negocio borrará tus datos personales y cerrará tu cuenta. Tus compras y pagos se conservan sin tu nombre, como pide la ley.",
+  motivo: "Motivo (opcional)",
+  confirmarBaja: "Enviar solicitud",
+  bajaEnviada: "Solicitud enviada. El negocio te responderá.",
+  bajaPendiente: "Tu solicitud de baja está en revisión.",
+  bajaRechazada: "El negocio no pudo darte de baja: {respuesta}",
+};
+
+export const privacidadNegocio = {
+  titulo: "Solicitudes de privacidad",
+  ayuda:
+    "Alumnos que pidieron la baja de sus datos. Al atenderla se borran sus datos personales (nombre, correo, celular, documentos) y su cuenta; sus compras y pagos se conservan sin nombre. La ley pide responder en 20 días hábiles.",
+  vacio: "No hay solicitudes.",
+  solicitada: "Pedida el {fecha}",
+  responderAntes: "responder antes del {fecha}",
+  atender: "Dar de baja",
+  rechazar: "Rechazar",
+  motivoRechazo: "Motivo del rechazo",
+  confirmarRechazo: "Rechazar solicitud",
+  confirmarAtender:
+    "Se borrarán los datos personales de esta persona y su cuenta. No se puede deshacer. ¿Continuar?",
+  atendida: "Baja aplicada.",
+  estados: {
+    pendiente: "Pendiente",
+    atendida: "Dada de baja",
+    rechazada: "Rechazada",
+  },
+};
