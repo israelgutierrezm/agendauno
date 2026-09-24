@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
+use App\Modules\Tenancy\Integraciones\ValidarDestinoWebhook;
 use App\Modules\Tenancy\Models\EntregaWebhookTenant;
 use App\Modules\Tenancy\Models\WebhookSalienteTenant;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,8 @@ use Illuminate\Validation\Rule;
  */
 class WebhooksSalientesTenantController
 {
+    public function __construct(private readonly ValidarDestinoWebhook $destinos) {}
+
     private const LIMITE_ENTREGAS = 100;
 
     public function index(): JsonResponse
@@ -40,6 +43,9 @@ class WebhooksSalientesTenantController
             'eventos.*' => ['string', Rule::in(EventoDeDominioTenant::TIPOS)],
             'activo' => ['boolean'],
         ]);
+
+        // SSRF: solo destinos públicos (se vuelve a validar en cada envío).
+        $this->destinos->validar((string) $validado['url']);
 
         $secreto = 'whsec_'.Str::random(40);
 

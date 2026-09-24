@@ -7,6 +7,8 @@ namespace App\Modules\Tenancy;
 use App\Modules\Tenancy\Application\VerificadorGoogle;
 use App\Modules\Tenancy\Application\VerificadorGoogleTokeninfo;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Integraciones\ResolvedorDns;
+use App\Modules\Tenancy\Integraciones\ResolvedorDnsSistema;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Support\AlmacenamientoTenant;
 use App\Modules\Tenancy\Support\CacheTenant;
@@ -29,6 +31,7 @@ class TenancyServiceProvider extends ServiceProvider
         // Verificador de ID token de Google (SSO tenant-local); intercambiable en
         // pruebas por un doble que devuelve una identidad conocida.
         $this->app->bind(VerificadorGoogle::class, VerificadorGoogleTokeninfo::class);
+        $this->app->bind(ResolvedorDns::class, ResolvedorDnsSistema::class);
 
         // Aislamiento de recursos por estudio (cache/almacenamiento) sobre el
         // estudio activo del gestor. Un estado por request/job.

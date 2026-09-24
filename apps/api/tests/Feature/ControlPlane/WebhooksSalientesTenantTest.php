@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\Http;
 
 beforeEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
+    // ejemplo.test resuelve a una IP pública (sin tocar la red).
+    dnsFalso(['ejemplo.test' => ['93.184.216.34']]);
 });
 
 afterEach(function (): void {
@@ -139,4 +141,70 @@ it('ofrece el catálogo de eventos y rechaza suscribirse a uno que no existe', f
         'url' => 'https://ejemplo.mx/hook',
         'eventos' => ['reserva.inventada'],
     ], conBearer($e['bearer']))->assertStatus(422);
+});
+
+it('no acepta destinos internos, reservados o sin https (SSRF)', function (): void {
+    Http::fake();
+    dnsFalso([
+        'ejemplo.test' => ['93.184.216.34'],
+        'interno.test' => ['192.168.1.10'],
+        'mixto.test' => ['93.184.216.34', '10.0.0.7'],
+    ]);
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+
+    foreach ([
+        'http://ejemplo.test/hook',
+        'https://127.0.0.1/hook',
+        'https://169.254.169.254/latest/meta-data',
+        'https://10.0.0.5/hook',
+        'https://[::1]/hook',
+        'https://[::ffff:127.0.0.1]/hook',
+        'https://usuario:clave@ejemplo.test/hook',
+        'https://ejemplo.test:6379/hook',
+        'https://interno.test/hook',
+        'https://mixto.test/hook',
+        'https://no-existe.test/hook',
+    ] as $url) {
+        $this->postJson("/api/v1/app/{$e['slug']}/webhooks-salientes", ['url' => $url], conBearer($e['bearer']))
+            ->assertStatus(422)
+            ->assertJsonPath('code', 'WEBHOOK_DESTINATION_NOT_ALLOWED');
+    }
+
+    $this->getJson("/api/v1/app/{$e['slug']}/webhooks-salientes", conBearer($e['bearer']))->assertJsonCount(0, 'data');
+    Http::assertNothingSent();
+});
+
+it('si el dominio pasa a resolver a una IP interna, no se envía nada', function (): void {
+    Http::fake(['*' => Http::response('ok', 200)]);
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $webhook = $this->postJson("/api/v1/app/{$e['slug']}/webhooks-salientes", [
+        'url' => 'https://ejemplo.test/hook', 'eventos' => ['reserva.creada'],
+    ], conBearer($e['bearer']))->assertCreated()->json('data');
+
+    // Cambia el DNS (rebinding) antes del envío.
+    dnsFalso(['ejemplo.test' => ['10.0.0.8']]);
+    reservaEnEstudio($e);
+    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+
+    $entregas = $this->getJson("/api/v1/app/{$e['slug']}/webhooks-salientes/{$webhook['id']}/entregas", conBearer($e['bearer']))
+        ->assertOk()->json('data');
+    expect($entregas[0]['estado'])->toBe('fallido')
+        ->and($entregas[0]['ultimo_error'])->toStartWith('Destino no permitido');
+    Http::assertNothingSent();
+});
+
+it('una redirección no cuenta como entregado', function (): void {
+    Http::fake(['*' => Http::response('', 302, ['Location' => 'http://169.254.169.254/'])]);
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $webhook = $this->postJson("/api/v1/app/{$e['slug']}/webhooks-salientes", [
+        'url' => 'https://ejemplo.test/hook', 'eventos' => ['reserva.creada'],
+    ], conBearer($e['bearer']))->assertCreated()->json('data');
+
+    reservaEnEstudio($e);
+    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+
+    $entregas = $this->getJson("/api/v1/app/{$e['slug']}/webhooks-salientes/{$webhook['id']}/entregas", conBearer($e['bearer']))
+        ->assertOk()->json('data');
+    expect($entregas[0]['estado'])->toBe('fallido')->and($entregas[0]['http_status'])->toBe(302);
+    Http::assertSentCount(1);
 });

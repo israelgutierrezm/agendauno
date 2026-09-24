@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Integraciones\ResolvedorDns;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -332,4 +333,25 @@ function compraPagadaTenant(array $e, string $personaUlid): void
 
     test()->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))
         ->assertOk();
+}
+
+/**
+ * Fija las respuestas del DNS para los webhooks salientes (sin tocar la red).
+ *
+ * @param  array<string, list<string>>  $mapa
+ */
+function dnsFalso(array $mapa): void
+{
+    app()->instance(ResolvedorDns::class, new class($mapa) implements ResolvedorDns
+    {
+        /**
+         * @param  array<string, list<string>>  $mapa
+         */
+        public function __construct(private readonly array $mapa) {}
+
+        public function ips(string $host): array
+        {
+            return $this->mapa[$host] ?? [];
+        }
+    });
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Exceptions\DestinoWebhookNoPermitido;
+use App\Modules\Tenancy\Integraciones\ValidarDestinoWebhook;
 use App\Modules\Tenancy\Models\EntregaWebhookTenant;
 use App\Modules\Tenancy\Models\WebhookSalienteTenant;
 use Illuminate\Support\Carbon;
@@ -17,10 +19,14 @@ use Throwable;
  * registra el resultado (estado/http_status/intentos/entregado_en/ultimo_error) en la
  * propia entrega. No lanza excepciones por fallos de red/HTTP: los deja como `fallido`
  * para reintento, de modo que un endpoint caido nunca rompe el relay del outbox.
+ * Antes de cada envío revalida el destino (SSRF), conecta a la IP ya validada y no
+ * sigue redirecciones.
  */
 class EntregarWebhookTenant
 {
     private const TIMEOUT = 5;
+
+    public function __construct(private readonly ValidarDestinoWebhook $destinos) {}
 
     public function entregar(EntregaWebhookTenant $entrega, WebhookSalienteTenant $endpoint): void
     {
@@ -33,7 +39,25 @@ class EntregarWebhookTenant
         $entrega->intentos++;
 
         try {
+            $destino = $this->destinos->validar((string) $endpoint->url);
+        } catch (DestinoWebhookNoPermitido $e) {
+            $entrega->estado = 'fallido';
+            $entrega->http_status = null;
+            $entrega->ultimo_error = Str::limit('Destino no permitido: '.$e->getMessage(), 250);
+            $entrega->save();
+
+            return;
+        }
+
+        // La conexión va a la IP que se validó (evita que el DNS cambie entre la
+        // validación y el envío).
+        $ip = str_contains($destino['ip'], ':') ? '['.$destino['ip'].']' : $destino['ip'];
+
+        try {
             $respuesta = Http::timeout(self::TIMEOUT)
+                ->connectTimeout(3)
+                ->withoutRedirecting()
+                ->withOptions(['curl' => [CURLOPT_RESOLVE => [$destino['host'].':'.$destino['puerto'].':'.$ip]]])
                 ->withHeaders([
                     'X-TurnoUno-Event' => $entrega->evento_tipo,
                     'X-TurnoUno-Delivery' => (string) $entrega->ulid,
