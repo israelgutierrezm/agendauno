@@ -37,6 +37,8 @@ function estudioConServicioDeCitas(): array
     $pro = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
         ->assertOk()->json('data.0.id');
 
+    abrirHorarioDeCitas($e, $pro, $sede['sucursal']);
+
     return ['e' => $e, 'sede' => $sede, 'pro' => $pro, 'hora' => now()->addDays(3)->format('Y-m-d').' 10:00:00'];
 }
 

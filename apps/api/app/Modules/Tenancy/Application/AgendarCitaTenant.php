@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\DetectsConcurrencyErrors;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -21,16 +25,32 @@ use Illuminate\Support\Facades\DB;
  * servicio con el proveedor a la hora elegida (cupo 1, individual) y encadena la
  * reserva según la política de la oferta — `pago` crea reserva pendiente + orden por la
  * sesión (a pagar para confirmar); `entitlement` consume la membresía. Todo atómico.
- * Reusa {@see VerificarAgendaTenant} (el hueco debe seguir libre) y {@see ReservasTenant}.
- * NOTA de concurrencia: dos clientes que tomen EXACTAMENTE el mismo hueco a la vez
- * pasan ambos el chequeo (no hay lock sobre una fila inexistente); es una ventana breve
- * — mitigar con índice único (instructor_id, inicia_en) o lock si se vuelve un problema.
+ *
+ * El servidor no confía en lo que ofreció la pantalla: el servicio debe agendarse
+ * como cita, el profesional debe serlo, la duración es la del servicio y, cuando
+ * agenda el cliente (página pública o su cuenta), la hora debe ser futura y caer en
+ * la atención del profesional en esa sede, en un día abierto. El negocio (recepción)
+ * puede agendar fuera de horario, pero nunca encimado.
+ *
+ * Concurrencia: lo PRIMERO de la transacción es una escritura sin cambios sobre la
+ * fila del profesional. En MySQL eso toma su bloqueo exclusivo; en SQLite, el de
+ * escritura de la base. Así dos solicitudes para el mismo profesional se atienden en
+ * fila y la segunda, al continuar, ya ve la cita de la primera. El choque se busca
+ * por intervalo (cualquier solapamiento, no solo la misma hora de inicio). Si aun así
+ * la base reporta un choque de concurrencia, se responde que el horario ya no está
+ * disponible.
  */
 class AgendarCitaTenant
 {
+    use DetectsConcurrencyErrors;
+
+    /** Duración cuando el servicio no la define. */
+    private const DURACION_DEFECTO = 30;
+
     public function __construct(
         private readonly VerificarAgendaTenant $agenda,
         private readonly ReservasTenant $reservas,
+        private readonly CalcularDisponibilidadTenant $disponibilidad,
     ) {}
 
     public function agendar(
@@ -42,9 +62,59 @@ class AgendarCitaTenant
         int $duracionMin,
         bool $porNegocio = false,
     ): ReservaTenant {
-        $termina = $inicia->addMinutes($duracionMin);
+        if ($oferta->politica_reserva !== PoliticaReservaTenant::Pago
+            && ! in_array($oferta->modalidad, [ModalidadOfertaTenant::Individual, ModalidadOfertaTenant::Privada], true)) {
+            throw new SesionNoReservable('Ese servicio no se agenda como cita.');
+        }
 
+        // La duración la fija el servicio; la que manda la pantalla solo cuenta si el
+        // servicio no tiene una.
+        $duracion = $oferta->duracion_minutos !== null && $oferta->duracion_minutos > 0
+            ? (int) $oferta->duracion_minutos
+            : ($duracionMin > 0 ? $duracionMin : self::DURACION_DEFECTO);
+        $termina = $inicia->addMinutes($duracion);
+
+        if (! $porNegocio) {
+            if (! $inicia->isFuture()) {
+                throw new SesionNoReservable('Ese horario ya pasó.');
+            }
+            if ($instructorId === null || ! $this->disponibilidad->cabeEnHorario($instructorId, $sucursal, $inicia, $termina)) {
+                throw new SesionNoReservable('Ese horario está fuera de la atención del profesional.');
+            }
+        }
+
+        try {
+            return $this->agendarEnTransaccion($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio);
+        } catch (QueryException $e) {
+            if ($this->causedByConcurrencyError($e)) {
+                throw new SesionNoReservable('Ese horario ya no está disponible.');
+            }
+
+            throw $e;
+        }
+    }
+
+    private function agendarEnTransaccion(
+        OfertaTenant $oferta,
+        SucursalTenant $sucursal,
+        PersonaTenant $persona,
+        ?int $instructorId,
+        CarbonImmutable $inicia,
+        CarbonImmutable $termina,
+        bool $porNegocio,
+    ): ReservaTenant {
         return DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio): ReservaTenant {
+            // Punto de serialización por profesional (ver arriba). Debe ir antes de
+            // leer su agenda para que la lectura vea lo que otra solicitud guardó.
+            if ($instructorId !== null) {
+                DB::connection('tenant')->table('users')->where('id', $instructorId)->update(['id' => DB::raw('id')]);
+            }
+            $profesional = $instructorId !== null ? Usuario::query()->find($instructorId) : null;
+            if (! $profesional instanceof Usuario || ! $profesional->activo
+                || ! in_array('instructor', $profesional->rolesEfectivos(), true)) {
+                throw new SesionNoReservable('Esa persona no atiende citas.');
+            }
+
             // El hueco debe seguir libre (el proveedor no puede tener dos cosas a la vez).
             if ($this->agenda->conflictos($instructorId, null, $inicia, $termina) !== []) {
                 throw new SesionNoReservable('Ese horario ya no está disponible.');
@@ -85,6 +155,6 @@ class AgendarCitaTenant
             }
 
             return $this->reservas->crear($sesion, $persona);
-        });
+        }, 3);
     }
 }

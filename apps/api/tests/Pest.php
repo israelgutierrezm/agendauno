@@ -355,3 +355,21 @@ function dnsFalso(array $mapa): void
         }
     });
 }
+
+/**
+ * Abre la atención del profesional en esa sede todos los días de 08:00 a 20:00 (el
+ * cliente solo agenda dentro del horario de atención).
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ */
+function abrirHorarioDeCitas(array $e, string $instructorUlid, string $sucursalUlid): void
+{
+    test()->putJson("/api/v1/app/{$e['slug']}/horarios-atencion", [
+        'instructor_id' => $instructorUlid,
+        'sucursal_id' => $sucursalUlid,
+        'horarios' => array_map(
+            static fn (int $dia): array => ['dia_semana' => $dia, 'hora_inicio' => '08:00', 'hora_fin' => '20:00'],
+            range(1, 7),
+        ),
+    ], conBearer($e['bearer']))->assertCreated();
+}

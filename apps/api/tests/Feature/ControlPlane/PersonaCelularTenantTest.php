@@ -42,6 +42,7 @@ it('la cita guest guarda el celular del cliente', function (): void {
     personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
     $coach = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
         ->assertOk()->json('data.0.id');
+    abrirHorarioDeCitas($e, $coach, $sede['sucursal']);
 
     // Guest agenda dejando nombre + celular (sin correo).
     $this->postJson("/api/v1/app/{$e['slug']}/citas", [

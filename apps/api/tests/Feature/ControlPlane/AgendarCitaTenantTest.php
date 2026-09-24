@@ -37,6 +37,8 @@ function estudioDeCitas(): array
     $coach = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
         ->assertOk()->json('data.0.id');
 
+    abrirHorarioDeCitas($e, $coach, $sede['sucursal']);
+
     return ['e' => $e, 'sede' => $sede, 'coach' => $coach];
 }
 

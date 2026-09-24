@@ -67,4 +67,45 @@ class CalcularDisponibilidadTenant
 
         return $slots;
     }
+
+    /**
+     * ¿El intervalo cae completo en una ventana de atención del profesional en esa
+     * sucursal, en un día que no está cerrado? (Lo que la pantalla ofreció como
+     * hueco; el servidor lo vuelve a exigir al agendar.)
+     */
+    public function cabeEnHorario(int $instructorId, SucursalTenant $sucursal, CarbonImmutable $inicia, CarbonImmutable $termina): bool
+    {
+        $zona = (string) ($sucursal->zona_horaria ?? config('app.timezone', 'UTC'));
+        $desde = $inicia->setTimezone($zona);
+        $hasta = $termina->setTimezone($zona);
+
+        // Una cita no cruza la medianoche local.
+        if ($desde->toDateString() !== $hasta->toDateString() && $hasta->format('H:i') !== '00:00') {
+            return false;
+        }
+        if (ExcepcionHorarioTenant::query()->whereDate('fecha', $desde->toDateString())->exists()) {
+            return false;
+        }
+
+        $horaInicio = $desde->format('H:i:s');
+        $horaFin = $hasta->toDateString() === $desde->toDateString() ? $hasta->format('H:i:s') : '24:00:00';
+
+        return HorarioAtencionTenant::query()
+            ->where('instructor_id', $instructorId)
+            ->where('sucursal_id', $sucursal->getKey())
+            ->where('dia_semana', $desde->isoWeekday())
+            ->get()
+            ->contains(static fn (HorarioAtencionTenant $v): bool => self::hora((string) $v->hora_inicio) <= $horaInicio
+                && self::hora((string) $v->hora_fin) >= $horaFin);
+    }
+
+    /**
+     * "9:00" / "09:00" / "09:00:00" → "09:00:00" (para comparar como texto).
+     */
+    private static function hora(string $valor): string
+    {
+        $partes = array_map('intval', explode(':', $valor)) + [0, 0, 0];
+
+        return sprintf('%02d:%02d:%02d', $partes[0], $partes[1], $partes[2]);
+    }
 }

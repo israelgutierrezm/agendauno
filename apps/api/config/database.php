@@ -106,6 +106,9 @@ return [
             'prefix' => '',
             'foreign_key_constraints' => true,
             'engine' => 'InnoDB',
+            // SQLite (dev/pruebas): una escritura concurrente espera su turno en vez de
+            // fallar al instante con "database is locked".
+            'busy_timeout' => env('TENANT_DB_BUSY_TIMEOUT', 5000),
         ],
 
         'pgsql' => [
