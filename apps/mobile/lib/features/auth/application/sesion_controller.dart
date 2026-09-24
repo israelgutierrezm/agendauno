@@ -91,6 +91,48 @@ class SesionController extends Notifier<Sesion?> {
     }
   }
 
+  /// Sube la foto de perfil (jpg, png o webp de hasta 4 MB) y refleja la nueva URL.
+  Future<void> subirFoto(List<int> bytes, String nombreArchivo) async {
+    final actual = state;
+    if (actual == null) {
+      return;
+    }
+    final res = await ref
+        .read(dioProvider)
+        .post<Map<String, dynamic>>(
+          '/api/v1/app/${actual.slug}/yo/foto',
+          data: FormData.fromMap({
+            'foto': MultipartFile.fromBytes(bytes, filename: nombreArchivo),
+          }),
+        );
+    await _reflejarUsuario(actual, res.data);
+  }
+
+  /// Quita la foto de perfil (vuelven las iniciales).
+  Future<void> quitarFoto() async {
+    final actual = state;
+    if (actual == null) {
+      return;
+    }
+    final res = await ref
+        .read(dioProvider)
+        .delete<Map<String, dynamic>>('/api/v1/app/${actual.slug}/yo/foto');
+    await _reflejarUsuario(actual, res.data);
+  }
+
+  Future<void> _reflejarUsuario(
+    Sesion actual,
+    Map<String, dynamic>? cuerpo,
+  ) async {
+    final usuario =
+        ((cuerpo?['data'] ?? {}) as Map<String, dynamic>)['usuario']
+            as Map<String, dynamic>?;
+    if (usuario != null) {
+      state = actual.conUsuario(usuario);
+      await ref.read(almacenSesionProvider).guardar(state!.aJson());
+    }
+  }
+
   /// Cambia la contraseña (la actual se pide si ya tenía una).
   Future<void> cambiarContrasena({
     String? actualContrasena,

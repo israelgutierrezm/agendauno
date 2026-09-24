@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../cuenta/presentation/cuenta_screen.dart' show hacerConAviso;
 
 /// Mi perfil: foto, nombre y contraseña de quien tiene la sesión, y cerrar sesión.
-/// La foto se cambia desde la web.
 class PerfilScreen extends ConsumerStatefulWidget {
   const PerfilScreen({super.key});
 
@@ -45,6 +45,81 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// Elige la foto (galería o cámara), la reduce y la sube.
+  Future<void> _elegirFoto(ImageSource origen) async {
+    final foto = await ImagePicker().pickImage(
+      source: origen,
+      maxWidth: 1024,
+      imageQuality: 85,
+    );
+    if (foto == null || !mounted) {
+      return;
+    }
+    final bytes = await foto.readAsBytes();
+    if (!mounted) {
+      return;
+    }
+    setState(() => _guardando = true);
+    await hacerConAviso(
+      context,
+      () => ref.read(sesionProvider.notifier).subirFoto(bytes, foto.name),
+      exito: 'Foto actualizada.',
+    );
+    if (mounted) {
+      setState(() => _guardando = false);
+    }
+  }
+
+  Future<void> _opcionesFoto({required bool tieneFoto}) async {
+    final elegido = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Elegir de la galería'),
+              onTap: () => Navigator.of(context).pop('galeria'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Tomar foto'),
+              onTap: () => Navigator.of(context).pop('camara'),
+            ),
+            if (tieneFoto)
+              ListTile(
+                leading: const Icon(
+                  Icons.delete_outline,
+                  color: TemaAgendaUno.error,
+                ),
+                title: const Text(
+                  'Quitar foto',
+                  style: TextStyle(color: TemaAgendaUno.error),
+                ),
+                onTap: () => Navigator.of(context).pop('quitar'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || elegido == null) {
+      return;
+    }
+    if (elegido == 'quitar') {
+      await hacerConAviso(
+        context,
+        () => ref.read(sesionProvider.notifier).quitarFoto(),
+        exito: 'Foto quitada.',
+      );
+      return;
+    }
+    await _elegirFoto(
+      elegido == 'camara' ? ImageSource.camera : ImageSource.gallery,
+    );
   }
 
   String? _opcional(TextEditingController c) =>
@@ -141,6 +216,15 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                         sesion.email!,
                         style: const TextStyle(color: TemaAgendaUno.textoSuave),
                       ),
+                    TextButton(
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                      onPressed: _guardando
+                          ? null
+                          : () => _opcionesFoto(
+                              tieneFoto: sesion.fotoUrl != null,
+                            ),
+                      child: const Text('Cambiar foto'),
+                    ),
                   ],
                 ),
               ),

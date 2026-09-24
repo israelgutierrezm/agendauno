@@ -8,6 +8,10 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Turnouno Mobile</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Para elegir tu foto de perfil.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Para tomarte una foto de perfil.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
