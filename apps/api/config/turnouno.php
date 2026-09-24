@@ -74,4 +74,17 @@ return [
         'min_score' => (float) env('RECAPTCHA_MIN_SCORE', 0.5),
     ],
 
+    /*
+    | Respaldos de la base de cada negocio (turnouno:respaldar-estudios, diario).
+    | En producción conviene un disco S3 (otro lugar que el servidor). Se conservan
+    | `dias` días. En MySQL usa los binarios mysqldump/mysql del servidor.
+    */
+    'respaldos' => [
+        'disco' => env('RESPALDOS_DISCO', 'local'),
+        'carpeta' => env('RESPALDOS_CARPETA', 'respaldos'),
+        'dias' => (int) env('RESPALDOS_DIAS', 14),
+        'mysqldump' => env('RESPALDOS_MYSQLDUMP', 'mysqldump'),
+        'mysql' => env('RESPALDOS_MYSQL', 'mysql'),
+    ],
+
 ];

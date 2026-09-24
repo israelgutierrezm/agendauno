@@ -55,6 +55,25 @@ php artisan turnouno:migrar-estudios --force --isolated  # BD de cada estudio
   (la anota `GestorDeConexionTenant::migrar()`, que usan también el
   aprovisionamiento, el demo y la migración legacy).
 
+## Respaldos por estudio
+
+Cada estudio tiene su propia base, así que se respalda y se restaura por separado:
+
+```bash
+php artisan turnouno:respaldar-estudios                  # todos (diario, 03:15)
+php artisan turnouno:respaldar-estudios --estudio=slug   # uno solo
+php artisan turnouno:restaurar-estudio slug --listar     # sus respaldos
+php artisan turnouno:restaurar-estudio slug --force      # vuelve al más reciente
+```
+
+- SQLite: `VACUUM INTO` (copia consistente con la base en uso). MySQL:
+  `mysqldump --single-transaction` (necesita los binarios `mysqldump`/`mysql` del
+  servidor; rutas en `RESPALDOS_MYSQLDUMP` / `RESPALDOS_MYSQL`).
+- Se guardan comprimidos en `RESPALDOS_DISCO` (usar un disco S3, fuera del
+  servidor) bajo `respaldos/{slug}/` y se conservan `RESPALDOS_DIAS` días (14).
+- Restaurar reemplaza TODOS los datos del estudio: hacerlo con el estudio fuera
+  de servicio. Un estudio que falla al respaldar no frena a los demás.
+
 ## Rutas
 
 - `POST /api/v1/registro` — alta pública de estudio (self-service).

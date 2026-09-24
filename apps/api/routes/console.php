@@ -47,5 +47,8 @@ Schedule::command('turnouno:cobrar-suscripciones')->dailyAt('00:45')->withoutOve
 // cerró (alumnos o profesionales activos según la modalidad) y se genera su cargo.
 Schedule::command('turnouno:generar-cargos-renta')->monthlyOn(1, '02:00')->withoutOverlapping();
 
+// Respalda la base de cada negocio y borra los respaldos viejos (retención).
+Schedule::command('turnouno:respaldar-estudios')->dailyAt('03:15')->withoutOverlapping();
+
 // Escala el dunning: suspende las membresias morosas cuya gracia vencio (R10).
 Schedule::command('turnouno:escalar-dunning')->dailyAt('01:00');
