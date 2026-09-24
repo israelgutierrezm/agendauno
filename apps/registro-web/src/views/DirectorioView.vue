@@ -244,7 +244,7 @@ onMounted(cargar);
       :style="{ background: 'var(--fondo)' }"
     >
       <div>
-        <h2 class="text-2xl font-bold">{{ $t("directorio.duenoTitulo") }}</h2>
+        <h2 class="text-2xl font-light">{{ $t("directorio.duenoTitulo") }}</h2>
         <p class="mt-2" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("directorio.duenoDesc") }}
         </p>

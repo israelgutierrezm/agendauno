@@ -650,7 +650,7 @@ onMounted(() => {
         class="relative tu-card flex max-h-[80vh] w-full max-w-2xl flex-col p-6"
       >
         <div class="flex items-center justify-between gap-3">
-          <h2 class="text-lg font-bold">
+          <h2 class="text-lg font-light">
             {{
               legalAbierto === "aviso"
                 ? $t("registro.avisoTitulo")

@@ -119,7 +119,7 @@ onMounted(cargar);
           >{{ iniciales(opciones.estudio.nombre) }}</span
         >
         <div>
-          <h1 class="text-xl font-bold">{{ opciones.estudio.nombre }}</h1>
+          <h1 class="text-xl font-light">{{ opciones.estudio.nombre }}</h1>
           <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("sucursalesPub.titulo") }}
           </p>

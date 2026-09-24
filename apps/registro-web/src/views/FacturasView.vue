@@ -207,7 +207,7 @@ onMounted(cargar);
 
       <!-- Emitir -->
       <div v-if="puedeEmitir" class="mt-6 tu-card p-6">
-        <h2 class="font-bold text-lg">{{ $t("facturas.nueva.titulo") }}</h2>
+        <h2 class="font-light text-lg">{{ $t("facturas.nueva.titulo") }}</h2>
 
         <form class="mt-4 space-y-5" @submit.prevent="emitir">
           <div>

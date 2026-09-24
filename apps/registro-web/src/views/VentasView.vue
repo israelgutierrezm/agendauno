@@ -241,7 +241,7 @@ onMounted(cargar);
     <div v-if="!cargando" class="mt-6 grid gap-6 md:grid-cols-2">
       <!-- Vender -->
       <div v-if="puedeVender" class="tu-card p-6">
-        <h2 class="font-bold text-lg">{{ $t("ventas.vender.titulo") }}</h2>
+        <h2 class="font-light text-lg">{{ $t("ventas.vender.titulo") }}</h2>
 
         <p
           v-if="miembros.length === 0"
@@ -386,7 +386,9 @@ onMounted(cargar);
       <!-- Productos / editor de membresías -->
       <div class="tu-card p-6">
         <div class="flex items-center justify-between gap-2">
-          <h2 class="font-bold text-lg">{{ $t("ventas.productos.titulo") }}</h2>
+          <h2 class="font-light text-lg">
+            {{ $t("ventas.productos.titulo") }}
+          </h2>
           <button
             v-if="puedeCrearProducto"
             class="tu-btn tu-btn-primario text-sm shrink-0"
@@ -448,7 +450,7 @@ onMounted(cargar);
 
     <!-- Ventas recientes -->
     <div v-if="!cargando" class="mt-6">
-      <h2 class="font-bold text-lg mb-3">{{ $t("ventas.ordenes.titulo") }}</h2>
+      <h2 class="font-light text-lg mb-3">{{ $t("ventas.ordenes.titulo") }}</h2>
       <TablaDatos
         :columnas="columnasOrdenes"
         :filas="ordenes"

@@ -278,7 +278,7 @@ onMounted(cargar);
       <div v-if="seleccionado" class="space-y-6">
         <!-- Constructor de campos -->
         <div class="tu-card p-6">
-          <h2 class="font-bold text-lg">
+          <h2 class="font-light text-lg">
             {{ seleccionado.nombre }} · {{ $t("formularios.campos.titulo") }}
           </h2>
           <ul
@@ -359,7 +359,7 @@ onMounted(cargar);
 
         <!-- Respuestas: se llenan desde el expediente de cada persona -->
         <div class="tu-card p-6">
-          <h2 class="font-bold text-lg">
+          <h2 class="font-light text-lg">
             {{ $t("formularios.respuestas.titulo") }}
             <span
               v-if="puedeGestionar && respuestas.length > 0"

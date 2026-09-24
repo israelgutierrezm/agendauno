@@ -427,7 +427,9 @@ onMounted(cargarReferencias);
 
         <!-- Vista previa de huecos -->
         <div class="mt-8 tu-card p-6">
-          <h2 class="font-bold text-lg">{{ $t("horarios.preview.titulo") }}</h2>
+          <h2 class="font-light text-lg">
+            {{ $t("horarios.preview.titulo") }}
+          </h2>
           <p class="text-sm mt-1" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("horarios.preview.ayuda") }}
           </p>

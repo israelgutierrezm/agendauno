@@ -131,7 +131,7 @@ onMounted(cargar);
     <div v-if="!cargando" class="mt-6 space-y-4">
       <div v-for="p in pasarelas" :key="p.proveedor" class="tu-card p-6">
         <div class="flex items-center justify-between gap-3">
-          <h2 class="font-bold text-lg">
+          <h2 class="font-light text-lg">
             {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
           </h2>
           <label class="flex items-center gap-2 text-sm cursor-pointer">

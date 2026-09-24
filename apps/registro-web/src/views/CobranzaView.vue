@@ -193,7 +193,7 @@ onMounted(cargar);
     <template v-else>
       <!-- Morosos (dunning) -->
       <div class="mt-6 flex items-center gap-3">
-        <h2 class="font-bold text-lg">{{ $t("cobranza.morosos") }}</h2>
+        <h2 class="font-light text-lg">{{ $t("cobranza.morosos") }}</h2>
         <span
           class="tu-badge"
           :class="morosos.length > 0 ? 'tu-badge-aviso' : 'tu-badge-exito'"
@@ -292,7 +292,7 @@ onMounted(cargar);
       </div>
 
       <!-- Pagos / reembolsos -->
-      <h2 class="mt-8 font-bold text-lg">{{ $t("cobranza.pagos") }}</h2>
+      <h2 class="mt-8 font-light text-lg">{{ $t("cobranza.pagos") }}</h2>
       <p
         v-if="pagos.length === 0"
         class="mt-3 tu-card p-6 text-sm"
@@ -429,7 +429,7 @@ onMounted(cargar);
         </table>
       </div>
       <!-- Próximas renovaciones (cobro recurrente) -->
-      <h2 class="mt-8 font-bold text-lg">{{ $t("cobranza.renovaciones") }}</h2>
+      <h2 class="mt-8 font-light text-lg">{{ $t("cobranza.renovaciones") }}</h2>
       <p
         v-if="suscripciones.length === 0"
         class="mt-3 tu-card p-6 text-sm"
@@ -505,7 +505,7 @@ onMounted(cargar);
         :style="{ background: 'var(--superficie)' }"
       >
         <div class="flex items-start justify-between gap-3">
-          <h3 class="text-lg font-bold">
+          <h3 class="text-lg font-light">
             {{ $t("cobranza.reembolso.titulo") }}
           </h3>
           <button

@@ -134,7 +134,7 @@ onMounted(cargarSucursales);
           borderColor: 'var(--borde)',
         }"
       >
-        <p class="text-lg font-bold truncate">
+        <p class="text-lg font-light truncate">
           {{
             esEdicion
               ? $t("productoEditor.tituloEditar")

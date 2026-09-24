@@ -398,7 +398,7 @@ onMounted(cargar);
 
       <!-- Tendencias de ingresos (Etapa 2) -->
       <div class="mt-8 flex flex-wrap items-center gap-3">
-        <h2 class="font-bold text-lg">
+        <h2 class="font-light text-lg">
           {{ $t("reportes.tendencias.titulo") }}
         </h2>
         <div class="ml-auto flex items-center gap-2">
@@ -548,7 +548,7 @@ onMounted(cargar);
 
       <!-- Conversión + cohortes de retención (Etapa 2) -->
       <template v-if="cohortes">
-        <h2 class="mt-8 font-bold text-lg">
+        <h2 class="mt-8 font-light text-lg">
           {{ $t("reportes.conversion.titulo") }}
         </h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -641,7 +641,7 @@ onMounted(cargar);
       </template>
 
       <!-- Por sucursal -->
-      <h2 class="mt-8 font-bold text-lg">{{ $t("reportes.porSucursal") }}</h2>
+      <h2 class="mt-8 font-light text-lg">{{ $t("reportes.porSucursal") }}</h2>
       <p
         v-if="sucursales.length === 0"
         class="mt-3 text-sm"
@@ -695,7 +695,7 @@ onMounted(cargar);
       </div>
 
       <!-- Rentabilidad por clase (R30) -->
-      <h2 class="mt-8 font-bold text-lg">
+      <h2 class="mt-8 font-light text-lg">
         {{ $t("reportes.rentabilidad.titulo") }}
       </h2>
       <p
@@ -823,7 +823,7 @@ onMounted(cargar);
       </template>
 
       <!-- Demanda por horario (R31) -->
-      <h2 class="mt-8 font-bold text-lg">
+      <h2 class="mt-8 font-light text-lg">
         {{ $t("reportes.demanda.titulo") }}
       </h2>
       <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">

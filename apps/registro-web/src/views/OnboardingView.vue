@@ -322,7 +322,7 @@ onMounted(cargar);
         </div>
 
         <div class="flex items-center justify-between gap-2">
-          <h2 class="text-xl font-bold">
+          <h2 class="text-xl font-light">
             {{ $t(`onboarding.pasos.${pasoActual}`) }}
           </h2>
           <span

@@ -79,7 +79,7 @@ async function guardar(): Promise<void> {
           borderColor: 'var(--borde)',
         }"
       >
-        <p class="text-lg font-bold truncate">
+        <p class="text-lg font-light truncate">
           {{ $t("miembros.editar.titulo") }}
         </p>
         <button

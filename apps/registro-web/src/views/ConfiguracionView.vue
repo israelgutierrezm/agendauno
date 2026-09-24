@@ -132,7 +132,7 @@ onMounted(cargar);
     <template v-if="!cargando">
       <!-- Logo del estudio -->
       <div class="mt-6 tu-card p-6">
-        <h2 class="font-bold text-lg">{{ $t("configuracion.logoTitulo") }}</h2>
+        <h2 class="font-light text-lg">{{ $t("configuracion.logoTitulo") }}</h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("configuracion.logoDesc") }}
         </p>
@@ -186,7 +186,7 @@ onMounted(cargar);
       <div class="mt-6 tu-card p-6">
         <div class="flex items-start justify-between gap-4">
           <div>
-            <h2 class="font-bold text-lg">
+            <h2 class="font-light text-lg">
               {{ $t("configuracion.directorioTitulo") }}
             </h2>
             <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">

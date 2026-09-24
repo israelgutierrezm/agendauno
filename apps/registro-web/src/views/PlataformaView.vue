@@ -322,7 +322,7 @@ function borrar(): void {
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-10">
     <!-- Puerta por token -->
     <div v-if="!autenticado" class="mx-auto max-w-sm tu-card p-6">
-      <h1 class="font-bold text-xl">{{ $t("plataforma.titulo") }}</h1>
+      <h1 class="font-light text-xl">{{ $t("plataforma.titulo") }}</h1>
       <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("plataforma.tokenAyuda") }}
       </p>
@@ -353,7 +353,7 @@ function borrar(): void {
     <template v-else>
       <div class="flex items-start justify-between gap-4">
         <div>
-          <h1 class="font-bold text-2xl">{{ $t("plataforma.titulo") }}</h1>
+          <h1 class="font-light text-2xl">{{ $t("plataforma.titulo") }}</h1>
           <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("plataforma.subtitulo") }}
           </p>
@@ -367,7 +367,7 @@ function borrar(): void {
       <div class="mt-6 tu-card p-6">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <h2 class="font-bold">{{ $t("plataforma.facturapi.titulo") }}</h2>
+            <h2 class="font-light">{{ $t("plataforma.facturapi.titulo") }}</h2>
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
               {{ $t("plataforma.facturapi.subtitulo") }}
             </p>
@@ -425,7 +425,7 @@ function borrar(): void {
 
       <!-- Documentos legales (aviso de privacidad y términos) -->
       <div class="mt-6 tu-card p-6">
-        <h2 class="font-bold">{{ $t("plataforma.legales.titulo") }}</h2>
+        <h2 class="font-light">{{ $t("plataforma.legales.titulo") }}</h2>
         <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("plataforma.legales.subtitulo") }}
         </p>
@@ -477,7 +477,7 @@ function borrar(): void {
 
       <!-- Pasarelas de cobro de la plataforma -->
       <div class="mt-6">
-        <h2 class="font-bold text-lg">
+        <h2 class="font-light text-lg">
           {{ $t("plataforma.pasarelas.titulo") }}
         </h2>
         <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -486,7 +486,7 @@ function borrar(): void {
         <div class="mt-3 grid gap-3 sm:grid-cols-3">
           <div v-for="p in pasarelas" :key="p.proveedor" class="tu-card p-4">
             <div class="flex items-center justify-between gap-2">
-              <span class="font-bold">{{
+              <span class="font-light">{{
                 $t(`pasarelas.proveedores.${p.proveedor}`)
               }}</span>
               <label class="flex items-center gap-1.5 text-xs">
@@ -561,7 +561,7 @@ function borrar(): void {
       <TarifasPlataforma class="mt-8" :api-url="apiUrl" :token="token" />
 
       <!-- Estudios -->
-      <h2 class="mt-8 font-bold text-lg">
+      <h2 class="mt-8 font-light text-lg">
         {{ $t("plataforma.estudios.titulo") }} · {{ estudios.length }}
       </h2>
       <p
@@ -608,7 +608,7 @@ function borrar(): void {
       <!-- Editor de facturación de un tenant -->
       <div v-if="editando" class="mt-4 tu-card p-5">
         <div class="flex items-center justify-between gap-3">
-          <h3 class="font-bold">
+          <h3 class="font-light">
             {{
               $t("plataforma.estudios.editarTitulo", {
                 estudio: editando.nombre,

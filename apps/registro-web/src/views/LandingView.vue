@@ -847,7 +847,7 @@ onBeforeUnmount(() => observador?.disconnect());
         class="mx-auto max-w-3xl px-4 sm:px-6 py-20 sm:py-28 text-center reveal"
       >
         <h2
-          class="font-bold tracking-tight text-4xl sm:text-5xl"
+          class="font-light tracking-tight text-4xl sm:text-5xl"
           style="letter-spacing: -0.025em; line-height: 1.07"
         >
           {{ $t("landing.ctaFinalTitulo") }}

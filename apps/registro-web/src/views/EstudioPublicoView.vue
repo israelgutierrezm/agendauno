@@ -258,7 +258,7 @@ onMounted(cargar);
 
       <!-- Próximas clases -->
       <section class="mx-auto max-w-5xl px-4 py-12">
-        <h2 class="text-2xl font-bold">
+        <h2 class="text-2xl font-light">
           {{ $t("escaparate.proximasClases") }}
         </h2>
         <p
@@ -274,7 +274,7 @@ onMounted(cargar);
             :key="i"
             class="tu-card p-5"
           >
-            <p class="font-bold">{{ s.clase ?? "—" }}</p>
+            <p class="font-light">{{ s.clase ?? "—" }}</p>
             <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
               {{ fechaHora(s.inicia_en, s.zona_horaria) }}
             </p>
@@ -308,7 +308,7 @@ onMounted(cargar);
       <!-- Precios -->
       <section class="py-12" :style="{ background: 'var(--superficie)' }">
         <div class="mx-auto max-w-5xl px-4">
-          <h2 class="text-2xl font-bold">{{ $t("escaparate.precios") }}</h2>
+          <h2 class="text-2xl font-light">{{ $t("escaparate.precios") }}</h2>
           <p
             v-if="escaparate.productos.length === 0"
             class="mt-4"
@@ -325,7 +325,7 @@ onMounted(cargar);
               <span class="tu-badge self-start">{{
                 $t(`escaparate.registro.tipos.${p.tipo}`)
               }}</span>
-              <p class="mt-2 font-bold">{{ p.nombre }}</p>
+              <p class="mt-2 font-light">{{ p.nombre }}</p>
               <p class="mt-1 text-2xl font-extrabold">
                 {{ dinero(p.precio_minor, p.moneda) }}
               </p>
@@ -354,7 +354,7 @@ onMounted(cargar);
         v-if="escaparate.instructores.length > 0"
         class="mx-auto max-w-5xl px-4 py-12"
       >
-        <h2 class="text-2xl font-bold">{{ $t("escaparate.instructores") }}</h2>
+        <h2 class="text-2xl font-light">{{ $t("escaparate.instructores") }}</h2>
         <ul class="mt-6 flex flex-wrap gap-4">
           <li
             v-for="(nombre, i) in escaparate.instructores"
@@ -379,7 +379,7 @@ onMounted(cargar);
         :style="{ background: 'var(--superficie)' }"
       >
         <div class="mx-auto max-w-5xl px-4">
-          <h2 class="text-2xl font-bold">{{ $t("escaparate.ubicacion") }}</h2>
+          <h2 class="text-2xl font-light">{{ $t("escaparate.ubicacion") }}</h2>
           <p
             v-if="ubicacion"
             class="mt-2"
@@ -408,7 +408,7 @@ onMounted(cargar);
 
       <!-- CTA final -->
       <section class="mx-auto max-w-3xl px-4 py-14 text-center">
-        <h2 class="text-2xl font-bold">{{ escaparate.estudio.nombre }}</h2>
+        <h2 class="text-2xl font-light">{{ escaparate.estudio.nombre }}</h2>
         <button
           type="button"
           class="tu-btn tu-btn-primario mt-5 px-8"
@@ -433,7 +433,7 @@ onMounted(cargar);
         >
           <div class="flex items-start justify-between gap-3">
             <div>
-              <h3 class="text-xl font-bold">
+              <h3 class="text-xl font-light">
                 {{ $t("escaparate.registro.titulo") }}
               </h3>
               <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">

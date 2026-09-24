@@ -263,7 +263,7 @@ onMounted(cargar);
       <div class="mt-6 grid gap-4 lg:grid-cols-5">
         <!-- Cómo te cobramos -->
         <div class="tu-card p-5 lg:col-span-2">
-          <h2 class="font-bold">{{ $t("cobro.modo.titulo") }}</h2>
+          <h2 class="font-light">{{ $t("cobro.modo.titulo") }}</h2>
           <p class="mt-2 text-lg font-semibold">
             {{
               renta.modo_cobro === "fijo"
@@ -292,7 +292,7 @@ onMounted(cargar);
 
         <!-- Mes en curso con su desglose -->
         <div class="tu-card p-5 lg:col-span-3">
-          <h2 class="font-bold">
+          <h2 class="font-light">
             {{ $t("cobro.actual.titulo") }} · {{ renta.actual.periodo }}
           </h2>
           <div class="mt-2 flex items-end justify-between gap-4 flex-wrap">
@@ -402,7 +402,7 @@ onMounted(cargar);
             {{ quien ? $t("cobro.quien.ocultar") : $t("cobro.quien.ver") }}
           </button>
           <div v-if="quien" class="mt-3">
-            <p class="text-sm font-bold">{{ $t("cobro.quien.titulo") }}</p>
+            <p class="text-sm font-light">{{ $t("cobro.quien.titulo") }}</p>
             <p
               v-if="quien.descripcion"
               class="text-xs mt-1"
@@ -441,7 +441,7 @@ onMounted(cargar);
       </div>
 
       <!-- Historial de cargos -->
-      <h2 class="mt-8 font-bold text-lg">{{ $t("renta.historial") }}</h2>
+      <h2 class="mt-8 font-light text-lg">{{ $t("renta.historial") }}</h2>
       <p
         v-if="renta.cargos.length === 0"
         class="mt-3 text-sm"

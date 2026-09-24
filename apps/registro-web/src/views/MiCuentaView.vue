@@ -310,7 +310,7 @@ onMounted(() => cargar());
         class="mt-6 tu-card p-6"
         :style="{ borderLeft: '4px solid var(--primario)' }"
       >
-        <h2 class="font-bold text-lg">{{ $t("miCuenta.waiversTitulo") }}</h2>
+        <h2 class="font-light text-lg">{{ $t("miCuenta.waiversTitulo") }}</h2>
         <ul class="mt-3 space-y-3">
           <li v-for="w in waivers" :key="w.id" class="text-sm">
             <div class="font-semibold">{{ w.titulo }}</div>
@@ -334,7 +334,7 @@ onMounted(() => cargar());
       <div class="mt-6 grid gap-6 md:grid-cols-2">
         <!-- Creditos -->
         <div class="tu-card p-6">
-          <h2 class="font-bold text-lg">{{ $t("miCuenta.creditos") }}</h2>
+          <h2 class="font-light text-lg">{{ $t("miCuenta.creditos") }}</h2>
           <ul v-if="derechos.length > 0" class="mt-3 space-y-2 text-sm">
             <li
               v-for="d in derechos"
@@ -365,7 +365,7 @@ onMounted(() => cargar());
 
         <!-- Mis reservas -->
         <div class="tu-card p-6">
-          <h2 class="font-bold text-lg">{{ $t("miCuenta.misReservas") }}</h2>
+          <h2 class="font-light text-lg">{{ $t("miCuenta.misReservas") }}</h2>
           <ul v-if="reservas.length > 0" class="mt-3 space-y-2 text-sm">
             <li
               v-for="r in reservas"
@@ -451,7 +451,7 @@ onMounted(() => cargar());
 
       <!-- Comprar (autoservicio comercial) -->
       <div v-if="productos.length > 0" class="mt-6 tu-card p-6">
-        <h2 class="font-bold text-lg">{{ $t("miCuenta.comprar.titulo") }}</h2>
+        <h2 class="font-light text-lg">{{ $t("miCuenta.comprar.titulo") }}</h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("miCuenta.comprar.subtitulo") }}
         </p>
@@ -503,13 +503,13 @@ onMounted(() => cargar());
 
       <!-- Agendar una cita (negocios de citas) -->
       <div v-if="sesion.esCitas" class="mt-6 tu-card p-6">
-        <h2 class="font-bold text-lg">{{ $t("citaCuenta.titulo") }}</h2>
+        <h2 class="font-light text-lg">{{ $t("citaCuenta.titulo") }}</h2>
         <AgendarCitaCuenta class="mt-3" @agendada="cargar(true)" />
       </div>
 
       <!-- Proximas clases -->
       <div v-else class="mt-6 tu-card p-6">
-        <h2 class="font-bold text-lg">{{ $t("miCuenta.agenda") }}</h2>
+        <h2 class="font-light text-lg">{{ $t("miCuenta.agenda") }}</h2>
         <p
           v-if="mensaje === 'ok'"
           class="mt-2 text-sm"
@@ -579,7 +579,9 @@ onMounted(() => cargar());
         v-if="formularios.length > 0 && personaId !== null"
         class="mt-6 tu-card p-6"
       >
-        <h2 class="font-bold text-lg">{{ $t("miCuentaExtra.formularios") }}</h2>
+        <h2 class="font-light text-lg">
+          {{ $t("miCuentaExtra.formularios") }}
+        </h2>
         <ListaFormularios
           class="mt-2"
           :formularios="formularios"
@@ -591,7 +593,7 @@ onMounted(() => cargar());
 
       <!-- Mis compras (historial) -->
       <div v-if="ordenes.length > 0" class="mt-6 tu-card p-6">
-        <h2 class="font-bold text-lg">{{ $t("miCuenta.compras.titulo") }}</h2>
+        <h2 class="font-light text-lg">{{ $t("miCuenta.compras.titulo") }}</h2>
         <ul class="mt-3 space-y-2 text-sm">
           <li
             v-for="o in ordenes"

@@ -125,7 +125,7 @@ onMounted(cargarStaff);
 
     <!-- Esquema de pago -->
     <div class="mt-6 tu-card p-5">
-      <h2 class="font-bold">{{ $t("nomina.esquemas") }}</h2>
+      <h2 class="font-light">{{ $t("nomina.esquemas") }}</h2>
       <form
         class="mt-3 grid sm:grid-cols-2 gap-3"
         @submit.prevent="guardarEsquema"
@@ -180,7 +180,7 @@ onMounted(cargarStaff);
 
     <!-- Cálculo del periodo -->
     <div class="mt-6 tu-card p-5">
-      <h2 class="font-bold">{{ $t("nomina.periodo") }}</h2>
+      <h2 class="font-light">{{ $t("nomina.periodo") }}</h2>
       <div class="mt-3 flex flex-wrap items-end gap-3">
         <div>
           <label class="tu-label" for="nd">{{ $t("nomina.desde") }}</label>

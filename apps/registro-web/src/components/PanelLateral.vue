@@ -50,7 +50,7 @@ onBeforeUnmount(() => {
               background: 'var(--superficie)',
             }"
           >
-            <h2 class="text-lg font-bold">{{ titulo }}</h2>
+            <h2 class="text-lg font-light">{{ titulo }}</h2>
             <button
               class="tu-icono-btn"
               type="button"

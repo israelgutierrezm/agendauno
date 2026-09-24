@@ -207,7 +207,7 @@ onMounted(cargar);
 
       <!-- Grupo seleccionado: inscritos + inscribir -->
       <div v-if="seleccionado" class="mt-6 tu-card p-5">
-        <h2 class="font-bold">
+        <h2 class="font-light">
           {{ seleccionado.nombre }} · {{ $t("cursos.inscritosTitulo") }}
         </h2>
 

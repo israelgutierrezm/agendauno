@@ -2286,7 +2286,7 @@ onMounted(async () => {
       <div class="absolute inset-0 bg-black/50" @click="mostrarNueva = false" />
       <div class="relative tu-card w-full max-w-lg p-6">
         <div class="flex items-center justify-between">
-          <h2 class="font-bold text-lg">{{ $t("agenda.nueva.titulo") }}</h2>
+          <h2 class="font-light text-lg">{{ $t("agenda.nueva.titulo") }}</h2>
           <button
             class="tu-icono-btn"
             :aria-label="$t('agenda.cerrarDetalle')"

@@ -303,7 +303,7 @@ onMounted(cargar);
           >{{ iniciales(opciones.estudio.nombre) }}</span
         >
         <div>
-          <h1 class="text-xl font-bold">{{ opciones.estudio.nombre }}</h1>
+          <h1 class="text-xl font-light">{{ opciones.estudio.nombre }}</h1>
           <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("reservar.titulo") }}
           </p>
@@ -327,7 +327,9 @@ onMounted(cargar);
         >
           ✓
         </div>
-        <h2 class="mt-3 text-lg font-bold">{{ $t("reservar.listoTitulo") }}</h2>
+        <h2 class="mt-3 text-lg font-light">
+          {{ $t("reservar.listoTitulo") }}
+        </h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{
             $t("reservar.listoResumen", {

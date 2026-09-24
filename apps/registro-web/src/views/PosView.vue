@@ -351,7 +351,7 @@ onMounted(cargar);
 
         <!-- Carrito -->
         <div class="tu-card p-4 h-fit">
-          <h2 class="font-bold">{{ $t("pos.carrito") }}</h2>
+          <h2 class="font-light">{{ $t("pos.carrito") }}</h2>
           <p
             v-if="carrito.length === 0"
             class="mt-2 text-sm"
@@ -674,7 +674,7 @@ onMounted(cargar);
         </ul>
 
         <!-- Ventas recientes -->
-        <h2 class="mt-8 font-bold text-lg">{{ $t("pos.ventas.titulo") }}</h2>
+        <h2 class="mt-8 font-light text-lg">{{ $t("pos.ventas.titulo") }}</h2>
         <p
           v-if="ventas.length === 0"
           class="mt-3 text-sm"

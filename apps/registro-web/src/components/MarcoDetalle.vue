@@ -115,7 +115,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", alTeclear));
 .md-titulo {
   margin-top: 0.35rem;
   font-size: 1.2rem;
-  font-weight: 700;
+  font-weight: 300;
   line-height: 1.2;
   letter-spacing: -0.02em;
 }
