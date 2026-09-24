@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CambiarCorreoTenant;
 use App\Modules\Tenancy\Http\UsuarioTenantPresenter;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\TokenAccesoTenant;
@@ -18,10 +19,12 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * "Mi perfil": lo que cada usuario ajusta de sí mismo (cualquier rol, sin permiso
- * extra): nombre, foto y contraseña. El correo no se cambia aquí (es su acceso).
+ * extra): nombre, foto, contraseña y correo (este último, confirmado por enlace).
  */
 class PerfilTenantController
 {
+    public function __construct(private readonly CambiarCorreoTenant $cambioCorreo) {}
+
     public function actualizar(Request $request): JsonResponse
     {
         $usuario = $this->usuario($request);
@@ -72,6 +75,37 @@ class PerfilTenantController
             ->where('tokenable_id', $usuario->getKey())
             ->whereKeyNot($this->tokenActual($request) ?? 0)
             ->delete();
+
+        return $this->responder($usuario);
+    }
+
+    /**
+     * Pide cambiar el correo de acceso: confirma con la contraseña actual (si ya
+     * tiene una) y envía el enlace al correo nuevo. Hasta abrirlo, sigue el anterior.
+     */
+    public function solicitarCambioCorreo(Request $request): JsonResponse
+    {
+        $usuario = $this->usuario($request);
+        $tieneContrasena = $usuario->password !== null && $usuario->password !== '';
+
+        $validado = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+            'password' => [$tieneContrasena ? 'required' : 'nullable', 'string'],
+        ]);
+
+        if ($tieneContrasena && ! Hash::check((string) $validado['password'], (string) $usuario->password)) {
+            throw ValidationException::withMessages(['password' => ['La contraseña no es correcta.']]);
+        }
+
+        $this->cambioCorreo->solicitar($this->estudio($request), $usuario, (string) $validado['email']);
+
+        return $this->responder($usuario);
+    }
+
+    public function cancelarCambioCorreo(Request $request): JsonResponse
+    {
+        $usuario = $this->usuario($request);
+        $this->cambioCorreo->cancelar($usuario);
 
         return $this->responder($usuario);
     }

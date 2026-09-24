@@ -15,7 +15,8 @@ import { useToastStore } from "@/stores/toast";
 
 /**
  * "Mi perfil": lo que cada persona ajusta de sí misma: su foto, su nombre (con
- * apellidos por separado), su contraseña y su apariencia.
+ * apellidos por separado), su correo de acceso (se confirma por enlace), su
+ * contraseña y su apariencia.
  */
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -92,6 +93,42 @@ async function guardarDatos(): Promise<void> {
     toast.error(mensajeDeError(err, t("miPerfil.error")));
   } finally {
     guardandoDatos.value = false;
+  }
+}
+
+// ---- Correo de acceso ----
+const editandoCorreo = ref(false);
+const correo = ref({ email: "", password: "" });
+const enviandoCorreo = ref(false);
+async function pedirCambioCorreo(): Promise<void> {
+  enviandoCorreo.value = true;
+  try {
+    const { data } = await api.post<Respuesta>(`${base.value}/yo/correo`, {
+      email: correo.value.email.trim(),
+      password: correo.value.password || null,
+    });
+    sesion.actualizarUsuario(data.data.usuario);
+    toast.exito(
+      t("miPerfil.correoEnviado", { email: correo.value.email.trim() }),
+    );
+    correo.value = { email: "", password: "" };
+    editandoCorreo.value = false;
+  } catch (err) {
+    toast.error(mensajeDeError(err, t("miPerfil.error")));
+  } finally {
+    enviandoCorreo.value = false;
+  }
+}
+async function cancelarCambioCorreo(): Promise<void> {
+  enviandoCorreo.value = true;
+  try {
+    const { data } = await api.delete<Respuesta>(`${base.value}/yo/correo`);
+    sesion.actualizarUsuario(data.data.usuario);
+    toast.exito(t("miPerfil.cambioCancelado"));
+  } catch (err) {
+    toast.error(mensajeDeError(err, t("miPerfil.error")));
+  } finally {
+    enviandoCorreo.value = false;
   }
 }
 
@@ -215,11 +252,6 @@ const aparienciaAbierta = ref(false);
               />
             </div>
           </div>
-          <div>
-            <p class="tu-label">{{ $t("miPerfil.correo") }}</p>
-            <p class="text-sm">{{ usuario.email }}</p>
-            <p class="tu-hint">{{ $t("miPerfil.correoAyuda") }}</p>
-          </div>
           <button
             type="submit"
             class="tu-btn tu-btn-primario"
@@ -229,6 +261,89 @@ const aparienciaAbierta = ref(false);
           </button>
         </div>
       </form>
+
+      <!-- Correo de acceso -->
+      <div class="mp-fila">
+        <div>
+          <h2 class="mp-titulo">{{ $t("miPerfil.correo") }}</h2>
+          <p class="mp-ayuda">{{ $t("miPerfil.correoAyuda") }}</p>
+        </div>
+        <div class="space-y-4">
+          <p class="text-sm">{{ usuario.email }}</p>
+          <template v-if="usuario.email_pendiente">
+            <p class="text-sm" role="status" style="color: var(--aviso)">
+              {{
+                $t("miPerfil.correoPendiente", {
+                  email: usuario.email_pendiente,
+                })
+              }}
+            </p>
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma text-sm"
+              :disabled="enviandoCorreo"
+              @click="cancelarCambioCorreo"
+            >
+              {{ $t("miPerfil.cancelarCambio") }}
+            </button>
+          </template>
+          <form
+            v-else-if="editandoCorreo"
+            class="space-y-4"
+            @submit.prevent="pedirCambioCorreo"
+          >
+            <div>
+              <label class="tu-label" for="mp-correo">{{
+                $t("miPerfil.correoNuevo")
+              }}</label>
+              <input
+                id="mp-correo"
+                v-model="correo.email"
+                type="email"
+                class="tu-input"
+                required
+                maxlength="255"
+                autocomplete="email"
+              />
+            </div>
+            <div v-if="usuario.tiene_contrasena !== false">
+              <label class="tu-label" for="mp-correo-clave">{{
+                $t("miPerfil.tuContrasena")
+              }}</label>
+              <CampoContrasena
+                id="mp-correo-clave"
+                v-model="correo.password"
+                autocomplete="current-password"
+                required
+              />
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="submit"
+                class="tu-btn tu-btn-primario"
+                :disabled="enviandoCorreo || correo.email.trim() === ''"
+              >
+                {{ $t("miPerfil.enviarEnlace") }}
+              </button>
+              <button
+                type="button"
+                class="tu-btn tu-btn-fantasma"
+                @click="editandoCorreo = false"
+              >
+                {{ $t("miPerfil.cancelar") }}
+              </button>
+            </div>
+          </form>
+          <button
+            v-else
+            type="button"
+            class="tu-btn tu-btn-fantasma text-sm"
+            @click="editandoCorreo = true"
+          >
+            {{ $t("miPerfil.cambiarCorreo") }}
+          </button>
+        </div>
+      </div>
 
       <!-- Contraseña -->
       <form class="mp-fila" @submit.prevent="cambiarClave">

@@ -152,6 +152,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/reenviar-activacion', [AuthTenantController::class, 'reenviarActivacion'])->middleware('throttle:login')->name('reenviar-activacion');
         Route::post('/recuperar-contrasena', [AuthTenantController::class, 'recuperarContrasena'])->middleware('throttle:recuperacion')->name('recuperar-contrasena');
         Route::post('/restablecer-contrasena', [AuthTenantController::class, 'restablecerContrasena'])->middleware('throttle:recuperacion')->name('restablecer-contrasena');
+        Route::post('/confirmar-correo', [AuthTenantController::class, 'confirmarCorreo'])->middleware('throttle:login')->name('confirmar-correo');
 
         // Marca pública (branding): nombre + logo del estudio para la pantalla de
         // acceso (sin auth). Con throttle para mitigar sondeo de slugs.
@@ -181,6 +182,8 @@ Route::prefix('v1')->group(function (): void {
             // Mi perfil: cada quien ajusta su nombre, su foto y su contraseña.
             Route::put('/yo/perfil', [PerfilTenantController::class, 'actualizar'])->name('yo.perfil');
             Route::put('/yo/contrasena', [PerfilTenantController::class, 'cambiarContrasena'])->name('yo.contrasena');
+            Route::post('/yo/correo', [PerfilTenantController::class, 'solicitarCambioCorreo'])->middleware('throttle:recuperacion')->name('yo.correo.store');
+            Route::delete('/yo/correo', [PerfilTenantController::class, 'cancelarCambioCorreo'])->name('yo.correo.destroy');
             Route::post('/yo/foto', [PerfilTenantController::class, 'subirFoto'])->name('yo.foto.store');
             Route::delete('/yo/foto', [PerfilTenantController::class, 'eliminarFoto'])->name('yo.foto.destroy');
             Route::post('/logout', [AuthTenantController::class, 'destroy'])->name('logout');

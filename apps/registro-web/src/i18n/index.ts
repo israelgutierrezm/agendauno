@@ -4,6 +4,7 @@ import agendaVisual from "./locales/agendaVisual.es-MX";
 import apariencia from "./locales/apariencia.es-MX";
 import cobro from "./locales/cobro.es-MX";
 import {
+  confirmarCorreo,
   expediente,
   listados,
   miPerfil,
@@ -44,6 +45,7 @@ export const i18n = createI18n({
       cobro,
       recepcionVisual,
       miPerfil,
+      confirmarCorreo,
       expediente,
       profesional,
       listados,

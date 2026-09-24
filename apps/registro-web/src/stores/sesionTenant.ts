@@ -22,6 +22,8 @@ export interface UsuarioTenant {
   nombre_corto?: string;
   foto_url?: string | null;
   tiene_contrasena?: boolean;
+  // Correo nuevo que espera confirmación por enlace.
+  email_pendiente?: string | null;
 }
 
 /** Cómo atiende el negocio: clases con cupo o citas 1 a 1 con un profesional. */

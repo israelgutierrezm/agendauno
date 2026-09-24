@@ -54,6 +54,7 @@ class Sesion {
     this.primerApellido,
     this.segundoApellido,
     this.email,
+    this.emailPendiente,
     this.fotoUrl,
     this.tieneContrasena = true,
     this.modalidad = Modalidad.clases,
@@ -70,6 +71,9 @@ class Sesion {
   final String? primerApellido;
   final String? segundoApellido;
   final String? email;
+
+  /// Correo nuevo que espera confirmación por enlace.
+  final String? emailPendiente;
   final String? fotoUrl;
   final bool tieneContrasena;
   final Modalidad modalidad;
@@ -96,6 +100,7 @@ class Sesion {
     'primer_apellido': primerApellido,
     'segundo_apellido': segundoApellido,
     'email': email,
+    'email_pendiente': emailPendiente,
     'foto_url': fotoUrl,
     'tiene_contrasena': tieneContrasena,
     'modalidad': modalidad.name,
@@ -123,6 +128,7 @@ class Sesion {
       primerApellido: datos['primer_apellido'] as String?,
       segundoApellido: datos['segundo_apellido'] as String?,
       email: datos['email'] as String?,
+      emailPendiente: datos['email_pendiente'] as String?,
       fotoUrl: datos['foto_url'] as String?,
       tieneContrasena: (datos['tiene_contrasena'] ?? true) as bool,
       modalidad: Modalidad.desde(datos['modalidad']),
@@ -150,6 +156,7 @@ class Sesion {
       primerApellido: usuario['primer_apellido'] as String?,
       segundoApellido: usuario['segundo_apellido'] as String?,
       email: usuario['email'] as String?,
+      emailPendiente: usuario['email_pendiente'] as String?,
       fotoUrl: usuario['foto_url'] as String?,
       tieneContrasena: (usuario['tiene_contrasena'] ?? true) as bool,
       modalidad: Modalidad.desde(config?['modalidad']),
@@ -171,10 +178,19 @@ class Sesion {
         ? _textos(usuario['permisos'])
         : permisos,
     nombrePila: usuario['nombre_pila'] as String? ?? nombrePila,
-    primerApellido: usuario['primer_apellido'] as String?,
-    segundoApellido: usuario['segundo_apellido'] as String?,
+    primerApellido: usuario.containsKey('primer_apellido')
+        ? usuario['primer_apellido'] as String?
+        : primerApellido,
+    segundoApellido: usuario.containsKey('segundo_apellido')
+        ? usuario['segundo_apellido'] as String?
+        : segundoApellido,
     email: usuario['email'] as String? ?? email,
-    fotoUrl: usuario['foto_url'] as String?,
+    emailPendiente: usuario.containsKey('email_pendiente')
+        ? usuario['email_pendiente'] as String?
+        : emailPendiente,
+    fotoUrl: usuario.containsKey('foto_url')
+        ? usuario['foto_url'] as String?
+        : fotoUrl,
     tieneContrasena: (usuario['tiene_contrasena'] ?? tieneContrasena) as bool,
     modalidad: modalidad,
     terminologia: terminologia,

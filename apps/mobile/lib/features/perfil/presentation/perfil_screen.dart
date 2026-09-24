@@ -168,6 +168,84 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     }
   }
 
+  /// Pide el correo nuevo (y la contraseña, si tiene) y manda el enlace.
+  Future<void> _cambiarCorreo(bool pideContrasena) async {
+    final correo = TextEditingController();
+    final clave = TextEditingController();
+    final enviar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cambiar correo'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Te enviaremos un enlace al correo nuevo. El cambio se aplica al abrirlo.',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: correo,
+              decoration: const InputDecoration(labelText: 'Correo nuevo'),
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+            ),
+            if (pideContrasena) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: clave,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Tu contraseña'),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Enviar enlace'),
+          ),
+        ],
+      ),
+    );
+    final datos = (correo.text.trim(), clave.text);
+    correo.dispose();
+    clave.dispose();
+    if (enviar != true || datos.$1.isEmpty || !mounted) {
+      return;
+    }
+
+    setState(() => _guardando = true);
+    await hacerConAviso(
+      context,
+      () => ref
+          .read(sesionProvider.notifier)
+          .pedirCambioCorreo(
+            email: datos.$1,
+            contrasena: datos.$2.isEmpty ? null : datos.$2,
+          ),
+      exito: 'Te enviamos un enlace a ${datos.$1}.',
+    );
+    if (mounted) {
+      setState(() => _guardando = false);
+    }
+  }
+
+  Future<void> _cancelarCambioCorreo() async {
+    setState(() => _guardando = true);
+    await hacerConAviso(
+      context,
+      () => ref.read(sesionProvider.notifier).cancelarCambioCorreo(),
+      exito: 'Cancelamos el cambio de correo.',
+    );
+    if (mounted) {
+      setState(() => _guardando = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final sesion = ref.watch(sesionProvider);
@@ -231,6 +309,42 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
             ],
           ),
           const SizedBox(height: 24),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Correo de acceso',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(sesion.email ?? ''),
+                  if (sesion.emailPendiente != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Falta confirmar ${sesion.emailPendiente}: abre el enlace que te enviamos (vence en 24 horas).',
+                      style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: _guardando ? null : _cancelarCambioCorreo,
+                      child: const Text('Cancelar cambio'),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: _guardando
+                          ? null
+                          : () => _cambiarCorreo(sesion.tieneContrasena),
+                      child: const Text('Cambiar correo'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),

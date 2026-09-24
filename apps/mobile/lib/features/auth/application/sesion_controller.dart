@@ -170,6 +170,36 @@ class SesionController extends Notifier<Sesion?> {
     }
   }
 
+  /// Pide cambiar el correo de acceso: llega un enlace al correo nuevo y el cambio
+  /// se aplica al abrirlo (en la web). Hasta entonces sigue el anterior.
+  Future<void> pedirCambioCorreo({
+    required String email,
+    String? contrasena,
+  }) async {
+    final actual = state;
+    if (actual == null) {
+      return;
+    }
+    final res = await ref
+        .read(dioProvider)
+        .post<Map<String, dynamic>>(
+          '/api/v1/app/${actual.slug}/yo/correo',
+          data: {'email': email, 'password': contrasena},
+        );
+    await _reflejarUsuario(actual, res.data);
+  }
+
+  Future<void> cancelarCambioCorreo() async {
+    final actual = state;
+    if (actual == null) {
+      return;
+    }
+    final res = await ref
+        .read(dioProvider)
+        .delete<Map<String, dynamic>>('/api/v1/app/${actual.slug}/yo/correo');
+    await _reflejarUsuario(actual, res.data);
+  }
+
   /// Cierra la sesión: revoca el token en el servidor (si hay red) y la borra del
   /// dispositivo.
   Future<void> cerrar() async {

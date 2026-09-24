@@ -61,6 +61,12 @@ const router = createRouter({
       component: () => import("@/views/RecuperarContrasenaView.vue"),
     },
     {
+      // Confirmar el correo nuevo desde el enlace que le llegó.
+      path: "/confirmar-correo/:slug",
+      name: "confirmar-correo",
+      component: () => import("@/views/ConfirmarCorreoView.vue"),
+    },
+    {
       path: "/activar/:slug?",
       name: "activar",
       component: () => import("@/views/ActivacionView.vue"),

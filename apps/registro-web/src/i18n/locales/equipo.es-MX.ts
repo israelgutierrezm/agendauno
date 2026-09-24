@@ -17,7 +17,18 @@ export const miPerfil = {
   primerApellido: "Apellido paterno",
   segundoApellido: "Apellido materno",
   correo: "Correo de acceso",
-  correoAyuda: "Es con el que entras; no se cambia aquí.",
+  correoAyuda: "Es con el que entras y donde te llegan los avisos.",
+  cambiarCorreo: "Cambiar correo",
+  correoNuevo: "Correo nuevo",
+  tuContrasena: "Tu contraseña",
+  enviarEnlace: "Enviar enlace",
+  cancelar: "Cancelar",
+  correoEnviado:
+    "Te enviamos un enlace a {email}. El cambio se aplica al abrirlo.",
+  correoPendiente:
+    "Falta confirmar {email}: abre el enlace que te enviamos (vence en 24 horas).",
+  cancelarCambio: "Cancelar cambio",
+  cambioCancelado: "Cancelamos el cambio de correo.",
   guardar: "Guardar",
   guardado: "Tus datos se guardaron.",
   contrasena: "Contraseña",
@@ -87,4 +98,14 @@ export const listados = {
   verLista: "Ver como lista",
   verCuadricula: "Ver como cuadrícula",
   agregar: "Agregar",
+};
+
+export const confirmarCorreo = {
+  titulo: "Confirma tu correo",
+  confirmando: "Confirmando tu correo…",
+  listo: "Listo. Desde ahora entras con {email}.",
+  entrar: "Ir a iniciar sesión",
+  volver: "Volver a mi perfil",
+  sinEnlace:
+    "Este enlace está incompleto. Pide el cambio otra vez desde Mi perfil.",
 };

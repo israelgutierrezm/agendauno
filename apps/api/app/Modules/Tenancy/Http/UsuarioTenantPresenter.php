@@ -31,6 +31,10 @@ class UsuarioTenantPresenter
             'segundo_apellido' => $usuario->segundo_apellido,
             'nombre_corto' => $usuario->nombreCorto(),
             'email' => $usuario->email,
+            // Correo nuevo que espera confirmación por enlace (null si no hay o venció).
+            'email_pendiente' => $usuario->email_nuevo_expira_en !== null && now()->lessThan($usuario->email_nuevo_expira_en)
+                ? $usuario->email_nuevo
+                : null,
             'foto_url' => $usuario->fotoUrl(),
             // ¿Ya tiene contraseña? (quien entra solo con Google aún no).
             'tiene_contrasena' => $usuario->password !== null && $usuario->password !== '',

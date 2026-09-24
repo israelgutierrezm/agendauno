@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\ActivacionPropietario;
 use App\Modules\Tenancy\Application\AutenticacionGoogleTenant;
 use App\Modules\Tenancy\Application\AutenticacionTenant;
+use App\Modules\Tenancy\Application\CambiarCorreoTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\RestablecerContrasenaTenant;
 use App\Modules\Tenancy\Http\Requests\ActivarTenantRequest;
@@ -32,6 +33,7 @@ class AuthTenantController
         private readonly AutenticacionGoogleTenant $google,
         private readonly EnviarActivacionTenant $enviarActivacion,
         private readonly RestablecerContrasenaTenant $restablecimiento,
+        private readonly CambiarCorreoTenant $cambioCorreo,
     ) {}
 
     /**
@@ -50,6 +52,18 @@ class AuthTenantController
      * Fija la contraseña nueva con el enlace del correo y deja la sesión iniciada
      * (las demás sesiones de la cuenta se cierran).
      */
+    /**
+     * Aplica el correo nuevo desde el enlace que le llegó (no requiere sesión).
+     */
+    public function confirmarCorreo(Request $request): JsonResponse
+    {
+        $validado = $request->validate(['token' => ['required', 'string', 'max:100']]);
+
+        $usuario = $this->cambioCorreo->confirmar($this->estudioDe($request), (string) $validado['token']);
+
+        return response()->json(['data' => ['email' => $usuario->email]]);
+    }
+
     public function restablecerContrasena(ActivarTenantRequest $request): JsonResponse
     {
         $usuario = $this->restablecimiento->restablecer(
