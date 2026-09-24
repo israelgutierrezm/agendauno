@@ -18,4 +18,14 @@ abstract class TenancyException extends RuntimeException
     {
         return 422;
     }
+
+    /**
+     * Datos para que el cliente resuelva el caso (el `meta` del error).
+     *
+     * @return array<string, mixed>
+     */
+    public function meta(): array
+    {
+        return [];
+    }
 }

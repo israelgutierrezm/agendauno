@@ -133,6 +133,8 @@ class BajaDePersonaTenant
                     'email_nuevo_token' => null,
                 ])->save();
                 $this->auth->revocarTodos($usuario);
+                $usuario->forceFill(['eliminado_por' => $actor?->getKey()])->save();
+                $usuario->delete();
             }
 
             $persona->forceFill([
@@ -147,7 +149,9 @@ class BajaDePersonaTenant
                 'es_facturable' => false,
                 'recibe_promociones' => false,
                 'usuario_id' => null,
+                'eliminado_por' => $actor?->getKey(),
             ])->save();
+            $persona->delete();
 
             $solicitud->update([
                 'estado' => SolicitudPrivacidadTenant::ATENDIDA,

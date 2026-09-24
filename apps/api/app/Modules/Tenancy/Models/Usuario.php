@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Support\Concerns\HasPublicId;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
@@ -33,6 +34,7 @@ class Usuario extends Authenticatable
 {
     use HasPublicId;
     use Notifiable;
+    use SoftDeletes;
 
     protected $connection = 'tenant';
 

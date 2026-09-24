@@ -60,7 +60,7 @@ class DomiciliacionTenant extends Model
      */
     public function persona(): BelongsTo
     {
-        return $this->belongsTo(PersonaTenant::class, 'persona_id');
+        return $this->belongsTo(PersonaTenant::class, 'persona_id')->withTrashed();
     }
 
     /**

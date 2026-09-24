@@ -31,7 +31,8 @@ class ExpedienteTenantController
 
     public function show(Request $request): JsonResponse
     {
-        $persona = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        // Su historial se consulta aunque esté dada de baja.
+        $persona = PersonaTenant::withTrashed()->where('ulid', (string) $request->route('persona'))->firstOrFail();
         $usuario = $request->attributes->get('usuario_tenant');
         abort_unless($usuario instanceof Usuario && AccesoExpedienteTenant::puedeVer($usuario, $persona), 403);
 

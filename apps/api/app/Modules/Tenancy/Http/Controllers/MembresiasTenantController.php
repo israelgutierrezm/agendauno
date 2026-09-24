@@ -184,7 +184,8 @@ class MembresiasTenantController
 
     public function derechos(Request $request): JsonResponse
     {
-        $persona = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        // Su historial se consulta aunque esté dada de baja.
+        $persona = PersonaTenant::withTrashed()->where('ulid', (string) $request->route('persona'))->firstOrFail();
 
         $derechos = DerechoTenant::query()
             ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))

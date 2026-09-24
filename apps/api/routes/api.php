@@ -251,6 +251,9 @@ Route::prefix('v1')->group(function (): void {
             // Apartado Usuarios: multi-rol por cuenta (rol de dueño protegido).
             Route::get('/usuarios', [UsuariosTenantController::class, 'index'])->middleware('puede:usuarios.gestionar')->name('usuarios.index');
             Route::put('/usuarios/{usuario}/roles', [UsuariosTenantController::class, 'actualizarRoles'])->middleware('puede:usuarios.gestionar')->name('usuarios.roles');
+            // Baja lógica del equipo (quita el acceso, conserva el historial) y reactivación.
+            Route::delete('/usuarios/{usuario}', [UsuariosTenantController::class, 'darDeBaja'])->middleware('puede:usuarios.gestionar')->name('usuarios.baja');
+            Route::post('/usuarios/{usuario}/reactivar', [UsuariosTenantController::class, 'reactivar'])->middleware('puede:usuarios.gestionar')->name('usuarios.reactivar');
 
             // RBAC con scope por sucursal (R19): asigna a un usuario un rol EN una
             // sucursal, ampliando su rol tenant-wide.
@@ -272,6 +275,9 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/miembros', [MiembrosTenantController::class, 'store'])->middleware('puede:miembros.gestionar')->name('miembros.store');
             // Editar datos y estado del alumno (suspender/archivar/no-facturable) con auditoría (P0).
             Route::put('/miembros/{persona}', [MiembrosTenantController::class, 'actualizar'])->middleware('puede:miembros.gestionar')->name('miembros.update');
+            // Baja lógica del alumno (cierra lo vigente, conserva su historial) y reactivación.
+            Route::delete('/miembros/{persona}', [MiembrosTenantController::class, 'darDeBaja'])->middleware('puede:miembros.gestionar')->name('miembros.baja');
+            Route::post('/miembros/{persona}/reactivar', [MiembrosTenantController::class, 'reactivar'])->middleware('puede:miembros.gestionar')->name('miembros.reactivar');
             // Importacion CSV de miembros (R37): preview (valida) e import (todo-o-nada).
             Route::post('/importaciones/miembros/preview', [ImportacionesTenantController::class, 'previewMiembros'])->middleware('puede:miembros.gestionar')->name('importaciones.miembros.preview');
             Route::post('/importaciones/miembros', [ImportacionesTenantController::class, 'importarMiembros'])->middleware('puede:miembros.gestionar')->name('importaciones.miembros.store');

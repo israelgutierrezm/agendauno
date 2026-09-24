@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import axios from "axios";
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 
@@ -37,6 +38,9 @@ interface Miembro {
   es_facturable: boolean;
   archivado: boolean;
   primera_vez: boolean | null;
+  // Baja lógica: cuándo y quién (solo en "Dados de baja").
+  dado_de_baja_en?: string | null;
+  dado_de_baja_por?: string | null;
 }
 interface Meta {
   total: number;
@@ -75,6 +79,7 @@ const filtrosDef = computed(() => {
       opciones: [
         { valor: "activo", texto: t("miembros.activo") },
         { valor: "inactivo", texto: t("miembros.suspendido") },
+        { valor: "baja", texto: t("bajas.dadosDeBaja") },
       ],
     },
     {
@@ -234,6 +239,38 @@ function onGuardado(): void {
   void cargar();
 }
 
+function fechaCorta(iso: string): string {
+  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(
+    new Date(iso),
+  );
+}
+function detalleBaja(m: Miembro): string {
+  if (!m.dado_de_baja_en) {
+    return "";
+  }
+  const fecha = fechaCorta(m.dado_de_baja_en);
+  return m.dado_de_baja_por
+    ? t("bajas.detallePor", { fecha, quien: m.dado_de_baja_por })
+    : t("bajas.detalle", { fecha });
+}
+
+// Reactiva a alguien dado de baja (vuelve con su historial).
+const reactivandoId = ref<string | null>(null);
+async function reactivar(id: string, nombre: string): Promise<void> {
+  reactivandoId.value = id;
+  error.value = null;
+  try {
+    await api.post(`${base.value}/miembros/${id}/reactivar`, {});
+    toast.exito(t("bajas.reactivado", { nombre }));
+    await cargar();
+  } catch (e) {
+    error.value = mensajeDeError(e);
+    toast.error(error.value);
+  } finally {
+    reactivandoId.value = null;
+  }
+}
+
 async function invitar(m: Miembro): Promise<void> {
   if (!m.email) {
     return;
@@ -266,6 +303,12 @@ const form = ref({
 });
 const guardando = ref(false);
 const abiertoAlta = ref(false);
+// El celular es de alguien dado de baja: el negocio decide (reactivarlo u otra persona).
+const coincidencia = ref<{
+  id: string;
+  nombre: string;
+  mensaje: string;
+} | null>(null);
 
 function abrirAlta(): void {
   form.value = {
@@ -279,18 +322,22 @@ function abrirAlta(): void {
   };
   mensaje.value = null;
   error.value = null;
+  coincidencia.value = null;
   abiertoAlta.value = true;
 }
 function cerrarAlta(): void {
   abiertoAlta.value = false;
 }
 
-async function crear(): Promise<void> {
+async function crear(liberarCelular = false): Promise<void> {
   guardando.value = true;
   error.value = null;
   mensaje.value = null;
+  coincidencia.value = null;
   try {
-    await api.post(`${base.value}/miembros`, {
+    const { data } = await api.post<{
+      data: { reactivado?: boolean; nombre_completo?: string };
+    }>(`${base.value}/miembros`, {
       nombre: form.value.nombre,
       segundo_nombre: form.value.segundo_nombre || null,
       primer_apellido: form.value.primer_apellido || null,
@@ -298,9 +345,15 @@ async function crear(): Promise<void> {
       email: form.value.email || null,
       celular: form.value.celular || null,
       tipo: form.value.tipo,
+      liberar_celular: liberarCelular || undefined,
     });
     const mismoTipo = form.value.tipo === tipo.value;
-    toast.exito(t("miembros.creado"));
+    // Con el correo de alguien dado de baja, se reactivó (con su historial).
+    toast.exito(
+      data.data.reactivado
+        ? t("bajas.reactivado", { nombre: data.data.nombre_completo ?? "" })
+        : t("miembros.creado"),
+    );
     form.value = {
       nombre: "",
       segundo_nombre: "",
@@ -315,11 +368,29 @@ async function crear(): Promise<void> {
       recargarDesde1();
     }
   } catch (e) {
+    const respuesta = axios.isAxiosError(e) ? e.response?.data : null;
+    if (respuesta?.code === "PERSON_DEACTIVATED_MATCH") {
+      coincidencia.value = {
+        id: respuesta.meta.persona.id,
+        nombre: respuesta.meta.persona.nombre,
+        mensaje: respuesta.message,
+      };
+      return;
+    }
     error.value = mensajeDeError(e);
     toast.error(error.value);
   } finally {
     guardando.value = false;
   }
+}
+
+async function reactivarCoincidencia(): Promise<void> {
+  if (coincidencia.value === null) {
+    return;
+  }
+  await reactivar(coincidencia.value.id, coincidencia.value.nombre);
+  coincidencia.value = null;
+  abiertoAlta.value = false;
 }
 
 watch(tipo, () => {
@@ -424,7 +495,14 @@ onMounted(() => {
                       <span v-else class="block font-medium truncate">{{
                         nombreCompleto(m)
                       }}</span>
-                      <p class="mt-0.5 text-xs">
+                      <p
+                        v-if="m.dado_de_baja_en"
+                        class="mt-0.5 text-xs"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        {{ detalleBaja(m) }}
+                      </p>
+                      <p v-else class="mt-0.5 text-xs">
                         <span
                           :style="{
                             color: m.activo
@@ -511,7 +589,14 @@ onMounted(() => {
                       {{ m.email ?? "—" }}
                     </td>
                     <!-- Estado en texto: lo normal (activo) en gris; lo que requiere atención, en color. -->
-                    <td class="px-4 py-2">
+                    <td
+                      v-if="m.dado_de_baja_en"
+                      class="px-4 py-2"
+                      :style="{ color: 'var(--texto-suave)' }"
+                    >
+                      {{ detalleBaja(m) }}
+                    </td>
+                    <td v-else class="px-4 py-2">
                       <span
                         :style="{
                           color: m.activo
@@ -537,7 +622,21 @@ onMounted(() => {
                         · {{ $t("miembros.archivado") }}</span
                       >
                     </td>
-                    <td class="px-4 py-2 text-right whitespace-nowrap">
+                    <td
+                      v-if="m.dado_de_baja_en"
+                      class="px-4 py-2 text-right whitespace-nowrap"
+                    >
+                      <button
+                        v-if="puedeGestionar"
+                        class="tu-enlace text-sm"
+                        type="button"
+                        :disabled="reactivandoId === m.id"
+                        @click="reactivar(m.id, nombreCompleto(m))"
+                      >
+                        {{ $t("bajas.reactivar") }}
+                      </button>
+                    </td>
+                    <td v-else class="px-4 py-2 text-right whitespace-nowrap">
                       <button
                         v-if="
                           puedeInvitar &&
@@ -627,7 +726,7 @@ onMounted(() => {
       :titulo="$t('miembros.nuevoTitulo')"
       @cerrar="cerrarAlta"
     >
-      <form class="space-y-4" @submit.prevent="crear">
+      <form class="space-y-4" @submit.prevent="crear()">
         <div>
           <label class="tu-label" for="mn">{{ $t("miembros.nombre") }}</label>
           <input id="mn" v-model="form.nombre" class="tu-input" required />
@@ -649,6 +748,35 @@ onMounted(() => {
         <p v-if="mensaje" class="text-sm" :style="{ color: 'var(--exito)' }">
           {{ $t("miembros.creado") }}
         </p>
+        <div
+          v-if="coincidencia"
+          class="rounded-lg border p-3 text-sm"
+          role="status"
+          :style="{ borderColor: 'var(--aviso)' }"
+        >
+          <p>{{ coincidencia.mensaje }}</p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="tu-btn tu-btn-primario text-sm"
+              :disabled="guardando || reactivandoId !== null"
+              @click="reactivarCoincidencia"
+            >
+              {{ $t("bajas.reactivarlo", { nombre: coincidencia.nombre }) }}
+            </button>
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma text-sm"
+              :disabled="guardando"
+              @click="crear(true)"
+            >
+              {{ $t("bajas.otraPersona") }}
+            </button>
+          </div>
+          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("bajas.otraPersonaAyuda") }}
+          </p>
+        </div>
       </form>
 
       <template #pie>
@@ -664,7 +792,7 @@ onMounted(() => {
             class="tu-btn tu-btn-primario"
             type="button"
             :disabled="guardando || form.nombre === ''"
-            @click="crear"
+            @click="crear()"
           >
             {{ guardando ? $t("miembros.creando") : $t("miembros.crear") }}
           </button>

@@ -17,6 +17,9 @@ interface UsuarioRow {
   rol: string;
   roles: string[];
   activo: boolean;
+  // Baja lógica: cuándo y quién (solo en "Dados de baja").
+  dado_de_baja_en?: string | null;
+  dado_de_baja_por?: string | null;
 }
 interface Sucursal {
   id: string;
@@ -43,6 +46,8 @@ const sucursales = ref<Sucursal[]>([]);
 const asignaciones = ref<Asignacion[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// Lista del equipo o de los dados de baja.
+const verBajas = ref(false);
 
 // La asignación por sede solo aplica con varias sucursales (con una, es moot).
 const hayMultiSucursal = computed(() => sucursales.value.length > 1);
@@ -116,6 +121,7 @@ async function cargar(): Promise<void> {
     const [u, s] = await Promise.all([
       api.get<{ data: UsuarioRow[]; roles: string[] }>(
         `${base.value}/usuarios`,
+        { params: { estado: verBajas.value ? "baja" : undefined } },
       ),
       api.get<{ data: Sucursal[] }>(`${base.value}/sucursales`),
     ]);
@@ -256,6 +262,64 @@ async function reenviar(u: UsuarioRow): Promise<void> {
   }
 }
 
+function detalleBaja(u: UsuarioRow): string {
+  if (!u.dado_de_baja_en) {
+    return "";
+  }
+  const fecha = new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+  }).format(new Date(u.dado_de_baja_en));
+  return u.dado_de_baja_por
+    ? t("bajas.detallePor", { fecha, quien: u.dado_de_baja_por })
+    : t("bajas.detalle", { fecha });
+}
+
+function alternarBajas(): void {
+  verBajas.value = !verBajas.value;
+  void cargar();
+}
+
+// Baja lógica: pierde el acceso; su historial se conserva (se reactiva al invitarlo).
+const motivoBaja = ref("");
+const dandoDeBaja = ref(false);
+async function darDeBaja(): Promise<void> {
+  const objetivo = editando.value;
+  if (
+    objetivo === null ||
+    !window.confirm(`${t("bajas.darDeBaja")}: ${objetivo.nombre}?`)
+  ) {
+    return;
+  }
+  dandoDeBaja.value = true;
+  errorEdicion.value = null;
+  try {
+    await api.delete(`${base.value}/usuarios/${objetivo.id}`, {
+      data: { motivo: motivoBaja.value.trim() || null },
+    });
+    motivoBaja.value = "";
+    cerrarEdicion();
+    await cargar();
+  } catch (e) {
+    errorEdicion.value = mensajeDeError(e);
+  } finally {
+    dandoDeBaja.value = false;
+  }
+}
+
+const reactivandoId = ref<string | null>(null);
+async function reactivar(u: UsuarioRow): Promise<void> {
+  reactivandoId.value = u.id;
+  error.value = null;
+  try {
+    await api.post(`${base.value}/usuarios/${u.id}/reactivar`, {});
+    await cargar();
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    reactivandoId.value = null;
+  }
+}
+
 onMounted(cargar);
 </script>
 
@@ -265,6 +329,12 @@ onMounted(cargar);
       :titulo="$t('usuarios.titulo')"
       :total="usuarios.length"
     />
+
+    <div class="mt-2 flex justify-end">
+      <button type="button" class="tu-enlace text-sm" @click="alternarBajas">
+        {{ verBajas ? $t("bajas.verEquipo") : $t("bajas.verBajas") }}
+      </button>
+    </div>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -309,8 +379,14 @@ onMounted(cargar);
         {{ (fila as UsuarioRow).roles.map(nombreRol).join(", ") }}
       </template>
 
-      <template #col-activo="{ valor }">
-        <span v-if="valor" class="tu-badge tu-badge-exito">
+      <template #col-activo="{ valor, fila }">
+        <span
+          v-if="(fila as UsuarioRow).dado_de_baja_en"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ detalleBaja(fila as UsuarioRow) }}
+        </span>
+        <span v-else-if="valor" class="tu-badge tu-badge-exito">
           {{ $t("usuarios.activo") }}
         </span>
         <span v-else :style="{ color: 'var(--texto-suave)' }">
@@ -319,7 +395,20 @@ onMounted(cargar);
       </template>
 
       <template #col-acciones="{ fila }">
-        <div class="flex items-center justify-end gap-2">
+        <div
+          v-if="(fila as UsuarioRow).dado_de_baja_en"
+          class="flex items-center justify-end"
+        >
+          <button
+            class="tu-btn tu-btn-fantasma text-sm"
+            type="button"
+            :disabled="reactivandoId === (fila as UsuarioRow).id"
+            @click="reactivar(fila as UsuarioRow)"
+          >
+            {{ $t("bajas.reactivar") }}
+          </button>
+        </div>
+        <div v-else class="flex items-center justify-end gap-2">
           <button
             v-if="!(fila as UsuarioRow).activo"
             class="tu-btn tu-btn-fantasma text-sm"
@@ -470,6 +559,33 @@ onMounted(cargar);
       >
         {{ $t("usuarios.duenoProtegido") }}
       </p>
+      <!-- Baja lógica (no a uno mismo) -->
+      <div
+        v-if="editando && editando.id !== sesion.usuario?.ulid"
+        class="mt-5 border-t pt-4 space-y-2"
+        :style="{ borderColor: 'var(--borde)' }"
+      >
+        <h3 class="font-semibold text-sm">{{ $t("bajas.darDeBaja") }}</h3>
+        <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("bajas.ayudaUsuario") }}
+        </p>
+        <input
+          v-model="motivoBaja"
+          class="tu-input"
+          maxlength="500"
+          :placeholder="$t('bajas.motivo')"
+        />
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          style="color: var(--error)"
+          :disabled="dandoDeBaja"
+          @click="darDeBaja"
+        >
+          {{ $t("bajas.darDeBaja") }}
+        </button>
+      </div>
+
       <p v-if="errorEdicion" class="mt-3 text-sm" style="color: var(--error)">
         {{ errorEdicion }}
       </p>

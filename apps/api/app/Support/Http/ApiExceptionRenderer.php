@@ -87,6 +87,7 @@ class ApiExceptionRenderer
                 $e->codigo(),
                 $e->getMessage() !== '' ? $e->getMessage() : 'No se pudo completar la operación de tenancy.',
                 $e->estadoHttp(),
+                $e->meta(),
             ),
             default => $this->generic($e),
         };

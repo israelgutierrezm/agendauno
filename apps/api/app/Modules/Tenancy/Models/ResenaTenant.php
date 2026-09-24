@@ -34,7 +34,7 @@ class ResenaTenant extends Model
      */
     public function persona(): BelongsTo
     {
-        return $this->belongsTo(PersonaTenant::class, 'persona_id');
+        return $this->belongsTo(PersonaTenant::class, 'persona_id')->withTrashed();
     }
 
     /**
@@ -50,7 +50,7 @@ class ResenaTenant extends Model
      */
     public function instructor(): BelongsTo
     {
-        return $this->belongsTo(Usuario::class, 'instructor_id');
+        return $this->belongsTo(Usuario::class, 'instructor_id')->withTrashed();
     }
 
     /**

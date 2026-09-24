@@ -125,7 +125,9 @@ class MedirUsoSaas
      */
     private function alumnos(string $periodo, CarbonImmutable $inicio, CarbonImmutable $fin, bool $quienes): array
     {
-        $consulta = PersonaTenant::query()
+        // Incluye a quien se dio de baja durante o después del mes: sí usó el servicio.
+        $consulta = PersonaTenant::withTrashed()
+            ->where(fn (Builder $q) => $q->whereNull('deleted_at')->orWhere('deleted_at', '>=', $inicio))
             ->where('tipo', TipoPersonaTenant::Miembro->value)
             ->where('es_facturable', true)
             ->where('archivado', false)
@@ -178,7 +180,7 @@ class MedirUsoSaas
 
         $profesionales = [];
         $fte = 0;
-        foreach (Usuario::query()->whereIn('id', $sesionesPorProfesional->keys())->orderBy('name')->get() as $u) {
+        foreach (Usuario::withTrashed()->whereIn('id', $sesionesPorProfesional->keys())->orderBy('name')->get() as $u) {
             $minutos = $minutosSemana[(int) $u->getKey()] ?? 0;
             $medioTiempo = $minutos > 0 && $minutos < $horasMedioTiempo * 60;
             $fte += $medioTiempo ? 500 : 1000;

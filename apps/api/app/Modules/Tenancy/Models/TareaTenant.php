@@ -46,7 +46,7 @@ class TareaTenant extends Model
      */
     public function persona(): BelongsTo
     {
-        return $this->belongsTo(PersonaTenant::class, 'persona_id');
+        return $this->belongsTo(PersonaTenant::class, 'persona_id')->withTrashed();
     }
 
     /**
@@ -54,6 +54,6 @@ class TareaTenant extends Model
      */
     public function responsable(): BelongsTo
     {
-        return $this->belongsTo(Usuario::class, 'responsable_id');
+        return $this->belongsTo(Usuario::class, 'responsable_id')->withTrashed();
     }
 }

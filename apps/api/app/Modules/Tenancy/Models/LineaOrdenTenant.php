@@ -55,6 +55,6 @@ class LineaOrdenTenant extends Model
      */
     public function beneficiario(): BelongsTo
     {
-        return $this->belongsTo(PersonaTenant::class, 'beneficiario_id');
+        return $this->belongsTo(PersonaTenant::class, 'beneficiario_id')->withTrashed();
     }
 }

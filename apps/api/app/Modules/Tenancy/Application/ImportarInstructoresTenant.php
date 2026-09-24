@@ -36,7 +36,8 @@ class ImportarInstructoresTenant
      */
     public function analizar(array $filas): array
     {
-        $existentes = Usuario::query()
+        // Con los dados de baja: su correo es suyo (se reactivan invitándolos de nuevo).
+        $existentes = Usuario::withTrashed()
             ->whereNotNull('email')
             ->pluck('email')
             ->map(static fn ($e): string => mb_strtolower((string) $e))

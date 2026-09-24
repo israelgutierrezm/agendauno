@@ -78,7 +78,7 @@ class CambiarCorreoTenant
 
             // Su ficha de persona (recibos, recordatorios) sigue al correo nuevo, si
             // ninguna otra persona lo tiene ya.
-            $libre = ! PersonaTenant::query()
+            $libre = ! PersonaTenant::withTrashed()
                 ->where('email', $nuevo)
                 ->where(fn ($q) => $q->whereNull('usuario_id')->orWhere('usuario_id', '!=', $usuario->getKey()))
                 ->exists();
@@ -103,6 +103,6 @@ class CambiarCorreoTenant
 
     private function enUso(string $email, Usuario $usuario): bool
     {
-        return Usuario::query()->where('email', $email)->whereKeyNot($usuario->getKey())->exists();
+        return Usuario::withTrashed()->where('email', $email)->whereKeyNot($usuario->getKey())->exists();
     }
 }

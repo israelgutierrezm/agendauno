@@ -33,6 +33,8 @@ import {
   resenas,
   pagoAutomatico,
   pagoTienda,
+  bajas,
+  corteCaja,
   pausaMembresia,
   plataformaAdmin,
   recuperarContrasena,
@@ -85,6 +87,8 @@ export const i18n = createI18n({
       resenas,
       pagoAutomatico,
       pagoTienda,
+      bajas,
+      corteCaja,
     },
   },
 });

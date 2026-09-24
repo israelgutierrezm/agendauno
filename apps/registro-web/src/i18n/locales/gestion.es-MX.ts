@@ -255,6 +255,25 @@ export const bitacora = {
   antes: "Antes",
   despues: "Después",
   detalle: "Detalle",
+  desde: "Desde",
+  hasta: "Hasta",
+  quien: "Quién",
+  categoria: "Tipo",
+  buscar: "Buscar",
+  todos: "Todos",
+  descargar: "Descargar CSV",
+  anterior: "Anterior",
+  siguiente: "Siguiente",
+  pagina: "Página {page} de {total}",
+  categorias: {
+    equipo: "Equipo",
+    alumnos: "Alumnos",
+    pagos: "Pagos",
+    membresias: "Membresías",
+    catalogo: "Catálogo y agenda",
+    privacidad: "Privacidad",
+    configuracion: "Configuración",
+  },
   acciones: {
     credito: { top_up: "Agregó créditos" },
     miembro: { actualizado: "Editó un miembro" },
@@ -624,4 +643,49 @@ export const pagoAutomatico = {
   seguridadOpenPay:
     "Tu tarjeta se envía cifrada directamente a OpenPay; AgendaUno no la ve ni la guarda.",
   autorizar: "Autorizar tarjeta",
+};
+
+export const bajas = {
+  darDeBaja: "Dar de baja",
+  ayudaMiembro:
+    "Deja de operar: se cancelan sus reservas por venir, sus membresías y sus pagos automáticos. Su historial (compras, pagos, asistencias) se conserva y se puede reactivar.",
+  ayudaUsuario:
+    "Pierde el acceso y se cierran sus sesiones. Su historial se conserva; si lo vuelves a invitar con su correo, se reactiva.",
+  motivo: "Motivo (opcional)",
+  dadosDeBaja: "Dados de baja",
+  detalle: "Dado de baja el {fecha}",
+  detallePor: "Dado de baja el {fecha} por {quien}",
+  reactivar: "Reactivar",
+  reactivado: "Reactivamos a {nombre} con su historial.",
+  reactivarlo: "Reactivar a {nombre}",
+  otraPersona: "Es otra persona",
+  otraPersonaAyuda: "El teléfono se le quita a quien está dado de baja.",
+  verBajas: "Ver dados de baja",
+  verEquipo: "Ver equipo",
+};
+
+export const corteCaja = {
+  titulo: "Corte de caja",
+  descargar: "Descargar CSV",
+  desde: "Desde",
+  hasta: "Hasta",
+  quien: "Quién",
+  tipo: "Tipo",
+  todos: "Todos",
+  cobrado: "Cobrado",
+  devuelto: "Devuelto",
+  neto: "Neto",
+  porMetodo: "Por método",
+  porPersona: "Por persona",
+  vacio: "No hay movimientos en esas fechas.",
+  fecha: "Fecha",
+  movimiento: "Movimiento",
+  monto: "Monto",
+  registro: "Registró: {quien}",
+  tipos: {
+    cobro: "Cobro",
+    devolucion: "Devolución",
+    venta: "Venta de mostrador",
+    cancelacion: "Cancelación",
+  },
 };

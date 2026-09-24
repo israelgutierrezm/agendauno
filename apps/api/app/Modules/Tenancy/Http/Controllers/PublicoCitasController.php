@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
+use App\Modules\Tenancy\Application\BajasTenant;
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
@@ -176,7 +177,8 @@ class PublicoCitasController
     }
 
     /**
-     * Persona guest: reutiliza por correo si existe; si no, la crea (sin usuario/login).
+     * Persona guest: reutiliza por correo si existe (si estaba dada de baja, se
+     * reactiva: el correo es suyo); si no, la crea (sin usuario/login).
      *
      * @param  array<string, mixed>  $datos
      */
@@ -185,8 +187,12 @@ class PublicoCitasController
         $email = isset($datos['email']) && $datos['email'] !== '' ? (string) $datos['email'] : null;
 
         if ($email !== null) {
-            $existente = PersonaTenant::query()->where('email', $email)->first();
+            $existente = PersonaTenant::withTrashed()->where('email', $email)->first();
             if ($existente instanceof PersonaTenant) {
+                if ($existente->trashed()) {
+                    app(BajasTenant::class)->reactivarPersona($existente, null, 'Agendó una cita en línea con su correo.');
+                }
+
                 return $existente;
             }
         }

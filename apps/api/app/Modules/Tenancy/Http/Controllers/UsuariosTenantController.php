@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\BajasTenant;
 use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
@@ -27,12 +28,16 @@ use Illuminate\Validation\ValidationException;
  * (p. ej. miembro y profesor). El rol `propietario` está protegido: siempre debe
  * existir al menos uno, solo un propietario puede conceder/quitar ese rol, y nadie
  * puede quitárselo a sí mismo. Opera sobre la BD del estudio resuelto.
+ *
+ * Baja lógica: dar de baja quita el acceso sin borrar (queda con quién y cuándo);
+ * invitar de nuevo ese correo reactiva la misma cuenta.
  */
 class UsuariosTenantController
 {
     public function __construct(
         private readonly EnviarActivacionTenant $enviarActivacion,
         private readonly PersonaDeUsuarioTenant $personas,
+        private readonly BajasTenant $bajas,
     ) {}
 
     /**
@@ -85,14 +90,42 @@ class UsuariosTenantController
     /**
      * Todos los usuarios del estudio con sus roles, para el apartado Usuarios.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $usuarios = Usuario::query()->orderBy('name')->get();
+        // `?estado=baja`: los dados de baja, con cuándo y quién.
+        $deBaja = (string) $request->query('estado', '') === 'baja';
+        $usuarios = ($deBaja ? Usuario::onlyTrashed() : Usuario::query())->orderBy('name')->get();
+        $quienes = $this->nombresDe($usuarios->pluck('eliminado_por')->filter()->all());
 
         return response()->json([
-            'data' => $usuarios->map(fn (Usuario $u): array => $this->presentar($u))->all(),
+            'data' => $usuarios->map(fn (Usuario $u): array => $this->presentar($u, $quienes))->all(),
             'roles' => CatalogoDePermisosTenant::todosLosRoles(),
         ]);
+    }
+
+    /**
+     * Baja lógica de un usuario del equipo: pierde el acceso (sesiones cerradas).
+     */
+    public function darDeBaja(Request $request): JsonResponse
+    {
+        $usuario = Usuario::query()->where('ulid', (string) $request->route('usuario'))->firstOrFail();
+        $motivo = $request->validate(['motivo' => ['nullable', 'string', 'max:500']])['motivo'] ?? null;
+
+        $this->bajas->darDeBajaUsuario($usuario, $this->actor($request), $motivo);
+
+        return response()->json(['data' => $this->presentar($usuario->refresh(), $this->nombresDe([$usuario->eliminado_por]))]);
+    }
+
+    /**
+     * Reactiva a un usuario dado de baja con sus roles de antes.
+     */
+    public function reactivar(Request $request): JsonResponse
+    {
+        $usuario = Usuario::withTrashed()->where('ulid', (string) $request->route('usuario'))->firstOrFail();
+
+        $this->bajas->reactivarUsuario($usuario, $this->actor($request));
+
+        return response()->json(['data' => $this->presentar($usuario->refresh())]);
     }
 
     public function invitar(Request $request): JsonResponse
@@ -105,8 +138,10 @@ class UsuariosTenantController
             'sucursal_id' => ['nullable', 'string'],
         ]);
 
-        // Email único dentro de la BD del tenant.
-        if (Usuario::query()->where('email', $validado['email'])->exists()) {
+        // Email único dentro de la BD del tenant (también el de alguien dado de baja:
+        // ese correo es suyo y se reactiva su cuenta).
+        $existente = Usuario::withTrashed()->where('email', $validado['email'])->first();
+        if ($existente instanceof Usuario && ! $existente->trashed()) {
             throw ValidationException::withMessages(['email' => ['Ya existe un usuario con ese correo en este estudio.']]);
         }
 
@@ -115,14 +150,24 @@ class UsuariosTenantController
             ? SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail()
             : null;
 
-        $usuario = Usuario::query()->create([
+        $datos = [
             'name' => $validado['nombre'],
             'email' => $validado['email'],
             'rol' => $validado['rol'],
             'roles' => [$validado['rol']],
             'activo' => false,
             'password' => null,
-        ]);
+        ];
+        $reactivado = $existente instanceof Usuario;
+        if ($existente instanceof Usuario) {
+            // Vuelve al equipo: misma cuenta (su historial), con el rol de ahora y una
+            // invitación nueva para definir su contraseña.
+            $this->bajas->reactivarUsuario($existente, $this->actor($request), 'Invitado de nuevo al equipo.');
+            $existente->forceFill($datos)->save();
+            $usuario = $existente;
+        } else {
+            $usuario = Usuario::query()->create($datos);
+        }
 
         // Asignación de sede (acota al usuario a esa sucursal con su rol).
         if ($sucursal instanceof SucursalTenant) {
@@ -138,6 +183,7 @@ class UsuariosTenantController
 
         return response()->json(['data' => [
             'usuario' => $this->presentar($usuario),
+            'reactivado' => $reactivado,
             'activacion' => app()->environment('production') ? null : ['email' => $usuario->email, 'token' => $token],
         ]], 201);
     }
@@ -236,10 +282,32 @@ class UsuariosTenantController
         return Usuario::query()->whereJsonContains('roles', 'propietario')->count();
     }
 
+    private function actor(Request $request): Usuario
+    {
+        $actor = $request->attributes->get('usuario_tenant');
+        abort_unless($actor instanceof Usuario, 401);
+
+        return $actor;
+    }
+
     /**
+     * Nombres de quienes dieron de baja (aunque ya no estén en el equipo).
+     *
+     * @param  array<int, mixed>  $ids
+     * @return array<int, string>
+     */
+    private function nombresDe(array $ids): array
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+
+        return $ids === [] ? [] : Usuario::withTrashed()->whereIn('id', $ids)->pluck('name', 'id')->map(fn ($n): string => (string) $n)->all();
+    }
+
+    /**
+     * @param  array<int, string>  $quienes  nombres de quienes dieron de baja
      * @return array<string, mixed>
      */
-    private function presentar(Usuario $usuario): array
+    private function presentar(Usuario $usuario, array $quienes = []): array
     {
         $roles = $usuario->rolesEfectivos();
 
@@ -252,6 +320,8 @@ class UsuariosTenantController
             'rol' => CatalogoDePermisosTenant::rolPrincipal($roles),
             'roles' => $roles,
             'activo' => (bool) $usuario->activo,
+            'dado_de_baja_en' => $usuario->deleted_at?->toIso8601String(),
+            'dado_de_baja_por' => $usuario->eliminado_por !== null ? ($quienes[(int) $usuario->eliminado_por] ?? null) : null,
         ];
     }
 }

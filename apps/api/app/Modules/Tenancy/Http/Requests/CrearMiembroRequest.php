@@ -38,8 +38,11 @@ class CrearMiembroRequest extends FormRequest
             'primer_apellido' => ['nullable', 'string', 'max:255'],
             'segundo_apellido' => ['nullable', 'string', 'max:255'],
             // Correo y teléfono son datos primarios: únicos dentro del estudio (tenant).
-            'email' => ['nullable', 'email', 'max:255', Rule::unique(PersonaTenant::class, 'email')],
-            'celular' => ['nullable', 'string', 'max:40', Rule::unique(PersonaTenant::class, 'celular')],
+            // Si son de alguien dado de baja, el alta lo resuelve (reactiva o pregunta).
+            'email' => ['nullable', 'email', 'max:255', Rule::unique(PersonaTenant::class, 'email')->whereNull('deleted_at')],
+            'celular' => ['nullable', 'string', 'max:40', Rule::unique(PersonaTenant::class, 'celular')->whereNull('deleted_at')],
+            // El celular es de alguien dado de baja pero es otra persona: se le quita.
+            'liberar_celular' => ['sometimes', 'boolean'],
             'tipo' => ['nullable', 'in:miembro,instructor,staff'],
             'es_facturable' => ['nullable', 'boolean'],
             'sucursal_id' => ['nullable', 'string'],

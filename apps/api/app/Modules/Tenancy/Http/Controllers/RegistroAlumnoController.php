@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AutenticacionTenant;
+use App\Modules\Tenancy\Application\BajasTenant;
 use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Modules\Tenancy\Application\RegistrarEventoTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -28,6 +29,7 @@ class RegistroAlumnoController
     public function __construct(
         private readonly AutenticacionTenant $auth,
         private readonly RegistrarEventoTenant $eventos,
+        private readonly BajasTenant $bajas,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -46,8 +48,10 @@ class RegistroAlumnoController
 
         $email = (string) $validado['email'];
 
-        // Email único dentro de la BD del estudio (no enumeramos otros estudios).
-        if (Usuario::query()->where('email', $email)->exists()) {
+        // Email único dentro de la BD del estudio (no enumeramos otros estudios). Si la
+        // cuenta está dada de baja, ese correo es suyo: se reactiva con su historial.
+        $existente = Usuario::withTrashed()->where('email', $email)->first();
+        if ($existente instanceof Usuario && ! $existente->trashed()) {
             throw ValidationException::withMessages([
                 'email' => ['Ya existe una cuenta con ese correo en este estudio. Inicia sesión.'],
             ]);
@@ -58,26 +62,45 @@ class RegistroAlumnoController
         $primerApellido = $primerApellidoRaw !== null ? (string) $primerApellidoRaw : null;
         $nombreCompleto = trim($nombre.' '.($primerApellido ?? ''));
 
-        $usuario = DB::connection('tenant')->transaction(function () use ($estudio, $nombre, $primerApellido, $email, $validado, $nombreCompleto): Usuario {
-            $usuario = Usuario::query()->create([
+        [$usuario, $persona] = DB::connection('tenant')->transaction(function () use ($estudio, $nombre, $primerApellido, $email, $validado, $nombreCompleto, $existente): array {
+            $datosUsuario = [
                 'name' => $nombreCompleto !== '' ? $nombreCompleto : $nombre,
                 'email' => $email,
                 'password' => (string) $validado['password'],
                 'activo' => true,
-                'rol' => 'miembro',
-                'roles' => ['miembro'],
-            ]);
+            ];
 
-            $persona = PersonaTenant::query()->create([
-                'nombre' => $nombre,
-                'primer_apellido' => $primerApellido,
-                'email' => $email,
-                'tipo' => TipoPersonaTenant::Miembro->value,
-                'activo' => true,
-                'es_facturable' => true,
-                'archivado' => false,
-                'usuario_id' => $usuario->getKey(),
-            ]);
+            // Su ficha: la de su cuenta, o la que el negocio ya le había dado de alta con
+            // ese correo (se liga en vez de duplicarla). Si estaba de baja, se reactiva.
+            $persona = ($existente instanceof Usuario
+                ? PersonaTenant::withTrashed()->where('usuario_id', $existente->getKey())->first()
+                : null) ?? PersonaTenant::withTrashed()->where('email', $email)->first();
+            if ($persona instanceof PersonaTenant && $persona->trashed()) {
+                $this->bajas->reactivarPersona($persona, null, 'Se registró de nuevo con su correo.');
+            }
+
+            if ($existente instanceof Usuario) {
+                $this->bajas->reactivarUsuario($existente, null, 'Se registró de nuevo con su correo.');
+                $existente->forceFill($datosUsuario)->save();
+                $usuario = $existente;
+            } else {
+                $usuario = Usuario::query()->create([...$datosUsuario, 'rol' => 'miembro', 'roles' => ['miembro']]);
+            }
+
+            if ($persona instanceof PersonaTenant) {
+                $persona->update(['usuario_id' => $usuario->getKey(), 'activo' => true, 'archivado' => false]);
+            } else {
+                $persona = PersonaTenant::query()->create([
+                    'nombre' => $nombre,
+                    'primer_apellido' => $primerApellido,
+                    'email' => $email,
+                    'tipo' => TipoPersonaTenant::Miembro->value,
+                    'activo' => true,
+                    'es_facturable' => true,
+                    'archivado' => false,
+                    'usuario_id' => $usuario->getKey(),
+                ]);
+            }
 
             // Correo de bienvenida (plantilla `cuenta.creada`) con el enlace a su cuenta.
             $this->eventos->registrar('cuenta.creada', 'persona', (string) $persona->ulid, [
@@ -85,13 +108,14 @@ class RegistroAlumnoController
                 'enlace' => rtrim((string) config('turnouno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $estudio->slug),
             ]);
 
-            return $usuario;
+            return [$usuario, $persona];
         });
 
         return response()->json(['data' => [
             'token' => $this->auth->emitir($usuario),
             'usuario' => $this->presentarUsuario($usuario),
             'estudio' => $this->presentarEstudio($estudio),
+            'persona_id' => (string) $persona->ulid,
         ]], 201);
     }
 

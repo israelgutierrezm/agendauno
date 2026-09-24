@@ -4,18 +4,25 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\Application\BajasTenant;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Persona operativa tenant-local (miembro/alumno o instructor), en la BD del
  * tenant. Reemplaza, en el data plane, a la `Persona` del esquema compartido.
+ *
+ * Baja lógica ({@see BajasTenant}): dada de baja
+ * queda oculta en todo el sistema (`deleted_at`) con su historial; `eliminado_por`
+ * es quién la dio de baja.
  */
 class PersonaTenant extends Model
 {
     use HasPublicId;
+    use SoftDeletes;
 
     protected $connection = 'tenant';
 

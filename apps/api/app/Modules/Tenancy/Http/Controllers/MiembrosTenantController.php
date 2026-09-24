@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\BajasTenant;
 use App\Modules\Tenancy\Application\MedirUsoSaas;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\Exceptions\PersonaDadaDeBaja;
 use App\Modules\Tenancy\Http\Requests\CrearMiembroRequest;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -33,6 +35,7 @@ class MiembrosTenantController
     public function __construct(
         private readonly RegistrarAuditoria $auditoria,
         private readonly ResolverAccesoTenant $acceso,
+        private readonly BajasTenant $bajas,
     ) {}
 
     /**
@@ -50,7 +53,9 @@ class MiembrosTenantController
         $tipo = (string) $request->query('tipo', TipoPersonaTenant::Miembro->value);
         $busqueda = trim((string) $request->query('q', ''));
 
-        $consulta = PersonaTenant::query()
+        // `?estado=baja`: los dados de baja (con cuándo y quién); si no, los vigentes.
+        $deBaja = (string) $request->query('estado', '') === 'baja';
+        $consulta = ($deBaja ? PersonaTenant::onlyTrashed() : PersonaTenant::query())
             ->with('sucursal')
             ->where('tipo', $tipo)
             ->when($this->sucursalIdDe((string) $request->query('sucursal_id', '')), fn ($q, int $id) => $q->where('sucursal_id', $id))
@@ -87,8 +92,8 @@ class MiembrosTenantController
             $consulta->where('activo', false);
         }
 
-        // Archivados ocultos por defecto.
-        $archivado = (string) $request->query('archivado', 'no');
+        // Archivados ocultos por defecto (los dados de baja se ven todos).
+        $archivado = $deBaja ? 'todos' : (string) $request->query('archivado', 'no');
         if ($archivado === 'no') {
             $consulta->where('archivado', false);
         } elseif ($archivado === 'si') {
@@ -105,9 +110,10 @@ class MiembrosTenantController
             /** @var Collection<int, PersonaTenant> $items */
             $items = $pagina->getCollection();
             $asistencias = $this->conteoAsistencias($items->pluck('id')->all());
+            $quienes = $this->nombresDe($items->pluck('eliminado_por')->filter()->all());
 
             return response()->json([
-                'data' => $items->map(fn (PersonaTenant $persona): array => $this->presentar($persona, (int) ($asistencias[$persona->getKey()] ?? 0)))->all(),
+                'data' => $items->map(fn (PersonaTenant $persona): array => $this->presentar($persona, (int) ($asistencias[$persona->getKey()] ?? 0), $quienes))->all(),
                 'meta' => [
                     'total' => $pagina->total(),
                     'page' => $pagina->currentPage(),
@@ -119,11 +125,13 @@ class MiembrosTenantController
 
         $personas = $consulta->limit(self::LIMITE)->get();
         $asistencias = $this->conteoAsistencias($personas->pluck('id')->all());
+        $quienes = $this->nombresDe($personas->pluck('eliminado_por')->filter()->all());
 
         return response()->json([
             'data' => $personas->map(fn (PersonaTenant $persona): array => $this->presentar(
                 $persona,
                 (int) ($asistencias[$persona->getKey()] ?? 0),
+                $quienes,
             ))->all(),
         ]);
     }
@@ -153,10 +161,44 @@ class MiembrosTenantController
 
     public function store(CrearMiembroRequest $request): JsonResponse
     {
+        $actor = $this->actor($request);
         $sucursalId = $this->resolverSucursalDeAlta(
-            $this->actor($request),
+            $actor,
             $this->sucursalIdDe((string) $request->validated('sucursal_id', '')),
         );
+
+        // El correo es de la persona para siempre: si está dada de baja, se reactiva
+        // (con su historial) en lugar de crear otra.
+        $email = $request->validated('email');
+        $conCorreo = is_string($email) && $email !== ''
+            ? PersonaTenant::onlyTrashed()->where('email', $email)->first()
+            : null;
+        if ($conCorreo instanceof PersonaTenant) {
+            $this->bajas->reactivarPersona($conCorreo, $actor, 'Se dio de alta de nuevo con su correo.');
+            $conCorreo->update(array_filter([
+                'nombre' => (string) $request->validated('nombre'),
+                'segundo_nombre' => $request->validated('segundo_nombre'),
+                'primer_apellido' => $request->validated('primer_apellido'),
+                'segundo_apellido' => $request->validated('segundo_apellido'),
+                'celular' => $request->validated('celular'),
+            ], static fn (mixed $v): bool => $v !== null && $v !== '') + ['activo' => true, 'archivado' => false]);
+
+            return response()->json(['data' => [...$this->presentar($conCorreo->refresh()->load('sucursal')), 'reactivado' => true]], 201);
+        }
+
+        // Con el celular no se reactiva sola (los números cambian de dueño): el negocio
+        // decide si la reactiva o si es otra persona (entonces el número se le quita).
+        $celular = $request->validated('celular');
+        $conCelular = is_string($celular) && $celular !== ''
+            ? PersonaTenant::onlyTrashed()->where('celular', $celular)->first()
+            : null;
+        if ($conCelular instanceof PersonaTenant) {
+            if (! $request->boolean('liberar_celular')) {
+                throw new PersonaDadaDeBaja($conCelular);
+            }
+            $conCelular->forceFill(['celular' => null])->save();
+            $this->auditoria->registrar($actor, 'miembro.celular_liberado', 'persona', (string) $conCelular->ulid, ['celular' => $celular], ['celular' => null], 'El número es de otra persona.');
+        }
 
         $persona = PersonaTenant::query()->create([
             'nombre' => (string) $request->validated('nombre'),
@@ -172,7 +214,61 @@ class MiembrosTenantController
             'sucursal_id' => $sucursalId,
         ]);
 
-        return response()->json(['data' => $this->presentar($persona->load('sucursal'))], 201);
+        return response()->json(['data' => [...$this->presentar($persona->load('sucursal')), 'reactivado' => false]], 201);
+    }
+
+    /**
+     * Baja lógica del alumno: se cierran sus reservas por venir, membresías y pagos
+     * automáticos; se conserva su historial.
+     */
+    public function darDeBaja(Request $request): JsonResponse
+    {
+        $persona = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        $actor = $this->actor($request);
+        $this->exigirSucursal($actor, $persona);
+        $motivo = $request->validate(['motivo' => ['nullable', 'string', 'max:500']])['motivo'] ?? null;
+
+        $this->bajas->darDeBajaPersona($persona, $actor, $motivo);
+
+        $persona = PersonaTenant::withTrashed()->with('sucursal')->findOrFail($persona->getKey());
+
+        return response()->json(['data' => $this->presentar($persona, null, $this->nombresDe([$persona->eliminado_por]))]);
+    }
+
+    /**
+     * Reactiva a un alumno dado de baja (con su historial).
+     */
+    public function reactivar(Request $request): JsonResponse
+    {
+        $persona = PersonaTenant::withTrashed()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        $actor = $this->actor($request);
+        $this->exigirSucursal($actor, $persona);
+
+        $this->bajas->reactivarPersona($persona, $actor);
+
+        return response()->json(['data' => $this->presentar($persona->refresh()->load('sucursal'))]);
+    }
+
+    private function exigirSucursal(?Usuario $actor, PersonaTenant $persona): void
+    {
+        abort_unless(
+            $actor === null || $this->acceso->permiteSucursal($actor, $persona->sucursal_id !== null ? (int) $persona->sucursal_id : null),
+            403,
+            'No puedes dar de baja o reactivar a un alumno de otra sucursal.',
+        );
+    }
+
+    /**
+     * Nombres de quienes dieron de baja (aunque ya no estén en el equipo).
+     *
+     * @param  array<int, mixed>  $ids
+     * @return array<int, string>
+     */
+    private function nombresDe(array $ids): array
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+
+        return $ids === [] ? [] : Usuario::withTrashed()->whereIn('id', $ids)->pluck('name', 'id')->map(fn ($n): string => (string) $n)->all();
     }
 
     /**
@@ -355,9 +451,10 @@ class MiembrosTenantController
     }
 
     /**
+     * @param  array<int, string>  $quienes  nombres de quienes dieron de baja
      * @return array<string, mixed>
      */
-    private function presentar(PersonaTenant $persona, ?int $asistencias = null): array
+    private function presentar(PersonaTenant $persona, ?int $asistencias = null, array $quienes = []): array
     {
         return [
             'id' => $persona->ulid,
@@ -378,6 +475,8 @@ class MiembrosTenantController
             'sucursal' => $persona->sucursal !== null
                 ? ['id' => $persona->sucursal->ulid, 'nombre' => $persona->sucursal->nombre]
                 : null,
+            'dado_de_baja_en' => $persona->deleted_at?->toIso8601String(),
+            'dado_de_baja_por' => $persona->eliminado_por !== null ? ($quienes[(int) $persona->eliminado_por] ?? null) : null,
         ];
     }
 }

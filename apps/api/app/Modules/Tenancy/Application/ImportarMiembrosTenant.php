@@ -31,7 +31,8 @@ class ImportarMiembrosTenant
      */
     public function analizar(array $filas): array
     {
-        $existentes = PersonaTenant::query()
+        // Con los dados de baja: su correo es suyo (se reactivan desde Miembros).
+        $existentes = PersonaTenant::withTrashed()
             ->whereNotNull('email')
             ->pluck('email')
             ->map(static fn ($e): string => mb_strtolower((string) $e))

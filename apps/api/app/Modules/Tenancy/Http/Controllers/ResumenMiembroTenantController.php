@@ -40,7 +40,8 @@ class ResumenMiembroTenantController
 
     public function __invoke(Request $request): JsonResponse
     {
-        $persona = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        // Su historial se consulta aunque esté dada de baja.
+        $persona = PersonaTenant::withTrashed()->where('ulid', (string) $request->route('persona'))->firstOrFail();
 
         // Alcance por sucursal (R19): un acotado no ve el resumen de un alumno de otra sede.
         $actor = $request->attributes->get('usuario_tenant');

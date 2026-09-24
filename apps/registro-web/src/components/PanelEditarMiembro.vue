@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -22,6 +23,7 @@ const emit = defineEmits<{
   (e: "guardado", m: MiembroEditable): void;
 }>();
 
+const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const base = `/api/v1/app/${sesion.slug}`;
 
@@ -37,6 +39,29 @@ const form = reactive({
 });
 const guardando = ref(false);
 const error = ref<string | null>(null);
+
+// Baja lógica: cierra lo vigente y conserva su historial (se puede reactivar).
+const motivoBaja = ref("");
+const dandoDeBaja = ref(false);
+async function darDeBaja(): Promise<void> {
+  const nombre = [form.nombre, form.primer_apellido].filter(Boolean).join(" ");
+  if (!window.confirm(`${t("bajas.darDeBaja")}: ${nombre}?`)) {
+    return;
+  }
+  dandoDeBaja.value = true;
+  error.value = null;
+  try {
+    await api.delete(`${base}/miembros/${props.miembro.id}`, {
+      data: { motivo: motivoBaja.value.trim() || null },
+    });
+    emit("guardado", props.miembro);
+    emit("cerrar");
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    dandoDeBaja.value = false;
+  }
+}
 
 async function guardar(): Promise<void> {
   guardando.value = true;
@@ -164,6 +189,31 @@ async function guardar(): Promise<void> {
         >
           {{ guardando ? $t("comun.guardar") + "…" : $t("comun.guardar") }}
         </button>
+
+        <div
+          class="border-t pt-4 space-y-2"
+          :style="{ borderColor: 'var(--borde)' }"
+        >
+          <p class="text-sm font-semibold">{{ $t("bajas.darDeBaja") }}</p>
+          <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("bajas.ayudaMiembro") }}
+          </p>
+          <input
+            v-model="motivoBaja"
+            class="tu-input"
+            maxlength="500"
+            :placeholder="$t('bajas.motivo')"
+          />
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma w-full"
+            style="color: var(--error)"
+            :disabled="dandoDeBaja"
+            @click="darDeBaja"
+          >
+            {{ $t("bajas.darDeBaja") }}
+          </button>
+        </div>
       </form>
     </aside>
   </div>

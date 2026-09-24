@@ -33,7 +33,8 @@ class FichaMiembroTenantController
 
     public function __invoke(Request $request): JsonResponse
     {
-        $persona = PersonaTenant::query()
+        // Su historial se consulta aunque esté dada de baja.
+        $persona = PersonaTenant::withTrashed()
             ->with('sucursal')
             ->where('ulid', (string) $request->route('persona'))
             ->firstOrFail();
@@ -53,6 +54,7 @@ class FichaMiembroTenantController
                 'celular' => $persona->celular,
                 'tipo' => $persona->tipo->value,
                 'activo' => $persona->activo,
+                'dado_de_baja_en' => $persona->deleted_at?->toIso8601String(),
                 'es_facturable' => $persona->es_facturable,
                 'archivado' => $persona->archivado,
                 'alta' => $persona->created_at?->toDateString(),

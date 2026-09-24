@@ -84,7 +84,7 @@ class SesionTenant extends Model
      */
     public function instructor(): BelongsTo
     {
-        return $this->belongsTo(Usuario::class, 'instructor_id');
+        return $this->belongsTo(Usuario::class, 'instructor_id')->withTrashed();
     }
 
     /**
