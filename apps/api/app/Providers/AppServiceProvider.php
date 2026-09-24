@@ -57,6 +57,18 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        // Recuperación de contraseña: aparte del login (no gasta sus intentos) y más
+        // estricta por correo, para que no sirva para inundar un buzón.
+        RateLimiter::for('recuperacion', function (Request $request): array {
+            $email = Str::lower((string) $request->input('email'));
+            $ip = (string) $request->ip();
+
+            return [
+                Limit::perMinute(3)->by($email.'|'.$ip),
+                Limit::perMinute(10)->by($ip),
+            ];
+        });
+
         // Rate limit de las rutas tenant AUTENTICADAS: por usuario tenant (o IP si no
         // se resolvio), para frenar abuso/enumeracion sin castigar a todo el estudio.
         RateLimiter::for('tenant', function (Request $request): Limit {

@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\ActivacionPropietario;
 use App\Modules\Tenancy\Application\AutenticacionGoogleTenant;
 use App\Modules\Tenancy\Application\AutenticacionTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
+use App\Modules\Tenancy\Application\RestablecerContrasenaTenant;
 use App\Modules\Tenancy\Http\Requests\ActivarTenantRequest;
 use App\Modules\Tenancy\Http\Requests\LoginTenantRequest;
 use App\Modules\Tenancy\Http\UsuarioTenantPresenter;
@@ -30,7 +31,39 @@ class AuthTenantController
         private readonly ActivacionPropietario $activacion,
         private readonly AutenticacionGoogleTenant $google,
         private readonly EnviarActivacionTenant $enviarActivacion,
+        private readonly RestablecerContrasenaTenant $restablecimiento,
     ) {}
+
+    /**
+     * Pide el enlace para elegir una contraseña nueva. Público y SIN enumeración:
+     * responde igual exista o no la cuenta.
+     */
+    public function recuperarContrasena(Request $request): JsonResponse
+    {
+        $validado = $request->validate(['email' => ['required', 'email']]);
+        $this->restablecimiento->solicitar($this->estudioDe($request), (string) $validado['email']);
+
+        return response()->json(['data' => ['ok' => true]]);
+    }
+
+    /**
+     * Fija la contraseña nueva con el enlace del correo y deja la sesión iniciada
+     * (las demás sesiones de la cuenta se cierran).
+     */
+    public function restablecerContrasena(ActivarTenantRequest $request): JsonResponse
+    {
+        $usuario = $this->restablecimiento->restablecer(
+            (string) $request->validated('email'),
+            (string) $request->validated('token'),
+            (string) $request->validated('password'),
+        );
+
+        return response()->json(['data' => [
+            'token' => $this->auth->emitir($usuario),
+            'usuario' => UsuarioTenantPresenter::datos($usuario),
+            'estudio' => $this->presentarEstudio($this->estudioDe($request)),
+        ]]);
+    }
 
     /**
      * Reenvía el correo de activación al propietario/usuario que aún no activa su

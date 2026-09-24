@@ -24,6 +24,7 @@ import {
   inventarioExtra,
   miCuentaExtra,
   plataformaAdmin,
+  recuperarContrasena,
   reembolsosPago,
   reglasAgenda,
   validacion,
@@ -61,6 +62,7 @@ export const i18n = createI18n({
       validacion,
       instructorClase,
       plataformaAdmin,
+      recuperarContrasena,
     },
   },
 });

@@ -156,6 +156,16 @@ onMounted(() => {
           autocomplete="current-password"
           :required="true"
         />
+        <RouterLink
+          class="tu-enlace mt-2 inline-block text-sm"
+          :to="{
+            name: 'recuperar-contrasena',
+            params: { slug: slug.trim() },
+            query: email ? { email } : {},
+          }"
+        >
+          {{ $t("recuperarContrasena.enlace") }}
+        </RouterLink>
       </div>
 
       <p v-if="sesion.error" class="text-sm" style="color: var(--error)">

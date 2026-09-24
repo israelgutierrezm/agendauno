@@ -50,6 +50,17 @@ const router = createRouter({
       component: () => import("@/views/SucursalesEstudioView.vue"),
     },
     {
+      // Recuperar la contraseña: pedir el enlace y, desde el correo, elegir la nueva.
+      path: "/recuperar/:slug?",
+      name: "recuperar-contrasena",
+      component: () => import("@/views/RecuperarContrasenaView.vue"),
+    },
+    {
+      path: "/restablecer/:slug",
+      name: "restablecer-contrasena",
+      component: () => import("@/views/RecuperarContrasenaView.vue"),
+    },
+    {
       path: "/activar/:slug?",
       name: "activar",
       component: () => import("@/views/ActivacionView.vue"),

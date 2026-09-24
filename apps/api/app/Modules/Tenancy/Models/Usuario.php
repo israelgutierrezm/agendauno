@@ -114,7 +114,7 @@ class Usuario extends Authenticatable
     /**
      * @var list<string>
      */
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = ['password', 'remember_token', 'activation_token', 'reset_token'];
 
     /**
      * @return array<string, string>
@@ -123,6 +123,7 @@ class Usuario extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'reset_expira_en' => 'datetime',
             'password' => 'hashed',
             'activo' => 'boolean',
             'roles' => 'array',

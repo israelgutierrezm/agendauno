@@ -42,14 +42,77 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() {
         _error = (data is Map && data['message'] is String)
             ? data['message'] as String
-            : 'No se pudo iniciar sesion.';
+            : 'No se pudo iniciar sesión.';
       });
     } catch (_) {
-      setState(() => _error = 'Ocurrio un error inesperado.');
+      setState(() => _error = 'Ocurrió un error inesperado.');
     } finally {
       if (mounted) {
         setState(() => _cargando = false);
       }
+    }
+  }
+
+  /// Pide el enlace de recuperación con el negocio y el correo escritos (o los que
+  /// se capturen en el diálogo). El enlace llega por correo y se abre en la web.
+  Future<void> _recuperar() async {
+    final slug = TextEditingController(text: _slug.text.trim());
+    final email = TextEditingController(text: _email.text.trim());
+    final enviar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Recupera tu contraseña'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Te enviaremos un enlace para elegir una contraseña nueva.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: slug,
+              decoration: const InputDecoration(labelText: 'Dirección del negocio'),
+              autocorrect: false,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: email,
+              decoration: const InputDecoration(labelText: 'Correo'),
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Enviar enlace')),
+        ],
+      ),
+    );
+    final datos = (slug.text.trim(), email.text.trim());
+    slug.dispose();
+    email.dispose();
+    if (enviar != true || datos.$1.isEmpty || datos.$2.isEmpty || !mounted) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(sesionProvider.notifier).pedirRecuperacion(datos.$1, datos.$2);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Si ese correo tiene cuenta, te llegará un enlace en unos minutos.'),
+        ),
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            (data is Map && data['message'] is String)
+                ? data['message'] as String
+                : 'No se pudo enviar el enlace. Revisa la dirección del negocio.',
+          ),
+        ),
+      );
     }
   }
 
@@ -77,7 +140,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   TextField(
                     controller: _slug,
                     decoration: const InputDecoration(
-                      labelText: 'Direccion del estudio',
+                      labelText: 'Dirección del negocio',
                       hintText: 'mi-estudio',
                     ),
                     autocorrect: false,
@@ -92,8 +155,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: _password,
-                    decoration: const InputDecoration(labelText: 'Contrasena'),
+                    decoration: const InputDecoration(labelText: 'Contraseña'),
                     obscureText: true,
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _cargando ? null : _recuperar,
+                      child: const Text('¿Olvidaste tu contraseña?'),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   if (_error != null) ...[

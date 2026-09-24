@@ -34,6 +34,17 @@ class SesionController extends Notifier<Sesion?> {
     await ref.read(almacenSesionProvider).guardar(state!.aJson());
   }
 
+  /// Pide el enlace para elegir una contraseña nueva (llega por correo y se abre en
+  /// la web). El servidor responde igual exista o no la cuenta.
+  Future<void> pedirRecuperacion(String slug, String email) async {
+    await ref
+        .read(dioProvider)
+        .post<Map<String, dynamic>>(
+          '/api/v1/app/$slug/recuperar-contrasena',
+          data: {'email': email},
+        );
+  }
+
   /// Revalida la sesión restaurada: si el servidor ya no reconoce el token (401),
   /// se cierra; si sí, se actualizan el usuario y el perfil del negocio. Sin red se
   /// conserva la sesión (se reintenta en la siguiente apertura).

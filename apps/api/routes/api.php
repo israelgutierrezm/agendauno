@@ -150,6 +150,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/activar', [AuthTenantController::class, 'activar'])->middleware('throttle:login')->name('activar');
         // Reenvío del correo de activación (público: el dueño aún no puede entrar).
         Route::post('/reenviar-activacion', [AuthTenantController::class, 'reenviarActivacion'])->middleware('throttle:login')->name('reenviar-activacion');
+        Route::post('/recuperar-contrasena', [AuthTenantController::class, 'recuperarContrasena'])->middleware('throttle:recuperacion')->name('recuperar-contrasena');
+        Route::post('/restablecer-contrasena', [AuthTenantController::class, 'restablecerContrasena'])->middleware('throttle:recuperacion')->name('restablecer-contrasena');
 
         // Marca pública (branding): nombre + logo del estudio para la pantalla de
         // acceso (sin auth). Con throttle para mitigar sondeo de slugs.

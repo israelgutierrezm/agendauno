@@ -405,3 +405,27 @@ export const plataformaAdmin = {
     webhook_password: "Contraseña del webhook",
   },
 };
+
+export const recuperarContrasena = {
+  enlace: "¿Olvidaste tu contraseña?",
+  titulo: "Recupera tu contraseña",
+  subtitulo:
+    "Escribe el correo con el que entras y te enviaremos un enlace para elegir una nueva.",
+  negocio: "Dirección de tu negocio",
+  negocioPh: "mi-negocio",
+  email: "Correo",
+  enviar: "Enviar enlace",
+  enviando: "Enviando…",
+  enviado:
+    "Si ese correo tiene cuenta, te llegará un enlace en unos minutos. Revisa también la carpeta de spam.",
+  volver: "Volver a iniciar sesión",
+  nuevaTitulo: "Elige una contraseña nueva",
+  nuevaSubtitulo: "Para {email}. Al guardarla se cerrarán tus otras sesiones.",
+  nueva: "Contraseña nueva",
+  confirmar: "Confirma la contraseña",
+  guardar: "Guardar y entrar",
+  guardando: "Guardando…",
+  pedirOtro: "Pedir un enlace nuevo",
+  sinEnlace:
+    "Este enlace está incompleto. Pide uno nuevo desde la pantalla de inicio de sesión.",
+};

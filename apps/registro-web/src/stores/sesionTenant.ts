@@ -221,6 +221,33 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     }
   }
 
+  /** Fija la contraseña nueva con el enlace del correo y deja la sesión iniciada. */
+  async function restablecerContrasena(
+    slugEstudio: string,
+    email: string,
+    token: string,
+    password: string,
+    passwordConfirmation: string,
+  ): Promise<void> {
+    cargando.value = true;
+    error.value = null;
+    try {
+      const { data } = await api.post<{ data: RespuestaAuth }>(
+        `/api/v1/app/${slugEstudio}/restablecer-contrasena`,
+        { email, token, password, password_confirmation: passwordConfirmation },
+      );
+      establecer(data.data);
+    } catch (e) {
+      error.value = mensajeDeError(
+        e,
+        i18n.global.t("validacion.sesion.activar"),
+      );
+      throw e;
+    } finally {
+      cargando.value = false;
+    }
+  }
+
   async function registrarAlumno(
     slugEstudio: string,
     datos: {
@@ -324,6 +351,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     iniciarSesion,
     iniciarSesionConGoogle,
     activar,
+    restablecerContrasena,
     registrarAlumno,
     cargarYo,
     actualizarUsuario,
