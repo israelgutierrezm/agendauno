@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
@@ -53,9 +54,11 @@ class ResumenMiembroTenantController
 
         $derechos = DerechoTenant::query()
             ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))
+            ->with('acuerdo.pausaAbierta')
             ->get();
 
         $tieneAcceso = false;
+        $pausadaHasta = null;
         $maxVigencia = null;
         $saldo = 0;
         foreach ($derechos as $derecho) {
@@ -63,8 +66,14 @@ class ResumenMiembroTenantController
             $vigente = $vence === null || $vence->gte($hoy);
             $disponible = $derecho->ilimitado ? 0 : $this->libro->disponible($derecho);
 
-            if ($vigente && ($derecho->ilimitado || $disponible > 0)) {
+            // Solo una membresía activa da acceso (en pausa o suspendida, no).
+            $activo = $derecho->acuerdo?->estado === EstadoAcuerdo::Activo;
+            if ($activo && $vigente && ($derecho->ilimitado || $disponible > 0)) {
                 $tieneAcceso = true;
+            }
+            $pausa = $derecho->acuerdo?->pausaAbierta;
+            if ($pausa !== null && ($pausadaHasta === null || $pausa->hasta->gt($pausadaHasta))) {
+                $pausadaHasta = $pausa->hasta;
             }
             if (! $derecho->ilimitado && $vigente) {
                 $saldo += max(0, $disponible);
@@ -79,6 +88,8 @@ class ResumenMiembroTenantController
         if ($derechos->isNotEmpty()) {
             if ($tieneAcceso) {
                 $estado = $maxVigencia !== null && $maxVigencia->lte($hoy->addDays(self::DIAS_POR_VENCER)) ? 'por_vencer' : 'vigente';
+            } elseif ($pausadaHasta !== null) {
+                $estado = 'pausada';
             } elseif ($maxVigencia !== null && $maxVigencia->lt($hoy)) {
                 $estado = 'vencida';
             }
@@ -123,6 +134,7 @@ class ResumenMiembroTenantController
             'membresia' => [
                 'estado' => $estado,
                 'valido_hasta' => $maxVigencia?->toDateString(),
+                'pausada_hasta' => $pausadaHasta?->toDateString(),
             ],
             'adeudo' => $adeudo,
             'documentos_pendientes' => $documentosPendientes,
@@ -150,6 +162,8 @@ class ResumenMiembroTenantController
             $alertas[] = 'membresia_vencida';
         } elseif ($estadoMembresia === 'por_vencer') {
             $alertas[] = 'membresia_por_vencer';
+        } elseif ($estadoMembresia === 'pausada') {
+            $alertas[] = 'membresia_pausada';
         } elseif ($estadoMembresia === 'sin') {
             $alertas[] = 'sin_acceso';
         }

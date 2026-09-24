@@ -34,6 +34,8 @@ class EventoDeDominioTenant
         'cobro.fallido',
         'membresia.suspendida',
         'membresia.regularizada',
+        'membresia.pausada',
+        'membresia.reanudada',
         'factura.timbrada',
         'cuenta.creada',
     ];

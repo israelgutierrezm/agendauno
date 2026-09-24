@@ -9,6 +9,7 @@ use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Acuerdo tenant-local: la compra de un producto comercial por una persona.
@@ -54,5 +55,23 @@ class AcuerdoTenant extends Model
     public function derechos(): HasMany
     {
         return $this->hasMany(DerechoTenant::class, 'acuerdo_id');
+    }
+
+    /**
+     * @return HasMany<PausaAcuerdoTenant, $this>
+     */
+    public function pausas(): HasMany
+    {
+        return $this->hasMany(PausaAcuerdoTenant::class, 'acuerdo_id');
+    }
+
+    /**
+     * La pausa en curso (a lo más una a la vez).
+     *
+     * @return HasOne<PausaAcuerdoTenant, $this>
+     */
+    public function pausaAbierta(): HasOne
+    {
+        return $this->hasOne(PausaAcuerdoTenant::class, 'acuerdo_id')->whereNull('reanudada_en');
     }
 }

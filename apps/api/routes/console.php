@@ -10,6 +10,9 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Reanuda las membresías cuya pausa terminó (antes de renovar ciclos y cobrar).
+Schedule::command('turnouno:reanudar-pausas')->dailyAt('00:05')->withoutOverlapping();
+
 // Reinicia/renueva a diario los ciclos vencidos de los derechos recurrentes.
 Schedule::command('entitlements:generar-ciclos')->dailyAt('00:15');
 

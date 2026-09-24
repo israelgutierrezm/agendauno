@@ -10,6 +10,8 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Derecho {
   id: string;
+  producto?: string | null;
+  pausa_hasta?: string | null;
   ilimitado: boolean;
   saldo: number | null;
   disponible: number | null;
@@ -357,8 +359,22 @@ onMounted(() => cargar());
             <li
               v-for="d in derechos"
               :key="d.id"
-              class="flex items-center justify-between"
+              class="flex flex-wrap items-center justify-between gap-x-3"
             >
+              <span
+                v-if="d.pausa_hasta"
+                class="w-full text-xs"
+                style="color: var(--aviso)"
+                >{{ d.producto ? `${d.producto} · ` : ""
+                }}{{
+                  $t("pausaMembresia.enPausa", {
+                    fecha: new Intl.DateTimeFormat("es-MX", {
+                      day: "numeric",
+                      month: "long",
+                    }).format(new Date(`${d.pausa_hasta}T12:00:00`)),
+                  })
+                }}</span
+              >
               <span v-if="d.ilimitado" class="tu-badge tu-badge-exito">{{
                 $t("miCuenta.ilimitado")
               }}</span>

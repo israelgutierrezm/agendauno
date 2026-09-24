@@ -74,7 +74,7 @@ class FichaMiembroTenantController
     {
         $derechos = DerechoTenant::query()
             ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))
-            ->with('acuerdo.producto')
+            ->with(['acuerdo.producto', 'acuerdo.pausaAbierta'])
             ->orderByDesc('id')
             ->get();
 
@@ -86,6 +86,10 @@ class FichaMiembroTenantController
                 'id' => $derecho->ulid,
                 'producto' => $derecho->acuerdo?->producto?->nombre,
                 'estado' => $derecho->acuerdo?->estado?->value,
+                // Para pausar/reanudar desde la ficha.
+                'acuerdo_id' => $derecho->acuerdo?->ulid,
+                'pausa_hasta' => $derecho->acuerdo?->pausaAbierta?->hasta->toDateString(),
+                'proxima_cobro_en' => $derecho->acuerdo?->proxima_cobro_en?->toDateString(),
                 'ilimitado' => $derecho->ilimitado,
                 'saldo_creditos' => $saldo !== null ? intdiv($saldo, 1000) : null,
                 'saldo_unidades' => $saldo,

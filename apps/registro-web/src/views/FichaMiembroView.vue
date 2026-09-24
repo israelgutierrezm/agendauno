@@ -19,7 +19,11 @@ interface Resumen {
   nombre_completo: string;
   email: string | null;
   saldo_creditos: number;
-  membresia: { estado: string; valido_hasta: string | null };
+  membresia: {
+    estado: string;
+    valido_hasta: string | null;
+    pausada_hasta?: string | null;
+  };
   adeudo: boolean;
   documentos_pendientes: number;
   asistencias: number;
@@ -40,6 +44,9 @@ interface Derecho {
   saldo_unidades: number | null;
   disponible_unidades: number | null;
   valido_hasta: string | null;
+  // Para pausar/reanudar la membresía a la que pertenece.
+  acuerdo_id: string | null;
+  pausa_hasta: string | null;
 }
 interface Movimiento {
   id: string;
@@ -157,6 +164,49 @@ async function recargar(d: Derecho): Promise<void> {
   }
 }
 
+// Pausar (congelar) la membresía por vacaciones, lesión, etc.
+const pausando = ref<string | null>(null);
+const pausa = ref({ hasta: "", motivo: "" });
+const guardandoPausa = ref(false);
+const hoy = new Date().toLocaleDateString("en-CA");
+
+function abrirPausa(d: Derecho): void {
+  pausa.value = { hasta: "", motivo: "" };
+  pausando.value = pausando.value === d.id ? null : d.id;
+}
+
+async function pausar(d: Derecho): Promise<void> {
+  guardandoPausa.value = true;
+  try {
+    await api.post(`${base.value}/acuerdos/${d.acuerdo_id}/pausar`, {
+      hasta: pausa.value.hasta,
+      motivo: pausa.value.motivo || null,
+    });
+    toast.exito(
+      t("pausaMembresia.pausada", { fecha: fecha(pausa.value.hasta) }),
+    );
+    pausando.value = null;
+    await cargar();
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    guardandoPausa.value = false;
+  }
+}
+
+async function reanudar(d: Derecho): Promise<void> {
+  guardandoPausa.value = true;
+  try {
+    await api.post(`${base.value}/acuerdos/${d.acuerdo_id}/reanudar`);
+    toast.exito(t("pausaMembresia.reanudada"));
+    await cargar();
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    guardandoPausa.value = false;
+  }
+}
+
 const resumen = ref<Resumen | null>(null);
 const ficha = ref<Ficha | null>(null);
 const cargando = ref(true);
@@ -196,7 +246,9 @@ function fecha(iso: string | null): string {
 
 // Ámbar para "por vencer"; rojo para el resto de alertas.
 function colorAlerta(codigo: string): string {
-  return codigo === "membresia_por_vencer" ? "var(--aviso)" : "var(--error)";
+  return codigo === "membresia_por_vencer" || codigo === "membresia_pausada"
+    ? "var(--aviso)"
+    : "var(--error)";
 }
 
 async function cargar(): Promise<void> {
@@ -395,7 +447,12 @@ watch(personaId, cargar, { immediate: true });
                           "
                           >{{ $t(`ficha.acuerdo.${d.estado}`) }}</span
                         >
-                        <span>{{
+                        <span v-if="d.pausa_hasta">{{
+                          $t("pausaMembresia.enPausa", {
+                            fecha: fecha(d.pausa_hasta),
+                          })
+                        }}</span>
+                        <span v-else>{{
                           d.valido_hasta
                             ? $t("ficha.derechos.vence", {
                                 fecha: fecha(d.valido_hasta),
@@ -427,30 +484,107 @@ watch(personaId, cargar, { immediate: true });
                       </template>
                     </div>
                     <div
-                      v-if="!d.ilimitado"
+                      v-if="
+                        !d.ilimitado ||
+                        (puedeRecargar &&
+                          d.acuerdo_id &&
+                          (d.estado === 'activo' || d.estado === 'pausado'))
+                      "
                       class="flex w-full items-center gap-4 text-sm"
                     >
-                      <button
-                        type="button"
-                        class="tu-enlace"
-                        :aria-expanded="movimientosDe === d.id"
-                        @click="verMovimientos(d)"
-                      >
-                        {{
-                          movimientosDe === d.id
-                            ? $t("creditosFicha.ocultar")
-                            : $t("creditosFicha.movimientos")
-                        }}
-                      </button>
-                      <button
-                        v-if="puedeRecargar"
-                        type="button"
-                        class="tu-enlace"
-                        @click="abrirRecarga(d)"
-                      >
-                        {{ $t("creditosFicha.agregar") }}
-                      </button>
+                      <template v-if="!d.ilimitado">
+                        <button
+                          type="button"
+                          class="tu-enlace"
+                          :aria-expanded="movimientosDe === d.id"
+                          @click="verMovimientos(d)"
+                        >
+                          {{
+                            movimientosDe === d.id
+                              ? $t("creditosFicha.ocultar")
+                              : $t("creditosFicha.movimientos")
+                          }}
+                        </button>
+                        <button
+                          v-if="puedeRecargar"
+                          type="button"
+                          class="tu-enlace"
+                          @click="abrirRecarga(d)"
+                        >
+                          {{ $t("creditosFicha.agregar") }}
+                        </button>
+                      </template>
+                      <template v-if="puedeRecargar && d.acuerdo_id">
+                        <button
+                          v-if="d.estado === 'activo'"
+                          type="button"
+                          class="tu-enlace"
+                          :aria-expanded="pausando === d.id"
+                          @click="abrirPausa(d)"
+                        >
+                          {{ $t("pausaMembresia.pausar") }}
+                        </button>
+                        <button
+                          v-else-if="d.estado === 'pausado'"
+                          type="button"
+                          class="tu-enlace"
+                          :disabled="guardandoPausa"
+                          @click="reanudar(d)"
+                        >
+                          {{ $t("pausaMembresia.reanudar") }}
+                        </button>
+                      </template>
                     </div>
+                    <form
+                      v-if="pausando === d.id"
+                      class="w-full space-y-3 rounded-xl border p-4"
+                      :style="{
+                        borderColor: 'var(--borde)',
+                        background: 'var(--fondo)',
+                      }"
+                      @submit.prevent="pausar(d)"
+                    >
+                      <p
+                        class="text-xs"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        {{ $t("pausaMembresia.ayuda") }}
+                      </p>
+                      <div class="flex flex-wrap items-end gap-3">
+                        <div>
+                          <label class="tu-label" :for="`ph-${d.id}`">{{
+                            $t("pausaMembresia.hasta")
+                          }}</label>
+                          <input
+                            :id="`ph-${d.id}`"
+                            v-model="pausa.hasta"
+                            class="tu-input"
+                            type="date"
+                            :min="hoy"
+                            required
+                          />
+                        </div>
+                        <div class="min-w-[12rem] flex-1">
+                          <label class="tu-label" :for="`pm-${d.id}`">{{
+                            $t("pausaMembresia.motivo")
+                          }}</label>
+                          <input
+                            :id="`pm-${d.id}`"
+                            v-model="pausa.motivo"
+                            class="tu-input"
+                            maxlength="255"
+                            :placeholder="$t('pausaMembresia.motivoPh')"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          class="tu-btn tu-btn-primario text-sm"
+                          :disabled="guardandoPausa || pausa.hasta === ''"
+                        >
+                          {{ $t("pausaMembresia.confirmar") }}
+                        </button>
+                      </div>
+                    </form>
                     <form
                       v-if="recargando === d.id"
                       class="flex w-full flex-wrap items-end gap-3 rounded-xl border p-4"
@@ -668,7 +802,18 @@ watch(personaId, cargar, { immediate: true });
               {{ $t(`recepcion.membresia.${resumen.membresia.estado}`) }}
             </p>
             <p
-              v-if="resumen.membresia.valido_hasta"
+              v-if="resumen.membresia.pausada_hasta"
+              class="text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{
+                $t("pausaMembresia.enPausa", {
+                  fecha: fecha(resumen.membresia.pausada_hasta),
+                })
+              }}
+            </p>
+            <p
+              v-else-if="resumen.membresia.valido_hasta"
               class="text-sm"
               :style="{ color: 'var(--texto-suave)' }"
             >

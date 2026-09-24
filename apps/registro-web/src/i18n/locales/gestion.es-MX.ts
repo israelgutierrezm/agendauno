@@ -120,6 +120,8 @@ export const conexiones = {
       membresia: {
         suspendida: "Membresía suspendida",
         regularizada: "Membresía regularizada",
+        pausada: "Membresía en pausa",
+        reanudada: "Membresía reanudada",
       },
       factura: { timbrada: "Factura timbrada" },
       cuenta: { creada: "Cuenta creada (bienvenida)" },
@@ -441,4 +443,18 @@ export const pagoEnLinea = {
   citaExito: "¡Listo! Recibimos tu pago. Tu cita se confirma en unos segundos.",
   rentaExito:
     "¡Gracias! Recibimos el pago de tu renta. Se confirma en unos segundos.",
+};
+
+export const pausaMembresia = {
+  pausar: "Pausar",
+  reanudar: "Reanudar",
+  hasta: "En pausa hasta (incluido)",
+  motivo: "Motivo",
+  motivoPh: "Vacaciones, lesión…",
+  confirmar: "Pausar membresía",
+  ayuda:
+    "Mientras esté en pausa no podrá reservar ni se le cobrará. Al volver, su próximo cobro y su vencimiento se recorren los días que duró la pausa. Las reservas que ya tenía se conservan.",
+  enPausa: "En pausa hasta el {fecha}",
+  pausada: "Membresía en pausa hasta el {fecha}.",
+  reanudada: "Membresía reanudada.",
 };

@@ -117,9 +117,12 @@ class MiTenantController
 
         $derechos = DerechoTenant::query()
             ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))
+            ->with(['acuerdo.producto', 'acuerdo.pausaAbierta'])
             ->get()
             ->map(fn (DerechoTenant $d): array => [
                 'id' => $d->ulid,
+                'producto' => $d->acuerdo?->producto?->nombre,
+                'pausa_hasta' => $d->acuerdo?->pausaAbierta?->hasta->toDateString(),
                 'ilimitado' => $d->ilimitado,
                 'saldo' => $d->ilimitado ? null : $this->libro->saldo($d),
                 'disponible' => $d->ilimitado ? null : $this->libro->disponible($d),

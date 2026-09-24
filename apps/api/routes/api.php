@@ -49,6 +49,7 @@ use App\Modules\Tenancy\Http\Controllers\OrganizacionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\PagoRentaController;
 use App\Modules\Tenancy\Http\Controllers\PagosTenantController;
 use App\Modules\Tenancy\Http\Controllers\PasarelasTenantController;
+use App\Modules\Tenancy\Http\Controllers\PausasMembresiaTenantController;
 use App\Modules\Tenancy\Http\Controllers\PerfilTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasHorarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasMensajeTenantController;
@@ -412,6 +413,9 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/dunning', [DunningTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('dunning.index');
             Route::post('/acuerdos/{acuerdo}/cobro-fallido', [DunningTenantController::class, 'registrarFallo'])->middleware('puede:ordenes.gestionar')->name('acuerdos.cobro-fallido');
             Route::post('/acuerdos/{acuerdo}/regularizar', [DunningTenantController::class, 'regularizar'])->middleware('puede:ordenes.gestionar')->name('acuerdos.regularizar');
+            // Pausar (congelar) y reanudar una membresía o paquete.
+            Route::post('/acuerdos/{acuerdo}/pausar', [PausasMembresiaTenantController::class, 'pausar'])->middleware('puede:membresias.gestionar')->name('acuerdos.pausar');
+            Route::post('/acuerdos/{acuerdo}/reanudar', [PausasMembresiaTenantController::class, 'reanudar'])->middleware('puede:membresias.gestionar')->name('acuerdos.reanudar');
             Route::get('/miembros/{persona}/derechos', [MembresiasTenantController::class, 'derechos'])->middleware('puede:derechos.ver')->name('miembros.derechos.index');
             // Resumen operativo del miembro para Recepcion (P0): membresia, saldo, adeudo, alertas.
             Route::get('/miembros/{persona}/resumen', ResumenMiembroTenantController::class)->middleware('puede:miembros.ver')->name('miembros.resumen');

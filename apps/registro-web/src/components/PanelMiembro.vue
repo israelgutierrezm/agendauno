@@ -17,7 +17,11 @@ interface Resumen {
   primera_vez: boolean;
   saldo_creditos: number;
   saldo_unidades: number;
-  membresia: { estado: string; valido_hasta: string | null };
+  membresia: {
+    estado: string;
+    valido_hasta: string | null;
+    pausada_hasta?: string | null;
+  };
   adeudo: boolean;
   documentos_pendientes: number;
   proxima_reserva: {
@@ -153,22 +157,28 @@ const pastilla = computed<{ texto: string; aviso: boolean } | null>(() => {
     m.estado === "sin"
       ? estado
       : `${t("recepcion.miembro.membresia")} ${estado.toLowerCase()}`;
-  const hasta =
-    m.valido_hasta !== null
-      ? new Intl.DateTimeFormat("es-MX", {
-          day: "numeric",
-          month: "short",
-        }).format(new Date(`${m.valido_hasta.slice(0, 10)}T12:00:00`))
-      : null;
+  // En pausa, la fecha que importa es cuándo vuelve.
+  const limite = m.estado === "pausada" ? m.pausada_hasta : m.valido_hasta;
+  const hasta = limite
+    ? new Intl.DateTimeFormat("es-MX", {
+        day: "numeric",
+        month: "short",
+      }).format(new Date(`${limite.slice(0, 10)}T12:00:00`))
+    : null;
   return {
     texto: hasta !== null ? `${texto} · hasta ${hasta}` : texto,
-    aviso: m.estado === "por_vencer" || m.estado === "vencida",
+    aviso:
+      m.estado === "por_vencer" ||
+      m.estado === "vencida" ||
+      m.estado === "pausada",
   };
 });
 
 // Ámbar para "por vencer"; rojo para el resto de alertas.
 function colorAlerta(codigo: string): string {
-  return codigo === "membresia_por_vencer" ? "var(--aviso)" : "var(--error)";
+  return codigo === "membresia_por_vencer" || codigo === "membresia_pausada"
+    ? "var(--aviso)"
+    : "var(--error)";
 }
 
 function fecha(iso: string, zona: string | null): string {

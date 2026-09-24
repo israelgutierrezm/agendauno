@@ -1,10 +1,20 @@
 /// Modelos del autoservicio del miembro (Mi cuenta).
 class DerechoMiembro {
-  const DerechoMiembro({required this.ilimitado, this.saldo, this.disponible});
+  const DerechoMiembro({
+    required this.ilimitado,
+    this.saldo,
+    this.disponible,
+    this.producto,
+    this.pausaHasta,
+  });
 
   final bool ilimitado;
   final int? saldo;
   final int? disponible;
+  final String? producto;
+
+  /// Último día en pausa (AAAA-MM-DD) si la membresía está congelada.
+  final String? pausaHasta;
 
   /// Créditos disponibles (1 crédito = 1000 unidades).
   int get creditosDisponibles => ((disponible ?? 0) / 1000).round();
@@ -13,6 +23,8 @@ class DerechoMiembro {
     ilimitado: (j['ilimitado'] ?? false) as bool,
     saldo: j['saldo'] as int?,
     disponible: j['disponible'] as int?,
+    producto: j['producto'] as String?,
+    pausaHasta: j['pausa_hasta'] as String?,
   );
 }
 

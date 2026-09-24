@@ -149,7 +149,8 @@ class GestionarDunningTenant
         $proceso->suspendido_en = Carbon::now();
         $proceso->proximo_intento_en = null;
 
-        if ($acuerdo->estado !== EstadoAcuerdo::Cancelado) {
+        // Cancelada o en pausa se queda como está (la pausa no se cobra).
+        if (! in_array($acuerdo->estado, [EstadoAcuerdo::Cancelado, EstadoAcuerdo::Pausado], true)) {
             $acuerdo->update(['estado' => EstadoAcuerdo::Suspendido->value]);
         }
     }

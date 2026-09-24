@@ -733,6 +733,7 @@ export default {
       en_mora: "En mora",
       suspendido: "Suspendido",
       regularizado: "Regularizado",
+      pausado: "En pausa",
     },
     pagoEstados: {
       aprobado: "Aprobado",
@@ -1594,6 +1595,7 @@ export default {
       adeudo: "Adeudo",
       membresia_vencida: "Membresía vencida",
       membresia_por_vencer: "Vence pronto",
+      membresia_pausada: "Membresía en pausa",
       sin_acceso: "Sin acceso",
       documentos: "Documentos pendientes",
     },
@@ -1602,6 +1604,7 @@ export default {
       vigente: "Vigente",
       por_vencer: "Por vencer",
       vencida: "Vencida",
+      pausada: "En pausa",
     },
     miembro: {
       sinAlertas: "Todo en orden",

@@ -157,14 +157,24 @@ class _Creditos extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: derechos
               .map(
-                (d) => Text(
-                  d.ilimitado
-                      ? 'Ilimitado'
-                      : '${d.creditosDisponibles} créditos disponibles',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
+                (d) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (d.pausaHasta != null)
+                      Text(
+                        '${d.producto != null ? '${d.producto} · ' : ''}En pausa hasta el ${Formato.dia(DateTime.parse(d.pausaHasta!))}',
+                        style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                      ),
+                    Text(
+                      d.ilimitado
+                          ? 'Ilimitado'
+                          : '${d.creditosDisponibles} créditos disponibles',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               )
               .toList(),

@@ -48,7 +48,8 @@ class CobroRecurrenteTenant
         $persona = $acuerdo->persona;
         $producto = $acuerdo->producto;
 
-        if (! $persona instanceof PersonaTenant || ! $producto instanceof ProductoTenant || $acuerdo->estado === EstadoAcuerdo::Cancelado) {
+        if (! $persona instanceof PersonaTenant || ! $producto instanceof ProductoTenant
+            || in_array($acuerdo->estado, [EstadoAcuerdo::Cancelado, EstadoAcuerdo::Pausado], true)) {
             return 'omitido';
         }
 
