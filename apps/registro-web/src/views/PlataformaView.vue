@@ -64,6 +64,8 @@ interface Pasarela {
   activa: boolean;
   modo: string;
   llaves_configuradas: string[];
+  disponible?: boolean;
+  lista?: boolean;
 }
 type Pestana = "estudios" | "cobros" | "tarifas" | "configuracion";
 
@@ -842,64 +844,92 @@ function borrar(): void {
           </p>
           <div class="mt-3 grid gap-3 md:grid-cols-3">
             <div v-for="p in pasarelas" :key="p.proveedor" class="tu-card p-4">
-              <div class="flex items-center justify-between gap-2">
+              <div
+                v-if="p.disponible === false"
+                class="flex items-center justify-between gap-2"
+              >
                 <h3 class="font-light">
                   {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
                 </h3>
-                <label class="flex items-center gap-1.5 text-xs">
-                  <input
-                    v-model="pasarelaDraft[p.proveedor].activa"
-                    type="checkbox"
-                  />
-                  {{ $t("plataforma.pasarelas.activa") }}
-                </label>
+                <span class="tu-badge">{{
+                  $t("pasarelasEstado.proximamente")
+                }}</span>
               </div>
-              <div class="mt-3">
-                <label class="tu-label" :for="`modo-${p.proveedor}`">{{
-                  $t("plataforma.pasarelas.modo")
-                }}</label>
-                <select
-                  :id="`modo-${p.proveedor}`"
-                  v-model="pasarelaDraft[p.proveedor].modo"
-                  class="tu-input"
+              <p
+                v-if="p.disponible === false"
+                class="mt-2 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("pasarelasEstado.noDisponible") }}
+              </p>
+              <template v-else>
+                <p
+                  v-if="p.activa && p.lista === false"
+                  class="mb-2 text-xs"
+                  role="status"
+                  style="color: var(--aviso)"
                 >
-                  <option value="test">
-                    {{ $t("plataforma.pasarelas.test") }}
-                  </option>
-                  <option value="live">
-                    {{ $t("plataforma.pasarelas.live") }}
-                  </option>
-                </select>
-              </div>
-              <div
-                v-for="llave in LLAVES_PASARELA[p.proveedor] ?? []"
-                :key="llave"
-                class="mt-2"
-              >
-                <label class="tu-label" :for="`${p.proveedor}-${llave}`">{{
-                  $t(`plataformaAdmin.llaves.${llave}`)
-                }}</label>
-                <input
-                  :id="`${p.proveedor}-${llave}`"
-                  v-model="pasarelaDraft[p.proveedor].llaves[llave]"
-                  class="tu-input"
-                  type="password"
-                  autocomplete="off"
-                  :placeholder="
-                    p.llaves_configuradas.includes(llave)
-                      ? $t('plataforma.pasarelas.configurada')
-                      : ''
-                  "
-                />
-              </div>
-              <button
-                class="tu-btn tu-btn-primario w-full mt-3 text-sm"
-                type="button"
-                :disabled="guardando === p.proveedor"
-                @click="guardarPasarela(p.proveedor)"
-              >
-                {{ $t("plataforma.pasarelas.guardar") }}
-              </button>
+                  {{ $t("pasarelasEstado.faltaLlave") }}
+                </p>
+                <div class="flex items-center justify-between gap-2">
+                  <h3 class="font-light">
+                    {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
+                  </h3>
+                  <label class="flex items-center gap-1.5 text-xs">
+                    <input
+                      v-model="pasarelaDraft[p.proveedor].activa"
+                      type="checkbox"
+                    />
+                    {{ $t("plataforma.pasarelas.activa") }}
+                  </label>
+                </div>
+                <div class="mt-3">
+                  <label class="tu-label" :for="`modo-${p.proveedor}`">{{
+                    $t("plataforma.pasarelas.modo")
+                  }}</label>
+                  <select
+                    :id="`modo-${p.proveedor}`"
+                    v-model="pasarelaDraft[p.proveedor].modo"
+                    class="tu-input"
+                  >
+                    <option value="test">
+                      {{ $t("plataforma.pasarelas.test") }}
+                    </option>
+                    <option value="live">
+                      {{ $t("plataforma.pasarelas.live") }}
+                    </option>
+                  </select>
+                </div>
+                <div
+                  v-for="llave in LLAVES_PASARELA[p.proveedor] ?? []"
+                  :key="llave"
+                  class="mt-2"
+                >
+                  <label class="tu-label" :for="`${p.proveedor}-${llave}`">{{
+                    $t(`plataformaAdmin.llaves.${llave}`)
+                  }}</label>
+                  <input
+                    :id="`${p.proveedor}-${llave}`"
+                    v-model="pasarelaDraft[p.proveedor].llaves[llave]"
+                    class="tu-input"
+                    type="password"
+                    autocomplete="off"
+                    :placeholder="
+                      p.llaves_configuradas.includes(llave)
+                        ? $t('plataforma.pasarelas.configurada')
+                        : ''
+                    "
+                  />
+                </div>
+                <button
+                  class="tu-btn tu-btn-primario w-full mt-3 text-sm"
+                  type="button"
+                  :disabled="guardando === p.proveedor"
+                  @click="guardarPasarela(p.proveedor)"
+                >
+                  {{ $t("plataforma.pasarelas.guardar") }}
+                </button>
+              </template>
             </div>
           </div>
         </div>

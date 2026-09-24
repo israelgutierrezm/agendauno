@@ -44,4 +44,21 @@ class ConfirmarPagoTenant
             }
         });
     }
+
+    /**
+     * El intento ya no se puede pagar (la sesión venció o el pago en tienda no se
+     * completó): queda rechazado. La orden sigue pendiente y se puede reintentar.
+     * Idempotente.
+     */
+    public function rechazarPorReferencia(string $referencia): void
+    {
+        if ($referencia === '') {
+            return;
+        }
+
+        PagoTenant::query()
+            ->where('referencia_externa', $referencia)
+            ->where('estado', EstadoPago::Pendiente->value)
+            ->update(['estado' => EstadoPago::Rechazado->value]);
+    }
 }

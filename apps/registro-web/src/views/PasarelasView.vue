@@ -9,6 +9,9 @@ interface Pasarela {
   activa: boolean;
   modo: string;
   llaves_configuradas: string[];
+  // ¿Existe de verdad? (OpenPay y Mercado Pago aún no) y ¿ya cobra?
+  disponible?: boolean;
+  lista?: boolean;
 }
 
 // Llaves que pide cada proveedor (para el formulario).
@@ -129,7 +132,26 @@ onMounted(cargar);
     </p>
 
     <div v-if="!cargando" class="mt-6 space-y-4">
-      <div v-for="p in pasarelas" :key="p.proveedor" class="tu-card p-6">
+      <div
+        v-for="p in pasarelas.filter((x) => x.disponible === false)"
+        :key="p.proveedor"
+        class="tu-card p-6"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="font-light text-lg">
+            {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
+          </h2>
+          <span class="tu-badge">{{ $t("pasarelasEstado.proximamente") }}</span>
+        </div>
+        <p class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("pasarelasEstado.noDisponible") }}
+        </p>
+      </div>
+      <div
+        v-for="p in pasarelas.filter((x) => x.disponible !== false)"
+        :key="p.proveedor"
+        class="tu-card p-6"
+      >
         <div class="flex items-center justify-between gap-3">
           <h2 class="font-light text-lg">
             {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
@@ -139,6 +161,17 @@ onMounted(cargar);
             {{ $t("pasarelas.activa") }}
           </label>
         </div>
+        <p
+          v-if="p.activa && p.lista === false"
+          class="mt-2 text-sm"
+          role="status"
+          style="color: var(--aviso)"
+        >
+          {{ $t("pasarelasEstado.faltaLlave") }}
+        </p>
+        <p v-else-if="p.lista" class="mt-2 text-sm" style="color: var(--exito)">
+          {{ $t("pasarelasEstado.lista") }}
+        </p>
 
         <div class="mt-3 grid sm:grid-cols-2 gap-3">
           <div>

@@ -12,9 +12,12 @@ use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\MedicionUso;
 use App\Modules\Tenancy\ModoCobroSaas;
+use App\Modules\Tenancy\Pagos\ProveedorPasarela;
+use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Administración de plataforma (PlatformAdmin): el operador de AgendaUno ve todos los
@@ -111,6 +114,8 @@ class PlataformaController
                 'activa' => $config instanceof ConfiguracionPasarelaPlataforma ? $config->activa : false,
                 'modo' => $config instanceof ConfiguracionPasarelaPlataforma ? $config->modo : 'test',
                 'llaves_configuradas' => $config instanceof ConfiguracionPasarelaPlataforma ? array_keys($config->llaves()) : [],
+                'disponible' => in_array($proveedor, ProveedorPasarela::implementadas(), true),
+                'lista' => app(RegistroDePasarelasPlataforma::class)->activa($proveedor),
             ];
         }, $this->proveedores());
 
@@ -131,6 +136,10 @@ class PlataformaController
             'credenciales' => ['nullable', 'array'],
             'credenciales.*' => ['nullable', 'string'],
         ]);
+
+        if ((bool) $validado['activa'] && ! in_array($proveedor, ProveedorPasarela::implementadas(), true)) {
+            throw ValidationException::withMessages(['activa' => ['Esta pasarela aún no está disponible.']]);
+        }
 
         $config = ConfiguracionPasarelaPlataforma::query()->firstOrNew(['proveedor' => $proveedor]);
         $config->activa = (bool) $validado['activa'];
@@ -154,6 +163,8 @@ class PlataformaController
             'activa' => $config->activa,
             'modo' => $config->modo,
             'llaves_configuradas' => array_keys($config->llaves()),
+            'disponible' => true,
+            'lista' => app(RegistroDePasarelasPlataforma::class)->activa($proveedor),
         ]]);
     }
 

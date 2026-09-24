@@ -6,9 +6,11 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaTenant;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
+use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Configuracion de pasarelas de pago del estudio (data plane del tenant): el
@@ -18,6 +20,8 @@ use Illuminate\Validation\Rule;
  */
 class PasarelasTenantController
 {
+    public function __construct(private readonly RegistroDePasarelasTenant $registro) {}
+
     /**
      * Proveedores configurables por el estudio (los integrados manual/simulada no
      * requieren configuracion).
@@ -43,6 +47,10 @@ class PasarelasTenantController
                 'llaves_configuradas' => $config instanceof ConfiguracionPasarelaTenant
                     ? array_keys($config->llaves())
                     : [],
+                // ¿Existe de verdad? (OpenPay y Mercado Pago aún no.)
+                'disponible' => ProveedorPasarela::disponible($proveedor),
+                // ¿Ya cobra? (activa y con lo necesario, p. ej. la llave de Stripe)
+                'lista' => $this->registro->activa($proveedor),
             ];
         }, $this->configurables());
 
@@ -60,6 +68,10 @@ class PasarelasTenantController
             'credenciales' => ['nullable', 'array'],
             'credenciales.*' => ['nullable', 'string'],
         ]);
+
+        if ((bool) $validado['activa'] && ! ProveedorPasarela::disponible($proveedor)) {
+            throw ValidationException::withMessages(['activa' => ['Esta pasarela aún no está disponible.']]);
+        }
 
         $config = ConfiguracionPasarelaTenant::query()->firstOrNew(['proveedor' => $proveedor]);
         $config->activa = (bool) $validado['activa'];
@@ -84,6 +96,8 @@ class PasarelasTenantController
             'activa' => $config->activa,
             'modo' => $config->modo,
             'llaves_configuradas' => array_keys($config->llaves()),
+            'disponible' => ProveedorPasarela::disponible($proveedor),
+            'lista' => $this->registro->activa($proveedor),
         ]]);
     }
 }

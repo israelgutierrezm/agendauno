@@ -26,6 +26,7 @@ import {
   miCuentaExtra,
   pagoEnLinea,
   paseEntrada,
+  pasarelasEstado,
   pausaMembresia,
   plataformaAdmin,
   recuperarContrasena,
@@ -71,6 +72,7 @@ export const i18n = createI18n({
       pagoEnLinea,
       pausaMembresia,
       paseEntrada,
+      pasarelasEstado,
     },
   },
 });

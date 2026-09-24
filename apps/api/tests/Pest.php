@@ -7,6 +7,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /*
@@ -285,6 +286,14 @@ function cargoRentaPendiente(array $e): string
 function activarStripePlataforma(array $credenciales = []): void
 {
     Config::set('turnouno.plataforma.token', 'token-plataforma');
+
+    // Sin llaves Stripe no cobra: por defecto una llave de prueba y Stripe simulado.
+    if ($credenciales === []) {
+        $credenciales = ['secret_key' => 'sk_test_plataforma'];
+        Http::fake(['api.stripe.com/*' => Http::response([
+            'id' => 'cs_renta_prueba', 'url' => 'https://checkout.stripe.com/c/pay/cs_renta_prueba',
+        ])]);
+    }
 
     test()->putJson('/api/v1/plataforma/pasarelas/stripe', array_filter([
         'activa' => true, 'modo' => 'test',

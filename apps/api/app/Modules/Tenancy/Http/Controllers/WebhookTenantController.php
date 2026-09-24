@@ -86,6 +86,12 @@ class WebhookTenantController
             }
         }
 
+        // El intento ya no se puede pagar: la sesión venció o el pago en tienda (OXXO)
+        // no se completó. Queda cerrado y se puede reintentar.
+        if (in_array($tipo, ['checkout.session.expired', 'checkout.session.async_payment_failed'], true) && $referencia !== '') {
+            $this->confirmar->rechazarPorReferencia($referencia);
+        }
+
         return response()->json(['data' => ['ok' => true]]);
     }
 }

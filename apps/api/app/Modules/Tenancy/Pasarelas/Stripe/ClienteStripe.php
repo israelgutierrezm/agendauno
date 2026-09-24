@@ -142,4 +142,28 @@ class ClienteStripe
             'status' => (string) ($json['status'] ?? ''),
         ];
     }
+
+    /**
+     * Vence una sesión de Checkout abierta. Devuelve su estado final: `expired` (ya
+     * no se puede pagar) o `complete` (ya se pagó).
+     */
+    public function expirarSesion(string $sesionId): string
+    {
+        $respuesta = Http::withToken($this->secretKey)
+            ->asForm()
+            ->post(self::BASE.'/checkout/sessions/'.rawurlencode($sesionId).'/expire');
+
+        if ($respuesta->successful()) {
+            return 'expired';
+        }
+
+        // No estaba abierta: se consulta cómo quedó.
+        /** @var array{status?: string} $json */
+        $json = Http::withToken($this->secretKey)
+            ->get(self::BASE.'/checkout/sessions/'.rawurlencode($sesionId))
+            ->throw()
+            ->json();
+
+        return (string) ($json['status'] ?? 'expired');
+    }
 }

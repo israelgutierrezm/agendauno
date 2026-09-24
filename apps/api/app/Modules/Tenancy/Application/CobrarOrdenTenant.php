@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\MetodoPago;
+use App\Modules\Tenancy\Pasarelas\PasarelaCancelable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use Illuminate\Support\Facades\DB;
 
@@ -48,6 +49,11 @@ class CobrarOrdenTenant
                 throw new OrdenNoLiquidable('La orden no admite cobro.');
             }
 
+            // Reintento: el intento anterior aún abierto se anula antes de abrir otro,
+            // para que no queden dos formas de pagar lo mismo. Si ya se pagó, se espera
+            // su confirmación en vez de cobrar otra vez.
+            $this->anularIntentosAbiertos($bloqueada);
+
             $pago = PagoTenant::query()->create([
                 'orden_id' => $bloqueada->getKey(),
                 'proveedor' => $proveedor,
@@ -75,5 +81,31 @@ class CobrarOrdenTenant
 
             return $pago;
         });
+    }
+
+    private function anularIntentosAbiertos(OrdenTenant $orden): void
+    {
+        $abiertos = PagoTenant::query()
+            ->where('orden_id', $orden->getKey())
+            ->where('estado', EstadoPago::Pendiente->value)
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($abiertos as $previo) {
+            try {
+                $pasarela = $this->registro->resolver($previo->proveedor);
+            } catch (PasarelaNoDisponible) {
+                $previo->update(['estado' => EstadoPago::Rechazado->value]);
+
+                continue;
+            }
+            if (! $pasarela instanceof PasarelaCancelable) {
+                continue; // p. ej. ventanilla: el comprobante lo aprueba el staff
+            }
+            if (! $pasarela->cancelar($previo, $this->registro->llaves($previo->proveedor))) {
+                throw new OrdenNoLiquidable('Ya hay un pago en proceso para esta compra; espera su confirmación.');
+            }
+            $previo->update(['estado' => EstadoPago::Rechazado->value]);
+        }
     }
 }

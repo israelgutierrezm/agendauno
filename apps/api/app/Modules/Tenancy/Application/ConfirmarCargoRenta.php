@@ -39,4 +39,20 @@ class ConfirmarCargoRenta
             ]);
         });
     }
+
+    /**
+     * El intento de pago de la renta ya no se puede pagar (sesión vencida, pago en
+     * tienda no completado): el cargo sigue pendiente, sin intento en curso.
+     */
+    public function intentoTerminado(string $referencia): void
+    {
+        if ($referencia === '') {
+            return;
+        }
+
+        CargoRenta::query()
+            ->where('referencia_pago', $referencia)
+            ->where('estado', EstadoCargoRenta::Pendiente->value)
+            ->update(['referencia_pago' => null]);
+    }
 }

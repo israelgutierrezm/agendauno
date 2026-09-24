@@ -39,6 +39,26 @@ enum ProveedorPasarela: string
         return [self::Stripe->value, self::OpenPay->value, self::MercadoPago->value];
     }
 
+    /**
+     * Pasarelas en línea con integración completa (cobro, confirmación, rechazo,
+     * reintento y devolución). Las demás se muestran como no disponibles y no se
+     * pueden activar.
+     *
+     * @return list<string>
+     */
+    public static function implementadas(): array
+    {
+        return [self::Stripe->value];
+    }
+
+    /**
+     * ¿Se puede usar? Las en línea solo si están implementadas; el resto sí.
+     */
+    public static function disponible(string $proveedor): bool
+    {
+        return ! in_array($proveedor, self::enLinea(), true) || in_array($proveedor, self::implementadas(), true);
+    }
+
     public function esEnLinea(): bool
     {
         return in_array($this->value, self::enLinea(), true);

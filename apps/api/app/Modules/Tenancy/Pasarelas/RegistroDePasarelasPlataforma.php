@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Pasarelas;
 
+use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
+use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 
 /**
  * Resuelve la pasarela de LA PLATAFORMA por proveedor y lee su configuracion (activa
  * + llaves) desde el control plane. Sirve para cobrar la renta del SaaS al dueño.
- * Todas las pasarelas de la plataforma son en linea (stripe/mercadopago/openpay) y
- * requieren estar activas: aqui no hay cobro manual (el dueño siempre paga en linea).
+ * El dueño siempre paga en línea; hoy solo con Stripe (activa y con llave secreta).
+ * OpenPay y Mercado Pago aún no tienen integración completa: no se pueden usar.
  * Espejo, a nivel plataforma, de {@see RegistroDePasarelasTenant}.
  */
 class RegistroDePasarelasPlataforma
@@ -26,7 +28,7 @@ class RegistroDePasarelasPlataforma
     {
         return match ($proveedor) {
             'stripe' => $this->stripe,
-            default => new PasarelaPendientePlataforma($proveedor),
+            default => throw new PasarelaNoDisponible('Esa pasarela aún no está disponible.'),
         };
     }
 
@@ -35,10 +37,17 @@ class RegistroDePasarelasPlataforma
      */
     public function activa(string $proveedor): bool
     {
-        return (bool) ConfiguracionPasarelaPlataforma::query()
+        if (! in_array($proveedor, ProveedorPasarela::implementadas(), true)) {
+            return false;
+        }
+
+        $config = ConfiguracionPasarelaPlataforma::query()
             ->where('proveedor', $proveedor)
             ->where('activa', true)
-            ->exists();
+            ->first();
+
+        return $config instanceof ConfiguracionPasarelaPlataforma
+            && ($proveedor !== 'stripe' || ($config->llaves()['secret_key'] ?? '') !== '');
     }
 
     /**

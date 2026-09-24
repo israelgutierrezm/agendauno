@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Pasarelas;
 
+use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Pasarelas\Stripe\ClienteStripe;
-use Illuminate\Support\Str;
 
 /**
  * Cobro en linea de la renta del SaaS con Stripe, usando la `secret_key` de LA
- * PLATAFORMA. Con llave crea un PaymentIntent real (reusa ClienteStripe, testeable
- * con Http::fake) y devuelve `pendiente` con el client_secret para Stripe.js; el
- * webhook firmado confirma. SIN llave devuelve un intento simulado pendiente: el
- * flujo queda listo para activarse en cuanto la plataforma cargue sus llaves.
+ * PLATAFORMA: abre una sesión de Checkout y devuelve `pendiente` con la URL; el
+ * webhook firmado confirma. Sin llave no cobra (la pasarela no está lista).
  */
 class PasarelaStripePlataforma implements PasarelaPlataforma
 {
@@ -27,8 +25,7 @@ class PasarelaStripePlataforma implements PasarelaPlataforma
         $secretKey = $llaves['secret_key'] ?? '';
 
         if ($secretKey === '') {
-            // Listo para llaves: intento simulado pendiente (lo confirma el webhook).
-            return ResultadoPago::pendiente('stripe_sim_'.Str::lower(Str::random(24)));
+            throw new PasarelaNoDisponible('Stripe no tiene llaves configuradas.');
         }
 
         $retorno = RetornoPago::urls($cargo->retorno ?? '/renta');
@@ -49,5 +46,21 @@ class PasarelaStripePlataforma implements PasarelaPlataforma
             'tipo' => 'redirect',
             'url' => $sesion['url'],
         ]);
+    }
+
+    /**
+     * Vence el intento anterior de pago de la renta (sesión abierta). `false` si ya
+     * se pagó y hay que esperar su confirmación.
+     *
+     * @param  array<string, string>  $llaves
+     */
+    public function cancelarIntento(string $referencia, array $llaves): bool
+    {
+        $secretKey = $llaves['secret_key'] ?? '';
+        if (! str_starts_with($referencia, 'cs_') || $secretKey === '') {
+            return true;
+        }
+
+        return (new ClienteStripe($secretKey))->expirarSesion($referencia) !== 'complete';
     }
 }

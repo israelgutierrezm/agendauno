@@ -485,3 +485,11 @@ export const paseEntrada = {
     "Con un lector de códigos, escanea el pase aquí mismo y se registra la entrada.",
   entrada: "{nombre}: {resultado}",
 };
+
+export const pasarelasEstado = {
+  proximamente: "Próximamente",
+  noDisponible:
+    "Aún no está disponible. Por ahora el cobro en línea es con Stripe.",
+  faltaLlave: "Falta la llave secreta: sin ella no se cobra en línea.",
+  lista: "Lista para cobrar",
+};

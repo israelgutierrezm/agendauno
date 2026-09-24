@@ -8,6 +8,7 @@ use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\Exceptions\CargoRentaNoPagable;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\CargoRenta;
+use App\Modules\Tenancy\Pasarelas\PasarelaStripePlataforma;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -21,7 +22,10 @@ use Illuminate\Support\Facades\DB;
  */
 class CobrarCargoRenta
 {
-    public function __construct(private readonly RegistroDePasarelasPlataforma $registro) {}
+    public function __construct(
+        private readonly RegistroDePasarelasPlataforma $registro,
+        private readonly PasarelaStripePlataforma $stripe,
+    ) {}
 
     public function ejecutar(CargoRenta $cargo, string $proveedor): CargoRenta
     {
@@ -34,6 +38,14 @@ class CobrarCargoRenta
 
             if ($bloqueado->estado !== EstadoCargoRenta::Pendiente) {
                 throw new CargoRentaNoPagable('El cargo no admite cobro.');
+            }
+
+            // Reintento: el intento anterior (sesión abierta) se vence antes de abrir
+            // otro; si ya se pagó, se espera su confirmación en vez de cobrar de nuevo.
+            $anterior = (string) $bloqueado->referencia_pago;
+            if ($anterior !== '' && $bloqueado->metodo_pago === 'stripe'
+                && ! $this->stripe->cancelarIntento($anterior, $this->registro->llaves('stripe'))) {
+                throw new CargoRentaNoPagable('Ya hay un pago en proceso para esta renta; espera su confirmación.');
             }
 
             $resultado = $this->registro->resolver($proveedor)->cobrar($bloqueado, $this->registro->llaves($proveedor));
