@@ -53,4 +53,14 @@ class OrdenTenant extends Model
     {
         return $this->hasMany(LineaOrdenTenant::class, 'orden_id');
     }
+
+    /**
+     * Sesión que se paga (órdenes de cita con pago para reservar).
+     *
+     * @return BelongsTo<SesionTenant, $this>
+     */
+    public function sesion(): BelongsTo
+    {
+        return $this->belongsTo(SesionTenant::class, 'sesion_id');
+    }
 }

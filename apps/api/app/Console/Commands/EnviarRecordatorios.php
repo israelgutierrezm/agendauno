@@ -34,7 +34,7 @@ class EnviarRecordatorios extends Command
                         continue;
                     }
 
-                    $emitidos += $gestor->ejecutarEn($estudio, fn (): int => $recordatorios->ejecutar((string) $estudio->nombre));
+                    $emitidos += $gestor->ejecutarEn($estudio, fn (): int => $recordatorios->ejecutar());
                 }
             });
 

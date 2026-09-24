@@ -23,6 +23,7 @@ class EventoDeDominioTenant
      */
     public const TIPOS = [
         'reserva.creada',
+        'reserva.confirmada',
         'reserva.ofrecida',
         'reserva.recordatorio_24h',
         'reserva.recordatorio_2h',
@@ -34,6 +35,7 @@ class EventoDeDominioTenant
         'membresia.suspendida',
         'membresia.regularizada',
         'factura.timbrada',
+        'cuenta.creada',
     ];
 
     /**

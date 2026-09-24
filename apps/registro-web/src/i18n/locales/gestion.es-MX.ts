@@ -107,13 +107,14 @@ export const conexiones = {
     tipos: {
       reserva: {
         creada: "Reserva creada",
+        confirmada: "Reserva confirmada",
         ofrecida: "Lugar ofrecido (lista de espera)",
         recordatorio_24h: "Recordatorio 24 h antes",
         recordatorio_2h: "Recordatorio 2 h antes",
       },
       asistencia: { marcada: "Asistencia marcada" },
       acceso: { registrado: "Acceso registrado" },
-      orden: { pagada: "Venta pagada" },
+      orden: { pagada: "Venta pagada (recibo)" },
       pago: { reembolsado: "Pago reembolsado" },
       cobro: { fallido: "Cobro recurrente fallido" },
       membresia: {
@@ -121,6 +122,7 @@ export const conexiones = {
         regularizada: "Membresía regularizada",
       },
       factura: { timbrada: "Factura timbrada" },
+      cuenta: { creada: "Cuenta creada (bienvenida)" },
     },
   },
 };
@@ -139,8 +141,8 @@ export const comunicacionesAuto = {
   asunto: "Asunto",
   cuerpo: "Mensaje",
   marcadores:
-    "Puedes usar {a} y {b}, además de los datos del evento (por ejemplo {c}).",
-  marcadoresRecordatorio: "Puedes usar {lista}.",
+    "Puedes usar {a}, {b} y {d}, además de los datos del evento (por ejemplo {c}).",
+  marcadoresLista: "Puedes usar {lista}.",
   guardar: "Guardar mensaje",
   guardado: "Mensaje automático guardado.",
   eliminar: "Quitar mensaje",

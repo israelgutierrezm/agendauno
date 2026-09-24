@@ -15,4 +15,15 @@ enum MetodoPago: string
     case Spei = 'spei';
     case Efectivo = 'efectivo';
     case Ventanilla = 'ventanilla';
+
+    public function etiqueta(): string
+    {
+        return match ($this) {
+            self::Tarjeta => 'Tarjeta',
+            self::Oxxo => 'OXXO',
+            self::Spei => 'Transferencia SPEI',
+            self::Efectivo => 'Efectivo',
+            self::Ventanilla => 'Ventanilla',
+        };
+    }
 }

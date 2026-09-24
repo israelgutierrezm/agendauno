@@ -26,7 +26,6 @@ class CobrarOrdenTenant
     public function __construct(
         private readonly RegistroDePasarelasTenant $registro,
         private readonly FulfillmentTenant $fulfillment,
-        private readonly RegistrarEventoTenant $eventos,
     ) {}
 
     public function ejecutar(OrdenTenant $orden, string $proveedor, ?MetodoPago $metodo = null, ?string $idempotencyKey = null, ?string $retorno = null): PagoTenant
@@ -65,13 +64,8 @@ class CobrarOrdenTenant
 
             if ($resultado->esAprobado()) {
                 $pago->update(['estado' => EstadoPago::Aprobado->value, 'referencia_externa' => $resultado->referencia]);
+                // El fulfillment asienta orden.pagada (recibo, puntos de lealtad).
                 $this->fulfillment->cumplir($bloqueada);
-                // Evento de dominio (outbox): habilita acumular puntos de lealtad por compra.
-                $this->eventos->registrar('orden.pagada', 'orden', $bloqueada->ulid, [
-                    'persona_id' => $bloqueada->persona?->ulid,
-                    'total_minor' => $bloqueada->total_minor,
-                    'orden_id' => $bloqueada->ulid,
-                ]);
             } elseif ($resultado->esPendiente()) {
                 // Queda pendiente; el webhook confirmara y hara el fulfillment.
                 $pago->update(['referencia_externa' => $resultado->referencia]);

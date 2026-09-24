@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Comunicaciones\DatosDeSesion;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -31,22 +32,19 @@ class GenerarRecordatoriosTenant
 {
     public function __construct(private readonly RegistrarEventoTenant $eventos) {}
 
-    /**
-     * @param  string  $negocio  nombre del negocio, para el texto del mensaje
-     */
-    public function ejecutar(string $negocio, ?CarbonImmutable $ahora = null): int
+    public function ejecutar(?CarbonImmutable $ahora = null): int
     {
         $ahora ??= CarbonImmutable::now();
         $emitidos = 0;
 
         foreach (Recordatorio::cases() as $recordatorio) {
-            $emitidos += $this->emitir($recordatorio, $negocio, $ahora);
+            $emitidos += $this->emitir($recordatorio, $ahora);
         }
 
         return $emitidos;
     }
 
-    private function emitir(Recordatorio $recordatorio, string $negocio, CarbonImmutable $ahora): int
+    private function emitir(Recordatorio $recordatorio, CarbonImmutable $ahora): int
     {
         $desde = $ahora->addMinutes($recordatorio->siguiente()?->minutos() ?? 0);
         $hasta = $ahora->addMinutes($recordatorio->minutos());
@@ -60,7 +58,7 @@ class GenerarRecordatoriosTenant
                 ->where('inicia_en', '>', $desde)
                 ->where('inicia_en', '<=', $hasta))
             ->with(['sesion.oferta', 'sesion.sucursal', 'sesion.instructor', 'persona'])
-            ->chunkById(200, function (Collection $reservas) use ($recordatorio, $negocio, $ahora, &$emitidos): void {
+            ->chunkById(200, function (Collection $reservas) use ($recordatorio, $ahora, &$emitidos): void {
                 /** @var Collection<int, ReservaTenant> $reservas */
                 foreach ($reservas as $reserva) {
                     $sesion = $reserva->sesion;
@@ -74,7 +72,7 @@ class GenerarRecordatoriosTenant
                         continue;
                     }
 
-                    if ($this->reclamar($reserva, $recordatorio, $ahora, $this->datos($sesion, $persona, $negocio))) {
+                    if ($this->reclamar($reserva, $recordatorio, $ahora, ['persona_id' => (string) $persona->ulid, ...DatosDeSesion::para($sesion)])) {
                         $emitidos++;
                     }
                 }
@@ -103,32 +101,5 @@ class GenerarRecordatoriosTenant
 
             return true;
         });
-    }
-
-    /**
-     * Datos del evento; también son los marcadores de la plantilla ({{actividad}},
-     * {{fecha}}, {{hora}}, {{sucursal}}, {{con}}, {{negocio}}). Fecha y hora van en la
-     * zona horaria de la sesión.
-     *
-     * @return array<string, string>
-     */
-    private function datos(SesionTenant $sesion, PersonaTenant $persona, string $negocio): array
-    {
-        $local = CarbonImmutable::instance($sesion->inicia_en)
-            ->setTimezone($sesion->zona_horaria ?: $sesion->sucursal?->zona_horaria ?: 'America/Mexico_City')
-            ->locale('es');
-
-        return [
-            'persona_id' => (string) $persona->ulid,
-            'sesion_id' => (string) $sesion->ulid,
-            'tipo' => $sesion->tipo->value,
-            'inicia_en' => CarbonImmutable::instance($sesion->inicia_en)->toIso8601String(),
-            'actividad' => (string) $sesion->oferta?->nombre,
-            'fecha' => $local->isoFormat('dddd D [de] MMMM'),
-            'hora' => $local->format('H:i'),
-            'sucursal' => (string) $sesion->sucursal?->nombre,
-            'con' => $sesion->instructor?->nombreCorto() ?? '',
-            'negocio' => $negocio,
-        ];
     }
 }

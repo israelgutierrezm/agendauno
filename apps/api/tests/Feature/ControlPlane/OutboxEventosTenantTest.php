@@ -45,10 +45,15 @@ it('reservar escribe el evento en el outbox y NO lo despacha hasta el relay; el 
             && $ev->agregadoId === $reserva
             && $ev->payload['estado'] === 'confirmada',
     );
+    // Con lugar, la reserva también queda confirmada (correo de confirmación).
+    Event::assertDispatched(
+        EventoDeDominioTenant::class,
+        fn (EventoDeDominioTenant $ev): bool => $ev->tipo === 'reserva.confirmada' && $ev->agregadoId === $reserva,
+    );
 
     // Segundo relay: nada que republicar (idempotente, marcado publicado_en).
     $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
-    Event::assertDispatchedTimes(EventoDeDominioTenant::class, 1);
+    Event::assertDispatchedTimes(EventoDeDominioTenant::class, 2);
 });
 
 it('un consumidor suscrito recibe el evento de dominio que publica el relay', function (): void {

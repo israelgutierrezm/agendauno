@@ -47,6 +47,6 @@ class CorreoActivacion extends Mailable implements ShouldQueue
             .'<p><a href="'.e($url).'">Activar mi cuenta</a></p>'
             .'<p>Si el botón no funciona, copia y pega este enlace en tu navegador:<br>'.e($url).'</p>';
 
-        return new Content(htmlString: $html);
+        return new Content(htmlString: DisenoCorreo::envolver($this->estudioNombre, $html));
     }
 }

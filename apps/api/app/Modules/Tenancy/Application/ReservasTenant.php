@@ -52,6 +52,7 @@ class ReservasTenant
         private readonly ResolverPoliticaCancelacionTenant $politicas,
         private readonly RegistrarEventoTenant $eventos,
         private readonly OrdenesTenant $ordenes,
+        private readonly EmitirReservaConfirmadaTenant $confirmada,
     ) {}
 
     /**
@@ -376,8 +377,12 @@ class ReservasTenant
             }
 
             $bloqueada->update(['persona_id' => $destino->getKey()]);
+            $bloqueada->refresh();
+            if ($bloqueada->estado === EstadoReserva::Confirmada) {
+                $this->confirmada->emitir($bloqueada);
+            }
 
-            return $bloqueada->refresh();
+            return $bloqueada;
         });
     }
 
@@ -567,6 +572,7 @@ class ReservasTenant
                 'estado' => EstadoReserva::Confirmada->value,
                 'oferta_expira_en' => null,
             ]);
+            $this->confirmada->emitir($bloqueada);
 
             return $bloqueada;
         });
@@ -753,6 +759,10 @@ class ReservasTenant
             'estado' => $reserva->estado->value,
             'costo_unidades' => $reserva->costo_unidades,
         ]);
+
+        if ($reserva->estado === EstadoReserva::Confirmada) {
+            $this->confirmada->emitir($reserva);
+        }
     }
 
     /**

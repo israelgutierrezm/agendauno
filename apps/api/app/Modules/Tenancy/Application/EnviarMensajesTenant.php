@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
@@ -26,6 +27,8 @@ class EnviarMensajesTenant
     private const MAX_INTENTOS = 6;
 
     private const LOTE = 500;
+
+    public function __construct(private readonly GestorDeConexionTenant $gestor) {}
 
     public function ejecutar(): int
     {
@@ -69,6 +72,13 @@ class EnviarMensajesTenant
             throw new RuntimeException('El mensaje de email no tiene destinatario.');
         }
 
-        Mail::to($destinatario)->send(new MensajeMailable($mensaje->asunto, $mensaje->cuerpo));
+        $estudio = $this->gestor->actual();
+
+        Mail::to($destinatario)->send(new MensajeMailable(
+            $mensaje->asunto,
+            $mensaje->cuerpo,
+            (string) $estudio?->nombre,
+            $estudio?->contacto_email,
+        ));
     }
 }

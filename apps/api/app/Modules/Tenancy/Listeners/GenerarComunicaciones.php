@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Listeners;
 use App\Modules\Tenancy\Application\EnviarMensajesTenant;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -21,6 +22,8 @@ use App\Modules\Tenancy\Models\PlantillaMensajeTenant;
  */
 class GenerarComunicaciones
 {
+    public function __construct(private readonly GestorDeConexionTenant $gestor) {}
+
     public function handle(EventoDeDominioTenant $evento): void
     {
         $plantillas = PlantillaMensajeTenant::query()
@@ -74,13 +77,18 @@ class GenerarComunicaciones
     }
 
     /**
-     * Mapa de marcadores para el render: datos escalares del evento + de la persona.
+     * Mapa de marcadores para el render: el negocio, los datos escalares del evento y
+     * los de la persona.
      *
      * @return array<string, string>
      */
     private function contexto(EventoDeDominioTenant $evento, ?PersonaTenant $persona): array
     {
-        $contexto = ['tipo' => $evento->tipo, 'agregado_id' => (string) ($evento->agregadoId ?? '')];
+        $contexto = [
+            'negocio' => (string) $this->gestor->actual()?->nombre,
+            'tipo' => $evento->tipo,
+            'agregado_id' => (string) ($evento->agregadoId ?? ''),
+        ];
 
         foreach ($evento->payload as $clave => $valor) {
             if (is_scalar($valor) || $valor === null) {

@@ -47,7 +47,8 @@ function reservaConCorreo(string $reservadaEn): array
 }
 
 /**
- * Corre el aviso y los relays a esa hora (UTC); devuelve los mensajes generados.
+ * Corre el aviso y los relays a esa hora (UTC); devuelve los recordatorios generados
+ * (la reserva también genera su confirmación, que aquí no cuenta).
  *
  * @param  array{slug: string, bearer: string}  $e
  * @return list<array<string, mixed>>
@@ -58,7 +59,14 @@ function recordarA(array $e, string $ahora): array
     test()->artisan('turnouno:enviar-recordatorios')->assertSuccessful();
     test()->artisan('turnouno:despachar-outbox')->assertSuccessful();
 
-    return test()->getJson("/api/v1/app/{$e['slug']}/mensajes", conBearer($e['bearer']))->assertOk()->json('data');
+    $mensajes = test()->getJson("/api/v1/app/{$e['slug']}/mensajes", conBearer($e['bearer']))->assertOk()->json('data');
+
+    return array_values(array_filter($mensajes, fn (array $m): bool => esRecordatorio((string) $m['asunto'])));
+}
+
+function esRecordatorio(string $asunto): bool
+{
+    return str_starts_with($asunto, 'Recordatorio:') || str_starts_with($asunto, 'Hoy a las');
 }
 
 it('manda el correo de 24 h y el de 2 h, cada uno una sola vez', function (): void {
@@ -67,8 +75,8 @@ it('manda el correo de 24 h y el de 2 h, cada uno una sola vez', function (): vo
 
     // Cada estudio trae los dos correos activos, editables en Automáticos.
     $plantillas = collect($this->getJson("/api/v1/app/{$e['slug']}/plantillas-mensaje", conBearer($e['bearer']))->json('data'));
-    expect($plantillas->where('activo', true)->where('canal', 'email')->pluck('clave')->sort()->values()->all())
-        ->toBe(['reserva.recordatorio_24h', 'reserva.recordatorio_2h']);
+    expect($plantillas->where('activo', true)->where('canal', 'email')->pluck('clave')->all())
+        ->toContain('reserva.recordatorio_24h', 'reserva.recordatorio_2h');
 
     // Un día antes (menos 10 min): el de 24 h, con fecha y hora locales.
     $mensajes = recordarA($e, '2026-09-30 14:10:00');
@@ -85,7 +93,8 @@ it('manda el correo de 24 h y el de 2 h, cada uno una sola vez', function (): vo
         ->and(collect($mensajes)->pluck('asunto'))->toContain('Hoy a las 08:00: Nivel 1');
 
     $this->artisan('turnouno:enviar-mensajes')->assertSuccessful();
-    Mail::assertSent(MensajeMailable::class, 2);
+    Mail::assertSent(MensajeMailable::class, fn (MensajeMailable $mail): bool => str_starts_with($mail->asuntoMensaje, 'Recordatorio:'));
+    Mail::assertSent(MensajeMailable::class, fn (MensajeMailable $mail): bool => str_starts_with($mail->asuntoMensaje, 'Hoy a las'));
 });
 
 it('quien reserva el mismo día solo recibe el de 2 h', function (): void {

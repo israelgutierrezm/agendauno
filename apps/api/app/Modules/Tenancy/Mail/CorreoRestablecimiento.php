@@ -44,6 +44,6 @@ class CorreoRestablecimiento extends Mailable implements ShouldQueue
             .'<p>El enlace sirve una sola vez y vence en una hora. Si no lo pediste, ignora este correo: tu contraseña no cambia.</p>'
             .'<p>Si el botón no funciona, copia y pega este enlace en tu navegador:<br>'.e($url).'</p>';
 
-        return new Content(htmlString: $html);
+        return new Content(htmlString: DisenoCorreo::envolver($this->estudioNombre, $html));
     }
 }

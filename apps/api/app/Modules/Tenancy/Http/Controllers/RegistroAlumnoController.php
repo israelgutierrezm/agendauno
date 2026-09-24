@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AutenticacionTenant;
 use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
+use App\Modules\Tenancy\Application\RegistrarEventoTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -24,7 +25,10 @@ use Illuminate\Validation\ValidationException;
  */
 class RegistroAlumnoController
 {
-    public function __construct(private readonly AutenticacionTenant $auth) {}
+    public function __construct(
+        private readonly AutenticacionTenant $auth,
+        private readonly RegistrarEventoTenant $eventos,
+    ) {}
 
     public function __invoke(Request $request): JsonResponse
     {
@@ -54,7 +58,7 @@ class RegistroAlumnoController
         $primerApellido = $primerApellidoRaw !== null ? (string) $primerApellidoRaw : null;
         $nombreCompleto = trim($nombre.' '.($primerApellido ?? ''));
 
-        $usuario = DB::connection('tenant')->transaction(function () use ($nombre, $primerApellido, $email, $validado, $nombreCompleto): Usuario {
+        $usuario = DB::connection('tenant')->transaction(function () use ($estudio, $nombre, $primerApellido, $email, $validado, $nombreCompleto): Usuario {
             $usuario = Usuario::query()->create([
                 'name' => $nombreCompleto !== '' ? $nombreCompleto : $nombre,
                 'email' => $email,
@@ -64,7 +68,7 @@ class RegistroAlumnoController
                 'roles' => ['miembro'],
             ]);
 
-            PersonaTenant::query()->create([
+            $persona = PersonaTenant::query()->create([
                 'nombre' => $nombre,
                 'primer_apellido' => $primerApellido,
                 'email' => $email,
@@ -73,6 +77,12 @@ class RegistroAlumnoController
                 'es_facturable' => true,
                 'archivado' => false,
                 'usuario_id' => $usuario->getKey(),
+            ]);
+
+            // Correo de bienvenida (plantilla `cuenta.creada`) con el enlace a su cuenta.
+            $this->eventos->registrar('cuenta.creada', 'persona', (string) $persona->ulid, [
+                'persona_id' => (string) $persona->ulid,
+                'enlace' => rtrim((string) config('turnouno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $estudio->slug),
             ]);
 
             return $usuario;

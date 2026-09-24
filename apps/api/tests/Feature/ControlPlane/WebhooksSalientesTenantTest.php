@@ -41,6 +41,7 @@ it('entrega el evento FIRMADO al endpoint suscrito y registra la entrega', funct
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $webhook = $this->postJson("/api/v1/app/{$e['slug']}/webhooks-salientes", [
         'url' => 'https://ejemplo.test/hook',
+        'eventos' => ['reserva.creada'], // la reserva también publica reserva.confirmada
     ], conBearer($e['bearer']))->assertCreated()->json('data');
 
     $secreto = $webhook['secreto'];
@@ -91,6 +92,7 @@ it('marca la entrega fallida y el comando de reintento la reenvia', function ():
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $webhook = $this->postJson("/api/v1/app/{$e['slug']}/webhooks-salientes", [
         'url' => 'https://ejemplo.test/hook',
+        'eventos' => ['reserva.creada'], // la reserva también publica reserva.confirmada
     ], conBearer($e['bearer']))->assertCreated()->json('data');
 
     reservaEnEstudio($e);

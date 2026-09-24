@@ -169,8 +169,9 @@ const borrador = ref<{
 }>({ canal: "interno", asunto: "", cuerpo: "", activo: true });
 const guardandoPlantilla = ref(false);
 
-// Los recordatorios traen los datos de la clase o cita; el resto, los del evento.
-const MARCADORES_RECORDATORIO = [
+// Marcadores de los correos que traen datos legibles (confirmación, recordatorios,
+// recibo, bienvenida); el resto usa los datos del evento.
+const MARCADORES_SESION = [
   "persona_nombre",
   "actividad",
   "fecha",
@@ -179,18 +180,35 @@ const MARCADORES_RECORDATORIO = [
   "con",
   "negocio",
 ];
+const MARCADORES_POR_EVENTO: Record<string, string[]> = {
+  "reserva.confirmada": MARCADORES_SESION,
+  "reserva.recordatorio_24h": MARCADORES_SESION,
+  "reserva.recordatorio_2h": MARCADORES_SESION,
+  "orden.pagada": [
+    "persona_nombre",
+    "detalle",
+    "total",
+    "metodo",
+    "fecha",
+    "folio",
+    "negocio",
+  ],
+  "cuenta.creada": ["persona_nombre", "enlace", "negocio"],
+};
 
-const marcadoresAuto = computed(() =>
-  editor.value.clave.startsWith("reserva.recordatorio")
-    ? t("comunicacionesAuto.marcadoresRecordatorio", {
-        lista: MARCADORES_RECORDATORIO.map((m) => `{{${m}}}`).join(", "),
+const marcadoresAuto = computed(() => {
+  const propios = MARCADORES_POR_EVENTO[editor.value.clave];
+  return propios
+    ? t("comunicacionesAuto.marcadoresLista", {
+        lista: propios.map((m) => `{{${m}}}`).join(", "),
       })
     : t("comunicacionesAuto.marcadores", {
         a: "{{persona_nombre}}",
         b: "{{persona_email}}",
         c: "{{estado}}",
-      }),
-);
+        d: "{{negocio}}",
+      });
+});
 
 function plantillaDe(clave: string, canal: Canal): Plantilla | undefined {
   return plantillas.value.find((p) => p.clave === clave && p.canal === canal);

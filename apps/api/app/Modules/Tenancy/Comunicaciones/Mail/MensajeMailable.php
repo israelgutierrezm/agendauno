@@ -4,29 +4,41 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Comunicaciones\Mail;
 
+use App\Modules\Tenancy\Mail\DisenoCorreo;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 
 /**
  * Correo de una comunicacion (R28): lleva el asunto y el cuerpo YA renderizados desde
  * la plantilla del estudio. Cuerpo en texto plano escapado (sin plantilla Blade), para
- * no ejecutar contenido definido por el tenant.
+ * no ejecutar contenido definido por el tenant. Sale a nombre del negocio (con la
+ * dirección de la plataforma) y las respuestas llegan al correo de contacto del
+ * negocio.
  */
 class MensajeMailable extends Mailable
 {
     public function __construct(
         public readonly string $asuntoMensaje,
         public readonly string $cuerpoMensaje,
+        public readonly string $negocio = '',
+        public readonly ?string $responderA = null,
     ) {}
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: $this->asuntoMensaje);
+        $remitente = (string) config('mail.from.address');
+
+        return new Envelope(
+            from: new Address($remitente, $this->negocio !== '' ? $this->negocio : (string) config('mail.from.name')),
+            replyTo: is_string($this->responderA) && $this->responderA !== '' ? [new Address($this->responderA, $this->negocio)] : [],
+            subject: $this->asuntoMensaje,
+        );
     }
 
     public function content(): Content
     {
-        return new Content(htmlString: '<p>'.nl2br(e($this->cuerpoMensaje)).'</p>');
+        return new Content(htmlString: DisenoCorreo::envolver($this->negocio, DisenoCorreo::texto($this->cuerpoMensaje)));
     }
 }
