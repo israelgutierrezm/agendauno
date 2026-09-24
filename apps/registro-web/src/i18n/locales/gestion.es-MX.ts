@@ -458,3 +458,20 @@ export const pausaMembresia = {
   pausada: "Membresía en pausa hasta el {fecha}.",
   reanudada: "Membresía reanudada.",
 };
+
+export const paseEntrada = {
+  titulo: "Mi pase de entrada",
+  ayuda:
+    "Muéstralo en recepción para registrar tu entrada. Se renueva solo cada minuto.",
+  mostrar: "Mostrar mi pase",
+  ocultar: "Ocultar",
+  alt: "Código QR de tu pase de entrada",
+  error: "No se pudo generar tu pase.",
+  escanear: "Escanear pase",
+  apunta: "Apunta la cámara al código QR del pase.",
+  sinCamara:
+    "No se pudo abrir la cámara en este navegador. Usa un lector de códigos o busca al alumno por su nombre.",
+  pistaLector:
+    "Con un lector de códigos, escanea el pase aquí mismo y se registra la entrada.",
+  entrada: "{nombre}: {resultado}",
+};

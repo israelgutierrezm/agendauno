@@ -5,6 +5,7 @@ import AgendarCitaCuenta from "@/components/AgendarCitaCuenta.vue";
 import ListaFormularios from "@/components/ListaFormularios.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import type { FormularioPersona } from "@/lib/formularios";
+import PaseEntrada from "@/components/PaseEntrada.vue";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -396,6 +397,9 @@ onMounted(() => cargar());
             {{ $t("miCuenta.sinCreditos") }}
           </p>
         </div>
+
+        <!-- Pase de entrada (QR) -->
+        <PaseEntrada v-if="personaId !== null" />
 
         <!-- Mis reservas -->
         <div class="tu-card p-6">

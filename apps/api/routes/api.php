@@ -192,6 +192,7 @@ Route::prefix('v1')->group(function (): void {
             // Autoservicio del miembro: opera solo sobre su propia persona (sin
             // permisos de staff). Resuelve la persona del usuario autenticado.
             Route::get('/mi/perfil', [MiTenantController::class, 'perfil'])->name('mi.perfil');
+            Route::get('/mi/pase', [MiTenantController::class, 'pase'])->name('mi.pase');
             Route::get('/mi/agenda', [MiTenantController::class, 'agenda'])->name('mi.agenda');
             Route::post('/mi/reservas', [MiTenantController::class, 'reservar'])->name('mi.reservas.store');
             // Agenda una cita desde un hueco de disponibilidad (F-08): crea la sesión + reserva/pago.

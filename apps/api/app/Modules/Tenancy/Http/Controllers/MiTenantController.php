@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Application\FormulariosDePersonaTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
+use App\Modules\Tenancy\Application\PaseAccesoTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
@@ -155,6 +156,23 @@ class MiTenantController
                 'penaliza_tarde' => (bool) $politica->penaliza_tarde,
                 'penaliza_no_show' => (bool) $politica->penaliza_no_show,
             ] : null,
+        ]]);
+    }
+
+    /**
+     * Pase de entrada (QR) del alumno: vence en minutos; la pantalla lo renueva.
+     */
+    public function pase(Request $request, PaseAccesoTenant $pases): JsonResponse
+    {
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 404);
+
+        $pase = $pases->emitir($persona);
+
+        return response()->json(['data' => [
+            'codigo' => $pase['codigo'],
+            'vence_en' => $pase['vence_en']->toIso8601String(),
+            'nombre' => $persona->nombreCompleto(),
         ]]);
     }
 

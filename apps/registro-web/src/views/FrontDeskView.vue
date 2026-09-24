@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EscanerPase from "@/components/EscanerPase.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PanelClase from "@/components/PanelClase.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
@@ -107,8 +108,73 @@ const buscando = ref(false);
 const miembroActivo = ref<{ id: string; nombre: string } | null>(null);
 let tempBusqueda: ReturnType<typeof setTimeout> | undefined;
 
+// Pase QR del alumno: el lector USB lo "escribe" en el buscador (y da Enter) o se
+// escanea con la cámara. Se registra la entrada y se abre su ficha.
+const PREFIJO_PASE = "AU1.";
+const escanerAbierto = ref(false);
+const camaraDisponible =
+  typeof window !== "undefined" &&
+  "BarcodeDetector" in window &&
+  !!navigator.mediaDevices?.getUserMedia;
+const registrandoPase = ref(false);
+const avisoPase = ref<{ texto: string; permitido: boolean } | null>(null);
+
+function esPase(texto: string): boolean {
+  return texto.trim().startsWith(PREFIJO_PASE);
+}
+
+async function registrarPase(codigo: string): Promise<void> {
+  escanerAbierto.value = false;
+  busqueda.value = "";
+  resultados.value = [];
+  registrandoPase.value = true;
+  try {
+    const { data } = await api.post<{
+      data: {
+        permitido: boolean;
+        codigo: string;
+        persona_id: string | null;
+        persona_nombre: string | null;
+      };
+    }>(`${base.value}/accesos`, {
+      codigo: codigo.trim(),
+      sucursal_id: sucursalFiltro.value || null,
+    });
+    const r = data.data;
+    const resultado = `${t(
+      r.permitido ? "accesoRecepcion.permitido" : "accesoRecepcion.denegado",
+    )} · ${t(`accesoRecepcion.codigos.${r.codigo}`)}`;
+    avisoPase.value = {
+      texto: t("paseEntrada.entrada", {
+        nombre: r.persona_nombre ?? "—",
+        resultado,
+      }),
+      permitido: r.permitido,
+    };
+    if (r.persona_id) {
+      miembroActivo.value = {
+        id: r.persona_id,
+        nombre: r.persona_nombre ?? "",
+      };
+    }
+  } catch (e) {
+    avisoPase.value = { texto: mensajeDeError(e), permitido: false };
+  } finally {
+    registrandoPase.value = false;
+  }
+}
+
+function alEnter(): void {
+  if (esPase(busqueda.value)) {
+    void registrarPase(busqueda.value);
+  }
+}
+
 async function buscar(): Promise<void> {
   const q = busqueda.value.trim();
+  if (esPase(q)) {
+    return;
+  }
   if (q.length < 2) {
     resultados.value = [];
     return;
@@ -243,14 +309,26 @@ onMounted(async () => {
         class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2"
         :style="{ color: 'var(--texto-suave)' }"
       />
-      <input
-        v-model="busqueda"
-        type="search"
-        class="tu-input pl-10"
-        :placeholder="$t('recepcion.buscarMiembro')"
-      />
+      <div class="flex gap-2">
+        <input
+          v-model="busqueda"
+          type="search"
+          class="tu-input pl-10"
+          :placeholder="$t('recepcion.buscarMiembro')"
+          :disabled="registrandoPase"
+          @keydown.enter.prevent="alEnter"
+        />
+        <button
+          v-if="camaraDisponible"
+          type="button"
+          class="tu-btn tu-btn-fantasma shrink-0"
+          @click="escanerAbierto = true"
+        >
+          {{ $t("paseEntrada.escanear") }}
+        </button>
+      </div>
       <div
-        v-if="busqueda.trim().length >= 2"
+        v-if="busqueda.trim().length >= 2 && !esPase(busqueda)"
         class="absolute z-20 mt-1 w-full tu-card overflow-hidden"
       >
         <p
@@ -287,6 +365,18 @@ onMounted(async () => {
         </ul>
       </div>
     </div>
+
+    <p
+      v-if="avisoPase"
+      class="mt-3 text-sm font-medium"
+      role="status"
+      :style="{ color: avisoPase.permitido ? 'var(--exito)' : 'var(--error)' }"
+    >
+      {{ avisoPase.texto }}
+    </p>
+    <p v-else class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
+      {{ $t("paseEntrada.pistaLector") }}
+    </p>
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
@@ -477,10 +567,17 @@ onMounted(async () => {
     />
     <PanelMiembro
       v-if="miembroActivo"
+      :key="miembroActivo.id"
       :persona-id="miembroActivo.id"
       :nombre="miembroActivo.nombre"
       :sucursal-id="sucursalFiltro || undefined"
       @cerrar="miembroActivo = null"
+    />
+    <EscanerPase
+      v-if="camaraDisponible"
+      :abierto="escanerAbierto"
+      @codigo="registrarPase"
+      @cerrar="escanerAbierto = false"
     />
   </section>
 </template>
