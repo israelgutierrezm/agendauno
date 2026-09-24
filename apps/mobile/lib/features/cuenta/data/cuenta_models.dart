@@ -179,7 +179,11 @@ class MiCuenta {
     this.consentimientos = const [],
     this.pagoEnLinea = false,
     this.pagoAutomatico = false,
+    this.resenasPendientes = const [],
   });
+
+  /// Clases o citas a las que asistió y aún no califica.
+  final List<ResenaPendiente> resenasPendientes;
 
   /// ¿El negocio cobra en línea? Entonces puede pagar aquí lo pendiente.
   final bool pagoEnLinea;
@@ -315,4 +319,73 @@ class PagoAutomatico {
   final bool disponible;
   final TarjetaDomiciliada? tarjeta;
   final List<MembresiaRenovable> membresias;
+}
+
+/// Una clase o cita a la que asistió y puede calificar (1 a 5 y un comentario).
+class ResenaPendiente {
+  const ResenaPendiente({
+    required this.reservaId,
+    this.actividad,
+    this.con,
+    this.fecha,
+  });
+
+  final String reservaId;
+  final String? actividad;
+  final String? con;
+  final String? fecha;
+
+  factory ResenaPendiente.desdeJson(Map<String, dynamic> j) => ResenaPendiente(
+    reservaId: (j['reserva_id'] ?? '') as String,
+    actividad: j['actividad'] as String?,
+    con: j['con'] as String?,
+    fecha: j['fecha'] as String?,
+  );
+}
+
+/// Privacidad del alumno frente al negocio (derechos ARCO).
+class Privacidad {
+  const Privacidad({required this.recibePromociones, this.baja});
+
+  final bool recibePromociones;
+
+  /// Su solicitud de baja de datos, si hizo una.
+  final SolicitudBaja? baja;
+
+  factory Privacidad.desdeJson(Map<String, dynamic> j) {
+    final baja = j['baja'];
+    return Privacidad(
+      recibePromociones: (j['recibe_promociones'] ?? true) as bool,
+      baja: baja is Map<String, dynamic> ? SolicitudBaja.desdeJson(baja) : null,
+    );
+  }
+}
+
+class SolicitudBaja {
+  const SolicitudBaja({
+    required this.estado,
+    this.solicitadaEn,
+    this.respuesta,
+  });
+
+  /// pendiente | atendida | rechazada.
+  final String estado;
+  final String? solicitadaEn;
+  final String? respuesta;
+
+  String get estadoTexto => switch (estado) {
+    'pendiente' => 'Solicitud de baja en revisión',
+    'atendida' => 'Tus datos se dieron de baja',
+    'rechazada' =>
+      respuesta != null && respuesta!.isNotEmpty
+          ? 'Solicitud rechazada · $respuesta'
+          : 'Solicitud rechazada',
+    _ => estado,
+  };
+
+  factory SolicitudBaja.desdeJson(Map<String, dynamic> j) => SolicitudBaja(
+    estado: (j['estado'] ?? '') as String,
+    solicitadaEn: j['solicitada_en'] as String?,
+    respuesta: j['respuesta'] as String?,
+  );
 }

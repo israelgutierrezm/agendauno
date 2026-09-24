@@ -47,6 +47,66 @@ class CuentaRepository {
       consentimientos: consentimientos,
       pagoEnLinea: (data['pago_en_linea'] ?? false) as bool,
       pagoAutomatico: (data['pago_automatico'] ?? false) as bool,
+      resenasPendientes: await _resenasPendientes(),
+    );
+  }
+
+  /// Lo que puede calificar; si falla, simplemente no se ofrece.
+  Future<List<ResenaPendiente>> _resenasPendientes() async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '$_base/mi/resenas/pendientes',
+      );
+      return ((res.data?['data'] ?? []) as List)
+          .map((e) => ResenaPendiente.desdeJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  /// Califica una clase o cita a la que asistió (1 a 5 y comentario opcional).
+  Future<void> calificar(
+    String reservaId,
+    int calificacion,
+    String? comentario,
+  ) => _dio.post<Map<String, dynamic>>(
+    '$_base/mi/reservas/$reservaId/resena',
+    data: {'calificacion': calificacion, 'comentario': comentario},
+  );
+
+  Future<Privacidad> privacidad() async {
+    final res = await _dio.get<Map<String, dynamic>>('$_base/mi/privacidad');
+    return Privacidad.desdeJson(
+      (res.data?['data'] ?? {}) as Map<String, dynamic>,
+    );
+  }
+
+  /// Recibir o no promociones del negocio (oposición).
+  Future<Privacidad> cambiarPromociones(bool recibir) async {
+    final res = await _dio.put<Map<String, dynamic>>(
+      '$_base/mi/privacidad',
+      data: {'recibe_promociones': recibir},
+    );
+    return Privacidad.desdeJson(
+      (res.data?['data'] ?? {}) as Map<String, dynamic>,
+    );
+  }
+
+  /// Todo lo que el negocio tiene de él (derecho de acceso).
+  Future<Map<String, dynamic>> misDatos() async {
+    final res = await _dio.get<Map<String, dynamic>>('$_base/mi/datos');
+    return (res.data?['data'] ?? {}) as Map<String, dynamic>;
+  }
+
+  /// Pide la baja de sus datos (cancelación); el negocio la atiende.
+  Future<Privacidad> solicitarBaja(String? motivo) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/mi/privacidad/baja',
+      data: {'motivo': motivo},
+    );
+    return Privacidad.desdeJson(
+      (res.data?['data'] ?? {}) as Map<String, dynamic>,
     );
   }
 

@@ -11,6 +11,7 @@ import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
 import 'agendar_cita_sheet.dart';
+import 'mi_privacidad_screen.dart';
 import 'mis_documentos_screen.dart';
 import 'pago_automatico_screen.dart';
 import 'pase_sheet.dart';
@@ -71,6 +72,11 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
               for (final c in cuenta.consentimientos) _Consentimiento(c),
+              if (cuenta.resenasPendientes.isNotEmpty) ...[
+                const _Titulo('Califica tus clases'),
+                for (final r in cuenta.resenasPendientes)
+                  _CalificarClase(r, key: ValueKey(r.reservaId)),
+              ],
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.qr_code_2),
@@ -111,6 +117,19 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
                     ),
                   ),
                 ),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.privacy_tip_outlined),
+                  title: const Text('Privacidad y mis datos'),
+                  subtitle: const Text('Promociones, tus datos y su baja'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const MiPrivacidadScreen(),
+                    ),
+                  ),
+                ),
+              ),
               const _Titulo('Mis créditos'),
               _Creditos(cuenta.derechos),
               const _Titulo('Mis reservas'),
@@ -423,6 +442,108 @@ class _Clase extends ConsumerWidget {
           ].join(' · '),
         ),
         trailing: accion,
+      ),
+    );
+  }
+}
+
+/// Calificar una clase o cita a la que asistió: 1 a 5 y un comentario opcional.
+class _CalificarClase extends ConsumerStatefulWidget {
+  const _CalificarClase(this.r, {super.key});
+
+  final ResenaPendiente r;
+
+  @override
+  ConsumerState<_CalificarClase> createState() => _CalificarClaseState();
+}
+
+class _CalificarClaseState extends ConsumerState<_CalificarClase> {
+  int _estrellas = 0;
+  final _comentario = TextEditingController();
+  bool _enviando = false;
+
+  @override
+  void dispose() {
+    _comentario.dispose();
+    super.dispose();
+  }
+
+  Future<void> _enviar() async {
+    setState(() => _enviando = true);
+    final texto = _comentario.text.trim();
+    await hacerConAviso(
+      context,
+      () => ref
+          .read(cuentaProvider.notifier)
+          .calificar(
+            widget.r.reservaId,
+            _estrellas,
+            texto.isEmpty ? null : texto,
+          ),
+      exito: '¡Gracias por tu calificación!',
+    );
+    if (mounted) {
+      setState(() => _enviando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.r;
+    final detalle = [
+      if (r.fecha != null) Formato.fechaHora(r.fecha),
+      if (r.con != null) r.con!,
+    ].join(' · ');
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              r.actividad ?? '—',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            if (detalle.isNotEmpty)
+              Text(
+                detalle,
+                style: const TextStyle(color: TemaAgendaUno.textoSuave),
+              ),
+            Row(
+              children: [
+                for (var n = 1; n <= 5; n++)
+                  IconButton(
+                    tooltip: '$n de 5',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _enviando
+                        ? null
+                        : () => setState(() => _estrellas = n),
+                    icon: Icon(
+                      n <= _estrellas ? Icons.star : Icons.star_border,
+                      color: n <= _estrellas
+                          ? TemaAgendaUno.aviso
+                          : TemaAgendaUno.textoSuave,
+                    ),
+                  ),
+              ],
+            ),
+            TextField(
+              controller: _comentario,
+              maxLength: 1000,
+              decoration: const InputDecoration(
+                hintText: '¿Cómo te fue? (opcional)',
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton(
+                onPressed: _enviando || _estrellas == 0 ? null : _enviar,
+                child: const Text('Enviar'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

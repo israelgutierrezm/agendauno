@@ -32,6 +32,12 @@ class CuentaController extends AsyncNotifier<MiCuenta> {
   Future<void> firmar(String consentimientoId) =>
       _hacer((repo) => repo.firmar(consentimientoId));
 
+  Future<void> calificar(
+    String reservaId,
+    int calificacion,
+    String? comentario,
+  ) => _hacer((repo) => repo.calificar(reservaId, calificacion, comentario));
+
   /// Tras agendar una cita (la agenda el formulario de citas).
   Future<void> recargar() => _hacer((_) async {});
 
