@@ -158,3 +158,65 @@ it('el endpoint público de legales responde vacío si no se han configurado', f
         ->assertJsonPath('data.aviso_privacidad', null)
         ->assertJsonPath('data.terminos', null);
 });
+
+it('la ficha de un estudio muestra su contacto, su uso y sus cargos; la lista, su adeudo', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    cargoRentaPendiente($e);
+
+    $ficha = test()->getJson('/api/v1/plataforma/estudios/estudio-a', conTokenPlataforma())->assertOk()->json('data');
+    expect($ficha['contacto']['email'])->not->toBeNull()
+        ->and($ficha['cargos'])->toHaveCount(1)
+        ->and($ficha['cargos'][0]['estado'])->toBe('pendiente');
+
+    test()->getJson('/api/v1/plataforma/estudios', conTokenPlataforma())
+        ->assertOk()
+        ->assertJsonPath('data.0.adeudo_minor', $ficha['cargos'][0]['monto_minor']);
+});
+
+it('suspender corta el acceso al estudio y reactivar lo devuelve', function (): void {
+    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    terminarPrueba($e);
+
+    test()->postJson('/api/v1/plataforma/estudios/estudio-a/suspender', ['motivo' => 'Falta de pago'], conTokenPlataforma())
+        ->assertOk()->assertJsonPath('data.estado', 'suspended');
+    test()->getJson('/api/v1/app/estudio-a/yo', conBearer($e['bearer']))->assertNotFound();
+
+    test()->postJson('/api/v1/plataforma/estudios/estudio-a/reactivar', [], conTokenPlataforma())
+        ->assertOk()->assertJsonPath('data.estado', 'active');
+    test()->getJson('/api/v1/app/estudio-a/yo', conBearer($e['bearer']))->assertOk();
+
+    // Reactivar algo que no está suspendido no aplica.
+    test()->postJson('/api/v1/plataforma/estudios/estudio-a/reactivar', [], conTokenPlataforma())->assertStatus(422);
+});
+
+it('extender la prueba la corre desde hoy si ya había terminado y la regresa a prueba', function (): void {
+    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    terminarPrueba($e);
+
+    test()->postJson('/api/v1/plataforma/estudios/estudio-a/extender-prueba', ['dias' => 15], conTokenPlataforma())
+        ->assertOk()
+        ->assertJsonPath('data.trial_termina_en', now()->addDays(15)->toDateString())
+        ->assertJsonPath('data.estado', 'trialing')
+        ->assertJsonPath('data.estado_facturacion', 'trial');
+
+    // Un estudio suspendido se reactiva primero.
+    test()->postJson('/api/v1/plataforma/estudios/estudio-a/suspender', [], conTokenPlataforma())->assertOk();
+    test()->postJson('/api/v1/plataforma/estudios/estudio-a/extender-prueba', ['dias' => 15], conTokenPlataforma())
+        ->assertStatus(422);
+});
+
+it('los cobros resumen lo pendiente y filtran por estado; exigen token de plataforma', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    cargoRentaPendiente($e);
+
+    $cobros = test()->getJson('/api/v1/plataforma/cobros', conTokenPlataforma())->assertOk()->json();
+    expect($cobros['data'])->toHaveCount(1)
+        ->and($cobros['data'][0]['estudio_slug'])->toBe('estudio-a')
+        ->and($cobros['resumen']['pendiente_minor'])->toBe($cobros['data'][0]['monto_minor'])
+        ->and($cobros['resumen']['estudios_con_adeudo'])->toBe(1);
+
+    test()->getJson('/api/v1/plataforma/cobros?estado=pagado', conTokenPlataforma())->assertOk()->assertJsonCount(0, 'data');
+    test()->getJson('/api/v1/plataforma/cobros', conTokenPlataforma('otro'))->assertUnauthorized();
+});

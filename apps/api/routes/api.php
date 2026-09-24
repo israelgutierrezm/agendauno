@@ -52,7 +52,9 @@ use App\Modules\Tenancy\Http\Controllers\PasarelasTenantController;
 use App\Modules\Tenancy\Http\Controllers\PerfilTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasHorarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasMensajeTenantController;
+use App\Modules\Tenancy\Http\Controllers\PlataformaCobrosController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaController;
+use App\Modules\Tenancy\Http\Controllers\PlataformaEstudiosController;
 use App\Modules\Tenancy\Http\Controllers\PoliticasCancelacionTenantController;
 use App\Modules\Tenancy\Http\Controllers\PromocionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\PublicoCitasController;
@@ -117,6 +119,11 @@ Route::prefix('v1')->group(function (): void {
     // los estudios y gestiona credenciales globales (cuenta FacturAPI).
     Route::prefix('plataforma')->middleware(['plataforma.auth', 'throttle:60,1'])->name('api.v1.plataforma.')->group(function (): void {
         Route::get('/estudios', [PlataformaController::class, 'estudios'])->name('estudios');
+        Route::get('/estudios/{estudio}', [PlataformaEstudiosController::class, 'show'])->name('estudios.show');
+        Route::post('/estudios/{estudio}/suspender', [PlataformaEstudiosController::class, 'suspender'])->name('estudios.suspender');
+        Route::post('/estudios/{estudio}/reactivar', [PlataformaEstudiosController::class, 'reactivar'])->name('estudios.reactivar');
+        Route::post('/estudios/{estudio}/extender-prueba', [PlataformaEstudiosController::class, 'extenderPrueba'])->name('estudios.extender-prueba');
+        Route::get('/cobros', PlataformaCobrosController::class)->name('cobros');
         Route::put('/estudios/{estudio}', [PlataformaController::class, 'actualizarEstudio'])->name('estudios.actualizar');
         Route::get('/configuracion', [PlataformaController::class, 'configuracion'])->name('configuracion');
         Route::put('/configuracion', [PlataformaController::class, 'guardarConfiguracion'])->name('configuracion.guardar');

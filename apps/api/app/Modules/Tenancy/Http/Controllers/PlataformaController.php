@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\EstadoFacturacion;
+use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\MedicionUso;
 use App\Modules\Tenancy\ModoCobroSaas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,22 +28,29 @@ class PlataformaController
     {
         $estudios = Estudio::query()->orderBy('slug')->get();
 
+        // Uso del último periodo medido y adeudo (cargos pendientes) por estudio,
+        // en dos consultas agregadas (sin una por fila).
+        $ultimos = MedicionUso::query()
+            ->selectRaw('estudio_id, max(periodo) as periodo')
+            ->groupBy('estudio_id');
+        $uso = MedicionUso::query()
+            ->joinSub($ultimos, 'u', fn ($j) => $j->on('mediciones_uso.estudio_id', '=', 'u.estudio_id')
+                ->on('mediciones_uso.periodo', '=', 'u.periodo'))
+            ->get(['mediciones_uso.estudio_id', 'mediciones_uso.cantidad', 'mediciones_uso.metrica'])
+            ->keyBy('estudio_id');
+        $adeudo = CargoRenta::query()
+            ->where('estado', EstadoCargoRenta::Pendiente->value)
+            ->selectRaw('estudio_id, sum(monto_minor) as total')
+            ->groupBy('estudio_id')
+            ->pluck('total', 'estudio_id');
+
         return response()->json([
             'data' => $estudios->map(static fn (Estudio $e): array => [
-                'slug' => $e->slug,
-                'nombre' => $e->nombre,
-                'estado' => $e->estado->value,
-                'estado_facturacion' => $e->estado_facturacion->value,
-                'perfil' => $e->perfil_negocio->value,
-                'modalidad' => $e->modalidad()->value,
-                'modo_cobro' => $e->modo_cobro->value,
-                'cuota_fija_minor' => $e->cuota_fija_minor,
-                'trial_termina_en' => $e->trial_termina_en?->toDateString(),
-                'moneda' => $e->moneda,
-                'publicado' => (bool) $e->publicado,
-                'pais' => $e->pais,
-                'ciudad' => $e->ciudad,
-                'creado_en' => $e->created_at?->toIso8601String(),
+                ...PlataformaEstudiosController::resumen($e),
+                'uso' => $uso->has($e->getKey())
+                    ? ['cantidad' => (int) $uso[$e->getKey()]->cantidad, 'metrica' => $uso[$e->getKey()]->metrica]
+                    : null,
+                'adeudo_minor' => (int) ($adeudo[$e->getKey()] ?? 0),
             ])->all(),
             'total' => $estudios->count(),
         ]);
