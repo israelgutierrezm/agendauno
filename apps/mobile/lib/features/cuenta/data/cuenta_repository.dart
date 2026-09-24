@@ -45,7 +45,32 @@ class CuentaRepository {
       reservas: reservas,
       clases: clases,
       consentimientos: consentimientos,
+      pagoEnLinea: (data['pago_en_linea'] ?? false) as bool,
     );
+  }
+
+  /// Abre el pago en línea de una orden (p. ej. una cita apartada): devuelve la URL
+  /// de la página de pago de la pasarela, o null si no hay que redirigir.
+  Future<String?> pagarOrden(String ordenId) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/mi/ordenes/$ordenId/cobrar',
+      data: {'metodo': 'tarjeta'},
+    );
+    final checkout =
+        ((res.data?['data'] ?? {}) as Map<String, dynamic>)['checkout'];
+    if (checkout is Map && checkout['tipo'] == 'redirect') {
+      final url = checkout['url'];
+      return url is String && url.isNotEmpty ? url : null;
+    }
+    return null;
+  }
+
+  /// Código del pase de entrada (QR firmado que vence en minutos).
+  Future<String> pase() async {
+    final res = await _dio.get<Map<String, dynamic>>('$_base/mi/pase');
+    return ((res.data?['data'] ?? {}) as Map<String, dynamic>)['codigo']
+            as String? ??
+        '';
   }
 
   /// Reserva un lugar, o se anota en la lista de espera si la clase está llena.

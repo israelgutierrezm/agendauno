@@ -173,8 +173,11 @@ class MiCuenta {
     required this.reservas,
     required this.clases,
     this.consentimientos = const [],
+    this.pagoEnLinea = false,
   });
 
+  /// ¿El negocio cobra en línea? Entonces puede pagar aquí lo pendiente.
+  final bool pagoEnLinea;
   final List<DerechoMiembro> derechos;
   final List<ReservaMiembro> reservas;
   final List<ClaseMiembro> clases;

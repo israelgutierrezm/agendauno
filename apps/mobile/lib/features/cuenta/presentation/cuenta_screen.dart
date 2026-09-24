@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
@@ -8,15 +9,39 @@ import '../../auth/application/sesion_controller.dart';
 import '../../perfil/presentation/perfil_screen.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
+import '../data/cuenta_repository.dart';
 import 'agendar_cita_sheet.dart';
+import 'pase_sheet.dart';
 
 /// Autoservicio del alumno o cliente: consentimientos por firmar, créditos,
 /// reservas y, según el negocio, las próximas clases o agendar una cita.
-class CuentaScreen extends ConsumerWidget {
+class CuentaScreen extends ConsumerStatefulWidget {
   const CuentaScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CuentaScreen> createState() => _CuentaScreenState();
+}
+
+class _CuentaScreenState extends ConsumerState<CuentaScreen> {
+  // Al volver del navegador (pago en línea) se actualiza la cuenta.
+  late final AppLifecycleListener _ciclo = AppLifecycleListener(
+    onResume: () => ref.invalidate(cuentaProvider),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _ciclo;
+  }
+
+  @override
+  void dispose() {
+    _ciclo.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final sesion = ref.watch(sesionProvider);
     final estado = ref.watch(cuentaProvider);
     final esCitas = sesion?.esCitas ?? false;
@@ -44,13 +69,28 @@ class CuentaScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
               for (final c in cuenta.consentimientos) _Consentimiento(c),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.qr_code_2),
+                  title: const Text('Mi pase de entrada'),
+                  subtitle: const Text('Muéstralo en recepción'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => showModalBottomSheet<void>(
+                    context: context,
+                    showDragHandle: true,
+                    builder: (_) => const PaseSheet(),
+                  ),
+                ),
+              ),
               const _Titulo('Mis créditos'),
               _Creditos(cuenta.derechos),
               const _Titulo('Mis reservas'),
               if (cuenta.reservas.isEmpty)
                 const _Vacio('No tienes reservas próximas.')
               else
-                ...cuenta.reservas.map((r) => _Reserva(r)),
+                ...cuenta.reservas.map(
+                  (r) => _Reserva(r, pagoEnLinea: cuenta.pagoEnLinea),
+                ),
               if (esCitas) ...[
                 const _Titulo('Agendar una cita'),
                 Card(
@@ -185,9 +225,43 @@ class _Creditos extends StatelessWidget {
 }
 
 class _Reserva extends ConsumerWidget {
-  const _Reserva(this.r);
+  const _Reserva(this.r, {this.pagoEnLinea = false});
 
   final ReservaMiembro r;
+  final bool pagoEnLinea;
+
+  bool get _sePagaAqui =>
+      r.estado == 'pendiente_pago' && pagoEnLinea && r.ordenId != null;
+
+  /// Abre la página de pago de la pasarela en el navegador; al volver a la app la
+  /// cuenta se actualiza (el webhook confirma el pago).
+  Future<void> _pagar(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(cuentaRepositoryProvider);
+    if (repo == null) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    await hacerConAviso(context, () async {
+      final url = await repo.pagarOrden(r.ordenId!);
+      if (url == null) {
+        await ref.read(cuentaProvider.notifier).recargar();
+        return;
+      }
+      final abierto = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            abierto
+                ? 'Completa el pago en el navegador; al volver actualizamos tu cuenta.'
+                : 'No se pudo abrir la página de pago.',
+          ),
+        ),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -220,7 +294,7 @@ class _Reserva extends ConsumerWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            if (r.estado == 'pendiente_pago')
+            if (r.estado == 'pendiente_pago' && !_sePagaAqui)
               const Padding(
                 padding: EdgeInsets.only(top: 4),
                 child: Text(
@@ -234,6 +308,11 @@ class _Reserva extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (_sePagaAqui)
+                  FilledButton(
+                    onPressed: () => _pagar(context, ref),
+                    child: const Text('Pagar'),
+                  ),
                 if (r.ofrecida)
                   FilledButton(
                     onPressed: () => hacerConAviso(
