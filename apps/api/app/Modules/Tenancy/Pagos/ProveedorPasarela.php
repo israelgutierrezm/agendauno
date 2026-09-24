@@ -40,13 +40,22 @@ enum ProveedorPasarela: string
     }
 
     /**
-     * Pasarelas en línea con integración completa (cobro, confirmación, rechazo,
-     * reintento y devolución). Las demás se muestran como no disponibles y no se
-     * pueden activar.
+     * Pasarelas en línea con integración completa para los negocios (cobro,
+     * confirmación, rechazo, reintento, devolución y pago automático).
      *
      * @return list<string>
      */
     public static function implementadas(): array
+    {
+        return [self::Stripe->value, self::MercadoPago->value, self::OpenPay->value];
+    }
+
+    /**
+     * Pasarelas con las que la plataforma cobra la renta del SaaS a los negocios.
+     *
+     * @return list<string>
+     */
+    public static function implementadasPlataforma(): array
     {
         return [self::Stripe->value];
     }

@@ -36,6 +36,7 @@ class PausarMembresiaTenant
     public function __construct(
         private readonly RegistrarEventoTenant $eventos,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly DomiciliacionesTenant $domiciliaciones,
     ) {}
 
     public function pausar(AcuerdoTenant $acuerdo, CarbonImmutable $hasta, ?string $motivo, ?Usuario $actor): PausaAcuerdoTenant
@@ -50,7 +51,7 @@ class PausarMembresiaTenant
             throw new PausaNoPermitida('Una pausa puede durar hasta '.self::MAX_DIAS.' días.');
         }
 
-        return DB::connection('tenant')->transaction(function () use ($acuerdo, $hoy, $hasta, $motivo, $actor): PausaAcuerdoTenant {
+        $pausa = DB::connection('tenant')->transaction(function () use ($acuerdo, $hoy, $hasta, $motivo, $actor): PausaAcuerdoTenant {
             $bloqueado = AcuerdoTenant::query()->whereKey($acuerdo->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueado->estado !== EstadoAcuerdo::Activo) {
@@ -93,6 +94,11 @@ class PausarMembresiaTenant
 
             return $pausa;
         });
+
+        // Una suscripción de la pasarela seguiría cobrando durante la pausa.
+        $this->domiciliaciones->alPausar($acuerdo);
+
+        return $pausa;
     }
 
     /**

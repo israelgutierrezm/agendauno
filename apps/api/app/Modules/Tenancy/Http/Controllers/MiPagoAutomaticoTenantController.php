@@ -17,8 +17,8 @@ use Illuminate\Http\Request;
 /**
  * "Pago automático" (autoservicio del alumno): sus membresías que se renuevan, cuáles
  * se cobran solas y con qué tarjeta. Activa o quita el cobro automático de cada una y
- * cambia la tarjeta (se autoriza en la página de la pasarela; aquí nunca se capturan
- * datos de tarjeta).
+ * cambia la tarjeta (se autoriza en la página de la pasarela o, con OpenPay, se
+ * tokeniza en el navegador: aquí nunca llegan datos de tarjeta).
  */
 class MiPagoAutomaticoTenantController
 {
@@ -33,7 +33,7 @@ class MiPagoAutomaticoTenantController
     {
         $persona = $this->persona($request);
         $proveedor = $this->domiciliaciones->proveedor();
-        $tarjeta = $proveedor !== null ? $this->domiciliaciones->tarjetaDe($persona, $proveedor) : null;
+        $tarjeta = $this->domiciliaciones->tarjetaCompartida($persona);
 
         $membresias = AcuerdoTenant::query()
             ->where('persona_id', $persona->getKey())
@@ -42,12 +42,20 @@ class MiPagoAutomaticoTenantController
             ->with(['producto', 'domiciliacion'])
             ->orderBy('proxima_cobro_en')
             ->get();
+        // Suscripciones creadas que el alumno aún no autoriza en la pasarela.
+        $porAutorizar = DomiciliacionTenant::query()
+            ->whereIn('acuerdo_id', $membresias->modelKeys())
+            ->where('estado', DomiciliacionTenant::PENDIENTE)
+            ->pluck('acuerdo_id')
+            ->all();
 
         return response()->json(['data' => [
             'disponible' => $proveedor !== null,
             'tarjeta' => $tarjeta instanceof DomiciliacionTenant ? $tarjeta->tarjeta() : null,
             'membresias' => $membresias->map(static fn (AcuerdoTenant $a): array => [
                 'id' => $a->ulid,
+                'pendiente' => in_array($a->getKey(), $porAutorizar, false),
+                'tarjeta' => $a->domiciliacion?->marca !== null ? $a->domiciliacion->tarjeta() : null,
                 'producto' => $a->producto?->nombre,
                 'monto_minor' => $a->producto?->precio_minor,
                 'moneda' => $a->producto?->moneda,
@@ -61,17 +69,23 @@ class MiPagoAutomaticoTenantController
 
     /**
      * Activa el cobro automático de una membresía: al momento si ya hay tarjeta; si
-     * no, devuelve la página de la pasarela para autorizarla.
+     * no, devuelve la página de la pasarela para autorizarla, o (OpenPay) lo que
+     * necesita su formulario de tarjeta; con la tarjeta ya tokenizada, suscribe.
      */
     public function activar(Request $request): JsonResponse
     {
         $acuerdo = $this->acuerdo($request);
+        $datos = $request->validate([
+            'token_id' => ['sometimes', 'string', 'max:255'],
+            'device_session_id' => ['sometimes', 'string', 'max:255'],
+        ]);
 
-        $resultado = $this->domiciliaciones->activar($acuerdo, self::RETORNO);
+        $resultado = $this->domiciliaciones->activar($acuerdo, self::RETORNO, $datos);
 
         return response()->json(['data' => [
             'estado' => $resultado['estado'],
             'checkout' => isset($resultado['url']) ? ['tipo' => 'redirect', 'url' => $resultado['url']] : null,
+            'formulario' => $resultado['formulario'] ?? null,
         ]]);
     }
 

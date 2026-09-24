@@ -71,19 +71,24 @@ function ordenConStripeListo(array $e): string
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
 }
 
-it('OpenPay y Mercado Pago aparecen como no disponibles y no se pueden activar', function (): void {
+it('Stripe, Mercado Pago y OpenPay se pueden activar, pero sin sus llaves no cobran', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
 
     $pasarelas = collect($this->getJson("/api/v1/app/{$e['slug']}/pasarelas", conBearer($e['bearer']))->assertOk()->json('data'))
         ->keyBy('proveedor');
-    expect($pasarelas['stripe']['disponible'])->toBeTrue()
-        ->and($pasarelas['openpay']['disponible'])->toBeFalse()
-        ->and($pasarelas['mercadopago']['disponible'])->toBeFalse();
+    foreach (['stripe', 'openpay', 'mercadopago'] as $proveedor) {
+        expect($pasarelas[$proveedor]['disponible'])->toBeTrue()
+            ->and($pasarelas[$proveedor]['webhook_url'])->toEndWith("/webhooks/tenant/estudio-a/{$proveedor}");
+    }
 
+    // Activas pero sin sus llaves: no están listas para cobrar.
     foreach (['openpay', 'mercadopago'] as $proveedor) {
         $this->putJson("/api/v1/app/{$e['slug']}/pasarelas/{$proveedor}", ['activa' => true, 'modo' => 'test'], conBearer($e['bearer']))
-            ->assertStatus(422);
+            ->assertOk()->assertJsonPath('data.lista', false);
     }
+    $this->putJson("/api/v1/app/{$e['slug']}/pasarelas/openpay", [
+        'activa' => true, 'modo' => 'test', 'credenciales' => ['merchant_id' => 'm123'],
+    ], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.lista', false);
 });
 
 it('Stripe sin llave secreta no cobra (antes simulaba un intento)', function (): void {

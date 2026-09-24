@@ -12,14 +12,14 @@ use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
-use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
-use App\Modules\Tenancy\Models\ProductoTenant;
-use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Pagos\EstadoPago;
+use App\Modules\Tenancy\Pasarelas\PasarelaConSuscripcion;
+use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
+use Throwable;
 
 /**
  * Cobro recurrente (Etapa 2) tenant-local: al llegar `proxima_cobro_en` de una
@@ -41,17 +41,26 @@ use Illuminate\Support\Carbon;
  *
  * Con pago automático (domiciliación) el periodo se cobra a la tarjeta autorizada,
  * sin el cliente presente; si el banco lo rechaza, entra la mora con el motivo y el
- * enlace para pagar a mano, y los reintentos vuelven a intentar la tarjeta.
+ * enlace para pagar a mano, y los reintentos vuelven a intentar la tarjeta. Si el
+ * pago automático es una suscripción (Mercado Pago, OpenPay) no se cobra aquí: se
+ * concilia lo que cobró la pasarela y, si pasan días sin cobro, se avisa.
  *
  * @phpstan-type Resumen array{cobrados: int, pendientes: int, fallidos: int}
  */
 class CobroRecurrenteTenant
 {
+    /**
+     * Días de espera, tras la fecha de renovación, al cobro de una suscripción.
+     */
+    private const GRACIA_SUSCRIPCION_DIAS = 3;
+
     public function __construct(
-        private readonly OrdenesTenant $ordenes,
+        private readonly DeudaDeRenovacionTenant $deudas,
         private readonly CobrarOrdenTenant $cobrar,
         private readonly GestionarDunningTenant $dunning,
         private readonly DomiciliacionesTenant $domiciliaciones,
+        private readonly ConciliarSuscripcionTenant $suscripciones,
+        private readonly RegistroDePasarelasTenant $registro,
     ) {}
 
     /**
@@ -60,18 +69,20 @@ class CobroRecurrenteTenant
      */
     public function renovar(AcuerdoTenant $acuerdo, string $proveedor): string
     {
-        $acuerdo->loadMissing(['persona', 'producto']);
-        $persona = $acuerdo->persona;
-        $producto = $acuerdo->producto;
-
-        if (! $persona instanceof PersonaTenant || ! $producto instanceof ProductoTenant
-            || in_array($acuerdo->estado, [EstadoAcuerdo::Cancelado, EstadoAcuerdo::Pausado], true)) {
+        if (in_array($acuerdo->estado, [EstadoAcuerdo::Cancelado, EstadoAcuerdo::Pausado], true)) {
             return 'omitido';
         }
 
-        $orden = $this->deudaDelPeriodo($acuerdo, $persona, $producto);
-
         $domiciliacion = $acuerdo->domiciliacion()->first();
+        if ($domiciliacion instanceof DomiciliacionTenant && $this->esSuscripcion($domiciliacion)) {
+            return $this->suscripcion($acuerdo, $domiciliacion);
+        }
+
+        $orden = $this->deudas->de($acuerdo);
+        if ($orden === null) {
+            return 'omitido';
+        }
+
         if ($domiciliacion instanceof DomiciliacionTenant) {
             return $this->cargoAutomatico($acuerdo, $orden, $domiciliacion);
         }
@@ -147,24 +158,40 @@ class CobroRecurrenteTenant
     }
 
     /**
-     * La orden de renovación pendiente del acuerdo (la deuda del periodo), o una
-     * nueva si no hay.
+     * Suscripción en la pasarela: se concilia lo que cobró. Si pasan los días de
+     * gracia sin cobro, se avisa para pagar a mano (la mora da seguimiento).
      */
-    private function deudaDelPeriodo(AcuerdoTenant $acuerdo, PersonaTenant $persona, ProductoTenant $producto): OrdenTenant
+    private function suscripcion(AcuerdoTenant $acuerdo, DomiciliacionTenant $domiciliacion): string
     {
-        $pendiente = OrdenTenant::query()
-            ->where('renueva_acuerdo_id', $acuerdo->getKey())
-            ->where('estado', EstadoOrden::Pendiente->value)
-            ->latest('id')
-            ->first();
-        if ($pendiente instanceof OrdenTenant) {
-            return $pendiente;
+        try {
+            $resultado = $this->suscripciones->conciliar($domiciliacion);
+        } catch (Throwable $e) {
+            // La pasarela no respondió: se vuelve a consultar en la siguiente corrida.
+            report($e);
+
+            return 'fallido';
+        }
+        if ($resultado !== 'sin_cambios') {
+            return $resultado;
         }
 
-        $orden = $this->ordenes->crear($persona, [['producto' => $producto, 'cantidad' => 1, 'beneficiario' => null]]);
-        $orden->update(['renueva_acuerdo_id' => $acuerdo->getKey()]);
+        $limite = Carbon::today()->subDays(self::GRACIA_SUSCRIPCION_DIAS);
+        if ($acuerdo->proxima_cobro_en !== null && $acuerdo->proxima_cobro_en->lt($limite)) {
+            $this->dunning->registrarFallo($acuerdo, 'No hemos recibido el cobro automático de tu suscripción.');
 
-        return $orden;
+            return 'fallido';
+        }
+
+        return 'pendiente';
+    }
+
+    private function esSuscripcion(DomiciliacionTenant $domiciliacion): bool
+    {
+        try {
+            return $this->registro->resolver($domiciliacion->proveedor) instanceof PasarelaConSuscripcion;
+        } catch (PasarelaNoDisponible) {
+            return false;
+        }
     }
 
     /**

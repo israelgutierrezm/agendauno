@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaTenant;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
@@ -20,7 +21,10 @@ use Illuminate\Validation\ValidationException;
  */
 class PasarelasTenantController
 {
-    public function __construct(private readonly RegistroDePasarelasTenant $registro) {}
+    public function __construct(
+        private readonly RegistroDePasarelasTenant $registro,
+        private readonly GestorDeConexionTenant $gestor,
+    ) {}
 
     /**
      * Proveedores configurables por el estudio (los integrados manual/simulada no
@@ -37,24 +41,41 @@ class PasarelasTenantController
     {
         $configs = ConfiguracionPasarelaTenant::query()->get()->keyBy('proveedor');
 
-        $data = array_map(function (string $proveedor) use ($configs): array {
-            $config = $configs->get($proveedor);
-
-            return [
-                'proveedor' => $proveedor,
-                'activa' => $config instanceof ConfiguracionPasarelaTenant ? $config->activa : false,
-                'modo' => $config instanceof ConfiguracionPasarelaTenant ? $config->modo : 'test',
-                'llaves_configuradas' => $config instanceof ConfiguracionPasarelaTenant
-                    ? array_keys($config->llaves())
-                    : [],
-                // ¿Existe de verdad? (OpenPay y Mercado Pago aún no.)
-                'disponible' => ProveedorPasarela::disponible($proveedor),
-                // ¿Ya cobra? (activa y con lo necesario, p. ej. la llave de Stripe)
-                'lista' => $this->registro->activa($proveedor),
-            ];
-        }, $this->configurables());
+        $data = array_map(
+            fn (string $proveedor): array => $this->presentar($proveedor, $configs->get($proveedor)),
+            $this->configurables(),
+        );
 
         return response()->json(['data' => $data]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentar(string $proveedor, ?ConfiguracionPasarelaTenant $config): array
+    {
+        $enLinea = in_array($proveedor, ProveedorPasarela::enLinea(), true);
+
+        return [
+            'proveedor' => $proveedor,
+            'activa' => $config instanceof ConfiguracionPasarelaTenant ? $config->activa : false,
+            'modo' => $config instanceof ConfiguracionPasarelaTenant ? $config->modo : 'test',
+            'llaves_configuradas' => $config instanceof ConfiguracionPasarelaTenant
+                ? array_keys($config->llaves())
+                : [],
+            'disponible' => ProveedorPasarela::disponible($proveedor),
+            // ¿Ya cobra? (activa y con sus llaves)
+            'lista' => $this->registro->activa($proveedor),
+            // A dónde manda sus avisos la pasarela (se registra en su tablero).
+            'webhook_url' => $enLinea ? route('api.v1.webhooks.tenant', [
+                'estudio' => (string) $this->gestor->actual()?->slug,
+                'proveedor' => $proveedor,
+            ]) : null,
+            // OpenPay: el código que manda al registrar el webhook.
+            'codigo_verificacion' => $proveedor === 'openpay' && $config instanceof ConfiguracionPasarelaTenant
+                ? $config->codigo_verificacion
+                : null,
+        ];
     }
 
     public function upsert(Request $request): JsonResponse
@@ -91,13 +112,6 @@ class PasarelasTenantController
 
         $config->save();
 
-        return response()->json(['data' => [
-            'proveedor' => $proveedor,
-            'activa' => $config->activa,
-            'modo' => $config->modo,
-            'llaves_configuradas' => array_keys($config->llaves()),
-            'disponible' => ProveedorPasarela::disponible($proveedor),
-            'lista' => $this->registro->activa($proveedor),
-        ]]);
+        return response()->json(['data' => $this->presentar($proveedor, $config)]);
     }
 }

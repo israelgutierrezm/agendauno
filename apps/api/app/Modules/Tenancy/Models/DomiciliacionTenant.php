@@ -11,13 +11,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Pago automático (domiciliación) de una membresía: cada renovación se cobra sola al
  * método que el alumno autorizó en la pasarela. Guarda solo referencias de la
- * pasarela y lo necesario para mostrar la tarjeta (marca, últimos 4, vencimiento).
+ * pasarela (método, y en suscripciones su cliente y la suscripción) y lo necesario
+ * para mostrar la tarjeta (marca, últimos 4, vencimiento).
  */
 class DomiciliacionTenant extends Model
 {
     use HasPublicId;
 
     public const ACTIVA = 'activa';
+
+    /**
+     * Suscripción creada en la pasarela que el cliente aún no autoriza.
+     */
+    public const PENDIENTE = 'pendiente';
 
     public const CANCELADA = 'cancelada';
 
@@ -26,7 +32,7 @@ class DomiciliacionTenant extends Model
     protected $table = 'domiciliaciones';
 
     protected $fillable = [
-        'acuerdo_id', 'persona_id', 'proveedor', 'estado', 'metodo_externo', 'marca', 'ultimos4',
+        'acuerdo_id', 'persona_id', 'proveedor', 'estado', 'metodo_externo', 'cliente_externo', 'suscripcion_externa', 'marca', 'ultimos4',
         'expira_mes', 'expira_anio', 'ultimo_error', 'ultimo_error_en', 'activada_en', 'cancelada_en',
     ];
 

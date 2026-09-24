@@ -20,7 +20,7 @@ class ConfiguracionPasarelaTenant extends Model
 
     protected $table = 'configuraciones_pasarela';
 
-    protected $fillable = ['proveedor', 'activa', 'modo', 'credenciales'];
+    protected $fillable = ['proveedor', 'activa', 'modo', 'credenciales', 'codigo_verificacion'];
 
     /**
      * @var list<string>

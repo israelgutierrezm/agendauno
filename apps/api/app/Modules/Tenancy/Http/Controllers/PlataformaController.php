@@ -114,7 +114,7 @@ class PlataformaController
                 'activa' => $config instanceof ConfiguracionPasarelaPlataforma ? $config->activa : false,
                 'modo' => $config instanceof ConfiguracionPasarelaPlataforma ? $config->modo : 'test',
                 'llaves_configuradas' => $config instanceof ConfiguracionPasarelaPlataforma ? array_keys($config->llaves()) : [],
-                'disponible' => in_array($proveedor, ProveedorPasarela::implementadas(), true),
+                'disponible' => in_array($proveedor, ProveedorPasarela::implementadasPlataforma(), true),
                 'lista' => app(RegistroDePasarelasPlataforma::class)->activa($proveedor),
             ];
         }, $this->proveedores());
@@ -137,7 +137,7 @@ class PlataformaController
             'credenciales.*' => ['nullable', 'string'],
         ]);
 
-        if ((bool) $validado['activa'] && ! in_array($proveedor, ProveedorPasarela::implementadas(), true)) {
+        if ((bool) $validado['activa'] && ! in_array($proveedor, ProveedorPasarela::implementadasPlataforma(), true)) {
             throw ValidationException::withMessages(['activa' => ['Esta pasarela aún no está disponible.']]);
         }
 

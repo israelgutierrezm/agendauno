@@ -11,20 +11,36 @@ use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 /**
  * Resuelve la pasarela tenant-local por proveedor y lee su configuracion (activa +
  * llaves) desde la BD del estudio. `manual`/`efectivo` estan siempre disponibles;
- * `ventanilla` (depósito con comprobante) requiere estar activa; en línea solo
- * Stripe, activa y con su llave secreta. OpenPay y Mercado Pago aún no tienen
- * integración completa: no se pueden usar (se muestran como no disponibles).
+ * `ventanilla` (depósito con comprobante) requiere estar activa; en línea (Stripe,
+ * Mercado Pago, OpenPay), activa y con las llaves sin las que no puede cobrar.
  */
 class RegistroDePasarelasTenant
 {
     private const INTEGRADAS = ['manual', 'efectivo'];
 
-    public function __construct(private readonly PasarelaStripeTenant $stripe) {}
+    /**
+     * Llaves sin las cuales la pasarela en línea no puede cobrar.
+     *
+     * @var array<string, list<string>>
+     */
+    private const LLAVES_REQUERIDAS = [
+        'stripe' => ['secret_key'],
+        'mercadopago' => ['access_token'],
+        'openpay' => ['merchant_id', 'private_key'],
+    ];
+
+    public function __construct(
+        private readonly PasarelaStripeTenant $stripe,
+        private readonly PasarelaMercadoPagoTenant $mercadoPago,
+        private readonly PasarelaOpenPayTenant $openPay,
+    ) {}
 
     public function resolver(string $proveedor): PasarelaTenant
     {
         return match ($proveedor) {
             'stripe' => $this->stripe,
+            'mercadopago' => $this->mercadoPago,
+            'openpay' => $this->openPay,
             'manual', 'efectivo' => new PasarelaManualTenant,
             'ventanilla' => new PasarelaPendienteTenant('ventanilla'),
             default => throw new PasarelaNoDisponible('Esa pasarela aún no está disponible.'),
@@ -33,7 +49,7 @@ class RegistroDePasarelasTenant
 
     /**
      * ¿El proveedor puede cobrar? Integradas siempre; el resto solo si existe de
-     * verdad, está activo y (Stripe) tiene su llave secreta.
+     * verdad, está activo y tiene sus llaves.
      */
     public function activa(string $proveedor): bool
     {
@@ -52,7 +68,14 @@ class RegistroDePasarelasTenant
             return false;
         }
 
-        return $proveedor !== 'stripe' || ($config->llaves()['secret_key'] ?? '') !== '';
+        $llaves = $config->llaves();
+        foreach (self::LLAVES_REQUERIDAS[$proveedor] ?? [] as $llave) {
+            if (($llaves[$llave] ?? '') === '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

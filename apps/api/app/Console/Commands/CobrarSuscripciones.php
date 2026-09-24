@@ -7,8 +7,8 @@ namespace App\Console\Commands;
 use App\Modules\Tenancy\Application\CobroRecurrenteTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
-use App\Modules\Tenancy\Models\ConfiguracionPasarelaTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -24,23 +24,24 @@ class CobrarSuscripciones extends Command
 
     protected $description = 'Cobra las renovaciones recurrentes vencidas y reintenta a los morosos';
 
-    public function handle(CobroRecurrenteTenant $cobro, GestorDeConexionTenant $gestor): int
+    public function handle(CobroRecurrenteTenant $cobro, GestorDeConexionTenant $gestor, RegistroDePasarelasTenant $pasarelas): int
     {
         $totales = ['cobrados' => 0, 'pendientes' => 0, 'fallidos' => 0];
 
         Estudio::query()
             ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value])
-            ->chunkById(100, function (Collection $estudios) use (&$totales, $cobro, $gestor): void {
+            ->chunkById(100, function (Collection $estudios) use (&$totales, $cobro, $gestor, $pasarelas): void {
                 /** @var Collection<int, Estudio> $estudios */
                 foreach ($estudios as $estudio) {
                     if (! $gestor->baseDeDatosExiste($estudio)) {
                         continue;
                     }
 
-                    $resumen = $gestor->ejecutarEn($estudio, function () use ($cobro): array {
-                        // Pasarela en línea activa del estudio (nunca 'manual': no cobraría de verdad).
-                        $proveedor = ConfiguracionPasarelaTenant::query()->where('activa', true)->value('proveedor');
-                        if (! is_string($proveedor) || $proveedor === '') {
+                    $resumen = $gestor->ejecutarEn($estudio, function () use ($cobro, $pasarelas): array {
+                        // Pasarela en línea lista del estudio (nunca manual ni ventanilla: no
+                        // cobrarían de verdad).
+                        $proveedor = $pasarelas->enLinea();
+                        if ($proveedor === null) {
                             return ['cobrados' => 0, 'pendientes' => 0, 'fallidos' => 0];
                         }
 

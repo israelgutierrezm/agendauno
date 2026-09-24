@@ -37,7 +37,7 @@ class RegistroDePasarelasPlataforma
      */
     public function activa(string $proveedor): bool
     {
-        if (! in_array($proveedor, ProveedorPasarela::implementadas(), true)) {
+        if (! in_array($proveedor, ProveedorPasarela::implementadasPlataforma(), true)) {
             return false;
         }
 

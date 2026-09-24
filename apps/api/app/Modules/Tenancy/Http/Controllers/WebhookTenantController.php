@@ -6,6 +6,9 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\ConfirmarPagoTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
+use App\Modules\Tenancy\Pasarelas\MercadoPago\NotificacionesMercadoPago;
+use App\Modules\Tenancy\Pasarelas\MercadoPago\VerificarFirmaMercadoPago;
+use App\Modules\Tenancy\Pasarelas\OpenPay\NotificacionesOpenPay;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\Pasarelas\Stripe\TarjetasStripe;
 use App\Modules\Tenancy\Pasarelas\Stripe\VerificarFirmaStripe;
@@ -15,8 +18,10 @@ use Illuminate\Http\Request;
 /**
  * Webhook publico de pasarela por estudio: `/webhooks/tenant/{estudio}/{proveedor}`.
  * El estudio se resuelve (y su BD se conecta) por `estudio.resolver`. Confirma el
- * pago pendiente correspondiente -> fulfillment. Idempotente. Para Stripe verifica
- * la firma con la `webhook_secret` del estudio cuando esta configurada.
+ * pago pendiente correspondiente -> fulfillment. Idempotente. Verificación por
+ * pasarela: Stripe y Mercado Pago con la firma (`webhook_secret`); OpenPay con el
+ * usuario y contraseña del webhook. Mercado Pago y OpenPay además releen el cobro
+ * en su API antes de confirmar.
  */
 class WebhookTenantController
 {
@@ -25,6 +30,8 @@ class WebhookTenantController
         private readonly RegistroDePasarelasTenant $registro,
         private readonly ReembolsarPagoTenant $reembolsos,
         private readonly TarjetasStripe $tarjetas,
+        private readonly NotificacionesMercadoPago $mercadoPago,
+        private readonly NotificacionesOpenPay $openPay,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -33,6 +40,12 @@ class WebhookTenantController
 
         if ($proveedor === 'stripe') {
             return $this->stripe($request);
+        }
+        if ($proveedor === 'mercadopago') {
+            return $this->mercadoPago($request);
+        }
+        if ($proveedor === 'openpay') {
+            return $this->openPay($request);
         }
 
         // Otros proveedores aun no tienen verificacion de firma dedicada en el plano
@@ -49,6 +62,74 @@ class WebhookTenantController
         }
 
         return response()->json(['data' => ['ok' => true]]);
+    }
+
+    /**
+     * Mercado Pago: `?data.id=…&type=…` (PHP lo entrega como `data_id`) firmado en
+     * `x-signature`; también acepta el formato anterior `?topic=…&id=…`.
+     */
+    private function mercadoPago(Request $request): JsonResponse
+    {
+        $secreto = $this->registro->llaves('mercadopago')['webhook_secret'] ?? '';
+        $dataId = (string) $request->query('data_id', '');
+
+        if ($secreto === '') {
+            if (app()->environment('production')) {
+                abort(400, 'Webhook sin secreto configurado.');
+            }
+        } elseif (! VerificarFirmaMercadoPago::valida($dataId, $request->header('x-request-id'), $request->header('x-signature'), $secreto)) {
+            abort(401, 'Firma inválida.');
+        }
+
+        $tipo = (string) ($request->query('type') ?? $request->json('type') ?? $request->query('topic') ?? '');
+        $id = $dataId !== '' ? $dataId : (string) ($request->json('data.id') ?? $request->query('id') ?? '');
+        $this->mercadoPago->procesar($tipo, $id);
+
+        return response()->json(['data' => ['ok' => true]]);
+    }
+
+    /**
+     * OpenPay: HTTP Basic con el usuario y contraseña que el negocio guardó.
+     */
+    private function openPay(Request $request): JsonResponse
+    {
+        $llaves = $this->registro->llaves('openpay');
+        $usuario = $llaves['webhook_user'] ?? '';
+        $clave = $llaves['webhook_password'] ?? '';
+
+        if ($usuario === '' || $clave === '') {
+            if (app()->environment('production')) {
+                abort(400, 'Webhook sin usuario y contraseña configurados.');
+            }
+        } else {
+            [$recibidoUsuario, $recibidaClave] = self::credencialesBasic($request->header('Authorization'));
+            if (! hash_equals($usuario, $recibidoUsuario) || ! hash_equals($clave, $recibidaClave)) {
+                abort(401, 'Credenciales inválidas.');
+            }
+        }
+
+        /** @var array<string, mixed> $evento */
+        $evento = $request->json()->all();
+        $this->openPay->procesar($evento);
+
+        return response()->json(['data' => ['ok' => true]]);
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private static function credencialesBasic(?string $encabezado): array
+    {
+        if ($encabezado === null || ! str_starts_with($encabezado, 'Basic ')) {
+            return ['', ''];
+        }
+        $decodificado = base64_decode(substr($encabezado, 6), true);
+        if ($decodificado === false || ! str_contains($decodificado, ':')) {
+            return ['', ''];
+        }
+        [$usuario, $clave] = explode(':', $decodificado, 2);
+
+        return [$usuario, $clave];
     }
 
     private function stripe(Request $request): JsonResponse
