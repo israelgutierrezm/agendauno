@@ -283,6 +283,13 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Reseñas de los alumnos (promedios y comentarios).
+      path: "/resenas",
+      name: "resenas",
+      component: () => import("@/views/ResenasView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/integraciones",
       name: "integraciones",
       component: () => import("@/views/IntegracionesView.vue"),

@@ -8,6 +8,7 @@ use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
+use App\Modules\Tenancy\Models\ResenaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -57,6 +58,7 @@ class EscaparateController
             'instructores' => $this->instructores(),
             'productos' => $this->productos(),
             'proximas_sesiones' => $this->proximasSesiones(),
+            'resenas' => $this->resenas(),
         ]]);
     }
 
@@ -143,5 +145,35 @@ class EscaparateController
                 'lugares_libres' => $capacidad !== null ? max(0, $capacidad - $confirmadas) : null,
             ];
         })->all();
+    }
+
+    /**
+     * Calificación pública: promedio y las reseñas más recientes con comentario
+     * (solo las visibles; sin apellidos).
+     *
+     * @return array{promedio: float|null, total: int, recientes: list<array<string, mixed>>}
+     */
+    private function resenas(): array
+    {
+        $visibles = ResenaTenant::query()->where('visible', true);
+        $total = (clone $visibles)->count();
+
+        return [
+            'promedio' => $total > 0 ? round((float) (clone $visibles)->avg('calificacion'), 1) : null,
+            'total' => $total,
+            'recientes' => (clone $visibles)
+                ->whereNotNull('comentario')
+                ->with(['persona', 'oferta'])
+                ->orderByDesc('id')
+                ->limit(6)
+                ->get()
+                ->map(static fn (ResenaTenant $r): array => [
+                    'calificacion' => $r->calificacion,
+                    'comentario' => $r->comentario,
+                    'nombre' => $r->persona?->nombre,
+                    'actividad' => $r->oferta?->nombre,
+                    'fecha' => $r->created_at?->toDateString(),
+                ])->values()->all(),
+        ];
     }
 }

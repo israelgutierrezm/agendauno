@@ -30,6 +30,7 @@ import {
   misDocumentos,
   pasarelasEstado,
   privacidadNegocio,
+  resenas,
   pausaMembresia,
   plataformaAdmin,
   recuperarContrasena,
@@ -79,6 +80,7 @@ export const i18n = createI18n({
       misDocumentos,
       miPrivacidad,
       privacidadNegocio,
+      resenas,
     },
   },
 });

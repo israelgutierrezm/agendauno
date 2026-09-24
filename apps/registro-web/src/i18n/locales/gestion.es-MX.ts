@@ -549,3 +549,19 @@ export const privacidadNegocio = {
     rechazada: "Rechazada",
   },
 };
+
+export const resenas = {
+  titulo: "Reseñas",
+  califica: "Califica tus clases",
+  calificacion: "Calificación",
+  estrellas: "{n} de 5",
+  comentarioPh: "¿Cómo te fue? (opcional)",
+  enviar: "Enviar",
+  gracias: "¡Gracias por tu calificación!",
+  total: "{n} reseñas",
+  porProfesional: "Por profesional",
+  vacio: "Aún no hay reseñas.",
+  oculta: "oculta del público",
+  ocultar: "Ocultar del público",
+  mostrar: "Mostrar al público",
+};

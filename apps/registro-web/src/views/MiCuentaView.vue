@@ -5,6 +5,7 @@ import AgendarCitaCuenta from "@/components/AgendarCitaCuenta.vue";
 import ListaFormularios from "@/components/ListaFormularios.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import type { FormularioPersona } from "@/lib/formularios";
+import CalificarClases from "@/components/CalificarClases.vue";
 import MiPrivacidad from "@/components/MiPrivacidad.vue";
 import MisDocumentos from "@/components/MisDocumentos.vue";
 import PaseEntrada from "@/components/PaseEntrada.vue";
@@ -399,6 +400,9 @@ onMounted(() => cargar());
             {{ $t("miCuenta.sinCreditos") }}
           </p>
         </div>
+
+        <!-- Calificar lo que tomó -->
+        <CalificarClases v-if="personaId !== null" />
 
         <!-- Pase de entrada (QR) -->
         <PaseEntrada v-if="personaId !== null" />

@@ -39,6 +39,7 @@ class EventoDeDominioTenant
         'factura.timbrada',
         'cuenta.creada',
         'privacidad.baja_solicitada',
+        'resena.creada',
     ];
 
     /**

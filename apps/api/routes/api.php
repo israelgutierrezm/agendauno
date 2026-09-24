@@ -73,6 +73,7 @@ use App\Modules\Tenancy\Http\Controllers\ReporteNegocioTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteRentabilidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteSucursalesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteTendenciasTenantController;
+use App\Modules\Tenancy\Http\Controllers\ResenasTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReservasTenantController;
 use App\Modules\Tenancy\Http\Controllers\RespuestasFormularioController;
 use App\Modules\Tenancy\Http\Controllers\ResumenMiembroTenantController;
@@ -219,6 +220,9 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/mi/privacidad', [MiPrivacidadTenantController::class, 'actualizar'])->name('mi.privacidad.actualizar');
             Route::get('/mi/datos', [MiPrivacidadTenantController::class, 'datos'])->name('mi.datos');
             Route::post('/mi/privacidad/baja', [MiPrivacidadTenantController::class, 'solicitarBaja'])->name('mi.privacidad.baja');
+            // Reseñas: lo que el alumno puede calificar y su calificación.
+            Route::get('/mi/resenas/pendientes', [ResenasTenantController::class, 'pendientes'])->name('mi.resenas.pendientes');
+            Route::post('/mi/reservas/{reserva}/resena', [ResenasTenantController::class, 'calificar'])->name('mi.reservas.resena');
             // Mis documentos: los que pide el negocio, subir el propio y descargarlo.
             Route::get('/mi/documentos', [MisDocumentosTenantController::class, 'index'])->name('mi.documentos.index');
             Route::post('/mi/documentos', [MisDocumentosTenantController::class, 'subir'])->name('mi.documentos.subir');
@@ -249,6 +253,9 @@ Route::prefix('v1')->group(function (): void {
 
             // Operación tenant-local: alta de alumnos (data plane del estudio).
             Route::get('/miembros', [MiembrosTenantController::class, 'index'])->middleware('puede:miembros.ver')->name('miembros.index');
+            // Reseñas de los alumnos (con promedios); el negocio puede ocultar una.
+            Route::get('/resenas', [ResenasTenantController::class, 'index'])->middleware('puede:miembros.ver')->name('resenas.index');
+            Route::put('/resenas/{resena}/visible', [ResenasTenantController::class, 'visibilidad'])->middleware('puede:miembros.gestionar')->name('resenas.visible');
             // Solicitudes de baja de datos (ARCO): el negocio las atiende o rechaza.
             Route::get('/solicitudes-privacidad', [SolicitudesPrivacidadTenantController::class, 'index'])->middleware('puede:miembros.gestionar')->name('solicitudes-privacidad.index');
             Route::post('/solicitudes-privacidad/{solicitud}/atender', [SolicitudesPrivacidadTenantController::class, 'atender'])->middleware('puede:miembros.gestionar')->name('solicitudes-privacidad.atender');

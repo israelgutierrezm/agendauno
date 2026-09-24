@@ -52,6 +52,13 @@ export const MENU: MenuItem[] = [
         permiso: "comunicaciones.gestionar",
       },
       {
+        clave: "resenas",
+        etiqueta: "resenas.titulo",
+        icono: "mensaje",
+        ruta: "resenas",
+        permiso: "miembros.ver",
+      },
+      {
         clave: "instructores",
         etiqueta: "nav.instructores",
         icono: "instructores",
