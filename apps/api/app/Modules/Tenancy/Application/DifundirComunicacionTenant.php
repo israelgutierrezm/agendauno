@@ -18,12 +18,15 @@ use Illuminate\Support\Facades\DB;
  * audiencia en vivo ({@see ResolverSegmentoTenant}) y encola un {@see MensajeTenant} por
  * destinatario, renderizando los marcadores {{persona_nombre}}/{{persona_email}} — NO
  * envía: eso lo hace el relay {@see EnviarMensajesTenant}. En canal `email` omite a
- * quien no tiene correo. Todo en una transacción del tenant (la conexión ya debe estar
+ * quien no tiene correo y en `push` a quien no tiene la app con sesión. Todo en una transacción del tenant (la conexión ya debe estar
  * activa). Devuelve el encabezado de la difusión con el total ENCOLADO.
  */
 class DifundirComunicacionTenant
 {
-    public function __construct(private ResolverSegmentoTenant $resolver) {}
+    public function __construct(
+        private ResolverSegmentoTenant $resolver,
+        private EntregarPushTenant $push,
+    ) {}
 
     public function ejecutar(
         SegmentoComunicacion $segmento,
@@ -51,6 +54,9 @@ class DifundirComunicacionTenant
                         continue; // sin correo no se puede encolar un email
                     }
                     $destinatario = $email;
+                }
+                if ($canal === CanalComunicacion::Push && ! $this->push->puedeRecibir($persona)) {
+                    continue; // sin la app con sesión no hay a dónde mandarla
                 }
 
                 $contexto = $this->contexto($persona);

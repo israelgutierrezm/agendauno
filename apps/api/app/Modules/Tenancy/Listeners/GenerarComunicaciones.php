@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Listeners;
 
+use App\Modules\Tenancy\Application\EntregarPushTenant;
 use App\Modules\Tenancy\Application\EnviarMensajesTenant;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
@@ -22,7 +23,10 @@ use App\Modules\Tenancy\Models\PlantillaMensajeTenant;
  */
 class GenerarComunicaciones
 {
-    public function __construct(private readonly GestorDeConexionTenant $gestor) {}
+    public function __construct(
+        private readonly GestorDeConexionTenant $gestor,
+        private readonly EntregarPushTenant $push,
+    ) {}
 
     public function handle(EventoDeDominioTenant $evento): void
     {
@@ -47,6 +51,9 @@ class GenerarComunicaciones
                     continue; // sin correo no se puede encolar un email
                 }
                 $destinatario = $email;
+            }
+            if ($plantilla->canal === CanalComunicacion::Push && ! $this->push->puedeRecibir($persona)) {
+                continue; // sin FCM o sin la app con sesión, no hay a dónde mandarla
             }
 
             MensajeTenant::query()->create([

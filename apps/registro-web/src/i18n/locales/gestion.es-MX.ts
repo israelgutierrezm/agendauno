@@ -146,7 +146,11 @@ export const comunicacionesAuto = {
   sinConfigurar: "Sin mensaje",
   editor: "Mensaje automático",
   canal: "Canal",
+  canalPush: "Notificación en la app",
+  ayudaPush:
+    "Llega al teléfono de quien tiene la app con sesión. Usa un título corto y una sola línea.",
   asunto: "Asunto",
+  asuntoPush: "Título",
   cuerpo: "Mensaje",
   marcadores:
     "Puedes usar {a}, {b} y {d}, además de los datos del evento (por ejemplo {c}).",

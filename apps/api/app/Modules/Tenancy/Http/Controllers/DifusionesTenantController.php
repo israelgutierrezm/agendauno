@@ -34,6 +34,8 @@ class DifusionesTenantController
                 'descripcion' => $s->descripcion(),
                 'total' => $conteos[$s->value] ?? 0,
             ], SegmentoComunicacion::cases()),
+            // Push solo aparece si la plataforma tiene FCM configurado.
+            'canales' => array_map(static fn (CanalComunicacion $c): string => $c->value, CanalComunicacion::disponibles()),
         ]);
     }
 
@@ -50,7 +52,7 @@ class DifusionesTenantController
     {
         $validado = $request->validate([
             'segmento' => ['required', Rule::enum(SegmentoComunicacion::class)],
-            'canal' => ['required', Rule::enum(CanalComunicacion::class)],
+            'canal' => ['required', Rule::in(array_map(static fn (CanalComunicacion $c): string => $c->value, CanalComunicacion::disponibles()))],
             'asunto' => ['required', 'string', 'max:255'],
             'cuerpo' => ['required', 'string', 'max:5000'],
         ]);

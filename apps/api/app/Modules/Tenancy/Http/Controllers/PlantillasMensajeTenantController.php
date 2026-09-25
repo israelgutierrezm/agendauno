@@ -26,6 +26,8 @@ class PlantillasMensajeTenantController
         return response()->json([
             'data' => $plantillas->map(fn (PlantillaMensajeTenant $p): array => $this->presentar($p))->all(),
             'eventos_disponibles' => EventoDeDominioTenant::TIPOS,
+            // Push solo aparece si la plataforma tiene FCM configurado.
+            'canales' => array_map(static fn (CanalComunicacion $c): string => $c->value, CanalComunicacion::disponibles()),
         ]);
     }
 
@@ -33,7 +35,7 @@ class PlantillasMensajeTenantController
     {
         $validado = $request->validate([
             'clave' => ['required', Rule::in(EventoDeDominioTenant::TIPOS)],
-            'canal' => ['required', Rule::enum(CanalComunicacion::class)],
+            'canal' => ['required', Rule::in(array_map(static fn (CanalComunicacion $c): string => $c->value, CanalComunicacion::disponibles()))],
             'asunto' => ['required', 'string', 'max:255'],
             'cuerpo' => ['required', 'string', 'max:5000'],
             'activo' => ['boolean'],

@@ -18,7 +18,8 @@ use Throwable;
 /**
  * Relay de comunicaciones (R28): envia los mensajes ENCOLADOS (y reintenta los
  * FALLIDOS que no agotaron intentos) de la BD del tenant. `interno` = queda como
- * bandeja in-app de la persona (se marca enviado); `email` = se envia por correo. Un
+ * bandeja in-app de la persona (se marca enviado); `email` = se envia por correo;
+ * `push` = notificación a los teléfonos con la app ({@see EntregarPushTenant}). Un
  * fallo deja el mensaje `fallido` para reintento (no rompe el lote). Debe correr con
  * la conexion del tenant ya activa (ver el comando que lo orquesta).
  */
@@ -28,7 +29,10 @@ class EnviarMensajesTenant
 
     private const LOTE = 500;
 
-    public function __construct(private readonly GestorDeConexionTenant $gestor) {}
+    public function __construct(
+        private readonly GestorDeConexionTenant $gestor,
+        private readonly EntregarPushTenant $push,
+    ) {}
 
     public function ejecutar(): int
     {
@@ -64,6 +68,11 @@ class EnviarMensajesTenant
     {
         if ($mensaje->canal === CanalComunicacion::Interno) {
             // Bandeja in-app: el propio mensaje es la entrega; nada externo que hacer.
+            return;
+        }
+        if ($mensaje->canal === CanalComunicacion::Push) {
+            $this->push->entregar($mensaje);
+
             return;
         }
 

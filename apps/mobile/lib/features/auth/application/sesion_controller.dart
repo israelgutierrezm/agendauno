@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/auth_token.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/storage/almacen_sesion.dart';
+import '../../notificaciones/application/push_controller.dart';
 import '../data/sesion.dart';
 
 /// Sesión restaurada del almacén cifrado al abrir la app (la fija `main`).
@@ -248,11 +249,12 @@ class SesionController extends Notifier<Sesion?> {
         as String?;
   }
 
-  /// Cierra la sesión: revoca el token en el servidor (si hay red) y la borra del
-  /// dispositivo.
+  /// Cierra la sesión: deja de recibir sus push, revoca el token en el servidor (si
+  /// hay red) y la borra del dispositivo.
   Future<void> cerrar() async {
     final actual = state;
     if (actual != null) {
+      await ref.read(pushProvider).olvidar(actual);
       try {
         await ref
             .read(dioProvider)

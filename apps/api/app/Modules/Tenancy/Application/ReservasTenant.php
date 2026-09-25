@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Comunicaciones\DatosDeSesion;
 use App\Modules\Tenancy\Creditos\Exceptions\SaldoInsuficiente;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\EstadoSesionTenant;
@@ -523,7 +524,7 @@ class ReservasTenant
 
         // Notificacion (outbox): "tienes un lugar, acepta antes de que expire".
         $this->eventos->registrar('reserva.ofrecida', 'reserva', $siguiente->ulid, [
-            'sesion_id' => $sesion->ulid,
+            ...DatosDeSesion::para($sesion),
             'persona_id' => $siguiente->persona?->ulid,
             'expira_en' => $siguiente->oferta_expira_en?->toIso8601String(),
         ]);

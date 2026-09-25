@@ -47,6 +47,14 @@ class MensajeTenant extends Model
     }
 
     /**
+     * @return BelongsTo<PlantillaMensajeTenant, $this>
+     */
+    public function plantilla(): BelongsTo
+    {
+        return $this->belongsTo(PlantillaMensajeTenant::class, 'plantilla_id')->withTrashed();
+    }
+
+    /**
      * @return BelongsTo<DifusionTenant, $this>
      */
     public function difusion(): BelongsTo

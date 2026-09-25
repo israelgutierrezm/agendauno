@@ -45,4 +45,14 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
     ],
 
+    /*
+    | Notificaciones push (Firebase Cloud Messaging, API HTTP v1): ruta al JSON de la
+    | cuenta de servicio del proyecto de Firebase de la app. Sin él no se envían push.
+    | El proyecto se toma del JSON (o de FCM_PROJECT_ID si se indica).
+    */
+    'fcm' => [
+        'credenciales' => env('FCM_CREDENTIALS'),
+        'proyecto' => env('FCM_PROJECT_ID'),
+    ],
+
 ];

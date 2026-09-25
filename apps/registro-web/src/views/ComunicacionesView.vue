@@ -32,7 +32,7 @@ interface Difusion {
   enviada_en: string | null;
 }
 
-type Canal = "interno" | "email";
+type Canal = "interno" | "email" | "push";
 interface Plantilla {
   id: string;
   clave: string;
@@ -70,7 +70,7 @@ const exito = ref<number | null>(null);
 
 const form = ref({
   segmento: "",
-  canal: "interno" as "interno" | "email",
+  canal: "interno" as Canal,
   asunto: "",
   cuerpo: "",
 });
@@ -97,10 +97,17 @@ const marcadoresTexto = computed(() =>
 );
 
 function canalTexto(canal: string): string {
+  if (canal === "push") {
+    return t("comunicacionesAuto.canalPush");
+  }
   return canal === "email"
     ? t("comunicaciones.canalEmail")
     : t("comunicaciones.canalInterno");
 }
+
+// Canales que ofrece el servidor: push solo si la plataforma tiene FCM configurado.
+const canalesDifusion = ref<Canal[]>(["interno", "email"]);
+const canalesAuto = ref<Canal[]>(["interno", "email"]);
 
 function fecha(iso: string | null): string {
   if (iso === null) {
@@ -119,10 +126,13 @@ async function cargar(): Promise<void> {
   error.value = null;
   try {
     const [seg, dif] = await Promise.all([
-      api.get<{ data: Segmento[] }>(`${base.value}/comunicaciones/segmentos`),
+      api.get<{ data: Segmento[]; canales?: Canal[] }>(
+        `${base.value}/comunicaciones/segmentos`,
+      ),
       api.get<{ data: Difusion[] }>(`${base.value}/comunicaciones/difusiones`),
     ]);
     segmentos.value = seg.data.data;
+    canalesDifusion.value = seg.data.canales ?? ["interno", "email"];
     difusiones.value = dif.data.data;
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -252,11 +262,8 @@ function cargarBorrador(): void {
 
 function configurar(clave: string): void {
   editor.value = { abierto: true, clave };
-  borrador.value.canal = plantillaDe(clave, "interno")
-    ? "interno"
-    : plantillaDe(clave, "email")
-      ? "email"
-      : "interno";
+  borrador.value.canal =
+    canalesAuto.value.find((c) => plantillaDe(clave, c)) ?? "interno";
   cargarBorrador();
 }
 
@@ -269,9 +276,11 @@ async function cargarAutomaticos(): Promise<void> {
   const { data } = await api.get<{
     data: Plantilla[];
     eventos_disponibles: string[];
+    canales?: Canal[];
   }>(`${base.value}/plantillas-mensaje`);
   plantillas.value = data.data;
   eventos.value = data.eventos_disponibles;
+  canalesAuto.value = data.canales ?? ["interno", "email"];
 }
 
 async function guardarPlantilla(): Promise<void> {
@@ -429,28 +438,18 @@ onMounted(cargar);
           }}</span>
           <div class="flex gap-1">
             <button
+              v-for="canal in canalesDifusion"
+              :key="canal"
               type="button"
               class="tu-badge cursor-pointer"
               :style="
-                form.canal === 'interno'
+                form.canal === canal
                   ? { background: 'var(--primario)', color: '#fff' }
                   : {}
               "
-              @click="form.canal = 'interno'"
+              @click="form.canal = canal"
             >
-              {{ $t("comunicaciones.canalInterno") }}
-            </button>
-            <button
-              type="button"
-              class="tu-badge cursor-pointer"
-              :style="
-                form.canal === 'email'
-                  ? { background: 'var(--primario)', color: '#fff' }
-                  : {}
-              "
-              @click="form.canal = 'email'"
-            >
-              {{ $t("comunicaciones.canalEmail") }}
+              {{ canalTexto(canal) }}
             </button>
           </div>
         </div>
@@ -575,10 +574,7 @@ onMounted(cargar);
               class="mt-0.5 flex flex-wrap gap-1.5 text-xs"
               :style="{ color: 'var(--texto-suave)' }"
             >
-              <template
-                v-for="canal in ['interno', 'email'] as const"
-                :key="canal"
-              >
+              <template v-for="canal in canalesAuto" :key="canal">
                 <span
                   v-if="plantillaDe(ev, canal)"
                   class="tu-badge"
@@ -586,10 +582,9 @@ onMounted(cargar);
                   >{{ canalTexto(canal) }}</span
                 >
               </template>
-              <span
-                v-if="!plantillaDe(ev, 'interno') && !plantillaDe(ev, 'email')"
-                >{{ $t("comunicacionesAuto.sinConfigurar") }}</span
-              >
+              <span v-if="!canalesAuto.some((c) => plantillaDe(ev, c))">{{
+                $t("comunicacionesAuto.sinConfigurar")
+              }}</span>
             </p>
           </div>
           <button
@@ -668,7 +663,7 @@ onMounted(cargar);
           <span class="tu-label">{{ $t("comunicacionesAuto.canal") }}</span>
           <div class="tu-segmentado" role="group">
             <button
-              v-for="canal in ['interno', 'email'] as const"
+              v-for="canal in canalesAuto"
               :key="canal"
               type="button"
               :aria-pressed="borrador.canal === canal"
@@ -680,7 +675,9 @@ onMounted(cargar);
         </div>
         <div>
           <label class="tu-label" for="pl-asunto">{{
-            $t("comunicacionesAuto.asunto")
+            borrador.canal === "push"
+              ? $t("comunicacionesAuto.asuntoPush")
+              : $t("comunicacionesAuto.asunto")
           }}</label>
           <input
             id="pl-asunto"
@@ -704,6 +701,13 @@ onMounted(cargar);
           />
           <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
             {{ marcadoresAuto }}
+          </p>
+          <p
+            v-if="borrador.canal === 'push'"
+            class="mt-1 text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("comunicacionesAuto.ayudaPush") }}
           </p>
         </div>
         <label class="flex items-center gap-2 text-sm">

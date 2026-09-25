@@ -42,6 +42,7 @@ use App\Modules\Tenancy\Http\Controllers\LlavesApiTenantController;
 use App\Modules\Tenancy\Http\Controllers\MarcaEstudioController;
 use App\Modules\Tenancy\Http\Controllers\MembresiasTenantController;
 use App\Modules\Tenancy\Http\Controllers\MensajesTenantController;
+use App\Modules\Tenancy\Http\Controllers\MiDispositivosTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiembrosTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiPagoAutomaticoTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiPrivacidadTenantController;
@@ -217,6 +218,9 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/waivers', [MiTenantController::class, 'waiversPendientes'])->name('mi.waivers.index');
             Route::post('/mi/waivers/{waiver}/aceptar', [MiTenantController::class, 'aceptarWaiver'])->name('mi.waivers.aceptar');
             Route::get('/mi/formularios', [MiTenantController::class, 'formularios'])->name('mi.formularios.index');
+            // Notificaciones push: la app registra el teléfono al iniciar sesión y lo quita al salir.
+            Route::post('/mi/dispositivos', [MiDispositivosTenantController::class, 'registrar'])->name('mi.dispositivos.store');
+            Route::delete('/mi/dispositivos', [MiDispositivosTenantController::class, 'quitar'])->name('mi.dispositivos.destroy');
             // Privacidad (ARCO): descargar mis datos, oponerme a promociones, pedir la baja.
             Route::get('/mi/privacidad', [MiPrivacidadTenantController::class, 'mostrar'])->name('mi.privacidad');
             Route::put('/mi/privacidad', [MiPrivacidadTenantController::class, 'actualizar'])->name('mi.privacidad.actualizar');
