@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use Illuminate\Http\JsonResponse;
@@ -24,6 +26,7 @@ class PasarelasTenantController
     public function __construct(
         private readonly RegistroDePasarelasTenant $registro,
         private readonly GestorDeConexionTenant $gestor,
+        private readonly RegistrarAuditoria $auditoria,
     ) {}
 
     /**
@@ -95,6 +98,10 @@ class PasarelasTenantController
         }
 
         $config = ConfiguracionPasarelaTenant::query()->firstOrNew(['proveedor' => $proveedor]);
+        // Para la bitácora: estado y NOMBRES de las llaves (nunca sus valores).
+        $antes = $config->exists
+            ? ['proveedor' => $proveedor, 'activa' => $config->activa, 'modo' => $config->modo, 'llaves_configuradas' => array_keys($config->llaves())]
+            : null;
         $config->activa = (bool) $validado['activa'];
         $config->modo = (string) $validado['modo'];
 
@@ -111,6 +118,14 @@ class PasarelasTenantController
         }
 
         $config->save();
+
+        $actor = $request->attributes->get('usuario_tenant');
+        $this->auditoria->registrar($actor instanceof Usuario ? $actor : null, 'pasarela.configurada', 'pasarela', $proveedor, $antes, [
+            'proveedor' => $proveedor,
+            'activa' => $config->activa,
+            'modo' => $config->modo,
+            'llaves_configuradas' => array_keys($config->llaves()),
+        ]);
 
         return response()->json(['data' => $this->presentar($proveedor, $config)]);
     }

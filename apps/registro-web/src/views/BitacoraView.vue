@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -17,6 +17,8 @@ interface Cambio {
   id: string;
   actor: string | null;
   accion: string;
+  // Qué pasó, en palabras (del servidor).
+  descripcion?: string;
   entidad_tipo: string;
   motivo: string | null;
   antes: Record<string, Valor> | null;
@@ -45,6 +47,28 @@ const abierto = ref<string | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
+// Filtros de los cambios (fechas en la zona del negocio) y paginación.
+const desde = ref("");
+const hasta = ref("");
+const usuario = ref("");
+const categoria = ref("");
+const texto = ref("");
+const pagina = ref(1);
+const ultimaPagina = ref(1);
+const actores = ref<{ id: string; nombre: string }[]>([]);
+const categorias = ref<string[]>([]);
+const descargando = ref(false);
+
+function filtros(): Record<string, string | number | undefined> {
+  return {
+    desde: desde.value || undefined,
+    hasta: hasta.value || undefined,
+    usuario: usuario.value || undefined,
+    categoria: categoria.value || undefined,
+    q: texto.value.trim() || undefined,
+  };
+}
+
 function fecha(iso: string | null): string {
   if (iso === null) {
     return "—";
@@ -58,6 +82,9 @@ function fecha(iso: string | null): string {
 }
 
 function accion(c: Cambio): string {
+  if (c.descripcion && c.descripcion !== c.accion) {
+    return c.descripcion;
+  }
   const clave = `bitacora.acciones.${c.accion}`;
   return te(clave) ? t(clave) : c.accion;
 }
@@ -86,10 +113,20 @@ async function cargar(): Promise<void> {
   error.value = null;
   try {
     if (pestana.value === "cambios") {
-      const { data } = await api.get<{ data: Cambio[] }>(
-        `${base.value}/auditorias`,
-      );
+      const { data } = await api.get<{
+        data: Cambio[];
+        meta?: {
+          ultima_pagina: number;
+          actores: { id: string; nombre: string }[];
+          categorias: string[];
+        };
+      }>(`${base.value}/auditorias`, {
+        params: { ...filtros(), page: pagina.value, per_page: 50 },
+      });
       cambios.value = data.data;
+      ultimaPagina.value = data.meta?.ultima_pagina ?? 1;
+      actores.value = data.meta?.actores ?? [];
+      categorias.value = data.meta?.categorias ?? [];
     } else {
       const { data } = await api.get<{ data: Acceso[] }>(
         `${base.value}/accesos`,
@@ -106,6 +143,43 @@ async function cargar(): Promise<void> {
 function irPestana(p: Pestana): void {
   pestana.value = p;
   void cargar();
+}
+
+function irPagina(n: number): void {
+  if (n < 1 || n > ultimaPagina.value) {
+    return;
+  }
+  pagina.value = n;
+  void cargar();
+}
+
+let espera: ReturnType<typeof setTimeout> | undefined;
+watch([desde, hasta, usuario, categoria, texto], () => {
+  clearTimeout(espera);
+  espera = setTimeout(() => {
+    pagina.value = 1;
+    void cargar();
+  }, 300);
+});
+
+async function descargar(): Promise<void> {
+  descargando.value = true;
+  try {
+    const { data } = await api.get<Blob>(`${base.value}/auditorias`, {
+      params: { ...filtros(), formato: "csv" },
+      responseType: "blob",
+    });
+    const url = URL.createObjectURL(data);
+    const enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download = "bitacora.csv";
+    enlace.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    descargando.value = false;
+  }
 }
 
 onMounted(cargar);
@@ -139,6 +213,51 @@ onMounted(cargar);
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
     </p>
+
+    <!-- Filtros de los cambios -->
+    <div
+      v-if="pestana === 'cambios'"
+      class="mt-5 flex flex-wrap items-end gap-3 text-sm"
+    >
+      <label class="grid gap-1">
+        <span class="tu-label">{{ $t("bitacora.desde") }}</span>
+        <input v-model="desde" type="date" class="tu-input" />
+      </label>
+      <label class="grid gap-1">
+        <span class="tu-label">{{ $t("bitacora.hasta") }}</span>
+        <input v-model="hasta" type="date" class="tu-input" />
+      </label>
+      <label class="grid gap-1">
+        <span class="tu-label">{{ $t("bitacora.quien") }}</span>
+        <select v-model="usuario" class="tu-input">
+          <option value="">{{ $t("bitacora.todos") }}</option>
+          <option v-for="a in actores" :key="a.id" :value="a.id">
+            {{ a.nombre }}
+          </option>
+        </select>
+      </label>
+      <label class="grid gap-1">
+        <span class="tu-label">{{ $t("bitacora.categoria") }}</span>
+        <select v-model="categoria" class="tu-input">
+          <option value="">{{ $t("bitacora.todos") }}</option>
+          <option v-for="c in categorias" :key="c" :value="c">
+            {{ $t(`bitacora.categorias.${c}`) }}
+          </option>
+        </select>
+      </label>
+      <label class="grid flex-1 gap-1 min-w-[10rem]">
+        <span class="tu-label">{{ $t("bitacora.buscar") }}</span>
+        <input v-model="texto" class="tu-input" />
+      </label>
+      <button
+        type="button"
+        class="tu-btn tu-btn-fantasma text-sm"
+        :disabled="descargando"
+        @click="descargar"
+      >
+        {{ $t("bitacora.descargar") }}
+      </button>
+    </div>
 
     <div class="mt-5 tu-card p-5">
       <p
@@ -217,6 +336,30 @@ onMounted(cargar);
             </table>
           </li>
         </ul>
+        <div
+          v-if="ultimaPagina > 1"
+          class="mt-3 flex items-center justify-between gap-3 text-sm"
+        >
+          <button
+            type="button"
+            class="tu-enlace"
+            :disabled="pagina <= 1"
+            @click="irPagina(pagina - 1)"
+          >
+            ← {{ $t("bitacora.anterior") }}
+          </button>
+          <span :style="{ color: 'var(--texto-suave)' }">{{
+            $t("bitacora.pagina", { page: pagina, total: ultimaPagina })
+          }}</span>
+          <button
+            type="button"
+            class="tu-enlace"
+            :disabled="pagina >= ultimaPagina"
+            @click="irPagina(pagina + 1)"
+          >
+            {{ $t("bitacora.siguiente") }} →
+          </button>
+        </div>
       </template>
 
       <!-- Accesos -->

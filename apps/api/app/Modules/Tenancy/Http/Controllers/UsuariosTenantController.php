@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\BajasTenant;
 use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
+use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Models\AsignacionPersonalTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\SucursalTenant;
@@ -38,6 +39,7 @@ class UsuariosTenantController
         private readonly EnviarActivacionTenant $enviarActivacion,
         private readonly PersonaDeUsuarioTenant $personas,
         private readonly BajasTenant $bajas,
+        private readonly RegistrarAuditoria $auditoria,
     ) {}
 
     /**
@@ -178,6 +180,14 @@ class UsuariosTenantController
             ]);
         }
 
+        if (! $reactivado) {
+            $this->auditoria->registrar($this->actor($request), 'usuario.invitado', 'usuario', (string) $usuario->ulid, null, [
+                'nombre' => $usuario->name,
+                'email' => $usuario->email,
+                'rol' => $validado['rol'],
+            ]);
+        }
+
         // Genera el token y ENVÍA la invitación por correo.
         $token = $this->enviarActivacion->enviar($this->estudioDe($request), (string) $usuario->email);
 
@@ -232,10 +242,17 @@ class UsuariosTenantController
 
         $this->protegerPropietario($request, $usuario, $rolesNuevos);
 
+        $antes = $usuario->rolesEfectivos();
         $usuario->update([
             'roles' => $rolesNuevos,
             'rol' => CatalogoDePermisosTenant::rolPrincipal($rolesNuevos),
         ]);
+        if ($antes !== $rolesNuevos) {
+            $this->auditoria->registrar($this->actor($request), 'usuario.roles', 'usuario', (string) $usuario->ulid,
+                ['nombre' => $usuario->name, 'roles' => $antes],
+                ['nombre' => $usuario->name, 'roles' => $rolesNuevos],
+            );
+        }
 
         return response()->json(['data' => $this->presentar($usuario->refresh())]);
     }
