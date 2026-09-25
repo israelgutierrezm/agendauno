@@ -170,6 +170,48 @@ class OpcionesCita {
   final List<OpcionCita> profesionales;
 }
 
+/// Lo que el alumno tiene por pagar: p. ej. la renovación de su membresía, que se
+/// abre unos días antes para pagarla por adelantado. Una cita apartada se paga
+/// desde su reserva.
+class OrdenPorPagar {
+  const OrdenPorPagar({
+    required this.id,
+    required this.concepto,
+    required this.totalMinor,
+  });
+
+  final String id;
+  final String concepto;
+  final int totalMinor;
+
+  /// Las órdenes pendientes con productos (las de una cita no traen productos).
+  static List<OrdenPorPagar> pendientes(List<dynamic> ordenes) => ordenes
+      .whereType<Map<String, dynamic>>()
+      .where(
+        (o) =>
+            o['estado'] == 'pendiente' &&
+            ((o['lineas'] ?? []) as List).isNotEmpty,
+      )
+      .map(OrdenPorPagar.desdeJson)
+      .toList();
+
+  factory OrdenPorPagar.desdeJson(Map<String, dynamic> j) {
+    final lineas = ((j['lineas'] ?? []) as List)
+        .whereType<Map<String, dynamic>>()
+        .map((l) {
+          final nombre = (l['producto'] as String?) ?? 'Producto';
+          final cantidad = (l['cantidad'] as int?) ?? 1;
+          return cantidad > 1 ? '$nombre × $cantidad' : nombre;
+        })
+        .toList();
+    return OrdenPorPagar(
+      id: j['id'] as String,
+      concepto: lineas.join(', '),
+      totalMinor: (j['total_minor'] as int?) ?? 0,
+    );
+  }
+}
+
 /// Estado agregado de la pantalla Mi cuenta.
 class MiCuenta {
   const MiCuenta({
@@ -180,7 +222,11 @@ class MiCuenta {
     this.pagoEnLinea = false,
     this.pagoAutomatico = false,
     this.resenasPendientes = const [],
+    this.porPagar = const [],
   });
+
+  /// Lo que tiene pendiente de pago (p. ej. su renovación).
+  final List<OrdenPorPagar> porPagar;
 
   /// Clases o citas a las que asistió y aún no califica.
   final List<ResenaPendiente> resenasPendientes;

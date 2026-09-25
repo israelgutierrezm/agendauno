@@ -40,6 +40,7 @@ class BajaDePersonaTenant
         private readonly RegistrarEventoTenant $eventos,
         private readonly RegistrarAuditoria $auditoria,
         private readonly DomiciliacionesTenant $domiciliaciones,
+        private readonly DeudaDeRenovacionTenant $deudas,
     ) {}
 
     public function solicitar(PersonaTenant $persona, ?string $motivo): SolicitudPrivacidadTenant
@@ -104,6 +105,7 @@ class BajaDePersonaTenant
                 ->where('persona_id', $persona->getKey())
                 ->where('estado', '!=', EstadoAcuerdo::Cancelado->value)
                 ->update(['estado' => EstadoAcuerdo::Cancelado->value]);
+            $this->deudas->anular(AcuerdoTenant::query()->where('persona_id', $persona->getKey())->pluck('id')->all(), $actor);
 
             $documentos = Documento::query()->where('persona_id', $persona->getKey())->get();
             $archivos = $documentos->pluck('ruta')->filter()->all();

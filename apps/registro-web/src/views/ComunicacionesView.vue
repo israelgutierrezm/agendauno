@@ -184,6 +184,8 @@ const MARCADORES_POR_EVENTO: Record<string, string[]> = {
   "reserva.confirmada": MARCADORES_SESION,
   "reserva.recordatorio_24h": MARCADORES_SESION,
   "reserva.recordatorio_2h": MARCADORES_SESION,
+  "reserva.cancelada": [...MARCADORES_SESION, "credito"],
+  "reserva.sesion_cancelada": [...MARCADORES_SESION, "credito", "enlace"],
   "orden.pagada": [
     "persona_nombre",
     "detalle",
@@ -196,6 +198,15 @@ const MARCADORES_POR_EVENTO: Record<string, string[]> = {
   "cuenta.creada": ["persona_nombre", "enlace", "negocio"],
   "membresia.pausada": ["persona_nombre", "producto", "hasta", "negocio"],
   "membresia.reanudada": ["persona_nombre", "producto", "negocio"],
+  "membresia.renovacion_proxima": [
+    "persona_nombre",
+    "producto",
+    "fecha",
+    "monto",
+    "como_pagar",
+    "enlace",
+    "negocio",
+  ],
   "cobro.fallido": [
     "persona_nombre",
     "producto",

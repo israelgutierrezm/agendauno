@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 
 /**
@@ -45,5 +46,28 @@ class DeudaDeRenovacionTenant
         $orden->update(['renueva_acuerdo_id' => $acuerdo->getKey()]);
 
         return $orden;
+    }
+
+    /**
+     * Las membresías ya no se renuevan (se cancelaron): su orden de renovación
+     * pendiente, si la había (p. ej. la abrió el aviso de renovación), deja de estar
+     * por cobrar.
+     *
+     * @param  array<int, mixed>  $acuerdoIds
+     */
+    public function anular(array $acuerdoIds, ?Usuario $actor = null): void
+    {
+        if ($acuerdoIds === []) {
+            return;
+        }
+
+        OrdenTenant::query()
+            ->whereIn('renueva_acuerdo_id', $acuerdoIds)
+            ->where('estado', EstadoOrden::Pendiente->value)
+            ->update([
+                'estado' => EstadoOrden::Cancelada->value,
+                'cancelada_en' => now(),
+                'cancelada_por' => $actor?->getKey(),
+            ]);
     }
 }

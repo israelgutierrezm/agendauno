@@ -48,7 +48,18 @@ class CuentaRepository {
       pagoEnLinea: (data['pago_en_linea'] ?? false) as bool,
       pagoAutomatico: (data['pago_automatico'] ?? false) as bool,
       resenasPendientes: await _resenasPendientes(),
+      porPagar: await _porPagar(),
     );
+  }
+
+  /// Lo que tiene pendiente de pago; si falla, simplemente no se muestra.
+  Future<List<OrdenPorPagar>> _porPagar() async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('$_base/mi/ordenes');
+      return OrdenPorPagar.pendientes((res.data?['data'] ?? []) as List);
+    } on DioException {
+      return const [];
+    }
   }
 
   /// Lo que puede calificar; si falla, simplemente no se ofrece.

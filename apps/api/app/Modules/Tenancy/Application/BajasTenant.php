@@ -37,6 +37,7 @@ class BajasTenant
         private readonly AutenticacionTenant $auth,
         private readonly DomiciliacionesTenant $domiciliaciones,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly DeudaDeRenovacionTenant $deudas,
     ) {}
 
     /**
@@ -72,6 +73,7 @@ class BajasTenant
             AcuerdoTenant::query()
                 ->whereKey($vigentes->modelKeys())
                 ->update(['estado' => EstadoAcuerdo::Cancelado->value]);
+            $this->deudas->anular($vigentes->modelKeys(), $actor);
 
             $usuario = $this->usuarioSoloAlumno($persona);
             if ($usuario instanceof Usuario) {

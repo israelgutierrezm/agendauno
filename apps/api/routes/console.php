@@ -43,6 +43,10 @@ Schedule::command('turnouno:expirar-reservas-pago')->everyMinute()->withoutOverl
 // Antes de escalar el dunning, para dar oportunidad a los reintentos del día.
 Schedule::command('turnouno:cobrar-suscripciones')->dailyAt('00:45')->withoutOverlapping();
 
+// Aviso de renovación próxima (3 días antes), a las 09:00 de CDMX: cuándo, cuánto y
+// cómo se paga; a quien paga a mano le abre la renovación para pagarla por adelantado.
+Schedule::command('turnouno:avisar-renovaciones')->dailyAt('15:00')->withoutOverlapping();
+
 // Cobro del SaaS mes vencido (ADR 0019): el día 1 se congela la medición del mes que
 // cerró (alumnos o profesionales activos según la modalidad) y se genera su cargo.
 Schedule::command('turnouno:generar-cargos-renta')->monthlyOn(1, '02:00')->withoutOverlapping();

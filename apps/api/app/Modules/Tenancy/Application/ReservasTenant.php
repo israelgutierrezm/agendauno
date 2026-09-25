@@ -53,6 +53,7 @@ class ReservasTenant
         private readonly RegistrarEventoTenant $eventos,
         private readonly OrdenesTenant $ordenes,
         private readonly EmitirReservaConfirmadaTenant $confirmada,
+        private readonly EmitirReservaCanceladaTenant $cancelada,
     ) {}
 
     /**
@@ -422,6 +423,8 @@ class ReservasTenant
             // Bloquea la sesion para promover de forma segura tras liberar el cupo.
             $sesion = SesionTenant::query()->whereKey($bloqueada->sesion_id)->lockForUpdate()->firstOrFail();
 
+            $estadoAnterior = $bloqueada->estado;
+            $credito = '';
             $retencion = $bloqueada->retencion;
             if ($retencion !== null) {
                 // Politica congelada en la reserva (R8); `$horasLimite` es solo el
@@ -435,6 +438,7 @@ class ReservasTenant
                     // A tiempo, o el estudio no penaliza la cancelacion tardia: el
                     // credito retenido vuelve al miembro.
                     $this->creditos->liberar($retencion);
+                    $credito = EmitirReservaCanceladaTenant::CREDITO_DEVUELTO;
                 } else {
                     // Cancelación tardía con penalización: el crédito se cobra. Se deja
                     // trazable con el origen (reserva) y la reserva referida.
@@ -445,10 +449,15 @@ class ReservasTenant
                         null,
                         ['motivo' => 'cancelacion_tardia'],
                     ));
+                    $credito = EmitirReservaCanceladaTenant::creditoCobrado($horas);
                 }
             }
 
             $bloqueada->update(['estado' => EstadoReserva::Cancelada->value]);
+            // Aviso al alumno (no al salir de la lista de espera ni de una reserva ya vencida).
+            if (in_array($estadoAnterior, [EstadoReserva::Confirmada, EstadoReserva::PendientePago], true)) {
+                $this->cancelada->reservaCancelada($bloqueada, $credito);
+            }
             // Si su orden (cita de pago) seguía sin cobrar, ya no se entregará: se cancela.
             $this->cancelarOrdenPendiente($bloqueada);
 
@@ -692,12 +701,16 @@ class ReservasTenant
                 ->get();
 
             foreach ($reservas as $reserva) {
+                $devuelto = false;
                 if ($reserva->retencion !== null) {
                     $this->creditos->liberar($reserva->retencion);
+                    $devuelto = true;
                 }
 
                 $reserva->update(['estado' => EstadoReserva::Cancelada->value]);
                 $this->cancelarOrdenPendiente($reserva);
+                // Cada persona afectada recibe el aviso, con el enlace para reservar otra.
+                $this->cancelada->sesionCancelada($reserva, $devuelto);
             }
 
             $bloqueada->update(['estado' => EstadoSesionTenant::Cancelada->value]);

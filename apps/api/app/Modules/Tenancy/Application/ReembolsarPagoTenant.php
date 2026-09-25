@@ -58,6 +58,7 @@ class ReembolsarPagoTenant
         private readonly RegistroDePasarelasTenant $registro,
         private readonly RegistrarEventoTenant $eventos,
         private readonly DomiciliacionesTenant $domiciliaciones,
+        private readonly DeudaDeRenovacionTenant $deudas,
     ) {}
 
     /**
@@ -264,8 +265,9 @@ class ReembolsarPagoTenant
                 }
             }
             $acuerdo->update(['estado' => EstadoAcuerdo::Cancelado->value]);
-            // Cancelada ya no se renueva: sin pago automático.
+            // Cancelada ya no se renueva: sin pago automático ni renovación por cobrar.
             $this->domiciliaciones->desactivar($acuerdo);
+            $this->deudas->anular([$acuerdo->getKey()], $actor);
         }
     }
 

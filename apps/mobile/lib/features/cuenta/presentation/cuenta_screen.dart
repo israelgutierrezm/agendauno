@@ -77,6 +77,11 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
                 for (final r in cuenta.resenasPendientes)
                   _CalificarClase(r, key: ValueKey(r.reservaId)),
               ],
+              if (cuenta.porPagar.isNotEmpty) ...[
+                const _Titulo('Por pagar'),
+                for (final o in cuenta.porPagar)
+                  _PorPagar(o, pagoEnLinea: cuenta.pagoEnLinea),
+              ],
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.qr_code_2),
@@ -281,36 +286,6 @@ class _Reserva extends ConsumerWidget {
   bool get _sePagaAqui =>
       r.estado == 'pendiente_pago' && pagoEnLinea && r.ordenId != null;
 
-  /// Abre la página de pago de la pasarela en el navegador; al volver a la app la
-  /// cuenta se actualiza (el webhook confirma el pago).
-  Future<void> _pagar(BuildContext context, WidgetRef ref) async {
-    final repo = ref.read(cuentaRepositoryProvider);
-    if (repo == null) {
-      return;
-    }
-    final messenger = ScaffoldMessenger.of(context);
-    await hacerConAviso(context, () async {
-      final url = await repo.pagarOrden(r.ordenId!);
-      if (url == null) {
-        await ref.read(cuentaProvider.notifier).recargar();
-        return;
-      }
-      final abierto = await launchUrl(
-        Uri.parse(url),
-        mode: LaunchMode.externalApplication,
-      );
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            abierto
-                ? 'Completa el pago en el navegador; al volver actualizamos tu cuenta.'
-                : 'No se pudo abrir la página de pago.',
-          ),
-        ),
-      );
-    });
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(cuentaProvider.notifier);
@@ -358,7 +333,7 @@ class _Reserva extends ConsumerWidget {
               children: [
                 if (_sePagaAqui)
                   FilledButton(
-                    onPressed: () => _pagar(context, ref),
+                    onPressed: () => pagarEnLinea(context, ref, r.ordenId!),
                     child: const Text('Pagar'),
                   ),
                 if (r.ofrecida)
@@ -388,6 +363,67 @@ class _Reserva extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Abre la página de pago de la pasarela en el navegador; al volver a la app la
+/// cuenta se actualiza (el webhook confirma el pago).
+Future<void> pagarEnLinea(
+  BuildContext context,
+  WidgetRef ref,
+  String ordenId,
+) async {
+  final repo = ref.read(cuentaRepositoryProvider);
+  if (repo == null) {
+    return;
+  }
+  final messenger = ScaffoldMessenger.of(context);
+  await hacerConAviso(context, () async {
+    final url = await repo.pagarOrden(ordenId);
+    if (url == null) {
+      await ref.read(cuentaProvider.notifier).recargar();
+      return;
+    }
+    final abierto = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          abierto
+              ? 'Completa el pago en el navegador; al volver actualizamos tu cuenta.'
+              : 'No se pudo abrir la página de pago.',
+        ),
+      ),
+    );
+  });
+}
+
+/// Una orden pendiente: se paga aquí si el negocio cobra en línea; si no, en
+/// recepción.
+class _PorPagar extends ConsumerWidget {
+  const _PorPagar(this.o, {this.pagoEnLinea = false});
+
+  final OrdenPorPagar o;
+  final bool pagoEnLinea;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Card(
+    child: ListTile(
+      title: Text(o.concepto),
+      subtitle: Text(
+        pagoEnLinea
+            ? Formato.dinero(o.totalMinor)
+            : '${Formato.dinero(o.totalMinor)} · Págalo en recepción',
+      ),
+      trailing: pagoEnLinea
+          ? FilledButton(
+              onPressed: () => pagarEnLinea(context, ref, o.id),
+              child: const Text('Pagar'),
+            )
+          : null,
+    ),
+  );
 }
 
 class _Clase extends ConsumerWidget {
