@@ -9,13 +9,15 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\DispositivoPushTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Database\Eloquent\Collection;
 use RuntimeException;
 use Throwable;
 
 /**
- * Entrega de un mensaje por push: a cada teléfono donde la persona tiene la app con
- * sesión en este negocio. Los tokens que FCM ya no reconoce se olvidan. Si ningún
+ * Entrega de un mensaje por push: a cada teléfono donde su destinatario (el usuario
+ * del equipo al que va, o si no el de la persona) tiene la app con sesión en este
+ * negocio. Los tokens que FCM ya no reconoce se olvidan. Si ningún
  * teléfono lo recibió por un error pasajero, se lanza para que el relay reintente.
  */
 class EntregarPushTenant
@@ -30,14 +32,23 @@ class EntregarPushTenant
      */
     public function puedeRecibir(?PersonaTenant $persona): bool
     {
-        return $this->fcm->configurado() && $this->dispositivos($persona)->isNotEmpty();
+        return $this->fcm->configurado() && $this->dispositivos(self::usuarioDe($persona))->isNotEmpty();
+    }
+
+    /**
+     * ¿Se le puede mandar push a este usuario del equipo?
+     */
+    public function puedeRecibirUsuario(Usuario $usuario): bool
+    {
+        return $this->fcm->configurado() && $this->dispositivos((int) $usuario->getKey())->isNotEmpty();
     }
 
     public function entregar(MensajeTenant $mensaje): void
     {
-        $dispositivos = $this->dispositivos($mensaje->persona);
+        $usuario = $mensaje->usuario_id !== null ? (int) $mensaje->usuario_id : self::usuarioDe($mensaje->persona);
+        $dispositivos = $this->dispositivos($usuario);
         if ($dispositivos->isEmpty()) {
-            throw new RuntimeException('La persona ya no tiene la app con sesión en ningún teléfono.');
+            throw new RuntimeException('El destinatario ya no tiene la app con sesión en ningún teléfono.');
         }
 
         $datos = [
@@ -67,18 +78,30 @@ class EntregarPushTenant
             throw $pasajero;
         }
 
-        throw new RuntimeException('Ningún teléfono de la persona aceptó la notificación.');
+        throw new RuntimeException('Ningún teléfono del destinatario aceptó la notificación.');
+    }
+
+    /**
+     * El usuario de la persona (su cuenta en la app), si sigue activa.
+     */
+    private static function usuarioDe(?PersonaTenant $persona): ?int
+    {
+        if (! $persona instanceof PersonaTenant || $persona->trashed() || $persona->usuario_id === null) {
+            return null;
+        }
+
+        return (int) $persona->usuario_id;
     }
 
     /**
      * @return Collection<int, DispositivoPushTenant>
      */
-    private function dispositivos(?PersonaTenant $persona): Collection
+    private function dispositivos(?int $usuarioId): Collection
     {
-        if (! $persona instanceof PersonaTenant || $persona->trashed() || $persona->usuario_id === null) {
+        if ($usuarioId === null) {
             return new Collection;
         }
 
-        return DispositivoPushTenant::query()->where('usuario_id', $persona->usuario_id)->orderBy('id')->get();
+        return DispositivoPushTenant::query()->where('usuario_id', $usuarioId)->orderBy('id')->get();
     }
 }

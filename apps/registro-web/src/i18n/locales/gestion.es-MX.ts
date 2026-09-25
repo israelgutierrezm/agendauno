@@ -146,6 +146,12 @@ export const comunicacionesAuto = {
   sinConfigurar: "Sin mensaje",
   editor: "Mensaje automático",
   canal: "Canal",
+  para: "Para",
+  paraPersona: "Alumno o cliente",
+  paraProfesional: "Profesional de la cita",
+  ayudaProfesional:
+    "Le llega a quien atiende la cita, por correo o en la app. En clases grupales no se avisa al instructor por cada reserva.",
+  alProfesional: "Profesional",
   canalPush: "Notificación en la app",
   ayudaPush:
     "Llega al teléfono de quien tiene la app con sesión. Usa un título corto y una sola línea.",

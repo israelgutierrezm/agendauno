@@ -33,10 +33,13 @@ interface Difusion {
 }
 
 type Canal = "interno" | "email" | "push";
+// A quién va el mensaje automático: la persona del evento o el profesional de la cita.
+type Destinatario = "persona" | "profesional";
 interface Plantilla {
   id: string;
   clave: string;
   canal: Canal;
+  destinatario: Destinatario;
   asunto: string;
   cuerpo: string;
   activo: boolean;
@@ -172,11 +175,33 @@ const editor = ref<{ abierto: boolean; clave: string }>({
   clave: "",
 });
 const borrador = ref<{
+  destinatario: Destinatario;
   canal: Canal;
   asunto: string;
   cuerpo: string;
   activo: boolean;
-}>({ canal: "interno", asunto: "", cuerpo: "", activo: true });
+}>({
+  destinatario: "persona",
+  canal: "interno",
+  asunto: "",
+  cuerpo: "",
+  activo: true,
+});
+
+// Al profesional se le avisa por correo o en la app (el equipo no tiene bandeja).
+const canalesDelBorrador = computed(() =>
+  borrador.value.destinatario === "profesional"
+    ? canalesAuto.value.filter((c) => c !== "interno")
+    : canalesAuto.value,
+);
+// Lo configurado de un evento, en orden: primero al alumno, luego al profesional.
+function configuradas(clave: string): Plantilla[] {
+  return (["persona", "profesional"] as const).flatMap((d) =>
+    canalesAuto.value
+      .map((c) => plantillaDe(clave, c, d))
+      .filter((p): p is Plantilla => p !== undefined),
+  );
+}
 const guardandoPlantilla = ref(false);
 
 // Marcadores de los correos que traen datos legibles (confirmación, recordatorios,
@@ -246,13 +271,27 @@ const marcadoresAuto = computed(() => {
       });
 });
 
-function plantillaDe(clave: string, canal: Canal): Plantilla | undefined {
-  return plantillas.value.find((p) => p.clave === clave && p.canal === canal);
+function plantillaDe(
+  clave: string,
+  canal: Canal,
+  destinatario: Destinatario = "persona",
+): Plantilla | undefined {
+  return plantillas.value.find(
+    (p) =>
+      p.clave === clave &&
+      p.canal === canal &&
+      (p.destinatario ?? "persona") === destinatario,
+  );
 }
 
 function cargarBorrador(): void {
-  const existente = plantillaDe(editor.value.clave, borrador.value.canal);
+  const existente = plantillaDe(
+    editor.value.clave,
+    borrador.value.canal,
+    borrador.value.destinatario,
+  );
   borrador.value = {
+    destinatario: borrador.value.destinatario,
     canal: borrador.value.canal,
     asunto: existente?.asunto ?? "",
     cuerpo: existente?.cuerpo ?? "",
@@ -262,6 +301,7 @@ function cargarBorrador(): void {
 
 function configurar(clave: string): void {
   editor.value = { abierto: true, clave };
+  borrador.value.destinatario = "persona";
   borrador.value.canal =
     canalesAuto.value.find((c) => plantillaDe(clave, c)) ?? "interno";
   cargarBorrador();
@@ -269,6 +309,18 @@ function configurar(clave: string): void {
 
 function elegirCanal(canal: Canal): void {
   borrador.value.canal = canal;
+  cargarBorrador();
+}
+
+function elegirDestinatario(destinatario: Destinatario): void {
+  borrador.value.destinatario = destinatario;
+  const canales = canalesDelBorrador.value;
+  if (!canales.includes(borrador.value.canal)) {
+    borrador.value.canal =
+      canales.find((c) => plantillaDe(editor.value.clave, c, destinatario)) ??
+      canales[0] ??
+      "email";
+  }
   cargarBorrador();
 }
 
@@ -301,7 +353,11 @@ async function guardarPlantilla(): Promise<void> {
 }
 
 async function eliminarPlantilla(): Promise<void> {
-  const existente = plantillaDe(editor.value.clave, borrador.value.canal);
+  const existente = plantillaDe(
+    editor.value.clave,
+    borrador.value.canal,
+    borrador.value.destinatario,
+  );
   if (
     existente === undefined ||
     !window.confirm(t("comunicacionesAuto.confirmarEliminar"))
@@ -574,15 +630,18 @@ onMounted(cargar);
               class="mt-0.5 flex flex-wrap gap-1.5 text-xs"
               :style="{ color: 'var(--texto-suave)' }"
             >
-              <template v-for="canal in canalesAuto" :key="canal">
-                <span
-                  v-if="plantillaDe(ev, canal)"
-                  class="tu-badge"
-                  :class="{ 'tu-badge-exito': plantillaDe(ev, canal)?.activo }"
-                  >{{ canalTexto(canal) }}</span
-                >
-              </template>
-              <span v-if="!canalesAuto.some((c) => plantillaDe(ev, c))">{{
+              <span
+                v-for="p in configuradas(ev)"
+                :key="p.id"
+                class="tu-badge"
+                :class="{ 'tu-badge-exito': p.activo }"
+                >{{
+                  p.destinatario === "profesional"
+                    ? `${$t("comunicacionesAuto.alProfesional")} · ${canalTexto(p.canal)}`
+                    : canalTexto(p.canal)
+                }}</span
+              >
+              <span v-if="configuradas(ev).length === 0">{{
                 $t("comunicacionesAuto.sinConfigurar")
               }}</span>
             </p>
@@ -660,10 +719,35 @@ onMounted(cargar);
         @submit.prevent="guardarPlantilla"
       >
         <div>
+          <span class="tu-label">{{ $t("comunicacionesAuto.para") }}</span>
+          <div class="tu-segmentado" role="group">
+            <button
+              v-for="d in ['persona', 'profesional'] as const"
+              :key="d"
+              type="button"
+              :aria-pressed="borrador.destinatario === d"
+              @click="elegirDestinatario(d)"
+            >
+              {{
+                d === "persona"
+                  ? $t("comunicacionesAuto.paraPersona")
+                  : $t("comunicacionesAuto.paraProfesional")
+              }}
+            </button>
+          </div>
+          <p
+            v-if="borrador.destinatario === 'profesional'"
+            class="mt-1 text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("comunicacionesAuto.ayudaProfesional") }}
+          </p>
+        </div>
+        <div>
           <span class="tu-label">{{ $t("comunicacionesAuto.canal") }}</span>
           <div class="tu-segmentado" role="group">
             <button
-              v-for="canal in canalesAuto"
+              v-for="canal in canalesDelBorrador"
               :key="canal"
               type="button"
               :aria-pressed="borrador.canal === canal"

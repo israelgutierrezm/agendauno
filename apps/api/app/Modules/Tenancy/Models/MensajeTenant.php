@@ -24,7 +24,7 @@ class MensajeTenant extends Model
     protected $table = 'mensajes';
 
     protected $fillable = [
-        'persona_id', 'plantilla_id', 'difusion_id', 'canal', 'destinatario', 'asunto', 'cuerpo',
+        'persona_id', 'usuario_id', 'plantilla_id', 'difusion_id', 'canal', 'destinatario', 'asunto', 'cuerpo',
         'estado', 'intentos', 'ultimo_error', 'evento_ulid', 'enviado_en',
     ];
 
@@ -44,6 +44,17 @@ class MensajeTenant extends Model
     public function persona(): BelongsTo
     {
         return $this->belongsTo(PersonaTenant::class, 'persona_id')->withTrashed();
+    }
+
+    /**
+     * El usuario del equipo que lo recibe (avisos al profesional); vacío si va a la
+     * persona.
+     *
+     * @return BelongsTo<Usuario, $this>
+     */
+    public function usuario(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'usuario_id')->withTrashed();
     }
 
     /**

@@ -29,7 +29,7 @@ class MensajesTenantController
                 isset($validado['estado']),
                 fn ($q) => $q->where('estado', $validado['estado']),
             )
-            ->with('persona')
+            ->with(['persona', 'usuario'])
             ->orderByDesc('id')
             ->limit(self::LIMITE)
             ->get();
@@ -37,7 +37,8 @@ class MensajesTenantController
         return response()->json([
             'data' => $mensajes->map(fn (MensajeTenant $m): array => [
                 'id' => $m->ulid,
-                'persona' => $m->persona?->nombre,
+                // A quién se envió: el usuario del equipo (avisos al profesional) o la persona.
+                'persona' => $m->usuario->name ?? $m->persona?->nombre,
                 'canal' => $m->canal->value,
                 'destinatario' => $m->destinatario,
                 'asunto' => $m->asunto,

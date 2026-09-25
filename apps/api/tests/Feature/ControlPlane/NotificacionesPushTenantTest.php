@@ -49,33 +49,6 @@ afterEach(function (): void {
 });
 
 /**
- * Cuenta de servicio de Firebase de prueba (llave RSA nueva); devuelve la llave
- * pública para verificar la firma del JWT.
- */
-function cuentaDeServicioFcmDePrueba(): string
-{
-    $dir = storage_path('framework/testing/fcm');
-    File::ensureDirectoryExists($dir);
-    $cnf = $dir.'/openssl.cnf';
-    file_put_contents($cnf, "[ req ]\ndistinguished_name = dn\n[ dn ]\n");
-
-    $llave = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA, 'config' => $cnf]);
-    expect($llave)->not->toBeFalse();
-    openssl_pkey_export($llave, $pem, null, ['config' => $cnf]);
-
-    file_put_contents($dir.'/cuenta.json', json_encode([
-        'type' => 'service_account',
-        'project_id' => 'agendauno-prueba',
-        'client_email' => 'push@agendauno-prueba.iam.gserviceaccount.com',
-        'private_key' => $pem,
-        'token_uri' => 'https://oauth2.googleapis.com/token',
-    ]));
-    config(['services.fcm.credenciales' => $dir.'/cuenta.json']);
-
-    return (string) openssl_pkey_get_details($llave)['key'];
-}
-
-/**
  * @param  array{slug: string}  $e
  */
 function enNegocioPush(array $e, callable $fn): mixed
