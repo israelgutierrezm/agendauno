@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
+use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Models\AsignacionPersonalTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -32,7 +33,7 @@ class AsignacionesPersonalTenantController
      * Asigna (o reasigna) el rol de un usuario en una sucursal. Idempotente por
      * (usuario, sucursal).
      */
-    public function guardar(Request $request): JsonResponse
+    public function guardar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $validado = $request->validate([
             'usuario_id' => ['required', 'string'],
@@ -43,18 +44,24 @@ class AsignacionesPersonalTenantController
         $usuario = Usuario::query()->where('ulid', $validado['usuario_id'])->firstOrFail();
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
 
-        $asignacion = AsignacionPersonalTenant::query()->updateOrCreate(
+        $asignacion = AsignacionPersonalTenant::withTrashed()->updateOrCreate(
             ['usuario_id' => $usuario->getKey(), 'sucursal_id' => $sucursal->getKey()],
             ['rol' => $validado['rol']],
         );
+        // Esa clave estaba eliminada: se restaura con los datos nuevos.
+        if ($asignacion->trashed()) {
+            $asignacion->restore();
+            $eliminaciones->restaurado($asignacion, 'asignacion', $asignacion->only($asignacion->getFillable()));
+        }
 
         return response()->json(['data' => $this->presentar($asignacion->fresh(['usuario', 'sucursal']))], 201);
     }
 
-    public function eliminar(Request $request): JsonResponse
+    public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $asignacion = AsignacionPersonalTenant::query()->where('ulid', (string) $request->route('asignacion'))->firstOrFail();
-        $asignacion->delete();
+        // Baja lógica: deja de usarse; queda en la bitácora qué era y quién lo eliminó.
+        $eliminaciones->eliminar($asignacion, 'asignacion', $asignacion->only(['usuario_id', 'sucursal_id', 'rol']));
 
         return response()->json(status: 204);
     }

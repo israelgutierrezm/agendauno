@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Models\PlantillaMensajeTenant;
@@ -28,7 +29,7 @@ class PlantillasMensajeTenantController
         ]);
     }
 
-    public function guardar(Request $request): JsonResponse
+    public function guardar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $validado = $request->validate([
             'clave' => ['required', Rule::in(EventoDeDominioTenant::TIPOS)],
@@ -38,7 +39,7 @@ class PlantillasMensajeTenantController
             'activo' => ['boolean'],
         ]);
 
-        $plantilla = PlantillaMensajeTenant::query()->updateOrCreate(
+        $plantilla = PlantillaMensajeTenant::withTrashed()->updateOrCreate(
             ['clave' => $validado['clave'], 'canal' => $validado['canal']],
             [
                 'asunto' => $validado['asunto'],
@@ -46,14 +47,20 @@ class PlantillasMensajeTenantController
                 'activo' => (bool) ($validado['activo'] ?? true),
             ],
         );
+        // Esa clave estaba eliminada: se restaura con los datos nuevos.
+        if ($plantilla->trashed()) {
+            $plantilla->restore();
+            $eliminaciones->restaurado($plantilla, 'plantilla_mensaje', $plantilla->only($plantilla->getFillable()));
+        }
 
         return response()->json(['data' => $this->presentar($plantilla)], 201);
     }
 
-    public function eliminar(Request $request): JsonResponse
+    public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $plantilla = PlantillaMensajeTenant::query()->where('ulid', (string) $request->route('plantilla'))->firstOrFail();
-        $plantilla->delete();
+        // Baja lógica: deja de usarse; queda en la bitácora qué era y quién lo eliminó.
+        $eliminaciones->eliminar($plantilla, 'plantilla_mensaje', $plantilla->only(['clave', 'canal', 'asunto']));
 
         return response()->json(status: 204);
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Application\GestionarPromocionesTenant;
 use App\Modules\Tenancy\Models\PromocionTenant;
 use App\Modules\Tenancy\Ordenes\TipoPromocion;
@@ -31,12 +32,22 @@ class PromocionesTenantController
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $datos = $this->normalizarDatos($request);
 
-        if (PromocionTenant::query()->where('codigo', mb_strtoupper(trim((string) $datos['codigo'])))->exists()) {
+        $existente = PromocionTenant::withTrashed()->where('codigo', mb_strtoupper(trim((string) $datos['codigo'])))->first();
+        if ($existente instanceof PromocionTenant && ! $existente->trashed()) {
             throw ValidationException::withMessages(['codigo' => ['Ya existe una promoción con ese código.']]);
+        }
+
+        // El código era de una promoción eliminada: se restaura con los datos nuevos.
+        if ($existente instanceof PromocionTenant) {
+            $existente->restore();
+            $promocion = $this->promociones->actualizar($existente, $datos);
+            $eliminaciones->restaurado($promocion, 'promocion', $promocion->only(['codigo', 'descripcion', 'tipo', 'valor']));
+
+            return response()->json(['data' => [...$this->presentar($promocion), 'restaurada' => true]], 201);
         }
 
         $promocion = $this->promociones->crear($datos);
@@ -49,7 +60,7 @@ class PromocionesTenantController
         $promocion = $this->resolver($request);
         $datos = $this->normalizarDatos($request);
 
-        $duplicada = PromocionTenant::query()
+        $duplicada = PromocionTenant::withTrashed()
             ->where('codigo', mb_strtoupper(trim((string) $datos['codigo'])))
             ->whereKeyNot($promocion->getKey())
             ->exists();
@@ -62,10 +73,11 @@ class PromocionesTenantController
         return response()->json(['data' => $this->presentar($promocion->refresh())]);
     }
 
-    public function eliminar(Request $request): JsonResponse
+    public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $promocion = $this->resolver($request);
-        $promocion->delete();
+        // Baja lógica: deja de usarse; queda en la bitácora qué era y quién lo eliminó.
+        $eliminaciones->eliminar($promocion, 'promocion', $promocion->only(['codigo', 'descripcion', 'tipo', 'valor']));
 
         return response()->json(['data' => ['id' => $promocion->ulid, 'eliminada' => true]]);
     }

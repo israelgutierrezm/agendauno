@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Models;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Plantilla de comunicacion tenant-local (R28): asunto + cuerpo con marcadores
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 class PlantillaMensajeTenant extends Model
 {
     use HasPublicId;
+    use SoftDeletes;
 
     protected $connection = 'tenant';
 

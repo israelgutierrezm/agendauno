@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Models;
 use App\Modules\Tenancy\Automatizacion\AccionAutomatizacion;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Regla de automatización tenant-local (R16): ante un evento de dominio, si el payload
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
 class ReglaAutomatizacionTenant extends Model
 {
     use HasPublicId;
+    use SoftDeletes;
 
     protected $connection = 'tenant';
 

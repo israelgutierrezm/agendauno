@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Models;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Plantilla de horario recurrente tenant-local (R5): una oferta impartida en una
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PlantillaHorarioTenant extends Model
 {
     use HasPublicId;
+    use SoftDeletes;
 
     protected $connection = 'tenant';
 

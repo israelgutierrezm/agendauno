@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Recursos\ModoRecurso;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Recurso reservable tenant-local (R3): sala/cancha/carril/equipo de una sucursal.
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class RecursoTenant extends Model
 {
     use HasPublicId;
+    use SoftDeletes;
 
     protected $connection = 'tenant';
 

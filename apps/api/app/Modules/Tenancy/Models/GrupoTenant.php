@@ -35,7 +35,7 @@ class GrupoTenant extends Model
      */
     public function plantilla(): BelongsTo
     {
-        return $this->belongsTo(PlantillaHorarioTenant::class, 'plantilla_id');
+        return $this->belongsTo(PlantillaHorarioTenant::class, 'plantilla_id')->withTrashed();
     }
 
     /**

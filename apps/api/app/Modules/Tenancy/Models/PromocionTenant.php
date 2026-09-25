@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Models;
 use App\Modules\Tenancy\Ordenes\TipoPromocion;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Promoción / cupón de descuento tenant-local (R22). Aplica al total de una orden un
@@ -20,6 +21,7 @@ use Illuminate\Database\Eloquent\Model;
 class PromocionTenant extends Model
 {
     use HasPublicId;
+    use SoftDeletes;
 
     protected $connection = 'tenant';
 

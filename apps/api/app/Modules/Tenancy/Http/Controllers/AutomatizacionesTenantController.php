@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Automatizacion\AccionAutomatizacion;
 use App\Modules\Tenancy\Automatizacion\EventoAutomatizacion;
 use App\Modules\Tenancy\Models\ReglaAutomatizacionTenant;
@@ -50,10 +51,11 @@ class AutomatizacionesTenantController
         return response()->json(['data' => $this->presentar($regla->refresh())]);
     }
 
-    public function eliminar(Request $request): JsonResponse
+    public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $regla = $this->resolver($request);
-        $regla->delete();
+        // Baja lógica: deja de usarse; queda en la bitácora qué era y quién lo eliminó.
+        $eliminaciones->eliminar($regla, 'automatizacion', $regla->only(['nombre', 'evento', 'accion']));
 
         return response()->json(['data' => ['id' => $regla->ulid, 'eliminada' => true]]);
     }

@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Models;
 
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Fecha sin generacion de agenda (feriado/cierre) tenant-local (R5). La generacion
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
 class ExcepcionHorarioTenant extends Model
 {
     use HasPublicId;
+    use SoftDeletes;
 
     protected $connection = 'tenant';
 

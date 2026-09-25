@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Integraciones\ValidarDestinoWebhook;
 use App\Modules\Tenancy\Models\EntregaWebhookTenant;
@@ -62,10 +63,11 @@ class WebhooksSalientesTenantController
         ], 201);
     }
 
-    public function eliminar(Request $request): JsonResponse
+    public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $webhook = WebhookSalienteTenant::query()->where('ulid', (string) $request->route('webhook'))->firstOrFail();
-        $webhook->delete();
+        // Baja lógica: deja de usarse; queda en la bitácora qué era y quién lo eliminó.
+        $eliminaciones->eliminar($webhook, 'webhook', $webhook->only(['url', 'eventos']));
 
         return response()->json(status: 204);
     }

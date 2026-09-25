@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\ReglaCapacidadCanalTenant;
 use App\Modules\Tenancy\Reservas\CanalReserva;
@@ -33,7 +34,7 @@ class CapacidadCanalTenantController
         ]);
     }
 
-    public function guardar(Request $request): JsonResponse
+    public function guardar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $oferta = $this->resolverOferta($request);
 
@@ -44,7 +45,7 @@ class CapacidadCanalTenantController
             'activa' => ['boolean'],
         ]);
 
-        $regla = ReglaCapacidadCanalTenant::query()->updateOrCreate(
+        $regla = ReglaCapacidadCanalTenant::withTrashed()->updateOrCreate(
             ['oferta_id' => $oferta->getKey(), 'canal' => $validado['canal']],
             [
                 'cupos' => (int) $validado['cupos'],
@@ -52,14 +53,20 @@ class CapacidadCanalTenantController
                 'activa' => (bool) ($validado['activa'] ?? true),
             ],
         );
+        // Esa clave estaba eliminada: se restaura con los datos nuevos.
+        if ($regla->trashed()) {
+            $regla->restore();
+            $eliminaciones->restaurado($regla, 'capacidad', $regla->only($regla->getFillable()));
+        }
 
         return response()->json(['data' => $this->presentar($regla)], 201);
     }
 
-    public function eliminar(Request $request): JsonResponse
+    public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $regla = ReglaCapacidadCanalTenant::query()->where('ulid', (string) $request->route('regla'))->firstOrFail();
-        $regla->delete();
+        // Baja lógica: deja de usarse; queda en la bitácora qué era y quién lo eliminó.
+        $eliminaciones->eliminar($regla, 'capacidad', $regla->only(['canal', 'cupos']));
 
         return response()->json(['data' => ['id' => $regla->ulid, 'eliminada' => true]]);
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Application\GenerarAgendaTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
@@ -68,10 +69,11 @@ class PlantillasHorarioTenantController
         return response()->json(['data' => $this->presentar($plantilla->load(['oferta', 'sucursal', 'instructor']))], 201);
     }
 
-    public function eliminar(Request $request): JsonResponse
+    public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $plantilla = PlantillaHorarioTenant::query()->where('ulid', (string) $request->route('plantilla'))->firstOrFail();
-        $plantilla->delete();
+        // Baja lógica: deja de usarse; queda en la bitácora qué era y quién lo eliminó.
+        $eliminaciones->eliminar($plantilla, 'plantilla_horario', $plantilla->only(['dias_semana', 'hora_local', 'duracion_minutos', 'vigente_desde', 'vigente_hasta']));
 
         return response()->json(status: 204);
     }

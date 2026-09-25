@@ -74,7 +74,7 @@ class SesionTenant extends Model
      */
     public function recurso(): BelongsTo
     {
-        return $this->belongsTo(RecursoTenant::class, 'recurso_id');
+        return $this->belongsTo(RecursoTenant::class, 'recurso_id')->withTrashed();
     }
 
     /**

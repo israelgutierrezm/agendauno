@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Recursos\ModoRecurso;
@@ -52,10 +53,11 @@ class RecursosTenantController
         return response()->json(['data' => $this->presentar($recurso->load('sucursal'))], 201);
     }
 
-    public function eliminar(Request $request): JsonResponse
+    public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
     {
         $recurso = RecursoTenant::query()->where('ulid', (string) $request->route('recurso'))->firstOrFail();
-        $recurso->delete();
+        // Baja lógica: deja de usarse; queda en la bitácora qué era y quién lo eliminó.
+        $eliminaciones->eliminar($recurso, 'recurso', $recurso->only(['nombre', 'tipo', 'capacidad']));
 
         return response()->json(status: 204);
     }
