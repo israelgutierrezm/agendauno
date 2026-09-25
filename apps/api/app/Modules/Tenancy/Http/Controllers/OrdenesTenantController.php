@@ -6,12 +6,14 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
+use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,6 +35,7 @@ class OrdenesTenantController
         private readonly OrdenesTenant $ordenes,
         private readonly CobrarOrdenTenant $cobrar,
         private readonly ResolverAccesoTenant $acceso,
+        private readonly RegistrarAuditoria $auditoria,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -121,7 +124,17 @@ class OrdenesTenantController
         $metodo = isset($validado['metodo']) ? MetodoPago::from($validado['metodo']) : null;
         $key = ($validado['idempotency_key'] ?? '') !== '' ? $validado['idempotency_key'] : null;
 
-        $pago = $this->cobrar->ejecutar($orden, $validado['proveedor'], $metodo, $key, '/ventas');
+        $actor = $request->attributes->get('usuario_tenant');
+        $actor = $actor instanceof Usuario ? $actor : null;
+        $pago = $this->cobrar->ejecutar($orden, $validado['proveedor'], $metodo, $key, '/ventas', $actor);
+        if ($pago->estado === EstadoPago::Aprobado && $pago->wasRecentlyCreated) {
+            $this->auditoria->registrar($actor, 'pago.registrado', 'pago', (string) $pago->ulid, null, [
+                'orden' => (string) $orden->ulid,
+                'monto_minor' => $pago->monto_minor,
+                'moneda' => $pago->moneda,
+                'metodo' => $pago->metodo->value ?? $pago->proveedor,
+            ]);
+        }
 
         return response()->json(['data' => [
             'pago' => $pago->ulid,
@@ -141,9 +154,22 @@ class OrdenesTenantController
             'referencia' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $liquidada = $this->ordenes->liquidar($orden, $validado['metodo'], $validado['referencia'] ?? null);
+        $actor = $request->attributes->get('usuario_tenant');
+        $actor = $actor instanceof Usuario ? $actor : null;
+        $pago = $this->ordenes->liquidar($orden, $validado['metodo'], $validado['referencia'] ?? null, $actor);
 
-        return response()->json(['data' => $this->presentar($liquidada->refresh())]);
+        // Cobro en caja: queda quién lo registró (el pago lo guarda; aquí, la bitácora).
+        if ($pago !== null) {
+            $this->auditoria->registrar($actor, 'pago.registrado', 'pago', (string) $pago->ulid, null, [
+                'orden' => (string) $orden->ulid,
+                'monto_minor' => $pago->monto_minor,
+                'moneda' => $pago->moneda,
+                'metodo' => $validado['metodo'],
+                'referencia' => $validado['referencia'] ?? null,
+            ]);
+        }
+
+        return response()->json(['data' => $this->presentar($orden->refresh())]);
     }
 
     /**

@@ -26,7 +26,7 @@ class PagoTenant extends Model
 
     protected $fillable = [
         'orden_id', 'proveedor', 'metodo', 'estado', 'monto_minor', 'moneda',
-        'referencia_externa', 'idempotency_key', 'domiciliacion_id',
+        'referencia_externa', 'idempotency_key', 'domiciliacion_id', 'registrado_por',
     ];
 
     /**
@@ -57,6 +57,16 @@ class PagoTenant extends Model
         'metodo' => MetodoPago::class,
         'monto_minor' => 'integer',
     ];
+
+    /**
+     * Quién registró el cobro (en caja) o pagó en línea con su cuenta.
+     *
+     * @return BelongsTo<Usuario, $this>
+     */
+    public function registradoPor(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'registrado_por')->withTrashed();
+    }
 
     /**
      * El pago automático con el que se hizo el cargo (si fue domiciliado).

@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Pagos\EstadoPago;
@@ -33,7 +34,10 @@ class CobrarOrdenTenant
         private readonly FulfillmentTenant $fulfillment,
     ) {}
 
-    public function ejecutar(OrdenTenant $orden, string $proveedor, ?MetodoPago $metodo = null, ?string $idempotencyKey = null, ?string $retorno = null): PagoTenant
+    /**
+     * @param  Usuario|null  $registradoPor  quién registra el cobro (en caja, o el alumno al pagar en línea)
+     */
+    public function ejecutar(OrdenTenant $orden, string $proveedor, ?MetodoPago $metodo = null, ?string $idempotencyKey = null, ?string $retorno = null, ?Usuario $registradoPor = null): PagoTenant
     {
         if ($idempotencyKey !== null) {
             $previo = PagoTenant::query()->where('idempotency_key', $idempotencyKey)->first();
@@ -46,7 +50,7 @@ class CobrarOrdenTenant
             throw new PasarelaNoDisponible('La pasarela no esta activa en este estudio.');
         }
 
-        return DB::connection('tenant')->transaction(function () use ($orden, $proveedor, $metodo, $idempotencyKey, $retorno): PagoTenant {
+        return DB::connection('tenant')->transaction(function () use ($orden, $proveedor, $metodo, $idempotencyKey, $retorno, $registradoPor): PagoTenant {
             $bloqueada = OrdenTenant::query()->whereKey($orden->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueada->estado !== EstadoOrden::Pendiente) {
@@ -66,6 +70,7 @@ class CobrarOrdenTenant
                 'monto_minor' => $bloqueada->total_minor,
                 'moneda' => $bloqueada->moneda,
                 'idempotency_key' => $idempotencyKey,
+                'registrado_por' => $registradoPor?->getKey(),
             ]);
 
             $pago->retorno = $retorno;

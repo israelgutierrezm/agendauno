@@ -1,0 +1,337 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+
+import { api, mensajeDeError } from "@/lib/api";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
+
+/**
+ * Corte de caja: los movimientos de dinero de un rango de fechas con quién hizo cada
+ * uno (cobros, devoluciones, ventas de mostrador y cancelaciones) y los totales por
+ * método y por persona del equipo. Se descarga en CSV.
+ */
+interface Movimiento {
+  fecha: string;
+  tipo: "cobro" | "devolucion" | "venta" | "cancelacion";
+  monto_minor: number;
+  moneda: string;
+  metodo: string | null;
+  persona: string | null;
+  concepto: string;
+  quien: string;
+  quien_id: string | null;
+  referencia: string;
+  detalle: string | null;
+}
+interface Totales {
+  cobrado_minor: number;
+  devuelto_minor: number;
+  neto_minor: number;
+  por_metodo: Record<string, number>;
+  por_usuario: {
+    quien: string;
+    cobrado_minor: number;
+    devuelto_minor: number;
+  }[];
+}
+
+const { t } = useI18n();
+const sesion = useSesionTenantStore();
+const base = computed(() => `/api/v1/app/${sesion.slug}`);
+
+function hoy(): string {
+  const d = new Date();
+  const dos = (n: number): string => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+}
+
+const desde = ref(hoy());
+const hasta = ref(hoy());
+const usuario = ref("");
+const tipo = ref("");
+const movimientos = ref<Movimiento[]>([]);
+const totales = ref<Totales | null>(null);
+// Quienes aparecen en el rango (para filtrar por persona del equipo).
+const personasEquipo = ref<{ id: string; nombre: string }[]>([]);
+const cargando = ref(false);
+const descargando = ref(false);
+const error = ref<string | null>(null);
+
+function dinero(minor: number, moneda = "MXN"): string {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: moneda,
+  }).format(minor / 100);
+}
+function fechaHora(iso: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(iso));
+}
+
+function parametros(): Record<string, string | undefined> {
+  return {
+    desde: desde.value,
+    hasta: hasta.value,
+    usuario: usuario.value || undefined,
+    tipo: tipo.value || undefined,
+  };
+}
+
+async function cargar(): Promise<void> {
+  if (desde.value === "" || hasta.value === "") {
+    return;
+  }
+  cargando.value = true;
+  error.value = null;
+  try {
+    const { data } = await api.get<{ data: Movimiento[]; totales: Totales }>(
+      `${base.value}/pagos/movimientos`,
+      { params: parametros() },
+    );
+    movimientos.value = data.data;
+    totales.value = data.totales;
+    if (usuario.value === "") {
+      const vistos = new Map<string, string>();
+      for (const m of data.data) {
+        if (m.quien_id) {
+          vistos.set(m.quien_id, m.quien);
+        }
+      }
+      personasEquipo.value = [...vistos].map(([id, nombre]) => ({
+        id,
+        nombre,
+      }));
+    }
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    cargando.value = false;
+  }
+}
+
+async function descargar(): Promise<void> {
+  descargando.value = true;
+  try {
+    const { data } = await api.get<Blob>(`${base.value}/pagos/movimientos`, {
+      params: { ...parametros(), formato: "csv" },
+      responseType: "blob",
+    });
+    const url = URL.createObjectURL(data);
+    const enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download = `movimientos-${desde.value}-a-${hasta.value}.csv`;
+    enlace.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    descargando.value = false;
+  }
+}
+
+watch([desde, hasta, usuario, tipo], () => void cargar());
+onMounted(cargar);
+</script>
+
+<template>
+  <div>
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <h2 class="font-light text-lg">{{ $t("corteCaja.titulo") }}</h2>
+      <button
+        type="button"
+        class="tu-btn tu-btn-fantasma text-sm"
+        :disabled="descargando || movimientos.length === 0"
+        @click="descargar"
+      >
+        {{ $t("corteCaja.descargar") }}
+      </button>
+    </div>
+
+    <div class="mt-3 flex flex-wrap items-end gap-3 text-sm">
+      <label class="grid gap-1">
+        <span class="tu-label">{{ $t("corteCaja.desde") }}</span>
+        <input v-model="desde" type="date" class="tu-input" />
+      </label>
+      <label class="grid gap-1">
+        <span class="tu-label">{{ $t("corteCaja.hasta") }}</span>
+        <input v-model="hasta" type="date" class="tu-input" />
+      </label>
+      <label class="grid gap-1">
+        <span class="tu-label">{{ $t("corteCaja.quien") }}</span>
+        <select v-model="usuario" class="tu-input">
+          <option value="">{{ $t("corteCaja.todos") }}</option>
+          <option v-for="p in personasEquipo" :key="p.id" :value="p.id">
+            {{ p.nombre }}
+          </option>
+        </select>
+      </label>
+      <label class="grid gap-1">
+        <span class="tu-label">{{ $t("corteCaja.tipo") }}</span>
+        <select v-model="tipo" class="tu-input">
+          <option value="">{{ $t("corteCaja.todos") }}</option>
+          <option value="cobro">{{ $t("corteCaja.tipos.cobro") }}</option>
+          <option value="devolucion">
+            {{ $t("corteCaja.tipos.devolucion") }}
+          </option>
+          <option value="venta">{{ $t("corteCaja.tipos.venta") }}</option>
+          <option value="cancelacion">
+            {{ $t("corteCaja.tipos.cancelacion") }}
+          </option>
+        </select>
+      </label>
+    </div>
+
+    <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
+      {{ error }}
+    </p>
+
+    <!-- Totales: una franja -->
+    <div
+      v-if="totales"
+      class="mt-3 tu-card grid grid-cols-3 divide-x divide-[var(--borde)]"
+    >
+      <div class="p-4">
+        <p class="tu-label">{{ $t("corteCaja.cobrado") }}</p>
+        <p class="text-xl font-semibold tabular-nums">
+          {{ dinero(totales.cobrado_minor) }}
+        </p>
+      </div>
+      <div class="p-4">
+        <p class="tu-label">{{ $t("corteCaja.devuelto") }}</p>
+        <p class="text-xl font-semibold tabular-nums">
+          {{ dinero(totales.devuelto_minor) }}
+        </p>
+      </div>
+      <div class="p-4">
+        <p class="tu-label">{{ $t("corteCaja.neto") }}</p>
+        <p class="text-xl font-semibold tabular-nums">
+          {{ dinero(totales.neto_minor) }}
+        </p>
+      </div>
+    </div>
+    <div
+      v-if="totales && movimientos.length > 0"
+      class="mt-3 grid gap-3 text-sm sm:grid-cols-2"
+    >
+      <div class="tu-card p-4">
+        <p class="tu-label">{{ $t("corteCaja.porMetodo") }}</p>
+        <ul class="mt-1 space-y-1">
+          <li
+            v-for="(monto, metodo) in totales.por_metodo"
+            :key="metodo"
+            class="flex justify-between gap-3"
+          >
+            <span>{{ metodo }}</span>
+            <span class="tabular-nums">{{ dinero(monto) }}</span>
+          </li>
+        </ul>
+      </div>
+      <div class="tu-card p-4">
+        <p class="tu-label">{{ $t("corteCaja.porPersona") }}</p>
+        <ul class="mt-1 space-y-1">
+          <li
+            v-for="u in totales.por_usuario"
+            :key="u.quien"
+            class="flex justify-between gap-3"
+          >
+            <span>{{ u.quien }}</span>
+            <span class="tabular-nums">
+              {{ dinero(u.cobrado_minor) }}
+              <span
+                v-if="u.devuelto_minor > 0"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                · −{{ dinero(u.devuelto_minor) }}</span
+              >
+            </span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="mt-3 tu-card overflow-hidden">
+      <p
+        v-if="cargando"
+        class="p-5 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("comun.cargando") }}
+      </p>
+      <p
+        v-else-if="movimientos.length === 0"
+        class="p-5 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("corteCaja.vacio") }}
+      </p>
+      <table v-else class="w-full text-sm">
+        <thead>
+          <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
+            <th class="px-4 py-2 font-medium">{{ $t("corteCaja.fecha") }}</th>
+            <th class="px-4 py-2 font-medium">
+              {{ $t("corteCaja.movimiento") }}
+            </th>
+            <th class="px-4 py-2 font-medium hidden sm:table-cell">
+              {{ $t("corteCaja.quien") }}
+            </th>
+            <th class="px-4 py-2 font-medium text-right">
+              {{ $t("corteCaja.monto") }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="m in movimientos"
+            :key="`${m.tipo}-${m.referencia}`"
+            class="border-t"
+            :style="{ borderColor: 'var(--borde)' }"
+          >
+            <td
+              class="px-4 py-2 whitespace-nowrap"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ fechaHora(m.fecha) }}
+            </td>
+            <td class="px-4 py-2">
+              <span class="font-medium">{{
+                t(`corteCaja.tipos.${m.tipo}`)
+              }}</span>
+              <span :style="{ color: 'var(--texto-suave)' }">
+                · {{ m.persona ? `${m.persona} · ` : "" }}{{ m.concepto }}</span
+              >
+              <span
+                v-if="m.detalle && m.tipo !== 'cobro'"
+                class="block text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{ m.detalle }}</span
+              >
+              <span
+                class="block text-xs sm:hidden"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{ m.quien }}</span
+              >
+            </td>
+            <td class="px-4 py-2 hidden sm:table-cell">{{ m.quien }}</td>
+            <td
+              class="px-4 py-2 text-right tabular-nums whitespace-nowrap"
+              :style="{
+                color:
+                  m.monto_minor < 0
+                    ? 'var(--error)'
+                    : m.tipo === 'cancelacion'
+                      ? 'var(--texto-suave)'
+                      : undefined,
+              }"
+            >
+              {{
+                m.tipo === "cancelacion" ? "—" : dinero(m.monto_minor, m.moneda)
+              }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</template>

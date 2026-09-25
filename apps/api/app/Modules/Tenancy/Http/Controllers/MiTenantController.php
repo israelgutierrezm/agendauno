@@ -490,7 +490,9 @@ class MiTenantController
         $metodo = isset($validado['metodo']) ? MetodoPago::from($validado['metodo']) : null;
         $key = ($validado['idempotency_key'] ?? '') !== '' ? $validado['idempotency_key'] : null;
 
-        $pago = $this->cobrarOrden->ejecutar($orden, $validado['proveedor'], $metodo, $key, '/mi-cuenta');
+        // El propio alumno paga en línea: queda como quien registró el cobro.
+        $alumno = $request->attributes->get('usuario_tenant');
+        $pago = $this->cobrarOrden->ejecutar($orden, $validado['proveedor'], $metodo, $key, '/mi-cuenta', $alumno instanceof Usuario ? $alumno : null);
 
         return response()->json(['data' => [
             'pago' => $pago->ulid,

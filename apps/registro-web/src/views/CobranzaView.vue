@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import CorteDeCaja from "@/components/CorteDeCaja.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -26,6 +27,8 @@ interface Pago {
   metodo: string | null;
   reembolsado_minor: number;
   reembolsable_minor: number;
+  // Quién registró el cobro (en caja) o quién pagó en línea.
+  registrado_por?: string | null;
 }
 interface Suscripcion {
   id: string;
@@ -364,6 +367,9 @@ onMounted(cargar);
       </div>
 
       <!-- Pagos / reembolsos -->
+      <!-- Corte de caja: movimientos por fecha y por quién -->
+      <CorteDeCaja v-if="sesion.puede('facturacion.ver')" class="mt-8" />
+
       <h2 class="mt-8 font-light text-lg">{{ $t("cobranza.pagos") }}</h2>
       <p
         v-if="pagos.length === 0"
@@ -400,7 +406,17 @@ onMounted(cargar);
                 >
                   {{ fechaHora(p.fecha) }}
                 </td>
-                <td class="px-4 py-2 font-semibold">{{ p.persona ?? "—" }}</td>
+                <td class="px-4 py-2">
+                  <span class="font-semibold">{{ p.persona ?? "—" }}</span>
+                  <span
+                    v-if="p.registrado_por"
+                    class="block text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{
+                      $t("corteCaja.registro", { quien: p.registrado_por })
+                    }}</span
+                  >
+                </td>
                 <td class="px-4 py-2 text-right">
                   {{ dinero(p.monto_minor, p.moneda) }}
                   <button

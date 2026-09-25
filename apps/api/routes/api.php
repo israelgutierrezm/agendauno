@@ -47,6 +47,7 @@ use App\Modules\Tenancy\Http\Controllers\MiPagoAutomaticoTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiPrivacidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\MisDocumentosTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiTenantController;
+use App\Modules\Tenancy\Http\Controllers\MovimientosPagoTenantController;
 use App\Modules\Tenancy\Http\Controllers\OnboardingController;
 use App\Modules\Tenancy\Http\Controllers\OrdenesTenantController;
 use App\Modules\Tenancy\Http\Controllers\OrganizacionesTenantController;
@@ -542,6 +543,8 @@ Route::prefix('v1')->group(function (): void {
             // (proporcional). Operacion sensible: exige motivo y queda auditada.
             // Pantalla de cobranza (Etapa 2): pagos capturados para consultar y reembolsar.
             Route::get('/pagos', [PagosTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('pagos.index');
+            // Corte de caja: movimientos por fecha y por quién (cobros, devoluciones, ventas, cancelaciones).
+            Route::get('/pagos/movimientos', [MovimientosPagoTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('pagos.movimientos');
             // Suscripciones recurrentes: próximas renovaciones que cobrará el scheduler (Etapa 2).
             Route::get('/suscripciones', [SuscripcionesTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('suscripciones.index');
             // Pago automático: invitar al alumno a activarlo (correo) o quitarlo a petición suya.

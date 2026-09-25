@@ -191,7 +191,11 @@ class ReembolsarPagoTenant
         ]);
 
         if ($esTotal && $revertir && $orden !== null) {
-            $orden->update(['estado' => EstadoOrden::Cancelada->value]);
+            $orden->update([
+                'estado' => EstadoOrden::Cancelada->value,
+                'cancelada_en' => now(),
+                'cancelada_por' => $actor?->getKey(),
+            ]);
         }
 
         // Evento de dominio (outbox, R39): conciliación, aviso al cliente, webhooks.

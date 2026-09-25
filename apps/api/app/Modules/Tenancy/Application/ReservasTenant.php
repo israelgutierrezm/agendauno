@@ -744,7 +744,7 @@ class ReservasTenant
 
         OrdenTenant::query()->whereKey($reserva->orden_id)
             ->where('estado', EstadoOrden::Pendiente->value)
-            ->update(['estado' => EstadoOrden::Cancelada->value]);
+            ->update(['estado' => EstadoOrden::Cancelada->value, 'cancelada_en' => now()]);
     }
 
     /**

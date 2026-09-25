@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Ordenes\Exceptions\MonedaMixta;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
+use App\Modules\Tenancy\Pagos\MetodoPago;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -23,8 +26,8 @@ use Illuminate\Support\Facades\DB;
 class OrdenesTenant
 {
     public function __construct(
-        private readonly FulfillmentTenant $fulfillment,
         private readonly GestionarPromocionesTenant $promociones,
+        private readonly CobrarOrdenTenant $cobrar,
     ) {}
 
     /**
@@ -103,28 +106,37 @@ class OrdenesTenant
     }
 
     /**
-     * Liquida una orden pendiente (pago manual/ventanilla) y hace el fulfillment de
-     * forma atomica. Idempotente: una orden ya pagada devuelve sin volver a conceder
-     * derechos. La orden cancelada no admite liquidacion.
+     * Liquida en caja una orden pendiente (efectivo, transferencia, ventanilla…):
+     * registra su PAGO (con quién lo cobró, para el corte de caja) y hace el
+     * fulfillment. Si había un pago en línea abierto, se cierra primero (si ya se
+     * pagó, no se cobra dos veces). Idempotente: una orden ya pagada no se vuelve a
+     * cobrar (devuelve null). La orden cancelada no admite liquidación.
      */
-    public function liquidar(OrdenTenant $orden, string $metodo, ?string $referencia = null): OrdenTenant
+    public function liquidar(OrdenTenant $orden, string $metodo, ?string $referencia = null, ?Usuario $actor = null): ?PagoTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($orden, $metodo, $referencia): OrdenTenant {
-            $bloqueada = OrdenTenant::query()->whereKey($orden->getKey())->lockForUpdate()->firstOrFail();
+        $orden->refresh();
+        if ($orden->estado === EstadoOrden::Pagada) {
+            return null;
+        }
+        if ($orden->estado === EstadoOrden::Cancelada) {
+            throw new OrdenNoLiquidable('La orden no admite liquidacion.');
+        }
 
-            if ($bloqueada->estado === EstadoOrden::Pagada) {
-                return $bloqueada;
-            }
+        return DB::connection('tenant')->transaction(function () use ($orden, $metodo, $referencia, $actor): PagoTenant {
+            $pago = $this->cobrar->ejecutar($orden, 'manual', self::metodoDeCaja($metodo), null, null, $actor);
+            $orden->update(['metodo_pago' => $metodo, 'referencia_pago' => $referencia]);
 
-            if ($bloqueada->estado === EstadoOrden::Cancelada) {
-                throw new OrdenNoLiquidable('La orden no admite liquidacion.');
-            }
-
-            // Registra el metodo/referencia del pago manual y hace el fulfillment.
-            $bloqueada->update(['metodo_pago' => $metodo, 'referencia_pago' => $referencia]);
-            $this->fulfillment->cumplir($bloqueada);
-
-            return $bloqueada->refresh();
+            return $pago;
         });
+    }
+
+    private static function metodoDeCaja(string $metodo): ?MetodoPago
+    {
+        return match ($metodo) {
+            'efectivo' => MetodoPago::Efectivo,
+            'transferencia' => MetodoPago::Spei,
+            'ventanilla' => MetodoPago::Ventanilla,
+            default => null,
+        };
     }
 }

@@ -26,7 +26,7 @@ class PagosTenantController
                 EstadoPago::ParcialmenteReembolsado->value,
                 EstadoPago::Reembolsado->value,
             ])
-            ->with(['orden.persona'])
+            ->with(['orden.persona', 'registradoPor'])
             ->withSum('reembolsos as reembolsado_minor', 'monto_minor')
             ->orderByDesc('id')
             ->limit(self::LIMITE)
@@ -47,6 +47,7 @@ class PagosTenantController
                     'metodo' => $pago->metodo?->value,
                     'reembolsado_minor' => $reembolsado,
                     'reembolsable_minor' => max(0, $pago->monto_minor - $reembolsado),
+                    'registrado_por' => $pago->registradoPor?->name,
                 ];
             })->all(),
         ]);
