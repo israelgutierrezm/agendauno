@@ -97,6 +97,24 @@ it('no acepta a quien no atiende citas ni un servicio que no se agenda', functio
     citaPublica($ctx, '10:00')->assertStatus(422);
 });
 
+it('un profesional invitado que aún no activa su cuenta atiende citas; dado de baja, ya no', function (): void {
+    $ctx = barberiaQueValida();
+    $this->postJson("/api/v1/app/{$ctx['e']['slug']}/usuarios/invitar", [
+        'nombre' => 'Carlos Núñez', 'email' => 'carlos@barberia.mx', 'rol' => 'instructor',
+    ], conBearer($ctx['e']['bearer']))->assertCreated();
+    $carlos = (string) collect($this->getJson("/api/v1/app/{$ctx['e']['slug']}/instructores", conBearer($ctx['e']['bearer']))->json('data'))
+        ->firstWhere('nombre', 'Carlos Núñez')['id'];
+    $this->putJson("/api/v1/app/{$ctx['e']['slug']}/horarios-atencion", [
+        'instructor_id' => $carlos, 'sucursal_id' => $ctx['sede']['sucursal'],
+        'horarios' => array_map(static fn (int $d): array => ['dia_semana' => $d, 'hora_inicio' => '09:00', 'hora_fin' => '12:00'], range(1, 7)),
+    ], conBearer($ctx['e']['bearer']))->assertCreated();
+
+    citaPublica($ctx, '10:00', ['instructor_id' => $carlos])->assertCreated();
+
+    $this->deleteJson("/api/v1/app/{$ctx['e']['slug']}/usuarios/{$carlos}", [], conBearer($ctx['e']['bearer']))->assertOk();
+    citaPublica($ctx, '11:00', ['instructor_id' => $carlos])->assertNotFound();
+});
+
 it('una cita que se encima (aunque empiece a otra hora) se rechaza', function (): void {
     $ctx = barberiaQueValida();
     $this->putJson("/api/v1/app/{$ctx['e']['slug']}/ofertas/{$ctx['sede']['oferta']}", ['lugares' => 0, 'duracion_minutos' => 60], conBearer($ctx['e']['bearer']))

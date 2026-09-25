@@ -110,8 +110,9 @@ class AgendarCitaTenant
                 DB::connection('tenant')->table('users')->where('id', $instructorId)->update(['id' => DB::raw('id')]);
             }
             $profesional = $instructorId !== null ? Usuario::query()->find($instructorId) : null;
-            if (! $profesional instanceof Usuario || ! $profesional->activo
-                || ! in_array('instructor', $profesional->rolesEfectivos(), true)) {
+            // Un profesional invitado que aún no activa su cuenta sí atiende; uno dado
+            // de baja ya no se encuentra.
+            if (! $profesional instanceof Usuario || ! in_array('instructor', $profesional->rolesEfectivos(), true)) {
                 throw new SesionNoReservable('Esa persona no atiende citas.');
             }
 
