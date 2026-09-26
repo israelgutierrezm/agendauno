@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 
+import BloqueosAgenda from "@/components/BloqueosAgenda.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -424,6 +425,19 @@ onMounted(cargarReferencias);
             >
           </div>
         </div>
+
+        <!-- Bloqueos (2.2): comida, vacaciones, ausencias o cierre de la sede -->
+        <BloqueosAgenda
+          :base="base"
+          :proveedor-id="proveedorId"
+          :proveedor-nombre="
+            proveedores.find((p) => p.id === proveedorId)?.nombre ?? ''
+          "
+          :sucursal-id="sucursalId"
+          :sucursal-nombre="sucursalActual?.nombre ?? ''"
+          :zona="sucursalActual?.zona_horaria ?? 'America/Mexico_City'"
+          :puede-gestionar="puedeGestionar"
+        />
 
         <!-- Vista previa de huecos -->
         <div class="mt-8 tu-card p-6">

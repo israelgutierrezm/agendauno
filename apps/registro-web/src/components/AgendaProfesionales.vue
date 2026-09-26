@@ -22,6 +22,7 @@ import {
   fueraDeHorario,
   minutosLocal,
   tonoServicio,
+  type BloqueoAgenda,
   type EstadoCita,
   type SesionAgenda,
   type VentanaAtencion,
@@ -42,6 +43,8 @@ const props = defineProps<{
   catalogo: string[]; // ids de oferta en orden de catálogo (color estable)
   seleccionada: string | null;
   puedeCrear: boolean;
+  // Comida, vacaciones o cierre (2.2): se sombrean como "fuera de horario".
+  bloqueos?: BloqueoAgenda[];
 }>();
 
 const emit = defineEmits<{
@@ -182,6 +185,36 @@ function margenPx(
   return min > 0 ? (min / 60) * PX_HORA : 0;
 }
 
+// Tramos del día bloqueados para esa persona (suyos o de toda la sede), a escala.
+function bloqueosDe(
+  instructorId: string,
+): { top: number; alto: number; etiqueta: string }[] {
+  return (props.bloqueos ?? [])
+    .filter(
+      (b) =>
+        (b.ambito === "profesional" && b.instructor_id === instructorId) ||
+        b.ambito === "sede",
+    )
+    .flatMap((b) => {
+      const diaIni = fechaLocal(b.desde, props.zona);
+      const diaFin = fechaLocal(b.hasta, props.zona);
+      if (diaIni > props.fecha || diaFin < props.fecha) {
+        return [];
+      }
+      const ini = Math.max(
+        rango.value.ini,
+        diaIni < props.fecha ? 0 : minutosLocal(b.desde, props.zona),
+      );
+      const fin = Math.min(
+        rango.value.fin,
+        diaFin > props.fecha ? 24 * 60 : minutosLocal(b.hasta, props.zona),
+      );
+      return fin > ini
+        ? [{ top: y(ini), alto: y(fin) - y(ini), etiqueta: b.motivo }]
+        : [];
+    });
+}
+
 const columnas = computed<Columna[]>(() => {
   const cols: Columna[] = props.profesionales.map((p) => {
     const propias = delDia.value.filter((s) => s.instructor_id === p.id);
@@ -210,14 +243,17 @@ const columnas = computed<Columna[]>(() => {
       id: p.id,
       nombre: p.nombre,
       tarjetas: tarjetasDe(propias),
-      fuera: fuera.map((f) => ({
-        top: y(f.ini),
-        alto: y(f.fin) - y(f.ini),
-        etiqueta:
-          ventanas.length === 0 && !sinVentanasConfiguradas
-            ? t("agendaVisual.profesionales.noTrabaja")
-            : t("agendaVisual.profesionales.fueraHorario"),
-      })),
+      fuera: [
+        ...fuera.map((f) => ({
+          top: y(f.ini),
+          alto: y(f.fin) - y(f.ini),
+          etiqueta:
+            ventanas.length === 0 && !sinVentanasConfiguradas
+              ? t("agendaVisual.profesionales.noTrabaja")
+              : t("agendaVisual.profesionales.fueraHorario"),
+        })),
+        ...bloqueosDe(p.id),
+      ],
       resumen: t("agendaVisual.profesionales.citasN", { n: citas }, citas),
       ocupacion:
         minutosAtencion > 0

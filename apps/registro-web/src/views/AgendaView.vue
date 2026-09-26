@@ -16,6 +16,7 @@ import {
   tonoServicio,
   type CitaTitular,
   type SesionAgenda,
+  type BloqueoAgenda,
   type VentanaAtencion,
 } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
@@ -119,6 +120,8 @@ const instructores = ref<{ id: string; nombre: string }[]>([]);
 const recursos = ref<Recurso[]>([]);
 // Horario de atención de cada profesional (sombrea lo que queda fuera en citas).
 const ventanas = ref<VentanaAtencion[]>([]);
+// Comida, vacaciones o cierres de la semana visible (2.2).
+const bloqueos = ref<BloqueoAgenda[]>([]);
 const cargando = ref(true);
 const cargandoSesiones = ref(false);
 const error = ref<string | null>(null);
@@ -450,6 +453,13 @@ async function cargarSesiones(): Promise<void> {
       { params },
     );
     sesiones.value = data.data;
+    if (sesion.esCitas) {
+      const b = await api.get<{ data: BloqueoAgenda[] }>(
+        `${base.value}/bloqueos`,
+        { params: { desde: params.desde, hasta: params.hasta } },
+      );
+      bloqueos.value = b.data.data;
+    }
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -1404,6 +1414,7 @@ onMounted(async () => {
         :sesiones="sesionesVisibles"
         :profesionales="profesionalesVisibles"
         :ventanas="ventanas"
+        :bloqueos="bloqueos"
         :catalogo="catalogo"
         :seleccionada="citaAbierta?.id ?? detalle?.id ?? null"
         :puede-crear="puedeReservar"

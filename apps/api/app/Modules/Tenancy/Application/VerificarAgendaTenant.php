@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Models\BloqueoAgendaTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use Carbon\CarbonInterface;
@@ -24,6 +25,8 @@ use Illuminate\Validation\ValidationException;
  *
  * Los choques se miden sobre lo que OCUPA cada sesión: su atención más la
  * preparación y la limpieza del servicio (fase 2, punto 2.3, {@see MargenesServicio}).
+ * Los bloqueos de agenda (2.2) cuentan igual: un profesional en su comida, una sede
+ * cerrada o una sala en mantenimiento no se agendan.
  *
  * Los conflictos salen estructurados para (a) avisar en el formulario y (b) bloquear
  * el guardado con un mensaje útil.
@@ -96,6 +99,19 @@ class VerificarAgendaTenant
                         : "Esa persona ya atiende {$servicio} a las {$cuando}.",
                     'sesion' => $choque->ulid,
                 ];
+            } else {
+                $bloqueo = BloqueoAgendaTenant::query()->where('instructor_id', $instructorId)->entre($desde, $hasta)->first();
+                if ($bloqueo instanceof BloqueoAgendaTenant) {
+                    $conflictos[] = ['tipo' => 'bloqueo', 'campo' => 'instructor_id', 'mensaje' => "Esa persona no está disponible en ese horario ({$bloqueo->motivo}).", 'sesion' => null];
+                }
+            }
+        }
+
+        // Sede cerrada en ese horario.
+        if ($sucursalId !== null) {
+            $cierre = BloqueoAgendaTenant::query()->where('sucursal_id', $sucursalId)->entre($desde, $hasta)->first();
+            if ($cierre instanceof BloqueoAgendaTenant) {
+                $conflictos[] = ['tipo' => 'bloqueo', 'campo' => 'sucursal_id', 'mensaje' => "La sede está cerrada en ese horario ({$cierre->motivo}).", 'sesion' => null];
             }
         }
 
@@ -104,12 +120,19 @@ class VerificarAgendaTenant
                 $conflictos[] = ['tipo' => 'recurso', 'campo' => 'recurso_id', 'mensaje' => "{$recurso->nombre} está fuera de servicio.", 'sesion' => null];
             } elseif ($sucursalId !== null && (int) $recurso->sucursal_id !== $sucursalId) {
                 $conflictos[] = ['tipo' => 'recurso', 'campo' => 'recurso_id', 'mensaje' => "{$recurso->nombre} es de otra sede.", 'sesion' => null];
+            } elseif (($mantenimiento = $this->bloqueoDeRecurso($recurso, $desde, $hasta)) !== null) {
+                $conflictos[] = ['tipo' => 'bloqueo', 'campo' => 'recurso_id', 'mensaje' => "{$recurso->nombre} está bloqueado en ese horario ({$mantenimiento->motivo}).", 'sesion' => null];
             } elseif (! $this->recursos->disponible($recurso, $desde, $hasta, $excluirSerieId, $excluirSesionId)) {
                 $conflictos[] = ['tipo' => 'recurso', 'campo' => 'recurso_id', 'mensaje' => "{$recurso->nombre} no está disponible en ese horario.", 'sesion' => null];
             }
         }
 
         return $conflictos;
+    }
+
+    private function bloqueoDeRecurso(RecursoTenant $recurso, CarbonInterface $desde, CarbonInterface $hasta): ?BloqueoAgendaTenant
+    {
+        return BloqueoAgendaTenant::query()->where('recurso_id', $recurso->getKey())->entre($desde, $hasta)->first();
     }
 
     /**

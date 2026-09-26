@@ -780,3 +780,28 @@ export const margenesServicio = {
   resumen: "+{n} min de preparación y limpieza",
   enAgenda: "Preparación o limpieza",
 };
+
+// Bloqueos de agenda (fase 2, punto 2.2).
+export const bloqueosAgenda = {
+  titulo: "Bloqueos",
+  ayuda:
+    "Comida, vacaciones, ausencias o cierres. Ese horario deja de ofrecerse y no se puede agendar; lo que ya estaba agendado no se cancela solo.",
+  vacio: "Sin bloqueos próximos.",
+  sede: "Toda la sede ({sede})",
+  todaLaSede: "toda la sede",
+  fecha: "Día",
+  desdeDia: "Desde el día",
+  hastaDia: "Hasta el día",
+  desde: "De",
+  hasta: "A",
+  todoElDia: "Días completos",
+  motivo: "Motivo",
+  motivoEjemplo: "Comida, vacaciones, mantenimiento…",
+  bloquear: "Bloquear",
+  bloquearIgual: "Bloquear de todos modos",
+  quitar: "Quitar",
+  afectadas:
+    "Ya hay {n} citas o clases en ese horario. No se cancelan: revísalas después de bloquear.",
+  conReservas: "{n} con reserva",
+  enAgenda: "Bloqueado",
+};

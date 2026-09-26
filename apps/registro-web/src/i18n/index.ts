@@ -35,6 +35,7 @@ import {
   pagoAutomatico,
   pagoTienda,
   bajas,
+  bloqueosAgenda,
   cancelacion,
   confirmarRegistro,
   corteCaja,
@@ -99,6 +100,7 @@ export const i18n = createI18n({
       cancelacion,
       movimientosCredito,
       margenesServicio,
+      bloqueosAgenda,
     },
   },
 });

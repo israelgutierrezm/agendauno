@@ -76,7 +76,7 @@ class CalcularDisponibilidadTenant
                 $termina = $cursor->addMinutes($duracionMin)->utc();
 
                 // Solo huecos futuros y sin conflicto de agenda del instructor.
-                if ($inicia->greaterThan($ahora) && $this->agenda->conflictos($instructorId, null, $inicia, $termina, margenes: $margenes) === []) {
+                if ($inicia->greaterThan($ahora) && $this->agenda->conflictos($instructorId, null, $inicia, $termina, sucursalId: (int) $sucursal->getKey(), margenes: $margenes) === []) {
                     $slots[] = [
                         'inicia' => $inicia->toIso8601String(),
                         'termina' => $termina->toIso8601String(),

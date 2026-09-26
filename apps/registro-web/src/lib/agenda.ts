@@ -35,6 +35,16 @@ export interface SesionAgenda {
   cita?: CitaTitular | null;
 }
 
+/** Bloqueo de agenda (2.2) tal como lo dibuja la agenda. */
+export interface BloqueoAgenda {
+  ambito: "profesional" | "sede" | "sala";
+  instructor_id: string | null;
+  sucursal_id: string | null;
+  desde: string;
+  hasta: string;
+  motivo: string;
+}
+
 export interface VentanaAtencion {
   instructor_id: string | null;
   sucursal_id: string | null;
