@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 
 import BarraListado from "@/components/BarraListado.vue";
+import EstadoVacioListado from "@/components/EstadoVacioListado.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import { useVistaListado } from "@/lib/vistaListado";
 
@@ -65,15 +66,25 @@ function limpiar(): void {
   valores.value = {};
 }
 
+function restablecer(): void {
+  q.value = "";
+  limpiar();
+}
+
+function normalizar(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 const filtradas = computed(() => {
-  const termino = q.value.trim().toLowerCase();
+  const termino = normalizar(q.value.trim());
   return props.filas.filter((fila) => {
     if (termino !== "") {
       const coincideTexto = clavesBusqueda.value.some((clave) => {
         const valor = fila[clave];
-        return (
-          typeof valor === "string" && valor.toLowerCase().includes(termino)
-        );
+        return typeof valor === "string" && normalizar(valor).includes(termino);
       });
       if (!coincideTexto) {
         return false;
@@ -137,13 +148,13 @@ const enCuadricula = computed(() => vista?.value === "cuadricula");
 
     <!-- Cuadrícula: cada fila como tarjeta (la primera columna es el título). -->
     <div v-if="enCuadricula" :class="conBarra ? 'mt-4' : ''">
-      <p
+      <EstadoVacioListado
         v-if="paginadas.length === 0"
-        class="tu-card px-4 py-8 text-center"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ vacio ?? $t("tabla.vacio") }}
-      </p>
+        class="tu-card"
+        :filtrado="filas.length > 0"
+        :mensaje="vacio"
+        @restablecer="restablecer"
+      />
       <ul v-else class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <li v-for="(fila, i) in paginadas" :key="i" class="tu-card p-4">
           <slot name="tarjeta" :fila="fila">
@@ -179,7 +190,7 @@ const enCuadricula = computed(() => vista?.value === "cuadricula");
           </slot>
         </li>
       </ul>
-      <div class="mt-3 tu-card overflow-hidden">
+      <div v-if="filtradas.length" class="mt-3 tu-card overflow-hidden">
         <PaginacionListado
           :page="paginaSegura"
           :ultima-pagina="totalPaginas"
@@ -216,10 +227,14 @@ const enCuadricula = computed(() => vista?.value === "cuadricula");
             <tr v-if="paginadas.length === 0">
               <td
                 :colspan="columnas.length"
-                class="px-4 py-8 text-center"
+                class="text-center"
                 :style="{ color: 'var(--texto-suave)' }"
               >
-                {{ vacio ?? $t("tabla.vacio") }}
+                <EstadoVacioListado
+                  :filtrado="filas.length > 0"
+                  :mensaje="vacio"
+                  @restablecer="restablecer"
+                />
               </td>
             </tr>
             <tr

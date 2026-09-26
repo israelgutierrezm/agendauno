@@ -45,8 +45,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="mx-auto max-w-md px-4 py-10">
-    <h1 class="text-xl font-light">{{ $t("confirmarCorreo.titulo") }}</h1>
+  <section class="tu-public-access">
+    <p class="tu-public-eyebrow">Verificación de cuenta</p>
+    <h1 class="tu-public-form-title">{{ $t("confirmarCorreo.titulo") }}</h1>
 
     <div class="mt-6 tu-card p-6 text-sm">
       <p v-if="estado === 'confirmando'" role="status">

@@ -4,14 +4,14 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 
 import IconoNav from "@/components/IconoNav.vue";
-import LogoTurnoUno from "@/components/LogoTurnoUno.vue";
+import PublicShell from "@/components/PublicShell.vue";
 import NavArbol from "@/components/NavArbol.vue";
 import AppToaster from "@/components/AppToaster.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import type { MenuItem, NavEstado } from "@/components/nav";
-import { trackEvent } from "@/lib/analytics";
 import { esVisible, hojas, MENU, TITULOS_FUERA_DEL_MENU } from "@/lib/menu";
 import { plural } from "@/lib/terminologia";
+import { slugDeContexto } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useAparienciaStore } from "@/stores/apariencia";
 import { useTemaStore } from "@/stores/tema";
@@ -21,6 +21,21 @@ const tema = useTemaStore();
 const sesion = useSesionTenantStore();
 const router = useRouter();
 const route = useRoute();
+
+const esAcceso = computed(() => route.name === "entrar");
+
+const RUTAS_PUBLICAS_DE_NEGOCIO = new Set([
+  "estudio-publico",
+  "estudio-corto",
+  "agendar-cita",
+  "sucursales-estudio",
+]);
+const esRutaPublicaDeNegocio = computed(
+  () =>
+    RUTAS_PUBLICAS_DE_NEGOCIO.has(String(route.name)) ||
+    (String(route.name) === "entrar" &&
+      (slugDeContexto() !== null || typeof route.query.estudio === "string")),
+);
 
 tema.inicializar();
 // Con sesión guardada, su tema se pinta desde el primer cuadro (lo confirma /yo).
@@ -73,7 +88,10 @@ const enlaceActivo = computed(() => {
 });
 const tituloSeccion = computed(() => {
   if (enlaceActivo.value !== null) {
-    return t(enlaceActivo.value.etiqueta);
+    const item = enlaceActivo.value;
+    return item.termino !== undefined
+      ? plural(sesion.terminologia[item.termino])
+      : t(item.etiqueta);
   }
   const propio = TITULOS_FUERA_DEL_MENU[String(route.name)];
   return propio !== undefined ? t(propio) : (sesion.estudio?.nombre ?? "");
@@ -292,7 +310,7 @@ onMounted(() => {
               <path d="M4 7h16M4 12h16M4 17h16" />
             </svg>
           </button>
-          <h1 class="text-base font-semibold truncate">{{ tituloSeccion }}</h1>
+          <p class="text-base font-semibold truncate">{{ tituloSeccion }}</p>
         </div>
 
         <div class="flex items-center gap-1 sm:gap-2 shrink-0">
@@ -431,111 +449,17 @@ onMounted(() => {
   />
 
   <!-- ===================== APP PÚBLICA ===================== -->
-  <div v-else class="min-h-screen flex flex-col">
-    <header class="tu-public-nav">
-      <div
-        class="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between gap-4"
-      >
-        <RouterLink
-          :to="{ name: 'inicio' }"
-          class="flex items-center gap-2 font-bold text-lg shrink-0"
-        >
-          <LogoTurnoUno :tam="32" />
-          <span class="hidden sm:inline">{{ $t("marca") }}</span>
-        </RouterLink>
-
-        <nav class="flex items-center gap-1 sm:gap-2 shrink-0">
-          <RouterLink
-            class="tu-btn tu-btn-fantasma tu-public-community"
-            :to="{ name: 'directorio' }"
-            @click="
-              trackEvent('marketing_cta_clicked', {
-                placement: 'navigation',
-                destination: 'directory',
-              })
-            "
-          >
-            {{ $t("nav.directorio") }}
-          </RouterLink>
-          <RouterLink class="tu-btn tu-btn-fantasma" :to="{ name: 'entrar' }">
-            {{ $t("nav.entrar") }}
-          </RouterLink>
-          <button
-            type="button"
-            class="tu-btn tu-btn-fantasma px-2.5"
-            :title="tema.esOscuro ? $t('tema.claro') : $t('tema.oscuro')"
-            :aria-label="tema.esOscuro ? $t('tema.claro') : $t('tema.oscuro')"
-            @click="tema.alternarModo()"
-          >
-            <svg
-              v-if="tema.esOscuro"
-              aria-hidden="true"
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-            >
-              <circle cx="12" cy="12" r="4" />
-              <path
-                d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"
-              />
-            </svg>
-            <svg
-              v-else
-              aria-hidden="true"
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M20.5 15.2A8.5 8.5 0 0 1 8.8 3.5 8.5 8.5 0 1 0 20.5 15.2Z"
-              />
-            </svg>
-          </button>
-          <RouterLink
-            class="tu-btn tu-btn-primario"
-            :to="{ name: 'registro' }"
-            @click="
-              trackEvent('marketing_cta_clicked', {
-                placement: 'navigation',
-                destination: 'register',
-              })
-            "
-          >
-            {{ $t("nav.registrar") }}
-          </RouterLink>
-        </nav>
-      </div>
-    </header>
-
-    <main class="flex-1">
-      <!-- Al cerrar sesión la ruta privada sigue activa un instante (hasta el
-           redirect): no se monta aquí, o pediría sus datos ya sin sesión. -->
-      <RouterView v-if="route.meta.requiereSesion !== true" />
-    </main>
-
-    <footer
-      class="text-sm"
-      :style="{ color: 'var(--texto-suave)', background: 'var(--fondo)' }"
-    >
-      <div
-        class="mx-auto max-w-6xl px-4 py-8 flex items-center justify-between"
-      >
-        <span>© {{ new Date().getFullYear() }} {{ $t("marca") }}</span>
-        <RouterLink class="tu-enlace" :to="{ name: 'directorio' }">{{
-          $t("nav.directorio")
-        }}</RouterLink>
-      </div>
-    </footer>
-  </div>
+  <PublicShell
+    v-else
+    :pagina="String(route.name ?? '')"
+    :es-oscuro="tema.esOscuro"
+    :es-acceso="esAcceso"
+    :es-ruta-publica-de-negocio="esRutaPublicaDeNegocio"
+    @alternar-tema="tema.alternarModo()"
+  >
+    <!-- No volver a montar una ruta privada mientras se cierra la sesión. -->
+    <RouterView v-if="route.meta.requiereSesion !== true" />
+  </PublicShell>
 
   <!-- Notificaciones flotantes (toasts), montadas una sola vez para toda la app. -->
   <AppToaster />
@@ -543,31 +467,6 @@ onMounted(() => {
 </template>
 
 <style>
-/* Navegación pública discreta: fija, translúcida y sin elevación artificial. */
-.tu-public-nav {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  background: color-mix(in srgb, var(--superficie) 84%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--borde) 70%, transparent);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-}
-.tu-public-logo {
-  border-radius: 10px;
-  background: var(--texto);
-  color: var(--superficie);
-  letter-spacing: -0.04em;
-}
-.tu-public-community {
-  display: none;
-}
-@media (min-width: 640px) {
-  .tu-public-community {
-    display: inline-flex;
-  }
-}
-
 /* Enlaces de la barra lateral (clara u oscura según el tema). */
 .tu-side-link {
   display: flex;

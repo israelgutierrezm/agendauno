@@ -12,7 +12,9 @@ defineProps<{
 
 <template>
   <div class="flex items-center justify-between gap-4 flex-wrap">
-    <h1 class="text-2xl font-semibold tracking-tight leading-tight min-w-0">
+    <h1
+      class="text-2xl font-semibold tracking-tight leading-tight min-w-0 break-words"
+    >
       {{ titulo }}
       <span
         v-if="total !== undefined"
@@ -21,7 +23,10 @@ defineProps<{
         >{{ total }}</span
       >
     </h1>
-    <div v-if="$slots.acciones" class="flex items-center gap-2 shrink-0">
+    <div
+      v-if="$slots.acciones"
+      class="flex w-full max-w-full flex-wrap items-center gap-2 sm:w-auto"
+    >
       <slot name="acciones" />
     </div>
   </div>

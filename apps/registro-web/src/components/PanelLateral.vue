@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, watch } from "vue";
+import { ref } from "vue";
 
 import IconoNav from "@/components/IconoNav.vue";
+import { useFocoPanel } from "@/lib/focoPanel";
 
 /**
  * Panel lateral deslizante (drawer) anclado a la DERECHA, para altas/ediciones
@@ -12,24 +13,12 @@ import IconoNav from "@/components/IconoNav.vue";
 const props = defineProps<{ abierto: boolean; titulo?: string }>();
 const emit = defineEmits<{ cerrar: [] }>();
 
-function alTecla(evento: KeyboardEvent): void {
-  if (evento.key === "Escape" && props.abierto) {
-    emit("cerrar");
-  }
-}
-
-watch(
+const panel = ref<HTMLElement | null>(null);
+useFocoPanel(
   () => props.abierto,
-  (abierto) => {
-    document.body.style.overflow = abierto ? "hidden" : "";
-  },
+  panel,
+  () => emit("cerrar"),
 );
-
-onMounted(() => window.addEventListener("keydown", alTecla));
-onBeforeUnmount(() => {
-  window.removeEventListener("keydown", alTecla);
-  document.body.style.overflow = "";
-});
 </script>
 
 <template>
@@ -38,10 +27,13 @@ onBeforeUnmount(() => {
       <div v-if="abierto" class="fixed inset-0 z-50 flex justify-end">
         <div class="absolute inset-0 bg-black/50" @click="emit('cerrar')" />
         <aside
+          ref="panel"
           class="tu-drawer-panel relative flex h-full w-full max-w-md flex-col overflow-y-auto shadow-xl"
           :style="{ background: 'var(--superficie)' }"
           role="dialog"
           aria-modal="true"
+          :aria-label="titulo || $t('comun.detalle')"
+          tabindex="-1"
         >
           <header
             class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b p-5"
@@ -97,5 +89,13 @@ onBeforeUnmount(() => {
 .tu-drawer-enter-from .tu-drawer-panel,
 .tu-drawer-leave-to .tu-drawer-panel {
   transform: translateX(100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tu-drawer-enter-active,
+  .tu-drawer-leave-active,
+  .tu-drawer-enter-active .tu-drawer-panel,
+  .tu-drawer-leave-active .tu-drawer-panel {
+    transition: none;
+  }
 }
 </style>

@@ -1,14 +1,8 @@
-interface SeoOptions {
-  title: string;
-  description: string;
-  path?: string;
-  image?: string;
-  type?: "website" | "profile";
-  jsonLd?: Record<string, unknown> | null;
-}
-
-const SITE_URL = "https://agendauno.mx";
-const DEFAULT_IMAGE = `${SITE_URL}/assets/landing/turnouno-calendar.webp`;
+import {
+  SITE_URL,
+  DEFAULT_IMAGE,
+  type SeoOptions,
+} from "@/marketing/seoConfig";
 
 function upsertMeta(
   selector: string,
@@ -42,6 +36,14 @@ export function updateSeo(options: SeoOptions): void {
   const image = options.image ?? DEFAULT_IMAGE;
 
   document.title = options.title;
+  upsertMeta(
+    'meta[name="robots"]',
+    "name",
+    "robots",
+    options.index === false
+      ? "noindex,follow"
+      : "index,follow,max-image-preview:large",
+  );
   upsertMeta(
     'meta[name="description"]',
     "name",
@@ -87,7 +89,10 @@ export function updateSeo(options: SeoOptions): void {
     options.description,
   );
   upsertMeta('meta[name="twitter:image"]', "name", "twitter:image", image);
-  upsertCanonical(canonical);
+  if (options.index === false) {
+    document.head.querySelector('link[rel="canonical"]')?.remove();
+    document.head.querySelector('meta[property="og:url"]')?.remove();
+  } else upsertCanonical(canonical);
 
   document.head.querySelector("#turnouno-route-jsonld")?.remove();
   if (options.jsonLd) {
@@ -98,9 +103,3 @@ export function updateSeo(options: SeoOptions): void {
     document.head.appendChild(script);
   }
 }
-
-export const DEFAULT_SEO = {
-  title: "AgendaUno | Software para estudios y academias",
-  description:
-    "Gestiona agenda, reservas, membresías, cobros y asistencia desde un solo lugar. Prueba AgendaUno gratis durante 14 días, sin tarjeta.",
-} as const;

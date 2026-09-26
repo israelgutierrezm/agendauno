@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build": "vue-tsc -b && node scripts/build-marketing.mjs",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:marketing": "node scripts/check-marketing.mjs && node scripts/check-marketing-http.mjs",
     "test:watch": "vitest",
     "typecheck": "vue-tsc -b",
     "lint": "eslint . --max-warnings 0",

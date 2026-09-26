@@ -3,7 +3,9 @@ import { createRouter, createWebHistory } from "vue-router";
 import LandingView from "@/views/LandingView.vue";
 import { trackPageView } from "@/lib/analytics";
 import { puedeEntrar } from "@/lib/menu";
-import { DEFAULT_SEO, updateSeo } from "@/lib/seo";
+import { updateSeo } from "@/lib/seo";
+import { seoParaRuta } from "@/marketing/seoConfig";
+import { soluciones, rutaSolucion } from "@/marketing/soluciones";
 import { slugDeContexto } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -17,18 +19,35 @@ const router = createRouter({
   history: createWebHistory(),
   scrollBehavior(to, _from, savedPosition) {
     if (savedPosition) return savedPosition;
-    if (to.hash) return { el: to.hash, behavior: "smooth" };
+    if (to.hash) {
+      const headerHeight =
+        document.querySelector(".tu-public-nav")?.getBoundingClientRect()
+          .height ?? 0;
+      return { el: to.hash, top: headerHeight + 16, behavior: "smooth" };
+    }
     return { top: 0 };
   },
   routes: [
     { path: "/", name: "inicio", component: LandingView },
+    {
+      path: "/aviso-de-privacidad",
+      name: "aviso-privacidad",
+      component: () => import("@/views/AvisoPrivacidadView.vue"),
+    },
+    ...soluciones.map((solucion) => ({
+      path: rutaSolucion(solucion.slug),
+      name: `solucion-${solucion.slug}`,
+      component: () => import("@/views/SolucionView.vue"),
+      props: { slug: solucion.slug },
+    })),
     {
       path: "/registro",
       name: "registro",
       component: () => import("@/views/RegistroView.vue"),
     },
     {
-      path: "/directorio",
+      path: "/negocios",
+      alias: ["/explorar", "/directorio"],
       name: "directorio",
       component: () => import("@/views/DirectorioView.vue"),
     },
@@ -394,36 +413,12 @@ router.beforeEach(async (to) => {
   return true;
 });
 
-const PUBLIC_SEO: Record<string, { title: string; description: string }> = {
-  inicio: DEFAULT_SEO,
-  registro: {
-    title: "Crea tu estudio gratis | AgendaUno",
-    description:
-      "Configura tu estudio en AgendaUno y prueba agenda, reservas, membresías y cobros durante 14 días sin tarjeta.",
-  },
-  directorio: {
-    title: "Encuentra clases y estudios | AgendaUno",
-    description:
-      "Descubre estudios, gimnasios y academias, consulta sus próximas clases y crea tu cuenta directamente con cada estudio.",
-  },
-  "estudio-publico": {
-    title: "Clases y estudios en AgendaUno",
-    description:
-      "Consulta horarios, instructores y precios de este estudio en AgendaUno.",
-  },
-  entrar: {
-    title: "Entrar a tu estudio | AgendaUno",
-    description: "Accede a la cuenta independiente de tu estudio en AgendaUno.",
-  },
-};
-
-router.afterEach((to) => {
-  const routeName = String(to.name ?? "");
-  const seo = PUBLIC_SEO[routeName];
-  if (seo) {
-    updateSeo({ ...seo, path: to.path });
-  }
-  trackPageView(to.path, seo?.title ?? routeName);
+router.afterEach((to, _from, failure) => {
+  if (failure) return;
+  const seo = seoParaRuta(to.path);
+  updateSeo(seo);
+  // No enviar slugs, IDs internos ni URLs de activación a la medición comercial.
+  if (seo.index || to.name === "registro") trackPageView(to.path, seo.title);
 });
 
 export default router;

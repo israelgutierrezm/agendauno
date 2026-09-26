@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
+import { recordarNegocio } from "@/lib/negociosRecientes";
 
 interface EstudioDirectorio {
   slug: string;
@@ -24,13 +25,63 @@ const error = ref<string | null>(null);
 const PERFILES = [
   "pilates",
   "pole",
+  "academia",
+  "gimnasio",
   "yoga",
   "danza",
-  "gimnasio",
   "natacion",
-  "academia",
+  "barberia",
+  "estetica",
+  "salon",
+  "spa",
+  "salud",
   "general",
 ] as const;
+
+const CATEGORIAS_DESTACADAS = [
+  {
+    clave: "pilates",
+    trazos: ["M5 18c3-5 11-5 14 0", "M8 12a4 4 0 1 1 8 0", "M4 21h16"],
+  },
+  {
+    clave: "pole",
+    trazos: ["M12 3v18", "M7 7c3 0 5 2 5 5", "M17 17c-3 0-5-2-5-5"],
+  },
+  {
+    clave: "academia",
+    trazos: ["M4 20h16", "M6 18V9l6-5 6 5v9", "M9 12h6", "M9 15h6"],
+  },
+  {
+    clave: "barberia",
+    trazos: [
+      "M7 7l10 10",
+      "M17 7 7 17",
+      "M6 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
+      "M18 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
+    ],
+  },
+] as const;
+
+const IMAGENES_PERFIL: Record<string, string> = {
+  barberia: "barberia-v1.jpg",
+  estetica: "estetica-v1.jpg",
+  salon: "estetica-v1.jpg",
+  spa: "estetica-v1.jpg",
+  salud: "consultorios-v1.webp",
+  pilates: "pilates-v1.jpg",
+  pole: "pole-v1.jpg",
+  yoga: "yoga-v1.jpg",
+  danza: "danza-v1.jpg",
+  gimnasio: "gimnasio-v1.jpg",
+  natacion: "natacion-v1.jpg",
+  academia: "academias-v1.jpg",
+  general: "academias-v1.jpg",
+};
+
+function imagenPerfil(valor: string): string {
+  const archivo = IMAGENES_PERFIL[valor] ?? IMAGENES_PERFIL.general;
+  return `/assets/landing/disciplinas/${archivo}`;
+}
 
 async function cargar(): Promise<void> {
   cargando.value = true;
@@ -58,14 +109,29 @@ async function cargar(): Promise<void> {
   }
 }
 
-function verEstudio(slug: string): void {
+function verEstudio(estudio: EstudioDirectorio): void {
   trackEvent("community_studio_selected", { source: "directory" });
-  void router.push({ name: "estudio-publico", params: { slug } });
+  recordarNegocio({
+    slug: estudio.slug,
+    nombre: estudio.nombre,
+    logo_url: estudio.logo_url,
+    ciudad: estudio.ciudad,
+    pais: estudio.pais,
+  });
+  void router.push({
+    name: "estudio-publico",
+    params: { slug: estudio.slug },
+  });
 }
 
 function limpiar(): void {
   q.value = "";
   perfil.value = "";
+  void cargar();
+}
+
+function seleccionarPerfil(valor: string): void {
+  perfil.value = perfil.value === valor ? "" : valor;
   void cargar();
 }
 
@@ -83,7 +149,7 @@ onMounted(cargar);
 
 <template>
   <section class="tu-directorio-hero">
-    <div class="mx-auto max-w-5xl px-4 py-14 sm:py-20 text-center">
+    <div class="mx-auto max-w-4xl px-4 py-14 sm:py-20 text-center">
       <p
         class="text-sm font-semibold uppercase tracking-widest"
         :style="{ color: 'var(--texto-suave)' }"
@@ -136,10 +202,46 @@ onMounted(cargar);
           {{ $t("directorio.buscarCta") }}
         </button>
       </form>
+
+      <div
+        class="tu-categorias"
+        role="list"
+        :aria-label="$t('directorio.categoriasTitulo')"
+      >
+        <button
+          v-for="categoria in CATEGORIAS_DESTACADAS"
+          :key="categoria.clave"
+          type="button"
+          class="tu-categoria"
+          :class="{ 'tu-categoria--activa': perfil === categoria.clave }"
+          :aria-pressed="perfil === categoria.clave"
+          @click="seleccionarPerfil(categoria.clave)"
+        >
+          <span class="tu-categoria-icono" aria-hidden="true">
+            <svg
+              width="23"
+              height="23"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.65"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                v-for="(trazo, i) in categoria.trazos"
+                :key="i"
+                :d="trazo"
+              />
+            </svg>
+          </span>
+          <span>{{ $t(`registro.perfiles.${categoria.clave}`) }}</span>
+        </button>
+      </div>
     </div>
   </section>
 
-  <section class="mx-auto max-w-5xl px-4 py-10 sm:py-14">
+  <section class="mx-auto max-w-4xl px-4 py-10 sm:py-16">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p
         v-if="cargando"
@@ -167,10 +269,10 @@ onMounted(cargar);
 
     <div
       v-if="cargando"
-      class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      class="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
       aria-hidden="true"
     >
-      <div v-for="n in 6" :key="n" class="tu-card h-40 animate-pulse" />
+      <div v-for="n in 6" :key="n" class="tu-card h-80 animate-pulse" />
     </div>
 
     <div
@@ -184,57 +286,88 @@ onMounted(cargar);
       </button>
     </div>
 
-    <p
+    <div
       v-else-if="estudios.length === 0"
-      class="mt-10 text-center"
+      class="tu-public-empty mt-8"
+      role="status"
       :style="{ color: 'var(--texto-suave)' }"
     >
-      {{
-        q.trim() !== ""
-          ? $t("directorio.sinResultados", { q })
-          : $t("directorio.vacio")
-      }}
-    </p>
-
-    <ul v-else class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <li
-        v-for="e in estudios"
-        :key="e.slug"
-        class="tu-card tu-estudio-card p-5 flex flex-col"
+      <p>
+        {{
+          q.trim() !== ""
+            ? $t("directorio.sinResultados", { q })
+            : $t("directorio.vacio")
+        }}
+      </p>
+      <p class="mt-2 text-sm">
+        Prueba con el nombre del negocio o pide a su equipo el enlace directo de
+        reservas.
+      </p>
+      <button
+        v-if="q || perfil"
+        type="button"
+        class="tu-btn tu-btn-fantasma mt-4"
+        @click="limpiar"
       >
-        <div class="flex items-center gap-3">
-          <img
-            v-if="e.logo_url"
-            :src="e.logo_url"
-            :alt="e.nombre"
-            class="h-11 w-11 rounded-lg object-cover"
-          />
-          <span
-            v-else
-            class="h-11 w-11 rounded-lg inline-flex items-center justify-center font-bold text-white"
-            :style="{ background: 'var(--primario)' }"
-            aria-hidden="true"
-            >{{ iniciales(e.nombre) }}</span
-          >
-          <div class="min-w-0">
-            <p class="font-bold truncate">{{ e.nombre }}</p>
-            <p
-              class="text-sm truncate"
-              :style="{ color: 'var(--texto-suave)' }"
+        Quitar filtros
+      </button>
+    </div>
+
+    <ul v-else class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <li v-for="e in estudios" :key="e.slug" class="tu-card tu-estudio-card">
+        <button class="tu-estudio-accion" type="button" @click="verEstudio(e)">
+          <span class="tu-estudio-portada">
+            <img
+              :src="imagenPerfil(e.perfil)"
+              alt=""
+              width="1122"
+              height="1402"
+              loading="lazy"
+              decoding="async"
+            />
+            <span class="tu-estudio-degradado" aria-hidden="true"></span>
+            <span class="tu-estudio-perfil">{{
+              $t(`registro.perfiles.${e.perfil}`)
+            }}</span>
+            <img
+              v-if="e.logo_url"
+              :src="e.logo_url"
+              :alt="e.nombre"
+              class="tu-estudio-logo"
+            />
+            <span
+              v-else
+              class="tu-estudio-logo tu-estudio-iniciales"
+              aria-hidden="true"
             >
-              {{ [e.ciudad, e.pais].filter(Boolean).join(", ") || "—" }}
-            </p>
-          </div>
-        </div>
-        <span class="tu-badge mt-5 self-start">{{
-          $t(`registro.perfiles.${e.perfil}`)
-        }}</span>
-        <button
-          class="tu-btn tu-btn-primario mt-4 w-full justify-center"
-          type="button"
-          @click="verEstudio(e.slug)"
-        >
-          {{ $t("directorio.verEstudio") }}
+              {{ iniciales(e.nombre) }}
+            </span>
+          </span>
+          <span class="tu-estudio-info">
+            <span class="min-w-0 text-left">
+              <strong class="tu-estudio-nombre">{{ e.nombre }}</strong>
+              <span class="tu-estudio-ubicacion">
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  aria-hidden="true"
+                >
+                  <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
+                  <circle cx="12" cy="10" r="2.5" />
+                </svg>
+                {{
+                  [e.ciudad, e.pais].filter(Boolean).join(", ") ||
+                  $t("directorio.ubicacionPendiente")
+                }}
+              </span>
+            </span>
+            <span class="tu-estudio-flecha" aria-hidden="true">→</span>
+          </span>
+          <span class="tu-estudio-cta">{{ $t("directorio.verEstudio") }}</span>
         </button>
       </li>
     </ul>
@@ -267,15 +400,38 @@ onMounted(cargar);
 
 <style scoped>
 .tu-directorio-hero {
-  background: var(--fondo);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 12% 16%,
+      rgb(53 194 249 / 16%),
+      transparent 28rem
+    ),
+    radial-gradient(circle at 89% 68%, rgb(0 112 255 / 15%), transparent 24rem),
+    var(--fondo);
+}
+.tu-directorio-hero::after {
+  position: absolute;
+  inset: auto -8rem -15rem auto;
+  width: 28rem;
+  height: 28rem;
+  border: 1px solid color-mix(in srgb, var(--primario) 13%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4rem color-mix(in srgb, var(--primario) 4%, transparent);
+  content: "";
+  pointer-events: none;
 }
 .tu-buscador-directorio {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 0.65rem;
   max-width: 52rem;
   padding: 0.65rem;
   border-radius: 1.25rem;
   background: var(--superficie);
+  box-shadow: 0 1rem 3.5rem rgb(39 55 73 / 10%);
 }
 .tu-busqueda-texto {
   display: flex;
@@ -300,11 +456,170 @@ onMounted(cargar);
   border-radius: 0.8rem;
   background: var(--fondo);
 }
+.tu-categorias {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  max-width: 45rem;
+  margin: 1.35rem auto 0;
+  justify-content: center;
+  gap: 0.65rem;
+}
+.tu-categoria {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.52rem 0.8rem;
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--superficie) 86%, transparent);
+  color: var(--texto-suave);
+  font-size: 0.76rem;
+  font-weight: 650;
+  backdrop-filter: blur(14px);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+.tu-categoria:hover,
+.tu-categoria--activa {
+  border-color: color-mix(in srgb, var(--primario) 45%, var(--borde));
+  background: color-mix(in srgb, var(--primario) 10%, var(--superficie));
+  color: var(--texto);
+  transform: translateY(-2px);
+}
+.tu-categoria-icono {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-content: center;
+  border-radius: 50%;
+  background: var(--fondo);
+  color: var(--primario);
+}
 .tu-estudio-card {
-  transition: transform 0.2s ease;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
 }
 .tu-estudio-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-5px);
+  box-shadow: 0 1.4rem 3.5rem rgb(37 49 64 / 13%);
+}
+.tu-estudio-accion {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: inherit;
+}
+.tu-estudio-portada {
+  position: relative;
+  display: block;
+  height: 12.5rem;
+  overflow: hidden;
+}
+.tu-estudio-portada > img:first-child {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.tu-estudio-card:hover .tu-estudio-portada > img:first-child {
+  transform: scale(1.045);
+}
+.tu-estudio-degradado {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgb(15 22 31 / 4%) 40%,
+    rgb(15 22 31 / 42%)
+  );
+}
+.tu-estudio-perfil {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.85rem;
+  padding: 0.42rem 0.65rem;
+  border: 1px solid rgb(255 255 255 / 42%);
+  border-radius: 999px;
+  background: rgb(16 24 34 / 52%);
+  color: white;
+  font-size: 0.68rem;
+  font-weight: 700;
+  backdrop-filter: blur(12px);
+}
+.tu-estudio-logo {
+  position: absolute;
+  left: 1rem;
+  bottom: -0.15rem;
+  width: 3.6rem;
+  height: 3.6rem;
+  border: 0.25rem solid var(--superficie);
+  border-radius: 1rem;
+  background: var(--superficie);
+  object-fit: cover;
+  box-shadow: 0 0.5rem 1.4rem rgb(16 25 36 / 20%);
+}
+.tu-estudio-iniciales {
+  display: grid;
+  place-content: center;
+  background: var(--primario);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.tu-estudio-info {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.15rem 0.7rem;
+}
+.tu-estudio-nombre,
+.tu-estudio-ubicacion {
+  display: block;
+}
+.tu-estudio-nombre {
+  overflow: hidden;
+  font-size: 1.08rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tu-estudio-ubicacion {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+}
+.tu-estudio-flecha {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  place-content: center;
+  border-radius: 50%;
+  background: var(--fondo);
+  color: var(--primario);
+  transition: transform 0.2s ease;
+}
+.tu-estudio-card:hover .tu-estudio-flecha {
+  transform: translateX(3px);
+}
+.tu-estudio-cta {
+  padding: 0 1.15rem 1.15rem;
+  color: var(--primario);
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 @media (min-width: 768px) {
   .tu-buscador-directorio {
@@ -315,8 +630,22 @@ onMounted(cargar);
     border-radius: 999px;
   }
 }
+@media (max-width: 639px) {
+  .tu-categorias {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 0.4rem;
+    scrollbar-width: none;
+  }
+  .tu-categoria {
+    flex: 0 0 auto;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .tu-estudio-card {
+  .tu-estudio-card,
+  .tu-estudio-portada > img:first-child,
+  .tu-estudio-flecha,
+  .tu-categoria {
     transition: none;
   }
 }

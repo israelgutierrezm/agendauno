@@ -51,7 +51,8 @@ function ir(n: number): void {
 
 <template>
   <nav
-    v-if="ultimaPagina > 1"
+    v-if="total > 0"
+    :aria-label="$t('tabla.paginacion')"
     class="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 sm:px-6"
     :style="{ borderColor: 'var(--borde)' }"
   >
@@ -59,10 +60,10 @@ function ir(n: number): void {
       {{ $t("tabla.mostrando", { desde, hasta, total }) }}
     </span>
 
-    <div class="flex flex-wrap items-center gap-1">
+    <div v-if="ultimaPagina > 1" class="flex flex-wrap items-center gap-1">
       <button
         type="button"
-        class="min-w-9 rounded-lg px-3 py-1.5 text-center text-sm disabled:opacity-40"
+        class="min-h-11 min-w-11 rounded-lg px-3 py-1.5 text-center text-sm disabled:opacity-40"
         :style="{ color: 'var(--texto-suave)' }"
         :disabled="page <= 1"
         :aria-label="$t('tabla.anterior')"
@@ -80,7 +81,9 @@ function ir(n: number): void {
         <button
           v-else
           type="button"
-          class="min-w-9 rounded-lg px-3 py-1.5 text-center text-sm"
+          class="min-h-11 min-w-11 rounded-lg px-3 py-1.5 text-center text-sm"
+          :aria-current="n === page ? 'page' : undefined"
+          :aria-label="$t('tabla.pagina', { n })"
           :style="
             n === page
               ? {
@@ -96,7 +99,7 @@ function ir(n: number): void {
       </template>
       <button
         type="button"
-        class="min-w-9 rounded-lg px-3 py-1.5 text-center text-sm disabled:opacity-40"
+        class="min-h-11 min-w-11 rounded-lg px-3 py-1.5 text-center text-sm disabled:opacity-40"
         :style="{ color: 'var(--texto-suave)' }"
         :disabled="page >= ultimaPagina"
         :aria-label="$t('tabla.siguiente')"

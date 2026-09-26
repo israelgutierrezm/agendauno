@@ -1,47 +1,51 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import { trackEvent } from "@/lib/analytics";
+import CarruselNegocios from "@/components/CarruselNegocios.vue";
+import ProductoDemo from "@/components/ProductoDemo.vue";
+import FuncionesLanding from "@/components/FuncionesLanding.vue";
+import ModalidadesLanding from "@/components/ModalidadesLanding.vue";
+import SolucionesEnlaces from "@/components/SolucionesEnlaces.vue";
+import TextoDestacado from "@/components/TextoDestacado.vue";
+import NegociosAnimados from "@/components/NegociosAnimados.vue";
 
 const { t } = useI18n();
-const DIAS_PRUEBA = 14;
+const DIAS_PRUEBA = 30;
+const negociosAnimados = computed(() =>
+  [
+    "pilates",
+    "pole",
+    "academias",
+    "acuaticas",
+    "yoga",
+    "barberias",
+    "esteticas",
+    "spas",
+    "wellness",
+    "terapeutas",
+    "dentistas",
+    "psicologos",
+  ].map((clave) => t(`landing.heroEscritura.negocios.${clave}`)),
+);
 
-// Iconos de línea (outline 24x24, currentColor) — estilo SF Symbols, sin emoji.
-const ICONOS: Record<string, string[]> = {
-  agenda: [
-    "M4 8.5A1.5 1.5 0 0 1 5.5 7h13A1.5 1.5 0 0 1 20 8.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z",
-    "M4 11h16",
-    "M8 4.5v3",
-    "M16 4.5v3",
-  ],
-  reservas: ["M5 12.5l4 4 10-10", "M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18z"],
-  membresias: ["M4 8.5h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4z", "M14 8.5v11"],
-  pagos: [
-    "M3.5 7.5A1.5 1.5 0 0 1 5 6h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 18H5a1.5 1.5 0 0 1-1.5-1.5z",
-    "M3.5 10h17",
-    "M7 14.5h4",
-  ],
-  pos: [
-    "M4 7.5h16l-1 9.5a1.5 1.5 0 0 1-1.5 1.3H6.5A1.5 1.5 0 0 1 5 17z",
-    "M8.5 7.5V6a3.5 3.5 0 0 1 7 0v1.5",
-    "M9.5 11.5h5",
-  ],
-  reportes: ["M4 20V13", "M9 20V8", "M14 20v-4", "M19 20V5", "M3.5 20h17"],
-} as const;
-
-const funciones = [
-  { icono: "agenda", clave: "agenda" },
-  { icono: "reservas", clave: "reservas" },
-  { icono: "membresias", clave: "membresias" },
-  { icono: "pagos", clave: "pagos" },
-  { icono: "pos", clave: "pos" },
-  { icono: "reportes", clave: "reportes" },
+const modelos = ["clases", "citas"] as const;
+const modoDemo = ref<"clases" | "citas">("clases");
+function elegirAgenda(modo: "clases" | "citas"): void {
+  modoDemo.value = modo;
+  trackEvent("marketing_business_mode_selected", {
+    mode: modo,
+    placement: "business_modes",
+  });
+}
+const sellosConfianza = [
+  "prueba",
+  "configuracion",
+  "cobro",
+  "cancelacion",
 ] as const;
-
-const resultados = ["clases", "cobros", "control"] as const;
-const sellosConfianza = ["prueba", "tenant", "cobro", "cancelacion"] as const;
 
 const beneficiosMoviles = ["b1", "b2", "b3"] as const;
 
@@ -53,14 +57,14 @@ const pasos = [
 
 const faqs = [
   { q: "q1", a: "a1" },
+  { q: "q6", a: "a6" },
+  { q: "q9", a: "a9" },
   { q: "q2", a: "a2" },
-  { q: "q3", a: "a3" },
+  { q: "q7", a: "a7" },
   { q: "q4", a: "a4" },
   { q: "q5", a: "a5" },
-  { q: "q6", a: "a6" },
-  { q: "q7", a: "a7" },
   { q: "q8", a: "a8" },
-  { q: "q9", a: "a9" },
+  { q: "q3", a: "a3" },
 ] as const;
 
 function medirCta(ubicacion: string, destino: string): void {
@@ -70,75 +74,55 @@ function medirCta(ubicacion: string, destino: string): void {
   });
 }
 
-function verProducto(): void {
-  medirCta("hero", "product_demo");
-  document
-    .querySelector("#producto")
-    ?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-const DISCIPLINAS = [
+const NEGOCIOS = [
   { clave: "pilates", imagen: "pilates-v1.jpg", destacada: true },
   { clave: "pole", imagen: "pole-v1.jpg", destacada: true },
-  { clave: "natacion", imagen: "natacion-v1.jpg", destacada: false },
-  { clave: "gimnasio", imagen: "gimnasio-v1.jpg", destacada: false },
-  { clave: "yoga", imagen: "yoga-v1.jpg", destacada: false },
-  { clave: "danza", imagen: "danza-v1.jpg", destacada: false },
-  { clave: "crossfit", imagen: "crossfit-v1.jpg", destacada: false },
   { clave: "academias", imagen: "academias-v1.jpg", destacada: false },
+  { clave: "acuaticas", imagen: "natacion-v1.jpg", destacada: false },
+  { clave: "barberia", imagen: "barberia-v1.jpg", destacada: false },
+  { clave: "estetica", imagen: "estetica-v1.jpg", destacada: false },
+  { clave: "dentistas", imagen: "consultorios-v1.webp", destacada: false },
+  { clave: "psicologos", imagen: "psicologia-v1.webp", destacada: false },
+  { clave: "wellness", imagen: "wellness-v1.webp", destacada: false },
+  { clave: "spa", imagen: "spa-v1.webp", destacada: false },
+  { clave: "terapeutas", imagen: "terapeutas-v1.webp", destacada: false },
+  { clave: "gimnasio", imagen: "gimnasio-v1.jpg", destacada: false },
+  { clave: "danza", imagen: "danza-v1.jpg", destacada: false },
+  { clave: "yoga", imagen: "yoga-v1.jpg", destacada: false },
 ] as const;
 
-const verticales = computed(() =>
-  DISCIPLINAS.map((disciplina) => ({
-    ...disciplina,
-    nombre: t(`landing.paraQuien.disciplinas.${disciplina.clave}.nombre`),
-    descripcion: t(
-      `landing.paraQuien.disciplinas.${disciplina.clave}.descripcion`,
-    ),
-    alt: t(`landing.paraQuien.disciplinas.${disciplina.clave}.alt`),
-    src: `/assets/landing/disciplinas/${disciplina.imagen}`,
+const negocios = computed(() =>
+  NEGOCIOS.map((negocio) => ({
+    ...negocio,
+    nombre: t(`landing.paraQuien.negocios.${negocio.clave}.nombre`),
+    descripcion: t(`landing.paraQuien.negocios.${negocio.clave}.descripcion`),
+    alt: t(`landing.paraQuien.negocios.${negocio.clave}.alt`),
+    src: `/assets/landing/disciplinas/${negocio.imagen}`,
   })),
 );
 
-// Bloques de la agenda de ejemplo (mockup) — el color por tipo de clase.
-const clasesDemo = [
-  { clave: "clase1", color: "#c8d8e0", pct: 100, etq: "lleno", vivo: true },
-  { clave: "clase2", color: "#e8d0d0", pct: 70, etq: "lugares", vivo: false },
-  { clave: "clase3", color: "#dddc8c", pct: 45, etq: "lugares", vivo: false },
+const heroNegocios = [
+  { clave: "pole", imagen: "pole-v1.jpg" },
+  { clave: "pilates", imagen: "pilates-v1.jpg" },
+  { clave: "barberia", imagen: "barberia-v1.jpg" },
+] as const;
+const flujoReserva = [
+  "servicio",
+  "profesional",
+  "horario",
+  "confirmacion",
 ] as const;
 
-// --- Animaciones: reveal-on-scroll + contadores, respetando prefers-reduced-motion.
+// Aparición al entrar en pantalla, respetando prefers-reduced-motion.
 let observador: IntersectionObserver | undefined;
-
-function animarContador(el: HTMLElement): void {
-  const objetivo = Number(el.dataset.contador ?? "0");
-  const sufijo = el.dataset.sufijo ?? "";
-  const duracion = 1100;
-  const inicio = performance.now();
-  const paso = (ahora: number): void => {
-    const p = Math.min(1, (ahora - inicio) / duracion);
-    const val = Math.round(objetivo * (1 - Math.pow(1 - p, 3))); // easeOutCubic
-    el.textContent = `${val}${sufijo}`;
-    if (p < 1) {
-      requestAnimationFrame(paso);
-    }
-  };
-  requestAnimationFrame(paso);
-}
 
 onMounted(() => {
   const nodos = Array.from(document.querySelectorAll<HTMLElement>(".reveal"));
-  const contadores = Array.from(
-    document.querySelectorAll<HTMLElement>("[data-contador]"),
-  );
   const reducido =
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
-  if (reducido) {
+  if (reducido || !("IntersectionObserver" in window)) {
     nodos.forEach((n) => n.classList.add("reveal-in"));
-    contadores.forEach((c) => {
-      c.textContent = `${c.dataset.contador ?? ""}${c.dataset.sufijo ?? ""}`;
-    });
     return;
   }
 
@@ -147,9 +131,6 @@ onMounted(() => {
       for (const e of entradas) {
         if (e.isIntersecting) {
           e.target.classList.add("reveal-in");
-          e.target
-            .querySelectorAll<HTMLElement>("[data-contador]")
-            .forEach(animarContador);
           observador?.unobserve(e.target);
         }
       }
@@ -167,15 +148,30 @@ onBeforeUnmount(() => observador?.disconnect());
     <section class="tu-banda tu-hero" :style="{ background: 'var(--fondo)' }">
       <div class="tu-hero-layout mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="tu-hero-copy reveal">
-          <span class="tu-eyebrow">{{ $t("landing.etiqueta") }}</span>
-          <h1 class="tu-display max-w-3xl">{{ $t("landing.titulo") }}</h1>
+          <NegociosAnimados
+            :negocios="negociosAnimados"
+            :prefijo="$t('landing.heroEscritura.prefijo')"
+            :pausar="$t('landing.heroEscritura.pausar')"
+            :reanudar="$t('landing.heroEscritura.reanudar')"
+          />
+          <h1 class="tu-display max-w-3xl">
+            <TextoDestacado :texto="$t('landing.titulo')" enfasis="Más" />
+          </h1>
           <p
-            class="tu-hero-sub mt-6 text-xl sm:text-2xl max-w-2xl"
+            class="tu-hero-sub mt-5 text-lg sm:text-xl max-w-2xl"
             style="color: var(--texto-suave); letter-spacing: -0.01em"
           >
             {{ $t("landing.subtitulo") }}
           </p>
-          <div class="tu-hero-actions mt-9 flex flex-wrap items-center gap-3">
+          <ul
+            class="tu-hero-flow"
+            :aria-label="$t('landing.heroVisual.flujoTitulo')"
+          >
+            <li v-for="paso in flujoReserva" :key="paso">
+              {{ $t(`landing.heroVisual.flujo.${paso}`) }}
+            </li>
+          </ul>
+          <div class="tu-hero-actions mt-7 flex flex-wrap items-center gap-3">
             <RouterLink
               class="tu-btn tu-btn-primario text-base px-7 py-3"
               :to="{ name: 'registro' }"
@@ -186,7 +182,7 @@ onBeforeUnmount(() => observador?.disconnect());
             <a
               class="tu-btn tu-btn-fantasma text-base px-7 py-3"
               href="#producto"
-              @click="verProducto"
+              @click="medirCta('hero', 'product')"
             >
               {{ $t("landing.ctaProducto") }}
             </a>
@@ -203,35 +199,30 @@ onBeforeUnmount(() => observador?.disconnect());
         </div>
 
         <figure class="tu-hero-visual reveal">
-          <div class="tu-imagen-marco tu-imagen-cielo">
-            <img
-              src="/assets/landing/turnouno-calendar.webp"
-              :alt="$t('landing.producto.imagenAlt')"
-              width="1776"
-              height="887"
-              fetchpriority="high"
-              decoding="async"
-            />
-            <span class="tu-hero-chip">
-              <span class="tu-hero-chip-icon" aria-hidden="true">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path
-                    d="M4 8.5A1.5 1.5 0 0 1 5.5 7h13A1.5 1.5 0 0 1 20 8.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z"
-                  />
-                  <path d="M4 11h16M8 4.5v3M16 4.5v3" />
-                </svg>
+          <div class="tu-hero-collage">
+            <div
+              v-for="(negocio, i) in heroNegocios"
+              :key="negocio.clave"
+              class="tu-hero-foto"
+              :class="`tu-hero-foto--${i + 1}`"
+            >
+              <img
+                :src="`/assets/landing/disciplinas/${negocio.imagen}`"
+                :alt="$t(`landing.heroVisual.${negocio.clave}Alt`)"
+                width="1122"
+                height="1402"
+                :fetchpriority="i === 0 ? 'high' : undefined"
+                decoding="async"
+              />
+              <span>{{ $t(`landing.heroVisual.${negocio.clave}`) }}</span>
+            </div>
+            <div class="tu-hero-reserva">
+              <span class="tu-hero-reserva-check" aria-hidden="true">✓</span>
+              <span>
+                <strong>{{ $t("landing.heroVisual.confirmada") }}</strong>
+                <small>{{ $t("landing.heroVisual.confirmadaDetalle") }}</small>
               </span>
-              <span>{{ $t("landing.producto.agendaTitulo") }}</span>
-            </span>
+            </div>
           </div>
         </figure>
       </div>
@@ -253,78 +244,11 @@ onBeforeUnmount(() => observador?.disconnect());
       </div>
     </section>
 
-    <!-- ===================== RESULTADOS ===================== -->
-    <section class="tu-banda" :style="{ background: 'var(--superficie)' }">
-      <div class="mx-auto max-w-6xl px-4 sm:px-6 py-20 sm:py-28">
-        <p class="tu-seccion-etiqueta reveal">
-          {{ $t("landing.resultados.etiqueta") }}
-        </p>
-        <h2 class="tu-titulo mt-3 max-w-4xl reveal">
-          {{ $t("landing.resultados.titulo") }}
-        </h2>
-        <div class="tu-resultados mt-12 grid gap-5 lg:grid-cols-3">
-          <article
-            v-for="(resultado, i) in resultados"
-            :key="resultado"
-            class="tu-card p-7 sm:p-8 reveal"
-            :style="{ transitionDelay: i * 90 + 'ms' }"
-          >
-            <div
-              class="tu-resultado-grafico"
-              :class="`tu-resultado-grafico--${resultado}`"
-              aria-hidden="true"
-            >
-              <template v-if="resultado === 'clases'">
-                <div class="tu-ocupacion-anillo">
-                  <strong>92%</strong>
-                  <span>lleno</span>
-                </div>
-                <div class="tu-asientos">
-                  <span
-                    v-for="n in 8"
-                    :key="n"
-                    :class="{ libre: n === 8 }"
-                  ></span>
-                </div>
-              </template>
-              <template v-else-if="resultado === 'cobros'">
-                <div v-for="n in 3" :key="n" class="tu-pago-linea">
-                  <span class="tu-pago-avatar"></span>
-                  <span class="tu-pago-barra"></span>
-                  <span class="tu-pago-check">✓</span>
-                </div>
-              </template>
-              <template v-else>
-                <div class="tu-mini-barras">
-                  <span v-for="n in 7" :key="n"></span>
-                </div>
-                <div class="tu-mini-tendencia">
-                  <span></span><span></span><span></span><span></span>
-                </div>
-              </template>
-            </div>
-            <span class="tu-resultado-num" aria-hidden="true"
-              >0{{ i + 1 }}</span
-            >
-            <h3 class="mt-8 text-2xl font-semibold tracking-tight">
-              {{ $t(`landing.puntos.${resultado}`) }}
-            </h3>
-            <p
-              class="mt-3 text-base leading-relaxed"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{ $t(`landing.puntos.${resultado}Desc`) }}
-            </p>
-          </article>
-        </div>
-      </div>
-    </section>
-
     <!-- ===================== PRODUCTO ===================== -->
     <section
       id="producto"
       class="tu-banda tu-ancla"
-      :style="{ background: 'var(--fondo)' }"
+      :style="{ background: 'var(--superficie)' }"
     >
       <div class="mx-auto max-w-5xl px-4 sm:px-6 pt-20 sm:pt-28">
         <p class="tu-seccion-etiqueta reveal">
@@ -341,134 +265,46 @@ onBeforeUnmount(() => observador?.disconnect());
         </p>
       </div>
 
-      <!-- Mockup funcional animado: los textos siguen siendo HTML traducible. -->
-      <div class="mx-auto max-w-5xl px-4 sm:px-6 pt-10 pb-20 sm:pb-28">
-        <div class="tu-ventana reveal mx-auto max-w-4xl">
-          <!-- Barra de título -->
-          <div class="tu-ventana-barra">
-            <span class="tu-punto" style="background: #ff5f57"></span>
-            <span class="tu-punto" style="background: #febc2e"></span>
-            <span class="tu-punto" style="background: #28c840"></span>
-            <span
-              class="ml-3 text-xs font-semibold"
-              :style="{ color: 'var(--texto-suave)' }"
-              >{{ $t("landing.producto.barra") }} · AgendaUno</span
-            >
-            <span
-              class="ml-auto text-[10px] uppercase tracking-wide"
-              :style="{ color: 'var(--texto-suave)' }"
-              >{{ $t("landing.producto.demo") }}</span
-            >
-          </div>
-          <div class="flex">
-            <!-- Sidebar simulada -->
-            <div
-              class="hidden sm:flex w-40 shrink-0 flex-col gap-2 p-3"
-              :style="{ background: 'var(--barra)' }"
-            >
-              <div
-                class="h-6 rounded-lg"
-                :style="{ background: 'var(--barra-activo)' }"
-              ></div>
-              <div
-                v-for="i in 6"
-                :key="i"
-                class="h-3.5 rounded-md"
-                :style="{ background: 'var(--barra-suave)', opacity: 0.8 }"
-              ></div>
-            </div>
-            <!-- Contenido -->
-            <div
-              class="flex-1 p-4 sm:p-6"
-              :style="{ background: 'var(--superficie)' }"
-            >
-              <!-- Métricas (contadores animados, datos de ejemplo) -->
-              <div class="grid grid-cols-3 gap-3">
-                <div class="tu-card p-3">
-                  <div class="text-2xl font-extrabold" data-contador="128">
-                    0
-                  </div>
-                  <div
-                    class="text-[11px]"
-                    :style="{ color: 'var(--texto-suave)' }"
-                  >
-                    {{ $t("landing.producto.m1") }}
-                  </div>
-                </div>
-                <div class="tu-card p-3">
-                  <div
-                    class="text-2xl font-extrabold"
-                    data-contador="86"
-                    data-sufijo="%"
-                  >
-                    0%
-                  </div>
-                  <div
-                    class="text-[11px]"
-                    :style="{ color: 'var(--texto-suave)' }"
-                  >
-                    {{ $t("landing.producto.m2") }}
-                  </div>
-                </div>
-                <div class="tu-card p-3">
-                  <div class="text-2xl font-extrabold" data-contador="24">
-                    0
-                  </div>
-                  <div
-                    class="text-[11px]"
-                    :style="{ color: 'var(--texto-suave)' }"
-                  >
-                    {{ $t("landing.producto.m3") }}
-                  </div>
-                </div>
-              </div>
-              <h4 class="mt-5 font-semibold text-sm">
-                {{ $t("landing.producto.agendaTitulo") }}
-              </h4>
-              <div class="mt-2 space-y-2">
-                <div v-for="c in clasesDemo" :key="c.clave" class="tu-card p-3">
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="flex items-center gap-2 text-sm font-medium">
-                      <span
-                        class="h-2.5 w-2.5 rounded-full"
-                        :style="{ background: c.color }"
-                      ></span>
-                      {{ $t(`landing.producto.${c.clave}`) }}
-                      <span
-                        v-if="c.vivo"
-                        class="tu-vivo"
-                        aria-hidden="true"
-                      ></span>
-                    </span>
-                    <span
-                      class="tu-badge"
-                      :class="
-                        c.etq === 'lleno' ? 'tu-badge-aviso' : 'tu-badge-exito'
-                      "
-                    >
-                      {{
-                        c.etq === "lleno"
-                          ? $t("landing.producto.lleno")
-                          : $t("landing.producto.lugares")
-                      }}
-                    </span>
-                  </div>
-                  <div class="tu-barra mt-2">
-                    <span
-                      class="tu-barra-fill"
-                      :style="{ '--pct': c.pct + '%', background: c.color }"
-                    ></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+      <div class="mx-auto max-w-6xl px-4 sm:px-6 pt-10 pb-20 sm:pb-28">
+        <ProductoDemo v-model="modoDemo" />
+        <div class="mt-8 text-center">
+          <RouterLink
+            class="tu-btn tu-btn-primario px-7 py-3"
+            :to="{ name: 'registro' }"
+            @click="medirCta('product_demo', 'register')"
+          >
+            Quiero organizar mi negocio
+          </RouterLink>
+          <p class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
+            {{ DIAS_PRUEBA }} días para probarlo. Sin tarjeta.
+          </p>
         </div>
       </div>
     </section>
 
+    <!-- ===================== MODALIDADES ===================== -->
+    <section class="tu-banda" :style="{ background: 'var(--fondo)' }">
+      <div class="mx-auto max-w-6xl px-4 sm:px-6 py-20 sm:py-28">
+        <div class="tu-modalidades-intro">
+          <p class="tu-seccion-etiqueta">Pensada para tu forma de trabajar</p>
+          <h2 class="tu-titulo mt-3 max-w-4xl">
+            Tu negocio tiene su ritmo. Tu agenda también.
+          </h2>
+          <p class="mt-4 max-w-2xl" :style="{ color: 'var(--texto-suave)' }">
+            Organiza los lugares de una clase o el tiempo de cada profesional.
+            Elige una modalidad para explorar su agenda.
+          </p>
+        </div>
+        <ModalidadesLanding @elegir="elegirAgenda" />
+      </div>
+    </section>
+
     <!-- ===================== CÓMO FUNCIONA ===================== -->
-    <section class="tu-banda" :style="{ background: 'var(--superficie)' }">
+    <section
+      id="como-funciona"
+      class="tu-banda tu-ancla"
+      :style="{ background: 'var(--superficie)' }"
+    >
       <div class="mx-auto max-w-5xl px-4 sm:px-6 py-20 sm:py-28">
         <h2 class="tu-titulo reveal">
           {{ $t("landing.comoFunciona.titulo") }}
@@ -487,63 +323,66 @@ onBeforeUnmount(() => observador?.disconnect());
             :style="{ transitionDelay: i * 90 + 'ms' }"
           >
             <div class="tu-paso-num">{{ p.n }}</div>
-            <h3 class="mt-4 font-semibold text-xl tracking-tight">
+            <h3 class="mt-4 font-light text-xl tracking-tight">
               {{ $t(`landing.comoFunciona.${p.t}`) }}
             </h3>
             <p class="mt-2" :style="{ color: 'var(--texto-suave)' }">
               {{ $t(`landing.comoFunciona.${p.d}`) }}
             </p>
+            <div class="tu-paso-ejemplo">
+              <span class="tu-paso-ejemplo-label">Ejemplo</span>
+              <template v-if="p.n === 1">
+                <strong>Pilates Reformer</strong>
+                <span>Lunes · 18:00 · Andrea</span>
+                <span class="tu-paso-status">8 lugares disponibles</span>
+              </template>
+              <template v-else-if="p.n === 2">
+                <strong>Tu página de reservas</strong>
+                <span>tuestudio.agendauno.mx</span>
+                <span class="tu-paso-status">Elige clase y horario →</span>
+              </template>
+              <template v-else>
+                <strong>Una reserva en tu agenda</strong>
+                <span>Pilates · Sofía · 18:00</span>
+                <span class="tu-paso-status"
+                  >Confirmada · 7 lugares libres</span
+                >
+              </template>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
     <!-- ===================== FUNCIONES ===================== -->
-    <section class="tu-banda" :style="{ background: 'var(--fondo)' }">
+    <section
+      id="soluciones"
+      class="tu-banda tu-ancla"
+      :style="{ background: 'var(--fondo)' }"
+    >
       <div class="mx-auto max-w-6xl px-4 sm:px-6 py-20 sm:py-28">
-        <h2 class="tu-titulo reveal">{{ $t("landing.seccionTitulo") }}</h2>
+        <h2 class="tu-titulo reveal">
+          <TextoDestacado
+            :texto="$t('landing.seccionTitulo')"
+            enfasis="crecer"
+          />
+        </h2>
         <p
           class="mt-3 text-lg max-w-2xl reveal"
           :style="{ color: 'var(--texto-suave)' }"
         >
           {{ $t("landing.seccionSub") }}
         </p>
-        <div
-          class="tu-funciones mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          <div
-            v-for="(f, i) in funciones"
-            :key="f.clave"
-            class="tu-card p-7 reveal"
-            :style="{ transitionDelay: (i % 3) * 90 + 'ms' }"
-          >
-            <span class="tu-icono-caja" aria-hidden="true">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.7"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path v-for="(d, j) in ICONOS[f.icono]" :key="j" :d="d" />
-              </svg>
-            </span>
-            <h3 class="mt-4 font-semibold text-xl tracking-tight">
-              {{ $t(`landing.funciones.${f.clave}`) }}
-            </h3>
-            <p class="mt-2" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t(`landing.funciones.${f.clave}Desc`) }}
-            </p>
-          </div>
-        </div>
+        <FuncionesLanding />
       </div>
     </section>
 
-    <!-- ===================== OPERACIÓN MÓVIL ===================== -->
-    <section class="tu-banda" :style="{ background: 'var(--superficie)' }">
+    <!-- ===================== OPERACIÓN ===================== -->
+    <section
+      id="operacion"
+      class="tu-banda"
+      :style="{ background: 'var(--superficie)' }"
+    >
       <div class="mx-auto max-w-6xl px-4 sm:px-6 py-20 sm:py-28">
         <div
           class="tu-operacion grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16"
@@ -552,7 +391,9 @@ onBeforeUnmount(() => observador?.disconnect());
             <p class="tu-seccion-etiqueta">
               {{ $t("landing.operacion.etiqueta") }}
             </p>
-            <h2 class="tu-titulo mt-3">{{ $t("landing.operacion.titulo") }}</h2>
+            <h2 class="tu-titulo mt-3">
+              {{ $t("landing.operacion.titulo") }}
+            </h2>
             <p
               class="mt-5 text-lg max-w-xl"
               :style="{ color: 'var(--texto-suave)' }"
@@ -594,7 +435,7 @@ onBeforeUnmount(() => observador?.disconnect());
 
           <figure class="tu-imagen-marco tu-imagen-rosa reveal">
             <img
-              src="/assets/landing/turnouno-checkin-pos.webp"
+              :src="'/assets/landing/agendauno-checkin-pos.webp'"
               :alt="$t('landing.operacion.imagenAlt')"
               width="1536"
               height="1024"
@@ -607,59 +448,68 @@ onBeforeUnmount(() => observador?.disconnect());
     </section>
 
     <!-- ===================== PRECIO ===================== -->
-    <section class="tu-banda" :style="{ background: 'var(--fondo)' }">
+    <section
+      id="precios"
+      class="tu-banda tu-ancla"
+      :style="{ background: 'var(--fondo)' }"
+    >
       <div class="mx-auto max-w-6xl px-4 sm:px-6 py-20 sm:py-28">
-        <div
-          class="tu-precio-layout grid items-center gap-10 lg:grid-cols-[1fr_1.05fr] lg:gap-16"
-        >
-          <div class="reveal">
-            <p class="tu-seccion-etiqueta">
-              {{ $t("landing.precio.etiqueta") }}
+        <div class="max-w-3xl reveal">
+          <p class="tu-seccion-etiqueta">{{ $t("landing.precio.etiqueta") }}</p>
+          <h2 class="tu-titulo mt-3">
+            {{ $t("landing.precio.titulo") }}
+          </h2>
+          <p
+            class="mt-5 text-lg leading-relaxed"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("landing.precio.subtitulo") }}
+          </p>
+        </div>
+        <div class="tu-precio-modelos mt-10">
+          <article
+            v-for="modelo in modelos"
+            :key="modelo"
+            class="tu-precio-card"
+          >
+            <p class="tu-precio-badge">
+              {{ $t(`landing.precio.${modelo}.nombre`) }}
             </p>
-            <h2 class="tu-titulo mt-3">{{ $t("landing.precio.titulo") }}</h2>
+            <h3 class="tu-precio-titulo mt-6 tracking-tight">
+              {{ $t(`landing.precio.${modelo}.unidad`) }}
+            </h3>
             <p
-              class="mt-5 max-w-xl text-lg leading-relaxed"
+              class="mt-3 leading-relaxed"
               :style="{ color: 'var(--texto-suave)' }"
             >
-              {{ $t("landing.precio.subtitulo") }}
+              {{ $t(`landing.precio.${modelo}.detalle`) }}
+            </p>
+            <p class="tu-precio-nota mt-6">
+              {{ $t(`landing.precio.${modelo}.nota`) }}
+            </p>
+          </article>
+        </div>
+        <div class="tu-precio-prueba mt-6">
+          <div>
+            <strong
+              >{{ $t("landing.precio.badge", { dias: DIAS_PRUEBA }) }} · Sin
+              tarjeta</strong
+            >
+            <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("landing.precio.pruebaDetalle") }}
             </p>
           </div>
-
-          <article class="tu-precio-card reveal">
-            <span class="tu-precio-badge">{{
-              $t("landing.precio.badge", { dias: DIAS_PRUEBA })
-            }}</span>
-            <p
-              class="mt-6 text-sm font-semibold uppercase tracking-widest"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{ $t("landing.precio.modelo") }}
-            </p>
-            <p class="mt-2 text-4xl sm:text-5xl font-bold tracking-tight">
-              {{ $t("landing.precio.valor") }}
-            </p>
-            <p class="mt-3" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("landing.precio.detalle") }}
-            </p>
-            <ul class="mt-7 space-y-3" role="list">
-              <li v-for="n in 4" :key="n" class="tu-check-item">
-                <span class="tu-check" aria-hidden="true">✓</span>
-                <span>{{ $t(`landing.precio.i${n}`) }}</span>
-              </li>
-            </ul>
-            <RouterLink
-              class="tu-btn tu-btn-primario mt-8 w-full justify-center text-base py-3"
-              :to="{ name: 'registro' }"
-              @click="medirCta('pricing', 'register')"
-            >
-              {{ $t("landing.ctaRegistrar") }}
-            </RouterLink>
-          </article>
+          <RouterLink
+            class="tu-btn tu-btn-primario px-7 py-3"
+            :to="{ name: 'registro' }"
+            @click="medirCta('pricing', 'register')"
+            >{{ $t("landing.ctaRegistrar") }}</RouterLink
+          >
         </div>
       </div>
     </section>
 
-    <!-- ===================== COMUNIDAD ===================== -->
+    <!-- ===================== PÁGINA PÚBLICA / EXPLORAR ===================== -->
     <section class="tu-banda" :style="{ background: 'var(--superficie)' }">
       <div class="mx-auto max-w-6xl px-4 sm:px-6 py-20 sm:py-28">
         <div
@@ -669,7 +519,9 @@ onBeforeUnmount(() => observador?.disconnect());
             <p class="tu-seccion-etiqueta">
               {{ $t("landing.comunidad.etiqueta") }}
             </p>
-            <h2 class="tu-titulo mt-3">{{ $t("landing.comunidad.titulo") }}</h2>
+            <h2 class="tu-titulo mt-3">
+              {{ $t("landing.comunidad.titulo") }}
+            </h2>
             <p
               class="mt-5 max-w-xl text-lg leading-relaxed"
               :style="{ color: 'var(--texto-suave)' }"
@@ -690,24 +542,16 @@ onBeforeUnmount(() => observador?.disconnect());
               >
                 {{ $t("landing.comunidad.cta") }}
               </RouterLink>
-              <RouterLink
-                class="tu-link-flecha"
-                :to="{ name: 'directorio' }"
-                @click="medirCta('community_benefit', 'directory')"
-              >
-                {{ $t("landing.comunidad.enlace") }}
-                <span aria-hidden="true">›</span>
-              </RouterLink>
             </div>
           </div>
 
           <div class="tu-escaparate-demo reveal" aria-hidden="true">
             <div class="tu-escaparate-cabecera">
-              <span class="tu-escaparate-logo">LU</span>
+              <span class="tu-escaparate-logo">D27</span>
               <div>
-                <p class="font-bold text-lg">Lumen Pilates</p>
+                <p class="font-light text-lg">Impulso Studio</p>
                 <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-                  Roma Norte · Ciudad de México
+                  Juárez · Ciudad de México
                 </p>
               </div>
               <span class="tu-badge tu-badge-exito ml-auto">{{
@@ -756,61 +600,51 @@ onBeforeUnmount(() => observador?.disconnect());
       </div>
     </section>
 
-    <!-- ===================== DISCIPLINAS ===================== -->
+    <!-- ===================== TIPOS DE NEGOCIO ===================== -->
     <section
-      class="tu-banda tu-disciplinas"
+      id="para-quien"
+      class="tu-banda tu-disciplinas tu-ancla"
       :style="{ background: 'var(--fondo)' }"
     >
-      <div class="mx-auto max-w-6xl px-4 sm:px-6 py-20 sm:py-28">
-        <p class="tu-seccion-etiqueta reveal">
-          {{ $t("landing.paraQuien.etiqueta") }}
-        </p>
-        <h2 class="tu-titulo mt-3 reveal">
-          {{ $t("landing.paraQuien.titulo") }}
-        </h2>
-        <p
-          class="mt-3 text-lg max-w-2xl reveal"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("landing.paraQuien.subtitulo") }}
-        </p>
-        <div class="tu-disciplinas-grid mt-10">
-          <article
-            v-for="(v, i) in verticales"
-            :key="v.clave"
-            class="tu-disciplina-card reveal"
-            :class="[
-              v.destacada ? 'tu-disciplina-card--destacada' : '',
-              `tu-disciplina-card--${v.clave}`,
-            ]"
-            :style="{
-              transitionDelay: (i % 4) * 80 + 'ms',
-            }"
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 py-20 sm:py-28">
+        <div class="text-center mx-auto max-w-3xl">
+          <p class="tu-seccion-etiqueta reveal">
+            {{ $t("landing.paraQuien.etiqueta") }}
+          </p>
+          <h2 class="tu-titulo mt-3 reveal">
+            {{ $t("landing.paraQuien.titulo") }}
+          </h2>
+          <p
+            class="mt-4 text-lg reveal"
+            :style="{ color: 'var(--texto-suave)' }"
           >
-            <img
-              class="tu-disciplina-imagen"
-              :src="v.src"
-              :alt="v.alt"
-              loading="lazy"
-              decoding="async"
-              width="1122"
-              height="1402"
-            />
-            <span
-              v-if="v.clave === 'pole'"
-              class="tu-disciplina-brillo"
-              aria-hidden="true"
-            ></span>
-            <div class="tu-disciplina-contenido">
-              <span class="tu-disciplina-chip">
-                {{ $t("landing.paraQuien.incluye") }}
-              </span>
-              <h3>{{ v.nombre }}</h3>
-              <p>{{ v.descripcion }}</p>
-            </div>
-            <span class="tu-disciplina-flecha" aria-hidden="true">✦</span>
-          </article>
+            Tú haces que quieran volver. AgendaUno te ayuda a organizar cada
+            clase, cada cita y cada nueva reserva.
+          </p>
         </div>
+        <CarruselNegocios :negocios="negocios">
+          <RouterLink
+            class="tu-btn tu-btn-primario px-7 py-3"
+            :to="{ name: 'registro' }"
+            @click="medirCta('business_carousel', 'register')"
+          >
+            Empieza con tu negocio
+            <span aria-hidden="true">↗</span>
+          </RouterLink>
+          <p class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
+            Tu agenda. Tu equipo. Tu próxima reserva.
+          </p>
+        </CarruselNegocios>
+        <div class="mt-10">
+          <h3 class="text-lg font-light text-center">
+            Conoce AgendaUno para tu tipo de negocio
+          </h3>
+          <SolucionesEnlaces />
+        </div>
+        <p class="tu-alcance-salud mt-10 max-w-3xl mx-auto">
+          <strong>{{ $t("landing.paraQuien.saludTitulo") }}</strong>
+          {{ $t("landing.paraQuien.saludAlcance") }}
+        </p>
       </div>
     </section>
 
@@ -846,10 +680,7 @@ onBeforeUnmount(() => observador?.disconnect());
       <div
         class="mx-auto max-w-3xl px-4 sm:px-6 py-20 sm:py-28 text-center reveal"
       >
-        <h2
-          class="font-light tracking-tight text-4xl sm:text-5xl"
-          style="letter-spacing: -0.025em; line-height: 1.07"
-        >
+        <h2 class="tu-titulo tu-titulo-final">
           {{ $t("landing.ctaFinalTitulo") }}
         </h2>
         <p class="mt-4 text-lg" :style="{ color: 'var(--texto-suave)' }">
@@ -869,19 +700,47 @@ onBeforeUnmount(() => observador?.disconnect());
 
 <style scoped>
 .tu-landing {
-  --landing-radius: 28px;
+  --landing-radius: var(--radio-tarjeta, 18px);
   overflow: clip;
 }
 .tu-ancla {
-  scroll-margin-top: 3.5rem;
+  scroll-margin-top: 6.5rem;
+}
+.tu-pasos > div {
+  display: flex;
+  flex-direction: column;
+}
+.tu-paso-ejemplo {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1.1rem;
+  border: 1px solid var(--borde);
+  border-radius: 1rem;
+  background: var(--fondo);
+  margin-top: 1.5rem;
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+}
+.tu-paso-ejemplo strong {
+  color: var(--texto);
+}
+.tu-paso-ejemplo-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.62rem;
+}
+.tu-paso-status {
+  color: var(--primario-fuerte);
+  font-weight: 600;
+  padding-top: 0.3rem;
 }
 .tu-hero-layout {
   display: grid;
-  min-height: calc(100svh - 3.5rem);
+  min-height: calc(100svh - 5rem);
   align-items: center;
   gap: clamp(2.5rem, 5vw, 4rem);
-  padding-top: clamp(3.5rem, 8vh, 6.5rem);
-  padding-bottom: clamp(3.5rem, 8vh, 6.5rem);
+  padding-top: clamp(2.75rem, 6vh, 5rem);
+  padding-bottom: clamp(2.75rem, 6vh, 5rem);
 }
 .tu-hero-copy {
   position: relative;
@@ -891,42 +750,159 @@ onBeforeUnmount(() => observador?.disconnect());
   min-width: 0;
   transform-origin: 50% 100%;
 }
-.tu-hero-visual .tu-imagen-marco {
+.tu-hero-collage {
   position: relative;
-  aspect-ratio: 5 / 4;
+  display: grid;
+  height: clamp(32rem, 54vw, 41rem);
+  grid-template-columns: 0.9fr 1.08fr 0.9fr;
+  align-items: center;
+  gap: 0.65rem;
+  overflow: hidden;
+  padding: 1rem;
+  border-radius: var(--radio-panel, 28px);
+  background:
+    radial-gradient(circle at 84% 18%, rgb(79 127 144 / 16%), transparent 32%),
+    linear-gradient(145deg, #e9edf1 0%, #eef4f5 52%, #e3edef 100%);
 }
-.tu-hero-visual img {
+.tu-hero-foto {
+  position: relative;
+  height: 82%;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 1.5rem;
+  background: #fff;
+  box-shadow: 0 1.2rem 3.5rem rgb(36 51 70 / 13%);
+}
+.tu-hero-foto--2 {
+  height: 96%;
+}
+.tu-hero-foto--1 img {
+  object-position: 65% center;
+}
+.tu-hero-foto--3 {
+  height: 76%;
+}
+.tu-hero-foto img {
+  display: block;
+  width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center;
+  transition: transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.tu-hero-chip {
+.tu-hero-foto:hover img {
+  transform: scale(1.045);
+}
+.tu-hero-foto > span {
   position: absolute;
-  bottom: 1.25rem;
-  left: 1.25rem;
+  right: 0.55rem;
+  bottom: 0.55rem;
+  left: 0.55rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.65rem;
-  max-width: calc(100% - 2.5rem);
-  padding: 0.65rem 0.9rem;
-  border: 1px solid rgb(255 255 255 / 72%);
-  border-radius: 999px;
-  background: rgb(255 255 255 / 84%);
-  color: #1d1d1f;
-  font-size: 0.88rem;
+  justify-content: center;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid rgb(255 255 255 / 48%);
+  border-radius: 8px;
+  background: rgb(14 22 32 / 58%);
+  color: #fff;
+  font-size: 0.72rem;
   font-weight: 600;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(14px);
 }
-.tu-hero-chip-icon {
-  display: inline-flex;
-  color: #0066cc;
+.tu-hero-reserva {
+  position: absolute;
+  z-index: 3;
+  right: 1.4rem;
+  bottom: 1.4rem;
+  display: flex;
+  max-width: 17rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 1.15rem;
+  background: rgb(255 255 255 / 88%);
+  color: #17212e;
+  box-shadow: 0 1rem 2.8rem rgb(38 51 67 / 18%);
+  backdrop-filter: blur(18px);
+  animation: tu-reserva-flota 4.6s ease-in-out infinite;
+}
+.tu-hero-reserva-check {
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  flex: 0 0 auto;
+  place-content: center;
+  border-radius: 50%;
+  background: #198754;
+  color: #fff;
+  font-weight: 700;
+}
+.tu-hero-reserva strong,
+.tu-hero-reserva small {
+  display: block;
+}
+.tu-hero-reserva strong {
+  font-size: 0.84rem;
+}
+.tu-hero-reserva small {
+  margin-top: 0.1rem;
+  color: #5f6975;
+  font-size: 0.7rem;
+}
+.tu-hero-foto--1 {
+  animation: tu-foto-flota 7s ease-in-out infinite alternate;
+}
+.tu-hero-foto--3 {
+  animation: tu-foto-flota 8s -3s ease-in-out infinite alternate-reverse;
+}
+@keyframes tu-foto-flota {
+  to {
+    transform: translateY(-0.65rem);
+  }
+}
+@keyframes tu-reserva-flota {
+  50% {
+    transform: translateY(-0.45rem);
+  }
 }
 .tu-hero-proof {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem;
+}
+.tu-hero-flow {
+  display: flex;
+  max-width: 42rem;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 1.45rem;
+  padding: 0;
+  list-style: none;
+}
+.tu-hero-flow li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.42rem 0.62rem;
+  border: 1px solid color-mix(in srgb, var(--primario) 18%, var(--borde));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--superficie) 82%, transparent);
+  color: var(--texto);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.tu-hero-flow li span {
+  display: grid;
+  width: 1.28rem;
+  height: 1.28rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primario);
+  color: #fff;
+  font-size: 0.65rem;
 }
 
 .tu-confianza {
@@ -937,7 +913,7 @@ onBeforeUnmount(() => observador?.disconnect());
   display: grid;
   gap: 0.75rem;
   padding: 1.1rem 1.25rem;
-  border-radius: 999px;
+  border-radius: var(--radio-tarjeta, 18px);
   background: var(--superficie);
 }
 .tu-confianza-item {
@@ -955,24 +931,31 @@ onBeforeUnmount(() => observador?.disconnect());
   font-weight: 800;
 }
 
-/* Títulos grandes y aireados: la jerarquía hace el trabajo, no los adornos. */
+/* Titulares ligeros; el contraste queda reservado para palabras clave. */
 .tu-titulo {
-  font-weight: 700;
-  font-size: clamp(2.35rem, 5vw, 3.5rem);
+  font-weight: 300;
+  font-size: clamp(2.05rem, 4.35vw, 3.05rem);
   letter-spacing: -0.028em;
-  line-height: 1.05;
+  line-height: 1.14;
 }
 .tu-display {
-  font-weight: 700;
-  font-size: clamp(3.2rem, 5vw, 4.75rem);
+  font-weight: 300;
+  font-size: clamp(2.8rem, 4.35vw, 4.125rem);
   letter-spacing: -0.04em;
-  line-height: 1.04;
+  line-height: 1.12;
   text-wrap: balance;
+}
+.tu-titulo-final {
+  font-size: clamp(1.95rem, 4.35vw, 2.625rem);
+}
+.tu-precio-titulo {
+  font-size: 1.625rem;
+  font-weight: 300;
 }
 .tu-eyebrow,
 .tu-seccion-etiqueta {
   display: inline-block;
-  color: #b64400;
+  color: var(--enlace);
   font-size: 0.82rem;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -983,7 +966,7 @@ onBeforeUnmount(() => observador?.disconnect());
   letter-spacing: 0.08em;
 }
 
-/* Las tarjetas de la landing son superficies planas de 28 px, sin borde ni sombra. */
+/* Radios de tarjetas separados de las imágenes y de los paneles grandes. */
 .tu-landing .tu-card {
   border: 0;
   border-radius: var(--landing-radius);
@@ -992,9 +975,6 @@ onBeforeUnmount(() => observador?.disconnect());
 .tu-pasos .tu-card,
 .tu-landing details.tu-card {
   background: var(--fondo);
-}
-.tu-funciones .tu-card {
-  background: var(--superficie);
 }
 .tu-resultado-num {
   color: var(--texto-suave);
@@ -1010,10 +990,10 @@ onBeforeUnmount(() => observador?.disconnect());
   overflow: hidden;
   border-radius: 1.4rem;
 }
-.tu-resultado-grafico--clases {
+.tu-resultado-grafico--agenda {
   align-items: center;
   justify-content: space-around;
-  background: #e7f2f8;
+  background: #e7f3ff;
 }
 .tu-ocupacion-anillo {
   position: relative;
@@ -1022,7 +1002,10 @@ onBeforeUnmount(() => observador?.disconnect());
   aspect-ratio: 1;
   place-content: center;
   border-radius: 50%;
-  background: conic-gradient(#0071e3 0 92%, rgb(255 255 255 / 0.72) 92% 100%);
+  background: conic-gradient(
+    var(--primario) 0 92%,
+    rgb(255 255 255 / 0.72) 92% 100%
+  );
   text-align: center;
   animation: tu-grafico-flota 5s ease-in-out infinite;
 }
@@ -1070,7 +1053,7 @@ onBeforeUnmount(() => observador?.disconnect());
   justify-content: center;
   gap: 0.65rem;
   padding: 1.3rem;
-  background: #f5e8e8;
+  background: #e8f9fd;
 }
 .tu-pago-linea {
   display: grid;
@@ -1079,7 +1062,7 @@ onBeforeUnmount(() => observador?.disconnect());
   gap: 0.7rem;
   min-height: 2.8rem;
   padding: 0 0.7rem;
-  border: 1px solid rgb(110 50 50 / 0.07);
+  border: 1px solid rgb(3 27 78 / 8%);
   border-radius: 0.9rem;
   background: rgb(255 255 255 / 0.73);
   animation: tu-pago-entra 5s ease-in-out infinite;
@@ -1094,14 +1077,14 @@ onBeforeUnmount(() => observador?.disconnect());
   width: 1.8rem;
   height: 1.8rem;
   border-radius: 50%;
-  background: linear-gradient(145deg, #d89c9c, #7f9ab4);
+  background: #4f7f90;
 }
 .tu-pago-barra {
   width: 72%;
   height: 0.48rem;
   border-radius: 999px;
-  background: #d8c9c9;
-  box-shadow: 0 0.78rem #eadfdf;
+  background: #c9e6f5;
+  box-shadow: 0 0.78rem #dceff8;
 }
 .tu-pago-check {
   display: grid;
@@ -1109,7 +1092,7 @@ onBeforeUnmount(() => observador?.disconnect());
   height: 1.55rem;
   place-content: center;
   border-radius: 50%;
-  background: #21844a;
+  background: #198754;
   color: #fff;
   font-size: 0.72rem;
   font-weight: 700;
@@ -1118,7 +1101,7 @@ onBeforeUnmount(() => observador?.disconnect());
   align-items: flex-end;
   justify-content: space-between;
   padding: 1.35rem 1.45rem 1.2rem;
-  background: #e9e9e2;
+  background: #e9edf5;
 }
 .tu-mini-barras {
   display: flex;
@@ -1130,7 +1113,7 @@ onBeforeUnmount(() => observador?.disconnect());
   width: 0.78rem;
   height: 35%;
   border-radius: 999px;
-  background: #596680;
+  background: #031b4e;
   transform-origin: bottom;
   animation: tu-barra-respira 3.4s ease-in-out infinite alternate;
 }
@@ -1169,8 +1152,8 @@ onBeforeUnmount(() => observador?.disconnect());
   height: 0.56rem;
   border: 2px solid #fff;
   border-radius: 50%;
-  background: #d06435;
-  box-shadow: 0 0 0 1px rgb(208 100 53 / 0.28);
+  background: #00c6f2;
+  box-shadow: 0 0 0 1px rgb(0 198 242 / 28%);
 }
 .tu-mini-tendencia span:nth-child(2) {
   transform: translateY(-0.8rem);
@@ -1214,7 +1197,7 @@ onBeforeUnmount(() => observador?.disconnect());
 /* Fotografía de producto: el color vive en la imagen, no en la interfaz. */
 .tu-imagen-marco {
   overflow: hidden;
-  border-radius: var(--landing-radius);
+  border-radius: var(--radio-imagen, 22px);
   background: var(--fondo);
 }
 .tu-imagen-marco img {
@@ -1233,7 +1216,7 @@ onBeforeUnmount(() => observador?.disconnect());
   background: #edf5fb;
 }
 .tu-imagen-rosa {
-  background: #f6e5e7;
+  background: #e7f8fc;
 }
 @keyframes tu-entrada-producto {
   from {
@@ -1247,7 +1230,7 @@ onBeforeUnmount(() => observador?.disconnect());
 /* Ventana de app (mockup). */
 .tu-ventana {
   border: 1px solid var(--borde);
-  border-radius: var(--landing-radius);
+  border-radius: var(--radio-panel, 28px);
   overflow: hidden;
   background: var(--superficie);
 }
@@ -1319,16 +1302,6 @@ onBeforeUnmount(() => observador?.disconnect());
 }
 
 /* Caja de icono de función. */
-.tu-icono-caja {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 3.25rem;
-  width: 3.25rem;
-  border-radius: 1rem;
-  background: var(--fondo);
-  color: var(--texto);
-}
 
 .tu-check-item {
   display: flex;
@@ -1361,7 +1334,38 @@ onBeforeUnmount(() => observador?.disconnect());
   text-decoration: underline;
 }
 
-/* Precio: una sola tarjeta de decisión, sin planes artificiales. */
+/* La suscripción y los cobros a clientes se explican por separado. */
+.tu-precio-modelos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+.tu-precio-nota {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--borde);
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.tu-precio-prueba {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-tarjeta, 18px);
+}
+@media (max-width: 639px) {
+  .tu-precio-modelos {
+    grid-template-columns: 1fr;
+  }
+  .tu-precio-prueba .tu-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
 .tu-precio-card {
   padding: clamp(1.75rem, 4vw, 3rem);
   border-radius: var(--landing-radius);
@@ -1370,17 +1374,17 @@ onBeforeUnmount(() => observador?.disconnect());
 .tu-precio-badge {
   display: inline-flex;
   padding: 0.45rem 0.75rem;
-  border-radius: 999px;
-  background: #f0e4d3;
-  color: #6b360d;
+  border-radius: 8px;
+  background: var(--primario-suave);
+  color: var(--enlace);
   font-size: 0.82rem;
   font-weight: 700;
 }
 
-/* Vista pública del estudio: prueba visual del beneficio de Comunidad. */
+/* Vista pública del negocio: prueba visual del enlace de reservas. */
 .tu-escaparate-demo {
   overflow: hidden;
-  border-radius: var(--landing-radius);
+  border-radius: var(--radio-panel, 28px);
   background: var(--fondo);
 }
 .tu-escaparate-cabecera {
@@ -1388,7 +1392,7 @@ onBeforeUnmount(() => observador?.disconnect());
   align-items: center;
   gap: 0.9rem;
   padding: 1.5rem;
-  background: #edf5fb;
+  background: #e7f3ff;
 }
 .tu-escaparate-logo {
   display: inline-flex;
@@ -1398,7 +1402,7 @@ onBeforeUnmount(() => observador?.disconnect());
   align-items: center;
   justify-content: center;
   border-radius: 1rem;
-  background: #2e3642;
+  background: #031b4e;
   color: #fff;
   font-size: 0.85rem;
   font-weight: 800;
@@ -1427,8 +1431,8 @@ onBeforeUnmount(() => observador?.disconnect());
   min-height: 2.75rem;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  background: #0071e3;
+  border-radius: var(--radio-boton, 11px);
+  background: var(--primario);
   color: #fff;
   font-size: 0.9rem;
   font-weight: 600;
@@ -1438,131 +1442,23 @@ onBeforeUnmount(() => observador?.disconnect());
 .tu-disciplinas {
   overflow: hidden;
 }
-.tu-disciplinas-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-auto-flow: dense;
-  gap: 1rem;
+.tu-alcance-salud {
+  padding: 1rem 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--primario) 16%, var(--borde));
+  border-left: 3px solid var(--acento);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--superficie) 78%, transparent);
+  color: var(--texto-suave);
+  font-size: 0.88rem;
+  line-height: 1.6;
 }
-.tu-disciplina-card {
-  position: relative;
-  min-height: 20rem;
-  overflow: hidden;
-  border-radius: var(--landing-radius);
-  background: #1b1d22;
-  color: #fff;
-  isolation: isolate;
-  transition:
-    opacity 0.7s ease,
-    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+.tu-alcance-salud strong {
+  color: var(--texto);
 }
-.tu-disciplina-card::after {
-  position: absolute;
-  z-index: 1;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgb(7 12 19 / 0.04) 28%, rgb(7 12 19 / 0.82) 100%),
-    linear-gradient(90deg, rgb(7 12 19 / 0.28), transparent 52%);
-  content: "";
-  pointer-events: none;
-}
-.tu-disciplina-imagen {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scale(1.025);
-  transition: transform 1s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.tu-disciplina-card:hover .tu-disciplina-imagen {
-  transform: scale(1.075);
-}
-.tu-disciplina-contenido {
-  position: absolute;
-  z-index: 2;
-  right: 1.35rem;
-  bottom: 1.35rem;
-  left: 1.35rem;
-  max-width: 28rem;
-  text-shadow: 0 1px 18px rgb(0 0 0 / 0.28);
-}
-.tu-disciplina-chip {
-  display: inline-flex;
-  margin-bottom: 0.75rem;
-  padding: 0.42rem 0.7rem;
-  border: 1px solid rgb(255 255 255 / 0.34);
-  border-radius: 999px;
-  background: rgb(10 16 24 / 0.28);
-  backdrop-filter: blur(12px);
-  color: rgb(255 255 255 / 0.9);
-  font-size: 0.69rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-.tu-disciplina-contenido h3 {
-  font-size: clamp(1.7rem, 3vw, 2.45rem);
-  font-weight: 700;
-  letter-spacing: -0.035em;
-  line-height: 1;
-}
-.tu-disciplina-contenido p {
-  max-width: 23rem;
-  margin-top: 0.55rem;
-  color: rgb(255 255 255 / 0.84);
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-.tu-disciplina-flecha {
-  position: absolute;
-  z-index: 2;
-  top: 1.15rem;
-  right: 1.15rem;
-  display: grid;
-  width: 2.45rem;
-  height: 2.45rem;
-  place-content: center;
-  border: 1px solid rgb(255 255 255 / 0.35);
-  border-radius: 50%;
-  background: rgb(10 16 24 / 0.22);
-  backdrop-filter: blur(12px);
-  color: #fff;
-  font-size: 1.1rem;
-}
-.tu-disciplina-card--pole .tu-disciplina-imagen {
-  animation: tu-pole-movimiento 9s ease-in-out infinite alternate;
-}
-.tu-disciplina-brillo {
-  position: absolute;
-  z-index: 1;
-  top: -18%;
-  right: -12%;
-  width: 13rem;
-  height: 13rem;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgb(255 219 217 / 0.5), transparent 67%);
-  filter: blur(6px);
-  animation: tu-pole-brillo 5.5s ease-in-out infinite;
-}
-@keyframes tu-pole-movimiento {
-  from {
-    transform: scale(1.04) translate3d(0, -0.6%, 0);
-  }
-  to {
-    transform: scale(1.1) translate3d(-1.2%, 1.1%, 0);
-  }
-}
-@keyframes tu-pole-brillo {
-  50% {
-    opacity: 0.45;
-    transform: translate3d(-2.5rem, 2rem, 0) scale(1.18);
-  }
-}
-
 /* Reveal on scroll. */
 .reveal {
-  opacity: 0;
-  transform: translateY(18px);
+  opacity: 1;
+  transform: none;
   transition:
     opacity 0.7s ease,
     transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
@@ -1571,6 +1467,15 @@ onBeforeUnmount(() => observador?.disconnect());
 .reveal-in {
   opacity: 1;
   transform: none;
+  animation: entrada-contenido 0.7s ease both;
+}
+@keyframes entrada-contenido {
+  from {
+    transform: translateY(18px);
+  }
+  to {
+    transform: none;
+  }
 }
 
 details > summary::-webkit-details-marker {
@@ -1583,16 +1488,19 @@ details[open] > summary > span {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .reveal-in {
+    animation: none;
+  }
   .reveal,
   .tu-barra-fill,
-  .tu-disciplina-card,
   .tu-imagen-marco img {
     transition: none;
   }
   .tu-vivo,
   .tu-hero-visual.reveal-in .tu-imagen-marco,
-  .tu-disciplina-card--pole .tu-disciplina-imagen,
-  .tu-disciplina-brillo,
+  .tu-hero-foto--1,
+  .tu-hero-foto--3,
+  .tu-hero-reserva,
   .tu-ocupacion-anillo,
   .tu-asientos span.libre,
   .tu-pago-linea,
@@ -1607,19 +1515,6 @@ details[open] > summary > span {
   }
   .tu-confianza-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  .tu-disciplinas-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 640px) and (max-width: 1023px) {
-  .tu-disciplinas-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .tu-disciplina-card--destacada {
-    grid-column: span 2;
-    min-height: 26rem;
   }
 }
 
@@ -1641,21 +1536,21 @@ details[open] > summary > span {
     width: min(100%, 48rem);
     margin-inline: auto;
   }
-  .tu-hero-visual .tu-imagen-marco {
-    aspect-ratio: 16 / 10;
+  .tu-hero-collage {
+    height: min(41rem, 72vw);
   }
 }
 
 @media (max-width: 639px) {
   .tu-display {
-    font-size: clamp(2.65rem, 12vw, 3.25rem);
+    font-size: clamp(2.3rem, 10.4vw, 2.85rem);
   }
   .tu-imagen-marco {
     border-radius: 20px;
   }
   .tu-hero-layout {
     gap: 1.75rem;
-    padding-top: 2.5rem;
+    padding-top: 2rem;
     padding-bottom: 3rem;
   }
   .tu-hero-sub {
@@ -1669,29 +1564,40 @@ details[open] > summary > span {
   .tu-hero-proof {
     margin-top: 0.8rem;
   }
-  .tu-hero-chip {
-    bottom: 0.75rem;
-    left: 0.75rem;
-    max-width: calc(100% - 1.5rem);
-    padding: 0.5rem 0.7rem;
-    font-size: 0.78rem;
+  .tu-hero-collage {
+    height: 27rem;
+    gap: 0.4rem;
+    padding: 0.6rem;
+    border-radius: 1.5rem;
+  }
+  .tu-hero-foto {
+    border-radius: 1.1rem;
+  }
+  .tu-hero-foto > span {
+    right: 0.3rem;
+    bottom: 0.3rem;
+    left: 0.3rem;
+    padding: 0.38rem 0.3rem;
+    font-size: 0.6rem;
+  }
+  .tu-hero-reserva {
+    right: 0.85rem;
+    bottom: 0.85rem;
+    max-width: 13.5rem;
+    padding: 0.62rem 0.7rem;
   }
   .tu-confianza {
     padding-bottom: 1.5rem;
   }
   .tu-confianza-grid {
     grid-template-columns: 1fr 1fr;
-    border-radius: 22px;
+    border-radius: var(--radio-tarjeta, 18px);
   }
   .tu-clase-publica {
     grid-template-columns: 3.1rem minmax(0, 1fr);
   }
   .tu-clase-publica > .tu-badge {
     display: none;
-  }
-  .tu-disciplina-card {
-    min-height: 22rem;
-    border-radius: 22px;
   }
 }
 </style>

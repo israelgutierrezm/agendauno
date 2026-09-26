@@ -5,6 +5,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
+import { recordarNegocio } from "@/lib/negociosRecientes";
 import { updateSeo } from "@/lib/seo";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -73,6 +74,12 @@ const ubicacion = computed(() => {
   const e = escaparate.value?.estudio;
   return e ? [e.ciudad, e.pais].filter(Boolean).join(", ") : "";
 });
+const usaCitas = computed(() => escaparate.value?.estudio.tiene_citas === true);
+const etiquetaProfesional = computed(
+  () =>
+    escaparate.value?.estudio.perfil_config.terminologia?.instructor ??
+    "Profesional",
+);
 
 function dinero(minor: number, moneda: string): string {
   return new Intl.NumberFormat("es-MX", {
@@ -119,10 +126,20 @@ async function cargar(): Promise<void> {
     );
     escaparate.value = data.data;
     const estudio = data.data.estudio;
+    recordarNegocio({
+      slug: estudio.slug,
+      nombre: estudio.nombre,
+      logo_url: estudio.logo_url,
+      ciudad: estudio.ciudad,
+      pais: estudio.pais,
+    });
     const lugar = [estudio.ciudad, estudio.pais].filter(Boolean).join(", ");
+    const esCitas = estudio.tiene_citas;
     updateSeo({
-      title: `${estudio.nombre} | Horarios y precios en AgendaUno`,
-      description: `Consulta próximas clases, instructores y precios de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}.`,
+      title: `${estudio.nombre} | ${esCitas ? "Servicios y citas" : "Horarios y clases"} en AgendaUno`,
+      description: esCitas
+        ? `Consulta servicios, profesionales y horarios disponibles de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}. Reserva tu cita en línea.`
+        : `Consulta próximas clases, instructores y precios de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}.`,
       path: `/estudio/${estudio.slug}`,
       image: estudio.logo_url ?? undefined,
       type: "profile",
@@ -218,6 +235,9 @@ onMounted(cargar);
           <h1 class="mt-5 text-4xl font-extrabold tracking-tight">
             {{ escaparate.estudio.nombre }}
           </h1>
+          <span class="tu-badge mt-4">{{
+            $t(`registro.perfiles.${escaparate.estudio.perfil}`)
+          }}</span>
           <p
             v-if="ubicacion"
             class="mt-2 text-lg"
@@ -238,13 +258,9 @@ onMounted(cargar);
               {{ $t("escaparate.agendarCita") }}
             </RouterLink>
             <button
+              v-if="!usaCitas"
               type="button"
-              class="tu-btn px-6"
-              :class="
-                escaparate.estudio.tiene_citas
-                  ? 'tu-btn-fantasma'
-                  : 'tu-btn-primario'
-              "
+              class="tu-btn tu-btn-primario px-6"
               @click="abrirRegistro('hero')"
             >
               {{ $t("escaparate.reservar") }}
@@ -256,14 +272,58 @@ onMounted(cargar);
                 trackEvent('student_login_clicked', { source: 'public_studio' })
               "
             >
-              {{ $t("escaparate.yaSoyAlumno") }}
+              {{
+                usaCitas
+                  ? $t("escaparate.yaSoyCliente")
+                  : $t("escaparate.yaSoyAlumno")
+              }}
             </RouterLink>
           </div>
         </div>
       </section>
 
+      <!-- Flujo de citas -->
+      <section v-if="usaCitas" class="tu-agenda-citas">
+        <div class="mx-auto max-w-5xl px-4 py-12 sm:py-16">
+          <div class="tu-agenda-citas-cabecera">
+            <div>
+              <p class="tu-agenda-citas-etiqueta">Agenda en línea</p>
+              <h2 class="text-3xl font-light tracking-tight">
+                {{ $t("escaparate.agendaCitasTitulo") }}
+              </h2>
+              <p
+                class="mt-3 max-w-2xl"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("escaparate.agendaCitasDesc") }}
+              </p>
+            </div>
+            <RouterLink
+              :to="{ name: 'agendar-cita', params: { slug } }"
+              class="tu-btn tu-btn-primario shrink-0 px-6"
+              @click="
+                trackEvent('book_appointment_clicked', { source: 'steps' })
+              "
+            >
+              {{ $t("escaparate.agendarCita") }}
+            </RouterLink>
+          </div>
+          <ol class="tu-agenda-pasos mt-9">
+            <li v-for="n in 3" :key="n">
+              <span class="tu-agenda-paso-num">0{{ n }}</span>
+              <strong>{{ $t(`escaparate.agendaPaso${n}`) }}</strong>
+              <span
+                v-if="n < 3"
+                class="tu-agenda-paso-linea"
+                aria-hidden="true"
+              ></span>
+            </li>
+          </ol>
+        </div>
+      </section>
+
       <!-- Próximas clases -->
-      <section class="mx-auto max-w-5xl px-4 py-12">
+      <section v-else class="mx-auto max-w-5xl px-4 py-12">
         <h2 class="text-2xl font-light">
           {{ $t("escaparate.proximasClases") }}
         </h2>
@@ -355,12 +415,29 @@ onMounted(cargar);
         </div>
       </section>
 
-      <!-- Instructores -->
+      <!-- Profesionales o instructores -->
       <section
         v-if="escaparate.instructores.length > 0"
         class="mx-auto max-w-5xl px-4 py-12"
       >
-        <h2 class="text-2xl font-light">{{ $t("escaparate.instructores") }}</h2>
+        <h2 class="text-2xl font-light">
+          {{
+            usaCitas
+              ? $t("escaparate.profesionales")
+              : $t("escaparate.instructores")
+          }}
+        </h2>
+        <p
+          v-if="usaCitas"
+          class="mt-2 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{
+            $t("escaparate.profesionalesDesc", {
+              profesional: etiquetaProfesional,
+            })
+          }}
+        </p>
         <ul class="mt-6 flex flex-wrap gap-4">
           <li
             v-for="(nombre, i) in escaparate.instructores"
@@ -415,7 +492,16 @@ onMounted(cargar);
       <!-- CTA final -->
       <section class="mx-auto max-w-3xl px-4 py-14 text-center">
         <h2 class="text-2xl font-light">{{ escaparate.estudio.nombre }}</h2>
+        <RouterLink
+          v-if="usaCitas"
+          :to="{ name: 'agendar-cita', params: { slug } }"
+          class="tu-btn tu-btn-primario mt-5 px-8"
+          @click="trackEvent('book_appointment_clicked', { source: 'final' })"
+        >
+          {{ $t("escaparate.agendarCita") }}
+        </RouterLink>
         <button
+          v-else
           type="button"
           class="tu-btn tu-btn-primario mt-5 px-8"
           @click="abrirRegistro('final')"
@@ -541,3 +627,83 @@ onMounted(cargar);
     </template>
   </div>
 </template>
+
+<style scoped>
+.tu-agenda-citas {
+  background:
+    radial-gradient(
+      circle at 88% 12%,
+      rgb(53 194 249 / 17%),
+      transparent 22rem
+    ),
+    var(--fondo);
+}
+.tu-agenda-citas-cabecera {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+}
+.tu-agenda-citas-etiqueta {
+  margin-bottom: 0.65rem;
+  color: var(--primario);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.tu-agenda-pasos {
+  display: grid;
+  gap: 0.85rem;
+}
+.tu-agenda-pasos li {
+  position: relative;
+  display: flex;
+  min-height: 6.5rem;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.2rem;
+  border: 1px solid var(--borde);
+  border-radius: 1.2rem;
+  background: color-mix(in srgb, var(--superficie) 90%, transparent);
+}
+.tu-agenda-paso-num {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  flex: 0 0 auto;
+  place-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primario) 11%, var(--superficie));
+  color: var(--primario);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+.tu-agenda-paso-linea {
+  display: none;
+}
+@media (min-width: 720px) {
+  .tu-agenda-pasos {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .tu-agenda-pasos li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .tu-agenda-paso-linea {
+    position: absolute;
+    top: 2.7rem;
+    left: calc(100% - 0.25rem);
+    z-index: 2;
+    display: block;
+    width: 1.35rem;
+    border-top: 1px dashed color-mix(in srgb, var(--primario) 45%, var(--borde));
+  }
+}
+@media (max-width: 639px) {
+  .tu-agenda-citas-cabecera {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+</style>

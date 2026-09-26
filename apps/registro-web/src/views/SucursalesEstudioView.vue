@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { api } from "@/lib/api";
+import { recordarNegocio } from "@/lib/negociosRecientes";
 
 interface Sucursal {
   id: string;
@@ -48,6 +49,13 @@ async function cargar(): Promise<void> {
       `/api/v1/app/${slug.value}/citas/opciones`,
     );
     opciones.value = data.data;
+    recordarNegocio({
+      slug: data.data.estudio.slug,
+      nombre: data.data.estudio.nombre,
+      logo_url: data.data.estudio.logo_url,
+      ciudad: null,
+      pais: null,
+    });
     // Una sola sede (o ninguna): no hay nada que elegir → directo.
     if (data.data.sucursales.length <= 1) {
       const unica = data.data.sucursales[0];

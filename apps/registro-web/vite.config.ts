@@ -1,15 +1,16 @@
-import { fileURLToPath, URL } from 'node:url'
+import { fileURLToPath, URL } from "node:url";
 
-import tailwindcss from '@tailwindcss/vite'
-import vue from '@vitejs/plugin-vue'
-import { defineConfig } from 'vitest/config'
+import tailwindcss from "@tailwindcss/vite";
+import vue from "@vitejs/plugin-vue";
+import { defineConfig } from "vitest/config";
+import { marketingPlugin } from "./build/marketingPlugin.ts";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue(), tailwindcss()],
+  plugins: [vue(), tailwindcss(), marketingPlugin()],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
   server: {
@@ -17,7 +18,7 @@ export default defineConfig({
     strictPort: true,
   },
   test: {
-    environment: 'jsdom',
+    environment: "jsdom",
     globals: true,
   },
-})
+});

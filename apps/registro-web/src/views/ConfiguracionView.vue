@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 
+import CargadorLogo from "@/components/CargadorLogo.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
-import LogoTurnoUno from "@/components/LogoTurnoUno.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { urlPublicaEstudio } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const sesion = useSesionTenantStore();
@@ -17,13 +18,11 @@ const guardado = ref(false);
 const error = ref<string | null>(null);
 const copiado = ref(false);
 
-// Logo (branding).
+// Logo (branding): la subida por arrastrar/soltar la maneja CargadorLogo.
 const logoUrl = ref<string | null>(null);
-const subiendoLogo = ref(false);
-const archivo = ref<HTMLInputElement | null>(null);
 
 const enlaceDirecto = computed(
-  () => `${window.location.origin}/entrar?estudio=${sesion.slug ?? ""}`,
+  () => `https://${urlPublicaEstudio(sesion.slug ?? "")}`,
 );
 
 async function cargar(): Promise<void> {
@@ -39,44 +38,6 @@ async function cargar(): Promise<void> {
     error.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
-  }
-}
-
-async function subirLogo(evento: Event): Promise<void> {
-  const archivos = (evento.target as HTMLInputElement).files;
-  if (archivos === null || archivos.length === 0) {
-    return;
-  }
-  subiendoLogo.value = true;
-  error.value = null;
-  try {
-    const cuerpo = new FormData();
-    cuerpo.append("logo", archivos[0]);
-    const { data } = await api.post<{ data: { logo_url: string } }>(
-      `${base.value}/marca/logo`,
-      cuerpo,
-    );
-    logoUrl.value = data.data.logo_url;
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    subiendoLogo.value = false;
-    if (archivo.value) {
-      archivo.value.value = "";
-    }
-  }
-}
-
-async function quitarLogo(): Promise<void> {
-  subiendoLogo.value = true;
-  error.value = null;
-  try {
-    await api.delete(`${base.value}/marca/logo`);
-    logoUrl.value = null;
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    subiendoLogo.value = false;
   }
 }
 
@@ -137,52 +98,16 @@ onMounted(cargar);
           {{ $t("configuracion.logoDesc") }}
         </p>
 
-        <div class="mt-4 flex items-center gap-4">
-          <img
-            v-if="logoUrl"
-            :src="logoUrl"
-            :alt="sesion.estudio?.nombre"
-            class="h-16 w-16 rounded-2xl object-cover"
-            :style="{ boxShadow: 'var(--sombra)' }"
+        <div class="mt-4">
+          <CargadorLogo
+            :logo-url="logoUrl"
+            :puede-gestionar="puedeGestionar"
+            @update:logo-url="logoUrl = $event"
           />
-          <LogoTurnoUno v-else :tam="64" />
-
-          <div class="flex flex-wrap gap-2">
-            <label
-              class="tu-btn tu-btn-primario cursor-pointer"
-              :class="{ 'opacity-60': subiendoLogo || !puedeGestionar }"
-            >
-              {{
-                subiendoLogo
-                  ? $t("configuracion.logoSubiendo")
-                  : $t("configuracion.logoSubir")
-              }}
-              <input
-                ref="archivo"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                class="hidden"
-                :disabled="subiendoLogo || !puedeGestionar"
-                @change="subirLogo"
-              />
-            </label>
-            <button
-              v-if="logoUrl"
-              type="button"
-              class="tu-btn tu-btn-fantasma"
-              :disabled="subiendoLogo || !puedeGestionar"
-              @click="quitarLogo"
-            >
-              {{ $t("configuracion.logoQuitar") }}
-            </button>
-          </div>
         </div>
-        <p class="mt-3 text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("configuracion.logoAyuda") }}
-        </p>
       </div>
 
-      <!-- Visibilidad en la Comunidad -->
+      <!-- Visibilidad en Explorar -->
       <div class="mt-6 tu-card p-6">
         <div class="flex items-start justify-between gap-4">
           <div>

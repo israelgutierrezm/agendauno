@@ -3,32 +3,24 @@
 /* Modo oscuro por clase en <html> (lo controla el store de tema). */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/*
-| Sistema de diseño estilo Apple: lienzo casi monocromo (blanco / gris #f5f5f7),
-| tipografía Inter (sustituto de SF Pro) con tracking negativo, UN solo acento azul
-| (#0071e3) reservado a las acciones, botones tipo píldora, tarjetas muy redondeadas
-| y planas (sin sombra) separadas por color/hairline. Tema claro por defecto y su
-| equivalente oscuro bajo `.dark`. La densidad ajusta la escala base.
-*/
+/* Sistema institucional Agenda Uno: claridad, propósito y bienestar. */
 :root {
-  --fondo: #f5f5f7; /* Canvas gris */
-  --superficie: #ffffff; /* Paper (tarjetas) */
-  --superficie-2: #e8e8ed; /* Cool wash (hover / secundario) */
-  --texto: #1d1d1f; /* Primary ink */
-  --texto-suave: #6e6e73; /* Gris secundario */
-  --borde: #d2d2d7; /* Hairline */
-  /* Acento (personalizable): azul Apple por defecto; los tonos "primario" se derivan. */
-  --acento: #0071e3; /* Electric blue */
+  --fondo: #f6f8fc;
+  --superficie: #ffffff;
+  --superficie-2: #e9edf5;
+  --texto: #031b4e;
+  --texto-suave: #5e6b84;
+  --borde: #d9e0ec;
+  --acento: #0070ff;
   --primario: var(--acento);
   --primario-fuerte: color-mix(in srgb, var(--acento), black 12%);
   --primario-contraste: #ffffff;
   --primario-suave: color-mix(in srgb, var(--acento) 10%, #ffffff);
-  --enlace: #0066cc; /* Link blue (texto) */
-  /* Barra lateral: casi negra (ink); el item activo va en azul. */
-  --barra: #1d1d1f;
-  --barra-suave: #2d2d2f;
-  --barra-activo: #0071e3;
-  --barra-texto: #a1a1a6;
+  --enlace: #0065e8;
+  --barra: #031b4e;
+  --barra-suave: #0b2b62;
+  --barra-activo: #0070ff;
+  --barra-texto: #bdc9de;
   --barra-borde: rgb(255 255 255 / 10%);
   --exito: #1a7f37;
   --exito-suave: #e6f4ea;
@@ -45,22 +37,22 @@
 }
 
 .dark {
-  --fondo: #000000;
-  --superficie: #1d1d1f;
-  --superficie-2: #2d2d2f;
-  --texto: #f5f5f7;
-  --texto-suave: #a1a1a6;
-  --borde: #38383a;
-  --acento: #0a84ff;
+  --fondo: #020d24;
+  --superficie: #071a3a;
+  --superficie-2: #0b2854;
+  --texto: #ffffff;
+  --texto-suave: #b6c3da;
+  --borde: #183968;
+  --acento: #2d88ff;
   --primario: var(--acento);
   --primario-fuerte: color-mix(in srgb, var(--acento), white 15%);
   --primario-contraste: #ffffff;
-  --primario-suave: color-mix(in srgb, var(--acento) 24%, #1d1d1f);
-  --enlace: #2997ff;
-  --barra: #000000;
-  --barra-suave: #1d1d1f;
-  --barra-activo: #0a84ff;
-  --barra-texto: #a1a1a6;
+  --primario-suave: color-mix(in srgb, var(--acento) 24%, #071a3a);
+  --enlace: #56a3ff;
+  --barra: #020d24;
+  --barra-suave: #0b2854;
+  --barra-activo: #2d88ff;
+  --barra-texto: #b6c3da;
   --barra-borde: rgb(255 255 255 / 10%);
   --exito: #30d158;
   --exito-suave: #0e2a17;
@@ -71,6 +63,64 @@
   --sombra: none;
   --sombra-tarjeta: none;
   color-scheme: dark;
+}
+
+/* La identidad comercial no hereda el acento personalizado de un negocio. */
+.tu-marketing {
+  --radio-boton: 11px;
+  --radio-tarjeta: 18px;
+  --radio-imagen: 22px;
+  --radio-panel: 28px;
+  --fondo: #f6f8fc;
+  --superficie: #fff;
+  --superficie-2: #e9edf5;
+  --texto: #182b39;
+  --texto-suave: #59666b;
+  --borde: #dce1de;
+  --acento: #198754;
+  --exito: #146c43;
+  --exito-suave: #e8f4ee;
+  --primario: #223b4b;
+  --primario-fuerte: #152a38;
+  --primario-contraste: #fff;
+  --primario-suave: color-mix(in srgb, #24566b 10%, #fff);
+  --enlace: #223b4b;
+  --marketing-enfasis: #198754;
+  --marketing-cta-hover: #152a38;
+  background: var(--fondo);
+  color: var(--texto);
+}
+.dark .tu-marketing {
+  --fondo: #020d24;
+  --superficie: #071a3a;
+  --superficie-2: #0b2854;
+  --texto: #f3f4ef;
+  --texto-suave: #b3bfbf;
+  --borde: #34444c;
+  --acento: #75b798;
+  --exito: #75b798;
+  --exito-suave: #102d25;
+  --primario: #dce5e5;
+  --primario-contraste: #182b39;
+  --primario-fuerte: #f0f4ef;
+  --primario-suave: color-mix(in srgb, #376d82 24%, #071a3a);
+  --enlace: #dce5e5;
+  --marketing-enfasis: #75b798;
+  --marketing-cta-hover: #f0f4ef;
+}
+.tu-marketing .tu-btn {
+  font-weight: 500;
+  box-shadow: none;
+}
+.tu-marketing .tu-btn-primario:hover:not(:disabled) {
+  background: var(--marketing-cta-hover);
+}
+.tu-marketing .tu-btn:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 3px;
+}
+.tu-marketing .tu-badge {
+  border-radius: 8px;
 }
 
 /* Base y componentes propios en capas de Tailwind v4: así las utilidades
@@ -90,12 +140,10 @@
     margin: 0;
     background: var(--fondo);
     color: var(--texto);
-    /* En dispositivos Apple resuelve a SF Pro (la fuente de referencia); Inter es el
-     sustituto en el resto, con Segoe UI/Roboto como respaldo del sistema. */
     font-family:
-      -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", ui-sans-serif,
-      system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    letter-spacing: -0.011em; /* tracking negativo sutil, estilo SF */
+      "Poppins", ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial,
+      sans-serif;
+    letter-spacing: -0.008em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transition:
@@ -103,7 +151,6 @@
       color 0.2s ease;
   }
 
-  /* Títulos con voz "SF Pro Display": peso alto y tracking negativo marcado. */
   h1,
   h2,
   h3 {

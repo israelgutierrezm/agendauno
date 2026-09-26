@@ -8,7 +8,7 @@ const DENSIDADES: Densidad[] = ["compacta", "normal", "comoda"];
 
 /**
  * Colores de acento disponibles. `hex: null` = el acento por defecto del tema
- * (indigo, distinto en claro/oscuro); los demas sobreescriben `--acento` y de ahi
+ * (Azul Uno, distinto en claro/oscuro); los demas sobreescriben `--acento` y de ahi
  * se derivan los tonos "primario" para ambos modos.
  */
 export const ACENTOS: { nombre: string; hex: string | null }[] = [

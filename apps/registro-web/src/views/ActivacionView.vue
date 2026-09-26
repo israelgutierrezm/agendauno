@@ -53,8 +53,9 @@ async function enviar(): Promise<void> {
 </script>
 
 <template>
-  <section class="mx-auto max-w-md px-4 py-10">
-    <h1 class="text-xl font-semibold">{{ $t("activacion.titulo") }}</h1>
+  <section class="tu-public-access">
+    <p class="tu-public-eyebrow">Activa tu cuenta</p>
+    <h1 class="tu-public-form-title">{{ $t("activacion.titulo") }}</h1>
     <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("activacion.subtitulo", { estudio: slug }) }}
     </p>

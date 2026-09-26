@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, useId } from "vue";
 
 import IconoNav from "@/components/IconoNav.vue";
 import type { VistaListado } from "@/lib/vistaListado";
@@ -61,6 +61,7 @@ const activos = computed(
 // Arranca abierto si ya hay algún filtro puesto (si no, no se entendería por
 // qué la lista viene acotada).
 const abierto = ref(activos.value > 0);
+const filtrosId = useId();
 
 function esActivo(clave: string): boolean {
   const v = props.valores[clave];
@@ -69,13 +70,15 @@ function esActivo(clave: string): boolean {
 </script>
 
 <template>
-  <section class="tu-card p-3 sm:p-4 space-y-3">
+  <section class="tu-card p-3 sm:p-4">
     <!-- Fila 1: filtros + buscador + extra + «Agregar». -->
     <div class="flex flex-wrap items-center gap-2 sm:gap-3">
       <button
         v-if="filtros.length"
         type="button"
         class="tu-btn tu-btn-fantasma shrink-0"
+        :aria-expanded="abierto"
+        :aria-controls="filtrosId"
         :style="
           abierto || activos
             ? {
@@ -116,14 +119,16 @@ function esActivo(clave: string): boolean {
         v-model="busqueda"
         type="search"
         :placeholder="placeholder ?? $t('tabla.buscar')"
-        class="tu-input min-w-0 flex-1 sm:min-w-52"
+        :aria-label="placeholder ?? $t('tabla.buscar')"
+        class="tu-input min-w-0 flex-1 basis-44 sm:min-w-52"
       />
 
-      <div class="ms-auto flex items-center gap-2">
+      <div class="ms-auto flex max-w-full flex-wrap items-center gap-2">
         <div
           v-if="vista !== undefined"
           class="tu-segmentado shrink-0"
           role="group"
+          :aria-label="$t('tabla.vista')"
         >
           <button
             type="button"
@@ -158,15 +163,17 @@ function esActivo(clave: string): boolean {
 
     <!-- Fila 2: filtros colapsables. -->
     <div
-      v-if="abierto && filtros.length"
-      class="flex flex-wrap items-center gap-2 border-t pt-3"
+      v-show="abierto && filtros.length"
+      :id="filtrosId"
+      class="mt-3 flex flex-wrap items-center gap-2 border-t pt-3"
       :style="{ borderColor: 'var(--borde)' }"
     >
       <template v-for="f in filtros" :key="f.clave">
         <button
           v-if="f.tipo === 'booleano'"
           type="button"
-          class="shrink-0 rounded-lg border px-2.5 py-1.5 text-xs font-medium"
+          class="min-h-11 rounded-lg border px-2.5 py-1.5 text-xs font-medium"
+          :aria-pressed="esActivo(f.clave)"
           :style="{
             borderColor: esActivo(f.clave) ? 'var(--primario)' : 'var(--borde)',
             color: esActivo(f.clave)
@@ -176,14 +183,15 @@ function esActivo(clave: string): boolean {
               ? 'color-mix(in srgb, var(--primario) 10%, transparent)'
               : 'transparent',
           }"
-          @click="emit('cambioFiltro', f.clave, valores[f.clave] ? '' : '1')"
+          @click="emit('cambioFiltro', f.clave, esActivo(f.clave) ? '' : '1')"
         >
           {{ f.etiqueta }}
         </button>
 
         <select
           v-else
-          class="tu-input w-auto min-w-0 grow basis-40 py-1.5 text-xs sm:grow-0 sm:basis-auto"
+          class="tu-input min-h-11 w-auto min-w-0 grow basis-40 py-1.5 text-xs sm:grow-0 sm:basis-auto"
+          :aria-label="f.etiqueta"
           :style="
             esActivo(f.clave)
               ? {

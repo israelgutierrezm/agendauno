@@ -71,10 +71,11 @@ async function guardar(): Promise<void> {
 </script>
 
 <template>
-  <section class="mx-auto max-w-md px-4 py-10">
+  <section class="tu-public-access">
+    <p class="tu-public-eyebrow">Recupera tu acceso</p>
     <!-- Paso 2: desde el enlace del correo -->
     <template v-if="esRestablecer">
-      <h1 class="text-xl font-semibold">
+      <h1 class="tu-public-form-title">
         {{ $t("recuperarContrasena.nuevaTitulo") }}
       </h1>
       <p
@@ -154,7 +155,7 @@ async function guardar(): Promise<void> {
 
     <!-- Paso 1: pedir el enlace -->
     <template v-else>
-      <h1 class="text-xl font-semibold">
+      <h1 class="tu-public-form-title">
         {{ $t("recuperarContrasena.titulo") }}
       </h1>
       <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">

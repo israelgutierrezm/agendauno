@@ -26,6 +26,8 @@ const compacto = (): boolean => estado?.compacto.value ?? false;
         class="tu-side-link w-full"
         :class="{ 'lg:justify-center': compacto() }"
         :title="compacto() ? (item.texto ?? t(item.etiqueta)) : undefined"
+        :aria-label="item.texto ?? t(item.etiqueta)"
+        :aria-expanded="!compacto() && abierto(item.clave)"
         @click="estado?.alternar(item.clave)"
       >
         <IconoNav :nombre="item.icono ?? 'punto'" :tam="20" class="shrink-0" />
@@ -56,6 +58,7 @@ const compacto = (): boolean => estado?.compacto.value ?? false;
       :class="{ 'lg:justify-center': compacto() }"
       :to="{ name: item.ruta }"
       :title="compacto() ? (item.texto ?? t(item.etiqueta)) : undefined"
+      :aria-label="item.texto ?? t(item.etiqueta)"
       @click="estado?.cerrarCajon()"
     >
       <IconoNav

@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
 import { useRetornoPago } from "@/lib/retornoPago";
+import { recordarNegocio } from "@/lib/negociosRecientes";
 
 interface Servicio {
   id: string;
@@ -132,6 +133,13 @@ async function cargar(): Promise<void> {
       `/api/v1/app/${slug.value}/citas/opciones`,
     );
     opciones.value = data.data;
+    recordarNegocio({
+      slug: data.data.estudio.slug,
+      nombre: data.data.estudio.nombre,
+      logo_url: data.data.estudio.logo_url,
+      ciudad: null,
+      pais: null,
+    });
     // Sede pre-seleccionada desde el selector de sucursal (?sucursal=<ulid>), o
     // la única si solo hay una.
     const preSuc = String(route.query.sucursal ?? "");

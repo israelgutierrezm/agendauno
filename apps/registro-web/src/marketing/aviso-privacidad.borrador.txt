@@ -1,0 +1,83 @@
+AVISO DE PRIVACIDAD INTEGRAL DE AGENDAUNO
+Borrador para revisión · 24 de septiembre de 2026
+
+ANTES DE PUBLICAR: completar los campos entre corchetes y validar que el texto corresponde a la operación real. La marca AgendaUno no sustituye el nombre legal del responsable.
+
+1. RESPONSABLE Y CONTACTO
+
+[NOMBRE COMPLETO O RAZÓN SOCIAL], con domicilio en [CALLE, NÚMERO, COLONIA, MUNICIPIO, ESTADO, CÓDIGO POSTAL Y PAÍS], opera AgendaUno y es responsable del tratamiento descrito en este aviso.
+
+Contacto para privacidad y derechos ARCO: [CORREO OPERATIVO]. Persona o área designada: [PERSONA O ÁREA].
+
+Este aviso comprende el sitio comercial, las cuentas de negocios, la suscripción del software y la atención a sus usuarios.
+
+2. DATOS PERSONALES
+
+Según las funciones utilizadas, tratamos:
+• Identificación y contacto: nombre, apellidos, correo, teléfono y fotografía de perfil si decides cargarla.
+• Información del negocio: nombre comercial, giro, ubicación proporcionada, zona horaria, sucursales y personas autorizadas.
+• Acceso y operación: identificadores de usuario, credenciales protegidas, permisos, sesiones, registros de actividad y comunicaciones de soporte.
+• Suscripción y facturación: uso facturable, cargos, referencias y estado del pago y, si solicitas factura, los datos fiscales necesarios.
+• Navegación: datos técnicos que registren los servicios de infraestructura, como dirección IP y navegador; páginas, interacciones y procedencia de campañas cuando se habilite esa medición.
+
+No solicitamos datos de salud u otros datos sensibles para registrar un negocio. No los incluyas en campos de contacto o soporte. El tratamiento de información de clientes de un negocio se explica en el apartado 4.
+
+3. FINALIDADES NECESARIAS Y SECUNDARIAS
+
+Finalidades necesarias: atender la solicitud de prueba; crear y activar la cuenta; autenticar accesos; habilitar, mantener y dar soporte al servicio; administrar permisos; comunicar incidencias y cambios operativos; prevenir abuso; gestionar suscripciones, pagos y comprobantes solicitados; y cumplir obligaciones aplicables.
+
+Finalidades secundarias propuestas: medir campañas y uso del sitio comercial, realizar encuestas y enviar novedades u ofertas. No son necesarias para contratar. Puedes negarte, limitar su uso o solicitar la baja mediante el contacto de privacidad sin perder por ello el servicio contratado. El consentimiento que corresponda deberá obtenerse separadamente de los términos del servicio.
+
+[CONFIRMAR LAS FINALIDADES SECUNDARIAS REALMENTE ACTIVAS Y LOS MECANISMOS EFECTIVOS DE NEGATIVA O CONSENTIMIENTO ANTES DE PUBLICAR.]
+
+4. DATOS ADMINISTRADOS POR LOS NEGOCIOS
+
+Cuando un estudio, academia o profesional utiliza AgendaUno para administrar datos de sus alumnos, clientes, pacientes, tutores o empleados, el negocio determina las finalidades de ese tratamiento y debe proporcionar su propio aviso. AgendaUno trata esa información por cuenta del negocio, conforme a sus instrucciones y al acuerdo de servicio, sin perjuicio de las obligaciones de cada parte.
+
+Para solicitudes sobre los datos entregados a un negocio, contacta a ese negocio. Si recibimos una solicitud que le corresponde, indicaremos el canal aplicable y colaboraremos conforme al acuerdo de tratamiento y a la normativa. Esta distribución de funciones no elimina tus derechos ni exonera a AgendaUno de sus propias obligaciones.
+
+El negocio debe establecer las medidas y consentimientos correspondientes al tratar datos sensibles o de menores. El aviso de la plataforma no sustituye el aviso del negocio ni el consentimiento informado.
+
+5. PROVEEDORES Y TRANSFERENCIAS
+
+La operación puede requerir proveedores de alojamiento, almacenamiento, correo transaccional, soporte, pagos, facturación o autenticación. Quienes actúen como encargados deberán tratar los datos conforme a instrucciones y obligaciones de confidencialidad y seguridad. Los terceros que actúen como responsables independientes se sujetan a sus propios avisos y a las reglas de transferencia aplicables.
+
+[IDENTIFICAR PROVEEDORES REALMENTE ACTIVOS, FINALIDADES, DATOS COMUNICADOS, PAÍSES Y SU CARÁCTER DE ENCARGADO O TERCERO. ENUMERAR TRANSFERENCIAS Y SU BASE APLICABLE; NO PUBLICAR UNA LISTA GENÉRICA.]
+
+Cuando una transferencia requiera consentimiento, se solicitará antes de realizarla mediante un mecanismo específico. También podrán comunicarse datos para atender requerimientos válidos de autoridades u otros supuestos permitidos por la legislación. La aceptación del servicio no autoriza cualquier transferencia o finalidad futura.
+
+6. TECNOLOGÍAS DE NAVEGACIÓN
+
+La aplicación utiliza almacenamiento local y de sesión del navegador para recordar preferencias visuales, accesos recientes y mantener la sesión. La medición comercial implementada puede registrar la procedencia de campañas y eventos de navegación; su envío externo depende de la configuración.
+
+Puedes consultar o eliminar los datos del sitio desde la configuración de privacidad del navegador. Esto puede cerrar sesiones o eliminar preferencias. Si se habilitan servicios adicionales de analítica, publicidad, acceso de Google o reCAPTCHA, deberán identificarse sus proveedores, datos y controles antes de su uso.
+
+[CONFIRMAR TECNOLOGÍAS ACTIVAS Y CONTROLES EFECTIVOS PARA TRATAMIENTOS OPCIONALES. NO AFIRMAR QUE EXISTE UN GESTOR DE CONSENTIMIENTO SI NO ESTÁ IMPLEMENTADO.]
+
+7. DERECHOS ARCO, REVOCACIÓN Y LIMITACIÓN
+
+Puedes solicitar acceso, rectificación, cancelación u oposición respecto de tus datos. También puedes revocar el consentimiento o limitar su uso y divulgación. Envía tu solicitud al contacto del apartado 1.
+
+Incluye tu nombre y un medio de respuesta, el derecho o petición, los elementos que ayuden a localizar los datos y, salvo para acceso, una descripción de los datos involucrados. Deberá acreditarse tu identidad y, cuando corresponda, la representación. Para rectificación, indica el cambio y la documentación que lo sustente. No envíes contraseñas ni códigos de acceso. El responsable deberá indicar un medio seguro para los documentos de acreditación necesarios.
+
+La determinación sobre solicitudes ARCO se comunicará en un máximo de 20 días hábiles desde la recepción y, si procede, se hará efectiva dentro de los 15 días hábiles siguientes a la comunicación. Los plazos podrán ampliarse una sola vez por un periodo igual cuando se justifique conforme a la ley. El ejercicio es gratuito, salvo costos permitidos por la normativa.
+
+Para revocación, limitación o baja de comunicaciones utiliza el mismo contacto. Se acusará recibo y se informará el alcance de la atención. La revocación no tiene efectos retroactivos. Podrán conservarse datos cuando exista una obligación aplicable y se explicará cualquier impedimento. Si la petición impide prestar una función necesaria, se informarán sus consecuencias.
+
+8. CONSERVACIÓN Y SEGURIDAD
+
+Los datos deberán conservarse durante el tiempo necesario para las finalidades informadas y obligaciones aplicables, y después bloquearse o suprimirse según corresponda. Los respaldos y registros técnicos deberán sujetarse a sus propios ciclos de conservación y eliminación.
+
+[VALIDAR Y DOCUMENTAR LOS PERIODOS REALES PARA CUENTAS, SOPORTE, FACTURACIÓN, REGISTROS Y RESPALDOS.]
+
+El responsable deberá mantener medidas administrativas, técnicas y físicas acordes con los riesgos y procedimientos de atención a incidentes. No se garantiza seguridad absoluta. Las vulneraciones que afecten significativamente derechos patrimoniales o morales deberán comunicarse conforme a la legislación.
+
+9. CAMBIOS AL AVISO
+
+La versión vigente estará disponible en /aviso-de-privacidad, en el sitio de AgendaUno, con su fecha de actualización. Los cambios que requieran nueva información o consentimiento se comunicarán por los canales de la cuenta y se recabará el consentimiento correspondiente antes del nuevo tratamiento.
+
+BASE DE REVISIÓN
+Ley Federal de Protección de Datos Personales en Posesión de los Particulares, texto vigente consultado el 24 de septiembre de 2026, última reforma del 14 de noviembre de 2025:
+https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPDPPP.pdf
+
+NOTA EDITORIAL: completar los pendientes y validar las prácticas antes de retirar las instrucciones y publicar el texto aprobado desde la administración de la plataforma, en Documentos legales → Aviso de privacidad. El footer y el registro consultan esa misma fuente. Este borrador no certifica cumplimiento legal.

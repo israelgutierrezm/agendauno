@@ -1,3 +1,5 @@
+import { rutasMarketing } from "@/marketing/seoConfig";
+
 export type AnalyticsValue = string | number | boolean | null;
 
 export type AnalyticsProperties = Record<string, AnalyticsValue>;
@@ -69,7 +71,12 @@ function deliver(payload: Record<string, unknown>): void {
     return;
   }
 
-  window.dataLayer?.push(payload);
+  // Un proveedor bloqueado nunca debe impedir un registro o una activación.
+  try {
+    window.dataLayer?.push(payload);
+  } catch {
+    /* Medición opcional. */
+  }
   window.dispatchEvent(
     new CustomEvent("turnouno:analytics", { detail: payload }),
   );
@@ -81,20 +88,40 @@ function deliver(payload: Record<string, unknown>): void {
   }
 
   const body = JSON.stringify(payload);
-  if (typeof navigator.sendBeacon === "function") {
-    navigator.sendBeacon(
-      endpoint,
-      new Blob([body], { type: "application/json" }),
-    );
-    return;
+  try {
+    if (
+      typeof navigator.sendBeacon === "function" &&
+      navigator.sendBeacon(
+        endpoint,
+        new Blob([body], { type: "application/json" }),
+      )
+    )
+      return;
+  } catch {
+    // Algunos navegadores bloquean beacon; se intenta fetch sin bloquear la UI.
   }
 
-  void fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-    keepalive: true,
-  }).catch(() => undefined);
+  try {
+    void fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true,
+    }).catch(() => undefined);
+  } catch {
+    /* Incluso un transporte bloqueado es opcional. */
+  }
+}
+
+export function analyticsPath(path: string): string {
+  const clean = path.split(/[?#]/)[0]!.replace(/\/$/, "") || "/";
+  if (
+    rutasMarketing.includes(clean) ||
+    ["/registro", "/entrar", "/negocios"].includes(clean)
+  )
+    return clean;
+  if (/^\/activar(?:\/|$)/.test(clean)) return "/activar";
+  return "/app";
 }
 
 export function trackEvent(
@@ -105,12 +132,15 @@ export function trackEvent(
     event: "turnouno_event",
     event_name: name,
     occurred_at: new Date().toISOString(),
-    page_path: typeof window === "undefined" ? "" : window.location.pathname,
+    page_path:
+      typeof window === "undefined"
+        ? ""
+        : analyticsPath(window.location.pathname),
     ...readAttribution(),
     ...properties,
   });
 }
 
 export function trackPageView(path: string, title: string): void {
-  trackEvent("page_view", { path, title });
+  trackEvent("page_view", { path: analyticsPath(path), title });
 }

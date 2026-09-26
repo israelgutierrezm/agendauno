@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import AccesosOperativos from "@/components/AccesosOperativos.vue";
 import EnlaceEstudio from "@/components/EnlaceEstudio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -110,6 +111,7 @@ onMounted(cargar);
 <template>
   <section class="mx-auto max-w-6xl px-4 py-8">
     <EncabezadoSeccion :titulo="sesion.estudio?.nombre ?? $t('nav.panel')" />
+    <AccesosOperativos />
 
     <!-- Quickstart (R36): guía de activación mientras falte configuración esencial -->
     <div v-if="quickstart && !quickstart.listo" class="mt-6 tu-card p-5">
