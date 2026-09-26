@@ -152,6 +152,10 @@ export const comunicacionesAuto = {
   ayudaProfesional:
     "Le llega a quien atiende la cita, por correo o en la app. En clases grupales no se avisa al instructor por cada reserva.",
   alProfesional: "Profesional",
+  paraEquipo: "Equipo del negocio",
+  ayudaEquipo:
+    "Le llega a quien puede atenderlo: por ejemplo, una solicitud de baja de datos a quien gestiona alumnos y una venta a quien ve la facturación.",
+  alEquipo: "Equipo",
   canalPush: "Notificación en la app",
   ayudaPush:
     "Llega al teléfono de quien tiene la app con sesión. Usa un título corto y una sola línea.",

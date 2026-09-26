@@ -68,7 +68,7 @@ class ResenasTenantController
         $reserva = ReservaTenant::query()
             ->where('ulid', (string) $request->route('reserva'))
             ->where('persona_id', $persona->getKey())
-            ->with(['sesion', 'asistencia'])
+            ->with(['sesion.oferta', 'asistencia'])
             ->firstOrFail();
 
         if ($reserva->asistencia?->estado !== EstadoAsistencia::Presente) {
@@ -96,6 +96,9 @@ class ResenasTenantController
                 'persona_id' => (string) $persona->ulid,
                 'calificacion' => $resena->calificacion,
                 'comentario' => (string) $resena->comentario,
+                // Para el aviso al equipo: qué se calificó y dónde verlo.
+                'actividad' => (string) $reserva->sesion->oferta?->nombre,
+                'enlace_panel' => rtrim((string) config('turnouno.url_app'), '/').'/resenas',
             ]);
 
             return $resena;

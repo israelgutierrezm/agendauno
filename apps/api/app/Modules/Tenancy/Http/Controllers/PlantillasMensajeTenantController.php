@@ -30,6 +30,11 @@ class PlantillasMensajeTenantController
             'eventos_disponibles' => EventoDeDominioTenant::TIPOS,
             // Push solo aparece si la plataforma tiene FCM configurado.
             'canales' => array_map(static fn (CanalComunicacion $c): string => $c->value, CanalComunicacion::disponibles()),
+            // Qué eventos se pueden avisar al profesional de la cita y al equipo.
+            'destinatarios' => [
+                'profesional' => DestinatarioMensaje::Profesional->eventos(),
+                'equipo' => DestinatarioMensaje::Equipo->eventos(),
+            ],
         ]);
     }
 
@@ -44,8 +49,12 @@ class PlantillasMensajeTenantController
             'activo' => ['boolean'],
         ]);
         $para = DestinatarioMensaje::tryFrom((string) ($validado['destinatario'] ?? '')) ?? DestinatarioMensaje::Persona;
-        if ($para === DestinatarioMensaje::Profesional && $validado['canal'] === CanalComunicacion::Interno->value) {
-            throw ValidationException::withMessages(['canal' => ['Al profesional se le avisa por correo o notificación en la app.']]);
+        $eventos = $para->eventos();
+        if ($eventos !== null && ! in_array($validado['clave'], $eventos, true)) {
+            throw ValidationException::withMessages(['destinatario' => ['Ese aviso no se puede enviar a ese destinatario.']]);
+        }
+        if ($para !== DestinatarioMensaje::Persona && $validado['canal'] === CanalComunicacion::Interno->value) {
+            throw ValidationException::withMessages(['canal' => ['Al equipo se le avisa por correo o notificación en la app.']]);
         }
 
         $plantilla = PlantillaMensajeTenant::withTrashed()->updateOrCreate(

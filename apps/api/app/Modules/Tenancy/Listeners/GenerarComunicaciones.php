@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Listeners;
 
 use App\Modules\Tenancy\Application\EntregarPushTenant;
 use App\Modules\Tenancy\Application\EnviarMensajesTenant;
+use App\Modules\Tenancy\Comunicaciones\AvisosAlEquipo;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\DestinatarioMensaje;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
@@ -50,7 +51,17 @@ class GenerarComunicaciones
 
         foreach ($plantillas as $plantilla) {
             if ($plantilla->destinatario === DestinatarioMensaje::Profesional) {
-                $this->avisarAlProfesional($plantilla, $profesional, $persona, $contexto, $evento);
+                if ($profesional instanceof Usuario) {
+                    $this->avisarAUsuario($plantilla, $profesional, $persona, $contexto, $evento);
+                }
+
+                continue;
+            }
+            if ($plantilla->destinatario === DestinatarioMensaje::Equipo) {
+                // A cada quien del equipo que puede atender lo que pasó.
+                foreach (AvisosAlEquipo::destinatarios($evento->tipo) as $usuario) {
+                    $this->avisarAUsuario($plantilla, $usuario, $persona, $contexto, $evento);
+                }
 
                 continue;
             }
@@ -82,35 +93,32 @@ class GenerarComunicaciones
     }
 
     /**
-     * Aviso al profesional de la cita, por correo o push (el equipo no tiene bandeja
-     * en la app). El mensaje guarda también de quién trata (la persona del evento).
+     * Aviso a un usuario del equipo (el profesional de la cita o quien atiende lo que
+     * pasó), por correo o push: el equipo no tiene bandeja en la app. El mensaje
+     * guarda también de quién trata (la persona del evento).
      *
      * @param  array<string, string>  $contexto
      */
-    private function avisarAlProfesional(
+    private function avisarAUsuario(
         PlantillaMensajeTenant $plantilla,
-        ?Usuario $profesional,
+        Usuario $usuario,
         ?PersonaTenant $persona,
         array $contexto,
         EventoDeDominioTenant $evento,
     ): void {
-        if (! $profesional instanceof Usuario) {
-            return;
-        }
-
         $destinatario = null;
         if ($plantilla->canal === CanalComunicacion::Email) {
-            $destinatario = (string) $profesional->email;
+            $destinatario = (string) $usuario->email;
             if ($destinatario === '') {
                 return;
             }
-        } elseif ($plantilla->canal !== CanalComunicacion::Push || ! $this->push->puedeRecibirUsuario($profesional)) {
+        } elseif ($plantilla->canal !== CanalComunicacion::Push || ! $this->push->puedeRecibirUsuario($usuario)) {
             return;
         }
 
         MensajeTenant::query()->create([
             'persona_id' => $persona?->getKey(),
-            'usuario_id' => $profesional->getKey(),
+            'usuario_id' => $usuario->getKey(),
             'plantilla_id' => $plantilla->getKey(),
             'canal' => $plantilla->canal->value,
             'destinatario' => $destinatario,

@@ -33,8 +33,9 @@ interface Difusion {
 }
 
 type Canal = "interno" | "email" | "push";
-// A quién va el mensaje automático: la persona del evento o el profesional de la cita.
-type Destinatario = "persona" | "profesional";
+// A quién va el mensaje automático: la persona del evento, el profesional de la cita
+// o el equipo del negocio (a quien puede atenderlo).
+type Destinatario = "persona" | "profesional" | "equipo";
 interface Plantilla {
   id: string;
   clave: string;
@@ -188,15 +189,35 @@ const borrador = ref<{
   activo: true,
 });
 
-// Al profesional se le avisa por correo o en la app (el equipo no tiene bandeja).
+// Al equipo se le avisa por correo o en la app (no tiene bandeja en la app).
 const canalesDelBorrador = computed(() =>
-  borrador.value.destinatario === "profesional"
-    ? canalesAuto.value.filter((c) => c !== "interno")
-    : canalesAuto.value,
+  borrador.value.destinatario === "persona"
+    ? canalesAuto.value
+    : canalesAuto.value.filter((c) => c !== "interno"),
 );
-// Lo configurado de un evento, en orden: primero al alumno, luego al profesional.
+// Qué eventos admiten avisar al profesional de la cita o al equipo (del servidor).
+const eventosPorDestinatario = ref<Record<"profesional" | "equipo", string[]>>({
+  profesional: [],
+  equipo: [],
+});
+function destinatariosDe(clave: string): Destinatario[] {
+  return [
+    "persona",
+    ...(["profesional", "equipo"] as const).filter((d) =>
+      eventosPorDestinatario.value[d].includes(clave),
+    ),
+  ];
+}
+function textoDestinatario(d: Destinatario): string {
+  return d === "profesional"
+    ? t("comunicacionesAuto.paraProfesional")
+    : d === "equipo"
+      ? t("comunicacionesAuto.paraEquipo")
+      : t("comunicacionesAuto.paraPersona");
+}
+// Lo configurado de un evento, en orden: al alumno, al profesional y al equipo.
 function configuradas(clave: string): Plantilla[] {
-  return (["persona", "profesional"] as const).flatMap((d) =>
+  return (["persona", "profesional", "equipo"] as const).flatMap((d) =>
     canalesAuto.value
       .map((c) => plantillaDe(clave, c, d))
       .filter((p): p is Plantilla => p !== undefined),
@@ -301,9 +322,10 @@ function cargarBorrador(): void {
 
 function configurar(clave: string): void {
   editor.value = { abierto: true, clave };
-  borrador.value.destinatario = "persona";
-  borrador.value.canal =
-    canalesAuto.value.find((c) => plantillaDe(clave, c)) ?? "interno";
+  // Abre en lo que ya esté configurado (p. ej. un aviso que solo va al equipo).
+  const primera = configuradas(clave)[0];
+  borrador.value.destinatario = primera?.destinatario ?? "persona";
+  borrador.value.canal = primera?.canal ?? "interno";
   cargarBorrador();
 }
 
@@ -329,10 +351,15 @@ async function cargarAutomaticos(): Promise<void> {
     data: Plantilla[];
     eventos_disponibles: string[];
     canales?: Canal[];
+    destinatarios?: Record<"profesional" | "equipo", string[]>;
   }>(`${base.value}/plantillas-mensaje`);
   plantillas.value = data.data;
   eventos.value = data.eventos_disponibles;
   canalesAuto.value = data.canales ?? ["interno", "email"];
+  eventosPorDestinatario.value = data.destinatarios ?? {
+    profesional: [],
+    equipo: [],
+  };
 }
 
 async function guardarPlantilla(): Promise<void> {
@@ -638,7 +665,9 @@ onMounted(cargar);
                 >{{
                   p.destinatario === "profesional"
                     ? `${$t("comunicacionesAuto.alProfesional")} · ${canalTexto(p.canal)}`
-                    : canalTexto(p.canal)
+                    : p.destinatario === "equipo"
+                      ? `${$t("comunicacionesAuto.alEquipo")} · ${canalTexto(p.canal)}`
+                      : canalTexto(p.canal)
                 }}</span
               >
               <span v-if="configuradas(ev).length === 0">{{
@@ -722,25 +751,25 @@ onMounted(cargar);
           <span class="tu-label">{{ $t("comunicacionesAuto.para") }}</span>
           <div class="tu-segmentado" role="group">
             <button
-              v-for="d in ['persona', 'profesional'] as const"
+              v-for="d in destinatariosDe(editor.clave)"
               :key="d"
               type="button"
               :aria-pressed="borrador.destinatario === d"
               @click="elegirDestinatario(d)"
             >
-              {{
-                d === "persona"
-                  ? $t("comunicacionesAuto.paraPersona")
-                  : $t("comunicacionesAuto.paraProfesional")
-              }}
+              {{ textoDestinatario(d) }}
             </button>
           </div>
           <p
-            v-if="borrador.destinatario === 'profesional'"
+            v-if="borrador.destinatario !== 'persona'"
             class="mt-1 text-xs"
             :style="{ color: 'var(--texto-suave)' }"
           >
-            {{ $t("comunicacionesAuto.ayudaProfesional") }}
+            {{
+              borrador.destinatario === "equipo"
+                ? $t("comunicacionesAuto.ayudaEquipo")
+                : $t("comunicacionesAuto.ayudaProfesional")
+            }}
           </p>
         </div>
         <div>
