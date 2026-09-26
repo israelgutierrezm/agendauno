@@ -192,7 +192,7 @@ it('cobra mes vencido: congela la medición del mes cerrado y no cambia después
     $this->assertDatabaseHas('mediciones_uso', ['periodo' => $pasado, 'cantidad' => 1, 'congelada' => true]);
 });
 
-it('los días de prueba dependen de la modalidad: 30 en clases y 14 en citas', function (): void {
+it('los negocios nuevos reciben 30 días de prueba en ambas modalidades', function (): void {
     estudioConSesion('pilates-a', 'dueno@pilates.mx');
     $this->postJson('/api/v1/registro', [
         'nombre' => 'Barbería B', 'slug' => 'barberia-b', 'perfil_negocio' => 'barberia',
@@ -202,7 +202,7 @@ it('los días de prueba dependen de la modalidad: 30 en clases y 14 en citas', f
 
     $hoy = now()->startOfDay();
     expect((int) $hoy->diffInDays(Estudio::query()->where('slug', 'pilates-a')->firstOrFail()->trial_termina_en))->toBe(30);
-    expect((int) $hoy->diffInDays(Estudio::query()->where('slug', 'barberia-b')->firstOrFail()->trial_termina_en))->toBe(14);
+    expect((int) $hoy->diffInDays(Estudio::query()->where('slug', 'barberia-b')->firstOrFail()->trial_termina_en))->toBe(30);
 });
 
 it('el superadmin publica una versión nueva de la tarifa y los cargos la usan', function (): void {

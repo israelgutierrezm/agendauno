@@ -76,6 +76,6 @@ class TarifaSaas extends Model
      */
     public function diasPrueba(): int
     {
-        return (int) ($this->definicion['dias_prueba'] ?? 14);
+        return (int) ($this->definicion['dias_prueba'] ?? 30);
     }
 }

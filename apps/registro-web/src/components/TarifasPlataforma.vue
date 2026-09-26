@@ -78,7 +78,7 @@ function borradorDe(tarifa: Tarifa | null, modalidad: Modalidad): Borrador {
           precio: pesos(b.unitario_minor),
         }));
   return {
-    dias_prueba: d?.dias_prueba ?? (modalidad === "clases" ? 30 : 14),
+    dias_prueba: d?.dias_prueba ?? 30,
     iva_porcentaje: d?.iva_porcentaje ?? 16,
     escalones: escalones.length > 0 ? escalones : [{ hasta: "", precio: "0" }],
     incluidas: d?.personas_incluidas_por_profesional ?? 10,

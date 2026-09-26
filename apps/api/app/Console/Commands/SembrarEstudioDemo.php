@@ -79,7 +79,7 @@ class SembrarEstudioDemo extends Command
             'estado' => EstadoEstudio::Trialing->value,
             'estado_facturacion' => EstadoFacturacion::Trial->value,
             'trial_inicia_en' => now()->toDateString(),
-            'trial_termina_en' => now()->addDays(14)->toDateString(),
+            'trial_termina_en' => now()->addDays(30)->toDateString(),
             'aprovisionado_en' => $estudio->aprovisionado_en ?? now(),
             'paso_aprovisionamiento' => null,
             'pais' => $estudio->pais ?? 'MX',

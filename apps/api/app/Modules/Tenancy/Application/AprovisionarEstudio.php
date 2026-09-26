@@ -24,7 +24,7 @@ use App\Modules\Tenancy\Models\Usuario;
 class AprovisionarEstudio
 {
     // Si aún no hay tarifa publicada para la modalidad.
-    private const DIAS_TRIAL = 14;
+    private const DIAS_TRIAL = 30;
 
     public function __construct(private readonly GestorDeConexionTenant $gestor) {}
 

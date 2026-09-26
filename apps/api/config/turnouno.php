@@ -14,7 +14,7 @@ return [
     /*
     | Días del periodo de prueba gratuito al aprovisionar un estudio.
     */
-    'dias_trial' => (int) env('TRIAL_DIAS', 14),
+    'dias_trial' => (int) env('TRIAL_DIAS', 30),
 
     /*
     | Dominio base para resolver el estudio por subdominio: `{slug}.agendauno.mx`.
