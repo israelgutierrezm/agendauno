@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Comunicaciones\DatosDeSesion;
+use App\Modules\Tenancy\Creditos\EstadoRetencion;
 use App\Modules\Tenancy\Creditos\Exceptions\SaldoInsuficiente;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\EstadoSesionTenant;
@@ -14,6 +15,7 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReglaCapacidadCanalTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\CupoLleno;
@@ -21,10 +23,12 @@ use App\Modules\Tenancy\Reservas\Exceptions\FueraDeVentana;
 use App\Modules\Tenancy\Reservas\Exceptions\LugarNoDisponible;
 use App\Modules\Tenancy\Reservas\Exceptions\OfertaNoDisponible;
 use App\Modules\Tenancy\Reservas\Exceptions\ReservaException;
+use App\Modules\Tenancy\Reservas\Exceptions\ReservaYaAtendida;
 use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\Reservas\Exceptions\SinDerechoDisponible;
 use App\Modules\Tenancy\Reservas\Exceptions\TransferenciaInvalida;
 use App\Modules\Tenancy\Reservas\Exceptions\YaReservado;
+use App\Modules\Tenancy\Reservas\QuienCancela;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +50,15 @@ class ReservasTenant
 
     // Ventana (min) para pagar una reserva pago-para-reservar antes de liberar el cupo.
     private const VENTANA_PAGO_MIN = 30;
+
+    // Horas límite de cancelación de reservas anteriores al snapshot de política (R8).
+    private const HORAS_LIMITE_RESPALDO = 6;
+
+    // Reservas que ocupan (o esperan) un lugar.
+    private const ACTIVAS = [
+        EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
+        EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value,
+    ];
 
     public function __construct(
         private readonly ResolverDerechoTenant $resolver,
@@ -390,18 +403,37 @@ class ReservasTenant
         });
     }
 
-    public function cancelar(ReservaTenant $reserva, int $horasLimite = 6): ReservaTenant
+    /**
+     * Cancela una reserva (fase 1, punto 1.4). `$quien` decide la política: solo la
+     * cancelación del CLIENTE (él mismo, o recepción a petición suya) puede cobrarle el
+     * crédito si es tardía; si cancela el NEGOCIO, el crédito siempre regresa. Queda
+     * registrado quién, con qué usuario y cuándo.
+     *
+     * Idempotente: cancelar dos veces no hace nada la segunda (ni devuelve dos
+     * créditos). Una reserva con asistencia registrada no se cancela.
+     */
+    public function cancelar(ReservaTenant $reserva, QuienCancela $quien = QuienCancela::Cliente, ?Usuario $actor = null, int $horasLimite = self::HORAS_LIMITE_RESPALDO): ReservaTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($reserva, $horasLimite): ReservaTenant {
+        return DB::connection('tenant')->transaction(function () use ($reserva, $quien, $actor, $horasLimite): ReservaTenant {
             $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
 
-            if ($bloqueada->estado === EstadoReserva::Cancelada) {
+            if (in_array($bloqueada->estado, [EstadoReserva::Cancelada, EstadoReserva::Expirada], true)) {
                 return $bloqueada;
             }
+            if ($bloqueada->asistencia()->exists()) {
+                throw new ReservaYaAtendida('Ya se registró la asistencia de esta reserva; no se puede cancelar.');
+            }
+
+            $quienCancelo = [
+                'estado' => EstadoReserva::Cancelada->value,
+                'cancelada_en' => now(),
+                'cancelada_por' => $quien->value,
+                'cancelada_por_usuario_id' => $actor?->getKey(),
+            ];
 
             // Cancelar un lugar en lista de espera: no hay hold ni promocion.
             if ($bloqueada->estado === EstadoReserva::EnEspera) {
-                $bloqueada->update(['estado' => EstadoReserva::Cancelada->value]);
+                $bloqueada->update([...$quienCancelo, 'motivo_cancelacion' => 'salio_de_espera']);
 
                 return $bloqueada;
             }
@@ -413,7 +445,8 @@ class ReservasTenant
                     $this->creditos->liberar($bloqueada->retencion);
                 }
                 $bloqueada->update([
-                    'estado' => EstadoReserva::Cancelada->value,
+                    ...$quienCancelo,
+                    'motivo_cancelacion' => 'oferta_rechazada',
                     'retencion_id' => null,
                     'unidades' => 0,
                     'oferta_expira_en' => null,
@@ -426,37 +459,31 @@ class ReservasTenant
             // Bloquea la sesion para promover de forma segura tras liberar el cupo.
             $sesion = SesionTenant::query()->whereKey($bloqueada->sesion_id)->lockForUpdate()->firstOrFail();
 
+            // La misma decisión que se mostró en la vista previa.
+            $efecto = $this->efecto($bloqueada, $sesion, $quien, $horasLimite);
             $estadoAnterior = $bloqueada->estado;
             $credito = '';
             $retencion = $bloqueada->retencion;
-            if ($retencion !== null) {
-                // Politica congelada en la reserva (R8); `$horasLimite` es solo el
-                // respaldo para reservas anteriores al snapshot.
-                $horas = $bloqueada->horas_limite ?? $horasLimite;
-                $penalizaTarde = $bloqueada->penaliza_tarde ?? true;
-                $momentoLimite = $sesion->inicia_en->copy()->subHours($horas);
-                $aTiempo = now()->lessThanOrEqualTo($momentoLimite);
-
-                if ($aTiempo || ! $penalizaTarde) {
-                    // A tiempo, o el estudio no penaliza la cancelacion tardia: el
-                    // credito retenido vuelve al miembro.
-                    $this->creditos->liberar($retencion);
-                    $credito = EmitirReservaCanceladaTenant::CREDITO_DEVUELTO;
-                } else {
-                    // Cancelación tardía con penalización: el crédito se cobra. Se deja
-                    // trazable con el origen (reserva) y la reserva referida.
-                    $this->creditos->confirmar($retencion, ContextoMovimiento::para(
-                        OrigenMovimiento::Reserva,
-                        'reserva',
-                        $bloqueada->ulid,
-                        null,
-                        ['motivo' => 'cancelacion_tardia'],
-                    ));
-                    $credito = EmitirReservaCanceladaTenant::creditoCobrado($horas);
-                }
+            if ($retencion !== null && $efecto->credito === EfectoCancelacion::DEVUELVE) {
+                $this->creditos->liberar($retencion);
+                $credito = EmitirReservaCanceladaTenant::CREDITO_DEVUELTO;
+            } elseif ($retencion !== null && $efecto->credito === EfectoCancelacion::COBRA) {
+                // Cancelación tardía del cliente con penalización: el crédito se cobra,
+                // trazable a la reserva y a quién canceló.
+                $this->creditos->confirmar($retencion, ContextoMovimiento::para(
+                    OrigenMovimiento::Reserva,
+                    'reserva',
+                    $bloqueada->ulid,
+                    $actor,
+                    ['motivo' => 'cancelacion_tardia'],
+                ));
+                $credito = EmitirReservaCanceladaTenant::creditoCobrado((int) ($bloqueada->horas_limite ?? $horasLimite));
             }
 
-            $bloqueada->update(['estado' => EstadoReserva::Cancelada->value]);
+            $bloqueada->update([
+                ...$quienCancelo,
+                'motivo_cancelacion' => $efecto->credito === EfectoCancelacion::COBRA ? 'tardia' : null,
+            ]);
             // Aviso al alumno (no al salir de la lista de espera ni de una reserva ya vencida).
             if (in_array($estadoAnterior, [EstadoReserva::Confirmada, EstadoReserva::PendientePago], true)) {
                 $this->cancelada->reservaCancelada($bloqueada, $credito);
@@ -470,6 +497,70 @@ class ReservasTenant
 
             return $bloqueada;
         });
+    }
+
+    /**
+     * Qué pasaría con el crédito si se cancela AHORA (vista previa, fase 1 punto 1.4):
+     * "Se devolverá 1 crédito", "Se cobrará 1 crédito…", "No usa créditos". Es la misma
+     * decisión que aplica {@see cancelar()}.
+     */
+    public function efectoDeCancelar(ReservaTenant $reserva, QuienCancela $quien = QuienCancela::Cliente): EfectoCancelacion
+    {
+        $reserva->loadMissing(['sesion', 'retencion', 'asistencia', 'orden']);
+        $sesion = $reserva->sesion;
+        if (! $sesion instanceof SesionTenant) {
+            return EfectoCancelacion::noCancelable('Esta reserva ya no tiene clase.');
+        }
+
+        return $this->efecto($reserva, $sesion, $quien, self::HORAS_LIMITE_RESPALDO);
+    }
+
+    private function efecto(ReservaTenant $reserva, SesionTenant $sesion, QuienCancela $quien, int $horasLimite): EfectoCancelacion
+    {
+        if ($reserva->estado === EstadoReserva::Cancelada) {
+            return EfectoCancelacion::noCancelable('Esta reserva ya está cancelada.');
+        }
+        if ($reserva->estado === EstadoReserva::Expirada) {
+            return EfectoCancelacion::noCancelable('Esta reserva ya venció.');
+        }
+        if ($reserva->asistencia()->exists()) {
+            return EfectoCancelacion::noCancelable('Ya se registró la asistencia de esta reserva; no se puede cancelar.');
+        }
+        if ($reserva->estado === EstadoReserva::EnEspera) {
+            return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, null, null, 'Sale de la lista de espera. No usa créditos.');
+        }
+
+        $retencion = $reserva->retencion;
+        if ($retencion === null || $retencion->estado !== EstadoRetencion::Activa) {
+            $pagada = $reserva->orden !== null && $reserva->orden->estado === EstadoOrden::Pagada;
+
+            return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, null, null, $pagada
+                ? 'No usa créditos. Ya está pagada: el pago no se reembolsa automáticamente.'
+                : 'No usa créditos.');
+        }
+
+        $unidades = (int) $retencion->unidades;
+        $devuelve = 'Se devolverá '.EfectoCancelacion::creditos($unidades).'.';
+        // Rechazar un lugar ofrecido de la lista de espera nunca penaliza.
+        if ($reserva->estado === EstadoReserva::Ofrecida) {
+            return new EfectoCancelacion(true, EfectoCancelacion::DEVUELVE, $unidades, null, null, $devuelve);
+        }
+
+        // Política congelada en la reserva (R8); `$horasLimite` es solo el respaldo
+        // para reservas anteriores al snapshot.
+        $horas = (int) ($reserva->horas_limite ?? $horasLimite);
+        $limite = $sesion->inicia_en->copy()->subHours($horas);
+        $aTiempo = now()->lessThanOrEqualTo($limite);
+
+        if ($quien !== QuienCancela::Cliente) {
+            return new EfectoCancelacion(true, EfectoCancelacion::DEVUELVE, $unidades, $aTiempo, $limite, $devuelve.' Cancela el negocio: sin penalización.');
+        }
+        if ($aTiempo || ! ($reserva->penaliza_tarde ?? true)) {
+            return new EfectoCancelacion(true, EfectoCancelacion::DEVUELVE, $unidades, $aTiempo, $limite, $devuelve);
+        }
+
+        return new EfectoCancelacion(true, EfectoCancelacion::COBRA, $unidades, false, $limite,
+            'Se cobrará '.EfectoCancelacion::creditos($unidades).": se cancela con menos de {$horas} h de anticipación.");
     }
 
     /**
@@ -665,7 +756,12 @@ class ReservasTenant
                     $sesion = SesionTenant::query()->whereKey($reserva->sesion_id)->lockForUpdate()->firstOrFail();
 
                     // Venció sin pago: si el pago llega después, solo esta se puede reconfirmar.
-                    $reserva->update(['estado' => EstadoReserva::Cancelada->value, 'motivo_cancelacion' => 'vencio_pago']);
+                    $reserva->update([
+                        'estado' => EstadoReserva::Cancelada->value,
+                        'motivo_cancelacion' => 'vencio_pago',
+                        'cancelada_en' => now(),
+                        'cancelada_por' => QuienCancela::Sistema->value,
+                    ]);
                     $this->cancelarOrdenPendiente($reserva);
                     $expiradas++;
                     if ($reserva->orden_id !== null) {
@@ -712,9 +808,7 @@ class ReservasTenant
 
         if ($sesion->esCita()) {
             // Mismo punto de serialización por profesional que al agendar una cita.
-            if ($sesion->instructor_id !== null) {
-                DB::connection('tenant')->table('users')->where('id', $sesion->instructor_id)->update(['id' => DB::raw('id')]);
-            }
+            $this->agenda->bloquear($sesion->instructor_id !== null ? (int) $sesion->instructor_id : null, null);
             if ($sesion->estado !== EstadoSesionTenant::Programada
                 && $this->agenda->conflictos($sesion->instructor_id, null, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey()) !== []) {
                 return false;
@@ -727,44 +821,58 @@ class ReservasTenant
             }
         }
 
-        $bloqueada->update(['estado' => EstadoReserva::PendientePago->value, 'motivo_cancelacion' => null]);
+        $bloqueada->update([
+            'estado' => EstadoReserva::PendientePago->value,
+            'motivo_cancelacion' => null,
+            'cancelada_en' => null,
+            'cancelada_por' => null,
+            'cancelada_por_usuario_id' => null,
+        ]);
 
         return true;
     }
 
     /**
      * Cancela una sesion (cancelacion del NEGOCIO): marca la sesion como cancelada y
-     * cancela TODAS sus reservas activas (confirmadas + en espera) liberando sus holds
-     * — el credito retenido vuelve al miembro, sin penalizarlo. Atomico (bloquea la
-     * sesion) e idempotente. No promueve lista de espera: la sesion no ocurrira.
+     * cancela TODAS sus reservas activas (confirmadas, ofrecidas, en espera y por
+     * pagar) liberando sus holds: el credito retenido vuelve al miembro, sin
+     * penalizarlo. Atomico (bloquea la sesion) e idempotente. No promueve lista de
+     * espera: la sesion no ocurrira. Una clase con asistencia registrada ya ocurrió y
+     * no se cancela.
      */
-    public function cancelarSesion(SesionTenant $sesion): void
+    public function cancelarSesion(SesionTenant $sesion, ?Usuario $actor = null): void
     {
-        DB::connection('tenant')->transaction(function () use ($sesion): void {
+        DB::connection('tenant')->transaction(function () use ($sesion, $actor): void {
             $bloqueada = SesionTenant::query()->whereKey($sesion->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueada->estado === EstadoSesionTenant::Cancelada) {
                 return;
             }
+            if ($this->tieneAsistencia($bloqueada)) {
+                throw new ReservaYaAtendida('Esta clase ya tiene asistencia registrada; no se puede cancelar.');
+            }
 
             $reservas = ReservaTenant::query()
                 ->where('sesion_id', $bloqueada->getKey())
-                ->whereIn('estado', [
-                    EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
-                    EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value,
-                ])
+                ->whereIn('estado', self::ACTIVAS)
                 ->with('retencion')
                 ->lockForUpdate()
                 ->get();
 
             foreach ($reservas as $reserva) {
                 $devuelto = false;
-                if ($reserva->retencion !== null) {
+                if ($reserva->retencion !== null && $reserva->retencion->estado === EstadoRetencion::Activa) {
                     $this->creditos->liberar($reserva->retencion);
                     $devuelto = true;
                 }
 
-                $reserva->update(['estado' => EstadoReserva::Cancelada->value]);
+                $reserva->update([
+                    'estado' => EstadoReserva::Cancelada->value,
+                    'motivo_cancelacion' => 'sesion_cancelada',
+                    'cancelada_en' => now(),
+                    'cancelada_por' => QuienCancela::Negocio->value,
+                    'cancelada_por_usuario_id' => $actor?->getKey(),
+                ]);
                 $this->cancelarOrdenPendiente($reserva);
                 // Cada persona afectada recibe el aviso, con el enlace para reservar otra.
                 $this->cancelada->sesionCancelada($reserva, $devuelto);
@@ -772,6 +880,53 @@ class ReservasTenant
 
             $bloqueada->update(['estado' => EstadoSesionTenant::Cancelada->value]);
         });
+    }
+
+    /**
+     * Qué pasaría al cancelar la sesión completa (vista previa): cuántas reservas se
+     * cancelan, cuántos créditos regresan y cuántas ya estaban pagadas (ese dinero no
+     * se reembolsa solo).
+     *
+     * @return array{cancelable: bool, reservas: int, unidades: int, pagadas: int, mensaje: string}
+     */
+    public function efectoDeCancelarSesion(SesionTenant $sesion): array
+    {
+        if ($sesion->estado === EstadoSesionTenant::Cancelada) {
+            return ['cancelable' => false, 'reservas' => 0, 'unidades' => 0, 'pagadas' => 0, 'mensaje' => 'Esta sesión ya está cancelada.'];
+        }
+        if ($this->tieneAsistencia($sesion)) {
+            return ['cancelable' => false, 'reservas' => 0, 'unidades' => 0, 'pagadas' => 0, 'mensaje' => 'Esta clase ya tiene asistencia registrada; no se puede cancelar.'];
+        }
+
+        $reservas = ReservaTenant::query()
+            ->where('sesion_id', $sesion->getKey())
+            ->whereIn('estado', self::ACTIVAS)
+            ->with(['retencion', 'orden'])
+            ->get();
+        $n = $reservas->count();
+        $unidades = (int) $reservas->sum(fn (ReservaTenant $r): int => $r->retencion !== null && $r->retencion->estado === EstadoRetencion::Activa ? (int) $r->retencion->unidades : 0);
+        $pagadas = $reservas->filter(fn (ReservaTenant $r): bool => $r->orden !== null && $r->orden->estado === EstadoOrden::Pagada)->count();
+
+        if ($n === 0) {
+            $mensaje = 'No tiene reservas.';
+        } else {
+            $mensaje = ($n === 1 ? 'Se cancelará 1 reserva' : "Se cancelarán {$n} reservas")
+                .($unidades > 0 ? ($unidades === 1000 ? ' y se devolverá ' : ' y se devolverán ').EfectoCancelacion::creditos($unidades) : '')
+                .'.'
+                .($pagadas > 0 ? ($pagadas === 1
+                    ? ' 1 ya está pagada: ese pago no se reembolsa automáticamente.'
+                    : " {$pagadas} ya están pagadas: esos pagos no se reembolsan automáticamente.") : '');
+        }
+
+        return ['cancelable' => true, 'reservas' => $n, 'unidades' => $unidades, 'pagadas' => $pagadas, 'mensaje' => $mensaje];
+    }
+
+    private function tieneAsistencia(SesionTenant $sesion): bool
+    {
+        return ReservaTenant::query()
+            ->where('sesion_id', $sesion->getKey())
+            ->whereHas('asistencia')
+            ->exists();
     }
 
     /**

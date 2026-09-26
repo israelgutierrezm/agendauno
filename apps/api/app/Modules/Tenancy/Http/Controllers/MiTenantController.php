@@ -14,11 +14,13 @@ use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
 use App\Modules\Tenancy\Application\PaseAccesoTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
+use App\Modules\Tenancy\Application\PresentarMovimientosCreditoTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
+use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -35,6 +37,7 @@ use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
+use App\Modules\Tenancy\Reservas\QuienCancela;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -49,6 +52,9 @@ use Illuminate\Validation\ValidationException;
  */
 class MiTenantController
 {
+    // Movimientos de créditos que ve el alumno (los más recientes).
+    private const LIMITE_MOVIMIENTOS = 200;
+
     public function __construct(
         private readonly ReservasTenant $reservas,
         private readonly LibroMayorTenant $libro,
@@ -319,9 +325,51 @@ class MiTenantController
         $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->firstOrFail();
         abort_unless((int) $reserva->persona_id === (int) $persona->getKey(), 403, 'Esta reserva no es tuya.');
 
-        $this->reservas->cancelar($reserva);
+        $usuario = $request->attributes->get('usuario_tenant');
+        $this->reservas->cancelar($reserva, QuienCancela::Cliente, $usuario instanceof Usuario ? $usuario : null);
 
         return response()->json(['data' => $this->presentarReserva($reserva->refresh()->load('sesion.oferta'))]);
+    }
+
+    /**
+     * Vista previa de cancelar una reserva propia: qué pasará con su crédito.
+     */
+    public function previsualizarCancelacion(Request $request): JsonResponse
+    {
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 403);
+
+        $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->firstOrFail();
+        abort_unless((int) $reserva->persona_id === (int) $persona->getKey(), 403, 'Esta reserva no es tuya.');
+
+        return response()->json(['data' => $this->reservas->efectoDeCancelar($reserva, QuienCancela::Cliente)->toArray()]);
+    }
+
+    /**
+     * Movimientos de créditos de un plan propio: por qué cambió su saldo (1.4). Un plan
+     * de otra persona no existe para él (404).
+     */
+    public function movimientosDerecho(Request $request, PresentarMovimientosCreditoTenant $movimientos): JsonResponse
+    {
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 404);
+
+        $derecho = DerechoTenant::query()
+            ->where('ulid', (string) $request->route('derecho'))
+            ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))
+            ->firstOrFail();
+
+        $lista = MovimientoCreditoTenant::query()
+            ->where('derecho_id', $derecho->getKey())
+            ->orderByDesc('id')
+            ->limit(self::LIMITE_MOVIMIENTOS)
+            ->get();
+
+        return response()->json([
+            'data' => $movimientos->presentar($lista),
+            'saldo' => $derecho->ilimitado ? null : $this->libro->saldo($derecho),
+            'disponible' => $derecho->ilimitado ? null : $this->libro->disponible($derecho),
+        ]);
     }
 
     public function aceptar(Request $request): JsonResponse

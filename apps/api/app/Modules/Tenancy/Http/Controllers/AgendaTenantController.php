@@ -353,9 +353,21 @@ class AgendaTenantController
         $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
         // Cancela la sesion Y sus reservas activas, liberando los holds (el credito
         // retenido vuelve al miembro). Antes solo marcaba la sesion y dejaba holds colgados.
-        $this->reservas->cancelarSesion($sesion);
+        $usuario = $request->attributes->get('usuario_tenant');
+        $this->reservas->cancelarSesion($sesion, $usuario instanceof Usuario ? $usuario : null);
 
         return response()->json(['data' => $this->presentar($sesion->refresh()->load('oferta'))]);
+    }
+
+    /**
+     * Vista previa de cancelar la sesión completa: reservas afectadas, créditos que
+     * regresan y pagos que no se reembolsan solos.
+     */
+    public function previsualizarCancelacion(Request $request): JsonResponse
+    {
+        $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+
+        return response()->json(['data' => $this->reservas->efectoDeCancelarSesion($sesion)]);
     }
 
     /**

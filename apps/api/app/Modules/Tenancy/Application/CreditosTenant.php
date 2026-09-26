@@ -87,6 +87,19 @@ class CreditosTenant
     }
 
     /**
+     * Devuelve unidades ya consumidas (p. ej. al corregir una asistencia): asienta un
+     * reverso positivo en el ledger, trazable a su origen.
+     */
+    public function devolver(DerechoTenant $derecho, int $unidades, ?string $descripcion = null, ?ContextoMovimiento $contexto = null): MovimientoCreditoTenant
+    {
+        return DB::connection('tenant')->transaction(function () use ($derecho, $unidades, $descripcion, $contexto): MovimientoCreditoTenant {
+            $bloqueado = DerechoTenant::query()->whereKey($derecho->getKey())->lockForUpdate()->firstOrFail();
+
+            return $this->libro->registrar($bloqueado, TipoMovimiento::Reverso, $unidades, $descripcion, $contexto);
+        });
+    }
+
+    /**
      * Pierde (forfeit) una retencion: las unidades se consumen sin servicio (p. ej.
      * cancelacion tardia). Asienta el consumo y la marca perdida.
      */

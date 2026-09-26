@@ -747,3 +747,26 @@ export const corteCaja = {
     cancelacion: "Cancelación",
   },
 };
+
+// Cancelar con el efecto a la vista (fase 1, punto 1.4).
+export const cancelacion = {
+  titulo: "Cancelar",
+  porNegocio: "Cancela el negocio",
+  porCliente: "Lo pidió el cliente",
+  calculando: "Revisando qué pasa con el crédito…",
+  confirmar: "Sí, cancelar",
+  volver: "Volver",
+  canceladaPor: {
+    cliente: "la canceló el cliente",
+    negocio: "la canceló el negocio",
+    sistema: "venció sin pago",
+  },
+};
+
+// Por qué cambió el saldo de créditos (lo ve el alumno y el equipo).
+export const movimientosCredito = {
+  ver: "Ver movimientos",
+  ocultar: "Ocultar movimientos",
+  vacio: "Aún no hay movimientos.",
+  saldo: "Saldo {n}",
+};

@@ -6,6 +6,8 @@ import ListaFormularios from "@/components/ListaFormularios.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import type { FormularioPersona } from "@/lib/formularios";
 import CalificarClases from "@/components/CalificarClases.vue";
+import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
+import MovimientosCreditos from "@/components/MovimientosCreditos.vue";
 import MiPrivacidad from "@/components/MiPrivacidad.vue";
 import MisDocumentos from "@/components/MisDocumentos.vue";
 import PagoAutomatico from "@/components/PagoAutomatico.vue";
@@ -80,6 +82,9 @@ const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 const derechos = ref<Derecho[]>([]);
+// Plan cuyo historial de créditos está abierto y reserva que se está cancelando.
+const verMovimientos = ref<string | null>(null);
+const cancelando = ref<string | null>(null);
 const reservas = ref<Reserva[]>([]);
 const clases = ref<Clase[]>([]);
 const waivers = ref<Waiver[]>([]);
@@ -259,6 +264,7 @@ async function cancelar(r: Reserva): Promise<void> {
   error.value = null;
   try {
     await api.post(`${base.value}/mi/reservas/${r.id}/cancelar`, {});
+    cancelando.value = null;
     await cargar(true);
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -454,6 +460,24 @@ onMounted(() => cargar());
                 <span class="font-bold text-lg">{{
                   creditos(d.disponible)
                 }}</span>
+                <button
+                  type="button"
+                  class="tu-enlace w-full text-left text-xs"
+                  :aria-expanded="verMovimientos === d.id"
+                  @click="
+                    verMovimientos = verMovimientos === d.id ? null : d.id
+                  "
+                >
+                  {{
+                    verMovimientos === d.id
+                      ? $t("movimientosCredito.ocultar")
+                      : $t("movimientosCredito.ver")
+                  }}
+                </button>
+                <MovimientosCreditos
+                  v-if="verMovimientos === d.id"
+                  :url="`${base}/mi/derechos/${d.id}/movimientos`"
+                />
               </template>
             </li>
           </ul>
@@ -488,7 +512,7 @@ onMounted(() => cargar());
             <li
               v-for="r in reservas"
               :key="r.id"
-              class="flex items-center justify-between gap-2"
+              class="flex flex-wrap items-center justify-between gap-2"
             >
               <span class="min-w-0">
                 <span class="font-medium">{{ r.oferta ?? "—" }}</span>
@@ -542,11 +566,21 @@ onMounted(() => cargar());
                   class="tu-enlace"
                   style="color: var(--error)"
                   :disabled="accionando"
-                  @click="cancelar(r)"
+                  :aria-expanded="cancelando === r.id"
+                  @click="cancelando = cancelando === r.id ? null : r.id"
                 >
                   {{ $t("miCuenta.cancelar") }}
                 </button>
               </span>
+              <!-- Antes de cancelar: qué pasará con su crédito. -->
+              <ConfirmarCancelacion
+                v-if="cancelando === r.id"
+                class="w-full"
+                :url="`${base}/mi/reservas/${r.id}/cancelacion`"
+                :ocupado="accionando"
+                @confirmar="cancelar(r)"
+                @cerrar="cancelando = null"
+              />
             </li>
           </ul>
           <p

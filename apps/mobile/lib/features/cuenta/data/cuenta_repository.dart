@@ -233,6 +233,26 @@ class CuentaRepository {
   Future<void> cancelar(String reservaId) =>
       _dio.post<Map<String, dynamic>>('$_base/mi/reservas/$reservaId/cancelar');
 
+  /// Qué pasará con su crédito si cancela ahora.
+  Future<EfectoCancelacion> efectoDeCancelar(String reservaId) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/reservas/$reservaId/cancelacion',
+    );
+    return EfectoCancelacion.desdeJson(
+      (res.data?['data'] ?? {}) as Map<String, dynamic>,
+    );
+  }
+
+  /// Movimientos de créditos de uno de sus planes (los más recientes primero).
+  Future<List<MovimientoCredito>> movimientos(String derechoId) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/derechos/$derechoId/movimientos',
+    );
+    return ((res.data?['data'] ?? []) as List)
+        .map((e) => MovimientoCredito.desdeJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Acepta el lugar que le ofreció la lista de espera.
   Future<void> aceptarLugar(String reservaId) =>
       _dio.post<Map<String, dynamic>>('$_base/mi/reservas/$reservaId/aceptar');

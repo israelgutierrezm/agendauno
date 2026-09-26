@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\ContextoMovimiento;
 use App\Modules\Tenancy\Application\CreditosTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
+use App\Modules\Tenancy\Application\PresentarMovimientosCreditoTenant;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
@@ -28,6 +29,7 @@ class CreditosTenantController
     public function __construct(
         private readonly CreditosTenant $creditos,
         private readonly LibroMayorTenant $libro,
+        private readonly PresentarMovimientosCreditoTenant $movimientos,
     ) {}
 
     public function consumir(Request $request): JsonResponse
@@ -143,6 +145,8 @@ class CreditosTenantController
             'unidades' => $movimiento->unidades,
             'saldo_posterior' => $movimiento->saldo_posterior,
             'descripcion' => $movimiento->descripcion,
+            // Por qué cambió el saldo, en palabras (el mismo texto que ve el alumno).
+            'concepto' => $this->movimientos->concepto($movimiento),
             'referencia_tipo' => $movimiento->referencia_tipo,
             'referencia_id' => $movimiento->referencia_id,
             'actor' => $movimiento->actor_nombre,

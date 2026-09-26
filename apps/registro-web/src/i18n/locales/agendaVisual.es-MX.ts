@@ -100,7 +100,6 @@ export default {
     marcarLlegada: "Llegó",
     noAsistio: "No asistió",
     cancelar: "Cancelar cita",
-    confirmarCancelar: "¿Cancelar esta cita? El horario queda libre.",
     okLlego: "Llegada registrada.",
     okNoAsistio: "Se marcó como no asistió.",
     okCobrada: "Cita cobrada.",

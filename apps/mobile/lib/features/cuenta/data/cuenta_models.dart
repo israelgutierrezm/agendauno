@@ -6,6 +6,7 @@ import '../../../core/theme/tema_agendauno.dart';
 class DerechoMiembro {
   const DerechoMiembro({
     required this.ilimitado,
+    this.id,
     this.saldo,
     this.disponible,
     this.producto,
@@ -13,6 +14,7 @@ class DerechoMiembro {
   });
 
   final bool ilimitado;
+  final String? id;
   final int? saldo;
   final int? disponible;
   final String? producto;
@@ -25,11 +27,69 @@ class DerechoMiembro {
 
   factory DerechoMiembro.desdeJson(Map<String, dynamic> j) => DerechoMiembro(
     ilimitado: (j['ilimitado'] ?? false) as bool,
+    id: j['id'] as String?,
     saldo: j['saldo'] as int?,
     disponible: j['disponible'] as int?,
     producto: j['producto'] as String?,
     pausaHasta: j['pausa_hasta'] as String?,
   );
+}
+
+/// Qué pasará con su crédito si cancela ahora (vista previa del negocio).
+class EfectoCancelacion {
+  const EfectoCancelacion({required this.cancelable, required this.mensaje});
+
+  final bool cancelable;
+  final String mensaje;
+
+  factory EfectoCancelacion.desdeJson(Map<String, dynamic> j) =>
+      EfectoCancelacion(
+        cancelable: (j['cancelable'] ?? false) as bool,
+        mensaje: (j['mensaje'] ?? '') as String,
+      );
+}
+
+/// Un movimiento de sus créditos: por qué cambió el saldo.
+class MovimientoCredito {
+  const MovimientoCredito({
+    required this.id,
+    required this.concepto,
+    required this.unidades,
+    required this.saldoPosterior,
+    this.fecha,
+    this.clase,
+    this.claseIniciaEn,
+  });
+
+  final String id;
+  final String concepto;
+  final int unidades;
+  final int saldoPosterior;
+  final String? fecha;
+  final String? clase;
+  final String? claseIniciaEn;
+
+  /// "+8", "-1", "-0.5" (1 crédito = 1000 unidades).
+  static String creditos(int unidades, {bool conSigno = true}) {
+    final n = unidades / 1000;
+    final texto = n == n.roundToDouble()
+        ? n.round().toString()
+        : n.toStringAsFixed(1);
+    return conSigno && n > 0 ? '+$texto' : texto;
+  }
+
+  factory MovimientoCredito.desdeJson(Map<String, dynamic> j) {
+    final clase = j['clase'] as Map<String, dynamic>?;
+    return MovimientoCredito(
+      id: (j['id'] ?? '') as String,
+      concepto: (j['concepto'] ?? '') as String,
+      unidades: (j['unidades'] ?? 0) as int,
+      saldoPosterior: (j['saldo_posterior'] ?? 0) as int,
+      fecha: j['fecha'] as String?,
+      clase: clase?['nombre'] as String?,
+      claseIniciaEn: clase?['inicia_en'] as String?,
+    );
+  }
 }
 
 class ReservaMiembro {

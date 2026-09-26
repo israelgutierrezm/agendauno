@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -158,8 +159,16 @@ function marcar(r: Reserva, estado: "presente" | "ausente"): Promise<void> {
 function aceptar(r: Reserva): Promise<void> {
   return accion(() => api.post(`${base.value}/reservas/${r.id}/aceptar`, {}));
 }
-function cancelar(r: Reserva): Promise<void> {
-  return accion(() => api.post(`${base.value}/reservas/${r.id}/cancelar`, {}));
+// Reserva cuya cancelación se está confirmando (con su efecto a la vista).
+const cancelando = ref<string | null>(null);
+async function cancelar(
+  r: Reserva,
+  por: "cliente" | "negocio" | null = null,
+): Promise<void> {
+  await accion(() =>
+    api.post(`${base.value}/reservas/${r.id}/cancelar`, por ? { por } : {}),
+  );
+  cancelando.value = null;
 }
 
 async function promover(): Promise<void> {
@@ -436,17 +445,27 @@ watch(() => props.sesion.id, cargar, { immediate: true });
                 {{ $t("recepcion.panel.noVino") }}
               </button>
             </template>
+            <!-- Con asistencia ya no se cancela (se corrige con Llegó / No vino). -->
             <button
-              v-if="puedeGestionar"
+              v-if="puedeGestionar && !r.asistencia"
               type="button"
               class="tu-enlace text-xs ml-auto"
               style="color: var(--error)"
               :disabled="accionando"
-              @click="cancelar(r)"
+              :aria-expanded="cancelando === r.id"
+              @click="cancelando = cancelando === r.id ? null : r.id"
             >
               {{ $t("agenda.roster.cancelarReserva") }}
             </button>
           </div>
+          <ConfirmarCancelacion
+            v-if="cancelando === r.id"
+            :url="`${base}/reservas/${r.id}/cancelacion`"
+            con-quien
+            :ocupado="accionando"
+            @confirmar="(por) => cancelar(r, por)"
+            @cerrar="cancelando = null"
+          />
         </li>
       </ul>
 

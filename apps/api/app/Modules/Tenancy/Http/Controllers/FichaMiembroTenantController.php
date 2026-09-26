@@ -124,6 +124,8 @@ class FichaMiembroTenantController
             'zona_horaria' => $reserva->sesion?->zona_horaria,
             'estado' => $reserva->estado->value,
             'asistencia' => $reserva->asistencia?->estado?->value,
+            // Quién canceló (cliente, negocio o sistema), si se canceló.
+            'cancelada_por' => $reserva->cancelada_por,
         ])->all();
     }
 

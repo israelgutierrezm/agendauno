@@ -13,6 +13,7 @@ import '../data/cuenta_repository.dart';
 import 'agendar_cita_sheet.dart';
 import 'mi_privacidad_screen.dart';
 import 'mis_documentos_screen.dart';
+import 'movimientos_sheet.dart';
 import 'pago_automatico_screen.dart';
 import 'pase_sheet.dart';
 
@@ -200,6 +201,58 @@ Future<void> hacerConAviso(
   }
 }
 
+/// Antes de cancelar muestra qué pasará con su crédito (según la política del
+/// negocio) y pide confirmación.
+Future<void> confirmarCancelacion(
+  BuildContext context,
+  WidgetRef ref,
+  String reservaId,
+) async {
+  final repo = ref.read(cuentaRepositoryProvider);
+  if (repo == null) {
+    return;
+  }
+  EfectoCancelacion efecto;
+  try {
+    efecto = await repo.efectoDeCancelar(reservaId);
+  } on DioException {
+    efecto = const EfectoCancelacion(
+      cancelable: true,
+      mensaje: '¿Cancelar esta reserva?',
+    );
+  }
+  if (!context.mounted) {
+    return;
+  }
+  final confirmada = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Cancelar reserva'),
+      content: Text(efecto.mensaje),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Volver'),
+        ),
+        if (efecto.cancelable)
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: TemaAgendaUno.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sí, cancelar'),
+          ),
+      ],
+    ),
+  );
+  if (confirmada != true || !context.mounted) {
+    return;
+  }
+  await hacerConAviso(
+    context,
+    () => ref.read(cuentaProvider.notifier).cancelar(reservaId),
+    exito: 'Reserva cancelada.',
+  );
+}
+
 class _Consentimiento extends ConsumerWidget {
   const _Consentimiento(this.c);
 
@@ -267,6 +320,18 @@ class _Creditos extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+                    // Por qué cambió su saldo.
+                    if (!d.ilimitado && d.id != null)
+                      TextButton(
+                        style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                        onPressed: () => showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          showDragHandle: true,
+                          builder: (_) => MovimientosSheet(derechoId: d.id!),
+                        ),
+                        child: const Text('Ver movimientos'),
+                      ),
                   ],
                 ),
               )
@@ -349,11 +414,7 @@ class _Reserva extends ConsumerWidget {
                   style: TextButton.styleFrom(
                     foregroundColor: TemaAgendaUno.error,
                   ),
-                  onPressed: () => hacerConAviso(
-                    context,
-                    () => notifier.cancelar(r.id),
-                    exito: 'Reserva cancelada.',
-                  ),
+                  onPressed: () => confirmarCancelacion(context, ref, r.id),
                   child: const Text('Cancelar'),
                 ),
               ],

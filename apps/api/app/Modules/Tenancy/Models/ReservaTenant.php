@@ -26,7 +26,7 @@ class ReservaTenant extends Model
         'sesion_id', 'persona_id', 'derecho_id', 'retencion_id', 'orden_id',
         'estado', 'canal', 'lugar', 'unidades', 'costo_unidades', 'idempotency_key',
         'horas_limite', 'penaliza_tarde', 'penaliza_no_show', 'oferta_expira_en',
-        'motivo_cancelacion',
+        'motivo_cancelacion', 'cancelada_en', 'cancelada_por', 'cancelada_por_usuario_id',
     ];
 
     /**
@@ -41,6 +41,7 @@ class ReservaTenant extends Model
         'penaliza_tarde' => 'boolean',
         'penaliza_no_show' => 'boolean',
         'oferta_expira_en' => 'datetime',
+        'cancelada_en' => 'datetime',
         'recordatorio_24h_en' => 'datetime',
         'recordatorio_2h_en' => 'datetime',
     ];

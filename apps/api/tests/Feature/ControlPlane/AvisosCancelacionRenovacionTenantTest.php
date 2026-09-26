@@ -94,7 +94,8 @@ it('al cancelar su reserva el alumno recibe el aviso con lo que pasó con su cr�
     $reserva = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$otra}/reservas", ['persona_id' => $bea], conBearer($e['bearer']))
         ->assertCreated()->json('data.id');
     $this->travelTo('2026-10-02 13:30:00');
-    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/cancelar", [], conBearer($e['bearer']))->assertOk();
+    // Recepción cancela a petición del cliente: aplica su política.
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/cancelar", ['por' => 'cliente'], conBearer($e['bearer']))->assertOk();
 
     $correos = correosQueEmpiezan($e, 'Cancelada:');
     expect($correos)->toHaveCount(2)

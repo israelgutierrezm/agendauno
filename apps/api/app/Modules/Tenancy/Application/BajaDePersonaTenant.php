@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Models\RespuestaFormulario;
 use App\Modules\Tenancy\Models\SolicitudPrivacidadTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
+use App\Modules\Tenancy\Reservas\QuienCancela;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -99,7 +100,7 @@ class BajaDePersonaTenant
             ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::EnEspera->value, EstadoReserva::Ofrecida->value, EstadoReserva::PendientePago->value])
             ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
             ->get()
-            ->each(fn (ReservaTenant $r) => $this->reservas->cancelar($r));
+            ->each(fn (ReservaTenant $r) => $this->reservas->cancelar($r, QuienCancela::Negocio, $actor));
 
         $archivos = [];
         DB::connection('tenant')->transaction(function () use ($persona, $solicitud, $actor, &$archivos): void {

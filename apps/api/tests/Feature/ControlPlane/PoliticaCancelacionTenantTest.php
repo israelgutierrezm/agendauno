@@ -70,7 +70,8 @@ it('con penaliza_tarde=true una cancelacion tardia consume el credito', function
     $reserva = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $vp['persona']], conBearer($e['bearer']))
         ->assertCreated()->json('data.id');
 
-    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/cancelar", [], conBearer($e['bearer']))->assertOk();
+    // A petición del cliente (si cancela el negocio, nunca se penaliza).
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/cancelar", ['por' => 'cliente'], conBearer($e['bearer']))->assertOk();
 
     // Tardia y penalizada: el credito se consume (1000 = 1 sesion).
     expect(saldosDerechoPolitica($e, $vp['persona']))->toBe(['saldo' => 7000, 'disponible' => 7000]);
@@ -131,7 +132,7 @@ it('la reserva usa el snapshot de la politica: cambiarla despues no afecta reser
     // Se ablanda la politica DESPUES de reservar.
     configurarPoliticaCancelacion($e, ['horas_limite' => 720, 'penaliza_tarde' => false, 'penaliza_no_show' => true]);
 
-    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/cancelar", [], conBearer($e['bearer']))->assertOk();
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/cancelar", ['por' => 'cliente'], conBearer($e['bearer']))->assertOk();
 
     // Se aplica el snapshot (penalizaba) y no la config nueva: credito consumido.
     expect(saldosDerechoPolitica($e, $vp['persona']))->toBe(['saldo' => 7000, 'disponible' => 7000]);

@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import AgendaClasesSemana from "@/components/AgendaClasesSemana.vue";
 import AgendaKpis from "@/components/AgendaKpis.vue";
 import AgendaProfesionales from "@/components/AgendaProfesionales.vue";
+import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PanelCita from "@/components/PanelCita.vue";
@@ -949,14 +950,22 @@ async function aceptar(reservaId: string, sesionId: string): Promise<void> {
     accionando.value = false;
   }
 }
+// Cancelaciones que se están confirmando (con su efecto a la vista).
+const cancelandoReserva = ref<string | null>(null);
+const cancelandoSesion = ref(false);
 async function cancelarReserva(
   reservaId: string,
   sesionId: string,
+  por: "cliente" | "negocio" | null = null,
 ): Promise<void> {
   accionando.value = true;
   error.value = null;
   try {
-    await api.post(`${base.value}/reservas/${reservaId}/cancelar`, {});
+    await api.post(
+      `${base.value}/reservas/${reservaId}/cancelar`,
+      por ? { por } : {},
+    );
+    cancelandoReserva.value = null;
     await refrescarTras(sesionId);
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -990,6 +999,7 @@ async function cancelarSesion(id: string): Promise<void> {
   error.value = null;
   try {
     await api.post(`${base.value}/sesiones/${id}/cancelar`, {});
+    cancelandoSesion.value = false;
     cerrarDetalle();
     await cargarSesiones();
   } catch (e) {
@@ -1898,11 +1908,17 @@ onMounted(async () => {
                     {{ $t("agenda.roster.transferir") }}
                   </button>
                   <button
-                    v-if="puedeReservar && r.estado !== 'cancelada'"
+                    v-if="
+                      puedeReservar && r.estado !== 'cancelada' && !r.asistencia
+                    "
                     class="tu-enlace"
                     style="color: var(--error)"
                     :disabled="accionando"
-                    @click="cancelarReserva(r.id, detalle.id)"
+                    :aria-expanded="cancelandoReserva === r.id"
+                    @click="
+                      cancelandoReserva =
+                        cancelandoReserva === r.id ? null : r.id
+                    "
                   >
                     {{ $t("agenda.roster.cancelarReserva") }}
                   </button>
@@ -1949,6 +1965,14 @@ onMounted(async () => {
                   {{ $t("comun.cancelar") }}
                 </button>
               </form>
+              <ConfirmarCancelacion
+                v-if="cancelandoReserva === r.id"
+                :url="`${base}/reservas/${r.id}/cancelacion`"
+                con-quien
+                :ocupado="accionando"
+                @confirmar="(por) => cancelarReserva(r.id, detalle!.id, por)"
+                @cerrar="cancelandoReserva = null"
+              />
             </li>
           </ul>
         </div>
@@ -2294,10 +2318,19 @@ onMounted(async () => {
             class="tu-enlace text-sm"
             style="color: var(--error)"
             :disabled="accionando"
-            @click="cancelarSesion(detalle.id)"
+            :aria-expanded="cancelandoSesion"
+            @click="cancelandoSesion = !cancelandoSesion"
           >
             {{ $t("agenda.sesion.cancelar") }}
           </button>
+          <!-- Antes: cuántas reservas se cancelan y cuántos créditos regresan. -->
+          <ConfirmarCancelacion
+            v-if="cancelandoSesion"
+            :url="`${base}/sesiones/${detalle.id}/cancelacion`"
+            :ocupado="accionando"
+            @confirmar="cancelarSesion(detalle!.id)"
+            @cerrar="cancelandoSesion = false"
+          />
         </div>
       </aside>
     </div>

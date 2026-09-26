@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SolicitudPrivacidadTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
+use App\Modules\Tenancy\Reservas\QuienCancela;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -58,7 +59,7 @@ class BajasTenant
             ])
             ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', now()))
             ->get()
-            ->each(fn (ReservaTenant $r) => $this->reservas->cancelar($r, 0));
+            ->each(fn (ReservaTenant $r) => $this->reservas->cancelar($r, QuienCancela::Negocio, $actor));
 
         $vigentes = AcuerdoTenant::query()
             ->where('persona_id', $persona->getKey())

@@ -16,6 +16,7 @@ use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Reservas\CanalReserva;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
+use App\Modules\Tenancy\Reservas\QuienCancela;
 use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -198,13 +199,37 @@ class ReservasTenantController
         return response()->json(['data' => $decision->aArreglo()]);
     }
 
+    /**
+     * Cancela una reserva desde el negocio. `por`: `negocio` (por defecto; el crédito
+     * regresa sin penalización) o `cliente` (lo pidió el cliente; aplica su política).
+     */
     public function cancelar(Request $request): JsonResponse
     {
         $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->firstOrFail();
+        $usuario = $request->attributes->get('usuario_tenant');
 
-        $this->reservas->cancelar($reserva);
+        $this->reservas->cancelar($reserva, $this->quienCancela($request), $usuario instanceof Usuario ? $usuario : null);
 
         return response()->json(['data' => $this->presentar($reserva->refresh())]);
+    }
+
+    /**
+     * Vista previa: qué pasará con el crédito si se cancela ahora (con el mismo `por`).
+     */
+    public function previsualizarCancelacion(Request $request): JsonResponse
+    {
+        $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->firstOrFail();
+
+        return response()->json(['data' => $this->reservas->efectoDeCancelar($reserva, $this->quienCancela($request))->toArray()]);
+    }
+
+    private function quienCancela(Request $request): QuienCancela
+    {
+        $validado = $request->validate([
+            'por' => ['nullable', Rule::in([QuienCancela::Cliente->value, QuienCancela::Negocio->value])],
+        ]);
+
+        return QuienCancela::from((string) ($validado['por'] ?? QuienCancela::Negocio->value));
     }
 
     public function aceptar(Request $request): JsonResponse

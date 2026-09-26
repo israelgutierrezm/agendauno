@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import {
   aHora,
@@ -148,15 +149,23 @@ function cobrar(): void {
     t("agendaVisual.cita.okCobrada"),
   );
 }
-function cancelar(): void {
+// Confirmación en línea con el efecto a la vista (quién cancela y qué pasa).
+const cancelando = ref(false);
+function cancelar(por: "cliente" | "negocio" | null): void {
   const c = cita.value;
-  if (c === null || !window.confirm(t("agendaVisual.cita.confirmarCancelar"))) {
+  if (c === null) {
     return;
   }
   void accion(
-    () => api.post(`${props.base}/reservas/${c.reserva_id}/cancelar`, {}),
+    () =>
+      api.post(
+        `${props.base}/reservas/${c.reserva_id}/cancelar`,
+        por ? { por } : {},
+      ),
     t("agendaVisual.cita.okCancelada"),
-  );
+  ).then(() => {
+    cancelando.value = false;
+  });
 }
 </script>
 
@@ -264,10 +273,19 @@ function cancelar(): void {
           class="tu-btn tu-btn-fantasma w-full"
           style="color: var(--error)"
           :disabled="accionando"
-          @click="cancelar"
+          :aria-expanded="cancelando"
+          @click="cancelando = !cancelando"
         >
           {{ $t("agendaVisual.cita.cancelar") }}
         </button>
+        <ConfirmarCancelacion
+          v-if="cancelando && cita !== null"
+          :url="`${base}/reservas/${cita.reserva_id}/cancelacion`"
+          con-quien
+          :ocupado="accionando"
+          @confirmar="cancelar"
+          @cerrar="cancelando = false"
+        />
       </div>
     </div>
   </PanelLateral>

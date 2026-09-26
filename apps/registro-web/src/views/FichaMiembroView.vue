@@ -54,6 +54,9 @@ interface Movimiento {
   unidades: number;
   saldo_posterior: number;
   descripcion: string | null;
+  // Por qué cambió el saldo, en palabras ("Asistencia", "Cancelación tardía"…).
+  concepto?: string;
+  origen?: string | null;
   actor: string | null;
   fecha: string | null;
 }
@@ -64,6 +67,7 @@ interface Reserva {
   zona_horaria: string | null;
   estado: string;
   asistencia: string | null;
+  cancelada_por?: "cliente" | "negocio" | "sistema" | null;
 }
 interface Orden {
   id: string;
@@ -652,13 +656,16 @@ watch(personaId, cargar, { immediate: true });
                       >
                         <span class="min-w-0">
                           <span class="block font-medium">{{
-                            $t(`creditosFicha.tipos.${m.tipo}`)
+                            m.concepto ?? $t(`creditosFicha.tipos.${m.tipo}`)
                           }}</span>
                           <span
                             class="block truncate"
                             :style="{ color: 'var(--texto-suave)' }"
                             >{{ fecha(m.fecha) }}
-                            <template v-if="m.descripcion">
+                            <!-- La nota solo en ajustes a mano (el resto ya lo dice el concepto). -->
+                            <template
+                              v-if="m.descripcion && m.origen === 'ajuste'"
+                            >
                               · {{ m.descripcion }}</template
                             >
                             <template v-if="m.actor">
@@ -733,9 +740,13 @@ watch(personaId, cargar, { immediate: true });
                       v-else
                       class="text-xs shrink-0"
                       :style="{ color: 'var(--texto-suave)' }"
-                      >{{
-                        $t(`agenda.roster.${r.asistencia ?? r.estado}`)
-                      }}</span
+                      >{{ $t(`agenda.roster.${r.asistencia ?? r.estado}`)
+                      }}<template v-if="r.cancelada_por">
+                        ·
+                        {{
+                          $t(`cancelacion.canceladaPor.${r.cancelada_por}`)
+                        }}</template
+                      ></span
                     >
                   </li>
                 </ul>
