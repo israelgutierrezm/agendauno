@@ -50,9 +50,10 @@ Schedule::command('turnouno:cobrar-suscripciones')->dailyAt('00:45')->withoutOve
 // cómo se paga; a quien paga a mano le abre la renovación para pagarla por adelantado.
 Schedule::command('turnouno:avisar-renovaciones')->dailyAt('15:00')->withoutOverlapping();
 
-// Cobro del SaaS mes vencido (ADR 0019): el día 1 se congela la medición del mes que
-// cerró (alumnos o profesionales activos según la modalidad) y se genera su cargo.
-Schedule::command('turnouno:generar-cargos-renta')->monthlyOn(1, '02:00')->withoutOverlapping();
+// Cobro del SaaS mes vencido (ADR 0019 y 0032): a diario a las 02:00 de CDMX se emiten
+// los cargos de los meses que ya cerraron en la zona de cada negocio (congelando su
+// medición); un cargo emitido no se vuelve a calcular, así que solo emite los que falten.
+Schedule::command('turnouno:generar-cargos-renta')->dailyAt('08:00')->withoutOverlapping();
 
 // Respalda la base de cada negocio y borra los respaldos viejos (retención).
 Schedule::command('turnouno:respaldar-estudios')->dailyAt('03:15')->withoutOverlapping();

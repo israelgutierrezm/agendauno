@@ -11,13 +11,20 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\TarifaSaas;
 use App\Modules\Tenancy\ModoCobroSaas;
 use Carbon\CarbonImmutable;
+use DomainException;
 
 /**
- * Genera (o actualiza) el cargo de renta del SaaS de un estudio para un periodo, MES
- * VENCIDO (ADR 0019): un periodo ya cerrado se factura con su medición CONGELADA; el
- * monto sale de la tarifa vigente de su modalidad (o de la cuota fija que pactó la
- * plataforma), sin cobrar los días de prueba gratis. Un periodo sin nada que cobrar
- * queda como `sin_cargo`. Idempotente por (estudio, periodo); no pisa un cargo pagado.
+ * Emite el cargo de renta del SaaS de un estudio para un periodo, MES VENCIDO (ADR
+ * 0019 y 0032):
+ *
+ * - solo cuando el mes ya cerró en la zona horaria del negocio (antes, lo que hay es
+ *   la estimación del apartado de renta); su medición se CONGELA;
+ * - con la tarifa vigente al cierre de ESE mes (no la de hoy), o la cuota fija pactada,
+ *   sin cobrar los días de prueba gratis;
+ * - guarda con qué se calculó (medición, regla, tarifa) y cuándo se emitió;
+ * - una vez emitido NO se recalcula: volver a correr el proceso no lo cambia aunque
+ *   después cambien la tarifa, la prueba o la medición. Idempotente por (estudio,
+ *   periodo). Un periodo sin nada que cobrar queda `sin_cargo`.
  *
  * @phpstan-import-type Desglose from CalcularRentaSaas
  */
@@ -28,55 +35,67 @@ class GenerarCargoRenta
         private readonly CalcularRentaSaas $calcular,
     ) {}
 
+    /**
+     * ¿El periodo (YYYY-MM) ya terminó en la zona horaria del negocio?
+     */
+    public function cerrado(Estudio $estudio, string $periodo): bool
+    {
+        return $periodo < CarbonImmutable::now(self::zona($estudio))->format('Y-m');
+    }
+
     public function paraEstudio(Estudio $estudio, string $periodo): CargoRenta
     {
         $existente = CargoRenta::query()
             ->where('estudio_id', $estudio->getKey())
             ->where('periodo', $periodo)
             ->first();
-
-        // Un cargo ya pagado no se re-genera.
-        if ($existente !== null && $existente->estado === EstadoCargoRenta::Pagado) {
+        // Un cargo emitido no se recalcula.
+        if ($existente instanceof CargoRenta) {
             return $existente;
         }
+        if (! $this->cerrado($estudio, $periodo)) {
+            throw new DomainException("El periodo {$periodo} aún no cierra para este negocio: por ahora solo hay una estimación.");
+        }
 
-        // Periodo cerrado → se congela su medición (lo facturado no cambia después).
-        $cerrado = $periodo < CarbonImmutable::now((string) ($estudio->zona_horaria ?: 'UTC'))->format('Y-m');
-        $medicion = $cerrado ? $this->medir->congelar($estudio, $periodo) : $this->medir->ejecutar($estudio, $periodo);
+        $medicion = $this->medir->congelar($estudio, $periodo);
+        $finDelPeriodo = CarbonImmutable::createFromFormat('Y-m-d', $periodo.'-01', self::zona($estudio))?->endOfMonth();
+        [$desglose, $version] = $this->cotizar($estudio, $medicion->metrica, $medicion->cantidad, $medicion->detalle ?? [], $periodo, $finDelPeriodo);
 
-        [$desglose, $version] = $this->cotizar($estudio, $medicion->metrica, $medicion->cantidad, $medicion->detalle ?? [], $periodo);
-
-        return CargoRenta::query()->updateOrCreate(
+        return CargoRenta::query()->firstOrCreate(
             ['estudio_id' => $estudio->getKey(), 'periodo' => $periodo],
             [
                 'modo_cobro' => $estudio->modo_cobro->value,
                 'metrica' => $medicion->metrica,
                 'alumnos_activos' => $medicion->cantidad,
+                'medicion_id' => $medicion->getKey(),
+                'regla_version' => $medicion->regla_version,
                 'tarifa_version' => $version,
                 'desglose' => $desglose,
                 'monto_minor' => $desglose['total_minor'],
                 'moneda' => $estudio->moneda,
                 'estado' => $desglose['total_minor'] > 0 ? EstadoCargoRenta::Pendiente->value : EstadoCargoRenta::SinCargo->value,
                 'vence_en' => CarbonImmutable::createFromFormat('Y-m-d', $periodo.'-01')?->endOfMonth()->addDays(10)->toDateString(),
+                'emitido_en' => now(),
             ],
         );
     }
 
     /**
      * Cotiza un periodo a partir de un uso (medido o estimado): desglose del cargo y
-     * versión de la tarifa aplicada (null con cuota fija).
+     * versión de la tarifa aplicada (null con cuota fija). La tarifa es la vigente en
+     * `$tarifaAl` (el cierre del periodo al emitir el cargo; ahora, al estimar).
      *
      * @param  array<string, mixed>  $detalle
      * @return array{0: Desglose, 1: int|null}
      */
-    public function cotizar(Estudio $estudio, string $metrica, int $cantidad, array $detalle, string $periodo): array
+    public function cotizar(Estudio $estudio, string $metrica, int $cantidad, array $detalle, string $periodo, ?CarbonImmutable $tarifaAl = null): array
     {
         if ($estudio->modo_cobro === ModoCobroSaas::Fijo) {
             $desglose = $this->calcular->fija((int) $estudio->cuota_fija_minor);
             $version = null;
         } else {
             $modalidad = $metrica === ModalidadServicio::Citas->metrica() ? ModalidadServicio::Citas : ModalidadServicio::Clases;
-            $tarifa = TarifaSaas::vigente($modalidad);
+            $tarifa = TarifaSaas::vigenteEn($modalidad, $tarifaAl ?? CarbonImmutable::now());
             $definicion = $tarifa->definicion ?? [];
             $desglose = $modalidad === ModalidadServicio::Citas
                 ? $this->calcular->citas($definicion, (int) ($detalle['fte_milesimas'] ?? $cantidad * 1000), (int) ($detalle['personas_fuera_de_cita'] ?? 0))
@@ -114,5 +133,10 @@ class GenerarCargoRenta
         }
 
         return [(int) $desde->diffInDays($fin) + 1, $dias];
+    }
+
+    private static function zona(Estudio $estudio): string
+    {
+        return (string) ($estudio->zona_horaria ?: 'UTC');
     }
 }

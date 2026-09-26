@@ -27,6 +27,7 @@ class CargoRenta extends Model
     protected $fillable = [
         'estudio_id', 'periodo', 'modo_cobro', 'metrica', 'alumnos_activos', 'tarifa_version', 'desglose', 'monto_minor',
         'moneda', 'estado', 'vence_en', 'pagado_en', 'metodo_pago', 'referencia_pago',
+        'medicion_id', 'regla_version', 'emitido_en',
     ];
 
     /**
@@ -55,6 +56,7 @@ class CargoRenta extends Model
         'monto_minor' => 'integer',
         'vence_en' => 'date',
         'pagado_en' => 'datetime',
+        'emitido_en' => 'datetime',
     ];
 
     /**

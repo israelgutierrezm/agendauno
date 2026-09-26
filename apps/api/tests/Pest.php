@@ -6,7 +6,6 @@ use App\Modules\Tenancy\Integraciones\ResolvedorDns;
 use App\Modules\Tenancy\Mail\CorreoConfirmarRegistro;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -260,8 +259,8 @@ function conPlataforma(string $token = 'token-plataforma'): array
 }
 
 /**
- * Pone cuota fija al estudio, genera el cargo de renta del periodo actual y devuelve
- * su ulid (control plane). Requiere el token de plataforma configurado.
+ * Pone cuota fija al estudio, cierra el mes y emite su cargo de renta; devuelve su
+ * ulid (control plane). Requiere el token de plataforma configurado.
  *
  * @param  array{slug: string, bearer: string}  $e
  */
@@ -274,8 +273,7 @@ function cargoRentaPendiente(array $e): string
         'modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900,
     ], conPlataforma())->assertOk();
 
-    $periodo = Carbon::now()->format('Y-m');
-    test()->artisan('turnouno:generar-cargos-renta', ['--periodo' => $periodo])->assertSuccessful();
+    emitirCargoDelMesEnCurso();
 
     return (string) test()->getJson('/api/v1/app/'.$e['slug'].'/renta', conBearer($e['bearer']))
         ->assertOk()->json('data.cargos.0.id');
@@ -428,4 +426,17 @@ function tokenDeRegistro(string $email): string
     });
 
     return $token;
+}
+
+/**
+ * Cierra el mes en curso (viaja al día 1 del siguiente, a mediodía de CDMX) y emite su
+ * cargo de renta: el cargo solo existe para meses cerrados. Devuelve el periodo.
+ */
+function emitirCargoDelMesEnCurso(): string
+{
+    $periodo = now('America/Mexico_City')->format('Y-m');
+    test()->travelTo(now('America/Mexico_City')->addMonthNoOverflow()->startOfMonth()->setTime(12, 0));
+    test()->artisan('turnouno:generar-cargos-renta', ['--periodo' => $periodo])->assertSuccessful();
+
+    return $periodo;
 }

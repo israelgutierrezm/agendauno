@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Support\Concerns\HasPublicId;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
@@ -53,6 +54,21 @@ class TarifaSaas extends Model
             ->where('vigente_desde', '<=', now())
             ->orderByDesc('version')
             ->first();
+    }
+
+    /**
+     * Tarifa de una modalidad vigente en un momento dado (p. ej. al cierre del mes que
+     * se cobra): una versión publicada después no cambia lo de meses anteriores. Antes
+     * de la primera versión publicada rige la primera.
+     */
+    public static function vigenteEn(ModalidadServicio $modalidad, CarbonInterface $momento): ?self
+    {
+        return static::query()
+            ->where('modalidad', $modalidad->value)
+            ->where('vigente_desde', '<=', $momento)
+            ->orderByDesc('version')
+            ->first()
+            ?? static::query()->where('modalidad', $modalidad->value)->orderBy('version')->first();
     }
 
     /**

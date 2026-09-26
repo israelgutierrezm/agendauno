@@ -80,6 +80,9 @@ class FacturacionController
                     'cantidad' => $c->alumnos_activos,
                     'alumnos_activos' => $c->alumnos_activos,
                     'tarifa_version' => $c->tarifa_version,
+                    // Con qué se calculó y cuándo se emitió (no cambia después).
+                    'regla' => $c->regla_version,
+                    'emitido_en' => $c->emitido_en?->toIso8601String(),
                     'desglose' => $c->desglose,
                     'monto_minor' => $c->monto_minor,
                     'moneda' => $c->moneda,

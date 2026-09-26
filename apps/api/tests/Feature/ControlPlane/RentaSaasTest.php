@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\CargoRenta;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -31,8 +30,7 @@ it('el comando genera el cargo de renta y el dueño lo ve en su apartado', funct
         'modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900,
     ], conPlataforma())->assertOk();
 
-    $periodo = Carbon::now()->format('Y-m');
-    $this->artisan('turnouno:generar-cargos-renta', ['--periodo' => $periodo])->assertSuccessful();
+    $periodo = emitirCargoDelMesEnCurso();
 
     $this->getJson("/api/v1/app/{$e['slug']}/renta", conBearer($e['bearer']))
         ->assertOk()
@@ -46,9 +44,7 @@ it('el comando genera el cargo de renta y el dueño lo ve en su apartado', funct
 it('la generación es idempotente: no duplica el cargo del periodo', function (): void {
     Config::set('turnouno.plataforma.token', 'token-plataforma');
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    $periodo = Carbon::now()->format('Y-m');
-
-    $this->artisan('turnouno:generar-cargos-renta', ['--periodo' => $periodo])->assertSuccessful();
+    $periodo = emitirCargoDelMesEnCurso();
     $this->artisan('turnouno:generar-cargos-renta', ['--periodo' => $periodo])->assertSuccessful();
 
     $this->getJson("/api/v1/app/{$e['slug']}/renta", conBearer($e['bearer']))

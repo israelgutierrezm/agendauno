@@ -60,7 +60,7 @@ it('clases: cobra la banda de alumnos activos del mes con IVA', function (): voi
     }
     crearMiembroTenant($e, 'Sin actividad');
 
-    $this->artisan('turnouno:generar-cargos-renta', ['--periodo' => periodoHoy()])->assertSuccessful();
+    emitirCargoDelMesEnCurso();
     $cargo = rentaDe($e)['cargos'][0];
 
     expect($cargo['metrica'])->toBe('alumnos_activos')
@@ -95,7 +95,7 @@ it('citas: cobra por profesional activo, con medio tiempo a 0.5', function (): v
         ],
     ], conBearer($e['bearer']))->assertCreated();
 
-    $this->artisan('turnouno:generar-cargos-renta', ['--periodo' => periodoHoy()])->assertSuccessful();
+    $periodo = emitirCargoDelMesEnCurso();
     $cargo = rentaDe($e)['cargos'][0];
 
     // 1º completo ($269) + 2º a medio tiempo (0.5 × $226).
@@ -104,7 +104,7 @@ it('citas: cobra por profesional activo, con medio tiempo a 0.5', function (): v
         ->and($cargo['desglose']['subtotal_minor'])->toBe(26900 + 11300);
 
     // Transparencia: el dueño ve quién cuenta y quién es medio tiempo.
-    $quien = $this->getJson("/api/v1/app/{$e['slug']}/renta/quien-cuenta", conBearer($e['bearer']))->assertOk()->json('data');
+    $quien = $this->getJson("/api/v1/app/{$e['slug']}/renta/quien-cuenta?periodo={$periodo}", conBearer($e['bearer']))->assertOk()->json('data');
     expect($quien['metrica'])->toBe('profesionales_activos')
         ->and($quien['quienes'])->toHaveCount(2)
         ->and(collect($quien['quienes'])->where('medio_tiempo', true))->toHaveCount(1)
@@ -142,7 +142,7 @@ it('un mes sin actividad queda sin cargo y no se puede pagar', function (): void
     terminarPrueba($e);
     activarStripePlataforma();
 
-    $this->artisan('turnouno:generar-cargos-renta', ['--periodo' => periodoHoy()])->assertSuccessful();
+    emitirCargoDelMesEnCurso();
     $cargo = rentaDe($e)['cargos'][0];
 
     expect($cargo['estado'])->toBe('sin_cargo')->and($cargo['monto_minor'])->toBe(0);
@@ -159,7 +159,7 @@ it('no se cobran los días de prueba gratis: el mes en que termina se prorratea'
     Estudio::query()->where('slug', $e['slug'])->update(['trial_termina_en' => $inicio->copy()->addDays(9)->toDateString()]);
     $dias = $inicio->daysInMonth;
 
-    $this->artisan('turnouno:generar-cargos-renta', ['--periodo' => periodoHoy()])->assertSuccessful();
+    emitirCargoDelMesEnCurso();
     $desglose = rentaDe($e)['cargos'][0]['desglose'];
 
     expect($desglose['prorrateo'])->toEqual(['dias_cobrables' => $dias - 10, 'dias_periodo' => $dias])
@@ -170,7 +170,7 @@ it('mientras dura la prueba gratis el mes queda sin cargo', function (): void {
     $e = estudioConSesion('pilates-a', 'dueno@pilates.mx'); // prueba de 30 días desde hoy
     compraPagadaTenant($e, crearMiembroTenant($e, 'Ana'));
 
-    $this->artisan('turnouno:generar-cargos-renta', ['--periodo' => periodoHoy()])->assertSuccessful();
+    emitirCargoDelMesEnCurso();
 
     expect(rentaDe($e)['cargos'][0]['estado'])->toBe('sin_cargo');
 });
@@ -221,7 +221,7 @@ it('el superadmin publica una versión nueva de la tarifa y los cargos la usan',
         'bandas' => [['hasta' => 50, 'monto_minor' => 29900], ['hasta' => null, 'monto_minor' => 99900]],
     ], conPlataforma())->assertCreated()->assertJsonPath('data.version', 2);
 
-    $this->artisan('turnouno:generar-cargos-renta', ['--periodo' => periodoHoy()])->assertSuccessful();
+    emitirCargoDelMesEnCurso();
     $cargo = rentaDe($e)['cargos'][0];
 
     expect($cargo['tarifa_version'])->toBe(2)->and($cargo['desglose']['subtotal_minor'])->toBe(29900);
