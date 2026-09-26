@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use Illuminate\Support\Facades\File;
+use Illuminate\Testing\TestResponse;
 
 beforeEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
@@ -31,7 +32,7 @@ function crearPromocion(array $e, array $datos): string
  *
  * @param  array{slug: string, bearer: string}  $e
  */
-function crearOrdenConPromo(array $e, ?string $codigo = null): \Illuminate\Testing\TestResponse
+function crearOrdenConPromo(array $e, ?string $codigo = null): TestResponse
 {
     $comprador = crearMiembroTenant($e, 'Compradora');
     $producto = crearPackTenant($e, 8000); // precio 89900
