@@ -15,6 +15,7 @@
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.7",
+        "brianium/paratest": "^7.20",
         "dedoc/scramble": "^0.13.43",
         "fakerphp/faker": "^1.23",
         "larastan/larastan": "^3.12",
