@@ -105,6 +105,19 @@ const hayCambios = computed(() => Object.keys(cambios.value).length > 0);
             <option value="1">{{ $t("parametrosConfig.si") }}</option>
             <option value="0">{{ $t("parametrosConfig.no") }}</option>
           </select>
+          <select
+            v-else-if="(p.opciones ?? []).length > 0"
+            :id="`par-${p.clave}`"
+            v-model="campos[p.clave]"
+            class="tu-input w-auto"
+          >
+            <option value="">
+              {{ $t("parametrosConfig.usarReferencia") }}
+            </option>
+            <option v-for="o in p.opciones" :key="o" :value="String(o)">
+              {{ texto(p, o) }}
+            </option>
+          </select>
           <span v-else class="flex items-center gap-2 shrink-0">
             <input
               :id="`par-${p.clave}`"

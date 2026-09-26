@@ -118,3 +118,17 @@ it('emitir factura exige permiso de gestion de ordenes', function (): void {
 
     test()->postJson("/api/v1/app/{$e['slug']}/facturas", cfdiValido(), conBearer($coach))->assertForbidden();
 });
+
+it('con la tasa de la región fronteriza factura con IVA 8 %; otras tasas no se aceptan', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    cargarDatosFiscales($e);
+    $errores = test()->putJson("/api/v1/app/{$e['slug']}/parametros", ['valores' => ['facturacion.iva_porcentaje' => 10]], conBearer($e['bearer']))
+        ->assertStatus(422)->json('meta.errors');
+    expect($errores['facturacion.iva_porcentaje'][0])->toBe('Tasa de IVA de las facturas: debe ser 16 o 8.');
+    test()->putJson("/api/v1/app/{$e['slug']}/parametros", ['valores' => ['facturacion.iva_porcentaje' => 8]], conBearer($e['bearer']))
+        ->assertOk();
+
+    $r = test()->postJson("/api/v1/app/{$e['slug']}/facturas", cfdiValido(), conBearer($e['bearer']))->assertStatus(201);
+    expect($r->json('data.impuesto_minor'))->toEqual(8000)
+        ->and($r->json('data.total_minor'))->toEqual(108000);
+});

@@ -20,12 +20,11 @@ use Illuminate\Support\Facades\DB;
  */
 class EmitirFacturaTenant
 {
-    /** IVA estándar (16%) en puntos base. */
-    private const IVA_BPS = 1600;
-
     public function __construct(
         private readonly ClienteFacturacion $cliente,
         private readonly RegistrarEventoTenant $eventos,
+        // Tasa de IVA (16, u 8 en la región fronteriza): la fija el negocio (ADR 0047).
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -44,11 +43,12 @@ class EmitirFacturaTenant
             static fn (array $i): int => $i['cantidad'] * $i['precio_unitario_minor'],
             $items,
         ));
-        $impuesto = intdiv($subtotal * self::IVA_BPS, 10000);
+        $ivaBps = $this->parametros->entero('facturacion.iva_porcentaje') * 100;
+        $impuesto = intdiv($subtotal * $ivaBps, 10000);
         $total = $subtotal + $impuesto;
 
         $llave = (string) ($emisor->facturapi_llave ?? config('turnouno.facturapi.llave') ?? '');
-        $cuerpo = $this->armarCuerpo($receptor, $items, $usoCfdi, $formaPago, $moneda);
+        $cuerpo = $this->armarCuerpo($receptor, $items, $usoCfdi, $formaPago, $moneda, $ivaBps);
 
         return DB::connection('tenant')->transaction(function () use (
             $receptor, $subtotal, $impuesto, $total, $moneda, $usoCfdi, $llave, $cuerpo
@@ -99,7 +99,7 @@ class EmitirFacturaTenant
      * @param  list<array<string, mixed>>  $items
      * @return array<string, mixed>
      */
-    private function armarCuerpo(array $receptor, array $items, string $usoCfdi, string $formaPago, string $moneda): array
+    private function armarCuerpo(array $receptor, array $items, string $usoCfdi, string $formaPago, string $moneda, int $ivaBps): array
     {
         return [
             'customer' => [
@@ -117,7 +117,7 @@ class EmitirFacturaTenant
                     'unit_key' => $i['clave_unidad'],
                     'price' => $i['precio_unitario_minor'] / 100,
                     'tax_included' => false,
-                    'taxes' => [['type' => 'IVA', 'rate' => self::IVA_BPS / 10000]],
+                    'taxes' => [['type' => 'IVA', 'rate' => $ivaBps / 10000]],
                 ],
             ], $items),
             'use' => $usoCfdi,

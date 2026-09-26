@@ -8,7 +8,8 @@ namespace App\Modules\Tenancy\Parametros;
  * Un parámetro de negocio configurable: su clave, cómo se presenta y entre qué valores
  * puede estar. `defecto` es solo el valor inicial: la plataforma (superadmin) fija el
  * suyo y cada negocio (administrador) puede ajustar el propio, salvo los que son solo
- * de plataforma (`porNegocio = false`). Los sí/no se guardan como 1/0.
+ * de plataforma (`porNegocio = false`). Los sí/no se guardan como 1/0. Con `opciones`,
+ * solo valen esos valores (p. ej. la tasa de IVA: 16 u 8).
  */
 final readonly class DefinicionParametro
 {
@@ -27,6 +28,8 @@ final readonly class DefinicionParametro
         public int $maximo = 1,
         public string $unidad = '',
         public bool $porNegocio = true,
+        /** @var list<int> */
+        public array $opciones = [],
     ) {}
 
     /**
@@ -44,6 +47,7 @@ final readonly class DefinicionParametro
             'maximo' => $this->maximo,
             'unidad' => $this->unidad,
             'por_negocio' => $this->porNegocio,
+            'opciones' => $this->opciones,
         ];
     }
 }

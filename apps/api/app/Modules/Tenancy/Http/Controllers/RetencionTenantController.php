@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
@@ -26,18 +27,16 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class RetencionTenantController
 {
-    // Ventana por defecto (días) hacia adelante para "por vencer".
-    private const DIAS_POR_DEFECTO = 14;
-
-    // Días hacia atrás para considerar una membresía "vencida recuperable".
-    private const GRACIA_VENCIDAS = 14;
-
-    public function __construct(private readonly ResolverAccesoTenant $acceso) {}
+    /** Las ventanas por defecto las fija el negocio (ADR 0047). */
+    public function __construct(
+        private readonly ResolverAccesoTenant $acceso,
+        private readonly ParametrosTenant $parametros,
+    ) {}
 
     public function porVencer(Request $request): Response
     {
         $hoy = CarbonImmutable::now()->startOfDay();
-        $dias = min(max((int) $request->query('dias', (string) self::DIAS_POR_DEFECTO), 1), 90);
+        $dias = min(max((int) $request->query('dias', (string) $this->parametros->entero('membresias.dias_por_vencer')), 1), 90);
 
         // MAX vencimiento por persona entre sus acuerdos ACTIVOS (una sola consulta).
         $filas = DerechoTenant::query()
@@ -49,13 +48,14 @@ class RetencionTenantController
             ->get();
 
         // Clasifica en PHP (evita trampas de comparación de fechas en SQL).
+        $vencidaDias = $this->parametros->entero('membresias.dias_vencida_recuperable');
         $ventana = [];
         foreach ($filas as $fila) {
             $vence = CarbonImmutable::parse((string) $fila->getAttribute('vence'))->startOfDay();
             $restantes = $hoy->diffInDays($vence, false);
             if ($restantes >= 0 && $restantes <= $dias) {
                 $estado = 'por_vencer';
-            } elseif ($restantes < 0 && $restantes >= -self::GRACIA_VENCIDAS) {
+            } elseif ($restantes < 0 && $restantes >= -$vencidaDias) {
                 $estado = 'vencida';
             } else {
                 continue;

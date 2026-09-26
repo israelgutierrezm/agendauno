@@ -72,4 +72,46 @@ describe("editor de parámetros", () => {
       },
     ]);
   });
+
+  it("con opciones fijas ofrece solo esos valores", async () => {
+    const w = mount(ParametrosEditor, {
+      props: {
+        modo: "negocio",
+        parametros: [
+          {
+            clave: "facturacion.iva_porcentaje",
+            grupo: "Facturación",
+            etiqueta: "Tasa de IVA de las facturas",
+            ayuda: "",
+            tipo: "entero",
+            minimo: 8,
+            maximo: 16,
+            unidad: "%",
+            opciones: [16, 8],
+            valor: null,
+            plataforma: 16,
+          },
+        ],
+      },
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            messages: { es: { parametrosConfig } },
+          }),
+        ],
+      },
+    });
+    const opciones = w
+      .findAll("#par-facturacion\\.iva_porcentaje option")
+      .map((o) => o.text());
+    expect(opciones.slice(1)).toEqual(["16 %", "8 %"]);
+
+    await w.get("#par-facturacion\\.iva_porcentaje").setValue("8");
+    await w.get("form").trigger("submit");
+    expect(w.emitted("guardar")?.[0]).toEqual([
+      { "facturacion.iva_porcentaje": 8 },
+    ]);
+  });
 });

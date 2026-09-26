@@ -20,17 +20,18 @@ class PaseAccesoTenant
 {
     public const PREFIJO = 'AU1';
 
-    /** Vigencia de un pase (segundos). */
-    public const VIGENCIA = 180;
-
-    public function __construct(private readonly GestorDeConexionTenant $gestor) {}
+    public function __construct(
+        private readonly GestorDeConexionTenant $gestor,
+        // Vigencia del pase (segundos): la fija el superadmin (ADR 0047).
+        private readonly ParametrosTenant $parametros,
+    ) {}
 
     /**
      * @return array{codigo: string, vence_en: CarbonImmutable}
      */
     public function emitir(PersonaTenant $persona, ?CarbonImmutable $ahora = null): array
     {
-        $vence = ($ahora ?? CarbonImmutable::now())->addSeconds(self::VIGENCIA);
+        $vence = ($ahora ?? CarbonImmutable::now())->addSeconds($this->parametros->entero('acceso.segundos_pase_qr'));
         $cuerpo = self::PREFIJO.'.'.$persona->ulid.'.'.$vence->getTimestamp();
 
         return ['codigo' => $cuerpo.'.'.$this->firma($cuerpo), 'vence_en' => $vence];

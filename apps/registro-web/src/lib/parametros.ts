@@ -12,6 +12,8 @@ export interface Parametro {
   minimo: number;
   maximo: number;
   unidad: string;
+  /** Si trae valores, solo se acepta uno de ellos (p. ej. IVA 16 u 8). */
+  opciones?: number[];
   valor: number | null;
   plataforma?: number;
   defecto?: number;

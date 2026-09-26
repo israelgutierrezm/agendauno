@@ -157,6 +157,11 @@ class ParametrosTenant
                 continue;
             }
             $entero = (int) $valor;
+            if ($definicion->opciones !== [] && ! in_array($entero, $definicion->opciones, true)) {
+                $errores[$clave] = ["{$definicion->etiqueta}: debe ser ".implode(' o ', $definicion->opciones).'.'];
+
+                continue;
+            }
             if ($entero < $definicion->minimo || $entero > $definicion->maximo) {
                 $errores[$clave] = ["{$definicion->etiqueta}: debe estar entre {$definicion->minimo} y {$definicion->maximo}."];
 

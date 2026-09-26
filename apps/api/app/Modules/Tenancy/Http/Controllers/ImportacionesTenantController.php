@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\ImportarInstructoresTenant;
 use App\Modules\Tenancy\Application\ImportarMiembrosTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,18 +24,20 @@ class ImportacionesTenantController
     public function __construct(
         private readonly ImportarMiembrosTenant $miembros,
         private readonly ImportarInstructoresTenant $instructores,
+        // Tope de filas por archivo: lo fija el superadmin (ADR 0047).
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     public function previewMiembros(Request $request): JsonResponse
     {
-        $filas = $this->parsear($request, ['nombre'], ImportarMiembrosTenant::MAX_FILAS);
+        $filas = $this->parsear($request, ['nombre'], $this->parametros->entero('importaciones.max_filas'));
 
         return response()->json(['data' => $this->miembros->analizar($filas)]);
     }
 
     public function importarMiembros(Request $request): JsonResponse
     {
-        $filas = $this->parsear($request, ['nombre'], ImportarMiembrosTenant::MAX_FILAS);
+        $filas = $this->parsear($request, ['nombre'], $this->parametros->entero('importaciones.max_filas'));
 
         $resultado = $this->miembros->importar($filas);
 
@@ -44,14 +47,14 @@ class ImportacionesTenantController
 
     public function previewInstructores(Request $request): JsonResponse
     {
-        $filas = $this->parsear($request, ['nombre', 'email'], ImportarInstructoresTenant::MAX_FILAS);
+        $filas = $this->parsear($request, ['nombre', 'email'], $this->parametros->entero('importaciones.max_filas'));
 
         return response()->json(['data' => $this->instructores->analizar($filas)]);
     }
 
     public function importarInstructores(Request $request): JsonResponse
     {
-        $filas = $this->parsear($request, ['nombre', 'email'], ImportarInstructoresTenant::MAX_FILAS);
+        $filas = $this->parsear($request, ['nombre', 'email'], $this->parametros->entero('importaciones.max_filas'));
 
         $resultado = $this->instructores->importar($filas, $this->estudioDe($request));
 

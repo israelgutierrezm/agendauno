@@ -246,3 +246,15 @@ it('si la membresía se cancela, su renovación por adelantado ya no queda por c
 
     expect(ordenesDeRenovacion($m)[0]['estado'])->toBe('cancelada');
 });
+
+it('con cuántos días de anticipación se avisa la renovación lo decide el negocio', function (): void {
+    $m = mensualidadPorRenovar();
+    $this->putJson("/api/v1/app/{$m['slug']}/parametros", ['valores' => ['membresias.dias_aviso_renovacion' => 5]], conBearer($m['bearer']))
+        ->assertOk();
+
+    // Se renueva el 1 de octubre: el 26 de septiembre faltan 5 días.
+    $this->travelTo('2026-09-26 15:00:00');
+    $this->artisan('turnouno:avisar-renovaciones')->assertSuccessful();
+
+    expect(correosQueEmpiezan($m, 'Tu Mensualidad'))->toHaveCount(1);
+});

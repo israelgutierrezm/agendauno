@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 
 /*
@@ -82,4 +83,16 @@ it('sin ficha de alumno no hay pase', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
 
     $this->getJson("/api/v1/app/{$e['slug']}/mi/pase", conBearer($e['bearer']))->assertNotFound();
+});
+
+it('la vigencia del pase la fija el superadmin', function (): void {
+    $this->travelTo('2030-01-01 12:00:00');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $alumna = alumnaConAccesoLibre($e);
+    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    $this->putJson('/api/v1/plataforma/parametros', ['valores' => ['acceso.segundos_pase_qr' => 300]], conPlataforma())
+        ->assertOk();
+
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/pase", conBearer($alumna['bearer']))
+        ->assertOk()->assertJsonPath('data.vence_en', '2030-01-01T12:05:00+00:00');
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Pasarelas;
 
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\DomiciliacionNoPermitida;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
@@ -28,12 +29,11 @@ use Illuminate\Support\Carbon;
  */
 class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConSuscripcion, PasarelaReembolsable, PasarelaTenant
 {
-    /**
-     * Días para pagar (también el ticket en efectivo; Mercado Pago recomienda ≥ 3).
-     */
-    private const DIAS_PARA_PAGAR = 3;
-
-    public function __construct(private readonly GestorDeConexionTenant $gestor) {}
+    public function __construct(
+        private readonly GestorDeConexionTenant $gestor,
+        // Días para pagar en tienda (OXXO): los fija el negocio (ADR 0047).
+        private readonly ParametrosTenant $parametros,
+    ) {}
 
     public function nombre(): string
     {
@@ -53,7 +53,7 @@ class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConSuscri
             $this->urlNotificaciones(),
             ['success' => $retorno['exito'], 'pending' => $retorno['exito'], 'failure' => $retorno['cancelado']],
             $orden?->persona?->email,
-            Carbon::now()->addDays(self::DIAS_PARA_PAGAR),
+            Carbon::now()->addDays($this->parametros->entero('cobranza.dias_pagar_en_tienda')),
         );
 
         return ResultadoPago::pendiente($preferencia['id'], [

@@ -164,3 +164,16 @@ it('pausar exige membresias.gestionar', function (): void {
     $this->postJson("/api/v1/app/{$m['slug']}/acuerdos/{$m['acuerdo']}/pausar", ['hasta' => '2026-09-20'], conBearer($instructor))
         ->assertStatus(403);
 });
+
+it('cuánto puede durar una pausa lo decide el negocio', function (): void {
+    $this->travelTo('2026-09-10 12:00:00');
+    $m = membresiaParaPausar();
+    $url = "/api/v1/app/{$m['slug']}/acuerdos/{$m['acuerdo']}";
+    $this->putJson("/api/v1/app/{$m['slug']}/parametros", ['valores' => ['membresias.max_dias_pausa' => 30]], conBearer($m['bearer']))
+        ->assertOk();
+
+    // Del 10 de septiembre al 10 de octubre son 31 días.
+    $this->postJson("{$url}/pausar", ['hasta' => '2026-10-10'], conBearer($m['bearer']))
+        ->assertStatus(422)->assertJsonPath('message', 'Una pausa puede durar hasta 30 días.');
+    $this->postJson("{$url}/pausar", ['hasta' => '2026-10-09'], conBearer($m['bearer']))->assertOk();
+});

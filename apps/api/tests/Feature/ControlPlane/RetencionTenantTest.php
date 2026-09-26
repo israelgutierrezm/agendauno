@@ -90,3 +90,25 @@ it('el radar exige el permiso miembros.ver (el alumno no entra)', function (): v
     $this->getJson("/api/v1/app/{$e['slug']}/retencion/por-vencer", conBearer($a['bearer']))
         ->assertForbidden();
 });
+
+it('"por vencer" y "vencida" se miden igual en el radar y en la ficha, con los días que fija el negocio', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $pronto = venderPackAMiembroTenant($e, 8000, 'Pronto');
+    $vencio = venderPackAMiembroTenant($e, 8000, 'Vencio');
+    fijarVigencia($e, $pronto['derecho'], CarbonImmutable::now()->addDays(12)->toDateString());
+    fijarVigencia($e, $vencio['derecho'], CarbonImmutable::now()->subDays(20)->toDateString());
+    $radar = fn (): array => collect($this->getJson("/api/v1/app/{$e['slug']}/retencion/por-vencer", conBearer($e['bearer']))->assertOk()->json('data.miembros'))
+        ->pluck('estado', 'nombre_completo')->all();
+    $ficha = fn (): string => (string) $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$pronto['persona']}/resumen", conBearer($e['bearer']))
+        ->assertOk()->json('data.membresia.estado');
+
+    // Inicial: por vencer desde 14 días antes; vencida recuperable hasta 14 días después.
+    expect($radar())->toBe(['Pronto' => 'por_vencer'])
+        ->and($ficha())->toBe('por_vencer');
+
+    $this->putJson("/api/v1/app/{$e['slug']}/parametros", ['valores' => [
+        'membresias.dias_por_vencer' => 7, 'membresias.dias_vencida_recuperable' => 30,
+    ]], conBearer($e['bearer']))->assertOk();
+    expect($radar())->toBe(['Vencio' => 'vencida'])
+        ->and($ficha())->toBe('vigente');
+});

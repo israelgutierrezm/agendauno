@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\LibroMayorTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
@@ -29,13 +30,12 @@ use Illuminate\Http\Request;
  */
 class ResumenMiembroTenantController
 {
-    // Días de antelación para avisar que la membresía está por vencer.
-    private const DIAS_POR_VENCER = 10;
-
     public function __construct(
         private readonly LibroMayorTenant $libro,
         private readonly WaiversTenant $waivers,
         private readonly ResolverAccesoTenant $acceso,
+        // Desde cuántos días antes está "por vencer": lo fija el negocio (ADR 0047).
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -88,7 +88,7 @@ class ResumenMiembroTenantController
         $estado = 'sin';
         if ($derechos->isNotEmpty()) {
             if ($tieneAcceso) {
-                $estado = $maxVigencia !== null && $maxVigencia->lte($hoy->addDays(self::DIAS_POR_VENCER)) ? 'por_vencer' : 'vigente';
+                $estado = $maxVigencia !== null && $maxVigencia->lte($hoy->addDays($this->parametros->entero('membresias.dias_por_vencer'))) ? 'por_vencer' : 'vigente';
             } elseif ($pausadaHasta !== null) {
                 $estado = 'pausada';
             } elseif ($maxVigencia !== null && $maxVigencia->lt($hoy)) {

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -133,6 +134,9 @@ it('una notificación con otra contraseña no toca nada', function (): void {
 
 it('con OXXO se entrega la referencia, el código de barras y el recibo', function (): void {
     $c = compraConOpenPay();
+    // La referencia vence en los días que fija el negocio.
+    $this->putJson("/api/v1/app/{$c['slug']}/parametros", ['valores' => ['cobranza.dias_pagar_en_tienda' => 5]], conBearer($c['bearer']))
+        ->assertOk();
 
     $checkout = $this->postJson("/api/v1/app/{$c['slug']}/mi/ordenes/{$c['orden']}/cobrar", ['metodo' => 'oxxo'], conBearer($c['alumno']))
         ->assertCreated()->json('data.checkout');
@@ -140,7 +144,8 @@ it('con OXXO se entrega la referencia, el código de barras y el recibo', functi
     expect($checkout['tipo'])->toBe('voucher')
         ->and($checkout['referencia'])->toBe('000020TRN')
         ->and($checkout['codigo_barras'])->toBe('https://sandbox-api.openpay.mx/barcode/000020TRN')
-        ->and($checkout['recibo'])->toBe('https://sandbox-dashboard.openpay.mx/paynet-pdf/m123/000020TRN');
+        ->and($checkout['recibo'])->toBe('https://sandbox-dashboard.openpay.mx/paynet-pdf/m123/000020TRN')
+        ->and(CarbonImmutable::parse($checkout['vence'])->toDateString())->toBe(now()->addDays(5)->toDateString());
     Http::assertSent(fn (Request $q): bool => str_ends_with($q->url(), '/charges') && $q['method'] === 'store' && isset($q['due_date']));
 });
 

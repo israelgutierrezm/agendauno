@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 
 beforeEach(function (): void {
@@ -102,4 +103,15 @@ it('la importación exige permiso de gestión de miembros', function (): void {
 
     test()->post("/api/v1/app/{$e['slug']}/importaciones/miembros/preview", ['archivo' => csvFalso($csv)], ['Accept' => 'application/json'] + conBearer($coach))
         ->assertForbidden();
+});
+
+it('el tope de filas por archivo lo fija el superadmin', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    $this->putJson('/api/v1/plataforma/parametros', ['valores' => ['importaciones.max_filas' => 100]], conPlataforma())
+        ->assertOk();
+    $filas = implode("\n", array_map(fn (int $i): string => "Persona {$i}", range(1, 101)));
+
+    $this->post("/api/v1/app/{$e['slug']}/importaciones/miembros/preview", ['archivo' => csvFalso("nombre\n{$filas}\n")], cabecerasCsv($e))
+        ->assertStatus(422)->assertJsonPath('meta.errors.archivo.0', 'El archivo excede el máximo de 100 filas.');
 });

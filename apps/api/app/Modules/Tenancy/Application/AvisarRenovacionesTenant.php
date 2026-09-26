@@ -18,8 +18,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Aviso de renovación próxima: {@see self::DIAS_ANTES} días antes de que se renueve
- * una membresía, el alumno recibe cuándo y cuánto (evento
+ * Aviso de renovación próxima: los días antes que fija el negocio
+ * (`membresias.dias_aviso_renovacion`, ADR 0047) de que se renueve una membresía, el alumno recibe cuándo y cuánto (evento
  * `membresia.renovacion_proxima`, que las plantillas convierten en correo).
  *
  * - Con pago automático, solo se le avisa que se cobrará solo (a su tarjeta).
@@ -33,13 +33,12 @@ use Illuminate\Support\Facades\DB;
  */
 class AvisarRenovacionesTenant
 {
-    public const DIAS_ANTES = 3;
-
     public function __construct(
         private readonly RegistrarEventoTenant $eventos,
         private readonly DeudaDeRenovacionTenant $deudas,
         private readonly RegistroDePasarelasTenant $pasarelas,
         private readonly GestorDeConexionTenant $gestor,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     public function ejecutar(?CarbonImmutable $hoy = null): int
@@ -52,7 +51,7 @@ class AvisarRenovacionesTenant
             ->where('estado', EstadoAcuerdo::Activo->value)
             ->whereNotNull('proxima_cobro_en')
             ->whereDate('proxima_cobro_en', '>', $hoy->toDateString())
-            ->whereDate('proxima_cobro_en', '<=', $hoy->addDays(self::DIAS_ANTES)->toDateString())
+            ->whereDate('proxima_cobro_en', '<=', $hoy->addDays($this->parametros->entero('membresias.dias_aviso_renovacion'))->toDateString())
             ->where(fn (Builder $q) => $q
                 ->whereNull('aviso_renovacion_para')
                 ->orWhereColumn('aviso_renovacion_para', '!=', 'proxima_cobro_en'))

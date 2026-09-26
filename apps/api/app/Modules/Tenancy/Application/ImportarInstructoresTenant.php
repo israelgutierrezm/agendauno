@@ -20,9 +20,6 @@ use Illuminate\Support\Facades\Validator;
  */
 class ImportarInstructoresTenant
 {
-    /** Tope defensivo de filas por importación. */
-    public const MAX_FILAS = 1000;
-
     /** Columnas reconocidas del CSV (el resto se ignora). */
     public const COLUMNAS = ['nombre', 'email'];
 

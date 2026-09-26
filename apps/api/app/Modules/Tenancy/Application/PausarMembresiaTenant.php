@@ -30,13 +30,12 @@ use Illuminate\Support\Facades\DB;
  */
 class PausarMembresiaTenant
 {
-    /** Duración máxima de una pausa (días). */
-    public const MAX_DIAS = 180;
-
     public function __construct(
         private readonly RegistrarEventoTenant $eventos,
         private readonly RegistrarAuditoria $auditoria,
         private readonly DomiciliacionesTenant $domiciliaciones,
+        // Duración máxima de una pausa: la fija el negocio (ADR 0047).
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     public function pausar(AcuerdoTenant $acuerdo, CarbonImmutable $hasta, ?string $motivo, ?Usuario $actor): PausaAcuerdoTenant
@@ -47,8 +46,9 @@ class PausarMembresiaTenant
         if ($hasta->lt($hoy)) {
             throw new PausaNoPermitida('La pausa debe terminar hoy o después.');
         }
-        if ($hoy->diffInDays($hasta) + 1 > self::MAX_DIAS) {
-            throw new PausaNoPermitida('Una pausa puede durar hasta '.self::MAX_DIAS.' días.');
+        $maximo = $this->parametros->entero('membresias.max_dias_pausa');
+        if ($hoy->diffInDays($hasta) + 1 > $maximo) {
+            throw new PausaNoPermitida("Una pausa puede durar hasta {$maximo} días.");
         }
 
         $pausa = DB::connection('tenant')->transaction(function () use ($acuerdo, $hoy, $hasta, $motivo, $actor): PausaAcuerdoTenant {

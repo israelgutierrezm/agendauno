@@ -23,11 +23,8 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class ResolverSegmentoTenant
 {
-    // Ventana (días) hacia adelante para "por vencer".
-    private const DIAS_POR_VENCER = 14;
-
-    // Días hacia atrás para considerar una membresía "vencida recuperable".
-    private const GRACIA_VENCIDAS = 14;
+    /** "Por vencer" y "vencida recuperable": ventanas que fija el negocio (ADR 0047). */
+    public function __construct(private readonly ParametrosTenant $parametros) {}
 
     /**
      * @return Collection<int, PersonaTenant>
@@ -90,13 +87,15 @@ class ResolverSegmentoTenant
             ->selectRaw('acuerdos.persona_id as pid, MAX(derechos.valido_hasta) as vence')
             ->get();
 
+        $porVencerDias = $this->parametros->entero('membresias.dias_por_vencer');
+        $vencidaDias = $this->parametros->entero('membresias.dias_vencida_recuperable');
         $pids = [];
         foreach ($filas as $fila) {
             $vence = CarbonImmutable::parse((string) $fila->getAttribute('vence'))->startOfDay();
             $restantes = $hoy->diffInDays($vence, false);
             $coincide = $porVencer
-                ? ($restantes >= 0 && $restantes <= self::DIAS_POR_VENCER)
-                : ($restantes < 0 && $restantes >= -self::GRACIA_VENCIDAS);
+                ? ($restantes >= 0 && $restantes <= $porVencerDias)
+                : ($restantes < 0 && $restantes >= -$vencidaDias);
             if ($coincide) {
                 $pids[] = (int) $fila->getAttribute('pid');
             }

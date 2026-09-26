@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Pasarelas;
 
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\DomiciliacionNoPermitida;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
@@ -34,12 +35,11 @@ use Illuminate\Support\Carbon;
  */
 class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConSuscripcion, PasarelaReembolsable, PasarelaTenant
 {
-    /**
-     * Días para pagar en tienda.
-     */
-    private const DIAS_PARA_PAGAR = 3;
-
-    public function __construct(private readonly GestorDeConexionTenant $gestor) {}
+    public function __construct(
+        private readonly GestorDeConexionTenant $gestor,
+        // Días para pagar en tienda (OXXO): los fija el negocio (ADR 0047).
+        private readonly ParametrosTenant $parametros,
+    ) {}
 
     public function nombre(): string
     {
@@ -54,7 +54,7 @@ class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConSuscripcio
         $concepto = ConceptoDeCobro::de($orden);
 
         if ($pago->metodo === MetodoPago::Oxxo) {
-            $vence = Carbon::now()->addDays(self::DIAS_PARA_PAGAR);
+            $vence = Carbon::now()->addDays($this->parametros->entero('cobranza.dias_pagar_en_tienda'));
             $cargo = $api->crearCargoEnTienda($pago->monto_minor, $pago->moneda, $concepto, (string) $pago->ulid, $cliente, $vence);
 
             return ResultadoPago::pendiente($cargo['id'], [
