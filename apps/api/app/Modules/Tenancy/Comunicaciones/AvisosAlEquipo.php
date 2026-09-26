@@ -26,6 +26,8 @@ final class AvisosAlEquipo
         'orden.pagada' => 'facturacion.ver',
         'cobro.fallido' => 'facturacion.ver',
         'membresia.suspendida' => 'facturacion.ver',
+        'pago.tardio' => 'facturacion.ver',
+        'pago.duplicado' => 'facturacion.ver',
     ];
 
     /**

@@ -117,7 +117,11 @@ export const conexiones = {
       asistencia: { marcada: "Asistencia marcada" },
       acceso: { registrado: "Acceso registrado" },
       orden: { pagada: "Venta pagada (recibo)" },
-      pago: { reembolsado: "Pago reembolsado" },
+      pago: {
+        reembolsado: "Pago reembolsado",
+        tardio: "Pago tardío (apartado vencido)",
+        duplicado: "Cobro doble",
+      },
       cobro: { fallido: "Cobro recurrente fallido" },
       membresia: {
         suspendida: "Membresía suspendida",
@@ -361,6 +365,9 @@ export const porConciliar = {
   ayuda:
     "Movimientos que la pasarela no confirmó. Revisa en su panel qué pasó y márcalo aquí.",
   devolucion: "Devolución de {monto}",
+  pagoTardio: "Pago tardío de {monto}",
+  pagoDuplicado: "Cobro doble de {monto}",
+  devolverPago: "Devolver el pago",
   resolver: "Resolver",
   nota: "Qué revisaste",
   notaEjemplo: "Ej.: en el panel de Stripe aparece devuelta el 25/09",

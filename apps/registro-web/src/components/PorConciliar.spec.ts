@@ -20,6 +20,8 @@ const devolucionSinConfirmar = {
   detalle: "La pasarela no confirmó la devolución.",
   fecha: "2026-09-25T18:00:00Z",
   persona: "Ana López",
+  monto_minor: 89900,
+  moneda: "MXN",
   reembolso: {
     estado: "incierto",
     monto_minor: 89900,
@@ -80,8 +82,49 @@ describe("por conciliar", () => {
 
     expect(api.post).toHaveBeenCalledWith(
       "/api/v1/app/estudio-a/incidencias-cobro/i1/resolver",
-      { resolucion: "En Stripe aparece devuelta", reembolso: "aprobado" },
+      {
+        resolucion: "En Stripe aparece devuelta",
+        reembolso: "aprobado",
+        accion: null,
+      },
     );
     expect(w.emitted("cambio")).toHaveLength(1);
+  });
+
+  it("un pago tardío se devuelve desde la bandeja", async () => {
+    api.get.mockResolvedValueOnce({
+      data: {
+        data: [
+          {
+            id: "i2",
+            tipo: "pago_tardio",
+            detalle: "Llegó el pago cuando su apartado ya había vencido.",
+            fecha: null,
+            persona: "Bea",
+            monto_minor: 25000,
+            moneda: "MXN",
+            reembolso: null,
+          },
+        ],
+      },
+    });
+    api.get.mockResolvedValueOnce({ data: { data: [] } });
+    api.post.mockResolvedValue({ data: { data: {} } });
+    const w = montar();
+    await flushPromises();
+
+    expect(w.text()).toContain("Pago tardío de");
+    await w.get("button.tu-enlace").trigger("click");
+    await w.get("input").setValue("Se le avisó");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Devolver el pago")
+      ?.trigger("click");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/estudio-a/incidencias-cobro/i2/resolver",
+      { resolucion: "Se le avisó", reembolso: null, accion: "devolver" },
+    );
   });
 });

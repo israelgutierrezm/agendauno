@@ -17,6 +17,8 @@ interface Incidencia {
   detalle: string;
   fecha: string | null;
   persona: string | null;
+  monto_minor: number | null;
+  moneda: string | null;
   reembolso: {
     estado: string;
     monto_minor: number;
@@ -67,6 +69,7 @@ function abrir(i: Incidencia): void {
 async function resolver(
   i: Incidencia,
   reembolso: "aprobado" | "fallido" | null,
+  accion: "devolver" | null = null,
 ): Promise<void> {
   if (nota.value.trim() === "") {
     error.value = t("porConciliar.faltaNota");
@@ -78,6 +81,7 @@ async function resolver(
     await api.post(`${base.value}/incidencias-cobro/${i.id}/resolver`, {
       resolucion: nota.value.trim(),
       reembolso,
+      accion,
     });
     abierta.value = null;
     await cargar();
@@ -109,6 +113,16 @@ defineExpose({ cargar });
                   $t("porConciliar.devolucion", {
                     monto: dinero(i.reembolso.monto_minor, i.reembolso.moneda),
                   })
+                }}
+              </template>
+              <template v-else-if="i.monto_minor !== null">
+                {{
+                  $t(
+                    i.tipo === "pago_duplicado"
+                      ? "porConciliar.pagoDuplicado"
+                      : "porConciliar.pagoTardio",
+                    { monto: dinero(i.monto_minor, i.moneda ?? "MXN") },
+                  )
                 }}
               </template>
               <template v-if="i.persona"> · {{ i.persona }}</template>
@@ -167,15 +181,25 @@ defineExpose({ cargar });
                 {{ $t("porConciliar.noSeDevolvio") }}
               </button>
             </template>
-            <button
-              v-else
-              type="button"
-              class="tu-btn tu-btn-primario"
-              :disabled="guardando"
-              @click="resolver(i, null)"
-            >
-              {{ $t("porConciliar.marcarResuelta") }}
-            </button>
+            <template v-else>
+              <button
+                v-if="i.reembolso === null && i.monto_minor !== null"
+                type="button"
+                class="tu-btn tu-btn-primario"
+                :disabled="guardando"
+                @click="resolver(i, null, 'devolver')"
+              >
+                {{ $t("porConciliar.devolverPago") }}
+              </button>
+              <button
+                type="button"
+                class="tu-btn tu-btn-fantasma"
+                :disabled="guardando"
+                @click="resolver(i, null)"
+              >
+                {{ $t("porConciliar.marcarResuelta") }}
+              </button>
+            </template>
           </div>
         </div>
       </li>

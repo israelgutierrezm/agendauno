@@ -33,6 +33,8 @@ class EventoDeDominioTenant
         'acceso.registrado',
         'orden.pagada',
         'pago.reembolsado',
+        'pago.tardio',
+        'pago.duplicado',
         'cobro.fallido',
         'membresia.suspendida',
         'membresia.regularizada',

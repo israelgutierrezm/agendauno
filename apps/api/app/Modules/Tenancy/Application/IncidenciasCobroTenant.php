@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 
@@ -40,6 +41,19 @@ class IncidenciasCobroTenant
             'detalle' => $detalle,
             'datos' => $datos,
         ]);
+    }
+
+    /**
+     * Abre (o deja abierta) la incidencia de un pago (p. ej. llegó tarde o dos veces).
+     *
+     * @param  array<string, mixed>  $datos
+     */
+    public function porPago(string $tipo, PagoTenant $pago, string $detalle, array $datos = []): IncidenciaCobroTenant
+    {
+        return IncidenciaCobroTenant::query()->firstOrCreate(
+            ['tipo' => $tipo, 'pago_id' => $pago->getKey(), 'estado' => IncidenciaCobroTenant::ABIERTA],
+            ['orden_id' => $pago->orden_id, 'detalle' => $detalle, 'datos' => $datos],
+        );
     }
 
     /**

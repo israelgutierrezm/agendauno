@@ -23,6 +23,10 @@ class IncidenciaCobroTenant extends Model
 
     public const REEMBOLSO_INCIERTO = 'reembolso_incierto';
 
+    public const PAGO_TARDIO = 'pago_tardio';
+
+    public const PAGO_DUPLICADO = 'pago_duplicado';
+
     protected $connection = 'tenant';
 
     protected $table = 'incidencias_cobro';

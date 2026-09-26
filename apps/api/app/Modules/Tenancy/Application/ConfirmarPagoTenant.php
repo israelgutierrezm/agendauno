@@ -4,72 +4,82 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Comunicaciones\DatosDeOrden;
+use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
-use App\Modules\Tenancy\Pasarelas\PasarelaCancelable;
-use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Throwable;
 
 /**
- * Confirma un pago pendiente tenant-local a partir de la referencia del intento (la
- * que envia el webhook de la pasarela) y hace el fulfillment de su orden.
- * Idempotente: un pago que no esta pendiente no se reprocesa.
+ * Confirma un pago tenant-local a partir de la referencia del intento (la que envía
+ * el webhook de la pasarela). El dinero cobrado queda SIEMPRE registrado (pago
+ * aprobado); qué pasa con su compra depende de cómo esté:
+ * - pendiente → se entrega (fulfillment) y se cierran los demás intentos abiertos;
+ * - ya pagada con otro intento → cobro doble: queda por conciliar para devolverlo;
+ * - cancelada (p. ej. venció el apartado de la cita) → pago tardío: se reconfirma si
+ *   el horario sigue libre o queda por conciliar ({@see PagoTardioTenant}). Una
+ *   orden cancelada nunca pasa a pagada sin revalidar.
+ * Idempotente: solo se procesa un intento pendiente o cerrado (rechazado); uno ya
+ * aprobado o devuelto no se reabre aunque el aviso se repita.
  */
 class ConfirmarPagoTenant
 {
     public function __construct(
         private readonly FulfillmentTenant $fulfillment,
-        private readonly RegistroDePasarelasTenant $registro,
+        private readonly CerrarIntentosPagoTenant $intentos,
+        private readonly PagoTardioTenant $tardio,
+        private readonly IncidenciasCobroTenant $incidencias,
+        private readonly RegistrarEventoTenant $eventos,
     ) {}
 
     /**
      * La pasarela confirma que ESTE pago se cobró (con la referencia de su cobro).
-     * Si el intento ya se había cerrado (el cliente reintentó) pero la compra sigue
-     * pendiente, se confirma igual y se cierran los demás intentos abiertos, para
-     * que no se pague dos veces. Si la compra ya estaba pagada, se reporta el cobro
-     * doble para devolverlo. Idempotente.
      */
     public function aprobar(PagoTenant $pago, string $referencia): void
     {
         $abiertos = DB::connection('tenant')->transaction(function () use ($pago, $referencia): array {
             $bloqueado = PagoTenant::query()->whereKey($pago->getKey())->lockForUpdate()->first();
-            if (! $bloqueado instanceof PagoTenant || $bloqueado->estado === EstadoPago::Aprobado) {
+            if (! $bloqueado instanceof PagoTenant
+                || ! in_array($bloqueado->estado, [EstadoPago::Pendiente, EstadoPago::Rechazado], true)) {
                 return [];
             }
             $orden = OrdenTenant::query()->whereKey($bloqueado->orden_id)->lockForUpdate()->first();
-            if ($bloqueado->estado !== EstadoPago::Pendiente
-                && (! $orden instanceof OrdenTenant || $orden->estado !== EstadoOrden::Pendiente)) {
-                Log::warning('Se cobró un intento ya cerrado de una compra resuelta: hay que devolverlo.', [
-                    'pago' => $bloqueado->ulid,
-                    'referencia' => $referencia,
-                ]);
-
-                return [];
-            }
 
             $bloqueado->update([
                 'estado' => EstadoPago::Aprobado->value,
                 'referencia_externa' => $referencia !== '' ? $referencia : $bloqueado->referencia_externa,
             ]);
-            if ($orden instanceof OrdenTenant) {
-                // El fulfillment asienta orden.pagada (recibo, puntos de lealtad).
-                $this->fulfillment->cumplir($orden);
+            if (! $orden instanceof OrdenTenant) {
+                return [];
             }
 
-            return PagoTenant::query()
-                ->where('orden_id', $bloqueado->orden_id)
-                ->whereKeyNot($bloqueado->getKey())
-                ->where('estado', EstadoPago::Pendiente->value)
-                ->get()
-                ->all();
+            if ($orden->estado === EstadoOrden::Pendiente) {
+                // El fulfillment asienta orden.pagada (recibo, puntos de lealtad).
+                $this->fulfillment->cumplir($orden);
+
+                return PagoTenant::query()
+                    ->where('orden_id', $orden->getKey())
+                    ->whereKeyNot($bloqueado->getKey())
+                    ->where('estado', EstadoPago::Pendiente->value)
+                    ->get()
+                    ->all();
+            }
+
+            if ($orden->estado === EstadoOrden::Pagada) {
+                $this->cobroDoble($bloqueado, $orden);
+
+                return [];
+            }
+
+            $this->tardio->atender($bloqueado, $orden);
+
+            return [];
         });
 
         foreach ($abiertos as $abierto) {
-            $this->cerrarIntento($abierto);
+            $this->intentos->cerrar($abierto);
         }
     }
 
@@ -79,24 +89,10 @@ class ConfirmarPagoTenant
             return;
         }
 
-        DB::connection('tenant')->transaction(function () use ($referencia): void {
-            $pago = PagoTenant::query()
-                ->where('referencia_externa', $referencia)
-                ->lockForUpdate()
-                ->first();
-
-            if (! $pago instanceof PagoTenant || $pago->estado !== EstadoPago::Pendiente) {
-                return;
-            }
-
-            $pago->update(['estado' => EstadoPago::Aprobado->value]);
-
-            $orden = $pago->orden;
-            if ($orden !== null) {
-                // El fulfillment asienta orden.pagada (recibo, puntos de lealtad).
-                $this->fulfillment->cumplir($orden);
-            }
-        });
+        $pago = PagoTenant::query()->where('referencia_externa', $referencia)->first();
+        if ($pago instanceof PagoTenant) {
+            $this->aprobar($pago, $referencia);
+        }
     }
 
     /**
@@ -117,23 +113,23 @@ class ConfirmarPagoTenant
     }
 
     /**
-     * Cierra un intento que quedó abierto al confirmarse otro de la misma compra. Si
-     * la pasarela dice que también se cobró, se reporta para devolverlo.
+     * La compra ya estaba pagada con otro intento: este cobro sobra. Queda por
+     * conciliar para devolverlo, y el equipo que ve la facturación se entera.
      */
-    private function cerrarIntento(PagoTenant $pago): void
+    private function cobroDoble(PagoTenant $pago, OrdenTenant $orden): void
     {
-        try {
-            $pasarela = $this->registro->resolver($pago->proveedor);
-            if ($pasarela instanceof PasarelaCancelable
-                && ! $pasarela->cancelar($pago, $this->registro->llaves($pago->proveedor))) {
-                Log::warning('Otro intento de la misma compra también se cobró: hay que devolverlo.', ['pago' => $pago->ulid]);
+        $monto = DatosDeOrden::dinero((int) $pago->monto_minor, (string) ($pago->moneda ?: 'MXN'));
 
-                return;
-            }
-        } catch (Throwable $e) {
-            report($e);
-        }
-
-        $pago->update(['estado' => EstadoPago::Rechazado->value]);
+        $this->incidencias->porPago(
+            IncidenciaCobroTenant::PAGO_DUPLICADO,
+            $pago,
+            "Se cobró dos veces la misma compra ({$monto}). Devuelve este cobro.",
+        );
+        $orden->loadMissing('persona');
+        $this->eventos->registrar('pago.duplicado', 'pago', (string) $pago->ulid, [
+            'persona_id' => $orden->persona?->ulid,
+            'monto' => $monto,
+            'orden_id' => (string) $orden->ulid,
+        ]);
     }
 }

@@ -55,6 +55,8 @@ class ReservasTenant
         private readonly OrdenesTenant $ordenes,
         private readonly EmitirReservaConfirmadaTenant $confirmada,
         private readonly EmitirReservaCanceladaTenant $cancelada,
+        private readonly VerificarAgendaTenant $agenda,
+        private readonly CerrarIntentosPagoTenant $intentos,
     ) {}
 
     /**
@@ -645,14 +647,15 @@ class ReservasTenant
     {
         $limite = now()->subMinutes(self::VENTANA_PAGO_MIN);
         $expiradas = 0;
+        $ordenes = [];
 
         ReservaTenant::query()
             ->where('estado', EstadoReserva::PendientePago->value)
             ->where('created_at', '<', $limite)
             ->orderBy('id')
             ->pluck('id')
-            ->each(function ($id) use (&$expiradas): void {
-                DB::connection('tenant')->transaction(function () use ($id, &$expiradas): void {
+            ->each(function ($id) use (&$expiradas, &$ordenes): void {
+                DB::connection('tenant')->transaction(function () use ($id, &$expiradas, &$ordenes): void {
                     $reserva = ReservaTenant::query()->whereKey($id)->lockForUpdate()->first();
                     if (! $reserva instanceof ReservaTenant || $reserva->estado !== EstadoReserva::PendientePago) {
                         return;
@@ -661,9 +664,13 @@ class ReservasTenant
                     // Libera el cupo bajo el lock de la sesión (para promover con seguridad).
                     $sesion = SesionTenant::query()->whereKey($reserva->sesion_id)->lockForUpdate()->firstOrFail();
 
-                    $reserva->update(['estado' => EstadoReserva::Cancelada->value]);
+                    // Venció sin pago: si el pago llega después, solo esta se puede reconfirmar.
+                    $reserva->update(['estado' => EstadoReserva::Cancelada->value, 'motivo_cancelacion' => 'vencio_pago']);
                     $this->cancelarOrdenPendiente($reserva);
                     $expiradas++;
+                    if ($reserva->orden_id !== null) {
+                        $ordenes[] = (int) $reserva->orden_id;
+                    }
 
                     // Una cita sin pagar libera el horario del profesional; en una clase,
                     // el cupo liberado se ofrece al siguiente en lista de espera.
@@ -673,7 +680,56 @@ class ReservasTenant
                 });
             });
 
+        // Fuera de la transacción: el cobro que quedó abierto en la pasarela se cierra
+        // para que no pueda pagarse tarde (si ya se cobró, se atiende como pago tardío).
+        foreach ($ordenes as $orden) {
+            $this->intentos->deOrden($orden);
+        }
+
         return $expiradas;
+    }
+
+    /**
+     * Llegó el pago de una reserva cuyo apartado venció sin pago (1.2): se reconfirma
+     * solo si su horario sigue libre y aún no empieza, revalidando bajo candado (nunca
+     * desplaza a otro cliente). En una cita, que el profesional no tenga otra cosa a
+     * esa hora; en una clase, que haya lugar. La deja pendiente de pago para que el
+     * fulfillment la confirme. Debe llamarse dentro de una transacción.
+     */
+    public function reconfirmarPagoTardio(ReservaTenant $reserva): bool
+    {
+        $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->first();
+        if (! $bloqueada instanceof ReservaTenant
+            || $bloqueada->estado !== EstadoReserva::Cancelada
+            || $bloqueada->motivo_cancelacion !== 'vencio_pago') {
+            return false;
+        }
+
+        $sesion = SesionTenant::query()->whereKey($bloqueada->sesion_id)->lockForUpdate()->first();
+        if (! $sesion instanceof SesionTenant || ! $sesion->inicia_en->isFuture()) {
+            return false;
+        }
+
+        if ($sesion->esCita()) {
+            // Mismo punto de serialización por profesional que al agendar una cita.
+            if ($sesion->instructor_id !== null) {
+                DB::connection('tenant')->table('users')->where('id', $sesion->instructor_id)->update(['id' => DB::raw('id')]);
+            }
+            if ($sesion->estado !== EstadoSesionTenant::Programada
+                && $this->agenda->conflictos($sesion->instructor_id, null, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey()) !== []) {
+                return false;
+            }
+            $sesion->update(['estado' => EstadoSesionTenant::Programada->value]);
+        } else {
+            $canal = (string) ($bloqueada->canal ?? 'directo');
+            if ($sesion->estado !== EstadoSesionTenant::Programada || $this->disponiblesParaCanal($sesion, $canal) < 1) {
+                return false;
+            }
+        }
+
+        $bloqueada->update(['estado' => EstadoReserva::PendientePago->value, 'motivo_cancelacion' => null]);
+
+        return true;
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\IncidenciasCobroTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
@@ -19,7 +20,9 @@ use Illuminate\Validation\ValidationException;
 /**
  * Bandeja "por conciliar" de Cobranza: lo del dinero que necesita que alguien lo
  * revise, y cómo se resolvió (quién, cuándo, qué). Una devolución incierta se
- * resuelve diciendo si la pasarela la hizo o no (se ve en su panel).
+ * resuelve diciendo si la pasarela la hizo o no (se ve en su panel); un pago tardío
+ * o doble, devolviéndolo (`accion: devolver`) o marcándolo resuelto (p. ej. se
+ * reagendó con el cliente).
  */
 class IncidenciasCobroTenantController
 {
@@ -48,6 +51,8 @@ class IncidenciasCobroTenantController
             'resolucion' => ['required', 'string', 'max:500'],
             // En una devolución incierta: si la pasarela la hizo o no.
             'reembolso' => ['nullable', Rule::in([EstadoReembolso::Aprobado->value, EstadoReembolso::Fallido->value])],
+            // En un pago tardío o doble: devolverlo completo.
+            'accion' => ['nullable', Rule::in(['devolver'])],
         ]);
         $actor = $request->attributes->get('usuario_tenant');
         $actor = $actor instanceof Usuario ? $actor : null;
@@ -65,10 +70,20 @@ class IncidenciasCobroTenantController
             $reembolsos->resolver($reembolso, $resultado, null, $resultado === EstadoReembolso::Fallido ? 'Marcada como no hecha: '.$validado['resolucion'] : null, $actor);
         }
 
+        if (($validado['accion'] ?? null) === 'devolver') {
+            $pago = $incidencia->pago;
+            if (! $pago instanceof PagoTenant || $reembolso instanceof ReembolsoTenant) {
+                throw ValidationException::withMessages(['accion' => ['Aquí no hay un pago que devolver.']]);
+            }
+            // La llave de la incidencia: repetir no devuelve dos veces.
+            $reembolsos->ejecutar($pago, null, 'Devolución: '.$validado['resolucion'], $actor, false, false, 'incidencia_'.$incidencia->ulid);
+        }
+
         $incidencias->cerrar($incidencia->refresh(), (string) $validado['resolucion'], $actor);
         $auditoria->registrar($actor, 'incidencia.resuelta', 'incidencia_cobro', (string) $incidencia->ulid, null, [
             'tipo' => $incidencia->tipo,
             'reembolso' => $validado['reembolso'] ?? null,
+            'accion' => $validado['accion'] ?? null,
         ], (string) $validado['resolucion']);
 
         return response()->json(['data' => $this->presentar($incidencia->refresh()->load(['pago.orden.persona', 'reembolso', 'resolvio']))]);
@@ -89,6 +104,8 @@ class IncidenciasCobroTenantController
             'fecha' => $incidencia->created_at?->toIso8601String(),
             'persona' => $incidencia->pago?->orden?->persona?->nombreCompleto(),
             'pago' => $incidencia->pago?->ulid,
+            'monto_minor' => $incidencia->pago?->monto_minor,
+            'moneda' => $incidencia->pago?->moneda,
             'reembolso' => $reembolso instanceof ReembolsoTenant ? [
                 'id' => $reembolso->ulid,
                 'estado' => $reembolso->estado->value,
