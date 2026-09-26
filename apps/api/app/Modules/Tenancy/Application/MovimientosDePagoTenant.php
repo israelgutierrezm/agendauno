@@ -21,26 +21,40 @@ use Illuminate\Support\Str;
 /**
  * Movimientos de dinero del negocio en un rango de fechas (en su zona horaria), con
  * quién hizo cada uno: cobros (en caja, en línea, pagos automáticos), devoluciones,
- * ventas de mostrador y cancelaciones de compras. Sirve de corte de caja: totales
- * por método y por persona del equipo.
+ * ventas de mostrador y cancelaciones de compras. Sirve de corte de caja.
+ *
+ * - Cada movimiento cuenta en la fecha en que el dinero se movió: un cobro, cuando se
+ *   aprobó (`aprobado_en`: un pago iniciado ayer y confirmado hoy es de hoy); una
+ *   devolución, cuando se hizo (`aplicado_en`).
+ * - Los totales se calculan en la base sobre TODO el rango, no sobre las filas que se
+ *   muestran (la lista trae a lo más `limite`, las más recientes, y avisa si se cortó).
+ * - Nunca se suman monedas distintas: hay totales por moneda.
+ * - Cada movimiento lleva su referencia y la de su operación de origen (orden, pago).
  *
  * Quién: el usuario que registró el cobro, hizo la devolución, vendió o canceló; si
  * no hubo uno, lo dice ("En línea", "Pago automático", "Sistema").
  *
- * @phpstan-type Movimiento array{fecha: string, tipo: string, monto_minor: int, moneda: string, metodo: string|null, persona: string|null, concepto: string, quien: string, quien_id: string|null, referencia: string, detalle: string|null}
+ * @phpstan-type Movimiento array{fecha: string, tipo: string, monto_minor: int, moneda: string, metodo: string|null, persona: string|null, concepto: string, quien: string, quien_id: string|null, referencia: string, orden: string|null, pago: string|null, detalle: string|null}
+ * @phpstan-type Totales array{moneda: string, cobrado_minor: int, devuelto_minor: int, neto_minor: int, por_cobrar_minor: int, por_metodo: array<string, int>, por_usuario: list<array{quien: string, cobrado_minor: int, devuelto_minor: int}>}
  */
 class MovimientosDePagoTenant
 {
-    private const LIMITE = 2000;
+    public const LIMITE = 2000;
+
+    /**
+     * Estados de un pago cuyo dinero sí entró (aunque después se haya devuelto).
+     */
+    private const COBRADOS = [EstadoPago::Aprobado, EstadoPago::ParcialmenteReembolsado, EstadoPago::Reembolsado];
 
     public function __construct(private readonly GestorDeConexionTenant $gestor) {}
 
     /**
      * @param  string|null  $usuarioUlid  solo lo que hizo esa persona del equipo
      * @param  string|null  $tipo  cobro | devolucion | venta | cancelacion
-     * @return array{movimientos: list<Movimiento>, totales: array{cobrado_minor: int, devuelto_minor: int, neto_minor: int, por_metodo: array<string, int>, por_usuario: list<array{quien: string, cobrado_minor: int, devuelto_minor: int}>}}
+     * @param  int|null  $limite  filas por tipo en la lista (null = todas, p. ej. para el CSV)
+     * @return array{movimientos: list<Movimiento>, totales: list<Totales>, truncado: bool}
      */
-    public function listar(string $desde, string $hasta, ?string $usuarioUlid = null, ?string $tipo = null): array
+    public function listar(string $desde, string $hasta, ?string $usuarioUlid = null, ?string $tipo = null, ?int $limite = self::LIMITE): array
     {
         $zona = (string) ($this->gestor->actual()?->zona_horaria ?: 'America/Mexico_City');
         $inicio = CarbonImmutable::parse($desde, $zona)->startOfDay()->utc();
@@ -50,46 +64,55 @@ class MovimientosDePagoTenant
         if ($usuarioUlid !== null && $usuarioUlid !== '') {
             $usuarioId = (int) (Usuario::withTrashed()->where('ulid', $usuarioUlid)->value('id') ?? 0);
         }
+        $incluye = static fn (string $t): bool => $tipo === null || $tipo === '' || $tipo === $t;
 
         $movimientos = [];
-        if ($tipo === null || $tipo === '' || $tipo === 'cobro') {
-            $movimientos = [...$movimientos, ...$this->cobros($inicio, $fin, $usuarioId)];
-        }
-        if ($tipo === null || $tipo === '' || $tipo === 'devolucion') {
-            $movimientos = [...$movimientos, ...$this->devoluciones($inicio, $fin, $usuarioId)];
-        }
-        if ($tipo === null || $tipo === '' || $tipo === 'venta') {
-            $movimientos = [...$movimientos, ...$this->ventas($inicio, $fin, $usuarioId)];
-        }
-        if ($tipo === null || $tipo === '' || $tipo === 'cancelacion') {
-            $movimientos = [...$movimientos, ...$this->cancelaciones($inicio, $fin, $usuarioId)];
+        $truncado = false;
+        foreach ([
+            'cobro' => fn (): array => $this->cobros($inicio, $fin, $usuarioId, $limite),
+            'devolucion' => fn (): array => $this->devoluciones($inicio, $fin, $usuarioId, $limite),
+            'venta' => fn (): array => $this->ventas($inicio, $fin, $usuarioId, $limite),
+            'cancelacion' => fn (): array => $this->cancelaciones($inicio, $fin, $usuarioId, $limite),
+        ] as $t => $consulta) {
+            if (! $incluye($t)) {
+                continue;
+            }
+            [$filas, $cortado] = $consulta();
+            $movimientos = [...$movimientos, ...$filas];
+            $truncado = $truncado || $cortado;
         }
 
         usort($movimientos, static fn (array $a, array $b): int => strcmp($b['fecha'], $a['fecha']));
 
-        return ['movimientos' => $movimientos, 'totales' => $this->totales($movimientos)];
+        return [
+            'movimientos' => $movimientos,
+            'totales' => $this->totales($inicio, $fin, $usuarioId, $incluye),
+            'truncado' => $truncado,
+        ];
     }
 
     /**
-     * @return list<Movimiento>
+     * @return array{0: list<Movimiento>, 1: bool}
      */
-    private function cobros(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId): array
+    private function cobros(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId, ?int $limite): array
     {
         $pagos = PagoTenant::query()
-            ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value, EstadoPago::Reembolsado->value])
-            ->whereBetween('created_at', [$inicio, $fin])
+            ->whereIn('estado', array_map(static fn (EstadoPago $e): string => $e->value, self::COBRADOS))
+            ->whereBetween('aprobado_en', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('registrado_por', $usuarioId))
             ->with(['orden.persona', 'orden.lineas.producto'])
+            ->orderByDesc('aprobado_en')
             ->orderByDesc('id')
-            ->limit(self::LIMITE)
+            ->when($limite !== null, fn ($q) => $q->limit($limite + 1))
             ->get();
-        $nombres = $this->nombres($pagos->pluck('registrado_por')->all());
+        [$pagos, $cortado] = self::recortar($pagos->all(), $limite);
+        $nombres = $this->nombres(array_map(static fn (PagoTenant $p): mixed => $p->registrado_por, $pagos));
 
-        return $pagos->map(function (PagoTenant $pago) use ($nombres): array {
+        return [array_map(function (PagoTenant $pago) use ($nombres): array {
             $registro = $pago->registrado_por !== null ? $nombres[(int) $pago->registrado_por] ?? null : null;
 
             return [
-                'fecha' => (string) $pago->created_at?->toIso8601String(),
+                'fecha' => (string) $pago->aprobado_en?->toIso8601String(),
                 'tipo' => 'cobro',
                 'monto_minor' => $pago->monto_minor,
                 'moneda' => $pago->moneda,
@@ -99,31 +122,35 @@ class MovimientosDePagoTenant
                 'quien' => $registro['nombre'] ?? ($pago->domiciliacion_id !== null ? 'Pago automático' : 'En línea'),
                 'quien_id' => $registro['ulid'] ?? null,
                 'referencia' => (string) $pago->ulid,
+                'orden' => $pago->orden?->ulid,
+                'pago' => (string) $pago->ulid,
                 'detalle' => $pago->proveedor,
             ];
-        })->values()->all();
+        }, $pagos), $cortado];
     }
 
     /**
-     * @return list<Movimiento>
+     * @return array{0: list<Movimiento>, 1: bool}
      */
-    private function devoluciones(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId): array
+    private function devoluciones(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId, ?int $limite): array
     {
         $reembolsos = ReembolsoTenant::query()
             ->where('estado', EstadoReembolso::Aprobado->value)
-            ->whereBetween('created_at', [$inicio, $fin])
+            ->whereBetween('aplicado_en', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('actor_id', $usuarioId))
             ->with(['pago.orden.persona', 'pago.orden.lineas.producto'])
+            ->orderByDesc('aplicado_en')
             ->orderByDesc('id')
-            ->limit(self::LIMITE)
+            ->when($limite !== null, fn ($q) => $q->limit($limite + 1))
             ->get();
-        $nombres = $this->nombres($reembolsos->pluck('actor_id')->all());
+        [$reembolsos, $cortado] = self::recortar($reembolsos->all(), $limite);
+        $nombres = $this->nombres(array_map(static fn (ReembolsoTenant $r): mixed => $r->actor_id, $reembolsos));
 
-        return $reembolsos->map(function (ReembolsoTenant $r) use ($nombres): array {
+        return [array_map(function (ReembolsoTenant $r) use ($nombres): array {
             $actor = $r->actor_id !== null ? $nombres[(int) $r->actor_id] ?? null : null;
 
             return [
-                'fecha' => (string) $r->created_at?->toIso8601String(),
+                'fecha' => (string) $r->aplicado_en?->toIso8601String(),
                 'tipo' => 'devolucion',
                 'monto_minor' => -$r->monto_minor,
                 'moneda' => $r->moneda,
@@ -133,26 +160,29 @@ class MovimientosDePagoTenant
                 'quien' => $actor['nombre'] ?? ($r->actor_nombre ?: 'Sistema'),
                 'quien_id' => $actor['ulid'] ?? null,
                 'referencia' => (string) $r->ulid,
+                'orden' => $r->pago?->orden?->ulid,
+                'pago' => $r->pago?->ulid,
                 'detalle' => $r->motivo,
             ];
-        })->values()->all();
+        }, $reembolsos), $cortado];
     }
 
     /**
-     * @return list<Movimiento>
+     * @return array{0: list<Movimiento>, 1: bool}
      */
-    private function ventas(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId): array
+    private function ventas(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId, ?int $limite): array
     {
         $ventas = VentaPosTenant::query()
             ->whereBetween('created_at', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('usuario_id', $usuarioId))
             ->with('lineas.articulo')
             ->orderByDesc('id')
-            ->limit(self::LIMITE)
+            ->when($limite !== null, fn ($q) => $q->limit($limite + 1))
             ->get();
-        $nombres = $this->nombres($ventas->pluck('usuario_id')->all());
+        [$ventas, $cortado] = self::recortar($ventas->all(), $limite);
+        $nombres = $this->nombres(array_map(static fn (VentaPosTenant $v): mixed => $v->usuario_id, $ventas));
 
-        return $ventas->map(function (VentaPosTenant $v) use ($nombres): array {
+        return [array_map(function (VentaPosTenant $v) use ($nombres): array {
             $vendio = $v->usuario_id !== null ? $nombres[(int) $v->usuario_id] ?? null : null;
             $concepto = $v->lineas->map(fn ($l): string => (string) ($l->articulo->nombre ?? ''))->filter()->unique()->implode(', ');
 
@@ -167,29 +197,33 @@ class MovimientosDePagoTenant
                 'quien' => $vendio['nombre'] ?? 'Sistema',
                 'quien_id' => $vendio['ulid'] ?? null,
                 'referencia' => (string) $v->ulid,
+                'orden' => null,
+                'pago' => null,
                 'detalle' => null,
             ];
-        })->values()->all();
+        }, $ventas), $cortado];
     }
 
     /**
      * Compras canceladas (no mueven dinero; se listan para saber quién y cuándo).
      *
-     * @return list<Movimiento>
+     * @return array{0: list<Movimiento>, 1: bool}
      */
-    private function cancelaciones(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId): array
+    private function cancelaciones(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId, ?int $limite): array
     {
         $ordenes = OrdenTenant::query()
             ->where('estado', EstadoOrden::Cancelada->value)
             ->whereBetween('cancelada_en', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('cancelada_por', $usuarioId))
             ->with(['persona', 'lineas.producto'])
+            ->orderByDesc('cancelada_en')
             ->orderByDesc('id')
-            ->limit(self::LIMITE)
+            ->when($limite !== null, fn ($q) => $q->limit($limite + 1))
             ->get();
-        $nombres = $this->nombres($ordenes->pluck('cancelada_por')->all());
+        [$ordenes, $cortado] = self::recortar($ordenes->all(), $limite);
+        $nombres = $this->nombres(array_map(static fn (OrdenTenant $o): mixed => $o->cancelada_por, $ordenes));
 
-        return $ordenes->map(function (OrdenTenant $o) use ($nombres): array {
+        return [array_map(function (OrdenTenant $o) use ($nombres): array {
             $cancelo = $o->cancelada_por !== null ? $nombres[(int) $o->cancelada_por] ?? null : null;
 
             return [
@@ -203,44 +237,132 @@ class MovimientosDePagoTenant
                 'quien' => $cancelo['nombre'] ?? 'Sistema',
                 'quien_id' => $cancelo['ulid'] ?? null,
                 'referencia' => (string) $o->ulid,
+                'orden' => (string) $o->ulid,
+                'pago' => null,
                 'detalle' => 'Total '.number_format($o->total_minor / 100, 2, '.', ','),
             ];
-        })->values()->all();
+        }, $ordenes), $cortado];
     }
 
     /**
-     * @param  list<Movimiento>  $movimientos
-     * @return array{cobrado_minor: int, devuelto_minor: int, neto_minor: int, por_metodo: array<string, int>, por_usuario: list<array{quien: string, cobrado_minor: int, devuelto_minor: int}>}
+     * Totales del rango COMPLETO, calculados en la base y separados por moneda: lo
+     * cobrado (por método y por quién), lo devuelto, el neto y lo que sigue por cobrar
+     * (compras del rango aún pendientes de pago).
+     *
+     * @param  callable(string): bool  $incluye
+     * @return list<Totales>
      */
-    private function totales(array $movimientos): array
+    private function totales(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId, callable $incluye): array
     {
-        $cobrado = 0;
-        $devuelto = 0;
-        $porMetodo = [];
-        $porUsuario = [];
-        foreach ($movimientos as $m) {
-            if ($m['tipo'] === 'cancelacion') {
-                continue;
-            }
-            $metodo = MetodoPago::tryFrom((string) $m['metodo'])?->etiqueta() ?? ucfirst((string) ($m['metodo'] ?? 'Otro'));
-            $porMetodo[$metodo] = ($porMetodo[$metodo] ?? 0) + $m['monto_minor'];
-            $porUsuario[$m['quien']] ??= ['quien' => $m['quien'], 'cobrado_minor' => 0, 'devuelto_minor' => 0];
-            if ($m['monto_minor'] >= 0) {
-                $cobrado += $m['monto_minor'];
-                $porUsuario[$m['quien']]['cobrado_minor'] += $m['monto_minor'];
+        /** @var array<string, array{moneda: string, cobrado_minor: int, devuelto_minor: int, neto_minor: int, por_cobrar_minor: int, por_metodo: array<string, int>, por_usuario: array<string, array{quien: string, cobrado_minor: int, devuelto_minor: int}>}> $por */
+        $por = [];
+        $sumar = function (string $moneda, ?string $metodo, int $monto, string $quien) use (&$por): void {
+            $por[$moneda] ??= ['moneda' => $moneda, 'cobrado_minor' => 0, 'devuelto_minor' => 0, 'neto_minor' => 0, 'por_cobrar_minor' => 0, 'por_metodo' => [], 'por_usuario' => []];
+            $etiqueta = MetodoPago::tryFrom((string) $metodo)?->etiqueta() ?? ucfirst($metodo !== null && $metodo !== '' ? $metodo : 'Otro');
+            $por[$moneda]['por_metodo'][$etiqueta] = ($por[$moneda]['por_metodo'][$etiqueta] ?? 0) + $monto;
+            $por[$moneda]['por_usuario'][$quien] ??= ['quien' => $quien, 'cobrado_minor' => 0, 'devuelto_minor' => 0];
+            if ($monto >= 0) {
+                $por[$moneda]['cobrado_minor'] += $monto;
+                $por[$moneda]['por_usuario'][$quien]['cobrado_minor'] += $monto;
             } else {
-                $devuelto += -$m['monto_minor'];
-                $porUsuario[$m['quien']]['devuelto_minor'] += -$m['monto_minor'];
+                $por[$moneda]['devuelto_minor'] += -$monto;
+                $por[$moneda]['por_usuario'][$quien]['devuelto_minor'] += -$monto;
+            }
+        };
+
+        if ($incluye('cobro')) {
+            $filas = PagoTenant::query()
+                ->selectRaw('moneda, metodo, proveedor, registrado_por, CASE WHEN domiciliacion_id IS NULL THEN 0 ELSE 1 END AS automatico, SUM(monto_minor) AS total')
+                ->whereIn('estado', array_map(static fn (EstadoPago $e): string => $e->value, self::COBRADOS))
+                ->whereBetween('aprobado_en', [$inicio, $fin])
+                ->when($usuarioId !== null, fn ($q) => $q->where('registrado_por', $usuarioId))
+                ->groupByRaw('moneda, metodo, proveedor, registrado_por, CASE WHEN domiciliacion_id IS NULL THEN 0 ELSE 1 END')
+                ->toBase()
+                ->get();
+            $nombres = $this->nombres($filas->pluck('registrado_por')->all());
+            foreach ($filas as $f) {
+                $quien = $f->registrado_por !== null
+                    ? ($nombres[(int) $f->registrado_por]['nombre'] ?? 'Sistema')
+                    : ((int) $f->automatico === 1 ? 'Pago automático' : 'En línea');
+                $sumar((string) $f->moneda, ($f->metodo ?? null) ?: ($f->proveedor ?? null), (int) $f->total, $quien);
             }
         }
 
-        return [
-            'cobrado_minor' => $cobrado,
-            'devuelto_minor' => $devuelto,
-            'neto_minor' => $cobrado - $devuelto,
-            'por_metodo' => $porMetodo,
-            'por_usuario' => array_values($porUsuario),
-        ];
+        if ($incluye('devolucion')) {
+            $filas = ReembolsoTenant::query()
+                ->join('pagos', 'pagos.id', '=', 'reembolsos.pago_id')
+                ->selectRaw('reembolsos.moneda AS moneda, pagos.metodo AS metodo, pagos.proveedor AS proveedor, reembolsos.actor_id AS actor_id, reembolsos.actor_nombre AS actor_nombre, SUM(reembolsos.monto_minor) AS total')
+                ->where('reembolsos.estado', EstadoReembolso::Aprobado->value)
+                ->whereBetween('reembolsos.aplicado_en', [$inicio, $fin])
+                ->when($usuarioId !== null, fn ($q) => $q->where('reembolsos.actor_id', $usuarioId))
+                ->groupBy('reembolsos.moneda', 'pagos.metodo', 'pagos.proveedor', 'reembolsos.actor_id', 'reembolsos.actor_nombre')
+                ->toBase()
+                ->get();
+            $nombres = $this->nombres($filas->pluck('actor_id')->all());
+            foreach ($filas as $f) {
+                $quien = $f->actor_id !== null
+                    ? ($nombres[(int) $f->actor_id]['nombre'] ?? 'Sistema')
+                    : ((string) ($f->actor_nombre ?? '') !== '' ? (string) $f->actor_nombre : 'Sistema');
+                $sumar((string) $f->moneda, ($f->metodo ?? null) ?: ($f->proveedor ?? null), -((int) $f->total), $quien);
+            }
+        }
+
+        if ($incluye('venta')) {
+            $filas = VentaPosTenant::query()
+                ->selectRaw('moneda, metodo_pago, usuario_id, SUM(total_minor) AS total')
+                ->whereBetween('created_at', [$inicio, $fin])
+                ->when($usuarioId !== null, fn ($q) => $q->where('usuario_id', $usuarioId))
+                ->groupBy('moneda', 'metodo_pago', 'usuario_id')
+                ->toBase()
+                ->get();
+            $nombres = $this->nombres($filas->pluck('usuario_id')->all());
+            foreach ($filas as $f) {
+                $quien = $f->usuario_id !== null ? ($nombres[(int) $f->usuario_id]['nombre'] ?? 'Sistema') : 'Sistema';
+                $sumar((string) $f->moneda, $f->metodo_pago ?? null, (int) $f->total, $quien);
+            }
+        }
+
+        // Lo que sigue por cobrar: compras del rango aún pendientes de pago.
+        $pendientes = OrdenTenant::query()
+            ->selectRaw('moneda, SUM(total_minor) AS total')
+            ->where('estado', EstadoOrden::Pendiente->value)
+            ->whereBetween('created_at', [$inicio, $fin])
+            ->groupBy('moneda')
+            ->toBase()
+            ->get();
+        foreach ($pendientes as $f) {
+            $moneda = (string) $f->moneda;
+            $por[$moneda] ??= ['moneda' => $moneda, 'cobrado_minor' => 0, 'devuelto_minor' => 0, 'neto_minor' => 0, 'por_cobrar_minor' => 0, 'por_metodo' => [], 'por_usuario' => []];
+            $por[$moneda]['por_cobrar_minor'] = (int) $f->total;
+        }
+
+        $totales = [];
+        foreach ($por as $t) {
+            $t['neto_minor'] = $t['cobrado_minor'] - $t['devuelto_minor'];
+            $t['por_usuario'] = array_values($t['por_usuario']);
+            $totales[] = $t;
+        }
+        // Primero la moneda con más movimiento (la principal del negocio).
+        usort($totales, static fn (array $a, array $b): int => $b['cobrado_minor'] <=> $a['cobrado_minor']);
+
+        return $totales;
+    }
+
+    /**
+     * Deja a lo más `$limite` filas y dice si había más.
+     *
+     * @template T
+     *
+     * @param  list<T>  $filas
+     * @return array{0: list<T>, 1: bool}
+     */
+    private static function recortar(array $filas, ?int $limite): array
+    {
+        if ($limite === null || count($filas) <= $limite) {
+            return [$filas, false];
+        }
+
+        return [array_slice($filas, 0, $limite), true];
     }
 
     /**

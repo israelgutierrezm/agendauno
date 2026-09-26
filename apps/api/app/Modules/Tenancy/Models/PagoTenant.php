@@ -27,6 +27,7 @@ class PagoTenant extends Model
     protected $fillable = [
         'orden_id', 'proveedor', 'metodo', 'estado', 'monto_minor', 'moneda',
         'referencia_externa', 'idempotency_key', 'domiciliacion_id', 'registrado_por',
+        'aprobado_en',
     ];
 
     /**
@@ -56,6 +57,8 @@ class PagoTenant extends Model
         'estado' => EstadoPago::class,
         'metodo' => MetodoPago::class,
         'monto_minor' => 'integer',
+        // Cuándo entró el dinero (distinto de cuándo se inició el cobro).
+        'aprobado_en' => 'datetime',
     ];
 
     /**

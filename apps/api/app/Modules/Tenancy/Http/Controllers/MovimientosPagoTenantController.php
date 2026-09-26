@@ -15,8 +15,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Movimientos de dinero por fecha y por quién (corte de caja): cobros, devoluciones,
- * ventas de mostrador y cancelaciones, con totales. Sin fechas, el día de hoy (en la
- * zona del negocio). `?formato=csv` lo descarga.
+ * ventas de mostrador y cancelaciones, con totales del rango completo por moneda. Sin
+ * fechas, el día de hoy (en la zona del negocio). La lista trae a lo más `limite`
+ * filas por tipo (avisa si se cortó); `?formato=csv` descarga TODAS con los mismos
+ * totales.
  */
 class MovimientosPagoTenantController
 {
@@ -37,6 +39,7 @@ class MovimientosPagoTenantController
             'usuario' => ['nullable', 'string', 'max:40'],
             'tipo' => ['nullable', Rule::in(array_keys(self::TIPOS))],
             'formato' => ['nullable', Rule::in(['json', 'csv'])],
+            'limite' => ['nullable', 'integer', 'min:1', 'max:'.MovimientosDePagoTenant::LIMITE],
         ]);
 
         $zona = $this->zona();
@@ -49,23 +52,32 @@ class MovimientosPagoTenantController
             throw ValidationException::withMessages(['hasta' => ['Consulta a lo más un año a la vez.']]);
         }
 
-        $resultado = $this->movimientos->listar($desde, $hasta, $validado['usuario'] ?? null, $validado['tipo'] ?? null);
-
         if (($validado['formato'] ?? 'json') === 'csv') {
-            return $this->csv($resultado['movimientos'], $desde, $hasta, $zona);
+            $todo = $this->movimientos->listar($desde, $hasta, $validado['usuario'] ?? null, $validado['tipo'] ?? null, null);
+
+            return $this->csv($todo['movimientos'], $todo['totales'], $desde, $hasta, $zona);
         }
+
+        $limite = (int) ($validado['limite'] ?? MovimientosDePagoTenant::LIMITE);
+        $resultado = $this->movimientos->listar($desde, $hasta, $validado['usuario'] ?? null, $validado['tipo'] ?? null, $limite);
 
         return response()->json([
             'data' => $resultado['movimientos'],
-            'totales' => $resultado['totales'],
-            'meta' => ['desde' => $desde, 'hasta' => $hasta],
+            // La moneda principal (compatibilidad) y todas por separado: nunca se suman.
+            'totales' => $resultado['totales'][0] ?? [
+                'moneda' => 'MXN', 'cobrado_minor' => 0, 'devuelto_minor' => 0, 'neto_minor' => 0,
+                'por_cobrar_minor' => 0, 'por_metodo' => [], 'por_usuario' => [],
+            ],
+            'totales_por_moneda' => $resultado['totales'],
+            'meta' => ['desde' => $desde, 'hasta' => $hasta, 'truncado' => $resultado['truncado'], 'limite' => $limite],
         ]);
     }
 
     /**
      * @param  list<array<string, mixed>>  $movimientos
+     * @param  list<array{moneda: string, cobrado_minor: int, devuelto_minor: int, neto_minor: int, por_cobrar_minor: int}>  $totales
      */
-    private function csv(array $movimientos, string $desde, string $hasta, string $zona): Response
+    private function csv(array $movimientos, array $totales, string $desde, string $hasta, string $zona): Response
     {
         $lineas = ['Fecha,Tipo,Monto,Moneda,Método,Persona,Concepto,Quién,Referencia,Detalle'];
         foreach ($movimientos as $m) {
@@ -82,6 +94,14 @@ class MovimientosPagoTenantController
                 (string) $m['referencia'],
                 (string) ($m['detalle'] ?? ''),
             ]));
+        }
+
+        // Los mismos totales del reporte, por moneda.
+        $lineas[] = '';
+        foreach ($totales as $t) {
+            foreach (['Total cobrado' => $t['cobrado_minor'], 'Total devuelto' => $t['devuelto_minor'], 'Neto' => $t['neto_minor'], 'Por cobrar' => $t['por_cobrar_minor']] as $concepto => $minor) {
+                $lineas[] = $concepto.','.number_format($minor / 100, 2, '.', '').','.$t['moneda'];
+            }
         }
 
         return response("\u{FEFF}".implode("\n", $lineas)."\n", 200, [

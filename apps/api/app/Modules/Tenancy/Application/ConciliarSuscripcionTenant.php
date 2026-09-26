@@ -110,6 +110,7 @@ class ConciliarSuscripcionTenant
                 'moneda' => $orden->moneda,
                 'referencia_externa' => $cobro->id,
                 'domiciliacion_id' => $domiciliacion->getKey(),
+                'aprobado_en' => $cobro->aprobado ? now() : null,
             ]);
             if ($cobro->aprobado) {
                 // Paga la deuda del periodo: la fecha avanza y la mora se regulariza.

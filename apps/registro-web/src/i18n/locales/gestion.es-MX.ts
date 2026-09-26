@@ -729,6 +729,10 @@ export const corteCaja = {
   cobrado: "Cobrado",
   devuelto: "Devuelto",
   neto: "Neto",
+  porCobrar: "Por cobrar",
+  enMoneda: "En {moneda}",
+  truncado:
+    "Se muestran los {n} movimientos más recientes; los totales y el CSV incluyen todos los del rango.",
   porMetodo: "Por método",
   porPersona: "Por persona",
   vacio: "No hay movimientos en esas fechas.",

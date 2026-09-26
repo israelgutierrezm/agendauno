@@ -50,6 +50,7 @@ class ConfirmarPagoTenant
             $bloqueado->update([
                 'estado' => EstadoPago::Aprobado->value,
                 'referencia_externa' => $referencia !== '' ? $referencia : $bloqueado->referencia_externa,
+                'aprobado_en' => now(),
             ]);
             if (! $orden instanceof OrdenTenant) {
                 return [];

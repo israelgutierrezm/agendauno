@@ -23,10 +23,14 @@ interface Movimiento {
   referencia: string;
   detalle: string | null;
 }
+// Totales del rango completo (no dependen de cuántas filas se muestran), por moneda.
 interface Totales {
+  moneda?: string;
   cobrado_minor: number;
   devuelto_minor: number;
   neto_minor: number;
+  // Compras del rango que siguen pendientes de pago.
+  por_cobrar_minor?: number;
   por_metodo: Record<string, number>;
   por_usuario: {
     quien: string;
@@ -50,7 +54,9 @@ const hasta = ref(hoy());
 const usuario = ref("");
 const tipo = ref("");
 const movimientos = ref<Movimiento[]>([]);
-const totales = ref<Totales | null>(null);
+const totalesPorMoneda = ref<Totales[]>([]);
+// La lista muestra los más recientes; los totales y el CSV incluyen todo el rango.
+const truncado = ref<number | null>(null);
 // Quienes aparecen en el rango (para filtrar por persona del equipo).
 const personasEquipo = ref<{ id: string; nombre: string }[]>([]);
 const cargando = ref(false);
@@ -86,12 +92,15 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const { data } = await api.get<{ data: Movimiento[]; totales: Totales }>(
-      `${base.value}/pagos/movimientos`,
-      { params: parametros() },
-    );
+    const { data } = await api.get<{
+      data: Movimiento[];
+      totales: Totales;
+      totales_por_moneda?: Totales[];
+      meta?: { truncado?: boolean; limite?: number };
+    }>(`${base.value}/pagos/movimientos`, { params: parametros() });
     movimientos.value = data.data;
-    totales.value = data.totales;
+    totalesPorMoneda.value = data.totales_por_moneda ?? [data.totales];
+    truncado.value = data.meta?.truncado ? (data.meta.limite ?? null) : null;
     if (usuario.value === "") {
       const vistos = new Map<string, string>();
       for (const m of data.data) {
@@ -187,69 +196,93 @@ onMounted(cargar);
       {{ error }}
     </p>
 
-    <!-- Totales: una franja -->
-    <div
-      v-if="totales"
-      class="mt-3 tu-card grid grid-cols-3 divide-x divide-[var(--borde)]"
+    <p
+      v-if="truncado !== null"
+      class="mt-3 text-sm"
+      role="status"
+      :style="{ color: 'var(--texto-suave)' }"
     >
-      <div class="p-4">
-        <p class="tu-label">{{ $t("corteCaja.cobrado") }}</p>
-        <p class="text-xl font-semibold tabular-nums">
-          {{ dinero(totales.cobrado_minor) }}
-        </p>
-      </div>
-      <div class="p-4">
-        <p class="tu-label">{{ $t("corteCaja.devuelto") }}</p>
-        <p class="text-xl font-semibold tabular-nums">
-          {{ dinero(totales.devuelto_minor) }}
-        </p>
-      </div>
-      <div class="p-4">
-        <p class="tu-label">{{ $t("corteCaja.neto") }}</p>
-        <p class="text-xl font-semibold tabular-nums">
-          {{ dinero(totales.neto_minor) }}
-        </p>
-      </div>
-    </div>
-    <div
-      v-if="totales && movimientos.length > 0"
-      class="mt-3 grid gap-3 text-sm sm:grid-cols-2"
+      {{ $t("corteCaja.truncado", { n: truncado }) }}
+    </p>
+
+    <!-- Totales: una franja por moneda (nunca se suman monedas distintas) -->
+    <template
+      v-for="totales in totalesPorMoneda"
+      :key="totales.moneda ?? 'MXN'"
     >
-      <div class="tu-card p-4">
-        <p class="tu-label">{{ $t("corteCaja.porMetodo") }}</p>
-        <ul class="mt-1 space-y-1">
-          <li
-            v-for="(monto, metodo) in totales.por_metodo"
-            :key="metodo"
-            class="flex justify-between gap-3"
-          >
-            <span>{{ metodo }}</span>
-            <span class="tabular-nums">{{ dinero(monto) }}</span>
-          </li>
-        </ul>
+      <p v-if="totalesPorMoneda.length > 1" class="mt-4 text-sm font-semibold">
+        {{ $t("corteCaja.enMoneda", { moneda: totales.moneda }) }}
+      </p>
+      <div
+        class="mt-3 tu-card grid grid-cols-2 sm:grid-cols-4 divide-x divide-[var(--borde)]"
+      >
+        <div class="p-4">
+          <p class="tu-label">{{ $t("corteCaja.cobrado") }}</p>
+          <p class="text-xl font-semibold tabular-nums">
+            {{ dinero(totales.cobrado_minor, totales.moneda) }}
+          </p>
+        </div>
+        <div class="p-4">
+          <p class="tu-label">{{ $t("corteCaja.devuelto") }}</p>
+          <p class="text-xl font-semibold tabular-nums">
+            {{ dinero(totales.devuelto_minor, totales.moneda) }}
+          </p>
+        </div>
+        <div class="p-4">
+          <p class="tu-label">{{ $t("corteCaja.neto") }}</p>
+          <p class="text-xl font-semibold tabular-nums">
+            {{ dinero(totales.neto_minor, totales.moneda) }}
+          </p>
+        </div>
+        <div class="p-4">
+          <p class="tu-label">{{ $t("corteCaja.porCobrar") }}</p>
+          <p class="text-xl font-semibold tabular-nums">
+            {{ dinero(totales.por_cobrar_minor ?? 0, totales.moneda) }}
+          </p>
+        </div>
       </div>
-      <div class="tu-card p-4">
-        <p class="tu-label">{{ $t("corteCaja.porPersona") }}</p>
-        <ul class="mt-1 space-y-1">
-          <li
-            v-for="u in totales.por_usuario"
-            :key="u.quien"
-            class="flex justify-between gap-3"
-          >
-            <span>{{ u.quien }}</span>
-            <span class="tabular-nums">
-              {{ dinero(u.cobrado_minor) }}
-              <span
-                v-if="u.devuelto_minor > 0"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                · −{{ dinero(u.devuelto_minor) }}</span
-              >
-            </span>
-          </li>
-        </ul>
+      <div
+        v-if="movimientos.length > 0"
+        class="mt-3 grid gap-3 text-sm sm:grid-cols-2"
+      >
+        <div class="tu-card p-4">
+          <p class="tu-label">{{ $t("corteCaja.porMetodo") }}</p>
+          <ul class="mt-1 space-y-1">
+            <li
+              v-for="(monto, metodo) in totales.por_metodo"
+              :key="metodo"
+              class="flex justify-between gap-3"
+            >
+              <span>{{ metodo }}</span>
+              <span class="tabular-nums">{{
+                dinero(monto, totales.moneda)
+              }}</span>
+            </li>
+          </ul>
+        </div>
+        <div class="tu-card p-4">
+          <p class="tu-label">{{ $t("corteCaja.porPersona") }}</p>
+          <ul class="mt-1 space-y-1">
+            <li
+              v-for="u in totales.por_usuario"
+              :key="u.quien"
+              class="flex justify-between gap-3"
+            >
+              <span>{{ u.quien }}</span>
+              <span class="tabular-nums">
+                {{ dinero(u.cobrado_minor, totales.moneda) }}
+                <span
+                  v-if="u.devuelto_minor > 0"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  · −{{ dinero(u.devuelto_minor, totales.moneda) }}</span
+                >
+              </span>
+            </li>
+          </ul>
+        </div>
       </div>
-    </div>
+    </template>
 
     <div class="mt-3 tu-card overflow-hidden">
       <p

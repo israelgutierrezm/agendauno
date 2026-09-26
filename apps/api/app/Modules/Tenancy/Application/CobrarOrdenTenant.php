@@ -143,7 +143,7 @@ class CobrarOrdenTenant
         $pago->checkout = $resultado->datos;
 
         if ($resultado->esAprobado()) {
-            $pago->update(['estado' => EstadoPago::Aprobado->value, 'referencia_externa' => $resultado->referencia]);
+            $pago->update(['estado' => EstadoPago::Aprobado->value, 'referencia_externa' => $resultado->referencia, 'aprobado_en' => now()]);
             // El fulfillment asienta orden.pagada (recibo, puntos de lealtad).
             $this->fulfillment->cumplir($orden);
         } elseif ($resultado->esPendiente()) {
