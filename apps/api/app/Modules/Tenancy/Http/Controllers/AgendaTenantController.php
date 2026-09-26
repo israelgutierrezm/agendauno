@@ -403,6 +403,7 @@ class AgendaTenantController
             'recurso_id' => $sesion->recurso?->ulid,
             // Clase recurrente de la que salió y su fecha en ella (2.5).
             'serie_id' => $sesion->serie?->ulid,
+            'serie_dias' => $sesion->serie?->dias_semana,
             'fecha_serie' => $sesion->fecha_serie?->toDateString(),
             'inicia_en' => $sesion->inicia_en->toIso8601String(),
             'termina_en' => $sesion->termina_en->toIso8601String(),

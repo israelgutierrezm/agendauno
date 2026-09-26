@@ -64,6 +64,7 @@ interface Sesion {
   // Clase recurrente de la que salió y su fecha en ella (2.5).
   serie_id?: string | null;
   fecha_serie?: string | null;
+  serie_dias?: number[] | null;
 }
 interface Recurso {
   id: string;
@@ -2428,6 +2429,7 @@ onMounted(async () => {
             "
             :profesionales="instructores"
             :profesional-id="detalle.instructor_id"
+            :dias="detalle.serie_dias ?? []"
             @hecho="horarioCambiado"
             @cerrar="cambiandoSerie = false"
           />

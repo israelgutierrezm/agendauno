@@ -96,14 +96,16 @@ class PlantillasHorarioTenantController
     }
 
     /**
-     * "Esta y las siguientes" (2.5): cambia hora, duración, profesional o sala desde
-     * `desde`. Con `previsualizar` no guarda nada y dice lo mismo que pasaría.
+     * "Esta y las siguientes" (2.5): cambia días (ADR 0045), hora, duración,
+     * profesional o sala desde `desde`. Con `previsualizar` no guarda nada y dice lo mismo que pasaría.
      */
     public function cambiar(Request $request, CambiarSerieTenant $cambiar): JsonResponse
     {
         $plantilla = PlantillaHorarioTenant::query()->where('ulid', (string) $request->route('plantilla'))->firstOrFail();
         $validado = $request->validate([
             'desde' => ['required', 'date_format:Y-m-d'],
+            'dias_semana' => ['nullable', 'array', 'min:1'],
+            'dias_semana.*' => ['integer', 'between:1,7'],
             'hora_local' => ['nullable', 'date_format:H:i'],
             'duracion_minutos' => ['nullable', 'integer', 'min:1', 'max:1440'],
             'instructor_id' => ['nullable', 'string'],
@@ -112,6 +114,11 @@ class PlantillasHorarioTenantController
         ]);
 
         $cambios = [];
+        if (isset($validado['dias_semana'])) {
+            $dias = array_values(array_unique(array_map('intval', $validado['dias_semana'])));
+            sort($dias);
+            $cambios['dias_semana'] = $dias;
+        }
         if (isset($validado['hora_local'])) {
             $cambios['hora_local'] = (string) $validado['hora_local'];
         }
@@ -126,7 +133,7 @@ class PlantillasHorarioTenantController
             $cambios['recurso_id'] = $this->resolverRecurso($validado['recurso_id'] ?? null);
         }
         if ($cambios === []) {
-            throw ValidationException::withMessages(['hora_local' => ['Indica qué cambia: hora, duración, profesional o sala.']]);
+            throw ValidationException::withMessages(['hora_local' => ['Indica qué cambia: días, hora, duración, profesional o sala.']]);
         }
 
         $actor = $request->attributes->get('usuario_tenant');
@@ -137,6 +144,9 @@ class PlantillasHorarioTenantController
             'aplicado' => $aplicar,
             'movidas' => $resultado->movidas,
             'conservadas' => $resultado->conservadas,
+            'quitadas' => $resultado->quitadas,
+            'creadas' => $resultado->creadas,
+            'omitidas' => $resultado->omitidas,
             'serie_id' => $resultado->serie,
         ]]);
     }

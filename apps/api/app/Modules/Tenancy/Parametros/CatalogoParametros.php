@@ -41,6 +41,10 @@ final class CatalogoParametros
             new DefinicionParametro('citas.duracion_defecto', 'Citas', 'Duración de una cita si el servicio no la define',
                 'Minutos.', $e, 30, 5, 480, 'min'),
 
+            // Clases recurrentes (ADR 0045).
+            new DefinicionParametro('agenda.dias_a_generar', 'Clases recurrentes', 'Fechas creadas por adelantado',
+                'Días hacia adelante con fechas de las clases recurrentes listas para reservar.', $e, 30, 7, 365, 'días'),
+
             // Acceso.
             new DefinicionParametro('acceso.minutos_antes', 'Acceso', 'Se puede entrar desde',
                 'Minutos antes de que empiece su clase o cita.', $e, 30, 0, 240, 'min'),

@@ -854,6 +854,11 @@ export const cambiarSerie = {
   aplicar: "Aplicar el cambio",
   movidas: "Se moverán {n} fechas.",
   conservadas: "{n} se quedan como están:",
+  dias: "Días",
+  nombresDias: "lunes,martes,miércoles,jueves,viernes,sábado,domingo",
+  quitadas: "Se quitan {n} fechas de los días que ya no van.",
+  creadas: "Se crean {n} fechas en los días nuevos.",
+  omitidas: "{n} fechas nuevas no se pueden crear:",
 };
 
 // Agenda como centro de operación (fase 2, punto 2.6).

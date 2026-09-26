@@ -4,8 +4,8 @@ import { ref } from "vue";
 import { api, mensajeDeError } from "@/lib/api";
 
 /**
- * "Esta y las siguientes" (fase 2, punto 2.5): cambia la hora, la duración o el
- * profesional de una clase recurrente desde esta fecha. Primero muestra qué pasará
+ * "Esta y las siguientes" (fase 2, punto 2.5): cambia los días, la hora, la duración
+ * o el profesional de una clase recurrente desde esta fecha (días: ADR 0045). Primero muestra qué pasará
  * (cuántas fechas se mueven y cuáles se conservan y por qué) y luego se aplica. El
  * historial no se toca y lo cambiado a mano se respeta.
  */
@@ -13,6 +13,9 @@ interface Resultado {
   aplicado: boolean;
   movidas: number;
   conservadas: { fecha: string; motivo: string }[];
+  quitadas?: number;
+  creadas?: number;
+  omitidas?: { fecha: string; motivo: string }[];
 }
 
 const props = defineProps<{
@@ -25,6 +28,8 @@ const props = defineProps<{
   duracion: number;
   profesionales: { id: string; nombre: string }[];
   profesionalId: string | null;
+  /** Días de la serie (ISO: 1 = lunes … 7 = domingo). */
+  dias: number[];
 }>();
 
 const emit = defineEmits<{ hecho: []; cerrar: [] }>();
@@ -39,6 +44,18 @@ const hora = ref(
 );
 const duracion = ref(props.duracion);
 const profesional = ref(props.profesionalId ?? "");
+const dias = ref<number[]>([...props.dias].sort((a, b) => a - b));
+const INICIALES = ["L", "M", "M", "J", "V", "S", "D"];
+function alternarDia(n: number): void {
+  const siguen = dias.value.includes(n)
+    ? dias.value.filter((d) => d !== n)
+    : [...dias.value, n].sort((a, b) => a - b);
+  // Al menos un día: para quitar la clase se cancela la serie.
+  if (siguen.length > 0) {
+    dias.value = siguen;
+    vista.value = null;
+  }
+}
 const vista = ref<Resultado | null>(null);
 const guardando = ref(false);
 const error = ref<string | null>(null);
@@ -62,6 +79,7 @@ async function enviar(previsualizar: boolean): Promise<void> {
         hora_local: hora.value,
         duracion_minutos: duracion.value,
         instructor_id: profesional.value,
+        ...(dias.value.length > 0 ? { dias_semana: dias.value } : {}),
         previsualizar,
       },
     );
@@ -88,6 +106,27 @@ async function enviar(previsualizar: boolean): Promise<void> {
     <p :style="{ color: 'var(--texto-suave)' }">
       {{ $t("cambiarSerie.desde", { fecha: fechaLarga(fecha) }) }}
     </p>
+    <div v-if="props.dias.length > 0">
+      <span class="tu-label">{{ $t("cambiarSerie.dias") }}</span>
+      <div class="mt-1 flex gap-1">
+        <button
+          v-for="(inicial, i) in INICIALES"
+          :key="i"
+          type="button"
+          class="h-8 w-8 rounded-full text-xs font-semibold"
+          :aria-pressed="dias.includes(i + 1)"
+          :aria-label="$t('cambiarSerie.nombresDias').split(',')[i]"
+          :style="
+            dias.includes(i + 1)
+              ? { background: 'var(--primario)', color: '#fff' }
+              : { background: 'var(--superficie-2)', color: 'var(--texto)' }
+          "
+          @click="alternarDia(i + 1)"
+        >
+          {{ inicial }}
+        </button>
+      </div>
+    </div>
     <div class="flex flex-wrap items-end gap-3">
       <div>
         <label class="tu-label" for="cs-hora">{{
@@ -139,6 +178,22 @@ async function enviar(previsualizar: boolean): Promise<void> {
     <!-- Qué pasará, antes de aplicar -->
     <div v-if="vista" role="status">
       <p>{{ $t("cambiarSerie.movidas", { n: vista.movidas }) }}</p>
+      <p v-if="(vista.quitadas ?? 0) > 0">
+        {{ $t("cambiarSerie.quitadas", { n: vista.quitadas }) }}
+      </p>
+      <p v-if="(vista.creadas ?? 0) > 0">
+        {{ $t("cambiarSerie.creadas", { n: vista.creadas }) }}
+      </p>
+      <template v-if="(vista.omitidas ?? []).length > 0">
+        <p class="mt-1" style="color: var(--aviso)">
+          {{ $t("cambiarSerie.omitidas", { n: vista.omitidas?.length }) }}
+        </p>
+        <ul class="mt-1" :style="{ color: 'var(--texto-suave)' }">
+          <li v-for="o in vista.omitidas" :key="o.fecha">
+            {{ fechaLarga(o.fecha) }} · {{ o.motivo }}
+          </li>
+        </ul>
+      </template>
       <template v-if="vista.conservadas.length > 0">
         <p class="mt-1" style="color: var(--aviso)">
           {{ $t("cambiarSerie.conservadas", { n: vista.conservadas.length }) }}

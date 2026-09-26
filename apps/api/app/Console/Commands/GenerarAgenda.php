@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Modules\Tenancy\Application\GenerarAgendaTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\Estudio;
@@ -19,27 +20,29 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class GenerarAgenda extends Command
 {
-    protected $signature = 'turnouno:generar-agenda {--dias=30}';
+    protected $signature = 'turnouno:generar-agenda {--dias= : Días adelante (si no, lo que fija cada negocio)}';
 
     protected $description = 'Materializa las sesiones recurrentes de las plantillas de horario de cada estudio';
 
-    public function handle(GenerarAgendaTenant $generar, GestorDeConexionTenant $gestor): int
+    public function handle(GenerarAgendaTenant $generar, GestorDeConexionTenant $gestor, ParametrosTenant $parametros): int
     {
-        $dias = max(1, (int) $this->option('dias'));
+        $forzado = $this->option('dias');
         $desde = now()->toDateString();
-        $hasta = now()->addDays($dias)->toDateString();
         $creadas = 0;
 
         Estudio::query()
             ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value])
-            ->chunkById(100, function (Collection $estudios) use (&$creadas, $generar, $gestor, $desde, $hasta): void {
+            ->chunkById(100, function (Collection $estudios) use (&$creadas, $generar, $gestor, $parametros, $forzado, $desde): void {
                 /** @var Collection<int, Estudio> $estudios */
                 foreach ($estudios as $estudio) {
                     if (! $gestor->baseDeDatosExiste($estudio)) {
                         continue;
                     }
 
-                    $creadas += $gestor->ejecutarEn($estudio, function () use ($generar, $desde, $hasta): int {
+                    $creadas += $gestor->ejecutarEn($estudio, function () use ($generar, $parametros, $forzado, $desde): int {
+                        // Cuántos días adelante: lo que fija el negocio (ADR 0045).
+                        $dias = max(1, is_numeric($forzado) ? (int) $forzado : $parametros->entero('agenda.dias_a_generar'));
+                        $hasta = now()->addDays($dias)->toDateString();
                         $n = 0;
                         PlantillaHorarioTenant::query()
                             ->where('activo', true)
