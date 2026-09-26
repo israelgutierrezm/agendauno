@@ -173,7 +173,12 @@ onMounted(cargar);
                   }}<template v-if="o.duracion_minutos">
                     · {{ o.duracion_minutos }} min</template
                   ></template
-                ><template
+                >
+                <template v-else>{{
+                  $t("catalogo.badgeEntitlement")
+                }}</template>
+                <!-- Va después del v-if/v-else de cómo se reserva (no entre ellos). -->
+                <template
                   v-if="(o.preparacion_min ?? 0) + (o.limpieza_min ?? 0) > 0"
                 >
                   ·
@@ -183,9 +188,6 @@ onMounted(cargar);
                     })
                   }}</template
                 >
-                <template v-else>{{
-                  $t("catalogo.badgeEntitlement")
-                }}</template>
                 <span
                   v-if="guardadoId === o.id"
                   class="ml-2"
