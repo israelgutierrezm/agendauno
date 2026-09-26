@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\PoliticaCancelacion;
 use App\Modules\Tenancy\Models\ActividadTenant;
 use App\Modules\Tenancy\Models\PoliticaCancelacionTenant;
 use Illuminate\Http\JsonResponse;
@@ -17,12 +19,21 @@ use Illuminate\Http\Request;
  */
 class PoliticasCancelacionTenantController
 {
-    public function index(): JsonResponse
+    public function index(ParametrosTenant $parametros): JsonResponse
     {
         $politicas = PoliticaCancelacionTenant::query()->with('actividad')->orderBy('actividad_id')->get();
+        // La que aplica mientras el negocio no defina la suya (la fija la plataforma).
+        $defecto = PoliticaCancelacion::porDefecto($parametros);
 
         return response()->json([
             'data' => $politicas->map(fn (PoliticaCancelacionTenant $p): array => $this->presentar($p))->all(),
+            'por_defecto' => [
+                'horas_limite' => $defecto->horasLimite,
+                'penaliza_tarde' => $defecto->penalizaTarde,
+                'penaliza_no_show' => $defecto->penalizaNoShow,
+                'tolerancia_no_show' => $defecto->toleranciaNoShow,
+                'ventana_no_show_dias' => $defecto->ventanaNoShowDias,
+            ],
         ]);
     }
 
@@ -38,6 +49,7 @@ class PoliticasCancelacionTenantController
             'penaliza_tarde' => ['required', 'boolean'],
             'penaliza_no_show' => ['required', 'boolean'],
             'tolerancia_no_show' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'ventana_no_show_dias' => ['nullable', 'integer', 'min:1', 'max:365'],
         ]);
 
         $actividadId = null;
@@ -53,6 +65,7 @@ class PoliticasCancelacionTenantController
                 'penaliza_tarde' => (bool) $validado['penaliza_tarde'],
                 'penaliza_no_show' => (bool) $validado['penaliza_no_show'],
                 'tolerancia_no_show' => (int) ($validado['tolerancia_no_show'] ?? 0),
+                'ventana_no_show_dias' => isset($validado['ventana_no_show_dias']) ? (int) $validado['ventana_no_show_dias'] : null,
             ],
         );
 
@@ -72,6 +85,7 @@ class PoliticasCancelacionTenantController
             'penaliza_tarde' => $politica->penaliza_tarde,
             'penaliza_no_show' => $politica->penaliza_no_show,
             'tolerancia_no_show' => $politica->tolerancia_no_show,
+            'ventana_no_show_dias' => $politica->ventana_no_show_dias,
         ];
     }
 }

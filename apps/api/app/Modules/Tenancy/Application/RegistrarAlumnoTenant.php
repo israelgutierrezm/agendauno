@@ -31,11 +31,10 @@ use Illuminate\Validation\ValidationException;
  */
 class RegistrarAlumnoTenant
 {
-    private const HORAS_VIGENCIA = 24;
-
     public function __construct(
         private readonly BajasTenant $bajas,
         private readonly RegistrarEventoTenant $eventos,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -67,7 +66,7 @@ class RegistrarAlumnoTenant
                 'primer_apellido' => $datos['primer_apellido'],
                 'password' => Hash::make($datos['password']),
                 'token_hash' => hash('sha256', $token),
-                'expira_en' => now()->addHours(self::HORAS_VIGENCIA),
+                'expira_en' => now()->addHours($this->parametros->entero('cuentas.horas_confirmar_registro')),
             ]);
         });
 

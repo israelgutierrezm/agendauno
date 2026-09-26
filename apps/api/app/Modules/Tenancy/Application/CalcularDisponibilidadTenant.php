@@ -22,6 +22,7 @@ class CalcularDisponibilidadTenant
     public function __construct(
         private readonly VerificarAgendaTenant $agenda,
         private readonly ElegirRecursoTenant $recursos,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -31,11 +32,11 @@ class CalcularDisponibilidadTenant
      *
      * @return array{0: int, 1: MargenesServicio}
      */
-    public static function duracionYMargenes(?OfertaTenant $oferta, ?int $duracionMin): array
+    public function duracionYMargenes(?OfertaTenant $oferta, ?int $duracionMin): array
     {
         $duracion = $oferta !== null && (int) $oferta->duracion_minutos > 0
             ? (int) $oferta->duracion_minutos
-            : ($duracionMin !== null && $duracionMin > 0 ? $duracionMin : 30);
+            : ($duracionMin !== null && $duracionMin > 0 ? $duracionMin : $this->parametros->entero('citas.duracion_defecto'));
 
         return [$duracion, MargenesServicio::de($oferta)];
     }

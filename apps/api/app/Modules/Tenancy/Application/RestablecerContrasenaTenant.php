@@ -19,11 +19,10 @@ use Illuminate\Support\Str;
  */
 class RestablecerContrasenaTenant
 {
-    private const MINUTOS = 60;
-
     public function __construct(
         private readonly EnviarActivacionTenant $activacion,
         private readonly AutenticacionTenant $auth,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -47,7 +46,7 @@ class RestablecerContrasenaTenant
         $token = Str::random(48);
         $usuario->forceFill([
             'reset_token' => hash('sha256', $token),
-            'reset_expira_en' => now()->addMinutes(self::MINUTOS),
+            'reset_expira_en' => now()->addMinutes($this->parametros->entero('cuentas.minutos_restablecer_contrasena')),
         ])->save();
 
         Mail::to((string) $usuario->email)->queue(new CorreoRestablecimiento(

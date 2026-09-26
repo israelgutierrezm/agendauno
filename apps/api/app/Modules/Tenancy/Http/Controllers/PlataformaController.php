@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\Models\CargoRenta;
@@ -187,6 +188,26 @@ class PlataformaController
         return response()->json(['data' => [
             'facturapi_configurada' => ConfiguracionPlataforma::llaveFacturapi() !== null,
         ]]);
+    }
+
+    /**
+     * Parámetros de plataforma (ADR 0042): el valor que aplica a todos los negocios que
+     * no ajustaron el suyo, y los que solo fija la plataforma (vigencias de enlaces).
+     */
+    public function parametros(ParametrosTenant $parametros): JsonResponse
+    {
+        return response()->json(['data' => $parametros->deLaPlataformaParaEditar()]);
+    }
+
+    /**
+     * `valores`: {clave: número | null}; null vuelve al valor inicial.
+     */
+    public function guardarParametros(Request $request, ParametrosTenant $parametros): JsonResponse
+    {
+        $validado = $request->validate(['valores' => ['required', 'array']]);
+        $parametros->guardarDePlataforma($validado['valores']);
+
+        return response()->json(['data' => $parametros->deLaPlataformaParaEditar()]);
     }
 
     /**

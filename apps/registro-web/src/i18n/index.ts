@@ -27,6 +27,7 @@ import {
   margenesServicio,
   miCuentaExtra,
   pagoEnLinea,
+  parametrosConfig,
   paseEntrada,
   miPrivacidad,
   misDocumentos,
@@ -109,6 +110,7 @@ export const i18n = createI18n({
       recursosServicio,
       cambiarSerie,
       agendaOperacion,
+      parametrosConfig,
     },
   },
 });

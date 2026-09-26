@@ -44,6 +44,7 @@ class ReprogramarTenant
         private readonly RegistrarEventoTenant $eventos,
         private readonly RegistrarAuditoria $auditoria,
         private readonly ElegirRecursoTenant $recursos,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     public function moverCita(ReservaTenant $reserva, CarbonImmutable $inicia, ?int $instructorId, ?Usuario $actor): ReservaTenant
@@ -254,7 +255,7 @@ class ReprogramarTenant
 
         $marcas = [];
         foreach (Recordatorio::cases() as $recordatorio) {
-            $momento = CarbonImmutable::instance($sesion->inicia_en)->subMinutes($recordatorio->minutos());
+            $momento = CarbonImmutable::instance($sesion->inicia_en)->subMinutes($recordatorio->minutos($this->parametros));
             $marcas[$recordatorio->columna()] = $momento->isPast() ? now() : null;
         }
         $reserva->forceFill($marcas)->save();

@@ -15,6 +15,8 @@ use App\Modules\Tenancy\Models\SesionTenant;
  */
 class ResolverPoliticaCancelacionTenant
 {
+    public function __construct(private readonly ParametrosTenant $parametros) {}
+
     public function paraSesion(SesionTenant $sesion): PoliticaCancelacion
     {
         $actividadId = $sesion->oferta?->actividad_id;
@@ -27,7 +29,7 @@ class ResolverPoliticaCancelacionTenant
         $politica ??= PoliticaCancelacionTenant::query()->whereNull('actividad_id')->first();
 
         return $politica instanceof PoliticaCancelacionTenant
-            ? PoliticaCancelacion::deModelo($politica)
-            : PoliticaCancelacion::porDefecto();
+            ? PoliticaCancelacion::deModelo($politica, $this->parametros)
+            : PoliticaCancelacion::porDefecto($this->parametros);
     }
 }

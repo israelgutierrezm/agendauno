@@ -23,7 +23,7 @@ use Illuminate\Validation\ValidationException;
  */
 class CambiarCorreoTenant
 {
-    private const HORAS = 24;
+    public function __construct(private readonly ParametrosTenant $parametros) {}
 
     public function solicitar(Estudio $estudio, Usuario $usuario, string $email): void
     {
@@ -40,7 +40,7 @@ class CambiarCorreoTenant
         $usuario->forceFill([
             'email_nuevo' => $email,
             'email_nuevo_token' => hash('sha256', $token),
-            'email_nuevo_expira_en' => now()->addHours(self::HORAS),
+            'email_nuevo_expira_en' => now()->addHours($this->parametros->entero('cuentas.horas_confirmar_correo')),
         ])->save();
 
         Mail::to($email)->queue(new CorreoConfirmarCorreo((string) $estudio->nombre, (string) $estudio->slug, $token));

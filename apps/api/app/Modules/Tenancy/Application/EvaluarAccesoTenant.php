@@ -24,8 +24,8 @@ use Carbon\CarbonInterface;
  */
 class EvaluarAccesoTenant
 {
-    // Minutos antes del inicio en que una reserva ya habilita el acceso.
-    private const VENTANA_ANTES = 30;
+    // Minutos antes del inicio en que una reserva ya habilita el acceso (configurable).
+    public function __construct(private readonly ParametrosTenant $parametros) {}
 
     public function evaluar(PersonaTenant $persona, ?int $sucursalId, CarbonInterface $momento): DecisionAcceso
     {
@@ -34,7 +34,7 @@ class EvaluarAccesoTenant
             ->where('estado', EstadoReserva::Confirmada->value)
             ->whereHas('sesion', function ($q) use ($momento, $sucursalId): void {
                 $q->where('estado', EstadoSesionTenant::Programada->value)
-                    ->where('inicia_en', '<=', $momento->copy()->addMinutes(self::VENTANA_ANTES))
+                    ->where('inicia_en', '<=', $momento->copy()->addMinutes($this->parametros->entero('acceso.minutos_antes')))
                     ->where('termina_en', '>=', $momento)
                     ->when($sucursalId !== null, fn ($q2) => $q2->where('sucursal_id', $sucursalId));
             })

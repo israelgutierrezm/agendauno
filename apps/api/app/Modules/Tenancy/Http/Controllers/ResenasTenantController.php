@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\RegistrarEventoTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
@@ -24,11 +25,10 @@ use Illuminate\Validation\ValidationException;
  */
 class ResenasTenantController
 {
-    private const DIAS_PARA_CALIFICAR = 30;
-
     public function __construct(
         private readonly PersonaDeUsuarioTenant $personas,
         private readonly RegistrarEventoTenant $eventos,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -42,7 +42,7 @@ class ResenasTenantController
         $reservas = ReservaTenant::query()
             ->where('persona_id', $persona->getKey())
             ->whereHas('asistencia', fn ($q) => $q->where('estado', EstadoAsistencia::Presente->value))
-            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>=', Carbon::now()->subDays(self::DIAS_PARA_CALIFICAR)))
+            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>=', Carbon::now()->subDays($this->parametros->entero('resenas.dias_para_calificar'))))
             ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('resenas')->whereColumn('resenas.reserva_id', 'reservas.id'))
             ->with(['sesion.oferta', 'sesion.instructor'])
             ->orderByDesc('id')
@@ -74,7 +74,7 @@ class ResenasTenantController
         if ($reserva->asistencia?->estado !== EstadoAsistencia::Presente) {
             throw ValidationException::withMessages(['reserva' => ['Solo puedes calificar lo que tomaste.']]);
         }
-        if ($reserva->sesion === null || $reserva->sesion->inicia_en->lt(Carbon::now()->subDays(self::DIAS_PARA_CALIFICAR))) {
+        if ($reserva->sesion === null || $reserva->sesion->inicia_en->lt(Carbon::now()->subDays($this->parametros->entero('resenas.dias_para_calificar')))) {
             throw ValidationException::withMessages(['reserva' => ['Ya pasó el tiempo para calificar esta clase.']]);
         }
         if (ResenaTenant::query()->where('reserva_id', $reserva->getKey())->exists()) {

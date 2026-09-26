@@ -193,6 +193,9 @@ export const reglasAgenda = {
   horas: "Horas de anticipación",
   penalizaTarde: "Cobrar cancelaciones tardías",
   penalizaNoShow: "Cobrar inasistencias",
+  tolerancia: "Faltas toleradas sin cobrar",
+  ventana: "En los últimos (días)",
+  toleraN: "tolera {n} en {d} días",
   guardar: "Guardar",
   guardada: "Política guardada.",
   general: "Para todas las actividades",
@@ -400,6 +403,7 @@ export const plataformaAdmin = {
     estudios: "Estudios",
     cobros: "Cobros",
     tarifas: "Tarifas",
+    parametros: "Parámetros",
     configuracion: "Configuración",
   },
   estudios: {
@@ -861,4 +865,22 @@ export const agendaOperacion = {
     por_cobrar: "Por cobrar",
     por_pagar: "Falta pagar en línea",
   },
+};
+
+// Parámetros configurables del negocio y de la plataforma (ADR 0042).
+export const parametrosConfig = {
+  tituloNegocio: "Límites y tiempos",
+  ayudaNegocio:
+    "Ajusta los tiempos y límites de tu negocio. Lo que dejes vacío usa el valor de la plataforma.",
+  tituloPlataforma: "Parámetros de la plataforma",
+  ayudaPlataforma:
+    "Valor que aplica a todos los negocios que no ajustaron el suyo. Vacío = el valor inicial.",
+  dePlataforma: "Plataforma: {valor}.",
+  inicial: "Inicial: {valor}.",
+  usarReferencia: "El de referencia",
+  si: "Sí",
+  no: "No",
+  guardar: "Guardar",
+  descartar: "Descartar cambios",
+  guardado: "Parámetros guardados.",
 };

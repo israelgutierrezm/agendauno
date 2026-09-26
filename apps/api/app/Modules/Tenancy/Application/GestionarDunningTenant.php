@@ -25,8 +25,6 @@ use Illuminate\Support\Facades\DB;
  */
 class GestionarDunningTenant
 {
-    private const GRACIA_DIAS = 7;
-
     /**
      * Backoff de reintentos (días desde el fallo) según el número de intento.
      *
@@ -37,6 +35,7 @@ class GestionarDunningTenant
     public function __construct(
         private readonly RegistrarEventoTenant $eventos,
         private readonly GestorDeConexionTenant $gestor,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -52,7 +51,7 @@ class GestionarDunningTenant
                     'acuerdo_id' => $acuerdo->getKey(),
                     'estado' => EstadoDunning::EnMora->value,
                     'intentos' => 1,
-                    'gracia_hasta' => Carbon::now()->addDays(self::GRACIA_DIAS),
+                    'gracia_hasta' => Carbon::now()->addDays($this->parametros->entero('cobranza.dias_gracia_adeudo')),
                     'proximo_intento_en' => $this->proximoIntento(1),
                     'ultimo_motivo' => $motivo,
                 ]);

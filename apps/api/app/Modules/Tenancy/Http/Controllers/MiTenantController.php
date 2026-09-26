@@ -290,7 +290,7 @@ class MiTenantController
         $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
         $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail() : null;
-        [$duracion, $margenes] = CalcularDisponibilidadTenant::duracionYMargenes($oferta, isset($validado['duracion_minutos']) ? (int) $validado['duracion_minutos'] : null);
+        [$duracion, $margenes] = $disponibilidad->duracionYMargenes($oferta, isset($validado['duracion_minutos']) ? (int) $validado['duracion_minutos'] : null);
 
         return response()->json(['data' => [
             'fecha' => $validado['fecha'],

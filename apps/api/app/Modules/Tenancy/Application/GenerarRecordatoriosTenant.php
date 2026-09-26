@@ -30,7 +30,10 @@ use Illuminate\Support\Facades\DB;
  */
 class GenerarRecordatoriosTenant
 {
-    public function __construct(private readonly RegistrarEventoTenant $eventos) {}
+    public function __construct(
+        private readonly RegistrarEventoTenant $eventos,
+        private readonly ParametrosTenant $parametros,
+    ) {}
 
     public function ejecutar(?CarbonImmutable $ahora = null): int
     {
@@ -46,8 +49,14 @@ class GenerarRecordatoriosTenant
 
     private function emitir(Recordatorio $recordatorio, CarbonImmutable $ahora): int
     {
-        $desde = $ahora->addMinutes($recordatorio->siguiente()?->minutos() ?? 0);
-        $hasta = $ahora->addMinutes($recordatorio->minutos());
+        $minutos = $recordatorio->minutos($this->parametros);
+        // Apagado (0) o igual al siguiente: no se envía.
+        $siguiente = $recordatorio->siguiente()?->minutos($this->parametros) ?? 0;
+        if ($minutos <= 0 || $minutos <= $siguiente) {
+            return 0;
+        }
+        $desde = $ahora->addMinutes($siguiente);
+        $hasta = $ahora->addMinutes($minutos);
         $emitidos = 0;
 
         ReservaTenant::query()
@@ -58,7 +67,7 @@ class GenerarRecordatoriosTenant
                 ->where('inicia_en', '>', $desde)
                 ->where('inicia_en', '<=', $hasta))
             ->with(['sesion.oferta', 'sesion.sucursal', 'sesion.instructor', 'persona'])
-            ->chunkById(200, function (Collection $reservas) use ($recordatorio, $ahora, &$emitidos): void {
+            ->chunkById(200, function (Collection $reservas) use ($recordatorio, $ahora, $minutos, &$emitidos): void {
                 /** @var Collection<int, ReservaTenant> $reservas */
                 foreach ($reservas as $reserva) {
                     $sesion = $reserva->sesion;
@@ -67,7 +76,7 @@ class GenerarRecordatoriosTenant
                         continue;
                     }
 
-                    $momento = CarbonImmutable::instance($sesion->inicia_en)->subMinutes($recordatorio->minutos());
+                    $momento = CarbonImmutable::instance($sesion->inicia_en)->subMinutes($minutos);
                     if ($reserva->created_at !== null && $reserva->created_at->greaterThan($momento)) {
                         continue;
                     }

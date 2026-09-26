@@ -56,6 +56,7 @@ use App\Modules\Tenancy\Http\Controllers\OrdenesTenantController;
 use App\Modules\Tenancy\Http\Controllers\OrganizacionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\PagoRentaController;
 use App\Modules\Tenancy\Http\Controllers\PagosTenantController;
+use App\Modules\Tenancy\Http\Controllers\ParametrosTenantController;
 use App\Modules\Tenancy\Http\Controllers\PasarelasTenantController;
 use App\Modules\Tenancy\Http\Controllers\PausasMembresiaTenantController;
 use App\Modules\Tenancy\Http\Controllers\PerfilTenantController;
@@ -140,6 +141,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/configuracion', [PlataformaController::class, 'configuracion'])->name('configuracion');
         Route::put('/configuracion', [PlataformaController::class, 'guardarConfiguracion'])->name('configuracion.guardar');
         // Documentos legales (aviso de privacidad y términos) mostrados en el registro.
+        Route::get('/parametros', [PlataformaController::class, 'parametros'])->name('parametros');
+        Route::put('/parametros', [PlataformaController::class, 'guardarParametros'])->name('parametros.guardar');
         Route::get('/legales', [PlataformaController::class, 'legales'])->name('legales');
         Route::put('/legales', [PlataformaController::class, 'guardarLegales'])->name('legales.guardar');
         // Pasarelas de la plataforma (para cobrar la renta del SaaS): on/off + llaves test/prod.
@@ -520,6 +523,9 @@ Route::prefix('v1')->group(function (): void {
 
             // Politica de cancelacion/no-show (R8): la reserva congela la vigente al
             // crearse; esto configura la global y overrides por actividad a futuro.
+            // Parámetros configurables del negocio (ADR 0042).
+            Route::get('/parametros', [ParametrosTenantController::class, 'index'])->middleware('puede:estudio.gestionar')->name('parametros.index');
+            Route::put('/parametros', [ParametrosTenantController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('parametros.guardar');
             Route::get('/politicas-cancelacion', [PoliticasCancelacionTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('politicas-cancelacion.index');
             Route::put('/politicas-cancelacion', [PoliticasCancelacionTenantController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('politicas-cancelacion.guardar');
 

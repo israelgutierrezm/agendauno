@@ -45,14 +45,12 @@ class AgendarCitaTenant
 {
     use DetectsConcurrencyErrors;
 
-    /** Duración cuando el servicio no la define. */
-    private const DURACION_DEFECTO = 30;
-
     public function __construct(
         private readonly VerificarAgendaTenant $agenda,
         private readonly ReservasTenant $reservas,
         private readonly CalcularDisponibilidadTenant $disponibilidad,
         private readonly ElegirRecursoTenant $recursos,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     public function agendar(
@@ -73,7 +71,7 @@ class AgendarCitaTenant
         // servicio no tiene una.
         $duracion = $oferta->duracion_minutos !== null && $oferta->duracion_minutos > 0
             ? (int) $oferta->duracion_minutos
-            : ($duracionMin > 0 ? $duracionMin : self::DURACION_DEFECTO);
+            : ($duracionMin > 0 ? $duracionMin : $this->parametros->entero('citas.duracion_defecto'));
         $termina = $inicia->addMinutes($duracion);
 
         if (! $porNegocio) {

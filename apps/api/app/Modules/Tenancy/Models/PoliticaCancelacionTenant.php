@@ -23,7 +23,7 @@ class PoliticaCancelacionTenant extends Model
     protected $table = 'politicas_cancelacion';
 
     protected $fillable = [
-        'actividad_id', 'horas_limite', 'penaliza_tarde', 'penaliza_no_show', 'tolerancia_no_show',
+        'actividad_id', 'horas_limite', 'penaliza_tarde', 'penaliza_no_show', 'tolerancia_no_show', 'ventana_no_show_dias',
     ];
 
     /**
@@ -34,6 +34,7 @@ class PoliticaCancelacionTenant extends Model
         'penaliza_tarde' => 'boolean',
         'penaliza_no_show' => 'boolean',
         'tolerancia_no_show' => 'integer',
+        'ventana_no_show_dias' => 'integer',
     ];
 
     /**

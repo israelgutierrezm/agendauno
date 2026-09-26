@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import ParametrosNegocio from "@/components/ParametrosNegocio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -21,6 +22,9 @@ interface Politica {
   horas_limite: number;
   penaliza_tarde: boolean;
   penaliza_no_show: boolean;
+  // Faltas toleradas sin cobrar y en cuántos días se cuentan (ADR 0043).
+  tolerancia_no_show: number;
+  ventana_no_show_dias: number | null;
 }
 interface DiaCerrado {
   id: string;
@@ -46,6 +50,9 @@ interface FormPolitica {
   horas_limite: number;
   penaliza_tarde: boolean;
   penaliza_no_show: boolean;
+  // Faltas toleradas sin cobrar y en cuántos días se cuentan (ADR 0043).
+  tolerancia_no_show: number;
+  ventana_no_show_dias: number | null;
 }
 
 const sesion = useSesionTenantStore();
@@ -65,12 +72,16 @@ const general = ref<FormPolitica>({
   horas_limite: 6,
   penaliza_tarde: true,
   penaliza_no_show: true,
+  tolerancia_no_show: 0,
+  ventana_no_show_dias: null,
 });
 const editando = ref<FormPolitica | null>(null);
 const guardando = ref(false);
 const nuevaActividad = ref("");
 
 const nuevoDia = ref({ fecha: "", motivo: "" });
+// Días de la ventana cuando la política no fija los suyos (los de la plataforma).
+const ventanaPlataforma = ref(30);
 
 const LETRAS = ["", "L", "M", "M", "J", "V", "S", "D"];
 
@@ -108,6 +119,12 @@ function resumen(p: Politica): string {
     t("reglasAgenda.resumen", { h: p.horas_limite }),
     p.penaliza_tarde ? t("reglasAgenda.cobraTarde") : null,
     p.penaliza_no_show ? t("reglasAgenda.cobraNoShow") : null,
+    p.penaliza_no_show && p.tolerancia_no_show > 0
+      ? t("reglasAgenda.toleraN", {
+          n: p.tolerancia_no_show,
+          d: p.ventana_no_show_dias ?? ventanaPlataforma.value,
+        })
+      : null,
   ]
     .filter((x) => x !== null)
     .join(" · ");
@@ -118,7 +135,10 @@ async function cargar(): Promise<void> {
   error.value = null;
   try {
     const [p, c, s, o] = await Promise.all([
-      api.get<{ data: Politica[] }>(`${base.value}/politicas-cancelacion`),
+      api.get<{
+        data: Politica[];
+        por_defecto?: Omit<FormPolitica, "actividad_id">;
+      }>(`${base.value}/politicas-cancelacion`),
       api.get<{ data: DiaCerrado[] }>(`${base.value}/excepciones-horario`),
       api.get<{ data: Serie[] }>(`${base.value}/plantillas-horario`),
       api.get<{ data: Oferta[] }>(`${base.value}/ofertas`),
@@ -133,6 +153,10 @@ async function cargar(): Promise<void> {
       }
     }
     actividades.value = [...unicas].map(([id, nombre]) => ({ id, nombre }));
+    const defecto = p.data.por_defecto;
+    if (defecto) {
+      ventanaPlataforma.value = defecto.ventana_no_show_dias ?? 30;
+    }
     const g = politicas.value.find((x) => x.actividad_id === null);
     if (g !== undefined) {
       general.value = {
@@ -140,7 +164,12 @@ async function cargar(): Promise<void> {
         horas_limite: g.horas_limite,
         penaliza_tarde: g.penaliza_tarde,
         penaliza_no_show: g.penaliza_no_show,
+        tolerancia_no_show: g.tolerancia_no_show,
+        ventana_no_show_dias: g.ventana_no_show_dias,
       };
+    } else if (defecto) {
+      // Sin política propia: se parte de la que fija la plataforma.
+      general.value = { actividad_id: null, ...defecto };
     }
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -170,6 +199,8 @@ function editarExcepcion(p: Politica): void {
     horas_limite: p.horas_limite,
     penaliza_tarde: p.penaliza_tarde,
     penaliza_no_show: p.penaliza_no_show,
+    tolerancia_no_show: p.tolerancia_no_show,
+    ventana_no_show_dias: p.ventana_no_show_dias,
   };
 }
 
@@ -281,6 +312,37 @@ onMounted(cargar);
             />
             {{ $t("reglasAgenda.penalizaNoShow") }}
           </label>
+          <template v-if="general.penaliza_no_show">
+            <div>
+              <label class="tu-label" for="ra-tolerancia">{{
+                $t("reglasAgenda.tolerancia")
+              }}</label>
+              <input
+                id="ra-tolerancia"
+                v-model.number="general.tolerancia_no_show"
+                class="tu-input w-24"
+                type="number"
+                min="0"
+                max="100"
+                :disabled="!puedePoliticas"
+              />
+            </div>
+            <div v-if="general.tolerancia_no_show > 0">
+              <label class="tu-label" for="ra-ventana">{{
+                $t("reglasAgenda.ventana")
+              }}</label>
+              <input
+                id="ra-ventana"
+                v-model.number="general.ventana_no_show_dias"
+                class="tu-input w-24"
+                type="number"
+                min="1"
+                max="365"
+                :placeholder="String(ventanaPlataforma)"
+                :disabled="!puedePoliticas"
+              />
+            </div>
+          </template>
           <button
             v-if="puedePoliticas"
             type="submit"
@@ -370,6 +432,35 @@ onMounted(cargar);
               <input v-model="editando.penaliza_no_show" type="checkbox" />
               {{ $t("reglasAgenda.penalizaNoShow") }}
             </label>
+            <template v-if="editando.penaliza_no_show">
+              <div>
+                <label class="tu-label" for="ra-tolerancia-act">{{
+                  $t("reglasAgenda.tolerancia")
+                }}</label>
+                <input
+                  id="ra-tolerancia-act"
+                  v-model.number="editando.tolerancia_no_show"
+                  class="tu-input w-24"
+                  type="number"
+                  min="0"
+                  max="100"
+                />
+              </div>
+              <div v-if="editando.tolerancia_no_show > 0">
+                <label class="tu-label" for="ra-ventana-act">{{
+                  $t("reglasAgenda.ventana")
+                }}</label>
+                <input
+                  id="ra-ventana-act"
+                  v-model.number="editando.ventana_no_show_dias"
+                  class="tu-input w-24"
+                  type="number"
+                  min="1"
+                  max="365"
+                  :placeholder="String(ventanaPlataforma)"
+                />
+              </div>
+            </template>
             <div class="flex gap-2">
               <button
                 type="submit"
@@ -521,6 +612,9 @@ onMounted(cargar);
           </li>
         </ul>
       </div>
+
+      <!-- Límites y tiempos del negocio (ADR 0042) -->
+      <ParametrosNegocio v-if="puedePoliticas" />
     </template>
   </section>
 </template>

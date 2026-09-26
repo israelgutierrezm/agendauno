@@ -20,7 +20,7 @@ class AsistenciaTenant extends Model
 
     protected $table = 'asistencias';
 
-    protected $fillable = ['reserva_id', 'estado', 'registrada_en'];
+    protected $fillable = ['reserva_id', 'estado', 'registrada_en', 'credito_cobrado'];
 
     /**
      * @var array<string, string>
@@ -28,6 +28,7 @@ class AsistenciaTenant extends Model
     protected $casts = [
         'estado' => EstadoAsistencia::class,
         'registrada_en' => 'datetime',
+        'credito_cobrado' => 'boolean',
     ];
 
     /**

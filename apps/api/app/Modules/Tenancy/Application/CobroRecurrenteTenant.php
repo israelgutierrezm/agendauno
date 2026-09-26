@@ -52,8 +52,6 @@ class CobroRecurrenteTenant
     /**
      * Días de espera, tras la fecha de renovación, al cobro de una suscripción.
      */
-    private const GRACIA_SUSCRIPCION_DIAS = 3;
-
     public function __construct(
         private readonly DeudaDeRenovacionTenant $deudas,
         private readonly CobrarOrdenTenant $cobrar,
@@ -61,6 +59,7 @@ class CobroRecurrenteTenant
         private readonly DomiciliacionesTenant $domiciliaciones,
         private readonly ConciliarSuscripcionTenant $suscripciones,
         private readonly RegistroDePasarelasTenant $registro,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -175,7 +174,7 @@ class CobroRecurrenteTenant
             return $resultado;
         }
 
-        $limite = Carbon::today()->subDays(self::GRACIA_SUSCRIPCION_DIAS);
+        $limite = Carbon::today()->subDays($this->parametros->entero('cobranza.dias_gracia_pago_automatico'));
         if ($acuerdo->proxima_cobro_en !== null && $acuerdo->proxima_cobro_en->lt($limite)) {
             $this->dunning->registrarFallo($acuerdo, 'No hemos recibido el cobro automático de tu suscripción.');
 

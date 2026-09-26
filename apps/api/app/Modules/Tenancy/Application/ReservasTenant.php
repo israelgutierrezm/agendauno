@@ -45,15 +45,6 @@ class ReservasTenant
     // Costo por defecto de una sesion: 1 credito = 1000 unidades escaladas.
     private const UNIDADES_POR_SESION = 1000;
 
-    // Ventana (min) para aceptar una oferta de lista de espera antes de que expire (R7).
-    private const VENTANA_OFERTA_MIN = 30;
-
-    // Ventana (min) para pagar una reserva pago-para-reservar antes de liberar el cupo.
-    private const VENTANA_PAGO_MIN = 30;
-
-    // Horas límite de cancelación de reservas anteriores al snapshot de política (R8).
-    private const HORAS_LIMITE_RESPALDO = 6;
-
     // Reservas que ocupan (o esperan) un lugar.
     private const ACTIVAS = [
         EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
@@ -70,6 +61,8 @@ class ReservasTenant
         private readonly EmitirReservaCanceladaTenant $cancelada,
         private readonly VerificarAgendaTenant $agenda,
         private readonly CerrarIntentosPagoTenant $intentos,
+        // Ventanas de pago y de oferta, y horas de cancelación (configurables, ADR 0042).
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -412,8 +405,11 @@ class ReservasTenant
      * Idempotente: cancelar dos veces no hace nada la segunda (ni devuelve dos
      * créditos). Una reserva con asistencia registrada no se cancela.
      */
-    public function cancelar(ReservaTenant $reserva, QuienCancela $quien = QuienCancela::Cliente, ?Usuario $actor = null, int $horasLimite = self::HORAS_LIMITE_RESPALDO): ReservaTenant
+    public function cancelar(ReservaTenant $reserva, QuienCancela $quien = QuienCancela::Cliente, ?Usuario $actor = null, ?int $horasLimite = null): ReservaTenant
     {
+        // Respaldo para reservas anteriores a que se congelara su política (R8).
+        $horasLimite ??= $this->parametros->entero('cancelacion.horas_limite');
+
         return DB::connection('tenant')->transaction(function () use ($reserva, $quien, $actor, $horasLimite): ReservaTenant {
             $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
 
@@ -512,7 +508,7 @@ class ReservasTenant
             return EfectoCancelacion::noCancelable('Esta reserva ya no tiene clase.');
         }
 
-        return $this->efecto($reserva, $sesion, $quien, self::HORAS_LIMITE_RESPALDO);
+        return $this->efecto($reserva, $sesion, $quien, $this->parametros->entero('cancelacion.horas_limite'));
     }
 
     private function efecto(ReservaTenant $reserva, SesionTenant $sesion, QuienCancela $quien, int $horasLimite): EfectoCancelacion
@@ -656,7 +652,7 @@ class ReservasTenant
             'estado' => EstadoReserva::Ofrecida->value,
             'retencion_id' => $retencion?->getKey(),
             'unidades' => $unidadesReservadas,
-            'oferta_expira_en' => now()->addMinutes(self::VENTANA_OFERTA_MIN),
+            'oferta_expira_en' => now()->addMinutes($this->parametros->entero('reservas.minutos_para_aceptar_lugar')),
         ]);
 
         // Notificacion (outbox): "tienes un lugar, acepta antes de que expire".
@@ -780,7 +776,7 @@ class ReservasTenant
      */
     public function expirarReservasPendientes(): int
     {
-        $limite = now()->subMinutes(self::VENTANA_PAGO_MIN);
+        $limite = now()->subMinutes($this->parametros->entero('reservas.minutos_para_pagar'));
         $expiradas = 0;
         $ordenes = [];
 

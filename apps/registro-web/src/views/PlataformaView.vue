@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import PanelLateral from "@/components/PanelLateral.vue";
+import ParametrosPlataforma from "@/components/ParametrosPlataforma.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import TarifasPlataforma from "@/components/TarifasPlataforma.vue";
 import { mensajeDeError } from "@/lib/api";
@@ -67,7 +68,8 @@ interface Pasarela {
   disponible?: boolean;
   lista?: boolean;
 }
-type Pestana = "estudios" | "cobros" | "tarifas" | "configuracion";
+type Pestana =
+  "estudios" | "cobros" | "tarifas" | "parametros" | "configuracion";
 
 const ESTADOS_FACT = [
   "trial",
@@ -552,6 +554,7 @@ function borrar(): void {
             'estudios',
             'cobros',
             'tarifas',
+            'parametros',
             'configuracion',
           ] as const"
           :key="p"
@@ -773,6 +776,14 @@ function borrar(): void {
           </ul>
         </div>
       </div>
+
+      <!-- Parámetros de plataforma (ADR 0042) -->
+      <ParametrosPlataforma
+        v-if="pestana === 'parametros'"
+        class="mt-5"
+        :api-url="apiUrl"
+        :token="token"
+      />
 
       <!-- Tarifas -->
       <TarifasPlataforma
