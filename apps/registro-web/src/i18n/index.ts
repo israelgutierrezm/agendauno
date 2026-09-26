@@ -36,6 +36,7 @@ import {
   pagoTienda,
   bajas,
   bloqueosAgenda,
+  cambiarSerie,
   cancelacion,
   confirmarRegistro,
   corteCaja,
@@ -105,6 +106,7 @@ export const i18n = createI18n({
       bloqueosAgenda,
       reprogramar,
       recursosServicio,
+      cambiarSerie,
     },
   },
 });

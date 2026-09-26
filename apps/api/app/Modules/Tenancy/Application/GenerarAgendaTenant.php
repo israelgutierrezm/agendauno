@@ -18,8 +18,9 @@ use Illuminate\Support\Facades\DB;
  * que no sea un día cerrado) crea una sesión con `inicia_en`/`termina_en` en UTC
  * (desde la hora local + zona de la sucursal).
  *
- * - IDEMPOTENTE: `firstOrCreate` sobre `(serie_id, inicia_en)` + el índice único, así
- *   que regenerar no duplica ni resucita una instancia editada o cancelada.
+ * - IDEMPOTENTE: cada sesión guarda su fecha de serie (`fecha_serie`, 2.5), así que
+ *   regenerar no duplica ni resucita una instancia editada, movida (de hora o de día)
+ *   o cancelada.
  * - Con las mismas reglas que al crear una sesión a mano ({@see VerificarAgendaTenant}):
  *   el instructor no puede tener otra cosa a esa hora y la sala no puede pasarse de su
  *   cupo, bajo el mismo candado por profesional y recurso.
@@ -76,10 +77,10 @@ class GenerarAgendaTenant
                 $iniciaEn = CarbonImmutable::parse($dia->toDateString().' '.$plantilla->hora_local, $zona)->utc();
                 $terminaEn = $iniciaEn->addMinutes($plantilla->duracion_minutos);
 
-                // Ya generada (aunque se haya editado o cancelado): no se toca.
+                // Ya generada (aunque se haya movido, editado o cancelado): no se toca.
                 $existe = SesionTenant::query()
                     ->where('serie_id', $plantilla->getKey())
-                    ->where('inicia_en', $iniciaEn)
+                    ->where(fn ($q) => $q->whereDate('fecha_serie', $dia->toDateString())->orWhere('inicia_en', $iniciaEn))
                     ->exists();
                 if ($existe) {
                     continue;
@@ -112,6 +113,7 @@ class GenerarAgendaTenant
                         'zona_horaria' => $zona,
                         'capacidad' => $capacidad,
                         'estado' => EstadoSesionTenant::Programada->value,
+                        'fecha_serie' => $dia->toDateString(),
                     ],
                 );
 

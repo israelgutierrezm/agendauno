@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\EventoOutboxTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
+use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -120,6 +121,10 @@ class ReprogramarTenant
                 ->all();
 
             $this->moverSesion($bloqueada, $inicia, $instructorId ?? ($bloqueada->instructor_id !== null ? (int) $bloqueada->instructor_id : null), $reservas, $actor);
+            // "Solo esta sesión": un cambio posterior a su serie la respeta (2.5).
+            if ($bloqueada->serie_id !== null) {
+                $bloqueada->forceFill(['editada_en' => now()])->save();
+            }
 
             return $bloqueada->refresh();
         });
@@ -168,6 +173,45 @@ class ReprogramarTenant
         } else {
             $this->auditoria->registrar($actor, 'sesion.reprogramada', 'sesion', (string) $sesion->ulid, $antes, DatosDeSesion::para($sesion));
         }
+    }
+
+    /**
+     * Mueve una sesión de una serie al aplicar un cambio de la serie (2.5), con las
+     * mismas reglas que reprogramar. Si choca, devuelve el motivo y no la toca; si
+     * cambió su hora, sus reservas reciben el aviso y sus recordatorios se rehacen.
+     */
+    public function moverInstancia(SesionTenant $sesion, CarbonImmutable $inicia, CarbonImmutable $termina, ?int $instructorId, ?int $recursoId): ?string
+    {
+        $recurso = $recursoId !== null ? RecursoTenant::query()->find($recursoId) : null;
+        $this->agenda->bloquear($instructorId, $recurso);
+        $conflictos = $this->agenda->conflictos($instructorId, $recurso, $inicia, $termina, (int) $sesion->getKey(), (int) $sesion->sucursal_id, null, MargenesServicio::deSesion($sesion));
+        if ($conflictos !== []) {
+            return $conflictos[0]['mensaje'];
+        }
+
+        $antes = DatosDeSesion::para($sesion);
+        $cambiaHora = ! $sesion->inicia_en->equalTo($inicia);
+        $sesion->update(['inicia_en' => $inicia, 'termina_en' => $termina, 'instructor_id' => $instructorId, 'recurso_id' => $recursoId]);
+        $sesion->unsetRelation('instructor');
+
+        if ($cambiaHora) {
+            $reservas = ReservaTenant::query()
+                ->where('sesion_id', $sesion->getKey())
+                ->whereIn('estado', [
+                    EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
+                    EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value,
+                ])
+                ->lockForUpdate()
+                ->get();
+            foreach ($reservas as $reserva) {
+                $this->recordatoriosDelNuevoHorario($reserva, $sesion);
+                if ($reserva->estado !== EstadoReserva::EnEspera) {
+                    $this->avisar($reserva, $sesion, $antes);
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

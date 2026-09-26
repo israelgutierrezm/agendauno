@@ -433,6 +433,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/plantillas-horario', [PlantillasHorarioTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('plantillas-horario.index');
             Route::post('/plantillas-horario', [PlantillasHorarioTenantController::class, 'crear'])->middleware('puede:agenda.gestionar')->name('plantillas-horario.store');
             Route::delete('/plantillas-horario/{plantilla}', [PlantillasHorarioTenantController::class, 'eliminar'])->middleware('puede:agenda.gestionar')->name('plantillas-horario.eliminar');
+            // "Esta y las siguientes" (2.5), con vista previa.
+            Route::post('/plantillas-horario/{plantilla}/cambiar', [PlantillasHorarioTenantController::class, 'cambiar'])->middleware('puede:agenda.gestionar')->name('plantillas-horario.cambiar');
             Route::post('/plantillas-horario/{plantilla}/generar', [PlantillasHorarioTenantController::class, 'generar'])->middleware('puede:agenda.gestionar')->name('plantillas-horario.generar');
             // Bloqueos (2.2): comida/vacaciones de un profesional, cierre de sede, sala en mantenimiento.
             Route::get('/bloqueos', [BloqueosAgendaTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('bloqueos.index');

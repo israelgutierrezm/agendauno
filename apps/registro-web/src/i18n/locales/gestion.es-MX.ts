@@ -836,3 +836,18 @@ export const recursosServicio = {
     "Si eliges alguno, cada cita toma uno libre de su sede (cabina, consultorio, sillón…). Sin marcar, el servicio no pide espacio.",
   resumen: "usa {lista}",
 };
+
+// "Esta y las siguientes" en una clase recurrente (fase 2, punto 2.5).
+export const cambiarSerie = {
+  titulo: "Esta y las siguientes",
+  soloEsta: "Solo esta sesión",
+  desde: "Desde el {fecha} en adelante. Las fechas anteriores no cambian.",
+  hora: "Hora",
+  duracion: "Duración (min)",
+  profesional: "Con",
+  sinAsignar: "Sin asignar",
+  revisar: "Revisar",
+  aplicar: "Aplicar el cambio",
+  movidas: "Se moverán {n} fechas.",
+  conservadas: "{n} se quedan como están:",
+};

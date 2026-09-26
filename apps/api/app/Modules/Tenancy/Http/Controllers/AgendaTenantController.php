@@ -216,7 +216,11 @@ class AgendaTenantController
         DB::connection('tenant')->transaction(function () use ($sesion, $instructorId): void {
             $this->agenda->bloquear($instructorId, null);
             $this->agenda->exigirSinConflictos($instructorId, null, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey(), margenes: MargenesServicio::deSesion($sesion));
-            $sesion->update(['instructor_id' => $instructorId]);
+            $sesion->update([
+                'instructor_id' => $instructorId,
+                // Cambio de solo esta sesión: un cambio a su serie la respeta (2.5).
+                'editada_en' => $sesion->serie_id !== null ? now() : $sesion->editada_en,
+            ]);
         });
 
         return response()->json(['data' => $this->presentar($sesion->refresh()->load(['oferta', 'instructor', 'recurso']))]);
@@ -236,7 +240,7 @@ class AgendaTenantController
     public function sesiones(Request $request): JsonResponse
     {
         $consulta = SesionTenant::query()
-            ->with(['oferta', 'sucursal', 'instructor', 'recurso'])
+            ->with(['oferta', 'sucursal', 'instructor', 'recurso', 'serie'])
             // Ocupacion = reservas que toman un lugar (confirmadas, ofrecidas y
             // pendientes de pago); mas cuantos esperan (estado "lista de espera").
             ->withCount([
@@ -397,6 +401,9 @@ class AgendaTenantController
             'instructor_id' => $sesion->instructor?->ulid,
             'sala' => $sesion->recurso?->nombre,
             'recurso_id' => $sesion->recurso?->ulid,
+            // Clase recurrente de la que salió y su fecha en ella (2.5).
+            'serie_id' => $sesion->serie?->ulid,
+            'fecha_serie' => $sesion->fecha_serie?->toDateString(),
             'inicia_en' => $sesion->inicia_en->toIso8601String(),
             'termina_en' => $sesion->termina_en->toIso8601String(),
             // Lo que ocupa en la agenda con preparación y limpieza (solo para el equipo).

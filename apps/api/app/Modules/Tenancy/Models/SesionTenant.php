@@ -27,7 +27,7 @@ class SesionTenant extends Model
 
     protected $table = 'sesiones';
 
-    protected $fillable = ['oferta_id', 'sucursal_id', 'serie_id', 'recurso_id', 'instructor_id', 'inicia_en', 'termina_en', 'zona_horaria', 'capacidad', 'estado', 'tipo', 'margen_antes_min', 'margen_despues_min'];
+    protected $fillable = ['oferta_id', 'sucursal_id', 'serie_id', 'recurso_id', 'instructor_id', 'inicia_en', 'termina_en', 'zona_horaria', 'capacidad', 'estado', 'tipo', 'margen_antes_min', 'margen_despues_min', 'fecha_serie', 'editada_en'];
 
     /**
      * @var array<string, mixed>
@@ -46,6 +46,8 @@ class SesionTenant extends Model
         'ocupa_hasta' => 'datetime',
         'margen_antes_min' => 'integer',
         'margen_despues_min' => 'integer',
+        'fecha_serie' => 'date',
+        'editada_en' => 'datetime',
         'capacidad' => 'integer',
         'estado' => EstadoSesionTenant::class,
         'tipo' => TipoSesionTenant::class,
@@ -80,6 +82,16 @@ class SesionTenant extends Model
     public function oferta(): BelongsTo
     {
         return $this->belongsTo(OfertaTenant::class, 'oferta_id');
+    }
+
+    /**
+     * Clase recurrente de la que salió (si salió de una).
+     *
+     * @return BelongsTo<PlantillaHorarioTenant, $this>
+     */
+    public function serie(): BelongsTo
+    {
+        return $this->belongsTo(PlantillaHorarioTenant::class, 'serie_id')->withTrashed();
     }
 
     /**

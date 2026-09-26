@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CambiarSerieTenant;
 use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Application\GenerarAgendaTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -13,6 +14,7 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Plantillas de horario recurrente del estudio (R5): definen la agenda que se
@@ -91,6 +93,52 @@ class PlantillasHorarioTenantController
 
         // Las fechas que no se pudieron generar, con su motivo (no se omiten en silencio).
         return response()->json(['data' => ['creadas' => $resultado->creadas, 'omitidas' => $resultado->omitidas]], 201);
+    }
+
+    /**
+     * "Esta y las siguientes" (2.5): cambia hora, duración, profesional o sala desde
+     * `desde`. Con `previsualizar` no guarda nada y dice lo mismo que pasaría.
+     */
+    public function cambiar(Request $request, CambiarSerieTenant $cambiar): JsonResponse
+    {
+        $plantilla = PlantillaHorarioTenant::query()->where('ulid', (string) $request->route('plantilla'))->firstOrFail();
+        $validado = $request->validate([
+            'desde' => ['required', 'date_format:Y-m-d'],
+            'hora_local' => ['nullable', 'date_format:H:i'],
+            'duracion_minutos' => ['nullable', 'integer', 'min:1', 'max:1440'],
+            'instructor_id' => ['nullable', 'string'],
+            'recurso_id' => ['nullable', 'string'],
+            'previsualizar' => ['sometimes', 'boolean'],
+        ]);
+
+        $cambios = [];
+        if (isset($validado['hora_local'])) {
+            $cambios['hora_local'] = (string) $validado['hora_local'];
+        }
+        if (isset($validado['duracion_minutos'])) {
+            $cambios['duracion_minutos'] = (int) $validado['duracion_minutos'];
+        }
+        // Profesional y sala: si vienen (aunque vacíos), se cambian (vacío = sin asignar).
+        if ($request->has('instructor_id')) {
+            $cambios['instructor_id'] = $this->resolverInstructor($validado['instructor_id'] ?? null);
+        }
+        if ($request->has('recurso_id')) {
+            $cambios['recurso_id'] = $this->resolverRecurso($validado['recurso_id'] ?? null);
+        }
+        if ($cambios === []) {
+            throw ValidationException::withMessages(['hora_local' => ['Indica qué cambia: hora, duración, profesional o sala.']]);
+        }
+
+        $actor = $request->attributes->get('usuario_tenant');
+        $aplicar = ! (bool) ($validado['previsualizar'] ?? false);
+        $resultado = $cambiar->desde($plantilla, (string) $validado['desde'], $cambios, $actor instanceof Usuario ? $actor : null, $aplicar);
+
+        return response()->json(['data' => [
+            'aplicado' => $aplicar,
+            'movidas' => $resultado->movidas,
+            'conservadas' => $resultado->conservadas,
+            'serie_id' => $resultado->serie,
+        ]]);
     }
 
     private function resolverInstructor(?string $ulid): ?int

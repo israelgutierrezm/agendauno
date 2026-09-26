@@ -135,6 +135,7 @@ class BitacoraTenant
             'privacidad.baja_rechazada' => 'Rechazó una solicitud de cancelación de datos',
             'reserva.reprogramada' => 'Reprogramó una cita o reserva'.(isset($antes['fecha'], $despues['fecha']) ? " del {$antes['fecha']} {$antes['hora']} al {$despues['fecha']} {$despues['hora']}" : ''),
             'sesion.reprogramada' => 'Cambió el horario de '.((string) ($despues['actividad'] ?? 'una clase')).(isset($despues['fecha']) ? " al {$despues['fecha']} {$despues['hora']}" : ''),
+            'plantilla_horario.cambiada' => 'Cambió una clase recurrente desde el '.((string) ($despues['desde'] ?? '')).(isset($despues['movidas']) ? " ({$despues['movidas']} fechas)" : ''),
             'bloqueo_agenda.creado' => 'Bloqueó la agenda'.(isset($despues['motivo']) ? ': '.$despues['motivo'] : ''),
             'pasarela.configurada' => 'Configuró la pasarela '.((string) ($despues['proveedor'] ?? '')).(isset($despues['activa']) ? ($despues['activa'] ? ' (activa)' : ' (inactiva)') : ''),
             default => self::eliminacion($a->accion, $antes, $despues) ?? $a->accion,

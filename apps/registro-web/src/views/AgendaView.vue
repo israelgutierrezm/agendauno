@@ -6,6 +6,7 @@ import AgendaClasesSemana from "@/components/AgendaClasesSemana.vue";
 import AgendaKpis from "@/components/AgendaKpis.vue";
 import AgendaProfesionales from "@/components/AgendaProfesionales.vue";
 import CambiarHorario from "@/components/CambiarHorario.vue";
+import CambiarSerie from "@/components/CambiarSerie.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -57,6 +58,9 @@ interface Sesion {
   // Cita 1 a 1: a quién se atiende y en qué va (null en clases).
   tipo?: "clase" | "cita";
   cita?: CitaTitular | null;
+  // Clase recurrente de la que salió y su fecha en ella (2.5).
+  serie_id?: string | null;
+  fecha_serie?: string | null;
 }
 interface Recurso {
   id: string;
@@ -966,8 +970,11 @@ const cancelandoReserva = ref<string | null>(null);
 const cancelandoSesion = ref(false);
 // Cambiar el horario de la clase completa (2.1): todas sus reservas la siguen.
 const cambiandoHorario = ref(false);
+// "Esta y las siguientes" de una clase recurrente (2.5).
+const cambiandoSerie = ref(false);
 async function horarioCambiado(): Promise<void> {
   cambiandoHorario.value = false;
+  cambiandoSerie.value = false;
   cerrarDetalle();
   await cargarSesiones();
 }
@@ -2348,8 +2355,40 @@ onMounted(async () => {
             :aria-expanded="cambiandoHorario"
             @click="cambiandoHorario = !cambiandoHorario"
           >
-            {{ $t("reprogramar.cambiarHorario") }}
+            {{
+              detalle.serie_id
+                ? $t("cambiarSerie.soloEsta")
+                : $t("reprogramar.cambiarHorario")
+            }}
           </button>
+          <button
+            v-if="detalle.serie_id && detalle.fecha_serie"
+            class="tu-enlace text-sm ml-4"
+            :disabled="accionando"
+            :aria-expanded="cambiandoSerie"
+            @click="cambiandoSerie = !cambiandoSerie"
+          >
+            {{ $t("cambiarSerie.titulo") }}
+          </button>
+          <CambiarSerie
+            v-if="cambiandoSerie && detalle.serie_id && detalle.fecha_serie"
+            :base="base"
+            :serie-id="detalle.serie_id"
+            :fecha="detalle.fecha_serie"
+            :zona="detalle.zona_horaria"
+            :inicia-en="detalle.inicia_en"
+            :duracion="
+              Math.round(
+                (new Date(detalle.termina_en).getTime() -
+                  new Date(detalle.inicia_en).getTime()) /
+                  60000,
+              )
+            "
+            :profesionales="instructores"
+            :profesional-id="detalle.instructor_id"
+            @hecho="horarioCambiado"
+            @cerrar="cambiandoSerie = false"
+          />
           <CambiarHorario
             v-if="cambiandoHorario"
             :url="`${base}/sesiones/${detalle.id}/reprogramar`"
