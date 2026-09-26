@@ -23,6 +23,7 @@ import {
   formulariosRespuestas,
   instructorClase,
   inventarioExtra,
+  margenesServicio,
   miCuentaExtra,
   pagoEnLinea,
   paseEntrada,
@@ -97,6 +98,7 @@ export const i18n = createI18n({
       corteCaja,
       cancelacion,
       movimientosCredito,
+      margenesServicio,
     },
   },
 });

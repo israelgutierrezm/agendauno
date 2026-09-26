@@ -16,6 +16,9 @@ interface Oferta {
   precio_clase_minor: number | null;
   politica_reserva: Politica;
   duracion_minutos: number | null;
+  // Preparación antes y limpieza después: ocupan la agenda, no se le dicen al cliente.
+  preparacion_min?: number;
+  limpieza_min?: number;
   actividad: string | null;
 }
 
@@ -34,11 +37,15 @@ const form = ref<{
   precio: string;
   duracion: string;
   lugares: string;
+  preparacion: string;
+  limpieza: string;
 }>({
   politica: "entitlement",
   precio: "",
   duracion: "",
   lugares: "0",
+  preparacion: "0",
+  limpieza: "0",
 });
 const guardando = ref(false);
 const guardadoId = ref<string | null>(null);
@@ -85,6 +92,8 @@ function configurar(o: Oferta): void {
       o.precio_clase_minor !== null ? String(o.precio_clase_minor / 100) : "",
     duracion: o.duracion_minutos !== null ? String(o.duracion_minutos) : "",
     lugares: String(o.lugares),
+    preparacion: String(o.preparacion_min ?? 0),
+    limpieza: String(o.limpieza_min ?? 0),
   };
 }
 function cerrar(): void {
@@ -107,6 +116,8 @@ async function guardar(o: Oferta): Promise<void> {
       politica_reserva: form.value.politica,
       // La duración solo aplica a citas; sin valor la limpiamos (null).
       duracion_minutos: duracion > 0 ? duracion : null,
+      preparacion_min: Math.max(0, Number(form.value.preparacion) || 0),
+      limpieza_min: Math.max(0, Number(form.value.limpieza) || 0),
     });
     guardadoId.value = o.id;
     editandoId.value = null;
@@ -162,6 +173,15 @@ onMounted(cargar);
                   }}<template v-if="o.duracion_minutos">
                     · {{ o.duracion_minutos }} min</template
                   ></template
+                ><template
+                  v-if="(o.preparacion_min ?? 0) + (o.limpieza_min ?? 0) > 0"
+                >
+                  ·
+                  {{
+                    $t("margenesServicio.resumen", {
+                      n: (o.preparacion_min ?? 0) + (o.limpieza_min ?? 0),
+                    })
+                  }}</template
                 >
                 <template v-else>{{
                   $t("catalogo.badgeEntitlement")
@@ -325,6 +345,36 @@ onMounted(cargar);
                   class="tu-input"
                 />
                 <span class="tu-hint">{{ $t("catalogo.lugaresAyuda") }}</span>
+              </div>
+              <!-- Preparación y limpieza (2.3): ocupan la agenda, no la cita. -->
+              <div>
+                <label class="tu-label" :for="`preparacion-${o.id}`">{{
+                  $t("margenesServicio.preparacion")
+                }}</label>
+                <input
+                  :id="`preparacion-${o.id}`"
+                  v-model="form.preparacion"
+                  type="number"
+                  min="0"
+                  max="240"
+                  step="5"
+                  class="tu-input"
+                />
+              </div>
+              <div>
+                <label class="tu-label" :for="`limpieza-${o.id}`">{{
+                  $t("margenesServicio.limpieza")
+                }}</label>
+                <input
+                  :id="`limpieza-${o.id}`"
+                  v-model="form.limpieza"
+                  type="number"
+                  min="0"
+                  max="240"
+                  step="5"
+                  class="tu-input"
+                />
+                <span class="tu-hint">{{ $t("margenesServicio.ayuda") }}</span>
               </div>
             </div>
 

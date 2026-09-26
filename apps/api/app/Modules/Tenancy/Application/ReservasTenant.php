@@ -810,7 +810,7 @@ class ReservasTenant
             // Mismo punto de serialización por profesional que al agendar una cita.
             $this->agenda->bloquear($sesion->instructor_id !== null ? (int) $sesion->instructor_id : null, null);
             if ($sesion->estado !== EstadoSesionTenant::Programada
-                && $this->agenda->conflictos($sesion->instructor_id, null, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey()) !== []) {
+                && $this->agenda->conflictos($sesion->instructor_id, null, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey(), margenes: MargenesServicio::deSesion($sesion)) !== []) {
                 return false;
             }
             $sesion->update(['estado' => EstadoSesionTenant::Programada->value]);

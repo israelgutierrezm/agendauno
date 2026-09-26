@@ -22,6 +22,9 @@ use Illuminate\Validation\ValidationException;
  *   y por recurso (siempre en ese orden, para no trabarse), así dos solicitudes
  *   simultáneas desde distintos dispositivos no pueden encimarse.
  *
+ * Los choques se miden sobre lo que OCUPA cada sesión: su atención más la
+ * preparación y la limpieza del servicio (fase 2, punto 2.3, {@see MargenesServicio}).
+ *
  * Los conflictos salen estructurados para (a) avisar en el formulario y (b) bloquear
  * el guardado con un mensaje útil.
  */
@@ -46,8 +49,9 @@ class VerificarAgendaTenant
     }
 
     /**
-     * Conflictos de una sesión propuesta. `excluirSesionId` omite la propia sesión (al
-     * editarla) y `excluirSerieId` las de su propia serie (al generarla).
+     * Conflictos de una sesión propuesta (su atención `inicia`–`termina` más sus
+     * márgenes). `excluirSesionId` omite la propia sesión (al editarla) y
+     * `excluirSerieId` las de su propia serie (al generarla).
      *
      * @return list<array{tipo: string, campo: string, mensaje: string, sesion: string|null}>
      */
@@ -59,16 +63,20 @@ class VerificarAgendaTenant
         ?int $excluirSesionId = null,
         ?int $sucursalId = null,
         ?int $excluirSerieId = null,
+        ?MargenesServicio $margenes = null,
     ): array {
+        $margenes ??= new MargenesServicio;
+        $desde = $margenes->desde($inicia);
+        $hasta = $margenes->hasta($termina);
         $conflictos = [];
 
-        // Profesional: no puede atender dos cosas que se solapan.
+        // Profesional: no puede atender dos cosas que se solapan (con sus márgenes).
         if ($instructorId !== null) {
             $choque = SesionTenant::query()
                 ->where('instructor_id', $instructorId)
                 ->where('estado', EstadoSesionTenant::Programada->value)
-                ->where('inicia_en', '<', $termina)
-                ->where('termina_en', '>', $inicia)
+                ->where('ocupa_desde', '<', $hasta)
+                ->where('ocupa_hasta', '>', $desde)
                 ->when($excluirSesionId !== null, fn ($q) => $q->where('id', '!=', $excluirSesionId))
                 ->when($excluirSerieId !== null, fn ($q) => $q->where(fn ($q2) => $q2->whereNull('serie_id')->orWhere('serie_id', '!=', $excluirSerieId)))
                 ->with('oferta')
@@ -77,10 +85,15 @@ class VerificarAgendaTenant
 
             if ($choque instanceof SesionTenant) {
                 $cuando = $choque->inicia_en->copy()->setTimezone((string) ($choque->zona_horaria ?: 'UTC'))->format('H:i');
+                $servicio = $choque->oferta !== null ? $choque->oferta->nombre : 'otra sesión';
+                // Si las atenciones no se tocan, lo que choca es la preparación o limpieza.
+                $soloMargenes = $choque->inicia_en->greaterThanOrEqualTo($termina) || $choque->termina_en->lessThanOrEqualTo($inicia);
                 $conflictos[] = [
                     'tipo' => 'instructor',
                     'campo' => 'instructor_id',
-                    'mensaje' => 'Esa persona ya atiende '.($choque->oferta !== null ? $choque->oferta->nombre : 'otra sesión').' a las '.$cuando.'.',
+                    'mensaje' => $soloMargenes
+                        ? "Ese horario invade la preparación o limpieza de {$servicio} de las {$cuando}."
+                        : "Esa persona ya atiende {$servicio} a las {$cuando}.",
                     'sesion' => $choque->ulid,
                 ];
             }
@@ -91,7 +104,7 @@ class VerificarAgendaTenant
                 $conflictos[] = ['tipo' => 'recurso', 'campo' => 'recurso_id', 'mensaje' => "{$recurso->nombre} está fuera de servicio.", 'sesion' => null];
             } elseif ($sucursalId !== null && (int) $recurso->sucursal_id !== $sucursalId) {
                 $conflictos[] = ['tipo' => 'recurso', 'campo' => 'recurso_id', 'mensaje' => "{$recurso->nombre} es de otra sede.", 'sesion' => null];
-            } elseif (! $this->recursos->disponible($recurso, $inicia, $termina, $excluirSerieId, $excluirSesionId)) {
+            } elseif (! $this->recursos->disponible($recurso, $desde, $hasta, $excluirSerieId, $excluirSesionId)) {
                 $conflictos[] = ['tipo' => 'recurso', 'campo' => 'recurso_id', 'mensaje' => "{$recurso->nombre} no está disponible en ese horario.", 'sesion' => null];
             }
         }
@@ -109,8 +122,9 @@ class VerificarAgendaTenant
         CarbonInterface $termina,
         ?int $excluirSesionId = null,
         ?int $sucursalId = null,
+        ?MargenesServicio $margenes = null,
     ): void {
-        $conflictos = $this->conflictos($instructorId, $recurso, $inicia, $termina, $excluirSesionId, $sucursalId);
+        $conflictos = $this->conflictos($instructorId, $recurso, $inicia, $termina, $excluirSesionId, $sucursalId, null, $margenes);
         if ($conflictos === []) {
             return;
         }

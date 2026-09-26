@@ -74,6 +74,7 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
       sucursalId: _sede!.id,
       fecha: Formato.iso(_dia!),
       duracionMinutos: _servicio!.duracionMinutos ?? 60,
+      servicioId: _servicio!.id,
     );
     if (mounted) {
       setState(() {

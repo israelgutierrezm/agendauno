@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
+use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\VerificarAgendaTenant;
@@ -97,7 +98,7 @@ class AgendaTenantController
         // solicitudes simultáneas no pueden encimarse.
         $sesion = DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $instructorId, $recurso, $inicia, $termina, $validado): SesionTenant {
             $this->agenda->bloquear($instructorId, $recurso);
-            $this->agenda->exigirSinConflictos($instructorId, $recurso, $inicia, $termina, null, (int) $sucursal->getKey());
+            $this->agenda->exigirSinConflictos($instructorId, $recurso, $inicia, $termina, null, (int) $sucursal->getKey(), MargenesServicio::de($oferta));
 
             return SesionTenant::query()->create([
                 'oferta_id' => $oferta->id,
@@ -172,6 +173,8 @@ class AgendaTenantController
             'inicia_en_local' => ['required', 'date'],
             'duracion_minutos' => ['required', 'integer', 'min:1', 'max:1440'],
             'sesion_id' => ['nullable', 'string'],
+            // El servicio aporta su preparación y limpieza (2.3).
+            'oferta_id' => ['nullable', 'string'],
         ]);
 
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
@@ -185,6 +188,10 @@ class AgendaTenantController
             ? SesionTenant::query()->where('ulid', $validado['sesion_id'])->value('id')
             : null;
 
+        $oferta = ($validado['oferta_id'] ?? '') !== ''
+            ? OfertaTenant::query()->where('ulid', $validado['oferta_id'])->first()
+            : null;
+
         $conflictos = $this->agenda->conflictos(
             $this->resolverInstructor($validado['instructor_id'] ?? null),
             $recurso,
@@ -192,6 +199,7 @@ class AgendaTenantController
             $termina,
             $excluir !== null ? (int) $excluir : null,
             (int) $sucursal->getKey(),
+            margenes: MargenesServicio::de($oferta),
         );
 
         return response()->json(['data' => ['conflictos' => $conflictos]]);
@@ -207,7 +215,7 @@ class AgendaTenantController
         // esta), revalidado bajo su candado.
         DB::connection('tenant')->transaction(function () use ($sesion, $instructorId): void {
             $this->agenda->bloquear($instructorId, null);
-            $this->agenda->exigirSinConflictos($instructorId, null, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey());
+            $this->agenda->exigirSinConflictos($instructorId, null, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey(), margenes: MargenesServicio::deSesion($sesion));
             $sesion->update(['instructor_id' => $instructorId]);
         });
 
@@ -391,6 +399,9 @@ class AgendaTenantController
             'recurso_id' => $sesion->recurso?->ulid,
             'inicia_en' => $sesion->inicia_en->toIso8601String(),
             'termina_en' => $sesion->termina_en->toIso8601String(),
+            // Lo que ocupa en la agenda con preparación y limpieza (solo para el equipo).
+            'ocupa_desde' => $sesion->ocupa_desde?->toIso8601String(),
+            'ocupa_hasta' => $sesion->ocupa_hasta?->toIso8601String(),
             'zona_horaria' => $sesion->zona_horaria,
             'capacidad' => $sesion->capacidad,
             'ocupados' => (int) ($sesion->getAttribute('ocupados') ?? 0),

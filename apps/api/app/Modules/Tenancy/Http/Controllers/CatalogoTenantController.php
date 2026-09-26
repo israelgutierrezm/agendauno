@@ -94,6 +94,10 @@ class CatalogoTenantController
             'precio_clase_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
             // Duración del servicio como cita (minutos); solo la usan las ofertas de cita.
             'duracion_minutos' => ['nullable', 'integer', 'min:5', 'max:1440'],
+            // Preparación antes y limpieza después: ocupan la agenda, no se le cobran
+            // ni se le comunican al cliente (2.3).
+            'preparacion_min' => ['nullable', 'integer', 'min:0', 'max:240'],
+            'limpieza_min' => ['nullable', 'integer', 'min:0', 'max:240'],
         ]);
 
         // Defaults por modalidad: en un negocio de citas el servicio se agenda y se paga
@@ -112,6 +116,8 @@ class CatalogoTenantController
             'duracion_minutos' => isset($validado['duracion_minutos'])
                 ? (int) $validado['duracion_minutos']
                 : ($esCitas ? 30 : null),
+            'preparacion_min' => (int) ($validado['preparacion_min'] ?? 0),
+            'limpieza_min' => (int) ($validado['limpieza_min'] ?? 0),
         ]);
 
         return response()->json(['data' => $this->presentarOferta($oferta)], 201);
@@ -128,9 +134,17 @@ class CatalogoTenantController
             'precio_clase_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
             'politica_reserva' => ['nullable', Rule::enum(PoliticaReservaTenant::class)],
             'duracion_minutos' => ['nullable', 'integer', 'min:5', 'max:1440'],
+            'preparacion_min' => ['nullable', 'integer', 'min:0', 'max:240'],
+            'limpieza_min' => ['nullable', 'integer', 'min:0', 'max:240'],
         ]);
 
         $cambios = ['lugares' => (int) $validado['lugares']];
+        // Los márgenes solo se tocan si vienen; aplican a lo que se agende desde ahora.
+        foreach (['preparacion_min', 'limpieza_min'] as $campo) {
+            if ($request->has($campo)) {
+                $cambios[$campo] = (int) ($validado[$campo] ?? 0);
+            }
+        }
         // El precio por clase (R30/citas) solo se toca si viene en la petición (null lo limpia).
         if ($request->has('precio_clase_minor')) {
             $cambios['precio_clase_minor'] = $validado['precio_clase_minor'] !== null ? (int) $validado['precio_clase_minor'] : null;
@@ -178,6 +192,8 @@ class CatalogoTenantController
             'precio_clase_minor' => $oferta->precio_clase_minor,
             'politica_reserva' => $oferta->politica_reserva->value,
             'duracion_minutos' => $oferta->duracion_minutos,
+            'preparacion_min' => (int) $oferta->preparacion_min,
+            'limpieza_min' => (int) $oferta->limpieza_min,
         ];
     }
 }

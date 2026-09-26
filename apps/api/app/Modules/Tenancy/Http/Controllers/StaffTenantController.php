@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CalcularNominaTenant;
+use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\VerificarAgendaTenant;
 use App\Modules\Tenancy\Models\AsignacionSesionTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
@@ -49,7 +50,7 @@ class StaffTenantController
             // Nadie puede estar en dos clases a la vez (imparta, sustituya o asista):
             // se revalida bajo su candado.
             $this->agenda->bloquear((int) $usuario->getKey(), null);
-            $this->agenda->exigirSinConflictos((int) $usuario->getKey(), null, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey());
+            $this->agenda->exigirSinConflictos((int) $usuario->getKey(), null, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey(), margenes: MargenesServicio::deSesion($sesion));
 
             return AsignacionSesionTenant::query()->updateOrCreate(
                 ['sesion_id' => $sesion->getKey(), 'usuario_id' => $usuario->getKey()],

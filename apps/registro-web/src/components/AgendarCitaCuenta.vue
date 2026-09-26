@@ -109,6 +109,8 @@ async function buscarHorarios(): Promise<void> {
           instructor_id: profesionalId.value,
           sucursal_id: sucursalId.value,
           fecha: fecha.value,
+          // El servicio aporta su duración y su preparación/limpieza.
+          oferta_id: servicio.value.id,
           duracion_minutos: servicio.value.duracion_minutos ?? 60,
         },
       },

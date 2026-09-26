@@ -770,3 +770,13 @@ export const movimientosCredito = {
   vacio: "Aún no hay movimientos.",
   saldo: "Saldo {n}",
 };
+
+// Tiempos de preparación y limpieza de un servicio (fase 2, punto 2.3).
+export const margenesServicio = {
+  preparacion: "Preparación antes (min)",
+  limpieza: "Limpieza después (min)",
+  ayuda:
+    "Ocupan la agenda del profesional y de la sala, pero no se le cobran ni se le muestran al cliente.",
+  resumen: "+{n} min de preparación y limpieza",
+  enAgenda: "Preparación o limpieza",
+};

@@ -14,6 +14,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Sesión de la agenda (oferta materializada en una sucursal), tenant-local. Horas
  * en UTC + snapshot de zona horaria.
+ *
+ * `inicia_en`/`termina_en` son la atención (lo que se le dice al cliente);
+ * `ocupa_desde`/`ocupa_hasta` es lo que ocupa en la agenda con la preparación y la
+ * limpieza del servicio (2.3), que se congelan al crearla.
  */
 class SesionTenant extends Model
 {
@@ -23,7 +27,7 @@ class SesionTenant extends Model
 
     protected $table = 'sesiones';
 
-    protected $fillable = ['oferta_id', 'sucursal_id', 'serie_id', 'recurso_id', 'instructor_id', 'inicia_en', 'termina_en', 'zona_horaria', 'capacidad', 'estado', 'tipo'];
+    protected $fillable = ['oferta_id', 'sucursal_id', 'serie_id', 'recurso_id', 'instructor_id', 'inicia_en', 'termina_en', 'zona_horaria', 'capacidad', 'estado', 'tipo', 'margen_antes_min', 'margen_despues_min'];
 
     /**
      * @var array<string, mixed>
@@ -38,10 +42,29 @@ class SesionTenant extends Model
     protected $casts = [
         'inicia_en' => 'datetime',
         'termina_en' => 'datetime',
+        'ocupa_desde' => 'datetime',
+        'ocupa_hasta' => 'datetime',
+        'margen_antes_min' => 'integer',
+        'margen_despues_min' => 'integer',
         'capacidad' => 'integer',
         'estado' => EstadoSesionTenant::class,
         'tipo' => TipoSesionTenant::class,
     ];
+
+    protected static function booted(): void
+    {
+        // Al crearse congela los márgenes de su servicio; lo que ocupa se recalcula
+        // cada que se guarda (si cambia el horario, cambia con él).
+        static::saving(function (self $sesion): void {
+            if (! $sesion->exists) {
+                $margenes = OfertaTenant::query()->find($sesion->oferta_id);
+                $sesion->margen_antes_min ??= (int) ($margenes->preparacion_min ?? 0);
+                $sesion->margen_despues_min ??= (int) ($margenes->limpieza_min ?? 0);
+            }
+            $sesion->ocupa_desde = $sesion->inicia_en->copy()->subMinutes((int) $sesion->margen_antes_min);
+            $sesion->ocupa_hasta = $sesion->termina_en->copy()->addMinutes((int) $sesion->margen_despues_min);
+        });
+    }
 
     /**
      * ¿Es una cita privada (materializada para una persona)?

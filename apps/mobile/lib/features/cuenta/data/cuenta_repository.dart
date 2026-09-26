@@ -279,11 +279,13 @@ class CuentaRepository {
   }
 
   /// Horarios libres (inicio en ISO UTC) de un profesional en una fecha (AAAA-MM-DD).
+  /// Con el servicio, el negocio aplica su duración y su preparación/limpieza.
   Future<List<String>> horariosLibres({
     required String profesionalId,
     required String sucursalId,
     required String fecha,
     required int duracionMinutos,
+    String? servicioId,
   }) async {
     final res = await _dio.get<Map<String, dynamic>>(
       '$_base/mi/citas/disponibilidad',
@@ -292,6 +294,7 @@ class CuentaRepository {
         'sucursal_id': sucursalId,
         'fecha': fecha,
         'duracion_minutos': duracionMinutos,
+        'oferta_id': ?servicioId,
       },
     );
     final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;

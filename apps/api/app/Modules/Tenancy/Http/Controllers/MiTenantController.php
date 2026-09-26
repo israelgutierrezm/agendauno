@@ -282,15 +282,19 @@ class MiTenantController
             'instructor_id' => ['required', 'string'],
             'sucursal_id' => ['required', 'string'],
             'fecha' => ['required', 'date_format:Y-m-d'],
-            'duracion_minutos' => ['required', 'integer', 'min:5', 'max:1440'],
+            // Con el servicio, su duración y sus márgenes (2.3); sin él, la duración.
+            'oferta_id' => ['nullable', 'string'],
+            'duracion_minutos' => ['required_without:oferta_id', 'nullable', 'integer', 'min:5', 'max:1440'],
         ]);
 
         $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
+        $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail() : null;
+        [$duracion, $margenes] = CalcularDisponibilidadTenant::duracionYMargenes($oferta, isset($validado['duracion_minutos']) ? (int) $validado['duracion_minutos'] : null);
 
         return response()->json(['data' => [
             'fecha' => $validado['fecha'],
-            'slots' => $disponibilidad->paraFecha((int) $instructor->getKey(), $sucursal, $validado['fecha'], (int) $validado['duracion_minutos']),
+            'slots' => $disponibilidad->paraFecha((int) $instructor->getKey(), $sucursal, $validado['fecha'], $duracion, null, $margenes),
         ]]);
     }
 

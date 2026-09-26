@@ -114,8 +114,9 @@ class AgendarCitaTenant
                 throw new SesionNoReservable('Esa persona no atiende citas.');
             }
 
-            // El hueco debe seguir libre (el proveedor no puede tener dos cosas a la vez).
-            if ($this->agenda->conflictos($instructorId, null, $inicia, $termina) !== []) {
+            // El hueco debe seguir libre (el proveedor no puede tener dos cosas a la vez),
+            // con la preparación y la limpieza del servicio.
+            if ($this->agenda->conflictos($instructorId, null, $inicia, $termina, margenes: MargenesServicio::de($oferta)) !== []) {
                 throw new SesionNoReservable('Ese horario ya no está disponible.');
             }
 

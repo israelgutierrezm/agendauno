@@ -93,6 +93,7 @@ class GenerarAgendaTenant
                     null,
                     (int) $plantilla->sucursal_id,
                     (int) $plantilla->getKey(),
+                    MargenesServicio::de($plantilla->oferta),
                 );
                 if ($conflictos !== []) {
                     $omitidas[] = ['fecha' => $dia->toDateString(), 'motivo' => $conflictos[0]['mensaje']];

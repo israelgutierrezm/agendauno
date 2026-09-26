@@ -116,6 +116,9 @@ interface Tarjeta {
   tenue: boolean;
   fondo: string;
   tinta: string;
+  // Alto (px) de la preparación antes y de la limpieza después (2.3).
+  antes: number;
+  despues: number;
 }
 
 interface Columna {
@@ -161,8 +164,22 @@ function tarjetasDe(sesiones: SesionAgenda[]): Tarjeta[] {
         estado === "no_asistio",
       fondo: tono.fondo,
       tinta: tono.tinta,
+      antes: margenPx(s.ocupa_desde, s.inicia_en),
+      despues: margenPx(s.termina_en, s.ocupa_hasta),
     };
   });
+}
+
+// Alto a escala de un margen (preparación o limpieza) entre dos instantes.
+function margenPx(
+  desde: string | null | undefined,
+  hasta: string | null | undefined,
+): number {
+  if (!desde || !hasta) {
+    return 0;
+  }
+  const min = (new Date(hasta).getTime() - new Date(desde).getTime()) / 60000;
+  return min > 0 ? (min / 60) * PX_HORA : 0;
 }
 
 const columnas = computed<Columna[]>(() => {
@@ -399,6 +416,34 @@ watch(() => props.fecha, enfocar);
           >
             + {{ aHora(fantasma.min) }}
           </div>
+
+          <!-- Preparación y limpieza: ocupan la agenda, no son parte de la cita. -->
+          <template v-for="tj in c.tarjetas" :key="`m-${tj.sesion.id}`">
+            <div
+              v-if="tj.antes > 0"
+              class="ag-margen"
+              :style="{
+                top: `${tj.top - tj.antes}px`,
+                height: `${tj.antes - 1}px`,
+                left: `calc(${tj.izq}% + 4px)`,
+                width: `calc(${tj.ancho}% - 8px)`,
+              }"
+              :title="$t('margenesServicio.enAgenda')"
+              aria-hidden="true"
+            ></div>
+            <div
+              v-if="tj.despues > 0"
+              class="ag-margen"
+              :style="{
+                top: `${tj.top + tj.alto + 1}px`,
+                height: `${tj.despues - 1}px`,
+                left: `calc(${tj.izq}% + 4px)`,
+                width: `calc(${tj.ancho}% - 8px)`,
+              }"
+              :title="$t('margenesServicio.enAgenda')"
+              aria-hidden="true"
+            ></div>
+          </template>
 
           <button
             v-for="tj in c.tarjetas"
@@ -687,5 +732,16 @@ watch(() => props.fecha, enfocar);
 :global(.dark) .ag-tarjeta {
   background: color-mix(in srgb, var(--tf) 18%, var(--superficie));
   border-left-color: var(--tf);
+}
+/* Preparación / limpieza del servicio: tramo tenue junto a la cita. */
+.ag-margen {
+  position: absolute;
+  border-radius: 0.3rem;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 4px,
+    var(--borde) 4px 5px
+  );
+  pointer-events: none;
 }
 </style>

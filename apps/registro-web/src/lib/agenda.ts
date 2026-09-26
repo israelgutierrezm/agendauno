@@ -24,6 +24,9 @@ export interface SesionAgenda {
   sala: string | null;
   inicia_en: string;
   termina_en: string;
+  // Lo que ocupa con la preparación y la limpieza del servicio (2.3).
+  ocupa_desde?: string | null;
+  ocupa_hasta?: string | null;
   zona_horaria: string;
   capacidad: number | null;
   ocupados: number;
