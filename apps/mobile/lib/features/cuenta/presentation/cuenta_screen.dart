@@ -16,6 +16,7 @@ import 'mis_documentos_screen.dart';
 import 'movimientos_sheet.dart';
 import 'pago_automatico_screen.dart';
 import 'pase_sheet.dart';
+import 'reprogramar_sheet.dart';
 
 /// Autoservicio del alumno o cliente: consentimientos por firmar, créditos,
 /// reservas y, según el negocio, las próximas clases o agendar una cita.
@@ -393,31 +394,46 @@ class _Reserva extends ConsumerWidget {
                   ),
                 ),
               ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (_sePagaAqui)
-                  FilledButton(
-                    onPressed: () => pagarEnLinea(context, ref, r.ordenId!),
-                    child: const Text('Pagar'),
-                  ),
-                if (r.ofrecida)
-                  FilledButton(
-                    onPressed: () => hacerConAviso(
-                      context,
-                      () => notifier.aceptarLugar(r.id),
-                      exito: '¡Lugar confirmado!',
+            // Wrap: en pantallas angostas los botones bajan de renglón.
+            SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (_sePagaAqui)
+                    FilledButton(
+                      onPressed: () => pagarEnLinea(context, ref, r.ordenId!),
+                      child: const Text('Pagar'),
                     ),
-                    child: const Text('Aceptar lugar'),
+                  if (r.ofrecida)
+                    FilledButton(
+                      onPressed: () => hacerConAviso(
+                        context,
+                        () => notifier.aceptarLugar(r.id),
+                        exito: '¡Lugar confirmado!',
+                      ),
+                      child: const Text('Aceptar lugar'),
+                    ),
+                  if (r.estado == 'confirmada' || r.estado == 'pendiente_pago')
+                    TextButton(
+                      onPressed: () => showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        showDragHandle: true,
+                        builder: (_) => ReprogramarSheet(r),
+                      ),
+                      child: const Text('Cambiar horario'),
+                    ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: TemaAgendaUno.error,
+                    ),
+                    onPressed: () => confirmarCancelacion(context, ref, r.id),
+                    child: const Text('Cancelar'),
                   ),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    foregroundColor: TemaAgendaUno.error,
-                  ),
-                  onPressed: () => confirmarCancelacion(context, ref, r.id),
-                  child: const Text('Cancelar'),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),

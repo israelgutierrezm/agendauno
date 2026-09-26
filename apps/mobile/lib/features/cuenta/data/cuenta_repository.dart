@@ -233,6 +233,31 @@ class CuentaRepository {
   Future<void> cancelar(String reservaId) =>
       _dio.post<Map<String, dynamic>>('$_base/mi/reservas/$reservaId/cancelar');
 
+  /// A qué puede cambiar su reserva (cita: horarios libres de ese día).
+  Future<OpcionesReprogramar> opcionesReprogramar(
+    String reservaId, {
+    String? fecha,
+  }) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/reservas/$reservaId/reprogramar',
+      queryParameters: {'fecha': ?fecha},
+    );
+    return OpcionesReprogramar.desdeJson(
+      (res.data?['data'] ?? {}) as Map<String, dynamic>,
+    );
+  }
+
+  /// Cambia el horario: cita a `iniciaEnLocal` (AAAA-MM-DD HH:MM:SS) o clase a
+  /// otra fecha (`sesionId`).
+  Future<void> reprogramar(
+    String reservaId, {
+    String? iniciaEnLocal,
+    String? sesionId,
+  }) => _dio.post<Map<String, dynamic>>(
+    '$_base/mi/reservas/$reservaId/reprogramar',
+    data: {'inicia_en_local': ?iniciaEnLocal, 'sesion_id': ?sesionId},
+  );
+
   /// Qué pasará con su crédito si cancela ahora.
   Future<EfectoCancelacion> efectoDeCancelar(String reservaId) async {
     final res = await _dio.get<Map<String, dynamic>>(

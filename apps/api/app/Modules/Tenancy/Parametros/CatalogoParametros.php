@@ -31,6 +31,12 @@ final class CatalogoParametros
             new DefinicionParametro('recordatorios.segundo_horas', 'Recordatorios', 'Segundo recordatorio',
                 'Horas antes de la clase o cita. 0 = no se envía.', $e, 2, 0, 48, 'h'),
 
+            // Reprogramar desde la cuenta del cliente (ADR 0044).
+            new DefinicionParametro('reprogramar.horas_limite_cliente', 'Cambios de horario desde la cuenta', 'El cliente puede cambiar su horario hasta',
+                'Horas antes del inicio. Después, solo el negocio.', $e, 12, 0, 720, 'h'),
+            new DefinicionParametro('reprogramar.maximo_cliente', 'Cambios de horario desde la cuenta', 'Cambios por reserva',
+                'Cuántas veces puede cambiar él mismo el horario de una reserva. 0 = solo el negocio.', $e, 1, 0, 20),
+
             // Citas.
             new DefinicionParametro('citas.duracion_defecto', 'Citas', 'Duración de una cita si el servicio no la define',
                 'Minutos.', $e, 30, 5, 480, 'min'),

@@ -8,6 +8,7 @@ import type { FormularioPersona } from "@/lib/formularios";
 import CalificarClases from "@/components/CalificarClases.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import MovimientosCreditos from "@/components/MovimientosCreditos.vue";
+import ReprogramarMiReserva from "@/components/ReprogramarMiReserva.vue";
 import MiPrivacidad from "@/components/MiPrivacidad.vue";
 import MisDocumentos from "@/components/MisDocumentos.vue";
 import PagoAutomatico from "@/components/PagoAutomatico.vue";
@@ -85,6 +86,13 @@ const derechos = ref<Derecho[]>([]);
 // Plan cuyo historial de créditos está abierto y reserva que se está cancelando.
 const verMovimientos = ref<string | null>(null);
 const cancelando = ref<string | null>(null);
+// Reserva cuyo horario está cambiando él mismo (ADR 0044).
+const reprogramando = ref<string | null>(null);
+async function reprogramada(): Promise<void> {
+  reprogramando.value = null;
+  mensaje.value = "reprogramada";
+  await cargar(true);
+}
 const reservas = ref<Reserva[]>([]);
 const clases = ref<Clase[]>([]);
 const waivers = ref<Waiver[]>([]);
@@ -363,6 +371,14 @@ onMounted(() => cargar());
     >
       {{ $t("miCuentaExtra.pagoEnProceso") }}
     </p>
+    <p
+      v-if="mensaje === 'reprogramada'"
+      class="mt-4 text-sm"
+      role="status"
+      :style="{ color: 'var(--exito)' }"
+    >
+      {{ $t("miReprogramar.hecho") }}
+    </p>
     <div v-if="voucher" class="mt-4 tu-card p-5 text-sm" role="status">
       <p class="font-medium">{{ $t("pagoTienda.titulo") }}</p>
       <p class="mt-1">
@@ -563,6 +579,20 @@ onMounted(() => cargar());
                   }}
                 </button>
                 <button
+                  v-if="
+                    r.estado === 'confirmada' || r.estado === 'pendiente_pago'
+                  "
+                  class="tu-enlace"
+                  :disabled="accionando"
+                  :aria-expanded="reprogramando === r.id"
+                  @click="
+                    reprogramando = reprogramando === r.id ? null : r.id;
+                    cancelando = null;
+                  "
+                >
+                  {{ $t("miReprogramar.boton") }}
+                </button>
+                <button
                   class="tu-enlace"
                   style="color: var(--error)"
                   :disabled="accionando"
@@ -572,6 +602,15 @@ onMounted(() => cargar());
                   {{ $t("miCuenta.cancelar") }}
                 </button>
               </span>
+              <ReprogramarMiReserva
+                v-if="reprogramando === r.id && r.inicia_en"
+                :base="base"
+                :reserva-id="r.id"
+                :zona="r.zona_horaria ?? 'America/Mexico_City'"
+                :inicia-en="r.inicia_en"
+                @hecho="reprogramada"
+                @cerrar="reprogramando = null"
+              />
               <!-- Antes de cancelar: qué pasará con su crédito. -->
               <ConfirmarCancelacion
                 v-if="cancelando === r.id"

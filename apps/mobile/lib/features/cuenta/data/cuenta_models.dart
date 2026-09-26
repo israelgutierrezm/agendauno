@@ -35,6 +35,51 @@ class DerechoMiembro {
   );
 }
 
+/// A qué puede cambiar su reserva (ADR 0044): horarios libres de la cita o
+/// otras fechas de la clase. Si no puede, el motivo.
+class OpcionesReprogramar {
+  const OpcionesReprogramar({
+    required this.puede,
+    required this.tipo,
+    required this.restantes,
+    this.motivo,
+    this.horarios = const [],
+    this.sesiones = const [],
+  });
+
+  final bool puede;
+  final String? motivo;
+
+  /// 'cita' o 'clase'.
+  final String tipo;
+  final int restantes;
+
+  /// Cita: inicio (ISO UTC) de cada horario libre.
+  final List<String> horarios;
+
+  /// Clase: (id, inicio ISO) de cada fecha con lugar.
+  final List<({String id, String iniciaEn})> sesiones;
+
+  factory OpcionesReprogramar.desdeJson(Map<String, dynamic> j) =>
+      OpcionesReprogramar(
+        puede: (j['puede'] ?? false) as bool,
+        motivo: j['motivo'] as String?,
+        tipo: (j['tipo'] ?? 'cita') as String,
+        restantes: (j['restantes'] ?? 0) as int,
+        horarios: ((j['slots'] ?? []) as List)
+            .map((s) => ((s as Map<String, dynamic>)['inicia'] ?? '') as String)
+            .where((s) => s.isNotEmpty)
+            .toList(),
+        sesiones: ((j['sesiones'] ?? []) as List).map((s) {
+          final m = s as Map<String, dynamic>;
+          return (
+            id: (m['id'] ?? '') as String,
+            iniciaEn: (m['inicia_en'] ?? '') as String,
+          );
+        }).toList(),
+      );
+}
+
 /// Qué pasará con su crédito si cancela ahora (vista previa del negocio).
 class EfectoCancelacion {
   const EfectoCancelacion({required this.cancelable, required this.mensaje});

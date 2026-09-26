@@ -26,6 +26,7 @@ import {
   inventarioExtra,
   margenesServicio,
   miCuentaExtra,
+  miReprogramar,
   pagoEnLinea,
   parametrosConfig,
   paseEntrada,
@@ -111,6 +112,7 @@ export const i18n = createI18n({
       cambiarSerie,
       agendaOperacion,
       parametrosConfig,
+      miReprogramar,
     },
   },
 });

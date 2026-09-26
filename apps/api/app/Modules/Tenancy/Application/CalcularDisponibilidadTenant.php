@@ -48,7 +48,7 @@ class CalcularDisponibilidadTenant
      *
      * @return list<array{inicia: string, termina: string}> ISO-8601 UTC
      */
-    public function paraFecha(int $instructorId, SucursalTenant $sucursal, string $fecha, int $duracionMin, ?int $pasoMin = null, ?MargenesServicio $margenes = null, ?OfertaTenant $servicio = null): array
+    public function paraFecha(int $instructorId, SucursalTenant $sucursal, string $fecha, int $duracionMin, ?int $pasoMin = null, ?MargenesServicio $margenes = null, ?OfertaTenant $servicio = null, ?int $excluirSesionId = null): array
     {
         $margenes ??= new MargenesServicio;
         // Si el servicio requiere cabina o equipo (2.4), el hueco necesita uno libre.
@@ -83,8 +83,8 @@ class CalcularDisponibilidadTenant
 
                 // Solo huecos futuros y sin conflicto de agenda del instructor.
                 if ($inicia->greaterThan($ahora)
-                    && $this->agenda->conflictos($instructorId, null, $inicia, $termina, sucursalId: (int) $sucursal->getKey(), margenes: $margenes) === []
-                    && ($conRecurso === null || $this->recursos->libre($conRecurso, (int) $sucursal->getKey(), $inicia, $termina, $margenes) !== null)) {
+                    && $this->agenda->conflictos($instructorId, null, $inicia, $termina, $excluirSesionId, (int) $sucursal->getKey(), margenes: $margenes) === []
+                    && ($conRecurso === null || $this->recursos->libre($conRecurso, (int) $sucursal->getKey(), $inicia, $termina, $margenes, $excluirSesionId) !== null)) {
                     $slots[] = [
                         'inicia' => $inicia->toIso8601String(),
                         'termina' => $termina->toIso8601String(),

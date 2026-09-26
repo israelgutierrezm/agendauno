@@ -26,7 +26,7 @@ class ReservaTenant extends Model
         'sesion_id', 'persona_id', 'derecho_id', 'retencion_id', 'orden_id',
         'estado', 'canal', 'lugar', 'unidades', 'costo_unidades', 'idempotency_key',
         'horas_limite', 'penaliza_tarde', 'penaliza_no_show', 'oferta_expira_en',
-        'motivo_cancelacion', 'cancelada_en', 'cancelada_por', 'cancelada_por_usuario_id',
+        'motivo_cancelacion', 'cancelada_en', 'cancelada_por', 'cancelada_por_usuario_id', 'reprogramaciones_cliente',
     ];
 
     /**

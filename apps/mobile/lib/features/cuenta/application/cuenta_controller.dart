@@ -26,6 +26,18 @@ class CuentaController extends AsyncNotifier<MiCuenta> {
   Future<void> cancelar(String reservaId) =>
       _hacer((repo) => repo.cancelar(reservaId));
 
+  Future<void> reprogramar(
+    String reservaId, {
+    String? iniciaEnLocal,
+    String? sesionId,
+  }) => _hacer(
+    (repo) => repo.reprogramar(
+      reservaId,
+      iniciaEnLocal: iniciaEnLocal,
+      sesionId: sesionId,
+    ),
+  );
+
   Future<void> aceptarLugar(String reservaId) =>
       _hacer((repo) => repo.aceptarLugar(reservaId));
 

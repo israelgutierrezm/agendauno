@@ -71,4 +71,44 @@ void main() {
     expect(s.terminologia.miembro, 'Cliente');
     expect(s.terminologia.instructor, 'Barbero');
   });
+
+  group('OpcionesReprogramar', () {
+    test('cita: horarios libres del día', () {
+      final o = OpcionesReprogramar.desdeJson({
+        'puede': true,
+        'motivo': null,
+        'tipo': 'cita',
+        'restantes': 1,
+        'slots': [
+          {'inicia': '2030-01-08T18:00:00+00:00', 'termina': '2030-01-08T19:00:00+00:00'},
+        ],
+      });
+      expect(o.puede, isTrue);
+      expect(o.tipo, 'cita');
+      expect(o.horarios, ['2030-01-08T18:00:00+00:00']);
+      expect(o.sesiones, isEmpty);
+    });
+
+    test('clase: otras fechas; y el motivo cuando ya no se puede', () {
+      final o = OpcionesReprogramar.desdeJson({
+        'puede': true,
+        'tipo': 'clase',
+        'restantes': 2,
+        'sesiones': [
+          {'id': 's9', 'inicia_en': '2030-01-09T14:00:00+00:00', 'zona_horaria': 'America/Mexico_City'},
+        ],
+      });
+      expect(o.sesiones.single.id, 's9');
+      expect(o.sesiones.single.iniciaEn, '2030-01-09T14:00:00+00:00');
+
+      final no = OpcionesReprogramar.desdeJson({
+        'puede': false,
+        'motivo': 'Ya no se puede cambiar: faltan menos de 12 h.',
+        'tipo': 'cita',
+        'restantes': 1,
+      });
+      expect(no.puede, isFalse);
+      expect(no.motivo, contains('12 h'));
+    });
+  });
 }
