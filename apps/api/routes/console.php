@@ -14,7 +14,7 @@ Artisan::command('inspire', function () {
 Schedule::command('turnouno:reanudar-pausas')->dailyAt('00:05')->withoutOverlapping();
 
 // Reinicia/renueva a diario los ciclos vencidos de los derechos recurrentes.
-Schedule::command('entitlements:generar-ciclos')->dailyAt('00:15');
+Schedule::command('entitlements:generar-ciclos')->dailyAt('00:15')->withoutOverlapping();
 
 // Publica los eventos de dominio pendientes del outbox de cada estudio (R39).
 // Frecuente para baja latencia; withoutOverlapping evita relays solapados.
@@ -59,4 +59,4 @@ Schedule::command('turnouno:generar-cargos-renta')->dailyAt('08:00')->withoutOve
 Schedule::command('turnouno:respaldar-estudios')->dailyAt('03:15')->withoutOverlapping();
 
 // Escala el dunning: suspende las membresias morosas cuya gracia vencio (R10).
-Schedule::command('turnouno:escalar-dunning')->dailyAt('01:00');
+Schedule::command('turnouno:escalar-dunning')->dailyAt('01:00')->withoutOverlapping();

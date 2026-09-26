@@ -13,6 +13,8 @@ use App\Modules\Tenancy\Models\WebhookSalienteTenant;
  * relay, entrega el evento (firmado) a cada endpoint saliente ACTIVO suscrito a ese
  * tipo. Corre dentro de la conexión del tenant activa. No propaga errores de entrega
  * (los deja como `fallido` para reintento) para no afectar la publicación del outbox.
+ * Si el evento se reintenta (otro consumidor falló), no vuelve a crear ni a mandar la
+ * entrega que ya existe para ese endpoint: sus reintentos van por su propio relay.
  */
 class EnviarWebhooksSalientes
 {
@@ -39,6 +41,10 @@ class EnviarWebhooksSalientes
         ];
 
         foreach ($endpoints as $endpoint) {
+            if ($endpoint->entregas()->where('evento_ulid', $evento->eventoUlid)->exists()) {
+                continue;
+            }
+
             $entrega = $endpoint->entregas()->create([
                 'evento_ulid' => $evento->eventoUlid,
                 'evento_tipo' => $evento->tipo,

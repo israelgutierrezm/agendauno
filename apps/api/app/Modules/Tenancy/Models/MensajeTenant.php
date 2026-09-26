@@ -25,7 +25,7 @@ class MensajeTenant extends Model
 
     protected $fillable = [
         'persona_id', 'usuario_id', 'plantilla_id', 'difusion_id', 'canal', 'destinatario', 'asunto', 'cuerpo',
-        'estado', 'intentos', 'ultimo_error', 'evento_ulid', 'enviado_en',
+        'estado', 'intentos', 'ultimo_error', 'evento_ulid', 'enviado_en', 'clave_envio',
     ];
 
     /**

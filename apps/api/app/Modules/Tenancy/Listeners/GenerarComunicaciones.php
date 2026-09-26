@@ -24,6 +24,10 @@ use App\Modules\Tenancy\Models\Usuario;
  * renderizando asunto/cuerpo con los datos del evento y de la persona. NO envia: eso
  * lo hace el relay {@see EnviarMensajesTenant}. Corre
  * dentro de la conexion del tenant activa.
+ *
+ * Sin repetir: el outbox entrega "al menos una vez" (si otro consumidor falla, el
+ * evento se reintenta). Cada mensaje lleva su llave de envío (evento + plantilla + a
+ * quién, única), así un reintento no manda el mismo aviso dos veces.
  */
 class GenerarComunicaciones
 {
@@ -79,7 +83,13 @@ class GenerarComunicaciones
                 continue; // sin FCM o sin la app con sesión, no hay a dónde mandarla
             }
 
+            $clave = self::claveEnvio($evento, $plantilla, null);
+            if ($this->yaGenerado($clave)) {
+                continue;
+            }
+
             MensajeTenant::query()->create([
+                'clave_envio' => $clave,
                 'persona_id' => $persona?->getKey(),
                 'plantilla_id' => $plantilla->getKey(),
                 'canal' => $plantilla->canal->value,
@@ -116,7 +126,13 @@ class GenerarComunicaciones
             return;
         }
 
+        $clave = self::claveEnvio($evento, $plantilla, $usuario);
+        if ($this->yaGenerado($clave)) {
+            return;
+        }
+
         MensajeTenant::query()->create([
+            'clave_envio' => $clave,
             'persona_id' => $persona?->getKey(),
             'usuario_id' => $usuario->getKey(),
             'plantilla_id' => $plantilla->getKey(),
@@ -127,6 +143,24 @@ class GenerarComunicaciones
             'estado' => EstadoMensaje::Encolado->value,
             'evento_ulid' => $evento->eventoUlid,
         ]);
+    }
+
+    /**
+     * Llave única del aviso: evento + plantilla + destinatario (la persona del evento,
+     * o el usuario del equipo). Un evento sin ulid no se deduplica.
+     */
+    private static function claveEnvio(EventoDeDominioTenant $evento, PlantillaMensajeTenant $plantilla, ?Usuario $usuario): ?string
+    {
+        if ($evento->eventoUlid === '') {
+            return null;
+        }
+
+        return $evento->eventoUlid.':'.$plantilla->getKey().':'.($usuario instanceof Usuario ? 'u'.$usuario->getKey() : 'p');
+    }
+
+    private function yaGenerado(?string $clave): bool
+    {
+        return $clave !== null && MensajeTenant::query()->where('clave_envio', $clave)->exists();
     }
 
     /**
