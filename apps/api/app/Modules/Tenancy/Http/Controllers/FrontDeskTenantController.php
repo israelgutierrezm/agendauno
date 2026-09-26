@@ -102,6 +102,8 @@ class FrontDeskTenantController
         return [
             'id' => $sesion->ulid,
             'oferta' => $sesion->oferta?->nombre,
+            // Para mover a un alumno a otra fecha de la misma clase (2.1).
+            'oferta_id' => $sesion->oferta?->ulid,
             'sucursal' => $sesion->sucursal?->nombre,
             'instructor' => $sesion->instructor?->name,
             'inicia_en' => $sesion->inicia_en->toIso8601String(),

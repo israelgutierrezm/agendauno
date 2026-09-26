@@ -51,7 +51,7 @@ interface Mensaje {
   canal: Canal;
   destinatario: string | null;
   asunto: string;
-  estado: "encolado" | "enviado" | "fallido";
+  estado: "encolado" | "enviado" | "fallido" | "descartado";
   intentos: number;
   enviado_en: string | null;
 }
@@ -242,6 +242,7 @@ const MARCADORES_POR_EVENTO: Record<string, string[]> = {
   "reserva.recordatorio_2h": MARCADORES_SESION,
   "reserva.cancelada": [...MARCADORES_SESION, "credito"],
   "reserva.sesion_cancelada": [...MARCADORES_SESION, "credito", "enlace"],
+  "reserva.reprogramada": [...MARCADORES_SESION, "antes_fecha", "antes_hora"],
   "orden.pagada": [
     "persona_nombre",
     "detalle",
@@ -695,7 +696,7 @@ onMounted(cargar);
       >
         <option value="">{{ $t("comunicacionesAuto.todos") }}</option>
         <option
-          v-for="e in ['encolado', 'enviado', 'fallido']"
+          v-for="e in ['encolado', 'enviado', 'fallido', 'descartado']"
           :key="e"
           :value="e"
         >

@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import CambiarHorario from "@/components/CambiarHorario.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import {
@@ -30,6 +31,8 @@ const props = defineProps<{
   puedeMarcar: boolean;
   puedeCobrar: boolean;
   puedeCancelar: boolean;
+  // Con quién se puede mover la cita (2.1).
+  profesionales?: { id: string; nombre: string }[];
 }>();
 
 const emit = defineEmits<{ cerrar: []; cambiada: [] }>();
@@ -149,6 +152,26 @@ function cobrar(): void {
     t("agendaVisual.cita.okCobrada"),
   );
 }
+// Reprogramar (2.1): misma reserva y pagos, otro horario.
+const reprogramando = ref(false);
+function reprogramada(datos: { antes: string; ahora: string }): void {
+  reprogramando.value = false;
+  const zona = props.sesion?.zona_horaria ?? "America/Mexico_City";
+  const f = (iso: string): string =>
+    new Intl.DateTimeFormat("es-MX", {
+      timeZone: zona,
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(iso));
+  toast.exito(
+    t("reprogramar.hecho", { antes: f(datos.antes), ahora: f(datos.ahora) }),
+  );
+  emit("cambiada");
+}
+
 // Confirmación en línea con el efecto a la vista (quién cancela y qué pasa).
 const cancelando = ref(false);
 function cancelar(por: "cliente" | "negocio" | null): void {
@@ -267,6 +290,25 @@ function cancelar(por: "cliente" | "negocio" | null): void {
             {{ $t("agendaVisual.cita.noAsistio") }}
           </button>
         </div>
+        <button
+          v-if="puedeCancelar && cita !== null && !cita.asistencia"
+          type="button"
+          class="tu-btn tu-btn-fantasma w-full"
+          :aria-expanded="reprogramando"
+          @click="reprogramando = !reprogramando"
+        >
+          {{ $t("reprogramar.titulo") }}
+        </button>
+        <CambiarHorario
+          v-if="reprogramando && cita !== null && sesion !== null"
+          :url="`${base}/reservas/${cita.reserva_id}/reprogramar`"
+          :zona="sesion.zona_horaria"
+          :inicia-en="sesion.inicia_en"
+          :profesionales="profesionales"
+          :profesional-id="sesion.instructor_id"
+          @hecho="reprogramada"
+          @cerrar="reprogramando = false"
+        />
         <button
           v-if="puedeCancelar"
           type="button"

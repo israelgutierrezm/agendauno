@@ -564,6 +564,50 @@ class ReservasTenant
     }
 
     /**
+     * Mueve la reserva de un alumno a OTRA fecha de la misma clase (2.1): conserva su
+     * crédito apartado, su canal y su historial. Bloquea ambas sesiones (en orden de
+     * id, para no trabarse) y revalida el cupo del destino para su canal. El lugar
+     * elegido no se traslada. El cupo liberado se ofrece a la lista de espera del
+     * origen. Debe llamarse dentro de una transacción con la reserva bloqueada.
+     */
+    public function moverA(ReservaTenant $reserva, SesionTenant $destino): void
+    {
+        if ((int) $destino->getKey() === (int) $reserva->sesion_id) {
+            throw new SesionNoReservable('Ya está en esa clase.');
+        }
+
+        $ids = [(int) $reserva->sesion_id, (int) $destino->getKey()];
+        sort($ids);
+        $sesiones = SesionTenant::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+        $origen = $sesiones->get((int) $reserva->sesion_id);
+        $nueva = $sesiones->get((int) $destino->getKey());
+        if (! $origen instanceof SesionTenant || ! $nueva instanceof SesionTenant) {
+            throw new SesionNoReservable('Esa clase ya no existe.');
+        }
+
+        if ((int) $nueva->oferta_id !== (int) $origen->oferta_id) {
+            throw new SesionNoReservable('Solo se puede mover a otra fecha de la misma clase.');
+        }
+        if ($nueva->estado !== EstadoSesionTenant::Programada || ! $nueva->inicia_en->isFuture()) {
+            throw new SesionNoReservable('Esa clase ya no se puede reservar.');
+        }
+        $yaEsta = ReservaTenant::query()
+            ->where('sesion_id', $nueva->getKey())
+            ->where('persona_id', $reserva->persona_id)
+            ->whereIn('estado', self::ACTIVAS)
+            ->exists();
+        if ($yaEsta) {
+            throw new YaReservado('Esa persona ya tiene lugar en esa clase.');
+        }
+        if ($this->disponiblesParaCanal($nueva, (string) ($reserva->canal ?? 'directo')) < 1) {
+            throw new CupoLleno('Esa clase ya no tiene lugares.');
+        }
+
+        $reserva->update(['sesion_id' => $nueva->getKey(), 'lugar' => null]);
+        $this->promover($origen);
+    }
+
+    /**
      * OFRECE el cupo liberado al siguiente de la lista de espera (FIFO), en vez de
      * confirmarlo directamente (waitlist robusta, R7): toma el hold (reserva el credito
      * durante la oferta), pasa la reserva a `ofrecida` con ventana de aceptacion y

@@ -28,7 +28,7 @@ enum DestinatarioMensaje: string
             // Los que traen una cita (su sesión) de la que ubicar al profesional.
             self::Profesional => [
                 'reserva.creada', 'reserva.confirmada', 'reserva.cancelada',
-                'reserva.recordatorio_24h', 'reserva.recordatorio_2h',
+                'reserva.recordatorio_24h', 'reserva.recordatorio_2h', 'reserva.reprogramada',
             ],
             self::Equipo => AvisosAlEquipo::eventos(),
         };

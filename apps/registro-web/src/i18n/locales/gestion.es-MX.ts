@@ -113,6 +113,7 @@ export const conexiones = {
         recordatorio_2h: "Recordatorio 2 h antes",
         cancelada: "Reserva cancelada",
         sesion_cancelada: "Clase o cita cancelada por el negocio",
+        reprogramada: "Cambio de horario",
       },
       asistencia: { marcada: "Asistencia marcada" },
       acceso: { registrado: "Acceso registrado" },
@@ -180,6 +181,7 @@ export const comunicacionesAuto = {
     encolado: "En cola",
     enviado: "Enviado",
     fallido: "Falló",
+    descartado: "Descartado",
   },
 };
 
@@ -804,4 +806,25 @@ export const bloqueosAgenda = {
     "Ya hay {n} citas o clases en ese horario. No se cancelan: revísalas después de bloquear.",
   conReservas: "{n} con reserva",
   enAgenda: "Bloqueado",
+};
+
+// Reprogramar sin cancelar (fase 2, punto 2.1).
+export const reprogramar = {
+  titulo: "Reprogramar",
+  cambiarHorario: "Cambiar horario",
+  fecha: "Nuevo día",
+  hora: "Hora",
+  profesional: "Con",
+  ayuda:
+    "Se conserva todo: cliente, pagos e historial. Si el nuevo horario ya no está libre, no cambia nada.",
+  guardar: "Cambiar",
+  volver: "Volver",
+  hecho: "Movida: antes {antes}, ahora {ahora}.",
+  moverTitulo: "Mover a otra fecha",
+  mover: "Mover",
+  otraFecha: "A otra fecha de esta clase",
+  elegir: "Elige la fecha",
+  sinFechas:
+    "No hay otras fechas de esta clase con lugar en los próximos 30 días.",
+  movida: "Se movió a otra fecha.",
 };

@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
+import MoverReserva from "@/components/MoverReserva.vue";
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -28,6 +29,7 @@ export interface SesionResumen {
   inicia_en: string;
   zona_horaria: string;
   capacidad: number | null;
+  oferta_id?: string | null;
 }
 
 // `incrustado`: se pinta junto a la lista (escritorio); si no, como panel (móvil).
@@ -161,6 +163,14 @@ function aceptar(r: Reserva): Promise<void> {
 }
 // Reserva cuya cancelación se está confirmando (con su efecto a la vista).
 const cancelando = ref<string | null>(null);
+// Reserva que se está moviendo a otra fecha de la clase (2.1).
+const moviendo = ref<string | null>(null);
+async function movida(): Promise<void> {
+  moviendo.value = null;
+  aviso.value = t("reprogramar.movida");
+  await cargar();
+  emit("cambio");
+}
 async function cancelar(
   r: Reserva,
   por: "cliente" | "negocio" | null = null,
@@ -445,6 +455,20 @@ watch(() => props.sesion.id, cargar, { immediate: true });
                 {{ $t("recepcion.panel.noVino") }}
               </button>
             </template>
+            <button
+              v-if="
+                puedeGestionar &&
+                !r.asistencia &&
+                r.estado === 'confirmada' &&
+                sesion.oferta_id
+              "
+              type="button"
+              class="tu-enlace text-xs"
+              :aria-expanded="moviendo === r.id"
+              @click="moviendo = moviendo === r.id ? null : r.id"
+            >
+              {{ $t("reprogramar.moverTitulo") }}
+            </button>
             <!-- Con asistencia ya no se cancela (se corrige con Llegó / No vino). -->
             <button
               v-if="puedeGestionar && !r.asistencia"
@@ -458,6 +482,15 @@ watch(() => props.sesion.id, cargar, { immediate: true });
               {{ $t("agenda.roster.cancelarReserva") }}
             </button>
           </div>
+          <MoverReserva
+            v-if="moviendo === r.id && sesion.oferta_id"
+            :base="base"
+            :reserva-id="r.id"
+            :sesion-id="sesion.id"
+            :oferta-id="sesion.oferta_id"
+            @hecho="movida"
+            @cerrar="moviendo = null"
+          />
           <ConfirmarCancelacion
             v-if="cancelando === r.id"
             :url="`${base}/reservas/${r.id}/cancelacion`"

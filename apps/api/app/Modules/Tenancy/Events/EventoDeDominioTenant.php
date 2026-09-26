@@ -29,6 +29,7 @@ class EventoDeDominioTenant
         'reserva.recordatorio_2h',
         'reserva.cancelada',
         'reserva.sesion_cancelada',
+        'reserva.reprogramada',
         'asistencia.marcada',
         'acceso.registrado',
         'orden.pagada',

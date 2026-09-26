@@ -45,6 +45,7 @@ import {
   porConciliar,
   recuperarContrasena,
   reembolsosPago,
+  reprogramar,
   reglasAgenda,
   validacion,
 } from "./locales/gestion.es-MX";
@@ -101,6 +102,7 @@ export const i18n = createI18n({
       movimientosCredito,
       margenesServicio,
       bloqueosAgenda,
+      reprogramar,
     },
   },
 });

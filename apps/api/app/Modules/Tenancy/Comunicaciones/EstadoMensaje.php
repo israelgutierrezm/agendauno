@@ -13,4 +13,6 @@ enum EstadoMensaje: string
     case Encolado = 'encolado';
     case Enviado = 'enviado';
     case Fallido = 'fallido';
+    // No se envía: dejó de aplicar (p. ej. el recordatorio de un horario que se reprogramó).
+    case Descartado = 'descartado';
 }

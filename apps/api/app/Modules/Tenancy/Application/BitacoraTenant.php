@@ -133,6 +133,9 @@ class BitacoraTenant
             'membresia.reanudada' => 'Reanudó una membresía',
             'privacidad.baja_atendida' => 'Canceló los datos personales (ARCO) de una persona',
             'privacidad.baja_rechazada' => 'Rechazó una solicitud de cancelación de datos',
+            'reserva.reprogramada' => 'Reprogramó una cita o reserva'.(isset($antes['fecha'], $despues['fecha']) ? " del {$antes['fecha']} {$antes['hora']} al {$despues['fecha']} {$despues['hora']}" : ''),
+            'sesion.reprogramada' => 'Cambió el horario de '.((string) ($despues['actividad'] ?? 'una clase')).(isset($despues['fecha']) ? " al {$despues['fecha']} {$despues['hora']}" : ''),
+            'bloqueo_agenda.creado' => 'Bloqueó la agenda'.(isset($despues['motivo']) ? ': '.$despues['motivo'] : ''),
             'pasarela.configurada' => 'Configuró la pasarela '.((string) ($despues['proveedor'] ?? '')).(isset($despues['activa']) ? ($despues['activa'] ? ' (activa)' : ' (inactiva)') : ''),
             default => self::eliminacion($a->accion, $antes, $despues) ?? $a->accion,
         };
@@ -156,6 +159,7 @@ class BitacoraTenant
             'excepcion_horario' => 'la excepción de horario',
             'webhook' => 'el webhook',
             'asignacion' => 'la asignación de sede',
+            'bloqueo_agenda' => 'el bloqueo de agenda',
         ];
         foreach (['eliminado' => 'Eliminó', 'restaurado' => 'Restauró'] as $sufijo => $verbo) {
             if (! str_ends_with($accion, '.'.$sufijo)) {
@@ -163,7 +167,7 @@ class BitacoraTenant
             }
             $tipo = substr($accion, 0, -strlen($sufijo) - 1);
             $datos = $sufijo === 'eliminado' ? $antes : $despues;
-            $nombre = (string) ($datos['nombre'] ?? $datos['codigo'] ?? $datos['url'] ?? $datos['clave'] ?? '');
+            $nombre = (string) ($datos['nombre'] ?? $datos['codigo'] ?? $datos['url'] ?? $datos['clave'] ?? $datos['motivo'] ?? '');
 
             return trim($verbo.' '.($etiquetas[$tipo] ?? $tipo).' '.$nombre);
         }

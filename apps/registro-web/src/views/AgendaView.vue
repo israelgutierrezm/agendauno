@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import AgendaClasesSemana from "@/components/AgendaClasesSemana.vue";
 import AgendaKpis from "@/components/AgendaKpis.vue";
 import AgendaProfesionales from "@/components/AgendaProfesionales.vue";
+import CambiarHorario from "@/components/CambiarHorario.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -963,6 +964,13 @@ async function aceptar(reservaId: string, sesionId: string): Promise<void> {
 // Cancelaciones que se están confirmando (con su efecto a la vista).
 const cancelandoReserva = ref<string | null>(null);
 const cancelandoSesion = ref(false);
+// Cambiar el horario de la clase completa (2.1): todas sus reservas la siguen.
+const cambiandoHorario = ref(false);
+async function horarioCambiado(): Promise<void> {
+  cambiandoHorario.value = false;
+  cerrarDetalle();
+  await cargarSesiones();
+}
 async function cancelarReserva(
   reservaId: string,
   sesionId: string,
@@ -2334,6 +2342,22 @@ onMounted(async () => {
           >
             {{ $t("agenda.sesion.cancelar") }}
           </button>
+          <button
+            class="tu-enlace text-sm ml-4"
+            :disabled="accionando"
+            :aria-expanded="cambiandoHorario"
+            @click="cambiandoHorario = !cambiandoHorario"
+          >
+            {{ $t("reprogramar.cambiarHorario") }}
+          </button>
+          <CambiarHorario
+            v-if="cambiandoHorario"
+            :url="`${base}/sesiones/${detalle.id}/reprogramar`"
+            :zona="detalle.zona_horaria"
+            :inicia-en="detalle.inicia_en"
+            @hecho="horarioCambiado"
+            @cerrar="cambiandoHorario = false"
+          />
           <!-- Antes: cuántas reservas se cancelan y cuántos créditos regresan. -->
           <ConfirmarCancelacion
             v-if="cancelandoSesion"
@@ -2588,6 +2612,7 @@ onMounted(async () => {
       :puede-marcar="puedeMarcar"
       :puede-cobrar="puedeCobrar"
       :puede-cancelar="puedeReservar"
+      :profesionales="instructores"
       @cerrar="citaAbierta = null"
       @cambiada="alCambiarCita"
     />

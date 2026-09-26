@@ -78,6 +78,7 @@ use App\Modules\Tenancy\Http\Controllers\ReporteNegocioTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteRentabilidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteSucursalesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteTendenciasTenantController;
+use App\Modules\Tenancy\Http\Controllers\ReprogramarTenantController;
 use App\Modules\Tenancy\Http\Controllers\ResenasTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReservasTenantController;
 use App\Modules\Tenancy\Http\Controllers\RespuestasFormularioController;
@@ -411,6 +412,7 @@ Route::prefix('v1')->group(function (): void {
             // Literal antes de /sesiones/{sesion} para no ser sombreada.
             Route::post('/sesiones/verificar', [AgendaTenantController::class, 'verificar'])->middleware('puede:agenda.gestionar')->name('sesiones.verificar');
             Route::post('/sesiones', [AgendaTenantController::class, 'crearSesion'])->middleware('puede:agenda.gestionar')->name('sesiones.store');
+            Route::post('/sesiones/{sesion}/reprogramar', [ReprogramarTenantController::class, 'sesion'])->middleware('puede:agenda.gestionar')->name('sesiones.reprogramar');
             Route::post('/sesiones/{sesion}/cancelar', [AgendaTenantController::class, 'cancelar'])->middleware('puede:agenda.gestionar')->name('sesiones.cancelar');
             Route::get('/sesiones/{sesion}/cancelacion', [AgendaTenantController::class, 'previsualizarCancelacion'])->middleware('puede:agenda.gestionar')->name('sesiones.cancelacion');
             // El negocio agenda una cita para un cliente (recepción/teléfono): confirmada,
@@ -502,6 +504,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/sesiones/{sesion}/reservas', [ReservasTenantController::class, 'index'])->middleware('puede:reservas.ver')->name('sesiones.reservas.index');
             Route::post('/sesiones/{sesion}/reservas/preview', [ReservasTenantController::class, 'preview'])->middleware('puede:reservas.ver')->name('sesiones.reservas.preview');
             Route::post('/sesiones/{sesion}/reservas', [ReservasTenantController::class, 'reservar'])->middleware('puede:reservas.gestionar')->name('sesiones.reservas.store');
+            // Reprogramar (2.1): una cita a otra hora/profesional o un alumno a otra fecha de su clase.
+            Route::post('/reservas/{reserva}/reprogramar', [ReprogramarTenantController::class, 'reserva'])->middleware('puede:reservas.gestionar')->name('reservas.reprogramar');
             Route::post('/reservas/{reserva}/cancelar', [ReservasTenantController::class, 'cancelar'])->middleware('puede:reservas.gestionar')->name('reservas.cancelar');
             Route::get('/reservas/{reserva}/cancelacion', [ReservasTenantController::class, 'previsualizarCancelacion'])->middleware('puede:reservas.gestionar')->name('reservas.cancelacion');
             // Waitlist robusta (R7): el ofrecido acepta su cupo antes de que expire.
