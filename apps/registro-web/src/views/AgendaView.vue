@@ -15,6 +15,9 @@ import PanelNuevaCita from "@/components/PanelNuevaCita.vue";
 import {
   kpisCitas,
   kpisClases,
+  COLOR_ESTADO_CITA,
+  estadoCita,
+  pagoCita,
   tonoServicio,
   type CitaTitular,
   type SesionAgenda,
@@ -145,6 +148,8 @@ const semanaInicio = ref(lunesDe(new Date()));
 const diaSel = ref(isoDe(new Date()));
 const sucursalFiltro = ref("");
 const instructorFiltro = ref("");
+// Por servicio o clase (2.6).
+const ofertaFiltro = ref("");
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
@@ -209,9 +214,12 @@ function nombreMiembro(m: Miembro): string {
 
 // Instructor se filtra en cliente (el server ya filtra por sucursal + rango).
 const sesionesVisibles = computed(() =>
-  instructorFiltro.value === ""
-    ? sesiones.value
-    : sesiones.value.filter((s) => s.instructor_id === instructorFiltro.value),
+  sesiones.value.filter(
+    (s) =>
+      (instructorFiltro.value === "" ||
+        s.instructor_id === instructorFiltro.value) &&
+      (ofertaFiltro.value === "" || s.oferta_id === ofertaFiltro.value),
+  ),
 );
 function sesionesDe(iso: string): Sesion[] {
   return sesionesVisibles.value
@@ -1334,6 +1342,18 @@ onMounted(async () => {
           </option>
         </select>
 
+        <select
+          v-if="ofertas.length > 1"
+          v-model="ofertaFiltro"
+          class="tu-input w-auto"
+          :aria-label="$t('agendaOperacion.servicio')"
+        >
+          <option value="">{{ $t("agendaOperacion.todosServicios") }}</option>
+          <option v-for="o in ofertas" :key="o.id" :value="o.id">
+            {{ o.nombre }}
+          </option>
+        </select>
+
         <div class="flex items-center gap-1 ml-auto">
           <button
             class="tu-icono-btn"
@@ -1423,7 +1443,7 @@ onMounted(async () => {
       <!-- ===== Vista POR PROFESIONAL (citas): el día en columnas ===== -->
       <AgendaProfesionales
         v-if="vista === 'profesionales'"
-        class="mt-4"
+        class="mt-4 hidden lg:block"
         :fecha="diaSel"
         :zona="zonaAgenda"
         :sesiones="sesionesVisibles"
@@ -1624,10 +1644,7 @@ onMounted(async () => {
       </div>
 
       <!-- ===== Vista DIA (movil siempre; escritorio si vista dia) ===== -->
-      <div
-        v-if="vista !== 'profesionales'"
-        :class="vista === 'dia' ? 'mt-4' : 'mt-4 lg:hidden'"
-      >
+      <div :class="vista === 'dia' ? 'mt-4' : 'mt-4 lg:hidden'">
         <!-- Tira de dias -->
         <div class="flex gap-1.5 overflow-x-auto pb-2">
           <button
@@ -1682,7 +1699,32 @@ onMounted(async () => {
                   </div>
                 </div>
                 <span class="flex flex-col items-end gap-1 shrink-0">
-                  <span class="inline-flex items-center gap-1.5 text-xs">
+                  <template v-if="s.tipo === 'cita'">
+                    <span class="inline-flex items-center gap-1.5 text-xs">
+                      <span
+                        class="tu-estado-dot"
+                        :style="{
+                          background:
+                            COLOR_ESTADO_CITA[estadoCita(s, new Date())],
+                        }"
+                      ></span>
+                      {{
+                        $t(
+                          `agendaVisual.estadosCita.${estadoCita(s, new Date())}`,
+                        )
+                      }}
+                    </span>
+                    <span
+                      v-if="
+                        pagoCita(s) === 'por_cobrar' ||
+                        pagoCita(s) === 'por_pagar'
+                      "
+                      class="text-[11px]"
+                      :style="{ color: 'var(--aviso)' }"
+                      >{{ $t(`agendaOperacion.pago.${pagoCita(s)}`) }}</span
+                    >
+                  </template>
+                  <span v-else class="inline-flex items-center gap-1.5 text-xs">
                     <span
                       class="tu-estado-dot"
                       :style="{ background: COLOR_ESTADO[estadoAgenda(s)] }"

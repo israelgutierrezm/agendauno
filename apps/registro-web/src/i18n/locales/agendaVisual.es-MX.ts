@@ -20,8 +20,7 @@ export default {
     libres: "Lugares libres por llenar",
   },
   estadosCita: {
-    pendiente_pago: "Pago pendiente",
-    confirmada: "Confirmada",
+    confirmada: "Agendada",
     llego: "Llegó",
     en_servicio: "En servicio",
     completada: "Completada",

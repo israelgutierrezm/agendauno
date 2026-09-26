@@ -9,6 +9,7 @@ import {
   kpisCitas,
   kpisClases,
   minutosLocal,
+  pagoCita,
   PALETA_SERVICIO,
   tonoServicio,
   type SesionAgenda,
@@ -61,9 +62,8 @@ describe("agenda / estado de la cita", () => {
 
   it("distingue pagada de pendiente de pago", () => {
     expect(estadoCita(cita("confirmada", null), antes)).toBe("confirmada");
-    expect(estadoCita(cita("pendiente_pago", null), antes)).toBe(
-      "pendiente_pago",
-    );
+    // El pago va aparte: apartada en línea sigue "agendada" en atención.
+    expect(estadoCita(cita("pendiente_pago", null), antes)).toBe("confirmada");
   });
 
   it("con asistencia: llegó, en servicio o completada según la hora", () => {
@@ -135,6 +135,24 @@ describe("agenda / carriles y horario", () => {
       { ini: 1080, fin: 1200 },
     ]);
     expect(fueraDeHorario([], 540, 1200)).toEqual([]);
+  });
+});
+
+describe("agenda / pago de la cita (aparte de la atención)", () => {
+  it("dice si falta pagar en línea, cobrar en caja o ya está pagada", () => {
+    const porCobrar = cita("confirmada", "presente");
+    porCobrar.cita = { ...porCobrar.cita!, orden_id: "o9", por_cobrar: true };
+    const pagada = cita("confirmada", null);
+    pagada.cita = { ...pagada.cita!, orden_id: "o8", por_cobrar: false };
+
+    expect(pagoCita(cita("pendiente_pago", null))).toBe("por_pagar");
+    expect(pagoCita(porCobrar)).toBe("por_cobrar");
+    expect(pagoCita(pagada)).toBe("pagada");
+    expect(pagoCita(cita("confirmada", null))).toBeNull();
+    // Llegó y falta cobrar: la atención y el pago no se mezclan.
+    expect(estadoCita(porCobrar, new Date("2026-10-05T15:00:00Z"))).toBe(
+      "llego",
+    );
   });
 });
 

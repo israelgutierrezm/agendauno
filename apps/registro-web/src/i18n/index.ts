@@ -13,6 +13,7 @@ import {
 import esMX from "./locales/es-MX";
 import {
   accesoRecepcion,
+  agendaOperacion,
   bitacora,
   citaCuenta,
   comunicacionesAuto,
@@ -107,6 +108,7 @@ export const i18n = createI18n({
       reprogramar,
       recursosServicio,
       cambiarSerie,
+      agendaOperacion,
     },
   },
 });

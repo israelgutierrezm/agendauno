@@ -21,9 +21,11 @@ import {
   fechaLocal,
   fueraDeHorario,
   minutosLocal,
+  pagoCita,
   tonoServicio,
   type BloqueoAgenda,
   type EstadoCita,
+  type PagoCita,
   type SesionAgenda,
   type VentanaAtencion,
 } from "@/lib/agenda";
@@ -116,6 +118,7 @@ interface Tarjeta {
   titulo: string;
   servicio: string;
   estado: EstadoCita | null; // null = clase grupal
+  pago: PagoCita | null; // aparte de la atención (2.6)
   tenue: boolean;
   fondo: string;
   tinta: string;
@@ -161,6 +164,7 @@ function tarjetasDe(sesiones: SesionAgenda[]): Tarjeta[] {
             capacidad: s.capacidad ?? "∞",
           }),
       estado,
+      pago: esCita ? pagoCita(s) : null,
       tenue:
         s.estado !== "programada" ||
         estado === "completada" ||
@@ -534,6 +538,15 @@ watch(() => props.fecha, enfocar);
                   :style="{ background: COLOR_ESTADO_CITA[tj.estado] }"
                 ></span>
                 {{ $t(`agendaVisual.estadosCita.${tj.estado}`) }}
+                <!-- El pago, aparte y solo si falta: "Por cobrar". -->
+                <template
+                  v-if="tj.pago === 'por_cobrar' || tj.pago === 'por_pagar'"
+                >
+                  ·
+                  <span style="color: var(--aviso)">{{
+                    $t(`agendaOperacion.pago.${tj.pago}`)
+                  }}</span></template
+                >
               </span>
             </template>
           </button>

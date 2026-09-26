@@ -851,3 +851,14 @@ export const cambiarSerie = {
   movidas: "Se moverán {n} fechas.",
   conservadas: "{n} se quedan como están:",
 };
+
+// Agenda como centro de operación (fase 2, punto 2.6).
+export const agendaOperacion = {
+  todosServicios: "Todos los servicios",
+  servicio: "Servicio",
+  pago: {
+    pagada: "Pagada",
+    por_cobrar: "Por cobrar",
+    por_pagar: "Falta pagar en línea",
+  },
+};

@@ -165,8 +165,11 @@ export function iniciales(nombre: string | null): string {
 
 // ------------------------------------------------------------ estado cita
 
+/**
+ * Estado de ATENCIÓN de una cita (qué pasa con el cliente). El pago va aparte en
+ * {@link pagoCita}: una cita puede estar agendada y pendiente de cobro (2.6).
+ */
 export type EstadoCita =
-  | "pendiente_pago"
   | "confirmada"
   | "llego"
   | "en_servicio"
@@ -180,7 +183,6 @@ export type EstadoCita =
  */
 export const COLOR_ESTADO_CITA: Record<EstadoCita, string> = {
   confirmada: "var(--exito)",
-  pendiente_pago: "var(--aviso)",
   llego: "var(--acento)",
   en_servicio: "var(--acento)",
   completada: "var(--texto-suave)",
@@ -197,7 +199,7 @@ export function estadoCita(s: SesionAgenda, ahora: Date): EstadoCita {
   if (s.estado !== "programada" || !s.cita) {
     return "cancelada";
   }
-  const { asistencia, estado } = s.cita;
+  const { asistencia } = s.cita;
   if (asistencia === "ausente") {
     return "no_asistio";
   }
@@ -208,7 +210,30 @@ export function estadoCita(s: SesionAgenda, ahora: Date): EstadoCita {
     }
     return t < new Date(s.termina_en).getTime() ? "en_servicio" : "completada";
   }
-  return estado === "pendiente_pago" ? "pendiente_pago" : "confirmada";
+  // Agendada (pagada o no): el pago se muestra aparte.
+  return "confirmada";
+}
+
+/** Estado de PAGO de una cita, separado de su atención (2.6). */
+export type PagoCita = "pagada" | "por_cobrar" | "por_pagar";
+
+/**
+ * `por_pagar`: apartada en línea, falta que el cliente pague; `por_cobrar`: la
+ * agendó el negocio y falta cobrarla en caja; `pagada`. Null = no lleva cobro (usa su
+ * membresía) o no es cita.
+ */
+export function pagoCita(s: SesionAgenda): PagoCita | null {
+  const c = s.cita;
+  if (!c) {
+    return null;
+  }
+  if (c.estado === "pendiente_pago") {
+    return "por_pagar";
+  }
+  if (c.orden_id == null) {
+    return null;
+  }
+  return c.por_cobrar === true ? "por_cobrar" : "pagada";
 }
 
 // ------------------------------------------------------------ cupo clase
@@ -335,10 +360,8 @@ export function kpisCitas(
       k.enLocal++;
     }
     // Por cobrar: pendiente de pago en línea o agendada por el negocio sin cobrar.
-    if (
-      e === "pendiente_pago" ||
-      (e !== "no_asistio" && s.cita?.por_cobrar === true)
-    ) {
+    const pago = pagoCita(s);
+    if (e !== "no_asistio" && (pago === "por_pagar" || pago === "por_cobrar")) {
       k.pendientesPago++;
       k.porCobrarMinor += s.oferta_precio_clase ?? 0;
     }
