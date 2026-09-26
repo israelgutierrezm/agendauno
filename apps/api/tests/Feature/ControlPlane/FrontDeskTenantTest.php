@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\File;
 
 beforeEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
+    // A media mañana en CDMX: una sesión "en 30 minutos" cae hoy (cerca de medianoche
+    // caería mañana y el resumen del día saldría vacío).
+    $this->travelTo(Carbon::now('America/Mexico_City')->setTime(10, 0));
 });
 
 afterEach(function (): void {
