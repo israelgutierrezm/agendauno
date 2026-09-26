@@ -27,7 +27,7 @@ Schedule::command('turnouno:reintentar-webhooks')->everyFiveMinutes()->withoutOv
 Schedule::command('turnouno:enviar-mensajes')->everyMinute()->withoutOverlapping();
 
 // Materializa la agenda recurrente de cada estudio (R5): ventana deslizante diaria.
-Schedule::command('turnouno:generar-agenda')->dailyAt('00:30');
+Schedule::command('turnouno:generar-agenda')->dailyAt('00:30')->withoutOverlapping();
 
 // Expira las ofertas de lista de espera vencidas y re-ofrece el cupo (R7).
 Schedule::command('turnouno:expirar-ofertas')->everyMinute()->withoutOverlapping();

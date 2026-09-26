@@ -14,20 +14,25 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Materializa las sesiones de una plantilla de horario tenant-local dentro de un rango
- * de fechas (R5). Por cada dia del rango cuyo dia de semana este en la plantilla (y que no sea una
- * excepcion/feriado) crea una sesion con `inicia_en`/`termina_en` en UTC (desde la
- * hora local + zona de la sucursal). Es IDEMPOTENTE (firstOrCreate sobre
- * `(serie_id, inicia_en)` + el indice unico), asi que reejecutar el rango no duplica
- * ni resucita una instancia editada/cancelada (override por instancia).
+ * de fechas (R5). Por cada día del rango cuyo día de semana esté en la plantilla (y
+ * que no sea un día cerrado) crea una sesión con `inicia_en`/`termina_en` en UTC
+ * (desde la hora local + zona de la sucursal).
+ *
+ * - IDEMPOTENTE: `firstOrCreate` sobre `(serie_id, inicia_en)` + el índice único, así
+ *   que regenerar no duplica ni resucita una instancia editada o cancelada.
+ * - Con las mismas reglas que al crear una sesión a mano ({@see VerificarAgendaTenant}):
+ *   el instructor no puede tener otra cosa a esa hora y la sala no puede pasarse de su
+ *   cupo, bajo el mismo candado por profesional y recurso.
+ * - Lo que no se puede generar se omite y se REPORTA (fecha y motivo).
  */
 class GenerarAgendaTenant
 {
-    public function __construct(private readonly VerificarRecursoTenant $recursos) {}
+    public function __construct(private readonly VerificarAgendaTenant $agenda) {}
 
-    public function ejecutar(PlantillaHorarioTenant $plantilla, string $desde, string $hasta): int
+    public function ejecutar(PlantillaHorarioTenant $plantilla, string $desde, string $hasta): GeneracionDeAgenda
     {
         if (! $plantilla->activo) {
-            return 0;
+            return new GeneracionDeAgenda(0, []);
         }
 
         $zona = is_string($plantilla->sucursal?->zona_horaria) ? $plantilla->sucursal->zona_horaria : 'UTC';
@@ -37,7 +42,7 @@ class GenerarAgendaTenant
             ? RecursoTenant::query()->find($plantilla->recurso_id)
             : null;
 
-        // Ventana efectiva = interseccion del rango pedido con la vigencia.
+        // Ventana efectiva = intersección del rango pedido con la vigencia.
         $inicio = CarbonImmutable::parse($desde)->startOfDay();
         if ($inicio->lt($plantilla->vigente_desde)) {
             $inicio = CarbonImmutable::parse($plantilla->vigente_desde->toDateString())->startOfDay();
@@ -57,25 +62,41 @@ class GenerarAgendaTenant
             ->map(fn ($fecha): string => $fecha->toDateString())
             ->flip();
 
-        return DB::connection('tenant')->transaction(function () use ($plantilla, $inicio, $fin, $dias, $zona, $capacidad, $excepciones, $recurso): int {
+        return DB::connection('tenant')->transaction(function () use ($plantilla, $inicio, $fin, $dias, $zona, $capacidad, $excepciones, $recurso): GeneracionDeAgenda {
+            $this->agenda->bloquear($plantilla->instructor_id !== null ? (int) $plantilla->instructor_id : null, $recurso);
+
             $creadas = 0;
+            $omitidas = [];
 
             for ($dia = $inicio; $dia->lte($fin); $dia = $dia->addDay()) {
-                if (! in_array($dia->dayOfWeekIso, $dias, true)) {
-                    continue;
-                }
-
-                if ($excepciones->has($dia->toDateString())) {
+                if (! in_array($dia->dayOfWeekIso, $dias, true) || $excepciones->has($dia->toDateString())) {
                     continue;
                 }
 
                 $iniciaEn = CarbonImmutable::parse($dia->toDateString().' '.$plantilla->hora_local, $zona)->utc();
                 $terminaEn = $iniciaEn->addMinutes($plantilla->duracion_minutos);
 
-                // Recurso ocupado a su cupo por OTRA serie/sesion en ese horario: se
-                // omite la instancia (se excluye la propia serie para no auto-chocar).
-                if ($recurso instanceof RecursoTenant
-                    && ! $this->recursos->disponible($recurso, $iniciaEn, $terminaEn, (int) $plantilla->getKey())) {
+                // Ya generada (aunque se haya editado o cancelado): no se toca.
+                $existe = SesionTenant::query()
+                    ->where('serie_id', $plantilla->getKey())
+                    ->where('inicia_en', $iniciaEn)
+                    ->exists();
+                if ($existe) {
+                    continue;
+                }
+
+                $conflictos = $this->agenda->conflictos(
+                    $plantilla->instructor_id !== null ? (int) $plantilla->instructor_id : null,
+                    $recurso,
+                    $iniciaEn,
+                    $terminaEn,
+                    null,
+                    (int) $plantilla->sucursal_id,
+                    (int) $plantilla->getKey(),
+                );
+                if ($conflictos !== []) {
+                    $omitidas[] = ['fecha' => $dia->toDateString(), 'motivo' => $conflictos[0]['mensaje']];
+
                     continue;
                 }
 
@@ -98,7 +119,7 @@ class GenerarAgendaTenant
                 }
             }
 
-            return $creadas;
+            return new GeneracionDeAgenda($creadas, $omitidas);
         });
     }
 }

@@ -63,7 +63,7 @@ it('bloquea agendar otra clase en la misma sala a la misma hora', function (): v
     // Se solapa (08:30) con la misma sala exclusiva → 422.
     crearSesionSala($e, $semilla, $sala, '2026-10-01 08:30:00')
         ->assertStatus(422)
-        ->assertJsonPath('meta.errors.recurso_id.0', 'El recurso o sala ya está ocupado en ese horario.');
+        ->assertJsonPath('meta.errors.recurso_id.0', 'Salón A no está disponible en ese horario.');
 });
 
 it('verificar reporta el conflicto de sala sin guardar', function (): void {

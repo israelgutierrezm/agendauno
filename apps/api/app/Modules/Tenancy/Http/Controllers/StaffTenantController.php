@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CalcularNominaTenant;
+use App\Modules\Tenancy\Application\VerificarAgendaTenant;
 use App\Modules\Tenancy\Models\AsignacionSesionTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
@@ -13,6 +14,7 @@ use App\Modules\Tenancy\Nomina\TipoPago;
 use App\Modules\Tenancy\RolSesionTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -22,7 +24,10 @@ use Illuminate\Validation\Rule;
  */
 class StaffTenantController
 {
-    public function __construct(private readonly CalcularNominaTenant $nomina) {}
+    public function __construct(
+        private readonly CalcularNominaTenant $nomina,
+        private readonly VerificarAgendaTenant $agenda,
+    ) {}
 
     public function asignar(Request $request): JsonResponse
     {
@@ -39,10 +44,18 @@ class StaffTenantController
             $sustituyeA = (int) Usuario::query()->where('ulid', $validado['sustituye_a'])->firstOrFail()->getKey();
         }
 
-        $asignacion = AsignacionSesionTenant::query()->updateOrCreate(
-            ['sesion_id' => $sesion->getKey(), 'usuario_id' => $usuario->getKey()],
-            ['rol' => $validado['rol'], 'sustituye_a' => $sustituyeA],
-        );
+        $rol = RolSesionTenant::from((string) $validado['rol']);
+        $asignacion = DB::connection('tenant')->transaction(function () use ($sesion, $usuario, $rol, $sustituyeA): AsignacionSesionTenant {
+            // Nadie puede estar en dos clases a la vez (imparta, sustituya o asista):
+            // se revalida bajo su candado.
+            $this->agenda->bloquear((int) $usuario->getKey(), null);
+            $this->agenda->exigirSinConflictos((int) $usuario->getKey(), null, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey());
+
+            return AsignacionSesionTenant::query()->updateOrCreate(
+                ['sesion_id' => $sesion->getKey(), 'usuario_id' => $usuario->getKey()],
+                ['rol' => $rol->value, 'sustituye_a' => $sustituyeA],
+            );
+        });
 
         return response()->json(['data' => $this->presentarAsignacion($asignacion->load('usuario'))], 201);
     }

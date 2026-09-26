@@ -21,12 +21,11 @@ use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
-use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Agenda del estudio, tenant-local. Materializa una oferta en una sucursal a una
@@ -94,20 +93,24 @@ class AgendaTenantController
             ? RecursoTenant::query()->where('ulid', $validado['recurso_id'])->firstOrFail()
             : null;
 
-        // Conflictos ANTES de guardar: instructor ocupado o recurso/sala sobre-reservado.
-        $this->exigirSinConflictos($instructorId, $recurso, $inicia, $termina);
+        // Se revalida al GUARDAR, bajo candado del profesional y del recurso: dos
+        // solicitudes simultáneas no pueden encimarse.
+        $sesion = DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $instructorId, $recurso, $inicia, $termina, $validado): SesionTenant {
+            $this->agenda->bloquear($instructorId, $recurso);
+            $this->agenda->exigirSinConflictos($instructorId, $recurso, $inicia, $termina, null, (int) $sucursal->getKey());
 
-        $sesion = SesionTenant::query()->create([
-            'oferta_id' => $oferta->id,
-            'sucursal_id' => $sucursal->id,
-            'instructor_id' => $instructorId,
-            'recurso_id' => $recurso?->getKey(),
-            'inicia_en' => $inicia,
-            'termina_en' => $termina,
-            'zona_horaria' => $sucursal->zona_horaria,
-            'capacidad' => $validado['capacidad'] ?? $oferta->capacidad,
-            'estado' => EstadoSesionTenant::Programada->value,
-        ]);
+            return SesionTenant::query()->create([
+                'oferta_id' => $oferta->id,
+                'sucursal_id' => $sucursal->id,
+                'instructor_id' => $instructorId,
+                'recurso_id' => $recurso?->getKey(),
+                'inicia_en' => $inicia,
+                'termina_en' => $termina,
+                'zona_horaria' => $sucursal->zona_horaria,
+                'capacidad' => $validado['capacidad'] ?? $oferta->capacidad,
+                'estado' => EstadoSesionTenant::Programada->value,
+            ]);
+        });
 
         return response()->json(['data' => $this->presentar($sesion->load(['oferta', 'instructor', 'recurso']))], 201);
     }
@@ -188,6 +191,7 @@ class AgendaTenantController
             $inicia,
             $termina,
             $excluir !== null ? (int) $excluir : null,
+            (int) $sucursal->getKey(),
         );
 
         return response()->json(['data' => ['conflictos' => $conflictos]]);
@@ -199,30 +203,15 @@ class AgendaTenantController
         $validado = $request->validate(['instructor_id' => ['nullable', 'string']]);
 
         $instructorId = $this->resolverInstructor($validado['instructor_id'] ?? null);
-        // Al reasignar, verifica que el instructor no choque con otra clase (excluye esta).
-        $this->exigirSinConflictos($instructorId, null, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey());
-
-        $sesion->update(['instructor_id' => $instructorId]);
+        // Al reasignar, el nuevo instructor no puede chocar con otra clase (excluye
+        // esta), revalidado bajo su candado.
+        DB::connection('tenant')->transaction(function () use ($sesion, $instructorId): void {
+            $this->agenda->bloquear($instructorId, null);
+            $this->agenda->exigirSinConflictos($instructorId, null, $sesion->inicia_en, $sesion->termina_en, (int) $sesion->getKey());
+            $sesion->update(['instructor_id' => $instructorId]);
+        });
 
         return response()->json(['data' => $this->presentar($sesion->refresh()->load(['oferta', 'instructor', 'recurso']))]);
-    }
-
-    /**
-     * Bloquea el guardado si hay conflictos (422 con el mensaje por campo).
-     */
-    private function exigirSinConflictos(?int $instructorId, ?RecursoTenant $recurso, CarbonInterface $inicia, CarbonInterface $termina, ?int $excluirSesionId = null): void
-    {
-        $conflictos = $this->agenda->conflictos($instructorId, $recurso, $inicia, $termina, $excluirSesionId);
-        if ($conflictos === []) {
-            return;
-        }
-
-        $errores = [];
-        foreach ($conflictos as $conflicto) {
-            $errores[$conflicto['campo']][] = $conflicto['mensaje'];
-        }
-
-        throw ValidationException::withMessages($errores);
     }
 
     private function resolverInstructor(?string $ulid): ?int

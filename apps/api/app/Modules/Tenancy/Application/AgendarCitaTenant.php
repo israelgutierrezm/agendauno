@@ -106,9 +106,7 @@ class AgendarCitaTenant
         return DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $persona, $instructorId, $inicia, $termina, $porNegocio): ReservaTenant {
             // Punto de serialización por profesional (ver arriba). Debe ir antes de
             // leer su agenda para que la lectura vea lo que otra solicitud guardó.
-            if ($instructorId !== null) {
-                DB::connection('tenant')->table('users')->where('id', $instructorId)->update(['id' => DB::raw('id')]);
-            }
+            $this->agenda->bloquear($instructorId, null);
             $profesional = $instructorId !== null ? Usuario::query()->find($instructorId) : null;
             // Un profesional invitado que aún no activa su cuenta sí atiende; uno dado
             // de baja ya no se encuentra.

@@ -52,7 +52,7 @@ it('bloquea crear una clase con el instructor ocupado en ese horario', function 
     crearSesionInstructor($e, $semilla, $instructor, '2026-10-01 08:30:00')
         ->assertStatus(422)
         ->assertJsonPath('code', 'VALIDATION_FAILED')
-        ->assertJsonPath('meta.errors.instructor_id.0', 'El instructor ya tiene una clase en ese horario (Nivel 1).');
+        ->assertJsonPath('meta.errors.instructor_id.0', 'Esa persona ya atiende Nivel 1 a las 08:00.');
 });
 
 it('permite el mismo instructor en horarios que no se solapan', function (): void {

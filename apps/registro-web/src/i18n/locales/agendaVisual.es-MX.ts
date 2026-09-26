@@ -116,4 +116,7 @@ export default {
   diaSiguiente: "Día siguiente",
   leyendaServicios: "Servicios",
   leyendaClases: "Clases",
+  // Al generar una clase recurrente: las fechas que no se pudieron crear y por qué.
+  serieOmitidas:
+    "Se crearon {creadas} clases. No se generaron {n} fechas: {detalle}",
 };

@@ -46,7 +46,7 @@ class GenerarAgenda extends Command
                             ->chunkById(200, function (Collection $plantillas) use (&$n, $generar, $desde, $hasta): void {
                                 /** @var Collection<int, PlantillaHorarioTenant> $plantillas */
                                 foreach ($plantillas as $plantilla) {
-                                    $n += $generar->ejecutar($plantilla, $desde, $hasta);
+                                    $n += $generar->ejecutar($plantilla, $desde, $hasta)->creadas;
                                 }
                             });
 

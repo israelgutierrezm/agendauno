@@ -121,6 +121,8 @@ const ventanas = ref<VentanaAtencion[]>([]);
 const cargando = ref(true);
 const cargandoSesiones = ref(false);
 const error = ref<string | null>(null);
+// Fechas de una clase recurrente que no se pudieron generar (y por qué).
+const avisoSerie = ref<string | null>(null);
 
 // ---- Calendario (semana / dia / por profesional) ----
 // Citas: el día en columnas por profesional (o la semana). Clases: la semana con
@@ -1139,6 +1141,7 @@ watch(modo, () => {
 async function crearSesion(): Promise<void> {
   creando.value = true;
   error.value = null;
+  avisoSerie.value = null;
   try {
     if (esRecurrente.value) {
       await crearRecurrente();
@@ -1204,10 +1207,23 @@ async function crearRecurrente(): Promise<void> {
     },
   );
 
-  await api.post(`${base.value}/plantillas-horario/${data.data.id}/generar`, {
+  const generacion = await api.post<{
+    data: { creadas: number; omitidas?: { fecha: string; motivo: string }[] };
+  }>(`${base.value}/plantillas-horario/${data.data.id}/generar`, {
     desde: fechaYmd,
     hasta,
   });
+  const omitidas = generacion.data.data.omitidas ?? [];
+  if (omitidas.length > 0) {
+    avisoSerie.value = t("agendaVisual.serieOmitidas", {
+      creadas: generacion.data.data.creadas,
+      n: omitidas.length,
+      detalle: omitidas
+        .slice(0, 5)
+        .map((o) => `${o.fecha} (${o.motivo})`)
+        .join("; "),
+    });
+  }
 }
 
 onMounted(async () => {
@@ -1242,6 +1258,14 @@ onMounted(async () => {
     </p>
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
+    </p>
+    <p
+      v-if="avisoSerie"
+      class="mt-4 text-sm"
+      role="status"
+      style="color: var(--aviso)"
+    >
+      {{ avisoSerie }}
     </p>
 
     <template v-if="!cargando">

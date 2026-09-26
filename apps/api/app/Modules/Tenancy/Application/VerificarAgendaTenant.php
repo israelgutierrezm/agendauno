@@ -8,21 +8,46 @@ use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
- * Verifica los conflictos de agenda ANTES de guardar una sesión (rework de Agenda):
- * un instructor no puede dar dos clases a la vez, y un recurso/sala no puede
- * sobre-reservarse (reusa {@see VerificarRecursoTenant}, R3). Devuelve los conflictos
- * de forma estructurada para (a) avisar en el formulario y (b) bloquear el guardado.
- * Opera sobre la BD del tenant resuelto.
+ * Reglas de agenda de TODAS las formas de crear o cambiar una sesión (recepción,
+ * asignar instructor o sustituto, citas y clases recurrentes), fase 1 punto 1.3:
+ *
+ * - un profesional no puede tener dos cosas a la vez;
+ * - un recurso/sala no puede superar su cupo simultáneo, debe estar activo y ser de
+ *   la misma sede que la sesión (reusa {@see VerificarRecursoTenant}, R3);
+ * - se revalida al GUARDAR, bajo candado: {@see bloquear()} serializa por profesional
+ *   y por recurso (siempre en ese orden, para no trabarse), así dos solicitudes
+ *   simultáneas desde distintos dispositivos no pueden encimarse.
+ *
+ * Los conflictos salen estructurados para (a) avisar en el formulario y (b) bloquear
+ * el guardado con un mensaje útil.
  */
 class VerificarAgendaTenant
 {
     public function __construct(private readonly VerificarRecursoTenant $recursos) {}
 
     /**
-     * Conflictos de una sesión propuesta. `excluirSesionId` omite la propia sesión
-     * (al reprogramar/editar).
+     * Punto de serialización: una escritura sin cambios sobre la fila del profesional
+     * y la del recurso (en MySQL toma su candado exclusivo; en SQLite el de escritura).
+     * La segunda solicitud espera y, al seguir, ve lo que guardó la primera. Debe
+     * llamarse dentro de la transacción que guarda la sesión, ANTES de revisar.
+     */
+    public function bloquear(?int $instructorId, ?RecursoTenant $recurso): void
+    {
+        if ($instructorId !== null) {
+            DB::connection('tenant')->table('users')->where('id', $instructorId)->update(['id' => DB::raw('id')]);
+        }
+        if ($recurso instanceof RecursoTenant) {
+            DB::connection('tenant')->table('recursos')->where('id', $recurso->getKey())->update(['id' => DB::raw('id')]);
+        }
+    }
+
+    /**
+     * Conflictos de una sesión propuesta. `excluirSesionId` omite la propia sesión (al
+     * editarla) y `excluirSerieId` las de su propia serie (al generarla).
      *
      * @return list<array{tipo: string, campo: string, mensaje: string, sesion: string|null}>
      */
@@ -32,10 +57,12 @@ class VerificarAgendaTenant
         CarbonInterface $inicia,
         CarbonInterface $termina,
         ?int $excluirSesionId = null,
+        ?int $sucursalId = null,
+        ?int $excluirSerieId = null,
     ): array {
         $conflictos = [];
 
-        // Instructor: no puede impartir dos clases que se solapan.
+        // Profesional: no puede atender dos cosas que se solapan.
         if ($instructorId !== null) {
             $choque = SesionTenant::query()
                 ->where('instructor_id', $instructorId)
@@ -43,29 +70,56 @@ class VerificarAgendaTenant
                 ->where('inicia_en', '<', $termina)
                 ->where('termina_en', '>', $inicia)
                 ->when($excluirSesionId !== null, fn ($q) => $q->where('id', '!=', $excluirSesionId))
+                ->when($excluirSerieId !== null, fn ($q) => $q->where(fn ($q2) => $q2->whereNull('serie_id')->orWhere('serie_id', '!=', $excluirSerieId)))
                 ->with('oferta')
+                ->orderBy('inicia_en')
                 ->first();
 
             if ($choque instanceof SesionTenant) {
+                $cuando = $choque->inicia_en->copy()->setTimezone((string) ($choque->zona_horaria ?: 'UTC'))->format('H:i');
                 $conflictos[] = [
                     'tipo' => 'instructor',
                     'campo' => 'instructor_id',
-                    'mensaje' => 'El instructor ya tiene una clase en ese horario'.($choque->oferta !== null ? ' ('.$choque->oferta->nombre.')' : '').'.',
+                    'mensaje' => 'Esa persona ya atiende '.($choque->oferta !== null ? $choque->oferta->nombre : 'otra sesión').' a las '.$cuando.'.',
                     'sesion' => $choque->ulid,
                 ];
             }
         }
 
-        // Recurso/sala: no puede superar su cupo simultáneo en el intervalo.
-        if ($recurso !== null && ! $this->recursos->disponible($recurso, $inicia, $termina, null)) {
-            $conflictos[] = [
-                'tipo' => 'recurso',
-                'campo' => 'recurso_id',
-                'mensaje' => 'El recurso o sala ya está ocupado en ese horario.',
-                'sesion' => null,
-            ];
+        if ($recurso instanceof RecursoTenant) {
+            if (! $recurso->activo) {
+                $conflictos[] = ['tipo' => 'recurso', 'campo' => 'recurso_id', 'mensaje' => "{$recurso->nombre} está fuera de servicio.", 'sesion' => null];
+            } elseif ($sucursalId !== null && (int) $recurso->sucursal_id !== $sucursalId) {
+                $conflictos[] = ['tipo' => 'recurso', 'campo' => 'recurso_id', 'mensaje' => "{$recurso->nombre} es de otra sede.", 'sesion' => null];
+            } elseif (! $this->recursos->disponible($recurso, $inicia, $termina, $excluirSerieId, $excluirSesionId)) {
+                $conflictos[] = ['tipo' => 'recurso', 'campo' => 'recurso_id', 'mensaje' => "{$recurso->nombre} no está disponible en ese horario.", 'sesion' => null];
+            }
         }
 
         return $conflictos;
+    }
+
+    /**
+     * Bloquea el guardado si hay conflictos (422 con el mensaje por campo).
+     */
+    public function exigirSinConflictos(
+        ?int $instructorId,
+        ?RecursoTenant $recurso,
+        CarbonInterface $inicia,
+        CarbonInterface $termina,
+        ?int $excluirSesionId = null,
+        ?int $sucursalId = null,
+    ): void {
+        $conflictos = $this->conflictos($instructorId, $recurso, $inicia, $termina, $excluirSesionId, $sucursalId);
+        if ($conflictos === []) {
+            return;
+        }
+
+        $errores = [];
+        foreach ($conflictos as $conflicto) {
+            $errores[$conflicto['campo']][] = $conflicto['mensaje'];
+        }
+
+        throw ValidationException::withMessages($errores);
     }
 }

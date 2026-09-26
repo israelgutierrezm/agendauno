@@ -87,9 +87,10 @@ class PlantillasHorarioTenantController
             'hasta' => ['required', 'date', 'after_or_equal:desde'],
         ]);
 
-        $creadas = $this->generar->ejecutar($plantilla, $validado['desde'], $validado['hasta']);
+        $resultado = $this->generar->ejecutar($plantilla, $validado['desde'], $validado['hasta']);
 
-        return response()->json(['data' => ['creadas' => $creadas]], 201);
+        // Las fechas que no se pudieron generar, con su motivo (no se omiten en silencio).
+        return response()->json(['data' => ['creadas' => $resultado->creadas, 'omitidas' => $resultado->omitidas]], 201);
     }
 
     private function resolverInstructor(?string $ulid): ?int

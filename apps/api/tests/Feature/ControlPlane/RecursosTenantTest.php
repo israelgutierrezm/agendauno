@@ -53,7 +53,7 @@ it('un recurso unidad no admite dos sesiones que se solapan, pero si contiguas',
 
     // Solapada -> rechazada.
     postSesionConRecurso($e, $semilla, $recurso, '2026-10-05 10:30')
-        ->assertStatus(422)->assertJsonPath('meta.errors.recurso_id.0', 'El recurso o sala ya está ocupado en ese horario.');
+        ->assertStatus(422)->assertJsonPath('meta.errors.recurso_id.0', 'Sala no está disponible en ese horario.');
 
     // Contigua (11:00, justo al terminar la primera) -> permitida.
     postSesionConRecurso($e, $semilla, $recurso, '2026-10-05 11:00')->assertCreated();
@@ -69,7 +69,7 @@ it('un recurso pool admite hasta su capacidad de sesiones simultaneas', function
 
     // La tercera simultanea supera la capacidad (2).
     postSesionConRecurso($e, $semilla, $recurso, '2026-10-05 10:45')
-        ->assertStatus(422)->assertJsonPath('meta.errors.recurso_id.0', 'El recurso o sala ya está ocupado en ese horario.');
+        ->assertStatus(422)->assertJsonPath('meta.errors.recurso_id.0', 'Sala no está disponible en ese horario.');
 });
 
 it('la generacion recurrente omite instancias cuyo recurso ya esta ocupado por otra serie', function (): void {
