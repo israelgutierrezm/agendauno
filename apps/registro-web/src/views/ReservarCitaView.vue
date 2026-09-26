@@ -165,6 +165,8 @@ async function buscarSlots(): Promise<void> {
           sucursal_id: sucursalId.value,
           fecha: fecha.value,
           duracion_minutos: duracion.value,
+          // Con el servicio cuentan sus márgenes y la sala o equipo que requiere.
+          ...(servicioId.value !== "" ? { oferta_id: servicioId.value } : {}),
         },
       },
     );
