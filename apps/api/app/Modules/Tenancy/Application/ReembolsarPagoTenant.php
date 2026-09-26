@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
+use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -24,6 +25,7 @@ use App\Modules\Tenancy\Pagos\Exceptions\PagoNoReembolsable;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Pasarelas\PasarelaReembolsable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -33,9 +35,12 @@ use Throwable;
  * entitlement.
  *
  * Cómo se devuelve el dinero (`metadata.via` de la devolución):
- * - **pasarela**: pago en línea → se pide la devolución a la pasarela (Stripe). Puede
- *   quedar `aprobada` en el momento, `pendiente` (la confirma después el webhook con
- *   {@see conciliar()}) o `fallida`.
+ * - **pasarela**: pago en línea → se registra `solicitado` y luego se pide a la
+ *   pasarela con la llave de la propia devolución (reintentar nunca devuelve dos
+ *   veces). Queda `aprobada`, `pendiente` (la confirma el webhook con
+ *   {@see conciliar()}), `fallida` (con el motivo) o `incierta` si no respondió: esa
+ *   pasa a "por conciliar" y se vuelve a consultar con la misma llave
+ *   ({@see ConciliarReembolsosTenant}).
  * - **manual**: pago en línea cuyo dinero el negocio ya devolvió por fuera
  *   (transferencia, efectivo); lo declara explícitamente. Si la pasarela no puede
  *   devolver en línea y no se declara manual, NO se registra nada.
@@ -59,11 +64,19 @@ class ReembolsarPagoTenant
         private readonly RegistrarEventoTenant $eventos,
         private readonly DomiciliacionesTenant $domiciliaciones,
         private readonly DeudaDeRenovacionTenant $deudas,
+        private readonly IncidenciasCobroTenant $incidencias,
     ) {}
+
+    /**
+     * Pasarelas que admiten reintentar la misma devolución con la misma llave sin
+     * devolver dos veces (Stripe la respeta 24 h; Mercado Pago, con X-Idempotency-Key).
+     */
+    private const REINTENTO_SEGURO = ['stripe', 'mercadopago'];
 
     /**
      * @param  int|null  $montoMinor  monto a devolver; null = todo lo pendiente
      * @param  bool  $manual  el dinero de un pago en línea ya se devolvió por fuera
+     * @param  string|null  $llave  la de la pantalla por intento: repetir la solicitud (doble clic) devuelve la misma devolución
      */
     public function ejecutar(
         PagoTenant $pago,
@@ -72,9 +85,19 @@ class ReembolsarPagoTenant
         ?Usuario $actor = null,
         bool $revertirCreditos = true,
         bool $manual = false,
+        ?string $llave = null,
     ): ReembolsoTenant {
-        return DB::connection('tenant')->transaction(function () use ($pago, $montoMinor, $motivo, $actor, $revertirCreditos, $manual): ReembolsoTenant {
+        // 1) Se registra la intención (y en caja o manual, se aplica) antes de hablar
+        // con la pasarela: si algo falla después, la devolución queda rastreable.
+        [$reembolso, $nuevo] = DB::connection('tenant')->transaction(function () use ($pago, $montoMinor, $motivo, $actor, $revertirCreditos, $manual, $llave): array {
             $bloqueado = PagoTenant::query()->whereKey($pago->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($llave !== null) {
+                $repetido = $bloqueado->reembolsos()->where('llave', $llave)->first();
+                if ($repetido instanceof ReembolsoTenant) {
+                    return [$repetido, false];
+                }
+            }
 
             if (! in_array($bloqueado->estado, [EstadoPago::Aprobado, EstadoPago::ParcialmenteReembolsado], true)) {
                 throw new PagoNoReembolsable('Solo se puede reembolsar un pago aprobado.');
@@ -82,7 +105,7 @@ class ReembolsarPagoTenant
 
             // Lo aprobado y lo que está en curso: no se puede devolver de más.
             $comprometido = (int) $bloqueado->reembolsos()
-                ->whereIn('estado', [EstadoReembolso::Aprobado->value, EstadoReembolso::Pendiente->value])
+                ->whereIn('estado', EstadoReembolso::comprometidos())
                 ->sum('monto_minor');
             $restante = $bloqueado->monto_minor - $comprometido;
             if ($restante <= 0) {
@@ -98,22 +121,22 @@ class ReembolsarPagoTenant
             $orden = $bloqueado->orden;
 
             // Devolución total: se rechaza si algún derecho de la orden ya tuvo uso
-            // (verificación ANTES de tocar la pasarela; no se devuelve dinero si luego
-            // no podríamos revocar el entitlement).
+            // (antes de tocar la pasarela: no se devuelve dinero si luego no podríamos
+            // revocar el entitlement).
             if ($esTotal && $revertirCreditos && $orden !== null) {
                 $this->exigirDerechosIntactos($orden);
             }
 
-            [$estado, $referencia, $via] = $this->solicitarDevolucion($bloqueado, $monto, $manual);
+            $via = $this->via($bloqueado, $manual);
 
             $reembolso = $bloqueado->reembolsos()->create([
                 'monto_minor' => $monto,
                 'moneda' => $bloqueado->moneda,
-                'estado' => $estado === EstadoReembolso::Aprobado ? EstadoReembolso::Pendiente->value : $estado->value,
+                'estado' => EstadoReembolso::Solicitado->value,
                 'proveedor' => $bloqueado->proveedor,
                 'motivo' => $motivo,
                 'revirtio_creditos' => false,
-                'referencia_externa' => $referencia,
+                'llave' => $llave,
                 'actor_id' => $actor?->getKey(),
                 'actor_nombre' => $actor?->name,
                 'metadata' => [
@@ -124,16 +147,69 @@ class ReembolsarPagoTenant
                 ],
             ]);
 
-            if ($estado === EstadoReembolso::Aprobado) {
+            // En caja o declarada manual el dinero ya se devolvió: se aplica ahora.
+            if ($via !== 'pasarela') {
                 $this->aplicarAprobado($bloqueado, $reembolso, $actor);
             }
 
-            return $reembolso->refresh();
+            return [$reembolso, true];
         });
+
+        // 2) En línea: se pide a la pasarela fuera de la transacción, con la llave de
+        // la propia devolución.
+        if ($nuevo && ($reembolso->metadata['via'] ?? null) === 'pasarela') {
+            $this->pedirAPasarela($reembolso, $actor);
+        }
+
+        return $reembolso->refresh();
     }
 
     /**
-     * Resultado de una devolución en línea que quedó pendiente (webhook de la
+     * Pide (o vuelve a pedir, con la MISMA llave) la devolución a la pasarela y aplica
+     * el resultado. Si la pasarela dijo que no, queda fallida y se avisa con su motivo;
+     * si no respondió, queda incierta (pudo haber devuelto) para confirmarla después.
+     */
+    public function pedirAPasarela(ReembolsoTenant $reembolso, ?Usuario $actor = null): void
+    {
+        $pago = PagoTenant::query()->whereKey($reembolso->pago_id)->firstOrFail();
+        $reembolso->increment('intentos');
+
+        try {
+            $pasarela = $this->pasarelaDe($pago);
+            $resultado = $pasarela->reembolsar($pago, $reembolso->monto_minor, $this->registro->llaves($pago->proveedor), 'reembolso_'.$reembolso->ulid);
+        } catch (PagoNoReembolsable|PasarelaNoDisponible $e) {
+            $this->resolver($reembolso, EstadoReembolso::Fallido, null, $e->getMessage(), $actor);
+
+            throw new PagoNoReembolsable($e->getMessage().' Si ya devolviste el dinero por otro medio, regístralo como devolución manual.');
+        } catch (RequestException $e) {
+            if ($e->response->status() < 500) {
+                // La pasarela respondió que no (p. ej. ya estaba devuelto): es definitivo.
+                $motivo = 'La pasarela no aceptó la devolución: '.$e->getMessage();
+                $this->resolver($reembolso, EstadoReembolso::Fallido, null, $motivo, $actor);
+
+                throw new PagoNoReembolsable($motivo.' Si ya devolviste el dinero por otro medio, regístralo como devolución manual.');
+            }
+            $this->marcarIncierto($reembolso, 'La pasarela respondió con error ('.$e->response->status().').');
+
+            return;
+        } catch (Throwable $e) {
+            // Sin respuesta (tiempo agotado, red): no sabemos si devolvió.
+            report($e);
+            $this->marcarIncierto($reembolso, 'La pasarela no respondió.');
+
+            return;
+        }
+
+        $estado = match (true) {
+            $resultado->esAprobado() => EstadoReembolso::Aprobado,
+            $resultado->esPendiente() => EstadoReembolso::Pendiente,
+            default => EstadoReembolso::Fallido,
+        };
+        $this->resolver($reembolso, $estado, $resultado->referencia, $resultado->motivo, $actor);
+    }
+
+    /**
+     * Resultado de una devolución en línea que llega después (webhook de la
      * pasarela): la aprueba (y aplica sus efectos) o la marca fallida. Idempotente.
      */
     public function conciliar(string $referencia, bool $exitosa): ?ReembolsoTenant
@@ -142,33 +218,88 @@ class ReembolsarPagoTenant
             return null;
         }
 
-        return DB::connection('tenant')->transaction(function () use ($referencia, $exitosa): ?ReembolsoTenant {
-            $reembolso = ReembolsoTenant::query()->where('referencia_externa', $referencia)->lockForUpdate()->first();
-            if (! $reembolso instanceof ReembolsoTenant || $reembolso->estado !== EstadoReembolso::Pendiente) {
-                return $reembolso;
-            }
+        $reembolso = ReembolsoTenant::query()->where('referencia_externa', $referencia)->first();
+        if (! $reembolso instanceof ReembolsoTenant) {
+            return null;
+        }
 
-            if (! $exitosa) {
-                $reembolso->update(['estado' => EstadoReembolso::Fallido->value]);
+        $this->resolver($reembolso, $exitosa ? EstadoReembolso::Aprobado : EstadoReembolso::Fallido, $referencia, null, null);
 
-                return $reembolso;
-            }
+        return $reembolso->refresh();
+    }
 
+    /**
+     * ¿Se puede volver a pedir a la pasarela sin riesgo de devolver dos veces?
+     */
+    public function reintentable(ReembolsoTenant $reembolso): bool
+    {
+        return in_array($reembolso->proveedor, self::REINTENTO_SEGURO, true);
+    }
+
+    /**
+     * Deja la devolución en su estado final (o pendiente) y aplica sus efectos UNA
+     * sola vez: una devolución ya aprobada o fallida no cambia.
+     */
+    public function resolver(ReembolsoTenant $reembolso, EstadoReembolso $estado, ?string $referencia, ?string $motivo, ?Usuario $actor): void
+    {
+        DB::connection('tenant')->transaction(function () use ($reembolso, $estado, $referencia, $motivo, $actor): void {
             $pago = PagoTenant::query()->whereKey($reembolso->pago_id)->lockForUpdate()->firstOrFail();
-            $this->aplicarAprobado($pago, $reembolso, null);
+            $bloqueado = ReembolsoTenant::query()->whereKey($reembolso->getKey())->lockForUpdate()->firstOrFail();
+            if ($bloqueado->estado->esFinal()) {
+                return;
+            }
 
-            return $reembolso->refresh();
+            $bloqueado->update(array_filter([
+                'referencia_externa' => $referencia,
+                'motivo_fallo' => $estado === EstadoReembolso::Fallido ? ($motivo ?? 'La pasarela rechazó la devolución.') : null,
+            ], static fn (?string $v): bool => $v !== null));
+
+            match ($estado) {
+                EstadoReembolso::Aprobado => $this->aplicarAprobado($pago, $bloqueado, $actor),
+                default => $bloqueado->update(['estado' => $estado->value]),
+            };
+
+            // Ya no es incierta: lo que estaba por conciliar queda resuelto.
+            $this->incidencias->cerrarDeReembolso($bloqueado, match ($estado) {
+                EstadoReembolso::Aprobado => 'Se confirmó la devolución.',
+                EstadoReembolso::Pendiente => 'La pasarela recibió la devolución; la confirma después.',
+                default => 'La devolución no se hizo.',
+            }, $actor);
+        });
+    }
+
+    /**
+     * La pasarela no respondió: la devolución queda incierta (no se aplica ni se pide
+     * otra) y pasa a "por conciliar" hasta confirmarla.
+     */
+    private function marcarIncierto(ReembolsoTenant $reembolso, string $motivo): void
+    {
+        DB::connection('tenant')->transaction(function () use ($reembolso, $motivo): void {
+            $bloqueado = ReembolsoTenant::query()->whereKey($reembolso->getKey())->lockForUpdate()->firstOrFail();
+            if ($bloqueado->estado->esFinal()) {
+                return;
+            }
+
+            $bloqueado->update(['estado' => EstadoReembolso::Incierto->value, 'motivo_fallo' => $motivo]);
+            $this->incidencias->porReembolso(
+                IncidenciaCobroTenant::REEMBOLSO_INCIERTO,
+                $bloqueado,
+                $this->reintentable($bloqueado)
+                    ? 'La pasarela no confirmó la devolución. La consultamos de nuevo automáticamente; si no se aclara, revísala en su panel.'
+                    : 'La pasarela no confirmó la devolución. Revisa en su panel si se hizo y márcala aquí.',
+                ['motivo' => $motivo],
+            );
         });
     }
 
     /**
      * Efectos de una devolución aprobada: revierte créditos (si se pidió), deja el
      * estado del pago según lo acumulado, cancela la orden en una total y emite el
-     * evento.
+     * evento. Se llama con el pago bloqueado.
      */
     private function aplicarAprobado(PagoTenant $pago, ReembolsoTenant $reembolso, ?Usuario $actor): void
     {
-        $reembolso->update(['estado' => EstadoReembolso::Aprobado->value]);
+        $reembolso->update(['estado' => EstadoReembolso::Aprobado->value, 'aplicado_en' => now()]);
 
         $metadata = $reembolso->metadata ?? [];
         $revertir = (bool) ($metadata['revertir_creditos'] ?? true);
@@ -211,19 +342,26 @@ class ReembolsarPagoTenant
     }
 
     /**
-     * Pide la devolución por la vía que corresponde al pago.
-     *
-     * @return array{0: EstadoReembolso, 1: string|null, 2: string}
+     * Por dónde se devuelve el dinero: `caja` (efectivo/manual/ventanilla),
+     * `manual` (en línea, pero ya se devolvió por fuera) o `pasarela`. Si la pasarela
+     * no puede devolver en línea, no se registra nada y se pide declararla manual.
      */
-    private function solicitarDevolucion(PagoTenant $pago, int $monto, bool $manual): array
+    private function via(PagoTenant $pago, bool $manual): string
     {
         if (! in_array($pago->proveedor, ProveedorPasarela::enLinea(), true)) {
-            return [EstadoReembolso::Aprobado, null, 'caja'];
+            return 'caja';
         }
         if ($manual) {
-            return [EstadoReembolso::Aprobado, null, 'manual'];
+            return 'manual';
         }
 
+        $this->pasarelaDe($pago);
+
+        return 'pasarela';
+    }
+
+    private function pasarelaDe(PagoTenant $pago): PasarelaReembolsable
+    {
         $sinVia = 'Esta pasarela no puede devolver el pago en línea. Si ya devolviste el dinero por otro medio, regístralo como devolución manual.';
         try {
             $pasarela = $this->registro->resolver($pago->proveedor);
@@ -234,21 +372,7 @@ class ReembolsarPagoTenant
             throw new PagoNoReembolsable($sinVia);
         }
 
-        try {
-            $resultado = $pasarela->reembolsar($pago, $monto, $this->registro->llaves($pago->proveedor));
-        } catch (PasarelaNoDisponible $e) {
-            throw new PagoNoReembolsable($e->getMessage().' Si ya devolviste el dinero por otro medio, regístralo como devolución manual.');
-        } catch (Throwable $e) {
-            throw new PagoNoReembolsable('La pasarela no aceptó la devolución: '.$e->getMessage());
-        }
-
-        $estado = match (true) {
-            $resultado->esAprobado() => EstadoReembolso::Aprobado,
-            $resultado->esPendiente() => EstadoReembolso::Pendiente,
-            default => EstadoReembolso::Fallido,
-        };
-
-        return [$estado, $resultado->referencia, 'pasarela'];
+        return $pasarela;
     }
 
     /**

@@ -10,7 +10,6 @@ use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Pasarelas\Stripe\ClienteStripe;
-use Illuminate\Support\Str;
 
 /**
  * Cobro en linea con Stripe usando la `secret_key` del estudio: abre una sesión de
@@ -80,7 +79,7 @@ class PasarelaStripeTenant implements PasarelaCancelable, PasarelaDomiciliable, 
      * Checkout (cs_…) o el PaymentIntent (pi_…: cargos automáticos y cobros
      * anteriores a Checkout).
      */
-    public function reembolsar(PagoTenant $pago, int $montoMinor, array $llaves): ResultadoPago
+    public function reembolsar(PagoTenant $pago, int $montoMinor, array $llaves, string $idempotencia): ResultadoPago
     {
         $cliente = self::api($llaves);
         $referencia = (string) $pago->referencia_externa;
@@ -92,8 +91,8 @@ class PasarelaStripeTenant implements PasarelaCancelable, PasarelaDomiciliable, 
         $reembolso = $cliente->crearReembolso(
             $intent,
             $montoMinor,
-            'reembolso_'.$pago->ulid.'_'.Str::lower((string) Str::ulid()),
-            ['pago' => (string) $pago->ulid],
+            $idempotencia,
+            ['pago' => (string) $pago->ulid, 'reembolso' => $idempotencia],
         );
 
         return match ($reembolso['status']) {

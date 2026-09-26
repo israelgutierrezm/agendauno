@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import CorteDeCaja from "@/components/CorteDeCaja.vue";
+import PorConciliar from "@/components/PorConciliar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -27,6 +28,8 @@ interface Pago {
   metodo: string | null;
   reembolsado_minor: number;
   reembolsable_minor: number;
+  // Tiene devoluciones (aunque estén en curso o hayan fallado).
+  con_reembolsos?: boolean;
   // Quién registró el cobro (en caja) o quién pagó en línea.
   registrado_por?: string | null;
 }
@@ -72,6 +75,7 @@ const rManual = ref(false);
 const rProcesando = ref(false);
 const PASARELAS_EN_LINEA = ["stripe", "openpay", "mercadopago"];
 const avisoReembolso = ref<string | null>(null);
+const porConciliar = ref<InstanceType<typeof PorConciliar> | null>(null);
 
 function dinero(minor: number, moneda: string): string {
   return new Intl.NumberFormat("es-MX", {
@@ -182,6 +186,8 @@ interface Reembolso {
   motivo: string | null;
   revirtio_creditos: boolean;
   via?: string | null;
+  // Por qué no se hizo (fallida) o por qué no se sabe aún (sin confirmar).
+  motivo_fallo?: string | null;
   actor: string | null;
   fecha: string | null;
 }
@@ -203,8 +209,12 @@ async function verReembolsos(p: Pago): Promise<void> {
   }
 }
 
+// Una llave por intento: repetir el envío (doble clic) no devuelve dos veces.
+const rLlave = ref("");
+
 function abrirReembolso(p: Pago): void {
   reembolsando.value = p;
+  rLlave.value = crypto.randomUUID();
   rMonto.value = String(p.reembolsable_minor / 100);
   rMotivo.value = "";
   rRevertir.value = true;
@@ -227,9 +237,15 @@ async function reembolsar(): Promise<void> {
         revertir_creditos: rRevertir.value,
         manual: rManual.value,
       },
+      { headers: { "Idempotency-Key": rLlave.value } },
     );
     avisoReembolso.value =
-      data.data.estado === "pendiente" ? t("reembolsosPago.enProceso") : null;
+      data.data.estado === "pendiente"
+        ? t("reembolsosPago.enProceso")
+        : data.data.estado === "incierto"
+          ? t("reembolsosPago.sinConfirmar")
+          : null;
+    porConciliar.value?.cargar();
     reembolsando.value = null;
     await cargar();
   } catch (e) {
@@ -367,6 +383,13 @@ onMounted(cargar);
       </div>
 
       <!-- Pagos / reembolsos -->
+      <!-- Por conciliar: lo del dinero que alguien debe revisar -->
+      <PorConciliar
+        v-if="sesion.puede('facturacion.ver')"
+        ref="porConciliar"
+        @cambio="cargar"
+      />
+
       <!-- Corte de caja: movimientos por fecha y por quién -->
       <CorteDeCaja v-if="sesion.puede('facturacion.ver')" class="mt-8" />
 
@@ -420,7 +443,7 @@ onMounted(cargar);
                 <td class="px-4 py-2 text-right">
                   {{ dinero(p.monto_minor, p.moneda) }}
                   <button
-                    v-if="p.reembolsado_minor > 0"
+                    v-if="p.con_reembolsos"
                     type="button"
                     class="block ml-auto text-xs underline-offset-2 hover:underline"
                     :style="{ color: 'var(--texto-suave)' }"
@@ -496,6 +519,12 @@ onMounted(cargar);
                               $t("reembolsosPago.creditosRevertidos")
                             }}</template
                           ></span
+                        >
+                        <span
+                          v-if="r.motivo_fallo"
+                          class="block"
+                          style="color: var(--error)"
+                          >{{ r.motivo_fallo }}</span
                         >
                       </span>
                       <span class="flex items-center gap-2 shrink-0">

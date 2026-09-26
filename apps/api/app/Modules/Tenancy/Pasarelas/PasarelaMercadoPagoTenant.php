@@ -12,7 +12,6 @@ use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Pasarelas\MercadoPago\ClienteMercadoPago;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 
 /**
  * Cobro en línea con Mercado Pago (Checkout Pro) usando el access token del
@@ -98,7 +97,7 @@ class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConSuscri
      * Devuelve dinero del cobro aprobado. Mercado Pago devuelve a la tarjeta; lo
      * pagado en efectivo va al saldo de Mercado Pago del cliente.
      */
-    public function reembolsar(PagoTenant $pago, int $montoMinor, array $llaves): ResultadoPago
+    public function reembolsar(PagoTenant $pago, int $montoMinor, array $llaves, string $idempotencia): ResultadoPago
     {
         $api = self::api($llaves);
         $cobro = self::cobroAprobado($api, $pago);
@@ -106,7 +105,7 @@ class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConSuscri
             throw new PasarelaNoDisponible('No se encontró el cobro en Mercado Pago.');
         }
 
-        $reembolso = $api->reembolsar($cobro, $montoMinor, 'reembolso_'.$pago->ulid.'_'.Str::lower((string) Str::ulid()));
+        $reembolso = $api->reembolsar($cobro, $montoMinor, $idempotencia);
 
         return match ($reembolso['status']) {
             'approved' => ResultadoPago::aprobado($reembolso['id']),

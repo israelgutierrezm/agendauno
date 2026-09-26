@@ -335,7 +335,9 @@ export const reembolsosPago = {
   por: "por {actor}",
   creditosRevertidos: "créditos revertidos",
   estados: {
+    solicitado: "Solicitado",
     pendiente: "En proceso",
+    incierto: "Sin confirmar",
     aprobado: "Reembolsado",
     fallido: "Falló",
   },
@@ -349,6 +351,23 @@ export const reembolsosPago = {
     "Transferencia o efectivo. Si no la marcas, la devolución se pide a la pasarela de pago.",
   enProceso:
     "La devolución quedó en proceso: se confirma cuando la pasarela de pago responda.",
+  sinConfirmar:
+    "La pasarela no respondió. La consultamos de nuevo automáticamente; mientras, aparece en Por conciliar.",
+};
+
+// Cobranza: lo del dinero que alguien debe revisar (devoluciones sin confirmar…).
+export const porConciliar = {
+  titulo: "Por conciliar",
+  ayuda:
+    "Movimientos que la pasarela no confirmó. Revisa en su panel qué pasó y márcalo aquí.",
+  devolucion: "Devolución de {monto}",
+  resolver: "Resolver",
+  nota: "Qué revisaste",
+  notaEjemplo: "Ej.: en el panel de Stripe aparece devuelta el 25/09",
+  faltaNota: "Escribe qué revisaste.",
+  siSeDevolvio: "Sí se devolvió",
+  noSeDevolvio: "No se devolvió",
+  marcarResuelta: "Marcar como resuelta",
 };
 
 export const validacion = {

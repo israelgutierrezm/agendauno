@@ -33,6 +33,7 @@ use App\Modules\Tenancy\Http\Controllers\FormulariosController;
 use App\Modules\Tenancy\Http\Controllers\FrontDeskTenantController;
 use App\Modules\Tenancy\Http\Controllers\GruposTenantController;
 use App\Modules\Tenancy\Http\Controllers\ImportacionesTenantController;
+use App\Modules\Tenancy\Http\Controllers\IncidenciasCobroTenantController;
 use App\Modules\Tenancy\Http\Controllers\IntegracionApiTenantController;
 use App\Modules\Tenancy\Http\Controllers\IntegracionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\InventarioTenantController;
@@ -549,6 +550,9 @@ Route::prefix('v1')->group(function (): void {
             // (proporcional). Operacion sensible: exige motivo y queda auditada.
             // Pantalla de cobranza (Etapa 2): pagos capturados para consultar y reembolsar.
             Route::get('/pagos', [PagosTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('pagos.index');
+            // Por conciliar: lo del dinero que alguien debe revisar (p. ej. devoluciones sin confirmar).
+            Route::get('/incidencias-cobro', [IncidenciasCobroTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('incidencias-cobro.index');
+            Route::post('/incidencias-cobro/{incidencia}/resolver', [IncidenciasCobroTenantController::class, 'resolver'])->middleware('puede:pagos.reembolsar')->name('incidencias-cobro.resolver');
             // Corte de caja: movimientos por fecha y por quién (cobros, devoluciones, ventas, cancelaciones).
             Route::get('/pagos/movimientos', [MovimientosPagoTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('pagos.movimientos');
             // Suscripciones recurrentes: próximas renovaciones que cobrará el scheduler (Etapa 2).

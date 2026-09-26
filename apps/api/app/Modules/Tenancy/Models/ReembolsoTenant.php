@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Devolución (refund) de un pago tenant-local. Enlazada a {@see PagoTenant}; la suma
  * de las devoluciones aprobadas de un pago nunca supera su monto. Registra quién la
  * hizo (actor), por qué (motivo) y si revocó el entitlement (`revirtio_creditos`).
+ * Se registra antes de pedirla a la pasarela; su ulid es la llave con la que se pide
+ * (reintentar nunca devuelve dos veces). `aplicado_en` = cuándo se devolvió.
  */
 class ReembolsoTenant extends Model
 {
@@ -25,6 +27,7 @@ class ReembolsoTenant extends Model
     protected $fillable = [
         'pago_id', 'monto_minor', 'moneda', 'estado', 'proveedor', 'motivo',
         'revirtio_creditos', 'referencia_externa', 'actor_id', 'actor_nombre', 'metadata',
+        'llave', 'motivo_fallo', 'intentos', 'aplicado_en',
     ];
 
     /**
@@ -35,6 +38,8 @@ class ReembolsoTenant extends Model
         'monto_minor' => 'integer',
         'revirtio_creditos' => 'boolean',
         'metadata' => 'array',
+        'intentos' => 'integer',
+        'aplicado_en' => 'datetime',
     ];
 
     /**

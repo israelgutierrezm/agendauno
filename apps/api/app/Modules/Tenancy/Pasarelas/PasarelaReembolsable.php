@@ -16,9 +16,11 @@ use App\Modules\Tenancy\Models\PagoTenant;
 interface PasarelaReembolsable
 {
     /**
-     * Solicita a la pasarela devolver `montoMinor` del pago dado.
+     * Solicita a la pasarela devolver `montoMinor` del pago dado. `$idempotencia` es
+     * estable por devolución (la misma en cada reintento): la pasarela no devuelve dos
+     * veces con la misma.
      *
      * @param  array<string, string>  $llaves  credenciales del estudio (descifradas)
      */
-    public function reembolsar(PagoTenant $pago, int $montoMinor, array $llaves): ResultadoPago;
+    public function reembolsar(PagoTenant $pago, int $montoMinor, array $llaves, string $idempotencia): ResultadoPago;
 }

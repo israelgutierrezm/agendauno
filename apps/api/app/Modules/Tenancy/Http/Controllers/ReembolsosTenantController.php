@@ -47,14 +47,20 @@ class ReembolsosTenantController
             'revertir_creditos' => ['boolean'],
             // Pago en línea cuyo dinero el negocio ya devolvió por fuera.
             'manual' => ['boolean'],
+            // Una por intento desde la pantalla: repetir (doble clic) no devuelve dos veces.
+            'idempotency_key' => ['nullable', 'string', 'max:100'],
         ]);
+        $llave = $request->header('Idempotency-Key') ?: ($validado['idempotency_key'] ?? null);
 
         $actor = $request->attributes->get('usuario_tenant');
         $actorUsuario = $actor instanceof Usuario ? $actor : null;
         $monto = isset($validado['monto_minor']) ? (int) $validado['monto_minor'] : null;
         $revertir = (bool) ($validado['revertir_creditos'] ?? true);
 
-        $reembolso = $this->reembolsos->ejecutar($pago, $monto, $validado['motivo'], $actorUsuario, $revertir, (bool) ($validado['manual'] ?? false));
+        $reembolso = $this->reembolsos->ejecutar(
+            $pago, $monto, $validado['motivo'], $actorUsuario, $revertir, (bool) ($validado['manual'] ?? false),
+            is_string($llave) && $llave !== '' ? mb_substr($llave, 0, 100) : null,
+        );
 
         $this->auditoria->registrar(
             $actorUsuario,
@@ -90,8 +96,12 @@ class ReembolsosTenantController
             'motivo' => $reembolso->motivo,
             'revirtio_creditos' => $reembolso->revirtio_creditos,
             'referencia_externa' => $reembolso->referencia_externa,
+            // Por qué no se hizo (fallida) o por qué no se sabe aún (incierta).
+            'motivo_fallo' => $reembolso->motivo_fallo,
             'actor' => $reembolso->actor_nombre,
             'fecha' => $reembolso->created_at?->toIso8601String(),
+            // Cuándo se devolvió de verdad (vacío mientras no se confirma).
+            'aplicado_en' => $reembolso->aplicado_en?->toIso8601String(),
         ];
     }
 }

@@ -96,13 +96,14 @@ class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConSuscripcio
      * Devuelve dinero de un cargo con tarjeta. OpenPay no devuelve pagos en tienda:
      * se devuelven por fuera y se registran como devolución manual.
      */
-    public function reembolsar(PagoTenant $pago, int $montoMinor, array $llaves): ResultadoPago
+    public function reembolsar(PagoTenant $pago, int $montoMinor, array $llaves, string $idempotencia): ResultadoPago
     {
         if ($pago->metodo === MetodoPago::Oxxo) {
             throw new PasarelaNoDisponible('OpenPay no devuelve pagos hechos en tienda.');
         }
 
-        $devolucion = $this->api($llaves)->reembolsar((string) $pago->referencia_externa, $montoMinor, 'Devolución de '.$pago->ulid);
+        // OpenPay no acepta llave de idempotencia: va en la descripción para ubicarla.
+        $devolucion = $this->api($llaves)->reembolsar((string) $pago->referencia_externa, $montoMinor, 'Devolución '.$idempotencia);
 
         return match ($devolucion['status']) {
             'completed' => ResultadoPago::aprobado($devolucion['id']),

@@ -139,15 +139,16 @@ it('si Stripe rechaza después la devolución pendiente, queda fallida y se pued
         ->assertCreated();
 });
 
-it('si la pasarela no puede devolver, no registra nada salvo que se declare devolución manual', function (): void {
+it('si la pasarela no puede devolver, el intento queda fallido y se puede declarar devolución manual', function (): void {
     stripeConDevolucion(null); // Stripe responde con error
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $p = packPagadoConStripe($e);
 
     $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$p['pago']}/reembolsos", ['motivo' => 'Se mudó'], conBearer($e['bearer']))
         ->assertStatus(422)->assertJsonPath('code', 'PAYMENT_NOT_REFUNDABLE');
+    // El intento queda registrado (antes de pedirlo) como fallido, con el motivo.
     $this->getJson("/api/v1/app/{$e['slug']}/pagos/{$p['pago']}/reembolsos", conBearer($e['bearer']))
-        ->assertOk()->assertJsonCount(0, 'data');
+        ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.estado', 'fallido');
     expect(saldoDeAna($e, $p['persona']))->toBe(8000);
 
     // El negocio le devolvió por transferencia y lo declara.

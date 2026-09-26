@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Pagos\EstadoPago;
+use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -27,7 +28,11 @@ class PagosTenantController
                 EstadoPago::Reembolsado->value,
             ])
             ->with(['orden.persona', 'registradoPor'])
-            ->withSum('reembolsos as reembolsado_minor', 'monto_minor')
+            // Devuelto de verdad (aprobado) y lo comprometido (incluye lo que está en curso);
+            // una devolución fallida no cuenta.
+            ->withSum(['reembolsos as reembolsado_minor' => fn ($q) => $q->where('estado', EstadoReembolso::Aprobado->value)], 'monto_minor')
+            ->withSum(['reembolsos as comprometido_minor' => fn ($q) => $q->whereIn('estado', EstadoReembolso::comprometidos())], 'monto_minor')
+            ->withCount('reembolsos')
             ->orderByDesc('id')
             ->limit(self::LIMITE)
             ->get();
@@ -35,6 +40,7 @@ class PagosTenantController
         return response()->json([
             'data' => $pagos->map(function (PagoTenant $pago): array {
                 $reembolsado = (int) ($pago->getAttribute('reembolsado_minor') ?? 0);
+                $comprometido = (int) ($pago->getAttribute('comprometido_minor') ?? 0);
 
                 return [
                     'id' => $pago->ulid,
@@ -46,7 +52,8 @@ class PagosTenantController
                     'proveedor' => $pago->proveedor,
                     'metodo' => $pago->metodo?->value,
                     'reembolsado_minor' => $reembolsado,
-                    'reembolsable_minor' => max(0, $pago->monto_minor - $reembolsado),
+                    'reembolsable_minor' => max(0, $pago->monto_minor - $comprometido),
+                    'con_reembolsos' => (int) $pago->getAttribute('reembolsos_count') > 0,
                     'registrado_por' => $pago->registradoPor?->name,
                 ];
             })->all(),

@@ -39,6 +39,9 @@ Schedule::command('turnouno:enviar-recordatorios')->everyFiveMinutes()->withoutO
 // Libera las reservas pago-para-reservar (citas) no pagadas a tiempo (R-citas).
 Schedule::command('turnouno:expirar-reservas-pago')->everyMinute()->withoutOverlapping();
 
+// Vuelve a consultar, con la misma llave, las devoluciones que la pasarela no confirmó.
+Schedule::command('turnouno:conciliar-reembolsos')->everyFiveMinutes()->withoutOverlapping();
+
 // Cobra las renovaciones recurrentes vencidas y reintenta a los morosos (Etapa 2).
 // Antes de escalar el dunning, para dar oportunidad a los reintentos del día.
 Schedule::command('turnouno:cobrar-suscripciones')->dailyAt('00:45')->withoutOverlapping();
