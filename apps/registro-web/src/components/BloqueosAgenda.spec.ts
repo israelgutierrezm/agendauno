@@ -108,3 +108,71 @@ describe("bloqueos de agenda", () => {
     );
   });
 });
+
+describe("bloqueos de una sala", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/recursos")
+            ? [
+                {
+                  id: "r1",
+                  nombre: "Cabina 1",
+                  sucursal_id: "suc1",
+                  activo: true,
+                },
+                {
+                  id: "r2",
+                  nombre: "Otra sede",
+                  sucursal_id: "suc2",
+                  activo: true,
+                },
+              ]
+            : [
+                {
+                  id: "b1",
+                  ambito: "sala",
+                  instructor_id: null,
+                  sucursal_id: null,
+                  recurso_id: "r1",
+                  desde: "2099-01-07T15:00:00Z",
+                  hasta: "2099-01-07T17:00:00Z",
+                  todo_el_dia: false,
+                  zona_horaria: "America/Mexico_City",
+                  motivo: "Mantenimiento",
+                  creado_por: null,
+                },
+              ],
+        },
+      }),
+    );
+  });
+
+  it("muestra los de las salas de la sede y bloquea una sala", async () => {
+    api.post
+      .mockResolvedValueOnce({ data: { data: { afectadas: [] } } })
+      .mockResolvedValueOnce({ data: { data: {} } });
+    const w = montar();
+    await flushPromises();
+    expect(w.text()).toContain("Mantenimiento");
+    expect(w.text()).toContain("Cabina 1");
+
+    await boton(w, "Una sala")!.trigger("click");
+    // Solo las salas de esta sede.
+    expect(w.findAll("#bl-sala option").map((o) => o.text())).toEqual([
+      "Cabina 1",
+    ]);
+    await w.get("#bl-motivo").setValue("Pintura");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/app/a/bloqueos",
+      expect.objectContaining({ recurso_id: "r1", motivo: "Pintura" }),
+    );
+    expect(api.post.mock.calls[1][1]).not.toHaveProperty("instructor_id");
+  });
+});

@@ -795,6 +795,8 @@ export const bloqueosAgenda = {
   vacio: "Sin bloqueos próximos.",
   sede: "Toda la sede ({sede})",
   todaLaSede: "toda la sede",
+  unaSala: "Una sala",
+  sala: "Sala, cabina o equipo",
   fecha: "Día",
   desdeDia: "Desde el día",
   hastaDia: "Hasta el día",

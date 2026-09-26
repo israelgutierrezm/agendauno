@@ -4,9 +4,9 @@ import { computed, ref, watch } from "vue";
 import { api, mensajeDeError } from "@/lib/api";
 
 /**
- * Bloqueos de agenda (fase 2, punto 2.2) de la persona o la sede elegidas en
- * Horarios: comida, vacaciones, ausencia o cierre, por horas o días completos, con su
- * motivo. Antes de guardar avisa qué citas o clases ya agendadas caen ahí (no se
+ * Bloqueos de agenda (fase 2, punto 2.2) de la persona, la sede o una sala de la sede
+ * elegidas en Horarios: comida, vacaciones, ausencia, mantenimiento o cierre, por
+ * horas o días completos, con su motivo. Antes de guardar avisa qué citas o clases ya agendadas caen ahí (no se
  * cancelan solas).
  */
 interface Bloqueo {
@@ -14,12 +14,19 @@ interface Bloqueo {
   ambito: "profesional" | "sede" | "sala";
   instructor_id: string | null;
   sucursal_id: string | null;
+  recurso_id: string | null;
   desde: string;
   hasta: string;
   todo_el_dia: boolean;
   zona_horaria: string;
   motivo: string;
   creado_por: string | null;
+}
+interface Sala {
+  id: string;
+  nombre: string;
+  sucursal_id: string | null;
+  activo: boolean;
 }
 interface Afectada {
   sesion: string;
@@ -40,6 +47,8 @@ const props = defineProps<{
 }>();
 
 const bloqueos = ref<Bloqueo[]>([]);
+// Salas (y cabinas o equipos) de la sede elegida.
+const salas = ref<Sala[]>([]);
 const error = ref<string | null>(null);
 const guardando = ref(false);
 // Lo ya agendado que caería en el bloqueo (null = aún no se revisa).
@@ -51,7 +60,8 @@ function hoy(): string {
   );
 }
 const form = ref({
-  ambito: "profesional" as "profesional" | "sede",
+  ambito: "profesional" as "profesional" | "sede" | "sala",
+  salaId: "",
   todoElDia: false,
   fecha: hoy(),
   fechaHasta: "",
@@ -64,9 +74,14 @@ const visibles = computed(() =>
   bloqueos.value.filter((b) =>
     b.ambito === "profesional"
       ? b.instructor_id === props.proveedorId
-      : b.ambito === "sede" && b.sucursal_id === props.sucursalId,
+      : b.ambito === "sede"
+        ? b.sucursal_id === props.sucursalId
+        : salas.value.some((s) => s.id === b.recurso_id),
   ),
 );
+function nombreSala(b: Bloqueo): string {
+  return salas.value.find((s) => s.id === b.recurso_id)?.nombre ?? "";
+}
 
 function cuando(b: Bloqueo): string {
   const fmt = (iso: string, conHora: boolean): string =>
@@ -102,13 +117,24 @@ function horaDe(a: Afectada): string {
 
 async function cargar(): Promise<void> {
   try {
-    const { data } = await api.get<{ data: Bloqueo[] }>(
-      `${props.base}/bloqueos`,
-      { params: { desde: hoy() } },
+    const [b, r] = await Promise.all([
+      api.get<{ data: Bloqueo[] }>(`${props.base}/bloqueos`, {
+        params: { desde: hoy() },
+      }),
+      api.get<{ data: Sala[] }>(`${props.base}/recursos`),
+    ]);
+    bloqueos.value = b.data.data.filter(
+      (x) => new Date(x.hasta).getTime() > Date.now(),
     );
-    bloqueos.value = data.data.filter(
-      (b) => new Date(b.hasta).getTime() > Date.now(),
+    salas.value = r.data.data.filter(
+      (s) => s.activo && s.sucursal_id === props.sucursalId,
     );
+    if (!salas.value.some((s) => s.id === form.value.salaId)) {
+      form.value.salaId = salas.value[0]?.id ?? "";
+      if (form.value.ambito === "sala" && form.value.salaId === "") {
+        form.value.ambito = "profesional";
+      }
+    }
   } catch (e) {
     error.value = mensajeDeError(e);
   }
@@ -119,7 +145,9 @@ function carga(): Record<string, string> {
   const quien: Record<string, string> =
     f.ambito === "profesional"
       ? { instructor_id: props.proveedorId }
-      : { sucursal_id: props.sucursalId };
+      : f.ambito === "sala"
+        ? { recurso_id: f.salaId }
+        : { sucursal_id: props.sucursalId };
   const cuando: Record<string, string> = f.todoElDia
     ? {
         fecha_desde: f.fecha,
@@ -196,6 +224,8 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
             >{{ cuando(b)
             }}<template v-if="b.ambito === 'sede'">
               · {{ $t("bloqueosAgenda.todaLaSede") }}</template
+            ><template v-else-if="b.ambito === 'sala'">
+              · {{ nombreSala(b) }}</template
             ><template v-if="b.creado_por">
               · {{ b.creado_por }}</template
             ></span
@@ -235,6 +265,29 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
         >
           {{ $t("bloqueosAgenda.sede", { sede: sucursalNombre }) }}
         </button>
+        <button
+          v-if="salas.length > 0"
+          type="button"
+          :aria-pressed="form.ambito === 'sala'"
+          @click="form.ambito = 'sala'"
+        >
+          {{ $t("bloqueosAgenda.unaSala") }}
+        </button>
+      </div>
+      <div v-if="form.ambito === 'sala'">
+        <label class="tu-label" for="bl-sala">{{
+          $t("bloqueosAgenda.sala")
+        }}</label>
+        <select
+          id="bl-sala"
+          v-model="form.salaId"
+          class="tu-input w-auto"
+          required
+        >
+          <option v-for="s in salas" :key="s.id" :value="s.id">
+            {{ s.nombre }}
+          </option>
+        </select>
       </div>
       <div class="flex flex-wrap items-end gap-3">
         <div>
