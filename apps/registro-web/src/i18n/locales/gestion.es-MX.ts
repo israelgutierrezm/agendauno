@@ -828,3 +828,11 @@ export const reprogramar = {
     "No hay otras fechas de esta clase con lugar en los próximos 30 días.",
   movida: "Se movió a otra fecha.",
 };
+
+// Espacios o equipos que requiere un servicio (fase 2, punto 2.4).
+export const recursosServicio = {
+  titulo: "Espacios que usa",
+  ayuda:
+    "Si eliges alguno, cada cita toma uno libre de su sede (cabina, consultorio, sillón…). Sin marcar, el servicio no pide espacio.",
+  resumen: "usa {lista}",
+};

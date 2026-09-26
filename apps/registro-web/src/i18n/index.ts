@@ -44,6 +44,7 @@ import {
   plataformaAdmin,
   porConciliar,
   recuperarContrasena,
+  recursosServicio,
   reembolsosPago,
   reprogramar,
   reglasAgenda,
@@ -103,6 +104,7 @@ export const i18n = createI18n({
       margenesServicio,
       bloqueosAgenda,
       reprogramar,
+      recursosServicio,
     },
   },
 });

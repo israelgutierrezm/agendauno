@@ -10,11 +10,13 @@ use App\Modules\Tenancy\Models\ActividadTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\ProgramaTenant;
+use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Catálogo del estudio (Programa → Actividad → Nivel/Oferta), tenant-local. Primer
@@ -136,9 +138,19 @@ class CatalogoTenantController
             'duracion_minutos' => ['nullable', 'integer', 'min:5', 'max:1440'],
             'preparacion_min' => ['nullable', 'integer', 'min:0', 'max:240'],
             'limpieza_min' => ['nullable', 'integer', 'min:0', 'max:240'],
+            // Espacios o equipos que puede usar (2.4); [] = no requiere.
+            'recursos' => ['sometimes', 'array'],
+            'recursos.*' => ['string'],
         ]);
 
         $cambios = ['lugares' => (int) $validado['lugares']];
+        if (array_key_exists('recursos', $validado)) {
+            $ids = RecursoTenant::query()->whereIn('ulid', $validado['recursos'])->pluck('id')->all();
+            if (count($ids) !== count(array_unique($validado['recursos']))) {
+                throw ValidationException::withMessages(['recursos' => ['Algún espacio no existe.']]);
+            }
+            $oferta->recursos()->sync($ids);
+        }
         // Los márgenes solo se tocan si vienen; aplican a lo que se agende desde ahora.
         foreach (['preparacion_min', 'limpieza_min'] as $campo) {
             if ($request->has($campo)) {
@@ -163,7 +175,7 @@ class CatalogoTenantController
 
     public function ofertas(): JsonResponse
     {
-        $ofertas = OfertaTenant::query()->with('actividad')->orderBy('nombre')->get();
+        $ofertas = OfertaTenant::query()->with(['actividad', 'recursos'])->orderBy('nombre')->get();
 
         return response()->json([
             'data' => $ofertas->map(fn (OfertaTenant $oferta): array => array_merge(
@@ -194,6 +206,7 @@ class CatalogoTenantController
             'duracion_minutos' => $oferta->duracion_minutos,
             'preparacion_min' => (int) $oferta->preparacion_min,
             'limpieza_min' => (int) $oferta->limpieza_min,
+            'recursos' => $oferta->recursos->pluck('ulid')->values()->all(),
         ];
     }
 }

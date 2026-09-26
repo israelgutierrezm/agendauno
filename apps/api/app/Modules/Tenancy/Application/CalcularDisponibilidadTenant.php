@@ -19,7 +19,10 @@ use Carbon\CarbonImmutable;
  */
 class CalcularDisponibilidadTenant
 {
-    public function __construct(private readonly VerificarAgendaTenant $agenda) {}
+    public function __construct(
+        private readonly VerificarAgendaTenant $agenda,
+        private readonly ElegirRecursoTenant $recursos,
+    ) {}
 
     /**
      * Duración y márgenes de una consulta: los del servicio si se indica; si no, la
@@ -44,9 +47,11 @@ class CalcularDisponibilidadTenant
      *
      * @return list<array{inicia: string, termina: string}> ISO-8601 UTC
      */
-    public function paraFecha(int $instructorId, SucursalTenant $sucursal, string $fecha, int $duracionMin, ?int $pasoMin = null, ?MargenesServicio $margenes = null): array
+    public function paraFecha(int $instructorId, SucursalTenant $sucursal, string $fecha, int $duracionMin, ?int $pasoMin = null, ?MargenesServicio $margenes = null, ?OfertaTenant $servicio = null): array
     {
         $margenes ??= new MargenesServicio;
+        // Si el servicio requiere cabina o equipo (2.4), el hueco necesita uno libre.
+        $conRecurso = $servicio !== null && $this->recursos->requiere($servicio) ? $servicio : null;
         // Día cerrado del negocio (feriado, cierre): no se ofrecen citas.
         if (ExcepcionHorarioTenant::query()->whereDate('fecha', $fecha)->exists()) {
             return [];
@@ -76,7 +81,9 @@ class CalcularDisponibilidadTenant
                 $termina = $cursor->addMinutes($duracionMin)->utc();
 
                 // Solo huecos futuros y sin conflicto de agenda del instructor.
-                if ($inicia->greaterThan($ahora) && $this->agenda->conflictos($instructorId, null, $inicia, $termina, sucursalId: (int) $sucursal->getKey(), margenes: $margenes) === []) {
+                if ($inicia->greaterThan($ahora)
+                    && $this->agenda->conflictos($instructorId, null, $inicia, $termina, sucursalId: (int) $sucursal->getKey(), margenes: $margenes) === []
+                    && ($conRecurso === null || $this->recursos->libre($conRecurso, (int) $sucursal->getKey(), $inicia, $termina, $margenes) !== null)) {
                     $slots[] = [
                         'inicia' => $inicia->toIso8601String(),
                         'termina' => $termina->toIso8601String(),

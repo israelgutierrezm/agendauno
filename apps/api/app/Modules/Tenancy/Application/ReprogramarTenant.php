@@ -42,6 +42,7 @@ class ReprogramarTenant
         private readonly ReservasTenant $reservas,
         private readonly RegistrarEventoTenant $eventos,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly ElegirRecursoTenant $recursos,
     ) {}
 
     public function moverCita(ReservaTenant $reserva, CarbonImmutable $inicia, ?int $instructorId, ?Usuario $actor): ReservaTenant
@@ -58,6 +59,18 @@ class ReprogramarTenant
                 if (! $profesional instanceof Usuario || ! in_array('instructor', $profesional->rolesEfectivos(), true)) {
                     throw new SesionNoReservable('Esa persona no atiende citas.');
                 }
+            }
+
+            // Cabina o equipo (2.4): uno libre a la nueva hora (la misma si sigue libre).
+            $oferta = $sesion->oferta;
+            if ($oferta !== null && $this->recursos->requiere($oferta)) {
+                $termina = $inicia->addMinutes((int) $sesion->inicia_en->diffInMinutes($sesion->termina_en, true));
+                $recurso = $this->recursos->libre($oferta, (int) $sesion->sucursal_id, $inicia, $termina, MargenesServicio::deSesion($sesion), (int) $sesion->getKey(), true);
+                if ($recurso === null) {
+                    throw new SesionNoReservable('No hay un espacio libre para ese servicio en ese horario.');
+                }
+                $sesion->recurso_id = (int) $recurso->getKey();
+                $sesion->unsetRelation('recurso');
             }
 
             $this->moverSesion($sesion, $inicia, $instructorId ?? ($sesion->instructor_id !== null ? (int) $sesion->instructor_id : null), [$bloqueada], $actor);

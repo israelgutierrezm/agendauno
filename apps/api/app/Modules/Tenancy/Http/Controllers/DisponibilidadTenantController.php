@@ -109,6 +109,7 @@ class DisponibilidadTenantController
             $duracion,
             isset($validado['paso_minutos']) ? (int) $validado['paso_minutos'] : null,
             $margenes,
+            $oferta,
         );
 
         return response()->json(['data' => ['fecha' => $validado['fecha'], 'slots' => $slots]]);

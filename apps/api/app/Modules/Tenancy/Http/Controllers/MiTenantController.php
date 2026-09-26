@@ -294,7 +294,7 @@ class MiTenantController
 
         return response()->json(['data' => [
             'fecha' => $validado['fecha'],
-            'slots' => $disponibilidad->paraFecha((int) $instructor->getKey(), $sucursal, $validado['fecha'], $duracion, null, $margenes),
+            'slots' => $disponibilidad->paraFecha((int) $instructor->getKey(), $sucursal, $validado['fecha'], $duracion, null, $margenes, $oferta),
         ]]);
     }
 

@@ -9,6 +9,7 @@ use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * Oferta de una actividad (clase vendible/agendable), tenant-local.
@@ -36,6 +37,16 @@ class OfertaTenant extends Model
         'preparacion_min' => 'integer',
         'limpieza_min' => 'integer',
     ];
+
+    /**
+     * Espacios o equipos que puede usar el servicio (2.4); vacío = no requiere.
+     *
+     * @return BelongsToMany<RecursoTenant, $this>
+     */
+    public function recursos(): BelongsToMany
+    {
+        return $this->belongsToMany(RecursoTenant::class, 'oferta_recursos', 'oferta_id', 'recurso_id')->withTimestamps();
+    }
 
     /**
      * @return BelongsTo<ActividadTenant, $this>

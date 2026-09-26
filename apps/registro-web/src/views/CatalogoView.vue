@@ -19,7 +19,15 @@ interface Oferta {
   // Preparación antes y limpieza después: ocupan la agenda, no se le dicen al cliente.
   preparacion_min?: number;
   limpieza_min?: number;
+  // Espacios o equipos que puede usar (2.4); vacío = no requiere.
+  recursos?: string[];
   actividad: string | null;
+}
+interface Recurso {
+  id: string;
+  nombre: string;
+  sucursal: string | null;
+  activo: boolean;
 }
 
 const sesion = useSesionTenantStore();
@@ -27,6 +35,13 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("catalogo.gestionar"));
 
 const ofertas = ref<Oferta[]>([]);
+const recursos = ref<Recurso[]>([]);
+function nombresDe(ids: string[] | undefined): string {
+  return (ids ?? [])
+    .map((id) => recursos.value.find((r) => r.id === id)?.nombre)
+    .filter(Boolean)
+    .join(", ");
+}
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
@@ -39,6 +54,7 @@ const form = ref<{
   lugares: string;
   preparacion: string;
   limpieza: string;
+  recursos: string[];
 }>({
   politica: "entitlement",
   precio: "",
@@ -46,6 +62,7 @@ const form = ref<{
   lugares: "0",
   preparacion: "0",
   limpieza: "0",
+  recursos: [],
 });
 const guardando = ref(false);
 const guardadoId = ref<string | null>(null);
@@ -76,6 +93,9 @@ async function cargar(): Promise<void> {
   try {
     const { data } = await api.get<{ data: Oferta[] }>(`${base.value}/ofertas`);
     ofertas.value = data.data;
+    // Espacios del negocio (si no hay, la sección no aparece).
+    const r = await api.get<{ data: Recurso[] }>(`${base.value}/recursos`);
+    recursos.value = r.data.data.filter((x) => x.activo);
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -94,6 +114,7 @@ function configurar(o: Oferta): void {
     lugares: String(o.lugares),
     preparacion: String(o.preparacion_min ?? 0),
     limpieza: String(o.limpieza_min ?? 0),
+    recursos: [...(o.recursos ?? [])],
   };
 }
 function cerrar(): void {
@@ -118,6 +139,7 @@ async function guardar(o: Oferta): Promise<void> {
       duracion_minutos: duracion > 0 ? duracion : null,
       preparacion_min: Math.max(0, Number(form.value.preparacion) || 0),
       limpieza_min: Math.max(0, Number(form.value.limpieza) || 0),
+      ...(recursos.value.length > 0 ? { recursos: form.value.recursos } : {}),
     });
     guardadoId.value = o.id;
     editandoId.value = null;
@@ -185,6 +207,13 @@ onMounted(cargar);
                   {{
                     $t("margenesServicio.resumen", {
                       n: (o.preparacion_min ?? 0) + (o.limpieza_min ?? 0),
+                    })
+                  }}</template
+                ><template v-if="(o.recursos ?? []).length > 0">
+                  ·
+                  {{
+                    $t("recursosServicio.resumen", {
+                      lista: nombresDe(o.recursos),
                     })
                   }}</template
                 >
@@ -378,6 +407,32 @@ onMounted(cargar);
                 />
                 <span class="tu-hint">{{ $t("margenesServicio.ayuda") }}</span>
               </div>
+              <!-- Espacios que usa (2.4): solo si el negocio tiene espacios. -->
+              <fieldset v-if="recursos.length > 0" class="sm:col-span-2">
+                <legend class="tu-label">
+                  {{ $t("recursosServicio.titulo") }}
+                </legend>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  <label
+                    v-for="r in recursos"
+                    :key="r.id"
+                    class="flex items-center gap-2"
+                  >
+                    <input
+                      v-model="form.recursos"
+                      type="checkbox"
+                      :value="r.id"
+                    />
+                    {{ r.nombre
+                    }}<span
+                      v-if="r.sucursal"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >· {{ r.sucursal }}</span
+                    >
+                  </label>
+                </div>
+                <span class="tu-hint">{{ $t("recursosServicio.ayuda") }}</span>
+              </fieldset>
             </div>
 
             <div class="mt-4 flex items-center gap-3">

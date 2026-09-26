@@ -8,6 +8,7 @@ use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
@@ -51,6 +52,7 @@ class AgendarCitaTenant
         private readonly VerificarAgendaTenant $agenda,
         private readonly ReservasTenant $reservas,
         private readonly CalcularDisponibilidadTenant $disponibilidad,
+        private readonly ElegirRecursoTenant $recursos,
     ) {}
 
     public function agendar(
@@ -120,10 +122,21 @@ class AgendarCitaTenant
                 throw new SesionNoReservable('Ese horario ya no está disponible.');
             }
 
+            // Si el servicio requiere cabina o equipo (2.4), toma uno libre de la sede
+            // bajo su candado: dos profesionales no se quedan con la misma cabina.
+            $recurso = null;
+            if ($this->recursos->requiere($oferta)) {
+                $recurso = $this->recursos->libre($oferta, (int) $sucursal->getKey(), $inicia, $termina, MargenesServicio::de($oferta), bloquear: true);
+                if (! $recurso instanceof RecursoTenant) {
+                    throw new SesionNoReservable('No hay un espacio libre para ese servicio en ese horario.');
+                }
+            }
+
             $sesion = SesionTenant::query()->create([
                 'oferta_id' => $oferta->getKey(),
                 'sucursal_id' => $sucursal->getKey(),
                 'instructor_id' => $instructorId,
+                'recurso_id' => $recurso?->getKey(),
                 'inicia_en' => $inicia,
                 'termina_en' => $termina,
                 'zona_horaria' => $sucursal->zona_horaria,
