@@ -55,6 +55,10 @@ final class CatalogoParametros
             new DefinicionParametro('cobranza.dias_gracia_adeudo', 'Cobranza', 'Días de gracia con un adeudo',
                 'Antes de suspender la membresía por falta de pago.', $e, 7, 0, 60, 'días'),
 
+            // Devoluciones (ADR 0046).
+            new DefinicionParametro('cancelacion.devolver_pago_si_cancela_negocio', 'Devoluciones', 'Si el negocio cancela algo ya pagado en línea, devolver el pago',
+                'Se devuelve solo, por la misma pasarela. Lo pagado en efectivo se devuelve en caja.', $sn, 0),
+
             // Reseñas.
             new DefinicionParametro('resenas.dias_para_calificar', 'Reseñas', 'Días para calificar una clase o cita',
                 'Después ya no se pide la reseña.', $e, 30, 1, 365, 'días'),

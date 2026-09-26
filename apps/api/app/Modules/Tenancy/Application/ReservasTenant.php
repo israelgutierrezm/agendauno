@@ -11,12 +11,15 @@ use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReglaCapacidadCanalTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Pagos\EstadoPago;
+use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\CupoLleno;
 use App\Modules\Tenancy\Reservas\Exceptions\FueraDeVentana;
@@ -530,9 +533,11 @@ class ReservasTenant
         if ($retencion === null || $retencion->estado !== EstadoRetencion::Activa) {
             $pagada = $reserva->orden !== null && $reserva->orden->estado === EstadoOrden::Pagada;
 
-            return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, null, null, $pagada
-                ? 'No usa créditos. Ya está pagada: el pago no se reembolsa automáticamente.'
-                : 'No usa créditos.');
+            return new EfectoCancelacion(true, EfectoCancelacion::NINGUNO, 0, null, null, match (true) {
+                ! $pagada => 'No usa créditos.',
+                $quien === QuienCancela::Negocio && $this->seDevuelveSolo($reserva) => 'No usa créditos. Ya está pagada en línea: el pago se devolverá automáticamente.',
+                default => 'No usa créditos. Ya está pagada: el pago no se reembolsa automáticamente.',
+            });
         }
 
         $unidades = (int) $retencion->unidades;
@@ -924,18 +929,18 @@ class ReservasTenant
 
     /**
      * Qué pasaría al cancelar la sesión completa (vista previa): cuántas reservas se
-     * cancelan, cuántos créditos regresan y cuántas ya estaban pagadas (ese dinero no
-     * se reembolsa solo).
+     * cancelan, cuántos créditos regresan y cuántas ya estaban pagadas (ese dinero se
+     * devuelve solo si se pagó en línea y el negocio así lo decidió, ADR 0046).
      *
-     * @return array{cancelable: bool, reservas: int, unidades: int, pagadas: int, mensaje: string}
+     * @return array{cancelable: bool, reservas: int, unidades: int, pagadas: int, se_devuelven: int, mensaje: string}
      */
     public function efectoDeCancelarSesion(SesionTenant $sesion): array
     {
         if ($sesion->estado === EstadoSesionTenant::Cancelada) {
-            return ['cancelable' => false, 'reservas' => 0, 'unidades' => 0, 'pagadas' => 0, 'mensaje' => 'Esta sesión ya está cancelada.'];
+            return ['cancelable' => false, 'reservas' => 0, 'unidades' => 0, 'pagadas' => 0, 'se_devuelven' => 0, 'mensaje' => 'Esta sesión ya está cancelada.'];
         }
         if ($this->tieneAsistencia($sesion)) {
-            return ['cancelable' => false, 'reservas' => 0, 'unidades' => 0, 'pagadas' => 0, 'mensaje' => 'Esta clase ya tiene asistencia registrada; no se puede cancelar.'];
+            return ['cancelable' => false, 'reservas' => 0, 'unidades' => 0, 'pagadas' => 0, 'se_devuelven' => 0, 'mensaje' => 'Esta clase ya tiene asistencia registrada; no se puede cancelar.'];
         }
 
         $reservas = ReservaTenant::query()
@@ -945,7 +950,10 @@ class ReservasTenant
             ->get();
         $n = $reservas->count();
         $unidades = (int) $reservas->sum(fn (ReservaTenant $r): int => $r->retencion !== null && $r->retencion->estado === EstadoRetencion::Activa ? (int) $r->retencion->unidades : 0);
-        $pagadas = $reservas->filter(fn (ReservaTenant $r): bool => $r->orden !== null && $r->orden->estado === EstadoOrden::Pagada)->count();
+        $conPago = $reservas->filter(fn (ReservaTenant $r): bool => $r->orden !== null && $r->orden->estado === EstadoOrden::Pagada);
+        $pagadas = $conPago->count();
+        $solas = $conPago->filter(fn (ReservaTenant $r): bool => $this->seDevuelveSolo($r))->count();
+        $aMano = $pagadas - $solas;
 
         if ($n === 0) {
             $mensaje = 'No tiene reservas.';
@@ -953,12 +961,30 @@ class ReservasTenant
             $mensaje = ($n === 1 ? 'Se cancelará 1 reserva' : "Se cancelarán {$n} reservas")
                 .($unidades > 0 ? ($unidades === 1000 ? ' y se devolverá ' : ' y se devolverán ').EfectoCancelacion::creditos($unidades) : '')
                 .'.'
-                .($pagadas > 0 ? ($pagadas === 1
+                .($solas > 0 ? ($solas === 1
+                    ? ' 1 ya está pagada en línea: el pago se devolverá automáticamente.'
+                    : " {$solas} ya están pagadas en línea: esos pagos se devolverán automáticamente.") : '')
+                .($aMano > 0 ? ($aMano === 1
                     ? ' 1 ya está pagada: ese pago no se reembolsa automáticamente.'
-                    : " {$pagadas} ya están pagadas: esos pagos no se reembolsan automáticamente.") : '');
+                    : " {$aMano} ya están pagadas: esos pagos no se reembolsan automáticamente.") : '');
         }
 
-        return ['cancelable' => true, 'reservas' => $n, 'unidades' => $unidades, 'pagadas' => $pagadas, 'mensaje' => $mensaje];
+        return ['cancelable' => true, 'reservas' => $n, 'unidades' => $unidades, 'pagadas' => $pagadas, 'se_devuelven' => $solas, 'mensaje' => $mensaje];
+    }
+
+    /**
+     * Si al cancelarla el negocio su pago se devuelve solo (ADR 0046): el negocio lo
+     * decidió y se pagó en línea.
+     */
+    private function seDevuelveSolo(ReservaTenant $reserva): bool
+    {
+        return $reserva->orden_id !== null
+            && $this->parametros->siNo('cancelacion.devolver_pago_si_cancela_negocio')
+            && PagoTenant::query()
+                ->where('orden_id', $reserva->orden_id)
+                ->whereIn('estado', [EstadoPago::Aprobado->value, EstadoPago::ParcialmenteReembolsado->value])
+                ->whereIn('proveedor', ProveedorPasarela::enLinea())
+                ->exists();
     }
 
     private function tieneAsistencia(SesionTenant $sesion): bool

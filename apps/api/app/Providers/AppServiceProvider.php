@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
 use App\Modules\Tenancy\Facturacion\FacturacionFalsa;
 use App\Modules\Tenancy\Facturacion\FacturApiHttp;
 use App\Modules\Tenancy\Listeners\AcumularPuntos;
+use App\Modules\Tenancy\Listeners\DevolverPagoAlCancelarNegocio;
 use App\Modules\Tenancy\Listeners\EjecutarAutomatizaciones;
 use App\Modules\Tenancy\Listeners\EnviarWebhooksSalientes;
 use App\Modules\Tenancy\Listeners\GenerarComunicaciones;
@@ -86,5 +87,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(EventoDeDominioTenant::class, EjecutarAutomatizaciones::class);
         // Lealtad (R24): acumula puntos al asistir (asistencia.marcada) o comprar (orden.pagada).
         Event::listen(EventoDeDominioTenant::class, AcumularPuntos::class);
+        // Si el negocio cancela algo ya pagado en línea, lo devuelve (si así lo decide; ADR 0046).
+        Event::listen(EventoDeDominioTenant::class, DevolverPagoAlCancelarNegocio::class);
     }
 }
