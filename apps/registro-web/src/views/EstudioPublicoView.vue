@@ -66,6 +66,8 @@ const form = ref({
   passwordConfirmation: "",
 });
 const errorRegistro = ref<string | null>(null);
+// Su correo ya era de alguien en el negocio: se confirma por correo antes de entrar.
+const confirmacionEnviada = ref<string | null>(null);
 
 const ubicacion = computed(() => {
   const e = escaparate.value?.estudio;
@@ -145,7 +147,7 @@ async function cargar(): Promise<void> {
 async function registrar(): Promise<void> {
   errorRegistro.value = null;
   try {
-    await sesion.registrarAlumno(slug.value, {
+    const registro = await sesion.registrarAlumno(slug.value, {
       nombre: form.value.nombre,
       primer_apellido: form.value.apellido,
       email: form.value.email,
@@ -156,6 +158,10 @@ async function registrar(): Promise<void> {
       business_profile: escaparate.value?.estudio.perfil ?? "unknown",
     });
     // Auto-login: al portal del alumno (su cuenta) para reservar/comprar.
+    if (registro.confirmar !== null) {
+      confirmacionEnviada.value = registro.confirmar;
+      return;
+    }
     void router.push({ name: sesion.rutaInicio });
   } catch (e) {
     errorRegistro.value = mensajeDeError(e);
@@ -509,6 +515,11 @@ onMounted(cargar);
               />
             </div>
 
+            <p v-if="confirmacionEnviada" class="text-sm" role="status">
+              {{
+                $t("confirmarRegistro.enviado", { email: confirmacionEnviada })
+              }}
+            </p>
             <p v-if="errorRegistro" class="text-sm" style="color: var(--error)">
               {{ errorRegistro }}
             </p>

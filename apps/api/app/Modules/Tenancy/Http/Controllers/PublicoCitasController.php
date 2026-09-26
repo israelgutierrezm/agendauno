@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
-use App\Modules\Tenancy\Application\BajasTenant;
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
@@ -18,6 +17,8 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
+use App\Modules\Tenancy\PoliticaReservaTenant;
+use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -113,6 +114,11 @@ class PublicoCitasController
         ]);
 
         $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
+        // Desde la página pública solo se agendan servicios que se pagan: uno que se toma
+        // con la membresía se reserva desde la cuenta (con sesión).
+        if ($oferta->politica_reserva !== PoliticaReservaTenant::Pago) {
+            throw new SesionNoReservable('Este servicio se reserva desde tu cuenta.');
+        }
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
         $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
         $persona = $this->personaGuest($validado);
@@ -177,22 +183,20 @@ class PublicoCitasController
     }
 
     /**
-     * Persona guest: reutiliza por correo si existe (si estaba dada de baja, se
-     * reactiva: el correo es suyo); si no, la crea (sin usuario/login).
+     * Persona guest. Escribir un correo no demuestra que sea suyo, así que: si es de
+     * una ficha vigente, la cita queda en su historial pero sin cambiar sus datos ni
+     * darle acceso a nada (el servicio se paga; no usa su membresía); a alguien dado
+     * de baja no se le reactiva: es un cliente nuevo. Sin usuario/login.
      *
      * @param  array<string, mixed>  $datos
      */
     private function personaGuest(array $datos): PersonaTenant
     {
-        $email = isset($datos['email']) && $datos['email'] !== '' ? (string) $datos['email'] : null;
+        $email = isset($datos['email']) && $datos['email'] !== '' ? mb_strtolower(trim((string) $datos['email'])) : null;
 
         if ($email !== null) {
-            $existente = PersonaTenant::withTrashed()->where('email', $email)->first();
+            $existente = PersonaTenant::query()->whereRaw('lower(email) = ?', [$email])->first();
             if ($existente instanceof PersonaTenant) {
-                if ($existente->trashed()) {
-                    app(BajasTenant::class)->reactivarPersona($existente, null, 'Agendó una cita en línea con su correo.');
-                }
-
                 return $existente;
             }
         }

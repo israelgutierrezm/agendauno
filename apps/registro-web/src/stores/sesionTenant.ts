@@ -250,6 +250,11 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     }
   }
 
+  /**
+   * Crea la cuenta del alumno. Si el correo ya es de alguien en el negocio, el
+   * servidor no la liga todavía: manda un enlace a ese correo y devuelve a qué
+   * correo (`confirmar`); si no, entra de una vez (`confirmar` = null).
+   */
   async function registrarAlumno(
     slugEstudio: string,
     datos: {
@@ -259,21 +264,25 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
       password: string;
       passwordConfirmation: string;
     },
-  ): Promise<void> {
+  ): Promise<{ confirmar: string | null }> {
     cargando.value = true;
     error.value = null;
     try {
-      const { data } = await api.post<{ data: RespuestaAuth }>(
-        `/api/v1/app/${slugEstudio}/registro-alumno`,
-        {
-          nombre: datos.nombre,
-          primer_apellido: datos.primer_apellido || null,
-          email: datos.email,
-          password: datos.password,
-          password_confirmation: datos.passwordConfirmation,
-        },
-      );
-      establecer(data.data);
+      const respuesta = await api.post<{
+        data: RespuestaAuth | { confirmacion: string; email: string };
+      }>(`/api/v1/app/${slugEstudio}/registro-alumno`, {
+        nombre: datos.nombre,
+        primer_apellido: datos.primer_apellido || null,
+        email: datos.email,
+        password: datos.password,
+        password_confirmation: datos.passwordConfirmation,
+      });
+      const cuerpo = respuesta.data.data;
+      if (respuesta.status === 202 && "confirmacion" in cuerpo) {
+        return { confirmar: cuerpo.email };
+      }
+      establecer(cuerpo as RespuestaAuth);
+      return { confirmar: null };
     } catch (e) {
       error.value = mensajeDeError(
         e,
@@ -283,6 +292,22 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     } finally {
       cargando.value = false;
     }
+  }
+
+  /**
+   * Abre el enlace del correo de confirmación de registro: liga la cuenta a su
+   * historial y entra.
+   */
+  async function confirmarRegistro(
+    slugEstudio: string,
+    email: string,
+    token: string,
+  ): Promise<void> {
+    const { data } = await api.post<{ data: RespuestaAuth }>(
+      `/api/v1/app/${slugEstudio}/registro-alumno/confirmar`,
+      { email, token },
+    );
+    establecer(data.data);
   }
 
   async function cargarYo(): Promise<void> {
@@ -355,6 +380,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     activar,
     restablecerContrasena,
     registrarAlumno,
+    confirmarRegistro,
     cargarYo,
     actualizarUsuario,
     verificarSesion,

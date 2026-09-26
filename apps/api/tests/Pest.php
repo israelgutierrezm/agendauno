@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Integraciones\ResolvedorDns;
+use App\Modules\Tenancy\Mail\CorreoConfirmarRegistro;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 /*
@@ -409,4 +411,21 @@ function cuentaDeServicioFcmDePrueba(): string
     config(['services.fcm.credenciales' => $dir.'/cuenta.json']);
 
     return (string) openssl_pkey_get_details($llave)['key'];
+}
+
+/**
+ * El token del último correo de confirmación de registro enviado a ese correo.
+ */
+function tokenDeRegistro(string $email): string
+{
+    $token = '';
+    Mail::assertQueued(CorreoConfirmarRegistro::class, function (CorreoConfirmarRegistro $correo) use ($email, &$token): bool {
+        if ($correo->email === $email) {
+            $token = $correo->token;
+        }
+
+        return $correo->email === $email;
+    });
+
+    return $token;
 }

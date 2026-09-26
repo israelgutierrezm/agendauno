@@ -5,7 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/sesion_controller.dart';
 
 /// Alta de un alumno nuevo en un negocio (el mismo registro público de la web): al
-/// crear la cuenta queda con la sesión iniciada.
+/// crear la cuenta queda con la sesión iniciada. Si su correo ya era de alguien en
+/// el negocio, primero confirma desde el correo que le llega.
 class RegistroScreen extends ConsumerStatefulWidget {
   const RegistroScreen({super.key, this.slugInicial = ''});
 
@@ -51,7 +52,7 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
     });
     final navegador = Navigator.of(context);
     try {
-      await ref
+      final porConfirmar = await ref
           .read(sesionProvider.notifier)
           .registrarAlumno(
             slug: _slug.text.trim(),
@@ -60,6 +61,25 @@ class _RegistroScreenState extends ConsumerState<RegistroScreen> {
             email: _email.text.trim(),
             password: _password.text,
           );
+      if (porConfirmar != null && mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Confirma tu correo'),
+            content: Text(
+              'Te enviamos un correo a $porConfirmar. Ábrelo y confirma que es '
+              'tuyo para entrar con tu historial; después inicia sesión con tu '
+              'contraseña.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
+        );
+      }
       navegador.popUntil((r) => r.isFirst);
     } on DioException catch (e) {
       final data = e.response?.data;

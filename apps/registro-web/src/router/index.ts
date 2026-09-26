@@ -67,6 +67,12 @@ const router = createRouter({
       component: () => import("@/views/ConfirmarCorreoView.vue"),
     },
     {
+      // Confirmar el registro cuyo correo ya era de alguien en el negocio.
+      path: "/confirmar-registro/:slug",
+      name: "confirmar-registro",
+      component: () => import("@/views/ConfirmarRegistroView.vue"),
+    },
+    {
       path: "/activar/:slug?",
       name: "activar",
       component: () => import("@/views/ActivacionView.vue"),

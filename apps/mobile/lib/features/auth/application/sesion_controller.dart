@@ -36,8 +36,10 @@ class SesionController extends Notifier<Sesion?> {
   }
 
   /// Crea la cuenta de un alumno nuevo en el negocio (registro público) y deja la
-  /// sesión iniciada, igual que el login.
-  Future<void> registrarAlumno({
+  /// sesión iniciada, igual que el login. Si el correo ya es de alguien en el
+  /// negocio, no entra todavía: el servidor manda un enlace a ese correo para
+  /// confirmar que es suyo, y devuelve ese correo.
+  Future<String?> registrarAlumno({
     required String slug,
     required String nombre,
     required String primerApellido,
@@ -58,6 +60,9 @@ class SesionController extends Notifier<Sesion?> {
         );
 
     final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
+    if (res.statusCode == 202) {
+      return (data['email'] ?? email) as String;
+    }
     final bearer = (data['token'] ?? '') as String;
     ref.read(authTokenProvider.notifier).establecer(bearer);
     state = Sesion.desdeJson(
@@ -67,6 +72,7 @@ class SesionController extends Notifier<Sesion?> {
       data['estudio'] as Map<String, dynamic>?,
     );
     await ref.read(almacenSesionProvider).guardar(state!.aJson());
+    return null;
   }
 
   /// Pide el enlace para elegir una contraseña nueva (llega por correo y se abre en

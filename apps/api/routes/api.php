@@ -172,6 +172,8 @@ Route::prefix('v1')->group(function (): void {
         // → auto-login). Sin auth; solo estudios listados en el directorio. Con throttle.
         Route::get('/escaparate', EscaparateController::class)->middleware('throttle:60,1')->name('escaparate');
         Route::post('/registro-alumno', RegistroAlumnoController::class)->middleware('throttle:login')->name('registro-alumno');
+        // Confirmar el registro cuyo correo ya era de alguien en el negocio (enlace del correo).
+        Route::post('/registro-alumno/confirmar', [RegistroAlumnoController::class, 'confirmar'])->middleware('throttle:login')->name('registro-alumno.confirmar');
 
         // Citas públicas (guest, sin cuenta): opciones (servicios/sucursales/barberos)
         // y disponibilidad para elegir hueco; luego agendar y pagar en línea (el
