@@ -227,15 +227,23 @@ function nombreMiembro(m: Miembro): string {
   return m.nombre_completo || m.nombre;
 }
 
-// Instructor se filtra en cliente (el server ya filtra por sucursal + rango).
-const sesionesVisibles = computed(() =>
-  sesiones.value.filter(
-    (s) =>
+// Lo que se ve: el servidor ensancha el rango un día antes y dos después (zonas
+// horarias), así que se recorta a las fechas LOCALES del periodo. Calendario,
+// indicadores y leyenda salen de esta misma lista (mismo periodo y filtros).
+// Profesional y servicio se filtran aquí; la sucursal ya la filtra el servidor.
+const sesionesVisibles = computed(() => {
+  const { desde, hasta } = rangoCarga.value;
+  return sesiones.value.filter((s) => {
+    const fecha = fechaLocalSesion(s.inicia_en, s.zona_horaria);
+    return (
+      fecha >= desde &&
+      fecha <= hasta &&
       (instructorFiltro.value === "" ||
         s.instructor_id === instructorFiltro.value) &&
-      (ofertaFiltro.value === "" || s.oferta_id === ofertaFiltro.value),
-  ),
-);
+      (ofertaFiltro.value === "" || s.oferta_id === ofertaFiltro.value)
+    );
+  });
+});
 function sesionesDe(iso: string): Sesion[] {
   return sesionesVisibles.value
     .filter((s) => fechaLocalSesion(s.inicia_en, s.zona_horaria) === iso)
