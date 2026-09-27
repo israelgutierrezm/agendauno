@@ -3,7 +3,6 @@ import { isAxiosError } from "axios";
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 
-import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import AccesosOperativos from "@/components/AccesosOperativos.vue";
 import EnlaceEstudio from "@/components/EnlaceEstudio.vue";
 import ResumenDelDia from "@/components/ResumenDelDia.vue";
@@ -31,6 +30,10 @@ const sesion = useSesionTenantStore();
  * Inicio del negocio: el día de hoy primero (agenda, asistencia, cobros y
  * renovaciones), luego los accesos a la operación y, al final, la suscripción.
  */
+const nombre = computed(() => {
+  const u = sesion.usuario;
+  return (u?.nombre_pila ?? u?.nombre ?? "").trim().split(/\s+/)[0] ?? "";
+});
 // "sábado 27 de septiembre": el día que se está viendo.
 const hoyTexto = new Intl.DateTimeFormat("es-MX", {
   weekday: "long",
@@ -122,7 +125,21 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-6xl px-4 py-8">
-    <EncabezadoSeccion :titulo="$t('operacion.hoy.titulo')" :total="hoyTexto" />
+    <h1 class="text-2xl font-semibold">
+      {{
+        nombre
+          ? $t("portal.inicio.saludo", { nombre })
+          : $t("portal.inicio.saludoSinNombre")
+      }}
+    </h1>
+    <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
+      {{
+        $t("operacion.hoy.saludo", {
+          estudio: sesion.estudio?.nombre ?? "",
+          fecha: hoyTexto,
+        })
+      }}
+    </p>
 
     <!-- Quickstart (R36): guía de activación mientras falte configuración esencial -->
     <div v-if="quickstart && !quickstart.listo" class="mt-6 tu-card p-5">

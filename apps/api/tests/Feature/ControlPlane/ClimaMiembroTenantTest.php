@@ -64,6 +64,7 @@ it('con clase próxima, el pronóstico para esa hora en su sucursal', function (
     $this->getJson("/api/v1/app/{$e['slug']}/mi/clima", conBearer($d['alumna']['bearer']))
         ->assertOk()
         ->assertJsonPath('data.tipo', 'pronostico')
+        ->assertJsonPath('data.sesion_tipo', 'clase')
         ->assertJsonPath('data.lugar', 'Roma Norte')
         ->assertJsonPath('data.temperatura', 16)
         ->assertJsonPath('data.condicion', 'Lluvia')

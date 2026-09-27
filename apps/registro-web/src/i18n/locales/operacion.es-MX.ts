@@ -11,6 +11,12 @@ export default {
   // Inicio del negocio: el día de hoy.
   hoy: {
     titulo: "Hoy",
+    saludo: "Esto es lo que pasa hoy en {estudio}, {fecha}.",
+    enCurso: "En curso",
+    loQueSigue: "Lo que sigue hoy",
+    diaTerminado: "Terminaron las clases de hoy",
+    abrirAgenda: "Abrir agenda",
+    irRecepcion: "Ir a recepción →",
     indicadores: {
       sesiones: "Clases",
       esperados: "Se esperan",

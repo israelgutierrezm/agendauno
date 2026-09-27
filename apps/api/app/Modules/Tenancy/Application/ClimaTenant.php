@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
@@ -27,6 +28,10 @@ use Illuminate\Support\Facades\Log;
  * 3. Si la IP no sirve (red privada, desarrollo, falla): el de ahora en la
  *    primera sucursal con coordenadas.
  *
+ * Para el equipo (`paraUsuario`), lo del negocio pesa más que la red de quien
+ * mira: el pronóstico de su próxima clase o cita (o la que está en curso); si no,
+ * el de ahora en su sede; y solo al final, por IP.
+ *
  * ── Nunca rompe el Inicio ──────────────────────────────────────────────────
  * Es un adorno útil: si Open-Meteo o la geolocalización tardan o fallan, se
  * devuelve null y la tarjeta simplemente no lo muestra. Lo que falla no se
@@ -43,6 +48,8 @@ class ClimaTenant
     /** Hasta dónde hay pronóstico por hora que valga la pena mostrar. */
     private const DIAS_PRONOSTICO = 14;
 
+    public function __construct(private readonly ResolverAccesoTenant $acceso) {}
+
     /**
      * @return array<string, mixed>|null
      */
@@ -55,7 +62,7 @@ class ClimaTenant
             && $proxima->inicia_en->lessThanOrEqualTo(CarbonImmutable::now()->addDays(self::DIAS_PRONOSTICO))) {
             $pronostico = $this->pronostico((float) $sucursal->latitud, (float) $sucursal->longitud, CarbonImmutable::instance($proxima->inicia_en), (string) $proxima->zona_horaria);
             if ($pronostico !== null) {
-                return [...$pronostico, 'tipo' => 'pronostico', 'lugar' => $sucursal->nombre, 'aproximado' => false];
+                return [...$pronostico, 'tipo' => 'pronostico', 'lugar' => $sucursal->nombre, 'aproximado' => false, 'sesion_tipo' => $proxima->tipo->value];
             }
         }
 
@@ -73,6 +80,56 @@ class ClimaTenant
             $ahora = $this->ahora((float) $sede->latitud, (float) $sede->longitud);
             if ($ahora !== null) {
                 return [...$ahora, 'tipo' => 'ahora', 'lugar' => $sede->nombre, 'aproximado' => false];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * El clima del Inicio de quien trabaja en el negocio (instructor, recepción,
+     * dueño): el pronóstico de su próxima clase o cita —o la que está en curso—
+     * en su sede; si no tiene, el de ahora en la sede del negocio (dentro de su
+     * alcance); y solo si ninguna sede tiene ubicación, el de su IP.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function paraUsuario(Usuario $usuario, ?string $ip): ?array
+    {
+        $permitidas = $this->acceso->sucursalesPermitidas($usuario);
+        $proxima = SesionTenant::query()
+            ->where('instructor_id', $usuario->getKey())
+            ->where('estado', EstadoSesionTenant::Programada->value)
+            ->where('termina_en', '>=', CarbonImmutable::now())
+            ->with('sucursal')
+            ->orderBy('inicia_en')
+            ->first();
+        $sucursal = $proxima?->sucursal;
+
+        if ($proxima !== null && $this->tieneUbicacion($sucursal)
+            && $proxima->inicia_en->lessThanOrEqualTo(CarbonImmutable::now()->addDays(self::DIAS_PRONOSTICO))) {
+            $pronostico = $this->pronostico((float) $sucursal->latitud, (float) $sucursal->longitud, CarbonImmutable::instance($proxima->inicia_en), (string) $proxima->zona_horaria);
+            if ($pronostico !== null) {
+                return [...$pronostico, 'tipo' => 'pronostico', 'lugar' => $sucursal->nombre, 'aproximado' => false, 'sesion_tipo' => $proxima->tipo->value];
+            }
+        }
+
+        $sede = $this->tieneUbicacion($sucursal) ? $sucursal
+            : SucursalTenant::query()->whereNotNull('latitud')->whereNotNull('longitud')
+                ->when($permitidas !== null, fn ($q) => $q->whereIn('id', $permitidas))
+                ->orderBy('id')->first();
+        if ($sede instanceof SucursalTenant) {
+            $ahora = $this->ahora((float) $sede->latitud, (float) $sede->longitud);
+            if ($ahora !== null) {
+                return [...$ahora, 'tipo' => 'ahora', 'lugar' => $sede->nombre, 'aproximado' => false];
+            }
+        }
+
+        $porIp = $this->ubicacionPorIp($ip);
+        if ($porIp !== null) {
+            $ahora = $this->ahora($porIp['latitud'], $porIp['longitud']);
+            if ($ahora !== null) {
+                return [...$ahora, 'tipo' => 'ahora', 'lugar' => $porIp['ciudad'], 'aproximado' => true];
             }
         }
 

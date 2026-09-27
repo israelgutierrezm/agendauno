@@ -3,15 +3,19 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import TarjetaPrincipal from "@/components/TarjetaPrincipal.vue";
 import { aHora, fechaLocal, minutosLocal } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
+import { lugarDelClima, useClima } from "@/lib/clima";
+import { fotoNegocio } from "@/lib/fotoNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
- * El día de hoy en el Inicio del negocio (GET /inicio/hoy): cuántas clases o citas
- * hay, quién se espera, quién llegó y a quién falta pasar lista; la agenda del día y
- * lo pendiente (cobros y renovaciones). Cada bloque llega solo si quien entra tiene
- * el permiso de su pantalla.
+ * El día de hoy en el Inicio del negocio (GET /inicio/hoy), con el estilo de los
+ * Inicios del portal: la tarjeta grande con lo que sigue (o lo que está en curso),
+ * los indicadores del día, la foto del giro y el clima del negocio; debajo la
+ * agenda del día y lo pendiente (cobros y renovaciones). Cada bloque llega solo si
+ * quien entra tiene el permiso de su pantalla.
  */
 interface SesionHoy {
   id: string;
@@ -55,6 +59,42 @@ const cargando = ref(true);
 const error = ref<string | null>(null);
 
 const zonaNavegador = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+const foto = computed(() => fotoNegocio(sesion.estudio?.perfil));
+// El clima del negocio (su sede) o el de la próxima clase de quien entra.
+const { clima, cargar: cargarClima } = useClima(
+  () => `/api/v1/app/${sesion.slug}/clima`,
+);
+const climaLugar = computed(() => lugarDelClima(clima.value, t));
+
+// Lo que está en curso o lo siguiente de hoy (sin las canceladas).
+const enCurso = computed(
+  () =>
+    hoy.value?.agenda?.sesiones.find((s) => s.momento === "en_curso") ?? null,
+);
+const siguiente = computed(
+  () =>
+    enCurso.value ??
+    hoy.value?.agenda?.sesiones.find((s) => s.momento === "proxima") ??
+    null,
+);
+const etiquetaDia = computed(() => {
+  if (enCurso.value) {
+    return t("operacion.hoy.enCurso");
+  }
+  return siguiente.value
+    ? t("operacion.hoy.loQueSigue")
+    : t("operacion.hoy.titulo");
+});
+const tituloDia = computed(() => {
+  const s = siguiente.value;
+  if (s) {
+    return nombre(s);
+  }
+  return (hoy.value?.agenda?.totales.sesiones ?? 0) > 0
+    ? t("operacion.hoy.diaTerminado")
+    : t("operacion.hoy.sinSesiones");
+});
 
 async function cargar(): Promise<void> {
   cargando.value = true;
@@ -124,7 +164,10 @@ const hayPendientes = computed(() => {
   );
 });
 
-onMounted(cargar);
+onMounted(() => {
+  void cargar();
+  void cargarClima();
+});
 </script>
 
 <template>
@@ -139,23 +182,57 @@ onMounted(cargar);
   </div>
 
   <template v-else-if="hoy">
-    <!-- Indicadores del día: una franja -->
-    <dl
-      v-if="indicadores.length"
-      class="mt-6 tu-card grid grid-cols-2 gap-4 p-5 sm:grid-cols-4"
+    <!-- La tarjeta principal: lo que sigue hoy y los indicadores del día -->
+    <TarjetaPrincipal
+      v-if="hoy.agenda"
+      class="mt-6"
+      :etiqueta="etiquetaDia"
+      :etiqueta-viva="enCurso !== null"
+      :foto="foto"
+      :clima="clima"
+      :clima-lugar="climaLugar"
     >
-      <div v-for="i in indicadores" :key="i.clave">
-        <dt class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ i.etiqueta }}
-        </dt>
-        <dd
-          class="mt-0.5 text-xl font-semibold tabular-nums"
-          :style="i.aviso ? { color: 'var(--aviso)' } : undefined"
+      <p class="mt-2 text-2xl font-semibold sm:text-3xl">{{ tituloDia }}</p>
+      <p v-if="siguiente" class="mt-2">
+        {{ hora(siguiente) }}
+        <span :style="{ color: 'var(--texto-suave)' }">
+          ·
+          {{
+            [siguiente.sucursal, siguiente.instructor]
+              .filter(Boolean)
+              .join(" · ")
+          }}</span
         >
-          {{ i.valor }}
-        </dd>
+      </p>
+      <dl class="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+        <div v-for="i in indicadores" :key="i.clave">
+          <dt class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ i.etiqueta }}
+          </dt>
+          <dd
+            class="mt-0.5 text-xl font-semibold tabular-nums"
+            :style="i.aviso ? { color: 'var(--aviso)' } : undefined"
+          >
+            {{ i.valor }}
+          </dd>
+        </div>
+      </dl>
+      <div class="mt-6 flex flex-wrap items-center gap-4">
+        <RouterLink
+          :to="{ name: 'agenda' }"
+          class="tu-btn tu-btn-primario inline-flex"
+        >
+          {{ $t("operacion.hoy.abrirAgenda") }}
+        </RouterLink>
+        <RouterLink
+          v-if="sesion.puede('reservas.gestionar')"
+          :to="{ name: 'recepcion' }"
+          class="tu-enlace text-sm"
+        >
+          {{ $t("operacion.hoy.irRecepcion") }}
+        </RouterLink>
       </div>
-    </dl>
+    </TarjetaPrincipal>
 
     <div class="mt-6 grid gap-6 lg:grid-cols-3">
       <!-- Agenda de hoy -->

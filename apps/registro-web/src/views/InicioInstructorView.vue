@@ -7,6 +7,10 @@ import AgregarCalendario from "@/components/AgregarCalendario.vue";
 import PanelCita from "@/components/PanelCita.vue";
 import PanelClase from "@/components/PanelClase.vue";
 import TarjetaAcceso from "@/components/TarjetaAcceso.vue";
+import TarjetaPrincipal from "@/components/TarjetaPrincipal.vue";
+import { PALETA_SERVICIO } from "@/lib/agenda";
+import { lugarDelClima, useClima } from "@/lib/clima";
+import { fotoNegocio } from "@/lib/fotoNegocio";
 import { cuandoCorto } from "@/lib/miCuenta";
 import {
   fechaEnZona,
@@ -17,14 +21,25 @@ import {
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
- * Inicio de quien imparte: su próxima clase o cita (con pase de lista y "agregar a
- * mi calendario") y accesos directos con su dato: hoy, alumnos esperados, los
- * próximos 7 días, su calendario, la agenda y su perfil.
+ * Inicio de quien imparte (con el mismo estilo que el del alumno): un saludo, la
+ * tarjeta grande con su próxima clase o cita —o la que está en curso— con pase de
+ * lista, la foto del giro y el clima de esa sede; y accesos directos con su color:
+ * hoy, alumnos esperados, los próximos 7 días, su calendario, la agenda y su perfil.
  */
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const { base, clases, cargando, error, cargar } = useMisClases();
 const abierta = ref<ClaseMia | null>(null);
+
+const nombre = computed(() => {
+  const u = sesion.usuario;
+  return (u?.nombre_pila ?? u?.nombre ?? "").trim().split(/\s+/)[0] ?? "";
+});
+const foto = computed(() => fotoNegocio(sesion.estudio?.perfil));
+// El pronóstico de su próxima clase o cita en su sede (GET /clima).
+const { clima, cargar: cargarClima } = useClima(
+  () => `/api/v1/app/${sesion.slug}/clima`,
+);
 
 // La hora avanza: la próxima pasa a "en curso" y luego a la siguiente.
 const ahora = ref(Date.now());
@@ -52,6 +67,31 @@ const deHoy = computed(() =>
 const alumnosHoy = computed(() =>
   deHoy.value.reduce((n, c) => n + c.ocupados, 0),
 );
+const climaLugar = computed(() =>
+  lugarDelClima(clima.value, t, proxima.value?.tipo),
+);
+// Por lo que es: en curso, su próxima cita o clase; sin nada, su agenda.
+const etiqueta = computed(() => {
+  if (enCurso.value) {
+    return t("portal.instructor.inicio.enCurso");
+  }
+  if (!proxima.value) {
+    return t("portal.instructor.inicio.proximaGeneral");
+  }
+  return proxima.value.tipo === "cita"
+    ? t("portal.instructor.inicio.proximaCita")
+    : t("portal.instructor.inicio.proxima");
+});
+
+// Un color por acceso, de la misma paleta de la agenda (como el Inicio del alumno).
+const TONOS: Record<string, string> = {
+  hoy: PALETA_SERVICIO[0].tinta,
+  alumnos: PALETA_SERVICIO[1].tinta,
+  semana: PALETA_SERVICIO[2].tinta,
+  calendario: PALETA_SERVICIO[5].tinta,
+  agenda: PALETA_SERVICIO[4].tinta,
+  perfil: PALETA_SERVICIO[3].tinta,
+};
 
 interface Acceso {
   clave: string;
@@ -144,6 +184,7 @@ async function recargar(): Promise<void> {
 
 onMounted(() => {
   void recargar();
+  void cargarClima();
   reloj = setInterval(() => (ahora.value = Date.now()), 60_000);
 });
 onUnmounted(() => clearInterval(reloj));
@@ -151,7 +192,20 @@ onUnmounted(() => clearInterval(reloj));
 
 <template>
   <section class="mx-auto max-w-5xl px-4 py-8">
-    <h1 class="text-xl font-semibold">{{ sesion.estudio?.nombre }}</h1>
+    <h1 class="text-2xl font-semibold">
+      {{
+        nombre
+          ? $t("portal.inicio.saludo", { nombre })
+          : $t("portal.inicio.saludoSinNombre")
+      }}
+    </h1>
+    <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
+      {{
+        $t("portal.instructor.inicio.resumen", {
+          estudio: sesion.estudio?.nombre ?? "",
+        })
+      }}
+    </p>
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
@@ -161,25 +215,20 @@ onUnmounted(() => clearInterval(reloj));
     </p>
 
     <template v-else>
-      <!-- Próxima clase o cita -->
-      <div class="mt-5 tu-card p-6">
-        <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-          <template v-if="enCurso">
-            <span :style="{ color: 'var(--primario)' }">{{
-              $t("portal.instructor.inicio.enCurso")
-            }}</span>
-          </template>
-          <template v-else>{{
-            proxima?.tipo === "cita"
-              ? $t("portal.instructor.inicio.proximaCita")
-              : proxima
-                ? $t("portal.instructor.inicio.proxima")
-                : $t("portal.instructor.inicio.proximaGeneral")
-          }}</template>
-        </p>
+      <!-- La tarjeta principal: siempre, con o sin algo agendado -->
+      <TarjetaPrincipal
+        class="mt-6"
+        :etiqueta="etiqueta"
+        :etiqueta-viva="enCurso"
+        :foto="foto"
+        :clima="clima"
+        :clima-lugar="climaLugar"
+      >
         <template v-if="proxima">
-          <p class="mt-1 text-2xl font-semibold">{{ proxima.oferta ?? "—" }}</p>
-          <p class="mt-1 first-letter:uppercase">
+          <p class="mt-2 text-2xl font-semibold sm:text-3xl">
+            {{ proxima.oferta ?? "—" }}
+          </p>
+          <p class="mt-2 first-letter:uppercase">
             {{ cuandoCorto(proxima.inicia_en, proxima.zona_horaria) }}
             <span
               v-if="proxima.sucursal || proxima.sala"
@@ -196,7 +245,7 @@ onUnmounted(() => clearInterval(reloj));
           >
             {{ detalle(proxima) }}
           </p>
-          <div class="mt-4 flex flex-wrap items-center gap-3">
+          <div class="mt-6 flex flex-wrap items-center gap-3">
             <button
               type="button"
               class="tu-btn tu-btn-primario"
@@ -224,19 +273,33 @@ onUnmounted(() => clearInterval(reloj));
             </RouterLink>
           </div>
         </template>
-        <p v-else class="mt-1">
-          {{ $t("portal.instructor.inicio.sinProxima") }}
-        </p>
-      </div>
+        <template v-else>
+          <p class="mt-2 text-2xl font-semibold sm:text-3xl">
+            {{ $t("portal.inicio.sinReservas") }}
+          </p>
+          <p class="mt-2" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("portal.instructor.inicio.sinProxima") }}
+          </p>
+          <div class="mt-6">
+            <RouterLink
+              :to="{ name: 'mis-clases' }"
+              class="tu-btn tu-btn-primario inline-flex"
+            >
+              {{ $t("portal.instructor.inicio.tarjetas.calendario") }}
+            </RouterLink>
+          </div>
+        </template>
+      </TarjetaPrincipal>
 
       <!-- Accesos directos -->
-      <ul class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <ul class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <li v-for="a in accesos" :key="a.clave">
           <TarjetaAcceso
             :to="a.to"
             :icono="a.icono"
             :titulo="a.titulo"
             :valor="a.valor"
+            :tono="TONOS[a.clave]"
           />
         </li>
       </ul>

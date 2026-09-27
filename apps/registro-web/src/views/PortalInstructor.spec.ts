@@ -127,7 +127,10 @@ describe("portal del instructor", () => {
         params: expect.objectContaining({ instructor_id: "u-coach" }),
       }),
     );
+    // El clima de su próxima clase (el del equipo, no el del alumno).
+    expect(api.get).toHaveBeenCalledWith("/api/v1/app/demo/clima");
     const texto = w.text();
+    expect(texto).toContain("Aquí tienes tus clases y citas en Estudio Demo.");
     expect(texto).toContain("Tu próxima clase");
     expect(texto).toContain("Pole Nivel 1");
     expect(texto).toContain("4 de 10 lugares ocupados · 2 en lista de espera");

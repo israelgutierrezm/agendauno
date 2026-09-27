@@ -4,12 +4,12 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
-import IconoClima from "@/components/IconoClima.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaseEntrada from "@/components/PaseEntrada.vue";
 import TarjetaAcceso from "@/components/TarjetaAcceso.vue";
+import TarjetaPrincipal from "@/components/TarjetaPrincipal.vue";
 import { PALETA_SERVICIO } from "@/lib/agenda";
-import { api } from "@/lib/api";
+import { lugarDelClima, useClima } from "@/lib/clima";
 import { fotoNegocio } from "@/lib/fotoNegocio";
 import { cuandoCorto, useMiCuenta } from "@/lib/miCuenta";
 import { useRetornoPago } from "@/lib/retornoPago";
@@ -56,51 +56,13 @@ const disponibles = computed(
       .length,
 );
 
-/**
- * El clima de la tarjeta (GET /mi/clima): el pronóstico para su próxima clase en su
- * sucursal o, sin clase, el de ahora donde está. Se pide aparte y sin esperar: si no
- * llega, la tarjeta simplemente no lo muestra.
- */
-interface Clima {
-  tipo: "pronostico" | "ahora";
-  lugar: string;
-  aproximado: boolean;
-  temperatura: number;
-  condicion: string;
-  icono: string;
-  es_de_dia: boolean;
-  lluvia: number | null;
-}
-const clima = ref<Clima | null>(null);
-async function cargarClima(): Promise<void> {
-  try {
-    const { data } = await api.get<{ data: Clima | null }>(
-      `/api/v1/app/${sesion.slug}/mi/clima`,
-    );
-    clima.value =
-      data.data && typeof data.data.temperatura === "number" ? data.data : null;
-  } catch {
-    clima.value = null;
-  }
-}
-const climaLugar = computed(() => {
-  const c = clima.value;
-  if (!c) {
-    return "";
-  }
-  if (c.tipo === "pronostico") {
-    // El pronóstico es para su próxima reserva: se nombra igual que en la tarjeta.
-    return proxima.value?.tipo === "cita"
-      ? t("portal.inicio.clima.pronosticoCita", { lugar: c.lugar })
-      : t("portal.inicio.clima.pronostico", { lugar: c.lugar });
-  }
-  if (c.lugar === "") {
-    return "";
-  }
-  return c.aproximado
-    ? t("portal.inicio.clima.ahoraCerca", { lugar: c.lugar })
-    : t("portal.inicio.clima.ahora", { lugar: c.lugar });
-});
+// El clima de la tarjeta (GET /mi/clima): el de su próxima reserva o el de ahora.
+const { clima, cargar: cargarClima } = useClima(
+  () => `/api/v1/app/${sesion.slug}/mi/clima`,
+);
+const climaLugar = computed(() =>
+  lugarDelClima(clima.value, t, proxima.value?.tipo),
+);
 
 // Créditos de lo vigente: ilimitado o la suma disponible (1000 unidades = 1).
 const creditos = computed<{ ilimitado: boolean; n: number } | null>(() => {
@@ -268,110 +230,80 @@ onMounted(() => {
     </p>
 
     <!-- La tarjeta principal: siempre, con o sin reserva. -->
-    <article class="mc-hero tu-card mt-6">
-      <div class="mc-hero-texto">
-        <p class="mc-etiqueta">{{ etiquetaProxima }}</p>
-        <p
-          v-if="cuenta.cargando.value"
-          class="mt-2"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("comun.cargando") }}
+    <TarjetaPrincipal
+      class="mt-6"
+      :etiqueta="etiquetaProxima"
+      :foto="foto"
+      :clima="clima"
+      :clima-lugar="climaLugar"
+    >
+      <p
+        v-if="cuenta.cargando.value"
+        class="mt-2"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("comun.cargando") }}
+      </p>
+      <template v-else-if="proxima">
+        <p class="mt-2 text-2xl font-semibold sm:text-3xl">
+          {{ proxima.oferta ?? "—" }}
         </p>
-        <template v-else-if="proxima">
-          <p class="mt-2 text-2xl font-semibold sm:text-3xl">
-            {{ proxima.oferta ?? "—" }}
-          </p>
-          <p class="mt-2 first-letter:uppercase">
-            {{ cuandoCorto(proxima.inicia_en, proxima.zona_horaria) }}
-            <span
-              v-if="proxima.sucursal"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              · {{ proxima.sucursal }}</span
-            >
-          </p>
-          <p
-            v-if="proxima.estado === 'pendiente_pago'"
-            class="mt-1 text-sm"
-            :style="{ color: 'var(--aviso)' }"
+        <p class="mt-2 first-letter:uppercase">
+          {{ cuandoCorto(proxima.inicia_en, proxima.zona_horaria) }}
+          <span
+            v-if="proxima.sucursal"
+            :style="{ color: 'var(--texto-suave)' }"
           >
-            {{ $t("miCuenta.pendiente_pago") }}
-          </p>
-          <div class="mt-6 flex flex-wrap items-center gap-4">
-            <AgregarCalendario
-              v-if="proxima.inicia_en"
-              primario
-              :evento="{
-                uid: `reserva-${proxima.id}`,
-                titulo: proxima.oferta ?? sesion.estudio?.nombre ?? '',
-                inicio: proxima.inicia_en,
-                fin: proxima.termina_en,
-                lugar: [sesion.estudio?.nombre, proxima.sucursal]
-                  .filter(Boolean)
-                  .join(' · '),
-              }"
-            />
-            <RouterLink
-              :to="{ name: 'mis-reservas' }"
-              class="tu-enlace text-sm"
-            >
-              {{ $t("portal.inicio.verDetalle") }}
-            </RouterLink>
-          </div>
-        </template>
-        <template v-else>
-          <p class="mt-2 text-2xl font-semibold sm:text-3xl">
-            {{ $t("portal.inicio.sinReservas") }}
-          </p>
-          <p class="mt-2" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("portal.inicio.sinProximaAyuda") }}
-          </p>
-          <div class="mt-6">
-            <RouterLink
-              :to="{ name: 'mis-reservas' }"
-              class="tu-btn tu-btn-primario inline-flex"
-            >
-              {{
-                sesion.esCitas
-                  ? $t("portal.inicio.tarjetas.agendar")
-                  : $t("portal.inicio.reservar")
-              }}
-            </RouterLink>
-          </div>
-        </template>
-      </div>
-
-      <div class="mc-hero-foto">
-        <img :src="foto" alt="" loading="lazy" />
-        <div v-if="clima" class="mc-clima" role="status">
-          <IconoClima
-            :icono="clima.icono"
-            :de-dia="clima.es_de_dia"
-            :tam="30"
+            · {{ proxima.sucursal }}</span
+          >
+        </p>
+        <p
+          v-if="proxima.estado === 'pendiente_pago'"
+          class="mt-1 text-sm"
+          :style="{ color: 'var(--aviso)' }"
+        >
+          {{ $t("miCuenta.pendiente_pago") }}
+        </p>
+        <div class="mt-6 flex flex-wrap items-center gap-4">
+          <AgregarCalendario
+            v-if="proxima.inicia_en"
+            primario
+            :evento="{
+              uid: `reserva-${proxima.id}`,
+              titulo: proxima.oferta ?? sesion.estudio?.nombre ?? '',
+              inicio: proxima.inicia_en,
+              fin: proxima.termina_en,
+              lugar: [sesion.estudio?.nombre, proxima.sucursal]
+                .filter(Boolean)
+                .join(' · '),
+            }"
           />
-          <div class="min-w-0">
-            <p class="leading-tight">
-              <span class="text-xl font-semibold"
-                >{{ clima.temperatura }}°</span
-              >
-              <span class="ml-1.5 text-sm">{{ clima.condicion }}</span>
-              <span
-                v-if="clima.lluvia !== null && clima.lluvia >= 20"
-                class="ml-1.5 text-sm opacity-85"
-                >·
-                {{
-                  $t("portal.inicio.clima.lluvia", { n: clima.lluvia })
-                }}</span
-              >
-            </p>
-            <p v-if="climaLugar" class="mt-0.5 truncate text-xs opacity-85">
-              {{ climaLugar }}
-            </p>
-          </div>
+          <RouterLink :to="{ name: 'mis-reservas' }" class="tu-enlace text-sm">
+            {{ $t("portal.inicio.verDetalle") }}
+          </RouterLink>
         </div>
-      </div>
-    </article>
+      </template>
+      <template v-else>
+        <p class="mt-2 text-2xl font-semibold sm:text-3xl">
+          {{ $t("portal.inicio.sinReservas") }}
+        </p>
+        <p class="mt-2" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("portal.inicio.sinProximaAyuda") }}
+        </p>
+        <div class="mt-6">
+          <RouterLink
+            :to="{ name: 'mis-reservas' }"
+            class="tu-btn tu-btn-primario inline-flex"
+          >
+            {{
+              sesion.esCitas
+                ? $t("portal.inicio.tarjetas.agendar")
+                : $t("portal.inicio.reservar")
+            }}
+          </RouterLink>
+        </div>
+      </template>
+    </TarjetaPrincipal>
 
     <template v-if="!cuenta.cargando.value">
       <!-- Lo que pide atención -->
@@ -436,66 +368,5 @@ onMounted(() => {
 }
 .pi-aviso:hover {
   border-color: var(--aviso);
-}
-
-/* Tarjeta principal: texto a la izquierda, foto del giro a la derecha (arriba en
-   móvil), con el clima sobre la foto. */
-.mc-hero {
-  display: grid;
-  overflow: hidden;
-  padding: 0;
-}
-.mc-hero-texto {
-  order: 2;
-  padding: 1.5rem;
-}
-.mc-hero-foto {
-  position: relative;
-  order: 1;
-  min-height: 11rem;
-  background: var(--superficie-2);
-}
-.mc-hero-foto img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-@media (min-width: 768px) {
-  .mc-hero {
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  }
-  .mc-hero-texto {
-    order: 1;
-    padding: 2.25rem 2rem;
-  }
-  .mc-hero-foto {
-    order: 2;
-    min-height: 16rem;
-  }
-}
-.mc-etiqueta {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--primario);
-}
-/* Sobre una foto cualquiera: fondo oscuro translúcido y texto blanco. */
-.mc-clima {
-  position: absolute;
-  left: 0.75rem;
-  right: 0.75rem;
-  bottom: 0.75rem;
-  display: flex;
-  max-width: max-content;
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.55rem 0.85rem;
-  border-radius: 0.8rem;
-  color: #fff;
-  background: rgb(15 23 42 / 0.58);
-  backdrop-filter: blur(6px);
 }
 </style>

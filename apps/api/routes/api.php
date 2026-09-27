@@ -16,6 +16,7 @@ use App\Modules\Tenancy\Http\Controllers\CalendarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\CapacidadCanalTenantController;
 use App\Modules\Tenancy\Http\Controllers\CatalogoTenantController;
 use App\Modules\Tenancy\Http\Controllers\CheckinsTenantController;
+use App\Modules\Tenancy\Http\Controllers\ClimaEquipoTenantController;
 use App\Modules\Tenancy\Http\Controllers\CreditosTenantController;
 use App\Modules\Tenancy\Http\Controllers\DatosFiscalesTenantController;
 use App\Modules\Tenancy\Http\Controllers\DifusionesTenantController;
@@ -327,6 +328,7 @@ Route::prefix('v1')->group(function (): void {
 
             // El día de hoy para el Inicio del negocio: cada bloque según los permisos.
             Route::get('/inicio/hoy', InicioHoyTenantController::class)->name('inicio.hoy');
+            Route::get('/clima', ClimaEquipoTenantController::class)->middleware('throttle:30,1')->name('clima');
 
             // Facturación SaaS del estudio (control plane; separada de pagos de alumnos).
             Route::get('/facturacion', [FacturacionController::class, 'show'])->middleware('puede:facturacion.ver')->name('facturacion');

@@ -82,6 +82,7 @@ export default {
       proxima: "Tu próxima clase",
       proximaCita: "Tu próxima cita",
       proximaGeneral: "Lo próximo en tu agenda",
+      resumen: "Aquí tienes tus clases y citas en {estudio}.",
       enCurso: "En curso",
       sinProxima: "No tienes clases asignadas en los próximos días.",
       cupo: "{ocupados} de {capacidad} lugares ocupados",
