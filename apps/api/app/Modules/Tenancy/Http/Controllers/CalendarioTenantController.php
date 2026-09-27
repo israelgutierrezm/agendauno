@@ -41,12 +41,32 @@ class CalendarioTenantController
         ]);
     }
 
+    /**
+     * Un solo evento (reserva suya o clase que imparte): la app lo abre para
+     * "Agregar a mi calendario" (Apple, Outlook y los demás leen el .ics).
+     */
+    public function evento(Request $request): Response
+    {
+        $usuario = $this->calendario->usuarioDe((string) $request->route('token'));
+        abort_unless($usuario instanceof Usuario, 404);
+        $ics = $this->calendario->icsDeEvento($usuario, $this->estudio($request), (string) $request->route('evento'));
+        abort_if($ics === null, 404);
+
+        return response($ics, 200, [
+            'Content-Type' => 'text/calendar; charset=utf-8',
+            'Content-Disposition' => 'inline; filename="evento.ics"',
+            'Cache-Control' => 'private, max-age=300',
+        ]);
+    }
+
     private function responder(string $url): JsonResponse
     {
         return response()->json(['data' => [
             'url' => $url,
             // Suscribirse con un toque (Apple Calendar / Outlook abren webcal://).
             'webcal' => (string) preg_replace('~^https?://~', 'webcal://', $url),
+            // Un solo evento: se cambia {evento} por `reserva-{id}` o `sesion-{id}`.
+            'evento' => (string) preg_replace('~\.ics$~', '/{evento}.ics', $url),
         ]]);
     }
 

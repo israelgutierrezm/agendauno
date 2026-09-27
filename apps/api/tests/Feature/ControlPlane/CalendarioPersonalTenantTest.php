@@ -67,3 +67,55 @@ it('quien imparte ve sus clases; regenerar invalida el enlace anterior', functio
     $this->get(rutaCalendario($nuevo))->assertOk();
     $this->get("/api/v1/app/{$e['slug']}/calendario/inventado.ics")->assertNotFound();
 });
+
+it('agregar a mi calendario: el alumno descarga su reserva sola, no la de otro', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $vale = alumnoConSesion($e, 'Vale', 'vale@correo.mx');
+    alumnoConSesion($e, 'Beto', 'beto@correo.mx');
+    $pack = crearPackTenant($e);
+    $sesion = crearSesionTenant($e, agendaSemilla($e), 5, now()->addDays(2)->format('Y-m-d').' 10:00:00');
+    $reservas = [];
+    foreach (['Vale', 'Beto'] as $nombre) {
+        $persona = (string) $this->getJson("/api/v1/app/{$e['slug']}/miembros?q={$nombre}", conBearer($e['bearer']))->json('data.0.id');
+        $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $pack], conBearer($e['bearer']))->assertCreated();
+        $reservas[$nombre] = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))
+            ->assertCreated()->json('data.id');
+    }
+
+    $plantilla = (string) $this->getJson("/api/v1/app/{$e['slug']}/yo/calendario", conBearer($vale['bearer']))->assertOk()->json('data.evento');
+    expect($plantilla)->toContain('/{evento}.ics');
+    $enlace = fn (string $evento): string => rutaCalendario(str_replace('{evento}', $evento, $plantilla));
+
+    $r = $this->get($enlace('reserva-'.$reservas['Vale']))->assertOk();
+    expect((string) $r->headers->get('Content-Type'))->toStartWith('text/calendar');
+    $ics = $r->getContent();
+    expect($ics)->toContain('UID:reserva-'.$reservas['Vale'].'@agendauno')
+        ->toContain('SUMMARY:Nivel 1')
+        ->and(substr_count($ics, 'BEGIN:VEVENT'))->toBe(1)
+        // Evento suelto: no es un calendario suscrito.
+        ->and($ics)->not->toContain('REFRESH-INTERVAL');
+
+    // La reserva de Beto no está en el enlace de Vale.
+    $this->get($enlace('reserva-'.$reservas['Beto']))->assertNotFound();
+    $this->get($enlace('sesion-'.$sesion))->assertNotFound();
+
+    // Cancelada, ya no se ofrece.
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas/{$reservas['Vale']}/cancelar", [], conBearer($vale['bearer']))->assertOk();
+    $this->get($enlace('reserva-'.$reservas['Vale']))->assertNotFound();
+});
+
+it('agregar a mi calendario: quien imparte descarga su clase, no la de otro', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $coach = personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
+    $coachId = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    $semilla = agendaSemilla($e);
+    $suya = crearSesionTenant($e, $semilla, 5, now()->addDays(1)->format('Y-m-d').' 18:00:00');
+    $ajena = crearSesionTenant($e, $semilla, 5, now()->addDays(1)->format('Y-m-d').' 20:00:00');
+    $this->putJson("/api/v1/app/{$e['slug']}/sesiones/{$suya}/instructor", ['instructor_id' => $coachId], conBearer($e['bearer']))->assertOk();
+
+    $plantilla = (string) $this->getJson("/api/v1/app/{$e['slug']}/yo/calendario", conBearer($coach))->json('data.evento');
+    $this->get(rutaCalendario(str_replace('{evento}', 'sesion-'.$suya, $plantilla)))->assertOk()
+        ->assertSee('UID:sesion-'.$suya.'@agendauno', false);
+    $this->get(rutaCalendario(str_replace('{evento}', 'sesion-'.$ajena, $plantilla)))->assertNotFound();
+    $this->get(rutaCalendario(str_replace('{evento}', 'otra-cosa', $plantilla)))->assertNotFound();
+});

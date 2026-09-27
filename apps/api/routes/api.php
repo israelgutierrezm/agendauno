@@ -197,6 +197,8 @@ Route::prefix('v1')->group(function (): void {
         // Calendario personal (iCal) que leen Google Calendar, Apple u Outlook con el
         // enlace privado de cada quien (sin sesión).
         Route::get('/calendario/{token}.ics', [CalendarioTenantController::class, 'feed'])->middleware('throttle:60,1')->name('calendario.feed');
+        Route::get('/calendario/{token}/{evento}.ics', [CalendarioTenantController::class, 'evento'])
+            ->where('evento', '(reserva|sesion)-[0-9A-Za-z]+')->middleware('throttle:60,1')->name('calendario.evento');
 
         Route::middleware(['estudio.auth', 'throttle:tenant'])->group(function (): void {
             Route::get('/yo', [AuthTenantController::class, 'yo'])->name('yo');

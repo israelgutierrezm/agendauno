@@ -26,6 +26,9 @@ class CalendarioPersonalTenant
 
     private const DIAS_ADELANTE = 120;
 
+    /** Reservas que ocupan su lugar (las que van a su calendario). */
+    private const RESERVA_VIGENTE = [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value];
+
     public function __construct(private readonly PersonaDeUsuarioTenant $personas) {}
 
     /**
@@ -67,25 +70,15 @@ class CalendarioPersonalTenant
         if ($persona !== null) {
             ReservaTenant::query()
                 ->where('persona_id', $persona->getKey())
-                ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value])
+                ->whereIn('estado', self::RESERVA_VIGENTE)
                 ->whereHas('sesion', fn ($q) => $q->where('estado', EstadoSesionTenant::Programada->value)->whereBetween('inicia_en', [$desde, $hasta]))
                 ->with(['sesion.oferta', 'sesion.sucursal', 'sesion.instructor'])
                 ->get()
                 ->each(function (ReservaTenant $r) use (&$eventos, $estudio): void {
-                    $sesion = $r->sesion;
-                    if ($sesion === null) {
-                        return;
+                    $evento = $this->eventoDeReserva($r, $estudio);
+                    if ($evento !== null) {
+                        $eventos[] = $evento;
                     }
-                    $con = $sesion->instructor?->nombreCorto();
-                    $eventos[] = $this->evento(
-                        'reserva-'.$r->ulid,
-                        (string) $sesion->oferta?->nombre ?: 'Reserva',
-                        $sesion->inicia_en,
-                        $sesion->termina_en,
-                        (string) $sesion->sucursal?->nombre,
-                        trim($estudio->nombre.($con ? ' · con '.$con : '')),
-                        $r->estado === EstadoReserva::PendientePago ? 'TENTATIVE' : 'CONFIRMED',
-                    );
                 });
         }
 
@@ -97,26 +90,101 @@ class CalendarioPersonalTenant
             ->with(['oferta', 'sucursal'])
             ->get()
             ->each(function (SesionTenant $s) use (&$eventos, $estudio): void {
-                $eventos[] = $this->evento(
-                    'sesion-'.$s->ulid,
-                    (string) $s->oferta?->nombre ?: 'Clase',
-                    $s->inicia_en,
-                    $s->termina_en,
-                    (string) $s->sucursal?->nombre,
-                    (string) $estudio->nombre,
-                    'CONFIRMED',
-                );
+                $eventos[] = $this->eventoDeSesion($s, $estudio);
             });
 
+        return $this->calendario($estudio, $eventos, suscripcion: true);
+    }
+
+    /**
+     * Un solo evento ("Agregar a mi calendario" desde la app): `reserva-{ulid}` de una
+     * reserva suya o `sesion-{ulid}` de algo que imparte. Null si no es suyo o ya no
+     * sigue en pie. El UID es el mismo que en su calendario suscrito.
+     */
+    public function icsDeEvento(Usuario $usuario, Estudio $estudio, string $evento): ?string
+    {
+        [$tipo, $ulid] = array_pad(explode('-', $evento, 2), 2, '');
+        $lineas = null;
+
+        if ($tipo === 'reserva') {
+            $persona = $this->personas->buscar($usuario);
+            $reserva = $persona === null ? null : ReservaTenant::query()
+                ->where('ulid', $ulid)
+                ->where('persona_id', $persona->getKey())
+                ->whereIn('estado', self::RESERVA_VIGENTE)
+                ->whereHas('sesion', fn ($q) => $q->where('estado', EstadoSesionTenant::Programada->value))
+                ->with(['sesion.oferta', 'sesion.sucursal', 'sesion.instructor'])
+                ->first();
+            $lineas = $reserva instanceof ReservaTenant ? $this->eventoDeReserva($reserva, $estudio) : null;
+        } elseif ($tipo === 'sesion') {
+            $sesion = SesionTenant::query()
+                ->where('ulid', $ulid)
+                ->where('instructor_id', $usuario->getKey())
+                ->where('estado', EstadoSesionTenant::Programada->value)
+                ->with(['oferta', 'sucursal'])
+                ->first();
+            $lineas = $sesion instanceof SesionTenant ? $this->eventoDeSesion($sesion, $estudio) : null;
+        }
+
+        return $lineas === null ? null : $this->calendario($estudio, [$lineas], suscripcion: false);
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function eventoDeReserva(ReservaTenant $r, Estudio $estudio): ?array
+    {
+        $sesion = $r->sesion;
+        if ($sesion === null) {
+            return null;
+        }
+        $con = $sesion->instructor?->nombreCorto();
+
+        return $this->evento(
+            'reserva-'.$r->ulid,
+            (string) $sesion->oferta?->nombre ?: 'Reserva',
+            $sesion->inicia_en,
+            $sesion->termina_en,
+            (string) $sesion->sucursal?->nombre,
+            trim($estudio->nombre.($con ? ' · con '.$con : '')),
+            $r->estado === EstadoReserva::PendientePago ? 'TENTATIVE' : 'CONFIRMED',
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function eventoDeSesion(SesionTenant $s, Estudio $estudio): array
+    {
+        return $this->evento(
+            'sesion-'.$s->ulid,
+            (string) $s->oferta?->nombre ?: 'Clase',
+            $s->inicia_en,
+            $s->termina_en,
+            (string) $s->sucursal?->nombre,
+            (string) $estudio->nombre,
+            'CONFIRMED',
+        );
+    }
+
+    /**
+     * El archivo: un calendario suscrito (se refresca cada hora) o un evento suelto.
+     *
+     * @param  list<list<string>>  $eventos
+     */
+    private function calendario(Estudio $estudio, array $eventos, bool $suscripcion): string
+    {
         $lineas = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
             'PRODID:-//AgendaUno//Calendario//ES',
             'CALSCALE:GREGORIAN',
             'METHOD:PUBLISH',
-            'X-WR-CALNAME:'.$this->texto($estudio->nombre),
-            'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
-            'X-PUBLISHED-TTL:PT1H',
+            ...($suscripcion ? [
+                'X-WR-CALNAME:'.$this->texto($estudio->nombre),
+                'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
+                'X-PUBLISHED-TTL:PT1H',
+            ] : []),
             ...array_merge(...($eventos ?: [[]])),
             'END:VCALENDAR',
         ];
