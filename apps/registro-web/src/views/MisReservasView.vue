@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
@@ -14,6 +14,7 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import ReprogramarMiReserva from "@/components/ReprogramarMiReserva.vue";
+import { api, mensajeDeError } from "@/lib/api";
 import {
   cuandoCorto,
   useMiCuenta,
@@ -46,6 +47,67 @@ const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const cuenta = useMiCuenta();
 
+/**
+ * Las clases disponibles se piden por el periodo que se ve (GET /mi/agenda con
+ * desde/hasta y, si eligió una, la sucursal): al moverse de semana o de mes se
+ * vuelven a pedir, así ningún periodo se ve vacío porque las primeras N clases del
+ * negocio eran de otras fechas o sedes. Cada pedido lleva su número: una respuesta
+ * vieja no pisa a la del periodo actual.
+ */
+interface Sede {
+  id: string;
+  nombre: string;
+}
+const periodo = ref<{ desde: string; hasta: string } | null>(null);
+const sucursalId = ref("");
+const sedes = ref<Sede[]>([]);
+const clasesPeriodo = ref<Clase[]>([]);
+const cargandoClases = ref(false);
+const errorClases = ref<string | null>(null);
+const truncado = ref(false);
+let pedido = 0;
+
+async function cargarClases(): Promise<void> {
+  if (sesion.esCitas || periodo.value === null) {
+    return;
+  }
+  const mio = ++pedido;
+  cargandoClases.value = true;
+  errorClases.value = null;
+  try {
+    const { data } = await api.get<{
+      data: Clase[];
+      meta?: { sucursales?: Sede[]; truncado?: boolean };
+    }>(`${cuenta.base.value}/mi/agenda`, {
+      params: {
+        desde: periodo.value.desde,
+        hasta: periodo.value.hasta,
+        sucursal_id: sucursalId.value || undefined,
+      },
+    });
+    if (mio !== pedido) {
+      return; // Ya se movió a otro periodo o sede.
+    }
+    clasesPeriodo.value = data.data;
+    sedes.value = data.meta?.sucursales ?? sedes.value;
+    truncado.value = data.meta?.truncado === true;
+  } catch (e) {
+    if (mio === pedido) {
+      clasesPeriodo.value = [];
+      errorClases.value = mensajeDeError(e);
+    }
+  } finally {
+    if (mio === pedido) {
+      cargandoClases.value = false;
+    }
+  }
+}
+function alCambiarPeriodo(r: { desde: string; hasta: string }): void {
+  periodo.value = { desde: r.desde, hasta: r.hasta };
+  void cargarClases();
+}
+watch(sucursalId, () => void cargarClases());
+
 const abierto = ref<Evento | null>(null);
 const accion = ref<"reprogramar" | "cancelar" | null>(null);
 const agendando = ref(false);
@@ -64,7 +126,7 @@ const eventos = computed<Evento[]>(() => {
     estado: r.estado,
     reserva: r,
   }));
-  const libres: Evento[] = cuenta.clases.value
+  const libres: Evento[] = clasesPeriodo.value
     .filter((c) => !cuenta.reservadas.value.has(c.id))
     .map((c) => ({
       id: c.id,
@@ -131,28 +193,33 @@ function llena(e: Evento): boolean {
   return !!c && c.capacidad !== null && c.ocupados >= c.capacidad;
 }
 
+// Tras reservar, cancelar o cambiar, el cupo del periodo cambió: se vuelve a pedir.
 async function reservar(e: Evento, esperar: boolean): Promise<void> {
   if (e.clase && (await cuenta.reservar(e.clase, esperar))) {
     aviso.value = esperar
       ? t("miCuenta.enListaEspera")
       : t("miCuenta.reservado");
     cerrar();
+    void cargarClases();
   }
 }
 async function cancelar(e: Evento): Promise<void> {
   if (e.reserva && (await cuenta.cancelar(e.reserva))) {
     cerrar();
+    void cargarClases();
   }
 }
 async function aceptar(e: Evento): Promise<void> {
   if (e.reserva && (await cuenta.aceptar(e.reserva))) {
     cerrar();
+    void cargarClases();
   }
 }
 async function reprogramada(): Promise<void> {
   aviso.value = t("miReprogramar.hecho");
   cerrar();
   await cuenta.cargar(true);
+  void cargarClases();
 }
 
 onMounted(() => void cuenta.asegurar());
@@ -188,18 +255,41 @@ onMounted(() => void cuenta.asegurar());
     >
       {{ aviso }}
     </p>
+    <p
+      v-if="truncado && !errorClases"
+      class="mt-3 text-sm"
+      :style="{ color: 'var(--aviso)' }"
+    >
+      {{ $t("portal.reservas.demasiadas") }}
+    </p>
 
     <CalendarioVistas
       class="mt-4"
       clave="tu.portal.vista"
       :eventos="enCalendario"
-      :cargando="cuenta.cargando.value"
+      :cargando="cuenta.cargando.value || cargandoClases"
+      :error="errorClases"
       @abrir="abrirPorId"
+      @rango="alCambiarPeriodo"
+      @reintentar="cargarClases"
     >
       <template #barra>
-        <RouterLink :to="{ name: 'mi-perfil' }" class="tu-enlace text-sm">{{
-          $t("portal.reservas.sincronizar")
-        }}</RouterLink>
+        <div class="flex flex-wrap items-center gap-3">
+          <label v-if="sedes.length > 1" class="text-sm">
+            <span class="sr-only">{{ $t("portal.reservas.sucursal") }}</span>
+            <select id="mr-sede" v-model="sucursalId" class="tu-input w-auto">
+              <option value="">
+                {{ $t("portal.reservas.todasSucursales") }}
+              </option>
+              <option v-for="s in sedes" :key="s.id" :value="s.id">
+                {{ s.nombre }}
+              </option>
+            </select>
+          </label>
+          <RouterLink :to="{ name: 'mi-perfil' }" class="tu-enlace text-sm">{{
+            $t("portal.reservas.sincronizar")
+          }}</RouterLink>
+        </div>
       </template>
 
       <!-- LISTA: las mías y las disponibles -->

@@ -74,6 +74,10 @@ export default {
     con: "Con {nombre}",
     lugares: "{libres} de {total} lugares",
     llena: "Llena",
+    sucursal: "Sucursal",
+    todasSucursales: "Todas las sucursales",
+    demasiadas:
+      "Hay más clases en estas fechas de las que caben aquí: elige una sucursal o un periodo más corto.",
   },
   // Portal de quien imparte: su Inicio y su calendario (solo lo suyo).
   instructor: {

@@ -57,6 +57,12 @@ class MiTenantController
     // Movimientos de créditos que ve el alumno (los más recientes).
     private const LIMITE_MOVIMIENTOS = 200;
 
+    /** Días que abarca como máximo un periodo de la agenda del alumno (un mes y algo). */
+    private const DIAS_AGENDA = 62;
+
+    /** Tope de clases de un periodo: si se llena, la respuesta lo dice (`truncado`). */
+    private const LIMITE_AGENDA = 500;
+
     public function __construct(
         private readonly ReservasTenant $reservas,
         private readonly LibroMayorTenant $libro,
@@ -190,33 +196,83 @@ class MiTenantController
         ]]);
     }
 
+    /**
+     * Las clases a las que puede entrar, por PERIODO (fechas locales de cada sede,
+     * fin incluido) y, si la elige, por sucursal: el calendario pide lo que ve y lo
+     * vuelve a pedir al moverse, así ninguna semana se ve vacía porque las primeras
+     * N clases del negocio eran de otras fechas o sedes. La sucursal se filtra en la
+     * consulta (antes del tope); si aun así se llena el tope, `meta.truncado` lo dice.
+     * Sin fechas: desde hoy y 30 días (lo que ve la lista).
+     */
     public function agenda(Request $request): JsonResponse
     {
+        $validado = $request->validate([
+            'desde' => ['nullable', 'date_format:Y-m-d'],
+            'hasta' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:desde'],
+            'sucursal_id' => ['nullable', 'string'],
+        ]);
+
+        $zona = (string) (SucursalTenant::query()->value('zona_horaria') ?? config('app.timezone', 'UTC'));
+        $desde = CarbonImmutable::parse($validado['desde'] ?? CarbonImmutable::now($zona)->toDateString(), 'UTC');
+        $hasta = isset($validado['hasta']) ? CarbonImmutable::parse($validado['hasta'], 'UTC') : $desde->addDays(30);
+        if ($desde->diffInDays($hasta) > self::DIAS_AGENDA) {
+            throw ValidationException::withMessages([
+                'hasta' => 'El periodo puede abarcar hasta '.self::DIAS_AGENDA.' días.',
+            ]);
+        }
+
+        $sucursalId = null;
+        if (($validado['sucursal_id'] ?? '') !== '') {
+            $sucursalId = (int) (SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->value('id') ?? 0);
+        }
+
+        // Un día de holgura por lado (las horas se guardan en UTC y cada sede tiene
+        // su zona); luego se queda solo lo que cae en el periodo en la fecha LOCAL.
+        $inicio = $desde->subDay()->startOfDay();
+        $ahora = CarbonImmutable::now();
         $sesiones = SesionTenant::query()
             ->where('estado', 'programada')
             // Solo clases abiertas: las citas son privadas de su titular.
             ->where('tipo', TipoSesionTenant::Clase->value)
-            ->where('inicia_en', '>=', CarbonImmutable::now())
+            ->where('inicia_en', '>=', $inicio->greaterThan($ahora) ? $inicio : $ahora)
+            ->where('inicia_en', '<', $hasta->addDays(2)->startOfDay())
+            ->when($sucursalId !== null, fn ($q) => $q->where('sucursal_id', $sucursalId))
             ->with(['oferta', 'sucursal', 'instructor'])
             // Cupo ocupado = reservas que toman lugar (confirmadas, ofrecidas y
             // pendientes de pago, que retienen el cupo mientras se pagan).
             ->withCount(['reservas as ocupados' => fn ($q) => $q->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::PendientePago->value])])
             ->orderBy('inicia_en')
-            ->limit(100)
+            ->limit(self::LIMITE_AGENDA + 1)
             ->get();
+        $truncado = $sesiones->count() > self::LIMITE_AGENDA;
+
+        $enPeriodo = $sesiones->take(self::LIMITE_AGENDA)->filter(function (SesionTenant $s) use ($desde, $hasta): bool {
+            $dia = $s->inicia_en->copy()->setTimezone((string) $s->zona_horaria)->toDateString();
+
+            return $dia >= $desde->toDateString() && $dia <= $hasta->toDateString();
+        });
 
         return response()->json([
-            'data' => $sesiones->map(fn (SesionTenant $s): array => [
+            'data' => $enPeriodo->map(fn (SesionTenant $s): array => [
                 'id' => $s->ulid,
                 'oferta' => $s->oferta?->nombre,
                 'sucursal' => $s->sucursal?->nombre,
+                'sucursal_id' => $s->sucursal?->ulid,
                 'inicia_en' => $s->inicia_en->toIso8601String(),
                 'termina_en' => $s->termina_en->toIso8601String(),
                 'instructor' => $s->instructor?->name,
                 'zona_horaria' => $s->zona_horaria,
                 'capacidad' => $s->capacidad,
                 'ocupados' => (int) ($s->getAttribute('ocupados') ?? 0),
-            ])->all(),
+            ])->values()->all(),
+            'meta' => [
+                'desde' => $desde->toDateString(),
+                'hasta' => $hasta->toDateString(),
+                'truncado' => $truncado,
+                // Para elegir sede en el calendario (solo si hay más de una).
+                'sucursales' => SucursalTenant::query()->orderBy('nombre')->get()
+                    ->map(fn (SucursalTenant $x): array => ['id' => $x->ulid, 'nombre' => $x->nombre])->all(),
+            ],
         ]);
     }
 

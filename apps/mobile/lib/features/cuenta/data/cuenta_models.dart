@@ -703,3 +703,46 @@ class ProductoComprable {
     return productos.where((p) => !p.esExtra || tienePaquete).toList();
   }
 }
+
+/// Una sede para elegir en el calendario de Reservas.
+class SedeAgenda {
+  const SedeAgenda({required this.id, required this.nombre});
+
+  final String id;
+  final String nombre;
+}
+
+/// Las clases de un periodo (GET /mi/agenda con desde/hasta y, si se eligió, la
+/// sucursal). `truncado`: había más de las que caben; conviene elegir sede o
+/// acortar el periodo.
+class AgendaPeriodo {
+  const AgendaPeriodo({
+    required this.clases,
+    this.sucursales = const [],
+    this.truncado = false,
+  });
+
+  factory AgendaPeriodo.desdeJson(Map<String, dynamic> j) {
+    final meta = (j['meta'] ?? const {}) as Map<String, dynamic>;
+    return AgendaPeriodo(
+      clases: ((j['data'] ?? const []) as List)
+          .whereType<Map<String, dynamic>>()
+          .map(ClaseMiembro.desdeJson)
+          .toList(),
+      sucursales: ((meta['sucursales'] ?? const []) as List)
+          .whereType<Map<String, dynamic>>()
+          .map(
+            (x) => SedeAgenda(
+              id: (x['id'] ?? '') as String,
+              nombre: (x['nombre'] ?? '') as String,
+            ),
+          )
+          .toList(),
+      truncado: (meta['truncado'] ?? false) as bool,
+    );
+  }
+
+  final List<ClaseMiembro> clases;
+  final List<SedeAgenda> sucursales;
+  final bool truncado;
+}

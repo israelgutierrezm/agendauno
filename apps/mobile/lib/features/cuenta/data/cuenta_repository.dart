@@ -20,7 +20,18 @@ class CuentaRepository {
     final respuestas = await Future.wait([
       _dio.get<Map<String, dynamic>>('$_base/mi/perfil'),
       _dio.get<Map<String, dynamic>>('$_base/mi/waivers'),
-      if (conClases) _dio.get<Map<String, dynamic>>('$_base/mi/agenda'),
+      // Las próximas clases (para el Inicio) no tumban la cuenta si fallan: el
+      // calendario de Reservas pide su periodo aparte y muestra su propio error.
+      if (conClases)
+        _dio
+            .get<Map<String, dynamic>>('$_base/mi/agenda')
+            .catchError(
+              (Object _) => Response<Map<String, dynamic>>(
+                requestOptions: RequestOptions(path: '$_base/mi/agenda'),
+                data: const {'data': <dynamic>[]},
+              ),
+              test: (e) => e is DioException,
+            ),
     ]);
 
     final data = (respuestas[0].data?['data'] ?? {}) as Map<String, dynamic>;
@@ -71,6 +82,27 @@ class CuentaRepository {
       ],
     },
   );
+
+  /// Las clases del periodo que ve el calendario (fechas locales, fin incluido)
+  /// y, si eligió una, de esa sucursal.
+  Future<AgendaPeriodo> agendaPeriodo(
+    DateTime desde,
+    DateTime hasta, {
+    String? sucursalId,
+  }) async {
+    String ymd(DateTime d) =>
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/agenda',
+      queryParameters: {
+        'desde': ymd(desde),
+        'hasta': ymd(hasta),
+        if (sucursalId != null && sucursalId.isNotEmpty)
+          'sucursal_id': sucursalId,
+      },
+    );
+    return AgendaPeriodo.desdeJson(res.data ?? const {});
+  }
 
   /// El clima de su Inicio: el pronóstico para su próxima clase o cita en su
   /// sucursal o el de ahora. Si falla o no se sabe, null (no se muestra).

@@ -234,6 +234,54 @@ describe("portal del alumno", () => {
     expect(texto).toContain("Pronóstico para tu cita en Roma Norte");
   });
 
+  it("reservas: pide las clases del periodo que se ve y las vuelve a pedir al moverse", async () => {
+    const w = montar(MisReservasView);
+    await flushPromises();
+    const pedidos = () =>
+      api.get.mock.calls.filter(
+        ([url, cfg]) =>
+          url === "/api/v1/app/demo/mi/agenda" && cfg?.params?.desde,
+      );
+    const primero = pedidos().at(-1)![1].params;
+    expect(primero.desde).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(primero.hasta).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    await w
+      .findAll(".tu-segmentado button")
+      .find((b) => b.text() === "Semana")!
+      .trigger("click");
+    await flushPromises();
+    await w.find('[aria-label="Siguiente"]').trigger("click");
+    await flushPromises();
+    const semanaSiguiente = pedidos().at(-1)![1].params;
+    expect(semanaSiguiente.desde > primero.desde).toBe(true);
+  });
+
+  it("si falla la carga del periodo, muestra el error con reintentar (no un calendario vacío)", async () => {
+    let falla = true;
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      if (ruta === "/mi/agenda" && falla) {
+        return Promise.reject(new Error("Sin conexión"));
+      }
+      return Promise.resolve({ data: { data: datos[ruta] ?? [] } });
+    });
+    const w = montar(MisReservasView);
+    await flushPromises();
+
+    expect(w.text()).toContain("Sin conexión");
+    expect(w.text()).not.toContain(portal.periodo.sinNada);
+    const reintentar = w
+      .findAll("button")
+      .find((b) => b.text() === esMX.comun.reintentar)!;
+
+    falla = false;
+    await reintentar.trigger("click");
+    await flushPromises();
+    expect(w.text()).not.toContain("Sin conexión");
+    expect(w.text()).toContain("Flexibilidad");
+  });
+
   it("reservas: lista con las suyas y las disponibles; en semana y detalle", async () => {
     const w = montar(MisReservasView);
     await flushPromises();

@@ -89,6 +89,51 @@ final cuentaProvider =
       CuentaController.new,
     );
 
+/// Lo que ve el calendario de Reservas: el periodo (lo avisa el calendario al
+/// moverse) y la sucursal elegida (vacía = todas).
+class FiltroAgenda
+    extends Notifier<({DateTime desde, DateTime hasta, String sucursal})> {
+  @override
+  ({DateTime desde, DateTime hasta, String sucursal}) build() {
+    final hoy = DateTime.now();
+    final dia = DateTime(hoy.year, hoy.month, hoy.day);
+    return (desde: dia, hasta: dia.add(const Duration(days: 30)), sucursal: '');
+  }
+
+  void fijarPeriodo(DateTime desde, DateTime hasta) {
+    if (desde != state.desde || hasta != state.hasta) {
+      state = (desde: desde, hasta: hasta, sucursal: state.sucursal);
+    }
+  }
+
+  void elegirSucursal(String sucursal) =>
+      state = (desde: state.desde, hasta: state.hasta, sucursal: sucursal);
+}
+
+final filtroAgendaProvider =
+    NotifierProvider.autoDispose<
+      FiltroAgenda,
+      ({DateTime desde, DateTime hasta, String sucursal})
+    >(FiltroAgenda.new);
+
+/// Las clases del periodo y sede que se ven; se vuelven a pedir al moverse de
+/// periodo o de sede, y tras reservar o cancelar (cambia el cupo).
+final clasesPeriodoProvider = FutureProvider.autoDispose<AgendaPeriodo>((
+  ref,
+) async {
+  final filtro = ref.watch(filtroAgendaProvider);
+  await ref.watch(cuentaProvider.future);
+  final repo = ref.watch(cuentaRepositoryProvider);
+  if (repo == null) {
+    return const AgendaPeriodo(clases: []);
+  }
+  return repo.agendaPeriodo(
+    filtro.desde,
+    filtro.hasta,
+    sucursalId: filtro.sucursal,
+  );
+});
+
 /// Los planes que puede comprar (se filtran las clases extra si no tiene paquete).
 final productosProvider = FutureProvider.autoDispose<List<ProductoComprable>>((
   ref,

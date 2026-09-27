@@ -193,7 +193,11 @@ export function useMiCuenta() {
             pago_automatico?: boolean;
           };
         }>(`${base.value}/mi/perfil`),
-        api.get<{ data: Clase[] }>(`${base.value}/mi/agenda`),
+        // Las próximas clases (para el Inicio) no tumban la cuenta si fallan: el
+        // calendario de Reservas pide su periodo aparte y muestra su propio error.
+        api
+          .get<{ data: Clase[] }>(`${base.value}/mi/agenda`)
+          .catch(() => ({ data: { data: [] as Clase[] } })),
         api.get<{ data: Waiver[] }>(`${base.value}/mi/waivers`),
         api.get<{ data: Producto[] }>(`${base.value}/mi/productos`),
         api.get<{ data: Orden[] }>(`${base.value}/mi/ordenes`),

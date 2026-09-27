@@ -34,12 +34,18 @@ const props = defineProps<{
   /** Clave para recordar la vista en este navegador. */
   clave: string;
   cargando?: boolean;
+  /**
+   * Si falló cargar el periodo: se muestra el aviso con "Reintentar" en lugar de
+   * los días (un error nunca se ve como un periodo vacío).
+   */
+  error?: string | null;
   /** Vista con la que abre (p. ej. desde un acceso directo); si no, la recordada. */
   vistaInicial?: Vista | null;
 }>();
 const emit = defineEmits<{
   abrir: [id: string];
   rango: [rango: { desde: string; hasta: string; vista: Vista }];
+  reintentar: [];
 }>();
 
 function vistaGuardada(): Vista {
@@ -293,6 +299,17 @@ defineExpose({ irDia });
     <p v-if="cargando" class="mt-6" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
+
+    <div v-else-if="error" class="mt-6 tu-card p-5 text-sm" role="alert">
+      <p style="color: var(--error)">{{ error }}</p>
+      <button
+        type="button"
+        class="tu-btn tu-btn-fantasma mt-3"
+        @click="emit('reintentar')"
+      >
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
 
     <template v-else>
       <!-- LISTA: la pone quien usa el calendario -->

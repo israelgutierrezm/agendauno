@@ -30,9 +30,10 @@ String lugaresTexto(ClaseMiembro c) {
       : '${c.capacidad! - c.ocupados} de ${c.capacidad} lugares';
 }
 
-/// Lo que pinta su calendario: sus reservas resaltadas y las clases disponibles.
-/// El id de cada evento es el de la reserva o el de la clase.
-List<EventoCal> eventosDeCuenta(MiCuenta c) {
+/// Lo que pinta su calendario: sus reservas resaltadas y las clases disponibles
+/// (las del periodo que se ve, si se pasan). El id de cada evento es el de la
+/// reserva o el de la clase.
+List<EventoCal> eventosDeCuenta(MiCuenta c, {List<ClaseMiembro>? clases}) {
   DateTime? fecha(String? iso) =>
       iso == null ? null : DateTime.tryParse(iso)?.toLocal();
   String detalle(String? sucursal, String? instructor) => [
@@ -52,7 +53,9 @@ List<EventoCal> eventosDeCuenta(MiCuenta c) {
         tono: r.estado == 'confirmada' ? TonoEvento.primario : TonoEvento.aviso,
         destacado: true,
       ),
-    for (final x in clasesDisponibles(c))
+    for (final x in (clases ?? c.clases).where(
+      (x) => x.iniciaEn != null && !c.sesionesReservadas.contains(x.id),
+    ))
       EventoCal(
         id: x.id,
         titulo: x.oferta ?? '—',

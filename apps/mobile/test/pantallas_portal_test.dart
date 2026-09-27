@@ -103,6 +103,10 @@ void main() {
           lluvia: 70,
         ),
       ),
+      // Las clases del periodo que ve el calendario de Reservas.
+      clasesPeriodoProvider.overrideWith(
+        (ref) async => AgendaPeriodo(clases: cuenta.clases),
+      ),
       cortePlanesProvider.overrideWith(
         (ref) async => [
           PlanCorte.desdeJson({
