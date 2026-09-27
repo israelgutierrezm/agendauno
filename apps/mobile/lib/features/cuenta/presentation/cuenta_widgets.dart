@@ -8,7 +8,6 @@ import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/eventos_cuenta.dart';
 import 'cuenta_screen.dart';
-import 'movimientos_sheet.dart';
 import 'reprogramar_sheet.dart';
 
 /// Piezas del portal del alumno o cliente que comparten sus pestañas.
@@ -175,67 +174,6 @@ class ConsentimientoCard extends ConsumerWidget {
       ),
     ),
   );
-}
-
-class CreditosCard extends StatelessWidget {
-  const CreditosCard(this.derechos, {super.key});
-
-  final List<DerechoMiembro> derechos;
-
-  @override
-  Widget build(BuildContext context) {
-    if (derechos.isEmpty) {
-      return const TextoVacio('Aún no tienes créditos.');
-    }
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: derechos
-              .map(
-                (d) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (d.producto != null)
-                      Text(
-                        d.producto!,
-                        style: const TextStyle(color: TemaAgendaUno.textoSuave),
-                      ),
-                    if (d.pausaHasta != null)
-                      Text(
-                        'En pausa hasta el ${Formato.dia(DateTime.parse(d.pausaHasta!))}',
-                        style: const TextStyle(color: TemaAgendaUno.textoSuave),
-                      ),
-                    Text(
-                      d.ilimitado
-                          ? 'Ilimitado'
-                          : '${d.creditosDisponibles} créditos disponibles',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    // Por qué cambió su saldo.
-                    if (!d.ilimitado && d.id != null)
-                      TextButton(
-                        style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                        onPressed: () => showModalBottomSheet<void>(
-                          context: context,
-                          isScrollControlled: true,
-                          showDragHandle: true,
-                          builder: (_) => MovimientosSheet(derechoId: d.id!),
-                        ),
-                        child: const Text('Ver movimientos'),
-                      ),
-                  ],
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    );
-  }
 }
 
 /// Una orden pendiente: se paga aquí si el negocio cobra en línea; si no, en

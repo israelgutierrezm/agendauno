@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:turnouno_mobile/core/calendario/calendario.dart';
 import 'package:turnouno_mobile/features/agenda/data/agenda_models.dart';
 import 'package:turnouno_mobile/features/auth/data/sesion.dart';
+import 'package:turnouno_mobile/features/cuenta/data/corte_planes.dart';
 import 'package:turnouno_mobile/features/cuenta/data/cuenta_models.dart';
 import 'package:turnouno_mobile/features/cuenta/data/eventos_cuenta.dart';
 import 'package:turnouno_mobile/features/instructor/application/mis_clases_controller.dart';
@@ -82,6 +83,45 @@ void main() {
       expect(llena.destacado, isFalse);
       expect(llena.estado, 'Llena');
       expect(llena.tono, TonoEvento.aviso);
+    });
+  });
+
+  group('corte de planes', () {
+    test('lee el corte y muestra solo los números que importan', () {
+      final p = PlanCorte.desdeJson({
+        'id': 'a1',
+        'derecho_id': 'd1',
+        'producto': '3 clases',
+        'estado': 'vigente',
+        'ilimitado': false,
+        'unidades': {
+          'incluidas': 3000,
+          'extras': 1000,
+          'usadas': 2500,
+          'apartadas': 0,
+          'disponibles': 1500,
+        },
+        'extras': [
+          {'producto': 'Clase extra', 'unidades': 1000, 'usadas': 500},
+        ],
+        'usos': [
+          {
+            'clase': 'Nivel 1',
+            'inicia_en': '2026-10-22T01:00:00Z',
+            'estado': 'no_asistio',
+          },
+        ],
+      });
+      expect(p.actual, isTrue);
+      expect(p.numeros, [
+        ('Incluidas', '3'),
+        ('Extras', '1'),
+        ('Usadas', '2.5'),
+        ('Disponibles', '1.5'),
+      ]);
+      expect(p.extras.single.usadas, 500);
+      expect(p.usos.single.pideAtencion, isTrue);
+      expect(p.usos.single.estadoTexto, 'No asistió');
     });
   });
 

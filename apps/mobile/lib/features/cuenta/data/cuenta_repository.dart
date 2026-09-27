@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../auth/application/sesion_controller.dart';
+import 'corte_planes.dart';
 import 'cuenta_models.dart';
 
 /// Acceso a los datos del autoservicio del miembro (`/app/{slug}/mi/*`), sobre el
@@ -266,6 +267,14 @@ class CuentaRepository {
     return EfectoCancelacion.desdeJson(
       (res.data?['data'] ?? {}) as Map<String, dynamic>,
     );
+  }
+
+  /// Corte de sus planes: qué incluía cada uno, cómo lo usó y lo que le queda.
+  Future<List<PlanCorte>> planes() async {
+    final res = await _dio.get<Map<String, dynamic>>('$_base/mi/planes');
+    return ((res.data?['data'] ?? []) as List)
+        .map((e) => PlanCorte.desdeJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// Movimientos de créditos de uno de sus planes (los más recientes primero).

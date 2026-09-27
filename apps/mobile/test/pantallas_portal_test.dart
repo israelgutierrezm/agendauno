@@ -5,6 +5,7 @@ import 'package:turnouno_mobile/features/agenda/data/agenda_models.dart';
 import 'package:turnouno_mobile/features/auth/application/sesion_controller.dart';
 import 'package:turnouno_mobile/features/auth/data/sesion.dart';
 import 'package:turnouno_mobile/features/cuenta/application/cuenta_controller.dart';
+import 'package:turnouno_mobile/features/cuenta/data/corte_planes.dart';
 import 'package:turnouno_mobile/features/cuenta/data/cuenta_models.dart';
 import 'package:turnouno_mobile/features/cuenta/presentation/cuenta_screen.dart';
 import 'package:turnouno_mobile/features/instructor/application/mis_clases_controller.dart';
@@ -90,6 +91,32 @@ void main() {
         const Sesion(slug: 'demo', bearer: 't', nombre: 'Vale', rol: 'miembro'),
       ),
       cuentaProvider.overrideWith(() => _CuentaFalsa(cuenta)),
+      cortePlanesProvider.overrideWith(
+        (ref) async => [
+          PlanCorte.desdeJson({
+            'id': 'a1',
+            'derecho_id': 'd1',
+            'producto': 'Pack 8 clases',
+            'desde': '2026-10-14',
+            'hasta': '2026-11-14',
+            'estado': 'vigente',
+            'ilimitado': false,
+            'aplica_a': ['Nivel 1'],
+            'unidades': {
+              'incluidas': 8000,
+              'usadas': 2000,
+              'disponibles': 6000,
+            },
+            'usos': [
+              {
+                'clase': 'Nivel 1',
+                'inicia_en': '2026-10-16T01:00:00Z',
+                'estado': 'asistio',
+              },
+            ],
+          }),
+        ],
+      ),
     ]);
 
     expect(find.text('Tu próxima clase'), findsOneWidget);
@@ -111,7 +138,12 @@ void main() {
     await tester.tap(find.text('Pagos').last);
     await tester.pumpAndSettle();
     expect(find.text('Por pagar'), findsOneWidget);
-    expect(find.text('6 créditos disponibles'), findsOneWidget);
+    expect(find.text('Mis planes'), findsOneWidget);
+    expect(find.text('Pack 8 clases'), findsWidgets);
+    expect(find.textContaining('Sirve para: Nivel 1'), findsOneWidget);
+    await tester.tap(find.text('Cómo lo usaste (1)'));
+    await tester.pumpAndSettle();
+    expect(find.text('Asistió'), findsOneWidget);
 
     await tester.tap(find.text('Expediente').last);
     await tester.pumpAndSettle();

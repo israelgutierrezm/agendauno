@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/sesion_controller.dart';
+import '../data/corte_planes.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
 
@@ -68,3 +69,11 @@ class CuentaController extends AsyncNotifier<MiCuenta> {
 final cuentaProvider = AsyncNotifierProvider<CuentaController, MiCuenta>(
   CuentaController.new,
 );
+
+/// Corte de sus planes; se vuelve a pedir cada vez que la cuenta se recarga (p. ej.
+/// tras reservar, cancelar o pagar).
+final cortePlanesProvider = FutureProvider<List<PlanCorte>>((ref) async {
+  await ref.watch(cuentaProvider.future);
+  final repo = ref.watch(cuentaRepositoryProvider);
+  return repo == null ? const [] : repo.planes();
+});
