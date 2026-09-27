@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Platform\Operacion;
 
+use App\Modules\Platform\Legales\DocumentoLegal;
+use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\RespaldosEstudio;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
-use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +36,7 @@ class VerificacionProduccion
         private readonly LatidoOperacion $latido,
         private readonly RespaldosEstudio $respaldos,
         private readonly RespaldosPlataforma $plataforma,
+        private readonly DocumentosLegales $legales,
     ) {}
 
     /**
@@ -198,13 +200,14 @@ class VerificacionProduccion
      */
     private function legales(): array
     {
-        $aviso = $this->texto('aviso_privacidad');
-        $terminos = $this->texto('terminos');
+        $aviso = $this->legales->vigente(DocumentoLegal::AVISO);
+        $terminos = $this->legales->vigente(DocumentoLegal::TERMINOS);
+        $responsable = $aviso !== null ? ($aviso->responsable ?? []) : [];
 
         return [
-            $this->punto('Legales', 'Aviso de privacidad publicado', $aviso !== '', 'Publícalo desde Plataforma → Legales.'),
-            $this->punto('Legales', 'Aviso sin marcadores del borrador', $aviso !== '' && preg_match('/\[[A-ZÁÉÍÓÚÑ ,.\-]{4,}\]/u', $aviso) !== 1, 'El aviso aún tiene campos por llenar entre corchetes (p. ej. [NOMBRE…]).'),
-            $this->punto('Legales', 'Términos y condiciones publicados', $terminos !== '', 'Publícalos desde Plataforma → Legales.'),
+            $this->punto('Legales', 'Aviso de privacidad publicado', $aviso !== null, 'Publícalo desde Plataforma → Legales (con los datos del responsable).'),
+            $this->punto('Legales', 'Aviso con los datos del responsable', ($responsable['nombre'] ?? '') !== '' && ($responsable['contacto'] ?? '') !== '', 'El aviso publicado no trae el responsable y su contacto de privacidad.'),
+            $this->punto('Legales', 'Términos y condiciones publicados', $terminos !== null, 'Publícalos desde Plataforma → Legales.'),
         ];
     }
 
@@ -225,15 +228,6 @@ class VerificacionProduccion
             $this->punto('Pagos', 'Stripe en modo producción', $stripe !== null && $stripe->modo === 'live' && str_starts_with((string) ($llaves['secret_key'] ?? ''), 'sk_live_'), 'Usa llaves sk_live_ y modo live.', critico: false),
             $this->punto('Pagos', 'Secreto del webhook de Stripe', (string) ($llaves['webhook_secret'] ?? '') !== '', 'Sin él no se confirman los pagos de la renta.'),
         ];
-    }
-
-    private function texto(string $clave): string
-    {
-        try {
-            return trim((string) ConfiguracionPlataforma::obtener($clave));
-        } catch (Throwable) {
-            return '';
-        }
     }
 
     /** Fecha del respaldo por su nombre ({slug}-AAAAMMDD-HHMMSS.ext). */

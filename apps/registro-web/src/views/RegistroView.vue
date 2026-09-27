@@ -52,9 +52,19 @@ const aceptaTerminos = ref(false);
 
 // Documentos legales (aviso de privacidad y términos) que edita el superadmin y se
 // muestran al dar clic en el enlace correspondiente del registro.
+// Se manda de vuelta qué versión se leyó: si cambió mientras tanto, la API pide
+// revisarla de nuevo.
+interface VersionLegal {
+  version: number;
+  vigente_desde: string;
+}
 const legales = ref<{
   aviso_privacidad: string | null;
   terminos: string | null;
+  versiones?: {
+    aviso_privacidad: VersionLegal | null;
+    terminos: VersionLegal | null;
+  };
 }>({ aviso_privacidad: null, terminos: null });
 const legalAbierto = ref<"aviso" | "terminos" | null>(null);
 function verLegal(cual: "aviso" | "terminos"): void {
@@ -250,6 +260,8 @@ async function enviar(): Promise<void> {
       contacto_telefono: whatsappNumero.value,
       contacto_email: contactoEmail.value,
       acepta_terminos: aceptaTerminos.value,
+      aviso_version: legales.value.versiones?.aviso_privacidad?.version,
+      terminos_version: legales.value.versiones?.terminos?.version,
     });
     creado.value = data.data.estudio;
     activacion.value = data.data.activacion;
@@ -301,7 +313,14 @@ onMounted(() => {
   trackEvent("studio_registration_started");
   void api
     .get<{
-      data: { aviso_privacidad: string | null; terminos: string | null };
+      data: {
+        aviso_privacidad: string | null;
+        terminos: string | null;
+        versiones?: {
+          aviso_privacidad: VersionLegal | null;
+          terminos: VersionLegal | null;
+        };
+      };
     }>("/api/v1/legales")
     .then(({ data }) => {
       legales.value = data.data;

@@ -5,6 +5,8 @@ import { api } from "@/lib/api";
 import AvisoPrivacidadContenido from "@/components/AvisoPrivacidadContenido.vue";
 
 const contenido = ref<string | null>(null);
+// Qué versión se ve y desde cuándo rige.
+const version = ref<{ version: number; vigente_desde: string } | null>(null);
 const cargando = ref(true);
 const error = ref(false);
 async function cargar() {
@@ -12,9 +14,15 @@ async function cargar() {
   error.value = false;
   try {
     const { data } = await api.get<{
-      data: { aviso_privacidad: string | null };
+      data: {
+        aviso_privacidad: string | null;
+        versiones?: {
+          aviso_privacidad: { version: number; vigente_desde: string } | null;
+        };
+      };
     }>("/api/v1/legales");
     contenido.value = data.data.aviso_privacidad;
+    version.value = data.data.versiones?.aviso_privacidad ?? null;
   } catch {
     error.value = true;
   } finally {
@@ -45,11 +53,26 @@ onMounted(cargar);
         Reintentar
       </button>
     </div>
-    <AvisoPrivacidadContenido v-else :contenido="contenido" />
+    <template v-else>
+      <p v-if="version" class="aviso-version">
+        Versión {{ version.version }} · vigente desde el
+        {{
+          new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(
+            new Date(version.vigente_desde),
+          )
+        }}
+      </p>
+      <AvisoPrivacidadContenido :contenido="contenido" />
+    </template>
   </article>
 </template>
 
 <style scoped>
+.aviso-version {
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+  color: var(--texto-suave);
+}
 .aviso-pagina {
   max-width: 52rem;
   margin: 0 auto;

@@ -22,6 +22,27 @@ describe("página del aviso", () => {
     expect(vista.text()).not.toContain("Borrador para revisión");
     vista.unmount();
   });
+  it("dice qué versión publicada se ve y desde cuándo rige", async () => {
+    mocks.get.mockResolvedValue({
+      data: {
+        data: {
+          aviso_privacidad: "Documento vigente",
+          versiones: {
+            aviso_privacidad: {
+              version: 3,
+              vigente_desde: "2026-10-01T12:00:00Z",
+            },
+          },
+        },
+      },
+    });
+    const vista = montar();
+    await flushPromises();
+    expect(vista.text()).toContain(
+      "Versión 3 · vigente desde el 1 de octubre de 2026",
+    );
+    vista.unmount();
+  });
   it("no sustituye un error de red por un borrador y permite reintentar", async () => {
     mocks.get.mockRejectedValueOnce(new Error("Sin conexión"));
     const vista = montar();

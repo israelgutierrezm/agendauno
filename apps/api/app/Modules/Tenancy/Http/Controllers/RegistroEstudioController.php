@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Platform\Legales\DocumentoLegal;
+use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\AprovisionarEstudio;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\RegistrarEstudio;
@@ -28,6 +30,7 @@ class RegistroEstudioController
         private readonly AprovisionarEstudio $aprovisionar,
         private readonly EnviarActivacionTenant $enviarActivacion,
         private readonly VerificarRecaptcha $recaptcha,
+        private readonly DocumentosLegales $legales,
     ) {}
 
     public function disponibilidad(Request $request): JsonResponse
@@ -47,6 +50,24 @@ class RegistroEstudioController
             ]);
         }
 
+        // En producción no se registra nadie sin un aviso de privacidad y unos
+        // términos publicados; y lo que se acepta es lo que se leyó.
+        $aviso = $this->legales->vigente(DocumentoLegal::AVISO);
+        $terminos = $this->legales->vigente(DocumentoLegal::TERMINOS);
+        if (app()->environment('production') && ($aviso === null || $terminos === null)) {
+            throw ValidationException::withMessages([
+                'acepta_terminos' => ['El registro abrirá cuando el aviso de privacidad y los términos estén publicados.'],
+            ]);
+        }
+        foreach (['aviso_version' => $aviso, 'terminos_version' => $terminos] as $campo => $vigente) {
+            $leida = $request->validated($campo);
+            if ($leida !== null && $vigente !== null && (int) $leida !== $vigente->version) {
+                throw ValidationException::withMessages([
+                    'acepta_terminos' => ['El aviso de privacidad o los términos cambiaron mientras te registrabas: revísalos y vuelve a aceptarlos.'],
+                ]);
+            }
+        }
+
         $estudio = $this->registrar->ejecutar([
             'nombre' => (string) $request->validated('nombre'),
             'slug' => (string) $request->validated('slug'),
@@ -62,6 +83,8 @@ class RegistroEstudioController
             'ciudad' => $request->validated('ciudad'),
             'zona_horaria' => $request->validated('zona_horaria'),
         ]);
+
+        $this->legales->registrarAceptacion($estudio, (string) $estudio->contacto_email, $request->ip(), $request->userAgent());
 
         // BD del tenant creada de forma síncrona (SQLite barato). En producción con
         // MySQL esto se despacharía a una cola; el estado permite reanudar.

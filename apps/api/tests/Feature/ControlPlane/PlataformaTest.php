@@ -134,22 +134,30 @@ it('carga la llave de la cuenta FacturAPI sin devolverla nunca', function (): vo
         ->assertOk()->assertJsonPath('data.facturapi_configurada', true);
 });
 
-it('el superadmin guarda aviso y términos y se ven en el endpoint público', function (): void {
+it('el superadmin guarda aviso y términos y, al publicarlos, se ven en el endpoint público', function (): void {
     Config::set('turnouno.plataforma.token', 'token-plataforma');
 
     test()->putJson('/api/v1/plataforma/legales', [
         'aviso_privacidad' => 'Nuestro aviso de privacidad.',
         'terminos' => 'Términos y condiciones del servicio.',
+        'responsable' => ['nombre' => 'AgendaUno', 'domicilio' => 'CDMX', 'contacto' => 'privacidad@agendauno.mx'],
     ], conTokenPlataforma())
         ->assertOk()
         ->assertJsonPath('data.aviso_privacidad', 'Nuestro aviso de privacidad.')
         ->assertJsonPath('data.terminos', 'Términos y condiciones del servicio.');
 
-    // El endpoint público (sin token) los entrega para el registro.
+    // Guardar es un borrador: el público aún no lo ve.
+    test()->getJson('/api/v1/legales')->assertOk()->assertJsonPath('data.aviso_privacidad', null);
+
+    test()->postJson('/api/v1/plataforma/legales/aviso_privacidad/publicar', [], conTokenPlataforma())->assertCreated();
+    test()->postJson('/api/v1/plataforma/legales/terminos/publicar', [], conTokenPlataforma())->assertCreated();
+
+    // El endpoint público (sin token) los entrega para el registro, con su versión.
     test()->getJson('/api/v1/legales')
         ->assertOk()
         ->assertJsonPath('data.aviso_privacidad', 'Nuestro aviso de privacidad.')
-        ->assertJsonPath('data.terminos', 'Términos y condiciones del servicio.');
+        ->assertJsonPath('data.terminos', 'Términos y condiciones del servicio.')
+        ->assertJsonPath('data.versiones.terminos.version', 1);
 });
 
 it('el endpoint público de legales responde vacío si no se han configurado', function (): void {

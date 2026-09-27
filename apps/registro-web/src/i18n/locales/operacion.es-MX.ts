@@ -55,6 +55,38 @@ export default {
     proxima: "Próxima reserva",
     estado: "Estado",
   },
+  // Documentos legales de la plataforma (superadmin): borrador y publicar.
+  legales: {
+    ayuda:
+      "Edita el borrador y publícalo cuando esté listo: los usuarios solo ven lo publicado, con su número de versión y fecha, y cada negocio acepta la versión vigente al registrarse.",
+    responsable: "Responsable del tratamiento (aparece en el aviso)",
+    nombre: "Nombre o razón social",
+    domicilio: "Domicilio completo",
+    contacto: "Correo para privacidad y derechos ARCO",
+    area: "Persona o área designada",
+    marcadores:
+      "Usa {'{'}responsable{'}'}, {'{'}domicilio{'}'}, {'{'}contacto{'}'} y {'{'}area{'}'} en el texto: se llenan con estos datos al publicar. No se publica mientras queden campos entre corchetes del borrador.",
+    nombreDoc: {
+      aviso_privacidad: "Aviso de privacidad",
+      terminos: "Términos y condiciones",
+    },
+    version: "publicado, versión {version} desde el {fecha}",
+    sinPublicar:
+      "sin publicar (el registro de negocios queda cerrado en producción)",
+    guardarBorrador: "Guardar borrador",
+    borradorGuardado:
+      "Borrador guardado. Los usuarios siguen viendo lo publicado.",
+    publicarAviso: "Publicar aviso",
+    publicarTerminos: "Publicar términos",
+    confirmar: {
+      aviso_privacidad:
+        "¿Publicar el aviso de privacidad? Será la versión vigente para todos y los negocios nuevos la aceptarán al registrarse.",
+      terminos:
+        "¿Publicar los términos y condiciones? Serán la versión vigente para todos y los negocios nuevos la aceptarán al registrarse.",
+    },
+    publicado: "Publicado: versión {version}.",
+    versionPublica: "Versión {version} · vigente desde el {fecha}",
+  },
   // Grupos y rótulos del menú lateral que no son el título de una pantalla.
   menu: {
     directorio: "Directorio",

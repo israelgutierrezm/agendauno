@@ -355,7 +355,26 @@ function colorCargo(c: Cargo): string {
 // ---- Configuración: FacturAPI, pasarelas y legales ----
 const facturapiConfigurada = ref(false);
 const llaveInput = ref("");
-const legales = ref({ aviso_privacidad: "", terminos: "" });
+// Documentos legales: el borrador (texto y responsable) y lo publicado. Guardar no
+// cambia lo que ven los usuarios; publicar crea la versión siguiente.
+interface Publicado {
+  version: number;
+  vigente_desde: string;
+}
+const legales = ref({
+  aviso_privacidad: "",
+  terminos: "",
+  responsable: { nombre: "", domicilio: "", contacto: "", area: "" },
+});
+const publicados = ref<{
+  aviso_privacidad: Publicado | null;
+  terminos: Publicado | null;
+}>({ aviso_privacidad: null, terminos: null });
+function fechaPublicado(p: Publicado): string {
+  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(
+    new Date(p.vigente_desde),
+  );
+}
 const pasarelas = ref<Pasarela[]>([]);
 const pasarelaDraft = ref<
   Record<
@@ -376,7 +395,20 @@ async function cargarConfiguracion(): Promise<void> {
       encabezados(),
     ),
     cliente.get<{
-      data: { aviso_privacidad: string | null; terminos: string | null };
+      data: {
+        aviso_privacidad: string | null;
+        terminos: string | null;
+        responsable?: {
+          nombre: string;
+          domicilio: string;
+          contacto: string;
+          area: string;
+        };
+        publicados?: {
+          aviso_privacidad: Publicado | null;
+          terminos: Publicado | null;
+        };
+      };
     }>("/api/v1/plataforma/legales", encabezados()),
   ]);
   facturapiConfigurada.value = cfg.data.data.facturapi_configurada;
@@ -384,6 +416,16 @@ async function cargarConfiguracion(): Promise<void> {
   legales.value = {
     aviso_privacidad: leg.data.data.aviso_privacidad ?? "",
     terminos: leg.data.data.terminos ?? "",
+    responsable: {
+      nombre: leg.data.data.responsable?.nombre ?? "",
+      domicilio: leg.data.data.responsable?.domicilio ?? "",
+      contacto: leg.data.data.responsable?.contacto ?? "",
+      area: leg.data.data.responsable?.area ?? "",
+    },
+  };
+  publicados.value = leg.data.data.publicados ?? {
+    aviso_privacidad: null,
+    terminos: null,
   };
   for (const p of pasarelas.value) {
     pasarelaDraft.value[p.proveedor] = {
@@ -414,18 +456,57 @@ async function guardarLlave(): Promise<void> {
   }
 }
 
-async function guardarLegales(): Promise<void> {
+async function guardarLegales(avisar = true): Promise<boolean> {
   guardando.value = "legales";
   try {
+    const r = legales.value.responsable;
     await cliente.put(
       "/api/v1/plataforma/legales",
       {
         aviso_privacidad: legales.value.aviso_privacidad || null,
         terminos: legales.value.terminos || null,
+        responsable: {
+          nombre: r.nombre || null,
+          domicilio: r.domicilio || null,
+          contacto: r.contacto || null,
+          area: r.area || null,
+        },
       },
       encabezados(),
     );
-    toast.exito(t("plataforma.legales.guardado"));
+    if (avisar) {
+      toast.exito(t("operacion.legales.borradorGuardado"));
+    }
+    return true;
+  } catch (err) {
+    toast.error(mensajeDeError(err));
+    return false;
+  } finally {
+    guardando.value = null;
+  }
+}
+
+// Publicar guarda antes el borrador (se publica lo que se ve) y crea la versión.
+async function publicarLegal(
+  tipo: "aviso_privacidad" | "terminos",
+): Promise<void> {
+  if (
+    !(await confirmar(t(`operacion.legales.confirmar.${tipo}`))) ||
+    !(await guardarLegales(false))
+  ) {
+    return;
+  }
+  guardando.value = `publicar-${tipo}`;
+  try {
+    const { data } = await cliente.post<{ data: Publicado }>(
+      `/api/v1/plataforma/legales/${tipo}/publicar`,
+      {},
+      encabezados(),
+    );
+    publicados.value = { ...publicados.value, [tipo]: data.data };
+    toast.exito(
+      t("operacion.legales.publicado", { version: data.data.version }),
+    );
   } catch (err) {
     toast.error(mensajeDeError(err));
   } finally {
@@ -968,19 +1049,68 @@ function borrar(): void {
           </div>
         </div>
 
-        <form class="tu-card p-5 grid gap-4" @submit.prevent="guardarLegales">
+        <form class="tu-card p-5 grid gap-4" @submit.prevent="guardarLegales()">
           <div>
             <h2 class="font-light text-lg">
               {{ $t("plataforma.legales.titulo") }}
             </h2>
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("plataforma.legales.subtitulo") }}
+              {{ $t("operacion.legales.ayuda") }}
             </p>
           </div>
+          <fieldset class="grid gap-3 sm:grid-cols-2">
+            <legend class="tu-label">
+              {{ $t("operacion.legales.responsable") }}
+            </legend>
+            <div>
+              <label class="tu-label" for="lg-resp-nombre">{{
+                $t("operacion.legales.nombre")
+              }}</label>
+              <input
+                id="lg-resp-nombre"
+                v-model="legales.responsable.nombre"
+                class="tu-input"
+              />
+            </div>
+            <div>
+              <label class="tu-label" for="lg-resp-contacto">{{
+                $t("operacion.legales.contacto")
+              }}</label>
+              <input
+                id="lg-resp-contacto"
+                v-model="legales.responsable.contacto"
+                type="email"
+                class="tu-input"
+              />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="tu-label" for="lg-resp-domicilio">{{
+                $t("operacion.legales.domicilio")
+              }}</label>
+              <input
+                id="lg-resp-domicilio"
+                v-model="legales.responsable.domicilio"
+                class="tu-input"
+              />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="tu-label" for="lg-resp-area">{{
+                $t("operacion.legales.area")
+              }}</label>
+              <input
+                id="lg-resp-area"
+                v-model="legales.responsable.area"
+                class="tu-input"
+              />
+            </div>
+          </fieldset>
           <div>
             <label class="tu-label" for="lg-aviso">{{
               $t("plataforma.legales.aviso")
             }}</label>
+            <p class="text-xs mb-1" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("operacion.legales.marcadores") }}
+            </p>
             <textarea
               id="lg-aviso"
               v-model="legales.aviso_privacidad"
@@ -999,13 +1129,49 @@ function borrar(): void {
               rows="6"
             />
           </div>
-          <div>
+          <ul class="text-sm grid gap-1">
+            <li
+              v-for="tipo in ['aviso_privacidad', 'terminos'] as const"
+              :key="tipo"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t(`operacion.legales.nombreDoc.${tipo}`) }}:
+              <template v-if="publicados[tipo]">
+                {{
+                  $t("operacion.legales.version", {
+                    version: publicados[tipo]!.version,
+                    fecha: fechaPublicado(publicados[tipo]!),
+                  })
+                }}
+              </template>
+              <span v-else :style="{ color: 'var(--aviso)' }">{{
+                $t("operacion.legales.sinPublicar")
+              }}</span>
+            </li>
+          </ul>
+          <div class="flex flex-wrap gap-2">
+            <button
+              class="tu-btn tu-btn-fantasma"
+              type="submit"
+              :disabled="guardando !== null"
+            >
+              {{ $t("operacion.legales.guardarBorrador") }}
+            </button>
             <button
               class="tu-btn tu-btn-primario"
-              type="submit"
-              :disabled="guardando === 'legales'"
+              type="button"
+              :disabled="guardando !== null"
+              @click="publicarLegal('aviso_privacidad')"
             >
-              {{ $t("plataforma.legales.guardar") }}
+              {{ $t("operacion.legales.publicarAviso") }}
+            </button>
+            <button
+              class="tu-btn tu-btn-primario"
+              type="button"
+              :disabled="guardando !== null"
+              @click="publicarLegal('terminos')"
+            >
+              {{ $t("operacion.legales.publicarTerminos") }}
             </button>
           </div>
         </form>

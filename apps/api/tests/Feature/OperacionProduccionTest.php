@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Platform\Operacion\LatidoOperacion;
-use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use Illuminate\Support\Facades\Cache;
 
 /*
@@ -56,12 +56,18 @@ it('fuera de producción la verificación dice qué falta y sale con error', fun
         ->assertFailed();
 });
 
-it('reconoce lo que sí está listo y un aviso que aún trae marcadores del borrador', function (): void {
+it('reconoce lo que sí está listo, incluido el aviso publicado con su responsable', function (): void {
     config(['mail.default' => 'smtp', 'turnouno.alertas.correo' => 'ops@agendauno.mx']);
     app(LatidoOperacion::class)->marcar(LatidoOperacion::PROGRAMADOR);
     app(LatidoOperacion::class)->marcar(LatidoOperacion::COLA);
-    ConfiguracionPlataforma::establecer('aviso_privacidad', "Responsable: [NOMBRE COMPLETO O RAZÓN SOCIAL]\nDomicilio: …");
-    ConfiguracionPlataforma::establecer('terminos', 'Términos de uso de AgendaUno.');
+    $legales = app(DocumentosLegales::class);
+    $legales->guardarBorrador([
+        'aviso_privacidad' => 'Aviso de {responsable}.',
+        'terminos' => 'Términos de uso de AgendaUno.',
+        'responsable' => ['nombre' => 'AgendaUno', 'domicilio' => 'CDMX', 'contacto' => 'privacidad@agendauno.mx'],
+    ]);
+    $legales->publicar('aviso_privacidad');
+    $legales->publicar('terminos');
 
     $this->artisan('turnouno:verificar-produccion')
         ->expectsOutputToContain('OK    Proveedor de correo real')
@@ -69,7 +75,7 @@ it('reconoce lo que sí está listo y un aviso que aún trae marcadores del borr
         ->expectsOutputToContain('OK    Programador de tareas latiendo')
         ->expectsOutputToContain('OK    Cola procesando')
         ->expectsOutputToContain('OK    Aviso de privacidad publicado')
-        ->expectsOutputToContain('FALTA Aviso sin marcadores del borrador')
+        ->expectsOutputToContain('OK    Aviso con los datos del responsable')
         ->expectsOutputToContain('OK    Términos y condiciones publicados')
         ->assertFailed();
 });

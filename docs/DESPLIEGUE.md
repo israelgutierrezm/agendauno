@@ -80,7 +80,10 @@ cp web.env.example web.env
    - `docker compose --env-file web.env exec api php artisan turnouno:probar-correo tu@correo.com` llega;
    - `docker compose --env-file web.env logs -f worker scheduler` no muestra errores.
 5. En el superadmin (`/plataforma`, con `PLATFORM_ADMIN_TOKEN`): tarifas del SaaS,
-   parámetros de plataforma y la pasarela con la que cobras la renta.
+   parámetros de plataforma, la pasarela con la que cobras la renta y **los documentos
+   legales**: llena los datos del responsable y publica el aviso de privacidad y los
+   términos. En producción el registro de negocios está cerrado hasta que ambos estén
+   publicados; cada negocio acepta la versión vigente y queda constancia.
 
 ## Actualizar
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Platform\Legales\DocumentoLegal;
+use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\EstadoFacturacion;
@@ -211,27 +213,52 @@ class PlataformaController
     }
 
     /**
-     * Documentos legales de la plataforma (aviso de privacidad y términos) que se
-     * muestran en el registro de negocios. Los edita el superadministrador.
+     * Documentos legales de la plataforma (aviso de privacidad y términos): el
+     * borrador que edita el superadministrador y las versiones publicadas (lo único
+     * que ven los usuarios).
      */
-    public function legales(): JsonResponse
+    public function legales(DocumentosLegales $legales): JsonResponse
     {
+        $publicado = static fn (?DocumentoLegal $d): ?array => $d === null ? null : [
+            'version' => $d->version,
+            'vigente_desde' => $d->vigente_desde->toIso8601String(),
+        ];
+
         return response()->json(['data' => [
-            'aviso_privacidad' => ConfiguracionPlataforma::obtener('aviso_privacidad'),
-            'terminos' => ConfiguracionPlataforma::obtener('terminos'),
+            ...$legales->borrador(),
+            'publicados' => [
+                'aviso_privacidad' => $publicado($legales->vigente(DocumentoLegal::AVISO)),
+                'terminos' => $publicado($legales->vigente(DocumentoLegal::TERMINOS)),
+            ],
         ]]);
     }
 
-    public function guardarLegales(Request $request): JsonResponse
+    /** Guarda el borrador (no cambia lo publicado). */
+    public function guardarLegales(Request $request, DocumentosLegales $legales): JsonResponse
     {
         $validado = $request->validate([
             'aviso_privacidad' => ['nullable', 'string', 'max:50000'],
             'terminos' => ['nullable', 'string', 'max:50000'],
+            'responsable' => ['nullable', 'array'],
+            'responsable.nombre' => ['nullable', 'string', 'max:200'],
+            'responsable.domicilio' => ['nullable', 'string', 'max:400'],
+            'responsable.contacto' => ['nullable', 'email', 'max:200'],
+            'responsable.area' => ['nullable', 'string', 'max:200'],
         ]);
+        $legales->guardarBorrador($validado);
 
-        ConfiguracionPlataforma::establecer('aviso_privacidad', $validado['aviso_privacidad'] ?? null);
-        ConfiguracionPlataforma::establecer('terminos', $validado['terminos'] ?? null);
+        return $this->legales($legales);
+    }
 
-        return $this->legales();
+    /** Publica el borrador de un documento como su versión siguiente. */
+    public function publicarLegal(Request $request, DocumentosLegales $legales): JsonResponse
+    {
+        $documento = $legales->publicar((string) $request->route('tipo'));
+
+        return response()->json(['data' => [
+            'tipo' => $documento->tipo,
+            'version' => $documento->version,
+            'vigente_desde' => $documento->vigente_desde->toIso8601String(),
+        ]], 201);
     }
 }

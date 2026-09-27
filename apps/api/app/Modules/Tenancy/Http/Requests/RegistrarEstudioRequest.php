@@ -54,6 +54,10 @@ class RegistrarEstudioRequest extends FormRequest
             'ciudad' => ['nullable', 'string', 'max:120'],
             'zona_horaria' => ['nullable', 'timezone'],
             'acepta_terminos' => ['accepted'],
+            // Las versiones que la persona leyó (si cambiaron mientras tanto, se le
+            // pide revisarlas de nuevo).
+            'aviso_version' => ['nullable', 'integer', 'min:1'],
+            'terminos_version' => ['nullable', 'integer', 'min:1'],
             // Anti-bots: token de reCAPTCHA v3 (se verifica en el controlador) y un
             // campo trampa (honeypot) que debe llegar vacío; si un bot lo llena, falla.
             'recaptcha_token' => ['nullable', 'string'],

@@ -152,6 +152,8 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/parametros', [PlataformaController::class, 'guardarParametros'])->name('parametros.guardar');
         Route::get('/legales', [PlataformaController::class, 'legales'])->name('legales');
         Route::put('/legales', [PlataformaController::class, 'guardarLegales'])->name('legales.guardar');
+        Route::post('/legales/{tipo}/publicar', [PlataformaController::class, 'publicarLegal'])
+            ->whereIn('tipo', ['aviso_privacidad', 'terminos'])->name('legales.publicar');
         // Pasarelas de la plataforma (para cobrar la renta del SaaS): on/off + llaves test/prod.
         Route::get('/pasarelas', [PlataformaController::class, 'pasarelas'])->name('pasarelas');
         Route::put('/pasarelas/{proveedor}', [PlataformaController::class, 'guardarPasarela'])->name('pasarelas.guardar');

@@ -4,30 +4,35 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
+use App\Modules\Platform\Legales\DocumentoLegal;
+use App\Modules\Platform\Legales\DocumentosLegales;
 use Illuminate\Http\JsonResponse;
-use Throwable;
 
 /**
- * Documentos legales públicos de la plataforma (aviso de privacidad y términos),
- * los que edita el superadministrador y se muestran en el registro de negocios.
- * Sin autenticación (contenido público). Tolera que la tabla aún no exista.
+ * Documentos legales públicos de la plataforma (aviso de privacidad y términos):
+ * solo las versiones PUBLICADAS por el superadministrador, con su número y fecha
+ * (el registro las manda de vuelta al aceptarlas). Sin autenticación. Si aún no se
+ * publican, vienen en null.
  */
 class LegalesPublicoController
 {
-    public function __invoke(): JsonResponse
+    public function __invoke(DocumentosLegales $legales): JsonResponse
     {
-        try {
-            $aviso = ConfiguracionPlataforma::obtener('aviso_privacidad');
-            $terminos = ConfiguracionPlataforma::obtener('terminos');
-        } catch (Throwable) {
-            $aviso = null;
-            $terminos = null;
-        }
+        $aviso = $legales->vigente(DocumentoLegal::AVISO);
+        $terminos = $legales->vigente(DocumentoLegal::TERMINOS);
+        $version = static fn (?DocumentoLegal $d): ?array => $d === null ? null : [
+            'version' => $d->version,
+            'vigente_desde' => $d->vigente_desde->toIso8601String(),
+        ];
 
         return response()->json(['data' => [
-            'aviso_privacidad' => $aviso,
-            'terminos' => $terminos,
+            'aviso_privacidad' => $aviso?->contenido,
+            'terminos' => $terminos?->contenido,
+            'versiones' => [
+                'aviso_privacidad' => $version($aviso),
+                'terminos' => $version($terminos),
+            ],
+            'responsable' => $aviso?->responsable,
         ]]);
     }
 }
