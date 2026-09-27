@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
@@ -32,6 +33,7 @@ class EnviarMensajesTenant
     public function __construct(
         private readonly GestorDeConexionTenant $gestor,
         private readonly EntregarPushTenant $push,
+        private readonly AlertasPlataforma $alertas,
     ) {}
 
     public function ejecutar(): int
@@ -56,6 +58,14 @@ class EnviarMensajesTenant
                 } catch (Throwable $e) {
                     $mensaje->estado = EstadoMensaje::Fallido;
                     $mensaje->ultimo_error = Str::limit($e->getMessage(), 250);
+                    // Agotó sus intentos: ya no se reintenta, el superadmin lo sabe.
+                    if ($mensaje->intentos >= self::MAX_INTENTOS) {
+                        $this->alertas->registrar(
+                            'correo_fallido',
+                            ($this->gestor->actual()->slug ?? '').':'.$mensaje->canal->value,
+                            "Un mensaje ({$mensaje->canal->value}) no salió tras ".self::MAX_INTENTOS.' intentos: '.$mensaje->ultimo_error,
+                        );
+                    }
                 }
 
                 $mensaje->save();

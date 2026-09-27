@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
 use App\Modules\Tenancy\Facturacion\FacturacionFalsa;
@@ -17,6 +18,7 @@ use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -29,6 +31,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Una sola instancia: recuerda qué excepciones ya registró con su tipo.
+        $this->app->singleton(AlertasPlataforma::class);
         // Proveedor de facturación (CFDI): FacturAPI real si hay llave maestra de
         // plataforma; si no, el falso (dev/test y modo no-configurado).
         $this->app->bind(ClienteFacturacion::class, function (): ClienteFacturacion {
@@ -82,6 +86,14 @@ class AppServiceProvider extends ServiceProvider
         // Consumidores del outbox: los eventos de dominio publicados por el relay se
         // entregan a los webhooks salientes del estudio (R40) y generan las
         // comunicaciones (R28) definidas por plantilla.
+        // Un trabajo de la cola que agotó sus intentos: alerta al superadmin.
+        Event::listen(JobFailed::class, function (JobFailed $evento): void {
+            app(AlertasPlataforma::class)->registrarExcepcion(
+                'trabajo_fallido',
+                $evento->job->resolveName(),
+                $evento->exception,
+            );
+        });
         Event::listen(EventoDeDominioTenant::class, EnviarWebhooksSalientes::class);
         Event::listen(EventoDeDominioTenant::class, GenerarComunicaciones::class);
         Event::listen(EventoDeDominioTenant::class, EjecutarAutomatizaciones::class);

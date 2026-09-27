@@ -14,6 +14,9 @@ Artisan::command('inspire', function () {
 // salud, Docker y turnouno:verificar-produccion).
 Schedule::command('turnouno:latido')->everyMinute();
 
+// Resumen de alertas de la plataforma al superadmin (ALERTAS_CORREO), agrupado.
+Schedule::command('turnouno:enviar-alertas')->everyTenMinutes()->withoutOverlapping();
+
 // Reanuda las membresías cuya pausa terminó (antes de renovar ciclos y cobrar).
 Schedule::command('turnouno:reanudar-pausas')->dailyAt('00:05')->withoutOverlapping();
 

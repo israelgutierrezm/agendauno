@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Application\RespaldosEstudio;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
@@ -43,6 +44,7 @@ class RespaldarEstudios extends Command
                 $this->line("{$estudio->slug}: {$ruta}".($borrados > 0 ? " ({$borrados} viejos borrados)" : ''));
             } catch (Throwable $e) {
                 $fallas++;
+                app(AlertasPlataforma::class)->registrarExcepcion('respaldo_fallido', $estudio->slug, $e, $estudio->slug);
                 report($e);
                 $this->error("{$estudio->slug}: {$e->getMessage()}");
             }

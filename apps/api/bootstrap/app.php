@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\CorrelationId;
+use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Http\Middleware\AlcanceLlaveApi;
 use App\Modules\Tenancy\Http\Middleware\AutenticarLlaveApi;
 use App\Modules\Tenancy\Http\Middleware\AutenticarPlataforma;
@@ -70,4 +71,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         // Stable machine-readable JSON error contract for /api/* (see docs/API.md).
         $exceptions->render(new ApiExceptionRenderer);
+        // Todo lo que se reporta también llega al superadmin, agrupado (alertas de
+        // la plataforma); el registro normal en el log sigue igual.
+        $exceptions->report(function (Throwable $e): void {
+            app(AlertasPlataforma::class)->desdeExcepcion($e);
+        });
     })->create();

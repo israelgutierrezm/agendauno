@@ -15,7 +15,7 @@ use App\Modules\Tenancy\Models\WebhookSalienteTenant;
  */
 class ReintentarWebhooksTenant
 {
-    private const MAX_INTENTOS = 6;
+    public const MAX_INTENTOS = 6;
 
     private const LOTE = 500;
 

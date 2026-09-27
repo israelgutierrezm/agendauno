@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Modules\Platform\Operacion\LatidoOperacion;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
@@ -25,7 +26,7 @@ class HealthController
     /** @var list<string> */
     private array $critical = ['database', 'cache'];
 
-    public function __invoke(LatidoOperacion $latido): JsonResponse
+    public function __invoke(Request $request, LatidoOperacion $latido): JsonResponse
     {
         $checks = [
             'database' => $this->probe(function (): bool {
@@ -43,8 +44,11 @@ class HealthController
             'cola' => ['status' => $this->latido($latido, LatidoOperacion::COLA)],
         ];
 
+        // `?estricto=1` (para un monitor externo): también exige que el programador y
+        // la cola estén latiendo; si el programador se detiene no puede avisar solo.
+        $criticos = $request->boolean('estricto') ? [...$this->critical, 'programador', 'cola'] : $this->critical;
         $healthy = collect($checks)
-            ->only($this->critical)
+            ->only($criticos)
             ->every(fn (array $check): bool => $check['status'] === 'ok');
 
         return response()->json([

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Platform\Operacion\AlertasPlataforma;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\DestinoWebhookNoPermitido;
 use App\Modules\Tenancy\Integraciones\ValidarDestinoWebhook;
 use App\Modules\Tenancy\Models\EntregaWebhookTenant;
@@ -26,7 +28,11 @@ class EntregarWebhookTenant
 {
     private const TIMEOUT = 5;
 
-    public function __construct(private readonly ValidarDestinoWebhook $destinos) {}
+    public function __construct(
+        private readonly ValidarDestinoWebhook $destinos,
+        private readonly AlertasPlataforma $alertas,
+        private readonly GestorDeConexionTenant $gestor,
+    ) {}
 
     public function entregar(EntregaWebhookTenant $entrega, WebhookSalienteTenant $endpoint): void
     {
@@ -45,6 +51,7 @@ class EntregarWebhookTenant
             $entrega->http_status = null;
             $entrega->ultimo_error = Str::limit('Destino no permitido: '.$e->getMessage(), 250);
             $entrega->save();
+            $this->alertarSiSeAgoto($entrega, $endpoint);
 
             return;
         }
@@ -83,5 +90,18 @@ class EntregarWebhookTenant
         }
 
         $entrega->save();
+        $this->alertarSiSeAgoto($entrega, $endpoint);
+    }
+
+    /** Agotó sus intentos: ya no se reintenta, el superadmin lo sabe. */
+    private function alertarSiSeAgoto(EntregaWebhookTenant $entrega, WebhookSalienteTenant $endpoint): void
+    {
+        if ($entrega->estado === 'fallido' && $entrega->intentos >= ReintentarWebhooksTenant::MAX_INTENTOS) {
+            $this->alertas->registrar(
+                'webhook_saliente_fallido',
+                ($this->gestor->actual()->slug ?? '').':'.$endpoint->getKey(),
+                "El webhook {$endpoint->url} no respondió tras ".ReintentarWebhooksTenant::MAX_INTENTOS.' intentos: '.$entrega->ultimo_error,
+            );
+        }
     }
 }

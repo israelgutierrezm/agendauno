@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Platform\Operacion\AlertasPlataforma;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
@@ -15,6 +17,18 @@ use App\Modules\Tenancy\Models\Usuario;
  */
 class IncidenciasCobroTenant
 {
+    public function __construct(
+        private readonly AlertasPlataforma $alertas,
+        private readonly GestorDeConexionTenant $gestor,
+    ) {}
+
+    /** Una incidencia nueva de dinero: el superadmin también se entera. */
+    private function alertar(string $tipo, string $detalle): void
+    {
+        $slug = $this->gestor->actual()->slug ?? '';
+        $this->alertas->registrar('incidencia_cobro', "{$slug}:{$tipo}", "{$tipo}: {$detalle}");
+    }
+
     /**
      * Abre (o deja abierta) la incidencia de una devolución.
      *
@@ -33,6 +47,8 @@ class IncidenciasCobroTenant
             return $abierta;
         }
 
+        $this->alertar($tipo, $detalle);
+
         return IncidenciaCobroTenant::query()->create([
             'tipo' => $tipo,
             'estado' => IncidenciaCobroTenant::ABIERTA,
@@ -50,10 +66,15 @@ class IncidenciasCobroTenant
      */
     public function porPago(string $tipo, PagoTenant $pago, string $detalle, array $datos = []): IncidenciaCobroTenant
     {
-        return IncidenciaCobroTenant::query()->firstOrCreate(
+        $incidencia = IncidenciaCobroTenant::query()->firstOrCreate(
             ['tipo' => $tipo, 'pago_id' => $pago->getKey(), 'estado' => IncidenciaCobroTenant::ABIERTA],
             ['orden_id' => $pago->orden_id, 'detalle' => $detalle, 'datos' => $datos],
         );
+        if ($incidencia->wasRecentlyCreated) {
+            $this->alertar($tipo, $detalle);
+        }
+
+        return $incidencia;
     }
 
     /**
