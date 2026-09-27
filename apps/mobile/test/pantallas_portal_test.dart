@@ -281,9 +281,23 @@ void main() {
       ),
       proximasMisClasesProvider.overrideWith((ref) async => sesiones),
       misClasesProvider.overrideWith((ref) async => sesiones),
+      climaEquipoProvider.overrideWith(
+        (ref) async => const ClimaMiembro(
+          tipo: 'pronostico',
+          lugar: 'Roma Norte',
+          aproximado: false,
+          temperatura: 21,
+          condicion: 'Parcialmente nublado',
+          icono: 'parcial',
+          esDeDia: true,
+        ),
+      ),
     ]);
 
-    expect(find.text('Tu próxima clase'), findsOneWidget);
+    // El mismo estilo del Inicio del alumno: saludo, tarjeta grande y clima.
+    expect(find.text('¡Hola, Mariana!'), findsOneWidget);
+    expect(find.text('TU PRÓXIMA CLASE'), findsOneWidget);
+    expect(find.text('Pronóstico para tu clase en Roma Norte'), findsOneWidget);
     expect(find.text('Pole Nivel 1'), findsOneWidget);
     expect(
       find.text('6 de 10 lugares ocupados · 2 en lista de espera'),
@@ -292,7 +306,9 @@ void main() {
     expect(find.text('Pasar lista'), findsOneWidget);
     expect(find.text('2 clases'), findsOneWidget); // próximos 7 días
 
-    // "Mi calendario" abre Mis clases en el mes.
+    // "Mi calendario" abre Mis clases en el mes (el acceso está bajo la tarjeta).
+    await tester.ensureVisible(find.text('Mi calendario'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Mi calendario'));
     await tester.pumpAndSettle();
     expect(find.text('Mis clases'), findsWidgets);

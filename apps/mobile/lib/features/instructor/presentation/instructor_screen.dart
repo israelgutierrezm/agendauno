@@ -13,6 +13,7 @@ import '../../agenda/presentation/pase_lista_screen.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../../cuenta/presentation/cuenta_widgets.dart';
+import '../../cuenta/presentation/tarjeta_principal.dart';
 import '../../perfil/presentation/perfil_screen.dart';
 import '../application/mis_clases_controller.dart';
 
@@ -140,6 +141,12 @@ class _Inicio extends ConsumerWidget {
     final clase = terminos.sesion.toLowerCase();
     final clases = terminos.sesiones.toLowerCase();
     final estado = ref.watch(proximasMisClasesProvider);
+    final clima = ref.watch(climaEquipoProvider).value;
+    final nombre = (sesion?.nombrePila ?? sesion?.nombre ?? '')
+        .trim()
+        .split(RegExp(r'\s+'))
+        .first;
+    final estudio = sesion?.estudioNombre;
 
     return estado.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -168,36 +175,65 @@ class _Inicio extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        enCurso
-                            ? 'En curso'
-                            : proxima == null
-                            ? 'Lo próximo en tu agenda'
-                            : (proxima.esCita
-                                  ? 'Tu próxima cita'
-                                  : 'Tu próxima $clase'),
-                        style: TextStyle(
-                          color: enCurso
-                              ? TemaAgendaUno.acento
-                              : TemaAgendaUno.textoSuave,
-                          fontWeight: enCurso ? FontWeight.w700 : null,
-                        ),
-                      ),
-                      if (proxima == null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            'No tienes $clases asignadas en los próximos días.',
+              Text(
+                nombre.isEmpty ? '¡Hola!' : '¡Hola, $nombre!',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                estudio == null || estudio.isEmpty
+                    ? 'Aquí tienes tus $clases.'
+                    : 'Aquí tienes tus $clases y citas en $estudio.',
+                style: const TextStyle(color: TemaAgendaUno.textoSuave),
+              ),
+              const SizedBox(height: 16),
+              // La tarjeta principal: siempre, con o sin algo agendado.
+              TarjetaPrincipal(
+                etiqueta: enCurso
+                    ? 'En curso'
+                    : proxima == null
+                    ? 'Lo próximo en tu agenda'
+                    : (proxima.esCita
+                          ? 'Tu próxima cita'
+                          : 'Tu próxima $clase'),
+                foto: fotoNegocio(sesion?.perfil),
+                clima: clima,
+                dondeClima:
+                    clima?.dondeTexto(
+                      proxima?.esCita == true ? 'cita' : clase,
+                    ) ??
+                    '',
+                contenido: proxima == null
+                    ? [
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Nada agendado por ahora',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
                           ),
-                        )
-                      else ...[
+                        ),
                         const SizedBox(height: 4),
+                        Text(
+                          'No tienes $clases asignadas en los próximos días.',
+                          style: const TextStyle(
+                            color: TemaAgendaUno.textoSuave,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        FilledButton(
+                          onPressed: () => onIr(
+                            PestanaInstructor.clases,
+                            vista: VistaCal.lista,
+                          ),
+                          child: const Text('Mi calendario'),
+                        ),
+                      ]
+                    : [
+                        const SizedBox(height: 6),
                         Text(
                           proxima.oferta ?? '—',
                           style: const TextStyle(
@@ -205,7 +241,7 @@ class _Inicio extends ConsumerWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 4),
                         Text(
                           [
                             Formato.fechaHora(
@@ -224,7 +260,7 @@ class _Inicio extends ConsumerWidget {
                                   : TemaAgendaUno.textoSuave,
                             ),
                           ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 14),
                         Wrap(
                           spacing: 8,
                           runSpacing: 4,
@@ -245,15 +281,13 @@ class _Inicio extends ConsumerWidget {
                           ],
                         ),
                       ],
-                    ],
-                  ),
-                ),
               ),
               const SizedBox(height: 12),
               RejillaAccesos([
                 TarjetaAcceso(
                   icono: Icons.today_outlined,
                   titulo: 'Hoy',
+                  tono: TonosAcceso.reservar,
                   valor: cuantas(deHoy.length),
                   onTap: () =>
                       onIr(PestanaInstructor.clases, vista: VistaCal.dia),
@@ -261,6 +295,7 @@ class _Inicio extends ConsumerWidget {
                 TarjetaAcceso(
                   icono: Icons.groups_outlined,
                   titulo: terminos.miembros,
+                  tono: TonosAcceso.creditos,
                   valor: esperados == 0
                       ? 'Nadie esperado hoy'
                       : (esperados == 1
@@ -272,6 +307,7 @@ class _Inicio extends ConsumerWidget {
                 TarjetaAcceso(
                   icono: Icons.view_list_outlined,
                   titulo: 'Próximos 7 días',
+                  tono: TonosAcceso.reservas,
                   valor: cuantas(sesiones.length),
                   onTap: () =>
                       onIr(PestanaInstructor.clases, vista: VistaCal.lista),
@@ -279,6 +315,7 @@ class _Inicio extends ConsumerWidget {
                 TarjetaAcceso(
                   icono: Icons.calendar_month_outlined,
                   titulo: 'Mi calendario',
+                  tono: TonosAcceso.pase,
                   valor: 'Lista, día, semana y mes',
                   onTap: () =>
                       onIr(PestanaInstructor.clases, vista: VistaCal.mes),
@@ -286,12 +323,14 @@ class _Inicio extends ConsumerWidget {
                 TarjetaAcceso(
                   icono: Icons.schedule_outlined,
                   titulo: 'Agenda',
+                  tono: TonosAcceso.pagos,
                   valor: 'Tu día con horarios y pase de lista',
                   onTap: () => onIr(PestanaInstructor.agenda),
                 ),
                 TarjetaAcceso(
                   icono: Icons.person_outline,
                   titulo: 'Mi perfil',
+                  tono: TonosAcceso.expediente,
                   valor: 'Foto, contraseña y calendario del teléfono',
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(

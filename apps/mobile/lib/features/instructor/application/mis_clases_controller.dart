@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/calendario/calendario.dart';
 import '../../agenda/data/agenda_models.dart';
 import '../../agenda/data/agenda_repository.dart';
+import '../../cuenta/data/cuenta_models.dart';
 
 /// Rango de fechas que se ve en "Mis clases" (lo fija el calendario al moverse).
 class RangoMisClases extends Notifier<({DateTime desde, DateTime hasta})> {
@@ -49,6 +50,16 @@ final proximasMisClasesProvider =
       final sesiones = await repo.sesiones(hoy, Calendario.mas(hoy, 6));
       return sesiones.where((s) => s.programada).toList();
     });
+
+/// El clima de su Inicio (el de su próxima clase o cita en su sede); se vuelve a
+/// pedir con sus clases.
+final climaEquipoProvider = FutureProvider.autoDispose<ClimaMiembro?>((
+  ref,
+) async {
+  await ref.watch(proximasMisClasesProvider.future);
+  final repo = ref.watch(agendaRepositoryProvider);
+  return repo?.clima();
+});
 
 /// Cupo de una clase ("6/10") o, en una cita, con quién.
 String cupoDe(SesionAgenda s) {

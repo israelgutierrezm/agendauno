@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../auth/application/sesion_controller.dart';
+import '../../cuenta/data/cuenta_models.dart';
 import 'agenda_models.dart';
 
 /// Agenda del staff (`/app/{slug}/…`): sesiones del día, profesionales y las
@@ -34,6 +35,18 @@ class AgendaRepository {
         .where((s) => ymd(s.iniciaEn).compareTo(a) >= 0 && ymd(s.iniciaEn).compareTo(b) <= 0)
         .toList()
       ..sort((x, y) => x.iniciaEn.compareTo(y.iniciaEn));
+  }
+
+  /// El clima del Inicio del equipo (GET /clima): el de su próxima clase o cita en
+  /// su sede, o el de ahora en el negocio. Null si falla o no se sabe.
+  Future<ClimaMiembro?> clima() async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('$_base/clima');
+      final data = res.data?['data'];
+      return data is Map<String, dynamic> ? ClimaMiembro.desdeJson(data) : null;
+    } on DioException {
+      return null;
+    }
   }
 
   Future<List<Profesional>> profesionales() async {

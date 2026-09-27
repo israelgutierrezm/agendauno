@@ -245,13 +245,3 @@ class InicioTab extends ConsumerWidget {
     return n == 1 ? '1 crédito' : '$n créditos';
   }
 }
-
-/// Un color por acceso del Inicio: los tonos medios de la agenda de la web.
-abstract final class TonosAcceso {
-  static const reservar = Color(0xFF0070FF);
-  static const reservas = Color(0xFF9673DE);
-  static const creditos = Color(0xFF12A68B);
-  static const pagos = Color(0xFFE07A2E);
-  static const pase = Color(0xFF1C9BC7);
-  static const expediente = Color(0xFFD6457F);
-}
