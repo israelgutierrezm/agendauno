@@ -9,6 +9,7 @@ import NavArbol from "@/components/NavArbol.vue";
 import AppToaster from "@/components/AppToaster.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import type { MenuItem, NavEstado } from "@/components/nav";
+import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
 import { esVisible, hojas, MENU, TITULOS_FUERA_DEL_MENU } from "@/lib/menu";
 import { plural } from "@/lib/terminologia";
 import { slugDeContexto } from "@/lib/tenant";
@@ -158,7 +159,6 @@ function siglas(nombre: string | undefined): string {
       .toUpperCase() || "·"
   );
 }
-const inicialesEstudio = computed(() => siglas(sesion.estudio?.nombre));
 const inicialesUsuario = computed(() => siglas(sesion.usuario?.nombre));
 
 // Estado de la interfaz.
@@ -231,16 +231,13 @@ onMounted(() => {
           :alt="sesion.estudio?.nombre"
           class="h-9 w-9 rounded-xl object-cover shrink-0"
         />
-        <span
+        <!-- Sin logo propio: el isotipo de AgendaUno. -->
+        <img
           v-else
-          class="h-9 w-9 rounded-xl inline-flex items-center justify-center text-sm font-semibold shrink-0"
-          :style="{
-            background: 'var(--barra-activo)',
-            color: 'var(--barra-activo-texto)',
-          }"
-          aria-hidden="true"
-          >{{ inicialesEstudio }}</span
-        >
+          :src="ISOTIPO_AGENDAUNO"
+          alt=""
+          class="h-9 w-9 object-contain shrink-0"
+        />
         <span v-show="!compactoEfectivo" class="min-w-0">
           <span
             class="block text-sm font-semibold truncate"

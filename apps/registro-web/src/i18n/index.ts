@@ -63,6 +63,7 @@ import {
   terminologiaNegocio,
   validacion,
 } from "./locales/gestion.es-MX";
+import asistente from "./locales/asistente.es-MX";
 import planes from "./locales/planes.es-MX";
 import portal from "./locales/portal.es-MX";
 import recepcionVisual from "./locales/recepcionVisual.es-MX";
@@ -125,6 +126,7 @@ const mensajesBase = {
   nuevaClase,
   portal,
   planes,
+  asistente,
 };
 
 export const i18n = createI18n({

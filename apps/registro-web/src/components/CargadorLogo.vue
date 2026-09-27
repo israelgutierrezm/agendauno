@@ -104,11 +104,11 @@ async function quitar(): Promise<void> {
 <template>
   <div>
     <div
-      class="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-8 text-center transition"
+      class="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-8 text-center transition"
       :class="{ 'cursor-pointer': habilitado }"
       :style="{
         borderColor: arrastrando ? 'var(--primario)' : 'var(--borde)',
-        background: arrastrando ? 'var(--primario-suave)' : 'var(--superficie)',
+        background: arrastrando ? 'var(--primario-suave)' : 'var(--fondo)',
         opacity: puedeGestionar ? 1 : 0.6,
       }"
       role="button"
@@ -129,42 +129,36 @@ async function quitar(): Promise<void> {
         class="h-20 w-20 rounded-2xl object-cover"
         :style="{ boxShadow: 'var(--sombra)' }"
       />
-      <span
-        v-else
-        class="inline-flex h-12 w-12 items-center justify-center rounded-xl"
-        :style="{
-          background: 'var(--primario-suave)',
-          color: 'var(--primario-fuerte)',
-        }"
-        aria-hidden="true"
-      >
+      <span v-else class="cl-icono" aria-hidden="true">
         <svg
-          width="24"
-          height="24"
+          width="30"
+          height="30"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          stroke-width="1.8"
+          stroke-width="1.6"
           stroke-linecap="round"
           stroke-linejoin="round"
         >
-          <path d="M12 16V4" />
-          <path d="M7 9l5-5 5 5" />
-          <path
-            d="M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16"
-          />
+          <rect x="3.5" y="3.5" width="17" height="17" rx="2.5" />
+          <circle cx="9" cy="9" r="1.75" />
+          <path d="M20.5 15.5 15.5 10.5 5 20.5" />
         </svg>
       </span>
 
       <p class="text-sm font-medium">
-        {{
-          subiendo
-            ? $t("configuracion.logoSubiendo")
-            : $t("configuracion.logoArrastra")
-        }}
+        <template v-if="subiendo">{{
+          $t("configuracion.logoSubiendo")
+        }}</template>
+        <template v-else>
+          {{ $t("asistente.logo.arrastra") }}
+          <span :style="{ color: 'var(--primario)' }">{{
+            $t("asistente.logo.selecciona")
+          }}</span>
+        </template>
       </p>
       <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("configuracion.logoAyuda") }}
+        {{ $t("asistente.logo.ayuda") }}
       </p>
 
       <input
@@ -202,3 +196,16 @@ async function quitar(): Promise<void> {
     </p>
   </div>
 </template>
+
+<style scoped>
+.cl-icono {
+  display: inline-flex;
+  height: 4rem;
+  width: 4rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--primario-suave);
+  color: var(--primario-fuerte);
+}
+</style>

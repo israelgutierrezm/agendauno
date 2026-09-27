@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { RouterLink, useRouter } from "vue-router";
 
 import CargadorLogo from "@/components/CargadorLogo.vue";
@@ -8,8 +9,26 @@ import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
+/**
+ * Asistente de configuración: pasos numerados en horizontal, el avance arriba y un
+ * pie común (omitir, anterior, guardar y continuar). Cada paso guarda lo suyo.
+ */
+const { t } = useI18n();
 const router = useRouter();
 const sesion = useSesionTenantStore();
+
+// Ícono de cada paso (el de la tarjeta).
+const ICONOS: Record<string, string> = {
+  marca: "mi-cuenta",
+  sucursal: "ubicacion",
+  actividades: "agenda",
+  horarios: "reloj",
+  productos: "etiqueta",
+  politicas: "documentos",
+  pasarela: "pasarelas",
+  personal: "instructores",
+  publicacion: "contenido",
+};
 
 const ZONAS = [
   "America/Mexico_City",
@@ -250,6 +269,101 @@ function irAgenda(): void {
   void router.push({ name: sesion.esCitas ? "horarios" : "agenda" });
 }
 
+// Avance: lo completado del total de pasos.
+const porcentaje = computed(() =>
+  pasos.value.length === 0
+    ? 0
+    : Math.round((completados.value.size / pasos.value.length) * 100),
+);
+
+/**
+ * Botón principal del pie según el paso: guarda lo capturado y avanza; en pasos
+ * sin captura (o ya resueltos), solo continúa.
+ */
+const accion = computed<{
+  texto: string;
+  deshabilitado: boolean;
+  ejecutar: () => void;
+}>(() => {
+  const g = guardando.value;
+  const guardarYContinuar = t("onboarding.siguiente");
+  switch (pasoActual.value) {
+    case "marca":
+      return {
+        texto: guardarYContinuar,
+        deshabilitado: g,
+        ejecutar: () => void guardarMarca(),
+      };
+    case "sucursal":
+      return completados.value.has("sucursal")
+        ? {
+            texto: t("asistente.continuar"),
+            deshabilitado: g,
+            ejecutar: avanzar,
+          }
+        : {
+            texto: guardarYContinuar,
+            deshabilitado: g || suc.value.nombre.trim() === "",
+            ejecutar: () => void crearSucursal(),
+          };
+    case "actividades":
+      return {
+        texto: guardarYContinuar,
+        deshabilitado:
+          g ||
+          act.value.programa.trim() === "" ||
+          act.value.actividad.trim() === "" ||
+          act.value.oferta.trim() === "",
+        ejecutar: () => void crearActividad(),
+      };
+    case "productos":
+      return {
+        texto: guardarYContinuar,
+        deshabilitado: g || prod.value.nombre.trim() === "",
+        ejecutar: () => void crearProducto(),
+      };
+    case "personal":
+      return {
+        texto: t("asistente.invitarYContinuar"),
+        deshabilitado:
+          g || per.value.nombre.trim() === "" || per.value.email.trim() === "",
+        ejecutar: () => void invitarPersonal(),
+      };
+    case "publicacion":
+      return {
+        texto: t("asistente.guardar"),
+        deshabilitado: g,
+        ejecutar: () => void publicar(),
+      };
+    case "horarios":
+      return {
+        texto: configReal.value.horarios
+          ? t("asistente.continuar")
+          : t("onboarding.horarios.yaListo"),
+        deshabilitado: g,
+        ejecutar: continuarSimple,
+      };
+    case "politicas":
+      return configReal.value.politicas
+        ? {
+            texto: t("asistente.continuar"),
+            deshabilitado: g,
+            ejecutar: continuarSimple,
+          }
+        : {
+            texto: guardarYContinuar,
+            deshabilitado: g,
+            ejecutar: () => void guardarPolitica(),
+          };
+    default:
+      return {
+        texto: t("asistente.continuar"),
+        deshabilitado: g,
+        ejecutar: continuarSimple,
+      };
+  }
+});
+
 const mensajeTexto = computed(() => {
   if (mensaje.value === null) {
     return null;
@@ -262,82 +376,118 @@ onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 py-10">
-    <h1 class="text-xl font-semibold">{{ $t("onboarding.titulo") }}</h1>
-    <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t("onboarding.subtitulo") }}
-    </p>
+  <section class="mx-auto max-w-6xl px-4 py-8 sm:py-10">
+    <!-- Encabezado y avance -->
+    <div class="flex flex-wrap items-end justify-between gap-6">
+      <div class="min-w-0">
+        <h1 class="text-2xl font-semibold sm:text-3xl">
+          {{ $t("onboarding.titulo") }}
+        </h1>
+        <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("onboarding.subtitulo") }}
+        </p>
+      </div>
+      <div v-if="!cargando" class="ob-avance">
+        <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("asistente.paso", { n: indice + 1, total: pasos.length }) }}
+        </p>
+        <div class="mt-2 flex items-center gap-3">
+          <div
+            class="ob-barra"
+            role="progressbar"
+            :aria-valuenow="porcentaje"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <span :style="{ width: `${porcentaje}%` }" />
+          </div>
+          <span
+            class="text-sm tabular-nums"
+            :style="{ color: 'var(--texto-suave)' }"
+            >{{ porcentaje }}%</span
+          >
+        </div>
+      </div>
+    </div>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
 
-    <div v-else class="mt-6 grid gap-6 md:grid-cols-[220px_1fr]">
-      <!-- Stepper -->
-      <ol class="tu-card p-3 h-max text-sm">
-        <li v-for="(p, i) in pasos" :key="p">
+    <template v-else>
+      <!-- Pasos numerados -->
+      <ol class="ob-pasos" :aria-label="$t('onboarding.titulo')">
+        <li
+          v-for="(p, i) in pasos"
+          :key="p"
+          class="ob-paso"
+          :class="{
+            'ob-actual': i === indice,
+            'ob-hecho': completados.has(p) && i !== indice,
+          }"
+        >
           <button
             type="button"
-            class="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left"
-            :style="{
-              background:
-                i === indice ? 'var(--primario-suave)' : 'transparent',
-              color: i === indice ? 'var(--primario-fuerte)' : 'var(--texto)',
-            }"
+            class="ob-paso-boton"
+            :aria-current="i === indice ? 'step' : undefined"
             @click="irA(i)"
           >
-            <span
-              class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs"
-              :style="{
-                background: completados.has(p)
-                  ? 'var(--exito)'
-                  : 'var(--superficie-2)',
-                color: completados.has(p) ? '#fff' : 'var(--texto-suave)',
-              }"
-              ><IconoNav
-                v-if="completados.has(p)"
+            <span class="ob-circulo">
+              <IconoNav
+                v-if="completados.has(p) && i !== indice"
                 nombre="hecho"
-                :tam="12"
-              /><template v-else>{{ i + 1 }}</template></span
-            >
-            <span>{{ $t(`onboarding.pasos.${p}`) }}</span>
+                :tam="16"
+              />
+              <template v-else>{{ i + 1 }}</template>
+            </span>
+            <span class="ob-etiqueta">{{ $t(`onboarding.pasos.${p}`) }}</span>
           </button>
         </li>
       </ol>
 
-      <!-- Contenido del paso -->
-      <div class="tu-card p-6">
-        <div
-          v-if="completo"
-          class="mb-5 rounded-lg p-3 text-sm flex items-center justify-between gap-3"
-          :style="{ background: 'var(--exito-suave)', color: 'var(--exito)' }"
+      <div
+        v-if="completo"
+        class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl p-4 text-sm"
+        :style="{ background: 'var(--exito-suave)', color: 'var(--exito)' }"
+      >
+        <span>{{ $t("onboarding.completo") }}</span>
+        <button
+          class="tu-btn tu-btn-primario"
+          @click="router.push({ name: 'panel' })"
         >
-          <span>{{ $t("onboarding.completo") }}</span>
-          <button
-            class="tu-btn tu-btn-primario"
-            @click="router.push({ name: 'panel' })"
-          >
-            {{ $t("onboarding.irPanel") }}
-          </button>
-        </div>
+          {{ $t("onboarding.irPanel") }}
+        </button>
+      </div>
 
-        <div class="flex items-center justify-between gap-2">
-          <h2 class="text-xl font-light">
-            {{ $t(`onboarding.pasos.${pasoActual}`) }}
-          </h2>
-          <span
-            v-if="completados.has(pasoActual)"
-            class="tu-badge tu-badge-exito"
-            >{{ $t("onboarding.hecho") }}</span
-          >
-        </div>
-        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t(`onboarding.${pasoActual}.desc`) }}
-        </p>
+      <!-- Paso actual -->
+      <article class="tu-card mt-6 p-5 sm:p-8">
+        <header class="flex items-start gap-4">
+          <span class="ob-icono" aria-hidden="true">
+            <IconoNav
+              :nombre="ICONOS[pasoActual] ?? 'configuracion'"
+              :tam="28"
+            />
+          </span>
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="text-xl font-semibold sm:text-2xl">
+                {{ $t(`onboarding.pasos.${pasoActual}`) }}
+              </h2>
+              <span
+                v-if="completados.has(pasoActual)"
+                class="tu-badge tu-badge-exito"
+                >{{ $t("onboarding.hecho") }}</span
+              >
+            </div>
+            <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t(`onboarding.${pasoActual}.desc`) }}
+            </p>
+          </div>
+        </header>
 
         <p
           v-if="mensajeTexto"
-          class="mt-4 rounded-lg p-2.5 text-sm"
+          class="mt-5 rounded-lg p-2.5 text-sm"
           :style="{ background: 'var(--exito-suave)', color: 'var(--exito)' }"
         >
           {{
@@ -346,15 +496,20 @@ onMounted(cargar);
             })
           }}
         </p>
-        <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
+        <p v-if="error" class="mt-5 text-sm" style="color: var(--error)">
           {{ error }}
         </p>
 
-        <div class="mt-5 space-y-4">
+        <div class="mt-6 space-y-4">
           <!-- marca -->
           <template v-if="pasoActual === 'marca'">
             <div>
-              <span class="tu-label">{{ $t("onboarding.marca.logo") }}</span>
+              <p class="tu-label">
+                {{ $t("asistente.logo.etiqueta") }}
+                <span :style="{ color: 'var(--texto-suave)' }">{{
+                  $t("asistente.logo.opcional")
+                }}</span>
+              </p>
               <div class="mt-1">
                 <CargadorLogo
                   :logo-url="logoUrl"
@@ -362,13 +517,6 @@ onMounted(cargar);
                 />
               </div>
             </div>
-            <button
-              class="tu-btn tu-btn-primario"
-              :disabled="guardando"
-              @click="guardarMarca"
-            >
-              {{ $t("onboarding.siguiente") }}
-            </button>
           </template>
 
           <!-- sucursal -->
@@ -378,19 +526,14 @@ onMounted(cargar);
               <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
                 {{ $t("onboarding.sucursal.yaTienes") }}
               </p>
-              <div class="flex flex-wrap gap-2">
-                <RouterLink
-                  :to="{ name: 'sedes' }"
-                  class="tu-btn tu-btn-fantasma"
-                >
-                  {{ $t("onboarding.sucursal.gestionar") }}
-                </RouterLink>
-                <button class="tu-btn tu-btn-primario" @click="avanzar">
-                  {{ $t("onboarding.siguiente") }}
-                </button>
-              </div>
+              <RouterLink
+                :to="{ name: 'sedes' }"
+                class="tu-btn tu-btn-fantasma inline-flex"
+              >
+                {{ $t("onboarding.sucursal.gestionar") }}
+              </RouterLink>
             </template>
-            <template v-else>
+            <div v-else class="grid gap-3 sm:grid-cols-2">
               <div>
                 <label class="tu-label" for="sn">{{
                   $t("onboarding.sucursal.nombre")
@@ -412,19 +555,12 @@ onMounted(cargar);
                   </option>
                 </select>
               </div>
-              <button
-                class="tu-btn tu-btn-primario"
-                :disabled="guardando || suc.nombre.trim() === ''"
-                @click="crearSucursal"
-              >
-                {{ $t("onboarding.sucursal.crear") }}
-              </button>
-            </template>
+            </div>
           </template>
 
           <!-- actividades -->
           <template v-else-if="pasoActual === 'actividades'">
-            <div class="grid sm:grid-cols-2 gap-3">
+            <div class="grid gap-3 sm:grid-cols-2">
               <div>
                 <label class="tu-label" for="ap">{{
                   $t("onboarding.actividades.programa")
@@ -487,23 +623,11 @@ onMounted(cargar);
                 />
               </div>
             </div>
-            <button
-              class="tu-btn tu-btn-primario"
-              :disabled="
-                guardando ||
-                act.programa.trim() === '' ||
-                act.actividad.trim() === '' ||
-                act.oferta.trim() === ''
-              "
-              @click="crearActividad"
-            >
-              {{ $t("onboarding.actividades.crear") }}
-            </button>
           </template>
 
           <!-- productos -->
           <template v-else-if="pasoActual === 'productos'">
-            <div class="grid sm:grid-cols-2 gap-3">
+            <div class="grid gap-3 sm:grid-cols-2">
               <div>
                 <label class="tu-label" for="pn">{{
                   $t("onboarding.productos.nombre")
@@ -560,18 +684,11 @@ onMounted(cargar);
                 </p>
               </div>
             </div>
-            <button
-              class="tu-btn tu-btn-primario"
-              :disabled="guardando || prod.nombre.trim() === ''"
-              @click="crearProducto"
-            >
-              {{ $t("onboarding.productos.crear") }}
-            </button>
           </template>
 
           <!-- personal -->
           <template v-else-if="pasoActual === 'personal'">
-            <div class="grid sm:grid-cols-3 gap-3">
+            <div class="grid gap-3 sm:grid-cols-3">
               <div>
                 <label class="tu-label" for="pen">{{
                   $t("onboarding.personal.nombre")
@@ -621,15 +738,6 @@ onMounted(cargar);
               <p class="mt-1">{{ $t("onboarding.personal.tokenDev") }}</p>
               <code>{{ invitacion.token }}</code>
             </div>
-            <button
-              class="tu-btn tu-btn-primario"
-              :disabled="
-                guardando || per.nombre.trim() === '' || per.email.trim() === ''
-              "
-              @click="invitarPersonal"
-            >
-              {{ $t("onboarding.personal.invitar") }}
-            </button>
           </template>
 
           <!-- publicacion -->
@@ -642,18 +750,11 @@ onMounted(cargar);
               <input v-model="pub.privado" type="checkbox" />
               <span>{{ $t("onboarding.publicacion.privado") }}</span>
             </label>
-            <button
-              class="tu-btn tu-btn-primario"
-              :disabled="guardando"
-              @click="publicar"
-            >
-              {{ $t("onboarding.publicacion.guardar") }}
-            </button>
           </template>
 
           <!-- horarios (guiado: crear en la Agenda; sin callejón) -->
           <template v-else-if="pasoActual === 'horarios'">
-            <div
+            <p
               v-if="configReal.horarios"
               class="rounded-lg p-3 text-sm"
               :style="{
@@ -662,17 +763,16 @@ onMounted(cargar);
               }"
             >
               {{ $t("onboarding.horarios.listo") }}
-            </div>
-            <p v-else class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{
-                sesion.esCitas
-                  ? $t("agendaVisual.onboarding.horariosAyuda")
-                  : $t("onboarding.horarios.ayuda")
-              }}
             </p>
-            <div class="flex flex-wrap gap-2">
+            <template v-else>
+              <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+                {{
+                  sesion.esCitas
+                    ? $t("agendaVisual.onboarding.horariosAyuda")
+                    : $t("onboarding.horarios.ayuda")
+                }}
+              </p>
               <button
-                v-if="!configReal.horarios"
                 class="tu-btn tu-btn-fantasma"
                 type="button"
                 @click="irAgenda"
@@ -683,23 +783,12 @@ onMounted(cargar);
                     : $t("onboarding.horarios.abrirAgenda")
                 }}
               </button>
-              <button
-                class="tu-btn tu-btn-primario"
-                :disabled="guardando"
-                @click="continuarSimple"
-              >
-                {{
-                  configReal.horarios
-                    ? $t("onboarding.siguiente")
-                    : $t("onboarding.horarios.yaListo")
-                }}
-              </button>
-            </div>
+            </template>
           </template>
 
           <!-- politicas (config minima inline; sin callejón) -->
           <template v-else-if="pasoActual === 'politicas'">
-            <div
+            <p
               v-if="configReal.politicas"
               class="rounded-lg p-3 text-sm"
               :style="{
@@ -708,7 +797,7 @@ onMounted(cargar);
               }"
             >
               {{ $t("onboarding.politicas.listo") }}
-            </div>
+            </p>
             <template v-else>
               <div>
                 <label class="tu-label" for="poh">{{
@@ -738,54 +827,152 @@ onMounted(cargar);
                 <span>{{ $t("onboarding.politicas.penalizaNoShow") }}</span>
               </label>
             </template>
-            <button
-              class="tu-btn tu-btn-primario"
-              :disabled="guardando"
-              @click="
-                configReal.politicas ? continuarSimple() : guardarPolitica()
-              "
-            >
-              {{
-                configReal.politicas
-                  ? $t("onboarding.siguiente")
-                  : $t("onboarding.politicas.guardar")
-              }}
-            </button>
-          </template>
-
-          <!-- pasos informativos (pasarela) -->
-          <template v-else>
-            <button
-              class="tu-btn tu-btn-primario"
-              :disabled="guardando"
-              @click="continuarSimple"
-            >
-              {{ $t("onboarding.siguiente") }}
-            </button>
           </template>
         </div>
 
-        <!-- Navegacion -->
-        <div
-          class="mt-6 flex items-center justify-between border-t pt-4"
-          :style="{ borderColor: 'var(--borde)' }"
-        >
-          <button
-            class="tu-btn tu-btn-fantasma"
-            :disabled="indice === 0"
-            @click="retroceder"
-          >
-            {{ $t("onboarding.anterior") }}
-          </button>
+        <!-- Pie: omitir · anterior · guardar y continuar -->
+        <footer class="ob-pie">
           <button
             v-if="indice < pasos.length - 1"
+            type="button"
             class="tu-enlace text-sm"
             @click="avanzar"
           >
             {{ $t("onboarding.omitir") }}
           </button>
-        </div>
-      </div>
-    </div>
+          <span v-else />
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma"
+              :disabled="indice === 0"
+              @click="retroceder"
+            >
+              {{ $t("onboarding.anterior") }}
+            </button>
+            <button
+              type="button"
+              class="tu-btn tu-btn-primario"
+              :disabled="accion.deshabilitado"
+              @click="accion.ejecutar"
+            >
+              {{ accion.texto }}
+              <span aria-hidden="true">→</span>
+            </button>
+          </div>
+        </footer>
+      </article>
+    </template>
   </section>
 </template>
+
+<style scoped>
+.ob-avance {
+  width: min(100%, 26rem);
+}
+.ob-barra {
+  flex: 1;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--superficie-2);
+  overflow: hidden;
+}
+.ob-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primario);
+  transition: width 0.3s ease;
+}
+
+/* Pasos: círculos numerados unidos por una línea; en el teléfono se desplazan. */
+.ob-pasos {
+  display: flex;
+  margin-top: 2rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+.ob-paso {
+  position: relative;
+  flex: 1 0 5.5rem;
+}
+.ob-paso + .ob-paso::before {
+  content: "";
+  position: absolute;
+  top: 1.25rem;
+  right: calc(50% + 1.5rem);
+  left: calc(-50% + 1.5rem);
+  height: 1px;
+  background: var(--borde);
+}
+.ob-paso.ob-hecho::before,
+.ob-paso.ob-actual::before {
+  background: color-mix(in srgb, var(--primario) 45%, var(--borde));
+}
+.ob-paso-boton {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+}
+.ob-circulo {
+  display: inline-flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--superficie-2);
+  color: var(--texto-suave);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.ob-paso-boton:hover .ob-circulo {
+  color: var(--texto);
+}
+.ob-etiqueta {
+  font-size: 0.875rem;
+  color: var(--texto-suave);
+  white-space: nowrap;
+}
+.ob-hecho .ob-circulo {
+  background: var(--primario-suave);
+  color: var(--primario-fuerte);
+}
+.ob-actual .ob-circulo {
+  background: var(--primario);
+  color: var(--primario-contraste, #fff);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primario) 18%, transparent);
+}
+.ob-actual .ob-etiqueta {
+  color: var(--primario);
+  font-weight: 600;
+}
+
+.ob-icono {
+  display: inline-flex;
+  height: 3.5rem;
+  width: 3.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background: var(--primario-suave);
+  color: var(--primario-fuerte);
+}
+
+.ob-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--borde);
+}
+</style>
