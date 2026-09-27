@@ -3,7 +3,12 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
-import type { ResumenTarjeta } from "@/lib/resumenTarjeta";
+import {
+  creditosDe,
+  cuandoReserva,
+  estadoMembresia,
+  type ResumenTarjeta,
+} from "@/lib/resumenTarjeta";
 
 /**
  * Tarjeta de una persona en la cuadrícula de Miembros: quién es y cómo contactarla,
@@ -23,64 +28,8 @@ const props = defineProps<{
 
 const { t } = useI18n();
 
-const creditos = computed(() => {
-  const r = props.resumen?.membresia;
-  if (!r || !r.tiene_acceso) {
-    return null;
-  }
-  if (r.ilimitado) {
-    return t("tarjetas.ilimitado");
-  }
-  const n = r.saldo_unidades / 1000;
-  return t(
-    "tarjetas.creditos",
-    {
-      n: new Intl.NumberFormat("es-MX", { maximumFractionDigits: 1 }).format(n),
-    },
-    n === 1 ? 1 : 2,
-  );
-});
-
-function fechaCorta(ymd: string): string {
-  return new Intl.DateTimeFormat("es-MX", {
-    day: "numeric",
-    month: "short",
-  }).format(new Date(`${ymd}T12:00:00`));
-}
-
-// Qué pasa con su membresía, en una frase; con color solo si pide atención.
-const estado = computed<{ texto: string; color?: string } | null>(() => {
-  const m = props.resumen?.membresia;
-  if (!m) {
-    return null;
-  }
-  switch (m.estado) {
-    case "vigente":
-      return m.valido_hasta
-        ? { texto: t("tarjetas.vence", { fecha: fechaCorta(m.valido_hasta) }) }
-        : null;
-    case "por_vencer":
-      return {
-        texto: t("tarjetas.vence", { fecha: fechaCorta(m.valido_hasta ?? "") }),
-        color: "var(--aviso)",
-      };
-    case "vencida":
-      return {
-        texto: t("tarjetas.vencio", {
-          fecha: fechaCorta(m.valido_hasta ?? ""),
-        }),
-        color: "var(--error)",
-      };
-    case "pausada":
-      return {
-        texto: t("tarjetas.enPausa", {
-          fecha: fechaCorta(m.pausada_hasta ?? ""),
-        }),
-      };
-    default:
-      return { texto: t("tarjetas.sinMembresia") };
-  }
-});
+const creditos = computed(() => creditosDe(props.resumen?.membresia, t));
+const estado = computed(() => estadoMembresia(props.resumen?.membresia, t));
 
 function haceCuanto(iso: string): string {
   const dia = (d: Date) =>
@@ -90,18 +39,6 @@ function haceCuanto(iso: string): string {
     dias,
     "day",
   );
-}
-
-function cuando(iso: string, zona: string | null): string {
-  return new Intl.DateTimeFormat("es-MX", {
-    timeZone: zona ?? undefined,
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(iso));
 }
 
 const contacto = computed(() =>
@@ -185,7 +122,10 @@ const contacto = computed(() =>
             :title="resumen.proxima.clase ?? undefined"
           >
             {{
-              cuando(resumen.proxima.inicia_en, resumen.proxima.zona_horaria)
+              cuandoReserva(
+                resumen.proxima.inicia_en,
+                resumen.proxima.zona_horaria,
+              )
             }}
           </dd>
           <dd v-else>{{ $t("tarjetas.sinReservas") }}</dd>

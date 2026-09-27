@@ -549,6 +549,8 @@ class MiembrosTenantController
             'es_facturable' => $persona->es_facturable,
             'archivado' => $persona->archivado,
             'alta' => $persona->created_at?->toDateString(),
+            // Tiene cuenta para entrar a la app o al portal (activó su invitación).
+            'acceso_app' => $persona->usuario_id !== null,
             'asistencias' => $asistencias,
             'primera_vez' => $asistencias !== null ? $asistencias === 0 : null,
             'sucursal' => $persona->sucursal !== null

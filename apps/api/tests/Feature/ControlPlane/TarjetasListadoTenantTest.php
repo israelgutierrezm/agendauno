@@ -87,3 +87,15 @@ it('cada instructor trae su agenda de la semana y sus sedes, sin datos de contac
     expect($this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0'))
         ->not->toHaveKey('resumen');
 });
+
+it('la lista dice quién ya tiene cuenta para entrar a la app', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    alumnoConSesion($e, 'Vale', 'vale@correo.mx');
+    crearMiembroTenant($e, 'Beto');
+
+    $filas = collect($this->getJson("/api/v1/app/{$e['slug']}/miembros?page=1", conBearer($e['bearer']))->assertOk()->json('data'))
+        ->keyBy('nombre');
+
+    expect($filas['Vale']['acceso_app'])->toBeTrue()
+        ->and($filas['Beto']['acceso_app'])->toBeFalse();
+});

@@ -18,7 +18,13 @@ import PanelMiembro from "@/components/PanelMiembro.vue";
 import TarjetaMiembro from "@/components/TarjetaMiembro.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useAnchoMinimo } from "@/lib/pantalla";
-import type { ResumenTarjeta } from "@/lib/resumenTarjeta";
+import {
+  creditosDe,
+  cuandoReserva,
+  diaCorto,
+  estadoMembresia,
+  type ResumenTarjeta,
+} from "@/lib/resumenTarjeta";
 import { plural } from "@/lib/terminologia";
 import { useVistaListado } from "@/lib/vistaListado";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -40,6 +46,8 @@ interface Miembro {
   es_facturable: boolean;
   archivado: boolean;
   primera_vez: boolean | null;
+  alta?: string | null;
+  acceso_app?: boolean;
   celular?: string | null;
   sucursal?: { id: string; nombre: string } | null;
   // Para las tarjetas (`resumen=1`): membresía, visitas y adeudo.
@@ -535,13 +543,45 @@ onMounted(() => {
                       {{ $t("miembros.colNombre") }}
                     </th>
                     <th
-                      class="px-4 py-3 whitespace-nowrap hidden"
-                      :class="{ 'sm:table-cell': !resumenAlLado }"
+                      v-if="tipo !== 'miembro'"
+                      class="px-4 py-3 whitespace-nowrap hidden sm:table-cell"
                     >
                       {{ $t("miembros.colCorreo") }}
                     </th>
+                    <template v-else>
+                      <th
+                        class="px-4 py-3 whitespace-nowrap hidden md:table-cell"
+                      >
+                        {{ $t("operacion.clientes.registro") }}
+                      </th>
+                      <th
+                        class="px-4 py-3 whitespace-nowrap hidden lg:table-cell"
+                      >
+                        {{ $t("operacion.clientes.app") }}
+                      </th>
+                      <th
+                        class="px-4 py-3 whitespace-nowrap hidden sm:table-cell"
+                      >
+                        {{ $t("operacion.clientes.plan") }}
+                      </th>
+                      <th
+                        class="px-4 py-3 whitespace-nowrap hidden md:table-cell"
+                      >
+                        {{ $t("operacion.clientes.saldo") }}
+                      </th>
+                      <th
+                        class="px-4 py-3 whitespace-nowrap hidden"
+                        :class="{ 'xl:table-cell': !resumenAlLado }"
+                      >
+                        {{ $t("operacion.clientes.proxima") }}
+                      </th>
+                    </template>
                     <th class="px-4 py-3 whitespace-nowrap">
-                      {{ $t("miembros.colEstado") }}
+                      {{
+                        tipo === "miembro"
+                          ? $t("operacion.clientes.estado")
+                          : $t("miembros.colEstado")
+                      }}
                     </th>
                     <th class="px-4 py-3 text-right"></th>
                   </tr>
@@ -577,12 +617,80 @@ onMounted(() => {
                       </div>
                     </td>
                     <td
-                      class="px-4 py-2 hidden"
-                      :class="{ 'sm:table-cell': !resumenAlLado }"
+                      v-if="tipo !== 'miembro'"
+                      class="px-4 py-2 hidden sm:table-cell"
                       :style="{ color: 'var(--texto-suave)' }"
                     >
                       {{ m.email ?? "—" }}
                     </td>
+                    <template v-else>
+                      <td
+                        class="px-4 py-2 whitespace-nowrap hidden md:table-cell"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        {{ m.alta ? diaCorto(m.alta) : "—" }}
+                      </td>
+                      <td
+                        class="px-4 py-2 whitespace-nowrap hidden lg:table-cell"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        {{
+                          m.acceso_app
+                            ? $t("operacion.clientes.conApp")
+                            : invitados.has(m.id)
+                              ? $t("miembros.invitado")
+                              : $t("operacion.clientes.sinApp")
+                        }}
+                      </td>
+                      <td class="px-4 py-2 hidden sm:table-cell">
+                        <span class="block max-w-[14rem] truncate">{{
+                          m.resumen?.membresia.plan ??
+                          $t("tarjetas.sinMembresia")
+                        }}</span>
+                        <span
+                          v-if="
+                            m.resumen?.membresia.plan &&
+                            estadoMembresia(m.resumen.membresia, t)
+                          "
+                          class="block text-xs"
+                          :style="{
+                            color:
+                              estadoMembresia(m.resumen.membresia, t)!.color ??
+                              'var(--texto-suave)',
+                          }"
+                          >{{
+                            estadoMembresia(m.resumen.membresia, t)!.texto
+                          }}</span
+                        >
+                      </td>
+                      <td
+                        class="px-4 py-2 whitespace-nowrap hidden md:table-cell tabular-nums"
+                      >
+                        {{ creditosDe(m.resumen?.membresia, t) ?? "—" }}
+                      </td>
+                      <td
+                        class="px-4 py-2 whitespace-nowrap hidden"
+                        :class="{ 'xl:table-cell': !resumenAlLado }"
+                        :title="m.resumen?.proxima?.clase ?? undefined"
+                      >
+                        <template v-if="m.resumen?.proxima">
+                          <span class="block first-letter:uppercase">{{
+                            cuandoReserva(
+                              m.resumen.proxima.inicia_en,
+                              m.resumen.proxima.zona_horaria,
+                            )
+                          }}</span>
+                          <span
+                            class="block max-w-[12rem] truncate text-xs"
+                            :style="{ color: 'var(--texto-suave)' }"
+                            >{{ m.resumen.proxima.clase }}</span
+                          >
+                        </template>
+                        <span v-else :style="{ color: 'var(--texto-suave)' }"
+                          >—</span
+                        >
+                      </td>
+                    </template>
                     <!-- Estado en texto: lo normal (activo) en gris; lo que requiere atención, en color. -->
                     <td
                       v-if="m.dado_de_baja_en"
@@ -637,6 +745,7 @@ onMounted(() => {
                           puedeInvitar &&
                           tipo === 'miembro' &&
                           m.email &&
+                          !m.acceso_app &&
                           !invitados.has(m.id)
                         "
                         class="tu-enlace text-sm mr-3"

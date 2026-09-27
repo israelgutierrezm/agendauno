@@ -38,6 +38,17 @@ export default {
     vencidas:
       "1 membresía vencida por recuperar | {n} membresías vencidas por recuperar",
   },
+  // Columnas de la lista de alumnos o clientes: un dato por columna.
+  clientes: {
+    registro: "Registro",
+    app: "App",
+    conApp: "Con acceso",
+    sinApp: "Sin cuenta",
+    plan: "Plan vigente",
+    saldo: "Saldo",
+    proxima: "Próxima reserva",
+    estado: "Estado",
+  },
   // Grupos y rótulos del menú lateral que no son el título de una pantalla.
   menu: {
     directorio: "Directorio",
