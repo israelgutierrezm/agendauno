@@ -353,6 +353,39 @@ async function cargar(): Promise<void> {
   }
 }
 
+/**
+ * Pestañas: Resumen, Ingresos y Ocupación dependen del periodo elegido; Clientes
+ * (cohortes por mes de alta) y Equipo y sucursales (estado actual), no. El selector
+ * de periodo solo aparece donde cuenta, y cada pestaña dice de qué son sus cifras.
+ */
+type Pestana = "resumen" | "ingresos" | "ocupacion" | "clientes" | "equipo";
+const PESTANAS: Pestana[] = [
+  "resumen",
+  "ingresos",
+  "ocupacion",
+  "clientes",
+  "equipo",
+];
+const pestana = ref<Pestana>("resumen");
+const usaPeriodo = computed(
+  () =>
+    pestana.value === "resumen" ||
+    pestana.value === "ingresos" ||
+    pestana.value === "ocupacion",
+);
+const periodoTexto = computed(() => {
+  const f = (ymd: string) =>
+    new Intl.DateTimeFormat("es-MX", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(new Date(`${ymd}T12:00:00`));
+  return t("operacion.reportes.periodo", {
+    desde: f(desde.value),
+    hasta: f(hasta.value),
+  });
+});
+
 function esteMes(): void {
   desde.value = inicioMes();
   hasta.value = iso(new Date());
@@ -373,8 +406,20 @@ onMounted(cargar);
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion :titulo="$t('reportes.titulo')" />
 
+    <div class="tu-segmentado mt-6 max-w-full overflow-x-auto" role="group">
+      <button
+        v-for="p in PESTANAS"
+        :key="p"
+        type="button"
+        :aria-pressed="pestana === p"
+        @click="pestana = p"
+      >
+        {{ $t(`operacion.reportes.pestanas.${p}`) }}
+      </button>
+    </div>
+
     <!-- Periodo -->
-    <div class="mt-6 flex flex-wrap items-end gap-3">
+    <div v-if="usaPeriodo" class="mt-4 flex flex-wrap items-end gap-3">
       <div>
         <label class="tu-label" for="rd">{{ $t("reportes.desde") }}</label>
         <input id="rd" v-model="desde" type="date" class="tu-input w-auto" />
@@ -400,8 +445,19 @@ onMounted(cargar);
     </p>
 
     <template v-else>
+      <p
+        v-if="usaPeriodo"
+        class="mt-4 text-xs"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ periodoTexto }}
+      </p>
+
       <!-- Métricas del negocio -->
-      <div class="mt-6 tu-card px-5 py-4 grid grid-cols-3 lg:grid-cols-6 gap-4">
+      <div
+        v-if="pestana === 'resumen'"
+        class="mt-4 tu-card px-5 py-4 grid grid-cols-3 lg:grid-cols-6 gap-4"
+      >
         <div v-for="card in tarjetas" :key="card.clave">
           <div class="text-xl font-semibold tabular-nums">{{ card.valor }}</div>
           <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
@@ -411,158 +467,180 @@ onMounted(cargar);
       </div>
 
       <!-- Tendencias de ingresos (Etapa 2) -->
-      <div class="mt-8 flex flex-wrap items-center gap-3">
-        <h2 class="font-light text-lg">
-          {{ $t("reportes.tendencias.titulo") }}
-        </h2>
-        <div class="ml-auto flex items-center gap-2">
-          <select
-            v-model="agrupacion"
-            class="tu-input w-auto"
-            :aria-label="$t('reportes.tendencias.agrupacion')"
-          >
-            <option value="dia">{{ $t("reportes.tendencias.dia") }}</option>
-            <option value="semana">
-              {{ $t("reportes.tendencias.semana") }}
-            </option>
-            <option value="mes">{{ $t("reportes.tendencias.mes") }}</option>
-          </select>
-          <button
-            class="tu-btn tu-btn-fantasma"
-            type="button"
-            :disabled="
-              exportando || !tendencias || tendencias.serie.length === 0
-            "
-            @click="exportarTendencias"
-          >
-            {{
-              exportando
-                ? $t("reportes.tendencias.exportando")
-                : $t("reportes.tendencias.exportar")
-            }}
-          </button>
-        </div>
-      </div>
-
-      <template v-if="tendencias">
-        <!-- Totales del periodo -->
-        <div class="mt-3 tu-card px-5 py-4 grid grid-cols-3 gap-4">
-          <div>
-            <div class="text-xl font-semibold tabular-nums">
-              {{ dinero(tendencias.totales.ingresos_minor, tendencias.moneda) }}
-            </div>
-            <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("reportes.tendencias.ingresos") }}
-            </div>
-          </div>
-          <div>
-            <div class="text-xl font-semibold tabular-nums">
-              {{ tendencias.totales.ordenes }}
-            </div>
-            <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("reportes.tendencias.ordenes") }}
-            </div>
-          </div>
-          <div>
-            <div class="text-xl font-semibold tabular-nums">
-              {{
-                dinero(
-                  tendencias.totales.ticket_promedio_minor,
-                  tendencias.moneda,
-                )
-              }}
-            </div>
-            <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t("reportes.tendencias.ticket") }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Barras de ingresos por bucket -->
-        <div class="mt-4 tu-card p-5">
-          <p
-            v-if="tendencias.totales.ingresos_minor === 0"
-            class="text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("reportes.tendencias.vacio") }}
-          </p>
-          <template v-else>
-            <div
-              class="flex items-end gap-1 h-40 border-b"
-              :style="{ borderColor: 'var(--borde)' }"
+      <template v-if="pestana === 'ingresos'">
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+          <h2 class="font-light text-lg">
+            {{ $t("reportes.tendencias.titulo") }}
+          </h2>
+          <div class="ml-auto flex items-center gap-2">
+            <select
+              v-model="agrupacion"
+              class="tu-input w-auto"
+              :aria-label="$t('reportes.tendencias.agrupacion')"
             >
+              <option value="dia">{{ $t("reportes.tendencias.dia") }}</option>
+              <option value="semana">
+                {{ $t("reportes.tendencias.semana") }}
+              </option>
+              <option value="mes">{{ $t("reportes.tendencias.mes") }}</option>
+            </select>
+            <button
+              class="tu-btn tu-btn-fantasma"
+              type="button"
+              :disabled="
+                exportando || !tendencias || tendencias.serie.length === 0
+              "
+              @click="exportarTendencias"
+            >
+              {{
+                exportando
+                  ? $t("reportes.tendencias.exportando")
+                  : $t("reportes.tendencias.exportar")
+              }}
+            </button>
+          </div>
+        </div>
+
+        <template v-if="tendencias">
+          <!-- Totales del periodo -->
+          <div class="mt-3 tu-card px-5 py-4 grid grid-cols-3 gap-4">
+            <div>
+              <div class="text-xl font-semibold tabular-nums">
+                {{
+                  dinero(tendencias.totales.ingresos_minor, tendencias.moneda)
+                }}
+              </div>
               <div
-                v-for="p in tendencias.serie"
-                :key="p.fecha"
-                class="flex-1 min-w-[2px] rounded-t transition-all"
-                :style="{
-                  height: barra(p),
-                  background: 'var(--primario)',
-                  minHeight: p.ingresos_minor > 0 ? '3px' : '0',
-                }"
-                :title="`${fechaBucket(p.fecha)} · ${dinero(p.ingresos_minor, tendencias.moneda)} · ${p.ordenes} órd.`"
-              />
+                class="text-xs mt-1"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("reportes.tendencias.ingresos") }}
+              </div>
             </div>
-            <div
-              class="flex justify-between text-xs mt-1"
+            <div>
+              <div class="text-xl font-semibold tabular-nums">
+                {{ tendencias.totales.ordenes }}
+              </div>
+              <div
+                class="text-xs mt-1"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("reportes.tendencias.ordenes") }}
+              </div>
+            </div>
+            <div>
+              <div class="text-xl font-semibold tabular-nums">
+                {{
+                  dinero(
+                    tendencias.totales.ticket_promedio_minor,
+                    tendencias.moneda,
+                  )
+                }}
+              </div>
+              <div
+                class="text-xs mt-1"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("reportes.tendencias.ticket") }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Barras de ingresos por bucket -->
+          <div class="mt-4 tu-card p-5">
+            <p
+              v-if="tendencias.totales.ingresos_minor === 0"
+              class="text-sm"
               :style="{ color: 'var(--texto-suave)' }"
             >
-              <span>{{ fechaBucket(tendencias.serie[0].fecha) }}</span>
-              <span>{{
-                fechaBucket(tendencias.serie[tendencias.serie.length - 1].fecha)
-              }}</span>
-            </div>
-          </template>
-        </div>
-
-        <!-- Desglose por producto -->
-        <h3 class="mt-6 font-semibold">
-          {{ $t("reportes.tendencias.porProducto") }}
-        </h3>
-        <p
-          v-if="tendencias.por_producto.length === 0"
-          class="mt-3 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("reportes.tendencias.sinProducto") }}
-        </p>
-        <div v-else class="mt-3 tu-card overflow-hidden">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                <th class="px-4 py-2 font-medium">
-                  {{ $t("reportes.tendencias.colProducto") }}
-                </th>
-                <th class="px-4 py-2 font-medium text-right">
-                  {{ $t("reportes.tendencias.colUnidades") }}
-                </th>
-                <th class="px-4 py-2 font-medium text-right">
-                  {{ $t("reportes.tendencias.colIngresos") }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="p in tendencias.por_producto"
-                :key="p.producto"
-                class="border-t"
+              {{ $t("reportes.tendencias.vacio") }}
+            </p>
+            <template v-else>
+              <div
+                class="flex items-end gap-1 h-40 border-b"
                 :style="{ borderColor: 'var(--borde)' }"
               >
-                <td class="px-4 py-2 font-semibold">{{ p.producto }}</td>
-                <td class="px-4 py-2 text-right">{{ p.unidades }}</td>
-                <td class="px-4 py-2 text-right">
-                  {{ dinero(p.ingresos_minor, tendencias.moneda) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                <div
+                  v-for="p in tendencias.serie"
+                  :key="p.fecha"
+                  class="flex-1 min-w-[2px] rounded-t transition-all"
+                  :style="{
+                    height: barra(p),
+                    background: 'var(--primario)',
+                    minHeight: p.ingresos_minor > 0 ? '3px' : '0',
+                  }"
+                  :title="`${fechaBucket(p.fecha)} · ${dinero(p.ingresos_minor, tendencias.moneda)} · ${p.ordenes} órd.`"
+                />
+              </div>
+              <div
+                class="flex justify-between text-xs mt-1"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                <span>{{ fechaBucket(tendencias.serie[0].fecha) }}</span>
+                <span>{{
+                  fechaBucket(
+                    tendencias.serie[tendencias.serie.length - 1].fecha,
+                  )
+                }}</span>
+              </div>
+            </template>
+          </div>
+
+          <!-- Desglose por producto -->
+          <h3 class="mt-6 font-semibold">
+            {{ $t("reportes.tendencias.porProducto") }}
+          </h3>
+          <p
+            v-if="tendencias.por_producto.length === 0"
+            class="mt-3 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("reportes.tendencias.sinProducto") }}
+          </p>
+          <div v-else class="mt-3 tu-card overflow-hidden">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
+                  <th class="px-4 py-2 font-medium">
+                    {{ $t("reportes.tendencias.colProducto") }}
+                  </th>
+                  <th class="px-4 py-2 font-medium text-right">
+                    {{ $t("reportes.tendencias.colUnidades") }}
+                  </th>
+                  <th class="px-4 py-2 font-medium text-right">
+                    {{ $t("reportes.tendencias.colIngresos") }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="p in tendencias.por_producto"
+                  :key="p.producto"
+                  class="border-t"
+                  :style="{ borderColor: 'var(--borde)' }"
+                >
+                  <td class="px-4 py-2 font-semibold">{{ p.producto }}</td>
+                  <td class="px-4 py-2 text-right">{{ p.unidades }}</td>
+                  <td class="px-4 py-2 text-right">
+                    {{ dinero(p.ingresos_minor, tendencias.moneda) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
       </template>
 
+      <p
+        v-if="pestana === 'clientes' && !cohortes"
+        class="mt-6 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("operacion.reportes.sinClientes") }}
+      </p>
       <!-- Conversión + cohortes de retención (Etapa 2) -->
-      <template v-if="cohortes">
-        <h2 class="mt-8 font-light text-lg">
+      <template v-if="pestana === 'clientes' && cohortes">
+        <h2 class="mt-6 font-light text-lg">
           {{ $t("reportes.conversion.titulo") }}
         </h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -655,365 +733,378 @@ onMounted(cargar);
       </template>
 
       <!-- Por sucursal -->
-      <h2 class="mt-8 font-light text-lg">{{ $t("reportes.porSucursal") }}</h2>
-      <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("operacion.reportes.estadoActual") }}
-      </p>
-      <p
-        v-if="sucursales.length === 0"
-        class="mt-3 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("reportes.sinSucursales") }}
-      </p>
-      <div v-else class="mt-3 tu-card overflow-hidden">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-              <th class="px-4 py-2 font-medium">
-                {{ $t("reportes.colSucursal") }}
-              </th>
-              <th class="px-4 py-2 font-medium hidden sm:table-cell">
-                {{ $t("reportes.colRegion") }}
-              </th>
-              <th class="px-4 py-2 font-medium hidden sm:table-cell">
-                {{ $t("reportes.colMoneda") }}
-              </th>
-              <th class="px-4 py-2 font-medium text-right">
-                {{ $t("reportes.colMiembros") }}
-              </th>
-              <th class="px-4 py-2 font-medium text-right">
-                {{ $t("reportes.colClases") }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="s in sucursales"
-              :key="s.id"
-              class="border-t"
-              :style="{ borderColor: 'var(--borde)' }"
-            >
-              <td class="px-4 py-2 font-semibold">{{ s.nombre }}</td>
-              <td
-                class="px-4 py-2 hidden sm:table-cell"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{ s.region ?? "—" }}
-              </td>
-              <td class="px-4 py-2 hidden sm:table-cell">
-                {{ s.moneda ?? "—" }}
-              </td>
-              <td class="px-4 py-2 text-right">{{ s.miembros_activos }}</td>
-              <td class="px-4 py-2 text-right">{{ s.sesiones_proximas }}</td>
-            </tr>
-            <tr
-              v-if="sinSucursal > 0"
-              class="border-t"
-              :style="{ borderColor: 'var(--borde)' }"
-            >
-              <td class="px-4 py-2" :style="{ color: 'var(--texto-suave)' }">
-                {{ $t("operacion.reportes.sinSucursal") }}
-              </td>
-              <td class="px-4 py-2 hidden sm:table-cell" />
-              <td class="px-4 py-2 hidden sm:table-cell" />
-              <td class="px-4 py-2 text-right">{{ sinSucursal }}</td>
-              <td class="px-4 py-2 text-right">—</td>
-            </tr>
-          </tbody>
-          <tfoot v-if="totalesSucursales">
-            <tr
-              class="border-t font-semibold"
-              :style="{ borderColor: 'var(--borde)' }"
-            >
-              <td class="px-4 py-2">{{ $t("operacion.reportes.total") }}</td>
-              <td class="px-4 py-2 hidden sm:table-cell" />
-              <td class="px-4 py-2 hidden sm:table-cell" />
-              <td class="px-4 py-2 text-right">
-                {{ totalesSucursales.miembros_activos }}
-              </td>
-              <td class="px-4 py-2 text-right">
-                {{ totalesSucursales.sesiones_proximas }}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <!-- Rentabilidad por clase (R30) -->
-      <h2 class="mt-8 font-light text-lg">
-        {{ $t("reportes.rentabilidad.titulo") }}
-      </h2>
-      <p
-        v-if="!rentabilidad || rentabilidad.ofertas.length === 0"
-        class="mt-3 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("reportes.rentabilidad.vacio") }}
-      </p>
-      <template v-else>
-        <div class="mt-3 tu-card overflow-hidden">
+      <template v-if="pestana === 'equipo'">
+        <h2 class="mt-6 font-light text-lg">
+          {{ $t("reportes.porSucursal") }}
+        </h2>
+        <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("operacion.reportes.estadoActual") }}
+        </p>
+        <p
+          v-if="sucursales.length === 0"
+          class="mt-3 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("reportes.sinSucursales") }}
+        </p>
+        <div v-else class="mt-3 tu-card overflow-hidden">
           <table class="w-full text-sm">
             <thead>
               <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
                 <th class="px-4 py-2 font-medium">
-                  {{ $t("reportes.rentabilidad.colClase") }}
+                  {{ $t("reportes.colSucursal") }}
                 </th>
-                <th
-                  class="px-4 py-2 font-medium text-right hidden sm:table-cell"
-                >
-                  {{ $t("reportes.rentabilidad.colSesiones") }}
+                <th class="px-4 py-2 font-medium hidden sm:table-cell">
+                  {{ $t("reportes.colRegion") }}
                 </th>
-                <th class="px-4 py-2 font-medium text-right">
-                  {{ $t("reportes.rentabilidad.colAsistentes") }}
+                <th class="px-4 py-2 font-medium hidden sm:table-cell">
+                  {{ $t("reportes.colMoneda") }}
                 </th>
                 <th class="px-4 py-2 font-medium text-right">
-                  {{ $t("reportes.rentabilidad.colIngreso") }}
+                  {{ $t("reportes.colMiembros") }}
                 </th>
                 <th class="px-4 py-2 font-medium text-right">
-                  {{ $t("reportes.rentabilidad.colCosto") }}
-                </th>
-                <th class="px-4 py-2 font-medium text-right">
-                  {{ $t("reportes.rentabilidad.colMargen") }}
+                  {{ $t("reportes.colClases") }}
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="o in rentabilidad.ofertas"
-                :key="o.id ?? o.oferta"
+                v-for="s in sucursales"
+                :key="s.id"
                 class="border-t"
                 :style="{ borderColor: 'var(--borde)' }"
               >
-                <td class="px-4 py-2 font-semibold">{{ o.oferta }}</td>
-                <td class="px-4 py-2 text-right hidden sm:table-cell">
-                  {{ o.sesiones }}
-                </td>
-                <td class="px-4 py-2 text-right">{{ o.asistentes }}</td>
-                <td class="px-4 py-2 text-right">
-                  {{ dinero(o.ingreso_minor, rentabilidad.moneda) }}
-                </td>
-                <td class="px-4 py-2 text-right">
-                  {{ dinero(o.costo_minor, rentabilidad.moneda) }}
-                </td>
+                <td class="px-4 py-2 font-semibold">{{ s.nombre }}</td>
                 <td
-                  class="px-4 py-2 text-right font-semibold"
-                  :style="{
-                    color:
-                      o.margen_minor >= 0 ? 'var(--exito)' : 'var(--error)',
-                  }"
+                  class="px-4 py-2 hidden sm:table-cell"
+                  :style="{ color: 'var(--texto-suave)' }"
                 >
-                  {{ dinero(o.margen_minor, rentabilidad.moneda) }}
+                  {{ s.region ?? "—" }}
                 </td>
+                <td class="px-4 py-2 hidden sm:table-cell">
+                  {{ s.moneda ?? "—" }}
+                </td>
+                <td class="px-4 py-2 text-right">{{ s.miembros_activos }}</td>
+                <td class="px-4 py-2 text-right">{{ s.sesiones_proximas }}</td>
               </tr>
-            </tbody>
-            <tfoot>
               <tr
-                class="border-t font-bold"
+                v-if="sinSucursal > 0"
+                class="border-t"
                 :style="{ borderColor: 'var(--borde)' }"
               >
-                <td class="px-4 py-2">
-                  {{ $t("reportes.rentabilidad.total") }}
+                <td class="px-4 py-2" :style="{ color: 'var(--texto-suave)' }">
+                  {{ $t("operacion.reportes.sinSucursal") }}
                 </td>
-                <td class="px-4 py-2 hidden sm:table-cell"></td>
+                <td class="px-4 py-2 hidden sm:table-cell" />
+                <td class="px-4 py-2 hidden sm:table-cell" />
+                <td class="px-4 py-2 text-right">{{ sinSucursal }}</td>
+                <td class="px-4 py-2 text-right">—</td>
+              </tr>
+            </tbody>
+            <tfoot v-if="totalesSucursales">
+              <tr
+                class="border-t font-semibold"
+                :style="{ borderColor: 'var(--borde)' }"
+              >
+                <td class="px-4 py-2">{{ $t("operacion.reportes.total") }}</td>
+                <td class="px-4 py-2 hidden sm:table-cell" />
+                <td class="px-4 py-2 hidden sm:table-cell" />
                 <td class="px-4 py-2 text-right">
-                  {{ rentabilidad.totales.asistentes }}
+                  {{ totalesSucursales.miembros_activos }}
                 </td>
                 <td class="px-4 py-2 text-right">
-                  {{
-                    dinero(
-                      rentabilidad.totales.ingreso_minor,
-                      rentabilidad.moneda,
-                    )
-                  }}
-                </td>
-                <td class="px-4 py-2 text-right">
-                  {{
-                    dinero(
-                      rentabilidad.totales.costo_minor,
-                      rentabilidad.moneda,
-                    )
-                  }}
-                </td>
-                <td
-                  class="px-4 py-2 text-right"
-                  :style="{
-                    color:
-                      rentabilidad.totales.margen_minor >= 0
-                        ? 'var(--exito)'
-                        : 'var(--error)',
-                  }"
-                >
-                  {{
-                    dinero(
-                      rentabilidad.totales.margen_minor,
-                      rentabilidad.moneda,
-                    )
-                  }}
+                  {{ totalesSucursales.sesiones_proximas }}
                 </td>
               </tr>
             </tfoot>
           </table>
         </div>
+      </template>
+
+      <!-- Rentabilidad por clase (R30) -->
+      <template v-if="pestana === 'ingresos'">
+        <h2 class="mt-8 font-light text-lg">
+          {{ $t("reportes.rentabilidad.titulo") }}
+        </h2>
         <p
-          v-if="rentabilidad.totales.sin_costo_unitario > 0"
-          class="mt-3 text-xs"
+          v-if="!rentabilidad || rentabilidad.ofertas.length === 0"
+          class="mt-3 text-sm"
           :style="{ color: 'var(--texto-suave)' }"
         >
-          {{
-            $t("reportes.rentabilidad.sinCosto", {
-              n: rentabilidad.totales.sin_costo_unitario,
-            })
-          }}
+          {{ $t("reportes.rentabilidad.vacio") }}
         </p>
+        <template v-else>
+          <div class="mt-3 tu-card overflow-hidden">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
+                  <th class="px-4 py-2 font-medium">
+                    {{ $t("reportes.rentabilidad.colClase") }}
+                  </th>
+                  <th
+                    class="px-4 py-2 font-medium text-right hidden sm:table-cell"
+                  >
+                    {{ $t("reportes.rentabilidad.colSesiones") }}
+                  </th>
+                  <th class="px-4 py-2 font-medium text-right">
+                    {{ $t("reportes.rentabilidad.colAsistentes") }}
+                  </th>
+                  <th class="px-4 py-2 font-medium text-right">
+                    {{ $t("reportes.rentabilidad.colIngreso") }}
+                  </th>
+                  <th class="px-4 py-2 font-medium text-right">
+                    {{ $t("reportes.rentabilidad.colCosto") }}
+                  </th>
+                  <th class="px-4 py-2 font-medium text-right">
+                    {{ $t("reportes.rentabilidad.colMargen") }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="o in rentabilidad.ofertas"
+                  :key="o.id ?? o.oferta"
+                  class="border-t"
+                  :style="{ borderColor: 'var(--borde)' }"
+                >
+                  <td class="px-4 py-2 font-semibold">{{ o.oferta }}</td>
+                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                    {{ o.sesiones }}
+                  </td>
+                  <td class="px-4 py-2 text-right">{{ o.asistentes }}</td>
+                  <td class="px-4 py-2 text-right">
+                    {{ dinero(o.ingreso_minor, rentabilidad.moneda) }}
+                  </td>
+                  <td class="px-4 py-2 text-right">
+                    {{ dinero(o.costo_minor, rentabilidad.moneda) }}
+                  </td>
+                  <td
+                    class="px-4 py-2 text-right font-semibold"
+                    :style="{
+                      color:
+                        o.margen_minor >= 0 ? 'var(--exito)' : 'var(--error)',
+                    }"
+                  >
+                    {{ dinero(o.margen_minor, rentabilidad.moneda) }}
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr
+                  class="border-t font-bold"
+                  :style="{ borderColor: 'var(--borde)' }"
+                >
+                  <td class="px-4 py-2">
+                    {{ $t("reportes.rentabilidad.total") }}
+                  </td>
+                  <td class="px-4 py-2 hidden sm:table-cell"></td>
+                  <td class="px-4 py-2 text-right">
+                    {{ rentabilidad.totales.asistentes }}
+                  </td>
+                  <td class="px-4 py-2 text-right">
+                    {{
+                      dinero(
+                        rentabilidad.totales.ingreso_minor,
+                        rentabilidad.moneda,
+                      )
+                    }}
+                  </td>
+                  <td class="px-4 py-2 text-right">
+                    {{
+                      dinero(
+                        rentabilidad.totales.costo_minor,
+                        rentabilidad.moneda,
+                      )
+                    }}
+                  </td>
+                  <td
+                    class="px-4 py-2 text-right"
+                    :style="{
+                      color:
+                        rentabilidad.totales.margen_minor >= 0
+                          ? 'var(--exito)'
+                          : 'var(--error)',
+                    }"
+                  >
+                    {{
+                      dinero(
+                        rentabilidad.totales.margen_minor,
+                        rentabilidad.moneda,
+                      )
+                    }}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <p
+            v-if="rentabilidad.totales.sin_costo_unitario > 0"
+            class="mt-3 text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{
+              $t("reportes.rentabilidad.sinCosto", {
+                n: rentabilidad.totales.sin_costo_unitario,
+              })
+            }}
+          </p>
+        </template>
       </template>
 
       <!-- Demanda por horario (R31) -->
-      <h2 class="mt-8 font-light text-lg">
-        {{ $t("reportes.demanda.titulo") }}
-      </h2>
-      <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("reportes.demanda.subtitulo") }}
-      </p>
-      <p
-        v-if="!demanda || demanda.matriz.length === 0"
-        class="mt-3 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("reportes.demanda.vacio") }}
-      </p>
-      <template v-else>
-        <!-- Heatmap día × hora -->
-        <div class="mt-3 tu-card overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="text-center" :style="{ color: 'var(--texto-suave)' }">
-                <th class="px-3 py-2 font-medium text-left">
-                  {{ $t("reportes.demanda.hora") }}
-                </th>
-                <th
-                  v-for="(d, i) in diasSemana"
-                  :key="i"
-                  class="px-2 py-2 font-medium"
-                >
-                  {{ d }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="h in horasDemanda"
-                :key="h"
-                class="border-t"
-                :style="{ borderColor: 'var(--borde)' }"
-              >
-                <td class="px-3 py-1.5 font-semibold whitespace-nowrap">
-                  {{ String(h).padStart(2, "0") }}:00
-                </td>
-                <td
-                  v-for="dia in [1, 2, 3, 4, 5, 6, 7]"
-                  :key="dia"
-                  class="px-1 py-1 text-center"
-                >
-                  <div
-                    v-if="celdaDemanda(dia, h)"
-                    class="relative rounded-lg py-1.5 text-xs font-semibold"
-                    :style="{
-                      background: colorOcupacion(
-                        celdaDemanda(dia, h)!.ocupacion_pct,
-                      ),
-                    }"
-                    :title="`${celdaDemanda(dia, h)!.confirmadas}/${celdaDemanda(dia, h)!.capacidad}`"
-                  >
-                    {{ pct(celdaDemanda(dia, h)!.ocupacion_pct) }}
-                    <span
-                      v-if="celdaDemanda(dia, h)!.espera > 0"
-                      class="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full"
-                      :style="{ background: 'var(--aviso)' }"
-                      :title="$t('reportes.demanda.colEspera')"
-                    />
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("reportes.demanda.leyenda") }}
+      <template v-if="pestana === 'ocupacion'">
+        <h2 class="mt-4 font-light text-lg">
+          {{ $t("reportes.demanda.titulo") }}
+        </h2>
+        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("reportes.demanda.subtitulo") }}
         </p>
+        <p
+          v-if="!demanda || demanda.matriz.length === 0"
+          class="mt-3 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("reportes.demanda.vacio") }}
+        </p>
+        <template v-else>
+          <!-- Heatmap día × hora -->
+          <div class="mt-3 tu-card overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr
+                  class="text-center"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  <th class="px-3 py-2 font-medium text-left">
+                    {{ $t("reportes.demanda.hora") }}
+                  </th>
+                  <th
+                    v-for="(d, i) in diasSemana"
+                    :key="i"
+                    class="px-2 py-2 font-medium"
+                  >
+                    {{ d }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="h in horasDemanda"
+                  :key="h"
+                  class="border-t"
+                  :style="{ borderColor: 'var(--borde)' }"
+                >
+                  <td class="px-3 py-1.5 font-semibold whitespace-nowrap">
+                    {{ String(h).padStart(2, "0") }}:00
+                  </td>
+                  <td
+                    v-for="dia in [1, 2, 3, 4, 5, 6, 7]"
+                    :key="dia"
+                    class="px-1 py-1 text-center"
+                  >
+                    <div
+                      v-if="celdaDemanda(dia, h)"
+                      class="relative rounded-lg py-1.5 text-xs font-semibold"
+                      :style="{
+                        background: colorOcupacion(
+                          celdaDemanda(dia, h)!.ocupacion_pct,
+                        ),
+                      }"
+                      :title="`${celdaDemanda(dia, h)!.confirmadas}/${celdaDemanda(dia, h)!.capacidad}`"
+                    >
+                      {{ pct(celdaDemanda(dia, h)!.ocupacion_pct) }}
+                      <span
+                        v-if="celdaDemanda(dia, h)!.espera > 0"
+                        class="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full"
+                        :style="{ background: 'var(--aviso)' }"
+                        :title="$t('reportes.demanda.colEspera')"
+                      />
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("reportes.demanda.leyenda") }}
+          </p>
 
-        <!-- Por actividad -->
-        <h3 class="mt-6 font-semibold">
-          {{ $t("reportes.demanda.porActividad") }}
-        </h3>
-        <div class="mt-3 tu-card overflow-hidden">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                <th class="px-4 py-2 font-medium">
-                  {{ $t("reportes.demanda.colActividad") }}
-                </th>
-                <th
-                  class="px-4 py-2 font-medium text-right hidden sm:table-cell"
+          <!-- Por actividad -->
+          <h3 class="mt-6 font-semibold">
+            {{ $t("reportes.demanda.porActividad") }}
+          </h3>
+          <div class="mt-3 tu-card overflow-hidden">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
+                  <th class="px-4 py-2 font-medium">
+                    {{ $t("reportes.demanda.colActividad") }}
+                  </th>
+                  <th
+                    class="px-4 py-2 font-medium text-right hidden sm:table-cell"
+                  >
+                    {{ $t("reportes.demanda.colSesiones") }}
+                  </th>
+                  <th class="px-4 py-2 font-medium text-right">
+                    {{ $t("reportes.demanda.colConfirmadas") }}
+                  </th>
+                  <th class="px-4 py-2 font-medium text-right">
+                    {{ $t("reportes.demanda.colEspera") }}
+                  </th>
+                  <th class="px-4 py-2 font-medium text-right">
+                    {{ $t("reportes.demanda.colOcupacion") }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="a in demanda.actividades"
+                  :key="a.id ?? a.actividad"
+                  class="border-t"
+                  :style="{ borderColor: 'var(--borde)' }"
                 >
-                  {{ $t("reportes.demanda.colSesiones") }}
-                </th>
-                <th class="px-4 py-2 font-medium text-right">
-                  {{ $t("reportes.demanda.colConfirmadas") }}
-                </th>
-                <th class="px-4 py-2 font-medium text-right">
-                  {{ $t("reportes.demanda.colEspera") }}
-                </th>
-                <th class="px-4 py-2 font-medium text-right">
-                  {{ $t("reportes.demanda.colOcupacion") }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="a in demanda.actividades"
-                :key="a.id ?? a.actividad"
-                class="border-t"
-                :style="{ borderColor: 'var(--borde)' }"
-              >
-                <td class="px-4 py-2 font-semibold">{{ a.actividad }}</td>
-                <td class="px-4 py-2 text-right hidden sm:table-cell">
-                  {{ a.sesiones }}
-                </td>
-                <td class="px-4 py-2 text-right">{{ a.confirmadas }}</td>
-                <td
-                  class="px-4 py-2 text-right font-semibold"
-                  :style="{ color: a.espera > 0 ? 'var(--aviso)' : 'inherit' }"
+                  <td class="px-4 py-2 font-semibold">{{ a.actividad }}</td>
+                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                    {{ a.sesiones }}
+                  </td>
+                  <td class="px-4 py-2 text-right">{{ a.confirmadas }}</td>
+                  <td
+                    class="px-4 py-2 text-right font-semibold"
+                    :style="{
+                      color: a.espera > 0 ? 'var(--aviso)' : 'inherit',
+                    }"
+                  >
+                    {{ a.espera }}
+                  </td>
+                  <td class="px-4 py-2 text-right font-semibold">
+                    {{ pct(a.ocupacion_pct) }}
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr
+                  class="border-t font-bold"
+                  :style="{ borderColor: 'var(--borde)' }"
                 >
-                  {{ a.espera }}
-                </td>
-                <td class="px-4 py-2 text-right font-semibold">
-                  {{ pct(a.ocupacion_pct) }}
-                </td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr
-                class="border-t font-bold"
-                :style="{ borderColor: 'var(--borde)' }"
-              >
-                <td class="px-4 py-2">{{ $t("reportes.demanda.total") }}</td>
-                <td class="px-4 py-2 text-right hidden sm:table-cell">
-                  {{ demanda.totales.sesiones }}
-                </td>
-                <td class="px-4 py-2 text-right">
-                  {{ demanda.totales.confirmadas }}
-                </td>
-                <td class="px-4 py-2 text-right">
-                  {{ demanda.totales.espera }}
-                </td>
-                <td class="px-4 py-2 text-right">
-                  {{ pct(demanda.totales.ocupacion_pct) }}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                  <td class="px-4 py-2">{{ $t("reportes.demanda.total") }}</td>
+                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                    {{ demanda.totales.sesiones }}
+                  </td>
+                  <td class="px-4 py-2 text-right">
+                    {{ demanda.totales.confirmadas }}
+                  </td>
+                  <td class="px-4 py-2 text-right">
+                    {{ demanda.totales.espera }}
+                  </td>
+                  <td class="px-4 py-2 text-right">
+                    {{ pct(demanda.totales.ocupacion_pct) }}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </template>
       </template>
     </template>
   </section>

@@ -68,6 +68,15 @@ describe("reporte por sucursal", () => {
     });
     await flushPromises();
 
+    // Resumen primero; el periodo no aplica a sucursales (estado actual).
+    expect(w.find('input[type="date"]').exists()).toBe(true);
+    await w
+      .findAll(".tu-segmentado button")
+      .find((b) => b.text() === "Equipo y sucursales")!
+      .trigger("click");
+    expect(w.find('input[type="date"]').exists()).toBe(false);
+    expect(w.text()).toContain("Estado actual");
+
     const filas = w
       .findAll("table")
       .find((t) => t.text().includes("Roma Norte"))!

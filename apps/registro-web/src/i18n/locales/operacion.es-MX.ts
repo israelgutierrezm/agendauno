@@ -61,6 +61,16 @@ export default {
     sinSucursal: "Sin sucursal asignada",
     total: "Total",
     estadoActual: "Estado actual: no depende del periodo elegido.",
+    periodo: "Cifras del {desde} al {hasta}.",
+    sinClientes:
+      "Aún no hay altas suficientes para medir conversión y permanencia.",
+    pestanas: {
+      resumen: "Resumen",
+      ingresos: "Ingresos",
+      ocupacion: "Ocupación",
+      clientes: "Clientes",
+      equipo: "Equipo y sucursales",
+    },
   },
   horarios: {
     descartar:
