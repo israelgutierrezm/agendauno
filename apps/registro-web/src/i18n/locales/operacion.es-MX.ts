@@ -84,6 +84,8 @@ export default {
     },
   },
   horarios: {
+    noSeCargo:
+      "No se pudo cargar el horario de esta persona. Reintenta antes de editarlo.",
     descartar:
       "Tienes cambios sin guardar en este horario. ¿Descartarlos y cambiar de selección?",
   },

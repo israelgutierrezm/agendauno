@@ -109,6 +109,42 @@ describe("horarios de atención", () => {
     expect(guardar()!.attributes("disabled")).toBeUndefined();
   });
 
+  it("si falla la carga de otra persona, no queda el horario anterior ni se puede guardar", async () => {
+    const w = montar();
+    await flushPromises();
+    await w.find("#h-prov").setValue("ana");
+    await flushPromises();
+    pendientes.get("ana")!(horario("07:00:00"));
+    await flushPromises();
+    expect(w.find("#d1-i0-ini").exists()).toBe(true);
+
+    // La de Beto falla.
+    api.get.mockImplementationOnce(() => Promise.reject(new Error("red")));
+    await w.find("#h-prov").setValue("beto");
+    await flushPromises();
+
+    const guardar = w
+      .findAll("button")
+      .find((b) => b.text() === esMX.horarios.guardar);
+    expect(w.find("#d1-i0-ini").exists()).toBe(false);
+    expect(guardar).toBeUndefined();
+    expect(w.text()).toContain(operacion.horarios.noSeCargo);
+    expect(api.put).not.toHaveBeenCalled();
+
+    // Reintentar trae el de Beto.
+    await w
+      .findAll("button")
+      .find((b) => b.text() === esMX.comun.reintentar)!
+      .trigger("click");
+    await flushPromises();
+    pendientes.get("beto")!(horario("10:00:00"));
+    await flushPromises();
+    expect((w.find("#d1-i0-ini").element as HTMLInputElement).value).toBe(
+      "10:00",
+    );
+    expect(w.text()).not.toContain(operacion.horarios.noSeCargo);
+  });
+
   it("con cambios sin guardar, pregunta antes de cambiar de persona", async () => {
     const pregunta = vi.spyOn(window, "confirm").mockReturnValue(false);
     const w = montar();

@@ -59,6 +59,11 @@ const sinGuardar = computed(
 // Cada carga lleva su número: una respuesta vieja (de una selección anterior que
 // tardó más) no pisa a la actual.
 let pedido = 0;
+// De qué sucursal y persona es lo que está en el editor. Solo se muestra y se
+// guarda si coincide con lo elegido: si la carga de otra persona falla, nunca
+// queda a la vista (ni se guarda sobre ella) el horario de la anterior.
+const cargadoPara = ref<string | null>(null);
+const fallaHorario = ref(false);
 
 const cargando = ref(true);
 const cargandoHorario = ref(false);
@@ -72,6 +77,19 @@ const sucursalActual = computed(
 const listo = computed(
   () => sucursalId.value !== "" && proveedorId.value !== "",
 );
+const claveActual = computed(() =>
+  listo.value ? `${sucursalId.value}|${proveedorId.value}` : null,
+);
+const horarioListo = computed(
+  () => cargadoPara.value !== null && cargadoPara.value === claveActual.value,
+);
+
+/** El editor en blanco y sin dueño (antes de cargar, o si la carga falló). */
+function vaciarEditor(): void {
+  cargadoPara.value = null;
+  semana.value = semanaVacia();
+  original.value = JSON.stringify(semana.value);
+}
 
 // Una franja es válida si tiene inicio y fin y el fin es posterior al inicio.
 const rangoInvalido = computed(() =>
@@ -111,7 +129,10 @@ async function cargarHorario(): Promise<void> {
     return;
   }
   const mio = ++pedido;
+  const clave = claveActual.value;
+  vaciarEditor();
   cargandoHorario.value = true;
+  fallaHorario.value = false;
   error.value = null;
   okGuardado.value = false;
   try {
@@ -136,8 +157,11 @@ async function cargarHorario(): Promise<void> {
     }
     semana.value = nueva;
     original.value = JSON.stringify(nueva);
+    cargadoPara.value = clave;
   } catch (e) {
     if (mio === pedido) {
+      vaciarEditor();
+      fallaHorario.value = true;
       error.value = mensajeDeError(e);
     }
   } finally {
@@ -174,9 +198,10 @@ function copiarASemana(dia: number): void {
 }
 
 async function guardar(): Promise<void> {
-  // Mientras carga, lo que se ve podría ser de otra selección: no se guarda.
+  // Solo se guarda lo cargado para esta misma sucursal y persona (nunca mientras
+  // carga ni tras una carga fallida).
   if (
-    !listo.value ||
+    !horarioListo.value ||
     rangoInvalido.value ||
     !puedeGestionar.value ||
     cargandoHorario.value
@@ -283,8 +308,8 @@ watch([sucursalId, proveedorId], async (_nuevo, [sucAntes, provAntes]) => {
     void cargarHorario();
   } else {
     pedido++;
-    semana.value = semanaVacia();
-    original.value = JSON.stringify(semana.value);
+    fallaHorario.value = false;
+    vaciarEditor();
   }
 });
 
@@ -359,8 +384,26 @@ onMounted(cargarReferencias);
           {{ $t("comun.cargando") }}
         </p>
 
+        <!-- Falló la carga: nada de la selección anterior, solo reintentar -->
+        <div
+          v-else-if="fallaHorario"
+          class="mt-6 tu-card p-5 text-sm"
+          role="alert"
+        >
+          <p style="color: var(--error)">
+            {{ $t("operacion.horarios.noSeCargo") }}
+          </p>
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma mt-3"
+            @click="cargarHorario"
+          >
+            {{ $t("comun.reintentar") }}
+          </button>
+        </div>
+
         <!-- Editor semanal -->
-        <div v-else class="mt-6 space-y-2">
+        <div v-else-if="horarioListo" class="mt-6 space-y-2">
           <div v-for="d in DIAS" :key="d" class="tu-card p-4">
             <div class="flex items-center justify-between gap-3">
               <h3 class="font-semibold">{{ $t(`horarios.dias.${d}`) }}</h3>
@@ -443,7 +486,9 @@ onMounted(cargarReferencias);
               v-if="puedeGestionar"
               class="tu-btn tu-btn-primario"
               type="button"
-              :disabled="guardando || rangoInvalido || cargandoHorario"
+              :disabled="
+                guardando || rangoInvalido || cargandoHorario || !horarioListo
+              "
               @click="guardar"
             >
               {{
