@@ -69,6 +69,19 @@ Never edit a four-class membership into six classes just because the member buys
 
 Create a separate purchase/grant and ledger entries.
 
+Implemented (ADR 0050): an add-on is its own agreement + entitlement (`extra_de_id`)
+tied to the member's current package; it shares the package's classes and expiry
+and is consumed after it.
+
+## Validity and class scope (ADR 0050)
+
+- Validity: none, N days, N months to the same date, or until the end of the
+  (Nth) month. Computed at sale in the business time zone; the last day counts.
+- A plan may apply only to some offerings (`producto_ofertas`), copied to the
+  entitlement at sale (`derecho_ofertas`).
+- Members see a statement per plan (`GET /mi/planes`): included, extras, each use
+  (attended, no-show, late cancel, upcoming), refunded, expired, available.
+
 ## Credit ledger
 
 Ledger entry examples:

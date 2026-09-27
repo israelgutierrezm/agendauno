@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CorteDePlanesTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\MembresiasTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
@@ -218,6 +219,17 @@ class MembresiasTenantController
         return response()->json([
             'data' => $derechos->map(fn (DerechoTenant $derecho): array => $this->presentarDerecho($derecho))->all(),
         ]);
+    }
+
+    /**
+     * Corte de los planes de una persona (el mismo que ve en su cuenta).
+     */
+    public function planes(Request $request, CorteDePlanesTenant $corte): JsonResponse
+    {
+        // Su historial se consulta aunque esté dada de baja.
+        $persona = PersonaTenant::withTrashed()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+
+        return response()->json(['data' => $corte->dePersona($persona)]);
     }
 
     public function topUp(Request $request): JsonResponse

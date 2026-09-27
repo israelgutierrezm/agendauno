@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
+use App\Modules\Tenancy\Application\CorteDePlanesTenant;
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\FormulariosDePersonaTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
@@ -355,6 +356,17 @@ class MiTenantController
      * Movimientos de créditos de un plan propio: por qué cambió su saldo (1.4). Un plan
      * de otra persona no existe para él (404).
      */
+    /**
+     * Corte de sus planes: qué incluía cada paquete o membresía, en qué clases lo usó,
+     * sus clases extra, lo que le queda y lo que venció.
+     */
+    public function planes(Request $request, CorteDePlanesTenant $corte): JsonResponse
+    {
+        $persona = $this->persona($request);
+
+        return response()->json(['data' => $persona instanceof PersonaTenant ? $corte->dePersona($persona) : []]);
+    }
+
     public function movimientosDerecho(Request $request, PresentarMovimientosCreditoTenant $movimientos): JsonResponse
     {
         $persona = $this->persona($request);
