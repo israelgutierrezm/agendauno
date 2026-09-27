@@ -404,7 +404,14 @@ router.beforeEach(async (to) => {
   // landing de marketing: pasa por el selector de sucursal, que redirige solo
   // cuando el estudio tiene una sola sede (o va directo a agendar/su página).
   if (String(to.name) === "inicio") {
-    const slug = slugDeContexto();
+    // El estudio del subdominio o del `?estudio=` de ESTA dirección, no de la página
+    // de la que se viene: el logo de AgendaUno en /entrar?estudio=… lleva a la portada.
+    const estudio =
+      typeof to.query.estudio === "string" ? to.query.estudio : "";
+    const slug = slugDeContexto(
+      window.location.hostname,
+      estudio !== "" ? `?estudio=${encodeURIComponent(estudio)}` : "",
+    );
     if (slug !== null) {
       return { name: "sucursales-estudio", params: { slug } };
     }
