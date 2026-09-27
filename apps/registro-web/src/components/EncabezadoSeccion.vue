@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * Encabezado de una pantalla del panel: el título (con su total, si aplica) y las
- * acciones a la derecha. Sin ícono ni texto explicativo: la pantalla se explica
- * sola y la barra superior ya dice dónde estás.
+ * Encabezado de una pantalla del panel: el único título de la página (con su total,
+ * si aplica) y las acciones a la derecha. Sin ícono ni texto explicativo: la
+ * pantalla se explica sola.
  */
 defineProps<{
   titulo: string;

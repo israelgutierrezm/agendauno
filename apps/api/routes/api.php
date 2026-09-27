@@ -35,6 +35,7 @@ use App\Modules\Tenancy\Http\Controllers\FrontDeskTenantController;
 use App\Modules\Tenancy\Http\Controllers\GruposTenantController;
 use App\Modules\Tenancy\Http\Controllers\ImportacionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\IncidenciasCobroTenantController;
+use App\Modules\Tenancy\Http\Controllers\InicioHoyTenantController;
 use App\Modules\Tenancy\Http\Controllers\IntegracionApiTenantController;
 use App\Modules\Tenancy\Http\Controllers\IntegracionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\InventarioTenantController;
@@ -323,6 +324,9 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/automatizaciones', [AutomatizacionesTenantController::class, 'store'])->middleware('puede:automatizaciones.gestionar')->name('automatizaciones.store');
             Route::put('/automatizaciones/{regla}', [AutomatizacionesTenantController::class, 'actualizar'])->middleware('puede:automatizaciones.gestionar')->name('automatizaciones.update');
             Route::delete('/automatizaciones/{regla}', [AutomatizacionesTenantController::class, 'eliminar'])->middleware('puede:automatizaciones.gestionar')->name('automatizaciones.destroy');
+
+            // El día de hoy para el Inicio del negocio: cada bloque según los permisos.
+            Route::get('/inicio/hoy', InicioHoyTenantController::class)->name('inicio.hoy');
 
             // Facturación SaaS del estudio (control plane; separada de pagos de alumnos).
             Route::get('/facturacion', [FacturacionController::class, 'show'])->middleware('puede:facturacion.ver')->name('facturacion');

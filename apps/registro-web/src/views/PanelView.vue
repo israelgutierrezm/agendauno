@@ -6,6 +6,7 @@ import { RouterLink } from "vue-router";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import AccesosOperativos from "@/components/AccesosOperativos.vue";
 import EnlaceEstudio from "@/components/EnlaceEstudio.vue";
+import ResumenDelDia from "@/components/ResumenDelDia.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -25,6 +26,17 @@ interface Facturacion {
 }
 
 const sesion = useSesionTenantStore();
+
+/**
+ * Inicio del negocio: el día de hoy primero (agenda, asistencia, cobros y
+ * renovaciones), luego los accesos a la operación y, al final, la suscripción.
+ */
+// "sábado 27 de septiembre": el día que se está viendo.
+const hoyTexto = new Intl.DateTimeFormat("es-MX", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+}).format(new Date());
 
 interface Quickstart {
   tareas: Array<{
@@ -110,8 +122,7 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-6xl px-4 py-8">
-    <EncabezadoSeccion :titulo="sesion.estudio?.nombre ?? $t('nav.panel')" />
-    <AccesosOperativos />
+    <EncabezadoSeccion :titulo="$t('operacion.hoy.titulo')" :total="hoyTexto" />
 
     <!-- Quickstart (R36): guía de activación mientras falte configuración esencial -->
     <div v-if="quickstart && !quickstart.listo" class="mt-6 tu-card p-5">
@@ -188,6 +199,10 @@ onMounted(cargar);
         </li>
       </ul>
     </div>
+
+    <ResumenDelDia />
+
+    <AccesosOperativos />
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}

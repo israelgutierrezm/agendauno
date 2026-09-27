@@ -8,6 +8,36 @@ export default {
     aceptar: "Confirmar",
     cancelar: "Cancelar",
   },
+  // Inicio del negocio: el día de hoy.
+  hoy: {
+    titulo: "Hoy",
+    indicadores: {
+      sesiones: "Clases",
+      esperados: "Se esperan",
+      llegaron: "Llegaron",
+      sinMarcar: "Por pasar lista",
+    },
+    agenda: "Agenda de hoy",
+    verAgenda: "Ver agenda →",
+    sinSesiones: "No hay clases hoy.",
+    cupo: "{n} de {total}",
+    pasarLista:
+      "Falta pasar lista a 1 persona | Falta pasar lista a {n} personas",
+    momento: {
+      proxima: "Próxima",
+      en_curso: "En curso",
+      termino: "Terminó",
+      cancelada: "Cancelada",
+    },
+    pendientes: "Pendientes",
+    alDia: "Todo al día: nada por cobrar ni renovaciones por atender.",
+    porCobrar: "1 orden por cobrar | {n} órdenes por cobrar",
+    enMora: "1 cuenta en mora | {n} cuentas en mora",
+    porVencer:
+      "1 membresía vence en {dias} días o menos | {n} membresías vencen en {dias} días o menos",
+    vencidas:
+      "1 membresía vencida por recuperar | {n} membresías vencidas por recuperar",
+  },
   // Grupos y rótulos del menú lateral que no son el título de una pantalla.
   menu: {
     directorio: "Directorio",
