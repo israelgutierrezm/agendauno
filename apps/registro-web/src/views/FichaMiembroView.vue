@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import CortePlanes from "@/components/CortePlanes.vue";
 import ExpedientePersona from "@/components/ExpedientePersona.vue";
 import PanelEditarMiembro, {
   type MiembroEditable,
@@ -98,12 +99,16 @@ interface Ficha {
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
-// Actividad (membresías, reservas, compras) o Expediente (documentos, formularios,
-// consentimientos). Va en la URL (?seccion=expediente) para poder enlazarla.
-const seccion = computed(() =>
-  route.query.seccion === "expediente" ? "expediente" : "actividad",
+// Actividad (membresías, reservas, compras), Planes (el corte de cada paquete o
+// membresía: qué incluía y cómo lo usó) o Expediente (documentos, formularios,
+// consentimientos). Va en la URL (?seccion=planes) para poder enlazarla.
+type Seccion = "actividad" | "planes" | "expediente";
+const seccion = computed<Seccion>(() =>
+  route.query.seccion === "expediente" || route.query.seccion === "planes"
+    ? route.query.seccion
+    : "actividad",
 );
-function irSeccion(s: "actividad" | "expediente"): void {
+function irSeccion(s: Seccion): void {
   void router.replace({
     query: { ...route.query, seccion: s === "actividad" ? undefined : s },
   });
@@ -400,6 +405,13 @@ watch(personaId, cargar, { immediate: true });
                 </button>
                 <button
                   type="button"
+                  :aria-pressed="seccion === 'planes'"
+                  @click="irSeccion('planes')"
+                >
+                  {{ $t("planes.corte.tituloEquipo") }}
+                </button>
+                <button
+                  type="button"
                   :aria-pressed="seccion === 'expediente'"
                   @click="irSeccion('expediente')"
                 >
@@ -408,8 +420,14 @@ watch(personaId, cargar, { immediate: true });
               </div>
             </div>
 
+            <div v-if="seccion === 'planes'" class="px-5 py-5">
+              <CortePlanes
+                equipo
+                :url="`${base}/miembros/${ficha.persona.id}/planes`"
+              />
+            </div>
             <ExpedientePersona
-              v-if="seccion === 'expediente'"
+              v-else-if="seccion === 'expediente'"
               :persona-id="ficha.persona.id"
               tipo-persona="miembro"
             />
