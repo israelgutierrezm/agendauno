@@ -34,18 +34,20 @@ it('edita la plantilla de un producto (precio, vigencia) sin tocar lo vendido', 
     $producto = crearProductoTenant($e, []);
 
     $data = $this->putJson("/api/v1/app/{$e['slug']}/productos/{$producto}", [
-        'nombre' => 'Pack 10 clases', 'precio_minor' => 99900, 'vigencia_dias' => 30,
+        'nombre' => 'Pack 10 clases', 'precio_minor' => 99900, 'vigencia_tipo' => 'dias', 'vigencia_cantidad' => 30,
     ], conBearer($e['bearer']))->assertOk()->json('data');
 
     expect($data['nombre'])->toBe('Pack 10 clases');
     expect($data['precio_minor'])->toBe(99900);
-    expect($data['vigencia_dias'])->toBe(30);
+    expect($data['vigencia_tipo'])->toBe('dias')
+        ->and($data['vigencia_cantidad'])->toBe(30)
+        ->and($data['vence_si_compra_hoy'])->toBe(CarbonImmutable::now('America/Mexico_City')->addDays(30)->toDateString());
 });
 
 it('la vigencia del producto fija el vencimiento del derecho al venderse', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $persona = crearMiembroTenant($e, 'Ana');
-    $producto = crearProductoTenant($e, ['vigencia_dias' => 30]);
+    $producto = crearProductoTenant($e, ['vigencia_tipo' => 'dias', 'vigencia_cantidad' => 30]);
 
     $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
         'persona_id' => $persona, 'producto_id' => $producto,
@@ -54,7 +56,56 @@ it('la vigencia del producto fija el vencimiento del derecho al venderse', funct
     $ficha = $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/ficha", conBearer($e['bearer']))
         ->assertOk()->json('data');
 
-    expect($ficha['derechos'][0]['valido_hasta'])->toBe(CarbonImmutable::now()->addDays(30)->toDateString());
+    // La fecha de compra es la del negocio (Ciudad de México), no la del servidor.
+    expect($ficha['derechos'][0]['valido_hasta'])->toBe(CarbonImmutable::now('America/Mexico_City')->addDays(30)->toDateString());
+});
+
+it('vigencia por meses a la misma fecha o hasta fin de mes', function (string $tipo, int $cantidad, Closure $esperado): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $persona = crearMiembroTenant($e, 'Ana');
+    $producto = crearProductoTenant($e, ['vigencia_tipo' => $tipo, 'vigencia_cantidad' => $cantidad]);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+        'persona_id' => $persona, 'producto_id' => $producto,
+    ], conBearer($e['bearer']))->assertCreated();
+
+    $ficha = $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/ficha", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($ficha['derechos'][0]['valido_hasta'])->toBe($esperado(CarbonImmutable::now('America/Mexico_City'))->toDateString());
+})->with([
+    'un mes a la misma fecha' => ['meses', 1, fn (CarbonImmutable $hoy) => $hoy->addMonthsNoOverflow(1)],
+    'hasta fin de este mes' => ['fin_de_mes', 1, fn (CarbonImmutable $hoy) => $hoy->endOfMonth()],
+    'hasta fin del mes siguiente' => ['fin_de_mes', 2, fn (CarbonImmutable $hoy) => $hoy->startOfMonth()->addMonthNoOverflow()->endOfMonth()],
+]);
+
+it('la vigencia pide su cantidad y quitarla deja el producto sin vencimiento', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $this->postJson("/api/v1/app/{$e['slug']}/productos", [
+        'nombre' => 'Pack', 'tipo' => 'paquete', 'precio_minor' => 50000, 'moneda' => 'MXN',
+        'creditos_incluidos' => 4000, 'vigencia_tipo' => 'meses',
+    ], conBearer($e['bearer']))->assertUnprocessable()->assertJsonValidationErrors(['vigencia_cantidad'], 'meta.errors');
+
+    $producto = crearProductoTenant($e, ['vigencia_tipo' => 'meses', 'vigencia_cantidad' => 1]);
+    $data = $this->putJson("/api/v1/app/{$e['slug']}/productos/{$producto}", ['vigencia_tipo' => null], conBearer($e['bearer']))
+        ->assertOk()->json('data');
+    expect($data['vigencia_tipo'])->toBeNull()
+        ->and($data['vigencia_cantidad'])->toBeNull()
+        ->and($data['vence_si_compra_hoy'])->toBeNull();
+});
+
+it('una clase suelta es siempre de una clase', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $persona = crearMiembroTenant($e, 'Ana');
+    $producto = $this->postJson("/api/v1/app/{$e['slug']}/productos", [
+        'nombre' => 'Clase suelta', 'tipo' => 'sesion_individual', 'precio_minor' => 18000, 'moneda' => 'MXN',
+        'ilimitado' => true, 'creditos_incluidos' => 5000,
+    ], conBearer($e['bearer']))->assertCreated()->json('data');
+    expect($producto['ilimitado'])->toBeFalse()->and($producto['creditos_incluidos'])->toBe(1000);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", [
+        'persona_id' => $persona, 'producto_id' => $producto['id'],
+    ], conBearer($e['bearer']))->assertCreated();
+    $ficha = $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/ficha", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($ficha['derechos'][0]['saldo_unidades'])->toBe(1000);
 });
 
 it('archivar retira el producto de la venta pero lo conserva en el editor', function (): void {

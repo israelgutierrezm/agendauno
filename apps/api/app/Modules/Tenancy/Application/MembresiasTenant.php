@@ -6,9 +6,11 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Creditos\TipoMovimiento;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\PoliticaRollover;
 use App\Modules\Tenancy\Membresias\TipoProducto;
+use App\Modules\Tenancy\Membresias\VigenciaProducto;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
@@ -25,7 +27,13 @@ use Illuminate\Support\Facades\DB;
  */
 class MembresiasTenant
 {
-    public function __construct(private readonly LibroMayorTenant $libro) {}
+    /** Una clase suelta es de una sola clase (1000 unidades = 1 crédito). */
+    private const UNIDADES_CLASE_SUELTA = 1000;
+
+    public function __construct(
+        private readonly LibroMayorTenant $libro,
+        private readonly GestorDeConexionTenant $gestor,
+    ) {}
 
     public function crearProducto(
         string $nombre,
@@ -40,7 +48,7 @@ class MembresiasTenant
         ?int $rolloverMax = null,
         ?int $actividadId = null,
         ?int $sucursalId = null,
-        ?int $vigenciaDias = null,
+        ?VigenciaProducto $vigencia = null,
     ): ProductoTenant {
         return ProductoTenant::query()->create($this->normalizar([
             'nombre' => $nombre,
@@ -49,7 +57,8 @@ class MembresiasTenant
             'moneda' => $moneda,
             'ilimitado' => $ilimitado,
             'creditos_incluidos' => $creditosIncluidos,
-            'vigencia_dias' => $vigenciaDias,
+            'vigencia_tipo' => $vigencia?->tipo,
+            'vigencia_cantidad' => $vigencia?->cantidad,
             'archivado' => false,
             'politica_reset' => $politicaReset,
             'unidades_por_ciclo' => $unidadesPorCiclo,
@@ -71,9 +80,11 @@ class MembresiasTenant
     {
         // Base = estado actual del producto; encima, los campos provistos.
         $fusion = array_merge([
+            'tipo' => $producto->tipo,
             'ilimitado' => $producto->ilimitado,
             'creditos_incluidos' => $producto->creditos_incluidos,
-            'vigencia_dias' => $producto->vigencia_dias,
+            'vigencia_tipo' => $producto->vigencia_tipo,
+            'vigencia_cantidad' => $producto->vigencia_cantidad,
             'archivado' => $producto->archivado,
             'politica_reset' => $producto->politica_reset,
             'unidades_por_ciclo' => $producto->unidades_por_ciclo,
@@ -88,7 +99,8 @@ class MembresiasTenant
 
     /**
      * Reglas de coherencia de un producto: ilimitado no lleva créditos ni cupo por
-     * ciclo; sin recurrencia no hay cupo por ciclo; rollover_max solo si es limitado.
+     * ciclo; sin recurrencia no hay cupo por ciclo; rollover_max solo si es limitado;
+     * una clase suelta es de una sola clase; sin tipo de vigencia no hay cantidad.
      *
      * @param  array<string, mixed>  $a
      * @return array<string, mixed>
@@ -99,6 +111,15 @@ class MembresiasTenant
         $politicaReset = $a['politica_reset'] ?? PoliticaReset::Ninguno;
         $politicaRollover = $a['politica_rollover'] ?? PoliticaRollover::Ninguno;
         $recurrente = $politicaReset !== PoliticaReset::Ninguno;
+
+        if (($a['tipo'] ?? null) === TipoProducto::SesionIndividual) {
+            $ilimitado = false;
+            $a['ilimitado'] = false;
+            $a['creditos_incluidos'] = self::UNIDADES_CLASE_SUELTA;
+        }
+        if (($a['vigencia_tipo'] ?? null) === null) {
+            $a['vigencia_cantidad'] = null;
+        }
 
         $a['creditos_incluidos'] = $ilimitado ? null : ($a['creditos_incluidos'] ?? null);
         $a['unidades_por_ciclo'] = ($ilimitado || ! $recurrente) ? null : ($a['unidades_por_ciclo'] ?? null);
@@ -116,7 +137,8 @@ class MembresiasTenant
     public function venderProducto(PersonaTenant $persona, ProductoTenant $producto, ?string $fechaInicio = null, ?Usuario $actor = null): AcuerdoTenant
     {
         return DB::connection('tenant')->transaction(function () use ($persona, $producto, $fechaInicio, $actor): AcuerdoTenant {
-            $inicio = $fechaInicio ?? Carbon::now()->toDateString();
+            // La fecha de compra es la del negocio (no la del servidor en UTC).
+            $inicio = $fechaInicio ?? Carbon::now($this->zona())->toDateString();
 
             $politicaReset = $producto->politica_reset ?? PoliticaReset::Ninguno;
             $politicaRollover = $producto->politica_rollover ?? PoliticaRollover::Ninguno;
@@ -138,9 +160,7 @@ class MembresiasTenant
 
             // Vigencia del producto → ventana de validez del derecho (feed del radar de
             // retención y del control de acceso). Sin vigencia, no expira por fecha.
-            $validoHasta = $producto->vigencia_dias !== null
-                ? Carbon::parse($inicio)->addDays($producto->vigencia_dias)->toDateString()
-                : null;
+            $validoHasta = VigenciaProducto::de($producto)?->hasta($inicio);
 
             $derecho = $acuerdo->derechos()->create([
                 'ambito' => 'general',
@@ -196,6 +216,14 @@ class MembresiasTenant
                 ContextoMovimiento::para(OrigenMovimiento::TopUp, null, null, $actor),
             );
         });
+    }
+
+    /**
+     * Zona horaria del negocio: con ella se decide la fecha de compra.
+     */
+    public function zona(): string
+    {
+        return (string) ($this->gestor->actual()?->zona_horaria ?: 'America/Mexico_City');
     }
 
     /**

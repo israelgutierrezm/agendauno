@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Models;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\PoliticaRollover;
 use App\Modules\Tenancy\Membresias\TipoProducto;
+use App\Modules\Tenancy\Membresias\TipoVigencia;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,7 +27,7 @@ class ProductoTenant extends Model
 
     protected $fillable = [
         'nombre', 'tipo', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos',
-        'vigencia_dias', 'archivado', 'actividad_id', 'sucursal_id', 'politica_reset',
+        'vigencia_tipo', 'vigencia_cantidad', 'archivado', 'actividad_id', 'sucursal_id', 'politica_reset',
         'unidades_por_ciclo', 'politica_rollover', 'rollover_max',
     ];
 
@@ -38,7 +39,8 @@ class ProductoTenant extends Model
         'precio_minor' => 'integer',
         'ilimitado' => 'boolean',
         'creditos_incluidos' => 'integer',
-        'vigencia_dias' => 'integer',
+        'vigencia_tipo' => TipoVigencia::class,
+        'vigencia_cantidad' => 'integer',
         'archivado' => 'boolean',
         'politica_reset' => PoliticaReset::class,
         'politica_rollover' => PoliticaRollover::class,

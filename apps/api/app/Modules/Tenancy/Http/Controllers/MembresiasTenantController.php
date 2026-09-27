@@ -10,6 +10,8 @@ use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\PoliticaRollover;
 use App\Modules\Tenancy\Membresias\TipoProducto;
+use App\Modules\Tenancy\Membresias\TipoVigencia;
+use App\Modules\Tenancy\Membresias\VigenciaProducto;
 use App\Modules\Tenancy\Models\ActividadTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -28,6 +30,9 @@ use Illuminate\Validation\Rule;
 class MembresiasTenantController
 {
     private const LIMITE = 200;
+
+    /** Tope de la cantidad de vigencia (366 días o meses): evita capturas absurdas. */
+    private const VIGENCIA_MAXIMA = 366;
 
     public function __construct(
         private readonly MembresiasTenant $membresias,
@@ -60,7 +65,8 @@ class MembresiasTenantController
             'moneda' => ['required', 'string', 'size:3'],
             'ilimitado' => ['boolean'],
             'creditos_incluidos' => ['nullable', 'integer', 'min:0'],
-            'vigencia_dias' => ['nullable', 'integer', 'min:1'],
+            'vigencia_tipo' => ['nullable', Rule::enum(TipoVigencia::class)],
+            'vigencia_cantidad' => ['nullable', 'required_with:vigencia_tipo', 'integer', 'min:1', 'max:'.self::VIGENCIA_MAXIMA],
             'politica_reset' => ['nullable', Rule::enum(PoliticaReset::class)],
             'unidades_por_ciclo' => ['nullable', 'integer', 'min:0'],
             'politica_rollover' => ['nullable', Rule::enum(PoliticaRollover::class)],
@@ -82,7 +88,9 @@ class MembresiasTenantController
             isset($validado['rollover_max']) ? (int) $validado['rollover_max'] : null,
             $this->resolverId(ActividadTenant::class, $validado['actividad_id'] ?? null),
             $this->resolverId(SucursalTenant::class, $validado['sucursal_id'] ?? null),
-            isset($validado['vigencia_dias']) ? (int) $validado['vigencia_dias'] : null,
+            isset($validado['vigencia_tipo'])
+                ? new VigenciaProducto(TipoVigencia::from($validado['vigencia_tipo']), (int) $validado['vigencia_cantidad'])
+                : null,
         );
 
         return response()->json(['data' => $this->presentarProducto($producto)], 201);
@@ -104,7 +112,8 @@ class MembresiasTenantController
             'moneda' => ['sometimes', 'string', 'size:3'],
             'ilimitado' => ['sometimes', 'boolean'],
             'creditos_incluidos' => ['nullable', 'integer', 'min:0'],
-            'vigencia_dias' => ['nullable', 'integer', 'min:1'],
+            'vigencia_tipo' => ['sometimes', 'nullable', Rule::enum(TipoVigencia::class)],
+            'vigencia_cantidad' => ['nullable', 'required_with:vigencia_tipo', 'integer', 'min:1', 'max:'.self::VIGENCIA_MAXIMA],
             'politica_reset' => ['sometimes', Rule::enum(PoliticaReset::class)],
             'unidades_por_ciclo' => ['nullable', 'integer', 'min:0'],
             'politica_rollover' => ['sometimes', Rule::enum(PoliticaRollover::class)],
@@ -115,13 +124,16 @@ class MembresiasTenantController
         ]);
 
         $atributos = [];
-        foreach (['nombre', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos', 'vigencia_dias', 'unidades_por_ciclo', 'rollover_max', 'archivado'] as $campo) {
+        foreach (['nombre', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos', 'vigencia_cantidad', 'unidades_por_ciclo', 'rollover_max', 'archivado'] as $campo) {
             if ($request->has($campo)) {
                 $atributos[$campo] = $validado[$campo] ?? null;
             }
         }
         if ($request->has('tipo')) {
             $atributos['tipo'] = TipoProducto::from($validado['tipo']);
+        }
+        if ($request->has('vigencia_tipo')) {
+            $atributos['vigencia_tipo'] = isset($validado['vigencia_tipo']) ? TipoVigencia::from($validado['vigencia_tipo']) : null;
         }
         if ($request->has('politica_reset')) {
             $atributos['politica_reset'] = PoliticaReset::from($validado['politica_reset']);
@@ -136,7 +148,7 @@ class MembresiasTenantController
             $atributos['sucursal_id'] = $this->resolverId(SucursalTenant::class, $validado['sucursal_id'] ?? null);
         }
 
-        $antes = $producto->only(['nombre', 'precio_minor', 'ilimitado', 'creditos_incluidos', 'vigencia_dias', 'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max', 'archivado']);
+        $antes = $producto->only(['nombre', 'precio_minor', 'ilimitado', 'creditos_incluidos', 'vigencia_tipo', 'vigencia_cantidad', 'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max', 'archivado']);
         $this->membresias->actualizarProducto($producto, $atributos);
 
         $actor = $request->attributes->get('usuario_tenant');
@@ -146,7 +158,7 @@ class MembresiasTenantController
             'producto',
             $producto->ulid,
             $antes,
-            $producto->only(['nombre', 'precio_minor', 'ilimitado', 'creditos_incluidos', 'vigencia_dias', 'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max', 'archivado']),
+            $producto->only(['nombre', 'precio_minor', 'ilimitado', 'creditos_incluidos', 'vigencia_tipo', 'vigencia_cantidad', 'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max', 'archivado']),
         );
 
         return response()->json(['data' => $this->presentarProducto($producto)]);
@@ -258,7 +270,10 @@ class MembresiasTenantController
             'moneda' => $producto->moneda,
             'ilimitado' => $producto->ilimitado,
             'creditos_incluidos' => $producto->creditos_incluidos,
-            'vigencia_dias' => $producto->vigencia_dias,
+            'vigencia_tipo' => $producto->vigencia_tipo?->value,
+            'vigencia_cantidad' => $producto->vigencia_cantidad,
+            // Para mostrar la vigencia sin adivinar: hasta cuándo, si se compra hoy.
+            'vence_si_compra_hoy' => VigenciaProducto::de($producto)?->hasta(now($this->membresias->zona())->toDateString()),
             'archivado' => $producto->archivado,
             'politica_reset' => $producto->politica_reset->value,
             'unidades_por_ciclo' => $producto->unidades_por_ciclo,

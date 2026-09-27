@@ -110,6 +110,9 @@ class EscaparateController
                 'moneda' => $p->moneda,
                 'ilimitado' => $p->ilimitado,
                 'creditos_incluidos' => $p->creditos_incluidos,
+                // Cuánto dura lo que se compra (p. ej. 1 mes, o hasta fin de mes).
+                'vigencia_tipo' => $p->vigencia_tipo?->value,
+                'vigencia_cantidad' => $p->vigencia_cantidad,
             ])->all();
     }
 
