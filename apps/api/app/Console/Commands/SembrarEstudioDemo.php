@@ -11,7 +11,10 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\TipoProducto;
+use App\Modules\Tenancy\Membresias\TipoVigencia;
+use App\Modules\Tenancy\Membresias\VigenciaProducto;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
@@ -122,6 +125,7 @@ class SembrarEstudioDemo extends Command
             // Un negocio de citas no vende paquetes de clases ni tiene clases grupales.
             if (! $soloCitas && $oferta instanceof OfertaTenant) {
                 $this->venderPack($miembroEmail);
+                $this->sembrarPlanes($oferta, $miembroEmail);
                 $this->sembrarClases($oferta, $sucursal, $instructorEmail);
             }
             $this->sembrarCitas([$instructorEmail, $equipo['profesional'][0]], $miembroEmail);
@@ -253,6 +257,52 @@ class SembrarEstudioDemo extends Command
             ?? app(MembresiasTenant::class)->crearProducto('Pack 8 clases', TipoProducto::Paquete, 89900, 'MXN', false, 8000);
 
         app(MembresiasTenant::class)->venderProducto($persona, $pack);
+    }
+
+    /**
+     * Planes de ejemplo (ADR 0050): un paquete que solo sirve para Nivel 1 a 3 y vence
+     * al mes, una clase suelta, clases extra y una mensualidad ilimitada. A la alumna
+     * con acceso le suma 2 clases extra, para que su corte las muestre. Idempotente.
+     */
+    private function sembrarPlanes(OfertaTenant $nivel1, string $miembroEmail): void
+    {
+        $actividad = $nivel1->actividad;
+        if ($actividad === null) {
+            return;
+        }
+        $niveles = [$nivel1];
+        foreach (['Nivel 2', 'Nivel 3', 'Nivel 4'] as $nombre) {
+            $niveles[] = $actividad->ofertas()->firstOrCreate(
+                ['nombre' => $nombre],
+                ['modalidad' => ModalidadOfertaTenant::Grupal->value, 'capacidad' => 10],
+            );
+        }
+
+        $membresias = app(MembresiasTenant::class);
+        $plan = fn (string $nombre, callable $crear): ProductoTenant => ProductoTenant::query()->where('nombre', $nombre)->first() ?? $crear($nombre);
+
+        $plan('Paquete 4 clases (Nivel 1 a 3)', fn (string $n) => $membresias->crearProducto(
+            $n, TipoProducto::Paquete, 60000, 'MXN', false, 4000,
+            vigencia: new VigenciaProducto(TipoVigencia::Meses, 1),
+            ofertaIds: array_map(fn (OfertaTenant $o): int => (int) $o->getKey(), array_slice($niveles, 0, 3)),
+        ));
+        $plan('Clase suelta', fn (string $n) => $membresias->crearProducto(
+            $n, TipoProducto::SesionIndividual, 18000, 'MXN', false, 1000,
+            vigencia: new VigenciaProducto(TipoVigencia::FinDeMes, 1),
+        ));
+        $extra = $plan('2 clases extra', fn (string $n) => $membresias->crearProducto($n, TipoProducto::AddOn, 25000, 'MXN', false, 2000));
+        $plan('Mensualidad ilimitada', fn (string $n) => $membresias->crearProducto(
+            $n, TipoProducto::Membresia, 129900, 'MXN', true, null, politicaReset: PoliticaReset::Calendario,
+        ));
+
+        $persona = PersonaTenant::query()->where('email', $miembroEmail)->first();
+        $yaTieneExtras = $persona instanceof PersonaTenant && AcuerdoTenant::query()
+            ->where('persona_id', $persona->getKey())
+            ->where('producto_comercial_id', $extra->getKey())
+            ->exists();
+        if ($persona instanceof PersonaTenant && ! $yaTieneExtras && $membresias->paqueteParaExtras($persona) !== null) {
+            $membresias->venderProducto($persona, $extra);
+        }
     }
 
     private function sembrarClases(OfertaTenant $oferta, SucursalTenant $sucursal, string $instructorEmail): void
