@@ -63,6 +63,7 @@ import {
   terminologiaNegocio,
   validacion,
 } from "./locales/gestion.es-MX";
+import portal from "./locales/portal.es-MX";
 import recepcionVisual from "./locales/recepcionVisual.es-MX";
 
 // Textos base (sin adaptar a ningún negocio).
@@ -121,6 +122,7 @@ const mensajesBase = {
   terminologiaNegocio,
   tarjetas,
   nuevaClase,
+  portal,
 };
 
 export const i18n = createI18n({

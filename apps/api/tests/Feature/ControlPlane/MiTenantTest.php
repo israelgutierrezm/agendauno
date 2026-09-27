@@ -101,3 +101,22 @@ it('el miembro ve la agenda de sesiones proximas', function (): void {
     test()->getJson("/api/v1/app/{$e['slug']}/mi/agenda", conBearer($m['bearer']))
         ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.oferta', 'Nivel 1');
 });
+
+it('la agenda y las reservas del miembro traen la hora de fin (para su calendario)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $m = miembroConAcceso($e);
+    $semilla = agendaSemilla($e);
+    $sesion = crearSesionTenant($e, $semilla);
+
+    $agenda = test()->getJson("/api/v1/app/{$e['slug']}/mi/agenda", conBearer($m['bearer']))
+        ->assertOk()->assertJsonPath('data.0.instructor', null)->json('data.0');
+    // La sesión dura 60 minutos.
+    expect(strtotime($agenda['termina_en']) - strtotime($agenda['inicia_en']))->toBe(3600);
+
+    test()->postJson("/api/v1/app/{$e['slug']}/mi/reservas", ['sesion_id' => $sesion], conBearer($m['bearer']))
+        ->assertCreated();
+    $reserva = test()->getJson("/api/v1/app/{$e['slug']}/mi/perfil", conBearer($m['bearer']))
+        ->assertOk()->json('data.reservas.0');
+    expect($reserva)->toHaveKey('instructor')
+        ->and($reserva['termina_en'])->toBe($agenda['termina_en']);
+});

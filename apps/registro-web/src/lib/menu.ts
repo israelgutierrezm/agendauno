@@ -10,11 +10,48 @@ type Sesion = ReturnType<typeof useSesionTenantStore>;
 // Menu lateral en ARBOL (3 niveles): grupos por area -> secciones -> sub-secciones.
 export const MENU: MenuItem[] = [
   {
-    clave: "mi-cuenta",
+    // Portal del alumno o cliente (su cuenta en este negocio), una pantalla por tema.
+    clave: "mi-cuenta-grupo",
     etiqueta: "nav.miCuenta",
     icono: "mi-cuenta",
-    ruta: "mi-cuenta",
     soloMiembro: true,
+    hijos: [
+      {
+        clave: "mi-cuenta",
+        etiqueta: "portal.nav.inicio",
+        icono: "panel",
+        ruta: "mi-cuenta",
+        soloMiembro: true,
+      },
+      {
+        clave: "mis-reservas",
+        etiqueta: "portal.nav.reservas",
+        icono: "agenda",
+        ruta: "mis-reservas",
+        soloMiembro: true,
+      },
+      {
+        clave: "mis-pagos",
+        etiqueta: "portal.nav.pagos",
+        icono: "ventas",
+        ruta: "mis-pagos",
+        soloMiembro: true,
+      },
+      {
+        clave: "mi-expediente",
+        etiqueta: "portal.nav.expediente",
+        icono: "expediente",
+        ruta: "mi-expediente",
+        soloMiembro: true,
+      },
+      {
+        clave: "mi-configuracion",
+        etiqueta: "portal.nav.configuracion",
+        icono: "configuracion",
+        ruta: "mi-configuracion",
+        soloMiembro: true,
+      },
+    ],
   },
   {
     clave: "panel",

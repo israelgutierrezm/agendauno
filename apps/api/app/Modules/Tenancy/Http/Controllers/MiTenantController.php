@@ -146,7 +146,7 @@ class MiTenantController
                 EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
                 EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value,
             ])
-            ->with(['sesion.oferta', 'sesion.sucursal', 'orden'])
+            ->with(['sesion.oferta', 'sesion.sucursal', 'sesion.instructor', 'orden'])
             ->get()
             ->filter(fn (ReservaTenant $r): bool => $r->sesion !== null && ! $r->sesion->inicia_en->isPast())
             ->map(fn (ReservaTenant $r): array => $this->presentarReserva($r))
@@ -195,7 +195,7 @@ class MiTenantController
             // Solo clases abiertas: las citas son privadas de su titular.
             ->where('tipo', TipoSesionTenant::Clase->value)
             ->where('inicia_en', '>=', CarbonImmutable::now())
-            ->with(['oferta', 'sucursal'])
+            ->with(['oferta', 'sucursal', 'instructor'])
             // Cupo ocupado = reservas que toman lugar (confirmadas, ofrecidas y
             // pendientes de pago, que retienen el cupo mientras se pagan).
             ->withCount(['reservas as ocupados' => fn ($q) => $q->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::PendientePago->value])])
@@ -209,6 +209,8 @@ class MiTenantController
                 'oferta' => $s->oferta?->nombre,
                 'sucursal' => $s->sucursal?->nombre,
                 'inicia_en' => $s->inicia_en->toIso8601String(),
+                'termina_en' => $s->termina_en->toIso8601String(),
+                'instructor' => $s->instructor?->name,
                 'zona_horaria' => $s->zona_horaria,
                 'capacidad' => $s->capacidad,
                 'ocupados' => (int) ($s->getAttribute('ocupados') ?? 0),
@@ -413,6 +415,9 @@ class MiTenantController
             'oferta' => $reserva->sesion?->oferta?->nombre,
             'sucursal' => $reserva->sesion?->sucursal?->nombre,
             'inicia_en' => $reserva->sesion?->inicia_en->toIso8601String(),
+            // Fin y profesional: para verla en su calendario y agregarla al del teléfono.
+            'termina_en' => $reserva->sesion?->termina_en->toIso8601String(),
+            'instructor' => $reserva->sesion?->instructor?->name,
             'zona_horaria' => $reserva->sesion?->zona_horaria,
             // Vencimiento de la oferta de lista de espera (si la reserva está ofrecida).
             'oferta_expira_en' => $reserva->oferta_expira_en?->toIso8601String(),

@@ -345,9 +345,34 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Portal del alumno o cliente: Inicio con accesos y una pantalla por tema.
       path: "/mi-cuenta",
       name: "mi-cuenta",
       component: () => import("@/views/MiCuentaView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      path: "/mi-cuenta/reservas",
+      name: "mis-reservas",
+      component: () => import("@/views/MisReservasView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      path: "/mi-cuenta/pagos",
+      name: "mis-pagos",
+      component: () => import("@/views/MisPagosView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      path: "/mi-cuenta/expediente",
+      name: "mi-expediente",
+      component: () => import("@/views/MiExpedienteView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      path: "/mi-cuenta/configuracion",
+      name: "mi-configuracion",
+      component: () => import("@/views/MiConfiguracionView.vue"),
       meta: { requiereSesion: true },
     },
     {
