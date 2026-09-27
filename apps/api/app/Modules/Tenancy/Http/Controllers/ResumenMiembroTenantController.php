@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Tenancy\Application\LibroMayorTenant;
-use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
+use App\Modules\Tenancy\Application\ResumenMembresiasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\EstadoSesionTenant;
-use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
-use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -31,11 +28,9 @@ use Illuminate\Http\Request;
 class ResumenMiembroTenantController
 {
     public function __construct(
-        private readonly LibroMayorTenant $libro,
         private readonly WaiversTenant $waivers,
         private readonly ResolverAccesoTenant $acceso,
-        // Desde cuántos días antes está "por vencer": lo fija el negocio (ADR 0047).
-        private readonly ParametrosTenant $parametros,
+        private readonly ResumenMembresiasTenant $membresias,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -50,51 +45,11 @@ class ResumenMiembroTenantController
             403,
         );
 
-        $hoy = CarbonImmutable::now()->startOfDay();
         $ahora = CarbonImmutable::now();
-
-        $derechos = DerechoTenant::query()
-            ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))
-            ->with('acuerdo.pausaAbierta')
-            ->get();
-
-        $tieneAcceso = false;
-        $pausadaHasta = null;
-        $maxVigencia = null;
-        $saldo = 0;
-        foreach ($derechos as $derecho) {
-            $vence = $derecho->valido_hasta;
-            $vigente = $vence === null || $vence->gte($hoy);
-            $disponible = $derecho->ilimitado ? 0 : $this->libro->disponible($derecho);
-
-            // Solo una membresía activa da acceso (en pausa o suspendida, no).
-            $activo = $derecho->acuerdo?->estado === EstadoAcuerdo::Activo;
-            if ($activo && $vigente && ($derecho->ilimitado || $disponible > 0)) {
-                $tieneAcceso = true;
-            }
-            $pausa = $derecho->acuerdo?->pausaAbierta;
-            if ($pausa !== null && ($pausadaHasta === null || $pausa->hasta->gt($pausadaHasta))) {
-                $pausadaHasta = $pausa->hasta;
-            }
-            if (! $derecho->ilimitado && $vigente) {
-                $saldo += max(0, $disponible);
-            }
-            if ($vence !== null && ($maxVigencia === null || $vence->gt($maxVigencia))) {
-                $maxVigencia = $vence;
-            }
-        }
-
-        // Estado de membresía (explicable): sin / vigente / por_vencer / vencida.
-        $estado = 'sin';
-        if ($derechos->isNotEmpty()) {
-            if ($tieneAcceso) {
-                $estado = $maxVigencia !== null && $maxVigencia->lte($hoy->addDays($this->parametros->entero('membresias.dias_por_vencer'))) ? 'por_vencer' : 'vigente';
-            } elseif ($pausadaHasta !== null) {
-                $estado = 'pausada';
-            } elseif ($maxVigencia !== null && $maxVigencia->lt($hoy)) {
-                $estado = 'vencida';
-            }
-        }
+        // Membresía o paquete: la misma regla que las tarjetas del listado.
+        $membresia = $this->membresias->deVarias([(int) $persona->getKey()])[(int) $persona->getKey()];
+        $estado = $membresia['estado'];
+        $saldo = $membresia['saldo_unidades'];
 
         $adeudo = ProcesoDunningTenant::query()
             ->whereIn('estado', [EstadoDunning::EnMora->value, EstadoDunning::Suspendido->value])
@@ -134,8 +89,9 @@ class ResumenMiembroTenantController
             'saldo_unidades' => $saldo,
             'membresia' => [
                 'estado' => $estado,
-                'valido_hasta' => $maxVigencia?->toDateString(),
-                'pausada_hasta' => $pausadaHasta?->toDateString(),
+                'valido_hasta' => $membresia['valido_hasta'],
+                'pausada_hasta' => $membresia['pausada_hasta'],
+                'plan' => $membresia['plan'],
             ],
             'adeudo' => $adeudo,
             'documentos_pendientes' => $documentosPendientes,

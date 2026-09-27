@@ -15,8 +15,10 @@ import PanelEditarMiembro, {
 } from "@/components/PanelEditarMiembro.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
+import TarjetaMiembro from "@/components/TarjetaMiembro.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useAnchoMinimo } from "@/lib/pantalla";
+import type { ResumenTarjeta } from "@/lib/resumenTarjeta";
 import { plural } from "@/lib/terminologia";
 import { useVistaListado } from "@/lib/vistaListado";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -38,6 +40,10 @@ interface Miembro {
   es_facturable: boolean;
   archivado: boolean;
   primera_vez: boolean | null;
+  celular?: string | null;
+  sucursal?: { id: string; nombre: string } | null;
+  // Para las tarjetas (`resumen=1`): membresía, visitas y adeudo.
+  resumen?: ResumenTarjeta;
   // Baja lógica: cuándo y quién (solo en "Dados de baja").
   dado_de_baja_en?: string | null;
   dado_de_baja_por?: string | null;
@@ -178,6 +184,7 @@ async function cargar(): Promise<void> {
           sucursal_id: sucursalFiltro.value || undefined,
           page: page.value,
           per_page: perPage,
+          resumen: 1,
         },
       },
     );
@@ -484,45 +491,33 @@ onMounted(() => {
                     :class="{ 'mb-tarjeta-activa': seleccionado?.id === m.id }"
                     @click="elegir(m, $event)"
                   >
-                    <AvatarIniciales :nombre="m.nombre" tam="lg" />
-                    <div class="min-w-0">
-                      <RouterLink
-                        v-if="tipo === 'miembro'"
-                        :to="{ name: 'ficha-miembro', params: { id: m.id } }"
-                        class="block font-medium truncate hover:underline"
-                        >{{ nombreCompleto(m) }}</RouterLink
-                      >
-                      <span v-else class="block font-medium truncate">{{
-                        nombreCompleto(m)
-                      }}</span>
-                      <p
-                        v-if="m.dado_de_baja_en"
-                        class="mt-0.5 text-xs"
-                        :style="{ color: 'var(--texto-suave)' }"
-                      >
-                        {{ detalleBaja(m) }}
-                      </p>
-                      <p v-else class="mt-0.5 text-xs">
-                        <span
-                          :style="{
-                            color: m.activo
-                              ? 'var(--texto-suave)'
-                              : 'var(--aviso)',
-                          }"
-                          >{{
-                            m.activo
-                              ? $t("miembros.activo")
-                              : $t("miembros.suspendido")
-                          }}</span
+                    <TarjetaMiembro
+                      :nombre="m.nombre"
+                      :nombre-completo="nombreCompleto(m)"
+                      :email="m.email"
+                      :celular="m.celular"
+                      :sede="hayMultiSucursal ? m.sucursal?.nombre : null"
+                      :activo="m.activo"
+                      :nuevo="tipo === 'miembro' && m.primera_vez === true"
+                      :resumen="m.dado_de_baja_en ? null : m.resumen"
+                    >
+                      <template #nombre>
+                        <RouterLink
+                          v-if="tipo === 'miembro'"
+                          :to="{ name: 'ficha-miembro', params: { id: m.id } }"
+                          class="hover:underline"
+                          >{{ nombreCompleto(m) }}</RouterLink
                         >
-                        <span
-                          v-if="tipo === 'miembro' && m.primera_vez"
-                          class="ml-1.5 font-medium"
-                          :style="{ color: 'var(--aviso)' }"
-                          >{{ $t("miembros.nuevo") }}</span
-                        >
-                      </p>
-                    </div>
+                        <template v-else>{{ nombreCompleto(m) }}</template>
+                      </template>
+                    </TarjetaMiembro>
+                    <p
+                      v-if="m.dado_de_baja_en"
+                      class="mt-2 text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                    >
+                      {{ detalleBaja(m) }}
+                    </p>
                   </div>
                 </li>
               </ul>
@@ -818,10 +813,9 @@ onMounted(() => {
 }
 /* Tarjeta de la vista en cuadrícula. */
 .mb-tarjeta {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.9rem;
+  display: block;
+  height: 100%;
+  padding: 1rem;
   border: 1px solid var(--borde);
   border-radius: 0.8rem;
   background: var(--superficie);

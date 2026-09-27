@@ -58,6 +58,7 @@ import {
   reembolsosPago,
   reprogramar,
   reglasAgenda,
+  tarjetas,
   terminologiaNegocio,
   validacion,
 } from "./locales/gestion.es-MX";
@@ -117,6 +118,7 @@ const mensajesBase = {
   parametrosConfig,
   miReprogramar,
   terminologiaNegocio,
+  tarjetas,
 };
 
 export const i18n = createI18n({

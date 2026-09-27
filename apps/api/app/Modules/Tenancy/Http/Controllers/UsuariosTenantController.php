@@ -9,11 +9,16 @@ use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
+use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\AsignacionPersonalTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\HorarioAtencionTenant;
+use App\Modules\Tenancy\Models\ResenaTenant;
+use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\TipoPersonaTenant;
+use App\Modules\Tenancy\TipoSesionTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -46,12 +51,23 @@ class UsuariosTenantController
      * Lista los instructores del estudio (usuarios con el rol instructor) para poder
      * asignarlos a sesiones. Solo ulid + nombre; nunca datos sensibles.
      */
-    public function instructores(): JsonResponse
+    public function instructores(Request $request): JsonResponse
     {
         $instructores = Usuario::query()
             ->whereJsonContains('roles', 'instructor')
             ->orderBy('name')
             ->get(['id', 'ulid', 'name', 'nombre', 'primer_apellido', 'foto_ruta']);
+
+        // `?resumen=1` (tarjetas del equipo): su agenda de la semana, sus sedes y, para
+        // quien ve a los clientes, sus reseñas. Nada de contacto: eso es privado.
+        $resumenes = [];
+        if ($request->boolean('resumen')) {
+            $actor = $request->attributes->get('usuario_tenant');
+            $resumenes = $this->resumenesDelEquipo(
+                array_map('intval', $instructores->modelKeys()),
+                $actor instanceof Usuario && $actor->puede('miembros.ver'),
+            );
+        }
 
         return response()->json([
             'data' => $instructores->map(static fn (Usuario $u): array => [
@@ -60,8 +76,74 @@ class UsuariosTenantController
                 // Para ubicarlo (tarjetas): primer nombre + apellido paterno y foto.
                 'nombre_corto' => $u->nombreCorto(),
                 'foto_url' => $u->fotoUrl(),
+                ...(isset($resumenes[$u->getKey()]) ? ['resumen' => $resumenes[$u->getKey()]] : []),
             ])->all(),
         ]);
+    }
+
+    /**
+     * Por instructor: su próxima clase o cita, cuántas tiene en los próximos 7 días,
+     * en qué sedes trabaja (por su agenda y su horario de atención) y, si se pide, el
+     * promedio de sus reseñas. Unas cuantas consultas para todo el equipo.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, array<string, mixed>>
+     */
+    private function resumenesDelEquipo(array $ids, bool $conResenas): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $sesiones = SesionTenant::query()
+            ->whereIn('instructor_id', $ids)
+            ->where('estado', EstadoSesionTenant::Programada->value)
+            ->whereBetween('inicia_en', [now(), now()->addDays(7)])
+            ->with(['oferta:id,nombre', 'sucursal:id,nombre'])
+            ->orderBy('inicia_en')
+            ->get();
+        $horarios = HorarioAtencionTenant::query()
+            ->whereIn('instructor_id', $ids)
+            ->with('sucursal:id,nombre')
+            ->get();
+        $resenas = $conResenas
+            ? ResenaTenant::query()
+                ->whereIn('instructor_id', $ids)
+                ->groupBy('instructor_id')
+                ->selectRaw('instructor_id, AVG(calificacion) as promedio, COUNT(*) as total')
+                ->get()
+                ->keyBy('instructor_id')
+            : collect();
+
+        $resumenes = [];
+        foreach ($ids as $id) {
+            $suyas = $sesiones->where('instructor_id', $id);
+            $proxima = $suyas->first();
+            $sedes = $suyas->pluck('sucursal.nombre')
+                ->merge($horarios->where('instructor_id', $id)->pluck('sucursal.nombre'))
+                ->filter()->unique()->sort()->values()->all();
+            $resena = $resenas->get($id);
+
+            $resumenes[$id] = [
+                'proxima' => $proxima instanceof SesionTenant ? [
+                    'inicia_en' => $proxima->inicia_en->toIso8601String(),
+                    'zona_horaria' => $proxima->zona_horaria,
+                    'clase' => $proxima->oferta?->nombre,
+                    'tipo' => $proxima->tipo->value,
+                ] : null,
+                'semana' => [
+                    'clases' => $suyas->where('tipo', TipoSesionTenant::Clase)->count(),
+                    'citas' => $suyas->where('tipo', TipoSesionTenant::Cita)->count(),
+                ],
+                'sedes' => $sedes,
+                'resenas' => $resena instanceof ResenaTenant ? [
+                    'promedio' => round((float) $resena->getAttribute('promedio'), 1),
+                    'total' => (int) $resena->getAttribute('total'),
+                ] : null,
+            ];
+        }
+
+        return $resumenes;
     }
 
     /**

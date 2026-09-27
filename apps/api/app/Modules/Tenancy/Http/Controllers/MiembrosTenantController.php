@@ -8,14 +8,21 @@ use App\Modules\Tenancy\Application\BajasTenant;
 use App\Modules\Tenancy\Application\MedirUsoSaas;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
+use App\Modules\Tenancy\Application\ResumenMembresiasTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\EstadoDunning;
+use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Exceptions\PersonaDadaDeBaja;
 use App\Modules\Tenancy\Http\Requests\CrearMiembroRequest;
+use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\TipoPersonaTenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,6 +43,7 @@ class MiembrosTenantController
         private readonly RegistrarAuditoria $auditoria,
         private readonly ResolverAccesoTenant $acceso,
         private readonly BajasTenant $bajas,
+        private readonly ResumenMembresiasTenant $membresias,
     ) {}
 
     /**
@@ -111,9 +119,16 @@ class MiembrosTenantController
             $items = $pagina->getCollection();
             $asistencias = $this->conteoAsistencias($items->pluck('id')->all());
             $quienes = $this->nombresDe($items->pluck('eliminado_por')->filter()->all());
+            // `?resumen=1` (tarjetas del listado): membresía, visitas y adeudo en lote.
+            $resumenes = $request->boolean('resumen') && $tipo === TipoPersonaTenant::Miembro->value
+                ? $this->resumenes($items)
+                : [];
 
             return response()->json([
-                'data' => $items->map(fn (PersonaTenant $persona): array => $this->presentar($persona, (int) ($asistencias[$persona->getKey()] ?? 0), $quienes))->all(),
+                'data' => $items->map(fn (PersonaTenant $persona): array => [
+                    ...$this->presentar($persona, (int) ($asistencias[$persona->getKey()] ?? 0), $quienes),
+                    ...(isset($resumenes[$persona->getKey()]) ? ['resumen' => $resumenes[$persona->getKey()]] : []),
+                ])->all(),
                 'meta' => [
                     'total' => $pagina->total(),
                     'page' => $pagina->currentPage(),
@@ -157,6 +172,70 @@ class MiembrosTenantController
             ->pluck('total', 'pid')
             ->map(fn ($v): int => (int) $v)
             ->all();
+    }
+
+    /**
+     * Lo que se ve de un vistazo en la tarjeta de cada persona: su membresía o paquete
+     * (misma regla que su resumen), su última visita, su próxima reserva y si debe.
+     * Unas cuantas consultas por página, no una por persona.
+     *
+     * @param  Collection<int, PersonaTenant>  $items
+     * @return array<int, array<string, mixed>>
+     */
+    private function resumenes(Collection $items): array
+    {
+        $ids = array_map('intval', $items->modelKeys());
+        if ($ids === []) {
+            return [];
+        }
+        $membresias = $this->membresias->deVarias($ids);
+
+        $ultimas = ReservaTenant::query()
+            ->join('asistencias', 'asistencias.reserva_id', '=', 'reservas.id')
+            ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
+            ->where('asistencias.estado', EstadoAsistencia::Presente->value)
+            ->whereIn('reservas.persona_id', $ids)
+            ->groupBy('reservas.persona_id')
+            ->selectRaw('reservas.persona_id as pid, MAX(sesiones.inicia_en) as ultima')
+            ->pluck('ultima', 'pid');
+
+        $proximas = ReservaTenant::query()
+            ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
+            ->whereIn('reservas.persona_id', $ids)
+            ->where('reservas.estado', EstadoReserva::Confirmada->value)
+            ->where('sesiones.estado', EstadoSesionTenant::Programada->value)
+            ->where('sesiones.inicia_en', '>=', now())
+            ->orderBy('sesiones.inicia_en')
+            ->get(['reservas.persona_id', 'sesiones.inicia_en', 'sesiones.zona_horaria', 'sesiones.oferta_id'])
+            ->unique('persona_id')
+            ->keyBy('persona_id');
+        $ofertas = OfertaTenant::query()->whereIn('id', $proximas->pluck('oferta_id')->unique()->all())->pluck('nombre', 'id');
+
+        $conAdeudo = ProcesoDunningTenant::query()
+            ->whereIn('estado', [EstadoDunning::EnMora->value, EstadoDunning::Suspendido->value])
+            ->whereHas('acuerdo', fn ($q) => $q->whereIn('persona_id', $ids))
+            ->with('acuerdo')
+            ->get()
+            ->map(fn (ProcesoDunningTenant $p): int => (int) $p->acuerdo?->persona_id)
+            ->flip();
+
+        $resumenes = [];
+        foreach ($ids as $id) {
+            $proxima = $proximas->get($id);
+            $ultima = $ultimas->get($id);
+            $resumenes[$id] = [
+                'membresia' => $membresias[$id],
+                'ultima_visita' => is_string($ultima) ? CarbonImmutable::parse($ultima, 'UTC')->toIso8601String() : null,
+                'proxima' => $proxima instanceof ReservaTenant ? [
+                    'inicia_en' => CarbonImmutable::parse((string) $proxima->getAttribute('inicia_en'), 'UTC')->toIso8601String(),
+                    'zona_horaria' => $proxima->getAttribute('zona_horaria'),
+                    'clase' => $ofertas->get((int) $proxima->getAttribute('oferta_id')),
+                ] : null,
+                'adeudo' => $conAdeudo->has($id),
+            ];
+        }
+
+        return $resumenes;
     }
 
     public function store(CrearMiembroRequest $request): JsonResponse

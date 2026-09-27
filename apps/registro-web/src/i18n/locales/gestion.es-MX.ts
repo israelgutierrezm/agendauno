@@ -921,3 +921,25 @@ export const terminologiaNegocio = {
   guardar: "Guardar",
   guardado: "Listo: tus pantallas ya usan estas palabras.",
 };
+
+// Tarjetas de los listados de Miembros e Instructores.
+export const tarjetas = {
+  ilimitado: "Ilimitado",
+  creditos: "1 crédito | {n} créditos",
+  vence: "vence el {fecha}",
+  vencio: "venció el {fecha}",
+  enPausa: "en pausa hasta el {fecha}",
+  sinMembresia: "Sin membresía",
+  adeudo: "Tiene un pago pendiente",
+  ultimaVisita: "Última visita",
+  sinVisitas: "Aún no asiste",
+  proxima: "Próxima",
+  sinReservas: "Sin reservas",
+  sede: "Sede",
+  estaSemana: "Próximos 7 días",
+  clases: "1 clase | {n} clases",
+  citas: "1 cita | {n} citas",
+  nadaAgendado: "Nada agendado",
+  resenas: "Reseñas",
+  promedio: "{promedio} de 5 ({n})",
+};
