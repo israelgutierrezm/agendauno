@@ -56,9 +56,24 @@ function filtrar(items: MenuItem[]): MenuItem[] {
         const hijos = filtrar(item.hijos);
         // Un grupo con una sola opción visible es esa opción (sin carpeta de más).
         if (hijos.length === 1) {
-          return hijos[0];
+          const unico = hijos[0];
+          return unico.terminoSuelto !== undefined
+            ? {
+                ...unico,
+                texto: plural(sesion.terminologia[unico.terminoSuelto]),
+              }
+            : unico;
         }
-        return hijos.length > 0 ? { ...item, hijos } : null;
+        if (hijos.length === 0) {
+          return null;
+        }
+        return item.termino !== undefined
+          ? {
+              ...item,
+              hijos,
+              texto: plural(sesion.terminologia[item.termino]),
+            }
+          : { ...item, hijos };
       }
       if (!visible(item)) {
         return null;

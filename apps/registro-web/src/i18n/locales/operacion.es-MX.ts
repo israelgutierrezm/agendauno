@@ -8,6 +8,13 @@ export default {
     aceptar: "Confirmar",
     cancelar: "Cancelar",
   },
+  // Grupos y rótulos del menú lateral que no son el título de una pantalla.
+  menu: {
+    directorio: "Directorio",
+    equipo: "Equipo",
+    marketing: "Marketing",
+    negocio: "Datos del negocio",
+  },
   sedes: {
     ubicacion: "Ubicación (para el clima de tus alumnos)",
     ubicacionPh: "19.4194, -99.1617",

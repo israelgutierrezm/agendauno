@@ -85,67 +85,7 @@ export const MENU: MenuItem[] = [
     permiso: "facturacion.ver",
   },
   {
-    clave: "personas",
-    etiqueta: "nav.grupos.personas",
-    icono: "personas",
-    hijos: [
-      {
-        clave: "miembros",
-        etiqueta: "nav.miembros",
-        icono: "miembros",
-        ruta: "miembros",
-        permiso: "miembros.ver",
-        termino: "miembro",
-      },
-      {
-        // Seguimiento comercial (quién está por vencer): no es del instructor.
-        // Lo que hoy se revisa son renovaciones (membresías por vencer o vencidas);
-        // "retención" prometería más (inasistencia, frecuencia…).
-        clave: "retencion",
-        etiqueta: "operacion.renovaciones.titulo",
-        icono: "pulso",
-        ruta: "retencion",
-        permiso: "miembros.gestionar",
-      },
-      {
-        clave: "comunicaciones",
-        etiqueta: "nav.comunicaciones",
-        icono: "mensaje",
-        ruta: "comunicaciones",
-        permiso: "comunicaciones.gestionar",
-      },
-      {
-        clave: "resenas",
-        etiqueta: "resenas.titulo",
-        icono: "mensaje",
-        ruta: "resenas",
-        permiso: "miembros.ver",
-      },
-      {
-        clave: "instructores",
-        etiqueta: "nav.instructores",
-        icono: "instructores",
-        ruta: "instructores",
-        permiso: "agenda.gestionar",
-        termino: "instructor",
-      },
-      {
-        clave: "nomina",
-        etiqueta: "nav.nomina",
-        icono: "nomina",
-        ruta: "nomina",
-        permiso: ["estudio.gestionar", "usuarios.gestionar"],
-      },
-      {
-        clave: "usuarios",
-        etiqueta: "nav.usuarios",
-        icono: "usuarios",
-        ruta: "usuarios",
-        permiso: "usuarios.gestionar",
-      },
-    ],
-  },
-  {
+    // El día a día: la agenda y el mostrador, a un clic.
     clave: "operacion",
     etiqueta: "nav.grupos.operacion",
     icono: "operacion",
@@ -164,23 +104,6 @@ export const MENU: MenuItem[] = [
         icono: "recepcion",
         ruta: "recepcion",
         permiso: "reservas.gestionar",
-      },
-      {
-        // Cómo se reservan las clases/servicios y a qué precio: configuración.
-        clave: "catalogo",
-        etiqueta: "planes.nav.clasesServicios",
-        icono: "etiqueta",
-        ruta: "catalogo",
-        permiso: "catalogo.gestionar",
-      },
-      {
-        // Horarios de atención de cada profesional: definen los huecos para citas.
-        clave: "horarios",
-        etiqueta: "nav.horarios",
-        icono: "reloj",
-        ruta: "horarios",
-        permiso: "agenda.ver",
-        modalidad: "citas",
       },
       {
         clave: "oportunidades",
@@ -206,13 +129,47 @@ export const MENU: MenuItem[] = [
         ruta: "tareas",
         permiso: "tareas.ver",
       },
+    ],
+  },
+  {
+    // Sus alumnos o clientes (el grupo lleva el término del negocio) y lo que se
+    // lleva de cada uno: renovaciones, documentos y formularios.
+    clave: "clientes",
+    etiqueta: "nav.miembros",
+    termino: "miembro",
+    icono: "personas",
+    hijos: [
       {
-        // Salas y equipo: se configuran, no se operan.
-        clave: "recursos",
-        etiqueta: "nav.recursos",
-        icono: "recursos",
-        ruta: "recursos",
-        permiso: "agenda.gestionar",
+        clave: "miembros",
+        etiqueta: "operacion.menu.directorio",
+        icono: "miembros",
+        ruta: "miembros",
+        permiso: "miembros.ver",
+        terminoSuelto: "miembro",
+      },
+      {
+        // Lo que hoy se revisa son renovaciones (membresías por vencer o vencidas);
+        // "retención" prometería más (inasistencia, frecuencia…).
+        clave: "retencion",
+        etiqueta: "operacion.renovaciones.titulo",
+        icono: "pulso",
+        ruta: "retencion",
+        permiso: "miembros.gestionar",
+      },
+      {
+        clave: "documentos",
+        etiqueta: "nav.documentos",
+        icono: "documentos",
+        ruta: "documentos",
+        permiso: "documentos.subir",
+      },
+      {
+        // Se llenan por persona: además hace falta ver miembros (un alumno no).
+        clave: "formularios",
+        etiqueta: "nav.formularios",
+        icono: "formularios",
+        ruta: "formularios",
+        permiso: "formularios.gestionar",
       },
     ],
   },
@@ -235,20 +192,6 @@ export const MENU: MenuItem[] = [
         icono: "ventas",
         ruta: "ventas",
         permiso: "productos.ver",
-      },
-      {
-        clave: "promociones",
-        etiqueta: "nav.promociones",
-        icono: "promociones",
-        ruta: "promociones",
-        permiso: "promociones.gestionar",
-      },
-      {
-        clave: "lealtad",
-        etiqueta: "nav.lealtad",
-        icono: "lealtad",
-        ruta: "lealtad",
-        permiso: "lealtad.ver",
       },
     ],
   },
@@ -293,48 +236,103 @@ export const MENU: MenuItem[] = [
         ruta: "facturas",
         permiso: "ordenes.ver",
       },
-      {
-        clave: "reportes",
-        etiqueta: "nav.reportes",
-        icono: "reportes",
-        ruta: "reportes",
-        permiso: "facturacion.ver",
-      },
     ],
   },
   {
-    clave: "contenido",
-    etiqueta: "nav.grupos.contenido",
-    icono: "contenido",
+    // Quien imparte o atiende: sus horarios y lo que se le paga.
+    clave: "equipo",
+    etiqueta: "operacion.menu.equipo",
+    icono: "instructores",
     hijos: [
       {
-        clave: "documentos",
-        etiqueta: "nav.documentos",
-        icono: "documentos",
-        ruta: "documentos",
-        permiso: "documentos.subir",
+        clave: "instructores",
+        etiqueta: "nav.instructores",
+        icono: "instructores",
+        ruta: "instructores",
+        permiso: "agenda.gestionar",
+        termino: "instructor",
       },
       {
-        // Se llenan por persona: además hace falta ver miembros (un alumno no).
-        clave: "formularios",
-        etiqueta: "nav.formularios",
-        icono: "formularios",
-        ruta: "formularios",
-        permiso: "formularios.gestionar",
+        // Horarios de atención de cada profesional: definen los huecos para citas.
+        clave: "horarios",
+        etiqueta: "nav.horarios",
+        icono: "reloj",
+        ruta: "horarios",
+        permiso: "agenda.ver",
+        modalidad: "citas",
+      },
+      {
+        clave: "nomina",
+        etiqueta: "nav.nomina",
+        icono: "nomina",
+        ruta: "nomina",
+        permiso: ["estudio.gestionar", "usuarios.gestionar"],
       },
     ],
   },
   {
+    // Atraer y conservar: avisos, promociones, lealtad y reseñas.
+    clave: "marketing",
+    etiqueta: "operacion.menu.marketing",
+    icono: "promociones",
+    hijos: [
+      {
+        clave: "comunicaciones",
+        etiqueta: "nav.comunicaciones",
+        icono: "mensaje",
+        ruta: "comunicaciones",
+        permiso: "comunicaciones.gestionar",
+      },
+      {
+        clave: "promociones",
+        etiqueta: "nav.promociones",
+        icono: "promociones",
+        ruta: "promociones",
+        permiso: "promociones.gestionar",
+      },
+      {
+        clave: "lealtad",
+        etiqueta: "nav.lealtad",
+        icono: "lealtad",
+        ruta: "lealtad",
+        permiso: "lealtad.ver",
+      },
+      {
+        clave: "resenas",
+        etiqueta: "resenas.titulo",
+        icono: "mensaje",
+        ruta: "resenas",
+        permiso: "miembros.ver",
+      },
+    ],
+  },
+  {
+    clave: "reportes",
+    etiqueta: "nav.reportes",
+    icono: "reportes",
+    ruta: "reportes",
+    permiso: "facturacion.ver",
+  },
+  {
+    // Cómo está armado el negocio: se configura una vez y se revisa de vez en cuando.
     clave: "ajustes",
-    etiqueta: "nav.grupos.ajustes",
+    etiqueta: "nav.configuracion",
     icono: "ajustes",
     hijos: [
       {
         clave: "configuracion",
-        etiqueta: "nav.configuracion",
+        etiqueta: "operacion.menu.negocio",
         icono: "configuracion",
         ruta: "configuracion",
         permiso: "estudio.gestionar",
+      },
+      {
+        // Cómo se reservan las clases/servicios y a qué precio.
+        clave: "catalogo",
+        etiqueta: "planes.nav.clasesServicios",
+        icono: "etiqueta",
+        ruta: "catalogo",
+        permiso: "catalogo.gestionar",
       },
       {
         clave: "reglas-agenda",
@@ -344,11 +342,26 @@ export const MENU: MenuItem[] = [
         permiso: "agenda.gestionar",
       },
       {
+        // Salas y equipo: se configuran, no se operan.
+        clave: "recursos",
+        etiqueta: "nav.recursos",
+        icono: "recursos",
+        ruta: "recursos",
+        permiso: "agenda.gestionar",
+      },
+      {
         clave: "sedes",
         etiqueta: "nav.sedes",
         icono: "ubicacion",
         ruta: "sedes",
         permiso: "sucursales.gestionar",
+      },
+      {
+        clave: "usuarios",
+        etiqueta: "nav.usuarios",
+        icono: "usuarios",
+        ruta: "usuarios",
+        permiso: "usuarios.gestionar",
       },
       {
         clave: "datos-fiscales",
@@ -365,6 +378,13 @@ export const MENU: MenuItem[] = [
         permiso: "pagos.configurar",
       },
       {
+        clave: "integraciones",
+        etiqueta: "nav.integraciones",
+        icono: "integraciones",
+        ruta: "integraciones",
+        permiso: "integraciones.configurar",
+      },
+      {
         clave: "bitacora",
         etiqueta: "bitacora.titulo",
         icono: "lista",
@@ -378,13 +398,6 @@ export const MENU: MenuItem[] = [
         icono: "documentos",
         ruta: "privacidad",
         permiso: "miembros.gestionar",
-      },
-      {
-        clave: "integraciones",
-        etiqueta: "nav.integraciones",
-        icono: "integraciones",
-        ruta: "integraciones",
-        permiso: "integraciones.configurar",
       },
     ],
   },

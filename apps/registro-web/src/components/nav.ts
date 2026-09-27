@@ -24,6 +24,9 @@ export interface MenuItem {
   flag?: "grupos" | "niveles" | "acceso_abierto";
   // La etiqueta es el plural del término del perfil (p. ej. Barberos, Clientes).
   termino?: "miembro" | "instructor";
+  // Fuera de su grupo (atajo del Inicio o grupo con solo esta opción), la etiqueta
+  // es el plural de este término: "Directorio" dentro de Alumnos, "Alumnos" suelto.
+  terminoSuelto?: "miembro" | "instructor";
   // Etiqueta ya resuelta; sustituye a la clave i18n.
   texto?: string;
   hijos?: MenuItem[];

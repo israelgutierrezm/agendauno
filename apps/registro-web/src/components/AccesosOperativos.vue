@@ -16,7 +16,20 @@ const accesos = computed(() => {
   ];
   return rutas.flatMap((ruta) => {
     const item = hojas(MENU).find((hoja) => hoja.ruta === ruta);
-    return item && esVisible(item, sesion) ? [item] : [];
+    if (!item || !esVisible(item, sesion)) {
+      return [];
+    }
+    // Suelto, fuera del menú: "Alumnos" o "Clientes", no "Directorio".
+    const termino = item.termino ?? item.terminoSuelto;
+    return [
+      {
+        ...item,
+        texto:
+          termino !== undefined
+            ? plural(sesion.terminologia[termino])
+            : undefined,
+      },
+    ];
   });
 });
 </script>
@@ -40,9 +53,7 @@ const accesos = computed(() => {
         /></span>
         <span class="min-w-0 flex-1">
           <span class="block font-medium">{{
-            item.termino
-              ? plural(sesion.terminologia[item.termino])
-              : $t(item.etiqueta)
+            item.texto ?? $t(item.etiqueta)
           }}</span>
           <span
             class="mt-1 block text-sm"
