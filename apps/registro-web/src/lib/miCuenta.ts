@@ -87,6 +87,11 @@ export interface Voucher {
 }
 
 // Estado único (módulo): todas las pantallas del portal ven lo mismo.
+//
+// Es de UNA sesión (negocio + token): al cambiar de cuenta o de negocio se vacía
+// antes de pintar nada, y las respuestas que lleguen de la sesión anterior se
+// descartan (`generacion`). Así, en un equipo compartido, si la carga de la nueva
+// sesión falla no queda a la vista nada de la anterior.
 const derechos = ref<Derecho[]>([]);
 const reservas = ref<Reserva[]>([]);
 const clases = ref<Clase[]>([]);
@@ -102,27 +107,79 @@ const cargando = ref(false);
 const cargado = ref(false);
 const error = ref<string | null>(null);
 const accionando = ref(false);
-let slugCargado: string | null = null;
+// De qué sesión es lo que hay en memoria, y un número que cambia con cada
+// reinicio: una respuesta que vuelve con otro número es de una sesión anterior.
+let identidadCargada: string | null = null;
+let generacion = 0;
+
+/** Vacía el estado del portal (al cambiar de cuenta o de negocio, o al salir). */
+export function reiniciarMiCuenta(): void {
+  generacion++;
+  identidadCargada = null;
+  derechos.value = [];
+  reservas.value = [];
+  clases.value = [];
+  waivers.value = [];
+  productos.value = [];
+  ordenes.value = [];
+  politica.value = null;
+  formularios.value = [];
+  personaId.value = null;
+  pagoEnLinea.value = false;
+  pagoAutomatico.value = false;
+  cargando.value = false;
+  cargado.value = false;
+  error.value = null;
+  accionando.value = false;
+}
+
+/** La sesión del portal: negocio + token (cambia con cada inicio de sesión). */
+export function identidadDeSesion(
+  slug: string | null,
+  bearer: string | null,
+): string | null {
+  return slug !== null && bearer !== null ? `${slug}|${bearer}` : null;
+}
 
 export function useMiCuenta() {
   const sesion = useSesionTenantStore();
   const base = computed(() => `/api/v1/app/${sesion.slug}`);
+  const identidad = () => identidadDeSesion(sesion.slug, sesion.bearer);
+
+  // Lo que hay en memoria es de otra sesión: se vacía antes de que la pantalla lo
+  // pinte (esto corre en el setup, antes del primer render).
+  if (identidadCargada !== null && identidadCargada !== identidad()) {
+    reiniciarMiCuenta();
+  }
 
   async function cargarFormularios(): Promise<void> {
+    const mia = generacion;
     try {
       const { data } = await api.get<{
         data: { persona_id: string; formularios: FormularioPersona[] };
       }>(`${base.value}/mi/formularios`);
+      if (mia !== generacion) {
+        return; // De una sesión anterior.
+      }
       personaId.value = data.data.persona_id;
       formularios.value = data.data.formularios;
     } catch {
       // Sin perfil de alumno: no hay formularios que llenar.
-      formularios.value = [];
+      if (mia === generacion) {
+        formularios.value = [];
+      }
     }
   }
 
   /** `silencioso`: recarga sin ocultar la pantalla. */
   async function cargar(silencioso = false): Promise<void> {
+    const id = identidad();
+    // Otra sesión: nada de la anterior se queda a la vista, ni si esta falla.
+    if (id !== identidadCargada) {
+      reiniciarMiCuenta();
+      silencioso = false;
+    }
+    const mia = generacion;
     cargando.value = !silencioso;
     error.value = null;
     try {
@@ -141,6 +198,9 @@ export function useMiCuenta() {
         api.get<{ data: Producto[] }>(`${base.value}/mi/productos`),
         api.get<{ data: Orden[] }>(`${base.value}/mi/ordenes`),
       ]);
+      if (mia !== generacion) {
+        return; // Llegó tarde, de una sesión anterior: se descarta.
+      }
       derechos.value = p.data.data.derechos;
       reservas.value = p.data.data.reservas;
       politica.value = p.data.data.politica_cancelacion;
@@ -151,18 +211,24 @@ export function useMiCuenta() {
       productos.value = pr.data.data;
       ordenes.value = o.data.data;
       cargado.value = true;
-      slugCargado = sesion.slug;
+      identidadCargada = id;
     } catch (e) {
-      error.value = mensajeDeError(e);
+      if (mia === generacion) {
+        error.value = mensajeDeError(e);
+      }
     } finally {
-      cargando.value = false;
+      if (mia === generacion) {
+        cargando.value = false;
+      }
     }
-    await cargarFormularios();
+    if (mia === generacion) {
+      await cargarFormularios();
+    }
   }
 
-  /** Carga si aún no hay datos de este negocio; si ya los hay, recarga en silencio. */
+  /** Carga si aún no hay datos de esta sesión; si ya los hay, recarga en silencio. */
   async function asegurar(): Promise<void> {
-    await cargar(cargado.value && slugCargado === sesion.slug);
+    await cargar(cargado.value && identidadCargada === identidad());
   }
 
   async function accion(fn: () => Promise<unknown>): Promise<boolean> {

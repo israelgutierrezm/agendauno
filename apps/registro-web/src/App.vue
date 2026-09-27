@@ -11,6 +11,7 @@ import PanelApariencia from "@/components/PanelApariencia.vue";
 import type { MenuItem, NavEstado } from "@/components/nav";
 import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
 import { esVisible, MENU } from "@/lib/menu";
+import { identidadDeSesion, reiniciarMiCuenta } from "@/lib/miCuenta";
 import { plural } from "@/lib/terminologia";
 import { slugDeContexto } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -19,6 +20,19 @@ import { useTemaStore } from "@/stores/tema";
 
 const tema = useTemaStore();
 const sesion = useSesionTenantStore();
+
+// Al cambiar de cuenta o de negocio (o al salir), el portal del alumno se vacía en
+// ese mismo instante: en un equipo compartido no queda en memoria nada de la
+// sesión anterior, aunque la carga de la nueva falle.
+watch(
+  () => identidadDeSesion(sesion.slug, sesion.bearer),
+  (nueva, anterior) => {
+    if (nueva !== anterior) {
+      reiniciarMiCuenta();
+    }
+  },
+  { flush: "sync" },
+);
 const router = useRouter();
 const route = useRoute();
 

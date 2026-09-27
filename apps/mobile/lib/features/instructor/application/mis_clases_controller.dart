@@ -24,8 +24,11 @@ final rangoMisClasesProvider =
       RangoMisClases.new,
     );
 
-/// Lo que imparte en el rango visible (solo lo programado).
-final misClasesProvider = FutureProvider<List<SesionAgenda>>((ref) async {
+/// Lo que imparte en el rango visible (solo lo programado). Como todo lo de una
+/// sesión, se descarta al salir del portal (no pasa a la siguiente sesión).
+final misClasesProvider = FutureProvider.autoDispose<List<SesionAgenda>>((
+  ref,
+) async {
   final repo = ref.watch(agendaRepositoryProvider);
   final rango = ref.watch(rangoMisClasesProvider);
   if (repo == null) {
@@ -36,17 +39,16 @@ final misClasesProvider = FutureProvider<List<SesionAgenda>>((ref) async {
 });
 
 /// Lo de hoy y los próximos 6 días (para su Inicio).
-final proximasMisClasesProvider = FutureProvider<List<SesionAgenda>>((
-  ref,
-) async {
-  final repo = ref.watch(agendaRepositoryProvider);
-  if (repo == null) {
-    return const [];
-  }
-  final hoy = Calendario.dia(DateTime.now());
-  final sesiones = await repo.sesiones(hoy, Calendario.mas(hoy, 6));
-  return sesiones.where((s) => s.programada).toList();
-});
+final proximasMisClasesProvider =
+    FutureProvider.autoDispose<List<SesionAgenda>>((ref) async {
+      final repo = ref.watch(agendaRepositoryProvider);
+      if (repo == null) {
+        return const [];
+      }
+      final hoy = Calendario.dia(DateTime.now());
+      final sesiones = await repo.sesiones(hoy, Calendario.mas(hoy, 6));
+      return sesiones.where((s) => s.programada).toList();
+    });
 
 /// Cupo de una clase ("6/10") o, en una cita, con quién.
 String cupoDe(SesionAgenda s) {

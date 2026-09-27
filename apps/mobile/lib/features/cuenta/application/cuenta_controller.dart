@@ -7,6 +7,12 @@ import '../data/cuenta_repository.dart';
 
 /// Carga y acciones de Mi cuenta. Tras cada acción recarga el estado para reflejar
 /// créditos, reservas y consentimientos actualizados.
+///
+/// Todo lo de Mi cuenta es de UNA sesión: estos proveedores se descartan al salir
+/// del portal (autoDispose; cambiar de cuenta o de negocio siempre pasa por la
+/// pantalla de acceso), así que la siguiente sesión empieza sin el valor anterior
+/// —Riverpod lo conservaría al recargar o fallar— y lo que responda tarde la sesión
+/// anterior ya no se escribe (`ref.mounted`).
 class CuentaController extends AsyncNotifier<MiCuenta> {
   @override
   Future<MiCuenta> build() async {
@@ -66,16 +72,27 @@ class CuentaController extends AsyncNotifier<MiCuenta> {
       return;
     }
     await accion(repo);
-    state = await AsyncValue.guard(() => repo.cargar(conClases: _conClases));
+    if (!ref.mounted) {
+      return; // Se salió o cambió la sesión mientras tanto.
+    }
+    final nuevo = await AsyncValue.guard(
+      () => repo.cargar(conClases: _conClases),
+    );
+    if (ref.mounted) {
+      state = nuevo;
+    }
   }
 }
 
-final cuentaProvider = AsyncNotifierProvider<CuentaController, MiCuenta>(
-  CuentaController.new,
-);
+final cuentaProvider =
+    AsyncNotifierProvider.autoDispose<CuentaController, MiCuenta>(
+      CuentaController.new,
+    );
 
 /// Los planes que puede comprar (se filtran las clases extra si no tiene paquete).
-final productosProvider = FutureProvider<List<ProductoComprable>>((ref) async {
+final productosProvider = FutureProvider.autoDispose<List<ProductoComprable>>((
+  ref,
+) async {
   final cuenta = await ref.watch(cuentaProvider.future);
   final repo = ref.watch(cuentaRepositoryProvider);
   if (repo == null) {
@@ -85,7 +102,7 @@ final productosProvider = FutureProvider<List<ProductoComprable>>((ref) async {
 });
 
 /// El clima del Inicio; se vuelve a pedir con la cuenta (su próxima reserva manda).
-final climaProvider = FutureProvider<ClimaMiembro?>((ref) async {
+final climaProvider = FutureProvider.autoDispose<ClimaMiembro?>((ref) async {
   await ref.watch(cuentaProvider.future);
   final repo = ref.watch(cuentaRepositoryProvider);
   return repo?.clima();
@@ -93,7 +110,9 @@ final climaProvider = FutureProvider<ClimaMiembro?>((ref) async {
 
 /// Corte de sus planes; se vuelve a pedir cada vez que la cuenta se recarga (p. ej.
 /// tras reservar, cancelar o pagar).
-final cortePlanesProvider = FutureProvider<List<PlanCorte>>((ref) async {
+final cortePlanesProvider = FutureProvider.autoDispose<List<PlanCorte>>((
+  ref,
+) async {
   await ref.watch(cuentaProvider.future);
   final repo = ref.watch(cuentaRepositoryProvider);
   return repo == null ? const [] : repo.planes();

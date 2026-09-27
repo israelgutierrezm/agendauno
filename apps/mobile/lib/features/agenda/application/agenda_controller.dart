@@ -24,7 +24,8 @@ class ProfesionalAgenda extends Notifier<String?> {
   void elegir(String? id) => state = id;
 }
 
-final profesionalAgendaProvider = NotifierProvider<ProfesionalAgenda, String?>(ProfesionalAgenda.new);
+// De la sesión (un profesional de ESTE negocio): se descarta al salir.
+final profesionalAgendaProvider = NotifierProvider.autoDispose<ProfesionalAgenda, String?>(ProfesionalAgenda.new);
 
 /// Lo que muestra la agenda de un día: sus sesiones y los profesionales.
 class AgendaDia {
@@ -61,9 +62,13 @@ class AgendaController extends AsyncNotifier<AgendaDia> {
       return;
     }
     await fn(repo);
+    if (!ref.mounted) {
+      return; // Se salió o cambió la sesión mientras tanto.
+    }
     ref.invalidateSelf();
     await future;
   }
 }
 
-final agendaProvider = AsyncNotifierProvider<AgendaController, AgendaDia>(AgendaController.new);
+// Lo de una sesión se descarta al salir: la siguiente no arranca con el valor anterior.
+final agendaProvider = AsyncNotifierProvider.autoDispose<AgendaController, AgendaDia>(AgendaController.new);
