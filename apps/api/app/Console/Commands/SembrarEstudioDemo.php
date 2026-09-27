@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\MembresiasTenant;
 use App\Modules\Tenancy\Application\RegistrarEstudio;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
@@ -26,7 +27,9 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\PoliticaReservaTenant;
+use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\TipoPersonaTenant;
+use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
@@ -121,7 +124,7 @@ class SembrarEstudioDemo extends Command
                 $this->venderPack($miembroEmail);
                 $this->sembrarClases($oferta, $sucursal, $instructorEmail);
             }
-            $this->sembrarCitas([$instructorEmail, $equipo['profesional'][0]]);
+            $this->sembrarCitas([$instructorEmail, $equipo['profesional'][0]], $miembroEmail);
         });
 
         $this->componentInfo($estudio, $slug, $password, $ownerEmail, $instructorEmail, $miembroEmail, $equipo);
@@ -289,13 +292,13 @@ class SembrarEstudioDemo extends Command
      *
      * @param  list<string>  $profesionales  correos de quienes atienden citas
      */
-    private function sembrarCitas(array $profesionales): void
+    private function sembrarCitas(array $profesionales, string $clienteEmail): void
     {
 
         // Servicio agendable como cita: pago-para-reservar, 30 min, MXN 250.
         $programa = ProgramaTenant::query()->firstOrCreate(['slug' => 'barberia'], ['nombre' => 'Barbería']);
         $actividad = $programa->actividades()->firstOrCreate(['slug' => 'cortes'], ['nombre' => 'Cortes']);
-        $actividad->ofertas()->firstOrCreate(
+        $servicio = $actividad->ofertas()->firstOrCreate(
             ['nombre' => 'Corte de cabello'],
             [
                 'modalidad' => ModalidadOfertaTenant::Individual->value,
@@ -314,6 +317,56 @@ class SembrarEstudioDemo extends Command
                         ['instructor_id' => $profesional->getKey(), 'sucursal_id' => $sucursal->getKey(), 'dia_semana' => $dia],
                         ['hora_inicio' => '09:00', 'hora_fin' => '18:00'],
                     );
+                }
+            }
+        }
+
+        $this->agendarCitasDemo($servicio, $profesionales, $clienteEmail);
+    }
+
+    /**
+     * Unas citas ya agendadas (mañana y pasado) con cada profesional, para que su
+     * portal y el de la clienta no se vean vacíos. Las agenda el negocio (quedan por
+     * cobrar en caja). Idempotente: no agenda a quien ya tiene citas próximas.
+     *
+     * @param  list<string>  $profesionales
+     */
+    private function agendarCitasDemo(OfertaTenant $servicio, array $profesionales, string $clienteEmail): void
+    {
+        $sucursal = SucursalTenant::query()->orderBy('id')->first();
+        if (! $sucursal instanceof SucursalTenant) {
+            return;
+        }
+
+        // La primera cita es de la clienta con acceso; las demás, de alumnos sin acceso.
+        $correos = [$clienteEmail, 'carla@demo.mx', 'diego@demo.mx', 'elena@demo.mx', 'fabian@demo.mx', 'gabriela@demo.mx'];
+        $personas = PersonaTenant::query()->whereIn('email', $correos)->get()->keyBy('email');
+        $horarios = [[1, 10, 0], [1, 12, 30], [2, 16, 0]];
+        $zona = (string) $sucursal->zona_horaria;
+        $agendar = app(AgendarCitaTenant::class);
+        $turno = 0;
+
+        foreach (Usuario::query()->whereIn('email', $profesionales)->orderBy('id')->get() as $profesional) {
+            $yaTiene = SesionTenant::query()
+                ->where('instructor_id', $profesional->getKey())
+                ->where('tipo', TipoSesionTenant::Cita->value)
+                ->where('estado', EstadoSesionTenant::Programada->value)
+                ->where('inicia_en', '>=', now())
+                ->exists();
+            if ($yaTiene) {
+                continue;
+            }
+
+            foreach ($horarios as [$dias, $hora, $minuto]) {
+                $persona = $personas->get($correos[$turno++ % count($correos)]);
+                if (! $persona instanceof PersonaTenant) {
+                    continue;
+                }
+                $inicia = CarbonImmutable::now($zona)->addDays($dias)->setTime($hora, $minuto)->utc();
+                try {
+                    $agendar->agendar($servicio, $sucursal, $persona, (int) $profesional->getKey(), $inicia, 30, porNegocio: true);
+                } catch (SesionNoReservable) {
+                    // Hueco ocupado (p. ej. por una clase): se omite.
                 }
             }
         }
