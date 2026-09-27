@@ -5,10 +5,10 @@ import 'features/auth/application/sesion_controller.dart';
 import 'core/network/auth_token.dart';
 import 'core/storage/almacen_sesion.dart';
 import 'core/theme/tema_agendauno.dart';
-import 'features/agenda/presentation/agenda_screen.dart';
 import 'features/auth/data/sesion.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/cuenta/presentation/cuenta_screen.dart';
+import 'features/inicio/presentation/equipo_screen.dart';
 import 'features/instructor/presentation/instructor_screen.dart';
 import 'features/notificaciones/application/push_controller.dart';
 
@@ -86,7 +86,7 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
               ? const CuentaScreen()
               : (sesion.esInstructorAcotado
                     ? const InstructorScreen()
-                    : const AgendaScreen()));
+                    : const EquipoScreen()));
 
     return MaterialApp(
       title: 'AgendaUno',
