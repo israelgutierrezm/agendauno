@@ -164,6 +164,14 @@ export const MENU: MenuItem[] = [
         permiso: "reservas.gestionar",
       },
       {
+        // Cómo se reservan las clases/servicios y a qué precio: configuración.
+        clave: "catalogo",
+        etiqueta: "planes.nav.clasesServicios",
+        icono: "etiqueta",
+        ruta: "catalogo",
+        permiso: "catalogo.gestionar",
+      },
+      {
         // Horarios de atención de cada profesional: definen los huecos para citas.
         clave: "horarios",
         etiqueta: "nav.horarios",
@@ -207,31 +215,24 @@ export const MENU: MenuItem[] = [
     ],
   },
   {
-    clave: "comercio",
-    etiqueta: "nav.grupos.comercio",
-    icono: "comercio",
+    // Lo que se vende para reservar (ADR 0050): planes y paquetes y su venta.
+    clave: "membresias",
+    etiqueta: "planes.nav.membresias",
+    icono: "etiqueta",
     hijos: [
       {
-        clave: "ventas",
-        etiqueta: "nav.ventas",
-        icono: "ventas",
-        ruta: "ventas",
+        clave: "planes",
+        etiqueta: "planes.nav.planes",
+        icono: "etiqueta",
+        ruta: "planes",
         permiso: "productos.ver",
       },
       {
-        clave: "pos",
-        etiqueta: "nav.pos",
-        icono: "pos",
-        ruta: "pos",
-        permiso: "inventario.ver",
-      },
-      {
-        // Cómo se reservan las clases/servicios y a qué precio: configuración.
-        clave: "catalogo",
-        etiqueta: "nav.catalogo",
-        icono: "etiqueta",
-        ruta: "catalogo",
-        permiso: "catalogo.gestionar",
+        clave: "ventas",
+        etiqueta: "planes.nav.vender",
+        icono: "ventas",
+        ruta: "ventas",
+        permiso: "productos.ver",
       },
       {
         clave: "promociones",
@@ -247,19 +248,48 @@ export const MENU: MenuItem[] = [
         ruta: "lealtad",
         permiso: "lealtad.ver",
       },
+    ],
+  },
+  {
+    // Artículos del mostrador (agua, ropa…): nada que ver con la agenda.
+    clave: "punto-venta",
+    etiqueta: "planes.nav.puntoVenta",
+    icono: "pos",
+    hijos: [
       {
-        clave: "facturas",
-        etiqueta: "nav.facturas",
-        icono: "facturas",
-        ruta: "facturas",
-        permiso: "ordenes.ver",
+        clave: "pos",
+        etiqueta: "planes.nav.mostrador",
+        icono: "pos",
+        ruta: "pos",
+        permiso: "inventario.ver",
       },
+      {
+        clave: "inventario",
+        etiqueta: "planes.nav.inventario",
+        icono: "lista",
+        ruta: "inventario",
+        permiso: "inventario.gestionar",
+      },
+    ],
+  },
+  {
+    clave: "cobros",
+    etiqueta: "planes.nav.cobros",
+    icono: "facturas",
+    hijos: [
       {
         clave: "cobranza",
         etiqueta: "nav.cobranza",
         icono: "facturas",
         ruta: "cobranza",
         permiso: "facturacion.ver",
+      },
+      {
+        clave: "facturas",
+        etiqueta: "nav.facturas",
+        icono: "facturas",
+        ruta: "facturas",
+        permiso: "ordenes.ver",
       },
       {
         clave: "reportes",

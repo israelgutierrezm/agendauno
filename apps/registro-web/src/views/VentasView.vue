@@ -2,12 +2,12 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { RouterLink } from "vue-router";
+
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
-import PanelEditarProducto, {
-  type ProductoEditable,
-} from "@/components/PanelEditarProducto.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { SECCIONES, fechaLarga, seccionDe, type Plan } from "@/lib/planes";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Miembro {
@@ -15,22 +15,7 @@ interface Miembro {
   nombre: string;
   nombre_completo: string;
 }
-interface Producto {
-  id: string;
-  nombre: string;
-  tipo: string;
-  precio_minor: number;
-  moneda: string;
-  ilimitado: boolean;
-  creditos_incluidos: number | null;
-  vigencia_dias: number | null;
-  politica_reset: string;
-  unidades_por_ciclo: number | null;
-  politica_rollover: string;
-  rollover_max: number | null;
-  sucursal_id: string | null;
-  archivado: boolean;
-}
+type Producto = Plan;
 type Orden = {
   id: string;
   comprador: string | null;
@@ -43,7 +28,7 @@ const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeVender = computed(() => sesion.puede("ordenes.gestionar"));
-const puedeCrearProducto = computed(() => sesion.puede("productos.gestionar"));
+const puedeVerPlanes = computed(() => sesion.puede("productos.ver"));
 
 const miembros = ref<Miembro[]>([]);
 const productos = ref<Producto[]>([]);
@@ -63,12 +48,15 @@ const puedePromos = computed(() => sesion.puede("ordenes.gestionar"));
 const promoPreview = ref<{ descuento: number; total: number } | null>(null);
 const validandoPromo = ref(false);
 
-// Editor de productos (alta/edición) por drawer.
-const editando = ref<ProductoEditable | null>(null);
-const abriendoEditor = ref(false);
-// Solo los vendibles (no archivados) entran al selector de venta.
+// Solo los vendibles (no archivados) entran al selector, agrupados por tipo.
 const productosVendibles = computed(() =>
   productos.value.filter((p) => !p.archivado),
+);
+const gruposVendibles = computed(() =>
+  SECCIONES.map((s) => ({
+    clave: s,
+    productos: productosVendibles.value.filter((p) => seccionDe(p.tipo) === s),
+  })).filter((g) => g.productos.length > 0),
 );
 
 const columnasOrdenes = computed(() => [
@@ -193,19 +181,6 @@ async function vender(): Promise<void> {
   }
 }
 
-function abrirNuevo(): void {
-  editando.value = null;
-  abriendoEditor.value = true;
-}
-function abrirEditar(p: Producto): void {
-  editando.value = { ...p };
-  abriendoEditor.value = true;
-}
-function onGuardado(): void {
-  abriendoEditor.value = false;
-  void cargar();
-}
-
 const exitoTexto = computed(() => {
   if (exito.value === null) {
     return null;
@@ -229,7 +204,7 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-7xl px-4 py-10">
-    <EncabezadoSeccion :titulo="$t('ventas.titulo')" />
+    <EncabezadoSeccion :titulo="$t('planes.nav.vender')" />
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -290,10 +265,34 @@ onMounted(cargar);
               <option value="" disabled>
                 {{ $t("ventas.vender.elegir") }}
               </option>
-              <option v-for="p in productosVendibles" :key="p.id" :value="p.id">
-                {{ p.nombre }} · {{ dinero(p.precio_minor, p.moneda) }}
-              </option>
+              <optgroup
+                v-for="g in gruposVendibles"
+                :key="g.clave"
+                :label="$t(`planes.secciones.${g.clave}`)"
+              >
+                <option v-for="p in g.productos" :key="p.id" :value="p.id">
+                  {{ p.nombre }} · {{ dinero(p.precio_minor, p.moneda) }}
+                </option>
+              </optgroup>
             </select>
+            <p
+              v-if="productoSel?.tipo === 'add_on'"
+              class="mt-1 text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("planes.vender.extraAyuda") }}
+            </p>
+            <p
+              v-else-if="productoSel?.vence_si_compra_hoy"
+              class="mt-1 text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{
+                $t("planes.vender.venceHoy", {
+                  hasta: fechaLarga(productoSel.vence_si_compra_hoy),
+                })
+              }}
+            </p>
           </div>
           <div>
             <label class="tu-label" for="vmet">{{
@@ -383,68 +382,11 @@ onMounted(cargar);
         </form>
       </div>
 
-      <!-- Productos / editor de membresías -->
-      <div class="tu-card p-6">
-        <div class="flex items-center justify-between gap-2">
-          <h2 class="font-light text-lg">
-            {{ $t("ventas.productos.titulo") }}
-          </h2>
-          <button
-            v-if="puedeCrearProducto"
-            class="tu-btn tu-btn-primario text-sm shrink-0"
-            type="button"
-            @click="abrirNuevo"
-          >
-            {{ $t("ventas.productos.nuevo") }}
-          </button>
-        </div>
-        <ul v-if="productos.length > 0" class="mt-4 space-y-3">
-          <li
-            v-for="p in productos"
-            :key="p.id"
-            class="flex items-start justify-between gap-2 border-t pt-3 first:border-0 first:pt-0"
-            :style="{ borderColor: 'var(--borde)' }"
-          >
-            <div class="min-w-0">
-              <p class="font-semibold truncate">
-                {{ p.nombre }}
-                <span v-if="p.archivado" class="tu-badge ml-1">{{
-                  $t("ventas.productos.archivado")
-                }}</span>
-              </p>
-              <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-                {{ dinero(p.precio_minor, p.moneda) }} ·
-                {{
-                  p.ilimitado
-                    ? $t("ventas.productos.ilimitado")
-                    : $t("ventas.productos.creditosSufijo", {
-                        n: Math.round((p.creditos_incluidos ?? 0) / 1000),
-                      })
-                }}
-                <template v-if="p.vigencia_dias">
-                  ·
-                  {{
-                    $t("ventas.productos.vigencia", { n: p.vigencia_dias })
-                  }}</template
-                >
-                <template v-if="p.politica_reset !== 'ninguno'">
-                  · {{ $t("ventas.productos.renueva") }}</template
-                >
-              </p>
-            </div>
-            <button
-              v-if="puedeCrearProducto"
-              class="tu-enlace text-sm shrink-0"
-              type="button"
-              @click="abrirEditar(p)"
-            >
-              {{ $t("ventas.productos.editar") }}
-            </button>
-          </li>
-        </ul>
-        <p v-else class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("ventas.productos.vacio") }}
-        </p>
+      <!-- Qué se vende: se configura en Planes y paquetes -->
+      <div v-if="puedeVerPlanes" class="self-start">
+        <RouterLink :to="{ name: 'planes' }" class="tu-enlace text-sm">{{
+          $t("planes.vender.configurar")
+        }}</RouterLink>
       </div>
     </div>
 
@@ -479,12 +421,5 @@ onMounted(cargar);
         </template>
       </TablaDatos>
     </div>
-
-    <PanelEditarProducto
-      v-if="abriendoEditor"
-      :producto="editando"
-      @cerrar="abriendoEditor = false"
-      @guardado="onGuardado"
-    />
   </section>
 </template>

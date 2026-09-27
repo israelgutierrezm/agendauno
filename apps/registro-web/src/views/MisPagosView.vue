@@ -1,26 +1,31 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 
+import CortePlanes from "@/components/CortePlanes.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
-import MovimientosCreditos from "@/components/MovimientosCreditos.vue";
 import PagoAutomatico from "@/components/PagoAutomatico.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { dinero, useMiCuenta, type Voucher } from "@/lib/miCuenta";
 import { useRetornoPago } from "@/lib/retornoPago";
 
 /**
- * Pagos del portal: sus créditos y membresías (con sus movimientos), lo que tiene por
- * pagar (en línea o en tienda), comprar un paquete o membresía, el pago automático y
- * el historial de compras.
+ * Pagos del portal: el corte de sus planes (qué incluía cada uno, cómo lo usó, sus
+ * clases extra y lo que le queda), lo que tiene por pagar (en línea o en tienda),
+ * comprar un plan, el pago automático y el historial de compras.
  */
+const { t } = useI18n();
 const cuenta = useMiCuenta();
 const retornoPago = useRetornoPago();
+const corte = ref<InstanceType<typeof CortePlanes> | null>(null);
 if (retornoPago.value === "exito") {
   // El webhook de la pasarela confirma el pago en segundos.
-  window.setTimeout(() => void cuenta.cargar(true), 4000);
+  window.setTimeout(() => {
+    void cuenta.cargar(true);
+    void corte.value?.cargar();
+  }, 4000);
 }
 
-const verMovimientos = ref<string | null>(null);
 const pagando = ref<string | null>(null);
 const comprando = ref<string | null>(null);
 const voucher = ref<Voucher | null>(null);
@@ -32,10 +37,34 @@ const historial = computed(() =>
   cuenta.ordenes.value.filter((o) => o.estado !== "pendiente"),
 );
 
-function creditos(u: number | null): string {
-  return new Intl.NumberFormat("es-MX", { maximumFractionDigits: 1 }).format(
-    (u ?? 0) / 1000,
-  );
+// Las clases extra se suman a un paquete: solo se ofrecen a quien tiene uno.
+const tienePaquete = computed(() =>
+  cuenta.derechos.value.some((d) => !d.ilimitado),
+);
+const comprables = computed(() =>
+  cuenta.productos.value.filter(
+    (p) => p.tipo !== "add_on" || tienePaquete.value,
+  ),
+);
+function vigencia(p: {
+  tipo: string;
+  vigencia_tipo?: string | null;
+  vigencia_cantidad?: number | null;
+}): string | null {
+  if (p.tipo === "add_on") {
+    return t("planes.resumen.conElPaquete");
+  }
+  const n = p.vigencia_cantidad ?? 0;
+  switch (p.vigencia_tipo) {
+    case "dias":
+      return t("planes.resumen.dias", { n }, n);
+    case "meses":
+      return t("planes.resumen.meses", { n }, n);
+    case "fin_de_mes":
+      return t("planes.resumen.finDeMes", { n }, n);
+    default:
+      return null;
+  }
 }
 function fecha(iso: string | null): string {
   return iso
@@ -161,67 +190,14 @@ onMounted(() => void cuenta.asegurar());
     </p>
 
     <template v-else>
-      <div class="mt-5 grid gap-4 lg:grid-cols-2">
-        <!-- Créditos y membresías -->
-        <div class="tu-card p-5">
-          <h2 class="font-semibold">{{ $t("portal.pagos.creditos") }}</h2>
-          <ul
-            v-if="cuenta.derechos.value.length > 0"
-            class="mt-3 space-y-3 text-sm"
-          >
-            <li v-for="d in cuenta.derechos.value" :key="d.id">
-              <div class="flex items-baseline justify-between gap-3">
-                <span class="font-medium">{{ d.producto ?? "—" }}</span>
-                <span v-if="d.ilimitado">{{ $t("miCuenta.ilimitado") }}</span>
-                <span v-else class="text-lg font-semibold">{{
-                  creditos(d.disponible)
-                }}</span>
-              </div>
-              <p
-                v-if="d.pausa_hasta"
-                class="text-xs"
-                :style="{ color: 'var(--aviso)' }"
-              >
-                {{
-                  $t("pausaMembresia.enPausa", {
-                    fecha: new Intl.DateTimeFormat("es-MX", {
-                      day: "numeric",
-                      month: "long",
-                    }).format(new Date(`${d.pausa_hasta}T12:00:00`)),
-                  })
-                }}
-              </p>
-              <template v-if="!d.ilimitado">
-                <button
-                  type="button"
-                  class="tu-enlace mt-1 text-xs"
-                  :aria-expanded="verMovimientos === d.id"
-                  @click="
-                    verMovimientos = verMovimientos === d.id ? null : d.id
-                  "
-                >
-                  {{
-                    verMovimientos === d.id
-                      ? $t("movimientosCredito.ocultar")
-                      : $t("movimientosCredito.ver")
-                  }}
-                </button>
-                <MovimientosCreditos
-                  v-if="verMovimientos === d.id"
-                  :url="`${cuenta.base.value}/mi/derechos/${d.id}/movimientos`"
-                />
-              </template>
-            </li>
-          </ul>
-          <p
-            v-else
-            class="mt-3 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("miCuenta.sinCreditos") }}
-          </p>
-        </div>
+      <!-- Corte de sus planes: qué incluía cada uno y cómo lo usó -->
+      <CortePlanes
+        ref="corte"
+        class="mt-5"
+        :url="`${cuenta.base.value}/mi/planes`"
+      />
 
+      <div class="mt-4">
         <!-- Por pagar -->
         <div class="tu-card p-5">
           <h2 class="font-semibold">{{ $t("portal.pagos.porPagar") }}</h2>
@@ -289,7 +265,7 @@ onMounted(() => void cuenta.asegurar());
       </div>
 
       <!-- Comprar -->
-      <div v-if="cuenta.productos.value.length > 0" class="mt-4 tu-card p-5">
+      <div v-if="comprables.length > 0" class="mt-4 tu-card p-5">
         <h2 class="font-semibold">{{ $t("miCuenta.comprar.titulo") }}</h2>
         <p
           v-if="mensaje === 'comprado'"
@@ -300,7 +276,7 @@ onMounted(() => void cuenta.asegurar());
         </p>
         <ul class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <li
-            v-for="p in cuenta.productos.value"
+            v-for="p in comprables"
             :key="p.id"
             class="flex flex-col rounded-xl border p-4"
             :style="{ borderColor: 'var(--borde)' }"
@@ -321,6 +297,13 @@ onMounted(() => void cuenta.asegurar());
                   n: p.creditos_incluidos / 1000,
                 })
               }}</template>
+            </p>
+            <p
+              v-if="vigencia(p)"
+              class="text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ vigencia(p) }}
             </p>
             <button
               class="tu-btn tu-btn-primario mt-auto w-full"

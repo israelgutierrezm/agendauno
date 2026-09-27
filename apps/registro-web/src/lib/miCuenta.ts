@@ -38,6 +38,9 @@ export interface Producto {
   moneda: string;
   ilimitado: boolean;
   creditos_incluidos: number | null;
+  // Cuánto dura lo que se compra (ADR 0050).
+  vigencia_tipo?: "dias" | "meses" | "fin_de_mes" | null;
+  vigencia_cantidad?: number | null;
 }
 export interface Orden {
   id: string;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -40,7 +41,21 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("inventario.gestionar"));
 const puedeVender = computed(() => sesion.puede("pos.vender"));
 
-const tab = ref<"vender" | "inventario">("vender");
+// La pestaña sigue a la entrada del menú: Mostrador (/pos) o Inventario (/inventario).
+const route = useRoute();
+const router = useRouter();
+const tabDeRuta = () => (route.name === "inventario" ? "inventario" : "vender");
+const tab = ref<"vender" | "inventario">(tabDeRuta());
+watch(
+  () => route.name,
+  () => (tab.value = tabDeRuta()),
+);
+function irA(destino: "vender" | "inventario"): void {
+  tab.value = destino;
+  void router.replace({
+    name: destino === "inventario" ? "inventario" : "pos",
+  });
+}
 const articulos = ref<Articulo[]>([]);
 const sucursales = ref<Sucursal[]>([]);
 const ventas = ref<Venta[]>([]);
@@ -262,7 +277,7 @@ onMounted(cargar);
           borderColor: tab === 'vender' ? 'var(--primario)' : 'transparent',
           color: tab === 'vender' ? 'var(--primario)' : 'var(--texto-suave)',
         }"
-        @click="tab = 'vender'"
+        @click="irA('vender')"
       >
         {{ $t("pos.tabVender") }}
       </button>
@@ -274,7 +289,7 @@ onMounted(cargar);
           color:
             tab === 'inventario' ? 'var(--primario)' : 'var(--texto-suave)',
         }"
-        @click="tab = 'inventario'"
+        @click="irA('inventario')"
       >
         {{ $t("pos.tabInventario") }}
       </button>

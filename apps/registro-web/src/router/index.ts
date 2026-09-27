@@ -259,6 +259,20 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Mismo punto de venta, en la pestaña de inventario (entrada propia del menú).
+      path: "/inventario",
+      name: "inventario",
+      component: () => import("@/views/PosView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      // Planes y paquetes (ADR 0050): qué se vende para reservar.
+      path: "/planes",
+      name: "planes",
+      component: () => import("@/views/PlanesView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/recepcion",
       name: "recepcion",
       component: () => import("@/views/FrontDeskView.vue"),
