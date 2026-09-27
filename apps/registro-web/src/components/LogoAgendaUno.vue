@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { computed } from "vue";
-
 type Variante =
   | "horizontal"
   | "horizontal-slogan"
@@ -8,7 +6,7 @@ type Variante =
   | "isotipo"
   | "negativo-slogan";
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
     variante?: Variante;
     ancho?: number;
@@ -22,48 +20,19 @@ const props = withDefaults(
     adaptable: true,
   },
 );
-
-const fuente = computed(() => {
-  const base = "/assets/brand/agendauno";
-  const fuentes: Record<Variante, string> = {
-    horizontal: `${base}/agenda_uno_horizontal.png`,
-    "horizontal-slogan": `${base}/agenda_uno_horizontal_con_slogan.png`,
-    vertical: `${base}/agenda_uno_vertical.png`,
-    isotipo: `${base}/isotipo_uno.png`,
-    "negativo-slogan": `${base}/agenda_uno_negativo_con_slogan.png`,
-  };
-  return fuentes[props.variante];
-});
-
-const mostrarAlterna = computed(
-  () =>
-    props.adaptable &&
-    ["horizontal", "horizontal-slogan"].includes(props.variante),
-);
 </script>
 
 <template>
   <span
     class="agendauno-logo"
-    :class="{ 'agendauno-logo--adaptable': mostrarAlterna }"
+    :class="{ 'agendauno-logo--isotipo': variante === 'isotipo' }"
     :style="{ width: `${ancho}px` }"
   >
+    <!-- Recursos institucionales originales, sin filtros ni redibujado. -->
     <img
-      class="agendauno-logo__imagen agendauno-logo__imagen--clara"
-      :src="fuente"
+      class="agendauno-logo__imagen"
+      :src="`/assets/brand/agendauno/final-v2/${variante === 'isotipo' ? 'isotipo' : variante === 'horizontal' ? 'logo' : 'logo-slogan'}.png`"
       :alt="alt"
-      decoding="async"
-    />
-    <img
-      v-if="mostrarAlterna"
-      class="agendauno-logo__imagen agendauno-logo__imagen--oscura"
-      :src="
-        variante === 'horizontal-slogan'
-          ? '/assets/brand/agendauno/agenda_uno_negativo_con_slogan.png'
-          : '/assets/brand/agendauno/agenda_uno_claro_sobre_fondo_obscuro.png'
-      "
-      :alt="alt"
-      decoding="async"
     />
   </span>
 </template>
@@ -73,6 +42,8 @@ const mostrarAlterna = computed(
   display: inline-block;
   max-width: 100%;
   flex: 0 0 auto;
+  background: #fff;
+  border-radius: 6px;
 }
 .agendauno-logo__imagen {
   display: block;
@@ -80,13 +51,7 @@ const mostrarAlterna = computed(
   height: auto;
   object-fit: contain;
 }
-.agendauno-logo__imagen--oscura {
-  display: none;
-}
-:global(.dark) .agendauno-logo--adaptable .agendauno-logo__imagen--clara {
-  display: none;
-}
-:global(.dark) .agendauno-logo--adaptable .agendauno-logo__imagen--oscura {
-  display: block;
+.agendauno-logo--isotipo {
+  background: transparent;
 }
 </style>

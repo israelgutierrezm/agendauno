@@ -1,7 +1,7 @@
 import { soluciones, rutaSolucion } from "./soluciones.ts";
 
 export const SITE_URL = "https://agendauno.mx";
-export const DEFAULT_IMAGE = `${SITE_URL}/assets/landing/agendauno-calendar.webp`;
+export const DEFAULT_IMAGE = `${SITE_URL}/assets/brand/agendauno/final-v2/open-graph.png`;
 export interface SeoOptions {
   title: string;
   description: string;
@@ -48,7 +48,7 @@ export function seoParaRuta(path: string): SeoOptions {
             "@id": `${SITE_URL}/#organization`,
             name: "AgendaUno",
             url: SITE_URL,
-            logo: `${SITE_URL}/assets/brand/agendauno/agenda_uno_horizontal.png`,
+            logo: `${SITE_URL}/assets/brand/agendauno/final-v2/logo.png`,
           },
           {
             "@type": "WebPage",
