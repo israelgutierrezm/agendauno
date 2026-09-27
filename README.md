@@ -81,12 +81,19 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
 flutter analyze && flutter test
 ```
 
+## Producción
+
+Imágenes Docker (API con worker y scheduler, web con nginx), `docker-compose.yml` y
+plantillas de variables en `infra/produccion/`. Paso a paso en `docs/DESPLIEGUE.md`
+(ADR 0048).
+
 ## Estado
 
-- **Sprint 0** — andamiaje de fundación: **completo**.
-- **Slice 1** — Tenant · User · Persona · Auth · RBAC base · `/api/v1/me` · aislamiento: **completo**.
-- **Slice 2 (backend)** — Organización · Marca · Sucursal · scope por sucursal · personal: **completo**.
-- **Slice 2 (frontend)** — pantallas de administración (auth SPA + sucursales): pendiente.
+SaaS multi-tenant con una base de datos por negocio: clases y citas, membresías y
+créditos con ledger, pagos en línea (Stripe, Mercado Pago, OpenPay), portal del
+alumno, app móvil, recepción, reportes, comunicaciones, superadmin y cobro del SaaS.
+Las fases 1 (operación) y 2 (agenda cotidiana) están cerradas; los límites de negocio
+son parámetros configurables por negocio o por la plataforma (ADR 0042 y 0047).
 
 Lee `docs/DEVELOPMENT_PLAN.md` para la hoja de ruta por slices, `docs/DATABASE.md` para el glosario
 y esquema, y `docs/adr/` para las decisiones de arquitectura.

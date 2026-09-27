@@ -1,0 +1,85 @@
+# AgendaUno en un servidor (VPS) con Docker. Guía completa: docs/DESPLIEGUE.md.
+#
+#   cd infra/produccion
+#   cp api.env.example api.env   # y llénalo
+#   cp web.env.example web.env   # y llénalo
+#   docker compose --env-file web.env up -d --build
+#
+# MySQL va aparte (servicio administrado o un servidor propio): cada negocio tiene su
+# propia base, así que el usuario de la API necesita poder crear bases `tenant_%`.
+# nginx escucha solo en 127.0.0.1:8080: el proxy que termina TLS (Caddy, Cloudflare
+# Tunnel…) es lo único que lo alcanza.
+
+name: agendauno
+
+x-api: &api
+  build:
+    context: ../..
+    dockerfile: infra/produccion/api.Dockerfile
+  image: agendauno-api:latest
+  env_file: api.env
+  volumes:
+    - storage:/var/www/html/storage
+  depends_on:
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  # La API (PHP-FPM). nginx le pasa /api y /up.
+  api:
+    <<: *api
+
+  # Correos y trabajos en cola.
+  worker:
+    <<: *api
+    command: ["php", "artisan", "queue:work", "redis", "--sleep=1", "--tries=3", "--max-time=3600"]
+
+  # Tareas programadas: recordatorios, renovaciones, agenda recurrente, cobros,
+  # respaldos… (routes/console.php).
+  scheduler:
+    <<: *api
+    command: ["php", "artisan", "schedule:work"]
+
+  # Sitio comercial + aplicación + paso de /api a PHP + archivos públicos.
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/produccion/web.Dockerfile
+      args:
+        VITE_DOMINIO_PUBLICO: ${DOMINIO:?Falta DOMINIO en web.env}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+        VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY:-}
+        VITE_ANALYTICS_ENDPOINT: ${VITE_ANALYTICS_ENDPOINT:-}
+        GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
+    image: agendauno-web:latest
+    environment:
+      DOMINIO: ${DOMINIO}
+      # Desde dónde llega el proxy TLS: por el puerto publicado, la red de Docker.
+      PROXY_CONFIABLE: ${PROXY_CONFIABLE:-172.16.0.0/12}
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      # Solo lectura; nginx sirve únicamente app/public (URLs /storage/…).
+      - storage:/var/www/storage-laravel:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  # storage de Laravel: archivos de los negocios (documentos, fotos, logos),
+  # respaldos locales y logs. Respáldalo junto con MySQL.
+  storage:
+  redis:

@@ -1,0 +1,17 @@
+# Solo entra lo que la imagen de la API necesita (contexto = raíz del repo).
+*
+!apps/api/
+!infra/produccion/php.ini
+!infra/produccion/api-entrypoint.sh
+
+apps/api/vendor/
+apps/api/node_modules/
+apps/api/.env
+apps/api/.env.*
+apps/api/build/
+apps/api/tests/
+apps/api/storage/*
+apps/api/bootstrap/cache/*.php
+apps/api/public/storage
+apps/api/public/hot
+apps/api/.phpunit.cache/

@@ -25,6 +25,8 @@ apps/api/build/
 .env
 .env.*
 !.env.example
+# Variables de producción (secretos): solo las plantillas *.env.example van al repo.
+infra/produccion/*.env
 
 # === Flutter / Dart ===
 apps/mobile/.dart_tool/
