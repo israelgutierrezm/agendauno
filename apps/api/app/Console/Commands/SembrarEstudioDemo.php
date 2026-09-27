@@ -54,6 +54,12 @@ class SembrarEstudioDemo extends Command
         $password = (string) $this->option('password');
         $instructorEmail = "beto@{$slug}.mx";
         $miembroEmail = "ana@{$slug}.mx";
+        // Cuentas para probar cada rol (misma contraseña que el resto).
+        $equipo = [
+            'admin' => ["admin@{$slug}.mx", 'Alma Administradora'],
+            'recepcionista' => ["recepcion@{$slug}.mx", 'Rita Recepción'],
+            'profesional' => ["sofia@{$slug}.mx", 'Sofía Profesional'],
+        ];
 
         // 1. Registro central del estudio (reusa el existente para conservar su BD).
         $estudio = Estudio::query()->where('slug', $slug)->first()
@@ -95,16 +101,17 @@ class SembrarEstudioDemo extends Command
         }
 
         // 4. Datos operativos dentro de la BD del tenant.
-        $gestor->ejecutarEn($estudio, function () use ($password, $ownerEmail, $instructorEmail, $miembroEmail): void {
+        $gestor->ejecutarEn($estudio, function () use ($password, $ownerEmail, $instructorEmail, $miembroEmail, $equipo): void {
             $this->sembrarPersonal($password, $ownerEmail, $instructorEmail, $miembroEmail);
+            $this->sembrarEquipo($password, $equipo);
             [$oferta, $sucursal] = $this->sembrarCatalogoYSucursal();
             $this->asignarSucursalDeCasa($sucursal);
             $this->venderPack($miembroEmail);
             $this->sembrarClases($oferta, $sucursal, $instructorEmail);
-            $this->sembrarCitas($instructorEmail);
+            $this->sembrarCitas([$instructorEmail, $equipo['profesional'][0]]);
         });
 
-        $this->componentInfo($estudio, $slug, $password, $ownerEmail, $instructorEmail, $miembroEmail);
+        $this->componentInfo($estudio, $slug, $password, $ownerEmail, $instructorEmail, $miembroEmail, $equipo);
 
         return self::SUCCESS;
     }
@@ -147,6 +154,24 @@ class SembrarEstudioDemo extends Command
                 ['email' => mb_strtolower($nombre).'@demo.mx'],
                 ['nombre' => $nombre, 'primer_apellido' => $apellido, 'tipo' => TipoPersonaTenant::Miembro->value,
                     'activo' => true, 'es_facturable' => true, 'archivado' => false],
+            );
+        }
+    }
+
+    /**
+     * Administradora, recepción y una profesional que solo atiende citas: una cuenta
+     * activa por rol, para revisar qué ve y qué puede hacer cada quien.
+     *
+     * @param  array<string, array{0: string, 1: string}>  $equipo  rol => [correo, nombre]
+     */
+    private function sembrarEquipo(string $password, array $equipo): void
+    {
+        foreach ($equipo as $rol => [$email, $nombre]) {
+            // La profesional de citas tiene el rol de instructor (cambia solo la etiqueta).
+            $rolReal = $rol === 'profesional' ? 'instructor' : $rol;
+            Usuario::query()->updateOrCreate(
+                ['email' => $email],
+                ['name' => $nombre, 'rol' => $rolReal, 'roles' => [$rolReal], 'activo' => true, 'password' => $password, 'activation_token' => null],
             );
         }
     }
@@ -240,16 +265,14 @@ class SembrarEstudioDemo extends Command
     }
 
     /**
-     * Servicio de CITA (barbería) + horario de atención del instructor, para poder
-     * revisar el flujo de citas: elegir sede → barbero → hueco → agendar y pagar.
+     * Servicio de CITA (barbería) + horario de atención de los profesionales, para
+     * revisar el flujo de citas: elegir sede → profesional → hueco → agendar y pagar.
      * Idempotente (no duplica ni el servicio ni las ventanas de atención).
+     *
+     * @param  list<string>  $profesionales  correos de quienes atienden citas
      */
-    private function sembrarCitas(string $instructorEmail): void
+    private function sembrarCitas(array $profesionales): void
     {
-        $instructor = Usuario::query()->where('email', $instructorEmail)->first();
-        if (! $instructor instanceof Usuario) {
-            return;
-        }
 
         // Servicio agendable como cita: pago-para-reservar, 30 min, MXN 250.
         $programa = ProgramaTenant::query()->firstOrCreate(['slug' => 'barberia'], ['nombre' => 'Barbería']);
@@ -265,13 +288,15 @@ class SembrarEstudioDemo extends Command
             ],
         );
 
-        // Horario de atención 09:00–18:00 (lun–dom) del instructor en cada sucursal.
-        foreach (SucursalTenant::query()->get() as $sucursal) {
-            for ($dia = 1; $dia <= 7; $dia++) {
-                HorarioAtencionTenant::query()->firstOrCreate(
-                    ['instructor_id' => $instructor->getKey(), 'sucursal_id' => $sucursal->getKey(), 'dia_semana' => $dia],
-                    ['hora_inicio' => '09:00', 'hora_fin' => '18:00'],
-                );
+        // Horario de atención 09:00–18:00 (lun–dom) de cada profesional en cada sucursal.
+        foreach (Usuario::query()->whereIn('email', $profesionales)->get() as $profesional) {
+            foreach (SucursalTenant::query()->get() as $sucursal) {
+                for ($dia = 1; $dia <= 7; $dia++) {
+                    HorarioAtencionTenant::query()->firstOrCreate(
+                        ['instructor_id' => $profesional->getKey(), 'sucursal_id' => $sucursal->getKey(), 'dia_semana' => $dia],
+                        ['hora_inicio' => '09:00', 'hora_fin' => '18:00'],
+                    );
+                }
             }
         }
     }
@@ -311,14 +336,20 @@ class SembrarEstudioDemo extends Command
         $estudio->update(['logo_url' => Storage::disk('public')->url($ruta)]);
     }
 
-    private function componentInfo(Estudio $estudio, string $slug, string $password, string $ownerEmail, string $instructorEmail, string $miembroEmail): void
+    /**
+     * @param  array<string, array{0: string, 1: string}>  $equipo
+     */
+    private function componentInfo(Estudio $estudio, string $slug, string $password, string $ownerEmail, string $instructorEmail, string $miembroEmail, array $equipo): void
     {
         $this->info("Estudio demo listo: {$estudio->nombre} (slug: {$slug})");
         $this->line('  Directorio:  publicado = '.($estudio->publicado ? 'si' : 'no'));
         $this->line("  App:         /app/{$slug}");
         $this->line('  Cuentas (contraseña: '.$password.'):');
-        $this->line("    Dueño:      {$ownerEmail}");
-        $this->line("    Instructor: {$instructorEmail}");
-        $this->line("    Alumna:     {$miembroEmail}");
+        $this->line("    Dueño:          {$ownerEmail}");
+        $this->line("    Administradora: {$equipo['admin'][0]}");
+        $this->line("    Recepción:      {$equipo['recepcionista'][0]}");
+        $this->line("    Instructor:     {$instructorEmail} (clases y citas)");
+        $this->line("    Profesional:    {$equipo['profesional'][0]} (solo citas)");
+        $this->line("    Alumna:         {$miembroEmail} (con paquete de clases)");
     }
 }
