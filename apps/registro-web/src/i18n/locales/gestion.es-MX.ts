@@ -943,3 +943,26 @@ export const tarjetas = {
   resenas: "Reseñas",
   promedio: "{promedio} de 5 ({n})",
 };
+
+// Nueva clase: tres formas de cargar horarios (fecha y hora por separado).
+export const nuevaClase = {
+  modos: {
+    una: "Una sola clase",
+    misma: "Misma hora, varios días",
+    porDia: "Horario por día",
+  },
+  ayuda: {
+    una: "Una fecha y una hora.",
+    misma: "Se repite cada semana a la misma hora en los días que elijas.",
+    porDia: "Se repite cada semana; cada día con su propia hora.",
+  },
+  fecha: "Fecha",
+  desde: "Empieza el",
+  hora: "Hora",
+  horarios: "Días y horas",
+  dia: "Día",
+  agregarDia: "Agregar día",
+  quitar: "Quitar",
+  repetido: "Hay un día repetido con la misma hora.",
+  nombresDias: "Lunes,Martes,Miércoles,Jueves,Viernes,Sábado,Domingo",
+};

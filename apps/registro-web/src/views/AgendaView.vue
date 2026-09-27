@@ -4,12 +4,14 @@ import { useI18n } from "vue-i18n";
 
 import AgendaClasesSemana from "@/components/AgendaClasesSemana.vue";
 import AgendaKpis from "@/components/AgendaKpis.vue";
+import AgendaMes from "@/components/AgendaMes.vue";
 import AgendaProfesionales from "@/components/AgendaProfesionales.vue";
 import CambiarHorario from "@/components/CambiarHorario.vue";
 import CambiarSerie from "@/components/CambiarSerie.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import PanelCita from "@/components/PanelCita.vue";
 import PanelNuevaCita from "@/components/PanelNuevaCita.vue";
 import {
@@ -140,12 +142,18 @@ const avisoSerie = ref<string | null>(null);
 // ---- Calendario (semana / dia / por profesional) ----
 // Citas: el día en columnas por profesional (o la semana). Clases: la semana con
 // cupos (o la lista del día).
-type Vista = "semana" | "dia" | "profesionales";
+type Vista = "semana" | "dia" | "profesionales" | "mes";
 const opcionesVista = computed<Vista[]>(() =>
-  sesion.esCitas ? ["profesionales", "semana"] : ["semana", "dia"],
+  sesion.esCitas
+    ? ["profesionales", "semana", "mes"]
+    : ["semana", "dia", "mes"],
 );
 const vista = ref<Vista>(sesion.esCitas ? "profesionales" : "semana");
 const semanaInicio = ref(lunesDe(new Date()));
+// Vista mensual: primer día del mes que se muestra.
+const mesInicio = ref(
+  new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+);
 const diaSel = ref(isoDe(new Date()));
 const sucursalFiltro = ref("");
 const instructorFiltro = ref("");
@@ -186,6 +194,12 @@ const dias = computed(() =>
 );
 
 const rangoTexto = computed(() => {
+  if (vista.value === "mes") {
+    return new Intl.DateTimeFormat("es-MX", {
+      month: "long",
+      year: "numeric",
+    }).format(mesInicio.value);
+  }
   const a = semanaInicio.value;
   const b = sumarDias(a, 6);
   const fmt = (d: Date, opts: Intl.DateTimeFormatOptions): string =>
@@ -455,10 +469,7 @@ async function cargarSesiones(): Promise<void> {
   cargandoSesiones.value = true;
   error.value = null;
   try {
-    const params: Record<string, string> = {
-      desde: dias.value[0].iso,
-      hasta: dias.value[6].iso,
-    };
+    const params: Record<string, string> = { ...rangoCarga.value };
     if (sucursalFiltro.value !== "") {
       params.sucursal_id = sucursalFiltro.value;
     }
@@ -481,8 +492,28 @@ async function cargarSesiones(): Promise<void> {
   }
 }
 
-// Recarga las sesiones al cambiar de semana o de sucursal.
-watch([semanaInicio, sucursalFiltro], cargarSesiones);
+// Lo que se pide al servidor: la semana, o las semanas completas del mes.
+const rangoCarga = computed(() => {
+  if (vista.value !== "mes") {
+    return { desde: dias.value[0].iso, hasta: dias.value[6].iso };
+  }
+  const inicio = lunesDe(mesInicio.value);
+  const ultimo = new Date(
+    mesInicio.value.getFullYear(),
+    mesInicio.value.getMonth() + 1,
+    0,
+  );
+  return {
+    desde: isoDe(inicio),
+    hasta: isoDe(sumarDias(lunesDe(ultimo), 6)),
+  };
+});
+
+// Recarga las sesiones al cambiar de rango (semana o mes) o de sucursal.
+watch(
+  [() => rangoCarga.value.desde, () => rangoCarga.value.hasta, sucursalFiltro],
+  cargarSesiones,
+);
 
 function irSemana(delta: number): void {
   // Preserva el día de la semana seleccionado (para que la vista de día en móvil
@@ -494,6 +525,25 @@ function irSemana(delta: number): void {
 function irHoy(): void {
   semanaInicio.value = lunesDe(new Date());
   diaSel.value = isoDe(new Date());
+  mesInicio.value = new Date(
+    new Date().getFullYear(),
+    new Date().getMonth(),
+    1,
+  );
+}
+function irMes(delta: number): void {
+  mesInicio.value = new Date(
+    mesInicio.value.getFullYear(),
+    mesInicio.value.getMonth() + delta,
+    1,
+  );
+}
+// Del mes a un día: la vista de día (clases) o por profesional (citas).
+function verDia(iso: string): void {
+  const [a, m, d] = iso.split("-").map(Number);
+  semanaInicio.value = lunesDe(new Date(a, m - 1, d));
+  diaSel.value = iso;
+  vista.value = sesion.esCitas ? "profesionales" : "dia";
 }
 // Por profesional se navega por DÍA (cambia de semana al cruzarla).
 function irDia(delta: number): void {
@@ -507,6 +557,8 @@ function irDia(delta: number): void {
 function irPaso(delta: number): void {
   if (vista.value === "profesionales") {
     irDia(delta);
+  } else if (vista.value === "mes") {
+    irMes(delta);
   } else {
     irSemana(delta);
   }
@@ -1064,19 +1116,24 @@ async function registrarCheckin(id: string): Promise<void> {
 
 // ---- Nueva clase (modal) ----
 const mostrarNueva = ref(false);
-// El usuario elige primero el tipo de carga; según eso se muestra el formulario
-// correcto (una sola clase vs. varias que se repiten cada semana).
-const modo = ref<"una" | "varias">("una");
-const esRecurrente = computed(() => modo.value === "varias");
+// Tres formas de cargar: una sola clase; la misma hora en varios días; o cada día
+// con su propia hora (p. ej. Nivel 1 el lunes a las 18:00 y el sábado a las 10:00).
+type ModoCarga = "una" | "misma" | "porDia";
+const MODOS: ModoCarga[] = ["una", "misma", "porDia"];
+const modo = ref<ModoCarga>("una");
+const esRecurrente = computed(() => modo.value !== "una");
 const form = ref({
   ofertaId: "",
   sucursalId: "",
   instructorId: "",
   recursoId: "",
   fecha: "",
+  hora: "",
   duracion: "60",
   capacidad: "",
   dias: [] as number[],
+  // "Horario por día": un renglón por día con su hora.
+  horarios: [] as { dia: number; hora: string }[],
   repetirHasta: "",
 });
 // Año de la fecha elegida: por defecto la recurrencia llega hasta el 31-dic de ese año.
@@ -1085,6 +1142,46 @@ const anioRecurrente = computed(() =>
     ? form.value.fecha.slice(0, 4)
     : String(new Date().getFullYear()),
 );
+// Renglones repetidos (mismo día y hora) en "Horario por día".
+const horarioRepetido = computed(() => {
+  const vistos = new Set<string>();
+  return form.value.horarios.some((h) => {
+    const clave = `${h.dia}-${h.hora}`;
+    const ya = vistos.has(clave);
+    vistos.add(clave);
+    return ya;
+  });
+});
+const listoParaCrear = computed(() => {
+  const f = form.value;
+  if (f.ofertaId === "" || f.sucursalId === "" || f.fecha === "") {
+    return false;
+  }
+  if (modo.value === "una") {
+    return f.hora !== "";
+  }
+  if (modo.value === "misma") {
+    return f.hora !== "" && f.dias.length > 0;
+  }
+  return (
+    f.horarios.length > 0 &&
+    f.horarios.every((h) => h.hora !== "") &&
+    !horarioRepetido.value
+  );
+});
+function agregarHorario(): void {
+  const ultimo = form.value.horarios.at(-1);
+  form.value.horarios.push({
+    dia: ultimo ? (ultimo.dia % 7) + 1 : diaInicial(),
+    hora: ultimo?.hora ?? form.value.hora,
+  });
+}
+function quitarHorario(i: number): void {
+  form.value.horarios.splice(i, 1);
+}
+function diaInicial(): number {
+  return form.value.fecha !== "" ? diaIsoDe(form.value.fecha) : 1;
+}
 // Recursos/salas de la sucursal elegida (para asignar sala a la clase).
 const recursosDeSucursal = computed(() =>
   form.value.sucursalId === ""
@@ -1112,6 +1209,7 @@ async function verificarConflictos(): Promise<void> {
   if (
     form.value.sucursalId === "" ||
     form.value.fecha === "" ||
+    form.value.hora === "" ||
     esRecurrente.value
   ) {
     return;
@@ -1124,7 +1222,7 @@ async function verificarConflictos(): Promise<void> {
         instructor_id:
           form.value.instructorId !== "" ? form.value.instructorId : null,
         recurso_id: form.value.recursoId !== "" ? form.value.recursoId : null,
-        inicia_en_local: form.value.fecha.replace("T", " ") + ":00",
+        inicia_en_local: `${form.value.fecha} ${form.value.hora}:00`,
         duracion_minutos: Number(form.value.duracion),
       },
     );
@@ -1140,6 +1238,7 @@ watch(
     form.value.instructorId,
     form.value.recursoId,
     form.value.fecha,
+    form.value.hora,
     form.value.duracion,
     esRecurrente.value,
   ],
@@ -1171,14 +1270,17 @@ function alternarDia(n: number): void {
     form.value.dias.splice(i, 1);
   }
 }
-// Al pasar a "varias", prefija el día de la semana de la fecha elegida.
-watch(modo, () => {
+// Al pasar a una forma recurrente, parte del día (y la hora) de la fecha elegida.
+watch(modo, (m) => {
   if (
-    esRecurrente.value &&
+    m === "misma" &&
     form.value.dias.length === 0 &&
     form.value.fecha !== ""
   ) {
-    form.value.dias = [diaIsoDe(form.value.fecha.slice(0, 10))];
+    form.value.dias = [diaIsoDe(form.value.fecha)];
+  }
+  if (m === "porDia" && form.value.horarios.length === 0) {
+    form.value.horarios = [{ dia: diaInicial(), hora: form.value.hora }];
   }
 });
 
@@ -1196,7 +1298,7 @@ async function crearSesion(): Promise<void> {
         instructor_id:
           form.value.instructorId !== "" ? form.value.instructorId : null,
         recurso_id: form.value.recursoId !== "" ? form.value.recursoId : null,
-        inicia_en_local: form.value.fecha.replace("T", " ") + ":00",
+        inicia_en_local: `${form.value.fecha} ${form.value.hora}:00`,
         duracion_minutos: Number(form.value.duracion),
         capacidad:
           form.value.capacidad !== "" ? Number(form.value.capacidad) : null,
@@ -1204,10 +1306,12 @@ async function crearSesion(): Promise<void> {
     }
     trackEvent("class_schedule_created", { recurring: esRecurrente.value });
     form.value.fecha = "";
+    form.value.hora = "";
     form.value.capacidad = "";
     form.value.recursoId = "";
     modo.value = "una";
     form.value.dias = [];
+    form.value.horarios = [];
     form.value.repetirHasta = "";
     mostrarNueva.value = false;
     await cargarSesiones();
@@ -1218,49 +1322,58 @@ async function crearSesion(): Promise<void> {
   }
 }
 
-// Crea una plantilla de horario recurrente y materializa sus sesiones del rango.
+// Crea las clases que se repiten: una plantilla por cada hora distinta (con los días
+// que tienen esa hora) y materializa sus sesiones del rango.
 async function crearRecurrente(): Promise<void> {
-  const fechaYmd = form.value.fecha.slice(0, 10);
-  const hora = form.value.fecha.slice(11, 16);
-  const dias =
-    form.value.dias.length > 0
-      ? [...form.value.dias].sort((a, b) => a - b)
-      : [diaIsoDe(fechaYmd)];
+  const desde = form.value.fecha;
+  const porHora = new Map<string, number[]>();
+  if (modo.value === "misma") {
+    porHora.set(form.value.hora, [...form.value.dias]);
+  } else {
+    for (const h of form.value.horarios) {
+      porHora.set(h.hora, [...(porHora.get(h.hora) ?? []), h.dia]);
+    }
+  }
   // Por defecto (sin fecha final) se generan las clases hasta el 31-dic del año
   // de la fecha elegida y la plantilla queda acotada ahí (no se extiende sola).
-  const finAnio = `${fechaYmd.slice(0, 4)}-12-31`;
   const hasta =
-    form.value.repetirHasta !== "" ? form.value.repetirHasta : finAnio;
+    form.value.repetirHasta !== ""
+      ? form.value.repetirHasta
+      : `${desde.slice(0, 4)}-12-31`;
 
-  const { data } = await api.post<{ data: { id: string } }>(
-    `${base.value}/plantillas-horario`,
-    {
-      oferta_id: form.value.ofertaId,
-      sucursal_id: form.value.sucursalId,
-      instructor_id:
-        form.value.instructorId !== "" ? form.value.instructorId : null,
-      // La sala elegida también aplica a las clases que se repiten.
-      recurso_id: form.value.recursoId !== "" ? form.value.recursoId : null,
-      dias_semana: dias,
-      hora_local: hora,
-      duracion_minutos: Number(form.value.duracion),
-      capacidad:
-        form.value.capacidad !== "" ? Number(form.value.capacidad) : null,
-      vigente_desde: fechaYmd,
-      vigente_hasta: hasta,
-    },
-  );
-
-  const generacion = await api.post<{
-    data: { creadas: number; omitidas?: { fecha: string; motivo: string }[] };
-  }>(`${base.value}/plantillas-horario/${data.data.id}/generar`, {
-    desde: fechaYmd,
-    hasta,
-  });
-  const omitidas = generacion.data.data.omitidas ?? [];
+  let creadas = 0;
+  const omitidas: { fecha: string; motivo: string }[] = [];
+  for (const [hora, dias] of porHora) {
+    const { data } = await api.post<{ data: { id: string } }>(
+      `${base.value}/plantillas-horario`,
+      {
+        oferta_id: form.value.ofertaId,
+        sucursal_id: form.value.sucursalId,
+        instructor_id:
+          form.value.instructorId !== "" ? form.value.instructorId : null,
+        // La sala elegida también aplica a las clases que se repiten.
+        recurso_id: form.value.recursoId !== "" ? form.value.recursoId : null,
+        dias_semana: [...new Set(dias)].sort((a, b) => a - b),
+        hora_local: hora,
+        duracion_minutos: Number(form.value.duracion),
+        capacidad:
+          form.value.capacidad !== "" ? Number(form.value.capacidad) : null,
+        vigente_desde: desde,
+        vigente_hasta: hasta,
+      },
+    );
+    const generacion = await api.post<{
+      data: { creadas: number; omitidas?: { fecha: string; motivo: string }[] };
+    }>(`${base.value}/plantillas-horario/${data.data.id}/generar`, {
+      desde,
+      hasta,
+    });
+    creadas += generacion.data.data.creadas;
+    omitidas.push(...(generacion.data.data.omitidas ?? []));
+  }
   if (omitidas.length > 0) {
     avisoSerie.value = t("agendaVisual.serieOmitidas", {
-      creadas: generacion.data.data.creadas,
+      creadas,
       n: omitidas.length,
       detalle: omitidas
         .slice(0, 5)
@@ -1361,7 +1474,9 @@ onMounted(async () => {
             :aria-label="
               vista === 'profesionales'
                 ? $t('agendaVisual.diaAnterior')
-                : $t('agenda.semanaAnterior')
+                : vista === 'mes'
+                  ? $t('agendaVisual.mes.anterior')
+                  : $t('agenda.semanaAnterior')
             "
             @click="irPaso(-1)"
           >
@@ -1375,7 +1490,9 @@ onMounted(async () => {
             :aria-label="
               vista === 'profesionales'
                 ? $t('agendaVisual.diaSiguiente')
-                : $t('agenda.semanaSiguiente')
+                : vista === 'mes'
+                  ? $t('agendaVisual.mes.siguiente')
+                  : $t('agenda.semanaSiguiente')
             "
             @click="irPaso(1)"
           >
@@ -1408,7 +1525,7 @@ onMounted(async () => {
       </div>
 
       <!-- Indicadores del día (citas) o de la semana (clases). -->
-      <AgendaKpis class="mt-4" :tarjetas="tarjetasKpi" />
+      <AgendaKpis v-if="vista !== 'mes'" class="mt-4" :tarjetas="tarjetasKpi" />
 
       <!-- Leyenda: el color identifica el servicio o la clase. -->
       <div
@@ -1440,6 +1557,18 @@ onMounted(async () => {
       >
         {{ $t("comun.cargando") }}
       </p>
+
+      <!-- ===== Vista MES: el mes en semanas; tocar un día lleva a ese día ===== -->
+      <AgendaMes
+        v-if="vista === 'mes'"
+        class="mt-4"
+        :mes="mesInicio"
+        :sesiones="sesionesVisibles"
+        :catalogo="catalogo"
+        :seleccionada="citaAbierta?.id ?? detalle?.id ?? null"
+        @abrir="abrirDesdeAgenda"
+        @dia="verDia"
+      />
 
       <!-- ===== Vista POR PROFESIONAL (citas): el día en columnas ===== -->
       <AgendaProfesionales
@@ -1644,8 +1773,16 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- ===== Vista DIA (movil siempre; escritorio si vista dia) ===== -->
-      <div :class="vista === 'dia' ? 'mt-4' : 'mt-4 lg:hidden'">
+      <!-- ===== Vista DIA (movil siempre salvo en el mes; escritorio si vista dia) ===== -->
+      <div
+        :class="
+          vista === 'mes'
+            ? 'hidden'
+            : vista === 'dia'
+              ? 'mt-4'
+              : 'mt-4 lg:hidden'
+        "
+      >
         <!-- Tira de dias -->
         <div class="flex gap-1.5 overflow-x-auto pb-2">
           <button
@@ -2454,238 +2591,275 @@ onMounted(async () => {
     </div>
 
     <!-- ===== Modal Nueva clase ===== -->
-    <div
-      v-if="mostrarNueva"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <ModalDialogo
+      :abierto="mostrarNueva"
+      :titulo="$t('agenda.nueva.titulo')"
+      @cerrar="mostrarNueva = false"
     >
-      <div class="absolute inset-0 bg-black/50" @click="mostrarNueva = false" />
-      <div class="relative tu-card w-full max-w-lg p-6">
-        <div class="flex items-center justify-between">
-          <h2 class="font-light text-lg">{{ $t("agenda.nueva.titulo") }}</h2>
-          <button
-            class="tu-icono-btn"
-            :aria-label="$t('agenda.cerrarDetalle')"
-            @click="mostrarNueva = false"
-          >
-            ✕
-          </button>
-        </div>
-        <p
-          v-if="ofertas.length === 0"
-          class="mt-2 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("agenda.nueva.sinOfertas") }}
-        </p>
-        <p
-          v-else-if="sucursales.length === 0"
-          class="mt-2 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("agenda.nueva.sinSucursales") }}
-        </p>
-        <form
-          v-else
-          class="mt-3 grid sm:grid-cols-2 gap-3"
-          @submit.prevent="crearSesion"
-        >
-          <!-- Tipo de carga: primero se elige, y según eso cambia el formulario. -->
-          <div
-            class="sm:col-span-2 inline-flex rounded-lg border p-1"
-            :style="{ borderColor: 'var(--borde)' }"
-          >
+      <p
+        v-if="ofertas.length === 0"
+        class="text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("agenda.nueva.sinOfertas") }}
+      </p>
+      <p
+        v-else-if="sucursales.length === 0"
+        class="text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("agenda.nueva.sinSucursales") }}
+      </p>
+      <form
+        v-else
+        id="form-nueva-clase"
+        class="grid gap-4 sm:grid-cols-2"
+        @submit.prevent="crearSesion"
+      >
+        <!-- Cómo se carga: primero se elige, y según eso cambia el formulario. -->
+        <div class="sm:col-span-2">
+          <div class="tu-segmentado" role="group">
             <button
-              v-for="op in ['una', 'varias'] as const"
+              v-for="op in MODOS"
               :key="op"
               type="button"
-              class="px-3 py-1.5 rounded-md text-sm font-semibold"
-              :style="{
-                background: modo === op ? 'var(--primario)' : 'transparent',
-                color:
-                  modo === op ? 'var(--primario-contraste)' : 'var(--texto)',
-              }"
+              :aria-pressed="modo === op"
               @click="modo = op"
             >
-              {{
-                op === "una"
-                  ? $t("agenda.nueva.modoUna")
-                  : $t("agenda.nueva.modoVarias")
-              }}
+              {{ $t(`nuevaClase.modos.${op}`) }}
             </button>
           </div>
-          <div>
-            <label class="tu-label" for="ao">{{
-              $t("agenda.nueva.oferta")
-            }}</label>
-            <select id="ao" v-model="form.ofertaId" class="tu-input" required>
-              <option value="" disabled>
-                {{ $t("agenda.reservar.elegir") }}
-              </option>
-              <option v-for="o in ofertas" :key="o.id" :value="o.id">
-                {{ o.nombre }}
-              </option>
-            </select>
-          </div>
-          <div>
-            <label class="tu-label" for="as">{{
-              $t("agenda.nueva.sucursal")
-            }}</label>
-            <select id="as" v-model="form.sucursalId" class="tu-input" required>
-              <option value="" disabled>
-                {{ $t("agenda.reservar.elegir") }}
-              </option>
-              <option v-for="s in sucursales" :key="s.id" :value="s.id">
-                {{ s.nombre }}
-              </option>
-            </select>
-          </div>
+          <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t(`nuevaClase.ayuda.${modo}`) }}
+          </p>
+        </div>
+
+        <div>
+          <label class="tu-label" for="ao">{{
+            $t("agenda.nueva.oferta")
+          }}</label>
+          <select id="ao" v-model="form.ofertaId" class="tu-input" required>
+            <option value="" disabled>
+              {{ $t("agenda.reservar.elegir") }}
+            </option>
+            <option v-for="o in ofertas" :key="o.id" :value="o.id">
+              {{ o.nombre }}
+            </option>
+          </select>
+        </div>
+        <div>
+          <label class="tu-label" for="as">{{
+            $t("agenda.nueva.sucursal")
+          }}</label>
+          <select id="as" v-model="form.sucursalId" class="tu-input" required>
+            <option value="" disabled>
+              {{ $t("agenda.reservar.elegir") }}
+            </option>
+            <option v-for="s in sucursales" :key="s.id" :value="s.id">
+              {{ s.nombre }}
+            </option>
+          </select>
+        </div>
+        <div v-if="instructores.length > 0">
+          <label class="tu-label" for="ai">{{
+            $t("agenda.nueva.instructor")
+          }}</label>
+          <select id="ai" v-model="form.instructorId" class="tu-input">
+            <option value="">{{ $t("agenda.nueva.sinInstructor") }}</option>
+            <option v-for="i in instructores" :key="i.id" :value="i.id">
+              {{ i.nombre }}
+            </option>
+          </select>
+        </div>
+        <div v-if="recursosDeSucursal.length > 0">
+          <label class="tu-label" for="arec">{{
+            $t("agenda.nueva.sala")
+          }}</label>
+          <select id="arec" v-model="form.recursoId" class="tu-input">
+            <option value="">{{ $t("agenda.nueva.sinSala") }}</option>
+            <option v-for="r in recursosDeSucursal" :key="r.id" :value="r.id">
+              {{ r.nombre }}
+            </option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-4">
           <div>
             <label class="tu-label" for="af">{{
-              esRecurrente
-                ? $t("agenda.nueva.primeraClase")
-                : $t("agenda.nueva.fecha")
+              esRecurrente ? $t("nuevaClase.desde") : $t("nuevaClase.fecha")
             }}</label>
             <input
               id="af"
               v-model="form.fecha"
               class="tu-input"
-              type="datetime-local"
+              type="date"
               required
             />
           </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div>
-              <label class="tu-label" for="ad">{{
-                $t("agenda.nueva.duracion")
-              }}</label>
-              <input
-                id="ad"
-                v-model="form.duracion"
-                class="tu-input"
-                type="number"
-                min="1"
-              />
-            </div>
-            <div>
-              <label class="tu-label" for="ac">{{
-                $t("agenda.nueva.capacidad")
-              }}</label>
-              <input
-                id="ac"
-                v-model="form.capacidad"
-                class="tu-input"
-                type="number"
-                min="1"
-              />
-            </div>
+          <div v-if="modo !== 'porDia'">
+            <label class="tu-label" for="ah">{{ $t("nuevaClase.hora") }}</label>
+            <input
+              id="ah"
+              v-model="form.hora"
+              class="tu-input"
+              type="time"
+              step="300"
+              required
+            />
           </div>
-          <div v-if="instructores.length > 0" class="sm:col-span-2">
-            <label class="tu-label" for="ai">{{
-              $t("agenda.nueva.instructor")
+          <div>
+            <label class="tu-label" for="ad">{{
+              $t("agenda.nueva.duracion")
             }}</label>
-            <select id="ai" v-model="form.instructorId" class="tu-input">
-              <option value="">{{ $t("agenda.nueva.sinInstructor") }}</option>
-              <option v-for="i in instructores" :key="i.id" :value="i.id">
-                {{ i.nombre }}
-              </option>
-            </select>
+            <input
+              id="ad"
+              v-model="form.duracion"
+              class="tu-input"
+              type="number"
+              min="1"
+            />
           </div>
-          <div v-if="recursosDeSucursal.length > 0" class="sm:col-span-2">
-            <label class="tu-label" for="arec">{{
-              $t("agenda.nueva.sala")
+          <div>
+            <label class="tu-label" for="ac">{{
+              $t("agenda.nueva.capacidad")
             }}</label>
-            <select id="arec" v-model="form.recursoId" class="tu-input">
-              <option value="">{{ $t("agenda.nueva.sinSala") }}</option>
-              <option v-for="r in recursosDeSucursal" :key="r.id" :value="r.id">
-                {{ r.nombre }}
-              </option>
-            </select>
+            <input
+              id="ac"
+              v-model="form.capacidad"
+              class="tu-input"
+              type="number"
+              min="1"
+            />
           </div>
+        </div>
 
-          <!-- Recurrencia (solo en modo "varias"): "una clase todos los martes" (R5). -->
-          <div
-            v-if="esRecurrente"
-            class="sm:col-span-2 rounded-lg border p-3 space-y-3"
-            :style="{ borderColor: 'var(--borde)' }"
-          >
-            <div>
-              <span class="tu-label">{{ $t("agenda.nueva.diasSemana") }}</span>
-              <div class="flex gap-1 mt-1">
-                <button
-                  v-for="d in DIAS_SEMANA"
-                  :key="d.n"
-                  type="button"
-                  class="h-9 w-9 rounded-full text-sm font-semibold"
-                  :style="
-                    form.dias.includes(d.n)
-                      ? { background: 'var(--primario)', color: '#fff' }
-                      : {
-                          background: 'var(--superficie-2)',
-                          color: 'var(--texto)',
-                        }
-                  "
-                  @click="alternarDia(d.n)"
-                >
-                  {{ d.etiqueta }}
-                </button>
-              </div>
-            </div>
-            <div>
-              <label class="tu-label" for="arh">{{
-                $t("agenda.nueva.repetirHasta")
-              }}</label>
-              <input
-                id="arh"
-                v-model="form.repetirHasta"
-                class="tu-input"
-                type="date"
-              />
-              <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
-                {{ $t("agenda.nueva.repetirAyuda", { anio: anioRecurrente }) }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Conflictos detectados ANTES de guardar (instructor/sala ocupados). -->
-          <div
-            v-if="conflictos.length > 0"
-            class="sm:col-span-2 rounded-lg p-3 text-sm"
-            :style="{ background: 'var(--aviso-suave)', color: 'var(--aviso)' }"
-          >
-            <p class="font-semibold">{{ $t("agenda.nueva.conflictos") }}</p>
-            <ul class="mt-1 list-disc pl-5">
-              <li v-for="(c, i) in conflictos" :key="i">{{ c.mensaje }}</li>
-            </ul>
-          </div>
-
-          <div class="sm:col-span-2 flex justify-end gap-2">
+        <!-- Misma hora en varios días -->
+        <div v-if="modo === 'misma'" class="sm:col-span-2">
+          <span class="tu-label">{{ $t("agenda.nueva.diasSemana") }}</span>
+          <div class="mt-1 flex flex-wrap gap-1.5">
             <button
+              v-for="d in DIAS_SEMANA"
+              :key="d.n"
               type="button"
-              class="tu-btn tu-btn-fantasma"
-              @click="mostrarNueva = false"
-            >
-              {{ $t("comun.cancelar") }}
-            </button>
-            <button
-              class="tu-btn tu-btn-primario"
-              type="submit"
-              :disabled="
-                creando ||
-                form.ofertaId === '' ||
-                form.sucursalId === '' ||
-                form.fecha === '' ||
-                (esRecurrente && form.dias.length === 0) ||
-                conflictos.length > 0
+              class="h-9 w-9 rounded-full text-sm font-semibold"
+              :aria-pressed="form.dias.includes(d.n)"
+              :aria-label="$t('nuevaClase.nombresDias').split(',')[d.n - 1]"
+              :style="
+                form.dias.includes(d.n)
+                  ? {
+                      background: 'var(--primario)',
+                      color: 'var(--primario-contraste)',
+                    }
+                  : {
+                      background: 'var(--superficie-2)',
+                      color: 'var(--texto)',
+                    }
               "
+              @click="alternarDia(d.n)"
             >
-              {{
-                creando ? $t("agenda.nueva.creando") : $t("agenda.nueva.crear")
-              }}
+              {{ d.etiqueta }}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        <!-- Cada día con su hora -->
+        <div v-if="modo === 'porDia'" class="sm:col-span-2">
+          <span class="tu-label">{{ $t("nuevaClase.horarios") }}</span>
+          <ul class="mt-1 space-y-2">
+            <li
+              v-for="(h, i) in form.horarios"
+              :key="i"
+              class="flex flex-wrap items-center gap-2"
+            >
+              <select
+                v-model.number="h.dia"
+                class="tu-input w-auto"
+                :aria-label="$t('nuevaClase.dia')"
+              >
+                <option v-for="d in DIAS_SEMANA" :key="d.n" :value="d.n">
+                  {{ $t("nuevaClase.nombresDias").split(",")[d.n - 1] }}
+                </option>
+              </select>
+              <input
+                v-model="h.hora"
+                class="tu-input w-auto"
+                type="time"
+                step="300"
+                required
+                :aria-label="$t('nuevaClase.hora')"
+              />
+              <button
+                v-if="form.horarios.length > 1"
+                type="button"
+                class="tu-enlace text-sm"
+                @click="quitarHorario(i)"
+              >
+                {{ $t("nuevaClase.quitar") }}
+              </button>
+            </li>
+          </ul>
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma mt-2 text-sm"
+            @click="agregarHorario"
+          >
+            {{ $t("nuevaClase.agregarDia") }}
+          </button>
+          <p
+            v-if="horarioRepetido"
+            class="mt-1 text-xs"
+            :style="{ color: 'var(--error)' }"
+          >
+            {{ $t("nuevaClase.repetido") }}
+          </p>
+        </div>
+
+        <div v-if="esRecurrente" class="sm:col-span-2 sm:max-w-xs">
+          <label class="tu-label" for="arh">{{
+            $t("agenda.nueva.repetirHasta")
+          }}</label>
+          <input
+            id="arh"
+            v-model="form.repetirHasta"
+            class="tu-input"
+            type="date"
+            :min="form.fecha || undefined"
+          />
+          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("agenda.nueva.repetirAyuda", { anio: anioRecurrente }) }}
+          </p>
+        </div>
+
+        <!-- Conflictos detectados ANTES de guardar (instructor/sala ocupados). -->
+        <div
+          v-if="conflictos.length > 0"
+          class="rounded-lg p-3 text-sm sm:col-span-2"
+          :style="{ background: 'var(--aviso-suave)', color: 'var(--aviso)' }"
+        >
+          <p class="font-semibold">{{ $t("agenda.nueva.conflictos") }}</p>
+          <ul class="mt-1 list-disc pl-5">
+            <li v-for="(c, i) in conflictos" :key="i">{{ c.mensaje }}</li>
+          </ul>
+        </div>
+      </form>
+
+      <template v-if="ofertas.length > 0 && sucursales.length > 0" #pie>
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          @click="mostrarNueva = false"
+        >
+          {{ $t("comun.cancelar") }}
+        </button>
+        <button
+          class="tu-btn tu-btn-primario"
+          type="submit"
+          form="form-nueva-clase"
+          :disabled="creando || !listoParaCrear || conflictos.length > 0"
+        >
+          {{ creando ? $t("agenda.nueva.creando") : $t("agenda.nueva.crear") }}
+        </button>
+      </template>
+    </ModalDialogo>
 
     <PanelCita
       :abierto="citaAbierta !== null"

@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import CorteDeCaja from "@/components/CorteDeCaja.vue";
 import PorConciliar from "@/components/PorConciliar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -667,29 +668,13 @@ onMounted(cargar);
     </template>
 
     <!-- Modal de reembolso -->
-    <div
-      v-if="reembolsando"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <ModalDialogo
+      :abierto="reembolsando !== null"
+      :titulo="$t('cobranza.reembolso.titulo')"
+      @cerrar="reembolsando = null"
     >
-      <div class="absolute inset-0 bg-black/50" @click="reembolsando = null" />
-      <div
-        class="relative w-full max-w-sm tu-card p-6"
-        :style="{ background: 'var(--superficie)' }"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <h3 class="text-lg font-light">
-            {{ $t("cobranza.reembolso.titulo") }}
-          </h3>
-          <button
-            type="button"
-            class="tu-icono-btn shrink-0"
-            :aria-label="$t('comun.cerrar')"
-            @click="reembolsando = null"
-          >
-            <span aria-hidden="true">✕</span>
-          </button>
-        </div>
-        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+      <template v-if="reembolsando">
+        <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ reembolsando.persona ?? "—" }} ·
           {{
             $t("cobranza.reembolso.reembolsable", {
@@ -700,7 +685,11 @@ onMounted(cargar);
             })
           }}
         </p>
-        <form class="mt-4 space-y-3" @submit.prevent="reembolsar">
+        <form
+          id="form-reembolso"
+          class="mt-4 grid gap-4 sm:grid-cols-2"
+          @submit.prevent="reembolsar"
+        >
           <div>
             <label class="tu-label" for="rm">{{
               $t("cobranza.reembolso.monto")
@@ -727,7 +716,9 @@ onMounted(cargar);
               :placeholder="$t('cobranza.reembolso.motivoPh')"
             />
           </div>
-          <label class="flex items-center justify-between gap-3 text-sm">
+          <label
+            class="flex items-center justify-between gap-3 text-sm sm:col-span-2"
+          >
             <span>
               {{ $t("cobranza.reembolso.revertir") }}
               <span
@@ -740,7 +731,7 @@ onMounted(cargar);
           </label>
           <label
             v-if="PASARELAS_EN_LINEA.includes(reembolsando.proveedor ?? '')"
-            class="flex items-center justify-between gap-3 text-sm"
+            class="flex items-center justify-between gap-3 text-sm sm:col-span-2"
           >
             <span>
               {{ $t("reembolsosPago.manual") }}
@@ -752,19 +743,29 @@ onMounted(cargar);
             </span>
             <input v-model="rManual" type="checkbox" class="h-5 w-5" />
           </label>
-          <button
-            class="tu-btn tu-btn-primario w-full"
-            type="submit"
-            :disabled="rProcesando || rMotivo.trim() === ''"
-          >
-            {{
-              rProcesando
-                ? $t("cobranza.reembolso.procesando")
-                : $t("cobranza.reembolso.confirmar")
-            }}
-          </button>
         </form>
-      </div>
-    </div>
+      </template>
+      <template #pie>
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          @click="reembolsando = null"
+        >
+          {{ $t("comun.cancelar") }}
+        </button>
+        <button
+          class="tu-btn tu-btn-primario"
+          type="submit"
+          form="form-reembolso"
+          :disabled="rProcesando || rMotivo.trim() === ''"
+        >
+          {{
+            rProcesando
+              ? $t("cobranza.reembolso.procesando")
+              : $t("cobranza.reembolso.confirmar")
+          }}
+        </button>
+      </template>
+    </ModalDialogo>
   </section>
 </template>

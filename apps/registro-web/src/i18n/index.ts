@@ -57,6 +57,7 @@ import {
   recursosServicio,
   reembolsosPago,
   reprogramar,
+  nuevaClase,
   reglasAgenda,
   tarjetas,
   terminologiaNegocio,
@@ -119,6 +120,7 @@ const mensajesBase = {
   miReprogramar,
   terminologiaNegocio,
   tarjetas,
+  nuevaClase,
 };
 
 export const i18n = createI18n({

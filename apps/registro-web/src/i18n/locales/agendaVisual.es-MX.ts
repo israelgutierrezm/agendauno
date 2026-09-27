@@ -7,6 +7,13 @@ export default {
     profesionales: "Por profesional",
     semana: "Semana",
     dia: "Día",
+    mes: "Mes",
+  },
+  mes: {
+    anterior: "Mes anterior",
+    siguiente: "Mes siguiente",
+    mas: "+{n} más",
+    verDia: "Ver el día {dia}",
   },
   kpis: {
     citas: "Citas del día",
