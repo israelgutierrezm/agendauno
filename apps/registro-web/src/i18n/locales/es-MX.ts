@@ -185,7 +185,7 @@ export default {
     ctaFinalSub:
       "Configura una clase o un servicio, comparte tu enlace y recibe tu primera reserva. Tienes {dias} días para probarlo, sin tarjeta.",
     comoFunciona: {
-      titulo: "Empieza en tres pasos",
+      titulo: "Empieza en solo tres pasos",
       subtitulo:
         "Tú preparas la agenda. Tus clientes reservan. Tu equipo tiene todo a la vista.",
       p1t: "Prepara tu agenda",
@@ -247,7 +247,7 @@ export default {
     },
     precio: {
       etiqueta: "Tu suscripción a AgendaUno",
-      titulo: "Una plataforma. Dos formas de acompañar tu negocio.",
+      titulo: "Un precio que acompaña el tamaño de tu negocio.",
       subtitulo:
         "La suscripción es el pago por usar AgendaUno. Los precios de tus clases, paquetes y servicios los defines tú; son cobros distintos.",
       badge: "{dias} días gratis",
@@ -262,8 +262,8 @@ export default {
         nombre: "Negocios con citas",
         unidad: "Por profesional",
         detalle:
-          "El modelo previsto para barberías, estéticas y consultorios toma como base a los profesionales que atienden.",
-        nota: "Próximamente: la suscripción por profesional está en preparación. Aún no se puede contratar con este esquema. Puedes probar la agenda de citas durante la prueba gratuita.",
+          "Para barberías, estéticas y consultorios, la suscripción toma como base a los profesionales activos del mes.",
+        nota: "El precio se suma por tramos de profesionales equivalentes. Un horario de atención mayor a 0 y menor a 20 horas semanales cuenta como medio tiempo.",
       },
       pruebaDetalle:
         "Configura tu agenda y comprueba cómo encaja en tu operación antes de contratar.",
@@ -397,7 +397,7 @@ export default {
       q5: "¿Sirve para consultorios o profesionales de la salud?",
       a5: "Sí, cuando necesitan organizar citas, disponibilidad, recordatorios y cobros. AgendaUno no sustituye un expediente clínico ni un sistema médico especializado.",
       q6: "¿Cómo se calcula el precio de AgendaUno?",
-      a6: "Para clases, el esquema por uso se calcula con los miembros o alumnos activos del periodo y la tarifa configurada; puedes revisar el padrón y el cargo estimado en tu panel. Para citas, estamos preparando la suscripción por profesional: todavía no se puede contratar con ese esquema.",
+      a6: "En estudios y academias, la renta se calcula por rangos de alumnos activos del mes, no por todas las personas registradas. En citas, se suman los tramos de profesionales activos equivalentes, considerando el medio tiempo. Consulta los rangos, el IVA y las reglas de ambas modalidades en Precios; el panel muestra el uso y el cargo estimado de tu negocio.",
       q7: "¿La suscripción es lo mismo que mis membresías o servicios?",
       a7: "No. La suscripción es lo que pagas por utilizar AgendaUno. Tú defines lo que cobras a tus clientes por servicios, clases, paquetes y membresías. Los pagos en línea requieren conectar una pasarela compatible y pueden tener comisiones de ese proveedor.",
       q8: "¿Tengo que aparecer en el directorio público?",
@@ -1158,6 +1158,8 @@ export default {
     sucursal: "Sucursal",
     barbero: "¿Con quién?",
     elegirBarbero: "Elige a la persona",
+    sinProfesionales:
+      "No hay profesionales disponibles para reservar en línea. Contacta al negocio.",
     cuando: "¿Qué día?",
     hora: "Elige una hora",
     sinHorario: "Elige el día para ver los horarios disponibles.",

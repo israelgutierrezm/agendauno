@@ -22,8 +22,9 @@
   --barra-activo: #0070ff;
   --barra-texto: #bdc9de;
   --barra-borde: rgb(255 255 255 / 10%);
-  --exito: #1a7f37;
-  --exito-suave: #e6f4ea;
+  --exito: #198754;
+  --exito-texto: #146c43;
+  --exito-suave: #d1e7dd;
   --error: #d70015;
   --error-suave: #fdeaea;
   --aviso: #b64400; /* Ember */
@@ -54,8 +55,9 @@
   --barra-activo: #2d88ff;
   --barra-texto: #b6c3da;
   --barra-borde: rgb(255 255 255 / 10%);
-  --exito: #30d158;
-  --exito-suave: #0e2a17;
+  --exito: #198754;
+  --exito-texto: #75b798;
+  --exito-suave: #051b11;
   --error: #ff453a;
   --error-suave: #2a1414;
   --aviso: #ff9f0a;
@@ -65,7 +67,8 @@
   color-scheme: dark;
 }
 
-/* La identidad comercial no hereda el acento personalizado de un negocio. */
+/* Las páginas públicas no heredan el tema personal de una sesión administrativa. */
+.tu-public-business,
 .tu-marketing {
   --radio-boton: 11px;
   --radio-tarjeta: 18px;
@@ -78,18 +81,27 @@
   --texto-suave: #59666b;
   --borde: #dce1de;
   --acento: #198754;
-  --exito: #146c43;
-  --exito-suave: #e8f4ee;
-  --primario: #223b4b;
-  --primario-fuerte: #152a38;
+  --exito: #198754;
+  --exito-texto: #146c43;
+  --exito-suave: #d1e7dd;
+  --primario: #007e91;
+  --primario-fuerte: #006574;
   --primario-contraste: #fff;
-  --primario-suave: color-mix(in srgb, #24566b 10%, #fff);
-  --enlace: #223b4b;
+  --primario-suave: color-mix(in srgb, #007e91 10%, #fff);
+  --enlace: #007487;
   --marketing-enfasis: #198754;
-  --marketing-cta-hover: #152a38;
+  --marketing-rosa: #e7549b;
+  --marketing-cielo: #74c0fc;
+  --marketing-operacion: #007e91;
+  --marketing-negocios: #1098ad;
+  /* Rosa de acción más profundo para mantener contraste con texto blanco. */
+  --marketing-cta: #c43b80;
+  --marketing-cta-contraste: #ffffff;
+  --marketing-cta-hover: #b63273;
   background: var(--fondo);
   color: var(--texto);
 }
+.dark .tu-public-business,
 .dark .tu-marketing {
   --fondo: #020d24;
   --superficie: #071a3a;
@@ -98,29 +110,51 @@
   --texto-suave: #b3bfbf;
   --borde: #34444c;
   --acento: #75b798;
-  --exito: #75b798;
-  --exito-suave: #102d25;
-  --primario: #dce5e5;
+  --exito: #198754;
+  --exito-texto: #75b798;
+  --exito-suave: #051b11;
+  --primario: #74d4df;
   --primario-contraste: #182b39;
-  --primario-fuerte: #f0f4ef;
-  --primario-suave: color-mix(in srgb, #376d82 24%, #071a3a);
-  --enlace: #dce5e5;
+  --primario-fuerte: #a4e8ef;
+  --primario-suave: color-mix(in srgb, #007e91 24%, #071a3a);
+  --enlace: #74d4df;
   --marketing-enfasis: #75b798;
-  --marketing-cta-hover: #f0f4ef;
 }
+.tu-public-business .tu-btn,
 .tu-marketing .tu-btn {
   font-weight: 500;
   box-shadow: none;
 }
+.tu-public-business .tu-btn-primario:hover:not(:disabled),
 .tu-marketing .tu-btn-primario:hover:not(:disabled) {
   background: var(--marketing-cta-hover);
 }
+.tu-public-business .tu-btn-primario,
+.tu-marketing .tu-btn-primario {
+  background: var(--marketing-cta);
+  color: var(--marketing-cta-contraste);
+}
+.tu-public-business .tu-btn:focus-visible,
 .tu-marketing .tu-btn:focus-visible {
   outline: 2px solid var(--acento);
   outline-offset: 3px;
 }
 .tu-marketing .tu-badge {
   border-radius: 8px;
+}
+
+/* Equivalente a Bootstrap text-success, compartido por todas las pantallas.
+   Para avisos pequeños sobre fondos tintados se usa el tono de énfasis accesible. */
+.text-success {
+  --bs-text-opacity: 1;
+  color: rgba(25, 135, 84, var(--bs-text-opacity)) !important;
+}
+.text-success-emphasis {
+  color: var(--exito-texto) !important;
+}
+.tu-public-business input[type="radio"],
+.tu-public-business input[type="checkbox"] {
+  accent-color: var(--primario);
 }
 
 /* Base y componentes propios en capas de Tailwind v4: así las utilidades

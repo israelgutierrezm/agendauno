@@ -39,6 +39,7 @@ class OpcionesCitaTenant
                     'id' => $s->ulid,
                     'nombre' => $s->nombre,
                     'zona_horaria' => $s->zona_horaria,
+                    'region' => $s->region,
                 ])->values()->all(),
             'instructores' => Usuario::query()
                 ->whereJsonContains('roles', 'instructor')
@@ -47,6 +48,7 @@ class OpcionesCitaTenant
                 ->map(static fn (Usuario $u): array => [
                     'id' => $u->ulid,
                     'nombre' => (string) $u->name,
+                    'foto_url' => $u->fotoUrl(),
                 ])->values()->all(),
         ];
     }

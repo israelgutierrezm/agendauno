@@ -65,7 +65,8 @@ it('clases: cobra la banda de alumnos activos del mes con IVA', function (): voi
 
     expect($cargo['metrica'])->toBe('alumnos_activos')
         ->and($cargo['cantidad'])->toBe(3)
-        ->and($cargo['tarifa_version'])->toBe(1)
+        // La versión 2 es la de los rangos de alumnos (2026_09_26_200000_rangos_alumnos_saas).
+        ->and($cargo['tarifa_version'])->toBe(2)
         ->and($cargo['desglose']['subtotal_minor'])->toBe(33900)
         ->and($cargo['desglose']['iva_minor'])->toBe(5424)
         ->and($cargo['monto_minor'])->toBe(39324)
@@ -213,18 +214,20 @@ it('el superadmin publica una versión nueva de la tarifa y los cargos la usan',
 
     $this->getJson('/api/v1/plataforma/tarifas', conPlataforma())
         ->assertOk()
-        ->assertJsonPath('data.clases.vigente.version', 1)
+        // La 1 es la inicial; la 2, la de los rangos de alumnos actuales.
+        ->assertJsonPath('data.clases.vigente.version', 2)
+        ->assertJsonPath('data.clases.vigente.definicion.bandas.0.hasta', 49)
         ->assertJsonPath('data.citas.vigente.definicion.tramos.0.unitario_minor', 26900);
 
     $this->postJson('/api/v1/plataforma/tarifas/clases', [
         'dias_prueba' => 30, 'iva_porcentaje' => 16,
         'bandas' => [['hasta' => 50, 'monto_minor' => 29900], ['hasta' => null, 'monto_minor' => 99900]],
-    ], conPlataforma())->assertCreated()->assertJsonPath('data.version', 2);
+    ], conPlataforma())->assertCreated()->assertJsonPath('data.version', 3);
 
     emitirCargoDelMesEnCurso();
     $cargo = rentaDe($e)['cargos'][0];
 
-    expect($cargo['tarifa_version'])->toBe(2)->and($cargo['desglose']['subtotal_minor'])->toBe(29900);
+    expect($cargo['tarifa_version'])->toBe(3)->and($cargo['desglose']['subtotal_minor'])->toBe(29900);
 });
 
 it('una tarifa sin techo o con topes desordenados se rechaza', function (): void {

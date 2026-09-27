@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import CampoContrasena from "@/components/CampoContrasena.vue";
+import LogoAgendaUno from "@/components/LogoAgendaUno.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { clientIdGoogle, renderizarBotonGoogle } from "@/lib/google";
 import {
@@ -44,6 +45,10 @@ const password = ref("");
 const avisoGoogle = ref(false);
 const marca = ref<Marca | null>(null);
 const marcaCargando = ref(false);
+const logoFallido = ref(false);
+watch([slug, () => marca.value?.logo_url], () => {
+  logoFallido.value = false;
+});
 
 const recientes = ref<NegocioReciente[]>(leerNegociosRecientes());
 const busqueda = ref("");
@@ -272,20 +277,16 @@ onMounted(async () => {
 
     <section class="tu-login-formulario">
       <div class="tu-login-formulario-inner">
-        <div v-if="!seleccionando && marca" class="tu-login-identidad">
+        <div class="tu-login-identidad">
           <img
-            v-if="!seleccionando && marca?.logo_url"
+            v-if="!seleccionando && marca?.logo_url && !logoFallido"
+            :key="`${slug}:${marca.logo_url}`"
             :src="marca.logo_url"
             :alt="marca.nombre"
             class="tu-login-logo-negocio"
+            @error="logoFallido = true"
           />
-          <span
-            v-else-if="!seleccionando && marca"
-            class="tu-login-logo-negocio tu-login-iniciales"
-            aria-hidden="true"
-          >
-            {{ iniciales(marca.nombre) }}
-          </span>
+          <LogoAgendaUno v-else variante="isotipo" :ancho="64" />
         </div>
 
         <template v-if="seleccionando">
@@ -693,13 +694,15 @@ onMounted(async () => {
 .tu-login-identidad {
   display: flex;
   align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
   gap: 0.5rem;
 }
 .tu-login-logo-negocio {
   width: 3.75rem;
   height: 3.75rem;
   border-radius: 1rem;
-  object-fit: cover;
+  object-fit: contain;
   box-shadow: var(--sombra);
 }
 .tu-login-iniciales,

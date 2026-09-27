@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-const props = defineProps<{ texto: string; enfasis: string }>();
+const props = defineProps<{
+  texto: string;
+  enfasis: string;
+  tono?: "rosa" | "verde";
+  negrita?: boolean;
+}>();
 // Solo presentación: conservar el texto literal, los espacios y el encabezado padre.
 const partes = computed(() => {
   const indice = props.enfasis ? props.texto.indexOf(props.enfasis) : -1;
@@ -20,9 +25,14 @@ const partes = computed(() => {
 <template>
   <span
     ><template v-for="(parte, indice) in partes" :key="indice"
-      ><span v-if="parte.destacado" class="tu-titulo-enfasis">{{
-        parte.texto
-      }}</span
+      ><span
+        v-if="parte.destacado"
+        class="tu-titulo-enfasis"
+        :class="{
+          'tu-titulo-enfasis--rosa': tono === 'rosa',
+          'tu-titulo-enfasis--negrita': negrita,
+        }"
+        >{{ parte.texto }}</span
       ><template v-else>{{ parte.texto }}</template></template
     ></span
   >
@@ -32,5 +42,11 @@ const partes = computed(() => {
 .tu-titulo-enfasis {
   font-weight: 400;
   color: var(--marketing-enfasis, var(--enlace));
+}
+.tu-titulo-enfasis--rosa {
+  color: var(--marketing-rosa);
+}
+.tu-titulo-enfasis--negrita {
+  font-weight: 700;
 }
 </style>

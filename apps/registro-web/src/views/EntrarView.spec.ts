@@ -73,7 +73,9 @@ describe("acceso por negocio", () => {
     expect(wrapper.text()).toContain("Busca tu negocio");
     expect(wrapper.text()).not.toContain("Busca otro negocio");
     expect(wrapper.find(".tu-selector-vacio").exists()).toBe(false);
-    expect(wrapper.find(".tu-login-identidad").exists()).toBe(false);
+    expect(wrapper.get(".tu-login-identidad img").attributes("src")).toBe(
+      "/assets/brand/agendauno/final-v2/isotipo.png",
+    );
     await wrapper.get("#buscar-negocio").setValue("Mi academia");
     await wrapper.get(".tu-selector-busqueda").trigger("submit");
     await flushPromises();
@@ -89,7 +91,7 @@ describe("acceso por negocio", () => {
       false,
     );
     expect(wrapper.find(".tu-login-identidad .agendauno-logo").exists()).toBe(
-      false,
+      true,
     );
     expect(mocks.get).not.toHaveBeenCalled();
   });
@@ -115,6 +117,9 @@ describe("acceso por negocio", () => {
     await flushPromises();
     expect(wrapper.findAll(".tu-negocio-principal")).toHaveLength(5);
     expect(wrapper.find("#email").exists()).toBe(false);
+    expect(wrapper.get(".tu-login-identidad img").attributes("src")).toContain(
+      "isotipo.png",
+    );
   });
 
   it("un enlace directo abre el formulario con la identidad del negocio", async () => {
@@ -134,14 +139,46 @@ describe("acceso por negocio", () => {
     expect(wrapper.find("#email").exists()).toBe(true);
   });
 
-  it("muestra iniciales si el negocio no tiene logo", async () => {
+  it("muestra el isotipo si el negocio no tiene logo, conservando su nombre", async () => {
     mocks.route.query = { estudio: "pilates" };
     mocks.get.mockResolvedValue({
       data: { data: { nombre: "Pilates Centro", logo_url: null } },
     });
     const wrapper = montar();
     await flushPromises();
-    expect(wrapper.get(".tu-login-iniciales").text()).toBe("PC");
+    expect(wrapper.get("h1").text()).toContain("Pilates Centro");
+    expect(wrapper.get(".tu-login-identidad img").attributes("src")).toContain(
+      "isotipo.png",
+    );
+    expect(wrapper.find(".tu-login-identidad .agendauno-logo").exists()).toBe(
+      true,
+    );
+  });
+
+  it("usa el isotipo si falla el logo y permite cargar el de otro negocio", async () => {
+    recordarCinco();
+    mocks.get.mockResolvedValue({
+      data: { data: { nombre: "Estudio 4", logo_url: "/logo-prueba.png" } },
+    });
+    const wrapper = montar();
+    await wrapper.get(".tu-negocio-principal").trigger("click");
+    await flushPromises();
+    await wrapper.get(".tu-login-logo-negocio").trigger("error");
+    expect(wrapper.find(".tu-login-logo-negocio").exists()).toBe(false);
+    expect(wrapper.get(".tu-login-identidad img").attributes("src")).toContain(
+      "isotipo.png",
+    );
+    expect(wrapper.get("h1").text()).toContain("Estudio 4");
+    await wrapper.get(".tu-login-cambiar").trigger("click");
+    await flushPromises();
+    mocks.get.mockResolvedValue({
+      data: { data: { nombre: "Estudio 3", logo_url: "/otro-logo.png" } },
+    });
+    await wrapper.findAll(".tu-negocio-principal")[1]!.trigger("click");
+    await flushPromises();
+    expect(wrapper.get(".tu-login-logo-negocio").attributes("src")).toBe(
+      "/otro-logo.png",
+    );
     expect(wrapper.find(".tu-login-identidad .agendauno-logo").exists()).toBe(
       false,
     );

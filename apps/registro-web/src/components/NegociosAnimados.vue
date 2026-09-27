@@ -164,8 +164,9 @@ onBeforeUnmount(() => {
 .negocios-escenario {
   display: inline-grid;
   padding-right: 0.6em;
-  color: var(--exito);
-  font-weight: 500;
+  color: var(--marketing-negocios);
+  font-size: 1.25rem;
+  font-weight: 700;
 }
 .negocios-medida,
 .negocios-texto {

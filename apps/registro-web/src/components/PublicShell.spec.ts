@@ -53,11 +53,11 @@ describe("encabezado público", () => {
     );
     vista.unmount();
   });
-  it("da más presencia al logo con slogan dentro de una barra compacta", () => {
+  it("muestra el nuevo logo dentro de una barra compacta", () => {
     const vista = montar();
     expect(vista.findComponent(LogoAgendaUno).props()).toMatchObject({
       ancho: 192,
-      variante: "horizontal-slogan",
+      variante: "horizontal",
     });
     expect(vista.get(".tu-public-container").classes()).toContain("min-h-18");
     expect(vista.get(".tu-public-container").classes()).toContain("py-2");
@@ -73,9 +73,10 @@ describe("encabezado público", () => {
     expect(vista.emitted("alternarTema")).toHaveLength(1);
     vista.unmount();
   });
-  it("no impone la identidad comercial a las vistas de un negocio", () => {
+  it("comparte colores públicos sin imponer navegación comercial al negocio", () => {
     const vista = montar({ esRutaPublicaDeNegocio: true });
     expect(vista.classes()).not.toContain("tu-marketing");
+    expect(vista.classes()).toContain("tu-public-business");
     expect(vista.find(".tu-public-nav").exists()).toBe(false);
     vista.unmount();
   });

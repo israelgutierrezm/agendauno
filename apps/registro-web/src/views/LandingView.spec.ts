@@ -86,7 +86,9 @@ describe("landing comercial", () => {
       const titulo = titulos.find((n) => n.text() === texto);
       expect(titulo, texto).toBeDefined();
       expect(titulo!.findAll(".tu-titulo-enfasis")).toHaveLength(
-        texto === es.landing.seccionTitulo ? 1 : 0,
+        [es.landing.seccionTitulo, es.landing.producto.titulo].includes(texto)
+          ? 1
+          : 0,
       );
     }
     expect(
@@ -97,8 +99,25 @@ describe("landing comercial", () => {
     ).toBe("crecer");
     expect(vista.findAll(".tu-titulo-enfasis").map((n) => n.text())).toEqual([
       "Más",
+      "agenda visual",
       "crecer",
     ]);
+    expect(vista.get("#producto .tu-titulo-enfasis").classes()).toContain(
+      "tu-titulo-enfasis--rosa",
+    );
+    expect(vista.get("#producto .tu-titulo-enfasis").classes()).toContain(
+      "tu-titulo-enfasis--negrita",
+    );
+    expect(vista.get("#soluciones .tu-titulo-enfasis").classes()).toContain(
+      "tu-titulo-enfasis--negrita",
+    );
+    expect(vista.findAll(".tu-enfasis-rosa").map((n) => n.text())).toEqual([
+      "ritmo",
+      "agenda",
+    ]);
+    expect(vista.get("#como-funciona h2").text()).toBe(
+      "Empieza en solo tres pasos",
+    );
     vista.unmount();
   });
   it("conserva la frase de marca y presenta el producto con un subtítulo concreto", () => {
@@ -135,11 +154,13 @@ describe("landing comercial", () => {
     expect(new Set(negocios.map((n) => n.clave)).size).toBe(negocios.length);
     vista.unmount();
   });
-  it("distingue la suscripción de los cobros propios y no ofrece el modelo pendiente como disponible", () => {
+  it("distingue la suscripción de los cobros propios y presenta las dos modalidades", () => {
     const vista = montar();
-    expect(vista.get("#precios").text()).toContain("Por miembro activo");
-    expect(vista.get("#precios").text()).toContain("Por profesional");
-    expect(vista.get("#precios").text()).toContain(
+    expect(vista.get("#precios").text()).toContain("Por alumnos activos");
+    expect(vista.get("#precios").text()).toContain("Citas por profesional");
+    expect(vista.get("#precios .precio-importe strong").text()).toBe("$339");
+    expect(vista.get("#precios .precio-impuestos").text()).toBe("+ IVA");
+    expect(vista.text()).not.toContain(
       "Aún no se puede contratar con este esquema",
     );
     expect(vista.get("#precios").text()).toContain("son cobros distintos");

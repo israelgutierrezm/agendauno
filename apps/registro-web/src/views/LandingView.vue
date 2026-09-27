@@ -11,6 +11,7 @@ import ModalidadesLanding from "@/components/ModalidadesLanding.vue";
 import SolucionesEnlaces from "@/components/SolucionesEnlaces.vue";
 import TextoDestacado from "@/components/TextoDestacado.vue";
 import NegociosAnimados from "@/components/NegociosAnimados.vue";
+import PreciosLanding from "@/components/PreciosLanding.vue";
 
 const { t } = useI18n();
 const DIAS_PRUEBA = 30;
@@ -31,7 +32,6 @@ const negociosAnimados = computed(() =>
   ].map((clave) => t(`landing.heroEscritura.negocios.${clave}`)),
 );
 
-const modelos = ["clases", "citas"] as const;
 const modoDemo = ref<"clases" | "citas">("clases");
 function elegirAgenda(modo: "clases" | "citas"): void {
   modoDemo.value = modo;
@@ -255,7 +255,12 @@ onBeforeUnmount(() => observador?.disconnect());
           {{ $t("landing.producto.etiqueta") }}
         </p>
         <h2 class="tu-titulo mt-3 max-w-3xl reveal">
-          {{ $t("landing.producto.titulo") }}
+          <TextoDestacado
+            :texto="$t('landing.producto.titulo')"
+            enfasis="agenda visual"
+            tono="rosa"
+            negrita
+          />
         </h2>
         <p
           class="mt-4 text-lg max-w-2xl reveal"
@@ -288,7 +293,8 @@ onBeforeUnmount(() => observador?.disconnect());
         <div class="tu-modalidades-intro">
           <p class="tu-seccion-etiqueta">Pensada para tu forma de trabajar</p>
           <h2 class="tu-titulo mt-3 max-w-4xl">
-            Tu negocio tiene su ritmo. Tu agenda también.
+            Tu negocio tiene su <strong class="tu-enfasis-rosa">ritmo</strong>.
+            Tu <strong class="tu-enfasis-rosa">agenda</strong> también.
           </h2>
           <p class="mt-4 max-w-2xl" :style="{ color: 'var(--texto-suave)' }">
             Organiza los lugares de una clase o el tiempo de cada profesional.
@@ -365,6 +371,7 @@ onBeforeUnmount(() => observador?.disconnect());
           <TextoDestacado
             :texto="$t('landing.seccionTitulo')"
             enfasis="crecer"
+            negrita
           />
         </h2>
         <p
@@ -466,29 +473,7 @@ onBeforeUnmount(() => observador?.disconnect());
             {{ $t("landing.precio.subtitulo") }}
           </p>
         </div>
-        <div class="tu-precio-modelos mt-10">
-          <article
-            v-for="modelo in modelos"
-            :key="modelo"
-            class="tu-precio-card"
-          >
-            <p class="tu-precio-badge">
-              {{ $t(`landing.precio.${modelo}.nombre`) }}
-            </p>
-            <h3 class="tu-precio-titulo mt-6 tracking-tight">
-              {{ $t(`landing.precio.${modelo}.unidad`) }}
-            </h3>
-            <p
-              class="mt-3 leading-relaxed"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{ $t(`landing.precio.${modelo}.detalle`) }}
-            </p>
-            <p class="tu-precio-nota mt-6">
-              {{ $t(`landing.precio.${modelo}.nota`) }}
-            </p>
-          </article>
-        </div>
+        <PreciosLanding />
         <div class="tu-precio-prueba mt-6">
           <div>
             <strong
@@ -875,10 +860,12 @@ onBeforeUnmount(() => observador?.disconnect());
 }
 .tu-hero-flow {
   display: flex;
+  justify-content: center;
   max-width: 42rem;
   flex-wrap: wrap;
   gap: 0.45rem;
   margin-top: 1.45rem;
+  margin-inline: auto;
   padding: 0;
   list-style: none;
 }
@@ -887,10 +874,10 @@ onBeforeUnmount(() => observador?.disconnect());
   align-items: center;
   gap: 0.42rem;
   padding: 0.42rem 0.62rem;
-  border: 1px solid color-mix(in srgb, var(--primario) 18%, var(--borde));
+  border: 1px solid var(--marketing-operacion);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--superficie) 82%, transparent);
-  color: var(--texto);
+  background: var(--marketing-operacion);
+  color: #fff;
   font-size: 0.75rem;
   font-weight: 600;
 }
@@ -903,6 +890,10 @@ onBeforeUnmount(() => observador?.disconnect());
   background: var(--primario);
   color: #fff;
   font-size: 0.65rem;
+}
+.tu-enfasis-rosa {
+  color: var(--marketing-rosa);
+  font-weight: 700;
 }
 
 .tu-confianza {

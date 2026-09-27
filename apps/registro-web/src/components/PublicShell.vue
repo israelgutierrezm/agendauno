@@ -28,7 +28,10 @@ defineEmits<{ alternarTema: [] }>();
 <template>
   <div
     class="tu-public-shell min-h-screen flex flex-col"
-    :class="{ 'tu-marketing': !esRutaPublicaDeNegocio }"
+    :class="{
+      'tu-marketing': !esRutaPublicaDeNegocio,
+      'tu-public-business': esRutaPublicaDeNegocio,
+    }"
   >
     <header v-if="esAcceso || !esRutaPublicaDeNegocio" class="tu-public-nav">
       <div
@@ -38,7 +41,7 @@ defineEmits<{ alternarTema: [] }>();
           :to="{ name: 'inicio' }"
           class="tu-public-brand flex items-center shrink-0"
         >
-          <LogoAgendaUno variante="horizontal-slogan" :ancho="192" />
+          <LogoAgendaUno variante="horizontal" :ancho="192" />
         </RouterLink>
 
         <nav

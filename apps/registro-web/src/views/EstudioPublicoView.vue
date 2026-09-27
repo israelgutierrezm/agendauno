@@ -235,8 +235,11 @@ onMounted(cargar);
           />
           <span
             v-else
-            class="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl text-2xl font-bold text-white"
-            :style="{ background: 'var(--primario)' }"
+            class="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl text-2xl font-bold"
+            :style="{
+              background: 'var(--primario)',
+              color: 'var(--primario-contraste)',
+            }"
             aria-hidden="true"
             >{{ iniciales(escaparate.estudio.nombre) }}</span
           >
@@ -454,8 +457,11 @@ onMounted(cargar);
             class="flex items-center gap-3"
           >
             <span
-              class="flex h-11 w-11 items-center justify-center rounded-full font-bold text-white"
-              :style="{ background: 'var(--primario)' }"
+              class="flex h-11 w-11 items-center justify-center rounded-full font-bold"
+              :style="{
+                background: 'var(--primario)',
+                color: 'var(--primario-contraste)',
+              }"
               aria-hidden="true"
               >{{ iniciales(nombre) }}</span
             >
