@@ -79,6 +79,15 @@ return [
     | En producción conviene un disco S3 (otro lugar que el servidor). Se conservan
     | `dias` días. En MySQL usa los binarios mysqldump/mysql del servidor.
     */
+    /*
+    | Alertas de la plataforma: a quién se avisa (por correo, agrupado) cuando fallan
+    | pagos, correos, respaldos o la cola. Sin correo no se avisa a nadie (y la
+    | verificación de producción lo marca como pendiente).
+    */
+    'alertas' => [
+        'correo' => env('ALERTAS_CORREO'),
+    ],
+
     'respaldos' => [
         'disco' => env('RESPALDOS_DISCO', 'local'),
         'carpeta' => env('RESPALDOS_CARPETA', 'respaldos'),

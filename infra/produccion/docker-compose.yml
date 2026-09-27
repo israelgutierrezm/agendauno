@@ -34,12 +34,26 @@ services:
   worker:
     <<: *api
     command: ["php", "artisan", "queue:work", "redis", "--sleep=1", "--tries=3", "--max-time=3600"]
+    # Sano si procesó el latido que encola el programador cada minuto.
+    healthcheck:
+      test: ["CMD", "php", "artisan", "turnouno:latido", "--verificar=cola"]
+      interval: 1m
+      timeout: 20s
+      retries: 3
+      start_period: 3m
 
   # Tareas programadas: recordatorios, renovaciones, agenda recurrente, cobros,
   # respaldos… (routes/console.php).
   scheduler:
     <<: *api
     command: ["php", "artisan", "schedule:work"]
+    # Sano si dejó su latido en el último par de minutos (turnouno:latido).
+    healthcheck:
+      test: ["CMD", "php", "artisan", "turnouno:latido", "--verificar=programador"]
+      interval: 1m
+      timeout: 20s
+      retries: 3
+      start_period: 3m
 
   # Sitio comercial + aplicación + paso de /api a PHP + archivos públicos.
   web:

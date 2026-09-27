@@ -10,6 +10,10 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Latido del programador y de la cola: prueba que ambos siguen vivos (chequeos de
+// salud, Docker y turnouno:verificar-produccion).
+Schedule::command('turnouno:latido')->everyMinute();
+
 // Reanuda las membresías cuya pausa terminó (antes de renovar ciclos y cobrar).
 Schedule::command('turnouno:reanudar-pausas')->dailyAt('00:05')->withoutOverlapping();
 

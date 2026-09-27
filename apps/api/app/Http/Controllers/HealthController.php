@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Modules\Platform\Operacion\LatidoOperacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -16,14 +17,15 @@ use Throwable;
  * `database` and `cache` are required for the app to function and drive the
  * overall status. `redis` is reported for visibility but is optional in local
  * development until the Docker Redis service is started, so it does not fail
- * the endpoint on its own.
+ * the endpoint on its own. `programador` and `cola` report the background
+ * processes' heartbeat (ok | atrasado | sin_datos), also informational.
  */
 class HealthController
 {
     /** @var list<string> */
     private array $critical = ['database', 'cache'];
 
-    public function __invoke(): JsonResponse
+    public function __invoke(LatidoOperacion $latido): JsonResponse
     {
         $checks = [
             'database' => $this->probe(function (): bool {
@@ -37,6 +39,8 @@ class HealthController
                 return Cache::get('health:ping') === '1';
             }),
             'redis' => $this->probe(fn (): bool => (bool) Redis::connection()->ping()),
+            'programador' => ['status' => $this->latido($latido, LatidoOperacion::PROGRAMADOR)],
+            'cola' => ['status' => $this->latido($latido, LatidoOperacion::COLA)],
         ];
 
         $healthy = collect($checks)
@@ -51,6 +55,15 @@ class HealthController
             'time' => now()->toIso8601String(),
             'checks' => $checks,
         ], $healthy ? 200 : 503);
+    }
+
+    private function latido(LatidoOperacion $latido, string $proceso): string
+    {
+        try {
+            return $latido->estado($proceso);
+        } catch (Throwable) {
+            return 'sin_datos';
+        }
     }
 
     /**
