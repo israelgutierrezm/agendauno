@@ -27,12 +27,13 @@ it('un usuario nuevo ve el tema predeterminado y el catálogo de temas', functio
         ->assertOk()
         ->assertJsonPath('data.usuario.apariencia.clave', 'agendauno')
         ->assertJsonPath('data.usuario.apariencia.tokens.acento', '#0070FF')
-        // El predeterminado es claro (barra lateral blanca); el azul marino queda aparte.
+        // El predeterminado es claro (barra lateral blanca).
         ->assertJsonPath('data.usuario.apariencia.tokens.barra', '#FFFFFF');
 
     $data = $this->getJson("/api/v1/app/{$e['slug']}/apariencia", conBearer($e['bearer']))->assertOk()->json('data');
     expect(collect($data['disponibles'])->pluck('clave')->all())
-        ->toContain('agendauno', 'agendauno_marino', 'oceano', 'medianoche', 'alto_contraste');
+        ->toContain('agendauno', 'oceano', 'medianoche', 'alto_contraste')
+        ->not->toContain('agendauno_marino', 'agendauno_noche', 'indigo');
     expect($data['personalizables'])->toBe(['acento', 'barra', 'barra_activo']);
 });
 

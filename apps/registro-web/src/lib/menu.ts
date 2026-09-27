@@ -426,14 +426,6 @@ const PERMISOS_FUERA_DEL_MENU: Record<string, string> = {
   onboarding: "estudio.gestionar",
 };
 
-/** Título de la barra superior para pantallas que no están en el menú. */
-export const TITULOS_FUERA_DEL_MENU: Record<string, string> = {
-  "mi-perfil": "miPerfil.titulo",
-  onboarding: "onboarding.titulo",
-  importar: "importar.titulo",
-  "importar-instructores": "importarInstructores.titulo",
-};
-
 export function hojas(items: MenuItem[]): MenuItem[] {
   return items.flatMap((i) => (i.hijos !== undefined ? hojas(i.hijos) : [i]));
 }

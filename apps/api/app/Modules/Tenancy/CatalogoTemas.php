@@ -43,32 +43,6 @@ final class CatalogoTemas
                 'borde' => '#E6E9F0', 'texto' => '#1E2A3B', 'texto_suave' => '#6B7385',
             ],
         ],
-        'agendauno_marino' => [
-            'nombre' => 'AgendaUno marino',
-            'oscuro' => false,
-            'permite_personalizar' => true,
-            'tokens' => [
-                'barra' => '#031B4E', 'barra_suave' => '#0B2B62', 'barra_texto' => '#BDC9DE',
-                'barra_activo' => '#0070FF', 'barra_activo_texto' => '#FFFFFF',
-                'barra_borde' => 'rgb(255 255 255 / 10%)', 'barra_titulo' => '#FFFFFF',
-                'acento' => '#0070FF', 'acento_texto' => '#FFFFFF',
-                'fondo' => '#F6F8FC', 'superficie' => '#FFFFFF', 'superficie_2' => '#E9EDF5',
-                'borde' => '#D9E0EC', 'texto' => '#031B4E', 'texto_suave' => '#5E6B84',
-            ],
-        ],
-        'agendauno_noche' => [
-            'nombre' => 'AgendaUno noche',
-            'oscuro' => true,
-            'permite_personalizar' => true,
-            'tokens' => [
-                'barra' => '#020D24', 'barra_suave' => '#0B2854', 'barra_texto' => '#B6C3DA',
-                'barra_activo' => '#2D88FF', 'barra_activo_texto' => '#FFFFFF',
-                'barra_borde' => 'rgb(255 255 255 / 10%)', 'barra_titulo' => '#FFFFFF',
-                'acento' => '#2D88FF', 'acento_texto' => '#FFFFFF',
-                'fondo' => '#020D24', 'superficie' => '#071A3A', 'superficie_2' => '#0B2854',
-                'borde' => '#183968', 'texto' => '#FFFFFF', 'texto_suave' => '#B6C3DA',
-            ],
-        ],
         'oceano' => [
             'nombre' => 'Océano',
             'oscuro' => false,
@@ -80,19 +54,6 @@ final class CatalogoTemas
                 'acento' => '#006A89', 'acento_texto' => '#FFFFFF',
                 'fondo' => '#F2F6F9', 'superficie' => '#FFFFFF', 'superficie_2' => '#E3EDF3',
                 'borde' => '#DCE6EC', 'texto' => '#0F2233', 'texto_suave' => '#5A7382',
-            ],
-        ],
-        'indigo' => [
-            'nombre' => 'Índigo',
-            'oscuro' => false,
-            'permite_personalizar' => true,
-            'tokens' => [
-                'barra' => '#1E1B4B', 'barra_suave' => '#312E81', 'barra_texto' => '#C7D2FE',
-                'barra_activo' => '#4F46E5', 'barra_activo_texto' => '#FFFFFF',
-                'barra_borde' => 'rgb(255 255 255 / 10%)', 'barra_titulo' => '#FFFFFF',
-                'acento' => '#4F46E5', 'acento_texto' => '#FFFFFF',
-                'fondo' => '#F1F5F9', 'superficie' => '#FFFFFF', 'superficie_2' => '#E6EAF3',
-                'borde' => '#E2E8F0', 'texto' => '#0F172A', 'texto_suave' => '#64748B',
             ],
         ],
         'medianoche' => [
@@ -163,7 +124,8 @@ final class CatalogoTemas
 
     /**
      * Lo que ve un usuario: su tema (o el predeterminado) con sus ajustes personales
-     * encima, solo si el tema los admite.
+     * encima, solo si el tema los admite. Un tema que ya no existe (se retiraron
+     * "AgendaUno marino", "AgendaUno noche" e "Índigo") cae en el predeterminado.
      *
      * @param  array<string, string>|null  $personalizacion
      * @return array{clave: string, nombre: string, oscuro: bool, permite_personalizar: bool, tokens: array<string, string>, personalizacion: array<string, string>}

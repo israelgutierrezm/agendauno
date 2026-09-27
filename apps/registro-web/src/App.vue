@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, provide, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 
 import IconoNav from "@/components/IconoNav.vue";
@@ -11,14 +10,13 @@ import DialogoConfirmar from "@/components/DialogoConfirmar.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import type { MenuItem, NavEstado } from "@/components/nav";
 import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
-import { esVisible, hojas, MENU, TITULOS_FUERA_DEL_MENU } from "@/lib/menu";
+import { esVisible, MENU } from "@/lib/menu";
 import { plural } from "@/lib/terminologia";
 import { slugDeContexto } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useAparienciaStore } from "@/stores/apariencia";
 import { useTemaStore } from "@/stores/tema";
 
-const { t } = useI18n();
 const tema = useTemaStore();
 const sesion = useSesionTenantStore();
 const router = useRouter();
@@ -78,26 +76,6 @@ const menuVisible = computed(() => filtrar(MENU));
 const hogar = computed(() => ({ name: sesion.rutaInicio }));
 
 const puedeConfigurar = computed(() => sesion.puede("estudio.gestionar"));
-
-const enlaceActivo = computed(() => {
-  const exacta = hojas(MENU).find((e) => e.ruta === route.name);
-  if (exacta !== undefined) {
-    return exacta;
-  }
-  // Subpáginas (p. ej. la ficha /miembros/:id): su sección es la del primer tramo.
-  const seccion = router.resolve(`/${route.path.split("/")[1] ?? ""}`).name;
-  return hojas(MENU).find((e) => e.ruta === seccion) ?? null;
-});
-const tituloSeccion = computed(() => {
-  if (enlaceActivo.value !== null) {
-    const item = enlaceActivo.value;
-    return item.termino !== undefined
-      ? plural(sesion.terminologia[item.termino])
-      : t(item.etiqueta);
-  }
-  const propio = TITULOS_FUERA_DEL_MENU[String(route.name)];
-  return propio !== undefined ? t(propio) : (sesion.estudio?.nombre ?? "");
-});
 
 // ---- Estado del arbol (expandir/colapsar grupos) ----
 const abiertos = ref<Set<string>>(new Set());
@@ -308,7 +286,6 @@ onMounted(() => {
               <path d="M4 7h16M4 12h16M4 17h16" />
             </svg>
           </button>
-          <p class="text-base font-semibold truncate">{{ tituloSeccion }}</p>
         </div>
 
         <div class="flex items-center gap-1 sm:gap-2 shrink-0">
