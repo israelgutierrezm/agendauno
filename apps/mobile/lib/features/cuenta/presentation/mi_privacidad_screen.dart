@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/tema_agendauno.dart';
+import '../../auth/application/sesion_controller.dart';
+import '../../auth/data/sesion.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
 import 'cuenta_screen.dart' show hacerConAviso;
@@ -185,9 +187,10 @@ class _MiPrivacidadScreenState extends ConsumerState<MiPrivacidadScreen> {
                 Card(
                   child: SwitchListTile(
                     title: const Text('Recibir promociones'),
-                    subtitle: const Text(
+                    subtitle: Text(
                       'Correos y mensajes con ofertas del negocio. Los avisos de '
-                      'tus clases y pagos siempre te llegan.',
+                      'tus ${(ref.watch(sesionProvider)?.terminologia ?? const Terminologia()).sesiones.toLowerCase()} '
+                      'y pagos siempre te llegan.',
                     ),
                     value: datos.recibePromociones,
                     onChanged: _ocupado ? null : _promociones,

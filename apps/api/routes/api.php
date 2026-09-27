@@ -91,6 +91,7 @@ use App\Modules\Tenancy\Http\Controllers\StaffTenantController;
 use App\Modules\Tenancy\Http\Controllers\SuscripcionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\TareasTenantController;
 use App\Modules\Tenancy\Http\Controllers\TarifasPlataformaController;
+use App\Modules\Tenancy\Http\Controllers\TerminologiaTenantController;
 use App\Modules\Tenancy\Http\Controllers\TiposDocumentoController;
 use App\Modules\Tenancy\Http\Controllers\UsuariosTenantController;
 use App\Modules\Tenancy\Http\Controllers\WaiversTenantController;
@@ -137,6 +138,9 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/estudios/{estudio}/suspender', [PlataformaEstudiosController::class, 'suspender'])->name('estudios.suspender');
         Route::post('/estudios/{estudio}/reactivar', [PlataformaEstudiosController::class, 'reactivar'])->name('estudios.reactivar');
         Route::post('/estudios/{estudio}/extender-prueba', [PlataformaEstudiosController::class, 'extenderPrueba'])->name('estudios.extender-prueba');
+        // Cómo se llaman las cosas en el negocio (ADR 0049).
+        Route::get('/estudios/{estudio}/terminologia', [PlataformaEstudiosController::class, 'terminologia'])->name('estudios.terminologia');
+        Route::put('/estudios/{estudio}/terminologia', [PlataformaEstudiosController::class, 'guardarTerminologia'])->name('estudios.terminologia.guardar');
         Route::get('/cobros', PlataformaCobrosController::class)->name('cobros');
         Route::put('/estudios/{estudio}', [PlataformaController::class, 'actualizarEstudio'])->name('estudios.actualizar');
         Route::get('/configuracion', [PlataformaController::class, 'configuracion'])->name('configuracion');
@@ -530,6 +534,9 @@ Route::prefix('v1')->group(function (): void {
             // Parámetros configurables del negocio (ADR 0042).
             Route::get('/parametros', [ParametrosTenantController::class, 'index'])->middleware('puede:estudio.gestionar')->name('parametros.index');
             Route::put('/parametros', [ParametrosTenantController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('parametros.guardar');
+            // Cómo se llaman las cosas en el negocio: clase/cita, alumno/cliente… (ADR 0049).
+            Route::get('/terminologia', [TerminologiaTenantController::class, 'index'])->middleware('puede:estudio.gestionar')->name('terminologia.index');
+            Route::put('/terminologia', [TerminologiaTenantController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('terminologia.guardar');
             Route::get('/politicas-cancelacion', [PoliticasCancelacionTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('politicas-cancelacion.index');
             Route::put('/politicas-cancelacion', [PoliticasCancelacionTenantController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('politicas-cancelacion.guardar');
 

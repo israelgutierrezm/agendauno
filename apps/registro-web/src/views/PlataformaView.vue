@@ -7,7 +7,9 @@ import PanelLateral from "@/components/PanelLateral.vue";
 import ParametrosPlataforma from "@/components/ParametrosPlataforma.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import TarifasPlataforma from "@/components/TarifasPlataforma.vue";
+import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
 import { mensajeDeError } from "@/lib/api";
+import type { DatosTerminologia } from "@/lib/terminologia";
 import { useToastStore } from "@/stores/toast";
 
 /**
@@ -236,6 +238,25 @@ function guardarCobro(): void {
       ),
     t("plataformaAdmin.ficha.guardado"),
   );
+}
+
+// Terminología del negocio (ADR 0049), para ajustarla desde soporte.
+async function cargarTerminologia(): Promise<DatosTerminologia> {
+  const { data } = await cliente.get<{ data: DatosTerminologia }>(
+    `/api/v1/plataforma/estudios/${ficha.value?.slug}/terminologia`,
+    encabezados(),
+  );
+  return data.data;
+}
+async function guardarTerminologia(
+  valores: Record<string, string | null>,
+): Promise<DatosTerminologia> {
+  const { data } = await cliente.put<{ data: DatosTerminologia }>(
+    `/api/v1/plataforma/estudios/${ficha.value?.slug}/terminologia`,
+    { valores },
+    encabezados(),
+  );
+  return data.data;
 }
 
 function extenderPrueba(): void {
@@ -1263,6 +1284,13 @@ function borrar(): void {
               {{ $t("plataformaAdmin.ficha.reactivar") }}
             </button>
           </section>
+
+          <!-- Cómo se llaman las cosas en este negocio -->
+          <TerminologiaNegocio
+            :key="ficha.slug"
+            :cargar="cargarTerminologia"
+            :guardar="guardarTerminologia"
+          />
         </div>
       </PanelLateral>
     </template>

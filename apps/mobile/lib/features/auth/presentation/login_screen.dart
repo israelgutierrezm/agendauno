@@ -192,7 +192,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   RegistroScreen(slugInicial: _slug.text.trim()),
                             ),
                           ),
-                    child: const Text('¿Eres alumno nuevo? Crea tu cuenta'),
+                    child: const Text('¿Primera vez aquí? Crea tu cuenta'),
                   ),
                 ],
               ),

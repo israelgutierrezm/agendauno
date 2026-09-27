@@ -181,7 +181,7 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
 
   Widget _clase(OpcionesReprogramar opciones) => opciones.sesiones.isEmpty
       ? const Text(
-          'No hay otras fechas de esta clase con lugar por ahora.',
+          'No hay otras fechas con lugar por ahora.',
           style: TextStyle(color: TemaAgendaUno.textoSuave),
         )
       : RadioGroup<String>(

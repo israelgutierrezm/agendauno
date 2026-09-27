@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { getCorrelationId } from "@/lib/correlationId";
+import { conTerminosActuales } from "@/lib/terminologia";
 
 /**
  * Cliente HTTP del flujo multi-tenant (registro/directorio/login por estudio).
@@ -52,11 +53,12 @@ export function mensajeDeError(
     if (errores) {
       const primero = Object.values(errores)[0]?.[0];
       if (typeof primero === "string" && primero !== "") {
-        return primero;
+        return conTerminosActuales(primero);
       }
     }
 
-    return data?.message ?? porDefecto;
+    // En la terminología del negocio: "Esta clase…" se lee "Esta cita…".
+    return conTerminosActuales(data?.message ?? porDefecto);
   }
 
   return porDefecto;

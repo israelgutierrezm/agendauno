@@ -82,7 +82,7 @@ class AgendaScreen extends ConsumerWidget {
               error: (e, _) => Center(child: Text('No se pudo cargar la agenda: $e')),
               data: (agenda) => (sesion?.esCitas ?? false)
                   ? _AgendaCitas(agenda: agenda, dia: dia, terminologia: sesion!.terminologia)
-                  : _AgendaClases(agenda: agenda),
+                  : _AgendaClases(agenda: agenda, terminologia: sesion?.terminologia ?? const Terminologia()),
             ),
           ),
         ],
@@ -226,7 +226,7 @@ class _AgendaCitas extends ConsumerWidget {
             items: [
               (
                 '${citas.where((s) => s.programada).length}',
-                '${terminologia.sesion.toLowerCase()}s hoy',
+                '${terminologia.sesiones.toLowerCase()} hoy',
                 const Color(0xFF101828),
               ),
               ('$enLocal', 'en el local', const Color(0xFF5B21B6)),
@@ -456,15 +456,16 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
 // ----------------------------------------------------------------- CLASES
 
 class _AgendaClases extends StatelessWidget {
-  const _AgendaClases({required this.agenda});
+  const _AgendaClases({required this.agenda, required this.terminologia});
 
   final AgendaDia agenda;
+  final Terminologia terminologia;
 
   @override
   Widget build(BuildContext context) {
     final clases = agenda.sesiones;
     if (clases.isEmpty) {
-      return const _Vacio('No hay clases programadas este día.');
+      return _Vacio('No hay ${terminologia.sesiones.toLowerCase()} programadas este día.');
     }
     final programadas = clases.where((s) => s.programada);
     final cap = programadas.fold<int>(0, (a, s) => a + (s.capacidad ?? 0));
@@ -477,7 +478,7 @@ class _AgendaClases extends StatelessWidget {
       children: [
         _Resumen(
           items: [
-            ('${programadas.length}', 'clases', const Color(0xFF101828)),
+            ('${programadas.length}', terminologia.sesiones.toLowerCase(), const Color(0xFF101828)),
             ('$res/$cap', 'lugares', const Color(0xFF0B4FD1)),
             ('$espera', 'en espera', const Color(0xFF5B21B6)),
           ],

@@ -905,3 +905,19 @@ export const miReprogramar = {
   volver: "Volver",
   hecho: "Listo: cambiamos tu horario.",
 };
+
+// Cómo se llaman las cosas en el negocio (ADR 0049). No se adapta a sí misma: la
+// sección "terminologiaNegocio" nombra los términos genéricos.
+export const terminologiaNegocio = {
+  titulo: "Cómo se llaman las cosas",
+  ayuda:
+    "Así se nombran en tus pantallas y en la app. Parte de lo de tu giro; elige otro si tu negocio usa otras palabras.",
+  terminos: {
+    sesion: "Lo que se reserva",
+    miembro: "Quien lo toma",
+    instructor: "Quien lo imparte",
+  },
+  delGiro: "Como en tu giro ({termino})",
+  guardar: "Guardar",
+  guardado: "Listo: tus pantallas ya usan estas palabras.",
+};

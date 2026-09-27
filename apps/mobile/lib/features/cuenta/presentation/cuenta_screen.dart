@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
+import '../../auth/data/sesion.dart';
 import '../../perfil/presentation/perfil_screen.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
@@ -48,6 +49,8 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
   @override
   Widget build(BuildContext context) {
     final sesion = ref.watch(sesionProvider);
+    // Como las nombra el negocio: citas, clases, sesiones… (ADR 0049).
+    final terminos = sesion?.terminologia ?? const Terminologia();
     final estado = ref.watch(cuentaProvider);
     final esCitas = sesion?.esCitas ?? false;
 
@@ -75,7 +78,7 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
             children: [
               for (final c in cuenta.consentimientos) _Consentimiento(c),
               if (cuenta.resenasPendientes.isNotEmpty) ...[
-                const _Titulo('Califica tus clases'),
+                _Titulo('Califica tus ${terminos.sesiones.toLowerCase()}'),
                 for (final r in cuenta.resenasPendientes)
                   _CalificarClase(r, key: ValueKey(r.reservaId)),
               ],
@@ -162,9 +165,9 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
                   ),
                 ),
               ] else ...[
-                const _Titulo('Próximas clases'),
+                _Titulo('Próximas ${terminos.sesiones.toLowerCase()}'),
                 if (cuenta.clases.isEmpty)
-                  const _Vacio('No hay clases programadas.')
+                  _Vacio('No hay ${terminos.sesiones.toLowerCase()} programadas.')
                 else
                   ...cuenta.clases.map(
                     (c) => _Clase(

@@ -9,22 +9,44 @@ enum Modalidad {
       valor == 'citas' ? Modalidad.citas : Modalidad.clases;
 }
 
-/// Terminología del perfil de negocio (p. ej. Cita / Cliente / Barbero).
+/// Terminología del negocio (p. ej. Cita / Cliente / Barbero), con plurales. La
+/// fija su giro y el administrador puede cambiarla (ADR 0049).
 class Terminologia {
   const Terminologia({
     this.sesion = 'Clase',
     this.miembro = 'Miembro',
     this.instructor = 'Instructor',
+    this.sesionesPlural,
+    this.miembrosPlural,
+    this.instructoresPlural,
   });
 
   final String sesion;
   final String miembro;
   final String instructor;
+  // Plurales tal como los manda el servidor (Lecciones, Coaches…).
+  final String? sesionesPlural;
+  final String? miembrosPlural;
+  final String? instructoresPlural;
+
+  String get sesiones => sesionesPlural ?? _plural(sesion);
+  String get miembros => miembrosPlural ?? _plural(miembro);
+  String get instructores => instructoresPlural ?? _plural(instructor);
+
+  static String _plural(String p) {
+    if (p.isEmpty) {
+      return p;
+    }
+    return 'aeiouáéó'.contains(p[p.length - 1].toLowerCase()) ? '${p}s' : '${p}es';
+  }
 
   Map<String, dynamic> aJson() => {
     'sesion': sesion,
+    'sesiones': sesiones,
     'miembro': miembro,
+    'miembros': miembros,
     'instructor': instructor,
+    'instructores': instructores,
   };
 
   factory Terminologia.desdeJson(Map<String, dynamic>? json) {
@@ -35,6 +57,9 @@ class Terminologia {
       sesion: (json['sesion'] ?? 'Clase') as String,
       miembro: (json['miembro'] ?? 'Miembro') as String,
       instructor: (json['instructor'] ?? 'Instructor') as String,
+      sesionesPlural: json['sesiones'] as String?,
+      miembrosPlural: json['miembros'] as String?,
+      instructoresPlural: json['instructores'] as String?,
     );
   }
 }

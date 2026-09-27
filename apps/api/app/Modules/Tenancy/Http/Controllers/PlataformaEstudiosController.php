@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\TerminologiaEstudio;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\Models\CargoRenta;
@@ -19,7 +20,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Ficha de un estudio para el operador de la plataforma (PlatformAdmin): datos del
  * negocio y su contacto, uso medido, cargos de renta y facturas; y las acciones de
- * soporte sobre su cuenta (suspender, reactivar, extender la prueba gratis).
+ * soporte sobre su cuenta (suspender, reactivar, extender la prueba gratis, cambiar
+ * su terminología).
  */
 class PlataformaEstudiosController
 {
@@ -135,6 +137,29 @@ class PlataformaEstudiosController
         Log::info('plataforma.estudio.prueba_extendida', ['estudio' => $modelo->slug, 'dias' => $validado['dias']]);
 
         return response()->json(['data' => self::resumen($modelo->refresh())]);
+    }
+
+    /**
+     * Terminología del negocio (ADR 0049), para ajustarla desde soporte.
+     */
+    public function terminologia(string $estudio, TerminologiaEstudio $terminologia): JsonResponse
+    {
+        $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
+
+        return response()->json(['data' => $terminologia->paraEditar($modelo)]);
+    }
+
+    /**
+     * `valores`: {sesion|miembro|instructor: opción | null}; null vuelve al del giro.
+     */
+    public function guardarTerminologia(Request $request, string $estudio, TerminologiaEstudio $terminologia): JsonResponse
+    {
+        $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
+        $validado = $request->validate(['valores' => ['required', 'array']]);
+        $cambio = $terminologia->guardar($modelo, $validado['valores']);
+        Log::info('plataforma.estudio.terminologia', ['estudio' => $modelo->slug, ...$cambio]);
+
+        return response()->json(['data' => $terminologia->paraEditar($modelo->refresh())]);
     }
 
     /**

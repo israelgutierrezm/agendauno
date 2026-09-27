@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 
-import { i18n } from "@/i18n";
+import { aplicarTerminologia, i18n } from "@/i18n";
 import { api, fijarBearer, mensajeDeError } from "@/lib/api";
 import { useAparienciaStore, type Apariencia } from "@/stores/apariencia";
 
@@ -33,6 +33,10 @@ export interface Terminologia {
   sesion: string;
   miembro: string;
   instructor: string;
+  // Plurales (ADR 0049): Citas, Clientes, Barberos.
+  sesiones?: string;
+  miembros?: string;
+  instructores?: string;
 }
 
 /** Configuración del perfil de negocio: adapta etiquetas y opciones sin forks. */
@@ -134,6 +138,13 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
   /** Terminología del perfil (p. ej. Cita / Cliente / Barbero). */
   const terminologia = computed<Terminologia>(
     () => estudio.value?.perfil_config?.terminologia ?? TERMINOLOGIA_DEFAULT,
+  );
+  // Los textos de las pantallas hablan como el negocio: en una barbería, "citas" y
+  // "clientes" en lugar de "clases" y "alumnos" (ADR 0049).
+  watch(
+    () => estudio.value?.perfil_config?.terminologia ?? null,
+    (terminos) => aplicarTerminologia(terminos),
+    { immediate: true, deep: true },
   );
 
   fijarBearer(bearer.value);

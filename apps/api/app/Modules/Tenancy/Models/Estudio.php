@@ -9,6 +9,7 @@ use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\ModoCobroSaas;
 use App\Modules\Tenancy\PerfilNegocio;
+use App\Modules\Tenancy\TerminologiaNegocio;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 
@@ -28,6 +29,7 @@ class Estudio extends Model
         'nombre',
         'slug',
         'perfil_negocio',
+        'terminologia',
         'logo_url',
         'estado',
         'paso_aprovisionamiento',
@@ -65,6 +67,7 @@ class Estudio extends Model
     protected $casts = [
         'estado' => EstadoEstudio::class,
         'perfil_negocio' => PerfilNegocio::class,
+        'terminologia' => 'array',
         'estado_facturacion' => EstadoFacturacion::class,
         'publicado' => 'boolean',
         'privado' => 'boolean',
@@ -96,14 +99,18 @@ class Estudio extends Model
     }
 
     /**
-     * Configuración que el frontend usa para adaptarse sin forks: terminología y
-     * feature-flags del perfil, más la modalidad de servicio.
+     * Configuración que el frontend usa para adaptarse sin forks: terminología (la del
+     * perfil con la que eligió el negocio encima, ADR 0049) y feature-flags del perfil,
+     * más la modalidad de servicio.
      *
      * @return array{terminologia: array<string, string>, flags: array<string, bool>, modalidad: string}
      */
     public function perfilConfig(): array
     {
-        return $this->perfil_negocio->configuracion() + ['modalidad' => $this->modalidad()->value];
+        $config = $this->perfil_negocio->configuracion();
+        $config['terminologia'] = TerminologiaNegocio::completa($config['terminologia'], $this->terminologia);
+
+        return $config + ['modalidad' => $this->modalidad()->value];
     }
 
     /**

@@ -3,7 +3,9 @@ import { computed, onMounted, ref } from "vue";
 
 import CargadorLogo from "@/components/CargadorLogo.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import type { DatosTerminologia, TerminosNegocio } from "@/lib/terminologia";
 import { urlPublicaEstudio } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -66,6 +68,28 @@ async function alternar(): Promise<void> {
   }
 }
 
+// Cómo se llaman las cosas (ADR 0049): al guardar, las pantallas cambian de inmediato.
+async function cargarTerminologia(): Promise<DatosTerminologia> {
+  const { data } = await api.get<{ data: DatosTerminologia }>(
+    `${base.value}/terminologia`,
+  );
+  return data.data;
+}
+async function guardarTerminologia(
+  valores: Record<string, string | null>,
+): Promise<DatosTerminologia> {
+  const { data } = await api.put<{ data: DatosTerminologia }>(
+    `${base.value}/terminologia`,
+    { valores },
+  );
+  return data.data;
+}
+function terminologiaGuardada(vigente: TerminosNegocio): void {
+  if (sesion.estudio?.perfil_config) {
+    sesion.estudio.perfil_config.terminologia = vigente;
+  }
+}
+
 async function copiar(): Promise<void> {
   try {
     await navigator.clipboard.writeText(enlaceDirecto.value);
@@ -106,6 +130,15 @@ onMounted(cargar);
           />
         </div>
       </div>
+
+      <!-- Cómo se llaman las cosas en el negocio -->
+      <TerminologiaNegocio
+        v-if="puedeGestionar"
+        class="mt-6"
+        :cargar="cargarTerminologia"
+        :guardar="guardarTerminologia"
+        @guardado="terminologiaGuardada"
+      />
 
       <!-- Visibilidad en Explorar -->
       <div class="mt-6 tu-card p-6">

@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/sesion_controller.dart';
+import '../../auth/data/sesion.dart';
 import '../application/agenda_controller.dart';
 import '../data/agenda_models.dart';
 import '../data/agenda_repository.dart';
@@ -120,9 +122,12 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
               ),
               const SizedBox(height: 12),
               if (enSala.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text('Nadie reservó esta clase todavía.', textAlign: TextAlign.center),
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'Nadie reservó esta ${(ref.watch(sesionProvider)?.terminologia ?? const Terminologia()).sesion.toLowerCase()} todavía.',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               for (final a in enSala) _fila(a),
             ],
