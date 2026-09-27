@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Membresias\PoliticaRollover;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -66,5 +67,15 @@ class DerechoTenant extends Model
     public function retenciones(): HasMany
     {
         return $this->hasMany(RetencionCreditoTenant::class, 'derecho_id');
+    }
+
+    /**
+     * Clases o servicios a los que aplica (vacío = a todos).
+     *
+     * @return BelongsToMany<OfertaTenant, $this>
+     */
+    public function ofertas(): BelongsToMany
+    {
+        return $this->belongsToMany(OfertaTenant::class, 'derecho_ofertas', 'derecho_id', 'oferta_id');
     }
 }

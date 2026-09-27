@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Membresias\TipoVigencia;
 use App\Modules\Tenancy\Membresias\VigenciaProducto;
 use App\Modules\Tenancy\Models\ActividadTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
+use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
@@ -21,6 +22,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Membresias del estudio (data plane del tenant): productos vendibles, venta
@@ -73,6 +75,8 @@ class MembresiasTenantController
             'rollover_max' => ['nullable', 'integer', 'min:0'],
             'actividad_id' => ['nullable', 'string'],
             'sucursal_id' => ['nullable', 'string'],
+            'ofertas' => ['sometimes', 'array', 'max:200'],
+            'ofertas.*' => ['string', 'distinct'],
         ]);
 
         $producto = $this->membresias->crearProducto(
@@ -91,6 +95,7 @@ class MembresiasTenantController
             isset($validado['vigencia_tipo'])
                 ? new VigenciaProducto(TipoVigencia::from($validado['vigencia_tipo']), (int) $validado['vigencia_cantidad'])
                 : null,
+            $this->ofertasDe($validado['ofertas'] ?? []),
         );
 
         return response()->json(['data' => $this->presentarProducto($producto)], 201);
@@ -121,6 +126,8 @@ class MembresiasTenantController
             'archivado' => ['sometimes', 'boolean'],
             'actividad_id' => ['sometimes', 'nullable', 'string'],
             'sucursal_id' => ['sometimes', 'nullable', 'string'],
+            'ofertas' => ['sometimes', 'array', 'max:200'],
+            'ofertas.*' => ['string', 'distinct'],
         ]);
 
         $atributos = [];
@@ -149,7 +156,11 @@ class MembresiasTenantController
         }
 
         $antes = $producto->only(['nombre', 'precio_minor', 'ilimitado', 'creditos_incluidos', 'vigencia_tipo', 'vigencia_cantidad', 'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max', 'archivado']);
-        $this->membresias->actualizarProducto($producto, $atributos);
+        $this->membresias->actualizarProducto(
+            $producto,
+            $atributos,
+            $request->has('ofertas') ? $this->ofertasDe($validado['ofertas'] ?? []) : null,
+        );
 
         $actor = $request->attributes->get('usuario_tenant');
         $this->auditoria->registrar(
@@ -260,7 +271,7 @@ class MembresiasTenantController
      */
     private function presentarProducto(ProductoTenant $producto): array
     {
-        $producto->loadMissing(['actividad', 'sucursal']);
+        $producto->loadMissing(['actividad', 'sucursal', 'ofertas']);
 
         return [
             'id' => $producto->ulid,
@@ -283,7 +294,28 @@ class MembresiasTenantController
             'actividad' => $producto->actividad?->nombre,
             'sucursal_id' => $producto->sucursal?->ulid,
             'sucursal' => $producto->sucursal?->nombre,
+            // Clases o servicios a los que aplica; vacío = a todos.
+            'ofertas' => $producto->ofertas
+                ->map(fn (OfertaTenant $o): array => ['id' => $o->ulid, 'nombre' => $o->nombre])
+                ->values()->all(),
         ];
+    }
+
+    /**
+     * Ids internos de las clases elegidas (por su ulid). Una que no exista es un error
+     * de captura, no se ignora en silencio.
+     *
+     * @param  list<string>  $ulids
+     * @return list<int>
+     */
+    private function ofertasDe(array $ulids): array
+    {
+        $ids = OfertaTenant::query()->whereIn('ulid', $ulids)->pluck('id', 'ulid');
+        if ($ids->count() !== count($ulids)) {
+            throw ValidationException::withMessages(['ofertas' => 'Alguna de las clases elegidas ya no existe.']);
+        }
+
+        return array_values(array_map('intval', $ids->all()));
     }
 
     /**

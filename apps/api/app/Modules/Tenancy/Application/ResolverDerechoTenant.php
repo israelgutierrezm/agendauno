@@ -27,6 +27,7 @@ class ResolverDerechoTenant
                 $consulta->where('persona_id', $persona->getKey())
                     ->where('estado', EstadoAcuerdo::Activo->value);
             })
+            ->with('ofertas:id')
             ->get()
             ->filter(fn (DerechoTenant $derecho): bool => $this->vigente($derecho, $sesion->inicia_en) && $this->cubre($derecho, $sesion));
 
@@ -42,8 +43,8 @@ class ResolverDerechoTenant
     }
 
     /**
-     * ¿El derecho cubre esta sesion segun sus restricciones de actividad/sucursal?
-     * Sin restriccion (nulo) cubre cualquiera.
+     * ¿El derecho cubre esta sesion segun sus restricciones de actividad, sucursal y
+     * clases (p. ej. "Nivel 1 a 3")? Sin restriccion (nulo o sin clases) cubre cualquiera.
      */
     private function cubre(DerechoTenant $derecho, SesionTenant $sesion): bool
     {
@@ -57,7 +58,9 @@ class ResolverDerechoTenant
             return false;
         }
 
-        return true;
+        $ofertas = $derecho->ofertas;
+
+        return $ofertas->isEmpty() || $ofertas->contains('id', (int) $sesion->oferta_id);
     }
 
     private function vigente(DerechoTenant $derecho, CarbonInterface $momento): bool

@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Membresias\TipoVigencia;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * Producto comercial vendible, tenant-local. Otorga derechos (entitlements) al
@@ -62,5 +63,15 @@ class ProductoTenant extends Model
     public function sucursal(): BelongsTo
     {
         return $this->belongsTo(SucursalTenant::class, 'sucursal_id');
+    }
+
+    /**
+     * Clases o servicios a los que aplica (vacío = a todos).
+     *
+     * @return BelongsToMany<OfertaTenant, $this>
+     */
+    public function ofertas(): BelongsToMany
+    {
+        return $this->belongsToMany(OfertaTenant::class, 'producto_ofertas', 'producto_id', 'oferta_id');
     }
 }

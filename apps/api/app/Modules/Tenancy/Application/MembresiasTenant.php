@@ -35,6 +35,9 @@ class MembresiasTenant
         private readonly GestorDeConexionTenant $gestor,
     ) {}
 
+    /**
+     * @param  list<int>  $ofertaIds  clases a las que aplica (vacío = a todas)
+     */
     public function crearProducto(
         string $nombre,
         TipoProducto $tipo,
@@ -49,8 +52,9 @@ class MembresiasTenant
         ?int $actividadId = null,
         ?int $sucursalId = null,
         ?VigenciaProducto $vigencia = null,
+        array $ofertaIds = [],
     ): ProductoTenant {
-        return ProductoTenant::query()->create($this->normalizar([
+        $producto = ProductoTenant::query()->create($this->normalizar([
             'nombre' => $nombre,
             'tipo' => $tipo,
             'precio_minor' => $precioMinor,
@@ -67,16 +71,21 @@ class MembresiasTenant
             'actividad_id' => $actividadId,
             'sucursal_id' => $sucursalId,
         ]));
+        $producto->ofertas()->sync($ofertaIds);
+
+        return $producto;
     }
 
     /**
      * Edita un producto (editor completo). Recibe los atributos ya resueltos (enums,
      * ids internos) y aplica las mismas reglas de coherencia que el alta. No toca los
      * acuerdos/derechos ya vendidos: solo cambia la plantilla para ventas futuras.
+     * `$ofertaIds` (null = sin cambio) fija a qué clases aplica.
      *
      * @param  array<string, mixed>  $atributos
+     * @param  list<int>|null  $ofertaIds
      */
-    public function actualizarProducto(ProductoTenant $producto, array $atributos): ProductoTenant
+    public function actualizarProducto(ProductoTenant $producto, array $atributos, ?array $ofertaIds = null): ProductoTenant
     {
         // Base = estado actual del producto; encima, los campos provistos.
         $fusion = array_merge([
@@ -93,6 +102,9 @@ class MembresiasTenant
         ], $atributos);
 
         $producto->update($this->normalizar($fusion));
+        if ($ofertaIds !== null) {
+            $producto->ofertas()->sync($ofertaIds);
+        }
 
         return $producto->refresh();
     }
@@ -176,6 +188,8 @@ class MembresiasTenant
                 'valido_desde' => $inicio,
                 'valido_hasta' => $validoHasta,
             ]);
+            // A qué clases aplica, copiado: editar el plan después no cambia lo vendido.
+            $derecho->ofertas()->sync($producto->ofertas()->pluck('ofertas.id')->all());
 
             if (! $producto->ilimitado) {
                 $concesion = $recurrente
