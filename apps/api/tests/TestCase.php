@@ -14,15 +14,14 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        // En paralelo (`pest --parallel`) cada proceso usa su propia carpeta de
-        // storage: las BD de los negocios (storage/tenants), archivos y llaves de
-        // prueba de un proceso no chocan con las de otro.
+        // Las pruebas nunca usan el storage real: ahí viven las BD de los negocios
+        // de desarrollo (storage/tenants), que las pruebas borran al limpiar. En
+        // paralelo (`pest --parallel`) cada proceso tiene además su propia carpeta,
+        // para que sus BD, archivos y llaves no choquen con las de otro.
         $proceso = ParallelTesting::token();
-        if ($proceso !== false) {
-            $ruta = base_path('storage/testing/proceso-'.$proceso);
-            File::ensureDirectoryExists($ruta.'/app');
-            File::ensureDirectoryExists($ruta.'/framework/testing');
-            $this->app->useStoragePath($ruta);
-        }
+        $ruta = base_path('storage/testing/'.($proceso !== false ? 'proceso-'.$proceso : 'serie'));
+        File::ensureDirectoryExists($ruta.'/app');
+        File::ensureDirectoryExists($ruta.'/framework/testing');
+        $this->app->useStoragePath($ruta);
     }
 }
