@@ -31,6 +31,13 @@ interface Sucursal {
   zona_horaria: string | null;
   region: string | null;
 }
+interface Resena {
+  calificacion: number;
+  comentario: string | null;
+  nombre: string | null;
+  actividad: string | null;
+  fecha: string | null;
+}
 interface Escaparate {
   estudio: {
     slug: string;
@@ -47,6 +54,8 @@ interface Escaparate {
   instructores: string[];
   productos: Producto[];
   proximas_sesiones: Sesion[];
+  // Solo las que el negocio deja visibles (promedio de todas; comentarios recientes).
+  resenas?: { promedio: number | null; total: number; recientes: Resena[] };
 }
 
 const route = useRoute();
@@ -451,6 +460,51 @@ onMounted(cargar);
               >{{ iniciales(nombre) }}</span
             >
             <span class="font-semibold">{{ nombre }}</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Reseñas visibles de sus clientes -->
+      <section
+        v-if="(escaparate.resenas?.total ?? 0) > 0"
+        class="mx-auto max-w-5xl px-4 py-12"
+      >
+        <h2 class="text-2xl font-light">{{ $t("escaparate.resenas") }}</h2>
+        <p class="mt-2 flex items-baseline gap-2">
+          <span class="text-3xl font-light">{{
+            $t("escaparate.promedio", {
+              promedio: escaparate.resenas?.promedio?.toFixed(1),
+            })
+          }}</span>
+          <span class="text-sm" :style="{ color: 'var(--texto-suave)' }">{{
+            $t("escaparate.totalResenas", escaparate.resenas?.total ?? 0)
+          }}</span>
+        </p>
+        <ul
+          v-if="(escaparate.resenas?.recientes ?? []).length > 0"
+          class="mt-6 grid gap-4 sm:grid-cols-2"
+        >
+          <li
+            v-for="(r, i) in escaparate.resenas?.recientes"
+            :key="i"
+            class="rounded-lg border p-4"
+            :style="{ borderColor: 'var(--borde)' }"
+          >
+            <p
+              class="text-sm tracking-widest"
+              :style="{ color: 'var(--aviso)' }"
+              :aria-label="$t('escaparate.estrellas', { n: r.calificacion })"
+              role="img"
+            >
+              {{ "★".repeat(r.calificacion)
+              }}<span :style="{ color: 'var(--borde)' }">{{
+                "★".repeat(5 - r.calificacion)
+              }}</span>
+            </p>
+            <p class="mt-2">{{ r.comentario }}</p>
+            <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ [r.nombre, r.actividad].filter(Boolean).join(" · ") }}
+            </p>
           </li>
         </ul>
       </section>

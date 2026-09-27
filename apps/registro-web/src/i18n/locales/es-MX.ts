@@ -543,6 +543,10 @@ export default {
     profesionalesDesc:
       "Consulta disponibilidad y elige a tu {profesional} al reservar.",
     ubicacion: "Ubicación",
+    resenas: "Lo que dicen sus clientes",
+    promedio: "{promedio} de 5",
+    totalResenas: "1 reseña | {n} reseñas",
+    estrellas: "{n} de 5 estrellas",
     lugaresLibres: "{n} lugares",
     lleno: "Lleno",
     cupoAbierto: "Cupo abierto",
