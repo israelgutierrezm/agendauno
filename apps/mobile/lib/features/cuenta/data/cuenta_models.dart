@@ -554,3 +554,51 @@ class SolicitudBaja {
     respuesta: j['respuesta'] as String?,
   );
 }
+
+/// El clima del Inicio (GET /mi/clima): el pronóstico para su próxima clase en su
+/// sucursal (`tipo` = pronostico) o el de ahora (`ahora`; `aproximado` si salió de
+/// su IP). `icono`: despejado, parcial, nublado, niebla, llovizna, lluvia, nieve o
+/// tormenta.
+class ClimaMiembro {
+  const ClimaMiembro({
+    required this.tipo,
+    required this.lugar,
+    required this.aproximado,
+    required this.temperatura,
+    required this.condicion,
+    required this.icono,
+    required this.esDeDia,
+    this.lluvia,
+  });
+
+  factory ClimaMiembro.desdeJson(Map<String, dynamic> json) => ClimaMiembro(
+    tipo: (json['tipo'] ?? 'ahora') as String,
+    lugar: (json['lugar'] ?? '') as String,
+    aproximado: (json['aproximado'] ?? false) as bool,
+    temperatura: (json['temperatura'] as num? ?? 0).round(),
+    condicion: (json['condicion'] ?? '') as String,
+    icono: (json['icono'] ?? 'nublado') as String,
+    esDeDia: (json['es_de_dia'] ?? true) as bool,
+    lluvia: (json['lluvia'] as num?)?.round(),
+  );
+
+  final String tipo;
+  final String lugar;
+  final bool aproximado;
+  final int temperatura;
+  final String condicion;
+  final String icono;
+  final bool esDeDia;
+  final int? lluvia;
+
+  /// "Pronóstico para tu clase en Roma Norte", "Ahora cerca de Guadalajara"…
+  String dondeTexto(String clase) {
+    if (tipo == 'pronostico') {
+      return 'Pronóstico para tu $clase en $lugar';
+    }
+    if (lugar.isEmpty) {
+      return '';
+    }
+    return aproximado ? 'Ahora cerca de $lugar' : 'Ahora en $lugar';
+  }
+}

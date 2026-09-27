@@ -84,6 +84,8 @@ class Sesion {
     this.tieneContrasena = true,
     this.modalidad = Modalidad.clases,
     this.terminologia = const Terminologia(),
+    this.estudioNombre,
+    this.perfil,
   });
 
   final String slug;
@@ -103,6 +105,10 @@ class Sesion {
   final bool tieneContrasena;
   final Modalidad modalidad;
   final Terminologia terminologia;
+
+  /// Nombre del negocio y su giro (perfil: pole, barberia, spa…).
+  final String? estudioNombre;
+  final String? perfil;
 
   bool get esCitas => modalidad == Modalidad.citas;
 
@@ -139,6 +145,8 @@ class Sesion {
     'tiene_contrasena': tieneContrasena,
     'modalidad': modalidad.name,
     'terminologia': terminologia.aJson(),
+    'estudio_nombre': estudioNombre,
+    'perfil': perfil,
   };
 
   /// Restaura una sesión guardada (null si le falta lo esencial).
@@ -169,6 +177,8 @@ class Sesion {
       terminologia: Terminologia.desdeJson(
         datos['terminologia'] as Map<String, dynamic>?,
       ),
+      estudioNombre: datos['estudio_nombre'] as String?,
+      perfil: datos['perfil'] as String?,
     );
   }
 
@@ -197,6 +207,8 @@ class Sesion {
       terminologia: Terminologia.desdeJson(
         config?['terminologia'] as Map<String, dynamic>?,
       ),
+      estudioNombre: estudio?['nombre'] as String?,
+      perfil: estudio?['perfil'] as String?,
     );
   }
 
@@ -228,6 +240,8 @@ class Sesion {
     tieneContrasena: (usuario['tiene_contrasena'] ?? tieneContrasena) as bool,
     modalidad: modalidad,
     terminologia: terminologia,
+    estudioNombre: estudioNombre,
+    perfil: perfil,
   );
 
   static List<String> _textos(Object? valor) => valor is List

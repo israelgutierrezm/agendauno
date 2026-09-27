@@ -45,6 +45,7 @@ class TarjetaAcceso extends StatelessWidget {
     required this.valor,
     required this.onTap,
     this.atencion = false,
+    this.tono,
   });
 
   final IconData icono;
@@ -53,41 +54,72 @@ class TarjetaAcceso extends StatelessWidget {
   final VoidCallback onTap;
   final bool atencion;
 
+  /// Con tono (Inicio del alumno): el ícono en su cuadro de ese color y una forma
+  /// suave en la esquina. Sin tono, el ícono gris de siempre.
+  final Color? tono;
+
   @override
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
+    clipBehavior: Clip.antiAlias,
     child: InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icono, color: TemaAgendaUno.textoSuave),
-            const Spacer(),
-            Text(
-              titulo,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              valor,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                color: atencion
-                    ? TemaAgendaUno.aviso
-                    : TemaAgendaUno.textoSuave,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (tono != null)
+            Positioned(
+              top: -34,
+              right: -34,
+              child: Container(
+                width: 92,
+                height: 92,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: tono!.withValues(alpha: 0.09),
+                ),
               ),
             ),
-          ],
-        ),
+          Padding(padding: const EdgeInsets.all(14), child: _contenido()),
+        ],
       ),
     ),
+  );
+
+  Widget _contenido() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (tono != null)
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: tono!.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icono, color: tono, size: 22),
+        )
+      else
+        Icon(icono, color: TemaAgendaUno.textoSuave),
+      const Spacer(),
+      Text(
+        titulo,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+      const SizedBox(height: 2),
+      Text(
+        valor,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 13,
+          color: atencion ? TemaAgendaUno.aviso : TemaAgendaUno.textoSuave,
+        ),
+      ),
+    ],
   );
 }
 

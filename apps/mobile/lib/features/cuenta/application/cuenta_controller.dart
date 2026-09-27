@@ -70,6 +70,13 @@ final cuentaProvider = AsyncNotifierProvider<CuentaController, MiCuenta>(
   CuentaController.new,
 );
 
+/// El clima del Inicio; se vuelve a pedir con la cuenta (su próxima reserva manda).
+final climaProvider = FutureProvider<ClimaMiembro?>((ref) async {
+  await ref.watch(cuentaProvider.future);
+  final repo = ref.watch(cuentaRepositoryProvider);
+  return repo?.clima();
+});
+
 /// Corte de sus planes; se vuelve a pedir cada vez que la cuenta se recarga (p. ej.
 /// tras reservar, cancelar o pagar).
 final cortePlanesProvider = FutureProvider<List<PlanCorte>>((ref) async {

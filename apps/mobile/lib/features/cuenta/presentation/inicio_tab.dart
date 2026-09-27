@@ -6,16 +6,19 @@ import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
+import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/eventos_cuenta.dart';
 import 'cuenta_widgets.dart';
 import 'pase_sheet.dart';
+import 'tarjeta_principal.dart';
 
 /// Pestañas del portal del alumno (el orden de la barra de abajo).
 enum PestanaCuenta { inicio, reservas, pagos, expediente, cuenta }
 
-/// Inicio del portal del alumno o cliente: lo que pide su atención, su próxima
-/// reserva (con "agregar a mi calendario") y accesos directos con su dato.
+/// Inicio del portal del alumno o cliente (como en la web): un saludo, la tarjeta
+/// grande con su próxima clase o cita (siempre; sin reserva invita a reservar) con la
+/// foto del giro y el clima, lo que pide su atención y accesos directos con su color.
 class InicioTab extends ConsumerWidget {
   const InicioTab({super.key, required this.cuenta, required this.onIr});
 
@@ -37,10 +40,101 @@ class InicioTab extends ConsumerWidget {
     final firmar = cuenta.consentimientos.length;
     final pagar = cuenta.porPagar.length;
     final creditos = _creditos(cuenta.derechos);
+    final clima = ref.watch(climaProvider).value;
+    final esCitas = sesion?.esCitas ?? false;
+    final nombre = _primerNombre(sesion);
+    final estudio = sesion?.estudioNombre;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       children: [
+        Text(
+          nombre.isEmpty ? '¡Hola!' : '¡Hola, $nombre!',
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          estudio == null || estudio.isEmpty
+              ? 'Aquí tienes un resumen de tu actividad.'
+              : 'Aquí tienes un resumen de tu actividad en $estudio.',
+          style: const TextStyle(color: TemaAgendaUno.textoSuave),
+        ),
+        const SizedBox(height: 16),
+
+        // La tarjeta principal: siempre, con o sin reserva.
+        TarjetaPrincipal(
+          etiqueta: 'Tu próxima $clase',
+          foto: fotoNegocio(sesion?.perfil),
+          clima: clima,
+          dondeClima: clima?.dondeTexto(clase) ?? '',
+          contenido: proxima != null
+              ? [
+                  const SizedBox(height: 6),
+                  Text(
+                    proxima.oferta ?? '—',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    [
+                      Formato.fechaHora(proxima.iniciaEn),
+                      if (proxima.sucursal != null) proxima.sucursal!,
+                    ].join(' · '),
+                  ),
+                  if (proxima.estado == 'pendiente_pago')
+                    const Text(
+                      'Pendiente de pago',
+                      style: TextStyle(color: TemaAgendaUno.aviso),
+                    ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      BotonAgregarCalendario(
+                        primario: true,
+                        evento: 'reserva-${proxima.id}',
+                        titulo: proxima.oferta ?? 'Reserva',
+                        inicio: DateTime.parse(proxima.iniciaEn!).toLocal(),
+                        fin: proxima.terminaEn == null
+                            ? null
+                            : DateTime.tryParse(proxima.terminaEn!)?.toLocal(),
+                        lugar: proxima.sucursal,
+                      ),
+                      TextButton(
+                        onPressed: () => onIr(PestanaCuenta.reservas),
+                        child: const Text('Ver en mis reservas'),
+                      ),
+                    ],
+                  ),
+                ]
+              : [
+                  const SizedBox(height: 6),
+                  Text(
+                    'Sin $clase agendada',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Elige tu próxima $clase y aparta tu lugar.',
+                    style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton(
+                    onPressed: () => onIr(PestanaCuenta.reservas),
+                    child: Text(esCitas ? 'Agendar una $clase' : 'Reservar'),
+                  ),
+                ],
+        ),
+        const SizedBox(height: 12),
+
         // Lo que pide atención.
         if (ofrecida != null)
           AvisoAtencion(
@@ -62,79 +156,12 @@ class InicioTab extends ConsumerWidget {
             onTap: () => onIr(PestanaCuenta.pagos),
           ),
 
-        // Su próxima reserva.
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Tu próxima $clase',
-                  style: const TextStyle(color: TemaAgendaUno.textoSuave),
-                ),
-                if (proxima != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    proxima.oferta ?? '—',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    [
-                      Formato.fechaHora(proxima.iniciaEn),
-                      if (proxima.sucursal != null) proxima.sucursal!,
-                    ].join(' · '),
-                  ),
-                  if (proxima.estado == 'pendiente_pago')
-                    const Text(
-                      'Pendiente de pago',
-                      style: TextStyle(color: TemaAgendaUno.aviso),
-                    ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      BotonAgregarCalendario(
-                        evento: 'reserva-${proxima.id}',
-                        titulo: proxima.oferta ?? 'Reserva',
-                        inicio: DateTime.parse(proxima.iniciaEn!).toLocal(),
-                        fin: proxima.terminaEn == null
-                            ? null
-                            : DateTime.tryParse(proxima.terminaEn!)?.toLocal(),
-                        lugar: proxima.sucursal,
-                      ),
-                      TextButton(
-                        onPressed: () => onIr(PestanaCuenta.reservas),
-                        child: const Text('Ver en mis reservas'),
-                      ),
-                    ],
-                  ),
-                ] else ...[
-                  const SizedBox(height: 4),
-                  const Text('No tienes reservas próximas.'),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: () => onIr(PestanaCuenta.reservas),
-                    child: const Text('Reservar'),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-
         // Accesos directos.
         RejillaAccesos([
           TarjetaAcceso(
             icono: Icons.event_available_outlined,
             titulo: 'Reservar',
+            tono: TonosAcceso.reservar,
             valor: sesion?.esCitas ?? false
                 ? 'Agenda tu próxima $clase'
                 : (disponibles == 1
@@ -145,6 +172,7 @@ class InicioTab extends ConsumerWidget {
           TarjetaAcceso(
             icono: Icons.view_list_outlined,
             titulo: 'Mis reservas',
+            tono: TonosAcceso.reservas,
             valor: proximas.isEmpty
                 ? 'Sin reservas próximas'
                 : (proximas.length == 1
@@ -155,12 +183,14 @@ class InicioTab extends ConsumerWidget {
           TarjetaAcceso(
             icono: Icons.local_offer_outlined,
             titulo: 'Mis créditos',
+            tono: TonosAcceso.creditos,
             valor: creditos,
             onTap: () => onIr(PestanaCuenta.pagos),
           ),
           TarjetaAcceso(
             icono: Icons.payments_outlined,
             titulo: 'Pagos',
+            tono: TonosAcceso.pagos,
             valor: pagar > 0
                 ? (pagar == 1 ? '1 por pagar' : '$pagar por pagar')
                 : 'Al corriente',
@@ -170,6 +200,7 @@ class InicioTab extends ConsumerWidget {
           TarjetaAcceso(
             icono: Icons.qr_code_2,
             titulo: 'Pase de entrada',
+            tono: TonosAcceso.pase,
             valor: 'Muéstralo al llegar',
             onTap: () => showModalBottomSheet<void>(
               context: context,
@@ -180,6 +211,7 @@ class InicioTab extends ConsumerWidget {
           TarjetaAcceso(
             icono: Icons.folder_outlined,
             titulo: 'Expediente',
+            tono: TonosAcceso.expediente,
             valor: firmar > 0
                 ? (firmar == 1
                       ? '1 documento por firmar'
@@ -193,6 +225,12 @@ class InicioTab extends ConsumerWidget {
     );
   }
 
+  /// Su primer nombre para el saludo.
+  static String _primerNombre(Sesion? sesion) {
+    final nombre = (sesion?.nombrePila ?? sesion?.nombre ?? '').trim();
+    return nombre.isEmpty ? '' : nombre.split(RegExp(r'\s+')).first;
+  }
+
   /// "Ilimitado", "6 créditos" o "Sin paquete activo" (1000 unidades = 1).
   static String _creditos(List<DerechoMiembro> derechos) {
     if (derechos.isEmpty) {
@@ -204,4 +242,14 @@ class InicioTab extends ConsumerWidget {
     final n = derechos.fold<int>(0, (a, d) => a + d.creditosDisponibles);
     return n == 1 ? '1 crédito' : '$n créditos';
   }
+}
+
+/// Un color por acceso del Inicio: los tonos medios de la agenda de la web.
+abstract final class TonosAcceso {
+  static const reservar = Color(0xFF0070FF);
+  static const reservas = Color(0xFF9673DE);
+  static const creditos = Color(0xFF12A68B);
+  static const pagos = Color(0xFFE07A2E);
+  static const pase = Color(0xFF1C9BC7);
+  static const expediente = Color(0xFFD6457F);
 }

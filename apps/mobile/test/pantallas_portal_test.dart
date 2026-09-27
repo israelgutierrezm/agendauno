@@ -91,6 +91,18 @@ void main() {
         const Sesion(slug: 'demo', bearer: 't', nombre: 'Vale', rol: 'miembro'),
       ),
       cuentaProvider.overrideWith(() => _CuentaFalsa(cuenta)),
+      climaProvider.overrideWith(
+        (ref) async => const ClimaMiembro(
+          tipo: 'pronostico',
+          lugar: 'Roma Norte',
+          aproximado: false,
+          temperatura: 16,
+          condicion: 'Lluvia',
+          icono: 'lluvia',
+          esDeDia: true,
+          lluvia: 70,
+        ),
+      ),
       cortePlanesProvider.overrideWith(
         (ref) async => [
           PlanCorte.desdeJson({
@@ -119,8 +131,11 @@ void main() {
       ),
     ]);
 
-    expect(find.text('Tu próxima clase'), findsOneWidget);
+    expect(find.text('¡Hola, Vale!'), findsOneWidget);
+    expect(find.text('TU PRÓXIMA CLASE'), findsOneWidget);
     expect(find.text('Pole Nivel 1'), findsOneWidget);
+    expect(find.text('Pronóstico para tu clase en Roma Norte'), findsOneWidget);
+    expect(find.textContaining('70 % de lluvia'), findsOneWidget);
     expect(find.text('Agregar a mi calendario'), findsOneWidget);
     expect(find.text('Tienes 1 documento por firmar'), findsOneWidget);
     expect(find.text('6 créditos'), findsOneWidget);
@@ -153,6 +168,40 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Privacidad y mis datos'), findsOneWidget);
   });
+
+  testWidgets(
+    'sin reserva la tarjeta principal sigue ahí e invita a reservar',
+    (tester) async {
+      await montar(tester, const CuentaScreen(), [
+        sesionInicialProvider.overrideWithValue(
+          const Sesion(
+            slug: 'demo',
+            bearer: 't',
+            nombre: 'Vale Ruiz',
+            rol: 'miembro',
+            estudioNombre: 'Estudio Demo',
+          ),
+        ),
+        cuentaProvider.overrideWith(
+          () => _CuentaFalsa(
+            const MiCuenta(derechos: [], reservas: [], clases: []),
+          ),
+        ),
+        climaProvider.overrideWith((ref) async => null),
+        cortePlanesProvider.overrideWith((ref) async => const []),
+      ]);
+
+      expect(find.text('¡Hola, Vale!'), findsOneWidget);
+      expect(
+        find.text('Aquí tienes un resumen de tu actividad en Estudio Demo.'),
+        findsOneWidget,
+      );
+      expect(find.text('TU PRÓXIMA CLASE'), findsOneWidget);
+      expect(find.text('Sin clase agendada'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Reservar'), findsOneWidget);
+      expect(find.text('Agregar a mi calendario'), findsNothing);
+    },
+  );
 
   testWidgets('portal del instructor: inicio y mis clases', (tester) async {
     SesionAgenda clase(String id, DateTime cuando, {int espera = 0}) =>

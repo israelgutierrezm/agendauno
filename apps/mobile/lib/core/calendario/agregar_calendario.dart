@@ -96,6 +96,7 @@ class BotonAgregarCalendario extends ConsumerWidget {
     required this.inicio,
     this.fin,
     this.lugar,
+    this.primario = false,
   });
 
   final String evento;
@@ -104,11 +105,12 @@ class BotonAgregarCalendario extends ConsumerWidget {
   final DateTime? fin;
   final String? lugar;
 
+  /// Relleno (acción principal de la tarjeta) en vez de contorno.
+  final bool primario;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) => OutlinedButton.icon(
-    icon: const Icon(Icons.event_available_outlined, size: 18),
-    label: const Text('Agregar a mi calendario'),
-    onPressed: () => mostrarAgregarCalendario(
+  Widget build(BuildContext context, WidgetRef ref) {
+    void abrir() => mostrarAgregarCalendario(
       context,
       ref,
       evento: evento,
@@ -116,6 +118,11 @@ class BotonAgregarCalendario extends ConsumerWidget {
       inicio: inicio,
       fin: fin,
       lugar: lugar,
-    ),
-  );
+    );
+    const icono = Icon(Icons.event_available_outlined, size: 18);
+    const texto = Text('Agregar a mi calendario');
+    return primario
+        ? FilledButton.icon(icon: icono, label: texto, onPressed: abrir)
+        : OutlinedButton.icon(icon: icono, label: texto, onPressed: abrir);
+  }
 }

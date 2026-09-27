@@ -53,6 +53,18 @@ class CuentaRepository {
     );
   }
 
+  /// El clima de su Inicio: el pronóstico para su próxima clase o cita en su
+  /// sucursal o el de ahora. Si falla o no se sabe, null (no se muestra).
+  Future<ClimaMiembro?> clima() async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>('$_base/mi/clima');
+      final data = res.data?['data'];
+      return data is Map<String, dynamic> ? ClimaMiembro.desdeJson(data) : null;
+    } on DioException {
+      return null;
+    }
+  }
+
   /// Lo que tiene pendiente de pago; si falla, simplemente no se muestra.
   Future<List<OrdenPorPagar>> _porPagar() async {
     try {
