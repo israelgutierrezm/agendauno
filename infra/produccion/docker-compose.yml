@@ -16,7 +16,9 @@ x-api: &api
   build:
     context: ../..
     dockerfile: infra/produccion/api.Dockerfile
-  image: agendauno-api:latest
+  # Cada versión con su etiqueta (el commit): permite volver atrás sin reconstruir
+  # (actualizar.sh y volver.sh la fijan en VERSION).
+  image: agendauno-api:${VERSION:-latest}
   env_file: api.env
   volumes:
     - storage:/var/www/html/storage
@@ -66,7 +68,7 @@ services:
         VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY:-}
         VITE_ANALYTICS_ENDPOINT: ${VITE_ANALYTICS_ENDPOINT:-}
         GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
-    image: agendauno-web:latest
+    image: agendauno-web:${VERSION:-latest}
     environment:
       DOMINIO: ${DOMINIO}
       # Desde dónde llega el proxy TLS: por el puerto publicado, la red de Docker.

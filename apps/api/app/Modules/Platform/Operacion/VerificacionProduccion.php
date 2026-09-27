@@ -28,9 +28,13 @@ class VerificacionProduccion
     /** Horas máximas desde el último respaldo de cada negocio. */
     private const HORAS_RESPALDO = 26;
 
+    /** Días máximos desde el último simulacro de restauración exitoso. */
+    private const DIAS_SIMULACRO = 8;
+
     public function __construct(
         private readonly LatidoOperacion $latido,
         private readonly RespaldosEstudio $respaldos,
+        private readonly RespaldosPlataforma $plataforma,
     ) {}
 
     /**
@@ -144,8 +148,31 @@ class VerificacionProduccion
             $leible = false;
         }
 
+        $reciente = function (?string $ruta): bool {
+            $fecha = $this->fechaDeRespaldo($ruta);
+
+            return $fecha !== null && $fecha->greaterThanOrEqualTo(CarbonImmutable::now()->subHours(self::HORAS_RESPALDO));
+        };
+        try {
+            $plataformaReciente = $reciente($this->plataforma->listar()[0] ?? null);
+            $archivosRecientes = $reciente($this->plataforma->listar(RespaldosPlataforma::ARCHIVOS)[0] ?? null);
+        } catch (Throwable) {
+            $plataformaReciente = $archivosRecientes = false;
+        }
+        $simulacro = $this->plataforma->ultimoSimulacro();
+        $simulacroOk = $simulacro !== null && $simulacro['ok']
+            && CarbonImmutable::parse($simulacro['fecha'])->greaterThanOrEqualTo(CarbonImmutable::now()->subDays(self::DIAS_SIMULACRO));
+
         return [
             $this->punto('Respaldos', 'Copias fuera del servidor', $disco !== 'local' && $disco !== '', "Ahora: {$disco}. Usa RESPALDOS_DISCO=s3 con un bucket externo."),
+            $this->punto('Respaldos', 'Base central respaldada en las últimas '.self::HORAS_RESPALDO.' h', $plataformaReciente, 'Corre php artisan turnouno:respaldar-plataforma.'),
+            $this->punto('Respaldos', 'Archivos subidos respaldados en las últimas '.self::HORAS_RESPALDO.' h', $archivosRecientes, 'Corre php artisan turnouno:respaldar-plataforma.'),
+            $this->punto(
+                'Respaldos',
+                'Restauración comprobada en los últimos '.self::DIAS_SIMULACRO.' días',
+                $simulacroOk,
+                $simulacro === null ? 'Nunca se ha probado: php artisan turnouno:simulacro-restauracion.' : 'El último simulacro ('.$simulacro['fecha'].') '.($simulacro['ok'] ? 'es viejo.' : 'falló.'),
+            ),
             $this->punto('Respaldos', 'Destino de respaldos accesible', $leible, 'No se pudo leer el disco de respaldos.'),
             $this->punto(
                 'Respaldos',

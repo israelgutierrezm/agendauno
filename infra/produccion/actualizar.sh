@@ -28,14 +28,25 @@ echo "    versión nueva: $VERSION (actual: $ANTERIOR)"
 echo "==> Construyendo imágenes $VERSION"
 $COMPOSE build
 
-echo "==> Respaldando antes de migrar (con la versión en marcha)"
-if [ "$ANTERIOR" != "latest" ] || $COMPOSE ps --status running api >/dev/null 2>&1; then
-  VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan turnouno:respaldar-plataforma
+EN_MARCHA="$(VERSION="$ANTERIOR" $COMPOSE ps -q api 2>/dev/null || true)"
+if [ -n "$EN_MARCHA" ]; then
+  # Un respaldo fallido detiene la actualización (set -e): no se migra sin punto
+  # de regreso.
+  echo "==> Respaldando antes de migrar (con la versión en marcha)"
+  if [ "${SIN_RESPALDO_PLATAFORMA:-0}" = "1" ]; then
+    # Solo la primera vez: la versión en marcha aún no tiene este comando; respalda
+    # MySQL con la herramienta del proveedor antes de usar esta opción.
+    echo "    (se omite el respaldo de la plataforma: SIN_RESPALDO_PLATAFORMA=1)"
+  else
+    VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan turnouno:respaldar-plataforma
+  fi
   VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan turnouno:respaldar-estudios
-fi
 
-echo "==> Modo mantenimiento"
-VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan down --retry=60 || true
+  echo "==> Modo mantenimiento"
+  VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan down --retry=60 || true
+else
+  echo "==> Primera instalación: no hay versión en marcha que respaldar"
+fi
 
 echo "==> Migraciones (plataforma y cada negocio)"
 if ! $COMPOSE run --rm api php artisan migrate --force \

@@ -9,8 +9,8 @@ Cómo poner AgendaUno en un servidor con Docker. Los archivos están en
 |---|---|
 | `web` | nginx: sitio comercial (HTML completo), la aplicación (`app.html`), pasa `/api` y `/up` a PHP y sirve `/storage` (logos y fotos). Escucha solo en `127.0.0.1:8080`. |
 | `api` | Laravel en PHP-FPM. |
-| `worker` | Cola en Redis: correos transaccionales. |
-| `scheduler` | Tareas programadas (`routes/console.php`): recordatorios, renovaciones, agenda recurrente, cobros, outbox, respaldos… |
+| `worker` | Cola en Redis: correos transaccionales. Chequeo de salud: su latido (`turnouno:latido --verificar=cola`). |
+| `scheduler` | Tareas programadas (`routes/console.php`): recordatorios, renovaciones, agenda recurrente, cobros, outbox, respaldos, alertas… Chequeo de salud: su latido. |
 | `redis` | Caché, colas y sesiones. |
 
 MySQL va aparte (servicio administrado o servidor propio). La web y la API comparten
@@ -73,6 +73,8 @@ cp web.env.example web.env
    ```
 
 4. Comprueba:
+   - `docker compose --env-file web.env exec api php artisan turnouno:verificar-produccion`
+     termina en «Lista para producción» (dice qué falta si no);
    - `curl -H "Host: DOMINIO" http://127.0.0.1:8080/up` responde 200;
    - `https://DOMINIO` muestra la portada y `https://DOMINIO/registro` el registro;
    - `docker compose --env-file web.env exec api php artisan turnouno:probar-correo tu@correo.com` llega;
@@ -83,27 +85,86 @@ cp web.env.example web.env
 ## Actualizar
 
 ```bash
-cd agendauno && git pull
-cd infra/produccion
-docker compose --env-file web.env build
-docker compose --env-file web.env run --rm api php artisan migrate --force
-docker compose --env-file web.env run --rm api php artisan turnouno:migrar-estudios --force
-docker compose --env-file web.env up -d
+cd agendauno/infra/produccion
+./actualizar.sh            # lo último de main
+./actualizar.sh v1.4.0     # o una etiqueta / commit
 ```
 
-`turnouno:migrar-estudios` aplica las migraciones nuevas a la base de cada negocio.
-Si la de alguno falla, sigue con los demás, lista cuáles fallaron y termina con
-error.
+`actualizar.sh` construye la versión nueva con su propia etiqueta (el commit), **respalda
+la plataforma y cada negocio antes de migrar** (si el respaldo falla, no sigue), pone
+la aplicación en mantenimiento, migra (la plataforma y, con
+`turnouno:migrar-estudios`, cada negocio), levanta la versión nueva, corre
+`turnouno:verificar-produccion` y anota el cambio en `.historial-versiones`.
+
+Si una migración falla, la versión anterior sigue en marcha (en mantenimiento) y el
+script dice cómo salir de él. La primera vez que uses el script, la versión en marcha
+aún no tiene `turnouno:respaldar-plataforma`: respalda MySQL con la herramienta del
+proveedor y corre `SIN_RESPALDO_PLATAFORMA=1 ./actualizar.sh`.
+
+### Volver a una versión anterior
+
+```bash
+./volver.sh                # a la versión de la que se vino
+./volver.sh 3f4b7c9        # a una versión concreta (ver .historial-versiones)
+```
+
+Vuelve en segundos, sin reconstruir: las imágenes de cada versión quedan en el
+servidor (bórralas a mano cuando ya no las necesites: `docker image ls agendauno-*`).
+Solo cambia el código: las migraciones se escriben para que la versión anterior siga
+funcionando con el esquema nuevo (primero se agrega; lo que se quita, en otra versión).
+Si una actualización cambió datos de forma incompatible, restaura además el respaldo
+que se tomó justo antes (ver «Datos y respaldos»).
 
 ## Datos y respaldos
 
-- **MySQL**: control plane y una base por negocio. Respáldalo con la herramienta del
-  proveedor (instantáneas diarias y retención).
-- **Volumen `storage`**: documentos, fotos, logos y los respaldos diarios por negocio
-  (`turnouno:respaldar-estudios`, 03:15, se conservan `RESPALDOS_DIAS`). Cópialo fuera
-  del servidor. Restaurar un negocio: `php artisan turnouno:restaurar-estudio`.
-- Guardar archivos en S3 requiere instalar `league/flysystem-aws-s3-v3` (pendiente de
-  aprobar). Mientras tanto viven en el volumen.
+Todo respaldo va al disco `RESPALDOS_DISCO`: en producción, un bucket compatible con S3
+**fuera del servidor** (R2, B2, S3…; variables `AWS_*` en `api.env`). Cada archivo lleva
+su suma sha256 al lado, que se comprueba antes de restaurar (un respaldo alterado no se
+restaura).
+
+| Qué | Cuándo | Comando |
+|---|---|---|
+| Base central de la plataforma (estudios, cobro del SaaS, configuración) | diario 03:05 y antes de cada actualización | `turnouno:respaldar-plataforma` |
+| Archivos subidos (documentos, fotos, logos) | diario 03:05 | `turnouno:respaldar-plataforma` |
+| Base de cada negocio | diario 03:15 y antes de cada actualización | `turnouno:respaldar-estudios` |
+| Simulacro: restaura el último respaldo de la plataforma y el de un negocio en bases temporales y comprueba que traigan sus tablas | domingos 04:30 | `turnouno:simulacro-restauracion` |
+
+Se conservan `RESPALDOS_DIAS` días. Si un respaldo o el simulacro fallan, llega la
+alerta por correo, y `turnouno:verificar-produccion` marca lo que esté viejo o sin
+probar.
+
+### Restaurar
+
+```bash
+docker compose --env-file web.env exec api php artisan down
+# La base central (el más reciente o --respaldo=RUTA; --listar para ver cuáles hay):
+docker compose --env-file web.env exec api php artisan turnouno:restaurar-plataforma --force
+# Un negocio:
+docker compose --env-file web.env exec api php artisan turnouno:restaurar-estudio SLUG --force
+docker compose --env-file web.env exec api php artisan up
+```
+
+Los archivos subidos se restauran descomprimiendo `respaldos/_archivos/archivos-….tar.gz`
+dentro del volumen `storage` (`private/` → `storage/app/private`, `public/` →
+`storage/app/public`).
+
+Además de esto, conviene que el proveedor de MySQL haga sus instantáneas diarias.
+
+## Alertas y monitoreo
+
+- `ALERTAS_CORREO` (en `api.env`) recibe cada 10 minutos, en un solo correo, lo que
+  falló en la operación: errores de la aplicación (incluidos cobros, domiciliaciones y
+  reembolsos), incidencias de cobro nuevas (pago tardío o duplicado, reembolso
+  incierto), correos que agotaron sus intentos, webhooks de los negocios que dejaron de
+  responder, respaldos fallidos, trabajos de la cola fallidos y la cola detenida. Lo
+  que sigue pasando se vuelve a avisar a las 6 horas, no a cada vez.
+- Si se detiene el **programador de tareas**, él mismo no puede avisar: registra
+  `https://DOMINIO/api/v1/health?estricto=1` en un monitor externo (UptimeRobot,
+  Better Stack…). Responde 503 si la base, la caché, el programador o la cola fallan.
+- `turnouno:verificar-produccion` revisa la instalación completa (entorno, correo,
+  latidos, respaldos fuera del servidor y recientes, alertas, aviso de privacidad,
+  pasarela de la plataforma). Córrelo tras instalar y tras cada actualización (el
+  script de actualizar lo hace).
 
 ## Operación
 
@@ -118,6 +179,6 @@ error.
 ## Pendiente de decidir
 
 - Proveedor del servidor, de MySQL y del correo.
-- Almacenamiento S3 (dependencia nueva) y monitoreo de errores (Sentry u otro,
-  también dependencia nueva).
+- Monitoreo de errores más completo (Sentry u otro; dependencia nueva). Por ahora las
+  alertas llegan por correo.
 - Despliegue automático desde el CI (hoy el CI solo prueba).

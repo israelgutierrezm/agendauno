@@ -62,8 +62,14 @@ Schedule::command('turnouno:avisar-renovaciones')->dailyAt('15:00')->withoutOver
 // medición); un cargo emitido no se vuelve a calcular, así que solo emite los que falten.
 Schedule::command('turnouno:generar-cargos-renta')->dailyAt('08:00')->withoutOverlapping();
 
-// Respalda la base de cada negocio y borra los respaldos viejos (retención).
+// Respalda la base central y los archivos subidos (03:05) y la base de cada negocio
+// (03:15), en el disco de respaldos (en producción, fuera del servidor), y borra los
+// viejos (retención).
+Schedule::command('turnouno:respaldar-plataforma')->dailyAt('03:05')->withoutOverlapping();
 Schedule::command('turnouno:respaldar-estudios')->dailyAt('03:15')->withoutOverlapping();
+
+// Simulacro de restauración (domingos): prueba que los respaldos se pueden restaurar.
+Schedule::command('turnouno:simulacro-restauracion')->weeklyOn(0, '04:30')->withoutOverlapping();
 
 // Escala el dunning: suspende las membresias morosas cuya gracia vencio (R10).
 Schedule::command('turnouno:escalar-dunning')->dailyAt('01:00')->withoutOverlapping();

@@ -32,10 +32,25 @@ it('respalda la base de cada negocio comprimida y aplica la retención', functio
 
     $this->artisan('turnouno:respaldar-estudios')->assertSuccessful();
 
+    // Cada respaldo con su suma sha256 al lado.
     $archivosA = Storage::disk('local')->files('respaldos/estudio-a');
-    expect($archivosA)->toHaveCount(1)
-        ->and(Storage::disk('local')->files('respaldos/estudio-b'))->toHaveCount(1);
-    expect(substr((string) gzdecode((string) Storage::disk('local')->get($archivosA[0])), 0, 15))->toBe('SQLite format 3');
+    $respaldo = collect($archivosA)->first(fn (string $a): bool => str_ends_with($a, '.sqlite.gz'));
+    expect($archivosA)->toHaveCount(2)
+        ->and(Storage::disk('local')->files('respaldos/estudio-b'))->toHaveCount(2)
+        ->and(Storage::disk('local')->get($respaldo.'.sha256'))->toBe(hash('sha256', (string) Storage::disk('local')->get($respaldo)));
+    expect(substr((string) gzdecode((string) Storage::disk('local')->get($respaldo)), 0, 15))->toBe('SQLite format 3');
+});
+
+it('un respaldo alterado no se restaura (su suma no coincide)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $this->artisan('turnouno:respaldar-estudios', ['--estudio' => 'estudio-a'])->assertSuccessful();
+    $respaldo = collect(Storage::disk('local')->files('respaldos/estudio-a'))
+        ->first(fn (string $a): bool => str_ends_with($a, '.sqlite.gz'));
+    Storage::disk('local')->put($respaldo, (string) gzencode('otra cosa'));
+
+    $this->artisan('turnouno:restaurar-estudio', ['estudio' => 'estudio-a', '--force' => true])
+        ->expectsOutputToContain('dañado')
+        ->assertFailed();
 });
 
 it('restaura un negocio desde su respaldo (con --force)', function (): void {

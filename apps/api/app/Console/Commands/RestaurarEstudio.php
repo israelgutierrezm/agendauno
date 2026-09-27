@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Modules\Tenancy\Application\RespaldosEstudio;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Console\Command;
+use Throwable;
 
 /**
  * Restaura la base de UN negocio desde uno de sus respaldos (por defecto el más
@@ -48,7 +49,13 @@ class RestaurarEstudio extends Command
             return self::FAILURE;
         }
 
-        $respaldos->restaurar($estudio, $ruta);
+        try {
+            $respaldos->restaurar($estudio, $ruta);
+        } catch (Throwable $e) {
+            $this->error("No se pudo restaurar {$estudio->slug}: ".$e->getMessage());
+
+            return self::FAILURE;
+        }
         $this->info("{$estudio->slug} restaurado desde {$ruta}.");
 
         return self::SUCCESS;
