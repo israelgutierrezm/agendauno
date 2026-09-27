@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Sucursal {
@@ -94,7 +95,7 @@ async function crear(): Promise<void> {
 }
 
 async function eliminar(r: Recurso): Promise<void> {
-  if (!window.confirm(t("recursos.confirmarEliminar"))) {
+  if (!(await confirmar(t("recursos.confirmarEliminar"), { peligro: true }))) {
     return;
   }
   try {

@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const { t } = useI18n();
@@ -272,7 +273,9 @@ async function alternarActiva(r: Regla): Promise<void> {
 }
 
 async function eliminarRegla(r: Regla): Promise<void> {
-  if (!window.confirm(t("tareas.reglas.confirmarEliminar"))) {
+  if (
+    !(await confirmar(t("tareas.reglas.confirmarEliminar"), { peligro: true }))
+  ) {
     return;
   }
   accionando.value = true;

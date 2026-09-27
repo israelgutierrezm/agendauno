@@ -33,6 +33,8 @@ const resumen = ref<Resumen | null>(null);
 const dias = ref(14);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// "No pudimos consultar" y "no hay pendientes" nunca deben verse igual.
+const errorCarga = ref(false);
 const exportando = ref(false);
 
 function fechaCorta(iso: string | null): string {
@@ -68,6 +70,7 @@ function asistTexto(m: Miembro): string {
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
+  errorCarga.value = false;
   try {
     const { data } = await api.get<{
       data: { resumen: Resumen; miembros: Miembro[] };
@@ -76,8 +79,10 @@ async function cargar(): Promise<void> {
     });
     miembros.value = data.data.miembros;
     resumen.value = data.data.resumen;
-  } catch (e) {
-    error.value = mensajeDeError(e);
+  } catch {
+    errorCarga.value = true;
+    miembros.value = [];
+    resumen.value = null;
   } finally {
     cargando.value = false;
   }
@@ -112,12 +117,15 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion :titulo="$t('retencion.titulo')" />
+    <EncabezadoSeccion :titulo="$t('operacion.renovaciones.titulo')" />
+    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+      {{ $t("operacion.renovaciones.subtitulo") }}
+    </p>
 
     <div class="mt-6 flex flex-wrap items-center gap-3">
       <div class="tu-card px-5 py-3">
         <div class="text-2xl font-semibold" :style="{ color: 'var(--aviso)' }">
-          {{ resumen?.por_vencer ?? 0 }}
+          {{ resumen?.por_vencer ?? "—" }}
         </div>
         <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("retencion.porVencer") }}
@@ -125,7 +133,7 @@ onMounted(cargar);
       </div>
       <div class="tu-card px-5 py-3">
         <div class="text-2xl font-semibold" :style="{ color: 'var(--error)' }">
-          {{ resumen?.vencidas ?? 0 }}
+          {{ resumen?.vencidas ?? "—" }}
         </div>
         <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("retencion.vencidas") }}
@@ -163,13 +171,26 @@ onMounted(cargar);
       {{ $t("comun.cargando") }}
     </p>
 
+    <div
+      v-else-if="errorCarga"
+      class="mt-6 tu-card flex flex-wrap items-center justify-between gap-3 p-6 text-sm"
+      role="alert"
+    >
+      <span style="color: var(--error)">{{
+        $t("operacion.renovaciones.errorCarga")
+      }}</span>
+      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
+
     <template v-else>
       <p
         v-if="miembros.length === 0"
         class="mt-6 tu-card p-6 text-sm"
         :style="{ color: 'var(--texto-suave)' }"
       >
-        {{ $t("retencion.vacio") }}
+        {{ $t("operacion.renovaciones.vacio") }}
       </p>
       <div v-else class="mt-4 tu-card overflow-hidden">
         <table class="w-full text-sm">

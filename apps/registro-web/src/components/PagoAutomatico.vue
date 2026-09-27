@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import TarjetaOpenPay from "@/components/TarjetaOpenPay.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import type { FormularioOpenPay } from "@/lib/openpay";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -141,7 +142,9 @@ function cambiarTarjeta(): Promise<void> {
 }
 
 async function quitar(m: Membresia): Promise<void> {
-  if (!window.confirm(t("pagoAutomatico.confirmarQuitar"))) {
+  if (
+    !(await confirmar(t("pagoAutomatico.confirmarQuitar"), { peligro: true }))
+  ) {
     return;
   }
   accionando.value = m.id;

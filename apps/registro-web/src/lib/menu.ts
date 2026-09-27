@@ -99,8 +99,10 @@ export const MENU: MenuItem[] = [
       },
       {
         // Seguimiento comercial (quién está por vencer): no es del instructor.
+        // Lo que hoy se revisa son renovaciones (membresías por vencer o vencidas);
+        // "retención" prometería más (inasistencia, frecuencia…).
         clave: "retencion",
-        etiqueta: "nav.retencion",
+        etiqueta: "operacion.renovaciones.titulo",
         icono: "pulso",
         ruta: "retencion",
         permiso: "miembros.gestionar",

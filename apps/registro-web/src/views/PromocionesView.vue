@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Promo {
@@ -137,7 +138,9 @@ async function guardar(): Promise<void> {
 }
 
 async function eliminar(p: Promo): Promise<void> {
-  if (!window.confirm(t("promociones.confirmarEliminar"))) {
+  if (
+    !(await confirmar(t("promociones.confirmarEliminar"), { peligro: true }))
+  ) {
     return;
   }
   accionando.value = true;

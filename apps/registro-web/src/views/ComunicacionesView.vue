@@ -3,8 +3,10 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -83,6 +85,19 @@ const segmentoSel = computed(() =>
   segmentos.value.find((s) => s.clave === form.value.segmento),
 );
 const destinatarios = computed(() => segmentoSel.value?.total ?? 0);
+
+// Antes de un envío masivo: a cuántos, por qué canal y cómo se verá (revisión).
+const revisando = ref(false);
+const EJEMPLO: Record<string, string> = {
+  persona_nombre: "Ana López",
+  persona_email: "ana@correo.mx",
+};
+function conEjemplo(texto: string): string {
+  return texto.replace(
+    /\{\{\s*(persona_nombre|persona_email)\s*\}\}/g,
+    (_, clave: string) => EJEMPLO[clave] ?? "",
+  );
+}
 const puedeEnviar = computed(
   () =>
     form.value.segmento !== "" &&
@@ -158,6 +173,7 @@ async function enviar(): Promise<void> {
       { ...form.value },
     );
     exito.value = data.data.total;
+    revisando.value = false;
     form.value.asunto = "";
     form.value.cuerpo = "";
     await cargar();
@@ -388,7 +404,9 @@ async function eliminarPlantilla(): Promise<void> {
   );
   if (
     existente === undefined ||
-    !window.confirm(t("comunicacionesAuto.confirmarEliminar"))
+    !(await confirmar(t("comunicacionesAuto.confirmarEliminar"), {
+      peligro: true,
+    }))
   ) {
     return;
   }
@@ -571,16 +589,78 @@ onMounted(cargar);
             class="tu-btn tu-btn-primario"
             type="button"
             :disabled="!puedeEnviar || enviando"
+            @click="revisando = true"
+          >
+            {{ $t("operacion.comunicacion.revisar") }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Revisión antes de enviar: destinatarios, canal y vista previa -->
+      <ModalDialogo
+        :abierto="revisando"
+        :titulo="$t('operacion.comunicacion.confirmarTitulo')"
+        tam="md"
+        @cerrar="revisando = false"
+      >
+        <p class="font-medium">
+          {{
+            $t(
+              "operacion.comunicacion.destinatarios",
+              { n: destinatarios },
+              destinatarios,
+            )
+          }}
+        </p>
+        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ segmentoSel?.etiqueta }} ·
+          {{
+            $t("operacion.comunicacion.canal", {
+              canal: canalTexto(form.canal),
+            })
+          }}
+        </p>
+        <p class="mt-5 text-xs" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("operacion.comunicacion.vistaPrevia") }}
+        </p>
+        <div
+          class="mt-1 rounded-xl border p-4"
+          :style="{ borderColor: 'var(--borde)', background: 'var(--fondo)' }"
+        >
+          <p class="font-semibold">{{ conEjemplo(form.asunto) }}</p>
+          <p class="mt-2 whitespace-pre-line text-sm">
+            {{ conEjemplo(form.cuerpo) }}
+          </p>
+        </div>
+        <p
+          v-if="destinatarios === 0"
+          class="mt-4 text-sm"
+          :style="{ color: 'var(--aviso)' }"
+        >
+          {{ $t("operacion.comunicacion.sinDestinatarios") }}
+        </p>
+        <div class="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            @click="revisando = false"
+          >
+            {{ $t("operacion.comunicacion.cancelar") }}
+          </button>
+          <button
+            type="button"
+            class="tu-btn tu-btn-primario"
+            :disabled="enviando || destinatarios === 0"
             @click="enviar"
           >
             {{
               enviando
                 ? $t("comunicaciones.enviando")
-                : $t("comunicaciones.enviar")
+                : $t("operacion.comunicacion.enviar")
             }}
           </button>
         </div>
-      </div>
+      </ModalDialogo>
 
       <!-- Historial -->
       <h3 class="mt-8 text-sm font-semibold">

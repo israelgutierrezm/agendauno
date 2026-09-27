@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ParametrosNegocio from "@/components/ParametrosNegocio.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -238,7 +239,7 @@ async function quitarDia(d: DiaCerrado): Promise<void> {
 }
 
 async function dejarDeRepetir(s: Serie): Promise<void> {
-  if (!window.confirm(t("reglasAgenda.confirmarDejar"))) {
+  if (!(await confirmar(t("reglasAgenda.confirmarDejar"), { peligro: true }))) {
     return;
   }
   try {

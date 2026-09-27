@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -292,7 +293,9 @@ async function publicar(): Promise<void> {
 }
 
 async function retirar(c: Consentimiento): Promise<void> {
-  if (!window.confirm(t("consentimientos.confirmarRetirar"))) {
+  if (
+    !(await confirmar(t("consentimientos.confirmarRetirar"), { peligro: true }))
+  ) {
     return;
   }
   accionando.value = true;

@@ -7,6 +7,7 @@ import IconoNav from "@/components/IconoNav.vue";
 import PublicShell from "@/components/PublicShell.vue";
 import NavArbol from "@/components/NavArbol.vue";
 import AppToaster from "@/components/AppToaster.vue";
+import DialogoConfirmar from "@/components/DialogoConfirmar.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import type { MenuItem, NavEstado } from "@/components/nav";
 import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
@@ -460,6 +461,8 @@ onMounted(() => {
 
   <!-- Notificaciones flotantes (toasts), montadas una sola vez para toda la app. -->
   <AppToaster />
+  <!-- Confirmaciones dentro de la app (lib/confirmar.ts). -->
+  <DialogoConfirmar />
   <PanelApariencia :abierto="menuApariencia" @cerrar="menuApariencia = false" />
 </template>
 

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import BloqueosAgenda from "@/components/BloqueosAgenda.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Sucursal {
@@ -30,6 +32,7 @@ interface Slot {
   termina: string;
 }
 
+const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
@@ -48,6 +51,14 @@ function semanaVacia(): Semana {
   return { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] };
 }
 const semana = ref<Semana>(semanaVacia());
+// Lo último cargado o guardado: para saber si hay cambios sin guardar.
+const original = ref(JSON.stringify(semanaVacia()));
+const sinGuardar = computed(
+  () => JSON.stringify(semana.value) !== original.value,
+);
+// Cada carga lleva su número: una respuesta vieja (de una selección anterior que
+// tardó más) no pisa a la actual.
+let pedido = 0;
 
 const cargando = ref(true);
 const cargandoHorario = ref(false);
@@ -99,6 +110,7 @@ async function cargarHorario(): Promise<void> {
   if (!listo.value) {
     return;
   }
+  const mio = ++pedido;
   cargandoHorario.value = true;
   error.value = null;
   okGuardado.value = false;
@@ -112,6 +124,9 @@ async function cargarHorario(): Promise<void> {
         },
       },
     );
+    if (mio !== pedido) {
+      return; // Ya se eligió otra sucursal o persona.
+    }
     const nueva = semanaVacia();
     for (const h of data.data) {
       (nueva[h.dia_semana] ?? (nueva[h.dia_semana] = [])).push({
@@ -120,10 +135,15 @@ async function cargarHorario(): Promise<void> {
       });
     }
     semana.value = nueva;
+    original.value = JSON.stringify(nueva);
   } catch (e) {
-    error.value = mensajeDeError(e);
+    if (mio === pedido) {
+      error.value = mensajeDeError(e);
+    }
   } finally {
-    cargandoHorario.value = false;
+    if (mio === pedido) {
+      cargandoHorario.value = false;
+    }
   }
 }
 
@@ -154,7 +174,13 @@ function copiarASemana(dia: number): void {
 }
 
 async function guardar(): Promise<void> {
-  if (!listo.value || rangoInvalido.value || !puedeGestionar.value) {
+  // Mientras carga, lo que se ve podría ser de otra selección: no se guarda.
+  if (
+    !listo.value ||
+    rangoInvalido.value ||
+    !puedeGestionar.value ||
+    cargandoHorario.value
+  ) {
     return;
   }
   guardando.value = true;
@@ -180,6 +206,7 @@ async function guardar(): Promise<void> {
       sucursal_id: sucursalId.value,
       horarios,
     });
+    original.value = JSON.stringify(semana.value);
     okGuardado.value = true;
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -233,13 +260,31 @@ async function verHuecos(): Promise<void> {
 }
 
 // Al cambiar de sucursal o de persona, recarga su horario y reinicia la vista previa.
-watch([sucursalId, proveedorId], () => {
+// Con cambios sin guardar, primero pregunta; si no se descartan, vuelve a la
+// selección anterior.
+let revirtiendo = false;
+watch([sucursalId, proveedorId], async (_nuevo, [sucAntes, provAntes]) => {
+  if (revirtiendo) {
+    revirtiendo = false;
+    return;
+  }
+  if (
+    sinGuardar.value &&
+    !(await confirmar(t("operacion.horarios.descartar"), { peligro: true }))
+  ) {
+    revirtiendo = true;
+    sucursalId.value = sucAntes;
+    proveedorId.value = provAntes;
+    return;
+  }
   slots.value = [];
   previewHecho.value = false;
   if (listo.value) {
-    cargarHorario();
+    void cargarHorario();
   } else {
+    pedido++;
     semana.value = semanaVacia();
+    original.value = JSON.stringify(semana.value);
   }
 });
 
@@ -398,7 +443,7 @@ onMounted(cargarReferencias);
               v-if="puedeGestionar"
               class="tu-btn tu-btn-primario"
               type="button"
-              :disabled="guardando || rangoInvalido"
+              :disabled="guardando || rangoInvalido || cargandoHorario"
               @click="guardar"
             >
               {{

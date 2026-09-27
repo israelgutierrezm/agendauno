@@ -9,6 +9,7 @@ import TablaDatos from "@/components/TablaDatos.vue";
 import TarifasPlataforma from "@/components/TarifasPlataforma.vue";
 import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
 import { mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import type { DatosTerminologia } from "@/lib/terminologia";
 import { useToastStore } from "@/stores/toast";
 
@@ -275,13 +276,14 @@ function extenderPrueba(): void {
   );
 }
 
-function suspender(): void {
+async function suspender(): Promise<void> {
   const f = ficha.value;
   if (
     f === null ||
-    !window.confirm(
+    !(await confirmar(
       t("plataformaAdmin.ficha.confirmarSuspender", { estudio: f.nombre }),
-    )
+      { peligro: true },
+    ))
   ) {
     return;
   }

@@ -468,13 +468,30 @@ onMounted(async () => {
           >
             {{ $t("comun.cargando") }}
           </p>
-          <p
+          <!-- Si falló la consulta, el error ya se muestra arriba: no es "no hay nada". -->
+          <p v-else-if="error" class="px-5 py-12 text-center text-sm">
+            <button type="button" class="tu-enlace" @click="cargar">
+              {{ $t("comun.reintentar") }}
+            </button>
+          </p>
+          <div
             v-else-if="sesiones.length === 0"
             class="px-5 py-12 text-center text-sm"
             :style="{ color: 'var(--texto-suave)' }"
           >
-            {{ $t("recepcion.vacio") }}
-          </p>
+            <p>
+              {{
+                sucursalFiltro !== ""
+                  ? $t("operacion.recepcion.sinActividadFiltros")
+                  : $t("operacion.recepcion.sinActividad")
+              }}
+            </p>
+            <RouterLink
+              :to="{ name: 'agenda' }"
+              class="tu-enlace mt-2 inline-block"
+              >{{ $t("operacion.recepcion.irAgenda") }}</RouterLink
+            >
+          </div>
           <ul v-else>
             <li v-for="s in sesiones" :key="s.id">
               <button
@@ -547,8 +564,9 @@ onMounted(async () => {
             @cerrar="sesionActiva = null"
             @cambio="cargar"
           />
+          <!-- Pedir que elija una clase solo tiene sentido si hay alguna. -->
           <p
-            v-else
+            v-else-if="!cargando && !error && sesiones.length > 0"
             class="px-6 py-10 text-sm"
             :style="{ color: 'var(--texto-suave)' }"
           >

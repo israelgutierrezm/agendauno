@@ -3,6 +3,7 @@ import { reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 export interface MiembroEditable {
@@ -45,7 +46,9 @@ const motivoBaja = ref("");
 const dandoDeBaja = ref(false);
 async function darDeBaja(): Promise<void> {
   const nombre = [form.nombre, form.primer_apellido].filter(Boolean).join(" ");
-  if (!window.confirm(`${t("bajas.darDeBaja")}: ${nombre}?`)) {
+  if (
+    !(await confirmar(`${t("bajas.darDeBaja")}: ${nombre}?`, { peligro: true }))
+  ) {
     return;
   }
   dandoDeBaja.value = true;

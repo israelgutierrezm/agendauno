@@ -7,6 +7,7 @@ import PorConciliar from "@/components/PorConciliar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Moroso {
@@ -147,7 +148,11 @@ async function invitarPagoAutomatico(s: Suscripcion): Promise<void> {
 }
 
 async function quitarPagoAutomatico(s: Suscripcion): Promise<void> {
-  if (!window.confirm(t("pagoAutomatico.confirmarQuitarNegocio"))) {
+  if (
+    !(await confirmar(t("pagoAutomatico.confirmarQuitarNegocio"), {
+      peligro: true,
+    }))
+  ) {
     return;
   }
   accionando.value = s.id;

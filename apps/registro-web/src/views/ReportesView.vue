@@ -26,6 +26,16 @@ interface SucursalReporte {
   miembros_activos: number;
   sesiones_proximas: number;
 }
+// `GET /reportes/sucursales`: las sucursales, quienes no tienen una y los totales.
+interface ReporteSucursales {
+  sucursales: SucursalReporte[];
+  sin_sucursal: { miembros_activos: number };
+  totales: {
+    sucursales: number;
+    miembros_activos: number;
+    sesiones_proximas: number;
+  };
+}
 interface RentabilidadOferta {
   id: string | null;
   oferta: string;
@@ -124,6 +134,8 @@ const desde = ref(inicioMes());
 const hasta = ref(iso(new Date()));
 const negocio = ref<Negocio | null>(null);
 const sucursales = ref<SucursalReporte[]>([]);
+const sinSucursal = ref(0);
+const totalesSucursales = ref<ReporteSucursales["totales"] | null>(null);
 const rentabilidad = ref<Rentabilidad | null>(null);
 const demanda = ref<Demanda | null>(null);
 const tendencias = ref<Tendencias | null>(null);
@@ -325,13 +337,15 @@ async function cargar(): Promise<void> {
   try {
     const [, s] = await Promise.all([
       cargarNegocio(),
-      api.get<{ data: SucursalReporte[] }>(`${base.value}/reportes/sucursales`),
+      api.get<{ data: ReporteSucursales }>(`${base.value}/reportes/sucursales`),
       cargarRentabilidad(),
       cargarDemanda(),
       cargarTendencias(),
       cargarCohortes(),
     ]);
-    sucursales.value = s.data.data;
+    sucursales.value = s.data.data.sucursales;
+    sinSucursal.value = s.data.data.sin_sucursal.miembros_activos;
+    totalesSucursales.value = s.data.data.totales;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -642,6 +656,9 @@ onMounted(cargar);
 
       <!-- Por sucursal -->
       <h2 class="mt-8 font-light text-lg">{{ $t("reportes.porSucursal") }}</h2>
+      <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+        {{ $t("operacion.reportes.estadoActual") }}
+      </p>
       <p
         v-if="sucursales.length === 0"
         class="mt-3 text-sm"
@@ -690,7 +707,36 @@ onMounted(cargar);
               <td class="px-4 py-2 text-right">{{ s.miembros_activos }}</td>
               <td class="px-4 py-2 text-right">{{ s.sesiones_proximas }}</td>
             </tr>
+            <tr
+              v-if="sinSucursal > 0"
+              class="border-t"
+              :style="{ borderColor: 'var(--borde)' }"
+            >
+              <td class="px-4 py-2" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("operacion.reportes.sinSucursal") }}
+              </td>
+              <td class="px-4 py-2 hidden sm:table-cell" />
+              <td class="px-4 py-2 hidden sm:table-cell" />
+              <td class="px-4 py-2 text-right">{{ sinSucursal }}</td>
+              <td class="px-4 py-2 text-right">—</td>
+            </tr>
           </tbody>
+          <tfoot v-if="totalesSucursales">
+            <tr
+              class="border-t font-semibold"
+              :style="{ borderColor: 'var(--borde)' }"
+            >
+              <td class="px-4 py-2">{{ $t("operacion.reportes.total") }}</td>
+              <td class="px-4 py-2 hidden sm:table-cell" />
+              <td class="px-4 py-2 hidden sm:table-cell" />
+              <td class="px-4 py-2 text-right">
+                {{ totalesSucursales.miembros_activos }}
+              </td>
+              <td class="px-4 py-2 text-right">
+                {{ totalesSucursales.sesiones_proximas }}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 

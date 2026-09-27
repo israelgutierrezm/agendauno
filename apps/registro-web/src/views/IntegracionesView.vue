@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -147,7 +148,11 @@ async function crearLlave(): Promise<void> {
 }
 
 async function revocar(l: LlaveApi): Promise<void> {
-  if (!window.confirm(t("conexiones.llave.confirmarRevocar"))) {
+  if (
+    !(await confirmar(t("conexiones.llave.confirmarRevocar"), {
+      peligro: true,
+    }))
+  ) {
     return;
   }
   try {
@@ -211,7 +216,11 @@ async function crearWebhook(): Promise<void> {
 }
 
 async function eliminarWebhook(w: Webhook): Promise<void> {
-  if (!window.confirm(t("conexiones.webhook.confirmarEliminar"))) {
+  if (
+    !(await confirmar(t("conexiones.webhook.confirmarEliminar"), {
+      peligro: true,
+    }))
+  ) {
     return;
   }
   try {

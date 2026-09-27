@@ -7,6 +7,7 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface UsuarioRow {
@@ -286,7 +287,9 @@ async function darDeBaja(): Promise<void> {
   const objetivo = editando.value;
   if (
     objetivo === null ||
-    !window.confirm(`${t("bajas.darDeBaja")}: ${objetivo.nombre}?`)
+    !(await confirmar(`${t("bajas.darDeBaja")}: ${objetivo.nombre}?`, {
+      peligro: true,
+    }))
   ) {
     return;
   }

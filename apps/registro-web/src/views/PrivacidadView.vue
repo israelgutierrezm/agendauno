@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -57,7 +58,11 @@ async function cargar(): Promise<void> {
 }
 
 async function atender(s: Solicitud): Promise<void> {
-  if (!window.confirm(t("privacidadNegocio.confirmarAtender"))) {
+  if (
+    !(await confirmar(t("privacidadNegocio.confirmarAtender"), {
+      peligro: true,
+    }))
+  ) {
     return;
   }
   ocupado.value = s.id;
