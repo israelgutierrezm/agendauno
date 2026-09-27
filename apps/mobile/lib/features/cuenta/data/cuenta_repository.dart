@@ -53,6 +53,25 @@ class CuentaRepository {
     );
   }
 
+  /// Lo que puede comprar (los planes vigentes del negocio, del más barato).
+  Future<List<ProductoComprable>> productos() async {
+    final res = await _dio.get<Map<String, dynamic>>('$_base/mi/productos');
+    return ((res.data?['data'] ?? []) as List)
+        .whereType<Map<String, dynamic>>()
+        .map(ProductoComprable.desdeJson)
+        .toList();
+  }
+
+  /// Compra un plan: crea la orden pendiente (se activa al pagarla).
+  Future<void> comprar(String productoId) => _dio.post<Map<String, dynamic>>(
+    '$_base/mi/ordenes',
+    data: {
+      'items': [
+        {'producto_id': productoId, 'cantidad': 1},
+      ],
+    },
+  );
+
   /// El clima de su Inicio: el pronóstico para su próxima clase o cita en su
   /// sucursal o el de ahora. Si falla o no se sabe, null (no se muestra).
   Future<ClimaMiembro?> clima() async {

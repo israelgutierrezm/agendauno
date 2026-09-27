@@ -51,6 +51,10 @@ class CuentaController extends AsyncNotifier<MiCuenta> {
     String? comentario,
   ) => _hacer((repo) => repo.calificar(reservaId, calificacion, comentario));
 
+  /// Compra un plan: la orden aparece en "Por pagar" al recargar.
+  Future<void> comprar(String productoId) =>
+      _hacer((repo) => repo.comprar(productoId));
+
   /// Tras agendar una cita (la agenda el formulario de citas).
   Future<void> recargar() => _hacer((_) async {});
 
@@ -69,6 +73,16 @@ class CuentaController extends AsyncNotifier<MiCuenta> {
 final cuentaProvider = AsyncNotifierProvider<CuentaController, MiCuenta>(
   CuentaController.new,
 );
+
+/// Los planes que puede comprar (se filtran las clases extra si no tiene paquete).
+final productosProvider = FutureProvider<List<ProductoComprable>>((ref) async {
+  final cuenta = await ref.watch(cuentaProvider.future);
+  final repo = ref.watch(cuentaRepositoryProvider);
+  if (repo == null) {
+    return const [];
+  }
+  return ProductoComprable.paraComprar(await repo.productos(), cuenta.derechos);
+});
 
 /// El clima del Inicio; se vuelve a pedir con la cuenta (su próxima reserva manda).
 final climaProvider = FutureProvider<ClimaMiembro?>((ref) async {

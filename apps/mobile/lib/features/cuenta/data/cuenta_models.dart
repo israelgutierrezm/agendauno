@@ -602,3 +602,98 @@ class ClimaMiembro {
     return aproximado ? 'Ahora cerca de $lugar' : 'Ahora en $lugar';
   }
 }
+
+/// Un plan que el alumno puede comprar (GET /mi/productos): paquete, membresía, clase
+/// suelta o clases extra. Comprar crea la orden; se activa al pagarla.
+class ProductoComprable {
+  const ProductoComprable({
+    required this.id,
+    required this.nombre,
+    required this.tipo,
+    required this.precioMinor,
+    required this.ilimitado,
+    this.creditosIncluidos,
+    this.vigenciaTipo,
+    this.vigenciaCantidad,
+  });
+
+  factory ProductoComprable.desdeJson(Map<String, dynamic> j) =>
+      ProductoComprable(
+        id: j['id'] as String,
+        nombre: (j['nombre'] ?? '') as String,
+        tipo: (j['tipo'] ?? '') as String,
+        precioMinor: (j['precio_minor'] as num? ?? 0).toInt(),
+        ilimitado: (j['ilimitado'] ?? false) as bool,
+        creditosIncluidos: (j['creditos_incluidos'] as num?)?.toInt(),
+        vigenciaTipo: j['vigencia_tipo'] as String?,
+        vigenciaCantidad: (j['vigencia_cantidad'] as num?)?.toInt(),
+      );
+
+  final String id;
+  final String nombre;
+  final String tipo;
+  final int precioMinor;
+  final bool ilimitado;
+  final int? creditosIncluidos;
+  final String? vigenciaTipo;
+  final int? vigenciaCantidad;
+
+  bool get esExtra => tipo == 'add_on';
+
+  /// "Paquete", "Membresía"… (como en la web).
+  String get tipoTexto => switch (tipo) {
+    'membresia' => 'Membresía',
+    'paquete' => 'Paquete',
+    'pase_dia' => 'Pase del día',
+    'sesion_individual' => 'Sesión individual',
+    'add_on' => 'Extra',
+    'taller' => 'Taller',
+    _ => 'Plan',
+  };
+
+  /// "Ilimitado", "8 créditos" o null.
+  String? get creditosTexto {
+    if (ilimitado) {
+      return 'Ilimitado';
+    }
+    final n = creditosIncluidos;
+    if (n == null || n <= 0) {
+      return null;
+    }
+    final c = n / 1000;
+    final texto = c == c.roundToDouble() ? c.toInt().toString() : c.toString();
+    return c == 1 ? '1 crédito' : '$texto créditos';
+  }
+
+  /// Cuánto dura lo que se compra (las clases extra vencen con su paquete).
+  String? get vigenciaTexto {
+    if (esExtra) {
+      return 'Vencen con el paquete';
+    }
+    final n = vigenciaCantidad ?? 0;
+    return switch (vigenciaTipo) {
+      'dias' =>
+        n == 1
+            ? 'Vence 1 día después de la compra'
+            : 'Vence $n días después de la compra',
+      'meses' =>
+        n == 1
+            ? 'Vence 1 mes después de la compra'
+            : 'Vence $n meses después de la compra',
+      'fin_de_mes' =>
+        n <= 1
+            ? 'Vence al terminar el mes de compra'
+            : 'Vence al terminar el mes $n (contando el de compra)',
+      _ => null,
+    };
+  }
+
+  /// Las clases extra solo tienen sentido con un paquete de créditos vigente.
+  static List<ProductoComprable> paraComprar(
+    List<ProductoComprable> productos,
+    List<DerechoMiembro> derechos,
+  ) {
+    final tienePaquete = derechos.any((d) => !d.ilimitado);
+    return productos.where((p) => !p.esExtra || tienePaquete).toList();
+  }
+}

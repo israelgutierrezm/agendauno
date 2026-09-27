@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
+import 'comprar_planes.dart';
 import 'corte_planes_card.dart';
 import 'cuenta_widgets.dart';
 import 'pago_automatico_screen.dart';
 
-/// Pagos del portal: lo que tiene por pagar, el corte de sus planes y el pago
-/// automático si el negocio lo ofrece.
+/// Pagos del portal: lo que tiene por pagar, comprar un plan, el corte de sus
+/// planes y el pago automático si el negocio lo ofrece.
 class PagosTab extends ConsumerWidget {
   const PagosTab({super.key, required this.cuenta});
 
@@ -26,6 +27,8 @@ class PagosTab extends ConsumerWidget {
         else
           for (final o in cuenta.porPagar)
             PorPagarTile(o, pagoEnLinea: cuenta.pagoEnLinea),
+        // Comprar un paquete o membresía: crea la orden y queda en "Por pagar".
+        const ComprarPlanesSeccion(),
         // El corte de cada plan: qué incluía, cómo lo usó y lo que le queda.
         const TituloSeccion('Mis planes'),
         const CortePlanesSeccion(),
