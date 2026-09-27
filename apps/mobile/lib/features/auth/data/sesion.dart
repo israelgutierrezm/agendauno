@@ -109,6 +109,15 @@ class Sesion {
   /// También es alumno/cliente aunque su rol principal sea otro.
   bool get esAlumno => rol == 'miembro' || roles.contains('miembro');
 
+  /// Solo imparte (sin rol de dueño, admin ni recepción): su app es su portal de
+  /// instructor (sus clases o citas); el servidor ya le acota la agenda.
+  bool get esInstructorAcotado {
+    final todos = {rol, ...roles};
+    return todos.contains('instructor') &&
+        todos.intersection(const {'propietario', 'admin', 'recepcionista'})
+            .isEmpty;
+  }
+
   /// ¿Tiene el permiso? (el propietario los tiene todos).
   bool puede(String permiso) =>
       permisos.contains('*') || permisos.contains(permiso);

@@ -53,6 +53,7 @@ class SesionAgenda {
     required this.instructor,
     required this.instructorId,
     required this.sala,
+    this.sucursal,
     required this.iniciaEn,
     required this.terminaEn,
     required this.capacidad,
@@ -70,6 +71,7 @@ class SesionAgenda {
   final String? instructor;
   final String? instructorId;
   final String? sala;
+  final String? sucursal;
   final DateTime iniciaEn;
   final DateTime terminaEn;
   final int? capacidad;
@@ -120,6 +122,7 @@ class SesionAgenda {
       instructor: json['instructor'] as String?,
       instructorId: json['instructor_id'] as String?,
       sala: json['sala'] as String?,
+      sucursal: json['sucursal'] as String?,
       iniciaEn: DateTime.parse(json['inicia_en'] as String).toLocal(),
       terminaEn: DateTime.parse(json['termina_en'] as String).toLocal(),
       capacidad: json['capacidad'] as int?,

@@ -145,6 +145,8 @@ class ReservaMiembro {
     this.oferta,
     this.sucursal,
     this.iniciaEn,
+    this.terminaEn,
+    this.instructor,
     this.zonaHoraria,
     this.ofertaExpiraEn,
     this.ordenId,
@@ -156,6 +158,10 @@ class ReservaMiembro {
   final String? oferta;
   final String? sucursal;
   final String? iniciaEn;
+  final String? terminaEn;
+
+  /// Con quién (profesional o instructor), si el negocio lo asignó.
+  final String? instructor;
   final String? zonaHoraria;
   // Hasta cuándo puede aceptar el lugar que le ofreció la lista de espera.
   final String? ofertaExpiraEn;
@@ -179,6 +185,8 @@ class ReservaMiembro {
     oferta: j['oferta'] as String?,
     sucursal: j['sucursal'] as String?,
     iniciaEn: j['inicia_en'] as String?,
+    terminaEn: j['termina_en'] as String?,
+    instructor: j['instructor'] as String?,
     zonaHoraria: j['zona_horaria'] as String?,
     ofertaExpiraEn: j['oferta_expira_en'] as String?,
     ordenId: j['orden_id'] as String?,
@@ -191,6 +199,8 @@ class ClaseMiembro {
     this.oferta,
     this.sucursal,
     this.iniciaEn,
+    this.terminaEn,
+    this.instructor,
     this.zonaHoraria,
     this.capacidad,
     this.ocupados = 0,
@@ -200,6 +210,8 @@ class ClaseMiembro {
   final String? oferta;
   final String? sucursal;
   final String? iniciaEn;
+  final String? terminaEn;
+  final String? instructor;
   final String? zonaHoraria;
   final int? capacidad;
   final int ocupados;
@@ -212,6 +224,8 @@ class ClaseMiembro {
     oferta: j['oferta'] as String?,
     sucursal: j['sucursal'] as String?,
     iniciaEn: j['inicia_en'] as String?,
+    terminaEn: j['termina_en'] as String?,
+    instructor: j['instructor'] as String?,
     zonaHoraria: j['zona_horaria'] as String?,
     capacidad: j['capacidad'] as int?,
     ocupados: (j['ocupados'] ?? 0) as int,

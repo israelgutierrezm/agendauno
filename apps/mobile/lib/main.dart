@@ -9,6 +9,7 @@ import 'features/agenda/presentation/agenda_screen.dart';
 import 'features/auth/data/sesion.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/cuenta/presentation/cuenta_screen.dart';
+import 'features/instructor/presentation/instructor_screen.dart';
 import 'features/notificaciones/application/push_controller.dart';
 
 Future<void> main() async {
@@ -69,8 +70,9 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Sin login global: con sesion tenant-local, el personal ve su agenda y el
-    // cliente su cuenta; sin sesion, el acceso por negocio.
+    // Sin login global: con sesion tenant-local, el cliente ve su cuenta, quien
+    // solo imparte su portal (sus clases) y el resto del personal la agenda; sin
+    // sesion, el acceso por negocio.
     final sesion = ref.watch(sesionProvider);
     // Al iniciar sesión (o cambiar de negocio), este teléfono recibe sus push.
     ref.listen(sesionProvider, (anterior, nueva) {
@@ -82,7 +84,9 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
         ? const LoginScreen()
         : (sesion.rol == 'miembro'
               ? const CuentaScreen()
-              : const AgendaScreen());
+              : (sesion.esInstructorAcotado
+                    ? const InstructorScreen()
+                    : const AgendaScreen()));
 
     return MaterialApp(
       title: 'AgendaUno',

@@ -18,18 +18,22 @@ class AgendaRepository {
   static String ymd(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  Future<List<SesionAgenda>> sesionesDelDia(DateTime dia) async {
+  Future<List<SesionAgenda>> sesionesDelDia(DateTime dia) => sesiones(dia, dia);
+
+  /// Sesiones entre dos días locales (ambos incluidos). A un instructor el
+  /// servidor solo le da las suyas.
+  Future<List<SesionAgenda>> sesiones(DateTime desde, DateTime hasta) async {
     final res = await _dio.get<Map<String, dynamic>>(
       '$_base/sesiones',
-      queryParameters: {'desde': ymd(dia), 'hasta': ymd(dia)},
+      queryParameters: {'desde': ymd(desde), 'hasta': ymd(hasta)},
     );
-    final objetivo = ymd(dia);
+    final (a, b) = (ymd(desde), ymd(hasta));
     return ((res.data?['data'] ?? []) as List)
         .map((e) => SesionAgenda.desdeJson(e as Map<String, dynamic>))
-        // El servidor ensancha la ventana un día por lado (zonas): se filtra el día local.
-        .where((s) => ymd(s.iniciaEn) == objetivo)
+        // El servidor ensancha la ventana un día por lado (zonas): se filtran los días locales.
+        .where((s) => ymd(s.iniciaEn).compareTo(a) >= 0 && ymd(s.iniciaEn).compareTo(b) <= 0)
         .toList()
-      ..sort((a, b) => a.iniciaEn.compareTo(b.iniciaEn));
+      ..sort((x, y) => x.iniciaEn.compareTo(y.iniciaEn));
   }
 
   Future<List<Profesional>> profesionales() async {

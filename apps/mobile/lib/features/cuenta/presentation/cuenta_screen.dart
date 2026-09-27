@@ -3,24 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
-import '../../auth/application/sesion_controller.dart';
-import '../../auth/data/sesion.dart';
 import '../../perfil/presentation/perfil_screen.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
-import 'agendar_cita_sheet.dart';
-import 'mi_privacidad_screen.dart';
-import 'mis_documentos_screen.dart';
-import 'movimientos_sheet.dart';
-import 'pago_automatico_screen.dart';
-import 'pase_sheet.dart';
-import 'reprogramar_sheet.dart';
+import 'configuracion_tab.dart';
+import 'expediente_tab.dart';
+import 'inicio_tab.dart';
+import 'pagos_tab.dart';
+import 'reservas_tab.dart';
 
-/// Autoservicio del alumno o cliente: consentimientos por firmar, créditos,
-/// reservas y, según el negocio, las próximas clases o agendar una cita.
+/// Portal del alumno o cliente: Inicio (atención, próxima reserva y accesos
+/// directos), Reservas (lista y calendario), Pagos, Expediente y su Cuenta, con la
+/// barra de abajo siempre a la mano.
 class CuentaScreen extends ConsumerStatefulWidget {
   const CuentaScreen({super.key});
 
@@ -33,6 +29,15 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
   late final AppLifecycleListener _ciclo = AppLifecycleListener(
     onResume: () => ref.invalidate(cuentaProvider),
   );
+  PestanaCuenta _pestana = PestanaCuenta.inicio;
+
+  static const _titulos = {
+    PestanaCuenta.inicio: 'Mi cuenta',
+    PestanaCuenta.reservas: 'Reservas',
+    PestanaCuenta.pagos: 'Pagos',
+    PestanaCuenta.expediente: 'Expediente',
+    PestanaCuenta.cuenta: 'Cuenta',
+  };
 
   @override
   void initState() {
@@ -46,17 +51,17 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
     super.dispose();
   }
 
+  void _ir(PestanaCuenta p) => setState(() => _pestana = p);
+
   @override
   Widget build(BuildContext context) {
-    final sesion = ref.watch(sesionProvider);
-    // Como las nombra el negocio: citas, clases, sesiones… (ADR 0049).
-    final terminos = sesion?.terminologia ?? const Terminologia();
     final estado = ref.watch(cuentaProvider);
-    final esCitas = sesion?.esCitas ?? false;
+    final firmar = estado.value?.consentimientos.length ?? 0;
+    final pagar = estado.value?.porPagar.length ?? 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mi cuenta'),
+        title: Text(_titulos[_pestana]!),
         actions: [
           IconButton(
             icon: const Icon(Icons.person_outline),
@@ -71,114 +76,55 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) =>
             _Error(onReintentar: () => ref.invalidate(cuentaProvider)),
-        data: (cuenta) => RefreshIndicator(
-          onRefresh: () => ref.refresh(cuentaProvider.future),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-            children: [
-              for (final c in cuenta.consentimientos) _Consentimiento(c),
-              if (cuenta.resenasPendientes.isNotEmpty) ...[
-                _Titulo('Califica tus ${terminos.sesiones.toLowerCase()}'),
-                for (final r in cuenta.resenasPendientes)
-                  _CalificarClase(r, key: ValueKey(r.reservaId)),
-              ],
-              if (cuenta.porPagar.isNotEmpty) ...[
-                const _Titulo('Por pagar'),
-                for (final o in cuenta.porPagar)
-                  _PorPagar(o, pagoEnLinea: cuenta.pagoEnLinea),
-              ],
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.qr_code_2),
-                  title: const Text('Mi pase de entrada'),
-                  subtitle: const Text('Muéstralo en recepción'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => showModalBottomSheet<void>(
-                    context: context,
-                    showDragHandle: true,
-                    builder: (_) => const PaseSheet(),
-                  ),
-                ),
-              ),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.description_outlined),
-                  title: const Text('Mis documentos'),
-                  subtitle: const Text('Los que te pide el negocio'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const MisDocumentosScreen(),
-                    ),
-                  ),
-                ),
-              ),
-              if (cuenta.pagoAutomatico)
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.autorenew),
-                    title: const Text('Pago automático'),
-                    subtitle: const Text('Tu membresía se cobra sola'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const PagoAutomaticoScreen(),
-                      ),
-                    ),
-                  ),
-                ),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.privacy_tip_outlined),
-                  title: const Text('Privacidad y mis datos'),
-                  subtitle: const Text('Promociones, tus datos y su baja'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const MiPrivacidadScreen(),
-                    ),
-                  ),
-                ),
-              ),
-              const _Titulo('Mis créditos'),
-              _Creditos(cuenta.derechos),
-              const _Titulo('Mis reservas'),
-              if (cuenta.reservas.isEmpty)
-                const _Vacio('No tienes reservas próximas.')
-              else
-                ...cuenta.reservas.map(
-                  (r) => _Reserva(r, pagoEnLinea: cuenta.pagoEnLinea),
-                ),
-              if (esCitas) ...[
-                const _Titulo('Agendar una cita'),
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.event_available_outlined),
-                    title: const Text('Elige servicio, profesional y hora'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => showModalBottomSheet<void>(
-                      context: context,
-                      isScrollControlled: true,
-                      showDragHandle: true,
-                      builder: (_) => const AgendarCitaSheet(),
-                    ),
-                  ),
-                ),
-              ] else ...[
-                _Titulo('Próximas ${terminos.sesiones.toLowerCase()}'),
-                if (cuenta.clases.isEmpty)
-                  _Vacio('No hay ${terminos.sesiones.toLowerCase()} programadas.')
-                else
-                  ...cuenta.clases.map(
-                    (c) => _Clase(
-                      c,
-                      reservada: cuenta.sesionesReservadas.contains(c.id),
-                    ),
-                  ),
-              ],
-            ],
+        data: (cuenta) => switch (_pestana) {
+          PestanaCuenta.inicio => RefreshIndicator(
+            onRefresh: () => ref.refresh(cuentaProvider.future),
+            child: InicioTab(cuenta: cuenta, onIr: _ir),
           ),
-        ),
+          PestanaCuenta.reservas => ReservasTab(cuenta: cuenta),
+          PestanaCuenta.pagos => PagosTab(cuenta: cuenta),
+          PestanaCuenta.expediente => ExpedienteTab(cuenta: cuenta),
+          PestanaCuenta.cuenta => const ConfiguracionTab(),
+        },
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _pestana.index,
+        onDestinationSelected: (i) => _ir(PestanaCuenta.values[i]),
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Inicio',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: 'Reservas',
+          ),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: pagar > 0,
+              label: Text('$pagar'),
+              child: const Icon(Icons.payments_outlined),
+            ),
+            selectedIcon: const Icon(Icons.payments),
+            label: 'Pagos',
+          ),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: firmar > 0,
+              label: Text('$firmar'),
+              child: const Icon(Icons.folder_outlined),
+            ),
+            selectedIcon: const Icon(Icons.folder),
+            label: 'Expediente',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Cuenta',
+          ),
+        ],
       ),
     );
   }
@@ -206,15 +152,15 @@ Future<void> hacerConAviso(
 }
 
 /// Antes de cancelar muestra qué pasará con su crédito (según la política del
-/// negocio) y pide confirmación.
-Future<void> confirmarCancelacion(
+/// negocio) y pide confirmación. Devuelve si se canceló.
+Future<bool> confirmarCancelacion(
   BuildContext context,
   WidgetRef ref,
   String reservaId,
 ) async {
   final repo = ref.read(cuentaRepositoryProvider);
   if (repo == null) {
-    return;
+    return false;
   }
   EfectoCancelacion efecto;
   try {
@@ -226,7 +172,7 @@ Future<void> confirmarCancelacion(
     );
   }
   if (!context.mounted) {
-    return;
+    return false;
   }
   final confirmada = await showDialog<bool>(
     context: context,
@@ -248,201 +194,14 @@ Future<void> confirmarCancelacion(
     ),
   );
   if (confirmada != true || !context.mounted) {
-    return;
+    return false;
   }
   await hacerConAviso(
     context,
     () => ref.read(cuentaProvider.notifier).cancelar(reservaId),
     exito: 'Reserva cancelada.',
   );
-}
-
-class _Consentimiento extends ConsumerWidget {
-  const _Consentimiento(this.c);
-
-  final ConsentimientoPendiente c;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(c.titulo, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Text(
-            c.contenido,
-            style: const TextStyle(color: TemaAgendaUno.textoSuave),
-          ),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: () => hacerConAviso(
-              context,
-              () => ref.read(cuentaProvider.notifier).firmar(c.id),
-              exito: 'Gracias, quedó firmado.',
-            ),
-            child: const Text('Acepto'),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _Creditos extends StatelessWidget {
-  const _Creditos(this.derechos);
-
-  final List<DerechoMiembro> derechos;
-
-  @override
-  Widget build(BuildContext context) {
-    if (derechos.isEmpty) {
-      return const _Vacio('Aún no tienes créditos.');
-    }
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: derechos
-              .map(
-                (d) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (d.pausaHasta != null)
-                      Text(
-                        '${d.producto != null ? '${d.producto} · ' : ''}En pausa hasta el ${Formato.dia(DateTime.parse(d.pausaHasta!))}',
-                        style: const TextStyle(color: TemaAgendaUno.textoSuave),
-                      ),
-                    Text(
-                      d.ilimitado
-                          ? 'Ilimitado'
-                          : '${d.creditosDisponibles} créditos disponibles',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    // Por qué cambió su saldo.
-                    if (!d.ilimitado && d.id != null)
-                      TextButton(
-                        style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                        onPressed: () => showModalBottomSheet<void>(
-                          context: context,
-                          isScrollControlled: true,
-                          showDragHandle: true,
-                          builder: (_) => MovimientosSheet(derechoId: d.id!),
-                        ),
-                        child: const Text('Ver movimientos'),
-                      ),
-                  ],
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _Reserva extends ConsumerWidget {
-  const _Reserva(this.r, {this.pagoEnLinea = false});
-
-  final ReservaMiembro r;
-  final bool pagoEnLinea;
-
-  bool get _sePagaAqui =>
-      r.estado == 'pendiente_pago' && pagoEnLinea && r.ordenId != null;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final notifier = ref.read(cuentaProvider.notifier);
-    final aviso =
-        r.ofrecida || r.estado == 'pendiente_pago' || r.estado == 'en_espera';
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              r.oferta ?? '—',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              [
-                Formato.fechaHora(r.iniciaEn),
-                if (r.sucursal != null) r.sucursal!,
-              ].join(' · '),
-              style: const TextStyle(color: TemaAgendaUno.textoSuave),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              r.estadoTexto,
-              style: TextStyle(
-                color: aviso ? TemaAgendaUno.aviso : TemaAgendaUno.exito,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            if (r.estado == 'pendiente_pago' && !_sePagaAqui)
-              const Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: Text(
-                  'Págala en el negocio o desde la web para confirmarla.',
-                  style: TextStyle(
-                    color: TemaAgendaUno.textoSuave,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            // Wrap: en pantallas angostas los botones bajan de renglón.
-            SizedBox(
-              width: double.infinity,
-              child: Wrap(
-                alignment: WrapAlignment.end,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (_sePagaAqui)
-                    FilledButton(
-                      onPressed: () => pagarEnLinea(context, ref, r.ordenId!),
-                      child: const Text('Pagar'),
-                    ),
-                  if (r.ofrecida)
-                    FilledButton(
-                      onPressed: () => hacerConAviso(
-                        context,
-                        () => notifier.aceptarLugar(r.id),
-                        exito: '¡Lugar confirmado!',
-                      ),
-                      child: const Text('Aceptar lugar'),
-                    ),
-                  if (r.estado == 'confirmada' || r.estado == 'pendiente_pago')
-                    TextButton(
-                      onPressed: () => showModalBottomSheet<void>(
-                        context: context,
-                        isScrollControlled: true,
-                        showDragHandle: true,
-                        builder: (_) => ReprogramarSheet(r),
-                      ),
-                      child: const Text('Cambiar horario'),
-                    ),
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: TemaAgendaUno.error,
-                    ),
-                    onPressed: () => confirmarCancelacion(context, ref, r.id),
-                    child: const Text('Cancelar'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  return true;
 }
 
 /// Abre la página de pago de la pasarela en el navegador; al volver a la app la
@@ -477,216 +236,6 @@ Future<void> pagarEnLinea(
       ),
     );
   });
-}
-
-/// Una orden pendiente: se paga aquí si el negocio cobra en línea; si no, en
-/// recepción.
-class _PorPagar extends ConsumerWidget {
-  const _PorPagar(this.o, {this.pagoEnLinea = false});
-
-  final OrdenPorPagar o;
-  final bool pagoEnLinea;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) => Card(
-    child: ListTile(
-      title: Text(o.concepto),
-      subtitle: Text(
-        pagoEnLinea
-            ? Formato.dinero(o.totalMinor)
-            : '${Formato.dinero(o.totalMinor)} · Págalo en recepción',
-      ),
-      trailing: pagoEnLinea
-          ? FilledButton(
-              onPressed: () => pagarEnLinea(context, ref, o.id),
-              child: const Text('Pagar'),
-            )
-          : null,
-    ),
-  );
-}
-
-class _Clase extends ConsumerWidget {
-  const _Clase(this.c, {required this.reservada});
-
-  final ClaseMiembro c;
-  final bool reservada;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final notifier = ref.read(cuentaProvider.notifier);
-    final lugares = c.capacidad != null
-        ? '${c.ocupados}/${c.capacidad}'
-        : '${c.ocupados}';
-    final Widget accion;
-    if (reservada) {
-      accion = const Text(
-        'Reservada',
-        style: TextStyle(
-          color: TemaAgendaUno.exito,
-          fontWeight: FontWeight.w600,
-        ),
-      );
-    } else if (c.llena) {
-      accion = OutlinedButton(
-        onPressed: () => hacerConAviso(
-          context,
-          () => notifier.reservar(c.id, esperar: true),
-          exito: 'Te anotamos en la lista de espera.',
-        ),
-        child: const Text('Lista de espera'),
-      );
-    } else {
-      accion = FilledButton(
-        onPressed: () => hacerConAviso(
-          context,
-          () => notifier.reservar(c.id),
-          exito: 'Reservado.',
-        ),
-        child: const Text('Reservar'),
-      );
-    }
-
-    return Card(
-      child: ListTile(
-        title: Text(c.oferta ?? '—'),
-        subtitle: Text(
-          [
-            Formato.fechaHora(c.iniciaEn),
-            if (c.sucursal != null) c.sucursal!,
-            lugares,
-          ].join(' · '),
-        ),
-        trailing: accion,
-      ),
-    );
-  }
-}
-
-/// Calificar una clase o cita a la que asistió: 1 a 5 y un comentario opcional.
-class _CalificarClase extends ConsumerStatefulWidget {
-  const _CalificarClase(this.r, {super.key});
-
-  final ResenaPendiente r;
-
-  @override
-  ConsumerState<_CalificarClase> createState() => _CalificarClaseState();
-}
-
-class _CalificarClaseState extends ConsumerState<_CalificarClase> {
-  int _estrellas = 0;
-  final _comentario = TextEditingController();
-  bool _enviando = false;
-
-  @override
-  void dispose() {
-    _comentario.dispose();
-    super.dispose();
-  }
-
-  Future<void> _enviar() async {
-    setState(() => _enviando = true);
-    final texto = _comentario.text.trim();
-    await hacerConAviso(
-      context,
-      () => ref
-          .read(cuentaProvider.notifier)
-          .calificar(
-            widget.r.reservaId,
-            _estrellas,
-            texto.isEmpty ? null : texto,
-          ),
-      exito: '¡Gracias por tu calificación!',
-    );
-    if (mounted) {
-      setState(() => _enviando = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final r = widget.r;
-    final detalle = [
-      if (r.fecha != null) Formato.fechaHora(r.fecha),
-      if (r.con != null) r.con!,
-    ].join(' · ');
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              r.actividad ?? '—',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            if (detalle.isNotEmpty)
-              Text(
-                detalle,
-                style: const TextStyle(color: TemaAgendaUno.textoSuave),
-              ),
-            Row(
-              children: [
-                for (var n = 1; n <= 5; n++)
-                  IconButton(
-                    tooltip: '$n de 5',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: _enviando
-                        ? null
-                        : () => setState(() => _estrellas = n),
-                    icon: Icon(
-                      n <= _estrellas ? Icons.star : Icons.star_border,
-                      color: n <= _estrellas
-                          ? TemaAgendaUno.aviso
-                          : TemaAgendaUno.textoSuave,
-                    ),
-                  ),
-              ],
-            ),
-            TextField(
-              controller: _comentario,
-              maxLength: 1000,
-              decoration: const InputDecoration(
-                hintText: '¿Cómo te fue? (opcional)',
-              ),
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton(
-                onPressed: _enviando || _estrellas == 0 ? null : _enviar,
-                child: const Text('Enviar'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Titulo extends StatelessWidget {
-  const _Titulo(this.texto);
-
-  final String texto;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 20, bottom: 8),
-    child: Text(texto, style: Theme.of(context).textTheme.titleMedium),
-  );
-}
-
-class _Vacio extends StatelessWidget {
-  const _Vacio(this.texto);
-
-  final String texto;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Text(texto, style: const TextStyle(color: TemaAgendaUno.textoSuave)),
-  );
 }
 
 class _Error extends StatelessWidget {

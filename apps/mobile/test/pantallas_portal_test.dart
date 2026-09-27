@@ -1,0 +1,180 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:turnouno_mobile/features/agenda/data/agenda_models.dart';
+import 'package:turnouno_mobile/features/auth/application/sesion_controller.dart';
+import 'package:turnouno_mobile/features/auth/data/sesion.dart';
+import 'package:turnouno_mobile/features/cuenta/application/cuenta_controller.dart';
+import 'package:turnouno_mobile/features/cuenta/data/cuenta_models.dart';
+import 'package:turnouno_mobile/features/cuenta/presentation/cuenta_screen.dart';
+import 'package:turnouno_mobile/features/instructor/application/mis_clases_controller.dart';
+import 'package:turnouno_mobile/features/instructor/presentation/instructor_screen.dart';
+
+/// Las pantallas completas de ambos portales se arman en un teléfono sin
+/// desbordes ni errores, y la barra de abajo lleva a cada parte.
+
+String iso(DateTime d) => d.toUtc().toIso8601String();
+
+class _CuentaFalsa extends CuentaController {
+  _CuentaFalsa(this.cuenta);
+
+  final MiCuenta cuenta;
+
+  @override
+  Future<MiCuenta> build() async => cuenta;
+}
+
+Future<void> montar(
+  WidgetTester tester,
+  Widget pantalla,
+  List overrides,
+) async {
+  tester.view.physicalSize = const Size(390, 844);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [...overrides],
+      child: MaterialApp(home: pantalla),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  final manana = DateTime.now().add(const Duration(days: 1));
+  final inicio = DateTime(manana.year, manana.month, manana.day, 9);
+
+  testWidgets('portal del alumno: inicio con accesos y cada pestaña', (
+    tester,
+  ) async {
+    final cuenta = MiCuenta(
+      derechos: const [
+        DerechoMiembro(
+          ilimitado: false,
+          id: 'd1',
+          disponible: 6000,
+          producto: 'Pack 8 clases',
+        ),
+      ],
+      reservas: [
+        ReservaMiembro(
+          id: 'r1',
+          estado: 'confirmada',
+          sesionId: 's1',
+          oferta: 'Pole Nivel 1',
+          sucursal: 'Roma Norte',
+          iniciaEn: iso(inicio),
+          terminaEn: iso(inicio.add(const Duration(hours: 1))),
+        ),
+      ],
+      clases: [
+        ClaseMiembro(
+          id: 's2',
+          oferta: 'Exotic con un nombre muy largo para ver que no se desborda',
+          sucursal: 'Condesa',
+          iniciaEn: iso(inicio.add(const Duration(hours: 3))),
+          capacidad: 8,
+          ocupados: 8,
+        ),
+      ],
+      consentimientos: const [
+        ConsentimientoPendiente(id: 'w1', titulo: 'Reglamento', contenido: '…'),
+      ],
+      porPagar: const [
+        OrdenPorPagar(id: 'o1', concepto: 'Pack 8 clases', totalMinor: 50000),
+      ],
+    );
+    await montar(tester, const CuentaScreen(), [
+      sesionInicialProvider.overrideWithValue(
+        const Sesion(slug: 'demo', bearer: 't', nombre: 'Vale', rol: 'miembro'),
+      ),
+      cuentaProvider.overrideWith(() => _CuentaFalsa(cuenta)),
+    ]);
+
+    expect(find.text('Tu próxima clase'), findsOneWidget);
+    expect(find.text('Pole Nivel 1'), findsOneWidget);
+    expect(find.text('Agregar a mi calendario'), findsOneWidget);
+    expect(find.text('Tienes 1 documento por firmar'), findsOneWidget);
+    expect(find.text('6 créditos'), findsOneWidget);
+
+    // Cada pestaña de la barra de abajo.
+    await tester.tap(find.text('Reservas').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Mis reservas'), findsWidgets);
+    expect(find.text('Llena'), findsOneWidget);
+    await tester.tap(find.text('Mes'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Semana'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Pagos').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Por pagar'), findsOneWidget);
+    expect(find.text('6 créditos disponibles'), findsOneWidget);
+
+    await tester.tap(find.text('Expediente').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Reglamento'), findsOneWidget);
+
+    await tester.tap(find.text('Cuenta').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Privacidad y mis datos'), findsOneWidget);
+  });
+
+  testWidgets('portal del instructor: inicio y mis clases', (tester) async {
+    SesionAgenda clase(String id, DateTime cuando, {int espera = 0}) =>
+        SesionAgenda.desdeJson({
+          'id': id,
+          'tipo': 'clase',
+          'oferta': 'Pole Nivel $id',
+          'sala': 'Sala A',
+          'sucursal': 'Roma Norte',
+          'inicia_en': iso(cuando),
+          'termina_en': iso(cuando.add(const Duration(hours: 1))),
+          'capacidad': 10,
+          'ocupados': 6,
+          'en_espera': espera,
+          'estado': 'programada',
+        });
+    final sesiones = [
+      clase('1', inicio, espera: 2),
+      clase('2', inicio.add(const Duration(days: 2))),
+    ];
+    await montar(tester, const InstructorScreen(), [
+      sesionInicialProvider.overrideWithValue(
+        const Sesion(
+          slug: 'demo',
+          bearer: 't',
+          nombre: 'Mariana',
+          rol: 'instructor',
+        ),
+      ),
+      proximasMisClasesProvider.overrideWith((ref) async => sesiones),
+      misClasesProvider.overrideWith((ref) async => sesiones),
+    ]);
+
+    expect(find.text('Tu próxima clase'), findsOneWidget);
+    expect(find.text('Pole Nivel 1'), findsOneWidget);
+    expect(
+      find.text('6 de 10 lugares ocupados · 2 en lista de espera'),
+      findsOneWidget,
+    );
+    expect(find.text('Pasar lista'), findsOneWidget);
+    expect(find.text('2 clases'), findsOneWidget); // próximos 7 días
+
+    // "Mi calendario" abre Mis clases en el mes.
+    await tester.tap(find.text('Mi calendario'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mis clases'), findsWidgets);
+    await tester.tap(find.text('Lista'));
+    await tester.pumpAndSettle();
+    expect(find.text('Próximas clases'), findsOneWidget);
+
+    // Tocar una clase abre su detalle con pase de lista y calendario.
+    await tester.tap(find.text('Pole Nivel 2'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pasar lista'), findsOneWidget);
+    expect(find.text('Agregar a mi calendario'), findsOneWidget);
+  });
+}
