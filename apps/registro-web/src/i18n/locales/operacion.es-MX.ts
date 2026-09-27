@@ -8,6 +8,18 @@ export default {
     aceptar: "Confirmar",
     cancelar: "Cancelar",
   },
+  sedes: {
+    ubicacion: "Ubicación (para el clima de tus alumnos)",
+    ubicacionPh: "19.4194, -99.1617",
+    ubicacionAyuda:
+      "Pega las coordenadas desde Google Maps (clic derecho sobre el lugar y copia los números) o usa tu ubicación si estás en la sucursal.",
+    usarMiUbicacion: "Usar mi ubicación actual",
+    ubicando: "Ubicando…",
+    verMapa: "Ver en el mapa →",
+    invalida:
+      "Escribe la latitud y la longitud separadas por una coma (p. ej. 19.4194, -99.1617).",
+    sinPermiso: "No pudimos obtener tu ubicación desde este dispositivo.",
+  },
   reportes: {
     sinSucursal: "Sin sucursal asignada",
     total: "Total",

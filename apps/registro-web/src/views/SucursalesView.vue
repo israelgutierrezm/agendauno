@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
@@ -13,6 +14,8 @@ interface Sucursal {
   region: string | null;
   moneda: string | null;
   impuesto_tasa_bps: number;
+  latitud?: number | null;
+  longitud?: number | null;
 }
 interface Organizacion {
   id: string;
@@ -32,6 +35,7 @@ const ZONAS = [
   "UTC",
 ];
 
+const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("sucursales.gestionar"));
@@ -55,6 +59,7 @@ const form = ref({
   zona_horaria: "America/Mexico_City",
   moneda: "MXN",
   iva: "16",
+  ubicacion: "",
 });
 
 const esNueva = computed(() => editandoId.value === null);
@@ -86,6 +91,7 @@ function abrirNueva(): void {
     zona_horaria: "America/Mexico_City",
     moneda: "MXN",
     iva: "16",
+    ubicacion: "",
   };
   abierto.value = true;
 }
@@ -98,8 +104,57 @@ function abrirEdicion(s: Sucursal): void {
     zona_horaria: s.zona_horaria ?? "America/Mexico_City",
     moneda: s.moneda ?? "MXN",
     iva: String(s.impuesto_tasa_bps / 100),
+    ubicacion:
+      s.latitud != null && s.longitud != null
+        ? `${s.latitud}, ${s.longitud}`
+        : "",
   };
   abierto.value = true;
+}
+
+// Ubicación: "19.4194, -99.1617" (como la copia Google Maps). Vacía = sin ubicación.
+const coordenadas = computed<
+  { latitud: number; longitud: number } | null | "invalida"
+>(() => {
+  const texto = form.value.ubicacion.trim();
+  if (texto === "") {
+    return null;
+  }
+  const m = /^(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)$/.exec(texto);
+  if (m === null) {
+    return "invalida";
+  }
+  const [latitud, longitud] = [Number(m[1]), Number(m[2])];
+  return Math.abs(latitud) <= 90 && Math.abs(longitud) <= 180
+    ? { latitud, longitud }
+    : "invalida";
+});
+const enlaceMapa = computed(() => {
+  const c = coordenadas.value;
+  return c && c !== "invalida"
+    ? `https://www.google.com/maps?q=${c.latitud},${c.longitud}`
+    : null;
+});
+const ubicando = ref(false);
+const errorUbicacion = ref<string | null>(null);
+function usarMiUbicacion(): void {
+  if (!("geolocation" in navigator)) {
+    errorUbicacion.value = t("operacion.sedes.sinPermiso");
+    return;
+  }
+  ubicando.value = true;
+  errorUbicacion.value = null;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      form.value.ubicacion = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+      ubicando.value = false;
+    },
+    () => {
+      errorUbicacion.value = t("operacion.sedes.sinPermiso");
+      ubicando.value = false;
+    },
+    { timeout: 10000 },
+  );
 }
 
 function cerrar(): void {
@@ -107,7 +162,11 @@ function cerrar(): void {
 }
 
 async function guardar(): Promise<void> {
-  if (!puedeGestionar.value || form.value.nombre.trim() === "") {
+  if (
+    !puedeGestionar.value ||
+    form.value.nombre.trim() === "" ||
+    coordenadas.value === "invalida"
+  ) {
     return;
   }
   guardando.value = true;
@@ -122,6 +181,8 @@ async function guardar(): Promise<void> {
           ? form.value.moneda.trim().toUpperCase()
           : null,
       impuesto_tasa_bps: Math.round((Number(form.value.iva) || 0) * 100),
+      latitud: coordenadas.value === null ? null : coordenadas.value.latitud,
+      longitud: coordenadas.value === null ? null : coordenadas.value.longitud,
     };
     if (esNueva.value) {
       await api.post(
@@ -287,6 +348,56 @@ onMounted(cargar);
             />
           </div>
         </div>
+        <div>
+          <label class="tu-label" for="s-ubicacion">{{
+            $t("operacion.sedes.ubicacion")
+          }}</label>
+          <input
+            id="s-ubicacion"
+            v-model="form.ubicacion"
+            class="tu-input"
+            :placeholder="$t('operacion.sedes.ubicacionPh')"
+          />
+          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("operacion.sedes.ubicacionAyuda") }}
+          </p>
+          <p
+            v-if="coordenadas === 'invalida'"
+            class="mt-1 text-xs"
+            style="color: var(--error)"
+          >
+            {{ $t("operacion.sedes.invalida") }}
+          </p>
+          <div class="mt-2 flex flex-wrap items-center gap-3 text-sm">
+            <button
+              type="button"
+              class="tu-enlace"
+              :disabled="ubicando"
+              @click="usarMiUbicacion"
+            >
+              {{
+                ubicando
+                  ? $t("operacion.sedes.ubicando")
+                  : $t("operacion.sedes.usarMiUbicacion")
+              }}
+            </button>
+            <a
+              v-if="enlaceMapa"
+              :href="enlaceMapa"
+              target="_blank"
+              rel="noopener"
+              class="tu-enlace"
+              >{{ $t("operacion.sedes.verMapa") }}</a
+            >
+          </div>
+          <p
+            v-if="errorUbicacion"
+            class="mt-1 text-xs"
+            style="color: var(--error)"
+          >
+            {{ errorUbicacion }}
+          </p>
+        </div>
       </form>
 
       <template #pie>
@@ -297,7 +408,11 @@ onMounted(cargar);
           <button
             class="tu-btn tu-btn-primario"
             type="button"
-            :disabled="guardando || form.nombre.trim() === ''"
+            :disabled="
+              guardando ||
+              form.nombre.trim() === '' ||
+              coordenadas === 'invalida'
+            "
             @click="guardar"
           >
             {{ guardando ? $t("comun.guardar") + "…" : $t("comun.guardar") }}

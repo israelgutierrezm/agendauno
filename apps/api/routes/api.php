@@ -235,6 +235,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/reservas/{reserva}/cancelacion', [MiTenantController::class, 'previsualizarCancelacion'])->name('mi.reservas.cancelacion');
             Route::get('/mi/derechos/{derecho}/movimientos', [MiTenantController::class, 'movimientosDerecho'])->name('mi.derechos.movimientos');
             Route::get('/mi/planes', [MiTenantController::class, 'planes'])->name('mi.planes');
+            Route::get('/mi/clima', [MiTenantController::class, 'clima'])->middleware('throttle:30,1')->name('mi.clima');
             Route::post('/mi/reservas/{reserva}/aceptar', [MiTenantController::class, 'aceptar'])->name('mi.reservas.aceptar');
             Route::get('/mi/waivers', [MiTenantController::class, 'waiversPendientes'])->name('mi.waivers.index');
             Route::post('/mi/waivers/{waiver}/aceptar', [MiTenantController::class, 'aceptarWaiver'])->name('mi.waivers.aceptar');

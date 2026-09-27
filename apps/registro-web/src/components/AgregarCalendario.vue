@@ -11,7 +11,7 @@ import {
  * "Agregar a mi calendario" de una reserva: Google Calendar (en una pestaña nueva) o
  * el archivo .ics para Apple Calendar, Outlook y los demás.
  */
-const props = defineProps<{ evento: EventoCalendario }>();
+const props = defineProps<{ evento: EventoCalendario; primario?: boolean }>();
 
 const abierto = ref(false);
 </script>
@@ -20,7 +20,8 @@ const abierto = ref(false);
   <div class="relative inline-block">
     <button
       type="button"
-      class="tu-btn tu-btn-fantasma text-sm"
+      class="tu-btn text-sm"
+      :class="props.primario ? 'tu-btn-primario' : 'tu-btn-fantasma'"
       :aria-expanded="abierto"
       @click="abierto = !abierto"
     >

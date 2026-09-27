@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
+use App\Modules\Tenancy\Application\ClimaTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\CorteDePlanesTenant;
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
@@ -353,9 +354,17 @@ class MiTenantController
     }
 
     /**
-     * Movimientos de créditos de un plan propio: por qué cambió su saldo (1.4). Un plan
-     * de otra persona no existe para él (404).
+     * El clima de su Inicio: el pronóstico para su próxima clase o cita en esa
+     * sucursal o, si no tiene, el de ahora (por su IP). Null si no se pudo saber:
+     * el Inicio no depende de un servicio externo.
      */
+    public function clima(Request $request, ClimaTenant $clima): JsonResponse
+    {
+        $persona = $this->persona($request);
+
+        return response()->json(['data' => $clima->paraMiembro($persona instanceof PersonaTenant ? $persona : null, $request->ip())]);
+    }
+
     /**
      * Corte de sus planes: qué incluía cada paquete o membresía, en qué clases lo usó,
      * sus clases extra, lo que le queda y lo que venció.
@@ -367,6 +376,10 @@ class MiTenantController
         return response()->json(['data' => $persona instanceof PersonaTenant ? $corte->dePersona($persona) : []]);
     }
 
+    /**
+     * Movimientos de créditos de un plan propio: por qué cambió su saldo (1.4). Un plan
+     * de otra persona no existe para él (404).
+     */
     public function movimientosDerecho(Request $request, PresentarMovimientosCreditoTenant $movimientos): JsonResponse
     {
         $persona = $this->persona($request);

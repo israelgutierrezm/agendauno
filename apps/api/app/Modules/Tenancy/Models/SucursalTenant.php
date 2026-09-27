@@ -23,13 +23,15 @@ class SucursalTenant extends Model
 
     protected $table = 'sucursales';
 
-    protected $fillable = ['organizacion_id', 'nombre', 'zona_horaria', 'region', 'moneda', 'impuesto_tasa_bps'];
+    protected $fillable = ['organizacion_id', 'nombre', 'zona_horaria', 'region', 'moneda', 'impuesto_tasa_bps', 'latitud', 'longitud'];
 
     /**
      * @var array<string, string>
      */
     protected $casts = [
         'impuesto_tasa_bps' => 'integer',
+        'latitud' => 'float',
+        'longitud' => 'float',
     ];
 
     /**

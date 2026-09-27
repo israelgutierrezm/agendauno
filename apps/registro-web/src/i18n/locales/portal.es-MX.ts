@@ -14,9 +14,20 @@ export default {
   },
   inicio: {
     titulo: "Inicio",
+    saludo: "¡Hola, {nombre}!",
+    saludoSinNombre: "¡Hola!",
+    resumen: "Aquí tienes un resumen de tu actividad en {estudio}.",
     proxima: "Tu próxima clase",
+    sinClase: "Sin clase agendada",
     sinProxima: "No tienes reservas próximas.",
+    sinProximaAyuda: "Elige tu próxima clase y aparta tu lugar.",
     reservar: "Reservar",
+    clima: {
+      pronostico: "Pronóstico para tu clase en {lugar}",
+      ahora: "Ahora en {lugar}",
+      ahoraCerca: "Ahora cerca de {lugar}",
+      lluvia: "{n} % de lluvia",
+    },
     verDetalle: "Ver en mis reservas →",
     atencion: {
       firmar:

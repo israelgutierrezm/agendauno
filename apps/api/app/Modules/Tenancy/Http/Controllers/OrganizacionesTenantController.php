@@ -50,6 +50,8 @@ class OrganizacionesTenantController
             'region' => $validado['region'] ?? null,
             'moneda' => $validado['moneda'] ?? null,
             'impuesto_tasa_bps' => $validado['impuesto_tasa_bps'] ?? 0,
+            'latitud' => $validado['latitud'] ?? null,
+            'longitud' => $validado['longitud'] ?? null,
         ]);
 
         return response()->json(['data' => $this->presentarSucursal($sucursal)], 201);
@@ -71,6 +73,11 @@ class OrganizacionesTenantController
 
         if (array_key_exists('impuesto_tasa_bps', $validado)) {
             $sucursal->impuesto_tasa_bps = (int) $validado['impuesto_tasa_bps'];
+        }
+        // La ubicación va junta (o se quita junta, con null en ambas).
+        if (array_key_exists('latitud', $validado)) {
+            $sucursal->latitud = $validado['latitud'];
+            $sucursal->longitud = $validado['longitud'] ?? null;
         }
 
         $sucursal->save();
@@ -98,6 +105,9 @@ class OrganizacionesTenantController
             'region' => ['nullable', 'string', 'max:255'],
             'moneda' => ['nullable', 'string', 'size:3'],
             'impuesto_tasa_bps' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            // Ubicación del local (para el clima): las dos o ninguna.
+            'latitud' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitud'],
+            'longitud' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitud'],
         ]);
     }
 
@@ -113,6 +123,8 @@ class OrganizacionesTenantController
             'region' => $sucursal->region,
             'moneda' => $sucursal->moneda !== null ? mb_strtoupper((string) $sucursal->moneda) : null,
             'impuesto_tasa_bps' => (int) $sucursal->impuesto_tasa_bps,
+            'latitud' => $sucursal->latitud,
+            'longitud' => $sucursal->longitud,
         ];
     }
 }

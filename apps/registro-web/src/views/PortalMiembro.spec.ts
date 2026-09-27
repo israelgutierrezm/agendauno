@@ -157,6 +157,41 @@ describe("portal del alumno", () => {
     expect(texto).toContain("1 por pagar");
   });
 
+  it("sin reserva la tarjeta principal sigue ahí (invita a reservar) y lleva el clima", async () => {
+    const sinReservas = {
+      ...(datos["/mi/perfil"] as object),
+      reservas: [],
+    };
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      const clima = {
+        tipo: "ahora",
+        lugar: "Guadalajara",
+        aproximado: true,
+        temperatura: 24,
+        condicion: "Despejado",
+        icono: "despejado",
+        es_de_dia: true,
+        lluvia: null,
+      };
+      const cuerpo =
+        ruta === "/mi/perfil"
+          ? sinReservas
+          : ruta === "/mi/clima"
+            ? clima
+            : (datos[ruta] ?? []);
+      return Promise.resolve({ data: { data: cuerpo } });
+    });
+    const w = montar(MiCuentaView);
+    await flushPromises();
+    const texto = w.text();
+
+    expect(texto).toContain("Tu próxima clase");
+    expect(texto).toContain("Sin clase agendada");
+    expect(texto).toContain("24°");
+    expect(texto).toContain("Ahora cerca de Guadalajara");
+  });
+
   it("reservas: lista con las suyas y las disponibles; en semana y detalle", async () => {
     const w = montar(MisReservasView);
     await flushPromises();
