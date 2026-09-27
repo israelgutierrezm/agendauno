@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -11,6 +12,7 @@ use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Ordenes\Exceptions\ExtraSinPaquete;
 use App\Modules\Tenancy\Ordenes\Exceptions\MonedaMixta;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Pagos\MetodoPago;
@@ -28,6 +30,7 @@ class OrdenesTenant
     public function __construct(
         private readonly GestionarPromocionesTenant $promociones,
         private readonly CobrarOrdenTenant $cobrar,
+        private readonly MembresiasTenant $membresias,
     ) {}
 
     /**
@@ -40,6 +43,11 @@ class OrdenesTenant
         foreach ($items as $item) {
             if ($item['producto']->moneda !== $moneda) {
                 throw new MonedaMixta('Una orden no puede mezclar monedas.');
+            }
+            // Clases extra: quien las recibe debe tener un paquete vigente al cual sumarlas.
+            $recibe = $item['beneficiario'] ?? $comprador;
+            if ($item['producto']->tipo === TipoProducto::AddOn && $this->membresias->paqueteParaExtras($recibe) === null) {
+                throw new ExtraSinPaquete('Las clases extra se suman a un paquete vigente, y esta persona no tiene uno.');
             }
         }
 

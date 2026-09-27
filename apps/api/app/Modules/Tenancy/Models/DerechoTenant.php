@@ -25,7 +25,7 @@ class DerechoTenant extends Model
     protected $table = 'derechos';
 
     protected $fillable = [
-        'acuerdo_id', 'ambito', 'actividad_id', 'sucursal_id', 'ilimitado',
+        'acuerdo_id', 'extra_de_id', 'ambito', 'actividad_id', 'sucursal_id', 'ilimitado',
         'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max',
         'ciclo_inicio', 'ciclo_fin', 'valido_desde', 'valido_hasta',
     ];
@@ -51,6 +51,26 @@ class DerechoTenant extends Model
     public function acuerdo(): BelongsTo
     {
         return $this->belongsTo(AcuerdoTenant::class, 'acuerdo_id');
+    }
+
+    /**
+     * Paquete al que se sumaron estas clases extra (null si no es un extra).
+     *
+     * @return BelongsTo<DerechoTenant, $this>
+     */
+    public function extraDe(): BelongsTo
+    {
+        return $this->belongsTo(DerechoTenant::class, 'extra_de_id');
+    }
+
+    /**
+     * Clases extra que se sumaron a este paquete.
+     *
+     * @return HasMany<DerechoTenant, $this>
+     */
+    public function extras(): HasMany
+    {
+        return $this->hasMany(DerechoTenant::class, 'extra_de_id');
     }
 
     /**

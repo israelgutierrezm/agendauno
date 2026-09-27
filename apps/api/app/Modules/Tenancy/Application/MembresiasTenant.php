@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Creditos\TipoMovimiento;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\PoliticaRollover;
 use App\Modules\Tenancy\Membresias\TipoProducto;
@@ -17,6 +18,7 @@ use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Ordenes\Exceptions\ExtraSinPaquete;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -145,12 +147,27 @@ class MembresiasTenant
      * la plantilla del producto) y concede sus creditos en el ledger, todo en una
      * sola transaccion. Producto recurrente: inicializa el primer ciclo y concede su
      * cupo; pack: concede sus creditos incluidos.
+     *
+     * Clases extra (add-on): se suman al paquete vigente de la persona y vencen con
+     * él. Sin paquete vigente se rechaza, salvo que ya se hayan pagado
+     * (`$extraAunSinPaquete`, p. ej. una compra en línea): entonces valen como un
+     * paquete aparte, con su propia vigencia.
      */
-    public function venderProducto(PersonaTenant $persona, ProductoTenant $producto, ?string $fechaInicio = null, ?Usuario $actor = null): AcuerdoTenant
+    public function venderProducto(PersonaTenant $persona, ProductoTenant $producto, ?string $fechaInicio = null, ?Usuario $actor = null, bool $extraAunSinPaquete = false): AcuerdoTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($persona, $producto, $fechaInicio, $actor): AcuerdoTenant {
+        return DB::connection('tenant')->transaction(function () use ($persona, $producto, $fechaInicio, $actor, $extraAunSinPaquete): AcuerdoTenant {
             // La fecha de compra es la del negocio (no la del servidor en UTC).
             $inicio = $fechaInicio ?? Carbon::now($this->zona())->toDateString();
+
+            if ($producto->tipo === TipoProducto::AddOn) {
+                $base = $this->paqueteParaExtras($persona, $inicio);
+                if ($base instanceof DerechoTenant) {
+                    return $this->sumarExtras($persona, $producto, $base, $inicio, $actor);
+                }
+                if (! $extraAunSinPaquete) {
+                    throw new ExtraSinPaquete('Las clases extra se suman a un paquete vigente, y esta persona no tiene uno.');
+                }
+            }
 
             $politicaReset = $producto->politica_reset ?? PoliticaReset::Ninguno;
             $politicaRollover = $producto->politica_rollover ?? PoliticaRollover::Ninguno;
@@ -230,6 +247,67 @@ class MembresiasTenant
                 ContextoMovimiento::para(OrigenMovimiento::TopUp, null, null, $actor),
             );
         });
+    }
+
+    /**
+     * Paquete vigente al que se sumarían unas clases extra: el más reciente con clases
+     * contadas (no ilimitado, no un extra) de un acuerdo activo. Null si no tiene.
+     */
+    public function paqueteParaExtras(PersonaTenant $persona, ?string $fecha = null): ?DerechoTenant
+    {
+        $hoy = $fecha ?? Carbon::now($this->zona())->toDateString();
+
+        return DerechoTenant::query()
+            ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey())->where('estado', EstadoAcuerdo::Activo->value))
+            ->whereNull('extra_de_id')
+            ->where('ilimitado', false)
+            ->where(fn ($q) => $q->whereNull('valido_desde')->orWhereDate('valido_desde', '<=', $hoy))
+            ->where(fn ($q) => $q->whereNull('valido_hasta')->orWhereDate('valido_hasta', '>=', $hoy))
+            ->orderByDesc('valido_desde')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    /**
+     * Las clases extra son una compra aparte (su acuerdo, su derecho y su asiento en el
+     * ledger; el paquete no se edita), ligada al paquete: mismas clases y sede, y
+     * vencen el mismo día.
+     */
+    private function sumarExtras(PersonaTenant $persona, ProductoTenant $producto, DerechoTenant $base, string $inicio, ?Usuario $actor): AcuerdoTenant
+    {
+        $acuerdo = AcuerdoTenant::query()->create([
+            'persona_id' => $persona->getKey(),
+            'producto_comercial_id' => $producto->getKey(),
+            'fecha_inicio' => $inicio,
+            'proxima_cobro_en' => null,
+            'estado' => 'activo',
+        ]);
+
+        $extra = $acuerdo->derechos()->create([
+            'extra_de_id' => $base->getKey(),
+            'ambito' => 'general',
+            'actividad_id' => $base->actividad_id,
+            'sucursal_id' => $base->sucursal_id,
+            'ilimitado' => false,
+            'politica_reset' => PoliticaReset::Ninguno->value,
+            'politica_rollover' => PoliticaRollover::Ninguno->value,
+            'valido_desde' => $inicio,
+            'valido_hasta' => $base->valido_hasta?->toDateString(),
+        ]);
+        $extra->ofertas()->sync($base->ofertas()->pluck('ofertas.id')->all());
+
+        $unidades = (int) ($producto->creditos_incluidos ?? 0);
+        if ($unidades > 0) {
+            $this->libro->registrar(
+                $extra,
+                TipoMovimiento::AddOn,
+                $unidades,
+                'Clases extra',
+                ContextoMovimiento::para(OrigenMovimiento::Venta, 'acuerdo', $acuerdo->ulid, $actor),
+            );
+        }
+
+        return $acuerdo;
     }
 
     /**

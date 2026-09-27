@@ -77,7 +77,8 @@ class FulfillmentTenant
             }
 
             for ($i = 0; $i < $linea->cantidad; $i++) {
-                $acuerdo = $this->membresias->venderProducto($beneficiario, $producto);
+                // Ya pagado: unas clases extra sin paquete vigente valen como paquete aparte.
+                $acuerdo = $this->membresias->venderProducto($beneficiario, $producto, extraAunSinPaquete: true);
                 $acuerdo->update(['linea_orden_id' => $linea->getKey()]);
             }
         }

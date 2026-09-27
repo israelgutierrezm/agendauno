@@ -29,7 +29,14 @@ class ResolverDerechoTenant
             })
             ->with('ofertas:id')
             ->get()
-            ->filter(fn (DerechoTenant $derecho): bool => $this->vigente($derecho, $sesion->inicia_en) && $this->cubre($derecho, $sesion));
+            ->filter(fn (DerechoTenant $derecho): bool => $this->vigente($derecho, $sesion->inicia_en) && $this->cubre($derecho, $sesion))
+            // Se gasta primero lo que vence antes; con el mismo vencimiento, el paquete
+            // antes que sus clases extra (así el corte muestra cuándo se usaron).
+            ->sortBy([
+                fn (DerechoTenant $a, DerechoTenant $b): int => ($a->valido_hasta?->toDateString() ?? '9999-12-31') <=> ($b->valido_hasta?->toDateString() ?? '9999-12-31'),
+                fn (DerechoTenant $a, DerechoTenant $b): int => ($a->extra_de_id !== null) <=> ($b->extra_de_id !== null),
+                fn (DerechoTenant $a, DerechoTenant $b): int => $a->getKey() <=> $b->getKey(),
+            ]);
 
         $limitado = $derechos->first(
             fn (DerechoTenant $derecho): bool => ! $derecho->ilimitado && $this->libro->disponible($derecho) >= $unidades,

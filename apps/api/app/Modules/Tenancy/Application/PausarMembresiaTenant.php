@@ -191,17 +191,28 @@ class PausarMembresiaTenant
             $acuerdo->proxima_cobro_en = $acuerdo->proxima_cobro_en->copy()->addDays($dias);
         }
 
-        DerechoTenant::query()
+        $derechos = DerechoTenant::query()
             ->where('acuerdo_id', $acuerdo->getKey())
             ->lockForUpdate()
-            ->get()
-            ->each(function (DerechoTenant $derecho) use ($dias): void {
-                foreach (['ciclo_inicio', 'ciclo_fin', 'valido_hasta'] as $campo) {
-                    if ($derecho->{$campo} !== null) {
-                        $derecho->{$campo} = $derecho->{$campo}->copy()->addDays($dias);
-                    }
+            ->get();
+        $derechos->each(function (DerechoTenant $derecho) use ($dias): void {
+            foreach (['ciclo_inicio', 'ciclo_fin', 'valido_hasta'] as $campo) {
+                if ($derecho->{$campo} !== null) {
+                    $derecho->{$campo} = $derecho->{$campo}->copy()->addDays($dias);
                 }
-                $derecho->save();
+            }
+            $derecho->save();
+        });
+
+        // Las clases extra vencen con su paquete: se corren igual.
+        DerechoTenant::query()
+            ->whereIn('extra_de_id', $derechos->modelKeys())
+            ->whereNotNull('valido_hasta')
+            ->lockForUpdate()
+            ->get()
+            ->each(function (DerechoTenant $extra) use ($dias): void {
+                $extra->valido_hasta = $extra->valido_hasta?->copy()->addDays($dias);
+                $extra->save();
             });
     }
 }
