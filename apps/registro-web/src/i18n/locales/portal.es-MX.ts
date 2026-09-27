@@ -17,13 +17,18 @@ export default {
     saludo: "¡Hola, {nombre}!",
     saludoSinNombre: "¡Hola!",
     resumen: "Aquí tienes un resumen de tu actividad en {estudio}.",
+    // La etiqueta de la tarjeta principal va por lo que se reservó: clase o cita; sin
+    // reserva, el término general.
     proxima: "Tu próxima clase",
-    sinClase: "Sin clase agendada",
+    proximaCita: "Tu próxima cita",
+    proximaReserva: "Tu próxima reserva",
+    sinReservas: "Nada agendado por ahora",
     sinProxima: "No tienes reservas próximas.",
     sinProximaAyuda: "Elige tu próxima clase y aparta tu lugar.",
     reservar: "Reservar",
     clima: {
       pronostico: "Pronóstico para tu clase en {lugar}",
+      pronosticoCita: "Pronóstico para tu cita en {lugar}",
       ahora: "Ahora en {lugar}",
       ahoraCerca: "Ahora cerca de {lugar}",
       lluvia: "{n} % de lluvia",
@@ -75,6 +80,8 @@ export default {
     nav: { grupo: "Mis clases", inicio: "Inicio", calendario: "Mi calendario" },
     inicio: {
       proxima: "Tu próxima clase",
+      proximaCita: "Tu próxima cita",
+      proximaGeneral: "Lo próximo en tu agenda",
       enCurso: "En curso",
       sinProxima: "No tienes clases asignadas en los próximos días.",
       cupo: "{ocupados} de {capacidad} lugares ocupados",

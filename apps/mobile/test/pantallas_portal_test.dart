@@ -196,12 +196,60 @@ void main() {
         find.text('Aquí tienes un resumen de tu actividad en Estudio Demo.'),
         findsOneWidget,
       );
-      expect(find.text('TU PRÓXIMA CLASE'), findsOneWidget);
-      expect(find.text('Sin clase agendada'), findsOneWidget);
+      // Sin reserva, el término general.
+      expect(find.text('TU PRÓXIMA RESERVA'), findsOneWidget);
+      expect(find.text('Nada agendado por ahora'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, 'Reservar'), findsOneWidget);
       expect(find.text('Agregar a mi calendario'), findsNothing);
     },
   );
+
+  testWidgets('una cita se nombra como cita, también en el pronóstico', (
+    tester,
+  ) async {
+    final manana = DateTime.now().add(const Duration(days: 1));
+    final cita = DateTime(manana.year, manana.month, manana.day, 10);
+    await montar(tester, const CuentaScreen(), [
+      sesionInicialProvider.overrideWithValue(
+        const Sesion(slug: 'demo', bearer: 't', nombre: 'Ana', rol: 'miembro'),
+      ),
+      cuentaProvider.overrideWith(
+        () => _CuentaFalsa(
+          MiCuenta(
+            derechos: const [],
+            reservas: [
+              ReservaMiembro(
+                id: 'r1',
+                estado: 'confirmada',
+                tipo: 'cita',
+                oferta: 'Corte de cabello',
+                sucursal: 'Roma Norte',
+                iniciaEn: iso(cita),
+              ),
+            ],
+            clases: const [],
+          ),
+        ),
+      ),
+      climaProvider.overrideWith(
+        (ref) async => const ClimaMiembro(
+          tipo: 'pronostico',
+          lugar: 'Roma Norte',
+          aproximado: false,
+          temperatura: 16,
+          condicion: 'Lluvia',
+          icono: 'lluvia',
+          esDeDia: true,
+        ),
+      ),
+      cortePlanesProvider.overrideWith((ref) async => const []),
+    ]);
+
+    expect(find.text('TU PRÓXIMA CITA'), findsOneWidget);
+    expect(find.text('TU PRÓXIMA CLASE'), findsNothing);
+    expect(find.text('Corte de cabello'), findsOneWidget);
+    expect(find.text('Pronóstico para tu cita en Roma Norte'), findsOneWidget);
+  });
 
   testWidgets('portal del instructor: inicio y mis clases', (tester) async {
     SesionAgenda clase(String id, DateTime cuando, {int espera = 0}) =>

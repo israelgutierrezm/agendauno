@@ -63,10 +63,15 @@ class InicioTab extends ConsumerWidget {
 
         // La tarjeta principal: siempre, con o sin reserva.
         TarjetaPrincipal(
-          etiqueta: 'Tu próxima $clase',
+          // Por lo que es: "Tu próxima cita" o "Tu próxima clase"; sin reserva,
+          // el término general.
+          etiqueta: proxima == null
+              ? 'Tu próxima reserva'
+              : (proxima.esCita ? 'Tu próxima cita' : 'Tu próxima $clase'),
           foto: fotoNegocio(sesion?.perfil),
           clima: clima,
-          dondeClima: clima?.dondeTexto(clase) ?? '',
+          dondeClima:
+              clima?.dondeTexto(proxima?.esCita == true ? 'cita' : clase) ?? '',
           contenido: proxima != null
               ? [
                   const SizedBox(height: 6),
@@ -114,12 +119,9 @@ class InicioTab extends ConsumerWidget {
                 ]
               : [
                   const SizedBox(height: 6),
-                  Text(
-                    'Sin $clase agendada',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  const Text(
+                    'Nada agendado por ahora',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 4),
                   Text(

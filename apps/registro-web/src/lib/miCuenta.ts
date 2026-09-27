@@ -20,6 +20,8 @@ export interface Derecho {
 export interface Reserva {
   id: string;
   sesion_id: string | null;
+  // Clase o cita (de la sesión): se nombra por lo que es.
+  tipo?: "clase" | "cita" | null;
   estado: string;
   oferta: string | null;
   sucursal: string | null;

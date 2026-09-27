@@ -150,11 +150,16 @@ class ReservaMiembro {
     this.zonaHoraria,
     this.ofertaExpiraEn,
     this.ordenId,
+    this.tipo,
   });
 
   final String id;
   final String estado;
   final String? sesionId;
+
+  /// Clase o cita (de la sesión): se nombra por lo que es.
+  final String? tipo;
+  bool get esCita => tipo == 'cita';
   final String? oferta;
   final String? sucursal;
   final String? iniciaEn;
@@ -190,6 +195,7 @@ class ReservaMiembro {
     zonaHoraria: j['zona_horaria'] as String?,
     ofertaExpiraEn: j['oferta_expira_en'] as String?,
     ordenId: j['orden_id'] as String?,
+    tipo: j['tipo'] as String?,
   );
 }
 

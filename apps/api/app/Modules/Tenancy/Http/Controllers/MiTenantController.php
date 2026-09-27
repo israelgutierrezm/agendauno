@@ -436,6 +436,9 @@ class MiTenantController
             // `sesion_id` + sucursal identifican la clase exacta: dos clases iguales en
             // distinta sucursal ya no se confunden (antes se relacionaban por oferta+hora).
             'sesion_id' => $reserva->sesion?->ulid,
+            // Clase o cita: la pantalla la nombra por lo que es ("Tu próxima cita"),
+            // no por el término general del negocio.
+            'tipo' => $reserva->sesion?->tipo->value,
             'estado' => $reserva->estado->value,
             'oferta' => $reserva->sesion?->oferta?->nombre,
             'sucursal' => $reserva->sesion?->sucursal?->nombre,

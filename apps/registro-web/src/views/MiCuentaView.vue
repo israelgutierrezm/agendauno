@@ -38,6 +38,15 @@ const proxima = computed(() =>
     (r) => r.estado === "confirmada" || r.estado === "pendiente_pago",
   ),
 );
+// Por lo que es: "Tu próxima cita" o "Tu próxima clase"; sin reserva, "reserva".
+const etiquetaProxima = computed(() => {
+  if (!proxima.value) {
+    return t("portal.inicio.proximaReserva");
+  }
+  return proxima.value.tipo === "cita"
+    ? t("portal.inicio.proximaCita")
+    : t("portal.inicio.proxima");
+});
 const ofrecida = computed(() =>
   cuenta.reservas.value.find((r) => r.estado === "ofrecida"),
 );
@@ -80,7 +89,10 @@ const climaLugar = computed(() => {
     return "";
   }
   if (c.tipo === "pronostico") {
-    return t("portal.inicio.clima.pronostico", { lugar: c.lugar });
+    // El pronóstico es para su próxima reserva: se nombra igual que en la tarjeta.
+    return proxima.value?.tipo === "cita"
+      ? t("portal.inicio.clima.pronosticoCita", { lugar: c.lugar })
+      : t("portal.inicio.clima.pronostico", { lugar: c.lugar });
   }
   if (c.lugar === "") {
     return "";
@@ -258,7 +270,7 @@ onMounted(() => {
     <!-- La tarjeta principal: siempre, con o sin reserva. -->
     <article class="mc-hero tu-card mt-6">
       <div class="mc-hero-texto">
-        <p class="mc-etiqueta">{{ $t("portal.inicio.proxima") }}</p>
+        <p class="mc-etiqueta">{{ etiquetaProxima }}</p>
         <p
           v-if="cuenta.cargando.value"
           class="mt-2"
@@ -310,7 +322,7 @@ onMounted(() => {
         </template>
         <template v-else>
           <p class="mt-2 text-2xl font-semibold sm:text-3xl">
-            {{ $t("portal.inicio.sinClase") }}
+            {{ $t("portal.inicio.sinReservas") }}
           </p>
           <p class="mt-2" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("portal.inicio.sinProximaAyuda") }}

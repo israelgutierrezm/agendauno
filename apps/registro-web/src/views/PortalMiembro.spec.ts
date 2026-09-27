@@ -186,10 +186,52 @@ describe("portal del alumno", () => {
     await flushPromises();
     const texto = w.text();
 
-    expect(texto).toContain("Tu próxima clase");
-    expect(texto).toContain("Sin clase agendada");
+    // Sin reserva, el término general.
+    expect(texto).toContain("Tu próxima reserva");
+    expect(texto).toContain("Nada agendado por ahora");
     expect(texto).toContain("24°");
     expect(texto).toContain("Ahora cerca de Guadalajara");
+  });
+
+  it("una cita se nombra como cita, también en el pronóstico", async () => {
+    const perfil = datos["/mi/perfil"] as { reservas: object[] };
+    const conCita = {
+      ...perfil,
+      reservas: [
+        {
+          ...(perfil.reservas[0] as object),
+          tipo: "cita",
+          oferta: "Corte de cabello",
+        },
+      ],
+    };
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      const cuerpo =
+        ruta === "/mi/perfil"
+          ? conCita
+          : ruta === "/mi/clima"
+            ? {
+                tipo: "pronostico",
+                lugar: "Roma Norte",
+                aproximado: false,
+                temperatura: 16,
+                condicion: "Lluvia",
+                icono: "lluvia",
+                es_de_dia: true,
+                lluvia: 70,
+              }
+            : (datos[ruta] ?? []);
+      return Promise.resolve({ data: { data: cuerpo } });
+    });
+    const w = montar(MiCuentaView);
+    await flushPromises();
+    const texto = w.text();
+
+    expect(texto).toContain("Tu próxima cita");
+    expect(texto).not.toContain("Tu próxima clase");
+    expect(texto).toContain("Corte de cabello");
+    expect(texto).toContain("Pronóstico para tu cita en Roma Norte");
   });
 
   it("reservas: lista con las suyas y las disponibles; en semana y detalle", async () => {

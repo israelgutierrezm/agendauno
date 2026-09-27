@@ -170,7 +170,11 @@ onUnmounted(() => clearInterval(reloj));
             }}</span>
           </template>
           <template v-else>{{
-            $t("portal.instructor.inicio.proxima")
+            proxima?.tipo === "cita"
+              ? $t("portal.instructor.inicio.proximaCita")
+              : proxima
+                ? $t("portal.instructor.inicio.proxima")
+                : $t("portal.instructor.inicio.proximaGeneral")
           }}</template>
         </p>
         <template v-if="proxima">

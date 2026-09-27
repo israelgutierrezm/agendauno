@@ -118,5 +118,6 @@ it('la agenda y las reservas del miembro traen la hora de fin (para su calendari
     $reserva = test()->getJson("/api/v1/app/{$e['slug']}/mi/perfil", conBearer($m['bearer']))
         ->assertOk()->json('data.reservas.0');
     expect($reserva)->toHaveKey('instructor')
+        ->and($reserva['tipo'])->toBe('clase')
         ->and($reserva['termina_en'])->toBe($agenda['termina_en']);
 });

@@ -175,7 +175,13 @@ class _Inicio extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        enCurso ? 'En curso' : 'Tu próxima $clase',
+                        enCurso
+                            ? 'En curso'
+                            : proxima == null
+                            ? 'Lo próximo en tu agenda'
+                            : (proxima.esCita
+                                  ? 'Tu próxima cita'
+                                  : 'Tu próxima $clase'),
                         style: TextStyle(
                           color: enCurso
                               ? TemaAgendaUno.acento

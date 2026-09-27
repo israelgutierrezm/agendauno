@@ -53,6 +53,9 @@ it('agenda una cita de pago: crea la sesión, deja la reserva pendiente y una or
 
     expect($r['estado'])->toBe('pendiente_pago');
     expect($r['orden_id'])->not->toBeNull();
+    // En su cuenta se nombra como lo que es: una cita.
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/perfil", conBearer($a['bearer']))
+        ->assertOk()->assertJsonPath('data.reservas.0.tipo', 'cita');
 });
 
 it('no permite dos citas del mismo proveedor a la misma hora', function (): void {
