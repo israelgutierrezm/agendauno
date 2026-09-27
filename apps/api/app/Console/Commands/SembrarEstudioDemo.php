@@ -12,6 +12,7 @@ use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
@@ -23,6 +24,7 @@ use App\Modules\Tenancy\Models\ProgramaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
@@ -38,7 +40,9 @@ use Illuminate\Support\Facades\Storage;
  */
 class SembrarEstudioDemo extends Command
 {
-    protected $signature = 'turnouno:sembrar-demo {--slug=demo} {--password=secreto123}';
+    protected $signature = 'turnouno:sembrar-demo {--slug=demo} {--password=password}
+        {--perfil= : Giro del negocio (p. ej. barberia); con uno de citas no se siembran clases grupales}
+        {--nombre= : Nombre del negocio si se crea}';
 
     protected $description = 'Reaprovisiona y siembra el estudio demo (solo dev) para revisión manual';
 
@@ -62,10 +66,12 @@ class SembrarEstudioDemo extends Command
         ];
 
         // 1. Registro central del estudio (reusa el existente para conservar su BD).
+        $perfil = $this->option('perfil');
         $estudio = Estudio::query()->where('slug', $slug)->first()
             ?? $registrar->ejecutar([
-                'nombre' => 'Estudio Demo',
+                'nombre' => is_string($this->option('nombre')) ? $this->option('nombre') : 'Estudio Demo',
                 'slug' => $slug,
+                'perfil_negocio' => is_string($perfil) ? $perfil : 'general',
                 'contacto_nombre' => 'Dueño Demo',
                 'contacto_email' => "demo@{$slug}.mx",
                 'pais' => 'MX',
@@ -81,6 +87,10 @@ class SembrarEstudioDemo extends Command
         $gestor->aprovisionarBaseDeDatos($estudio);
 
         // 3. Estado operativo + publicado en el directorio (para poder revisarlo).
+        if (is_string($perfil)) {
+            $estudio->update(['perfil_negocio' => PerfilNegocio::from($perfil)->value]);
+        }
+        $soloCitas = $estudio->refresh()->modalidad() === ModalidadServicio::Citas;
         $estudio->update([
             'estado' => EstadoEstudio::Trialing->value,
             'estado_facturacion' => EstadoFacturacion::Trial->value,
@@ -101,13 +111,16 @@ class SembrarEstudioDemo extends Command
         }
 
         // 4. Datos operativos dentro de la BD del tenant.
-        $gestor->ejecutarEn($estudio, function () use ($password, $ownerEmail, $instructorEmail, $miembroEmail, $equipo): void {
+        $gestor->ejecutarEn($estudio, function () use ($password, $ownerEmail, $instructorEmail, $miembroEmail, $equipo, $soloCitas): void {
             $this->sembrarPersonal($password, $ownerEmail, $instructorEmail, $miembroEmail);
             $this->sembrarEquipo($password, $equipo);
-            [$oferta, $sucursal] = $this->sembrarCatalogoYSucursal();
+            [$oferta, $sucursal] = $this->sembrarCatalogoYSucursal($soloCitas);
             $this->asignarSucursalDeCasa($sucursal);
-            $this->venderPack($miembroEmail);
-            $this->sembrarClases($oferta, $sucursal, $instructorEmail);
+            // Un negocio de citas no vende paquetes de clases ni tiene clases grupales.
+            if (! $soloCitas && $oferta instanceof OfertaTenant) {
+                $this->venderPack($miembroEmail);
+                $this->sembrarClases($oferta, $sucursal, $instructorEmail);
+            }
             $this->sembrarCitas([$instructorEmail, $equipo['profesional'][0]]);
         });
 
@@ -177,16 +190,21 @@ class SembrarEstudioDemo extends Command
     }
 
     /**
-     * @return array{0: OfertaTenant, 1: SucursalTenant}
+     * Sedes y, si el negocio da clases, la clase grupal de Pole.
+     *
+     * @return array{0: OfertaTenant|null, 1: SucursalTenant}
      */
-    private function sembrarCatalogoYSucursal(): array
+    private function sembrarCatalogoYSucursal(bool $soloCitas): array
     {
-        $programa = ProgramaTenant::query()->firstOrCreate(['slug' => 'pole'], ['nombre' => 'Pole']);
-        $actividad = $programa->actividades()->firstOrCreate(['slug' => 'pole-sport'], ['nombre' => 'Pole Sport']);
-        $oferta = $actividad->ofertas()->firstOrCreate(
-            ['nombre' => 'Nivel 1'],
-            ['modalidad' => ModalidadOfertaTenant::Grupal->value, 'capacidad' => 10],
-        );
+        $oferta = null;
+        if (! $soloCitas) {
+            $programa = ProgramaTenant::query()->firstOrCreate(['slug' => 'pole'], ['nombre' => 'Pole']);
+            $actividad = $programa->actividades()->firstOrCreate(['slug' => 'pole-sport'], ['nombre' => 'Pole Sport']);
+            $oferta = $actividad->ofertas()->firstOrCreate(
+                ['nombre' => 'Nivel 1'],
+                ['modalidad' => ModalidadOfertaTenant::Grupal->value, 'capacidad' => 10],
+            );
+        }
 
         $organizacion = OrganizacionTenant::query()->firstOrCreate(['nombre' => 'AgendaUno Demo']);
         $sucursal = $organizacion->sucursales()->firstOrCreate(
@@ -348,8 +366,13 @@ class SembrarEstudioDemo extends Command
         $this->line("    Dueño:          {$ownerEmail}");
         $this->line("    Administradora: {$equipo['admin'][0]}");
         $this->line("    Recepción:      {$equipo['recepcionista'][0]}");
-        $this->line("    Instructor:     {$instructorEmail} (clases y citas)");
-        $this->line("    Profesional:    {$equipo['profesional'][0]} (solo citas)");
-        $this->line("    Alumna:         {$miembroEmail} (con paquete de clases)");
+        if ($estudio->modalidad() === ModalidadServicio::Citas) {
+            $this->line("    Profesional:    {$instructorEmail} y {$equipo['profesional'][0]} (atienden citas)");
+            $this->line("    Clienta:        {$miembroEmail}");
+        } else {
+            $this->line("    Instructor:     {$instructorEmail} (clases y citas)");
+            $this->line("    Profesional:    {$equipo['profesional'][0]} (solo citas)");
+            $this->line("    Alumna:         {$miembroEmail} (con paquete de clases)");
+        }
     }
 }
