@@ -1,4 +1,5 @@
 import type { MenuItem } from "@/components/nav";
+import { esInstructor } from "@/lib/roles";
 import type { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -50,6 +51,29 @@ export const MENU: MenuItem[] = [
         icono: "configuracion",
         ruta: "mi-configuracion",
         soloMiembro: true,
+      },
+    ],
+  },
+  {
+    // Portal de quien imparte: su Inicio y su calendario (solo lo suyo).
+    clave: "instructor-grupo",
+    etiqueta: "portal.instructor.nav.grupo",
+    icono: "agenda",
+    soloInstructor: true,
+    hijos: [
+      {
+        clave: "inicio-instructor",
+        etiqueta: "portal.instructor.nav.inicio",
+        icono: "panel",
+        ruta: "inicio-instructor",
+        soloInstructor: true,
+      },
+      {
+        clave: "mis-clases",
+        etiqueta: "portal.instructor.nav.calendario",
+        icono: "cuadricula",
+        ruta: "mis-clases",
+        soloInstructor: true,
       },
     ],
   },
@@ -393,6 +417,9 @@ export function esAlumno(sesion: Sesion): boolean {
 export function esVisible(item: MenuItem, sesion: Sesion): boolean {
   if (item.soloMiembro === true) {
     return esAlumno(sesion);
+  }
+  if (item.soloInstructor === true) {
+    return esInstructor(sesion.usuario);
   }
   // Congruencia por modalidad y perfil: solo lo que le sirve a este negocio.
   if (item.modalidad !== undefined && item.modalidad !== sesion.modalidad) {

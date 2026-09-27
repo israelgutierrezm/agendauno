@@ -1,0 +1,212 @@
+<script setup lang="ts">
+import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { RouterLink, useRoute } from "vue-router";
+
+import AgregarCalendario from "@/components/AgregarCalendario.vue";
+import CalendarioVistas, {
+  type EventoPeriodo,
+  type Vista,
+} from "@/components/CalendarioVistas.vue";
+import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import PanelCita from "@/components/PanelCita.vue";
+import PanelClase from "@/components/PanelClase.vue";
+import { cuandoCorto } from "@/lib/miCuenta";
+import { useMisClases, type ClaseMia } from "@/lib/misClases";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
+
+/**
+ * Calendario de quien imparte: solo sus clases o citas, en lista (próximos 30
+ * días), día, semana o mes. Tocar una abre su pase de lista (clase) o su detalle
+ * (cita), con "agregar a mi calendario".
+ */
+const { t } = useI18n();
+const route = useRoute();
+const sesion = useSesionTenantStore();
+const { base, clases, cargando, error, cargar } = useMisClases();
+const abierta = ref<ClaseMia | null>(null);
+const rango = ref<{ desde: string; hasta: string } | null>(null);
+
+const vistaInicial = computed(() =>
+  typeof route.query.vista === "string" ? (route.query.vista as Vista) : null,
+);
+
+function detalle(c: ClaseMia): string {
+  const lugar = [c.sucursal, c.sala].filter(Boolean).join(" · ");
+  if (c.tipo === "cita") {
+    return [
+      c.cita?.cliente
+        ? t("portal.instructor.inicio.con", { nombre: c.cita.cliente })
+        : null,
+      lugar,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  return lugar;
+}
+function cupo(c: ClaseMia): string {
+  if (c.tipo === "cita") {
+    return "";
+  }
+  return c.capacidad !== null
+    ? `${c.ocupados}/${c.capacidad}`
+    : t("portal.instructor.inicio.inscritos", { n: c.ocupados }, c.ocupados);
+}
+
+const eventos = computed<EventoPeriodo[]>(() =>
+  clases.value.map((c) => ({
+    id: c.id,
+    titulo: c.oferta ?? "—",
+    inicia: c.inicia_en,
+    termina: c.termina_en,
+    zona: c.zona_horaria,
+    detalle: detalle(c),
+    estado: cupo(c),
+    tono: c.en_espera > 0 ? "aviso" : "suave",
+    destacado: true,
+  })),
+);
+
+async function alCambiarRango(r: { desde: string; hasta: string }) {
+  rango.value = r;
+  await cargar(r.desde, r.hasta);
+}
+async function recargar(): Promise<void> {
+  if (rango.value) {
+    await cargar(rango.value.desde, rango.value.hasta);
+  }
+  if (abierta.value) {
+    abierta.value =
+      clases.value.find((c) => c.id === abierta.value?.id) ?? null;
+  }
+}
+function abrir(id: string): void {
+  abierta.value = clases.value.find((c) => c.id === id) ?? null;
+}
+const eventoCalendario = computed(() =>
+  abierta.value
+    ? {
+        uid: `sesion-${abierta.value.id}`,
+        titulo: abierta.value.oferta ?? sesion.estudio?.nombre ?? "",
+        inicio: abierta.value.inicia_en,
+        fin: abierta.value.termina_en,
+        lugar: [sesion.estudio?.nombre, abierta.value.sucursal]
+          .filter(Boolean)
+          .join(" · "),
+      }
+    : null,
+);
+</script>
+
+<template>
+  <section class="mx-auto max-w-6xl px-4 py-8">
+    <EncabezadoSeccion :titulo="$t('portal.instructor.calendario.titulo')" />
+
+    <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
+      {{ error }}
+    </p>
+
+    <CalendarioVistas
+      class="mt-4"
+      clave="tu.instructor.vista"
+      :vista-inicial="vistaInicial"
+      :eventos="eventos"
+      :cargando="cargando"
+      @abrir="abrir"
+      @rango="alCambiarRango"
+    >
+      <template #barra>
+        <RouterLink :to="{ name: 'mi-perfil' }" class="tu-enlace text-sm">{{
+          $t("portal.instructor.calendario.sincronizar")
+        }}</RouterLink>
+      </template>
+
+      <!-- LISTA: próximos 30 días -->
+      <template #lista>
+        <div class="tu-card p-5">
+          <h2 class="font-semibold">
+            {{ $t("portal.instructor.calendario.proximas") }}
+          </h2>
+          <ul
+            v-if="clases.length > 0"
+            class="mt-3 divide-y divide-[var(--borde)]"
+          >
+            <li v-for="c in clases" :key="c.id">
+              <button type="button" class="mc-fila" @click="abrir(c.id)">
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate font-medium">{{
+                    c.oferta ?? "—"
+                  }}</span>
+                  <span
+                    class="block truncate text-sm first-letter:uppercase"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ cuandoCorto(c.inicia_en, c.zona_horaria)
+                    }}{{ detalle(c) ? ` · ${detalle(c)}` : "" }}</span
+                  >
+                </span>
+                <span
+                  v-if="cupo(c)"
+                  class="shrink-0 text-xs tabular-nums"
+                  :style="{
+                    color:
+                      c.en_espera > 0 ? 'var(--aviso)' : 'var(--texto-suave)',
+                  }"
+                  >{{ cupo(c) }}</span
+                >
+              </button>
+            </li>
+          </ul>
+          <p
+            v-else
+            class="mt-3 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("portal.instructor.calendario.sinClases") }}
+          </p>
+        </div>
+      </template>
+    </CalendarioVistas>
+
+    <!-- Pase de lista de la clase / detalle de la cita -->
+    <PanelClase
+      v-if="abierta && abierta.tipo !== 'cita'"
+      :sesion="abierta"
+      @cerrar="abierta = null"
+      @cambio="recargar"
+    >
+      <template #acciones>
+        <AgregarCalendario v-if="eventoCalendario" :evento="eventoCalendario" />
+      </template>
+    </PanelClase>
+    <PanelCita
+      :abierto="abierta !== null && abierta.tipo === 'cita'"
+      :base="base"
+      :sesion="abierta && abierta.tipo === 'cita' ? abierta : null"
+      :catalogo="[]"
+      :puede-marcar="sesion.puede('asistencia.marcar')"
+      :puede-cobrar="sesion.puede('ordenes.gestionar')"
+      :puede-cancelar="sesion.puede('reservas.gestionar')"
+      @cerrar="abierta = null"
+      @cambiada="recargar"
+    >
+      <template #acciones>
+        <AgregarCalendario v-if="eventoCalendario" :evento="eventoCalendario" />
+      </template>
+    </PanelCita>
+  </section>
+</template>
+
+<style scoped>
+.mc-fila {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0;
+  text-align: left;
+}
+.mc-fila:hover .font-medium {
+  color: var(--primario);
+}
+</style>

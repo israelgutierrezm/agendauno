@@ -168,9 +168,9 @@ describe("portal del alumno", () => {
       .findAll(".tu-segmentado button")
       .find((b) => b.text() === "Semana")!
       .trigger("click");
-    expect(w.find(".mr-chip-mia").exists()).toBe(true);
+    expect(w.find(".cv-chip-propio").exists()).toBe(true);
 
-    await w.find(".mr-chip-mia").trigger("click");
+    await w.find(".cv-chip-propio").trigger("click");
     expect(w.text()).toContain("Agregar a mi calendario");
     expect(w.text()).toContain(miReprogramar.boton);
   });

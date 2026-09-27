@@ -4,9 +4,9 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
-import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaseEntrada from "@/components/PaseEntrada.vue";
+import TarjetaAcceso from "@/components/TarjetaAcceso.vue";
 import { cuandoCorto, useMiCuenta } from "@/lib/miCuenta";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -227,7 +227,7 @@ onMounted(() => void cuenta.asegurar());
             <AgregarCalendario
               v-if="proxima.inicia_en"
               :evento="{
-                uid: proxima.id,
+                uid: `reserva-${proxima.id}`,
                 titulo: proxima.oferta ?? sesion.estudio?.nombre ?? '',
                 inicio: proxima.inicia_en,
                 fin: proxima.termina_en,
@@ -258,30 +258,14 @@ onMounted(() => void cuenta.asegurar());
       <!-- Accesos directos -->
       <ul class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <li v-for="a in accesos" :key="a.clave">
-          <component
-            :is="a.ruta ? RouterLink : 'button'"
+          <TarjetaAcceso
             :to="a.ruta ? { name: a.ruta } : undefined"
-            :type="a.ruta ? undefined : 'button'"
-            class="pi-acceso tu-card"
-            @click="a.alTocar?.()"
-          >
-            <IconoNav
-              :nombre="a.icono"
-              :tam="22"
-              :style="{ color: 'var(--texto-suave)' }"
-            />
-            <span class="min-w-0">
-              <span class="block font-semibold">{{ a.titulo }}</span>
-              <span
-                class="mt-0.5 block text-sm"
-                :style="{
-                  color: a.atencion ? 'var(--aviso)' : 'var(--texto-suave)',
-                }"
-                >{{ a.valor }}</span
-              >
-            </span>
-            <span class="pi-flecha" aria-hidden="true">→</span>
-          </component>
+            :icono="a.icono"
+            :titulo="a.titulo"
+            :valor="a.valor"
+            :atencion="a.atencion"
+            @tocar="a.alTocar?.()"
+          />
         </li>
       </ul>
     </template>
@@ -309,24 +293,5 @@ onMounted(() => void cuenta.asegurar());
 }
 .pi-aviso:hover {
   border-color: var(--aviso);
-}
-.pi-acceso {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  align-items: flex-start;
-  gap: 0.9rem;
-  padding: 1.1rem 1.2rem;
-  text-align: left;
-  text-decoration: none;
-  color: inherit;
-  transition: border-color 0.15s ease;
-}
-.pi-acceso:hover {
-  border-color: color-mix(in srgb, var(--primario) 45%, var(--borde));
-}
-.pi-flecha {
-  margin-left: auto;
-  color: var(--texto-suave);
 }
 </style>

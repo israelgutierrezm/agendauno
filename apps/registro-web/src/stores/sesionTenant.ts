@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 
 import { aplicarTerminologia, i18n } from "@/i18n";
 import { api, fijarBearer, mensajeDeError } from "@/lib/api";
+import { esInstructor } from "@/lib/roles";
 import { useAparienciaStore, type Apariencia } from "@/stores/apariencia";
 
 export interface UsuarioTenant {
@@ -103,7 +104,8 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
   /**
    * Ruta de INICIO según el rol: cada quien aterriza donde empieza su trabajo, no
    * en un panel que quizá no puede ver (P0). Dueño/admin → resumen del negocio;
-   * recepción → operación de hoy; instructor → su agenda; alumno → su cuenta.
+   * recepción → operación de hoy; instructor → su Inicio (sus clases); alumno →
+   * su cuenta.
    */
   const rutaInicio = computed<string>(() => {
     const u = usuario.value;
@@ -118,6 +120,9 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     }
     if (u.rol === "recepcionista" || puede("reservas.gestionar")) {
       return "recepcion";
+    }
+    if (esInstructor(u)) {
+      return "inicio-instructor";
     }
     if (puede("agenda.ver")) {
       return "agenda";

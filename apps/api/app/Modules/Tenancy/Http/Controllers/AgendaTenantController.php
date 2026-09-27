@@ -400,6 +400,7 @@ class AgendaTenantController
             'instructor' => $sesion->instructor?->name,
             'instructor_id' => $sesion->instructor?->ulid,
             'sala' => $sesion->recurso?->nombre,
+            'sucursal' => $sesion->sucursal?->nombre,
             'recurso_id' => $sesion->recurso?->ulid,
             // Clase recurrente de la que salió y su fecha en ella (2.5).
             'serie_id' => $sesion->serie?->ulid,

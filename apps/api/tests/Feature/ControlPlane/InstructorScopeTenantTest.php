@@ -107,3 +107,23 @@ it('el staff puede (re)asignar el instructor de una sesion', function (): void {
 
     test()->getJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", conBearer($coach1))->assertOk();
 });
+
+it('su calendario: el instructor ve solo sus sesiones, con la sede; el dueño que imparte filtra las suyas', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $coach1 = personalConSesion($e['slug'], $e['bearer'], 'coach1@correo.mx', 'instructor');
+    personalConSesion($e['slug'], $e['bearer'], 'coach2@correo.mx', 'instructor');
+    $suya = sesionConInstructor($e, $semilla, usuarioUlid($e, $coach1));
+    sesionConInstructor($e, $semilla, usuarioIdPorEmail($e, 'coach2@correo.mx'));
+    $delDueno = sesionConInstructor($e, $semilla, usuarioUlid($e, $e['bearer']));
+    $rango = 'desde=2026-10-01&hasta=2026-10-01';
+
+    $lista = test()->getJson("/api/v1/app/{$e['slug']}/sesiones?{$rango}", conBearer($coach1))->assertOk()->json('data');
+    expect(array_column($lista, 'id'))->toBe([$suya])
+        ->and($lista[0]['sucursal'])->toBe('Roma Norte');
+
+    // Quien ve toda la agenda pide solo las suyas con su id.
+    $propias = test()->getJson("/api/v1/app/{$e['slug']}/sesiones?{$rango}&instructor_id=".usuarioUlid($e, $e['bearer']), conBearer($e['bearer']))
+        ->assertOk()->json('data');
+    expect(array_column($propias, 'id'))->toBe([$delDueno]);
+});

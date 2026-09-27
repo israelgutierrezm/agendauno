@@ -376,6 +376,19 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Portal de quien imparte: Inicio con accesos y su calendario.
+      path: "/mis-clases",
+      name: "inicio-instructor",
+      component: () => import("@/views/InicioInstructorView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      path: "/mis-clases/calendario",
+      name: "mis-clases",
+      component: () => import("@/views/MisClasesView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       // Mi perfil: foto, nombre y contraseña de quien tiene la sesión (todo rol).
       path: "/mi-perfil",
       name: "mi-perfil",

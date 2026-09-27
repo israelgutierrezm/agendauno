@@ -16,6 +16,8 @@ export interface MenuItem {
   // pantalla también carga datos que exigen otro permiso).
   permiso?: string | string[];
   soloMiembro?: boolean;
+  // Solo para quien imparte clases o atiende citas (su portal).
+  soloInstructor?: boolean;
   // Solo se muestra en negocios de esta modalidad (clases con cupo o citas 1 a 1).
   modalidad?: ModalidadServicio;
   // Solo se muestra si el perfil de negocio activa este flag.

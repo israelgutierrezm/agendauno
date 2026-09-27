@@ -227,6 +227,9 @@ function cancelar(por: "cliente" | "negocio" | null): void {
         </div>
       </div>
 
+      <!-- Acciones de quien lo abre (p. ej. agregar a mi calendario) -->
+      <slot name="acciones" />
+
       <dl class="pc-datos">
         <dt>{{ $t("agendaVisual.nuevaCita.servicio") }}</dt>
         <dd>

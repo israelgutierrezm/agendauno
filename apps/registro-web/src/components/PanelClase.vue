@@ -297,6 +297,8 @@ watch(() => props.sesion.id, cargar, { immediate: true });
           }}</span></template
         >
       </p>
+      <!-- Acciones de quien lo abre (p. ej. agregar a mi calendario) -->
+      <div v-if="$slots.acciones" class="mt-3"><slot name="acciones" /></div>
     </template>
 
     <p v-if="aviso" class="mb-3 text-sm" style="color: var(--exito)">
