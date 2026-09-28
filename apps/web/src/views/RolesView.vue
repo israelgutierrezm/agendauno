@@ -416,7 +416,10 @@ onMounted(cargar);
           class="tu-btn tu-btn-primario w-full"
           type="button"
           :disabled="
-            guardando || nombre.trim() === '' || seleccion.size === 0 || incompleto
+            guardando ||
+            nombre.trim() === '' ||
+            seleccion.size === 0 ||
+            incompleto
           "
           @click="guardar"
         >

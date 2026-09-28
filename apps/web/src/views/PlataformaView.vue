@@ -3,6 +3,7 @@ import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import OperacionPlataforma from "@/components/OperacionPlataforma.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import ParametrosPlataforma from "@/components/ParametrosPlataforma.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
@@ -72,7 +73,12 @@ interface Pasarela {
   lista?: boolean;
 }
 type Pestana =
-  "estudios" | "cobros" | "tarifas" | "parametros" | "configuracion";
+  | "estudios"
+  | "cobros"
+  | "tarifas"
+  | "parametros"
+  | "configuracion"
+  | "operacion";
 
 const ESTADOS_FACT = [
   "trial",
@@ -660,6 +666,7 @@ function borrar(): void {
             'tarifas',
             'parametros',
             'configuracion',
+            'operacion',
           ] as const"
           :key="p"
           type="button"
@@ -880,6 +887,14 @@ function borrar(): void {
           </ul>
         </div>
       </div>
+
+      <!-- Operación: versión, procesos, verificación, respaldos y alertas -->
+      <OperacionPlataforma
+        v-if="pestana === 'operacion'"
+        class="mt-5"
+        :api-url="apiUrl"
+        :token="token"
+      />
 
       <!-- Parámetros de plataforma (ADR 0042) -->
       <ParametrosPlataforma

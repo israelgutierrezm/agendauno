@@ -68,6 +68,7 @@ use App\Modules\Tenancy\Http\Controllers\PlantillasMensajeTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaCobrosController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaEstudiosController;
+use App\Modules\Tenancy\Http\Controllers\PlataformaOperacionController;
 use App\Modules\Tenancy\Http\Controllers\PoliticasCancelacionTenantController;
 use App\Modules\Tenancy\Http\Controllers\PromocionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\PublicoCitasController;
@@ -145,6 +146,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/estudios/{estudio}/terminologia', [PlataformaEstudiosController::class, 'terminologia'])->name('estudios.terminologia');
         Route::put('/estudios/{estudio}/terminologia', [PlataformaEstudiosController::class, 'guardarTerminologia'])->name('estudios.terminologia.guardar');
         Route::get('/cobros', PlataformaCobrosController::class)->name('cobros');
+        // Estado de la operación: versión, procesos, verificación, respaldos y alertas.
+        Route::get('/operacion', PlataformaOperacionController::class)->name('operacion');
         Route::put('/estudios/{estudio}', [PlataformaController::class, 'actualizarEstudio'])->name('estudios.actualizar');
         Route::get('/configuracion', [PlataformaController::class, 'configuracion'])->name('configuracion');
         Route::put('/configuracion', [PlataformaController::class, 'guardarConfiguracion'])->name('configuracion.guardar');

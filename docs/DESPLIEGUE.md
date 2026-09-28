@@ -194,6 +194,12 @@ Además de esto, conviene que el proveedor de MySQL haga sus instantáneas diari
 
 ## Alertas y monitoreo
 
+El superadmin (pestaña **Operación**) muestra lo mismo que la consola y los correos:
+versión en marcha, si el servicio está abierto o en mantenimiento, el programador y
+la cola, la verificación de producción completa, los últimos respaldos con el detalle
+del último simulacro y las alertas de los últimos 30 días
+(`GET /api/v1/plataforma/operacion`, solo lectura).
+
 - `ALERTAS_CORREO` (en `api.env`) recibe cada 10 minutos, en un solo correo, lo que
   falló en la operación: errores de la aplicación (incluidos cobros, domiciliaciones y
   reembolsos), incidencias de cobro nuevas (pago tardío o duplicado, reembolso

@@ -215,6 +215,48 @@ class RespaldosPlataforma
     }
 
     /**
+     * El último simulacro con el resultado de cada respaldo probado y sus
+     * comprobaciones (para mostrarlo al superadmin), o null si nunca se hizo.
+     *
+     * @return array{fecha: string, ok: bool, pruebas: list<array{respaldo: string, ok: bool, detalle: string, comprobaciones: list<array{nombre: string, ok: bool, detalle: string}>}>}|null
+     */
+    public function detalleUltimoSimulacro(): ?array
+    {
+        $guardado = json_decode((string) ConfiguracionPlataforma::obtener(self::CLAVE_SIMULACRO), true);
+        if (! is_array($guardado) || ! isset($guardado['fecha'], $guardado['ok'])) {
+            return null;
+        }
+        $pruebas = [];
+        foreach (is_array($guardado['pruebas'] ?? null) ? $guardado['pruebas'] : [] as $p) {
+            if (! is_array($p)) {
+                continue;
+            }
+            $comprobaciones = [];
+            foreach (is_array($p['comprobaciones'] ?? null) ? $p['comprobaciones'] : [] as $c) {
+                if (is_array($c)) {
+                    $comprobaciones[] = ['nombre' => (string) ($c['nombre'] ?? ''), 'ok' => (bool) ($c['ok'] ?? false), 'detalle' => (string) ($c['detalle'] ?? '')];
+                }
+            }
+            $pruebas[] = [
+                'respaldo' => (string) ($p['respaldo'] ?? ''),
+                'ok' => (bool) ($p['ok'] ?? false),
+                'detalle' => (string) ($p['detalle'] ?? ''),
+                'comprobaciones' => $comprobaciones,
+            ];
+        }
+
+        return ['fecha' => (string) $guardado['fecha'], 'ok' => (bool) $guardado['ok'], 'pruebas' => $pruebas];
+    }
+
+    /** Fecha del respaldo más reciente de la plataforma o de los archivos. */
+    public function fechaUltimo(string $sub = self::PLATAFORMA): ?CarbonImmutable
+    {
+        $ruta = $this->listar($sub)[0] ?? null;
+
+        return $ruta === null ? null : $this->fechaDe($ruta);
+    }
+
+    /**
      * Restaura una base en un lugar temporal y comprueba que se podría operar con ella.
      *
      * @return array{respaldo: string, ok: bool, detalle: string, comprobaciones: list<array{nombre: string, ok: bool, detalle: string}>}

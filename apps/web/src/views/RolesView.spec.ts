@@ -150,14 +150,18 @@ describe("roles y permisos", () => {
       w.findAll(".tu-btn-primario").at(-1)!.attributes("disabled");
     expect(guardar()).toBeDefined();
     expect(
-      (editor.findAll("label.rp-opcion")[0].find("input").element as HTMLInputElement)
-        .checked,
+      (
+        editor.findAll("label.rp-opcion")[0].find("input")
+          .element as HTMLInputElement
+      ).checked,
     ).toBe(false);
 
     await aviso.find("button").trigger("click");
     expect(
-      (editor.findAll("label.rp-opcion")[0].find("input").element as HTMLInputElement)
-        .checked,
+      (
+        editor.findAll("label.rp-opcion")[0].find("input")
+          .element as HTMLInputElement
+      ).checked,
     ).toBe(true);
     expect(guardar()).toBeUndefined();
   });

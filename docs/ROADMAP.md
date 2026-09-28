@@ -24,9 +24,6 @@
 
 ## Después
 
-- Superadmin: pestaña de Operación (versión en marcha, latidos, respaldos y último
-  simulacro, verificación de producción y alertas abiertas); hoy solo por consola y
-  correo.
 - Conciliar el guardado de tarjeta de Stripe (pago automático) cuando no llega su
   aviso; hoy la conciliación cubre los cobros.
 - Separar «editar» y «eliminar» en el catálogo de permisos.

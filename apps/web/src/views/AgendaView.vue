@@ -631,7 +631,11 @@ const sucursalesAgenda = computed<Sucursal[]>(() =>
     ? sucursales.value
     : unicos(sesiones.value, (s) =>
         s.sucursal_id && s.sucursal
-          ? { id: s.sucursal_id, nombre: s.sucursal, zona_horaria: s.zona_horaria }
+          ? {
+              id: s.sucursal_id,
+              nombre: s.sucursal,
+              zona_horaria: s.zona_horaria,
+            }
           : null,
       ),
 );
@@ -1497,11 +1501,7 @@ onMounted(async () => {
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
     </p>
-    <p
-      v-if="errorReferencias"
-      class="mt-4 text-sm"
-      style="color: var(--error)"
-    >
+    <p v-if="errorReferencias" class="mt-4 text-sm" style="color: var(--error)">
       {{ errorReferencias }}
     </p>
     <p

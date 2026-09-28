@@ -93,9 +93,9 @@ describe("agenda con solo «ver agenda»", () => {
     await flushPromises();
 
     const pedidas = api.get.mock.calls.map((c) => String(c[0]));
-    expect(pedidas.some((u) => /\/(ofertas|sucursales|miembros)$/.test(u))).toBe(
-      false,
-    );
+    expect(
+      pedidas.some((u) => /\/(ofertas|sucursales|miembros)$/.test(u)),
+    ).toBe(false);
     const opciones = w.findAll("option").map((o) => o.text());
     expect(opciones).toEqual(
       expect.arrayContaining([
