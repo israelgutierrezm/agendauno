@@ -612,7 +612,7 @@ class VerificarConcurrencia extends Command
             'SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX'
         );
 
-        return md5((string) json_encode([$columnas, $indices]));
+        return hash('sha256', (string) json_encode([$columnas, $indices]));
     }
 
     private function nuevoEstudio(): Estudio
