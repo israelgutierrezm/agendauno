@@ -11,10 +11,11 @@ use Illuminate\Console\Command;
 use RuntimeException;
 
 /**
- * Simulacro de restauración (semanal): restaura el último respaldo de la plataforma
- * y el de un negocio en bases temporales, comprueba que traigan sus tablas y las
- * borra. No toca los datos en uso. Si falla, avisa al superadmin; el resultado lo
- * revisa turnouno:verificar-produccion.
+ * Simulacro de restauración (semanal): restaura el último respaldo de la plataforma,
+ * el de un negocio y el de los archivos en lugares temporales, comprueba que con
+ * ellos se podría volver a operar (tablas esenciales, datos, relaciones, una consulta
+ * real y los archivos idénticos a los en uso) y los borra. No toca los datos en uso.
+ * Si falla, avisa al superadmin; el resultado lo revisa turnouno:verificar-produccion.
  */
 class SimulacroRestauracion extends Command
 {
@@ -38,6 +39,9 @@ class SimulacroRestauracion extends Command
         $resultado = $respaldos->simulacro($estudio);
         foreach ($resultado['pruebas'] as $p) {
             $this->line(($p['ok'] ? '<fg=green>OK   </>' : '<fg=red>FALLA</>')." {$p['respaldo']} — {$p['detalle']}");
+            foreach ($p['comprobaciones'] as $c) {
+                $this->line('      '.($c['ok'] ? '<fg=green>✓</>' : '<fg=red>✗</>')." {$c['nombre']}: {$c['detalle']}");
+            }
         }
 
         if (! $resultado['ok']) {

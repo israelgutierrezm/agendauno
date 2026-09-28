@@ -102,16 +102,31 @@ cd agendauno/infra/produccion
 ./actualizar.sh v1.4.0     # o una etiqueta / commit
 ```
 
-`actualizar.sh` construye la versión nueva con su propia etiqueta (el commit), **respalda
-la plataforma y cada negocio antes de migrar** (si el respaldo falla, no sigue), pone
-la aplicación en mantenimiento, migra (la plataforma y, con
-`turnouno:migrar-estudios`, cada negocio), levanta la versión nueva, corre
-`turnouno:verificar-produccion` y anota el cambio en `.historial-versiones`.
+`actualizar.sh`:
 
-Si una migración falla, la versión anterior sigue en marcha (en mantenimiento) y el
-script dice cómo salir de él. La primera vez que uses el script, la versión en marcha
-aún no tiene `turnouno:respaldar-plataforma`: respalda MySQL con la herramienta del
-proveedor y corre `SIN_RESPALDO_PLATAFORMA=1 ./actualizar.sh`.
+1. Construye la versión nueva con su propia etiqueta (el commit) sin tocar lo que está
+   en marcha.
+2. **Punto de corte.** Pone la aplicación en mantenimiento (no entran escrituras),
+   detiene la cola y el programador **esperando a que terminen** lo que están haciendo
+   (`stop_grace_period`: 5 min la cola, 15 min el programador) y libera los candados de
+   tareas que se hubieran cortado. Recién entonces **respalda la plataforma y cada
+   negocio**: el respaldo trae todo lo aceptado. Si el respaldo falla, reabre la
+   versión anterior y no migra.
+3. Migra (la plataforma y, con `turnouno:migrar-estudios`, cada negocio) y levanta la
+   versión nueva **todavía en mantenimiento**.
+4. **Solo la abre si atiende**: base, caché, cola y programador de la versión nueva,
+   esquema de la plataforma y de cada negocio al día
+   (`turnouno:verificar-produccion --disponibilidad`) y una petición real por nginx.
+   Espera hasta 5 minutos; si no, la deja en mantenimiento, no la anota como actual y
+   sale con error, con las opciones para corregir o volver.
+5. Ya abierta, corre `turnouno:verificar-produccion` completa. Si falta algo para operar
+   en producción lo dice y sale con error (código 2), sin «Listo».
+
+La base nunca se revierte sola. Si una migración falla, todo queda en mantenimiento y el
+script dice cómo reabrir la versión anterior o restaurar los respaldos recién tomados.
+La primera vez que uses el script, la versión en marcha aún no tiene
+`turnouno:respaldar-plataforma`: respalda MySQL con la herramienta del proveedor y corre
+`SIN_RESPALDO_PLATAFORMA=1 ./actualizar.sh`.
 
 ### Volver a una versión anterior
 
@@ -120,8 +135,10 @@ proveedor y corre `SIN_RESPALDO_PLATAFORMA=1 ./actualizar.sh`.
 ./volver.sh 3f4b7c9        # a una versión concreta (ver .historial-versiones)
 ```
 
-Vuelve en segundos, sin reconstruir: las imágenes de cada versión quedan en el
-servidor (bórralas a mano cuando ya no las necesites: `docker image ls agendauno-*`).
+Vuelve sin reconstruir: las imágenes de cada versión quedan en el servidor (bórralas a
+mano cuando ya no las necesites: `docker image ls agendauno-*`). Igual que al actualizar,
+pone mantenimiento, deja terminar la cola y el programador y solo reabre si la versión
+atiende; si no, se queda en mantenimiento y sale con error.
 Solo cambia el código: las migraciones se escriben para que la versión anterior siga
 funcionando con el esquema nuevo (primero se agrega; lo que se quita, en otra versión).
 Si una actualización cambió datos de forma incompatible, restaura además el respaldo
@@ -139,7 +156,7 @@ restaura).
 | Base central de la plataforma (estudios, cobro del SaaS, configuración) | diario 03:05 y antes de cada actualización | `turnouno:respaldar-plataforma` |
 | Archivos subidos (documentos, fotos, logos) | diario 03:05 | `turnouno:respaldar-plataforma` |
 | Base de cada negocio | diario 03:15 y antes de cada actualización | `turnouno:respaldar-estudios` |
-| Simulacro: restaura el último respaldo de la plataforma y el de un negocio en bases temporales y comprueba que traigan sus tablas | domingos 04:30 | `turnouno:simulacro-restauracion` |
+| Simulacro: restaura en lugares temporales el último respaldo de la plataforma, el de un negocio y el de los archivos, y comprueba que se podría volver a operar (tablas esenciales, dueño con acceso, relaciones sin huérfanos, una consulta real, archivos idénticos a los en uso) | domingos 04:30 | `turnouno:simulacro-restauracion` |
 
 Se conservan `RESPALDOS_DIAS` días. Si un respaldo o el simulacro fallan, llega la
 alerta por correo, y `turnouno:verificar-produccion` marca lo que esté viejo o sin
@@ -178,7 +195,10 @@ Además de esto, conviene que el proveedor de MySQL haga sus instantáneas diari
 - `turnouno:verificar-produccion` revisa la instalación completa (entorno, correo,
   latidos, respaldos fuera del servidor y recientes, alertas, aviso de privacidad,
   pasarela de la plataforma). Córrelo tras instalar y tras cada actualización (el
-  script de actualizar lo hace).
+  script de actualizar lo hace). Distingue una instalación de prueba de la **apertura
+  comercial**: con `APERTURA_COMERCIAL=true` en `api.env` (o `--apertura`) exige Stripe
+  de la plataforma en modo live para cobrar la renta con dinero real; sin ella lo marca
+  como aviso y termina en «Lista como instalación sin cobro real de la renta».
 
 ## Operación
 

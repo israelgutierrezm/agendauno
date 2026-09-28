@@ -11,7 +11,9 @@ use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
@@ -23,6 +25,14 @@ use Throwable;
  * extremo a extremo, un correo en una bandeja) queda en la guía de verificación.
  *
  * Cada punto: `ok`, `aviso` (conviene atenderlo) o `falta` (bloquea operar).
+ *
+ * Dos cortes más:
+ * - {@see disponibilidad()}: lo mínimo para que la versión en marcha atienda (base,
+ *   caché, cola, programador y esquema al día). Lo usa actualizar.sh antes de quitar
+ *   el mantenimiento.
+ * - Apertura comercial (`APERTURA_COMERCIAL=true` o `$apertura`): además exige Stripe
+ *   en producción para la renta del SaaS. Sin ella, una instalación de prueba puede
+ *   quedar lista con Stripe en modo de prueba, y así lo dice.
  */
 class VerificacionProduccion
 {
@@ -42,18 +52,58 @@ class VerificacionProduccion
     /**
      * @return list<array{seccion: string, punto: string, estado: string, detalle: string}>
      */
-    public function revisar(): array
+    public function revisar(bool $apertura = false): array
     {
         return [
             ...$this->entorno(),
             ...$this->datos(),
+            ...$this->migraciones(),
             ...$this->procesos(),
             ...$this->correo(),
             ...$this->respaldos(),
             ...$this->alertas(),
             ...$this->legales(),
-            ...$this->pagos(),
+            ...$this->pagos($apertura || $this->aperturaComercial()),
         ];
+    }
+
+    /**
+     * Lo mínimo para que la versión en marcha atienda: sin nada de esto no se abre.
+     *
+     * @return list<array{seccion: string, punto: string, estado: string, detalle: string}>
+     */
+    public function disponibilidad(): array
+    {
+        try {
+            DB::connection()->getPdo();
+            $conecta = true;
+        } catch (Throwable) {
+            $conecta = false;
+        }
+        try {
+            $clave = 'operacion:prueba:'.bin2hex(random_bytes(4));
+            Cache::put($clave, 'ok', 60);
+            $cache = Cache::pull($clave) === 'ok';
+        } catch (Throwable) {
+            $cache = false;
+        }
+        $programador = $this->latido->estado(LatidoOperacion::PROGRAMADOR);
+        $cola = $this->latido->estado(LatidoOperacion::COLA);
+
+        return [
+            $this->punto('Disponibilidad', 'APP_KEY definida', (string) config('app.key') !== '', 'Sin APP_KEY no se leen sesiones ni llaves cifradas.'),
+            $this->punto('Disponibilidad', 'Conexión a la base de la plataforma', $conecta, 'Revisa DB_HOST, DB_DATABASE y credenciales.'),
+            $this->punto('Disponibilidad', 'Caché responde', $cache, 'Revisa Redis (REDIS_HOST).'),
+            ...($conecta ? $this->migraciones('Disponibilidad') : []),
+            $this->punto('Disponibilidad', 'Programador de tareas latiendo', $programador === 'ok', "Estado: {$programador}. Revisa el contenedor scheduler."),
+            $this->punto('Disponibilidad', 'Cola procesando', $cola === 'ok', "Estado: {$cola}. Revisa el contenedor worker."),
+        ];
+    }
+
+    /** ¿Se abrió para cobrar con dinero real? (APERTURA_COMERCIAL) */
+    public function aperturaComercial(): bool
+    {
+        return (bool) config('turnouno.operacion.apertura_comercial');
     }
 
     /**
@@ -93,6 +143,32 @@ class VerificacionProduccion
             $this->punto('Datos', 'Bases de los negocios en MySQL', config('turnouno.tenant_db_driver') === 'mysql', 'TENANT_DB_DRIVER=mysql (SQLite es solo para desarrollo).'),
             $this->punto('Datos', 'Caché compartida (Redis)', $cache === 'redis', "Ahora: {$cache}. Los latidos y los bloqueos necesitan una caché compartida."),
             $this->punto('Datos', 'Cola en Redis', $cola === 'redis', "Ahora: {$cola}. Con sync los correos se envían dentro de la petición."),
+        ];
+    }
+
+    /**
+     * El esquema de la plataforma y el de cada negocio, al día con el código.
+     *
+     * @return list<array{seccion: string, punto: string, estado: string, detalle: string}>
+     */
+    private function migraciones(string $seccion = 'Datos'): array
+    {
+        $nombres = static fn (string $ruta) => collect(File::files($ruta))->map(fn ($f): string => $f->getFilenameWithoutExtension());
+        try {
+            $pendientes = $nombres(database_path('migrations'))->diff(DB::table('migrations')->pluck('migration'))->count();
+            $ultima = (string) $nombres(database_path('migrations/tenant'))->sort()->last();
+            $atrasados = Estudio::query()
+                ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value, EstadoEstudio::Suspended->value])
+                ->where(fn ($q) => $q->whereNull('version_migraciones')->orWhere('version_migraciones', '!=', $ultima))
+                ->pluck('slug');
+        } catch (Throwable) {
+            $pendientes = -1;
+            $atrasados = collect(['(no se pudo revisar)']);
+        }
+
+        return [
+            $this->punto($seccion, 'Migraciones de la plataforma aplicadas', $pendientes === 0, $pendientes < 0 ? 'No se pudo revisar.' : "{$pendientes} pendiente(s): php artisan migrate --force."),
+            $this->punto($seccion, 'Esquema de cada negocio al día', $atrasados->isEmpty(), 'Atrasados: '.$atrasados->take(10)->implode(', ').'. Corre php artisan turnouno:migrar-estudios --force.'),
         ];
     }
 
@@ -214,7 +290,7 @@ class VerificacionProduccion
     /**
      * @return list<array{seccion: string, punto: string, estado: string, detalle: string}>
      */
-    private function pagos(): array
+    private function pagos(bool $apertura): array
     {
         try {
             $stripe = ConfiguracionPasarelaPlataforma::query()->where('proveedor', 'stripe')->first();
@@ -225,7 +301,14 @@ class VerificacionProduccion
 
         return [
             $this->punto('Pagos', 'Stripe de la plataforma activo (renta del SaaS)', $stripe !== null && $stripe->activa, 'Configúralo en Plataforma → Pasarelas.'),
-            $this->punto('Pagos', 'Stripe en modo producción', $stripe !== null && $stripe->modo === 'live' && str_starts_with((string) ($llaves['secret_key'] ?? ''), 'sk_live_'), 'Usa llaves sk_live_ y modo live.', critico: false),
+            // Para cobrar la renta con dinero real bloquea; en una instalación de prueba, no.
+            $this->punto(
+                'Pagos',
+                'Stripe en modo producción',
+                $stripe !== null && $stripe->modo === 'live' && str_starts_with((string) ($llaves['secret_key'] ?? ''), 'sk_live_'),
+                $apertura ? 'Usa llaves sk_live_ y modo live: sin ellas la renta no cobra dinero real.' : 'Modo de prueba: la renta del SaaS no cobra dinero real. Para abrir y cobrar, usa llaves sk_live_ y APERTURA_COMERCIAL=true.',
+                critico: $apertura,
+            ),
             $this->punto('Pagos', 'Secreto del webhook de Stripe', (string) ($llaves['webhook_secret'] ?? '') !== '', 'Sin él no se confirman los pagos de la renta.'),
         ];
     }

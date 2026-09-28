@@ -36,6 +36,9 @@ services:
   worker:
     <<: *api
     command: ["php", "artisan", "queue:work", "redis", "--sleep=1", "--tries=3", "--max-time=3600"]
+    # Al detenerse (actualizar.sh, docker compose stop) termina el trabajo en curso
+    # antes de salir; Docker lo mataría a los 10 s por defecto.
+    stop_grace_period: 5m
     # Sano si procesó el latido que encola el programador cada minuto.
     healthcheck:
       test: ["CMD", "php", "artisan", "turnouno:latido", "--verificar=cola"]
@@ -49,6 +52,9 @@ services:
   scheduler:
     <<: *api
     command: ["php", "artisan", "schedule:work"]
+    # Al detenerse deja de lanzar tareas y espera a que acaben las que corren (un
+    # respaldo nocturno puede tardar); cortarlas dejaría su candado 24 h.
+    stop_grace_period: 15m
     # Sano si dejó su latido en el último par de minutos (turnouno:latido).
     healthcheck:
       test: ["CMD", "php", "artisan", "turnouno:latido", "--verificar=programador"]

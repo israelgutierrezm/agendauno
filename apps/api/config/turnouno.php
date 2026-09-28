@@ -96,4 +96,13 @@ return [
         'mysql' => env('RESPALDOS_MYSQL', 'mysql'),
     ],
 
+    /*
+    | Operación. `apertura_comercial`: la instalación ya cobra la renta del SaaS con
+    | dinero real. La verificación de producción exige entonces Stripe en modo live;
+    | sin ella, es una instalación de prueba y así lo dice.
+    */
+    'operacion' => [
+        'apertura_comercial' => (bool) env('APERTURA_COMERCIAL', false),
+    ],
+
 ];
