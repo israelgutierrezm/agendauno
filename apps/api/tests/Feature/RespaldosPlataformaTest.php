@@ -68,7 +68,8 @@ it('el simulacro restaura la plataforma, un negocio y los archivos, y comprueba 
 
     $this->artisan('agendauno:simulacro-restauracion --estudio=estudio-a')
         ->expectsOutputToContain('Tablas esenciales')
-        ->expectsOutputToContain('Dueño con acceso: 1 cuenta(s) de dueño.')
+        ->expectsOutputToContain('que lista el inventario del respaldo')
+        ->expectsOutputToContain('Dueño con acceso: 1 cuenta(s) de dueño activas y con acceso.')
         ->expectsOutputToContain('Relaciones completas: Sin registros huérfanos.')
         ->expectsOutputToContain('Consulta de operación')
         ->expectsOutputToContain('Documentos, fotos y logos: 2 archivo(s) en uso idénticos a los recuperados.')
@@ -102,6 +103,25 @@ it('el simulacro no da por buena una restauración con la que no se podría oper
         ->and(AlertaPlataforma::query()->where('tipo', 'simulacro_fallido')->exists())->toBeTrue();
 });
 
+it('el simulacro exige todos los negocios del inventario y un dueño que pueda entrar', function (): void {
+    estudioConSesion('estudio-a', 'a@correo.mx');
+    $estudio = Estudio::query()->where('slug', 'estudio-a')->firstOrFail();
+    // El dueño existe, pero está desactivado: nadie podría entrar.
+    app(GestorDeConexionTenant::class)->ejecutarEn($estudio, fn () => Usuario::query()->where('rol', 'propietario')->update(['activo' => false]));
+    $this->artisan('agendauno:respaldar-plataforma --sin-archivos')->assertSuccessful();
+    $this->artisan('agendauno:respaldar-estudios')->assertSuccessful();
+    // El inventario del respaldo lista un negocio que el volcado no trae.
+    $inventario = app(RespaldosPlataforma::class)->listar()[0].'.inventario.json';
+    $datos = json_decode((string) Storage::disk('local')->get($inventario), true);
+    $datos['negocios'][] = 'negocio-perdido';
+    Storage::disk('local')->put($inventario, (string) json_encode($datos));
+
+    $this->artisan('agendauno:simulacro-restauracion --estudio=estudio-a')
+        ->expectsOutputToContain('Faltan 1 negocio(s) que lista el inventario del respaldo: negocio-perdido.')
+        ->expectsOutputToContain('Hay 1 cuenta(s) de dueño, pero ninguna activa, sin baja y con contraseña o Google')
+        ->assertFailed();
+});
+
 it('si un respaldo está dañado, el simulacro falla y avisa al superadmin', function (): void {
     $this->artisan('agendauno:respaldar-plataforma')->assertSuccessful();
     $ruta = app(RespaldosPlataforma::class)->listar()[0];
@@ -120,7 +140,7 @@ it('restaurar la base central pide --force y en pruebas nunca toca la base de la
     $this->artisan('agendauno:respaldar-plataforma --sin-archivos')->assertSuccessful();
 
     $this->artisan('agendauno:restaurar-plataforma')->expectsOutputToContain('--force')->assertFailed();
-    // La base de la suite (SQLite en memoria o turnouno_testing en MySQL) no es desechable.
+    // La base de la suite (SQLite en memoria o agendauno_testing en MySQL) no es desechable.
     $this->artisan('agendauno:restaurar-plataforma --force')->expectsOutputToContain('base desechable')->assertFailed();
 });
 

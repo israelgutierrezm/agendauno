@@ -1,6 +1,6 @@
 # ADR 0054 — Actualizar con punto de corte, abrir solo si atiende y simulacro que comprueba la operación
 
-Estado: Aceptado (2026-09-27). Amplía el ADR 0051.
+Estado: Aceptado (2026-09-27). Amplía el ADR 0051. Corregido por el ADR 0060: en mantenimiento, el programador y el worker se comprueban con señales que no reactivan la operación.
 
 ## Contexto
 
@@ -86,3 +86,14 @@ mientras corría, y `sh` lee el archivo conforme avanza.
   reintentan, y la conciliación de pagos (ADR 0053) recupera lo que se pierda.
 - Las páginas estáticas de la versión nueva (el sitio comercial) se publican al
   levantar el contenedor web, antes de que la API abra.
+
+## Actualización (2026-09-28): simulacro más estricto
+
+- El respaldo de la plataforma guarda su inventario (`.inventario.json`): los negocios
+  que trae, tomados antes del volcado y como los ve el volcado. El simulacro exige que
+  estén todos; ya no basta con que venga alguno.
+- «Dueño con acceso» exige un dueño activo, sin baja y con contraseña o Google (antes
+  contaba cualquier cuenta con el rol). El simulacro prefiere probar un negocio que ya
+  terminó su onboarding.
+- La base temporal del simulacro en MySQL se crea y se borra por una conexión aparte:
+  `CREATE/DROP DATABASE` confirmaban la transacción de quien lo llamaba.

@@ -49,15 +49,25 @@ class RespaldosPlataforma
         private readonly ComprobacionRestauracion $comprobacion,
     ) {}
 
-    /** Vuelca la base central. Devuelve la ruta del respaldo en el disco. */
+    /**
+     * Vuelca la base central y guarda junto a ella su inventario: los negocios que
+     * debe traer (el simulacro comprueba que estén todos). El inventario se toma antes
+     * del volcado y como lo ve el volcado (lo confirmado): un negocio registrado entre
+     * ambos viene de más, nunca de menos. Devuelve la ruta del respaldo en el disco.
+     */
     public function respaldarPlataforma(): string
     {
+        $inventario = ['negocios' => $this->comprobacion->negociosConfirmados(null)];
         $crudo = $this->volcado->temporal();
         try {
             $this->volcado->volcar(DB::getDefaultConnection(), $crudo);
             $extension = DB::connection()->getConfig('driver') === 'sqlite' ? 'sqlite.gz' : 'sql.gz';
+            $ruta = $this->volcado->guardar($crudo, $this->volcado->carpeta(self::PLATAFORMA), 'plataforma-'.$this->marca().'.'.$extension);
+            if (! $this->volcado->disco()->put($ruta.VolcadoBaseDatos::INVENTARIO, (string) json_encode($inventario))) {
+                throw new RuntimeException('No se pudo guardar el inventario del respaldo.');
+            }
 
-            return $this->volcado->guardar($crudo, $this->volcado->carpeta(self::PLATAFORMA), 'plataforma-'.$this->marca().'.'.$extension);
+            return $ruta;
         } finally {
             @unlink($crudo);
         }
@@ -171,7 +181,9 @@ class RespaldosPlataforma
     public function simulacro(?Estudio $estudio = null): array
     {
         $pruebas = [$this->probar($this->listar()[0] ?? null, self::PLATAFORMA)];
-        $estudio ??= Estudio::query()->inRandomOrder()->get()
+        // Al azar, uno con respaldos; de preferencia uno en uso (su dueño ya entró y
+        // terminó el onboarding): el simulacro exige un dueño que pueda entrar.
+        $estudio ??= Estudio::query()->orderByDesc('onboarding_completo')->inRandomOrder()->get()
             ->first(fn (Estudio $e): bool => $this->estudios->listar($e) !== []);
         if ($estudio instanceof Estudio) {
             $pruebas[] = $this->probar($this->estudios->listar($estudio)[0] ?? null, 'negocio');
@@ -217,7 +229,7 @@ class RespaldosPlataforma
         try {
             $this->volcado->bajar($ruta, $crudo);
             $revisar = fn (array $config): array => $tipo === self::PLATAFORMA
-                ? $this->comprobacion->plataforma($config, $this->fechaDe($ruta))
+                ? $this->comprobacion->plataforma($config, $this->fechaDe($ruta), $this->inventario($ruta))
                 : $this->comprobacion->negocio($config);
             $comprobaciones = str_contains($ruta, '.sqlite')
                 ? $revisar(['driver' => 'sqlite', 'database' => $crudo, 'prefix' => '', 'foreign_key_constraints' => false])
@@ -320,6 +332,26 @@ class RespaldosPlataforma
         }
 
         return str_starts_with($base, 'tenant_simulacro_') || str_ends_with($base, '_desechable');
+    }
+
+    /**
+     * Los negocios que debe traer un respaldo de la plataforma, según su inventario;
+     * null si es de antes de guardarlo.
+     *
+     * @return list<string>|null
+     */
+    private function inventario(string $ruta): ?array
+    {
+        $archivo = $ruta.VolcadoBaseDatos::INVENTARIO;
+        if (! $this->volcado->disco()->exists($archivo)) {
+            return null;
+        }
+        $datos = json_decode((string) $this->volcado->disco()->get($archivo), true);
+        if (! is_array($datos) || ! is_array($datos['negocios'] ?? null)) {
+            throw new RuntimeException('El inventario del respaldo está dañado.');
+        }
+
+        return array_values(array_map(strval(...), $datos['negocios']));
     }
 
     /** Fecha del respaldo por su nombre (…-AAAAMMDD-HHMMSS.ext). */

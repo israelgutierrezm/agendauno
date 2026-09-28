@@ -114,13 +114,20 @@ cd agendauno/infra/produccion
    versión anterior y no migra.
 3. Migra (la plataforma y, con `agendauno:migrar-estudios`, cada negocio) y levanta la
    versión nueva **todavía en mantenimiento**.
-4. **Solo la abre si atiende**: base, caché, cola y programador de la versión nueva,
-   esquema de la plataforma y de cada negocio al día
-   (`agendauno:verificar-produccion --disponibilidad`) y una petición real por nginx.
-   Espera hasta 5 minutos; si no, la deja en mantenimiento, no la anota como actual y
-   sale con error, con las opciones para corregir o volver.
-5. Ya abierta, corre `agendauno:verificar-produccion` completa. Si falta algo para operar
-   en producción lo dice y sale con error (código 2), sin «Listo».
+4. **Solo la abre si atiende**: base, caché, esquema de la plataforma y de cada negocio
+   al día (`agendauno:verificar-produccion --disponibilidad`) y una petición real por
+   nginx. En mantenimiento ninguna tarea del negocio corre y la cola no toma trabajos,
+   así que los procesos nuevos se comprueban con señales que no los reactivan:
+   - el **programador** late también en mantenimiento (solo `agendauno:latido`);
+   - el **worker** deja al arrancar su señal de arranque (`WorkerStarting`).
+
+   Ambas señales llevan la versión (`APP_VERSION`, la pone `docker-compose.yml`): solo
+   cuentan las de la versión nueva. Espera hasta 5 minutos; si no, la deja en
+   mantenimiento, no la anota como actual y sale con error, con las opciones para
+   corregir o volver.
+5. Ya abierta, **confirma que la cola procesa** (el latido del minuto pasa por ella; hasta
+   3 minutos) y corre `agendauno:verificar-produccion` completa. Si algo falta, lo dice y
+   sale con error (código 2), sin «Listo».
 
 La base nunca se revierte sola. Si una migración falla, todo queda en mantenimiento y el
 script dice cómo reabrir la versión anterior o restaurar los respaldos recién tomados.
@@ -137,8 +144,9 @@ La primera vez que uses el script, la versión en marcha aún no tiene
 
 Vuelve sin reconstruir: las imágenes de cada versión quedan en el servidor (bórralas a
 mano cuando ya no las necesites: `docker image ls agendauno-*`). Igual que al actualizar,
-pone mantenimiento, deja terminar la cola y el programador y solo reabre si la versión
-atiende; si no, se queda en mantenimiento y sale con error.
+pone mantenimiento, deja terminar la cola y el programador, solo reabre si la versión
+atiende (con las mismas señales) y ya abierta confirma que la cola procesa; si no, sale
+con error.
 Solo cambia el código: las migraciones se escriben para que la versión anterior siga
 funcionando con el esquema nuevo (primero se agrega; lo que se quita, en otra versión).
 Si una actualización cambió datos de forma incompatible, restaura además el respaldo
@@ -156,7 +164,12 @@ restaura).
 | Base central de la plataforma (estudios, cobro del SaaS, configuración) | diario 03:05 y antes de cada actualización | `agendauno:respaldar-plataforma` |
 | Archivos subidos (documentos, fotos, logos) | diario 03:05 | `agendauno:respaldar-plataforma` |
 | Base de cada negocio | diario 03:15 y antes de cada actualización | `agendauno:respaldar-estudios` |
-| Simulacro: restaura en lugares temporales el último respaldo de la plataforma, el de un negocio y el de los archivos, y comprueba que se podría volver a operar (tablas esenciales, dueño con acceso, relaciones sin huérfanos, una consulta real, archivos idénticos a los en uso) | domingos 04:30 | `agendauno:simulacro-restauracion` |
+| Simulacro: restaura en lugares temporales el último respaldo de la plataforma, el de un negocio y el de los archivos, y comprueba que se podría volver a operar (tablas esenciales, todos los negocios del inventario del respaldo, un dueño activo y con acceso, relaciones sin huérfanos, una consulta real, archivos idénticos a los en uso) | domingos 04:30 | `agendauno:simulacro-restauracion` |
+
+El respaldo de la plataforma guarda a su lado su inventario (`.inventario.json`): los
+negocios que debe traer. El simulacro exige todos; también exige, en el negocio que
+prueba, un dueño activo, sin baja y con contraseña o Google (de preferencia elige un
+negocio que ya terminó su onboarding).
 
 Se conservan `RESPALDOS_DIAS` días. Si un respaldo o el simulacro fallan, llega la
 alerta por correo, y `agendauno:verificar-produccion` marca lo que esté viejo o sin

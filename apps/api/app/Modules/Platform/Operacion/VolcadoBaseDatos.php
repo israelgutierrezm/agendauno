@@ -24,6 +24,9 @@ class VolcadoBaseDatos
     /** Sufijo del archivo con la suma de verificación de cada respaldo. */
     public const SUMA = '.sha256';
 
+    /** Inventario de lo que trae un respaldo (p. ej. los negocios de la plataforma). */
+    public const INVENTARIO = '.inventario.json';
+
     /**
      * Vuelca la base de una conexión ya configurada a un archivo local.
      */
@@ -160,7 +163,7 @@ class VolcadoBaseDatos
     {
         $archivos = array_values(array_filter(
             $this->disco()->files($carpeta),
-            static fn (string $a): bool => ! str_ends_with($a, self::SUMA),
+            static fn (string $a): bool => ! str_ends_with($a, self::SUMA) && ! str_ends_with($a, self::INVENTARIO),
         ));
         rsort($archivos);
 

@@ -17,6 +17,11 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // Versión en marcha (el commit de la imagen; docker-compose.yml la pone en
+    // APP_VERSION). Los latidos la llevan para distinguir los procesos nuevos de los
+    // anteriores al publicar.
+    'version' => env('APP_VERSION', 'dev'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

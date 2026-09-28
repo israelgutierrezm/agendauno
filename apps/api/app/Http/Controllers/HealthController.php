@@ -18,8 +18,10 @@ use Throwable;
  * `database` and `cache` are required for the app to function and drive the
  * overall status. `redis` is reported for visibility but is optional in local
  * development until the Docker Redis service is started, so it does not fail
- * the endpoint on its own. `programador` and `cola` report the background
- * processes' heartbeat (ok | atrasado | sin_datos), also informational.
+ * the endpoint on its own. `programador` and `cola` report whether this version's
+ * background processes are running (ok | atrasado | sin_datos | otra_version),
+ * also informational; during maintenance the queue counts once its worker started
+ * ({@see LatidoOperacion::enMarcha()}).
  */
 class HealthController
 {
@@ -55,7 +57,8 @@ class HealthController
             'status' => $healthy ? 'ok' : 'degraded',
             'app' => config('app.name'),
             'environment' => config('app.env'),
-            'version' => config('app.version', '0.1.0'),
+            'version' => config('app.version'),
+            'mantenimiento' => app()->isDownForMaintenance(),
             'time' => now()->toIso8601String(),
             'checks' => $checks,
         ], $healthy ? 200 : 503);
@@ -64,7 +67,7 @@ class HealthController
     private function latido(LatidoOperacion $latido, string $proceso): string
     {
         try {
-            return $latido->estado($proceso);
+            return $latido->enMarcha($proceso);
         } catch (Throwable) {
             return 'sin_datos';
         }

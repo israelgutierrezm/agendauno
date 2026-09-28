@@ -53,22 +53,27 @@ class ComprobacionRestauracion
     ];
 
     /**
-     * La base central restaurada.
+     * La base central restaurada. Deben venir todos los negocios del inventario que
+     * se guardó con el respaldo; si el respaldo es de antes de guardarlo, todos los
+     * que hoy existen y se registraron antes de la fecha del respaldo.
      *
      * @param  array<string, mixed>  $config  conexión a la base temporal
+     * @param  list<string>|null  $inventario  slugs de los negocios que trae el respaldo
      * @return list<Comprobacion>
      */
-    public function plataforma(array $config, ?CarbonImmutable $fecha): array
+    public function plataforma(array $config, ?CarbonImmutable $fecha, ?array $inventario = null): array
     {
-        return $this->conBase($config, function (Connection $db) use ($fecha): array {
+        $esperados = $inventario ?? $this->negociosConfirmados($fecha);
+
+        return $this->conBase($config, function (Connection $db) use ($esperados, $inventario): array {
             $faltan = $this->tablasQueFaltan($db, self::TABLAS_PLATAFORMA);
             if ($faltan !== []) {
                 return [$this->comprobacion('Tablas esenciales', false, 'Faltan: '.implode(', ', $faltan).'.')];
             }
 
-            // Los negocios que ya existían al respaldar deben venir en el respaldo.
-            $esperados = $this->negociosConfirmados($fecha);
             $restaurados = $db->table('estudios')->count();
+            $ausentes = array_values(array_diff($esperados, $db->table('estudios')->pluck('slug')->map(strval(...))->all()));
+            $origen = $inventario !== null ? 'que lista el inventario del respaldo' : 'registrados antes del respaldo';
             $incompletos = $db->table('estudios')->where(fn ($q) => $q->whereNull('slug')->orWhereNull('db_database'))->count();
             // Cada negocio con sus cargos (la consulta agrupada corre entera en la base).
             $consulta = $db->query()->fromSub(
@@ -84,8 +89,12 @@ class ComprobacionRestauracion
                 $this->comprobacion('Migraciones registradas', ($n = $db->table('migrations')->count()) > 0, "{$n} migraciones."),
                 $this->comprobacion(
                     'Negocios registrados',
-                    $restaurados > 0 || $esperados === 0,
-                    "{$restaurados} negocio(s) en el respaldo".($esperados > 0 ? " (hoy hay {$esperados} de antes del respaldo)" : '').'.',
+                    $ausentes === [],
+                    match (true) {
+                        $ausentes !== [] => 'Faltan '.count($ausentes)." negocio(s) {$origen}: ".implode(', ', array_slice($ausentes, 0, 5)).'.',
+                        $esperados === [] => "No hay negocios {$origen} ({$restaurados} en total).",
+                        default => 'Están los '.count($esperados)." negocio(s) {$origen} ({$restaurados} en total).",
+                    },
                 ),
                 $this->relaciones($db, self::RELACIONES_PLATAFORMA),
                 $this->comprobacion(
@@ -111,8 +120,14 @@ class ComprobacionRestauracion
                 return [$this->comprobacion('Tablas esenciales', false, 'Faltan: '.implode(', ', $faltan).'.')];
             }
 
+            // Un dueño que pueda entrar: activo, sin baja y con contraseña o Google.
             $duenos = $db->table('users')
-                ->where(fn ($q) => $q->where('rol', 'propietario')->orWhere('roles', 'like', '%"propietario"%'))
+                ->where(fn ($q) => $q->where('rol', 'propietario')->orWhere('roles', 'like', '%"propietario"%'));
+            $cuentasDueno = (clone $duenos)->count();
+            $habilitados = $duenos
+                ->where('activo', true)
+                ->when($db->getSchemaBuilder()->hasColumn('users', 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'))
+                ->where(fn ($q) => $q->whereNotNull('password')->orWhereNotNull('google_id'))
                 ->count();
             // Lo que hace la operación a diario: saldos del libro de créditos y la
             // agenda con sus alumnos.
@@ -129,7 +144,11 @@ class ComprobacionRestauracion
             return [
                 $this->comprobacion('Tablas esenciales', true, count(self::TABLAS_NEGOCIO).' tablas.'),
                 $this->comprobacion('Migraciones registradas', ($n = $db->table('migrations')->count()) > 0, "{$n} migraciones."),
-                $this->comprobacion('Dueño con acceso', $duenos > 0, $duenos > 0 ? "{$duenos} cuenta(s) de dueño." : 'No hay ninguna cuenta de dueño: nadie podría entrar a operar.'),
+                $this->comprobacion('Dueño con acceso', $habilitados > 0, match (true) {
+                    $habilitados > 0 => "{$habilitados} cuenta(s) de dueño activas y con acceso.",
+                    $cuentasDueno > 0 => "Hay {$cuentasDueno} cuenta(s) de dueño, pero ninguna activa, sin baja y con contraseña o Google: nadie podría entrar a operar.",
+                    default => 'No hay ninguna cuenta de dueño: nadie podría entrar a operar.',
+                }),
                 $this->relaciones($db, self::RELACIONES_NEGOCIO),
                 $this->comprobacion(
                     'Consulta de operación',
@@ -191,23 +210,26 @@ class ComprobacionRestauracion
     }
 
     /**
-     * Negocios registrados (y confirmados) antes de la fecha del respaldo. Se cuentan
-     * por otra conexión, como los ve el volcado: una transacción abierta en este
-     * proceso no cuenta. En SQLite (desarrollo y pruebas) el volcado se hace por la
-     * misma conexión y se cuenta igual.
+     * Slugs de los negocios registrados (y confirmados) hasta `$fecha` (todos si es
+     * null). Se leen por otra conexión, como los ve el volcado: una transacción
+     * abierta en este proceso no cuenta. En SQLite (desarrollo y pruebas) el volcado
+     * se hace por la misma conexión y se leen igual.
+     *
+     * @return list<string>
      */
-    private function negociosConfirmados(?CarbonImmutable $fecha): int
+    public function negociosConfirmados(?CarbonImmutable $fecha): array
     {
         /** @var array<string, mixed> $config */
         $config = DB::connection()->getConfig();
+        $leer = fn (Connection $db): array => $db->table('estudios')
+            ->when($fecha !== null, fn ($q) => $q->where('created_at', '<=', $fecha))
+            ->orderBy('slug')->pluck('slug')->map(strval(...))->values()->all();
         if (($config['driver'] ?? '') === 'sqlite') {
-            return DB::table('estudios')->when($fecha !== null, fn ($q) => $q->where('created_at', '<=', $fecha))->count();
+            return $leer(DB::connection());
         }
         config(['database.connections.plataforma_confirmada' => $config]);
         try {
-            return DB::connection('plataforma_confirmada')->table('estudios')
-                ->when($fecha !== null, fn ($q) => $q->where('created_at', '<=', $fecha))
-                ->count();
+            return $leer(DB::connection('plataforma_confirmada'));
         } finally {
             DB::purge('plataforma_confirmada');
         }

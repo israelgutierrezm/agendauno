@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Modules\Platform\Operacion\AlertasPlataforma;
+use App\Modules\Platform\Operacion\LatidoOperacion;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
 use App\Modules\Tenancy\Facturacion\FacturacionFalsa;
@@ -19,10 +20,13 @@ use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\WorkerStarting;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -93,6 +97,17 @@ class AppServiceProvider extends ServiceProvider
                 $evento->job->resolveName(),
                 $evento->exception,
             );
+        });
+        // El worker avisa que arrancó, con su versión y su conexión de cola al alcance.
+        // En mantenimiento no toma trabajos (ni el del latido): con esta marca la
+        // publicación sabe que la cola nueva está en marcha sin abrirla.
+        Event::listen(WorkerStarting::class, function (WorkerStarting $evento): void {
+            try {
+                Queue::connection($evento->connectionName)->size(explode(',', $evento->queue)[0]);
+                app(LatidoOperacion::class)->marcarArranque(LatidoOperacion::COLA);
+            } catch (Throwable $e) {
+                report($e);
+            }
         });
         Event::listen(EventoDeDominioTenant::class, EnviarWebhooksSalientes::class);
         Event::listen(EventoDeDominioTenant::class, GenerarComunicaciones::class);

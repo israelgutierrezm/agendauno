@@ -9,9 +9,11 @@ use App\Modules\Platform\Operacion\LatidoOperacion;
 use Illuminate\Console\Command;
 
 /**
- * Latido de los procesos de fondo. Sin opciones (cada minuto, desde el programador):
- * marca el del programador y encola el de la cola. Con `--verificar=programador|cola`
- * responde si ese proceso latió hace poco (lo usa el chequeo de salud de Docker).
+ * Latido de los procesos de fondo. Sin opciones (cada minuto, desde el programador,
+ * también en mantenimiento): marca el del programador y, si no hay mantenimiento,
+ * encola el de la cola. Con `--verificar=programador|cola` responde si ese proceso de
+ * esta versión está en marcha (lo usan el chequeo de salud de Docker y la publicación;
+ * en mantenimiento, la cola cuenta con que su worker haya arrancado).
  */
 class Latido extends Command
 {
@@ -30,15 +32,18 @@ class Latido extends Command
 
                 return self::INVALID;
             }
-            $estado = $latido->estado($proceso, max(1, (int) $this->option('minutos')));
+            $estado = $latido->enMarcha($proceso, max(1, (int) $this->option('minutos')));
             $ultimo = $latido->ultimo($proceso)?->toIso8601String() ?? 'nunca';
-            $this->line("{$proceso}: {$estado} (último latido: {$ultimo})");
+            $this->line("{$proceso}: {$estado} (versión {$latido->version()}; último latido: {$ultimo})");
 
             return $estado === 'ok' ? self::SUCCESS : self::FAILURE;
         }
 
         $latido->marcar(LatidoOperacion::PROGRAMADOR);
-        LatidoCola::dispatch();
+        // En mantenimiento la cola no toma trabajos: no se le acumulan latidos.
+        if (! app()->isDownForMaintenance()) {
+            LatidoCola::dispatch();
+        }
 
         return self::SUCCESS;
     }

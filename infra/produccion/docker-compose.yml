@@ -20,6 +20,9 @@ x-api: &api
   # (actualizar.sh y volver.sh la fijan en VERSION).
   image: agendauno-api:${VERSION:-latest}
   env_file: api.env
+  environment:
+    # Los latidos llevan la versión: al publicar solo cuentan los procesos nuevos.
+    APP_VERSION: ${VERSION:-latest}
   volumes:
     - storage:/var/www/html/storage
   depends_on:
@@ -39,7 +42,8 @@ services:
     # Al detenerse (actualizar.sh, docker compose stop) termina el trabajo en curso
     # antes de salir; Docker lo mataría a los 10 s por defecto.
     stop_grace_period: 5m
-    # Sano si procesó el latido que encola el programador cada minuto.
+    # Sano si procesó el latido que encola el programador cada minuto; en
+    # mantenimiento (no toma trabajos), si arrancó con esta versión.
     healthcheck:
       test: ["CMD", "php", "artisan", "agendauno:latido", "--verificar=cola"]
       interval: 1m
@@ -55,7 +59,8 @@ services:
     # Al detenerse deja de lanzar tareas y espera a que acaben las que corren (un
     # respaldo nocturno puede tardar); cortarlas dejaría su candado 24 h.
     stop_grace_period: 15m
-    # Sano si dejó su latido en el último par de minutos (agendauno:latido).
+    # Sano si dejó su latido hace poco (agendauno:latido, que corre también en
+    # mantenimiento).
     healthcheck:
       test: ["CMD", "php", "artisan", "agendauno:latido", "--verificar=programador"]
       interval: 1m

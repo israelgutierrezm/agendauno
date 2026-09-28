@@ -14,8 +14,9 @@
 #
 # Como al actualizar: pone mantenimiento, deja terminar la cola y el programador,
 # cambia de versión y solo reabre si la versión atiende (una petición real por nginx
-# con la base, la caché, la cola y el programador bien). Si no, se queda en
-# mantenimiento y sale con error.
+# con la base y la caché bien, el programador de esa versión latiendo y su worker
+# arrancado; en mantenimiento no toma trabajos). Si no, se queda en mantenimiento y
+# sale con error. Ya abierta, confirma que la cola procesa.
 set -eu
 
 principal() {
@@ -51,8 +52,10 @@ principal() {
   $COMPOSE exec -T api php artisan schedule:clear-cache >/dev/null 2>&1 || true
 
   echo "==> Levantando $DESTINO (sigue en mantenimiento)"
-  VERSION="$DESTINO" $COMPOSE run --rm api php artisan cache:forget operacion:latido:programador >/dev/null
-  VERSION="$DESTINO" $COMPOSE run --rm api php artisan cache:forget operacion:latido:cola >/dev/null
+  # Señales en blanco: solo cuentan las del programador y el worker que arrancan ahora.
+  for llave in operacion:latido:programador operacion:latido:cola operacion:arranque:cola; do
+    VERSION="$DESTINO" $COMPOSE run --rm api php artisan cache:forget "$llave" >/dev/null
+  done
   VERSION="$DESTINO" $COMPOSE up -d --remove-orphans
 
   echo "==> Comprobando que $DESTINO atiende antes de abrir"
@@ -72,12 +75,25 @@ principal() {
   VERSION="$DESTINO" $COMPOSE exec -T api php artisan up
   echo "$DESTINO" > .version-actual
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $ACTUAL -> $DESTINO (volver)" >> .historial-versiones
+
+  echo "==> Confirmando que la cola procesa"
+  intentos=0
+  until VERSION="$DESTINO" $COMPOSE exec -T api php artisan agendauno:latido --verificar=cola --minutos=2 >/dev/null 2>&1; do
+    intentos=$((intentos + 1))
+    if [ "$intentos" -ge 18 ]; then
+      echo "!! $DESTINO está abierta, pero la cola no procesó trabajos en 3 minutos."
+      echo "   Revisa: VERSION=$DESTINO $COMPOSE logs --tail=100 worker scheduler"
+      exit 2
+    fi
+    sleep 10
+  done
   echo "==> Listo: $DESTINO en marcha y atendiendo. Revisa lo demás con:"
   echo "   VERSION=$DESTINO $COMPOSE exec api php artisan agendauno:verificar-produccion"
 }
 
 # Una petición real por nginx y PHP-FPM, con la galleta que deja pasar el
-# mantenimiento: base, caché, cola y programador bien (?estricto=1).
+# mantenimiento: base y caché bien, programador de esta versión latiendo y su worker
+# arrancado (?estricto=1).
 disponible() {
   galleta="$(curl -s -o /dev/null -D - -H "Host: $DOMINIO" "http://127.0.0.1:8080/$SECRETO" \
     | tr -d '\r' | sed -n 's/^[Ss]et-[Cc]ookie: *\(laravel_maintenance=[^;]*\).*/\1/p' | head -n 1)"

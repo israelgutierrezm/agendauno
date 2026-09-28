@@ -7,8 +7,14 @@ use App\Modules\Platform\Operacion\LatidoOperacion;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Foundation\MaintenanceMode;
+use Illuminate\Foundation\CacheBasedMaintenanceMode;
+use Illuminate\Queue\Events\WorkerStarting;
+use Illuminate\Queue\WorkerOptions;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Queue;
 
 /*
 | Operación en producción: el latido prueba que el programador de tareas y la cola
@@ -18,6 +24,17 @@ use Illuminate\Support\Facades\File;
 beforeEach(function (): void {
     Cache::flush();
 });
+
+/**
+ * Mantenimiento solo para esta prueba (en la caché en memoria): el modo por archivo
+ * lo verían los demás procesos de la suite en paralelo.
+ */
+function enMantenimiento(): void
+{
+    $modo = new CacheBasedMaintenanceMode(app('cache'), 'array', 'prueba:mantenimiento');
+    app()->instance(MaintenanceMode::class, $modo);
+    $modo->activate([]);
+}
 
 it('el latido marca el programador y, por la cola, la cola', function (): void {
     $this->artisan('agendauno:latido --verificar=cola')->assertFailed();
@@ -128,4 +145,62 @@ it('con Stripe en modo de prueba, la apertura comercial no se aprueba y la insta
     config(['agendauno.operacion.apertura_comercial' => true]);
     $this->artisan('agendauno:verificar-produccion')
         ->expectsOutputToContain('FALTA Stripe en modo producción');
+});
+
+it('en mantenimiento solo corre el latido: el programador late y no se le encolan latidos a la cola', function (): void {
+    $eventos = collect(app(Schedule::class)->events());
+    $latido = $eventos->first(fn ($e): bool => str_contains((string) $e->command, 'agendauno:latido'));
+    expect($latido?->runsInMaintenanceMode())->toBeTrue()
+        ->and($eventos->reject(fn ($e): bool => $e === $latido)->filter->runsInMaintenanceMode())->toBeEmpty();
+
+    enMantenimiento();
+    Queue::fake();
+    $this->artisan('agendauno:latido')->assertSuccessful();
+
+    $this->artisan('agendauno:latido --verificar=programador')->assertSuccessful();
+    Queue::assertNothingPushed();
+});
+
+it('al publicar en mantenimiento, la cola cuenta si su worker arrancó con esta versión', function (): void {
+    File::deleteDirectory(storage_path('tenants'));
+    config(['app.version' => 'nueva']);
+    enMantenimiento();
+    app(LatidoOperacion::class)->marcar(LatidoOperacion::PROGRAMADOR);
+
+    // El worker aún no arranca: no se abre (y no hace falta que procese trabajos).
+    $this->artisan('agendauno:verificar-produccion --disponibilidad')
+        ->expectsOutputToContain('FALTA Cola en marcha (en mantenimiento no toma trabajos) — Estado: sin_datos')
+        ->assertFailed();
+
+    // El worker de la versión anterior arrancó: no cuenta.
+    config(['app.version' => 'anterior']);
+    event(new WorkerStarting('sync', 'default', new WorkerOptions));
+    config(['app.version' => 'nueva']);
+    $this->artisan('agendauno:verificar-produccion --disponibilidad')
+        ->expectsOutputToContain('FALTA Cola en marcha (en mantenimiento no toma trabajos) — Estado: otra_version')
+        ->assertFailed();
+
+    // El worker nuevo arrancó.
+    event(new WorkerStarting('sync', 'default', new WorkerOptions));
+    $this->artisan('agendauno:verificar-produccion --disponibilidad')
+        ->expectsOutputToContain('OK    Programador de tareas latiendo')
+        ->expectsOutputToContain('OK    Cola en marcha (en mantenimiento no toma trabajos)')
+        ->expectsOutputToContain('Lista para atender.')
+        ->assertSuccessful();
+    $this->artisan('agendauno:latido --verificar=cola')->assertSuccessful();
+});
+
+it('ya abierta, la cola cuenta solo si procesó el latido con esta versión', function (): void {
+    config(['app.version' => 'nueva']);
+    event(new WorkerStarting('sync', 'default', new WorkerOptions));
+    // Arrancar no basta fuera de mantenimiento: debe procesar.
+    $this->artisan('agendauno:latido --verificar=cola')->assertFailed();
+
+    config(['app.version' => 'anterior']);
+    app(LatidoOperacion::class)->marcar(LatidoOperacion::COLA);
+    config(['app.version' => 'nueva']);
+    expect(app(LatidoOperacion::class)->enMarcha(LatidoOperacion::COLA))->toBe('otra_version');
+
+    app(LatidoOperacion::class)->marcar(LatidoOperacion::COLA);
+    $this->artisan('agendauno:latido --verificar=cola')->assertSuccessful();
 });

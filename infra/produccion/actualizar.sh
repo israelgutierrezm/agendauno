@@ -14,11 +14,14 @@
 #    migra.
 # 3. Migra (plataforma y cada negocio) y levanta la versión nueva, todavía en
 #    mantenimiento.
-# 4. Solo la abre si atiende: base, caché, cola y programador de la versión nueva,
-#    esquema al día (verificar-produccion --disponibilidad) y una petición real por
-#    nginx. Si no, se queda en mantenimiento, no se anota como actual y sale con error.
-# 5. Ya abierta, corre la verificación completa: si falta algo para operar en
-#    producción, lo dice y sale con error (no «Listo»).
+# 4. Solo la abre si atiende: base, caché, esquema al día, el programador nuevo
+#    latiendo (su latido corre también en mantenimiento) y el worker nuevo en marcha
+#    (en mantenimiento no toma trabajos: cuenta su señal de arranque con la versión),
+#    más una petición real por nginx. Si no, se queda en mantenimiento, no se anota
+#    como actual y sale con error.
+# 5. Ya abierta, confirma que la cola procesa (el latido pasa por ella) y corre la
+#    verificación completa: si falta algo para operar en producción, lo dice y sale
+#    con error (no «Listo»).
 #
 # Nunca revierte la base sola: las migraciones se escriben para que la versión
 # anterior siga funcionando con el esquema nuevo; si una no lo fuera, se restaura a
@@ -83,9 +86,9 @@ principal() {
   fi
 
   echo "==> Levantando $VERSION (sigue en mantenimiento)"
-  # Latidos en blanco: solo cuentan los de la cola y el programador nuevos.
-  $COMPOSE run --rm api php artisan cache:forget operacion:latido:programador >/dev/null
-  $COMPOSE run --rm api php artisan cache:forget operacion:latido:cola >/dev/null
+  # Señales en blanco: solo cuentan las del programador y el worker que arrancan
+  # ahora (además llevan la versión).
+  limpiar_senales
   $COMPOSE up -d --remove-orphans
 
   echo "==> Comprobando que $VERSION atiende antes de abrir"
@@ -109,6 +112,14 @@ principal() {
   $COMPOSE exec -T api php artisan up
   echo "$VERSION" > .version-actual
   anotar "$ANTERIOR -> $VERSION"
+
+  echo "==> Confirmando que la cola procesa"
+  if ! cola_procesa; then
+    echo "!! $VERSION está abierta, pero la cola no procesó trabajos en 3 minutos (correos,"
+    echo "   avisos y cobros esperan). Revisa: $COMPOSE logs --tail=100 worker scheduler"
+    echo "   Si es de esta versión, regresa con: ./volver.sh $ANTERIOR"
+    exit 2
+  fi
 
   echo "==> Verificación completa de producción"
   if ! $COMPOSE exec -T api php artisan agendauno:verificar-produccion; then
@@ -134,15 +145,31 @@ respaldar() {
   VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan agendauno:respaldar-estudios || return 1
 }
 
+limpiar_senales() {
+  for llave in operacion:latido:programador operacion:latido:cola operacion:arranque:cola; do
+    $COMPOSE run --rm api php artisan cache:forget "$llave" >/dev/null
+  done
+}
+
+# Ya abierta: el programador encola el latido cada minuto y el worker lo procesa.
+cola_procesa() {
+  intentos=0
+  until $COMPOSE exec -T api php artisan agendauno:latido --verificar=cola --minutos=2 >/dev/null 2>&1; do
+    intentos=$((intentos + 1))
+    [ "$intentos" -ge 18 ] && return 1
+    sleep 10
+  done
+}
+
 reabrir_anterior() {
   echo "   Reabriendo la versión en marcha ($ANTERIOR) sin actualizar."
   VERSION="$ANTERIOR" $COMPOSE start worker scheduler || true
   VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan up || true
 }
 
-# ¿Atiende la versión nueva? Lo mínimo por dentro (base, caché, cola, programador,
-# esquema al día) y una petición real por nginx y PHP-FPM, con la galleta que deja
-# pasar el mantenimiento.
+# ¿Atiende la versión nueva? Lo mínimo por dentro (base, caché, esquema al día,
+# programador latiendo y worker arrancado, ambos de esta versión) y una petición real
+# por nginx y PHP-FPM, con la galleta que deja pasar el mantenimiento.
 disponible() {
   $COMPOSE exec -T api php artisan agendauno:verificar-produccion --disponibilidad >/dev/null 2>&1 || return 1
   galleta="$(curl -s -o /dev/null -D - -H "Host: $DOMINIO" "http://127.0.0.1:8080/$SECRETO" \

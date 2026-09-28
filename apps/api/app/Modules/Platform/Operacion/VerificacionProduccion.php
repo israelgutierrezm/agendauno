@@ -87,16 +87,13 @@ class VerificacionProduccion
         } catch (Throwable) {
             $cache = false;
         }
-        $programador = $this->latido->estado(LatidoOperacion::PROGRAMADOR);
-        $cola = $this->latido->estado(LatidoOperacion::COLA);
 
         return [
             $this->punto('Disponibilidad', 'APP_KEY definida', (string) config('app.key') !== '', 'Sin APP_KEY no se leen sesiones ni llaves cifradas.'),
             $this->punto('Disponibilidad', 'Conexión a la base de la plataforma', $conecta, 'Revisa DB_HOST, DB_DATABASE y credenciales.'),
             $this->punto('Disponibilidad', 'Caché responde', $cache, 'Revisa Redis (REDIS_HOST).'),
             ...($conecta ? $this->migraciones('Disponibilidad') : []),
-            $this->punto('Disponibilidad', 'Programador de tareas latiendo', $programador === 'ok', "Estado: {$programador}. Revisa el contenedor scheduler."),
-            $this->punto('Disponibilidad', 'Cola procesando', $cola === 'ok', "Estado: {$cola}. Revisa el contenedor worker."),
+            ...$this->procesosEnMarcha('Disponibilidad'),
         ];
     }
 
@@ -177,16 +174,34 @@ class VerificacionProduccion
      */
     private function procesos(): array
     {
-        $programador = $this->latido->estado(LatidoOperacion::PROGRAMADOR);
-        $cola = $this->latido->estado(LatidoOperacion::COLA);
         $fallidos = Schema::hasTable('failed_jobs')
             ? DB::table('failed_jobs')->where('failed_at', '>=', CarbonImmutable::now()->subDay())->count()
             : 0;
 
         return [
-            $this->punto('Procesos', 'Programador de tareas latiendo', $programador === 'ok', "Estado: {$programador}. Revisa el contenedor scheduler."),
-            $this->punto('Procesos', 'Cola procesando', $cola === 'ok', "Estado: {$cola}. Revisa el contenedor worker."),
+            ...$this->procesosEnMarcha('Procesos'),
             $this->punto('Procesos', 'Sin trabajos fallidos en 24 h', $fallidos === 0, "{$fallidos} trabajo(s) fallido(s): php artisan queue:failed.", critico: false),
+        ];
+    }
+
+    /**
+     * El programador y la cola de ESTA versión en marcha ({@see LatidoOperacion::enMarcha()}).
+     * En mantenimiento la cola no toma trabajos: basta con que su worker haya arrancado.
+     *
+     * @return list<array{seccion: string, punto: string, estado: string, detalle: string}>
+     */
+    private function procesosEnMarcha(string $seccion): array
+    {
+        $programador = $this->latido->enMarcha(LatidoOperacion::PROGRAMADOR);
+        $cola = $this->latido->enMarcha(LatidoOperacion::COLA);
+        $version = $this->latido->version();
+        $colaEnMantenimiento = app()->isDownForMaintenance();
+
+        return [
+            $this->punto($seccion, 'Programador de tareas latiendo', $programador === 'ok', "Estado: {$programador} (versión {$version}). Revisa el contenedor scheduler."),
+            $colaEnMantenimiento
+                ? $this->punto($seccion, 'Cola en marcha (en mantenimiento no toma trabajos)', $cola === 'ok', "Estado: {$cola} (versión {$version}). Revisa el contenedor worker.")
+                : $this->punto($seccion, 'Cola procesando', $cola === 'ok', "Estado: {$cola} (versión {$version}). Revisa el contenedor worker."),
         ];
     }
 

@@ -5,8 +5,10 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Schedule;
 
 // Latido del programador y de la cola: prueba que ambos siguen vivos (chequeos de
-// salud, Docker y agendauno:verificar-produccion).
-Schedule::command('agendauno:latido')->everyMinute();
+// salud, Docker y agendauno:verificar-produccion). Es la única tarea que corre en
+// mantenimiento: al publicar, prueba que el programador nuevo funciona antes de abrir
+// (ninguna tarea del negocio corre hasta abrir).
+Schedule::command('agendauno:latido')->everyMinute()->evenInMaintenanceMode();
 
 // Resumen de alertas de la plataforma al superadmin (ALERTAS_CORREO), agrupado.
 Schedule::command('agendauno:enviar-alertas')->everyTenMinutes()->withoutOverlapping();
@@ -15,7 +17,7 @@ Schedule::command('agendauno:enviar-alertas')->everyTenMinutes()->withoutOverlap
 Schedule::command('agendauno:reanudar-pausas')->dailyAt('00:05')->withoutOverlapping();
 
 // Reinicia/renueva a diario los ciclos vencidos de los derechos recurrentes.
-Schedule::command('entitlements:generar-ciclos')->dailyAt('00:15')->withoutOverlapping();
+Schedule::command('agendauno:generar-ciclos')->dailyAt('00:15')->withoutOverlapping();
 
 // Publica los eventos de dominio pendientes del outbox de cada estudio (R39).
 // Frecuente para baja latencia; withoutOverlapping evita relays solapados.
