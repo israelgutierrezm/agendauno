@@ -705,7 +705,6 @@ onMounted(async () => {
   object-fit: contain;
   box-shadow: var(--sombra);
 }
-.tu-login-iniciales,
 .tu-negocio-iniciales {
   display: inline-grid;
   flex: 0 0 auto;
@@ -870,40 +869,6 @@ onMounted(async () => {
 .tu-login-form {
   width: 100%;
 }
-.tu-login-slug {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 2.75rem;
-  overflow: hidden;
-  border: 1px solid var(--borde);
-  border-radius: 0.85rem;
-  background: var(--superficie);
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-.tu-login-slug:focus-within {
-  border-color: var(--primario);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primario) 15%, transparent);
-}
-.tu-login-slug input {
-  min-width: 0;
-  padding: 0.7rem 0 0.7rem 0.85rem;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--texto);
-}
-.tu-login-slug > span {
-  display: flex;
-  align-items: center;
-  padding: 0 0.85rem 0 0.35rem;
-  color: var(--texto-suave);
-  font-size: 0.82rem;
-}
-.tu-login-slug--fijo {
-  background: var(--superficie-2);
-}
 .tu-login-separador {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -940,11 +905,6 @@ onMounted(async () => {
     align-items: flex-start;
     flex-direction: column;
     gap: 0.2rem;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .tu-login-slug {
-    transition: none;
   }
 }
 </style>

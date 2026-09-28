@@ -11,8 +11,6 @@ export default {
   },
   comun: {
     cargando: "Cargando…",
-    volver: "Volver",
-    continuar: "Continuar",
     cancelar: "Cancelar",
     guardar: "Guardar",
     cerrar: "Cerrar",
@@ -24,7 +22,6 @@ export default {
   },
   tabla: {
     buscar: "Buscar…",
-    vacio: "Sin resultados.",
     anterior: "Anterior",
     siguiente: "Siguiente",
     mostrando: "{desde}–{hasta} de {total}",
@@ -40,11 +37,7 @@ export default {
     sinRegistros: "Todavía no hay registros.",
   },
   nav: {
-    inicio: "Inicio",
     menu: "Menu",
-    directorio: "Encuentra tu negocio",
-    registrar: "Crear mi negocio",
-    registrarCorto: "Crear",
     probar: "Probar gratis",
     probarCorto: "Probar",
     entrar: "Iniciar sesión",
@@ -70,9 +63,6 @@ export default {
     recursos: "Recursos",
     nomina: "Nómina",
     reportes: "Reportes",
-    ventas: "Ventas",
-    catalogo: "Catálogo",
-    pos: "Punto de venta",
     promociones: "Promociones",
     comunicaciones: "Comunicación",
     lealtad: "Lealtad",
@@ -80,7 +70,6 @@ export default {
     cobranza: "Cobranza",
     renta: "Suscripción",
     padron: "Padrón",
-    retencion: "Retención",
     importar: "Importar",
     datosFiscales: "Datos fiscales",
     documentos: "Documentos",
@@ -91,11 +80,7 @@ export default {
     sedes: "Sucursales",
     contraer: "Contraer",
     grupos: {
-      personas: "Personas",
       operacion: "Operación",
-      comercio: "Comercio",
-      contenido: "Contenido",
-      ajustes: "Ajustes",
       suscripcion: "Mi suscripción",
     },
   },
@@ -124,24 +109,16 @@ export default {
         psicologos: "psicólogos",
       },
     },
-    etiqueta: "Agenda, reservas y cobros para negocios con clases o citas",
     titulo: "Menos pendientes. Más tiempo para tus clientes.",
     subtitulo:
       "Gestiona reservas, clases, membresías, cobros y tu equipo desde un solo lugar.",
     ctaRegistrar: "Probar AgendaUno gratis",
     ctaProducto: "Explorar la agenda",
-    ctaDirectorio: "Explorar negocios",
     heroVisual: {
       pole: "Pole dance",
       poleAlt: "Atleta practicando Pole dance en un estudio profesional",
-      academias: "Academias",
-      academiasAlt:
-        "Instructora dirigiendo una clase de artes marciales para adultos",
       barberia: "Barberías",
       barberiaAlt: "Barbero atendiendo a un cliente en una barbería moderna",
-      estetica: "Estéticas",
-      esteticaAlt:
-        "Profesional atendiendo a una clienta en un salón de belleza",
       pilates: "Clases",
       pilatesAlt: "Alumna practicando Pilates Reformer",
       confirmada: "Reserva confirmada",
@@ -154,17 +131,6 @@ export default {
         confirmacion: "Reportes",
       },
     },
-    puntos: {
-      agenda: "Llena tu agenda",
-      agendaDesc:
-        "Tus clientes eligen servicio, profesional y horario; tus alumnos reservan su lugar sin escribirte.",
-      cobros: "Cobra sin complicaciones",
-      cobrosDesc:
-        "Citas, paquetes, membresías y pagos en línea para mantener cada cuenta al día.",
-      control: "Controla tu negocio",
-      controlDesc:
-        "Agenda, ventas, asistencia, inventario y reportes juntos. Adiós a las hojas de cálculo.",
-    },
     prueba: "Prueba gratis de {dias} días. Sin tarjeta.",
     pieHero: "Cancela cuando quieras.",
     confianza: {
@@ -173,11 +139,6 @@ export default {
       configuracion: "Configuración guiada para empezar",
       cobro: "Clases o citas por profesional",
       cancelacion: "Sin permanencia forzosa",
-    },
-    resultados: {
-      etiqueta: "Menos administración, más negocio",
-      titulo:
-        "Una agenda que trabaja antes, durante y después de cada reserva.",
     },
     seccionTitulo: "Lo que necesitas para operar y crecer.",
     seccionSub: "Una sola herramienta, ya trabajes con citas o con clases.",
@@ -219,19 +180,6 @@ export default {
       titulo: "Una agenda visual para todo tu equipo",
       subtitulo:
         "Explora una agenda de ejemplo, sin registrarte. Cambia entre clases y citas por profesional y selecciona una reserva para ver sus detalles.",
-      imagenAlt: "Agenda visual de citas y clases con métricas de ocupación",
-      barra: "Panel",
-      demo: "Vista de ejemplo",
-      m1: "Clientes activos",
-      m2: "Agenda ocupada",
-      m3: "Reservas hoy",
-      agendaTitulo: "Agenda de hoy",
-      cita1: "Pilates Reformer · Andrea · 10:30",
-      clase1: "Pole dance básico · 18:00",
-      cita2: "Corte premium · Marco · 19:30",
-      confirmada: "Confirmada",
-      pagada: "Pagada",
-      lugares: "3 lugares",
     },
     operacion: {
       etiqueta: "Recepción y ventas",
@@ -251,20 +199,6 @@ export default {
       subtitulo:
         "La suscripción es el pago por usar AgendaUno. Los precios de tus clases, paquetes y servicios los defines tú; son cobros distintos.",
       badge: "{dias} días gratis",
-      clases: {
-        nombre: "Estudios y academias",
-        unidad: "Por miembro activo",
-        detalle:
-          "Un modelo pensado para negocios que trabajan con alumnos, clases y membresías.",
-        nota: "En el esquema por uso, la renta mensual depende de los alumnos activos del periodo y de la tarifa configurada. Consulta el padrón facturable y el cargo estimado en tu panel.",
-      },
-      citas: {
-        nombre: "Negocios con citas",
-        unidad: "Por profesional",
-        detalle:
-          "Para barberías, estéticas y consultorios, la suscripción toma como base a los profesionales activos del mes.",
-        nota: "El precio se suma por tramos de profesionales equivalentes. Un horario de atención mayor a 0 y menor a 20 horas semanales cuenta como medio tiempo.",
-      },
       pruebaDetalle:
         "Configura tu agenda y comprueba cómo encaja en tu operación antes de contratar.",
     },
@@ -277,7 +211,6 @@ export default {
       i2: "Recibe citas, registros y pagos directamente desde tu página",
       i3: "Tú decides si también quieres aparecer en el directorio público",
       cta: "Probar AgendaUno gratis",
-      enlace: "Explorar negocios",
       demoAbierto: "Agenda abierta",
       demoTitulo: "Clases disponibles",
       demoSemana: "Hoy",
@@ -301,12 +234,9 @@ export default {
     paraQuien: {
       etiqueta: "Encuentra tu forma de trabajar",
       titulo: "Clases, academias y servicios con cita.",
-      subtitulo:
-        "AgendaUno prioriza la operación de estudios y academias, y también adapta disponibilidad, profesionales y cobros para negocios que trabajan por cita.",
       saludTitulo: "Para profesionales de la salud:",
       saludAlcance:
         "organiza citas, disponibilidad y cobros de dentistas, psicólogos y otros profesionales. No sustituye un expediente clínico ni un sistema médico especializado.",
-      incluye: "Agenda · pagos · página pública",
       negocios: {
         barberia: {
           nombre: "Barberías",
@@ -927,47 +857,6 @@ export default {
       confirmar: "Reembolsar",
       procesando: "Reembolsando…",
     },
-  },
-  productoEditor: {
-    tituloNuevo: "Nuevo producto",
-    tituloEditar: "Editar producto",
-    nombre: "Nombre",
-    tipo: "Tipo",
-    precio: "Precio (MXN)",
-    tipos: {
-      paquete: "Paquete de créditos",
-      membresia: "Membresía ilimitada",
-      pase_dia: "Pase del día",
-      sesion_individual: "Sesión individual",
-      add_on: "Extra / add-on",
-      taller: "Taller",
-    },
-    acceso: "Acceso",
-    ilimitado: "Acceso ilimitado",
-    ilimitadoAyuda: "Sin descontar créditos por reserva.",
-    creditos: "Créditos incluidos",
-    vigencia: "Vigencia (días)",
-    vigenciaPh: "Sin vencimiento",
-    vigenciaAyuda: "Días de validez desde la compra. Vacío = no vence.",
-    recurrencia: "Recurrencia",
-    reset: "Renovación de ciclo",
-    resets: {
-      ninguno: "No recurrente",
-      calendario: "Mensual (calendario)",
-      aniversario: "Mensual (aniversario)",
-    },
-    unidadesCiclo: "Créditos por ciclo",
-    rollover: "Acumulación (rollover)",
-    rollovers: {
-      ninguno: "No acumula",
-      completo: "Acumula todo",
-      limitado: "Acumula hasta un tope",
-    },
-    rolloverMax: "Tope de acumulación (créditos)",
-    sede: "Restringir a sede",
-    todasSedes: "Todas las sedes",
-    archivado: "Archivado",
-    archivadoAyuda: "Se retira de la venta sin borrar su historial.",
   },
   ficha: {
     volver: "Volver a miembros",

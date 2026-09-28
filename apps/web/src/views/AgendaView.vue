@@ -2917,14 +2917,6 @@ onMounted(async () => {
 .tu-bloque:active {
   transform: scale(0.99);
 }
-.tu-bloque--programada {
-  background: var(--primario-suave);
-  border-color: var(--primario);
-}
-.tu-bloque--completa {
-  background: rgba(245, 158, 11, 0.18);
-  border-color: #f59e0b;
-}
 .tu-bloque--cancelada {
   background: var(--superficie-2);
   border-color: var(--texto-suave);
@@ -2956,11 +2948,5 @@ onMounted(async () => {
   border-radius: 9999px;
   background: var(--aviso);
   flex-shrink: 0;
-}
-.tu-punto {
-  display: inline-block;
-  width: 0.85rem;
-  height: 0.85rem;
-  border-radius: 0.25rem;
 }
 </style>

@@ -7,21 +7,6 @@ export type Densidad = "compacta" | "normal" | "comoda";
 const DENSIDADES: Densidad[] = ["compacta", "normal", "comoda"];
 
 /**
- * Colores de acento disponibles. `hex: null` = el acento por defecto del tema
- * (Azul Uno, distinto en claro/oscuro); los demas sobreescriben `--acento` y de ahi
- * se derivan los tonos "primario" para ambos modos.
- */
-export const ACENTOS: { nombre: string; hex: string | null }[] = [
-  { nombre: "Azul", hex: null },
-  { nombre: "Indigo", hex: "#5e5ce6" },
-  { nombre: "Esmeralda", hex: "#059669" },
-  { nombre: "Cielo", hex: "#0284c7" },
-  { nombre: "Violeta", hex: "#7c3aed" },
-  { nombre: "Rosa", hex: "#e11d48" },
-  { nombre: "Ambar", hex: "#d97706" },
-];
-
-/**
  * Tema (claro/oscuro) y densidad (escala base) del flujo multi-tenant. Ambos se
  * persisten en localStorage y se aplican al elemento <html>: el modo oscuro por
  * clase `.dark`, la densidad por `data-densidad`.
@@ -69,16 +54,6 @@ export const useTemaStore = defineStore("tema", () => {
     aplicar();
   }
 
-  function fijarAcento(hex: string | null): void {
-    acento.value = hex;
-    if (hex === null) {
-      borrar("tu.acento");
-    } else {
-      persistir("tu.acento", hex);
-    }
-    aplicar();
-  }
-
   function alternarModo(): void {
     modo.value = modo.value === "oscuro" ? "claro" : "oscuro";
     persistir("tu.modo", modo.value);
@@ -102,20 +77,12 @@ export const useTemaStore = defineStore("tema", () => {
     inicializar,
     alternarModo,
     ajustarDensidad,
-    fijarAcento,
   };
 });
 
 function persistir(clave: string, valor: string): void {
   try {
     localStorage.setItem(clave, valor);
-  } catch {
-    // Ignora si localStorage no esta disponible.
-  }
-}
-function borrar(clave: string): void {
-  try {
-    localStorage.removeItem(clave);
   } catch {
     // Ignora si localStorage no esta disponible.
   }

@@ -49,7 +49,6 @@ import {
   cancelacion,
   confirmarRegistro,
   corteCaja,
-  movimientosCredito,
   pausaMembresia,
   plataformaAdmin,
   porConciliar,
@@ -113,7 +112,6 @@ const mensajesBase = {
   confirmarRegistro,
   corteCaja,
   cancelacion,
-  movimientosCredito,
   margenesServicio,
   bloqueosAgenda,
   reprogramar,
@@ -144,8 +142,6 @@ export const i18n = createI18n({
  */
 const SIN_ADAPTAR = new Set([
   "landing",
-  "precios",
-  "soluciones",
   "registro",
   "activacion",
   "directorio",

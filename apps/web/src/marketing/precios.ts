@@ -20,10 +20,6 @@ export const ejemplosCitas = [
   { capacidad: "3 profesionales", subtotal: 63000 },
 ] as const;
 
-export function conIva(subtotal: number): number {
-  return subtotal + Math.floor((subtotal * 16 + 50) / 100);
-}
-
 export function pesos(centavos: number): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",

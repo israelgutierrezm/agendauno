@@ -939,11 +939,6 @@ onBeforeUnmount(() => observador?.disconnect());
 .tu-titulo-final {
   font-size: clamp(1.95rem, 4.35vw, 2.625rem);
 }
-.tu-precio-titulo {
-  font-size: 1.625rem;
-  font-weight: 300;
-}
-.tu-eyebrow,
 .tu-seccion-etiqueta {
   display: inline-block;
   color: var(--enlace);
@@ -962,227 +957,9 @@ onBeforeUnmount(() => observador?.disconnect());
   border: 0;
   border-radius: var(--landing-radius);
 }
-.tu-resultados .tu-card,
 .tu-pasos .tu-card,
 .tu-landing details.tu-card {
   background: var(--fondo);
-}
-.tu-resultado-num {
-  color: var(--texto-suave);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-}
-.tu-resultado-grafico {
-  position: relative;
-  display: flex;
-  min-height: 11.5rem;
-  margin: -0.2rem -0.2rem 1.7rem;
-  overflow: hidden;
-  border-radius: 1.4rem;
-}
-.tu-resultado-grafico--agenda {
-  align-items: center;
-  justify-content: space-around;
-  background: #e7f3ff;
-}
-.tu-ocupacion-anillo {
-  position: relative;
-  display: grid;
-  width: 7.2rem;
-  aspect-ratio: 1;
-  place-content: center;
-  border-radius: 50%;
-  background: conic-gradient(
-    var(--primario) 0 92%,
-    rgb(255 255 255 / 0.72) 92% 100%
-  );
-  text-align: center;
-  animation: tu-grafico-flota 5s ease-in-out infinite;
-}
-.tu-ocupacion-anillo::before {
-  position: absolute;
-  inset: 0.62rem;
-  border-radius: inherit;
-  background: #f8fbfd;
-  content: "";
-}
-.tu-ocupacion-anillo strong,
-.tu-ocupacion-anillo span {
-  position: relative;
-  z-index: 1;
-}
-.tu-ocupacion-anillo strong {
-  color: #12334f;
-  font-size: 1.55rem;
-  line-height: 1;
-}
-.tu-ocupacion-anillo span {
-  margin-top: 0.25rem;
-  color: #547089;
-  font-size: 0.72rem;
-}
-.tu-asientos {
-  display: grid;
-  grid-template-columns: repeat(2, 1.7rem);
-  gap: 0.55rem;
-}
-.tu-asientos span {
-  height: 1.7rem;
-  border-radius: 0.58rem;
-  background: #61a7dc;
-  box-shadow: inset 0 -4px rgb(0 58 112 / 0.12);
-}
-.tu-asientos span.libre {
-  border: 1px dashed #8ba5b8;
-  background: rgb(255 255 255 / 0.6);
-  box-shadow: none;
-  animation: tu-asiento-pulso 2.2s ease-in-out infinite;
-}
-.tu-resultado-grafico--cobros {
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.65rem;
-  padding: 1.3rem;
-  background: #e8f9fd;
-}
-.tu-pago-linea {
-  display: grid;
-  grid-template-columns: 2.25rem 1fr 1.8rem;
-  align-items: center;
-  gap: 0.7rem;
-  min-height: 2.8rem;
-  padding: 0 0.7rem;
-  border: 1px solid rgb(3 27 78 / 8%);
-  border-radius: 0.9rem;
-  background: rgb(255 255 255 / 0.73);
-  animation: tu-pago-entra 5s ease-in-out infinite;
-}
-.tu-pago-linea:nth-child(2) {
-  animation-delay: -3.3s;
-}
-.tu-pago-linea:nth-child(3) {
-  animation-delay: -1.6s;
-}
-.tu-pago-avatar {
-  width: 1.8rem;
-  height: 1.8rem;
-  border-radius: 50%;
-  background: #4f7f90;
-}
-.tu-pago-barra {
-  width: 72%;
-  height: 0.48rem;
-  border-radius: 999px;
-  background: #c9e6f5;
-  box-shadow: 0 0.78rem #dceff8;
-}
-.tu-pago-check {
-  display: grid;
-  width: 1.55rem;
-  height: 1.55rem;
-  place-content: center;
-  border-radius: 50%;
-  background: #198754;
-  color: #fff;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-.tu-resultado-grafico--control {
-  align-items: flex-end;
-  justify-content: space-between;
-  padding: 1.35rem 1.45rem 1.2rem;
-  background: #e9edf5;
-}
-.tu-mini-barras {
-  display: flex;
-  height: 8rem;
-  align-items: flex-end;
-  gap: 0.48rem;
-}
-.tu-mini-barras span {
-  width: 0.78rem;
-  height: 35%;
-  border-radius: 999px;
-  background: #031b4e;
-  transform-origin: bottom;
-  animation: tu-barra-respira 3.4s ease-in-out infinite alternate;
-}
-.tu-mini-barras span:nth-child(2) {
-  height: 52%;
-  animation-delay: -1.8s;
-}
-.tu-mini-barras span:nth-child(3) {
-  height: 43%;
-  animation-delay: -0.8s;
-}
-.tu-mini-barras span:nth-child(4) {
-  height: 69%;
-  animation-delay: -2.4s;
-}
-.tu-mini-barras span:nth-child(5) {
-  height: 61%;
-  animation-delay: -1.2s;
-}
-.tu-mini-barras span:nth-child(6) {
-  height: 84%;
-  animation-delay: -2.8s;
-}
-.tu-mini-barras span:nth-child(7) {
-  height: 96%;
-  animation-delay: -0.4s;
-}
-.tu-mini-tendencia {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.6rem;
-  padding-bottom: 1.4rem;
-}
-.tu-mini-tendencia span {
-  width: 0.56rem;
-  height: 0.56rem;
-  border: 2px solid #fff;
-  border-radius: 50%;
-  background: #00c6f2;
-  box-shadow: 0 0 0 1px rgb(0 198 242 / 28%);
-}
-.tu-mini-tendencia span:nth-child(2) {
-  transform: translateY(-0.8rem);
-}
-.tu-mini-tendencia span:nth-child(3) {
-  transform: translateY(-0.35rem);
-}
-.tu-mini-tendencia span:nth-child(4) {
-  transform: translateY(-1.65rem);
-}
-@keyframes tu-grafico-flota {
-  50% {
-    transform: translateY(-0.35rem) rotate(1deg);
-  }
-}
-@keyframes tu-asiento-pulso {
-  50% {
-    opacity: 0.45;
-    transform: scale(0.9);
-  }
-}
-@keyframes tu-pago-entra {
-  0%,
-  18%,
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  8% {
-    transform: translateX(0.45rem);
-    opacity: 0.72;
-  }
-}
-@keyframes tu-barra-respira {
-  to {
-    transform: scaleY(0.72);
-    opacity: 0.68;
-  }
 }
 
 /* Fotografía de producto: el color vive en la imagen, no en la interfaz. */
@@ -1203,9 +980,6 @@ onBeforeUnmount(() => observador?.disconnect());
 .tu-hero-visual.reveal-in .tu-imagen-marco {
   animation: tu-entrada-producto 1s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.tu-imagen-cielo {
-  background: #edf5fb;
-}
 .tu-imagen-rosa {
   background: #e7f8fc;
 }
@@ -1215,66 +989,6 @@ onBeforeUnmount(() => observador?.disconnect());
   }
   to {
     transform: none;
-  }
-}
-
-/* Ventana de app (mockup). */
-.tu-ventana {
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-panel, 28px);
-  overflow: hidden;
-  background: var(--superficie);
-}
-.tu-ventana-barra {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: var(--fondo);
-  border-bottom: 1px solid var(--borde);
-}
-.tu-punto {
-  height: 0.75rem;
-  width: 0.75rem;
-  border-radius: 9999px;
-}
-
-/* Barra de ocupación que se llena al revelarse. */
-.tu-barra {
-  height: 6px;
-  border-radius: 9999px;
-  background: var(--borde);
-  overflow: hidden;
-}
-.tu-barra-fill {
-  display: block;
-  height: 100%;
-  width: 0;
-  border-radius: 9999px;
-}
-.reveal-in .tu-barra-fill {
-  width: var(--pct);
-  transition: width 1.1s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* Punto "en vivo" pulsante. */
-.tu-vivo {
-  height: 7px;
-  width: 7px;
-  border-radius: 9999px;
-  background: var(--exito);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--exito) 60%, transparent);
-  animation: tu-pulso 1.8s ease-out infinite;
-}
-@keyframes tu-pulso {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--exito) 55%, transparent);
-  }
-  70% {
-    box-shadow: 0 0 0 7px transparent;
-  }
-  100% {
-    box-shadow: 0 0 0 0 transparent;
   }
 }
 
@@ -1324,20 +1038,6 @@ onBeforeUnmount(() => observador?.disconnect());
 .tu-link-flecha:hover {
   text-decoration: underline;
 }
-
-/* La suscripción y los cobros a clientes se explican por separado. */
-.tu-precio-modelos {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.5rem;
-}
-.tu-precio-nota {
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--borde);
-  color: var(--texto-suave);
-  font-size: 0.85rem;
-  line-height: 1.6;
-}
 .tu-precio-prueba {
   display: flex;
   flex-wrap: wrap;
@@ -1349,27 +1049,10 @@ onBeforeUnmount(() => observador?.disconnect());
   border-radius: var(--radio-tarjeta, 18px);
 }
 @media (max-width: 639px) {
-  .tu-precio-modelos {
-    grid-template-columns: 1fr;
-  }
   .tu-precio-prueba .tu-btn {
     width: 100%;
     justify-content: center;
   }
-}
-.tu-precio-card {
-  padding: clamp(1.75rem, 4vw, 3rem);
-  border-radius: var(--landing-radius);
-  background: var(--superficie);
-}
-.tu-precio-badge {
-  display: inline-flex;
-  padding: 0.45rem 0.75rem;
-  border-radius: 8px;
-  background: var(--primario-suave);
-  color: var(--enlace);
-  font-size: 0.82rem;
-  font-weight: 700;
 }
 
 /* Vista pública del negocio: prueba visual del enlace de reservas. */
@@ -1483,19 +1166,13 @@ details[open] > summary > span {
     animation: none;
   }
   .reveal,
-  .tu-barra-fill,
   .tu-imagen-marco img {
     transition: none;
   }
-  .tu-vivo,
   .tu-hero-visual.reveal-in .tu-imagen-marco,
   .tu-hero-foto--1,
   .tu-hero-foto--3,
-  .tu-hero-reserva,
-  .tu-ocupacion-anillo,
-  .tu-asientos span.libre,
-  .tu-pago-linea,
-  .tu-mini-barras span {
+  .tu-hero-reserva {
     animation: none;
   }
 }

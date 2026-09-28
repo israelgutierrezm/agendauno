@@ -112,9 +112,6 @@ class Sesion {
 
   bool get esCitas => modalidad == Modalidad.citas;
 
-  /// También es alumno/cliente aunque su rol principal sea otro.
-  bool get esAlumno => rol == 'miembro' || roles.contains('miembro');
-
   /// Solo imparte (sin rol de dueño, admin ni recepción): su app es su portal de
   /// instructor (sus clases o citas); el servidor ya le acota la agenda.
   bool get esInstructorAcotado {

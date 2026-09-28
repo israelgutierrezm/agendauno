@@ -5,7 +5,6 @@
  */
 export default {
   nav: {
-    grupo: "Mi cuenta",
     inicio: "Inicio",
     reservas: "Reservas",
     pagos: "Pagos",
@@ -13,7 +12,6 @@ export default {
     configuracion: "Configuración",
   },
   inicio: {
-    titulo: "Inicio",
     saludo: "¡Hola, {nombre}!",
     saludoSinNombre: "¡Hola!",
     resumen: "Aquí tienes un resumen de tu actividad en {estudio}.",
@@ -23,7 +21,6 @@ export default {
     proximaCita: "Tu próxima cita",
     proximaReserva: "Tu próxima reserva",
     sinReservas: "Nada agendado por ahora",
-    sinProxima: "No tienes reservas próximas.",
     sinProximaAyuda: "Elige tu próxima clase y aparta tu lugar.",
     reservar: "Reservar",
     clima: {
@@ -39,7 +36,6 @@ export default {
         "Tienes 1 documento por firmar | Tienes {n} documentos por firmar",
       lugar:
         "Se liberó un lugar en {clase}: acéptalo antes de que se ofrezca a alguien más.",
-      pagar: "Tienes 1 pago pendiente | Tienes {n} pagos pendientes",
     },
     tarjetas: {
       reservar: "Reservar",
@@ -134,7 +130,6 @@ export default {
   },
   pagos: {
     titulo: "Pagos",
-    creditos: "Mis créditos",
     porPagar: "Por pagar",
     historial: "Historial de compras",
     sinHistorial: "Aún no hay compras.",

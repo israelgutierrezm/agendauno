@@ -42,7 +42,6 @@ export default {
     ocupadoPct: "{n}% ocupado",
     noTrabaja: "No atiende este día",
     fueraHorario: "Fuera de horario",
-    agendarA: "Agendar a las {hora}",
     ahora: "Ahora",
     sinCliente: "Sin cliente",
     lugares: "{ocupados}/{capacidad} lugares",
@@ -60,10 +59,6 @@ export default {
     baja: "Baja",
     enCurso: "En curso",
     cancelada: "Cancelada",
-    leyendaCupo: "Cupo",
-    cupoAlto: "90% o más",
-    cupoMedio: "40–89%",
-    cupoBajo: "Menos de 40%",
   },
   nuevaCita: {
     boton: "Nueva cita",

@@ -1,12 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import PreciosLanding from "./PreciosLanding.vue";
-import {
-  bandasEstudios,
-  conIva,
-  ejemplosCitas,
-  pesos,
-} from "@/marketing/precios";
+import { bandasEstudios, ejemplosCitas, pesos } from "@/marketing/precios";
 
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
 const montar = () =>
@@ -73,9 +68,6 @@ describe("precios públicos", () => {
       26900 + 22600,
       26900 + 22600 + 13500,
     ]);
-    expect(conIva(13450)).toBe(15602);
-    expect(conIva(33900)).toBe(39324);
-    expect(conIva(0)).toBe(0);
     expect(pesos(15602)).toBe("$156.02");
   });
 });

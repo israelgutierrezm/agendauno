@@ -198,10 +198,8 @@ export const reglasAgenda = {
   toleraN: "tolera {n} en {d} días",
   guardar: "Guardar",
   guardada: "Política guardada.",
-  general: "Para todas las actividades",
   porActividad: "Excepciones por actividad",
   agregarActividad: "Agregar excepción para…",
-  elegir: "Elige una actividad",
   resumen: "{h} h antes",
   cobraTarde: "cobra tardías",
   cobraNoShow: "cobra inasistencias",
@@ -315,7 +313,6 @@ export const bitacora = {
 };
 
 export const citaCuenta = {
-  titulo: "Agendar una cita",
   servicio: "Servicio",
   profesional: "Profesional",
   sede: "Sede",
@@ -331,7 +328,6 @@ export const citaCuenta = {
 };
 
 export const miCuentaExtra = {
-  formularios: "Mis formularios",
   pagar: "Pagar en línea",
   pagando: "Abriendo pago…",
   pagoEnProceso:
@@ -437,7 +433,6 @@ export const plataformaAdmin = {
     completa: "Completa",
     pendiente: "Pendiente",
     contacto: "Contacto",
-    sinContacto: "Sin datos de contacto.",
     uso: "Uso por mes",
     cargos: "Cargos de renta",
     sinCargos: "Aún no tiene cargos.",
@@ -477,11 +472,7 @@ export const plataformaAdmin = {
     todos: "Todos los estados",
     periodo: "Periodo",
     vacio: "No hay cargos con estos filtros.",
-    colPeriodo: "Periodo",
-    colMonto: "Monto",
     colEstado: "Estado",
-    colVence: "Vence",
-    colFactura: "Factura",
   },
   llaves: {
     secret_key: "Llave secreta",
@@ -581,7 +572,6 @@ export const pagoTienda = {
   pagarOxxo: "o paga en efectivo en OXXO",
   titulo: "Paga en tienda",
   referencia: "Referencia: {referencia}",
-  vence: "Vence el {fecha}",
   recibo: "Ver recibo para imprimir",
   ayuda:
     "Presenta la referencia en la caja. Tu compra se confirma sola cuando la tienda reporta el pago.",
@@ -769,14 +759,6 @@ export const cancelacion = {
   },
 };
 
-// Por qué cambió el saldo de créditos (lo ve el alumno y el equipo).
-export const movimientosCredito = {
-  ver: "Ver movimientos",
-  ocultar: "Ocultar movimientos",
-  vacio: "Aún no hay movimientos.",
-  saldo: "Saldo {n}",
-};
-
 // Tiempos de preparación y limpieza de un servicio (fase 2, punto 2.3).
 export const margenesServicio = {
   preparacion: "Preparación antes (min)",
@@ -811,7 +793,6 @@ export const bloqueosAgenda = {
   afectadas:
     "Ya hay {n} citas o clases en ese horario. No se cancelan: revísalas después de bloquear.",
   conReservas: "{n} con reserva",
-  enAgenda: "Bloqueado",
 };
 
 // Reprogramar sin cancelar (fase 2, punto 2.1).

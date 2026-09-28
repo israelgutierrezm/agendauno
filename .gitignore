@@ -5,7 +5,6 @@ Thumbs.db
 # === Editors ===
 .idea/
 .vscode/*
-!.vscode/extensions.json
 *.swp
 
 # === Node / Vite ===

@@ -279,13 +279,6 @@ defineEmits<{ alternarTema: [] }>();
   background: var(--superficie-2);
   color: var(--texto);
 }
-.tu-public-footer--tenant > div {
-  justify-content: center;
-  padding-block: 1.25rem;
-}
-.tu-public-footer--tenant .agendauno-logo {
-  width: 145px !important;
-}
 .tu-public-register-short {
   display: none;
 }

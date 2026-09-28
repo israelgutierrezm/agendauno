@@ -100,5 +100,5 @@ alumno, app móvil, recepción, reportes, comunicaciones, superadmin y cobro del
 Las fases 1 (operación) y 2 (agenda cotidiana) están cerradas; los límites de negocio
 son parámetros configurables por negocio o por la plataforma (ADR 0042 y 0047).
 
-Lee `docs/DEVELOPMENT_PLAN.md` para la hoja de ruta por slices, `docs/DATABASE.md` para el glosario
-y esquema, y `docs/adr/` para las decisiones de arquitectura.
+Lee `docs/DATABASE.md` para el glosario y esquema, y `docs/adr/` para las decisiones de
+arquitectura.

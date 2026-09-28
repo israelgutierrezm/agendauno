@@ -14,12 +14,11 @@ void main() {
 
       expect(instructor.puede('asistencia.marcar'), isTrue);
       expect(instructor.puede('ordenes.gestionar'), isFalse);
-      expect(instructor.esAlumno, isFalse);
     },
   );
 
   test(
-    'el propietario puede todo y quien también es alumno lo sigue siendo',
+    'el propietario puede todo',
     () {
       final dueno = Sesion.desdeJson('estudio', '1|x', {
         'nombre': 'Dueña',
@@ -29,7 +28,6 @@ void main() {
       });
 
       expect(dueno.puede('pagos.reembolsar'), isTrue);
-      expect(dueno.esAlumno, isTrue);
     },
   );
 

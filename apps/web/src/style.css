@@ -91,7 +91,6 @@
   --enlace: #007487;
   --marketing-enfasis: #198754;
   --marketing-rosa: #e7549b;
-  --marketing-cielo: #74c0fc;
   --marketing-operacion: #007e91;
   --marketing-negocios: #1098ad;
   /* Rosa de acción más profundo para mantener contraste con texto blanco. */
@@ -148,9 +147,6 @@
 .text-success {
   --bs-text-opacity: 1;
   color: rgba(25, 135, 84, var(--bs-text-opacity)) !important;
-}
-.text-success-emphasis {
-  color: var(--exito-texto) !important;
 }
 .tu-public-business input[type="radio"],
 .tu-public-business input[type="checkbox"] {
@@ -326,24 +322,6 @@
   }
   .tu-enlace:hover {
     text-decoration: underline;
-  }
-
-  .tu-nav-link {
-    padding: 0.45rem 0.85rem;
-    border-radius: 0.6rem;
-    font-weight: 500;
-    font-size: 0.9rem;
-    color: var(--texto-suave);
-    white-space: nowrap;
-    text-decoration: none;
-  }
-  .tu-nav-link:hover {
-    background: var(--superficie-2);
-    color: var(--texto);
-  }
-  .tu-nav-link.router-link-active {
-    background: var(--primario-suave);
-    color: var(--primario);
   }
 
   /* Control segmentado (Semana | Día…): riel gris y la opción activa en blanco. */
