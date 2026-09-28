@@ -27,7 +27,7 @@ class PagoTenant extends Model
     protected $fillable = [
         'orden_id', 'proveedor', 'metodo', 'estado', 'monto_minor', 'moneda',
         'referencia_externa', 'idempotency_key', 'domiciliacion_id', 'registrado_por',
-        'aprobado_en',
+        'aprobado_en', 'revisado_en', 'cerrado_sin_confirmar',
     ];
 
     /**
@@ -59,6 +59,9 @@ class PagoTenant extends Model
         'monto_minor' => 'integer',
         // Cuándo entró el dinero (distinto de cuándo se inició el cobro).
         'aprobado_en' => 'datetime',
+        // Conciliación: última consulta a la pasarela y si se cerró sin su confirmación.
+        'revisado_en' => 'datetime',
+        'cerrado_sin_confirmar' => 'boolean',
     ];
 
     /**

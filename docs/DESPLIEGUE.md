@@ -167,8 +167,10 @@ Además de esto, conviene que el proveedor de MySQL haga sus instantáneas diari
 - `ALERTAS_CORREO` (en `api.env`) recibe cada 10 minutos, en un solo correo, lo que
   falló en la operación: errores de la aplicación (incluidos cobros, domiciliaciones y
   reembolsos), incidencias de cobro nuevas (pago tardío o duplicado, reembolso
-  incierto), correos que agotaron sus intentos, webhooks de los negocios que dejaron de
-  responder, respaldos fallidos, trabajos de la cola fallidos y la cola detenida. Lo
+  incierto), cobros confirmados por la conciliación porque su aviso no llegó (webhook
+  de la pasarela mal configurado, ADR 0053), correos que agotaron sus intentos,
+  webhooks de los negocios que dejaron de responder, respaldos fallidos, trabajos de
+  la cola fallidos y la cola detenida. Lo
   que sigue pasando se vuelve a avisar a las 6 horas, no a cada vez.
 - Si se detiene el **programador de tareas**, él mismo no puede avisar: registra
   `https://DOMINIO/api/v1/health?estricto=1` en un monitor externo (UptimeRobot,

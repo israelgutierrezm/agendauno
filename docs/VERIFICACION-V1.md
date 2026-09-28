@@ -102,8 +102,10 @@ envían cada minuto.
 
 - [ ] Reserva con pago, espera a que venza y **después** termina de pagar:
   - OpenPay: deja abierta su página de pago, espera a que venza la reserva y paga;
-  - Stripe: paga con el webhook apagado, deja vencer la reserva y reenvía el
-    evento desde el dashboard («Resend»).
+  - Stripe: detén el `scheduler` (si no, la conciliación del caso 6 confirma el pago
+    antes de que venza), paga con el webhook apagado, vuelve a encender el
+    `scheduler`, deja vencer la reserva y reenvía el evento desde el dashboard
+    («Resend»).
 
   Resultado esperado:
   - si la clase no ha empezado y el lugar sigue libre, la reserva se reconfirma sola;
@@ -123,7 +125,28 @@ envían cada minuto.
 - [ ] Un aviso con firma incorrecta (por ejemplo, cambia el `webhook_secret`) se
   rechaza con 400 (Stripe) o 401 (Mercado Pago, OpenPay) y no toca nada.
 
-### 6. Reembolso y conciliación
+### 6. Aviso perdido
+
+`turnouno:conciliar-pagos` (cada 5 minutos) le pregunta a la pasarela por los cobros
+en línea sin confirmar desde hace más de 5 minutos, y por los intentos que se
+cerraron de nuestro lado sin que la pasarela lo confirmara (por ejemplo, un pago en
+tienda de OpenPay al reintentar con tarjeta). Aplica lo mismo que habría aplicado el
+aviso; nunca cobra ni cancela.
+
+- [ ] Quita (o rompe) el webhook en el panel de la pasarela y paga una compra.
+  - En 5–10 minutos la orden queda `pagada` y llega el recibo, sin aviso.
+  - La bitácora registra «pago.conciliado» y el superadmin recibe una alerta
+    «aviso de pago perdido» (una por negocio y pasarela).
+- [ ] Reserva con pago y paga con el webhook roto: la reserva queda confirmada
+  antes de que venza el apartado.
+- [ ] Paga en tienda (OXXO) con el webhook roto: se sigue preguntando, cada vez más
+  espaciado (cada vuelta la primera hora, cada 30 minutos el primer día, cada
+  2 horas después) mientras la referencia esté vigente; al pagarse, se confirma.
+- [ ] Deja vencer una sesión sin pagar: el intento queda cerrado y la compra sigue
+  en «Por pagar».
+- [ ] Restaura el webhook y reenvía un aviso ya conciliado: no se duplica nada.
+
+### 7. Reembolso y conciliación
 
 - [ ] **Total.** En Cobranza → Pagos → «Reembolsar» un paquete sin usar, con
   «revertir créditos». El pago queda `reembolsado`, las clases del paquete vuelven a
@@ -138,7 +161,7 @@ envían cada minuto.
 - [ ] **Corte de caja.** Lo cobrado y lo devuelto del día cuadra con lo que muestra
   el panel de la pasarela.
 
-### 7. Renovación de membresía
+### 8. Renovación de membresía
 
 No hay forma de adelantar el reloj desde los comandos: para probar sin esperar, en
 la base del negocio de prueba pon `acuerdos.proxima_cobro_en` en la fecha de hoy y
@@ -162,7 +185,7 @@ corre el comando a mano.
 - [ ] **Sin pago automático.** La renovación queda en «Por pagar» y en «En mora»
   («Falta completar el pago en línea») hasta que la alumna paga.
 
-### 8. Correos, recordatorios y push
+### 9. Correos, recordatorios y push
 
 - [ ] Cada caso anterior dejó su mensaje `enviado` en la Bandeja de salida y llegó
   al correo (revisa también spam: SPF y DKIM del remitente).
@@ -180,7 +203,7 @@ corre el comando a mano.
 Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado»,
 «membresía suspendida» al cliente y «reserva creada».
 
-### 9. Renta del SaaS (la plataforma cobra al negocio)
+### 10. Renta del SaaS (la plataforma cobra al negocio)
 
 - [ ] En `/plataforma` activa Stripe con llaves de prueba y registra en Stripe el
   webhook `APP_URL/api/v1/webhooks/plataforma/stripe` (la pantalla aún no lo
@@ -188,11 +211,3 @@ Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado�
 - [ ] Con un negocio fuera de prueba y un mes cerrado,
   `php artisan turnouno:generar-cargos-renta --periodo=AAAA-MM` crea su cargo. El
   dueño lo paga en «Suscripción» (`/renta`) y el cargo pasa a `pagado`.
-
-## Hueco conocido
-
-Si una pasarela nunca entrega el aviso de un pago de checkout (webhook caído y sin
-reintentos), ningún proceso consulta a la pasarela para recuperarlo: el pago queda
-`pendiente` y la reserva vence. Se recupera reenviando el evento desde el panel de
-la pasarela, que cae en el caso 4. Los reembolsos y los cobros de suscripciones sí
-se concilian solos.

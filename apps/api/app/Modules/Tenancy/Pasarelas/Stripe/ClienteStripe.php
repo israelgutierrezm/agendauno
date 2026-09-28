@@ -309,6 +309,46 @@ class ClienteStripe
     }
 
     /**
+     * Cómo va una sesión de Checkout: su estado (`open`, `complete`, `expired`), el de
+     * su pago (`paid`, `unpaid`, `no_payment_required`) y el de su cobro (el
+     * PaymentIntent: `succeeded`, `processing`, `requires_action`, `canceled`…), que
+     * dice si un pago en tienda sigue en espera.
+     *
+     * @return array{estado: string, pago: string, cobro: string}
+     */
+    public function sesion(string $sesionId): array
+    {
+        /** @var array{status?: string, payment_status?: string, payment_intent?: string|array{status?: string}|null} $json */
+        $json = Http::withToken($this->secretKey)
+            ->get(self::BASE.'/checkout/sessions/'.rawurlencode($sesionId), ['expand' => ['payment_intent']])
+            ->throw()
+            ->json();
+
+        $intent = $json['payment_intent'] ?? null;
+
+        return [
+            'estado' => (string) ($json['status'] ?? ''),
+            'pago' => (string) ($json['payment_status'] ?? ''),
+            'cobro' => is_array($intent) ? (string) ($intent['status'] ?? '') : '',
+        ];
+    }
+
+    /**
+     * Estado de un PaymentIntent (`succeeded`, `processing`, `requires_action`,
+     * `requires_payment_method`, `canceled`…).
+     */
+    public function estadoIntent(string $intentId): string
+    {
+        /** @var array{status?: string} $json */
+        $json = Http::withToken($this->secretKey)
+            ->get(self::BASE.'/payment_intents/'.rawurlencode($intentId))
+            ->throw()
+            ->json();
+
+        return (string) ($json['status'] ?? '');
+    }
+
+    /**
      * El PaymentIntent (cobro) que generó una sesión de Checkout ya pagada.
      */
     public function paymentIntentDeSesion(string $sesionId): ?string

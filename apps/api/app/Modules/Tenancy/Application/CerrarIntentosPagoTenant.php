@@ -16,6 +16,9 @@ use Throwable;
  * venció el apartado de una cita, o se confirmó otro intento de la misma compra), para
  * que no llegue un pago tarde. Si la pasarela dice que ese intento YA se cobró, se
  * deja pendiente: su confirmación llegará y se atenderá como pago tardío o cobro doble.
+ * Lo cerrado queda marcado para que la conciliación le pregunte a la pasarela si de
+ * verdad ya no se puede pagar ({@see ConciliarPagosTenant}): OpenPay no cancela, y la
+ * pasarela pudo no responder.
  */
 class CerrarIntentosPagoTenant
 {
@@ -50,6 +53,6 @@ class CerrarIntentosPagoTenant
 
         PagoTenant::query()->whereKey($pago->getKey())
             ->where('estado', EstadoPago::Pendiente->value)
-            ->update(['estado' => EstadoPago::Rechazado->value]);
+            ->update(['estado' => EstadoPago::Rechazado->value, 'cerrado_sin_confirmar' => true]);
     }
 }

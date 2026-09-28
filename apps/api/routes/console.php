@@ -49,6 +49,10 @@ Schedule::command('turnouno:expirar-reservas-pago')->everyMinute()->withoutOverl
 // Vuelve a consultar, con la misma llave, las devoluciones que la pasarela no confirmó.
 Schedule::command('turnouno:conciliar-reembolsos')->everyFiveMinutes()->withoutOverlapping();
 
+// Pregunta a la pasarela por los cobros cuyo aviso (webhook) no llegó y aplica lo que
+// habría aplicado el aviso. Antes de que venza el apartado de una cita (30 min).
+Schedule::command('turnouno:conciliar-pagos')->everyFiveMinutes()->withoutOverlapping();
+
 // Cobra las renovaciones recurrentes vencidas y reintenta a los morosos (Etapa 2).
 // Antes de escalar el dunning, para dar oportunidad a los reintentos del día.
 Schedule::command('turnouno:cobrar-suscripciones')->dailyAt('00:45')->withoutOverlapping();

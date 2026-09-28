@@ -21,7 +21,7 @@ use App\Modules\Tenancy\Pasarelas\Stripe\ClienteStripe;
  * compra con `domiciliar`) ligada al cliente de la persona en la cuenta del negocio;
  * cada renovación se cobra sin el cliente presente (`off_session`).
  */
-class PasarelaStripeTenant implements PasarelaCancelable, PasarelaDomiciliable, PasarelaReembolsable, PasarelaTenant
+class PasarelaStripeTenant implements PasarelaCancelable, PasarelaConsultable, PasarelaDomiciliable, PasarelaReembolsable, PasarelaTenant
 {
     public function nombre(): string
     {
@@ -72,6 +72,38 @@ class PasarelaStripeTenant implements PasarelaCancelable, PasarelaDomiciliable, 
             str_starts_with($referencia, 'pi_') => (new ClienteStripe($secretKey))->anularIntent($referencia),
             default => true, // no hay nada abierto que pagar
         };
+    }
+
+    /**
+     * Cómo va el intento en Stripe. Una sesión de Checkout pagada se aprueba con su id
+     * (lo mismo que haría su aviso); una completa sin pagar es un pago en tienda (OXXO)
+     * en espera, salvo que su cobro ya haya vencido o fallado.
+     */
+    public function consultar(PagoTenant $pago, array $llaves): ResultadoPago
+    {
+        $api = self::api($llaves);
+        $referencia = (string) $pago->referencia_externa;
+
+        if (str_starts_with($referencia, 'cs_')) {
+            $sesion = $api->sesion($referencia);
+
+            return match (true) {
+                in_array($sesion['pago'], ['paid', 'no_payment_required'], true) => ResultadoPago::aprobado($referencia),
+                $sesion['estado'] === 'expired' => ResultadoPago::rechazado('La sesión de pago de Stripe venció.'),
+                $sesion['estado'] === 'complete' && in_array($sesion['cobro'], ['canceled', 'requires_payment_method'], true) => ResultadoPago::rechazado('El pago en tienda venció o falló.'),
+                default => ResultadoPago::pendiente($referencia),
+            };
+        }
+
+        if (str_starts_with($referencia, 'pi_')) {
+            return match ($api->estadoIntent($referencia)) {
+                'succeeded' => ResultadoPago::aprobado($referencia),
+                'canceled', 'requires_payment_method' => ResultadoPago::rechazado('Stripe no pudo cobrar.'),
+                default => ResultadoPago::pendiente($referencia),
+            };
+        }
+
+        return ResultadoPago::pendiente($referencia);
     }
 
     /**

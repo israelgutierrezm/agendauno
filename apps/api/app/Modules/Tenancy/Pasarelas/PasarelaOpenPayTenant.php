@@ -33,7 +33,7 @@ use Illuminate\Support\Carbon;
  * por su precio y la suscripción con el primer cobro en la próxima renovación.
  * OpenPay cobra solo y aquí se concilian los cargos de ese cliente.
  */
-class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConSuscripcion, PasarelaReembolsable, PasarelaTenant
+class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConsultable, PasarelaConSuscripcion, PasarelaReembolsable, PasarelaTenant
 {
     public function __construct(
         private readonly GestorDeConexionTenant $gestor,
@@ -90,6 +90,21 @@ class PasarelaOpenPayTenant implements PasarelaCancelable, PasarelaConSuscripcio
         }
 
         return ($this->api($llaves)->cargo($referencia)['status'] ?? '') !== 'completed';
+    }
+
+    /**
+     * Cómo va el cargo. OpenPay no cancela cargos: uno en tienda cerrado de nuestro
+     * lado todavía se puede pagar hasta que vence, por eso se sigue preguntando.
+     */
+    public function consultar(PagoTenant $pago, array $llaves): ResultadoPago
+    {
+        $referencia = (string) $pago->referencia_externa;
+
+        return match ((string) ($this->api($llaves)->cargo($referencia)['status'] ?? '')) {
+            'completed' => ResultadoPago::aprobado($referencia),
+            'failed', 'cancelled', 'expired' => ResultadoPago::rechazado('El cargo de OpenPay venció o falló.'),
+            default => ResultadoPago::pendiente($referencia),
+        };
     }
 
     /**

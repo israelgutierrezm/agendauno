@@ -167,7 +167,7 @@ class CobrarOrdenTenant
             try {
                 $pasarela = $this->registro->resolver($previo->proveedor);
             } catch (PasarelaNoDisponible) {
-                $previo->update(['estado' => EstadoPago::Rechazado->value]);
+                $previo->update(['estado' => EstadoPago::Rechazado->value, 'cerrado_sin_confirmar' => true]);
 
                 continue;
             }
@@ -177,7 +177,9 @@ class CobrarOrdenTenant
             if (! $pasarela->cancelar($previo, $this->registro->llaves($previo->proveedor))) {
                 throw new OrdenNoLiquidable('Ya hay un pago en proceso para esta compra; espera su confirmación.');
             }
-            $previo->update(['estado' => EstadoPago::Rechazado->value]);
+            // Cerrado de este lado: la conciliación confirma con la pasarela que ya no
+            // se puede pagar (OpenPay, por ejemplo, no cancela un pago en tienda).
+            $previo->update(['estado' => EstadoPago::Rechazado->value, 'cerrado_sin_confirmar' => true]);
         }
     }
 }

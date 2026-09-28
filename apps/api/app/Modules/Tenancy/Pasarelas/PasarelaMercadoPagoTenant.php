@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pasarelas\MercadoPago\ClienteMercadoPago;
 use Illuminate\Support\Carbon;
 
@@ -27,7 +28,7 @@ use Illuminate\Support\Carbon;
  * cliente autoriza en Mercado Pago; Mercado Pago cobra cada mes (reintenta hasta 4
  * veces en 10 días) y aquí se concilian sus cobros.
  */
-class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConSuscripcion, PasarelaReembolsable, PasarelaTenant
+class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConsultable, PasarelaConSuscripcion, PasarelaReembolsable, PasarelaTenant
 {
     public function __construct(
         private readonly GestorDeConexionTenant $gestor,
@@ -91,6 +92,36 @@ class PasarelaMercadoPagoTenant implements PasarelaCancelable, PasarelaConSuscri
         }
 
         return true;
+    }
+
+    /**
+     * Cómo va el intento: los cobros de Mercado Pago para nuestro pago (su
+     * `external_reference`). Un cobro aprobado se aprueba con su id, como lo haría el
+     * aviso; uno en espera (p. ej. el ticket de OXXO) deja el intento pendiente. Sin
+     * cobro vivo, se puede pagar mientras la preferencia siga vigente y no se haya
+     * cerrado de nuestro lado (al cerrarla se vence).
+     */
+    public function consultar(PagoTenant $pago, array $llaves): ResultadoPago
+    {
+        $cobros = self::api($llaves)->pagosDeReferencia((string) $pago->ulid);
+
+        foreach ($cobros as $cobro) {
+            if (($cobro['status'] ?? '') === 'approved') {
+                return ResultadoPago::aprobado((string) ($cobro['id'] ?? ''));
+            }
+        }
+        foreach ($cobros as $cobro) {
+            if (in_array($cobro['status'] ?? '', ['pending', 'in_process', 'authorized'], true)) {
+                return ResultadoPago::pendiente((string) ($cobro['id'] ?? ''));
+            }
+        }
+
+        $vigente = $pago->estado === EstadoPago::Pendiente
+            && $pago->created_at?->copy()->addDays($this->parametros->entero('cobranza.dias_pagar_en_tienda'))->isFuture() === true;
+
+        return $vigente
+            ? ResultadoPago::pendiente((string) $pago->referencia_externa)
+            : ResultadoPago::rechazado('El pago en Mercado Pago ya no se puede completar.');
     }
 
     /**
