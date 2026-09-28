@@ -1,0 +1,6 @@
+# Copia a android/key.properties (no se sube al repositorio) con los datos de tu
+# llave de subida de Google Play. Guía: docs/MOBILE.md → «Firma de release».
+storeFile=/ruta/a/agendauno-subida.jks
+storePassword=
+keyAlias=subida
+keyPassword=

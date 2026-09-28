@@ -70,10 +70,24 @@ La app funciona sin Firebase; solo no recibe push. Para activarlas (ADR 0025):
 Al entrar, la app registra el token del teléfono en el negocio
 (`dispositivos_push`); al salir lo borra.
 
+## Firma de release (Android)
+
+Google Play pide una llave de subida propia. Se crea una sola vez y se guarda fuera del
+repositorio (si se pierde, hay que pedir a Google que la reemplace):
+
+```bash
+keytool -genkey -v -keystore agendauno-subida.jks -keyalg RSA -keysize 2048 -validity 10000 -alias subida
+```
+
+Copia `android/key.properties.example` a `android/key.properties` (ignorado por git) y
+llénalo con la ruta del `.jks`, el alias y las contraseñas. Con ese archivo,
+`flutter build appbundle` firma para Play; sin él, la versión de release se firma con
+la llave de depuración (sirve para probar en un teléfono, Play la rechaza).
+
 ## Pendiente para publicar
 
-- Firma de release de Android (hoy `build.gradle.kts` firma con la llave de debug)
-  y la configuración de iOS.
+- Crear la llave de subida (arriba) y la configuración de iOS (equipo y perfil en
+  Xcode).
 - Publicar en Google Play y App Store.
 
 ## Pruebas

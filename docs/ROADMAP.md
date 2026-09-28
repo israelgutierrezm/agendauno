@@ -20,10 +20,15 @@
 - Pruebas de punta a punta con llaves de prueba de cada pasarela
   (`docs/VERIFICACION-V1.md`).
 - Instalar en un servidor real y correr `actualizar.sh` / `volver.sh`.
-- Proyecto de Firebase para push; firma de release y publicación de la app.
+- Proyecto de Firebase para push; llave de subida de Android (la firma ya lee `android/key.properties`, ver `docs/MOBILE.md`) y publicación de la app.
 
 ## Después
 
+- Superadmin: pestaña de Operación (versión en marcha, latidos, respaldos y último
+  simulacro, verificación de producción y alertas abiertas); hoy solo por consola y
+  correo.
+- Conciliar el guardado de tarjeta de Stripe (pago automático) cuando no llega su
+  aviso; hoy la conciliación cubre los cobros.
 - Separar «editar» y «eliminar» en el catálogo de permisos.
 - Roles propios con faceta de instructor.
 - Monitoreo de errores más completo y despliegue automático desde el CI.
