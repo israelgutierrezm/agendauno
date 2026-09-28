@@ -910,6 +910,7 @@ export default {
       cobrar: "Cobrar y activar",
       cobrando: "Cobrando…",
       exitoPack: "Vendido. {persona} tiene {saldo} créditos.",
+      exitoVenta: "Venta registrada para {persona}.",
       exitoMembresia: "Vendido. {persona} tiene una membresía activa.",
       sinMiembros: "Primero agrega un alumno en Miembros.",
       sinProductos: "Primero crea un producto.",
@@ -1790,6 +1791,7 @@ export default {
     },
     roster: {
       vacio: "Sin reservas.",
+      sinPermiso: "Tu rol no incluye ver reservas: aquí no se muestra quién va.",
       confirmada: "Confirmada",
       en_espera: "En espera",
       ofrecida: "Oferta",

@@ -104,7 +104,8 @@ const router = useRouter();
 // consentimientos). Va en la URL (?seccion=planes) para poder enlazarla.
 type Seccion = "actividad" | "planes" | "expediente";
 const seccion = computed<Seccion>(() =>
-  route.query.seccion === "expediente" || route.query.seccion === "planes"
+  route.query.seccion === "expediente" ||
+  (route.query.seccion === "planes" && puedeVerDerechos.value)
     ? route.query.seccion
     : "actividad",
 );
@@ -117,6 +118,8 @@ const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const personaId = computed(() => String(route.params.id));
 const puedeGestionar = computed(() => sesion.puede("miembros.gestionar"));
+// El corte de cada plan y los movimientos de créditos piden ver derechos.
+const puedeVerDerechos = computed(() => sesion.puede("derechos.ver"));
 const puedeVender = computed(() => sesion.puede("ordenes.gestionar"));
 const puedeRecargar = computed(() => sesion.puede("membresias.gestionar"));
 const toast = useToastStore();
@@ -404,6 +407,7 @@ watch(personaId, cargar, { immediate: true });
                   {{ $t("expediente.actividad") }}
                 </button>
                 <button
+                  v-if="puedeVerDerechos"
                   type="button"
                   :aria-pressed="seccion === 'planes'"
                   @click="irSeccion('planes')"
@@ -516,6 +520,7 @@ watch(personaId, cargar, { immediate: true });
                     >
                       <template v-if="!d.ilimitado">
                         <button
+                          v-if="puedeVerDerechos"
                           type="button"
                           class="tu-enlace"
                           :aria-expanded="movimientosDe === d.id"

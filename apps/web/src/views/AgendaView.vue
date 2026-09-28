@@ -52,6 +52,8 @@ interface Sesion {
   instructor: string | null;
   instructor_id: string | null;
   sala: string | null;
+  sucursal?: string | null;
+  sucursal_id?: string | null;
   recurso_id: string | null;
   inicia_en: string;
   termina_en: string;
@@ -113,6 +115,12 @@ const puedeCatalogo = computed(() => sesion.puede("catalogo.gestionar"));
 const puedeReservar = computed(() => sesion.puede("reservas.gestionar"));
 const puedeMarcar = computed(() => sesion.puede("asistencia.marcar"));
 const puedeCheckin = computed(() => sesion.puede("checkins.registrar"));
+// La agenda se ve con solo agenda.ver: el catálogo, las sucursales y los alumnos se
+// cargan aparte y solo si el rol los puede ver.
+const puedeVerCatalogo = computed(() => sesion.puede("catalogo.ver"));
+const puedeVerSucursales = computed(() => sesion.puede("sucursales.ver"));
+const puedeVerMiembros = computed(() => sesion.puede("miembros.ver"));
+const puedeVerReservas = computed(() => sesion.puede("reservas.ver"));
 
 // Canales de reserva (booking source) para R20.
 const CANALES = [
@@ -136,6 +144,8 @@ const bloqueos = ref<BloqueoAgenda[]>([]);
 const cargando = ref(true);
 const cargandoSesiones = ref(false);
 const error = ref<string | null>(null);
+// Lo que no se pudo cargar de las listas de apoyo (no lo borra recargar sesiones).
+const errorReferencias = ref<string | null>(null);
 // Fechas de una clase recurrente que no se pudieron generar (y por qué).
 const avisoSerie = ref<string | null>(null);
 
@@ -439,38 +449,62 @@ const COLOR_ESTADO: Record<string, string> = {
 
 async function cargarReferencias(): Promise<void> {
   cargando.value = true;
-  error.value = null;
-  try {
-    const [o, s, m] = await Promise.all([
-      api.get<{ data: Oferta[] }>(`${base.value}/ofertas`),
-      api.get<{ data: Sucursal[] }>(`${base.value}/sucursales`),
-      api.get<{ data: Miembro[] }>(`${base.value}/miembros`, {
-        params: { tipo: "miembro" },
-      }),
-    ]);
-    ofertas.value = o.data.data;
-    sucursales.value = s.data.data;
-    miembros.value = m.data.data;
+  errorReferencias.value = null;
+  const pedir = async <T,>(
+    ruta: string,
+    params?: Record<string, string>,
+  ): Promise<T> =>
+    (await api.get<{ data: T }>(`${base.value}${ruta}`, { params })).data.data;
+  // Cada lista por separado: si una falla, las demás y la agenda siguen.
+  const tareas: Promise<unknown>[] = [
     // Profesionales (id + nombre) para filtrar y para las columnas por profesional.
-    const i = await api.get<{ data: { id: string; nombre: string }[] }>(
-      `${base.value}/instructores`,
+    pedir<{ id: string; nombre: string }[]>("/instructores").then((d) => {
+      instructores.value = d;
+    }),
+  ];
+  if (puedeVerCatalogo.value) {
+    tareas.push(
+      pedir<Oferta[]>("/ofertas").then((d) => {
+        ofertas.value = d;
+      }),
     );
-    instructores.value = i.data.data;
-    if (sesion.esCitas) {
-      const v = await api.get<{ data: VentanaAtencion[] }>(
-        `${base.value}/horarios-atencion`,
-      );
-      ventanas.value = v.data.data;
-    }
-    if (puedeGestionar.value) {
-      const r = await api.get<{ data: Recurso[] }>(`${base.value}/recursos`);
-      recursos.value = r.data.data.filter((x) => x.activo);
-    }
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    cargando.value = false;
   }
+  if (puedeVerSucursales.value) {
+    tareas.push(
+      pedir<Sucursal[]>("/sucursales").then((d) => {
+        sucursales.value = d;
+      }),
+    );
+  }
+  // Los alumnos solo hacen falta para inscribir o transferir.
+  if (puedeReservar.value && puedeVerMiembros.value) {
+    tareas.push(
+      pedir<Miembro[]>("/miembros", { tipo: "miembro" }).then((d) => {
+        miembros.value = d;
+      }),
+    );
+  }
+  if (sesion.esCitas) {
+    tareas.push(
+      pedir<VentanaAtencion[]>("/horarios-atencion").then((d) => {
+        ventanas.value = d;
+      }),
+    );
+  }
+  if (puedeGestionar.value) {
+    tareas.push(
+      pedir<Recurso[]>("/recursos").then((d) => {
+        recursos.value = d.filter((x) => x.activo);
+      }),
+    );
+  }
+  const fallida = (await Promise.allSettled(tareas)).find(
+    (r): r is PromiseRejectedResult => r.status === "rejected",
+  );
+  if (fallida !== undefined) {
+    errorReferencias.value = mensajeDeError(fallida.reason);
+  }
+  cargando.value = false;
 }
 
 async function cargarSesiones(): Promise<void> {
@@ -581,18 +615,52 @@ const diaTexto = computed(() => {
 });
 
 // ---- Agenda visual: catálogo (colores), zona, profesionales e indicadores ----
-const catalogo = computed(() => ofertas.value.map((o) => o.id));
+// Servicios y sucursales para filtros, colores y zona: los del catálogo si el rol
+// los puede ver; si no, los que aparecen en las sesiones que ve.
+const ofertasAgenda = computed<{ id: string; nombre: string }[]>(() =>
+  puedeVerCatalogo.value
+    ? ofertas.value
+    : unicos(sesiones.value, (s) =>
+        s.oferta_id !== null && s.oferta !== null
+          ? { id: s.oferta_id, nombre: s.oferta }
+          : null,
+      ),
+);
+const sucursalesAgenda = computed<Sucursal[]>(() =>
+  puedeVerSucursales.value
+    ? sucursales.value
+    : unicos(sesiones.value, (s) =>
+        s.sucursal_id && s.sucursal
+          ? { id: s.sucursal_id, nombre: s.sucursal, zona_horaria: s.zona_horaria }
+          : null,
+      ),
+);
+function unicos<T extends { id: string }>(
+  lista: Sesion[],
+  tomar: (s: Sesion) => T | null,
+): T[] {
+  const vistos = new Map<string, T>();
+  for (const s of lista) {
+    const x = tomar(s);
+    if (x !== null && !vistos.has(x.id)) {
+      vistos.set(x.id, x);
+    }
+  }
+  return [...vistos.values()].sort((a, b) => a.id.localeCompare(b.id));
+}
+const catalogo = computed(() => ofertasAgenda.value.map((o) => o.id));
 const zonaAgenda = computed(
   () =>
-    sucursales.value.find((s) => s.id === sucursalFiltro.value)?.zona_horaria ??
+    sucursalesAgenda.value.find((s) => s.id === sucursalFiltro.value)
+      ?.zona_horaria ??
     sesiones.value[0]?.zona_horaria ??
-    sucursales.value[0]?.zona_horaria ??
+    sucursalesAgenda.value[0]?.zona_horaria ??
     "America/Mexico_City",
 );
 // Leyenda: solo los servicios/clases que aparecen en lo que se está viendo.
 const leyenda = computed(() => {
   const presentes = new Set(sesionesVisibles.value.map((s) => s.oferta_id));
-  return ofertas.value
+  return ofertasAgenda.value
     .filter((o) => presentes.has(o.id))
     .map((o) => ({
       id: o.id,
@@ -919,6 +987,11 @@ function cerrarDetalle(): void {
 }
 
 async function cargarRoster(id: string): Promise<void> {
+  // Quién va a la clase: solo con permiso de ver reservas.
+  if (!puedeVerReservas.value) {
+    roster.value = [];
+    return;
+  }
   cargandoRoster.value = true;
   try {
     const { data } = await api.get<{ data: Reserva[] }>(
@@ -1425,6 +1498,13 @@ onMounted(async () => {
       {{ error }}
     </p>
     <p
+      v-if="errorReferencias"
+      class="mt-4 text-sm"
+      style="color: var(--error)"
+    >
+      {{ errorReferencias }}
+    </p>
+    <p
       v-if="avisoSerie"
       class="mt-4 text-sm"
       role="status"
@@ -1442,7 +1522,7 @@ onMounted(async () => {
           :aria-label="$t('agenda.nueva.sucursal')"
         >
           <option value="">{{ $t("agenda.todasSucursales") }}</option>
-          <option v-for="s in sucursales" :key="s.id" :value="s.id">
+          <option v-for="s in sucursalesAgenda" :key="s.id" :value="s.id">
             {{ s.nombre }}
           </option>
         </select>
@@ -1465,13 +1545,13 @@ onMounted(async () => {
         </select>
 
         <select
-          v-if="ofertas.length > 1"
+          v-if="ofertasAgenda.length > 1"
           v-model="ofertaFiltro"
           class="tu-input w-auto"
           :aria-label="$t('agendaOperacion.servicio')"
         >
           <option value="">{{ $t("agendaOperacion.todosServicios") }}</option>
-          <option v-for="o in ofertas" :key="o.id" :value="o.id">
+          <option v-for="o in ofertasAgenda" :key="o.id" :value="o.id">
             {{ o.nombre }}
           </option>
         </select>
@@ -2052,7 +2132,14 @@ onMounted(async () => {
             {{ $t("agenda.sesion.reservas") }}
           </h3>
           <p
-            v-if="cargandoRoster"
+            v-if="!puedeVerReservas"
+            class="mt-2 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("agenda.roster.sinPermiso") }}
+          </p>
+          <p
+            v-else-if="cargandoRoster"
             class="mt-2 text-sm"
             :style="{ color: 'var(--texto-suave)' }"
           >

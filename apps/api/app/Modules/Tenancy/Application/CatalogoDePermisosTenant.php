@@ -87,6 +87,62 @@ class CatalogoDePermisosTenant
         return array_merge(...array_values(self::catalogo()));
     }
 
+    /**
+     * Lo que cada permiso necesita para servir en la app: las pantallas y formularios
+     * que abre también leen otras listas (p. ej. «gestionar agenda» arma clases con el
+     * catálogo y las sucursales). Un rol propio debe traerlos; no se agregan solos.
+     * Completo: los requisitos de un requisito ya están en la lista.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function requisitos(): array
+    {
+        return [
+            'agenda.gestionar' => ['agenda.ver', 'catalogo.ver', 'sucursales.ver'],
+            'reservas.ver' => ['agenda.ver'],
+            'reservas.gestionar' => ['agenda.ver', 'reservas.ver', 'miembros.ver', 'catalogo.ver', 'sucursales.ver'],
+            'asistencia.marcar' => ['agenda.ver', 'reservas.ver'],
+            'checkins.registrar' => ['miembros.ver'],
+            'miembros.gestionar' => ['miembros.ver'],
+            'derechos.ver' => ['miembros.ver'],
+            'documentos.subir' => ['miembros.ver'],
+            'documentos.gestionar' => ['documentos.subir', 'miembros.ver'],
+            'formularios.gestionar' => ['formularios.responder'],
+            'catalogo.gestionar' => ['catalogo.ver', 'agenda.ver'],
+            'productos.gestionar' => ['productos.ver', 'catalogo.ver', 'sucursales.ver'],
+            'ordenes.gestionar' => ['ordenes.ver', 'productos.ver', 'miembros.ver', 'derechos.ver'],
+            'pagos.reembolsar' => ['ordenes.ver'],
+            'inventario.ver' => ['sucursales.ver'],
+            'inventario.gestionar' => ['inventario.ver', 'sucursales.ver'],
+            'pos.vender' => ['inventario.ver', 'sucursales.ver'],
+            'lealtad.ver' => ['miembros.ver'],
+            'lealtad.gestionar' => ['lealtad.ver', 'miembros.ver'],
+            'comunicaciones.gestionar' => ['comunicaciones.ver'],
+            'sucursales.gestionar' => ['sucursales.ver', 'organizaciones.ver'],
+            'organizaciones.gestionar' => ['organizaciones.ver'],
+            'usuarios.gestionar' => ['usuarios.invitar', 'sucursales.ver', 'miembros.ver'],
+            'tareas.gestionar' => ['tareas.ver'],
+        ];
+    }
+
+    /**
+     * Los requisitos que le faltan a un conjunto de permisos, por permiso.
+     *
+     * @param  list<string>  $permisos
+     * @return array<string, list<string>>
+     */
+    public static function requisitosFaltantes(array $permisos): array
+    {
+        $faltan = [];
+        foreach (self::requisitos() as $permiso => $necesita) {
+            if (in_array($permiso, $permisos, true) && ($ausentes = array_values(array_diff($necesita, $permisos))) !== []) {
+                $faltan[$permiso] = $ausentes;
+            }
+        }
+
+        return $faltan;
+    }
+
     public static function puede(string $rol, string $permiso): bool
     {
         $permisos = self::roles()[$rol] ?? [];

@@ -54,6 +54,12 @@ Formato `area.accion`. El catálogo completo, agrupado por área, está en
 
 Una prueba exige que todo permiso usado en una ruta esté en el catálogo.
 
+**Requisitos.** Algunos permisos necesitan otros para que sus pantallas sirvan: por
+ejemplo, «gestionar agenda» arma clases con el catálogo y las sucursales
+(`CatalogoDePermisosTenant::requisitos()`). Un rol propio debe traerlos: la API rechaza
+uno incompleto y el editor lo explica; no se agregan solos (ADR 0057). Las pantallas
+funcionan con su permiso mínimo y el menú muestra cada una solo con lo que su carga pide.
+
 ## Alcance
 
 - **Por sucursal** (`ResolverAccesoTenant`): un rol asignado en una sucursal

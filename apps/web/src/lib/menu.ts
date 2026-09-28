@@ -119,7 +119,8 @@ export const MENU: MenuItem[] = [
         etiqueta: "nav.cursos",
         icono: "grupos",
         ruta: "grupos",
-        permiso: "agenda.ver",
+        // La pantalla lista a los alumnos de cada grupo.
+        permiso: ["agenda.ver", "miembros.ver"],
         flag: "grupos",
       },
       {
@@ -191,7 +192,8 @@ export const MENU: MenuItem[] = [
         etiqueta: "planes.nav.vender",
         icono: "ventas",
         ruta: "ventas",
-        permiso: "productos.ver",
+        // Vende a un alumno y muestra las órdenes: sin eso la pantalla queda a medias.
+        permiso: ["productos.ver", "ordenes.ver", "miembros.ver"],
       },
     ],
   },
@@ -206,7 +208,8 @@ export const MENU: MenuItem[] = [
         etiqueta: "planes.nav.mostrador",
         icono: "pos",
         ruta: "pos",
-        permiso: "inventario.ver",
+        // El mostrador es para cobrar.
+        permiso: ["inventario.ver", "pos.vender"],
       },
       {
         clave: "inventario",
@@ -258,7 +261,8 @@ export const MENU: MenuItem[] = [
         etiqueta: "nav.horarios",
         icono: "reloj",
         ruta: "horarios",
-        permiso: "agenda.ver",
+        // El horario se arma por sucursal.
+        permiso: ["agenda.ver", "sucursales.ver"],
         modalidad: "citas",
       },
       {
@@ -439,12 +443,20 @@ export const MENU: MenuItem[] = [
  * Pantallas que no están en el menú pero piden permiso (fichas, importaciones…).
  * Las que no aparecen aquí ni en el menú solo piden sesión.
  */
-const PERMISOS_FUERA_DEL_MENU: Record<string, string> = {
+const PERMISOS_FUERA_DEL_MENU: Record<string, string | string[]> = {
   "ficha-miembro": "miembros.ver",
   "ficha-instructor": "usuarios.gestionar",
   importar: "miembros.gestionar",
   "importar-instructores": "usuarios.invitar",
-  onboarding: "estudio.gestionar",
+  // Cada paso crea algo distinto: sede, catálogo, planes, equipo.
+  onboarding: [
+    "estudio.gestionar",
+    "organizaciones.gestionar",
+    "sucursales.gestionar",
+    "catalogo.gestionar",
+    "productos.gestionar",
+    "usuarios.invitar",
+  ],
 };
 
 export function hojas(items: MenuItem[]): MenuItem[] {
@@ -490,5 +502,10 @@ export function puedeEntrar(nombreRuta: string, sesion: Sesion): boolean {
     return esVisible(hoja, sesion);
   }
   const permiso = PERMISOS_FUERA_DEL_MENU[nombreRuta];
-  return permiso === undefined || sesion.puede(permiso);
+  if (permiso === undefined) {
+    return true;
+  }
+  return (Array.isArray(permiso) ? permiso : [permiso]).every((p) =>
+    sesion.puede(p),
+  );
 }

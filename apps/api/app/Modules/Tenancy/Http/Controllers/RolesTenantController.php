@@ -47,6 +47,7 @@ class RolesTenantController
         return response()->json([
             'data' => $roles,
             'catalogo' => CatalogoDePermisosTenant::catalogo(),
+            'requisitos' => CatalogoDePermisosTenant::requisitos(),
             // Lo que quien arma el rol puede dar (su rol activo).
             'mis_permisos' => $this->roles->permisosDe($actor->rolesVigentes()),
         ]);

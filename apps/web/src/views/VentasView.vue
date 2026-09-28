@@ -155,27 +155,36 @@ async function vender(): Promise<void> {
     await api.post(`${base.value}/ordenes/${orden.data.data.id}/liquidar`, {
       metodo: venta.value.metodo,
     });
+  } catch (e) {
+    error.value = mensajeDeError(e);
+    vendiendo.value = false;
+    return;
+  }
 
+  // Ya se cobró: desde aquí nada se muestra como error de la venta ni deja el
+  // formulario listo para cobrar otra vez lo mismo.
+  const compradorId = venta.value.compradorId;
+  venta.value.productoId = "";
+  venta.value.codigoPromo = "";
+  promoPreview.value = null;
+  const persona = miembros.value.find((x) => x.id === compradorId);
+  const nombre = persona ? nombreMiembro(persona) : "";
+  exito.value = "venta:" + nombre;
+  try {
     // Muestra el derecho recien concedido al comprador.
     const der = await api.get<{
       data: Array<{ ilimitado: boolean; saldo: number | null }>;
-    }>(`${base.value}/miembros/${venta.value.compradorId}/derechos`);
-    const persona = miembros.value.find(
-      (x) => x.id === venta.value.compradorId,
-    );
-    const nombre = persona ? nombreMiembro(persona) : "";
+    }>(`${base.value}/miembros/${compradorId}/derechos`);
     const ultimo = der.data.data[0];
     exito.value =
       ultimo && ultimo.ilimitado
         ? "membresia:" + nombre
         : "pack:" + nombre + "|" + String(ultimo?.saldo ?? 0);
-
-    venta.value.productoId = "";
-    venta.value.codigoPromo = "";
-    promoPreview.value = null;
+  } catch {
+    // Sin el detalle del derecho basta con confirmar la venta.
+  }
+  try {
     await cargar();
-  } catch (e) {
-    error.value = mensajeDeError(e);
   } finally {
     vendiendo.value = false;
   }
@@ -184,6 +193,12 @@ async function vender(): Promise<void> {
 const exitoTexto = computed(() => {
   if (exito.value === null) {
     return null;
+  }
+  if (exito.value.startsWith("venta:")) {
+    return {
+      clave: "ventas.vender.exitoVenta",
+      args: { persona: exito.value.slice("venta:".length) },
+    };
   }
   if (exito.value.startsWith("membresia:")) {
     return {

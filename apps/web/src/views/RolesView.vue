@@ -32,6 +32,8 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const roles = ref<Rol[]>([]);
 const catalogo = ref<Record<string, string[]>>({});
 const misPermisos = ref<string[]>([]);
+// Lo que cada permiso necesita para que sus pantallas funcionen (lo exige la API).
+const requisitos = ref<Record<string, string[]>>({});
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const abiertos = ref<Set<string>>(new Set());
@@ -100,10 +102,12 @@ async function cargar(): Promise<void> {
     const { data } = await api.get<{
       data: Rol[];
       catalogo: Record<string, string[]>;
+      requisitos?: Record<string, string[]>;
       mis_permisos: string[];
     }>(`${base.value}/roles`);
     roles.value = data.data;
     catalogo.value = data.catalogo;
+    requisitos.value = data.requisitos ?? {};
     misPermisos.value = data.mis_permisos;
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -126,6 +130,32 @@ function abrirEdicion(rol: Rol): void {
   seleccion.value = new Set(rol.permisos);
   errorEditor.value = null;
   editorAbierto.value = true;
+}
+
+// Por cada permiso elegido, lo que le falta para servir.
+const faltantes = computed<Record<string, string[]>>(() => {
+  const r: Record<string, string[]> = {};
+  for (const p of seleccion.value) {
+    const faltan = (requisitos.value[p] ?? []).filter(
+      (x) => !seleccion.value.has(x),
+    );
+    if (faltan.length > 0) {
+      r[p] = faltan;
+    }
+  }
+  return r;
+});
+const incompleto = computed(() => Object.keys(faltantes.value).length > 0);
+
+// A la vista y a petición: nunca se agregan solos.
+function agregarNecesarios(permiso: string): void {
+  const s = new Set(seleccion.value);
+  for (const x of faltantes.value[permiso] ?? []) {
+    if (puedeDar(x)) {
+      s.add(x);
+    }
+  }
+  seleccion.value = s;
 }
 
 function alternarPermiso(permiso: string): void {
@@ -353,7 +383,30 @@ onMounted(cargar);
             />
             <span>{{ etiquetaPermiso(p) }}</span>
           </label>
+          <template v-for="p in permisos" :key="`n-${p}`">
+            <p
+              v-if="faltantes[p]"
+              class="rp-necesita"
+              :data-prueba="`necesita-${p}`"
+            >
+              {{
+                $t("operacion.rolesPropios.necesita", {
+                  lista: faltantes[p].map(etiquetaPermiso).join(", "),
+                })
+              }}
+              <button
+                type="button"
+                class="rp-agregar"
+                @click="agregarNecesarios(p)"
+              >
+                {{ $t("operacion.rolesPropios.agregarNecesarios") }}
+              </button>
+            </p>
+          </template>
         </fieldset>
+        <p v-if="incompleto" class="text-sm" style="color: var(--aviso)">
+          {{ $t("operacion.rolesPropios.incompleto") }}
+        </p>
         <p v-if="errorEditor" class="text-sm" style="color: var(--error)">
           {{ errorEditor }}
         </p>
@@ -362,7 +415,9 @@ onMounted(cargar);
         <button
           class="tu-btn tu-btn-primario w-full"
           type="button"
-          :disabled="guardando || nombre.trim() === '' || seleccion.size === 0"
+          :disabled="
+            guardando || nombre.trim() === '' || seleccion.size === 0 || incompleto
+          "
           @click="guardar"
         >
           {{ $t("operacion.rolesPropios.guardar") }}
@@ -424,6 +479,17 @@ onMounted(cargar);
   font-size: 0.8rem;
   font-weight: 600;
   margin-bottom: 0.3rem;
+}
+.rp-necesita {
+  margin: 0.25rem 0 0.5rem 1.6rem;
+  font-size: 0.8rem;
+  color: var(--texto-suave);
+}
+.rp-agregar {
+  margin-left: 0.35rem;
+  color: var(--acento);
+  text-decoration: underline;
+  cursor: pointer;
 }
 .rp-opcion {
   display: flex;

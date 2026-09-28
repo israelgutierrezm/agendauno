@@ -43,6 +43,7 @@ interface Regla {
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeReglas = computed(() => sesion.puede("automatizaciones.gestionar"));
+const puedeGestionar = computed(() => sesion.puede("tareas.gestionar"));
 
 const tab = ref<"pendientes" | "reglas">("pendientes");
 const error = ref<string | null>(null);
@@ -357,6 +358,7 @@ onMounted(cargarTareas);
           }}
         </button>
         <button
+          v-if="puedeGestionar"
           class="tu-btn tu-btn-primario"
           type="button"
           @click="mostrarNueva = true"
@@ -481,7 +483,7 @@ onMounted(cargarTareas);
             </div>
           </div>
           <button
-            v-if="tarea.estado === 'pendiente'"
+            v-if="puedeGestionar && tarea.estado === 'pendiente'"
             class="tu-btn tu-btn-fantasma shrink-0"
             type="button"
             :disabled="accionando"
@@ -490,7 +492,7 @@ onMounted(cargarTareas);
             {{ $t("tareas.completar") }}
           </button>
           <button
-            v-else
+            v-else-if="puedeGestionar"
             class="tu-enlace shrink-0"
             type="button"
             :disabled="accionando"

@@ -32,7 +32,7 @@ function crearRolPropio(string $slug, string $bearer, string $nombre, array $per
 }
 
 /** Coordinación: ve clientes y agenda, y administra el equipo y sus roles. */
-const PERMISOS_COORDINACION = ['miembros.ver', 'agenda.ver', 'reservas.ver', 'usuarios.gestionar', 'usuarios.invitar', 'roles.gestionar'];
+const PERMISOS_COORDINACION = ['miembros.ver', 'agenda.ver', 'reservas.ver', 'sucursales.ver', 'usuarios.gestionar', 'usuarios.invitar', 'roles.gestionar'];
 
 it('el dueño crea un rol propio, lo asigna y la persona trabaja solo con esos permisos', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
@@ -68,7 +68,7 @@ it('quien administra roles no da permisos que no tiene ni toca roles por encima 
     // Dentro de lo suyo, sí.
     $apoyo = crearRolPropio($e['slug'], $coordinadora, 'Apoyo', ['miembros.ver', 'agenda.ver'])->assertCreated()->json('data');
     // Un permiso que no tiene, no.
-    crearRolPropio($e['slug'], $coordinadora, 'Cajero', ['miembros.ver', 'pagos.reembolsar'])->assertUnprocessable()
+    crearRolPropio($e['slug'], $coordinadora, 'Cajero', ['miembros.ver', 'ordenes.ver', 'pagos.reembolsar'])->assertUnprocessable()
         ->assertJsonValidationErrors(['permisos'], 'meta.errors');
     // Un rol por encima de ella (Gerencia) no lo cambia ni lo borra.
     $this->putJson("/api/v1/app/{$e['slug']}/roles/{$gerencia['id']}", ['nombre' => 'Gerencia', 'permisos' => ['miembros.ver']], conBearer($coordinadora))
@@ -137,4 +137,40 @@ it('el catálogo tiene todo permiso que exige una ruta o que da un rol de sistem
 
     expect(array_values(array_diff(array_unique([...$rutas[1], ...$deSistema]), $catalogo)))->toBe([])
         ->and($catalogo)->toHaveCount(count(array_unique($catalogo)));
+});
+
+it('un rol trae lo que cada permiso necesita para servir; no se agrega en silencio', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+
+    // Gestionar la agenda arma clases con el catálogo y las sucursales.
+    crearRolPropio($e['slug'], $e['bearer'], 'Agenda', ['agenda.gestionar'])->assertUnprocessable()
+        ->assertJsonPath('meta.errors.permisos.0', '«agenda.gestionar» necesita también: agenda.ver, catalogo.ver, sucursales.ver.');
+    // Solo ver la agenda no necesita nada más (la pantalla funciona con eso).
+    $ver = crearRolPropio($e['slug'], $e['bearer'], 'Solo agenda', ['agenda.ver'])->assertCreated()->json('data');
+    expect($ver['permisos'])->toBe(['agenda.ver']);
+    // Editar tampoco deja un permiso a medias.
+    $this->putJson("/api/v1/app/{$e['slug']}/roles/{$ver['id']}", ['nombre' => 'Solo agenda', 'permisos' => ['agenda.ver', 'reservas.gestionar']], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['permisos'], 'meta.errors');
+
+    // El editor los recibe para explicarlos.
+    $requisitos = $this->getJson("/api/v1/app/{$e['slug']}/roles", conBearer($e['bearer']))->assertOk()->json('requisitos');
+    expect($requisitos['agenda.gestionar'])->toBe(['agenda.ver', 'catalogo.ver', 'sucursales.ver']);
+});
+
+it('los requisitos están completos, son del catálogo y los roles de sistema los cumplen', function (): void {
+    $catalogo = CatalogoDePermisosTenant::permisosDelCatalogo();
+    $requisitos = CatalogoDePermisosTenant::requisitos();
+    foreach ($requisitos as $permiso => $necesita) {
+        expect($catalogo)->toContain($permiso);
+        foreach ($necesita as $requisito) {
+            expect($catalogo)->toContain($requisito)
+                // Lo que necesita un requisito ya está en la lista (sin cadenas ocultas).
+                ->and(array_diff($requisitos[$requisito] ?? [], $necesita))->toBe([]);
+        }
+    }
+    foreach (CatalogoDePermisosTenant::roles() as $rol => $permisos) {
+        if ($permisos !== ['*']) {
+            expect(CatalogoDePermisosTenant::requisitosFaltantes($permisos))->toBe([], "El rol {$rol} no cumple los requisitos.");
+        }
+    }
 });

@@ -448,8 +448,15 @@ onMounted(cargar);
                 </td>
                 <td class="px-4 py-2 text-right">
                   {{ dinero(p.monto_minor, p.moneda) }}
+                  <span
+                    v-if="p.con_reembolsos && !puedeReembolsar"
+                    class="block ml-auto text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    −{{ dinero(p.reembolsado_minor, p.moneda) }}
+                  </span>
                   <button
-                    v-if="p.con_reembolsos"
+                    v-else-if="p.con_reembolsos"
                     type="button"
                     class="block ml-auto text-xs underline-offset-2 hover:underline"
                     :style="{ color: 'var(--texto-suave)' }"

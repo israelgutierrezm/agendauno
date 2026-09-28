@@ -109,6 +109,18 @@ class GestionarRolesTenant
         if ($desconocidos !== []) {
             throw ValidationException::withMessages(['permisos' => ['Permiso desconocido: '.implode(', ', $desconocidos).'.']]);
         }
+        // Cada permiso con lo que necesita para servir: sin eso, la pantalla que abre
+        // queda a medias (se explica y se pide; no se agrega en silencio).
+        $incompletos = CatalogoDePermisosTenant::requisitosFaltantes($permisos);
+        if ($incompletos !== []) {
+            throw ValidationException::withMessages([
+                'permisos' => array_map(
+                    fn (string $permiso, array $faltan): string => "«{$permiso}» necesita también: ".implode(', ', $faltan).'.',
+                    array_keys($incompletos),
+                    $incompletos,
+                ),
+            ]);
+        }
         $propios = $this->roles->permisosDe($actor->rolesVigentes());
         if (! RolesTenant::cabenEn($permisos, $propios)) {
             throw ValidationException::withMessages([

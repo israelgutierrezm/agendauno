@@ -57,6 +57,7 @@ const respuesta = {
     clientes: ["miembros.ver", "miembros.gestionar"],
     negocio: ["pagos.configurar"],
   },
+  requisitos: { "miembros.gestionar": ["miembros.ver"] },
   // Quien arma el rol: ve alumnos y administra roles, pero no configura pagos.
   mis_permisos: ["miembros.ver", "miembros.gestionar", "roles.gestionar"],
 };
@@ -132,5 +133,32 @@ describe("roles y permisos", () => {
       permisos: ["miembros.ver"],
     });
     expect(toast.exito).toHaveBeenCalled();
+  });
+
+  it("un permiso sin lo que necesita no se guarda; se agrega a la vista, no solo", async () => {
+    const w = montar();
+    await flushPromises();
+    await w.find(".tu-btn-primario").trigger("click");
+    const editor = w.find('[data-prueba="editor"]');
+    await editor.find("#rol-nombre").setValue("Altas");
+
+    // Dar de alta alumnos sin poder verlos: se explica y no deja guardar.
+    await editor.findAll("label.rp-opcion")[1].find("input").trigger("change");
+    const aviso = editor.find('[data-prueba="necesita-miembros.gestionar"]');
+    expect(aviso.text()).toContain("Ver alumnos y su ficha");
+    const guardar = () =>
+      w.findAll(".tu-btn-primario").at(-1)!.attributes("disabled");
+    expect(guardar()).toBeDefined();
+    expect(
+      (editor.findAll("label.rp-opcion")[0].find("input").element as HTMLInputElement)
+        .checked,
+    ).toBe(false);
+
+    await aviso.find("button").trigger("click");
+    expect(
+      (editor.findAll("label.rp-opcion")[0].find("input").element as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    expect(guardar()).toBeUndefined();
   });
 });

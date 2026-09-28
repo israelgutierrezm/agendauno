@@ -50,6 +50,30 @@ negocio a mano. El sistema propio ya decide todo con `puede()`.
   - En Equipo se asignan los roles propios con su nombre.
 - **Bitácora**: `rol.creado`, `rol.actualizado` y `rol.eliminado`.
 
+## Requisitos entre permisos (2026-09-28)
+
+Un rol con solo «ver agenda» llegaba a la Agenda, pero la pantalla también pedía el
+catálogo, las sucursales y los alumnos, y quedaba a medias. Se decidió:
+
+- **Las pantallas funcionan con su permiso mínimo.** La Agenda se ve con solo
+  `agenda.ver`: carga por separado lo opcional y solo si el rol lo puede ver. Arma sus
+  filtros con las sesiones que ve. El pase de lista solo aparece con `reservas.ver`.
+- **Lo que un permiso necesita se exige al armar el rol.**
+  `CatalogoDePermisosTenant::requisitos()` dice qué más necesita cada permiso para que
+  sus pantallas y formularios sirvan. Por ejemplo, `agenda.gestionar` arma clases con
+  el catálogo y las sucursales.
+  - La API rechaza un rol propio incompleto.
+  - El editor lo explica junto al permiso y ofrece «Agregar lo que necesita».
+  - Nunca se agrega nada en silencio.
+  - Una prueba exige que la lista esté completa (sin cadenas ocultas) y que los roles de
+    sistema la cumplan.
+- **El menú muestra una pantalla solo con todo lo que su carga pide.** Por ejemplo,
+  Ventas pide ver planes, órdenes y alumnos; Mostrador, cobrar.
+- Las acciones que el rol no puede hacer no se muestran (tareas, historial de
+  reembolsos, planes y movimientos de créditos en la ficha).
+- En Ventas, si la consulta posterior a la venta falla, eso ya no se presenta como
+  venta fallida.
+
 ## Consecuencias
 
 - El dueño puede delegar: arma un rol con `roles.gestionar` y la persona que lo tenga

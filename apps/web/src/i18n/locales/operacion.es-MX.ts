@@ -27,6 +27,10 @@ export default {
     nombrePh: "Por ejemplo: Coordinación",
     permisos: "Permisos",
     sinPermiso: "No lo tienes, así que no puedes darlo.",
+    necesita: "Para funcionar necesita también: {lista}.",
+    agregarNecesarios: "Agregar lo que necesita",
+    incompleto:
+      "Algunos permisos necesitan otros para que sus pantallas funcionen. Agrégalos o quita esos permisos para guardar.",
     guardar: "Guardar rol",
     guardado: "Rol guardado.",
     eliminado: "Rol eliminado.",
