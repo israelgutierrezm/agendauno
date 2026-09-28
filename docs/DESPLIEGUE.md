@@ -31,6 +31,9 @@ Así no hay CORS entre subdominios.
    GRANT ALL ON `tenant\_%`.* TO 'agendauno'@'%';
    ```
 
+   La aplicación trabaja en aislamiento `READ COMMITTED` (ADR 0052). Si el servidor
+   guarda binlog, debe ser `binlog_format=ROW`, el valor por defecto de MySQL 8.
+
 3. **DNS**: `DOMINIO`, `www.DOMINIO` y el comodín `*.DOMINIO` apuntando al servidor.
 4. **HTTPS** delante de nginx, con certificado comodín (`*.DOMINIO` más `DOMINIO`). El
    comodín exige validación por DNS. Opciones:
@@ -75,6 +78,12 @@ cp web.env.example web.env
 4. Comprueba:
    - `docker compose --env-file web.env exec api php artisan turnouno:verificar-produccion`
      termina en «Lista para producción» (dice qué falta si no);
+   - `docker compose --env-file web.env exec api php artisan turnouno:verificar-concurrencia`
+     termina en «Todo cuadró». Crea un negocio temporal con su base
+     (`tenant_verificacion_*`), pone a competir procesos a la vez (el último lugar, el
+     mismo horario de un profesional, cancelar y reprogramar), migra varios negocios,
+     respalda y restaura uno, y borra todo al final. Tarda unos minutos. Repítelo si
+     cambias de servidor o de versión de MySQL;
    - `curl -H "Host: DOMINIO" http://127.0.0.1:8080/up` responde 200;
    - `https://DOMINIO` muestra la portada y `https://DOMINIO/registro` el registro;
    - `docker compose --env-file web.env exec api php artisan turnouno:probar-correo tu@correo.com` llega;

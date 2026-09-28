@@ -61,6 +61,9 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => env('DB_ENGINE', 'InnoDB'),
+            // Cada lectura ve lo último confirmado: lo que se lee tras un candado ya
+            // incluye lo que guardó la solicitud anterior (ADR 0052).
+            'isolation_level' => env('DB_ISOLATION_LEVEL', 'READ COMMITTED'),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
@@ -106,6 +109,10 @@ return [
             'prefix' => '',
             'foreign_key_constraints' => true,
             'engine' => 'InnoDB',
+            // MySQL: los candados de fila (sesión, profesional, paquete) solo
+            // protegen si las lecturas de después ven lo recién confirmado; en
+            // REPEATABLE READ ven la foto del inicio y se sobrevende (ADR 0052).
+            'isolation_level' => env('DB_ISOLATION_LEVEL', 'READ COMMITTED'),
             // SQLite (dev/pruebas): una escritura concurrente espera su turno en vez de
             // fallar al instante con "database is locked".
             'busy_timeout' => env('TENANT_DB_BUSY_TIMEOUT', 5000),

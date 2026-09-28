@@ -75,6 +75,18 @@ jobs:
       - name: Tests (Pest)
         run: php artisan test
 
+      # Las pruebas usan SQLite para los negocios, que no tiene candados de fila ni
+      # escrituras simultáneas: aquí se comprueba en MySQL con procesos a la vez
+      # (último lugar, mismo horario, cancelar y reprogramar, migraciones de varios
+      # negocios, respaldo y restauración).
+      - name: Concurrency on MySQL
+        env:
+          DB_DATABASE: turnouno_verificacion
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE turnouno_verificacion CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+          php artisan migrate --force
+          php artisan turnouno:verificar-concurrencia --rondas=4
+
   registro-web:
     name: Registro · Vue
     runs-on: ubuntu-latest
