@@ -52,7 +52,7 @@ class ResolverAccesoTenant
      */
     public function esAcotadoPorSucursal(Usuario $usuario): bool
     {
-        if (array_intersect(['propietario', 'admin'], $usuario->rolesEfectivos()) !== []) {
+        if (array_intersect(['propietario', 'admin'], $usuario->rolesVigentes()) !== []) {
             return false;
         }
 

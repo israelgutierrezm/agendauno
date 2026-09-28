@@ -38,9 +38,12 @@ class UsuarioTenantPresenter
             'foto_url' => $usuario->fotoUrl(),
             // ¿Ya tiene contraseña? (quien entra solo con Google aún no).
             'tiene_contrasena' => $usuario->password !== null && $usuario->password !== '',
-            'rol' => CatalogoDePermisosTenant::rolPrincipal($roles),
+            // El rol con el que trabaja en esta sesión, sus permisos y los roles con
+            // los que puede entrar (quien tiene varios elige y cambia).
+            'rol' => $usuario->rolActivo() ?? CatalogoDePermisosTenant::rolPrincipal($roles),
             'roles' => $roles,
-            'permisos' => CatalogoDePermisosTenant::permisosDe($roles),
+            'roles_disponibles' => CatalogoDePermisosTenant::rolesDisponibles($roles),
+            'permisos' => CatalogoDePermisosTenant::permisosDe($usuario->rolesVigentes()),
             // Tema y colores propios: el front los aplica al entrar (ver /apariencia).
             'apariencia' => CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion),
         ];

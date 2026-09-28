@@ -8,6 +8,7 @@ import NavArbol from "@/components/NavArbol.vue";
 import AppToaster from "@/components/AppToaster.vue";
 import DialogoConfirmar from "@/components/DialogoConfirmar.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
+import PanelRoles from "@/components/PanelRoles.vue";
 import type { MenuItem, NavEstado } from "@/components/nav";
 import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
 import { esVisible, MENU } from "@/lib/menu";
@@ -174,6 +175,8 @@ const menuLateral = ref(false); // cajón en móvil
 const compacto = ref(false); // barra contraída (solo iconos) en escritorio
 const menuPerfil = ref(false);
 const menuApariencia = ref(false);
+// Panel «Cambiar de rol» (quien tiene más de un rol en el negocio).
+const menuRoles = ref(false);
 
 // La contracción solo aplica en escritorio; con el cajón abierto se ve completo.
 const compactoEfectivo = computed(() => compacto.value && !menuLateral.value);
@@ -318,6 +321,21 @@ onMounted(() => {
         </div>
 
         <div class="flex items-center gap-1 sm:gap-2 shrink-0">
+          <!-- Cambiar de rol: solo si puede entrar con más de uno -->
+          <button
+            v-if="sesion.tieneVariosRoles"
+            type="button"
+            class="tu-icono-btn"
+            :aria-label="$t('operacion.rolActivo.cambiar')"
+            :title="$t('operacion.rolActivo.cambiar')"
+            @click="
+              menuRoles = true;
+              menuPerfil = false;
+            "
+          >
+            <IconoNav nombre="intercambio" :tam="18" />
+          </button>
+
           <!-- Apariencia: tema y colores propios (panel lateral) -->
           <button
             type="button"
@@ -470,6 +488,7 @@ onMounted(() => {
   <!-- Confirmaciones dentro de la app (lib/confirmar.ts). -->
   <DialogoConfirmar />
   <PanelApariencia :abierto="menuApariencia" @cerrar="menuApariencia = false" />
+  <PanelRoles :abierto="menuRoles" @cerrar="menuRoles = false" />
 </template>
 
 <style>

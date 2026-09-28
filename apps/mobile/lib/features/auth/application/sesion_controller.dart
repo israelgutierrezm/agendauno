@@ -31,7 +31,35 @@ class SesionController extends Notifier<Sesion?> {
     final estudio = data['estudio'] as Map<String, dynamic>?;
 
     ref.read(authTokenProvider.notifier).establecer(bearer);
-    state = Sesion.desdeJson(slug, bearer, usuario, estudio);
+    final sesion = Sesion.desdeJson(slug, bearer, usuario, estudio);
+    await ref.read(almacenSesionProvider).guardar(sesion.aJson());
+    // Con más de un rol, primero «¿Cómo quieres entrar?».
+    state = sesion.tieneVariosRoles
+        ? sesion.conUsuario(const {}, eligiendoRol: true)
+        : sesion;
+  }
+
+  /// Cambia el rol con el que se trabaja (o confirma el que ya tenía al entrar).
+  /// El servidor lo guarda en la sesión y desde entonces solo concede sus
+  /// permisos; también lo recuerda para la próxima vez.
+  Future<void> cambiarRol(String rol) async {
+    final actual = state;
+    if (actual == null) {
+      return;
+    }
+    if (rol == actual.rol) {
+      state = actual.conUsuario(const {}, eligiendoRol: false);
+      return;
+    }
+    final res = await ref
+        .read(dioProvider)
+        .put<Map<String, dynamic>>(
+          '/api/v1/app/${actual.slug}/yo/rol-activo',
+          data: {'rol': rol},
+        );
+    final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
+    final usuario = (data['usuario'] ?? {}) as Map<String, dynamic>;
+    state = actual.conUsuario(usuario, eligiendoRol: false);
     await ref.read(almacenSesionProvider).guardar(state!.aJson());
   }
 

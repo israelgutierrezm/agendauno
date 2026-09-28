@@ -403,6 +403,13 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // «¿Cómo quieres entrar?»: quien tiene más de un rol elige con cuál trabaja.
+      path: "/elegir-rol",
+      name: "elegir-rol",
+      component: () => import("@/views/ElegirRolView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       // Mi perfil: foto, nombre y contraseña de quien tiene la sesión (todo rol).
       path: "/mi-perfil",
       name: "mi-perfil",

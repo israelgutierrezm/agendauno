@@ -146,6 +146,34 @@ class CatalogoDePermisosTenant
     }
 
     /**
+     * Qué parte de la app le toca a un rol: el negocio (`equipo`), el portal de quien
+     * imparte (`instructor`) o la cuenta del alumno (`miembro`).
+     */
+    public static function faceta(string $rol): string
+    {
+        return match ($rol) {
+            'instructor' => 'instructor',
+            'miembro' => 'miembro',
+            default => 'equipo',
+        };
+    }
+
+    /**
+     * Los roles con los que puede entrar, del más amplio al más acotado, con su
+     * faceta (para elegir al entrar y cambiar después).
+     *
+     * @param  list<string>  $roles
+     * @return list<array{clave: string, faceta: string}>
+     */
+    public static function rolesDisponibles(array $roles): array
+    {
+        $orden = array_flip(self::jerarquia());
+        usort($roles, static fn (string $a, string $b): int => ($orden[$a] ?? PHP_INT_MAX) <=> ($orden[$b] ?? PHP_INT_MAX));
+
+        return array_map(static fn (string $rol): array => ['clave' => $rol, 'faceta' => self::faceta($rol)], array_values(array_unique($roles)));
+    }
+
+    /**
      * Rol principal (el más privilegiado) de un conjunto de roles.
      *
      * @param  list<string>  $roles

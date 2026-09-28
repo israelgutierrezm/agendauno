@@ -3,6 +3,24 @@
  * renovaciones, recepción y comunicación. Aparte de es-MX.ts (la landing en curso).
  */
 export default {
+  // Rol activo: quien tiene varios roles elige con cuál entra y lo cambia arriba.
+  rolActivo: {
+    titulo: "¿Cómo quieres entrar?",
+    subtitulo:
+      "Tienes más de un rol en {estudio}. Cada uno muestra sus propias opciones; puedes cambiarlo cuando quieras desde la barra superior.",
+    cambiar: "Cambiar de rol",
+    panelSubtitulo: "Cada rol muestra sus propias opciones y permisos.",
+    activo: "Activo",
+    ultimo: "La última vez",
+    cambiado: "Ahora estás como {rol}.",
+    error: "No se pudo cambiar de rol.",
+    faceta: {
+      equipo:
+        "El negocio: agenda, clientes, cobros y reportes, según tus permisos.",
+      instructor: "Tus clases, tu agenda y la asistencia de tus alumnos.",
+      miembro: "Tus reservas, tus pagos y tu expediente.",
+    },
+  },
   confirmar: {
     titulo: "Confirmar",
     aceptar: "Confirmar",

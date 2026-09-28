@@ -61,8 +61,9 @@ const hayGoogle = clientIdGoogle() !== undefined;
 const contenedorGoogle = ref<HTMLElement | null>(null);
 const googleRenderizadoPara = ref("");
 
+// Con más de un rol, primero «¿Cómo quieres entrar?».
 function destino(): { name: string } {
-  return { name: sesion.rutaInicio };
+  return { name: sesion.destinoAlEntrar };
 }
 
 function ubicacion(negocio: {

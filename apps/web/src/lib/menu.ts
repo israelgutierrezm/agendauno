@@ -1,5 +1,5 @@
 import type { MenuItem } from "@/components/nav";
-import { esInstructor } from "@/lib/roles";
+import { esInstructor, esMiembro } from "@/lib/roles";
 import type { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -443,12 +443,9 @@ export function hojas(items: MenuItem[]): MenuItem[] {
   return items.flatMap((i) => (i.hijos !== undefined ? hojas(i.hijos) : [i]));
 }
 
-/** Quien tiene el rol de alumno (aunque su rol principal sea otro). */
+/** ¿Entró como alumno o cliente? Cuenta solo el rol activo. */
 export function esAlumno(sesion: Sesion): boolean {
-  const u = sesion.usuario;
-  return (
-    u !== null && (u.rol === "miembro" || (u.roles ?? []).includes("miembro"))
-  );
+  return esMiembro(sesion.usuario);
 }
 
 export function esVisible(item: MenuItem, sesion: Sesion): boolean {

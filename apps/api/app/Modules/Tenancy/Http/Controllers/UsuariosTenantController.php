@@ -355,7 +355,8 @@ class UsuariosTenantController
         }
 
         $actor = $request->attributes->get('usuario_tenant');
-        if (! ($actor instanceof Usuario) || ! $actor->tieneRol('propietario')) {
+        // Quien actúa como dueño (su rol activo), no quien además lo es.
+        if (! ($actor instanceof Usuario) || ! $actor->actuaComo('propietario')) {
             throw ValidationException::withMessages([
                 'roles' => ['Solo un dueño puede conceder o quitar el rol de dueño.'],
             ]);

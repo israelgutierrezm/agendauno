@@ -17,7 +17,7 @@ class TokenAccesoTenant extends Model
 
     protected $table = 'personal_access_tokens';
 
-    protected $fillable = ['tokenable_type', 'tokenable_id', 'name', 'token', 'abilities', 'last_used_at', 'expires_at'];
+    protected $fillable = ['tokenable_type', 'tokenable_id', 'name', 'rol_activo', 'token', 'abilities', 'last_used_at', 'expires_at'];
 
     /**
      * @var array<string, string>

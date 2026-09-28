@@ -3,15 +3,19 @@ import { computed, ref, watch } from "vue";
 
 import { aplicarTerminologia, i18n } from "@/i18n";
 import { api, fijarBearer, mensajeDeError } from "@/lib/api";
-import { esInstructor } from "@/lib/roles";
+import { esInstructor, esMiembro, type RolDisponible } from "@/lib/roles";
 import { useAparienciaStore, type Apariencia } from "@/stores/apariencia";
 
 export interface UsuarioTenant {
   ulid: string;
   nombre: string;
   email: string;
+  // Rol ACTIVO: con el que entró (el menú, su inicio y los permisos son de este).
   rol: string;
+  // Todos sus roles en el negocio y, de ellos, los que puede elegir para entrar.
   roles?: string[];
+  roles_disponibles?: RolDisponible[];
+  // Permisos del rol activo.
   permisos?: string[];
   // Tema y colores propios guardados en la cuenta.
   apariencia?: Apariencia;
@@ -112,7 +116,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     if (u === null) {
       return "entrar";
     }
-    if (u.rol === "miembro") {
+    if (esMiembro(u)) {
       return "mi-cuenta";
     }
     if (puede("facturacion.ver")) {
@@ -127,9 +131,19 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     if (puede("agenda.ver")) {
       return "agenda";
     }
-    // Sin pantallas de trabajo: su cuenta de alumno si también lo es; si no, su perfil.
-    return (u.roles ?? []).includes("miembro") ? "mi-cuenta" : "mi-perfil";
+    // Sin pantallas de trabajo con este rol: su perfil.
+    return "mi-perfil";
   });
+
+  /** ¿Puede entrar con más de un rol? Entonces elige al entrar y cambia arriba. */
+  const tieneVariosRoles = computed(
+    () => (usuario.value?.roles_disponibles?.length ?? 0) > 1,
+  );
+
+  /** A dónde va tras iniciar sesión: a elegir rol si tiene varios; si no, a su inicio. */
+  const destinoAlEntrar = computed<string>(() =>
+    tieneVariosRoles.value ? "elegir-rol" : rutaInicio.value,
+  );
 
   /**
    * Modalidad de servicio del negocio (derivada de su perfil). La agenda, el menú, la
@@ -338,6 +352,22 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     useAparienciaStore().activar(data.data.usuario.apariencia);
   }
 
+  /**
+   * Cambia el rol con el que se trabaja. La API lo guarda en la sesión y desde ese
+   * momento solo concede los permisos de ese rol; también lo recuerda para la
+   * próxima vez.
+   */
+  async function cambiarRol(rol: string): Promise<void> {
+    if (slug.value === null) {
+      return;
+    }
+    const { data } = await api.put<{
+      data: { usuario: UsuarioTenant; estudio: EstudioSesion };
+    }>(`/api/v1/app/${slug.value}/yo/rol-activo`, { rol });
+    usuario.value = data.data.usuario;
+    estudio.value = data.data.estudio;
+  }
+
   /** Tras editar "Mi perfil": la API devuelve el usuario ya actualizado. */
   function actualizarUsuario(datos: UsuarioTenant): void {
     usuario.value = datos;
@@ -388,6 +418,8 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     validando,
     puede,
     rutaInicio,
+    tieneVariosRoles,
+    destinoAlEntrar,
     modalidad,
     esCitas,
     terminologia,
@@ -398,6 +430,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     registrarAlumno,
     confirmarRegistro,
     cargarYo,
+    cambiarRol,
     actualizarUsuario,
     verificarSesion,
     cerrarSesion,

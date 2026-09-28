@@ -5,6 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
+import '../../auth/data/sesion.dart';
+import '../../auth/presentation/elegir_rol_screen.dart';
 import '../../cuenta/presentation/cuenta_screen.dart' show hacerConAviso;
 
 /// Mi perfil: foto, nombre y contraseña de quien tiene la sesión, y cerrar sesión.
@@ -270,6 +272,66 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     });
   }
 
+  /// «Cambiar de rol»: elige otro de sus roles; la app vuelve a su inicio con el
+  /// rol nuevo (lo que ve y lo que el servidor le concede son de ese rol).
+  Future<void> _cambiarRol() async {
+    final navegador = Navigator.of(context);
+    final elegido = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (hoja) {
+        final sesion = ref.read(sesionProvider);
+        if (sesion == null) {
+          return const SizedBox.shrink();
+        }
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Cambiar de rol',
+                  style: Theme.of(hoja).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Cada rol muestra sus propias opciones y permisos.',
+                  style: TextStyle(color: TemaAgendaUno.textoSuave),
+                ),
+                const SizedBox(height: 12),
+                ListaRoles(
+                  sesion: sesion,
+                  etiquetaMarca: 'Activo',
+                  onElegir: (clave) => Navigator.of(hoja).pop(clave),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (elegido == null || elegido == ref.read(sesionProvider)?.rol) {
+      return;
+    }
+    setState(() => _guardando = true);
+    try {
+      await ref.read(sesionProvider.notifier).cambiarRol(elegido);
+      navegador.popUntil((r) => r.isFirst);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo cambiar de rol.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _guardando = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final sesion = ref.watch(sesionProvider);
@@ -462,6 +524,21 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
               onTap: _guardando ? null : _agregarCalendario,
             ),
           ),
+          if (sesion.tieneVariosRoles)
+            Card(
+              child: ListTile(
+                key: const Key('cambiar-rol'),
+                leading: const Icon(Icons.swap_horiz),
+                title: const Text('Cambiar de rol'),
+                subtitle: Text(
+                  'Ahora: ${nombreDeRol(sesion.rolesDisponibles.firstWhere(
+                    (r) => r.clave == sesion.rol,
+                    orElse: () => RolDisponible(clave: sesion.rol, faceta: sesion.facetaActiva),
+                  ), sesion.terminologia)}',
+                ),
+                onTap: _guardando ? null : _cambiarRol,
+              ),
+            ),
           const SizedBox(height: 8),
           TextButton.icon(
             style: TextButton.styleFrom(foregroundColor: TemaAgendaUno.error),

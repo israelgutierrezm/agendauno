@@ -108,13 +108,20 @@ describe("portal del instructor", () => {
     vi.useRealTimers();
   });
 
-  it("solo quien tiene el rol de instructor ve su portal", () => {
+  it("ve su portal quien entró como instructor (cuenta solo el rol activo)", () => {
     expect(esInstructor({ rol: "instructor" })).toBe(true);
-    expect(esInstructor({ rol: "admin", roles: ["admin", "instructor"] })).toBe(
-      true,
-    );
+    // Administra y también imparte: entró como admin, ve el panel; cambia de rol
+    // para ver su portal.
+    expect(esInstructor({ rol: "admin" })).toBe(false);
     expect(esInstructor({ rol: "recepcionista" })).toBe(false);
     expect(esInstructor(null)).toBe(false);
+    // Un rol propio del negocio que imparte también abre el portal.
+    expect(
+      esInstructor({
+        rol: "coach",
+        roles_disponibles: [{ clave: "coach", faceta: "instructor" }],
+      }),
+    ).toBe(true);
   });
 
   it("el inicio pide solo lo suyo y muestra su próxima clase y sus accesos", async () => {

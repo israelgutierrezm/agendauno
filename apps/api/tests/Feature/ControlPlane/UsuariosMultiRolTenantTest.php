@@ -43,7 +43,7 @@ it('el apartado Usuarios lista todas las cuentas con sus roles', function (): vo
     expect($duena['rol'])->toEqual('propietario');
 });
 
-it('asignar varios roles a una cuenta une sus permisos', function (): void {
+it('asignar varios roles a una cuenta le deja entrar con cualquiera de ellos', function (): void {
     $e = estudioConSesion('estudio-x', 'duena@correo.mx');
     $bearerProfe = personalConSesion($e['slug'], $e['bearer'], 'profe@correo.mx', 'miembro');
     $ulid = ulidUsuarioPorEmail($e['slug'], $e['bearer'], 'profe@correo.mx');
@@ -55,11 +55,16 @@ it('asignar varios roles a una cuenta une sus permisos', function (): void {
     expect($r->json('data.roles'))->toEqualCanonicalizing(['miembro', 'instructor']);
     expect($r->json('data.rol'))->toEqual('instructor'); // rol principal (mas privilegiado)
 
-    // Al recargar su sesion ve permisos de AMBOS roles (union).
-    $permisos = test()->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($bearerProfe))
+    // Su sesión sigue con el rol con el que entró (ADR 0055): los permisos no se
+    // suman; ahora puede elegir también el nuevo.
+    $yo = test()->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($bearerProfe))->assertOk();
+    expect($yo->json('data.usuario.rol'))->toBe('miembro')
+        ->and($yo->json('data.usuario.permisos'))->toBe(['formularios.responder'])
+        ->and(collect($yo->json('data.usuario.roles_disponibles'))->pluck('clave')->all())->toBe(['instructor', 'miembro']);
+
+    $permisos = test()->putJson("/api/v1/app/{$e['slug']}/yo/rol-activo", ['rol' => 'instructor'], conBearer($bearerProfe))
         ->assertOk()->json('data.usuario.permisos');
-    expect($permisos)->toContain('reservas.ver');          // de instructor
-    expect($permisos)->toContain('formularios.responder'); // de miembro
+    expect($permisos)->toContain('reservas.ver')->toContain('asistencia.marcar');
 });
 
 it('la duena no puede quitarse a si misma el rol de dueno', function (): void {

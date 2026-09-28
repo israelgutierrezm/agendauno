@@ -191,6 +191,8 @@ const RUTAS: Record<string, string[]> = {
   ],
   hecho: ["M4.5 12.75l6 6 9-13.5"],
   punto: ["M12 12h.01"],
+  // Cambiar de rol: dos flechas en sentidos opuestos.
+  intercambio: ["M7 4 4 7l3 3", "M4 7h13", "M17 20l3-3-3-3", "M20 17H7"],
 };
 </script>
 

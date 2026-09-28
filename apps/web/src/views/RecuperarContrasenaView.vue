@@ -63,7 +63,7 @@ async function guardar(): Promise<void> {
       password.value,
       passwordConfirm.value,
     );
-    void router.push({ name: sesion.rutaInicio });
+    void router.push({ name: sesion.destinoAlEntrar });
   } catch {
     error.value = sesion.error;
   }

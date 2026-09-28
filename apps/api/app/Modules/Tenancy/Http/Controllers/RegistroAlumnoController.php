@@ -107,9 +107,10 @@ class RegistroAlumnoController
             'ulid' => $usuario->ulid,
             'nombre' => $usuario->name,
             'email' => $usuario->email,
-            'rol' => CatalogoDePermisosTenant::rolPrincipal($roles),
+            'rol' => $usuario->rolActivo() ?? CatalogoDePermisosTenant::rolPrincipal($roles),
             'roles' => $roles,
-            'permisos' => CatalogoDePermisosTenant::permisosDe($roles),
+            'roles_disponibles' => CatalogoDePermisosTenant::rolesDisponibles($roles),
+            'permisos' => CatalogoDePermisosTenant::permisosDe($usuario->rolesVigentes()),
         ];
     }
 

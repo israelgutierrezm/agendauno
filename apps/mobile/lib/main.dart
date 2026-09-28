@@ -6,6 +6,7 @@ import 'core/network/auth_token.dart';
 import 'core/storage/almacen_sesion.dart';
 import 'core/theme/tema_agendauno.dart';
 import 'features/auth/data/sesion.dart';
+import 'features/auth/presentation/elegir_rol_screen.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/cuenta/presentation/cuenta_screen.dart';
 import 'features/inicio/presentation/equipo_screen.dart';
@@ -80,13 +81,16 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
         ref.read(pushProvider).registrar(nueva);
       }
     });
+    // Con varios roles, al entrar elige con cuál; luego, la pantalla de ese rol.
     final Widget inicio = sesion == null
         ? const LoginScreen()
-        : (sesion.rol == 'miembro'
-              ? const CuentaScreen()
-              : (sesion.esInstructorAcotado
-                    ? const InstructorScreen()
-                    : const EquipoScreen()));
+        : sesion.eligiendoRol
+        ? const ElegirRolScreen()
+        : sesion.esMiembro
+        ? const CuentaScreen()
+        : sesion.esInstructorAcotado
+        ? const InstructorScreen()
+        : const EquipoScreen();
 
     return MaterialApp(
       title: 'AgendaUno',

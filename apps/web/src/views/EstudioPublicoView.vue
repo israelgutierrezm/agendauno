@@ -188,7 +188,7 @@ async function registrar(): Promise<void> {
       confirmacionEnviada.value = registro.confirmar;
       return;
     }
-    void router.push({ name: sesion.rutaInicio });
+    void router.push({ name: sesion.destinoAlEntrar });
   } catch (e) {
     errorRegistro.value = mensajeDeError(e);
   }

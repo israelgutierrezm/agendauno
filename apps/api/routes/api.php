@@ -206,6 +206,7 @@ Route::prefix('v1')->group(function (): void {
 
         Route::middleware(['estudio.auth', 'throttle:tenant'])->group(function (): void {
             Route::get('/yo', [AuthTenantController::class, 'yo'])->name('yo');
+            Route::put('/yo/rol-activo', [AuthTenantController::class, 'rolActivo'])->name('yo.rol-activo');
             Route::get('/yo/calendario', [CalendarioTenantController::class, 'enlace'])->name('yo.calendario');
             Route::post('/yo/calendario/regenerar', [CalendarioTenantController::class, 'regenerar'])->name('yo.calendario.regenerar');
             // Apariencia personal (tema y colores propios), guardada en la cuenta.

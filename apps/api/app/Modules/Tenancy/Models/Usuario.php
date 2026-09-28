@@ -43,14 +43,71 @@ class Usuario extends Authenticatable
     protected $fillable = [
         'name', 'email', 'password', 'google_id', 'activo', 'activation_token', 'rol', 'roles',
         'tema', 'tema_personalizacion', 'nombre', 'primer_apellido', 'segundo_apellido', 'foto_ruta',
+        'ultimo_rol',
     ];
 
     /**
-     * ¿El usuario tiene el permiso dado por CUALQUIERA de sus roles (unión)?
+     * Rol con el que trabaja en esta sesión (lo fija la autenticación con el del
+     * token). Fuera de una sesión (tareas programadas, avisos) queda en null y
+     * cuentan todos sus roles.
+     */
+    private ?string $rolEnUso = null;
+
+    /**
+     * ¿Tiene el permiso? En una sesión, solo con su rol ACTIVO: quien administra y
+     * además es alumno, al entrar como alumno no puede hacer lo del panel. Fuera de
+     * una sesión, con cualquiera de sus roles.
      */
     public function puede(string $permiso): bool
     {
-        return CatalogoDePermisosTenant::puedeAlguno($this->rolesEfectivos(), $permiso);
+        return CatalogoDePermisosTenant::puedeAlguno($this->rolesVigentes(), $permiso);
+    }
+
+    /**
+     * Fija el rol de la sesión: el pedido si todavía lo tiene; si no (o si no se
+     * pidió ninguno), el de la última vez o su rol principal. Devuelve el que quedó.
+     */
+    public function usarRol(?string $rol): string
+    {
+        $this->rolEnUso = $rol !== null && in_array($rol, $this->rolesEfectivos(), true)
+            ? $rol
+            : $this->rolPorDefecto();
+
+        return $this->rolEnUso;
+    }
+
+    /** El rol de la sesión, o null fuera de una sesión. */
+    public function rolActivo(): ?string
+    {
+        return $this->rolEnUso;
+    }
+
+    /** Con el que entra si no elige: el de la última vez si aún lo tiene; si no, el principal. */
+    public function rolPorDefecto(): string
+    {
+        $roles = $this->rolesEfectivos();
+
+        return is_string($this->ultimo_rol) && in_array($this->ultimo_rol, $roles, true)
+            ? $this->ultimo_rol
+            : CatalogoDePermisosTenant::rolPrincipal($roles);
+    }
+
+    /**
+     * Roles que cuentan para permisos y alcance: el activo en una sesión; todos
+     * fuera de ella. Para saber qué ES la persona (¿se le puede agendar?, ¿es
+     * dueña?) se usa {@see rolesEfectivos()}.
+     *
+     * @return list<string>
+     */
+    public function rolesVigentes(): array
+    {
+        return $this->rolEnUso !== null ? [$this->rolEnUso] : $this->rolesEfectivos();
+    }
+
+    /** ¿Está actuando con este rol? (en una sesión, solo el activo cuenta). */
+    public function actuaComo(string $rol): bool
+    {
+        return in_array($rol, $this->rolesVigentes(), true);
     }
 
     /**

@@ -28,7 +28,7 @@ onMounted(async () => {
   }
   try {
     await sesion.confirmarRegistro(slug, email, token);
-    void router.replace({ name: sesion.rutaInicio });
+    void router.replace({ name: sesion.destinoAlEntrar });
   } catch (e) {
     error.value = mensajeDeError(e);
     confirmando.value = false;

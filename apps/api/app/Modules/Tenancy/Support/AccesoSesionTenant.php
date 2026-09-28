@@ -41,8 +41,8 @@ class AccesoSesionTenant
 
     /**
      * ¿El usuario es instructor ACOTADO (alcance limitado a sus propias sesiones)?
-     * Solo lo está si `instructor` es su rol operativo más alto: si además tiene un
-     * rol de staff amplio (propietario/admin/recepcionista), opera sobre todas.
+     * Lo está si actúa como instructor sin un rol de staff amplio
+     * (propietario/admin/recepcionista): en una sesión cuenta solo su rol activo.
      */
     public function esInstructorAcotado(?Usuario $usuario): bool
     {
@@ -50,7 +50,7 @@ class AccesoSesionTenant
             return false;
         }
 
-        $roles = $usuario->rolesEfectivos();
+        $roles = $usuario->rolesVigentes();
         $amplios = ['propietario', 'admin', 'recepcionista'];
 
         return in_array('instructor', $roles, true) && array_intersect($amplios, $roles) === [];

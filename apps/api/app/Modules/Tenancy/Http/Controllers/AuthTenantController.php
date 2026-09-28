@@ -161,6 +161,27 @@ class AuthTenantController
         ]]);
     }
 
+    /**
+     * Cambia el rol con el que se trabaja en esta sesión (solo a uno que la persona
+     * tiene). Desde ese momento la API solo concede los permisos de ese rol; también
+     * queda como el de la última vez.
+     */
+    public function rolActivo(Request $request): JsonResponse
+    {
+        $usuario = $this->usuarioTenant($request);
+        abort_unless($usuario instanceof Usuario, 401);
+        $validado = $request->validate(['rol' => ['required', 'string', 'max:40']]);
+
+        if (! $this->auth->cambiarRol((string) $request->bearerToken(), $usuario, (string) $validado['rol'])) {
+            throw ValidationException::withMessages(['rol' => ['No tienes ese rol en este negocio.']]);
+        }
+
+        return response()->json(['data' => [
+            'usuario' => UsuarioTenantPresenter::datos($usuario),
+            'estudio' => $this->presentarEstudio($this->estudioDe($request)),
+        ]]);
+    }
+
     public function destroy(Request $request): JsonResponse
     {
         $usuario = $this->usuarioTenant($request);
