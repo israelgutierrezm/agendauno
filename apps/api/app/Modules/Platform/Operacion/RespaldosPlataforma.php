@@ -68,7 +68,7 @@ class RespaldosPlataforma
     {
         $tar = $this->volcado->temporal().'.tar';
         $excluir = [
-            'private/'.trim((string) config('turnouno.respaldos.carpeta', 'respaldos'), '/').'/',
+            'private/'.trim((string) config('agendauno.respaldos.carpeta', 'respaldos'), '/').'/',
             'private/respaldos-temp/',
         ];
         try {

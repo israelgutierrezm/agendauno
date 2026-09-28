@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class GenerarAgenda extends Command
 {
-    protected $signature = 'turnouno:generar-agenda {--dias= : Días adelante (si no, lo que fija cada negocio)}';
+    protected $signature = 'agendauno:generar-agenda {--dias= : Días adelante (si no, lo que fija cada negocio)}';
 
     protected $description = 'Materializa las sesiones recurrentes de las plantillas de horario de cada estudio';
 

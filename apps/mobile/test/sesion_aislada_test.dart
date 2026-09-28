@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/features/auth/application/sesion_controller.dart';
-import 'package:turnouno_mobile/features/auth/data/sesion.dart';
-import 'package:turnouno_mobile/features/cuenta/application/cuenta_controller.dart';
-import 'package:turnouno_mobile/features/cuenta/data/cuenta_models.dart';
-import 'package:turnouno_mobile/features/cuenta/data/cuenta_repository.dart';
+import 'package:agendauno/features/auth/application/sesion_controller.dart';
+import 'package:agendauno/features/auth/data/sesion.dart';
+import 'package:agendauno/features/cuenta/application/cuenta_controller.dart';
+import 'package:agendauno/features/cuenta/data/cuenta_models.dart';
+import 'package:agendauno/features/cuenta/data/cuenta_repository.dart';
 
 /// Lo de Mi cuenta es de UNA sesión: al cambiar de cuenta (salir y entrar otra
 /// persona en el mismo teléfono) no queda nada de la anterior aunque la carga

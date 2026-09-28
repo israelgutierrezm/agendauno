@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/features/agenda/application/agenda_controller.dart';
-import 'package:turnouno_mobile/features/agenda/presentation/agenda_screen.dart';
-import 'package:turnouno_mobile/features/auth/application/sesion_controller.dart';
-import 'package:turnouno_mobile/features/auth/data/sesion.dart';
-import 'package:turnouno_mobile/features/cuenta/data/cuenta_models.dart';
-import 'package:turnouno_mobile/features/inicio/data/inicio_repository.dart';
-import 'package:turnouno_mobile/features/inicio/data/resumen_hoy.dart';
-import 'package:turnouno_mobile/features/inicio/presentation/equipo_screen.dart';
+import 'package:agendauno/features/agenda/application/agenda_controller.dart';
+import 'package:agendauno/features/agenda/presentation/agenda_screen.dart';
+import 'package:agendauno/features/auth/application/sesion_controller.dart';
+import 'package:agendauno/features/auth/data/sesion.dart';
+import 'package:agendauno/features/cuenta/data/cuenta_models.dart';
+import 'package:agendauno/features/inicio/data/inicio_repository.dart';
+import 'package:agendauno/features/inicio/data/resumen_hoy.dart';
+import 'package:agendauno/features/inicio/presentation/equipo_screen.dart';
 
 /// El Inicio del negocio en la app: el día de hoy con el estilo de los otros
 /// portales (saludo, tarjeta grande con lo que sigue e indicadores, pendientes y

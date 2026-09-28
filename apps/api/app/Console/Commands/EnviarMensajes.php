@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class EnviarMensajes extends Command
 {
-    protected $signature = 'turnouno:enviar-mensajes';
+    protected $signature = 'agendauno:enviar-mensajes';
 
     protected $description = 'Envia los mensajes encolados (y reintenta los fallidos) de cada estudio';
 

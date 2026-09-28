@@ -15,7 +15,7 @@ use Illuminate\Console\Command;
  */
 class Latido extends Command
 {
-    protected $signature = 'turnouno:latido
+    protected $signature = 'agendauno:latido
         {--verificar= : programador o cola: sale con error si no ha latido hace poco}
         {--minutos=5 : Tolerancia en minutos al verificar}';
 

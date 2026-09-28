@@ -65,8 +65,8 @@ function negocioConEquipo(): array
  */
 function avisosAlEquipo(array $e): array
 {
-    test()->artisan('turnouno:despachar-outbox')->assertSuccessful();
-    test()->artisan('turnouno:enviar-mensajes')->assertSuccessful();
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    test()->artisan('agendauno:enviar-mensajes')->assertSuccessful();
 
     return app(GestorDeConexionTenant::class)->ejecutarEn(
         Estudio::query()->where('slug', $e['slug'])->firstOrFail(),

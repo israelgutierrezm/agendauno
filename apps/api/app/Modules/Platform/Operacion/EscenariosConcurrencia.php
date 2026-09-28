@@ -40,7 +40,7 @@ use InvalidArgumentException;
 use Throwable;
 
 /**
- * Los datos y las operaciones de `turnouno:verificar-concurrencia`: arma en el negocio
+ * Los datos y las operaciones de `agendauno:verificar-concurrencia`: arma en el negocio
  * temporal lo que cada caso necesita (clases, alumnos con paquete, profesionales) y
  * ejecuta UNA operación real del dominio (reservar, agendar, cancelar, reprogramar) en
  * el proceso hijo, igual que lo haría una petición. Trabaja sobre la conexión `tenant`
@@ -326,7 +326,7 @@ class EscenariosConcurrencia
     }
 
     /**
-     * Lo mismo que hace `turnouno:migrar-estudios` con cada negocio.
+     * Lo mismo que hace `agendauno:migrar-estudios` con cada negocio.
      */
     private function prepararMigrar(int $estudioId): callable
     {

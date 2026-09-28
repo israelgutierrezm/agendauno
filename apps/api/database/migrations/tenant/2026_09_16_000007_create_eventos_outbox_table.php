@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
  * Data plane (BD del tenant): OUTBOX de eventos de dominio (R39, habilitador de P1).
  * Los eventos importantes se ESCRIBEN en esta tabla DENTRO de la misma transaccion
  * que cambia el estado (atomico: ni se pierden ni se inventan). Un relay
- * (turnouno:despachar-outbox) los publica despues (at-least-once; los consumidores
+ * (agendauno:despachar-outbox) los publica despues (at-least-once; los consumidores
  * deben ser idempotentes) hacia comunicaciones/webhooks/analitica/automatizacion.
  * Sin `tenant_id`: aislamiento por base.
  */

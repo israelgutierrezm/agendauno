@@ -34,7 +34,7 @@ negocios mixtos y precios 10% por debajo de la competencia.
   14 citas. IVA 16% sobre el subtotal; el cargo guarda el total.
 - **Cálculo puro** (`CalcularRentaSaas`): desglose con líneas, subtotal, IVA y total,
   guardado con el cargo. Sin actividad no hay cargo.
-- **Mes vencido**: el día 1 (`turnouno:generar-cargos-renta`, por defecto el mes
+- **Mes vencido**: el día 1 (`agendauno:generar-cargos-renta`, por defecto el mes
   anterior) se congela la medición del mes cerrado y se genera su cargo. Una
   medición congelada no se recalcula.
 - **Prueba gratis**: los días cubiertos por la prueba no se cobran; el mes en que

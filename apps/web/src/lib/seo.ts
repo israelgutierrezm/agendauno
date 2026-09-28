@@ -94,10 +94,10 @@ export function updateSeo(options: SeoOptions): void {
     document.head.querySelector('meta[property="og:url"]')?.remove();
   } else upsertCanonical(canonical);
 
-  document.head.querySelector("#turnouno-route-jsonld")?.remove();
+  document.head.querySelector("#agendauno-route-jsonld")?.remove();
   if (options.jsonLd) {
     const script = document.createElement("script");
-    script.id = "turnouno-route-jsonld";
+    script.id = "agendauno-route-jsonld";
     script.type = "application/ld+json";
     script.textContent = JSON.stringify(options.jsonLd);
     document.head.appendChild(script);

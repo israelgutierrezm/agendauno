@@ -40,7 +40,7 @@ class AppServiceProvider extends ServiceProvider
             $llave = ConfiguracionPlataforma::llaveFacturapi();
 
             return $llave !== null
-                ? new FacturApiHttp((string) config('turnouno.facturapi.base_url'))
+                ? new FacturApiHttp((string) config('agendauno.facturapi.base_url'))
                 : new FacturacionFalsa;
         });
     }

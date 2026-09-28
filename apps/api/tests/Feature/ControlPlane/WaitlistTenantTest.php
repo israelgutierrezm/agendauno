@@ -62,7 +62,7 @@ it('al expirar la oferta, se marca expirada y el cupo se re-ofrece al siguiente'
 
     // Pasa la ventana de aceptacion (30 min) y corre el relay de expiracion.
     $this->travel(31)->minutes();
-    $this->artisan('turnouno:expirar-ofertas')->assertSuccessful();
+    $this->artisan('agendauno:expirar-ofertas')->assertSuccessful();
 
     // B expiro (sale del roster activo) y el cupo se re-ofrecio a C.
     $estados = estadosRoster($e, $d['sesion']);

@@ -69,7 +69,7 @@ function citaPagada(array $n, string $cuando): array
  */
 function mensajesAlCliente(array $e, string $email): array
 {
-    test()->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     return app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->firstOrFail(), fn (): array => MensajeTenant::query()
         ->where('destinatario', $email)->orderBy('id')->get()
@@ -116,7 +116,7 @@ it('no llega el recordatorio del horario anterior, sí el del nuevo', function (
 
     // Un día antes sale el recordatorio de las 10:00 del día 2…
     $this->travelTo('2030-01-01 17:00:00');
-    $this->artisan('turnouno:enviar-recordatorios')->assertSuccessful();
+    $this->artisan('agendauno:enviar-recordatorios')->assertSuccessful();
     // …y antes de enviarse, la cita se mueve al día 4.
     $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$cita['id']}/reprogramar", ['inicia_en_local' => '2030-01-04 11:00:00'], conBearer($e['bearer']))->assertOk();
 
@@ -127,7 +127,7 @@ it('no llega el recordatorio del horario anterior, sí el del nuevo', function (
 
     // El del nuevo horario llega a su hora.
     $this->travelTo('2030-01-03 17:30:00');
-    $this->artisan('turnouno:enviar-recordatorios')->assertSuccessful();
+    $this->artisan('agendauno:enviar-recordatorios')->assertSuccessful();
     expect($recordatorios()->all())->toBe(['Recordatorio: Nivel 1 el viernes 4 de enero a las 11:00']);
 });
 

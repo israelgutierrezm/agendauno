@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/features/agenda/data/agenda_models.dart';
-import 'package:turnouno_mobile/features/auth/application/sesion_controller.dart';
-import 'package:turnouno_mobile/features/auth/data/sesion.dart';
-import 'package:turnouno_mobile/features/cuenta/application/cuenta_controller.dart';
-import 'package:turnouno_mobile/features/cuenta/data/corte_planes.dart';
-import 'package:turnouno_mobile/features/cuenta/data/cuenta_models.dart';
-import 'package:turnouno_mobile/features/cuenta/presentation/cuenta_screen.dart';
-import 'package:turnouno_mobile/features/instructor/application/mis_clases_controller.dart';
-import 'package:turnouno_mobile/features/instructor/presentation/instructor_screen.dart';
+import 'package:agendauno/features/agenda/data/agenda_models.dart';
+import 'package:agendauno/features/auth/application/sesion_controller.dart';
+import 'package:agendauno/features/auth/data/sesion.dart';
+import 'package:agendauno/features/cuenta/application/cuenta_controller.dart';
+import 'package:agendauno/features/cuenta/data/corte_planes.dart';
+import 'package:agendauno/features/cuenta/data/cuenta_models.dart';
+import 'package:agendauno/features/cuenta/presentation/cuenta_screen.dart';
+import 'package:agendauno/features/instructor/application/mis_clases_controller.dart';
+import 'package:agendauno/features/instructor/presentation/instructor_screen.dart';
 
 /// Las pantallas completas de ambos portales se arman en un teléfono sin
 /// desbordes ni errores, y la barra de abajo lleva a cada parte.

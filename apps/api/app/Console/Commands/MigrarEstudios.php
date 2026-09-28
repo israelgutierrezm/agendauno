@@ -27,7 +27,7 @@ class MigrarEstudios extends Command implements Isolatable
 {
     use ConfirmableTrait;
 
-    protected $signature = 'turnouno:migrar-estudios
+    protected $signature = 'agendauno:migrar-estudios
         {--estudio= : Slug de un solo estudio}
         {--force : Correr en producción sin confirmar}';
 

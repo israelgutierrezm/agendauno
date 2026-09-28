@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class ReintentarWebhooks extends Command
 {
-    protected $signature = 'turnouno:reintentar-webhooks';
+    protected $signature = 'agendauno:reintentar-webhooks';
 
     protected $description = 'Reintenta las entregas de webhook fallidas de cada estudio';
 

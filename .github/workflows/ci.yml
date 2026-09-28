@@ -85,7 +85,7 @@ jobs:
         run: |
           mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE turnouno_verificacion CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
           php artisan migrate --force
-          php artisan turnouno:verificar-concurrencia --rondas=4
+          php artisan agendauno:verificar-concurrencia --rondas=4
 
   web:
     name: Web · Vue

@@ -1,6 +1,6 @@
 {
-    "name": "turnouno_mobile",
-    "short_name": "turnouno_mobile",
+    "name": "AgendaUno",
+    "short_name": "AgendaUno",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -126,11 +126,11 @@ it('acumula puntos al asistir a una clase (evento del outbox), idempotente por r
     test()->getJson("/api/v1/app/{$e['slug']}/miembros/{$vp['persona']}/puntos", conBearer($e['bearer']))->assertJsonPath('data.saldo', 0);
 
     // Relay -> acumula 10.
-    test()->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
     test()->getJson("/api/v1/app/{$e['slug']}/miembros/{$vp['persona']}/puntos", conBearer($e['bearer']))->assertJsonPath('data.saldo', 10);
 
     // Relay de nuevo -> sigue 10 (no premia dos veces).
-    test()->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
     test()->getJson("/api/v1/app/{$e['slug']}/miembros/{$vp['persona']}/puntos", conBearer($e['bearer']))->assertJsonPath('data.saldo', 10);
 });
 
@@ -149,7 +149,7 @@ it('acumula puntos al pagar una orden (1 punto por unidad de moneda)', function 
         'proveedor' => 'manual', 'metodo' => 'efectivo',
     ], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.estado', 'aprobado');
 
-    test()->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     // $899 * 1 punto/moneda = 899 puntos.
     test()->getJson("/api/v1/app/{$e['slug']}/miembros/{$comprador}/puntos", conBearer($e['bearer']))

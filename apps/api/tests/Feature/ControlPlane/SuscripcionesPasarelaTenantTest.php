@@ -222,7 +222,7 @@ it('la corrida diaria no cobra por su cuenta lo suscrito: concilia lo que cobró
     renovacionHoy($m);
     $this->pg->cuotas = [cuotaMercadoPago(11, 0, ['id' => 5001, 'status' => 'approved'])];
 
-    $this->artisan('turnouno:cobrar-suscripciones')->assertSuccessful();
+    $this->artisan('agendauno:cobrar-suscripciones')->assertSuccessful();
 
     Http::assertNotSent(fn (Request $q): bool => str_ends_with($q->url(), '/checkout/preferences'));
     expect(estadoRenovacion($m)['proxima'])->toBe(now()->addMonth()->toDateString());
@@ -290,7 +290,7 @@ it('los cargos de la suscripción de OpenPay pagan la renovación; un cargo fall
     renovacionHoy($m);
 
     $this->pg->cargosOp = [['id' => 'trxs1', 'status' => 'completed', 'amount' => 1299, 'transaction_type' => 'charge', 'customer_id' => 'cus_op1']];
-    $this->artisan('turnouno:cobrar-suscripciones')->assertSuccessful();
+    $this->artisan('agendauno:cobrar-suscripciones')->assertSuccessful();
     expect(estadoRenovacion($m)['proxima'])->toBe(now()->addMonth()->toDateString());
 
     $this->travel(1)->months();

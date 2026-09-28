@@ -46,7 +46,7 @@ use Illuminate\Support\Facades\Storage;
  */
 class SembrarEstudioDemo extends Command
 {
-    protected $signature = 'turnouno:sembrar-demo {--slug=demo} {--password=password}
+    protected $signature = 'agendauno:sembrar-demo {--slug=demo} {--password=password}
         {--perfil= : Giro del negocio (p. ej. barberia); con uno de citas no se siembran clases grupales}
         {--nombre= : Nombre del negocio si se crea}';
 

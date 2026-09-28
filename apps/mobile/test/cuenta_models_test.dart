@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/features/auth/data/sesion.dart';
-import 'package:turnouno_mobile/features/cuenta/data/cuenta_models.dart';
+import 'package:agendauno/features/auth/data/sesion.dart';
+import 'package:agendauno/features/cuenta/data/cuenta_models.dart';
 
 void main() {
   group('DerechoMiembro', () {

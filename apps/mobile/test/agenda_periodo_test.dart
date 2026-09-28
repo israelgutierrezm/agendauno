@@ -2,12 +2,12 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/features/auth/application/sesion_controller.dart';
-import 'package:turnouno_mobile/features/auth/data/sesion.dart';
-import 'package:turnouno_mobile/features/cuenta/application/cuenta_controller.dart';
-import 'package:turnouno_mobile/features/cuenta/data/cuenta_models.dart';
-import 'package:turnouno_mobile/features/cuenta/data/cuenta_repository.dart';
-import 'package:turnouno_mobile/features/cuenta/presentation/reservas_tab.dart';
+import 'package:agendauno/features/auth/application/sesion_controller.dart';
+import 'package:agendauno/features/auth/data/sesion.dart';
+import 'package:agendauno/features/cuenta/application/cuenta_controller.dart';
+import 'package:agendauno/features/cuenta/data/cuenta_models.dart';
+import 'package:agendauno/features/cuenta/data/cuenta_repository.dart';
+import 'package:agendauno/features/cuenta/presentation/reservas_tab.dart';
 
 /// El calendario de Reservas pide las clases del PERIODO que ve (y de la sede que
 /// elija), las vuelve a pedir al moverse y, si falla, lo dice con "Reintentar" en

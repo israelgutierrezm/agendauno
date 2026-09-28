@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class CobrarSuscripciones extends Command
 {
-    protected $signature = 'turnouno:cobrar-suscripciones';
+    protected $signature = 'agendauno:cobrar-suscripciones';
 
     protected $description = 'Cobra las renovaciones recurrentes vencidas y reintenta a los morosos';
 

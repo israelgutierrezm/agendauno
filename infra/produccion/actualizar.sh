@@ -71,7 +71,7 @@ principal() {
 
   echo "==> Migraciones (plataforma y cada negocio)"
   if ! $COMPOSE run --rm api php artisan migrate --force \
-    || ! $COMPOSE run --rm api php artisan turnouno:migrar-estudios --force; then
+    || ! $COMPOSE run --rm api php artisan agendauno:migrar-estudios --force; then
     echo "!! Falló una migración. Todo sigue en MANTENIMIENTO, con la versión $ANTERIOR detenida a medias"
     echo "   (sin cola ni programador). Parte del esquema pudo haber cambiado:"
     echo "   - revisa el error y, si $ANTERIOR funciona con el esquema actual, reábrela:"
@@ -94,7 +94,7 @@ principal() {
     intentos=$((intentos + 1))
     if [ "$intentos" -ge 30 ]; then
       echo "!! $VERSION no quedó lista en 5 minutos. Sigue en MANTENIMIENTO, sin abrir al público:"
-      $COMPOSE exec -T api php artisan turnouno:verificar-produccion --disponibilidad || true
+      $COMPOSE exec -T api php artisan agendauno:verificar-produccion --disponibilidad || true
       echo "   - corrige lo de arriba y ábrela: $COMPOSE exec api php artisan up"
       echo "   - o regresa el código a $ANTERIOR: ./volver.sh $ANTERIOR"
       echo "     (la base no se revierte; si la migración no fuera compatible con $ANTERIOR,"
@@ -111,7 +111,7 @@ principal() {
   anotar "$ANTERIOR -> $VERSION"
 
   echo "==> Verificación completa de producción"
-  if ! $COMPOSE exec -T api php artisan turnouno:verificar-produccion; then
+  if ! $COMPOSE exec -T api php artisan agendauno:verificar-produccion; then
     echo "!! $VERSION está abierta y atiende, pero faltan puntos para operar en producción (arriba)."
     echo "   Corrígelos. Si fueran de esta versión, regresa con: ./volver.sh $ANTERIOR"
     exit 2
@@ -129,9 +129,9 @@ respaldar() {
     # MySQL con la herramienta del proveedor antes de usar esta opción.
     echo "    (se omite el respaldo de la plataforma: SIN_RESPALDO_PLATAFORMA=1)"
   else
-    VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan turnouno:respaldar-plataforma || return 1
+    VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan agendauno:respaldar-plataforma || return 1
   fi
-  VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan turnouno:respaldar-estudios || return 1
+  VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan agendauno:respaldar-estudios || return 1
 }
 
 reabrir_anterior() {
@@ -144,7 +144,7 @@ reabrir_anterior() {
 # esquema al día) y una petición real por nginx y PHP-FPM, con la galleta que deja
 # pasar el mantenimiento.
 disponible() {
-  $COMPOSE exec -T api php artisan turnouno:verificar-produccion --disponibilidad >/dev/null 2>&1 || return 1
+  $COMPOSE exec -T api php artisan agendauno:verificar-produccion --disponibilidad >/dev/null 2>&1 || return 1
   galleta="$(curl -s -o /dev/null -D - -H "Host: $DOMINIO" "http://127.0.0.1:8080/$SECRETO" \
     | tr -d '\r' | sed -n 's/^[Ss]et-[Cc]ookie: *\(laravel_maintenance=[^;]*\).*/\1/p' | head -n 1)"
   [ -n "$galleta" ] || return 1

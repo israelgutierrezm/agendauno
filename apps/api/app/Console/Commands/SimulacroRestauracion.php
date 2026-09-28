@@ -15,11 +15,11 @@ use RuntimeException;
  * el de un negocio y el de los archivos en lugares temporales, comprueba que con
  * ellos se podría volver a operar (tablas esenciales, datos, relaciones, una consulta
  * real y los archivos idénticos a los en uso) y los borra. No toca los datos en uso.
- * Si falla, avisa al superadmin; el resultado lo revisa turnouno:verificar-produccion.
+ * Si falla, avisa al superadmin; el resultado lo revisa agendauno:verificar-produccion.
  */
 class SimulacroRestauracion extends Command
 {
-    protected $signature = 'turnouno:simulacro-restauracion {--estudio= : Slug del negocio a probar (por defecto, uno al azar)}';
+    protected $signature = 'agendauno:simulacro-restauracion {--estudio= : Slug del negocio a probar (por defecto, uno al azar)}';
 
     protected $description = 'Prueba que los respaldos se pueden restaurar (en bases temporales)';
 

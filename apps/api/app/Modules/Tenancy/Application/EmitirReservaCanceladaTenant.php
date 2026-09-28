@@ -40,7 +40,7 @@ class EmitirReservaCanceladaTenant
     {
         $this->emitir('reserva.sesion_cancelada', $reserva, [
             'credito' => $creditoDevuelto ? self::CREDITO_DEVUELTO : '',
-            'enlace' => rtrim((string) config('turnouno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $this->gestor->actual()?->slug),
+            'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $this->gestor->actual()?->slug),
         ]);
     }
 

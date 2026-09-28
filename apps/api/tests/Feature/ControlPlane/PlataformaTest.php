@@ -24,18 +24,18 @@ function conTokenPlataforma(string $token = 'token-plataforma'): array
 }
 
 it('sin token de plataforma configurado el apartado esta deshabilitado (401)', function (): void {
-    // No se configura turnouno.plataforma.token.
+    // No se configura agendauno.plataforma.token.
     test()->getJson('/api/v1/plataforma/estudios', conTokenPlataforma())->assertUnauthorized();
 });
 
 it('rechaza un token de plataforma incorrecto (401)', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
 
     test()->getJson('/api/v1/plataforma/estudios', conTokenPlataforma('otro'))->assertUnauthorized();
 });
 
 it('con el token correcto lista todos los estudios (control plane)', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
     estudioConSesion('estudio-a', 'a@correo.mx');
     estudioConSesion('estudio-b', 'b@correo.mx');
 
@@ -46,7 +46,7 @@ it('con el token correcto lista todos los estudios (control plane)', function ()
 });
 
 it('un estudio nuevo entra en cobro por activos; el admin lo cambia a fijo y el cargo lo refleja', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     terminarPrueba($e);
 
@@ -68,7 +68,7 @@ it('un estudio nuevo entra en cobro por activos; el admin lo cambia a fijo y el 
 });
 
 it('el cambio de facturación de un estudio exige token de plataforma', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
     estudioConSesion('estudio-a', 'a@correo.mx');
 
     test()->putJson('/api/v1/plataforma/estudios/estudio-a', [
@@ -77,7 +77,7 @@ it('el cambio de facturación de un estudio exige token de plataforma', function
 });
 
 it('activa y configura una pasarela de la plataforma sin devolver las llaves', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
 
     // Por defecto: apagadas, sin llaves.
     test()->getJson('/api/v1/plataforma/pasarelas', conTokenPlataforma())
@@ -105,7 +105,7 @@ it('activa y configura una pasarela de la plataforma sin devolver las llaves', f
 });
 
 it('rechaza configurar un proveedor desconocido y exige token de plataforma', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
 
     test()->putJson('/api/v1/plataforma/pasarelas/desconocido', [
         'activa' => true, 'modo' => 'test',
@@ -117,7 +117,7 @@ it('rechaza configurar un proveedor desconocido y exige token de plataforma', fu
 });
 
 it('carga la llave de la cuenta FacturAPI sin devolverla nunca', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
 
     test()->getJson('/api/v1/plataforma/configuracion', conTokenPlataforma())
         ->assertOk()->assertJsonPath('data.facturapi_configurada', false);
@@ -135,7 +135,7 @@ it('carga la llave de la cuenta FacturAPI sin devolverla nunca', function (): vo
 });
 
 it('el superadmin guarda aviso y términos y, al publicarlos, se ven en el endpoint público', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
 
     test()->putJson('/api/v1/plataforma/legales', [
         'aviso_privacidad' => 'Nuestro aviso de privacidad.',
@@ -182,7 +182,7 @@ it('la ficha de un estudio muestra su contacto, su uso y sus cargos; la lista, s
 });
 
 it('suspender corta el acceso al estudio y reactivar lo devuelve', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     terminarPrueba($e);
 
@@ -199,7 +199,7 @@ it('suspender corta el acceso al estudio y reactivar lo devuelve', function (): 
 });
 
 it('extender la prueba la corre desde hoy si ya había terminado y la regresa a prueba', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     terminarPrueba($e);
 

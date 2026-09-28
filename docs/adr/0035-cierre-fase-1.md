@@ -27,7 +27,7 @@ menos una vez": si un consumidor falla, el evento completo se reintenta.
     reintentos van por su propio relay.
   - Los mensajes anteriores quedan sin llave (el índice único admite varios NULL).
 - **Procesos diarios que no se enciman**: `entitlements:generar-ciclos` y
-  `turnouno:escalar-dunning` corren con `withoutOverlapping`, como el resto.
+  `agendauno:escalar-dunning` corren con `withoutOverlapping`, como el resto.
 - **Recorridos completos** en `RecorridosOperacionTest`, por la API:
   - **Clases**: la alumna se registra sola. Compra la mensualidad y la paga en
     recepción. Reserva tres clases y asiste a una. Cancela una a tiempo (el crédito

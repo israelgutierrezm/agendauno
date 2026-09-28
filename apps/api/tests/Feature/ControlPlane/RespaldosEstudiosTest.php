@@ -30,7 +30,7 @@ it('respalda la base de cada negocio comprimida y aplica la retención', functio
     Storage::disk('local')->put('respaldos/estudio-a/estudio-a-20200101-000000.sqlite.gz', 'viejo');
     touch(Storage::disk('local')->path('respaldos/estudio-a/estudio-a-20200101-000000.sqlite.gz'), now()->subDays(20)->getTimestamp());
 
-    $this->artisan('turnouno:respaldar-estudios')->assertSuccessful();
+    $this->artisan('agendauno:respaldar-estudios')->assertSuccessful();
 
     // Cada respaldo con su suma sha256 al lado.
     $archivosA = Storage::disk('local')->files('respaldos/estudio-a');
@@ -43,12 +43,12 @@ it('respalda la base de cada negocio comprimida y aplica la retención', functio
 
 it('un respaldo alterado no se restaura (su suma no coincide)', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    $this->artisan('turnouno:respaldar-estudios', ['--estudio' => 'estudio-a'])->assertSuccessful();
+    $this->artisan('agendauno:respaldar-estudios', ['--estudio' => 'estudio-a'])->assertSuccessful();
     $respaldo = collect(Storage::disk('local')->files('respaldos/estudio-a'))
         ->first(fn (string $a): bool => str_ends_with($a, '.sqlite.gz'));
     Storage::disk('local')->put($respaldo, (string) gzencode('otra cosa'));
 
-    $this->artisan('turnouno:restaurar-estudio', ['estudio' => 'estudio-a', '--force' => true])
+    $this->artisan('agendauno:restaurar-estudio', ['estudio' => 'estudio-a', '--force' => true])
         ->expectsOutputToContain('dañado')
         ->assertFailed();
 });
@@ -56,7 +56,7 @@ it('un respaldo alterado no se restaura (su suma no coincide)', function (): voi
 it('restaura un negocio desde su respaldo (con --force)', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     crearMiembroTenant($e, 'Ana');
-    $this->artisan('turnouno:respaldar-estudios', ['--estudio' => 'estudio-a'])->assertSuccessful();
+    $this->artisan('agendauno:respaldar-estudios', ['--estudio' => 'estudio-a'])->assertSuccessful();
 
     // Después del respaldo se da de alta a otra persona…
     crearMiembroTenant($e, 'Beto');
@@ -64,8 +64,8 @@ it('restaura un negocio desde su respaldo (con --force)', function (): void {
     expect($total())->toBe(2);
 
     // …sin --force no toca nada; con --force vuelve al respaldo.
-    $this->artisan('turnouno:restaurar-estudio', ['estudio' => 'estudio-a'])->assertFailed();
-    $this->artisan('turnouno:restaurar-estudio', ['estudio' => 'estudio-a', '--force' => true])->assertSuccessful();
+    $this->artisan('agendauno:restaurar-estudio', ['estudio' => 'estudio-a'])->assertFailed();
+    $this->artisan('agendauno:restaurar-estudio', ['estudio' => 'estudio-a', '--force' => true])->assertSuccessful();
 
     expect($total())->toBe(1);
 });

@@ -229,7 +229,7 @@ it('si el banco rechaza el cargo automático, entra la mora con el motivo y el r
     // Al reintento ya hay fondos: se cobra, se regulariza y se limpia el error.
     $this->stripe->cargo = 'exito';
     $this->travel(1)->days();
-    $this->artisan('turnouno:cobrar-suscripciones')->assertSuccessful();
+    $this->artisan('agendauno:cobrar-suscripciones')->assertSuccessful();
 
     $orden = (string) enEstudioPago($m, fn () => OrdenTenant::query()->whereNotNull('renueva_acuerdo_id')->value('ulid'));
     Http::assertSent(fn (Request $r): bool => str_ends_with($r->url(), '/payment_intents')

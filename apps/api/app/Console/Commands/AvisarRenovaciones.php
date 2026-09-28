@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class AvisarRenovaciones extends Command
 {
-    protected $signature = 'turnouno:avisar-renovaciones';
+    protected $signature = 'agendauno:avisar-renovaciones';
 
     protected $description = 'Avisa a los alumnos las renovaciones de membresía de los próximos días';
 

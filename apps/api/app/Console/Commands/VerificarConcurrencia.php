@@ -41,7 +41,7 @@ class VerificarConcurrencia extends Command
 {
     use ConfirmableTrait;
 
-    protected $signature = 'turnouno:verificar-concurrencia
+    protected $signature = 'agendauno:verificar-concurrencia
         {--base= : Base MySQL existente y VACÍA para el negocio temporal (se vacía al terminar). Sin ella se crea y se borra una base por negocio}
         {--rondas=3 : Veces que se repite cada caso}
         {--procesos=6 : Procesos que compiten en cada ronda}
@@ -92,7 +92,7 @@ class VerificarConcurrencia extends Command
         }
         $rondas = max(1, (int) $this->option('rondas'));
         $procesos = max(2, (int) $this->option('procesos'));
-        config(['turnouno.tenant_db_driver' => 'mysql']);
+        config(['agendauno.tenant_db_driver' => 'mysql']);
 
         try {
             $this->principal = $this->nuevoEstudio();
@@ -450,7 +450,7 @@ class VerificarConcurrencia extends Command
                     $paso['negocio'] = $this->principal->getKey();
                 }
                 $pool->path(base_path())->env(['XDEBUG_MODE' => 'off'])->timeout(300)->command([
-                    PHP_BINARY, 'artisan', 'turnouno:verificar-concurrencia',
+                    PHP_BINARY, 'artisan', 'agendauno:verificar-concurrencia',
                     '--paso='.base64_encode((string) json_encode($paso)),
                 ]);
             }

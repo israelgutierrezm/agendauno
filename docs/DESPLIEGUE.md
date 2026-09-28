@@ -9,7 +9,7 @@ Cómo poner AgendaUno en un servidor con Docker. Los archivos están en
 |---|---|
 | `web` | nginx: sitio comercial (HTML completo), la aplicación (`app.html`), pasa `/api` y `/up` a PHP y sirve `/storage` (logos y fotos). Escucha solo en `127.0.0.1:8080`. |
 | `api` | Laravel en PHP-FPM. |
-| `worker` | Cola en Redis: correos transaccionales. Chequeo de salud: su latido (`turnouno:latido --verificar=cola`). |
+| `worker` | Cola en Redis: correos transaccionales. Chequeo de salud: su latido (`agendauno:latido --verificar=cola`). |
 | `scheduler` | Tareas programadas (`routes/console.php`): recordatorios, renovaciones, agenda recurrente, cobros, outbox, respaldos, alertas… Chequeo de salud: su latido. |
 | `redis` | Caché, colas y sesiones. |
 
@@ -76,9 +76,9 @@ cp web.env.example web.env
    ```
 
 4. Comprueba:
-   - `docker compose --env-file web.env exec api php artisan turnouno:verificar-produccion`
+   - `docker compose --env-file web.env exec api php artisan agendauno:verificar-produccion`
      termina en «Lista para producción» (dice qué falta si no);
-   - `docker compose --env-file web.env exec api php artisan turnouno:verificar-concurrencia`
+   - `docker compose --env-file web.env exec api php artisan agendauno:verificar-concurrencia`
      termina en «Todo cuadró». Crea un negocio temporal con su base
      (`tenant_verificacion_*`), pone a competir procesos a la vez (el último lugar, el
      mismo horario de un profesional, cancelar y reprogramar), migra varios negocios,
@@ -86,7 +86,7 @@ cp web.env.example web.env
      cambias de servidor o de versión de MySQL;
    - `curl -H "Host: DOMINIO" http://127.0.0.1:8080/up` responde 200;
    - `https://DOMINIO` muestra la portada y `https://DOMINIO/registro` el registro;
-   - `docker compose --env-file web.env exec api php artisan turnouno:probar-correo tu@correo.com` llega;
+   - `docker compose --env-file web.env exec api php artisan agendauno:probar-correo tu@correo.com` llega;
    - `docker compose --env-file web.env logs -f worker scheduler` no muestra errores.
 5. En el superadmin (`/plataforma`, con `PLATFORM_ADMIN_TOKEN`): tarifas del SaaS,
    parámetros de plataforma, la pasarela con la que cobras la renta y **los documentos
@@ -112,20 +112,20 @@ cd agendauno/infra/produccion
    tareas que se hubieran cortado. Recién entonces **respalda la plataforma y cada
    negocio**: el respaldo trae todo lo aceptado. Si el respaldo falla, reabre la
    versión anterior y no migra.
-3. Migra (la plataforma y, con `turnouno:migrar-estudios`, cada negocio) y levanta la
+3. Migra (la plataforma y, con `agendauno:migrar-estudios`, cada negocio) y levanta la
    versión nueva **todavía en mantenimiento**.
 4. **Solo la abre si atiende**: base, caché, cola y programador de la versión nueva,
    esquema de la plataforma y de cada negocio al día
-   (`turnouno:verificar-produccion --disponibilidad`) y una petición real por nginx.
+   (`agendauno:verificar-produccion --disponibilidad`) y una petición real por nginx.
    Espera hasta 5 minutos; si no, la deja en mantenimiento, no la anota como actual y
    sale con error, con las opciones para corregir o volver.
-5. Ya abierta, corre `turnouno:verificar-produccion` completa. Si falta algo para operar
+5. Ya abierta, corre `agendauno:verificar-produccion` completa. Si falta algo para operar
    en producción lo dice y sale con error (código 2), sin «Listo».
 
 La base nunca se revierte sola. Si una migración falla, todo queda en mantenimiento y el
 script dice cómo reabrir la versión anterior o restaurar los respaldos recién tomados.
 La primera vez que uses el script, la versión en marcha aún no tiene
-`turnouno:respaldar-plataforma`: respalda MySQL con la herramienta del proveedor y corre
+`agendauno:respaldar-plataforma`: respalda MySQL con la herramienta del proveedor y corre
 `SIN_RESPALDO_PLATAFORMA=1 ./actualizar.sh`.
 
 ### Volver a una versión anterior
@@ -153,13 +153,13 @@ restaura).
 
 | Qué | Cuándo | Comando |
 |---|---|---|
-| Base central de la plataforma (estudios, cobro del SaaS, configuración) | diario 03:05 y antes de cada actualización | `turnouno:respaldar-plataforma` |
-| Archivos subidos (documentos, fotos, logos) | diario 03:05 | `turnouno:respaldar-plataforma` |
-| Base de cada negocio | diario 03:15 y antes de cada actualización | `turnouno:respaldar-estudios` |
-| Simulacro: restaura en lugares temporales el último respaldo de la plataforma, el de un negocio y el de los archivos, y comprueba que se podría volver a operar (tablas esenciales, dueño con acceso, relaciones sin huérfanos, una consulta real, archivos idénticos a los en uso) | domingos 04:30 | `turnouno:simulacro-restauracion` |
+| Base central de la plataforma (estudios, cobro del SaaS, configuración) | diario 03:05 y antes de cada actualización | `agendauno:respaldar-plataforma` |
+| Archivos subidos (documentos, fotos, logos) | diario 03:05 | `agendauno:respaldar-plataforma` |
+| Base de cada negocio | diario 03:15 y antes de cada actualización | `agendauno:respaldar-estudios` |
+| Simulacro: restaura en lugares temporales el último respaldo de la plataforma, el de un negocio y el de los archivos, y comprueba que se podría volver a operar (tablas esenciales, dueño con acceso, relaciones sin huérfanos, una consulta real, archivos idénticos a los en uso) | domingos 04:30 | `agendauno:simulacro-restauracion` |
 
 Se conservan `RESPALDOS_DIAS` días. Si un respaldo o el simulacro fallan, llega la
-alerta por correo, y `turnouno:verificar-produccion` marca lo que esté viejo o sin
+alerta por correo, y `agendauno:verificar-produccion` marca lo que esté viejo o sin
 probar.
 
 ### Restaurar
@@ -167,9 +167,9 @@ probar.
 ```bash
 docker compose --env-file web.env exec api php artisan down
 # La base central (el más reciente o --respaldo=RUTA; --listar para ver cuáles hay):
-docker compose --env-file web.env exec api php artisan turnouno:restaurar-plataforma --force
+docker compose --env-file web.env exec api php artisan agendauno:restaurar-plataforma --force
 # Un negocio:
-docker compose --env-file web.env exec api php artisan turnouno:restaurar-estudio SLUG --force
+docker compose --env-file web.env exec api php artisan agendauno:restaurar-estudio SLUG --force
 docker compose --env-file web.env exec api php artisan up
 ```
 
@@ -192,7 +192,7 @@ Además de esto, conviene que el proveedor de MySQL haga sus instantáneas diari
 - Si se detiene el **programador de tareas**, él mismo no puede avisar: registra
   `https://DOMINIO/api/v1/health?estricto=1` en un monitor externo (UptimeRobot,
   Better Stack…). Responde 503 si la base, la caché, el programador o la cola fallan.
-- `turnouno:verificar-produccion` revisa la instalación completa (entorno, correo,
+- `agendauno:verificar-produccion` revisa la instalación completa (entorno, correo,
   latidos, respaldos fuera del servidor y recientes, alertas, aviso de privacidad,
   pasarela de la plataforma). Córrelo tras instalar y tras cada actualización (el
   script de actualizar lo hace). Distingue una instalación de prueba de la **apertura

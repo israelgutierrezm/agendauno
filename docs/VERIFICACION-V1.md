@@ -2,7 +2,7 @@
 
 Guía para comprobar a mano, con llaves de prueba de Stripe, Mercado Pago y OpenPay,
 que el dinero y los avisos llegan a donde deben antes de abrir. Complementa a
-`turnouno:verificar-produccion` (configuración) y a `turnouno:verificar-concurrencia`
+`agendauno:verificar-produccion` (configuración) y a `agendauno:verificar-concurrencia`
 (carreras en MySQL); ver `docs/DESPLIEGUE.md`.
 
 Cada caso dice qué hacer y qué debe verse. Marca cada casilla por pasarela.
@@ -15,8 +15,8 @@ Cada caso dice qué hacer y qué debe verse. Marca cada casilla por pasarela.
    regresa el cliente después de pagar.
 2. **Cola y programador corriendo** (`worker` y `scheduler`). Sin ellos no salen
    correos, no se publican eventos y no vencen las reservas por pagar.
-   `turnouno:latido --verificar=cola` y `--verificar=programador` deben salir OK.
-3. **Correo real** (`MAIL_*`) y `php artisan turnouno:probar-correo tu@correo.com`
+   `agendauno:latido --verificar=cola` y `--verificar=programador` deben salir OK.
+3. **Correo real** (`MAIL_*`) y `php artisan agendauno:probar-correo tu@correo.com`
    recibido. Opcional: push con `FCM_CREDENTIALS` y `FCM_PROJECT_ID`.
 4. **Un negocio de prueba** registrado y operativo, con:
    - una clase grupal con cupo y un servicio de cita con **pago para reservar**
@@ -127,7 +127,7 @@ envían cada minuto.
 
 ### 6. Aviso perdido
 
-`turnouno:conciliar-pagos` (cada 5 minutos) le pregunta a la pasarela por los cobros
+`agendauno:conciliar-pagos` (cada 5 minutos) le pregunta a la pasarela por los cobros
 en línea sin confirmar desde hace más de 5 minutos, y por los intentos que se
 cerraron de nuestro lado sin que la pasarela lo confirmara (por ejemplo, un pago en
 tienda de OpenPay al reintentar con tarjeta). Aplica lo mismo que habría aplicado el
@@ -154,7 +154,7 @@ aviso; nunca cobra ni cancela.
 - [ ] **Paquete ya usado.** Un reembolso total de un paquete con clases usadas se
   rechaza; uno parcial revierte solo la parte proporcional sin usar.
 - [ ] **Pendiente.** Si la pasarela deja el reembolso pendiente, se cierra solo con
-  su aviso o con `turnouno:conciliar-reembolsos` (cada 5 minutos). Si no se puede
+  su aviso o con `agendauno:conciliar-reembolsos` (cada 5 minutos). Si no se puede
   saber cómo quedó, aparece «reembolso incierto» en «Por conciliar».
 - [ ] **OpenPay OXXO** no admite reembolso en línea: se registra como devolución
   manual (en caja o fuera del sistema).
@@ -168,11 +168,11 @@ la base del negocio de prueba pon `acuerdos.proxima_cobro_en` en la fecha de hoy
 corre el comando a mano.
 
 - [ ] **Aviso previo.** Con la renovación a 3 días o menos,
-  `php artisan turnouno:avisar-renovaciones` manda «renovación próxima» y, a quien
+  `php artisan agendauno:avisar-renovaciones` manda «renovación próxima» y, a quien
   paga a mano, le deja la orden de renovación en «Por pagar».
 - [ ] **Pago automático con tarjeta guardada (Stripe).** La alumna autoriza su
   tarjeta en «Pago automático» (vuelve con `?tarjeta=exito`). Con la renovación
-  vencida, `php artisan turnouno:cobrar-suscripciones` cobra sin que ella haga nada;
+  vencida, `php artisan agendauno:cobrar-suscripciones` cobra sin que ella haga nada;
   la membresía avanza al siguiente periodo y llega el recibo.
 - [ ] **Suscripción (Mercado Pago / OpenPay).** El cobro lo hace la pasarela; el
   comando solo concilia lo que ya cobró. Si en los días de gracia no llega el cobro,
@@ -180,7 +180,7 @@ corre el comando a mano.
 - [ ] **Rechazo.** Con una tarjeta que se rechaza (en Stripe, cámbiala por
   `4000 0000 0000 0341`, que se guarda pero falla al cobrar), el cobro abre la mora:
   aparece en «En mora», llega «cobro fallido» y se reintenta a los 1, 3 y 7 días. Al
-  vencer la gracia, `php artisan turnouno:escalar-dunning` suspende la membresía.
+  vencer la gracia, `php artisan agendauno:escalar-dunning` suspende la membresía.
   Pagar la deuda la regulariza.
 - [ ] **Sin pago automático.** La renovación queda en «Por pagar» y en «En mora»
   («Falta completar el pago en línea») hasta que la alumna paga.
@@ -190,7 +190,7 @@ corre el comando a mano.
 - [ ] Cada caso anterior dejó su mensaje `enviado` en la Bandeja de salida y llegó
   al correo (revisa también spam: SPF y DKIM del remitente).
 - [ ] **Recordatorios.** Reserva una clase para dentro de ~24 h y otra para dentro
-  de ~2 h: `turnouno:enviar-recordatorios` (cada 5 minutos) manda un recordatorio
+  de ~2 h: `agendauno:enviar-recordatorios` (cada 5 minutos) manda un recordatorio
   por reserva y momento, una sola vez.
 - [ ] **Cancelar y reprogramar** una reserva: llegan «reserva cancelada» y
   «reserva reprogramada» a la alumna y, si tiene la app, el push al profesional.
@@ -209,5 +209,5 @@ Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado�
   webhook `APP_URL/api/v1/webhooks/plataforma/stripe` (la pantalla aún no lo
   muestra). Hoy solo Stripe cobra la renta.
 - [ ] Con un negocio fuera de prueba y un mes cerrado,
-  `php artisan turnouno:generar-cargos-renta --periodo=AAAA-MM` crea su cargo. El
+  `php artisan agendauno:generar-cargos-renta --periodo=AAAA-MM` crea su cargo. El
   dueño lo paga en «Suscripción» (`/renta`) y el cargo pasa a `pagado`.

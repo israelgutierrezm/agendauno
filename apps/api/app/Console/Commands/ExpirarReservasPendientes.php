@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class ExpirarReservasPendientes extends Command
 {
-    protected $signature = 'turnouno:expirar-reservas-pago';
+    protected $signature = 'agendauno:expirar-reservas-pago';
 
     protected $description = 'Libera reservas de pago-para-reservar no pagadas a tiempo';
 

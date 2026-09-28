@@ -31,7 +31,7 @@ No hay una propiedad conectada automáticamente. Si se utiliza verificación por
 
 ## Embudo y medición
 
-La integración existente emite eventos a `window.dataLayer`, al evento local `turnouno:analytics` y, si se configura, a `VITE_ANALYTICS_ENDPOINT`. Sin un receptor o un gestor de etiquetas configurado no existe un panel de métricas ni almacenamiento persistente. No se instala GA4 ni se envían datos a una cuenta externa nueva.
+La integración existente emite eventos a `window.dataLayer`, al evento local `agendauno:analytics` y, si se configura, a `VITE_ANALYTICS_ENDPOINT`. Sin un receptor o un gestor de etiquetas configurado no existe un panel de métricas ni almacenamiento persistente. No se instala GA4 ni se envían datos a una cuenta externa nueva.
 
 | Etapa            | Evento                                  | Qué significa                                                      |
 | ---------------- | --------------------------------------- | ------------------------------------------------------------------ |

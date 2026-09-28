@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/core/config/firebase_config.dart';
-import 'package:turnouno_mobile/features/auth/data/sesion.dart';
-import 'package:turnouno_mobile/features/notificaciones/application/push_controller.dart';
-import 'package:turnouno_mobile/features/notificaciones/data/dispositivos_repository.dart';
+import 'package:agendauno/core/config/firebase_config.dart';
+import 'package:agendauno/features/auth/data/sesion.dart';
+import 'package:agendauno/features/notificaciones/application/push_controller.dart';
+import 'package:agendauno/features/notificaciones/data/dispositivos_repository.dart';
 
 /// Repositorio que solo anota lo que se le pide (no hay servidor en las pruebas).
 class _RepoAnotador extends DispositivosRepository {

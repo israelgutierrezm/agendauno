@@ -62,7 +62,7 @@ class EmitirFacturaPlataforma
                 'receptor_email' => $receptor['email'] ?? null,
                 'receptor_regimen' => $receptor['regimen_fiscal'] ?? null,
                 'receptor_cp' => $receptor['codigo_postal'],
-                'uso_cfdi' => (string) config('turnouno.facturapi.renta.uso_cfdi'),
+                'uso_cfdi' => (string) config('agendauno.facturapi.renta.uso_cfdi'),
                 'moneda' => $cargo->moneda,
                 'subtotal_minor' => $subtotal,
                 'impuesto_minor' => $impuesto,
@@ -115,16 +115,16 @@ class EmitirFacturaPlataforma
                 'quantity' => 1,
                 'product' => [
                     'description' => "Suscripción AgendaUno {$cargo->periodo}",
-                    'product_key' => (string) config('turnouno.facturapi.renta.clave_prod_serv'),
-                    'unit_key' => (string) config('turnouno.facturapi.renta.clave_unidad'),
+                    'product_key' => (string) config('agendauno.facturapi.renta.clave_prod_serv'),
+                    'unit_key' => (string) config('agendauno.facturapi.renta.clave_unidad'),
                     // El precio es IVA incluido: FacturAPI extrae el impuesto para cuadrar con lo cobrado.
                     'price' => $cargo->monto_minor / 100,
                     'tax_included' => true,
                     'taxes' => [['type' => 'IVA', 'rate' => 0.16]],
                 ],
             ]],
-            'use' => (string) config('turnouno.facturapi.renta.uso_cfdi'),
-            'payment_form' => (string) config('turnouno.facturapi.renta.forma_pago'),
+            'use' => (string) config('agendauno.facturapi.renta.uso_cfdi'),
+            'payment_form' => (string) config('agendauno.facturapi.renta.forma_pago'),
             'currency' => $cargo->moneda,
         ];
     }

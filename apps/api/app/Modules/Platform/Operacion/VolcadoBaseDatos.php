@@ -46,7 +46,7 @@ class VolcadoBaseDatos
         }
 
         $proceso = new Process([
-            (string) config('turnouno.respaldos.mysqldump', 'mysqldump'),
+            (string) config('agendauno.respaldos.mysqldump', 'mysqldump'),
             '--single-transaction', '--quick', '--skip-lock-tables', '--routines',
             '--host='.$config['host'], '--port='.$config['port'], '--user='.$config['username'],
             '--result-file='.$destino,
@@ -97,7 +97,7 @@ class VolcadoBaseDatos
         }
 
         $proceso = new Process([
-            (string) config('turnouno.respaldos.mysql', 'mysql'),
+            (string) config('agendauno.respaldos.mysql', 'mysql'),
             '--host='.$config['host'], '--port='.$config['port'], '--user='.$config['username'],
             (string) $config['database'],
         ], null, ['MYSQL_PWD' => (string) ($config['password'] ?? '')], fopen($origen, 'rb'), 3600);
@@ -200,11 +200,11 @@ class VolcadoBaseDatos
 
     public function carpeta(string $sub): string
     {
-        return trim((string) config('turnouno.respaldos.carpeta', 'respaldos'), '/').'/'.$sub;
+        return trim((string) config('agendauno.respaldos.carpeta', 'respaldos'), '/').'/'.$sub;
     }
 
     public function disco(): Filesystem
     {
-        return Storage::disk((string) config('turnouno.respaldos.disco', 'local'));
+        return Storage::disk((string) config('agendauno.respaldos.disco', 'local'));
     }
 }

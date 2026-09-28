@@ -50,15 +50,15 @@ it('entrega el evento FIRMADO al endpoint suscrito y registra la entrega', funct
     expect($secreto)->toStartWith('whsec_');
 
     reservaEnEstudio($e);
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     Http::assertSent(function ($request) use ($secreto): bool {
-        $firma = $request->header('X-TurnoUno-Signature')[0] ?? '';
+        $firma = $request->header('X-AgendaUno-Signature')[0] ?? '';
         $esperada = 'sha256='.hash_hmac('sha256', $request->body(), $secreto);
 
         return str_contains($request->url(), 'ejemplo.test/hook')
             && $firma === $esperada
-            && ($request->header('X-TurnoUno-Event')[0] ?? '') === 'reserva.creada';
+            && ($request->header('X-AgendaUno-Event')[0] ?? '') === 'reserva.creada';
     });
 
     $entregas = $this->getJson("/api/v1/app/{$e['slug']}/webhooks-salientes/{$webhook['id']}/entregas", conBearer($e['bearer']))
@@ -80,7 +80,7 @@ it('no entrega eventos a los que el endpoint no esta suscrito', function (): voi
     ], conBearer($e['bearer']))->assertCreated();
 
     reservaEnEstudio($e);
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     Http::assertNothingSent();
 });
@@ -98,7 +98,7 @@ it('marca la entrega fallida y el comando de reintento la reenvia', function ():
     ], conBearer($e['bearer']))->assertCreated()->json('data');
 
     reservaEnEstudio($e);
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     $entregas = $this->getJson("/api/v1/app/{$e['slug']}/webhooks-salientes/{$webhook['id']}/entregas", conBearer($e['bearer']))
         ->assertOk()->json('data');
@@ -106,7 +106,7 @@ it('marca la entrega fallida y el comando de reintento la reenvia', function ():
     expect($entregas[0]['intentos'])->toBe(1);
 
     // El endpoint ya responde bien: el reintento la entrega.
-    $this->artisan('turnouno:reintentar-webhooks')->assertSuccessful();
+    $this->artisan('agendauno:reintentar-webhooks')->assertSuccessful();
 
     $entregas = $this->getJson("/api/v1/app/{$e['slug']}/webhooks-salientes/{$webhook['id']}/entregas", conBearer($e['bearer']))
         ->assertOk()->json('data');
@@ -184,7 +184,7 @@ it('si el dominio pasa a resolver a una IP interna, no se envía nada', function
     // Cambia el DNS (rebinding) antes del envío.
     dnsFalso(['ejemplo.test' => ['10.0.0.8']]);
     reservaEnEstudio($e);
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     $entregas = $this->getJson("/api/v1/app/{$e['slug']}/webhooks-salientes/{$webhook['id']}/entregas", conBearer($e['bearer']))
         ->assertOk()->json('data');
@@ -201,7 +201,7 @@ it('una redirección no cuenta como entregado', function (): void {
     ], conBearer($e['bearer']))->assertCreated()->json('data');
 
     reservaEnEstudio($e);
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     $entregas = $this->getJson("/api/v1/app/{$e['slug']}/webhooks-salientes/{$webhook['id']}/entregas", conBearer($e['bearer']))
         ->assertOk()->json('data');

@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/core/calendario/calendario.dart';
-import 'package:turnouno_mobile/features/agenda/data/agenda_models.dart';
-import 'package:turnouno_mobile/features/auth/data/sesion.dart';
-import 'package:turnouno_mobile/features/cuenta/data/corte_planes.dart';
-import 'package:turnouno_mobile/features/cuenta/data/cuenta_models.dart';
-import 'package:turnouno_mobile/features/cuenta/data/eventos_cuenta.dart';
-import 'package:turnouno_mobile/features/instructor/application/mis_clases_controller.dart';
-import 'package:turnouno_mobile/features/instructor/presentation/instructor_screen.dart';
+import 'package:agendauno/core/calendario/calendario.dart';
+import 'package:agendauno/features/agenda/data/agenda_models.dart';
+import 'package:agendauno/features/auth/data/sesion.dart';
+import 'package:agendauno/features/cuenta/data/corte_planes.dart';
+import 'package:agendauno/features/cuenta/data/cuenta_models.dart';
+import 'package:agendauno/features/cuenta/data/eventos_cuenta.dart';
+import 'package:agendauno/features/instructor/application/mis_clases_controller.dart';
+import 'package:agendauno/features/instructor/presentation/instructor_screen.dart';
 
 void main() {
   group('portal del alumno', () {

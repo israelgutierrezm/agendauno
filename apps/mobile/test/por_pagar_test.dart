@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/features/cuenta/data/cuenta_models.dart';
+import 'package:agendauno/features/cuenta/data/cuenta_models.dart';
 
 void main() {
   test('por pagar solo trae lo pendiente con productos', () {

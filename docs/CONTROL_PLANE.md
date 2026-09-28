@@ -43,7 +43,7 @@ con:
 
 ```bash
 php artisan migrate --force                              # control plane
-php artisan turnouno:migrar-estudios --force --isolated  # BD de cada estudio
+php artisan agendauno:migrar-estudios --force --isolated  # BD de cada estudio
 ```
 
 - Recorre todos los estudios (`--estudio=slug` para uno solo); se salta los que se
@@ -60,10 +60,10 @@ php artisan turnouno:migrar-estudios --force --isolated  # BD de cada estudio
 Cada estudio tiene su propia base, así que se respalda y se restaura por separado:
 
 ```bash
-php artisan turnouno:respaldar-estudios                  # todos (diario, 03:15)
-php artisan turnouno:respaldar-estudios --estudio=slug   # uno solo
-php artisan turnouno:restaurar-estudio slug --listar     # sus respaldos
-php artisan turnouno:restaurar-estudio slug --force      # vuelve al más reciente
+php artisan agendauno:respaldar-estudios                  # todos (diario, 03:15)
+php artisan agendauno:respaldar-estudios --estudio=slug   # uno solo
+php artisan agendauno:restaurar-estudio slug --listar     # sus respaldos
+php artisan agendauno:restaurar-estudio slug --force      # vuelve al más reciente
 ```
 
 - SQLite: `VACUUM INTO` (copia consistente con la base en uso). MySQL:
@@ -82,7 +82,7 @@ php artisan turnouno:restaurar-estudio slug --force      # vuelve al más recien
 - `POST /api/v1/app/{estudio}/login` · `/activar` — auth tenant-local.
 - `GET  /api/v1/app/{estudio}/yo` · `POST /logout` — sesión tenant-local.
 
-En producción el tenant se resolverá también por `{slug}.turnouno.com`; hoy se
+En producción el tenant se resolverá también por `{slug}.agendauno.mx`; hoy se
 usa `…/app/{slug}` como alternativa configurable.
 
 ## Recorrido probado

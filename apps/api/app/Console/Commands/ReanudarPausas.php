@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class ReanudarPausas extends Command
 {
-    protected $signature = 'turnouno:reanudar-pausas';
+    protected $signature = 'agendauno:reanudar-pausas';
 
     protected $description = 'Reanuda las membresías cuya pausa ya terminó';
 

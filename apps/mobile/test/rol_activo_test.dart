@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/features/auth/application/sesion_controller.dart';
-import 'package:turnouno_mobile/features/auth/data/sesion.dart';
-import 'package:turnouno_mobile/features/auth/presentation/elegir_rol_screen.dart';
+import 'package:agendauno/features/auth/application/sesion_controller.dart';
+import 'package:agendauno/features/auth/data/sesion.dart';
+import 'package:agendauno/features/auth/presentation/elegir_rol_screen.dart';
 
 /// Rol activo: quien tiene varios roles entra con uno (lo elige al entrar) y la app
 /// muestra solo lo de ese rol. Datos sintéticos.

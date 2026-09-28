@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
 /*
-| Conciliación de pagos cuyo aviso (webhook) no llegó: turnouno:conciliar-pagos le
+| Conciliación de pagos cuyo aviso (webhook) no llegó: agendauno:conciliar-pagos le
 | pregunta a la pasarela cómo va cada intento y aplica lo que habría aplicado el aviso.
 | Nunca cobra ni cancela; si el aviso llega después, no se duplica nada.
 */
@@ -159,12 +159,12 @@ it('confirma un cobro de Stripe cuyo aviso no llegó y el aviso tardío ya no du
     $this->stripe->sesiones['cs_1'] = ['status' => 'complete', 'payment_status' => 'paid', 'intent' => 'succeeded'];
 
     // Dentro de los minutos de gracia no se pregunta: el aviso normal llega en segundos.
-    $this->artisan('turnouno:conciliar-pagos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
     expect($this->stripe->consultas)->toBe(0)
         ->and(estadoOrdenPorConciliar($c['slug'], $c['orden']))->toBe('pendiente');
 
     $this->travel(6)->minutes();
-    $this->artisan('turnouno:conciliar-pagos')
+    $this->artisan('agendauno:conciliar-pagos')
         ->expectsOutputToContain('Cobros confirmados: 1.')
         ->assertSuccessful();
 
@@ -178,7 +178,7 @@ it('confirma un cobro de Stripe cuyo aviso no llegó y el aviso tardío ya no du
     $this->postJson("/api/v1/webhooks/tenant/{$c['slug']}/stripe", [
         'type' => 'checkout.session.completed', 'data' => ['object' => ['id' => 'cs_1', 'payment_status' => 'paid']],
     ])->assertOk();
-    $this->artisan('turnouno:conciliar-pagos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
 
     enNegocioPorConciliar($c['slug'], function (): void {
         expect(PagoTenant::query()->where('estado', 'aprobado')->count())->toBe(1)
@@ -195,14 +195,14 @@ it('si la sesión venció, cierra el intento y la compra sigue por pagar', funct
     $this->stripe->sesiones['cs_1']['status'] = 'expired';
 
     $this->travel(6)->minutes();
-    $this->artisan('turnouno:conciliar-pagos')->expectsOutputToContain('Cerrados: 1.')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->expectsOutputToContain('Cerrados: 1.')->assertSuccessful();
 
     expect(pagoPorConciliar($c['slug'], $pago)->estado->value)->toBe('rechazado')
         ->and(estadoOrdenPorConciliar($c['slug'], $c['orden']))->toBe('pendiente');
 
     // Ya cerrado con la palabra de Stripe: no se vuelve a preguntar.
     $this->travel(3)->hours();
-    $this->artisan('turnouno:conciliar-pagos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
     expect($this->stripe->consultas)->toBe(1);
 });
 
@@ -212,30 +212,30 @@ it('un pago en tienda en espera se sigue preguntando, cada vez más espaciado, y
     $this->stripe->sesiones['cs_1'] = ['status' => 'complete', 'payment_status' => 'unpaid', 'intent' => 'requires_action'];
 
     $this->travel(6)->minutes();
-    $this->artisan('turnouno:conciliar-pagos')->expectsOutputToContain('En espera: 1.')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->expectsOutputToContain('En espera: 1.')->assertSuccessful();
     // La primera hora, en cada vuelta.
     $this->travel(5)->minutes();
-    $this->artisan('turnouno:conciliar-pagos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
     expect($this->stripe->consultas)->toBe(2);
 
     // Pasada la hora, cada 30 minutos.
     $this->travel(2)->hours();
-    $this->artisan('turnouno:conciliar-pagos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
     $this->travel(5)->minutes();
-    $this->artisan('turnouno:conciliar-pagos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
     expect($this->stripe->consultas)->toBe(3);
 
     // Stripe no responde: se anota y se reintenta después.
     $this->stripe->caida = true;
     $this->travel(31)->minutes();
-    $this->artisan('turnouno:conciliar-pagos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
     expect(pagoPorConciliar($c['slug'], $pago)->estado->value)->toBe('pendiente');
 
     // Se pagó en la tienda y el aviso se perdió.
     $this->stripe->caida = false;
     $this->stripe->sesiones['cs_1'] = ['status' => 'complete', 'payment_status' => 'paid', 'intent' => 'succeeded'];
     $this->travel(31)->minutes();
-    $this->artisan('turnouno:conciliar-pagos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
     expect(estadoOrdenPorConciliar($c['slug'], $c['orden']))->toBe('pagada');
 });
 
@@ -254,7 +254,7 @@ it('un pago en tienda de OpenPay cerrado de este lado al reintentar se cobra des
     // Lo paga en la tienda; el aviso no llega.
     $this->op->cargos['trx1']['status'] = 'completed';
     $this->travel(6)->minutes();
-    $this->artisan('turnouno:conciliar-pagos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
 
     expect(pagoPorConciliar($c['slug'], $enTienda)->estado->value)->toBe('aprobado')
         ->and(estadoOrdenPorConciliar($c['slug'], $c['orden']))->toBe('pagada')
@@ -269,7 +269,7 @@ it('con Mercado Pago confirma con el id de su cobro', function (): void {
     $this->mp->cobros['502'] = ['id' => 502, 'status' => 'approved', 'external_reference' => $pago];
 
     $this->travel(6)->minutes();
-    $this->artisan('turnouno:conciliar-pagos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
 
     $conciliado = pagoPorConciliar($c['slug'], $pago);
     expect($conciliado->estado->value)->toBe('aprobado')
@@ -301,11 +301,11 @@ it('la cita pagada cuyo aviso se perdió queda confirmada antes de que venza el 
     // Pagó al momento, pero el aviso de Stripe no llegó.
     $this->stripe->sesiones['cs_1'] = ['status' => 'complete', 'payment_status' => 'paid', 'intent' => 'succeeded'];
     $this->travel(6)->minutes();
-    $this->artisan('turnouno:conciliar-pagos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
 
     // Pasa la media hora del apartado: la cita ya estaba confirmada y no se libera.
     $this->travel(30)->minutes();
-    $this->artisan('turnouno:expirar-reservas-pago')->assertSuccessful();
+    $this->artisan('agendauno:expirar-reservas-pago')->assertSuccessful();
     $estado = enNegocioPorConciliar($e['slug'], fn () => ReservaTenant::query()->where('ulid', $cita['reserva'])->firstOrFail()->estado->value);
     expect($estado)->toBe('confirmada');
 });

@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\File;
 
 beforeEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
 });
 
 afterEach(function (): void {
@@ -63,13 +63,13 @@ it('no emite el cargo de un mes que aún no cierra en la zona del negocio', func
 
     // 03:00 UTC del 1 de enero = 21:00 del 31 de diciembre en CDMX: diciembre sigue abierto.
     $this->travelTo('2030-01-01 03:00:00');
-    $this->artisan('turnouno:generar-cargos-renta')->assertSuccessful();
-    $this->artisan('turnouno:generar-cargos-renta', ['--periodo' => '2029-12'])->assertSuccessful();
+    $this->artisan('agendauno:generar-cargos-renta')->assertSuccessful();
+    $this->artisan('agendauno:generar-cargos-renta', ['--periodo' => '2029-12'])->assertSuccessful();
     expect(cargoDeDiciembre())->toBeNull();
 
     // 08:00 UTC = 02:00 del 1 de enero en CDMX: diciembre cerró.
     $this->travelTo('2030-01-01 08:00:00');
-    $this->artisan('turnouno:generar-cargos-renta')->assertSuccessful();
+    $this->artisan('agendauno:generar-cargos-renta')->assertSuccessful();
 
     $cargo = cargoDeDiciembre();
     expect($cargo)->not->toBeNull()
@@ -83,13 +83,13 @@ it('no emite el cargo de un mes que aún no cierra en la zona del negocio', func
 it('un cargo emitido no cambia aunque después cambien la tarifa o la prueba gratis', function (): void {
     negocioActivoEnDiciembre();
     $this->travelTo('2030-01-02 12:00:00');
-    $this->artisan('turnouno:generar-cargos-renta')->assertSuccessful();
+    $this->artisan('agendauno:generar-cargos-renta')->assertSuccessful();
     $antes = cargoDeDiciembre()?->only(['monto_minor', 'tarifa_version', 'estado', 'emitido_en', 'desglose']);
 
     publicarTarifaNueva();
     Estudio::query()->where('slug', 'pilates-a')->update(['trial_termina_en' => '2030-12-31']);
-    $this->artisan('turnouno:generar-cargos-renta')->assertSuccessful();
-    $this->artisan('turnouno:generar-cargos-renta', ['--periodo' => '2029-12'])->assertSuccessful();
+    $this->artisan('agendauno:generar-cargos-renta')->assertSuccessful();
+    $this->artisan('agendauno:generar-cargos-renta', ['--periodo' => '2029-12'])->assertSuccessful();
 
     expect(cargoDeDiciembre()?->only(['monto_minor', 'tarifa_version', 'estado', 'emitido_en', 'desglose']))->toEqual($antes)
         ->and(CargoRenta::query()->where('periodo', '2029-12')->count())->toBe(1);
@@ -100,7 +100,7 @@ it('se cobra con la tarifa vigente en el mes, no con una publicada después', fu
     $this->travelTo('2030-01-02 12:00:00');
     publicarTarifaNueva(); // vigente desde el 2 de enero
 
-    $this->artisan('turnouno:generar-cargos-renta')->assertSuccessful();
+    $this->artisan('agendauno:generar-cargos-renta')->assertSuccessful();
 
     // La vigente en diciembre (la de los rangos de alumnos), no la del 2 de enero.
     expect(cargoDeDiciembre()?->tarifa_version)->toBe(2);

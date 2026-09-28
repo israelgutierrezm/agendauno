@@ -17,7 +17,7 @@ use Throwable;
 
 /**
  * Entrega (o reintenta) UN evento a UN endpoint saliente (R40). Firma el cuerpo con
- * HMAC-SHA256 usando el secreto del endpoint (cabecera `X-TurnoUno-Signature`) y
+ * HMAC-SHA256 usando el secreto del endpoint (cabecera `X-AgendaUno-Signature`) y
  * registra el resultado (estado/http_status/intentos/entregado_en/ultimo_error) en la
  * propia entrega. No lanza excepciones por fallos de red/HTTP: los deja como `fallido`
  * para reintento, de modo que un endpoint caido nunca rompe el relay del outbox.
@@ -66,9 +66,9 @@ class EntregarWebhookTenant
                 ->withoutRedirecting()
                 ->withOptions(['curl' => [CURLOPT_RESOLVE => [$destino['host'].':'.$destino['puerto'].':'.$ip]]])
                 ->withHeaders([
-                    'X-TurnoUno-Event' => $entrega->evento_tipo,
-                    'X-TurnoUno-Delivery' => (string) $entrega->ulid,
-                    'X-TurnoUno-Signature' => 'sha256='.$firma,
+                    'X-AgendaUno-Event' => $entrega->evento_tipo,
+                    'X-AgendaUno-Delivery' => (string) $entrega->ulid,
+                    'X-AgendaUno-Signature' => 'sha256='.$firma,
                 ])
                 ->withBody($cuerpo, 'application/json')
                 ->post($endpoint->url);

@@ -63,7 +63,7 @@ class ConfiguracionPlataforma extends Model
             // Tabla ausente (migraciones no corridas): usa el respaldo de entorno.
         }
 
-        $env = config('turnouno.facturapi.llave');
+        $env = config('agendauno.facturapi.llave');
 
         return is_string($env) && $env !== '' ? $env : null;
     }

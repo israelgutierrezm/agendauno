@@ -113,7 +113,7 @@ it('expira una reserva pendiente no pagada a tiempo y libera el cupo', function 
 
     // La reserva lleva > 30 min sin pagar → el relay debe liberarla.
     backdatearReservaTenant($e, $r['id'], 31);
-    $this->artisan('turnouno:expirar-reservas-pago')->assertSuccessful();
+    $this->artisan('agendauno:expirar-reservas-pago')->assertSuccessful();
 
     // Quedó cancelada y el cupo se liberó: Beto ya puede reservar.
     expect(estadoReservaTenant($e, $r['id']))->toBe('cancelada');

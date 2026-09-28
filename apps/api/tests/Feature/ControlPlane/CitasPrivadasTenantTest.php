@@ -128,7 +128,7 @@ it('una cita que no se paga a tiempo libera el horario del profesional', functio
     agendarCitaComo($ctx, $ana['bearer']);
 
     $this->travel(31)->minutes();
-    $this->artisan('turnouno:expirar-reservas-pago')->assertSuccessful();
+    $this->artisan('agendauno:expirar-reservas-pago')->assertSuccessful();
 
     expect(agendarCitaComo($ctx, $beto['bearer'])['estado'])->toBe('pendiente_pago');
 });

@@ -18,7 +18,7 @@ use Illuminate\Console\Command;
  */
 class VerificarProduccion extends Command
 {
-    protected $signature = 'turnouno:verificar-produccion
+    protected $signature = 'agendauno:verificar-produccion
         {--disponibilidad : Solo lo que la versión en marcha necesita para atender (actualizar.sh lo exige antes de abrir)}
         {--apertura : Exige además lo necesario para cobrar la renta con dinero real (como APERTURA_COMERCIAL=true)}';
 

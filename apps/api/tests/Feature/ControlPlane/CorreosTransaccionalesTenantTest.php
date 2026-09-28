@@ -30,7 +30,7 @@ afterEach(function (): void {
  */
 function mensajesDe(array $e, string $asuntoEmpieza): array
 {
-    test()->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
     $mensajes = test()->getJson("/api/v1/app/{$e['slug']}/mensajes", conBearer($e['bearer']))->assertOk()->json('data');
 
     return array_values(array_filter($mensajes, fn (array $m): bool => str_starts_with((string) $m['asunto'], $asuntoEmpieza)));
@@ -61,7 +61,7 @@ it('confirma la reserva por correo a nombre del negocio', function (): void {
         ->and($mensajes[0]['destinatario'])->toBe('bea@correo.mx')
         ->and($mensajes[0]['asunto'])->toBe('Reserva confirmada: Nivel 1 el jueves 1 de octubre');
 
-    $this->artisan('turnouno:enviar-mensajes')->assertSuccessful();
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
     Mail::assertSent(MensajeMailable::class, function (MensajeMailable $mail): bool {
         $html = $mail->render();
 
@@ -112,7 +112,7 @@ it('el recibo lleva el detalle, el total y el método de pago', function (): voi
     expect($mensajes)->toHaveCount(1)
         ->and($mensajes[0]['destinatario'])->toBe('bea@correo.mx');
 
-    $this->artisan('turnouno:enviar-mensajes')->assertSuccessful();
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
     Mail::assertSent(MensajeMailable::class, fn (MensajeMailable $mail): bool => $mail->asuntoMensaje === 'Recibo de tu pago en Estudio estudio-a'
         && str_contains($mail->cuerpoMensaje, 'Pack 8 clases · $899.00 MXN')
         && str_contains($mail->cuerpoMensaje, 'Total: $899.00 MXN')
@@ -128,7 +128,7 @@ it('da la bienvenida a quien crea su cuenta, con el enlace para entrar', functio
     expect($mensajes)->toHaveCount(1)
         ->and($mensajes[0]['destinatario'])->toBe('vale@correo.mx');
 
-    $this->artisan('turnouno:enviar-mensajes')->assertSuccessful();
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
     Mail::assertSent(MensajeMailable::class, fn (MensajeMailable $mail): bool => str_contains($mail->cuerpoMensaje, '/entrar?estudio=estudio-a')
         && str_contains($mail->render(), 'href="'));
 });
@@ -136,8 +136,8 @@ it('da la bienvenida a quien crea su cuenta, con el enlace para entrar', functio
 it('un correo de prueba confirma la configuración de correo', function (): void {
     Mail::fake();
 
-    $this->artisan('turnouno:probar-correo', ['destinatario' => 'yo@correo.mx'])->assertSuccessful();
-    $this->artisan('turnouno:probar-correo', ['destinatario' => 'no-es-correo'])->assertFailed();
+    $this->artisan('agendauno:probar-correo', ['destinatario' => 'yo@correo.mx'])->assertSuccessful();
+    $this->artisan('agendauno:probar-correo', ['destinatario' => 'no-es-correo'])->assertFailed();
 
     Mail::assertSent(MensajeMailable::class, fn (MensajeMailable $mail): bool => $mail->hasTo('yo@correo.mx'));
 });

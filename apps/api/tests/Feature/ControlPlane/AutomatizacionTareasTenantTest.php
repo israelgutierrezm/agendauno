@@ -52,7 +52,7 @@ it('una regla genera una tarea al ocurrir el evento, renderizada y con vencimien
     ]);
 
     reservarParaEvento($e);
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     $resp = $this->getJson("/api/v1/app/{$e['slug']}/tareas", conBearer($e['bearer']))->assertOk();
     $resp->assertJsonPath('pendientes', 1)
@@ -72,7 +72,7 @@ it('no genera tarea si el payload no cumple la condicion', function (): void {
     ]);
 
     reservarParaEvento($e);
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     $this->getJson("/api/v1/app/{$e['slug']}/tareas", conBearer($e['bearer']))->assertOk()->assertJsonPath('pendientes', 0);
 });
@@ -85,7 +85,7 @@ it('una regla inactiva no dispara', function (): void {
     ]);
 
     reservarParaEvento($e);
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     $this->getJson("/api/v1/app/{$e['slug']}/tareas", conBearer($e['bearer']))->assertOk()->assertJsonPath('pendientes', 0);
 });
@@ -95,8 +95,8 @@ it('no duplica la tarea aunque el relay corra varias veces (idempotente)', funct
     crearRegla($e, ['nombre' => 'Una vez', 'evento' => 'reserva.creada', 'titulo_plantilla' => 'Seguimiento']);
 
     reservarParaEvento($e);
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     $this->getJson("/api/v1/app/{$e['slug']}/tareas", conBearer($e['bearer']))->assertOk()->assertJsonPath('pendientes', 1);
 });
@@ -136,7 +136,7 @@ it('reglas y tareas son tenant-local: un estudio no ve las del otro', function (
 
     crearRegla($a, ['nombre' => 'Solo A', 'evento' => 'reserva.creada', 'titulo_plantilla' => 'A']);
     reservarParaEvento($a);
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     // A tiene su regla y su tarea; B no ve ninguna.
     $this->getJson("/api/v1/app/{$a['slug']}/tareas", conBearer($a['bearer']))->assertOk()->assertJsonPath('pendientes', 1);

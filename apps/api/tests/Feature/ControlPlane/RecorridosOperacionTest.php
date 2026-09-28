@@ -69,7 +69,7 @@ function enNegocioRecorrido(array $e, callable $fn): mixed
  */
 function correosA(array $e, string $email): array
 {
-    test()->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     return enNegocioRecorrido($e, fn (): array => MensajeTenant::query()
         ->where('canal', 'email')->where('destinatario', $email)
@@ -161,7 +161,7 @@ it('clases: alta, membresía, reservas, asistencia, cancelaciones, créditos y r
     // Renovación: tres días antes se abre la del siguiente periodo; se paga en
     // recepción y, al cambiar de ciclo, llegan los créditos nuevos.
     $this->travelTo('2030-01-29 15:00:00');
-    $this->artisan('turnouno:avisar-renovaciones')->assertSuccessful();
+    $this->artisan('agendauno:avisar-renovaciones')->assertSuccessful();
     $renovacion = collect($this->getJson("/api/v1/app/{$e['slug']}/mi/ordenes", conBearer($ana['bearer']))->assertOk()->json('data'))
         ->firstWhere('estado', 'pendiente');
     expect($renovacion['total_minor'])->toBe(80000);
@@ -260,8 +260,8 @@ it('si un consumidor del outbox falla y el evento se reintenta, no se repiten av
             throw new RuntimeException('Servicio caído');
         }
     });
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     [$avisos, $entregas] = enNegocioRecorrido($e, fn (): array => [
         MensajeTenant::query()->where('asunto', 'like', 'Reserva confirmada%')->count(),

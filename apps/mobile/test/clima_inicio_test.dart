@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/features/auth/data/sesion.dart';
-import 'package:turnouno_mobile/features/cuenta/data/cuenta_models.dart';
-import 'package:turnouno_mobile/features/cuenta/presentation/tarjeta_principal.dart';
+import 'package:agendauno/features/auth/data/sesion.dart';
+import 'package:agendauno/features/cuenta/data/cuenta_models.dart';
+import 'package:agendauno/features/cuenta/presentation/tarjeta_principal.dart';
 
 /// El clima y la foto del Inicio del alumno: qué dice cada clima y de dónde sale la
 /// foto; la sesión recuerda el nombre del negocio y su giro.

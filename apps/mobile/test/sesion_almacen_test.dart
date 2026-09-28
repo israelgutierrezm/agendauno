@@ -1,7 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/core/storage/almacen_sesion.dart';
-import 'package:turnouno_mobile/features/auth/data/sesion.dart';
+import 'package:agendauno/core/storage/almacen_sesion.dart';
+import 'package:agendauno/features/auth/data/sesion.dart';
 
 void main() {
   const sesion = Sesion(

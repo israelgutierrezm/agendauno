@@ -18,7 +18,7 @@ use Illuminate\Http\Request;
  * Suscripciones recurrentes del estudio (Etapa 2): membresías con cobro recurrente
  * (llevan `proxima_cobro_en`), para dar visibilidad de las próximas renovaciones que
  * el scheduler cobrará y de cuáles se cobran solas (pago automático) o se avisan
- * para pagar a mano. El cobro lo ejecuta el comando `turnouno:cobrar-suscripciones`.
+ * para pagar a mano. El cobro lo ejecuta el comando `agendauno:cobrar-suscripciones`.
  *
  * El negocio no captura tarjetas: invita al alumno a activar su pago automático (él
  * lo autoriza en la pasarela) y puede quitarlo si el alumno lo pide.
@@ -80,7 +80,7 @@ class SuscripcionesTenantController
             'acuerdo' => (string) $acuerdo->ulid,
             'persona_id' => $acuerdo->persona?->ulid,
             'producto' => (string) $acuerdo->producto?->nombre,
-            'enlace' => rtrim((string) config('turnouno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $this->gestor->actual()?->slug),
+            'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $this->gestor->actual()?->slug),
         ]);
 
         return response()->json(['data' => ['enviado' => true]]);

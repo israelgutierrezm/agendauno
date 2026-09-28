@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class EscalarDunning extends Command
 {
-    protected $signature = 'turnouno:escalar-dunning';
+    protected $signature = 'agendauno:escalar-dunning';
 
     protected $description = 'Suspende las membresias morosas cuyo periodo de gracia vencio';
 

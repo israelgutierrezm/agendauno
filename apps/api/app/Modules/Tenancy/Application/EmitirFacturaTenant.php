@@ -47,7 +47,7 @@ class EmitirFacturaTenant
         $impuesto = intdiv($subtotal * $ivaBps, 10000);
         $total = $subtotal + $impuesto;
 
-        $llave = (string) ($emisor->facturapi_llave ?? config('turnouno.facturapi.llave') ?? '');
+        $llave = (string) ($emisor->facturapi_llave ?? config('agendauno.facturapi.llave') ?? '');
         $cuerpo = $this->armarCuerpo($receptor, $items, $usoCfdi, $formaPago, $moneda, $ivaBps);
 
         return DB::connection('tenant')->transaction(function () use (
@@ -74,7 +74,7 @@ class EmitirFacturaTenant
                 ]);
             }
 
-            $base = rtrim((string) config('turnouno.facturapi.base_url'), '/');
+            $base = rtrim((string) config('agendauno.facturapi.base_url'), '/');
             $factura = FacturaTenant::query()->create($comun + [
                 'estado' => EstadoFactura::Timbrada->value,
                 'facturapi_id' => $resultado->facturaId,

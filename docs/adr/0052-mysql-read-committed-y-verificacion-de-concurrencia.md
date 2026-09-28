@@ -42,7 +42,7 @@ solicitud acaba de guardar. Casos encontrados al revisar el código:
   del código bloquean filas existentes (la sesión, el profesional, el derecho, la
   orden), no rangos vacíos. Con binlog, MySQL exige `binlog_format=ROW` (su valor por
   defecto).
-- **`turnouno:verificar-concurrencia`** comprueba en MySQL real lo que las pruebas no
+- **`agendauno:verificar-concurrencia`** comprueba en MySQL real lo que las pruebas no
   pueden. Crea un negocio temporal (`tenant_verificacion_*`, dentro del permiso
   `tenant\_%`), lanza procesos que arrancan a la vez y hacen la operación real del
   dominio, revisa el resultado y borra todo:

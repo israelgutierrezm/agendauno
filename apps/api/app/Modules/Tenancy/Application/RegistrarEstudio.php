@@ -72,7 +72,7 @@ class RegistrarEstudio
      */
     private function crear(array $datos, string $slug): Estudio
     {
-        $driver = (string) config('turnouno.tenant_db_driver', 'sqlite');
+        $driver = (string) config('agendauno.tenant_db_driver', 'sqlite');
 
         $dbDatabase = $driver === 'sqlite'
             ? $slug.'_'.Str::lower(Str::random(8)).'.sqlite'

@@ -34,7 +34,7 @@ class CorreoRestablecimiento extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
-        $base = rtrim((string) config('turnouno.url_app'), '/');
+        $base = rtrim((string) config('agendauno.url_app'), '/');
         $url = $base.'/restablecer/'.$this->slug
             .'?email='.rawurlencode($this->email)
             .'&token='.rawurlencode($this->token);

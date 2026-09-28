@@ -41,7 +41,7 @@ services:
     stop_grace_period: 5m
     # Sano si procesó el latido que encola el programador cada minuto.
     healthcheck:
-      test: ["CMD", "php", "artisan", "turnouno:latido", "--verificar=cola"]
+      test: ["CMD", "php", "artisan", "agendauno:latido", "--verificar=cola"]
       interval: 1m
       timeout: 20s
       retries: 3
@@ -55,9 +55,9 @@ services:
     # Al detenerse deja de lanzar tareas y espera a que acaben las que corren (un
     # respaldo nocturno puede tardar); cortarlas dejaría su candado 24 h.
     stop_grace_period: 15m
-    # Sano si dejó su latido en el último par de minutos (turnouno:latido).
+    # Sano si dejó su latido en el último par de minutos (agendauno:latido).
     healthcheck:
-      test: ["CMD", "php", "artisan", "turnouno:latido", "--verificar=programador"]
+      test: ["CMD", "php", "artisan", "agendauno:latido", "--verificar=programador"]
       interval: 1m
       timeout: 20s
       retries: 3

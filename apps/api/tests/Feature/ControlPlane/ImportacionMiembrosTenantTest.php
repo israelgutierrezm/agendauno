@@ -107,7 +107,7 @@ it('la importación exige permiso de gestión de miembros', function (): void {
 
 it('el tope de filas por archivo lo fija el superadmin', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
     $this->putJson('/api/v1/plataforma/parametros', ['valores' => ['importaciones.max_filas' => 100]], conPlataforma())
         ->assertOk();
     $filas = implode("\n", array_map(fn (int $i): string => "Persona {$i}", range(1, 101)));

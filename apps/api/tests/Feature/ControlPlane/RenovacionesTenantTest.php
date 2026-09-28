@@ -131,7 +131,7 @@ it('si el cliente no paga, al vencer la gracia se suspende; al pagar en caja se 
     renovarConStripe($m);
 
     $this->travel(8)->days();
-    $this->artisan('turnouno:escalar-dunning')->assertSuccessful();
+    $this->artisan('agendauno:escalar-dunning')->assertSuccessful();
     expect(renovarConStripe($m)['acuerdo'])->toBe('suspendido');
 
     // Paga en recepción la orden de renovación pendiente.

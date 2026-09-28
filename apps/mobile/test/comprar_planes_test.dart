@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/features/cuenta/application/cuenta_controller.dart';
-import 'package:turnouno_mobile/features/cuenta/data/cuenta_models.dart';
-import 'package:turnouno_mobile/features/cuenta/presentation/comprar_planes.dart';
+import 'package:agendauno/features/cuenta/application/cuenta_controller.dart';
+import 'package:agendauno/features/cuenta/data/cuenta_models.dart';
+import 'package:agendauno/features/cuenta/presentation/comprar_planes.dart';
 
 /// Comprar un plan desde la app: qué se ofrece, cómo se describe y que comprar crea
 /// la orden (que luego se paga en "Por pagar").

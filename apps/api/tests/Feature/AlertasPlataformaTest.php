@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Mail;
 beforeEach(function (): void {
     Cache::flush();
     File::deleteDirectory(storage_path('tenants'));
-    config(['turnouno.alertas.correo' => 'ops@agendauno.mx']);
+    config(['agendauno.alertas.correo' => 'ops@agendauno.mx']);
 });
 
 afterEach(function (): void {
@@ -40,7 +40,7 @@ it('agrupa lo que se repite y lo manda en un solo correo', function (): void {
     expect(AlertaPlataforma::query()->count())->toBe(2)
         ->and(AlertaPlataforma::query()->where('tipo', 'cobro_fallido')->value('veces'))->toBe(2);
 
-    $this->artisan('turnouno:enviar-alertas')->assertSuccessful();
+    $this->artisan('agendauno:enviar-alertas')->assertSuccessful();
 
     Mail::assertSent(MensajeMailable::class, 1);
     Mail::assertSent(MensajeMailable::class, fn (MensajeMailable $m): bool => $m->hasTo('ops@agendauno.mx')
@@ -49,7 +49,7 @@ it('agrupa lo que se repite y lo manda en un solo correo', function (): void {
     expect(AlertaPlataforma::query()->where('pendiente', true)->count())->toBe(0);
 
     // Sin nada nuevo, no hay otro correo.
-    $this->artisan('turnouno:enviar-alertas')->assertSuccessful();
+    $this->artisan('agendauno:enviar-alertas')->assertSuccessful();
     Mail::assertSent(MensajeMailable::class, 1);
 });
 
@@ -57,16 +57,16 @@ it('lo ya avisado que sigue pasando se vuelve a avisar solo tras la espera', fun
     Mail::fake();
     $alertas = app(AlertasPlataforma::class);
     $alertas->registrar('correo_fallido', 'pilates-a:email', 'No salió.');
-    $this->artisan('turnouno:enviar-alertas')->assertSuccessful();
+    $this->artisan('agendauno:enviar-alertas')->assertSuccessful();
 
     $this->travel(1)->hours();
     $alertas->registrar('correo_fallido', 'pilates-a:email', 'No salió.');
-    $this->artisan('turnouno:enviar-alertas')->assertSuccessful();
+    $this->artisan('agendauno:enviar-alertas')->assertSuccessful();
     Mail::assertSent(MensajeMailable::class, 1);
 
     $this->travel(AlertasPlataforma::HORAS_ESPERA + 1)->hours();
     $alertas->registrar('correo_fallido', 'pilates-a:email', 'No salió.');
-    $this->artisan('turnouno:enviar-alertas')->assertSuccessful();
+    $this->artisan('agendauno:enviar-alertas')->assertSuccessful();
     Mail::assertSent(MensajeMailable::class, 2);
 });
 
@@ -75,8 +75,8 @@ it('avisa si la cola dejó de latir; sin correo de alertas no falla', function (
     app(LatidoOperacion::class)->marcar(LatidoOperacion::COLA);
     $this->travel(10)->minutes();
 
-    config(['turnouno.alertas.correo' => null]);
-    $this->artisan('turnouno:enviar-alertas')
+    config(['agendauno.alertas.correo' => null]);
+    $this->artisan('agendauno:enviar-alertas')
         ->expectsOutputToContain('no hay ALERTAS_CORREO')
         ->assertSuccessful();
     Mail::assertNothingSent();
@@ -91,7 +91,7 @@ it('un correo de un negocio que agota sus intentos llega como alerta con el nego
         'estado' => 'encolado', 'intentos' => 5,
     ]));
 
-    $this->artisan('turnouno:enviar-mensajes')->assertSuccessful();
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
 
     $alerta = AlertaPlataforma::query()->where('tipo', 'correo_fallido')->firstOrFail();
     expect($alerta->estudio)->toBe('pilates-a')

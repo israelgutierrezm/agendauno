@@ -178,7 +178,7 @@ class RegistrarAlumnoTenant
             // Correo de bienvenida (plantilla `cuenta.creada`) con el enlace a su cuenta.
             $this->eventos->registrar('cuenta.creada', 'persona', (string) $persona->ulid, [
                 'persona_id' => (string) $persona->ulid,
-                'enlace' => rtrim((string) config('turnouno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $estudio->slug),
+                'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $estudio->slug),
             ]);
 
             return [$usuario, $persona];

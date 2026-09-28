@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 
 /*
-| `turnouno:migrar-estudios`: en cada despliegue lleva la BD de cada estudio
+| `agendauno:migrar-estudios`: en cada despliegue lleva la BD de cada estudio
 | existente a la última migración de tenant. Un estudio que falla no frena a los
 | demás, y la versión del esquema queda registrada en el control plane.
 */
@@ -65,7 +65,7 @@ it('aplica las migraciones nuevas a los estudios existentes y registra su versi�
     retrasarEsquema('estudio-b');
     expect(esquemaReal('estudio-a'))->not->toBe(ultimaMigracionTenant());
 
-    $this->artisan('turnouno:migrar-estudios')
+    $this->artisan('agendauno:migrar-estudios')
         ->expectsOutputToContain('1 migración(es) aplicada(s)')
         ->assertSuccessful();
 
@@ -75,7 +75,7 @@ it('aplica las migraciones nuevas a los estudios existentes y registra su versi�
     }
 
     // Idempotente: una segunda corrida no tiene nada que aplicar.
-    $this->artisan('turnouno:migrar-estudios')->expectsOutputToContain('al día')->assertSuccessful();
+    $this->artisan('agendauno:migrar-estudios')->expectsOutputToContain('al día')->assertSuccessful();
 });
 
 it('un estudio que falla no frena a los demás y el comando termina con error', function (): void {
@@ -86,7 +86,7 @@ it('un estudio que falla no frena a los demás y el comando termina con error', 
     // La BD de A está dañada: no es un SQLite válido.
     File::put(storage_path('tenants/'.estudioPorSlug('estudio-a')->db_database), str_repeat('x', 4096));
 
-    $this->artisan('turnouno:migrar-estudios')
+    $this->artisan('agendauno:migrar-estudios')
         ->expectsOutputToContain('1 estudio(s) no se pudieron migrar')
         ->assertFailed();
 
@@ -99,16 +99,16 @@ it('con --estudio migra solo ese, y se salta los estudios sin BD', function (): 
     retrasarEsquema('estudio-a');
     retrasarEsquema('estudio-b');
 
-    $this->artisan('turnouno:migrar-estudios', ['--estudio' => 'estudio-a'])->assertSuccessful();
+    $this->artisan('agendauno:migrar-estudios', ['--estudio' => 'estudio-a'])->assertSuccessful();
 
     expect(esquemaReal('estudio-a'))->toBe(ultimaMigracionTenant());
     expect(esquemaReal('estudio-b'))->not->toBe(ultimaMigracionTenant());
 
-    $this->artisan('turnouno:migrar-estudios', ['--estudio' => 'no-existe'])->assertFailed();
+    $this->artisan('agendauno:migrar-estudios', ['--estudio' => 'no-existe'])->assertFailed();
 
     // Un estudio cuya BD no existe (p. ej. se borró en dev) se reporta, no revienta.
     File::delete(storage_path('tenants/'.estudioPorSlug('estudio-b')->db_database));
-    $this->artisan('turnouno:migrar-estudios')
+    $this->artisan('agendauno:migrar-estudios')
         ->expectsOutputToContain('sin BD')
         ->assertSuccessful();
 });

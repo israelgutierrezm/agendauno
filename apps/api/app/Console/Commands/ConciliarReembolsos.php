@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class ConciliarReembolsos extends Command
 {
-    protected $signature = 'turnouno:conciliar-reembolsos';
+    protected $signature = 'agendauno:conciliar-reembolsos';
 
     protected $description = 'Aclara las devoluciones en línea que la pasarela no confirmó';
 

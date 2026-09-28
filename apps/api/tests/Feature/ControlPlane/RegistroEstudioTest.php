@@ -216,8 +216,8 @@ function datosRegistroCaptcha(string $slug, string $email): array
 }
 
 it('con reCAPTCHA configurado rechaza un puntaje bajo', function (): void {
-    Config::set('turnouno.recaptcha.secret', 'test-secret');
-    Config::set('turnouno.recaptcha.min_score', 0.5);
+    Config::set('agendauno.recaptcha.secret', 'test-secret');
+    Config::set('agendauno.recaptcha.min_score', 0.5);
     Http::fake(fn () => Http::response(['success' => true, 'score' => 0.1]));
 
     $resp = test()->postJson('/api/v1/registro', datosRegistroCaptcha('bajo', 'bajo@correo.mx'))
@@ -227,8 +227,8 @@ it('con reCAPTCHA configurado rechaza un puntaje bajo', function (): void {
 });
 
 it('con reCAPTCHA configurado acepta un puntaje alto', function (): void {
-    Config::set('turnouno.recaptcha.secret', 'test-secret');
-    Config::set('turnouno.recaptcha.min_score', 0.5);
+    Config::set('agendauno.recaptcha.secret', 'test-secret');
+    Config::set('agendauno.recaptcha.min_score', 0.5);
     Http::fake(fn () => Http::response(['success' => true, 'score' => 0.9]));
 
     test()->postJson('/api/v1/registro', datosRegistroCaptcha('alto', 'alto@correo.mx'))

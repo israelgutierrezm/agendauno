@@ -21,7 +21,7 @@ afterEach(function (): void {
 // cargarDatosFiscales) viven en tests/Pest.php.
 
 it('el comando genera el cargo de renta y el dueño lo ve en su apartado', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     terminarPrueba($e);
 
@@ -42,10 +42,10 @@ it('el comando genera el cargo de renta y el dueño lo ve en su apartado', funct
 });
 
 it('la generación es idempotente: no duplica el cargo del periodo', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $periodo = emitirCargoDelMesEnCurso();
-    $this->artisan('turnouno:generar-cargos-renta', ['--periodo' => $periodo])->assertSuccessful();
+    $this->artisan('agendauno:generar-cargos-renta', ['--periodo' => $periodo])->assertSuccessful();
 
     $this->getJson("/api/v1/app/{$e['slug']}/renta", conBearer($e['bearer']))
         ->assertOk()->assertJsonCount(1, 'data.cargos');

@@ -89,7 +89,7 @@ it('la vigencia del pase la fija el superadmin', function (): void {
     $this->travelTo('2030-01-01 12:00:00');
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $alumna = alumnaConAccesoLibre($e);
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
     $this->putJson('/api/v1/plataforma/parametros', ['valores' => ['acceso.segundos_pase_qr' => 300]], conPlataforma())
         ->assertOk();
 

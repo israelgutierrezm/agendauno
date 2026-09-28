@@ -92,8 +92,8 @@ it('si el negocio lo activó, al cancelar una cita pagada en línea el pago se d
 
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$c['sesion']}/cancelar", [], conBearer($e['bearer']))->assertOk();
     // El relay entrega el evento; aunque lo entregue dos veces, se devuelve una.
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     expect(devolucionesDelPago($c))->toBe(['aprobado']);
     $devoluciones = Http::recorded(fn (Request $r): bool => str_ends_with($r->url(), '/refunds'));
@@ -112,7 +112,7 @@ it('sin activarlo, el pago no se devuelve solo y la vista previa lo dice', funct
         ->assertOk()->assertJsonPath('data.se_devuelven', 0)
         ->assertJsonPath('data.mensaje', 'Se cancelará 1 reserva. 1 ya está pagada: ese pago no se reembolsa automáticamente.');
     $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$c['reserva']}/cancelar", [], conBearer($e['bearer']))->assertOk();
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     expect(devolucionesDelPago($c))->toBe([]);
     Http::assertNotSent(fn (Request $r): bool => str_ends_with($r->url(), '/refunds'));
@@ -127,7 +127,7 @@ it('si cancela el cliente se aplica su política, no la devolución automática'
     $this->getJson("/api/v1/app/{$e['slug']}/mi/reservas/{$c['reserva']}/cancelacion", conBearer($c['ana']['bearer']))
         ->assertOk()->assertJsonPath('data.mensaje', 'No usa créditos. Ya está pagada: el pago no se reembolsa automáticamente.');
     $this->postJson("/api/v1/app/{$e['slug']}/mi/reservas/{$c['reserva']}/cancelar", [], conBearer($c['ana']['bearer']))->assertOk();
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     expect(devolucionesDelPago($c))->toBe([]);
 });

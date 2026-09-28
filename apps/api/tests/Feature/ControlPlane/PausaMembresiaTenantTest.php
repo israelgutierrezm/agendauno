@@ -91,7 +91,7 @@ it('en pausa no reserva; al terminar se reanuda sola y corre sus fechas', functi
 
     // Al día siguiente del último día en pausa se reanuda sola: 10 días después.
     $this->travelTo('2026-09-20 00:10:00');
-    $this->artisan('turnouno:reanudar-pausas')->assertSuccessful();
+    $this->artisan('agendauno:reanudar-pausas')->assertSuccessful();
 
     $despues = derechoEnFicha($m);
     expect($despues['estado'])->toBe('activo')

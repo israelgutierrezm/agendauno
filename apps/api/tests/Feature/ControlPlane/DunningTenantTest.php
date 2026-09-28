@@ -82,7 +82,7 @@ it('en gracia el socio puede reservar; tras vencer la gracia queda suspendido y 
 
     // Vence la gracia y corre el escalado: se suspende.
     test()->travel(8)->days();
-    Artisan::call('turnouno:escalar-dunning');
+    Artisan::call('agendauno:escalar-dunning');
 
     test()->getJson("/api/v1/app/{$e['slug']}/dunning", conBearer($e['bearer']))
         ->assertOk()
@@ -106,7 +106,7 @@ it('regularizar reactiva un acuerdo suspendido (vuelve a poder reservar)', funct
 
     test()->postJson("/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/cobro-fallido", [], conBearer($e['bearer']))->assertCreated();
     test()->travel(8)->days();
-    Artisan::call('turnouno:escalar-dunning');
+    Artisan::call('agendauno:escalar-dunning');
 
     // Regulariza (paga): el acuerdo se reactiva.
     test()->postJson("/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/regularizar", [], conBearer($e['bearer']))

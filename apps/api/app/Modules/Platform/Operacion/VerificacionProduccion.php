@@ -103,7 +103,7 @@ class VerificacionProduccion
     /** ¿Se abrió para cobrar con dinero real? (APERTURA_COMERCIAL) */
     public function aperturaComercial(): bool
     {
-        return (bool) config('turnouno.operacion.apertura_comercial');
+        return (bool) config('agendauno.operacion.apertura_comercial');
     }
 
     /**
@@ -112,7 +112,7 @@ class VerificacionProduccion
     private function entorno(): array
     {
         $url = (string) config('app.url');
-        $token = (string) config('turnouno.plataforma.token');
+        $token = (string) config('agendauno.plataforma.token');
 
         return [
             $this->punto('Entorno', 'APP_ENV es production', app()->environment('production'), 'Ahora: '.app()->environment()),
@@ -120,7 +120,7 @@ class VerificacionProduccion
             $this->punto('Entorno', 'APP_KEY definida', (string) config('app.key') !== '', 'Genera una con php artisan key:generate --show.'),
             $this->punto('Entorno', 'APP_URL con https', str_starts_with($url, 'https://'), "Ahora: {$url}"),
             $this->punto('Entorno', 'Token de plataforma robusto', strlen($token) >= 32, 'PLATFORM_ADMIN_TOKEN de al menos 32 caracteres.'),
-            $this->punto('Entorno', 'reCAPTCHA en el registro', (string) config('turnouno.recaptcha.secret') !== '', 'Sin RECAPTCHA_SECRET el registro público no filtra bots.', critico: false),
+            $this->punto('Entorno', 'reCAPTCHA en el registro', (string) config('agendauno.recaptcha.secret') !== '', 'Sin RECAPTCHA_SECRET el registro público no filtra bots.', critico: false),
         ];
     }
 
@@ -140,7 +140,7 @@ class VerificacionProduccion
 
         return [
             $this->punto('Datos', 'Conexión a la base de la plataforma', $conecta, 'Revisa DB_HOST, DB_DATABASE y credenciales.'),
-            $this->punto('Datos', 'Bases de los negocios en MySQL', config('turnouno.tenant_db_driver') === 'mysql', 'TENANT_DB_DRIVER=mysql (SQLite es solo para desarrollo).'),
+            $this->punto('Datos', 'Bases de los negocios en MySQL', config('agendauno.tenant_db_driver') === 'mysql', 'TENANT_DB_DRIVER=mysql (SQLite es solo para desarrollo).'),
             $this->punto('Datos', 'Caché compartida (Redis)', $cache === 'redis', "Ahora: {$cache}. Los latidos y los bloqueos necesitan una caché compartida."),
             $this->punto('Datos', 'Cola en Redis', $cola === 'redis', "Ahora: {$cola}. Con sync los correos se envían dentro de la petición."),
         ];
@@ -168,7 +168,7 @@ class VerificacionProduccion
 
         return [
             $this->punto($seccion, 'Migraciones de la plataforma aplicadas', $pendientes === 0, $pendientes < 0 ? 'No se pudo revisar.' : "{$pendientes} pendiente(s): php artisan migrate --force."),
-            $this->punto($seccion, 'Esquema de cada negocio al día', $atrasados->isEmpty(), 'Atrasados: '.$atrasados->take(10)->implode(', ').'. Corre php artisan turnouno:migrar-estudios --force.'),
+            $this->punto($seccion, 'Esquema de cada negocio al día', $atrasados->isEmpty(), 'Atrasados: '.$atrasados->take(10)->implode(', ').'. Corre php artisan agendauno:migrar-estudios --force.'),
         ];
     }
 
@@ -209,7 +209,7 @@ class VerificacionProduccion
      */
     private function respaldos(): array
     {
-        $disco = (string) config('turnouno.respaldos.disco');
+        $disco = (string) config('agendauno.respaldos.disco');
         $sinRespaldo = [];
         try {
             $estudios = Estudio::query()
@@ -243,13 +243,13 @@ class VerificacionProduccion
 
         return [
             $this->punto('Respaldos', 'Copias fuera del servidor', $disco !== 'local' && $disco !== '', "Ahora: {$disco}. Usa RESPALDOS_DISCO=s3 con un bucket externo."),
-            $this->punto('Respaldos', 'Base central respaldada en las últimas '.self::HORAS_RESPALDO.' h', $plataformaReciente, 'Corre php artisan turnouno:respaldar-plataforma.'),
-            $this->punto('Respaldos', 'Archivos subidos respaldados en las últimas '.self::HORAS_RESPALDO.' h', $archivosRecientes, 'Corre php artisan turnouno:respaldar-plataforma.'),
+            $this->punto('Respaldos', 'Base central respaldada en las últimas '.self::HORAS_RESPALDO.' h', $plataformaReciente, 'Corre php artisan agendauno:respaldar-plataforma.'),
+            $this->punto('Respaldos', 'Archivos subidos respaldados en las últimas '.self::HORAS_RESPALDO.' h', $archivosRecientes, 'Corre php artisan agendauno:respaldar-plataforma.'),
             $this->punto(
                 'Respaldos',
                 'Restauración comprobada en los últimos '.self::DIAS_SIMULACRO.' días',
                 $simulacroOk,
-                $simulacro === null ? 'Nunca se ha probado: php artisan turnouno:simulacro-restauracion.' : 'El último simulacro ('.$simulacro['fecha'].') '.($simulacro['ok'] ? 'es viejo.' : 'falló.'),
+                $simulacro === null ? 'Nunca se ha probado: php artisan agendauno:simulacro-restauracion.' : 'El último simulacro ('.$simulacro['fecha'].') '.($simulacro['ok'] ? 'es viejo.' : 'falló.'),
             ),
             $this->punto('Respaldos', 'Destino de respaldos accesible', $leible, 'No se pudo leer el disco de respaldos.'),
             $this->punto(
@@ -267,7 +267,7 @@ class VerificacionProduccion
     private function alertas(): array
     {
         return [
-            $this->punto('Alertas', 'Correo para alertas de la plataforma', filter_var((string) config('turnouno.alertas.correo'), FILTER_VALIDATE_EMAIL) !== false, 'Define ALERTAS_CORREO (quién recibe los avisos de pagos, correos, respaldos y cola que fallan).'),
+            $this->punto('Alertas', 'Correo para alertas de la plataforma', filter_var((string) config('agendauno.alertas.correo'), FILTER_VALIDATE_EMAIL) !== false, 'Define ALERTAS_CORREO (quién recibe los avisos de pagos, correos, respaldos y cola que fallan).'),
         ];
     }
 

@@ -115,7 +115,7 @@ it('al vencer el apartado se cierra el cobro abierto en la pasarela', function (
     $c = citaApartadaSinPagar();
 
     $this->travel(31)->minutes();
-    $this->artisan('turnouno:expirar-reservas-pago')->assertSuccessful();
+    $this->artisan('agendauno:expirar-reservas-pago')->assertSuccessful();
 
     expect($this->stripe->expiradas)->toHaveCount(1)
         ->and(enNegocioTardio($c['e'], fn () => ReservaTenant::query()->where('ulid', $c['reserva'])->value('motivo_cancelacion')))->toBe('vencio_pago')
@@ -125,7 +125,7 @@ it('al vencer el apartado se cierra el cobro abierto en la pasarela', function (
 it('si el pago llega tarde y el horario sigue libre, la cita se reconfirma', function (): void {
     $c = citaApartadaSinPagar();
     $this->travel(31)->minutes();
-    $this->artisan('turnouno:expirar-reservas-pago')->assertSuccessful();
+    $this->artisan('agendauno:expirar-reservas-pago')->assertSuccessful();
 
     llegaElPagoDeCs1($c['e']);
 
@@ -141,12 +141,12 @@ it('si el pago llega tarde y el horario sigue libre, la cita se reconfirma', fun
 it('si el horario ya lo ocupó otro cliente, el pago queda identificado y por conciliar sin desplazar a nadie', function (): void {
     $c = citaApartadaSinPagar();
     $this->travel(31)->minutes();
-    $this->artisan('turnouno:expirar-reservas-pago')->assertSuccessful();
+    $this->artisan('agendauno:expirar-reservas-pago')->assertSuccessful();
     // Carlos toma ese mismo horario.
     $carlos = citaPublicaDe($c['e'], $c['sede'], $c['coach'], 'Carlos', 'carlos@correo.mx');
 
     llegaElPagoDeCs1($c['e']);
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     $estado = enNegocioTardio($c['e'], fn (): array => [
         'bea' => ReservaTenant::query()->where('ulid', $c['reserva'])->value('estado')->value,

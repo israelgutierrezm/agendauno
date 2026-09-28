@@ -12,11 +12,11 @@ use Throwable;
  * Reemplaza la base central de la plataforma con un respaldo (el más reciente, o el
  * indicado). Borra lo que haya: exige --force. Pon la aplicación en mantenimiento
  * antes (php artisan down). Los negocios se restauran aparte
- * (turnouno:restaurar-estudio).
+ * (agendauno:restaurar-estudio).
  */
 class RestaurarPlataforma extends Command
 {
-    protected $signature = 'turnouno:restaurar-plataforma
+    protected $signature = 'agendauno:restaurar-plataforma
         {--respaldo= : Ruta del respaldo en el disco (por defecto, el más reciente)}
         {--listar : Solo lista los respaldos disponibles}
         {--force : Confirma que se reemplaza la base central}';

@@ -56,8 +56,8 @@ function reservaConCorreo(string $reservadaEn): array
 function recordarA(array $e, string $ahora): array
 {
     test()->travelTo($ahora);
-    test()->artisan('turnouno:enviar-recordatorios')->assertSuccessful();
-    test()->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    test()->artisan('agendauno:enviar-recordatorios')->assertSuccessful();
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     $mensajes = test()->getJson("/api/v1/app/{$e['slug']}/mensajes", conBearer($e['bearer']))->assertOk()->json('data');
 
@@ -92,7 +92,7 @@ it('manda el correo de 24 h y el de 2 h, cada uno una sola vez', function (): vo
     expect($mensajes)->toHaveCount(2)
         ->and(collect($mensajes)->pluck('asunto'))->toContain('Hoy a las 08:00: Nivel 1');
 
-    $this->artisan('turnouno:enviar-mensajes')->assertSuccessful();
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
     Mail::assertSent(MensajeMailable::class, fn (MensajeMailable $mail): bool => str_starts_with($mail->asuntoMensaje, 'Recordatorio:'));
     Mail::assertSent(MensajeMailable::class, fn (MensajeMailable $mail): bool => str_starts_with($mail->asuntoMensaje, 'Hoy a las'));
 });

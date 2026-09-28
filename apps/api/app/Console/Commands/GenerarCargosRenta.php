@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class GenerarCargosRenta extends Command
 {
-    protected $signature = 'turnouno:generar-cargos-renta {--periodo= : Periodo YYYY-MM (por defecto el mes anterior de cada negocio: cobro mes vencido)}';
+    protected $signature = 'agendauno:generar-cargos-renta {--periodo= : Periodo YYYY-MM (por defecto el mes anterior de cada negocio: cobro mes vencido)}';
 
     protected $description = 'Emite los cargos de renta del SaaS de los meses ya cerrados';
 

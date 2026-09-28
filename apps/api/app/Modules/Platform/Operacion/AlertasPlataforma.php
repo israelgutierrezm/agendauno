@@ -14,7 +14,7 @@ use Throwable;
 /**
  * Alertas de la plataforma para el superadmin: lo que falla en la operación (errores
  * reportados, pagos, correos que agotaron intentos, webhooks, respaldos, cola…)
- * se agrupa por tipo y clave con un contador, y `turnouno:enviar-alertas` lo manda
+ * se agrupa por tipo y clave con un contador, y `agendauno:enviar-alertas` lo manda
  * en un resumen por correo. Lo ya avisado que SIGUE pasando se vuelve a avisar
  * pasadas unas horas, no a cada vez.
  *

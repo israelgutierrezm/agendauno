@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\File;
 
 beforeEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
-    config()->set('turnouno.dominio_base', 'agendauno.mx');
+    config()->set('agendauno.dominio_base', 'agendauno.mx');
 });
 
 afterEach(function (): void {

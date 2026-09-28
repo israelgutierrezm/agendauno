@@ -15,7 +15,7 @@ use Throwable;
  */
 class RestaurarEstudio extends Command
 {
-    protected $signature = 'turnouno:restaurar-estudio {estudio : slug del negocio} {--respaldo= : ruta del respaldo (por defecto el más reciente)} {--listar : solo muestra sus respaldos} {--force : confirma que se reemplazan sus datos}';
+    protected $signature = 'agendauno:restaurar-estudio {estudio : slug del negocio} {--respaldo= : ruta del respaldo (por defecto el más reciente)} {--listar : solo muestra sus respaldos} {--force : confirma que se reemplazan sus datos}';
 
     protected $description = 'Restaura la base de datos de un negocio desde un respaldo';
 

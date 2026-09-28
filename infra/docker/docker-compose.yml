@@ -1,4 +1,4 @@
-# Minimal development infrastructure for TurnoUno.
+# Minimal development infrastructure for AgendaUno.
 #
 # MySQL is provided by your local WAMP (port 3306); only Redis is containerized
 # because it is not installed natively on Windows.
@@ -10,7 +10,7 @@
 services:
   redis:
     image: redis:7-alpine
-    container_name: turnouno-redis
+    container_name: agendauno-redis
     ports:
       - "6379:6379"
     command: ["redis-server", "--appendonly", "yes"]
@@ -27,7 +27,7 @@ services:
   # Enable when the Communications work begins.
   # mailpit:
   #   image: axllent/mailpit:latest
-  #   container_name: turnouno-mailpit
+  #   container_name: agendauno-mailpit
   #   ports:
   #     - "1025:1025"   # SMTP
   #     - "8025:8025"   # Web UI
@@ -37,7 +37,7 @@ services:
   # with WAMP's 3306. If you enable this, update apps/api/.env DB_PORT=3307.
   # mysql:
   #   image: mysql:8.4
-  #   container_name: turnouno-mysql
+  #   container_name: agendauno-mysql
   #   environment:
   #     MYSQL_ROOT_PASSWORD: root
   #     MYSQL_DATABASE: turnouno

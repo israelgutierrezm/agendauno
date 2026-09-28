@@ -187,7 +187,7 @@ it('cobra mes vencido: congela la medición del mes cerrado y no cambia después
     $this->travelBack();
 
     // Sin --periodo: el mes anterior.
-    $this->artisan('turnouno:generar-cargos-renta')->assertSuccessful();
+    $this->artisan('agendauno:generar-cargos-renta')->assertSuccessful();
     $cargo = rentaDe($e)['cargos'][0];
     expect($cargo['periodo'])->toBe($pasado)->and($cargo['cantidad'])->toBe(1);
     $this->assertDatabaseHas('mediciones_uso', ['periodo' => $pasado, 'cantidad' => 1, 'congelada' => true]);
@@ -207,7 +207,7 @@ it('los negocios nuevos reciben 30 días de prueba en ambas modalidades', functi
 });
 
 it('el superadmin publica una versión nueva de la tarifa y los cargos la usan', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
     $e = estudioConSesion('pilates-a', 'dueno@pilates.mx');
     terminarPrueba($e);
     compraPagadaTenant($e, crearMiembroTenant($e, 'Ana'));
@@ -231,7 +231,7 @@ it('el superadmin publica una versión nueva de la tarifa y los cargos la usan',
 });
 
 it('una tarifa sin techo o con topes desordenados se rechaza', function (): void {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
 
     $this->postJson('/api/v1/plataforma/tarifas/clases', [
         'dias_prueba' => 30, 'iva_porcentaje' => 16,

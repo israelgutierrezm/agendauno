@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\File;
 
 /*
 | Operación en producción: el latido prueba que el programador de tareas y la cola
-| siguen vivos, y turnouno:verificar-produccion dice qué falta para operar.
+| siguen vivos, y agendauno:verificar-produccion dice qué falta para operar.
 */
 
 beforeEach(function (): void {
@@ -20,18 +20,18 @@ beforeEach(function (): void {
 });
 
 it('el latido marca el programador y, por la cola, la cola', function (): void {
-    $this->artisan('turnouno:latido --verificar=cola')->assertFailed();
+    $this->artisan('agendauno:latido --verificar=cola')->assertFailed();
 
     // En pruebas la cola es sync: el trabajo del latido corre en el acto.
-    $this->artisan('turnouno:latido')->assertSuccessful();
+    $this->artisan('agendauno:latido')->assertSuccessful();
 
-    $this->artisan('turnouno:latido --verificar=programador')->assertSuccessful();
-    $this->artisan('turnouno:latido --verificar=cola')->assertSuccessful();
+    $this->artisan('agendauno:latido --verificar=programador')->assertSuccessful();
+    $this->artisan('agendauno:latido --verificar=cola')->assertSuccessful();
 
     // Diez minutos sin latir: atrasado (el chequeo de Docker lo marca enfermo).
     $this->travel(10)->minutes();
-    $this->artisan('turnouno:latido --verificar=programador')->assertFailed();
-    $this->artisan('turnouno:latido --verificar=otro')->assertExitCode(2);
+    $this->artisan('agendauno:latido --verificar=programador')->assertFailed();
+    $this->artisan('agendauno:latido --verificar=otro')->assertExitCode(2);
 });
 
 it('el chequeo de salud informa los latidos sin tumbar el servicio', function (): void {
@@ -47,11 +47,11 @@ it('el chequeo de salud informa los latidos sin tumbar el servicio', function ()
 it('fuera de producción la verificación dice qué falta y sale con error', function (): void {
     config([
         'mail.default' => 'log',
-        'turnouno.respaldos.disco' => 'local',
-        'turnouno.alertas.correo' => null,
+        'agendauno.respaldos.disco' => 'local',
+        'agendauno.alertas.correo' => null,
     ]);
 
-    $this->artisan('turnouno:verificar-produccion')
+    $this->artisan('agendauno:verificar-produccion')
         ->expectsOutputToContain('FALTA APP_ENV es production')
         ->expectsOutputToContain('FALTA Proveedor de correo real')
         ->expectsOutputToContain('FALTA Copias fuera del servidor')
@@ -61,7 +61,7 @@ it('fuera de producción la verificación dice qué falta y sale con error', fun
 });
 
 it('reconoce lo que sí está listo, incluido el aviso publicado con su responsable', function (): void {
-    config(['mail.default' => 'smtp', 'turnouno.alertas.correo' => 'ops@agendauno.mx']);
+    config(['mail.default' => 'smtp', 'agendauno.alertas.correo' => 'ops@agendauno.mx']);
     app(LatidoOperacion::class)->marcar(LatidoOperacion::PROGRAMADOR);
     app(LatidoOperacion::class)->marcar(LatidoOperacion::COLA);
     $legales = app(DocumentosLegales::class);
@@ -73,7 +73,7 @@ it('reconoce lo que sí está listo, incluido el aviso publicado con su responsa
     $legales->publicar('aviso_privacidad');
     $legales->publicar('terminos');
 
-    $this->artisan('turnouno:verificar-produccion')
+    $this->artisan('agendauno:verificar-produccion')
         ->expectsOutputToContain('OK    Proveedor de correo real')
         ->expectsOutputToContain('OK    Correo para alertas de la plataforma')
         ->expectsOutputToContain('OK    Programador de tareas latiendo')
@@ -89,7 +89,7 @@ it('antes de abrir, la disponibilidad exige procesos vivos y el esquema al día'
     estudioConSesion('estudio-a', 'a@correo.mx');
 
     // Sin latidos (cola y programador recién reiniciados): no se abre.
-    $this->artisan('turnouno:verificar-produccion --disponibilidad')
+    $this->artisan('agendauno:verificar-produccion --disponibilidad')
         ->expectsOutputToContain('FALTA Programador de tareas latiendo')
         ->expectsOutputToContain('OK    Esquema de cada negocio al día')
         ->expectsOutputToContain('No está lista para atender')
@@ -97,14 +97,14 @@ it('antes de abrir, la disponibilidad exige procesos vivos y el esquema al día'
 
     app(LatidoOperacion::class)->marcar(LatidoOperacion::PROGRAMADOR);
     app(LatidoOperacion::class)->marcar(LatidoOperacion::COLA);
-    $this->artisan('turnouno:verificar-produccion --disponibilidad')
+    $this->artisan('agendauno:verificar-produccion --disponibilidad')
         ->expectsOutputToContain('OK    Migraciones de la plataforma aplicadas')
         ->expectsOutputToContain('Lista para atender.')
         ->assertSuccessful();
 
     // Un negocio que se quedó atrás en sus migraciones impide abrir.
     Estudio::query()->where('slug', 'estudio-a')->update(['version_migraciones' => '2026_01_01_000000_vieja']);
-    $this->artisan('turnouno:verificar-produccion --disponibilidad')
+    $this->artisan('agendauno:verificar-produccion --disponibilidad')
         ->expectsOutputToContain('FALTA Esquema de cada negocio al día — Atrasados: estudio-a.')
         ->assertFailed();
 
@@ -118,14 +118,14 @@ it('con Stripe en modo de prueba, la apertura comercial no se aprueba y la insta
         'credenciales' => ['secret_key' => 'sk_test_x', 'webhook_secret' => 'whsec_x'],
     ]);
 
-    $this->artisan('turnouno:verificar-produccion')
+    $this->artisan('agendauno:verificar-produccion')
         ->expectsOutputToContain('AVISO Stripe en modo producción — Modo de prueba: la renta del SaaS no cobra dinero real');
 
-    $this->artisan('turnouno:verificar-produccion --apertura')
+    $this->artisan('agendauno:verificar-produccion --apertura')
         ->expectsOutputToContain('FALTA Stripe en modo producción')
         ->assertFailed();
 
-    config(['turnouno.operacion.apertura_comercial' => true]);
-    $this->artisan('turnouno:verificar-produccion')
+    config(['agendauno.operacion.apertura_comercial' => true]);
+    $this->artisan('agendauno:verificar-produccion')
         ->expectsOutputToContain('FALTA Stripe en modo producción');
 });

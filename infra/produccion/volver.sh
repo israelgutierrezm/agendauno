@@ -9,8 +9,8 @@
 # la versión anterior siga funcionando con el esquema nuevo (primero se agrega,
 # después se quita en otra versión). Si una actualización cambió datos de forma
 # incompatible, además restaura el respaldo tomado justo antes de actualizar:
-#   docker compose --env-file web.env exec api php artisan turnouno:restaurar-plataforma --force
-#   docker compose --env-file web.env exec api php artisan turnouno:restaurar-estudio {slug} --force
+#   docker compose --env-file web.env exec api php artisan agendauno:restaurar-plataforma --force
+#   docker compose --env-file web.env exec api php artisan agendauno:restaurar-estudio {slug} --force
 #
 # Como al actualizar: pone mantenimiento, deja terminar la cola y el programador,
 # cambia de versión y solo reabre si la versión atiende (una petición real por nginx
@@ -73,7 +73,7 @@ principal() {
   echo "$DESTINO" > .version-actual
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $ACTUAL -> $DESTINO (volver)" >> .historial-versiones
   echo "==> Listo: $DESTINO en marcha y atendiendo. Revisa lo demás con:"
-  echo "   VERSION=$DESTINO $COMPOSE exec api php artisan turnouno:verificar-produccion"
+  echo "   VERSION=$DESTINO $COMPOSE exec api php artisan agendauno:verificar-produccion"
 }
 
 # Una petición real por nginx y PHP-FPM, con la galleta que deja pasar el

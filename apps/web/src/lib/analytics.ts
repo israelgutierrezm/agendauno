@@ -19,7 +19,7 @@ declare global {
   }
 }
 
-const ATTRIBUTION_KEY = "turnouno_attribution";
+const ATTRIBUTION_KEY = "agendauno_attribution";
 const UTM_KEYS = [
   "utm_source",
   "utm_medium",
@@ -78,7 +78,7 @@ function deliver(payload: Record<string, unknown>): void {
     /* Medición opcional. */
   }
   window.dispatchEvent(
-    new CustomEvent("turnouno:analytics", { detail: payload }),
+    new CustomEvent("agendauno:analytics", { detail: payload }),
   );
 
   const endpoint = import.meta.env.VITE_ANALYTICS_ENDPOINT as
@@ -129,7 +129,7 @@ export function trackEvent(
   properties: AnalyticsProperties = {},
 ): void {
   deliver({
-    event: "turnouno_event",
+    event: "agendauno_event",
     event_name: name,
     occurred_at: new Date().toISOString(),
     page_path:

@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class ConciliarPagos extends Command
 {
-    protected $signature = 'turnouno:conciliar-pagos {--estudio= : Slug de un solo estudio}';
+    protected $signature = 'agendauno:conciliar-pagos {--estudio= : Slug de un solo estudio}';
 
     protected $description = 'Confirma con la pasarela los cobros en línea cuyo aviso no llegó';
 

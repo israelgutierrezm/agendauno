@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/features/auth/data/sesion.dart';
+import 'package:agendauno/features/auth/data/sesion.dart';
 
 void main() {
   test(

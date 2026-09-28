@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\DB;
  * volver a `activo`, se corren por los días en pausa el próximo cobro, la ventana
  * del ciclo y el vencimiento de sus derechos: no pierde días ni se le regalan
  * ciclos, y paga cuando le toca. La pausa se reanuda sola al día siguiente de su
- * `hasta` (comando `turnouno:reanudar-pausas`) o antes, a mano.
+ * `hasta` (comando `agendauno:reanudar-pausas`) o antes, a mano.
  *
  * Invariantes: una sola pausa abierta por acuerdo; solo se pausa un acuerdo activo y
  * sin pago en mora; las reservas ya hechas se conservan.

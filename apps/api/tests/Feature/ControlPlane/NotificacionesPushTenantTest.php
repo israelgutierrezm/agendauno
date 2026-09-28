@@ -82,8 +82,8 @@ function alumnaConApp(): array
  */
 function pushGenerados(array $e): array
 {
-    test()->artisan('turnouno:despachar-outbox')->assertSuccessful();
-    test()->artisan('turnouno:enviar-mensajes')->assertSuccessful();
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    test()->artisan('agendauno:enviar-mensajes')->assertSuccessful();
 
     return enNegocioPush($e, fn (): array => MensajeTenant::query()->where('canal', 'push')->orderBy('id')->get()
         ->map(fn (MensajeTenant $m): array => ['estado' => $m->estado->value, 'asunto' => $m->asunto, 'cuerpo' => $m->cuerpo])
@@ -188,7 +188,7 @@ it('una difusión por push llega solo a quien tiene la app', function (): void {
         'segmento' => 'todos', 'canal' => 'push', 'asunto' => 'Clase especial', 'cuerpo' => 'Hola {{persona_nombre}}, este sábado hay clase abierta.',
     ], conBearer($m['bearer']))->assertCreated()->assertJsonPath('data.total', 1);
 
-    $this->artisan('turnouno:enviar-mensajes')->assertSuccessful();
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
     expect($this->fcm->envios)->toHaveCount(1)
         ->and($this->fcm->envios[0]['notification']['body'])->toBe('Hola Vale, este sábado hay clase abierta.')
         ->and($this->fcm->envios[0]['data']['tipo'])->toBe('difusion');

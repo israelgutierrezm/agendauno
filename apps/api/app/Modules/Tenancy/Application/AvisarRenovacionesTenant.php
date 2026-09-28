@@ -113,7 +113,7 @@ class AvisarRenovacionesTenant
                 'monto' => $monto,
                 'como_pagar' => $comoPagar,
                 'automatico' => $domiciliacion instanceof DomiciliacionTenant,
-                'enlace' => rtrim((string) config('turnouno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $this->gestor->actual()?->slug),
+                'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $this->gestor->actual()?->slug),
             ]);
 
             return true;

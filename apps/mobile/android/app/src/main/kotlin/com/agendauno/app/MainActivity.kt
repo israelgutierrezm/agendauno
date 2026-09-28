@@ -1,4 +1,4 @@
-package com.turnouno.turnouno_mobile
+package com.agendauno.app
 
 import io.flutter.embedding.android.FlutterActivity
 

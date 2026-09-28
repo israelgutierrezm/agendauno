@@ -18,7 +18,7 @@ class AutenticarPlataforma
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $token = config('turnouno.plataforma.token');
+        $token = config('agendauno.plataforma.token');
         $enviado = $request->bearerToken();
 
         abort_unless(

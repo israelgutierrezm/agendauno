@@ -24,7 +24,7 @@ use Throwable;
  */
 class EnviarAlertas extends Command
 {
-    protected $signature = 'turnouno:enviar-alertas';
+    protected $signature = 'agendauno:enviar-alertas';
 
     protected $description = 'Envía al superadmin el resumen de alertas pendientes de la plataforma';
 
@@ -43,7 +43,7 @@ class EnviarAlertas extends Command
         if ($pendientes->isEmpty()) {
             return self::SUCCESS;
         }
-        $correo = (string) config('turnouno.alertas.correo');
+        $correo = (string) config('agendauno.alertas.correo');
         if (filter_var($correo, FILTER_VALIDATE_EMAIL) === false) {
             $this->warn("Hay {$pendientes->count()} alerta(s) pero no hay ALERTAS_CORREO: nadie las recibe.");
 
@@ -112,7 +112,7 @@ class EnviarAlertas extends Command
             $veces = $a->veces > 1 ? " — {$a->veces} veces desde ".$a->primera_en->format('d/m H:i') : '';
             $lineas[] = "- {$donde}{$a->mensaje}{$veces}";
         }
-        $lineas[] = "\nRevisa el detalle en los logs (docker compose logs) y la verificación: php artisan turnouno:verificar-produccion.";
+        $lineas[] = "\nRevisa el detalle en los logs (docker compose logs) y la verificación: php artisan agendauno:verificar-produccion.";
 
         return implode("\n", $lineas);
     }

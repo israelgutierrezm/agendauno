@@ -266,7 +266,7 @@ function conPlataforma(string $token = 'token-plataforma'): array
  */
 function cargoRentaPendiente(array $e): string
 {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
     terminarPrueba($e);
 
     test()->putJson('/api/v1/plataforma/estudios/'.$e['slug'], [
@@ -286,7 +286,7 @@ function cargoRentaPendiente(array $e): string
  */
 function activarStripePlataforma(array $credenciales = []): void
 {
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
 
     // Sin llaves Stripe no cobra: por defecto una llave de prueba y Stripe simulado.
     if ($credenciales === []) {
@@ -436,7 +436,7 @@ function emitirCargoDelMesEnCurso(): string
 {
     $periodo = now('America/Mexico_City')->format('Y-m');
     test()->travelTo(now('America/Mexico_City')->addMonthNoOverflow()->startOfMonth()->setTime(12, 0));
-    test()->artisan('turnouno:generar-cargos-renta', ['--periodo' => $periodo])->assertSuccessful();
+    test()->artisan('agendauno:generar-cargos-renta', ['--periodo' => $periodo])->assertSuccessful();
 
     return $periodo;
 }

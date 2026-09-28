@@ -8,7 +8,7 @@ declare(strict_types=1);
 */
 
 it('acepta los subdominios de los negocios y rechaza otros orígenes', function (): void {
-    $dominio = (string) config('turnouno.dominio_base');
+    $dominio = (string) config('agendauno.dominio_base');
     $preflight = fn (string $origen) => $this->withHeaders([
         'Origin' => $origen,
         'Access-Control-Request-Method' => 'GET',

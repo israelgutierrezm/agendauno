@@ -195,7 +195,7 @@ class GestionarDunningTenant
             // Para el aviso al cliente: qué debe y dónde pagarlo (su cuenta).
             'producto' => (string) $acuerdo->producto?->nombre,
             'motivo' => (string) $proceso->ultimo_motivo,
-            'enlace' => rtrim((string) config('turnouno.url_app'), '/').'/entrar?estudio='.rawurlencode($slug),
+            'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/entrar?estudio='.rawurlencode($slug),
         ]);
     }
 }

@@ -80,8 +80,8 @@ function agendarCitaDeMarco(array $ctx): array
  */
 function publicarYEnviar(array $e): void
 {
-    test()->artisan('turnouno:despachar-outbox')->assertSuccessful();
-    test()->artisan('turnouno:enviar-mensajes')->assertSuccessful();
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    test()->artisan('agendauno:enviar-mensajes')->assertSuccessful();
 }
 
 it('al barbero le llega la cita nueva y la cancelada', function (): void {

@@ -195,7 +195,7 @@ it('cuántos días adelante se generan lo decide el negocio, también al cambiar
         'dias_semana' => [1], 'hora_local' => '08:00', 'duracion_minutos' => 60, 'vigente_desde' => '2030-01-07',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
 
-    $this->artisan('turnouno:generar-agenda')->assertSuccessful();
+    $this->artisan('agendauno:generar-agenda')->assertSuccessful();
     // Hoy es 1 de enero: 20 días adelante llega al 21.
     expect(array_keys(horarioDeEnero($e)))->toBe(['2030-01-07', '2030-01-14', '2030-01-21']);
 

@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class ExpirarOfertas extends Command
 {
-    protected $signature = 'turnouno:expirar-ofertas';
+    protected $signature = 'agendauno:expirar-ofertas';
 
     protected $description = 'Expira las ofertas de lista de espera vencidas y re-ofrece el cupo';
 

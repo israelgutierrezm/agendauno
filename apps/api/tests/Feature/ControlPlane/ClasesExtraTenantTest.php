@@ -128,7 +128,7 @@ it('al pausar el paquete, sus clases extra se recorren igual', function (): void
 
     $this->postJson("/api/v1/app/{$e['slug']}/acuerdos/{$acuerdo}/pausar", ['hasta' => '2026-10-18'], conBearer($e['bearer']))->assertOk();
     $this->travelTo('2026-10-19 00:10:00');
-    $this->artisan('turnouno:reanudar-pausas')->assertSuccessful();
+    $this->artisan('agendauno:reanudar-pausas')->assertSuccessful();
 
     // Cinco días en pausa (14 al 18): ambos vencen cinco días después.
     expect(array_column(derechosDe($e, $ana), 'valido_hasta'))->toBe(['2026-11-05', '2026-11-05']);

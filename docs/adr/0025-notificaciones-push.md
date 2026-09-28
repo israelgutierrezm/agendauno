@@ -38,7 +38,7 @@ llegaba al teléfono.
 ## Configuración
 
 1. Crear el proyecto de Firebase y registrar la app Android
-   (`com.turnouno.turnouno_mobile`) y la de iOS.
+   (`com.agendauno.app`) y la de iOS.
 2. API: Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada;
    guardar el JSON fuera del repositorio y apuntar `FCM_CREDENTIALS` a él.
 3. App: compilar con `FIREBASE_API_KEY`, `FIREBASE_APP_ID`, `FIREBASE_SENDER_ID`,

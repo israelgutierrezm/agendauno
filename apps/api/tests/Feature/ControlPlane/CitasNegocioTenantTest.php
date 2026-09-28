@@ -72,7 +72,7 @@ it('recepción agenda una cita confirmada con la orden por cobrar en caja', func
 
     // No expira como el pago en línea: sigue confirmada tras la ventana de pago.
     $this->travel(31)->minutes();
-    $this->artisan('turnouno:expirar-reservas-pago')->assertSuccessful();
+    $this->artisan('agendauno:expirar-reservas-pago')->assertSuccessful();
     $sesion = collect($this->getJson("/api/v1/app/{$ctx['e']['slug']}/sesiones?desde={$ctx['dia']}&hasta={$ctx['dia']}", conBearer($ctx['e']['bearer']))
         ->assertOk()->json('data'))->firstWhere('id', $cita['id']);
     expect($sesion['estado'])->toBe('programada');

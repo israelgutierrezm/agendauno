@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\File;
 /*
 | Outbox de eventos de dominio (R39, habilitador de P1): los eventos importantes se
 | ESCRIBEN en el outbox dentro de la transaccion (no se despachan en el acto); el relay
-| turnouno:despachar-outbox los publica despues (at-least-once) disparando
+| agendauno:despachar-outbox los publica despues (at-least-once) disparando
 | EventoDeDominioTenant, donde se enganchan los consumidores. Ver el roadmap.
 */
 
@@ -36,7 +36,7 @@ it('reservar escribe el evento en el outbox y NO lo despacha hasta el relay; el 
     // Escrito en el outbox, pero AUN no publicado (deferido al relay).
     Event::assertNotDispatched(EventoDeDominioTenant::class);
 
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     Event::assertDispatched(
         EventoDeDominioTenant::class,
@@ -52,7 +52,7 @@ it('reservar escribe el evento en el outbox y NO lo despacha hasta el relay; el 
     );
 
     // Segundo relay: nada que republicar (idempotente, marcado publicado_en).
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
     Event::assertDispatchedTimes(EventoDeDominioTenant::class, 2);
 });
 
@@ -70,7 +70,7 @@ it('un consumidor suscrito recibe el evento de dominio que publica el relay', fu
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $vp['persona']], conBearer($e['bearer']))
         ->assertCreated();
 
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     expect($recibidos)->toContain('reserva.creada');
 });
@@ -92,7 +92,7 @@ it('un reembolso emite pago.reembolsado por el outbox', function (): void {
     $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$pago}/reembolsos", ['motivo' => 'Baja'], conBearer($e['bearer']))
         ->assertCreated();
 
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     Event::assertDispatched(
         EventoDeDominioTenant::class,

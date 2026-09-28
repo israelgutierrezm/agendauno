@@ -24,7 +24,7 @@ rechazo se guardaba sin el motivo y no había dónde ver lo que quedó sin confi
   los efectos (créditos, membresías, estado del pago, orden, evento) se aplican **una
   sola vez**, al aprobarse, con el pago y la devolución bloqueados. `aplicado_en`
   guarda cuándo se devolvió de verdad.
-- **Aclarar lo incierto** (`turnouno:conciliar-reembolsos`, cada 5 min): se vuelve a
+- **Aclarar lo incierto** (`agendauno:conciliar-reembolsos`, cada 5 min): se vuelve a
   pedir con la misma llave durante 23 h en pasarelas que la respetan (Stripe, Mercado
   Pago). Pasado eso, o en OpenPay, queda **por conciliar** para que alguien revise el
   panel de la pasarela y diga si se hizo.

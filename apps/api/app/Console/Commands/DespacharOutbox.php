@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class DespacharOutbox extends Command
 {
-    protected $signature = 'turnouno:despachar-outbox';
+    protected $signature = 'agendauno:despachar-outbox';
 
     protected $description = 'Publica los eventos de dominio pendientes en el outbox de cada estudio';
 

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/features/agenda/data/agenda_models.dart';
+import 'package:agendauno/features/agenda/data/agenda_models.dart';
 
 Map<String, dynamic> _cita({String estado = 'confirmada', String? asistencia, bool porCobrar = false, String? orden}) =>
     {

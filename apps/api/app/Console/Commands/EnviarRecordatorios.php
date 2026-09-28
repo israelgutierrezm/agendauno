@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class EnviarRecordatorios extends Command
 {
-    protected $signature = 'turnouno:enviar-recordatorios';
+    protected $signature = 'agendauno:enviar-recordatorios';
 
     protected $description = 'Emite los recordatorios de clases y citas próximas (24 h y 2 h antes)';
 

@@ -17,7 +17,7 @@ use Throwable;
  */
 class RespaldarPlataforma extends Command
 {
-    protected $signature = 'turnouno:respaldar-plataforma
+    protected $signature = 'agendauno:respaldar-plataforma
         {--sin-archivos : Solo la base central (p. ej. justo antes de actualizar)}
         {--dias= : Días que se conservan (por defecto RESPALDOS_DIAS)}';
 
@@ -30,7 +30,7 @@ class RespaldarPlataforma extends Command
             if (! $this->option('sin-archivos')) {
                 $this->info('Archivos: '.$respaldos->respaldarArchivos());
             }
-            $dias = (int) ($this->option('dias') ?? config('turnouno.respaldos.dias', 14));
+            $dias = (int) ($this->option('dias') ?? config('agendauno.respaldos.dias', 14));
             $borrados = $respaldos->limpiar(max(1, $dias));
             if ($borrados > 0) {
                 $this->line("Respaldos viejos borrados: {$borrados}.");

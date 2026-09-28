@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\File;
 
 beforeEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
 });
 
 afterEach(function (): void {

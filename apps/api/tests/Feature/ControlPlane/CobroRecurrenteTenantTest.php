@@ -168,7 +168,7 @@ it('el comando cobra-suscripciones se salta estudios sin pasarela en línea', fu
     enTenant($m, fn () => AcuerdoTenant::query()->where('ulid', $m['acuerdo'])->firstOrFail()
         ->update(['proxima_cobro_en' => now()->subDay()->toDateString()]));
 
-    $this->artisan('turnouno:cobrar-suscripciones')->assertSuccessful();
+    $this->artisan('agendauno:cobrar-suscripciones')->assertSuccessful();
 
     // Sin pasarela en línea configurada: no cobra ni abre dunning.
     expect(enTenant($m, fn () => ProcesoDunningTenant::query()->count()))->toBe(0);

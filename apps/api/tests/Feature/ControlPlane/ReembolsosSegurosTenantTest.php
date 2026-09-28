@@ -120,7 +120,7 @@ it('si la pasarela no responde, queda incierta y se aclara con la misma llave si
     $this->postJson("/api/v1/app/{$p['slug']}/pagos/{$p['pago']}/reembolsos", ['motivo' => 'Otra'], conBearer($p['bearer']))->assertStatus(422);
 
     // El proceso la vuelve a pedir con la MISMA llave: Stripe responde lo de la primera vez.
-    $this->artisan('turnouno:conciliar-reembolsos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-reembolsos')->assertSuccessful();
 
     $this->getJson("/api/v1/app/{$p['slug']}/pagos/{$p['pago']}/reembolsos", conBearer($p['bearer']))
         ->assertOk()->assertJsonPath('data.0.estado', 'aprobado')->assertJsonCount(1, 'data');
@@ -130,7 +130,7 @@ it('si la pasarela no responde, queda incierta y se aclara con la misma llave si
         ->and(porConciliar($p))->toHaveCount(0);
 
     // Correrlo de nuevo no hace nada más.
-    $this->artisan('turnouno:conciliar-reembolsos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-reembolsos')->assertSuccessful();
     expect($this->stripe->llaves)->toHaveCount(2);
 });
 
@@ -141,7 +141,7 @@ it('pasado el tiempo en que la pasarela recuerda la llave, se resuelve a mano y 
         ->assertCreated()->assertJsonPath('data.estado', 'incierto');
 
     $this->travel(24)->hours();
-    $this->artisan('turnouno:conciliar-reembolsos')->assertSuccessful();
+    $this->artisan('agendauno:conciliar-reembolsos')->assertSuccessful();
     expect($this->stripe->llaves)->toHaveCount(1); // ya no se reintenta
 
     $incidencia = porConciliar($p)[0];

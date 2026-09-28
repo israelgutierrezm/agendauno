@@ -18,13 +18,13 @@ use Throwable;
  */
 class RespaldarEstudios extends Command
 {
-    protected $signature = 'turnouno:respaldar-estudios {--estudio= : slug de un solo negocio} {--dias= : días que se conservan (por defecto la configuración)}';
+    protected $signature = 'agendauno:respaldar-estudios {--estudio= : slug de un solo negocio} {--dias= : días que se conservan (por defecto la configuración)}';
 
     protected $description = 'Respalda la base de datos de cada negocio y aplica la retención';
 
     public function handle(RespaldosEstudio $respaldos, GestorDeConexionTenant $gestor): int
     {
-        $dias = (int) ($this->option('dias') ?: config('turnouno.respaldos.dias', 14));
+        $dias = (int) ($this->option('dias') ?: config('agendauno.respaldos.dias', 14));
         $fallas = 0;
 
         $estudios = Estudio::query()

@@ -1,4 +1,4 @@
-# TurnoUno — SaaS de Membresías
+# AgendaUno — SaaS de Membresías
 
 SaaS comercial multi-tenant para negocios basados en membresías, clases, reservas, recursos y
 actividades (estudios de pole, escuelas de natación, gimnasios). Un núcleo único configurable —
@@ -61,8 +61,8 @@ composer test       # Pest
 
 - Salud: `GET http://localhost:8000/api/v1/health`
 - OpenAPI (Scramble): `http://localhost:8000/docs/api`
-- Estudios demo: `php artisan turnouno:sembrar-demo` (negocio `demo`, clases y citas) y
-  `php artisan turnouno:sembrar-demo --slug=barberia --perfil=barberia --nombre="Barbería Demo"`
+- Estudios demo: `php artisan agendauno:sembrar-demo` (negocio `demo`, clases y citas) y
+  `php artisan agendauno:sembrar-demo --slug=barberia --perfil=barberia --nombre="Barbería Demo"`
   (solo citas). Crean una cuenta por rol (dueño, administradora, recepción, profesionales,
   alumna); la contraseña es la opción `--password` del comando y lo imprime al terminar.
 

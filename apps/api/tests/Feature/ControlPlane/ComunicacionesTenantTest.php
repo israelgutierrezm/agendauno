@@ -48,7 +48,7 @@ it('un evento genera un mensaje interno renderizado desde la plantilla y el rela
         ->assertCreated();
 
     // El relay del outbox publica reserva.creada -> se genera el mensaje (encolado).
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     $mensajes = $this->getJson("/api/v1/app/{$e['slug']}/mensajes", conBearer($e['bearer']))->assertOk()->json('data');
     expect($mensajes)->toHaveCount(1);
@@ -58,7 +58,7 @@ it('un evento genera un mensaje interno renderizado desde la plantilla y el rela
     expect($mensajes[0]['persona'])->toBe('Ana');
 
     // El relay de envio lo marca enviado (bandeja in-app).
-    $this->artisan('turnouno:enviar-mensajes')->assertSuccessful();
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
 
     $mensajes = $this->getJson("/api/v1/app/{$e['slug']}/mensajes?estado=enviado", conBearer($e['bearer']))
         ->assertOk()->json('data');
@@ -84,13 +84,13 @@ it('una plantilla de email genera y envia un correo al destinatario', function (
     $sesion = crearSesionTenant($e, $semilla, 5);
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))->assertCreated();
 
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     $mensajes = $this->getJson("/api/v1/app/{$e['slug']}/mensajes", conBearer($e['bearer']))->assertOk()->json('data');
     expect($mensajes[0]['canal'])->toBe('email');
     expect($mensajes[0]['destinatario'])->toBe('bea@correo.mx');
 
-    $this->artisan('turnouno:enviar-mensajes')->assertSuccessful();
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
 
     Mail::assertSent(
         MensajeMailable::class,
@@ -110,7 +110,7 @@ it('una plantilla inactiva no genera mensajes', function (): void {
     $sesion = crearSesionTenant($e, $semilla, 5);
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $vp['persona']], conBearer($e['bearer']))->assertCreated();
 
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     $this->getJson("/api/v1/app/{$e['slug']}/mensajes", conBearer($e['bearer']))->assertOk()->assertJsonCount(0, 'data');
 });
@@ -142,7 +142,7 @@ it('los eventos de asistencia identifican a la persona por su ULID (plantillas y
     $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/asistencia", ['estado' => 'presente'], conBearer($e['bearer']))
         ->assertCreated();
 
-    $this->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     $mensajes = $this->getJson("/api/v1/app/{$e['slug']}/mensajes", conBearer($e['bearer']))->assertOk()->json('data');
     expect($mensajes)->toHaveCount(1)

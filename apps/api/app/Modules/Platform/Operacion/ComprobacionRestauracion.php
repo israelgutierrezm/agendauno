@@ -153,7 +153,7 @@ class ComprobacionRestauracion
             : 0;
         $comparados = 0;
         $distintos = [];
-        $excluir = 'private/'.trim((string) config('turnouno.respaldos.carpeta', 'respaldos'), '/').'/';
+        $excluir = 'private/'.trim((string) config('agendauno.respaldos.carpeta', 'respaldos'), '/').'/';
         foreach (['private' => 'local', 'public' => 'public'] as $prefijo => $disco) {
             $raiz = rtrim(Storage::disk($disco)->path(''), '\\/');
             if (! is_dir($raiz)) {

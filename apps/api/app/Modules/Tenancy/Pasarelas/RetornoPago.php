@@ -17,7 +17,7 @@ final class RetornoPago
     public static function urls(?string $retorno, string $parametro = 'pago'): array
     {
         $ruta = '/'.ltrim($retorno ?? '/', '/');
-        $base = rtrim((string) config('turnouno.url_app'), '/').$ruta;
+        $base = rtrim((string) config('agendauno.url_app'), '/').$ruta;
         $union = str_contains($base, '?') ? '&' : '?';
 
         return [

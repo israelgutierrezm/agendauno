@@ -20,7 +20,7 @@ recibía nada y recepción no veía nada por cobrar.
 - **`reserva.sesion_cancelada`**: al cancelar el negocio la clase o cita, un evento por
   persona afectada (confirmadas, ofrecidas, en espera y pendientes de pago), con el
   enlace para reservar otro horario. No se envía además `reserva.cancelada`.
-- **`membresia.renovacion_proxima`**, 3 días antes (`turnouno:avisar-renovaciones`,
+- **`membresia.renovacion_proxima`**, 3 días antes (`agendauno:avisar-renovaciones`,
   diario): cuándo, cuánto y cómo se paga. Una vez por periodo
   (`acuerdos.aviso_renovacion_para`, reclamado con UPDATE condicional junto al
   evento).

@@ -29,7 +29,7 @@ describe("analytics", () => {
 
     expect(window.dataLayer).toHaveLength(1);
     expect(window.dataLayer?.[0]).toMatchObject({
-      event: "turnouno_event",
+      event: "agendauno_event",
       event_name: "marketing_cta_clicked",
       page_path: "/",
       utm_source: "instagram",

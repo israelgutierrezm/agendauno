@@ -60,7 +60,7 @@ function alumnaConPaquete(array $e, string $nombre, string $email): string
  */
 function correosQueEmpiezan(array $e, string $prefijo): array
 {
-    test()->artisan('turnouno:despachar-outbox')->assertSuccessful();
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
 
     return enNegocioAvisos($e, fn (): array => MensajeTenant::query()
         ->where('canal', 'email')
@@ -187,12 +187,12 @@ it('3 días antes avisa la renovación a quien paga a mano y ya puede pagarla po
 
     // Aún faltan 4 días: nada.
     $this->travelTo('2026-09-27 15:00:00');
-    $this->artisan('turnouno:avisar-renovaciones')->assertSuccessful();
+    $this->artisan('agendauno:avisar-renovaciones')->assertSuccessful();
     expect(correosQueEmpiezan($m, 'Tu Mensualidad'))->toHaveCount(0);
 
     $this->travelTo('2026-09-28 15:00:00');
-    $this->artisan('turnouno:avisar-renovaciones')->assertSuccessful();
-    $this->artisan('turnouno:avisar-renovaciones')->assertSuccessful(); // una sola vez por periodo
+    $this->artisan('agendauno:avisar-renovaciones')->assertSuccessful();
+    $this->artisan('agendauno:avisar-renovaciones')->assertSuccessful(); // una sola vez por periodo
 
     $correos = correosQueEmpiezan($m, 'Tu Mensualidad');
     expect($correos)->toHaveCount(1)
@@ -212,7 +212,7 @@ it('3 días antes avisa la renovación a quien paga a mano y ya puede pagarla po
 
     // El siguiente periodo se avisa en su momento.
     $this->travelTo('2026-10-29 15:00:00');
-    $this->artisan('turnouno:avisar-renovaciones')->assertSuccessful();
+    $this->artisan('agendauno:avisar-renovaciones')->assertSuccessful();
     expect(correosQueEmpiezan($m, 'Tu Mensualidad'))->toHaveCount(2)
         ->and(ordenesDeRenovacion($m))->toHaveCount(2);
 });
@@ -228,7 +228,7 @@ it('con pago automático solo avisa que se cobrará a su tarjeta, sin abrir la d
         ]);
     });
 
-    $this->artisan('turnouno:avisar-renovaciones')->assertSuccessful();
+    $this->artisan('agendauno:avisar-renovaciones')->assertSuccessful();
 
     $correos = correosQueEmpiezan($m, 'Tu Mensualidad');
     expect($correos)->toHaveCount(1)
@@ -238,7 +238,7 @@ it('con pago automático solo avisa que se cobrará a su tarjeta, sin abrir la d
 
 it('si la membresía se cancela, su renovación por adelantado ya no queda por cobrar', function (): void {
     $m = mensualidadPorRenovar();
-    $this->artisan('turnouno:avisar-renovaciones')->assertSuccessful();
+    $this->artisan('agendauno:avisar-renovaciones')->assertSuccessful();
     expect(ordenesDeRenovacion($m)[0]['estado'])->toBe('pendiente');
 
     // Se da de baja al alumno: sus membresías se cancelan y la deuda también.
@@ -254,7 +254,7 @@ it('con cuántos días de anticipación se avisa la renovación lo decide el neg
 
     // Se renueva el 1 de octubre: el 26 de septiembre faltan 5 días.
     $this->travelTo('2026-09-26 15:00:00');
-    $this->artisan('turnouno:avisar-renovaciones')->assertSuccessful();
+    $this->artisan('agendauno:avisar-renovaciones')->assertSuccessful();
 
     expect(correosQueEmpiezan($m, 'Tu Mensualidad'))->toHaveCount(1);
 });

@@ -30,7 +30,7 @@ Solo los reembolsos y los cobros de suscripciones se conciliaban solos.
     aviso). Sin cobro vivo, sigue pagable solo si la preferencia está vigente y no la
     cerramos.
   - **OpenPay**: el cargo por su id.
-- **`turnouno:conciliar-pagos`** (cada 5 minutos, `ConciliarPagosTenant`) revisa:
+- **`agendauno:conciliar-pagos`** (cada 5 minutos, `ConciliarPagosTenant`) revisa:
   - los pagos `pendiente` con más de 5 minutos (el aviso normal llega en segundos);
   - los `rechazado` con `cerrado_sin_confirmar`. Todo cierre de este lado lo marca:
     al reintentar, al vencer un apartado o al confirmarse otro intento.

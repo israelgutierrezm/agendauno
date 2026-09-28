@@ -122,7 +122,7 @@ export function renderSeoHead(seo: SeoOptions): string {
   }
   if (seo.jsonLd) {
     tags.push(
-      `<script id="turnouno-route-jsonld" type="application/ld+json">${JSON.stringify(seo.jsonLd).replace(/</g, "\\u003c")}</script>`,
+      `<script id="agendauno-route-jsonld" type="application/ld+json">${JSON.stringify(seo.jsonLd).replace(/</g, "\\u003c")}</script>`,
     );
   }
   return tags.join("\n");

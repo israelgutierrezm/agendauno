@@ -678,7 +678,7 @@ Route::prefix('v1')->group(function (): void {
     Route::prefix('app/{estudio}')->middleware('estudio.resolver')->name('api.v1.app.')->group($rutasTenant);
 
     // Acceso por subdominio: {slug}.agendauno.mx/api/v1/... (mismo comportamiento).
-    Route::domain('{estudio}.'.config('turnouno.dominio_base'))
+    Route::domain('{estudio}.'.config('agendauno.dominio_base'))
         ->middleware('estudio.resolver')
         ->name('api.v1.sub.')
         ->group($rutasTenant);

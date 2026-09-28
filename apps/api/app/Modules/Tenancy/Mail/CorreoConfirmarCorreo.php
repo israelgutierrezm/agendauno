@@ -33,7 +33,7 @@ class CorreoConfirmarCorreo extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
-        $url = rtrim((string) config('turnouno.url_app'), '/').'/confirmar-correo/'.$this->slug
+        $url = rtrim((string) config('agendauno.url_app'), '/').'/confirmar-correo/'.$this->slug
             .'?token='.rawurlencode($this->token);
 
         $html = '<p>Pediste usar este correo para entrar a '.e($this->estudioNombre).'.</p>'

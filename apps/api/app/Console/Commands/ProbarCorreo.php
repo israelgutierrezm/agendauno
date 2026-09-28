@@ -15,7 +15,7 @@ use Throwable;
  */
 class ProbarCorreo extends Command
 {
-    protected $signature = 'turnouno:probar-correo {destinatario : Correo que recibe la prueba}';
+    protected $signature = 'agendauno:probar-correo {destinatario : Correo que recibe la prueba}';
 
     protected $description = 'Envía un correo de prueba con la configuración de correo actual';
 

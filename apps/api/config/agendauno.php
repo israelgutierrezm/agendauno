@@ -70,7 +70,7 @@ return [
     ],
 
     /*
-    | Respaldos de la base de cada negocio (turnouno:respaldar-estudios, diario).
+    | Respaldos de la base de cada negocio (agendauno:respaldar-estudios, diario).
     | En producción conviene un disco S3 (otro lugar que el servidor). Se conservan
     | `dias` días. En MySQL usa los binarios mysqldump/mysql del servidor.
     */

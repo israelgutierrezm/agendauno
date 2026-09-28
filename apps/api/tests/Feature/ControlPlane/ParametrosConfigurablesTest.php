@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\File;
 
 beforeEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
-    Config::set('turnouno.plataforma.token', 'token-plataforma');
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
     $this->travelTo('2030-01-01 12:00:00');
 });
 
@@ -104,11 +104,11 @@ it('el tiempo para pagar una reserva apartada sale del parámetro del negocio', 
 
     // A los 45 minutos (antes con 30 ya se habría liberado) sigue apartada.
     $this->travelTo('2030-01-01 12:45:00');
-    $this->artisan('turnouno:expirar-reservas-pago')->assertSuccessful();
+    $this->artisan('agendauno:expirar-reservas-pago')->assertSuccessful();
     expect($estado())->toBe('pendiente_pago');
 
     $this->travelTo('2030-01-01 13:05:00');
-    $this->artisan('turnouno:expirar-reservas-pago')->assertSuccessful();
+    $this->artisan('agendauno:expirar-reservas-pago')->assertSuccessful();
     expect($estado())->toBe('cancelada');
 });
 
@@ -127,12 +127,12 @@ it('los recordatorios salen a las horas del negocio y el segundo se puede apagar
 
     // 47 h antes: ya toca el primero (48 h); con el valor inicial (24 h) aún no.
     $this->travelTo('2030-01-02 17:00:00');
-    $this->artisan('turnouno:enviar-recordatorios')->assertSuccessful();
+    $this->artisan('agendauno:enviar-recordatorios')->assertSuccessful();
     expect($eventos())->toBe(['reserva.recordatorio_24h']);
 
     // 1 h antes: el segundo está apagado.
     $this->travelTo('2030-01-04 15:00:00');
-    $this->artisan('turnouno:enviar-recordatorios')->assertSuccessful();
+    $this->artisan('agendauno:enviar-recordatorios')->assertSuccessful();
     expect($eventos())->toBe(['reserva.recordatorio_24h']);
 });
 

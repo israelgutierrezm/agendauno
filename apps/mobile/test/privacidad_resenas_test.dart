@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/features/cuenta/data/cuenta_models.dart';
+import 'package:agendauno/features/cuenta/data/cuenta_models.dart';
 
 void main() {
   test('la reseña pendiente trae la clase, con quién y cuándo', () {

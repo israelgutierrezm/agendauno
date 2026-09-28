@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:turnouno_mobile/core/calendario/calendario.dart';
-import 'package:turnouno_mobile/core/calendario/calendario_vistas.dart';
+import 'package:agendauno/core/calendario/calendario.dart';
+import 'package:agendauno/core/calendario/calendario_vistas.dart';
 
 void main() {
   group('Calendario', () {

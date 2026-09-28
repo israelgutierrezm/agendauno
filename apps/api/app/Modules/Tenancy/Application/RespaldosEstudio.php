@@ -18,7 +18,7 @@ use RuntimeException;
  * - MySQL (producción): `mysqldump --single-transaction` (sin bloquear la operación).
  *
  * El archivo se comprime (gzip) y se guarda en el disco configurado
- * (`turnouno.respaldos.disco`; en producción, S3 fuera del servidor) bajo
+ * (`agendauno.respaldos.disco`; en producción, S3 fuera del servidor) bajo
  * `{carpeta}/{slug}/`, con su suma sha256 al lado, que se comprueba antes de
  * restaurar. Se conservan los últimos N días. Restaurar reemplaza la base completa
  * del negocio: úsese solo con el negocio fuera de servicio.

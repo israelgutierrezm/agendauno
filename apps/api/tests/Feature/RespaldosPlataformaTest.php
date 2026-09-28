@@ -35,7 +35,7 @@ it('respalda la base central y los archivos subidos, cada uno con su suma', func
     // Lo que ya son respaldos no se vuelve a empaquetar.
     Storage::disk('local')->put('respaldos/estudio-a/viejo.sqlite.gz', 'x');
 
-    $this->artisan('turnouno:respaldar-plataforma')->assertSuccessful();
+    $this->artisan('agendauno:respaldar-plataforma')->assertSuccessful();
 
     $plataforma = app(RespaldosPlataforma::class)->listar();
     $archivos = app(RespaldosPlataforma::class)->listar(RespaldosPlataforma::ARCHIVOS);
@@ -63,10 +63,10 @@ it('el simulacro restaura la plataforma, un negocio y los archivos, y comprueba 
     estudioConSesion('estudio-a', 'a@correo.mx');
     Storage::disk('local')->put('documentos/estudio-a/reglamento.pdf', 'contenido');
     Storage::disk('public')->put('logos/estudio-a.png', 'logo');
-    $this->artisan('turnouno:respaldar-plataforma')->assertSuccessful();
-    $this->artisan('turnouno:respaldar-estudios')->assertSuccessful();
+    $this->artisan('agendauno:respaldar-plataforma')->assertSuccessful();
+    $this->artisan('agendauno:respaldar-estudios')->assertSuccessful();
 
-    $this->artisan('turnouno:simulacro-restauracion --estudio=estudio-a')
+    $this->artisan('agendauno:simulacro-restauracion --estudio=estudio-a')
         ->expectsOutputToContain('Tablas esenciales')
         ->expectsOutputToContain('Dueño con acceso: 1 cuenta(s) de dueño.')
         ->expectsOutputToContain('Relaciones completas: Sin registros huérfanos.')
@@ -77,7 +77,7 @@ it('el simulacro restaura la plataforma, un negocio y los archivos, y comprueba 
 
     $ultimo = app(RespaldosPlataforma::class)->ultimoSimulacro();
     expect($ultimo)->toMatchArray(['ok' => true]);
-    $this->artisan('turnouno:verificar-produccion')
+    $this->artisan('agendauno:verificar-produccion')
         ->expectsOutputToContain('OK    Restauración comprobada en los últimos 8 días')
         ->expectsOutputToContain('OK    Base central respaldada en las últimas 26 h');
 });
@@ -87,13 +87,13 @@ it('el simulacro no da por buena una restauración con la que no se podría oper
     $estudio = Estudio::query()->where('slug', 'estudio-a')->firstOrFail();
     // Un negocio sin nadie que pueda entrar a operarlo.
     app(GestorDeConexionTenant::class)->ejecutarEn($estudio, fn () => Usuario::query()->where('rol', 'propietario')->forceDelete());
-    $this->artisan('turnouno:respaldar-plataforma')->assertSuccessful();
-    $this->artisan('turnouno:respaldar-estudios')->assertSuccessful();
+    $this->artisan('agendauno:respaldar-plataforma')->assertSuccessful();
+    $this->artisan('agendauno:respaldar-estudios')->assertSuccessful();
     // Un documento que ya estaba al respaldar pero no quedó en el paquete.
     Storage::disk('local')->put('documentos/estudio-a/contrato.pdf', 'firmado');
     touch(Storage::disk('local')->path('documentos/estudio-a/contrato.pdf'), time() - 3600);
 
-    $this->artisan('turnouno:simulacro-restauracion --estudio=estudio-a')
+    $this->artisan('agendauno:simulacro-restauracion --estudio=estudio-a')
         ->expectsOutputToContain('Dueño con acceso: No hay ninguna cuenta de dueño')
         ->expectsOutputToContain('faltan o cambiaron: private/documentos/estudio-a/contrato.pdf')
         ->assertFailed();
@@ -103,11 +103,11 @@ it('el simulacro no da por buena una restauración con la que no se podría oper
 });
 
 it('si un respaldo está dañado, el simulacro falla y avisa al superadmin', function (): void {
-    $this->artisan('turnouno:respaldar-plataforma')->assertSuccessful();
+    $this->artisan('agendauno:respaldar-plataforma')->assertSuccessful();
     $ruta = app(RespaldosPlataforma::class)->listar()[0];
     Storage::disk('local')->put($ruta, (string) gzencode('no es una base'));
 
-    $this->artisan('turnouno:simulacro-restauracion')
+    $this->artisan('agendauno:simulacro-restauracion')
         ->expectsOutputToContain('dañado')
         ->assertFailed();
 
@@ -116,17 +116,17 @@ it('si un respaldo está dañado, el simulacro falla y avisa al superadmin', fun
 });
 
 it('restaurar la base central pide --force y en pruebas nunca toca la base de la suite', function (): void {
-    $this->artisan('turnouno:restaurar-plataforma --listar')->expectsOutputToContain('No hay respaldos')->assertSuccessful();
-    $this->artisan('turnouno:respaldar-plataforma --sin-archivos')->assertSuccessful();
+    $this->artisan('agendauno:restaurar-plataforma --listar')->expectsOutputToContain('No hay respaldos')->assertSuccessful();
+    $this->artisan('agendauno:respaldar-plataforma --sin-archivos')->assertSuccessful();
 
-    $this->artisan('turnouno:restaurar-plataforma')->expectsOutputToContain('--force')->assertFailed();
+    $this->artisan('agendauno:restaurar-plataforma')->expectsOutputToContain('--force')->assertFailed();
     // La base de la suite (SQLite en memoria o turnouno_testing en MySQL) no es desechable.
-    $this->artisan('turnouno:restaurar-plataforma --force')->expectsOutputToContain('base desechable')->assertFailed();
+    $this->artisan('agendauno:restaurar-plataforma --force')->expectsOutputToContain('base desechable')->assertFailed();
 });
 
 it('en pruebas sí restaura sobre una base desechable', function (): void {
     estudioConSesion('estudio-a', 'a@correo.mx');
-    $this->artisan('turnouno:respaldar-plataforma --sin-archivos')->assertSuccessful();
+    $this->artisan('agendauno:respaldar-plataforma --sin-archivos')->assertSuccessful();
     $ruta = app(RespaldosPlataforma::class)->listar()[0];
 
     // Una base SQLite desechable como destino (la suite sigue intacta).

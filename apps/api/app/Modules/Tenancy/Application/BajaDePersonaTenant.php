@@ -65,7 +65,7 @@ class BajaDePersonaTenant
                 'persona_id' => (string) $persona->ulid,
                 'solicitud' => (string) $solicitud->ulid,
                 // Para el aviso al equipo: dónde atenderla en el panel.
-                'enlace_panel' => rtrim((string) config('turnouno.url_app'), '/').'/privacidad',
+                'enlace_panel' => rtrim((string) config('agendauno.url_app'), '/').'/privacidad',
             ]);
 
             return $solicitud;

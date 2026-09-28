@@ -16,7 +16,7 @@ class VerificarRecaptcha
 {
     public function aprobado(?string $token, ?string $ip = null): bool
     {
-        $secret = config('turnouno.recaptcha.secret');
+        $secret = config('agendauno.recaptcha.secret');
         if (! is_string($secret) || $secret === '') {
             // Sin llaves configuradas no se exige captcha (dev/local).
             return true;
@@ -41,7 +41,7 @@ class VerificarRecaptcha
         }
 
         $puntaje = (float) ($datos['score'] ?? 0);
-        $minimo = (float) config('turnouno.recaptcha.min_score', 0.5);
+        $minimo = (float) config('agendauno.recaptcha.min_score', 0.5);
 
         return $puntaje >= $minimo;
     }
