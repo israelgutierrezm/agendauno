@@ -1,21 +1,24 @@
 # Control plane y multi-tenancy por base de datos
 
-Estado: **Fase 1 (expand) implementada**. Coexiste con el esquema compartido
-actual mientras se migra el plano de datos operativo (fases siguientes).
+Estado: **implementado**. Todo el sistema corre así: el esquema compartido con
+`tenant_id` se retiró (ADR 0058). Resumen del modelo en `docs/TENANCY.md`.
 
 ## Dos planos
 
 - **Control plane (central).** Conexión por defecto. Tabla `estudios`: registro
   de cada tenant SaaS con slug, estado de ciclo de vida, publicación en
-  directorio, trial, plan/precio por alumno, estado de facturación, contacto del
-  propietario y **configuración de su BD de tenant** (`db_driver`, `db_database`).
-  No contiene usuarios/alumnos ni datos operativos.
+  directorio, prueba, perfil y terminología, modalidad de cobro del SaaS, estado de
+  facturación, contacto del propietario y **configuración de su BD de tenant**
+  (`db_driver`, `db_database`, `version_migraciones`). Junto a ella: `tarifas_saas`
+  (versionadas), `mediciones_uso`, `cargos_renta`, `facturas_plataforma`,
+  `configuraciones_pasarela_plataforma`, `alertas_plataforma` y los documentos
+  legales. No contiene usuarios, alumnos ni datos operativos.
 - **Data plane (por tenant).** Una BD física por estudio (SQLite por tenant en
   dev/test; MySQL por tenant en producción con `TENANT_DB_DRIVER=mysql`). Contiene
-  la identidad tenant-local (`users`, email único **por tenant**) y —en fases
-  siguientes— el resto de la operación.
+  la identidad tenant-local (`users`, email único **por tenant**), los roles y toda
+  la operación del negocio.
 
-## Piezas (Fase 1)
+## Piezas
 
 - `Modules\Tenancy\Models\Estudio` — registro central (enums `EstadoEstudio`,
   `EstadoFacturacion`).
@@ -30,7 +33,8 @@ actual mientras se migra el plano de datos operativo (fases siguientes).
 - `Application\ActivacionPropietario` — token de un solo uso; el propietario fija
   su contraseña al activar.
 - `Application\AutenticacionTenant` — tokens de acceso guardados (hash) en la BD
-  del tenant; un token de un estudio no existe ni valida en otro.
+  del tenant; un token de un estudio no existe ni valida en otro. Cada token lleva
+  su rol activo (ADR 0055).
 - Middleware `ResolverEstudio` (resuelve por slug antes de autenticar, activa la
   conexión, falla 404 seguro) y `AutenticarTenant` (Bearer contra la BD del
   tenant).
@@ -80,10 +84,13 @@ php artisan agendauno:restaurar-estudio slug --force      # vuelve al más recie
 - `GET  /api/v1/registro/slug?slug=` — disponibilidad de slug.
 - `GET  /api/v1/directorio` — directorio público (solo publicados/no privados).
 - `POST /api/v1/app/{estudio}/login` · `/activar` — auth tenant-local.
-- `GET  /api/v1/app/{estudio}/yo` · `POST /logout` — sesión tenant-local.
+- `POST /api/v1/app/{estudio}/auth/google` — entrada con Google del negocio.
+- `GET  /api/v1/app/{estudio}/yo` · `PUT /yo/rol-activo` · `POST /logout` — sesión
+  tenant-local.
+- `/api/v1/plataforma/*` — superadmin (token `PLATFORM_ADMIN_TOKEN`).
 
-En producción el tenant se resolverá también por `{slug}.agendauno.mx`; hoy se
-usa `…/app/{slug}` como alternativa configurable.
+Las mismas rutas del negocio responden también por subdominio
+(`{slug}.agendauno.mx/api/v1/…`).
 
 ## Recorrido probado
 
@@ -91,13 +98,3 @@ usa `…/app/{slug}` como alternativa configurable.
 con pruebas de aislamiento: mismo correo en dos tenants = cuentas distintas;
 cambio de contraseña independiente; token de A no autentica en B; provisioning
 idempotente; slug único ante concurrencia; sin fuga de conexión entre tenants.
-
-## Pendiente (fases siguientes)
-
-Migrar el plano de datos operativo a la BD del tenant (organizaciones, personas,
-catálogo, agenda, membresías, reservas, pagos, autorización con spatie
-tenant-local, roles/permisos), resolución por subdominio, onboarding, medición de
-alumnos activos + facturación SaaS, Google SSO, formularios dinámicos y módulo de
-documentos para miembros/instructores, aislamiento de cache/colas/storage/logs
-por tenant, y la migración de datos existentes (expand-migrate-verify-cutover).
-Ver el roadmap en el reporte de la Fase 1.

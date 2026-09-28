@@ -1,36 +1,44 @@
-# Security
+# Seguridad
 
-## Critical threats
+## Amenazas principales
 
-- tenant data leakage
-- IDOR / broken object-level authorization
-- privilege escalation
-- insecure uploads
-- webhook replay
-- payment-state spoofing
-- leaked secrets
-- unsafe impersonation
-- mass assignment
+- fuga de datos entre negocios
+- IDOR / autorización rota a nivel de objeto
+- escalamiento de privilegios (roles propios, cambio de rol)
+- archivos subidos inseguros
+- webhooks falsos o repetidos
+- estado de pago falsificado
+- secretos filtrados
+- asignación masiva
 
-## Controls
+## Controles
 
-- TenantContext + scoped authorization
-- MFA-ready staff authentication
-- strict request validation
-- Laravel mass-assignment discipline
-- rate limiting
-- CSRF protection for SPA session flows
-- HMAC webhooks with timestamp/replay protection
-- signed URLs for private media
-- encrypted secrets
-- audit trails
-- least privilege
-- secure password/session policies
-- security headers
-- dependency scanning
+- Una base de datos por negocio; el negocio sale de la ruta o del subdominio, nunca
+  del cuerpo (`docs/TENANCY.md`).
+- Tokens propios por negocio: solo se guarda el hash; el token lleva el rol activo
+  y se revoca al salir.
+- Autorización en el servidor: permiso del rol activo + alcance por sucursal y por
+  profesional (`docs/AUTHORIZATION.md`). Nadie da más permisos de los que tiene.
+- ULIDs en la API; nunca IDs internos.
+- Validación estricta de cada petición y `$fillable` explícito.
+- Límites de peticiones en login, recuperación de contraseña, registro y rutas
+  públicas.
+- Webhooks: se verifican con la pasarela, son idempotentes y un cobro no confirmado
+  se concilia consultando a la pasarela (ADR 0013, 0053).
+- Llaves de pasarelas y de integraciones cifradas en la base; la web nunca las
+  vuelve a mostrar.
+- Webhooks salientes solo a destinos públicos (bloquea redes internas).
+- Archivos del negocio en su propio espacio; los documentos privados se descargan
+  solo por la API, con sesión y permiso.
+- Bitácora (`auditorias`) de lo sensible: dinero, roles, bajas, cambios de
+  configuración.
+- Registro público con verificación por correo (ADR 0028) y reCAPTCHA opcional.
+- Derechos ARCO y aviso de privacidad versionado con aceptación registrada.
+- HTTPS delante de nginx (certificado comodín) y encabezados de seguridad en nginx
+  (`infra/produccion`, `docs/DESPLIEGUE.md`).
 
-## Minors
+## Menores
 
-Only store information needed for operational, booking and sports-progress workflows.
-
-Guardian relationships and document acceptance must be auditable.
+Solo se guarda lo necesario para operar (reservas, asistencia, expediente). Las
+responsivas y la aceptación de documentos quedan registradas. No hay cuentas de
+tutores ni familias (ADR 0059).

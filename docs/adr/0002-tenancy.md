@@ -1,6 +1,6 @@
 # ADR 0002 — Shared Database Multi-Tenancy
 
-Status: Accepted for MVP
+Status: Superseded by ADR 0058 (one database per business)
 
 Use shared database/shared schema with explicit tenant_id.
 

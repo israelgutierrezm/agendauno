@@ -1,245 +1,169 @@
-# Membership SaaS — Claude Code Project Instructions
+# AgendaUno — Claude Code Project Instructions
 
 ## Mission
 
-Build a commercial, multi-tenant SaaS for membership-, class-, booking-, resource- and activity-based businesses.
+Build AgendaUno, a commercial multi-tenant SaaS for businesses that work with
+classes or appointments: studios (pole, pilates, yoga, dance), academies, gyms,
+swimming schools, barbershops, salons, spas and clinics.
 
-Initial pilot verticals:
-- Pole studios
-- Swimming schools
-- Gyms
-
-The product MUST use one configurable core. Do not create separate applications or duplicated domain logic per industry.
+The product MUST use one configurable core. Business profiles (`PerfilNegocio`)
+adapt terminology, flags and the service mode (classes or appointments). Do not
+create separate applications or duplicated domain logic per industry.
 
 ## Technology
 
-Backend:
-- Laravel 13
-- PHP 8.3+
-- MySQL
-- Redis
-- REST API
-- Laravel Sanctum
-- Queues / Jobs / Events / Listeners
-- Scheduler
-- Object storage compatible with S3
+Backend (`apps/api`):
+- Laravel 13, PHP 8.3+
+- MySQL: one control-plane database plus one database per business
+  (SQLite files per business in development and tests)
+- Redis (cache, queues, locks, rate limiting)
+- REST API under `/api/v1`
+- Own bearer tokens per business (no Sanctum, no Spatie)
+- Queues, jobs, events, listeners, outbox, scheduler
+- S3-compatible storage for backups and files
 
-Admin web:
-- Vue 3
-- Composition API
-- TypeScript
-- Vite
-- Tailwind CSS
-- Pinia
-- Vue Router
+Web (`apps/web`, one app): Vue 3, Composition API, TypeScript, Vite, Tailwind CSS
+v4, Pinia, Vue Router, vue-i18n. It serves the marketing site, business
+registration, the business panel, the member portal and the superadmin.
 
-Mobile:
-- Flutter
-- Feature-first architecture
-- MVVM-inspired presentation
-- Repository + service data layer
-- Optional use-case/domain layer where complexity justifies it
+Mobile (`apps/mobile`): Flutter, Riverpod, Dio; feature-first (`lib/features/*`),
+repository + service data layer.
 
-Infrastructure:
-- Docker for development parity
-- Redis for cache, queues, locks and rate limiting
-- S3-compatible storage
-- Horizontal-scaling friendly
-- CI/CD ready
+Infrastructure: Docker (`infra/produccion`, `actualizar.sh` / `volver.sh`),
+GitHub Actions CI (API with MySQL, web, mobile).
 
 ## Architectural Style
 
-Use a modular monolith.
+Modular monolith. Backend code lives in:
+- `apps/api/app/Modules/Tenancy/` — everything that belongs to a business (data
+  plane) and the control-plane entities it needs (`Estudio`, SaaS billing):
+  `Application/` (services), `Models/`, `Http/` (controllers, middleware,
+  presenters), plus domain folders (`Reservas`, `Creditos`, `Pagos`, `Pasarelas`,
+  `Membresias`, `Comunicaciones`, …) with enums, exceptions and value objects.
+- `apps/api/app/Modules/Platform/` — platform operations: `Operacion` (heartbeats,
+  alerts, backups, restore drills, production and concurrency checks) and
+  `Legales` (versioned privacy notice and terms).
+- `apps/api/app/Console/Commands/` — `agendauno:*` commands (scheduled in
+  `routes/console.php`).
 
 Do NOT:
 - create microservices prematurely;
-- put all models in app/Models;
-- put all business logic in Controllers;
+- put all models in `app/Models` or business logic in controllers;
 - put critical business logic in Vue or Flutter;
-- add industry checks such as `if ($industry === 'swimming')`;
-- add tenant-specific code;
+- add industry checks such as `if ($perfil === 'barberia')`: use profile config;
+- add business-specific code;
 - use EAV for core entities;
 - use float for money or credits;
 - maintain balances without ledgers;
-- expose sequential database IDs in public APIs unless explicitly approved;
+- expose sequential database IDs in public APIs (use ULIDs);
 - perform heavy processing synchronously;
 - trust frontend permission checks;
 - create migrations before the domain for the requested module is understood.
-
-Backend modules live under:
-`apps/api/app/Modules/<ModuleName>/`
-
-Each complex module may contain:
-- Domain/
-- Application/
-- Infrastructure/
-- Http/
 
 Simple CRUD does not need ceremonial DDD.
 
 ## Mandatory Domain Principles
 
-1. Tenant is the SaaS security and billing boundary.
-2. Organization/Brand/Branch live inside a tenant.
-3. A tenant may contain multiple branches.
-4. Person != User != Member != Guardian != Instructor.
-5. Purchaser != participant.
-6. Memberships, packs, add-ons and makeups grant entitlements.
-7. Booking validates eligibility, booking window, entitlements, capacity and resources.
-8. Credits use an auditable ledger.
-9. Reservations must be concurrency-safe.
-10. Payments are provider-agnostic.
-11. Domain events should support an outbox pattern for important asynchronous side effects.
-12. Configuration, policies and commercial plans that affect historical behavior should be versioned where appropriate.
-13. Feature flags, plan entitlements, tenant capabilities and industry profiles are distinct concepts.
-
-## Initial Domain Modules
-
-Foundation:
-- Identity
-- Tenancy
-- Organizations
-- Authorization
-- Configuration
-- Audit
-- Media
-
-Customer:
-- People
-- Households
-- CRM
-
-Commerce:
-- Catalog
-- Memberships
-- Entitlements
-- Credits
-- Orders
-- Payments
-
-Operations:
-- Resources
-- Scheduling
-- Bookings
-- Attendance
-- Access
-- Workforce
-
-Later:
-- Documents
-- Communications
-- Automations
-- Progress
-- Reports
-- Analytics
-- Integrations
-- PlatformBilling
-- PlatformAdmin
+1. The business (`Estudio`, tenant) is the SaaS security and billing boundary; each
+   one has its own database.
+2. Organizations (brands) and branches (`sucursales`) live inside a business.
+3. Person (`PersonaTenant`) != User (`Usuario`) != Member != Instructor.
+4. Purchaser != participant.
+5. Memberships, packs, extras and makeups grant entitlements (`derechos`).
+6. Booking validates eligibility, booking window, entitlements, capacity and
+   resources.
+7. Credits use an auditable ledger (`movimientos_credito`) with holds
+   (`retenciones_credito`).
+8. Reservations must be concurrency-safe: lock the parent row (session,
+   professional, entitlement, order) inside the transaction, then read.
+9. Payments are provider-agnostic (Stripe, Mercado Pago, OpenPay behind
+   `PasarelaTenant`); webhooks are idempotent and missed ones are reconciled.
+10. Domain events go through the outbox for asynchronous side effects.
+11. Configuration, policies and commercial plans that affect historical behavior
+    are versioned; business limits are parameters (per business or platform),
+    not hardcoded.
+12. Feature flags, plan entitlements, business capabilities and business profiles
+    are distinct concepts.
 
 ## Public Identifiers
 
-Default:
 - internal PK: BIGINT UNSIGNED
-- public ID: ULID
+- public ID: ULID (`HasPublicId`)
 
-Never let public API consumers depend on internal auto-increment IDs unless approved.
+Never let public API consumers depend on internal auto-increment IDs unless
+approved.
 
 ## Money
 
-Never use float.
-
-Preferred representation:
-- `amount_minor BIGINT`
-- `currency CHAR(3)`
-
-Example:
-89900 MXN = MXN 899.00.
+Never use float. Use `amount_minor BIGINT` + `currency CHAR(3)` (in this codebase:
+`*_minor` columns and `moneda`). Example: 89900 MXN = MXN 899.00.
 
 ## Credits
 
-Never store only `credits_available`.
-
-Use ledger entries and, when reservation semantics require it, holds/reservations.
-
-Support fractional business credits without floating point, using scaled integer units.
-
-Example:
-- 1000 units = 1 credit
-- 500 units = 0.5 credit
+Never store only `credits_available`. Use ledger entries and holds. Fractional
+credits use scaled integer units: 1000 units = 1 credit, 500 = 0.5.
 
 ## Authentication
 
-First-party SPA:
-- Sanctum cookie/session auth when architecture permits.
-
-Mobile:
-- Sanctum token authentication.
-
-Third-party integrations:
-- API keys initially.
-- OAuth when delegated third-party access is actually required.
+- Business users (web and mobile): bearer tokens issued per business
+  (`AutenticacionTenant`, `TokenAccesoTenant` in the business database, only the
+  hash is stored). Google SSO per business.
+- Active role per session (ADR 0055): a user with several roles enters with one
+  (`personal_access_tokens.rol_activo`) and switches with `PUT /yo/rol-activo`.
+- Superadmin: `PLATFORM_ADMIN_TOKEN`.
+- Third-party integrations: API keys with scopes; OAuth only when delegated access
+  is actually required.
 
 ## Authorization
 
-Use RBAC plus scope.
-
-A permission is not enough:
-- permission
-- tenant
-- scope (organization/branch/etc.)
-must be considered.
-
-Examples:
-- `members.view`
-- `members.create`
-- `bookings.create`
-- `attendance.mark`
-- `payments.refund`
-
-Do not authorize by role name in domain code when a permission/policy check is possible.
+RBAC per business plus scope:
+- System roles in code (`CatalogoDePermisosTenant`: propietario, admin,
+  recepcionista, instructor, miembro) and custom roles per business (`roles` table,
+  ADR 0057), both resolved by `RolesTenant`.
+- Permissions look like `miembros.ver`, `agenda.gestionar`, `reservas.gestionar`,
+  `asistencia.marcar`, `pagos.reembolsar`, `roles.gestionar`. Every permission
+  used in a route must be in `CatalogoDePermisosTenant::catalogo()`.
+- Check with the `puede:` middleware or `$usuario->puede()`; both use only the
+  ACTIVE role. Use `rolesEfectivos()` only for what the person is (bookable
+  professional, owner rules), never for permissions.
+- Scope: branch scope (`ResolverAccesoTenant`) and instructor scope
+  (`AccesoSesionTenant`).
+- Nobody grants what they do not have: custom roles and role assignments must fit
+  inside the actor's active permissions.
+- Do not authorize by role name in domain code when a permission check is possible.
 
 ## Multi-tenancy
 
-Initial strategy:
-- shared application
-- shared database
-- shared schema
-- explicit tenant_id on tenant-owned data
-
-Defense in depth:
-- TenantContext
-- tenant-aware repositories/queries
-- authorization policies
-- tenant-aware unique constraints
-- tenant-aware FK strategy where useful
-- isolation tests
-- audit logs
-
-Do not implement dedicated databases in MVP, but do not make the architecture impossible to evolve.
+- Control plane database: `estudios`, SaaS rates, rent charges, invoices,
+  platform alerts, legal documents.
+- One database per business (MySQL `tenant_*` in production; SQLite files in
+  `storage/tenants` in development and tests). Migrations for businesses live in
+  `database/migrations/tenant` and run with `agendauno:migrar-estudios`.
+- `GestorDeConexionTenant` points the `tenant` connection at one business;
+  `ejecutarEn()` always restores the previous one. Jobs carry the business in their
+  payload.
+- A business is resolved by path (`/api/v1/app/{slug}`) or subdomain
+  (`{slug}.agendauno.mx`).
+- MySQL runs in READ COMMITTED (ADR 0052); `agendauno:verificar-concurrencia`
+  proves the locking with real concurrent processes.
+- Defense in depth: isolation tests, authorization, audit log (`auditorias`).
 
 ## Testing Rules
 
-Every critical domain change requires tests.
+Every critical domain change requires tests. Critical suites: business isolation,
+membership activation, entitlement grants, credit consumption, booking
+capacity/concurrency, cancellation/refund of entitlement, waitlist promotion,
+payment webhook idempotency and reconciliation, authorization scopes, attendance.
 
-Critical suites:
-- tenant isolation
-- membership activation
-- entitlement grants
-- credit consumption
-- booking capacity/concurrency
-- cancellation/refund of entitlement
-- waitlist promotion
-- payment webhook idempotency
-- authorization scopes
-- attendance
-
-Prefer feature/integration tests around real domain flows over excessive mocking.
+Prefer feature tests around real domain flows over excessive mocking. Locally the
+API suite runs with SQLite (`DB_CONNECTION=sqlite DB_DATABASE=":memory:"`); CI runs
+it with MySQL and also runs the concurrency check.
 
 ## Workflow for Claude Code
 
 Before coding a new domain module:
 
-1. Read relevant docs under `/docs`.
+1. Read relevant docs under `/docs` and the ADRs in `docs/adr`.
 2. Summarize the requested behavior.
 3. Identify domain invariants.
 4. List affected entities and boundaries.
@@ -247,8 +171,14 @@ Before coding a new domain module:
 6. Propose implementation plan.
 7. Only then modify code.
 8. Add/update tests.
-9. Update docs/ADR when architecture changes.
+9. Update docs and add an ADR (next number in `docs/adr`) when architecture changes.
 
-For risky architectural decisions, stop and explain trade-offs before committing to a design.
+For risky architectural decisions, stop and explain trade-offs before committing
+to a design.
 
-Do not generate dozens of placeholder classes. Prefer small vertical slices that are fully implemented and tested.
+Naming: domain terms in Spanish (`Reserva`, `Sesion`, `Derecho`, `Sucursal`),
+framework and technical terms in English. Commands are `agendauno:*`; the config
+file is `config/agendauno.php`.
+
+Do not generate dozens of placeholder classes. Prefer small vertical slices that
+are fully implemented and tested.

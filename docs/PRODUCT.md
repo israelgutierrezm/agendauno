@@ -1,54 +1,45 @@
-# Product
+# Producto
 
-## Vision
+## Visión
 
-Build an operating system for membership-, class- and reservation-based businesses.
+AgendaUno es el sistema con el que un negocio de clases o de citas vende, agenda,
+cobra y atiende a sus clientes: panel web para el equipo, portal y app para el
+alumno o cliente, y cobro en línea. Un solo núcleo configurable, sin versiones por
+industria.
 
-The product must support different operational models through configuration and composable capabilities rather than hardcoded industry branches.
+## Dos modalidades
 
-## Initial verticals
+**Clases** (estudios de pilates, pole, yoga, danza; gimnasios; escuelas de natación;
+academias). Debe cubrir:
+- clases recurrentes con capacidad, niveles e instructores;
+- membresías ilimitadas o limitadas por ciclo, paquetes, pases y clases extra;
+- ventanas de reserva, cancelación con tolerancia, lista de espera;
+- pase de lista, check-in y QR de acceso;
+- varias sucursales y recursos (salas, carriles).
 
-### Pole studio
-Must prove:
-- multiple activity types;
-- levels;
-- class capacity;
-- one or more instructors;
-- configurable instructor visibility;
-- limited/unlimited memberships;
-- class packs;
-- add-on classes;
-- booking priority windows;
-- cancellation cutoff;
-- attendance;
-- multiple branches.
+**Citas** (barberías, salones, estética, spa, salud). Debe cubrir:
+- servicios con duración, márgenes y recursos;
+- profesionales con su horario de atención y bloqueos;
+- agendar en línea sin cuenta, con pago para reservar;
+- reprogramar y cancelar desde la cuenta del cliente;
+- recordatorios y avisos al profesional.
 
-### Swimming school
-Must prove:
-- family/guardian/dependent relationships;
-- recurring enrollment;
-- age and level restrictions;
-- pool/lane resources;
-- instructor ratios;
-- make-up entitlements;
-- skill progression.
+Un negocio mixto usa las dos: la modalidad solo decide cómo se cobra el SaaS y qué
+se ve primero.
 
-### Gym
-Must prove:
-- open gym access without booking;
-- class booking;
-- multi-location memberships;
-- check-in;
-- access eligibility.
+## Cobro del SaaS
 
-## Product principles
+Por alumnos activos (clases) o por profesionales activos (citas), con tarifas
+versionadas y mes vencido (ADR 0019). Prueba de 30 días.
 
-- Explainable rules
-- Excellent operational UX
-- Multi-branch by design
-- Family-first support
-- Resource-aware scheduling
-- Provider-independent payments
-- Auditability
-- Strong tenant isolation
-- Mobile-first member and instructor experience
+## Principios
+
+- Reglas explicables: si algo se niega, se dice por qué.
+- Operación diaria rápida para recepción.
+- Varias sucursales desde el diseño.
+- Agenda consciente de recursos.
+- Pagos independientes de la pasarela; el dinero siempre cuadra (ledger, bitácora,
+  conciliación).
+- Límites del negocio configurables, no fijos en código.
+- Aislamiento fuerte entre negocios (una base por negocio).
+- Experiencia móvil primero para alumnos y profesionales.

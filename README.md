@@ -1,8 +1,9 @@
-# AgendaUno — SaaS de Membresías
+# AgendaUno
 
-SaaS comercial multi-tenant para negocios basados en membresías, clases, reservas, recursos y
-actividades (estudios de pole, escuelas de natación, gimnasios). Un núcleo único configurable —
-sin forks por industria.
+SaaS comercial multi-tenant para negocios de clases o de citas: estudios (pilates, pole, yoga,
+danza), gimnasios, escuelas de natación, academias, barberías, salones, spas y consultorios. Un
+núcleo único configurable, sin forks por industria; cada negocio tiene su propia base de datos.
+Reglas para Claude Code en `CLAUDE.md`.
 
 ## Idioma del proyecto
 
@@ -16,7 +17,7 @@ conserva el **inglés** para framework y estándares técnicos (Controller, Requ
 |------|-------|-----------|
 | `apps/api` | Laravel 13 · PHP 8.3 · MySQL · Redis | API REST (modular monolith) |
 | `apps/web` | Vue 3 · TS · Vite · Tailwind · Pinia · Router | Web de AgendaUno: sitio comercial, registro, panel de cada negocio, portal del alumno y superadmin |
-| `apps/mobile` | Flutter · Riverpod · Dio | App de miembro / tutor / instructor |
+| `apps/mobile` | Flutter · Riverpod · Dio | App del alumno, del profesional y del equipo (`docs/MOBILE.md`) |
 | `docs/` | — | Arquitectura y producto (**fuente de verdad**): ADRs, despliegue, verificación |
 | `infra/docker/` | Docker Compose | Redis local (MySQL desde WAMP) |
 | `infra/produccion/` | Docker · nginx | Imágenes, compose, `actualizar.sh` / `volver.sh` (ver `docs/DESPLIEGUE.md`) |
@@ -47,11 +48,15 @@ La API arranca sin Redis usando drivers de cache/queue/sesión sobre base de dat
 ```bash
 cd apps/api
 php artisan key:generate      # el .env se crea durante el bootstrap
-php artisan migrate --seed
+php artisan migrate           # control plane
 php artisan serve             # http://localhost:8000
 ```
 
-Deben existir los esquemas `turnouno` y `turnouno_testing` (utf8mb4).
+En local, el control plane usa MySQL (esquemas `turnouno` y `turnouno_testing`, utf8mb4; los
+nombres de las bases no cambiaron con el nombre del producto) y cada negocio un archivo SQLite
+en `storage/tenants`. Tras agregar migraciones de negocio:
+`php artisan agendauno:migrar-estudios --force`. La suite de pruebas borra `storage/tenants`:
+vuelve a sembrar los negocios demo después de correrla.
 
 ```bash
 composer lint       # Pint (revisión de formato)
@@ -100,5 +105,6 @@ alumno, app móvil, recepción, reportes, comunicaciones, superadmin y cobro del
 Las fases 1 (operación) y 2 (agenda cotidiana) están cerradas; los límites de negocio
 son parámetros configurables por negocio o por la plataforma (ADR 0042 y 0047).
 
-Lee `docs/DATABASE.md` para el glosario y esquema, y `docs/adr/` para las decisiones de
-arquitectura.
+Para empezar: `docs/ARCHITECTURE.md`, `docs/TENANCY.md` (una base por negocio),
+`docs/AUTHORIZATION.md` (roles y rol activo), `docs/DATABASE.md` (tablas y glosario) y
+`docs/adr/` para las decisiones de arquitectura.

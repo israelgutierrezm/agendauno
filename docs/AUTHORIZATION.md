@@ -1,59 +1,77 @@
-# Authorization
+# Autorización
 
-## Model
+## Modelo
 
-RBAC + scope + tenant boundary.
+RBAC dentro de cada negocio + alcance. La frontera del negocio la da su base de
+datos (`docs/TENANCY.md`); dentro de ella decide el rol activo de la sesión.
 
-## User-facing role families
+## Roles
 
-Administrative:
-- Owner
-- Organization Admin
-- Branch Manager
-- Receptionist
-- Sales
-- Accountant
-- Marketing
+**De sistema** (en código, `CatalogoDePermisosTenant::roles()`):
 
-Instruction:
-- Lead Instructor
-- Instructor
-- Assistant Instructor
-- Coach
+| Rol | Faceta | Qué puede |
+|---|---|---|
+| `propietario` | equipo | Todo (`*`). Solo otro dueño cambia a un dueño. |
+| `admin` | equipo | Todo lo operativo y la configuración, menos pasarelas de pago, integraciones y roles |
+| `recepcionista` | equipo | Alumnos, ventas, reservas, pase de lista, punto de venta |
+| `instructor` | instructor | Su agenda, sus clases o citas y pase de lista (alcance propio) |
+| `miembro` | miembro | Su cuenta: reservar, comprar, sus documentos |
 
-Customer:
-- Member
-- Guardian
+**Propios del negocio** (tabla `roles`, ADR 0057): el negocio los arma con los
+permisos del catálogo, p. ej. «Coordinación». En V1 son de la faceta equipo.
 
-## Permission examples
+La faceta decide qué parte de la app ve la sesión: el panel (equipo), el portal de
+quien imparte (instructor) o la cuenta del alumno (miembro).
 
-- members.view
-- members.create
-- members.edit
-- bookings.view
-- bookings.create
-- bookings.cancel
-- attendance.view
-- attendance.mark
-- attendance.override
-- payments.view
-- payments.create
-- payments.refund
-- reports.export
-- staff.manage
-- roles.manage
+## Varios roles y rol activo
 
-## Scope
+Una persona puede tener varios roles en el mismo negocio (p. ej. instructora y
+alumna). Entra con uno: la web y la app preguntan al entrar, con el de la última vez
+marcado, y hay un botón para cambiar de rol. El token guarda el rol activo y el
+servidor solo concede lo de ese rol (ADR 0055).
 
-A role assignment may apply to:
-- tenant
-- organization
-- branch
+- `$usuario->puede('permiso')` y el middleware `puede:permiso` usan el rol activo.
+- `rolesEfectivos()` dice lo que la persona ES (se le agenda como profesional, reglas
+  del dueño); no se usa para conceder permisos.
 
-Example:
-Receptionist + `branch=roma`
+## Permisos
 
-## Rule
+Formato `area.accion`. El catálogo completo, agrupado por área, está en
+`CatalogoDePermisosTenant::catalogo()`:
 
-Frontend permission checks improve UX only.
-Backend policies/gates enforce security.
+- agenda: `agenda.ver`, `agenda.gestionar`, `reservas.ver`, `reservas.gestionar`,
+  `asistencia.marcar`, `checkins.registrar`
+- clientes: `miembros.ver`, `miembros.gestionar`, `derechos.ver`, documentos y
+  formularios
+- membresías: catálogo, productos, `membresias.gestionar`, `creditos.gestionar`,
+  `promociones.gestionar`
+- cobros: `ordenes.ver`, `ordenes.gestionar`, `pagos.reembolsar`, `facturacion.ver`
+- punto de venta: `pos.vender`, inventario
+- equipo: `usuarios.invitar`, `usuarios.gestionar`, `roles.gestionar`, tareas
+- marketing: comunicaciones, automatizaciones, lealtad
+- negocio: `estudio.gestionar`, sucursales, organizaciones,
+  `integraciones.configurar`, `pagos.configurar`, `auditoria.ver`
+
+Una prueba exige que todo permiso usado en una ruta esté en el catálogo.
+
+## Alcance
+
+- **Por sucursal** (`ResolverAccesoTenant`): un rol asignado en una sucursal
+  (`asignaciones_personal`) concede sus permisos solo ahí.
+- **Por profesional** (`AccesoSesionTenant`): el instructor ve y opera solo sus
+  clases y citas.
+- **El alumno** solo ve lo suyo (sus reservas, compras y documentos).
+- **Llaves de API**: alcances propios (`alcance:miembros.ver`), solo lectura.
+
+## Nadie da más de lo que tiene
+
+- Un rol propio solo lleva permisos que tiene quien lo arma.
+- No se edita ni se borra un rol con permisos que uno no tiene, ni uno que uno mismo
+  tiene; no se borra un rol asignado.
+- Al invitar o cambiar los roles de alguien, cada rol que se da o se quita debe caber
+  en los permisos del rol activo de quien lo hace.
+
+## Regla
+
+Lo que la web y la app ocultan es solo comodidad. La API decide siempre. No se
+autoriza por nombre de rol en el dominio cuando existe un permiso.

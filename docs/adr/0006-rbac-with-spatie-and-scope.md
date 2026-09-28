@@ -1,6 +1,6 @@
 # ADR 0006 — RBAC con spatie/laravel-permission + scope
 
-Estado: Aceptado (implementado en Slice 1 y Slice 2)
+Estado: Reemplazado. Spatie se retiró; los roles y permisos viven en la base de cada negocio (ADR 0055, 0057 y 0058). Se conserva la idea de permiso + alcance.
 
 ## Contexto
 

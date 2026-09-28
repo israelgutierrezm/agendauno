@@ -1,84 +1,44 @@
-# Commercial MVP
+# Alcance de la V1
 
-## Must ship
+Lo que la V1 incluye y lo que queda fuera. El estado de cada pieza está en los
+ADRs; la verificación antes de abrir, en `docs/VERIFICACION-V1.md`.
 
-Foundation:
-- tenancy
-- organizations/branches
-- identity/auth
-- RBAC + branch scope
-- audit
-- i18n es-MX
+## Incluye
 
-People:
-- persons
-- members
-- guardians
-- households
-- staff
+Plataforma:
+- registro público de negocios con prueba, directorio y subdominio por negocio;
+- una base de datos por negocio, respaldos y simulacro de restauración;
+- superadmin: negocios, tarifas, cobros del SaaS, parámetros, documentos legales;
+- cobro del SaaS por alumnos o profesionales activos.
 
-Catalog/resources:
-- programs
-- activities
-- levels/basic eligibility
-- offerings
-- facilities/resources
-- resource capacity
+Negocio:
+- onboarding guiado, sucursales, organizaciones, horario de atención;
+- equipo con roles de sistema y roles propios, rol activo por sesión, alcance por
+  sucursal y por profesional;
+- alumnos y clientes: ficha, expediente, documentos, formularios, responsivas;
+- catálogo de clases y servicios, recursos, agenda con series, bloqueos y
+  reprogramación;
+- membresías, paquetes, pases y extras con ledger de créditos;
+- reservas con lista de espera, cancelación, tolerancia de inasistencias, pase de
+  lista, check-in y QR;
+- ventas, órdenes, pagos en línea (Stripe, Mercado Pago, OpenPay), efectivo y
+  depósito, pago automático, reembolsos, conciliación, corte de caja;
+- punto de venta e inventario, promociones, lealtad;
+- comunicaciones: correos transaccionales, recordatorios, difusiones, push;
+- reportes, bitácora, parámetros configurables, terminología por negocio;
+- API de integración de solo lectura y webhooks salientes.
 
-Membership:
-- recurring
-- limited allowance
-- unlimited
-- class pack
-- add-on/top-up
-- booking window priority
-- entitlement ledger
-- calendar/anniversary entitlement cycles
+Alumno o cliente:
+- portal web y app: reservar, agendar, comprar, pagar, reprogramar, pase QR,
+  documentos, privacidad (ARCO), calendario iCal, reseñas.
 
-Scheduling:
-- recurring schedule templates
-- sessions
-- instructors
-- multiple staff assignments
-- configurable staff visibility
+## Fuera de la V1
 
-Booking:
-- eligibility
-- capacity locking
-- entitlement hold/consumption
-- cancellation cutoff
-- waitlist basic
-- attendance
-
-Vertical proof:
-- gym open access/check-in
-- pole credits/levels/resources
-- swimming family/levels/makeup basic
-
-Payments:
-- manual/cash
-- one online gateway through adapter
-
-Experience:
-- admin Vue app
-- responsive portal Vue app
-- initial Flutter app for member/guardian/instructor
-
-Commercial readiness:
-- CSV member import
-- transactional email
-- basic operational reports
-
-## Not MVP
-
-- marketplace
-- AI
-- full marketing automation
-- advanced POS/inventory
-- biometric access
-- complex payroll
-- CFDI
-- SSO
-- dedicated tenant DB
-- custom report builder
-- white-label app binaries
+- marketplace con compras entre negocios;
+- IA;
+- acceso biométrico o torniquetes;
+- nómina completa;
+- constructor de reportes a la medida;
+- apps de marca blanca por negocio;
+- modo sin conexión en la app;
+- familias y tutores (ADR 0059).

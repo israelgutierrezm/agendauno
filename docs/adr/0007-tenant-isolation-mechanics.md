@@ -1,6 +1,6 @@
 # ADR 0007 — Mecánica de aislamiento de tenant
 
-Estado: Aceptado (Slice 1)
+Estado: Reemplazado por el ADR 0058 (una base por negocio; sin `tenant_id` ni `TenantContext`).
 
 ## Contexto
 

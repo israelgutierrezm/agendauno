@@ -1,62 +1,54 @@
-# Pilot Validation
+# Validación con pilotos
 
-## Pole tenant
+Cada piloto se arma solo con configuración del mismo núcleo. Criterio de paso en
+todos: ninguna rama de código por industria.
 
-Configuration:
-- multiple branches
-- Pole Beginner / Intermediate / Advanced
-- Exotic
-- Flexibility
-- Conditioning
-- Open Pole
-- workshops
-- multiple instructors
-- instructor visibility
-- limited and unlimited memberships
-- class packs
-- top-ups
-- booking priority
-- cancellation cutoff
-- attendance
+## Estudio de clases (pole, pilates, yoga)
 
-Pass criteria:
-No pole-specific domain fork.
+Configuración:
+- varias sucursales;
+- actividades con niveles (principiante, intermedio, avanzado), talleres;
+- varios instructores por clase;
+- membresías limitadas e ilimitadas, paquetes, clases extra;
+- ventana de reserva, cancelación con tolerancia, lista de espera;
+- pase de lista.
 
-## Swimming tenant
+## Escuela de natación
 
-Configuration:
-- households
-- guardian + dependents
-- pools + lanes
-- age/level eligibility
-- recurring enrollment
-- instructor ratio
-- attendance
-- makeup entitlement
-- basic skill progression
+Configuración:
+- alberca y carriles como recursos;
+- niveles por actividad;
+- grupos fijos (inscripción recurrente);
+- capacidad por clase;
+- pase de lista.
 
-Pass criteria:
-No swimming-specific booking engine.
+Pendiente de evaluar con el piloto: restricciones por edad y clases de reposición.
 
-## Gym tenant
+Sin cuentas de tutor: el pago y la reserva los hace la cuenta del alumno o el equipo
+del negocio (ADR 0059).
 
-Configuration:
-- open gym access
-- group classes
-- personal training
-- multi-location membership
-- check-in
-- basic access validation
+## Gimnasio
 
-Pass criteria:
-No gym-specific membership subsystem.
+Configuración:
+- acceso libre con membresía (check-in y QR, sin reservar);
+- clases grupales;
+- entrenamiento personal como cita;
+- membresía válida en varias sucursales.
 
-## Architecture gate
+## Negocio de citas (barbería, salón, estética)
 
-Every new pilot requirement must be classified as:
-1. core configuration
-2. reusable core capability
-3. justified vertical extension
-4. tenant customization
+Configuración:
+- servicios con duración y márgenes;
+- profesionales con horario de atención y bloqueos;
+- agendar en línea sin cuenta, con pago para reservar;
+- recordatorios y reprogramación desde la cuenta.
 
-Tenant-specific code is prohibited.
+## Regla de arquitectura
+
+Cada requisito nuevo de un piloto se clasifica como:
+1. configuración del núcleo;
+2. capacidad reutilizable del núcleo;
+3. extensión justificada por perfil (terminología, flags, valores por defecto);
+4. personalización del negocio (parámetros).
+
+El código específico de un negocio está prohibido.
