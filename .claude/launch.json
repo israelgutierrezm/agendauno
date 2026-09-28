@@ -12,9 +12,9 @@
       "port": 8000
     },
     {
-      "name": "registro-web",
+      "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "apps/registro-web", "run", "dev"],
+      "runtimeArgs": ["--prefix", "apps/web", "run", "dev"],
       "port": 5175
     }
   ]

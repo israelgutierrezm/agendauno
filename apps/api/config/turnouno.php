@@ -25,7 +25,7 @@ return [
     'dominio_base' => env('APP_TENANT_DOMAIN', 'agendauno.mx'),
 
     /*
-    | URL base del panel web (SPA registro-web) para armar enlaces en correos
+    | URL base del panel web (SPA de apps/web) para armar enlaces en correos
     | (p. ej. el de activación de cuenta): {url_app}/activar/{slug}?email&token.
     */
     'url_app' => env('APP_SPA_URL', 'http://localhost:5175'),

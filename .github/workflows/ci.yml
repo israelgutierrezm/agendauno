@@ -87,12 +87,12 @@ jobs:
           php artisan migrate --force
           php artisan turnouno:verificar-concurrencia --rondas=4
 
-  registro-web:
-    name: Registro · Vue
+  web:
+    name: Web · Vue
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/registro-web
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
 
@@ -101,7 +101,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: apps/registro-web/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
 
       - run: npm ci
       - run: npm run lint

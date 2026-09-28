@@ -63,7 +63,7 @@ clínicas sin una política comercial y capacidad operativa que los respalden.
 
 ## Mantenimiento antes de publicar cambios de tarifa
 
-Los importes públicos están centralizados en `apps/registro-web/src/marketing/precios.ts`.
+Los importes públicos están centralizados en `apps/web/src/marketing/precios.ts`.
 Son una referencia comercial estática, no una consulta automática de facturación.
 Antes de publicar otra versión desde el panel de plataforma, actualizar esta referencia,
 los tramos detallados de `PreciosLanding.vue` y sus pruebas, y volver a generar el sitio.

@@ -1,12 +1,12 @@
 # Solo entra lo que la imagen web necesita (contexto = raíz del repo).
 *
-!apps/registro-web/
+!apps/web/
 !infra/produccion/nginx.conf.template
 !infra/produccion/nginx-comun.conf
 
-apps/registro-web/node_modules/
-apps/registro-web/dist/
-apps/registro-web/dist-ssr/
-apps/registro-web/.env
-apps/registro-web/.env.*
-apps/registro-web/coverage/
+apps/web/node_modules/
+apps/web/dist/
+apps/web/dist-ssr/
+apps/web/.env
+apps/web/.env.*
+apps/web/coverage/

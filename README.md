@@ -15,10 +15,12 @@ conserva el **inglés** para framework y estándares técnicos (Controller, Requ
 | Ruta | Stack | Propósito |
 |------|-------|-----------|
 | `apps/api` | Laravel 13 · PHP 8.3 · MySQL · Redis | API REST (modular monolith) |
-| `apps/registro-web` | Vue 3 · TS · Vite · Tailwind · Pinia · Router | Web de AgendaUno: landing, registro y panel de cada negocio |
+| `apps/web` | Vue 3 · TS · Vite · Tailwind · Pinia · Router | Web de AgendaUno: sitio comercial, registro, panel de cada negocio, portal del alumno y superadmin |
 | `apps/mobile` | Flutter · Riverpod · Dio | App de miembro / tutor / instructor |
-| `docs/` | — | Arquitectura y producto (**fuente de verdad**) |
+| `docs/` | — | Arquitectura y producto (**fuente de verdad**): ADRs, despliegue, verificación |
 | `infra/docker/` | Docker Compose | Redis local (MySQL desde WAMP) |
+| `infra/produccion/` | Docker · nginx | Imágenes, compose, `actualizar.sh` / `volver.sh` (ver `docs/DESPLIEGUE.md`) |
+| `.github/workflows/` | GitHub Actions | CI: un job por app y la verificación de concurrencia en MySQL |
 
 ## Requisitos
 
@@ -67,7 +69,7 @@ composer test       # Pest
 ### 3. Web
 
 ```bash
-cd apps/registro-web
+cd apps/web
 npm install
 npm run dev               # :5175
 npm run lint && npm run build && npm run test

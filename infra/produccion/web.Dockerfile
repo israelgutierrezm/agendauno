@@ -6,9 +6,9 @@
 
 FROM node:22-alpine AS build
 WORKDIR /web
-COPY apps/registro-web/package.json apps/registro-web/package-lock.json ./
+COPY apps/web/package.json apps/web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
-COPY apps/registro-web/ ./
+COPY apps/web/ ./
 
 # Variables públicas de compilación (quedan dentro del JavaScript: nada secreto).
 # VITE_API_URL vacío = la API en el mismo dominio (nginx pasa /api a PHP).
