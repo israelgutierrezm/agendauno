@@ -34,7 +34,7 @@ Activos críticos: datos personales, roster/asistencia, credenciales/tokens, con
 
 ### SEC-02 — P0 — Credenciales demo conocidas en el seeder principal
 
-`DatabaseSeeder` siempre crea `owner@turnouno.test` con contraseña `password` y llama a `PilotosSeeder`, que declara la misma contraseña para todas sus cuentas.
+`DatabaseSeeder` siempre crea `owner@agendauno.test` con contraseña `password` y llama a `PilotosSeeder`, que declara la misma contraseña para todas sus cuentas.
 
 **Evidencia:** `DatabaseSeeder.php:17-29`; `PilotosSeeder.php:27-31,54-58`.
 

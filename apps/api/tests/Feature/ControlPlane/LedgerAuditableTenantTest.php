@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\File;
 | Ledger de creditos AUDITABLE (R2): cada asiento registra de quien es (persona),
 | de donde nace (origen), el saldo resultante (saldo_posterior, conciliable), a que
 | entidad se refiere (reserva/acuerdo) y quien lo provoco (actor). El saldo verdadero
-| SIGUE derivandose de la suma. Ver docs/audits/turno-uno-competitive-audit.md.
+| SIGUE derivandose de la suma. Ver docs/audits/agendauno-competitive-audit.md.
 */
 
 beforeEach(function (): void {

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\File;
 
 /*
 | Bloque P0.A del roadmap: regresiones de integridad/seguridad del plano tenant.
-| Ver docs/audits/turno-uno-roadmap.md.
+| Ver docs/audits/agendauno-roadmap.md.
 */
 
 beforeEach(function (): void {

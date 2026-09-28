@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class GenerarCiclosEntitlement extends Command
 {
-    protected $signature = 'entitlements:generar-ciclos';
+    protected $signature = 'agendauno:generar-ciclos';
 
     protected $description = 'Reinicia/renueva los ciclos vencidos de los derechos recurrentes';
 

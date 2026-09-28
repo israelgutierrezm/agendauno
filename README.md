@@ -52,9 +52,8 @@ php artisan migrate           # control plane
 php artisan serve             # http://localhost:8000
 ```
 
-En local, el control plane usa MySQL (esquemas `turnouno` y `turnouno_testing`, utf8mb4; los
-nombres de las bases no cambiaron con el nombre del producto) y cada negocio un archivo SQLite
-en `storage/tenants`. Tras agregar migraciones de negocio:
+En local, el control plane usa MySQL (esquemas `agendauno` y `agendauno_testing`, utf8mb4) y
+cada negocio un archivo SQLite en `storage/tenants`. Tras agregar migraciones de negocio:
 `php artisan agendauno:migrar-estudios --force`. La suite de pruebas borra `storage/tenants`:
 vuelve a sembrar los negocios demo después de correrla.
 

@@ -9,7 +9,7 @@ producción en Linux. Redis no está instalado de forma nativa en Windows.
 
 ## Decisiones
 
-- **MySQL**: esquemas dedicados `turnouno` / `turnouno_testing` en el WAMP local (3306).
+- **MySQL**: esquemas dedicados `agendauno` / `agendauno_testing` en el WAMP local (3306).
 - **Forzar InnoDB** como motor MySQL de Laravel (`DB_ENGINE=InnoDB`). WAMP usa MyISAM
   por defecto, cuyo límite de índice de 1000 bytes rompe los índices únicos utf8mb4 y
   carece de las transacciones y locks que exigirá el motor de reservas.

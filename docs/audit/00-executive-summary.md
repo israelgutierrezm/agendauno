@@ -1,13 +1,13 @@
-# Auditoría integral de TurnoUno — resumen ejecutivo
+# Auditoría integral de AgendaUno — resumen ejecutivo
 
 **Fecha de corte:** 2026-09-15  
-**Repositorio auditado:** `C:\Dev\turnouno` (`main`)  
+**Repositorio auditado:** `github.com/israelgutierrezm/agendauno` (`main`)  
 **Alcance:** arquitectura, backend, aplicaciones web, móvil, seguridad, datos, rendimiento, escalabilidad, deuda técnica y producto.  
 **Naturaleza del trabajo:** revisión estática y dinámica; no se modificó código de producto.
 
 ## Dictamen
 
-TurnoUno tiene una base de ingeniería superior a la de un prototipo típico: monorepo claro, API Laravel organizada como monolito modular, aislamiento multi-tenant mediante contexto y *global scope*, identificadores ULID, permisos por tenant, ledger de créditos, bloqueos transaccionales para cupo, contratos de error estables y CI para las cuatro aplicaciones. Las verificaciones locales fueron satisfactorias: 127 pruebas de API (609 aserciones), 8 pruebas web, 2 pruebas móviles, Pint, PHPStan, ESLint, ambos builds web y Flutter Analyze pasaron. Composer y npm no reportaron avisos de seguridad conocidos en la fecha de corte.
+AgendaUno tiene una base de ingeniería superior a la de un prototipo típico: monorepo claro, API Laravel organizada como monolito modular, aislamiento multi-tenant mediante contexto y *global scope*, identificadores ULID, permisos por tenant, ledger de créditos, bloqueos transaccionales para cupo, contratos de error estables y CI para las cuatro aplicaciones. Las verificaciones locales fueron satisfactorias: 127 pruebas de API (609 aserciones), 8 pruebas web, 2 pruebas móviles, Pint, PHPStan, ESLint, ambos builds web y Flutter Analyze pasaron. Composer y npm no reportaron avisos de seguridad conocidos en la fecha de corte.
 
 Sin embargo, **el sistema no debe pasar a producción cobrando dinero real ni operando créditos hasta resolver los P0**. Tres defectos cambian directamente dinero o derechos:
 

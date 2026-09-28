@@ -26,7 +26,7 @@ La API pública está versionada bajo `/api/v1` en `apps/api/routes/api.php`.
 
 - Públicas: health, login por cookie, emisión de token y webhooks.
 - Autenticadas y tenant-scoped: organizaciones, personas, catálogo, recursos, membresías, créditos, agenda, reservas, asistencia, órdenes, pagos y portal.
-- Scheduler: `entitlements:generar-ciclos` diariamente a las 00:15.
+- Scheduler: `agendauno:generar-ciclos` diariamente a las 00:15.
 - Colas: hay propagación de tenant preparada, pero no se encontraron jobs de dominio para pagos, avisos o mantenimiento.
 
 ## Mapa de casos de uso principales
@@ -72,7 +72,7 @@ Estas capacidades hoy aparecen como comentarios, configuración o necesidades tr
 - `Audit`: actor, acción, objeto, before/after, motivo, IP y correlation ID.
 - `Outbox/Inbox`: entrega exactamente-una-vez lógica para efectos y webhooks.
 - `Notifications`: email, SMS, push, preferencias, plantillas y reintentos.
-- `BillingPlatform`: planes de TurnoUno, límites, trial y facturación del tenant.
+- `BillingPlatform`: planes de AgendaUno, límites, trial y facturación del tenant.
 - `TenantLifecycle`: alta, suspensión, exportación, cierre y retención.
 - `Reporting`: proyecciones y exportaciones, separadas de consultas OLTP.
 - `Identity`: invitaciones, recuperación, MFA, dispositivos/tokens y SSO futuro.

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\File;
 
 /*
 | Motor de reserva (P0.B): decision estructurada + endpoint de preview (dry-run).
-| Ver docs/BOOKING_ENGINE.md y docs/audits/turno-uno-roadmap.md.
+| Ver docs/BOOKING_ENGINE.md y docs/audits/agendauno-roadmap.md.
 */
 
 beforeEach(function (): void {

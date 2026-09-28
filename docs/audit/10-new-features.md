@@ -50,7 +50,7 @@ Para natación infantil y academias:
 - documentos con vencimiento y recordatorios;
 - privacidad: cada tutor ve solo relaciones vigentes y campos permitidos.
 
-Esto aprovecha el modelo `hogares/tutelas` ya existente y diferencia TurnoUno de un booking genérico.
+Esto aprovecha el modelo `hogares/tutelas` ya existente y diferencia AgendaUno de un booking genérico.
 
 ## 3. Motor de políticas por oferta/tenant
 
@@ -192,7 +192,7 @@ Actividad + modalidad + nivel + recurso + capacidad efectiva
 + métricas/automatizaciones verticales
 ```
 
-Con configuración versionada y plantillas por vertical, TurnoUno puede lanzar gimnasios, estudios y escuelas acuáticas sobre el mismo producto, acumulando conocimiento operativo. El moat proviene de datos limpios, workflows y configurabilidad, no de clonar pantallas.
+Con configuración versionada y plantillas por vertical, AgendaUno puede lanzar gimnasios, estudios y escuelas acuáticas sobre el mismo producto, acumulando conocimiento operativo. El moat proviene de datos limpios, workflows y configurabilidad, no de clonar pantallas.
 
 ## Priorización recomendada
 

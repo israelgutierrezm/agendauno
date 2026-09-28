@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
-| CORS: la API acepta el front configurado (FRONTEND_REGISTRO_URL, varias separadas
+| CORS: la API acepta el front configurado (FRONTEND_URL, varias separadas
 | por coma) y la app de cada negocio en su subdominio; cualquier otro origen no.
 */
 

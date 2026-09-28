@@ -12,7 +12,7 @@ concurrency:
 jobs:
   api:
     name: API · Laravel
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/api
@@ -20,7 +20,7 @@ jobs:
       DB_CONNECTION: mysql
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
-      DB_DATABASE: turnouno_testing
+      DB_DATABASE: agendauno_testing
       DB_USERNAME: root
       DB_PASSWORD: root
       REDIS_HOST: 127.0.0.1
@@ -29,7 +29,7 @@ jobs:
         image: mysql:8.4
         env:
           MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: turnouno_testing
+          MYSQL_DATABASE: agendauno_testing
         ports:
           - 3306:3306
         options: >-
@@ -47,7 +47,7 @@ jobs:
           --health-timeout=5s
           --health-retries=10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -81,23 +81,23 @@ jobs:
       # negocios, respaldo y restauración).
       - name: Concurrency on MySQL
         env:
-          DB_DATABASE: turnouno_verificacion
+          DB_DATABASE: agendauno_verificacion
         run: |
-          mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE turnouno_verificacion CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+          mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE agendauno_verificacion CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
           php artisan migrate --force
           php artisan agendauno:verificar-concurrencia --rondas=4
 
   web:
     name: Web · Vue
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -110,12 +110,12 @@ jobs:
 
   mobile:
     name: Mobile · Flutter
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: apps/mobile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2

@@ -112,7 +112,7 @@
 ## Fase 7 — SaaS y crecimiento (mes 4–6)
 
 - Tenant lifecycle, trial, planes, límites y metering.
-- Facturación de TurnoUno y control de morosidad del tenant.
+- Facturación de AgendaUno y control de morosidad del tenant.
 - Branding/dominio/config regional y feature flags.
 - S3 privado, AV, retención y exportación por tenant.
 - Suscripciones de miembros/dunning sobre payment core estable.

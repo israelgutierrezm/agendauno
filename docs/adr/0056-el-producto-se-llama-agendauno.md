@@ -25,14 +25,15 @@ Todo pasa a AgendaUno:
 | Analítica: `turnouno_attribution`, `turnouno_event`, `turnouno:analytics` | `agendauno_*`, `agendauno:analytics` |
 | `APP_NAME=TurnoUno`, `APP_TENANT_DOMAIN=turnouno.com` | `AgendaUno`, `agendauno.mx` |
 
-Se quedan como estaban:
-- los nombres de las bases de datos (`turnouno`, `turnouno_testing`), que son del
-  entorno de cada máquina y de CI;
-- la carpeta local (`turnouno`);
-- las auditorías fechadas (`docs/audit`, `docs/audits`).
+Después (2026-09-28) se completó el cambio:
+- el repositorio pasó a `github.com/israelgutierrezm/agendauno` (GitHub redirige la
+  URL vieja);
+- las bases de datos pasaron a `agendauno` y `agendauno_testing` (y
+  `agendauno_verificacion` en CI);
+- las auditorías de `docs/audits` pasaron a `agendauno-*.md` y dicen AgendaUno.
 
-El repositorio se renombró después a `github.com/israelgutierrezm/agendauno`
-(2026-09-28); GitHub redirige la URL vieja.
+Solo queda con el nombre viejo la carpeta local de cada máquina, que no es parte
+del repositorio.
 
 ## Consecuencias
 

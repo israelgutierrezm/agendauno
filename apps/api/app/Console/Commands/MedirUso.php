@@ -15,9 +15,9 @@ use Illuminate\Database\Eloquent\Collection;
  * profesionales activos) y guarda el agregado en el control plane. `--congelar`
  * cierra el periodo (fija la medición para facturar). Idempotente y por lotes.
  */
-class MedirUsoSaasCommand extends Command
+class MedirUso extends Command
 {
-    protected $signature = 'facturacion:medir {--periodo=} {--congelar}';
+    protected $signature = 'agendauno:medir-uso {--periodo=} {--congelar}';
 
     protected $description = 'Mide el uso de cada estudio (alumnos o profesionales activos) para el cobro del SaaS';
 

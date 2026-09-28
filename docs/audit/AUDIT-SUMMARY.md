@@ -1,11 +1,11 @@
-# AUDIT-SUMMARY — TurnoUno
+# AUDIT-SUMMARY — AgendaUno
 
-**Corte:** 2026-09-15 · **rama:** `main` · **alcance:** `C:\Dev\turnouno`  
+**Corte:** 2026-09-15 · **rama:** `main` · **alcance:** `github.com/israelgutierrezm/agendauno`  
 **Veredicto:** **NO-GO para producción financiera**; apto únicamente para desarrollo/demo controlada hasta cerrar P0.
 
 ## Una frase
 
-TurnoUno tiene un buen esqueleto de monolito modular y una suite saludable, pero hoy un miembro puede autoconcederse una compra con pago manual/simulado, la asistencia no consume créditos y el reembolso no devuelve dinero al proveedor.
+AgendaUno tiene un buen esqueleto de monolito modular y una suite saludable, pero hoy un miembro puede autoconcederse una compra con pago manual/simulado, la asistencia no consume créditos y el reembolso no devuelve dinero al proveedor.
 
 ## Qué se revisó
 

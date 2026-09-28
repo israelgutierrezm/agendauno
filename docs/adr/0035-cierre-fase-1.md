@@ -26,7 +26,7 @@ menos una vez": si un consumidor falla, el evento completo se reintenta.
   - La entrega de un webhook se busca por (endpoint, evento) antes de crearse; sus
     reintentos van por su propio relay.
   - Los mensajes anteriores quedan sin llave (el índice único admite varios NULL).
-- **Procesos diarios que no se enciman**: `entitlements:generar-ciclos` y
+- **Procesos diarios que no se enciman**: `agendauno:generar-ciclos` y
   `agendauno:escalar-dunning` corren con `withoutOverlapping`, como el resto.
 - **Recorridos completos** en `RecorridosOperacionTest`, por la API:
   - **Clases**: la alumna se registra sola. Compra la mensualidad y la paga en

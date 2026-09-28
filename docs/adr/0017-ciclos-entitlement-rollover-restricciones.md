@@ -21,7 +21,7 @@ restricciones por actividad/sucursal. El saldo sigue derivándose del ledger
   `rollover_max`), **expira** en el ledger lo no acarreado (`TipoMovimiento::Expiracion`,
   signo negativo), abre el ciclo siguiente (calendario = mes natural; aniversario
   = mes desde el ancla) y concede su cupo. Idempotente (solo avanza si el ciclo
-  actual venció); corre a diario con `entitlements:generar-ciclos` (scheduler).
+  actual venció); corre a diario con `agendauno:generar-ciclos` (scheduler).
 - **Add-ons/top-up**. `AgregarTopUp` suma un asiento `add_on` separado, sin editar
   la membresía (MEMBERSHIP_ENGINE: "create a separate grant and ledger entries").
   Endpoint `POST /derechos/{}/topups`.

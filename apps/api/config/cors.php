@@ -16,7 +16,7 @@ return [
     // varias URLs separadas por coma.
     'allowed_origins' => array_values(array_filter(array_map(
         'trim',
-        explode(',', (string) env('FRONTEND_REGISTRO_URL', 'http://localhost:5175')),
+        explode(',', (string) env('FRONTEND_URL', 'http://localhost:5175')),
     ))),
 
     'allowed_origins_patterns' => array_values(array_filter([

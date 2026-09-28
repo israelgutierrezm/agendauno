@@ -2,7 +2,7 @@
 
 ## Vista actual
 
-TurnoUno es un monorepo con cuatro aplicaciones y documentación de producto/arquitectura:
+AgendaUno es un monorepo con cuatro aplicaciones y documentación de producto/arquitectura:
 
 ```text
 apps/

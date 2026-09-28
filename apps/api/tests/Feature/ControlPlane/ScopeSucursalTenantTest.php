@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\File;
 | aplica en todo el estudio y, ADEMAS, se puede asignar a un usuario un rol EN una
 | sucursal, ampliando su alcance. Aqui: un instructor (acotado a sus sesiones) que es
 | asignado a una sucursal puede operar sobre TODAS las sesiones de esa sede, pero no
-| de otra. Ver docs/audits/turno-uno-competitive-audit.md.
+| de otra. Ver docs/audits/agendauno-competitive-audit.md.
 */
 
 beforeEach(function (): void {

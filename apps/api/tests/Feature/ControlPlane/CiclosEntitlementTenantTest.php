@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\File;
 
 /*
 | Renovacion de ciclos de entitlement en el plano TENANT (P0). Antes el motor solo
-| corria sobre el esquema legacy. Ver docs/audits/turno-uno-roadmap.md.
+| corria sobre el esquema legacy. Ver docs/audits/agendauno-roadmap.md.
 */
 
 beforeEach(function (): void {
@@ -50,7 +50,7 @@ it('el comando renueva los ciclos vencidos de un derecho recurrente en el plano 
         return (int) $derecho->getKey();
     });
 
-    $this->artisan('entitlements:generar-ciclos')->assertSuccessful();
+    $this->artisan('agendauno:generar-ciclos')->assertSuccessful();
 
     // El ciclo avanzo: con rollover "ninguno" se expira el saldo anterior y se concede
     // el cupo del nuevo ciclo (saldo neto = un cupo), y el ciclo queda al dia.
@@ -68,7 +68,7 @@ it('no renueva packs no recurrentes (politica_reset ninguno)', function (): void
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $vp = venderPackAMiembroTenant($e, 8000); // pack: politica_reset = ninguno
 
-    $this->artisan('entitlements:generar-ciclos')->assertSuccessful();
+    $this->artisan('agendauno:generar-ciclos')->assertSuccessful();
 
     // El pack conserva su saldo (no se le concede ni expira nada).
     $gestor = app(GestorDeConexionTenant::class);

@@ -2,7 +2,7 @@
 
 ## Diagnóstico
 
-TurnoUno puede soportar pilotos pequeños con la arquitectura actual, siempre que se cierren los defectos funcionales. El límite no será inicialmente PHP o Vue, sino las consultas sin límite, el ledger leído por sumas repetidas, los efectos externos sin colas/conciliación y la ausencia de controles operativos por tenant.
+AgendaUno puede soportar pilotos pequeños con la arquitectura actual, siempre que se cierren los defectos funcionales. El límite no será inicialmente PHP o Vue, sino las consultas sin límite, el ledger leído por sumas repetidas, los efectos externos sin colas/conciliación y la ausencia de controles operativos por tenant.
 
 No se recomienda migrar a microservicios. El camino de menor riesgo es un **monolito modular horizontalmente escalable**, MySQL bien indexado, Redis, workers y outbox.
 

@@ -40,7 +40,7 @@ services:
   #   container_name: agendauno-mysql
   #   environment:
   #     MYSQL_ROOT_PASSWORD: root
-  #     MYSQL_DATABASE: turnouno
+  #     MYSQL_DATABASE: agendauno
   #   ports:
   #     - "3307:3306"
   #   volumes:

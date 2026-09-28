@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\File;
 | Politica de cancelacion/no-show configurable (R8): global y override por actividad,
 | con deadline y penalizacion (tardia / no-show) configurables. La reserva CONGELA la
 | politica al crearse (snapshot): cambiarla luego no afecta reservas ya hechas.
-| Ver docs/audits/turno-uno-competitive-audit.md.
+| Ver docs/audits/agendauno-competitive-audit.md.
 */
 
 beforeEach(function (): void {

@@ -168,7 +168,7 @@ it('clases: alta, membresía, reservas, asistencia, cancelaciones, créditos y r
     $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$renovacion['id']}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
 
     $this->travelTo('2030-02-01 12:00:00');
-    $this->artisan('entitlements:generar-ciclos')->assertSuccessful();
+    $this->artisan('agendauno:generar-ciclos')->assertSuccessful();
     $movs = $this->getJson("/api/v1/app/{$e['slug']}/mi/derechos/{$derecho}/movimientos", conBearer($ana['bearer']))
         ->assertOk()->assertJsonPath('saldo', 4000);
     expect(collect($movs->json('data'))->take(2)->pluck('concepto')->all())->toBe(['Renovación del plan', 'Créditos vencidos']);

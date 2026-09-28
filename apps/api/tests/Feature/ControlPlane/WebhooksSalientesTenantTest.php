@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Http;
 | Webhooks salientes (R40), primer consumidor del outbox (R39): el estudio registra
 | endpoints firmados y el relay entrega los eventos de dominio (HMAC-SHA256), con
 | filtrado por tipo, registro de cada entrega y reintento de las fallidas.
-| Ver docs/audits/turno-uno-roadmap.md.
+| Ver docs/audits/agendauno-roadmap.md.
 */
 
 beforeEach(function (): void {

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\File;
 
 /*
 | Bitacora de auditoria tenant-local (R38): operaciones sensibles quedan registradas
-| con actor/entidad/antes-despues. Ver docs/audits/turno-uno-competitive-audit.md.
+| con actor/entidad/antes-despues. Ver docs/audits/agendauno-competitive-audit.md.
 */
 
 beforeEach(function (): void {

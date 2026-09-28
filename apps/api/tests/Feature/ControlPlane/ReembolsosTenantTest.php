@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\File;
 | Devoluciones (refunds) tenant-local (R11): total (revierte entitlement, solo si
 | esta intacto) y parcial (monetaria o proporcional). La suma de las devoluciones
 | aprobadas nunca supera el monto del pago; toda devolucion exige motivo y queda
-| auditada. Ver docs/audits/turno-uno-competitive-audit.md.
+| auditada. Ver docs/audits/agendauno-competitive-audit.md.
 */
 
 beforeEach(function (): void {

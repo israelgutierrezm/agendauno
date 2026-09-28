@@ -1,7 +1,7 @@
-# TurnoUno — Auditoría competitiva
+# AgendaUno — Auditoría competitiva
 
 **Fecha de corte:** 2026-09-16
-**Repositorio:** `C:\Dev\turnouno` (rama `main`)
+**Repositorio:** `github.com/israelgutierrezm/agendauno` (rama `main`)
 **Alcance:** inventario del código existente y clasificación de estado de los 45 requisitos del documento de producto (plataforma de operación de centros deportivos/wellness).
 **Naturaleza:** revisión estática; **no se modificó código de producto**. Auditoría realizada con 5 agentes de exploración por dominio + inspección directa.
 **Relación con trabajo previo:** este documento **no reemplaza** la auditoría de calidad/seguridad previa (`docs/audit/00-11` + `REMEDIATION.md`), la complementa con un ángulo **competitivo/de producto**. Reutiliza el diseño ya documentado en `docs/BOOKING_ENGINE.md`, `docs/MEMBERSHIP_ENGINE.md`, `docs/RESOURCE_ENGINE.md`, `docs/DOMAIN_MODEL.md` y los 17 ADR.
@@ -24,9 +24,9 @@ El sistema tiene **dos planos que coexisten**:
 ## 1. Arquitectura actual
 
 - **Backend:** Laravel 13 / PHP 8.3, monolito modular (`app/Modules/`). Sanctum 4 (legacy), RBAC propio (tenant). Redis (predis 3.6). Pest 4 + Larastan L6 + Pint. Scramble (OpenAPI).
-- **Multi-tenancy:** control plane central (`estudios`) + **data plane por tenant** (BD por estudio; SQLite en dev/test, MySQL en prod vía `TENANT_DB_DRIVER`). `GestorDeConexionTenant` reconfigura la conexión `tenant` por request; middleware `estudio.resolver → estudio.auth → puede:`. Resolución por ruta (`/app/{estudio}`) y por subdominio (`{slug}.turnouno.com`).
+- **Multi-tenancy:** control plane central (`estudios`) + **data plane por tenant** (BD por estudio; SQLite en dev/test, MySQL en prod vía `TENANT_DB_DRIVER`). `GestorDeConexionTenant` reconfigura la conexión `tenant` por request; middleware `estudio.resolver → estudio.auth → puede:`. Resolución por ruta (`/app/{estudio}`) y por subdominio (`{slug}.agendauno.mx`).
 - **Frontend:** `apps/registro-web` (Vue 3 + TS + Vite + Pinia + Tailwind v4, **activo**), `apps/admin-web` y `apps/portal-web` (Vue 3, **legacy**), `apps/mobile` (Flutter, Riverpod + Dio, incipiente).
-- **Config clave:** `config/turnouno.php` (`tenant_db_driver`, `dias_trial`, `dominio_base`), `config/database.php` (conexión `tenant`).
+- **Config clave:** `config/agendauno.php` (`tenant_db_driver`, `dias_trial`, `dominio_base`), `config/database.php` (conexión `tenant`).
 - **Coincide con la arquitectura objetivo del documento** (Laravel/PHP/MySQL/Redis/REST/tenant isolation/Vue 3+TS+Vite+Tailwind+Pinia/móvil, modular monolith). **No se propone cambiar el stack.**
 
 ## 2. Módulos existentes (17)
@@ -53,7 +53,7 @@ El sistema tiene **dos planos que coexisten**:
 
 ## 6. Jobs / queues
 
-- **0 jobs de dominio.** Cola configurada (`queue:listen` en `composer dev`, predis). Solo **comandos**: `entitlements:generar-ciclos` (scheduler diario, opera sobre LEGACY), `facturacion:medir`, `datos:migrar-tenant`, `turnouno:sembrar-demo`. No hay jobs asíncronos de negocio (notificaciones, webhooks salientes, proyecciones).
+- **0 jobs de dominio.** Cola configurada (`queue:listen` en `composer dev`, predis). Solo **comandos**: `agendauno:generar-ciclos` (scheduler diario, opera sobre LEGACY), `agendauno:medir-uso`, `datos:migrar-tenant`, `agendauno:sembrar-demo`. No hay jobs asíncronos de negocio (notificaciones, webhooks salientes, proyecciones).
 
 ## 7. Events / listeners
 
@@ -212,4 +212,4 @@ Estados: **OK** = existe y correcto · **PARC** = existe parcialmente · **REFAC
 - **Reutilizar lo que ya existe en legacy** al portar a tenant: `Recurso`/`ModoRecurso`, `AsignacionSesion`/`RolSesion`, `PlantillaHorario`/`ReglaRecurrencia`, `Hogar`/`Tutela`, `ControlDeAcceso` (branch scope), `ReembolsarPago`, `GenerarCicloEntitlement`.
 - **Reutilizar diseño ya documentado:** `docs/BOOKING_ENGINE.md` (pipeline R1), `docs/MEMBERSHIP_ENGINE.md` (R2/R10), `docs/RESOURCE_ENGINE.md` (R3), ADR-0004 (outbox R39).
 
-Ver el roadmap priorizado en **`turno-uno-roadmap.md`**.
+Ver el roadmap priorizado en **`agendauno-roadmap.md`**.

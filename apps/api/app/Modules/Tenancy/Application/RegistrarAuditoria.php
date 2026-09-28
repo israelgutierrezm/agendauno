@@ -11,7 +11,7 @@ use App\Modules\Tenancy\Models\Usuario;
  * Registra un asiento de auditoria (append-only) de una operacion sensible en la BD
  * del tenant: actor, accion, entidad afectada, antes/despues, motivo, y la IP +
  * correlation-id del request actual. Se cablea en las operaciones que mueven dinero,
- * creditos, accesos o permisos. Ver docs/audits/turno-uno-competitive-audit.md (R38).
+ * creditos, accesos o permisos. Ver docs/audits/agendauno-competitive-audit.md (R38).
  */
 class RegistrarAuditoria
 {
