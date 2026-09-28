@@ -51,7 +51,7 @@ Así no hay CORS entre subdominios.
 ## Primera instalación
 
 ```bash
-git clone https://github.com/israelgutierrezm/turnouno.git agendauno
+git clone https://github.com/israelgutierrezm/agendauno.git
 cd agendauno/infra/produccion
 cp api.env.example api.env
 cp web.env.example web.env

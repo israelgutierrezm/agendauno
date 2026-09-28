@@ -28,8 +28,11 @@ Todo pasa a AgendaUno:
 Se quedan como estaban:
 - los nombres de las bases de datos (`turnouno`, `turnouno_testing`), que son del
   entorno de cada máquina y de CI;
-- el repositorio (`github.com/israelgutierrezm/turnouno`) y las carpetas locales;
+- la carpeta local (`turnouno`);
 - las auditorías fechadas (`docs/audit`, `docs/audits`).
+
+El repositorio se renombró después a `github.com/israelgutierrezm/agendauno`
+(2026-09-28); GitHub redirige la URL vieja.
 
 ## Consecuencias
 
