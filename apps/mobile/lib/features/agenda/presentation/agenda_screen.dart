@@ -490,15 +490,17 @@ class _AgendaClases extends StatelessWidget {
   }
 }
 
-class _TarjetaClase extends StatelessWidget {
+class _TarjetaClase extends ConsumerWidget {
   const _TarjetaClase({required this.sesion, required this.ahora});
 
   final SesionAgenda sesion;
   final DateTime ahora;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final s = sesion;
+    // El pase de lista muestra quién va: pide ver reservas.
+    final verLista = ref.watch(sesionProvider)?.puede('reservas.ver') ?? false;
     final tono = TonoServicio.de(s.ofertaId);
     final pasada = !s.terminaEn.isAfter(ahora);
     final enCurso = !s.iniciaEn.isAfter(ahora) && s.terminaEn.isAfter(ahora) && s.programada;
@@ -524,7 +526,7 @@ class _TarjetaClase extends StatelessWidget {
       // Tocar la clase abre su pase de lista.
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: s.programada
+        onTap: s.programada && verLista
             ? () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => PaseListaScreen(sesion: s)))
             : null,
         child: Opacity(

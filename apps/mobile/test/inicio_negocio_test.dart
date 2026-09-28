@@ -106,6 +106,7 @@ void main() {
               nombre: 'Israel Gutiérrez',
               nombrePila: 'Israel',
               rol: 'propietario',
+              permisos: ['*'],
               estudioNombre: 'Estudio Demo',
             ),
           ),
@@ -147,5 +148,50 @@ void main() {
     await tester.tap(find.text('Abrir agenda'));
     await tester.pumpAndSettle();
     expect(find.byType(AgendaScreen), findsOneWidget);
+  });
+
+  testWidgets('un rol propio sin ver agenda ni pasar lista solo tiene su Inicio', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    Future<void> montar(List<String> permisos) => tester.pumpWidget(
+      ProviderScope(
+        key: UniqueKey(),
+        overrides: [
+          sesionInicialProvider.overrideWithValue(
+            Sesion(
+              slug: 'demo',
+              bearer: 't',
+              nombre: 'Coordinación',
+              rol: 'rol_coordinacion',
+              permisos: permisos,
+            ),
+          ),
+          // Sin agenda.ver el servidor no manda el bloque de la agenda.
+          resumenHoyProvider.overrideWith(
+            (ref) async => ResumenHoy.desdeJson({'fecha': 'x', 'agenda': null}),
+          ),
+          climaNegocioProvider.overrideWith((ref) async => null),
+          agendaProvider.overrideWith(_AgendaVacia.new),
+        ],
+        child: const MaterialApp(home: EquipoScreen()),
+      ),
+    );
+
+    await montar(['miembros.ver']);
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.text('Agenda del día'), findsNothing);
+    expect(find.text('Pasar lista'), findsNothing);
+    expect(find.text('Mi perfil'), findsOneWidget);
+
+    // Con ver agenda, sí su pestaña; pasar lista pide además ver reservas y marcar.
+    await montar(['agenda.ver']);
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.text('Agenda del día'), findsOneWidget);
+    expect(find.text('Pasar lista'), findsNothing);
   });
 }

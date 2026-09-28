@@ -29,43 +29,52 @@ class _EquipoScreenState extends ConsumerState<EquipoScreen> {
   void _ir(PestanaEquipo p) => setState(() => _pestana = p);
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    // La agenda del día trae su propia barra.
-    appBar: _pestana == PestanaEquipo.agenda
-        ? null
-        : AppBar(
-            title: const Text('Inicio'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.person_outline),
-                tooltip: 'Mi perfil',
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const PerfilScreen()),
+  Widget build(BuildContext context) {
+    // Un rol propio puede no ver la agenda: entonces solo tiene su Inicio.
+    final verAgenda = ref.watch(sesionProvider)?.puede('agenda.ver') ?? false;
+    final pestana = verAgenda ? _pestana : PestanaEquipo.inicio;
+    return Scaffold(
+      // La agenda del día trae su propia barra.
+      appBar: pestana == PestanaEquipo.agenda
+          ? null
+          : AppBar(
+              title: const Text('Inicio'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.person_outline),
+                  tooltip: 'Mi perfil',
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const PerfilScreen(),
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-    body: switch (_pestana) {
-      PestanaEquipo.inicio => _InicioNegocio(onIr: _ir),
-      PestanaEquipo.agenda => const AgendaScreen(),
-    },
-    bottomNavigationBar: NavigationBar(
-      selectedIndex: _pestana.index,
-      onDestinationSelected: (i) => _ir(PestanaEquipo.values[i]),
-      destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.home_outlined),
-          selectedIcon: Icon(Icons.home),
-          label: 'Inicio',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.schedule_outlined),
-          selectedIcon: Icon(Icons.schedule),
-          label: 'Agenda',
-        ),
-      ],
-    ),
-  );
+              ],
+            ),
+      body: switch (pestana) {
+        PestanaEquipo.inicio => _InicioNegocio(onIr: _ir),
+        PestanaEquipo.agenda => const AgendaScreen(),
+      },
+      bottomNavigationBar: !verAgenda
+          ? null
+          : NavigationBar(
+              selectedIndex: pestana.index,
+              onDestinationSelected: (i) => _ir(PestanaEquipo.values[i]),
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home),
+                  label: 'Inicio',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.schedule_outlined),
+                  selectedIcon: Icon(Icons.schedule),
+                  label: 'Agenda',
+                ),
+              ],
+            ),
+    );
+  }
 }
 
 /// El día de hoy: saludo, la tarjeta grande con lo que sigue (o lo que está en
@@ -87,6 +96,13 @@ class _InicioNegocio extends ConsumerWidget {
         .split(RegExp(r'\s+'))
         .first;
     final estudio = sesion?.estudioNombre;
+    // Cada acceso con su permiso: ver la agenda y, para pasar lista, ver quién va
+    // y marcar asistencia.
+    final verAgenda = sesion?.puede('agenda.ver') ?? false;
+    final pasarLista =
+        verAgenda &&
+        (sesion?.puede('reservas.ver') ?? false) &&
+        (sesion?.puede('asistencia.marcar') ?? false);
 
     return estado.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -167,29 +183,31 @@ class _InicioNegocio extends ConsumerWidget {
                 _Pendientes(hoy: hoy),
               const SizedBox(height: 4),
               RejillaAccesos([
-                TarjetaAcceso(
-                  icono: Icons.schedule_outlined,
-                  titulo: 'Agenda del día',
-                  valor: agenda == null
-                      ? 'Horarios y pase de lista'
-                      : (agenda.sesiones == 1
-                            ? '1 ${terminos.sesion.toLowerCase()} hoy'
-                            : '${agenda.sesiones} $clases hoy'),
-                  tono: TonosAcceso.reservar,
-                  onTap: () => onIr(PestanaEquipo.agenda),
-                ),
-                TarjetaAcceso(
-                  icono: Icons.fact_check_outlined,
-                  titulo: 'Pasar lista',
-                  valor: (agenda?.sinMarcar ?? 0) == 0
-                      ? 'Nadie pendiente'
-                      : (agenda!.sinMarcar == 1
-                            ? '1 persona pendiente'
-                            : '${agenda.sinMarcar} personas pendientes'),
-                  atencion: (agenda?.sinMarcar ?? 0) > 0,
-                  tono: TonosAcceso.creditos,
-                  onTap: () => onIr(PestanaEquipo.agenda),
-                ),
+                if (verAgenda)
+                  TarjetaAcceso(
+                    icono: Icons.schedule_outlined,
+                    titulo: 'Agenda del día',
+                    valor: agenda == null
+                        ? 'Horarios y pase de lista'
+                        : (agenda.sesiones == 1
+                              ? '1 ${terminos.sesion.toLowerCase()} hoy'
+                              : '${agenda.sesiones} $clases hoy'),
+                    tono: TonosAcceso.reservar,
+                    onTap: () => onIr(PestanaEquipo.agenda),
+                  ),
+                if (pasarLista)
+                  TarjetaAcceso(
+                    icono: Icons.fact_check_outlined,
+                    titulo: 'Pasar lista',
+                    valor: (agenda?.sinMarcar ?? 0) == 0
+                        ? 'Nadie pendiente'
+                        : (agenda!.sinMarcar == 1
+                              ? '1 persona pendiente'
+                              : '${agenda.sinMarcar} personas pendientes'),
+                    atencion: (agenda?.sinMarcar ?? 0) > 0,
+                    tono: TonosAcceso.creditos,
+                    onTap: () => onIr(PestanaEquipo.agenda),
+                  ),
                 TarjetaAcceso(
                   icono: Icons.person_outline,
                   titulo: 'Mi perfil',

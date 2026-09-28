@@ -138,6 +138,8 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
   }
 
   Widget _fila(Asistente a) {
+    // Sin permiso de marcar asistencia, la lista solo se consulta.
+    final puedeMarcar = ref.watch(sesionProvider)?.puede('asistencia.marcar') ?? false;
     final ocupado = _marcando.contains(a.reservaId);
     return Card(
       elevation: 0,
@@ -162,7 +164,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
           button: true,
           label: a.llego ? 'Quitar llegada de ${a.nombre}' : 'Marcar llegada de ${a.nombre}',
           child: InkResponse(
-            onTap: ocupado ? null : () => _marcar(a, a.llego ? 'ausente' : 'presente'),
+            onTap: ocupado || !puedeMarcar ? null : () => _marcar(a, a.llego ? 'ausente' : 'presente'),
             radius: 28,
             child: Container(
               width: 46,
