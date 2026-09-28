@@ -20,16 +20,6 @@ enum ProveedorPasarela: string
     case Ventanilla = 'ventanilla';
 
     /**
-     * Proveedores integrados, disponibles sin configuración.
-     *
-     * @return list<string>
-     */
-    public static function integrados(): array
-    {
-        return [self::Manual->value, self::Simulada->value];
-    }
-
-    /**
      * Proveedores en línea que cobran contra una API externa (asíncronos).
      *
      * @return list<string>
@@ -66,21 +56,5 @@ enum ProveedorPasarela: string
     public static function disponible(string $proveedor): bool
     {
         return ! in_array($proveedor, self::enLinea(), true) || in_array($proveedor, self::implementadas(), true);
-    }
-
-    public function esEnLinea(): bool
-    {
-        return in_array($this->value, self::enLinea(), true);
-    }
-
-    /**
-     * Proveedores con webhook firmado propio: NO se confirman por el webhook
-     * genérico (obligaría a saltarse la verificación).
-     *
-     * @return list<string>
-     */
-    public static function conWebhookFirmado(): array
-    {
-        return [self::Stripe->value, self::OpenPay->value, self::MercadoPago->value];
     }
 }

@@ -21,8 +21,6 @@ return [
     'attributes' => [
         'email' => 'correo electrónico',
         'password' => 'contraseña',
-        'device_name' => 'nombre del dispositivo',
         'nombre' => 'nombre',
-        'apellidos' => 'apellidos',
     ],
 ];

@@ -117,11 +117,6 @@ final class CatalogoTemas
         return isset(self::TEMAS[$clave]);
     }
 
-    public static function permitePersonalizar(string $clave): bool
-    {
-        return self::TEMAS[$clave]['permite_personalizar'] ?? false;
-    }
-
     /**
      * Lo que ve un usuario: su tema (o el predeterminado) con sus ajustes personales
      * encima, solo si el tema los admite. Un tema que ya no existe (se retiraron

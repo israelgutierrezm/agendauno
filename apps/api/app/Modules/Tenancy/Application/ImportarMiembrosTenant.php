@@ -17,9 +17,6 @@ use Illuminate\Support\Facades\Validator;
  */
 class ImportarMiembrosTenant
 {
-    /** Columnas reconocidas del CSV (el resto se ignora). */
-    public const COLUMNAS = ['nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email', 'tipo', 'es_facturable'];
-
     /**
      * Valida las filas sin escribir. Devuelve el resultado por fila + un resumen.
      *

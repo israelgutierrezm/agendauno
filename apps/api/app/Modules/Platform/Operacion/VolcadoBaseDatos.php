@@ -167,16 +167,6 @@ class VolcadoBaseDatos
         return $archivos;
     }
 
-    /**
-     * Cuántas tablas tiene la base restaurada en un archivo SQLite (para el simulacro).
-     */
-    public function tablasSqlite(string $archivo): int
-    {
-        $consulta = (new PDO('sqlite:'.$archivo))->query("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'");
-
-        return $consulta === false ? 0 : (int) $consulta->fetchColumn();
-    }
-
     private function comprimir(string $origen): string
     {
         $destino = $origen.'.gz';

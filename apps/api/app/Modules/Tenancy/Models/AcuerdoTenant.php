@@ -58,14 +58,6 @@ class AcuerdoTenant extends Model
     }
 
     /**
-     * @return HasMany<PausaAcuerdoTenant, $this>
-     */
-    public function pausas(): HasMany
-    {
-        return $this->hasMany(PausaAcuerdoTenant::class, 'acuerdo_id');
-    }
-
-    /**
      * El pago automático vigente de la membresía, si lo tiene.
      *
      * @return HasOne<DomiciliacionTenant, $this>

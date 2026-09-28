@@ -10,8 +10,6 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Integraciones\ResolvedorDns;
 use App\Modules\Tenancy\Integraciones\ResolvedorDnsSistema;
 use App\Modules\Tenancy\Models\Estudio;
-use App\Modules\Tenancy\Support\AlmacenamientoTenant;
-use App\Modules\Tenancy\Support\CacheTenant;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
@@ -32,11 +30,6 @@ class TenancyServiceProvider extends ServiceProvider
         // pruebas por un doble que devuelve una identidad conocida.
         $this->app->bind(VerificadorGoogle::class, VerificadorGoogleTokeninfo::class);
         $this->app->bind(ResolvedorDns::class, ResolvedorDnsSistema::class);
-
-        // Aislamiento de recursos por estudio (cache/almacenamiento) sobre el
-        // estudio activo del gestor. Un estado por request/job.
-        $this->app->scoped(CacheTenant::class);
-        $this->app->scoped(AlmacenamientoTenant::class);
     }
 
     public function boot(): void

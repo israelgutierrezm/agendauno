@@ -55,13 +55,4 @@ class DatosFiscalesTenant extends Model
     {
         return $this->sello_cer !== null && $this->sello_key !== null && $this->sello_password !== null;
     }
-
-    /**
-     * ¿El tenant ya está vinculado a una organización de facturación? (uso interno
-     * de la plataforma; no se expone al tenant).
-     */
-    public function facturapiConectado(): bool
-    {
-        return $this->facturapi_organizacion_id !== null && $this->facturapi_llave !== null;
-    }
 }

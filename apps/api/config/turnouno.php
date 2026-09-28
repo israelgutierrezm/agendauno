@@ -12,11 +12,6 @@ return [
     'tenant_db_driver' => env('TENANT_DB_DRIVER', 'sqlite'),
 
     /*
-    | Días del periodo de prueba gratuito al aprovisionar un estudio.
-    */
-    'dias_trial' => (int) env('TRIAL_DIAS', 30),
-
-    /*
     | Dominio base para resolver el estudio por subdominio: `{slug}.agendauno.mx`.
     | Las rutas del tenant se montan además bajo este dominio (aparte del acceso
     | por ruta `/app/{estudio}`). Ajustable por entorno (p. ej. un dominio de

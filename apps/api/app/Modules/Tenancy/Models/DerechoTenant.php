@@ -54,16 +54,6 @@ class DerechoTenant extends Model
     }
 
     /**
-     * Paquete al que se sumaron estas clases extra (null si no es un extra).
-     *
-     * @return BelongsTo<DerechoTenant, $this>
-     */
-    public function extraDe(): BelongsTo
-    {
-        return $this->belongsTo(DerechoTenant::class, 'extra_de_id');
-    }
-
-    /**
      * Clases extra que se sumaron a este paquete.
      *
      * @return HasMany<DerechoTenant, $this>

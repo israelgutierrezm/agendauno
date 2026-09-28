@@ -7,7 +7,6 @@ namespace App\Modules\Tenancy\Models;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Movimiento del ledger de inventario tenant-local (R21). El stock por (artículo,
@@ -34,12 +33,4 @@ class MovimientoInventarioTenant extends Model
         'tipo' => TipoMovimientoInventario::class,
         'cantidad' => 'integer',
     ];
-
-    /**
-     * @return BelongsTo<ArticuloTenant, $this>
-     */
-    public function articulo(): BelongsTo
-    {
-        return $this->belongsTo(ArticuloTenant::class, 'articulo_id');
-    }
 }

@@ -20,9 +20,6 @@ use Illuminate\Support\Facades\Validator;
  */
 class ImportarInstructoresTenant
 {
-    /** Columnas reconocidas del CSV (el resto se ignora). */
-    public const COLUMNAS = ['nombre', 'email'];
-
     public function __construct(private readonly EnviarActivacionTenant $enviarActivacion) {}
 
     /**

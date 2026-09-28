@@ -6,7 +6,6 @@ namespace App\Modules\Tenancy\Models;
 
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Sucursal del estudio (con zona horaria), tenant-local. Base para materializar la
@@ -33,12 +32,4 @@ class SucursalTenant extends Model
         'latitud' => 'float',
         'longitud' => 'float',
     ];
-
-    /**
-     * @return BelongsTo<OrganizacionTenant, $this>
-     */
-    public function organizacion(): BelongsTo
-    {
-        return $this->belongsTo(OrganizacionTenant::class, 'organizacion_id');
-    }
 }

@@ -280,35 +280,6 @@ class ClienteStripe
     }
 
     /**
-     * Crea un PaymentIntent y devuelve su id, estado y client_secret (que el
-     * cliente usa con Stripe.js para confirmar el pago).
-     *
-     * @return array{id: string, status: string, client_secret: string}
-     */
-    public function crearPaymentIntent(int $montoMinor, string $moneda, ?string $metodo): array
-    {
-        $tipos = $metodo === 'oxxo' ? ['oxxo'] : ['card'];
-
-        $respuesta = Http::withToken($this->secretKey)
-            ->asForm()
-            ->post(self::BASE.'/payment_intents', [
-                'amount' => $montoMinor,
-                'currency' => strtolower($moneda),
-                'payment_method_types' => $tipos,
-            ])
-            ->throw();
-
-        /** @var array{id?: string, status?: string, client_secret?: string} $json */
-        $json = $respuesta->json();
-
-        return [
-            'id' => (string) ($json['id'] ?? ''),
-            'status' => (string) ($json['status'] ?? ''),
-            'client_secret' => (string) ($json['client_secret'] ?? ''),
-        ];
-    }
-
-    /**
      * Cómo va una sesión de Checkout: su estado (`open`, `complete`, `expired`), el de
      * su pago (`paid`, `unpaid`, `no_payment_required`) y el de su cobro (el
      * PaymentIntent: `succeeded`, `processing`, `requires_action`, `canceled`…), que

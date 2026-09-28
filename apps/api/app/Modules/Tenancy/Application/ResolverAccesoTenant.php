@@ -16,15 +16,6 @@ use App\Modules\Tenancy\Models\Usuario;
 class ResolverAccesoTenant
 {
     /**
-     * ¿El usuario tiene el permiso dentro de la sucursal dada? Tenant-wide O por rol
-     * asignado en esa sucursal.
-     */
-    public function permiteEnSucursal(Usuario $usuario, string $permiso, int $sucursalId): bool
-    {
-        return $usuario->puede($permiso) || $this->rolAsignadoPermite($usuario, $permiso, $sucursalId);
-    }
-
-    /**
      * ¿El usuario tiene el permiso EN esa sucursal por un rol ASIGNADO ahi (sin contar
      * su rol tenant-wide)? Util para ampliar el alcance de un rol que, tenant-wide,
      * esta acotado (p. ej. un instructor limitado a sus sesiones).

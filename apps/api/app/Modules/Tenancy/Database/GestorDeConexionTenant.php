@@ -170,21 +170,6 @@ class GestorDeConexionTenant
         return DB::connection(self::CONEXION)->table('migrations')->pluck('migration')->all();
     }
 
-    /**
-     * Elimina la BD física del tenant (limpieza de aprovisionamiento fallido).
-     */
-    public function eliminarBaseDeDatos(Estudio $estudio): void
-    {
-        $this->desconectar();
-
-        if ($estudio->db_driver === 'sqlite') {
-            $ruta = $this->rutaSqlite($estudio);
-            if (File::exists($ruta)) {
-                File::delete($ruta);
-            }
-        }
-    }
-
     private function rutaSqlite(Estudio $estudio): string
     {
         return storage_path(self::RUTA_TENANTS.'/'.$estudio->db_database);

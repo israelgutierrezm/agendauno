@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
-use App\Modules\Tenancy\Exceptions\RecursoNoDisponible;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use Carbon\CarbonInterface;
@@ -37,12 +36,5 @@ class VerificarRecursoTenant
             ->count();
 
         return $solapadas < $recurso->cupoSimultaneo();
-    }
-
-    public function exigirDisponible(RecursoTenant $recurso, CarbonInterface $inicia, CarbonInterface $termina, ?int $excluirSerieId = null): void
-    {
-        if (! $this->disponible($recurso, $inicia, $termina, $excluirSerieId)) {
-            throw new RecursoNoDisponible('El recurso ya esta ocupado en ese horario.');
-        }
     }
 }
