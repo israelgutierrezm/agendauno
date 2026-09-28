@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AutenticacionTenant;
-use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Modules\Tenancy\Application\RegistrarAlumnoTenant;
 use App\Modules\Tenancy\Application\RegistroDeAlumno;
+use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -107,10 +107,10 @@ class RegistroAlumnoController
             'ulid' => $usuario->ulid,
             'nombre' => $usuario->name,
             'email' => $usuario->email,
-            'rol' => $usuario->rolActivo() ?? CatalogoDePermisosTenant::rolPrincipal($roles),
+            'rol' => $usuario->rolActivo() ?? app(RolesTenant::class)->principal($roles),
             'roles' => $roles,
-            'roles_disponibles' => CatalogoDePermisosTenant::rolesDisponibles($roles),
-            'permisos' => CatalogoDePermisosTenant::permisosDe($usuario->rolesVigentes()),
+            'roles_disponibles' => app(RolesTenant::class)->disponibles($roles),
+            'permisos' => app(RolesTenant::class)->permisosDe($usuario->rolesVigentes()),
         ];
     }
 

@@ -88,6 +88,7 @@ use App\Modules\Tenancy\Http\Controllers\ReservasTenantController;
 use App\Modules\Tenancy\Http\Controllers\RespuestasFormularioController;
 use App\Modules\Tenancy\Http\Controllers\ResumenMiembroTenantController;
 use App\Modules\Tenancy\Http\Controllers\RetencionTenantController;
+use App\Modules\Tenancy\Http\Controllers\RolesTenantController;
 use App\Modules\Tenancy\Http\Controllers\SolicitudesPrivacidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\StaffTenantController;
 use App\Modules\Tenancy\Http\Controllers\SuscripcionesTenantController;
@@ -282,6 +283,11 @@ Route::prefix('v1')->group(function (): void {
 
             // Apartado Usuarios: multi-rol por cuenta (rol de dueño protegido).
             Route::get('/usuarios', [UsuariosTenantController::class, 'index'])->middleware('puede:usuarios.gestionar')->name('usuarios.index');
+            // Roles propios del negocio (ADR 0057): nadie da permisos que no tiene.
+            Route::get('/roles', [RolesTenantController::class, 'index'])->middleware('puede:roles.gestionar')->name('roles.index');
+            Route::post('/roles', [RolesTenantController::class, 'store'])->middleware('puede:roles.gestionar')->name('roles.store');
+            Route::put('/roles/{rol}', [RolesTenantController::class, 'update'])->middleware('puede:roles.gestionar')->name('roles.update');
+            Route::delete('/roles/{rol}', [RolesTenantController::class, 'destroy'])->middleware('puede:roles.gestionar')->name('roles.destroy');
             Route::put('/usuarios/{usuario}/roles', [UsuariosTenantController::class, 'actualizarRoles'])->middleware('puede:usuarios.gestionar')->name('usuarios.roles');
             // Baja lógica del equipo (quita el acceso, conserva el historial) y reactivación.
             Route::delete('/usuarios/{usuario}', [UsuariosTenantController::class, 'darDeBaja'])->middleware('puede:usuarios.gestionar')->name('usuarios.baja');

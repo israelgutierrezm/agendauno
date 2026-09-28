@@ -3,6 +3,118 @@
  * renovaciones, recepción y comunicación. Aparte de es-MX.ts (la landing en curso).
  */
 export default {
+  // Roles propios del negocio (ADR 0057): nadie da permisos que no tiene.
+  rolesPropios: {
+    titulo: "Roles y permisos",
+    ayuda:
+      "Arma roles para tu equipo con los permisos que necesitan. Solo puedes dar permisos que tú tienes; los roles del sistema no se editan.",
+    nuevo: "Nuevo rol",
+    sistema: "Del sistema",
+    propio: "Propio del negocio",
+    personas: "Nadie lo tiene | 1 persona | {n} personas",
+    cuantosPermisos: "{n} permiso | {n} permisos",
+    todos: "Todos los permisos",
+    ver: "Ver permisos",
+    ocultar: "Ocultar permisos",
+    editar: "Editar",
+    eliminar: "Eliminar",
+    confirmarEliminar: "¿Eliminar el rol «{nombre}»? No se puede deshacer.",
+    noCambiar:
+      "Tiene permisos que tú no tienes, o es tu propio rol: no puedes cambiarlo.",
+    editorNuevo: "Nuevo rol",
+    editorEditar: "Editar rol",
+    nombre: "Nombre del rol",
+    nombrePh: "Por ejemplo: Coordinación",
+    permisos: "Permisos",
+    sinPermiso: "No lo tienes, así que no puedes darlo.",
+    guardar: "Guardar rol",
+    guardado: "Rol guardado.",
+    eliminado: "Rol eliminado.",
+    vacio: "Aún no hay roles propios. Crea el primero con «Nuevo rol».",
+    grupos: {
+      agenda: "Agenda",
+      clientes: "Alumnos",
+      membresias: "Membresías y catálogo",
+      cobros: "Cobros",
+      punto_venta: "Punto de venta",
+      equipo: "Equipo",
+      marketing: "Marketing",
+      negocio: "Negocio",
+    },
+    permiso: {
+      agenda: {
+        ver: "Ver la agenda",
+        gestionar: "Programar y editar la agenda",
+      },
+      reservas: {
+        ver: "Ver reservas",
+        gestionar: "Reservar, cancelar y mover reservas",
+      },
+      asistencia: { marcar: "Pasar asistencia" },
+      checkins: { registrar: "Registrar entradas" },
+      miembros: {
+        ver: "Ver alumnos y su ficha",
+        gestionar: "Dar de alta y editar alumnos",
+      },
+      derechos: { ver: "Ver paquetes y créditos de cada alumno" },
+      documentos: {
+        subir: "Subir documentos",
+        gestionar: "Administrar documentos y plantillas",
+      },
+      formularios: {
+        responder: "Llenar formularios",
+        gestionar: "Crear y editar formularios",
+      },
+      catalogo: {
+        ver: "Ver clases y servicios",
+        gestionar: "Crear y editar clases y servicios",
+      },
+      productos: {
+        ver: "Ver planes y paquetes",
+        gestionar: "Crear y editar planes y paquetes",
+      },
+      membresias: { gestionar: "Vender y administrar membresías" },
+      creditos: { gestionar: "Ajustar créditos" },
+      promociones: { gestionar: "Crear promociones" },
+      ordenes: {
+        ver: "Ver ventas",
+        gestionar: "Registrar ventas y cobros",
+      },
+      pagos: {
+        reembolsar: "Hacer reembolsos",
+        configurar: "Configurar pasarelas de pago",
+      },
+      facturacion: { ver: "Ver facturación e ingresos" },
+      pos: { vender: "Vender en mostrador" },
+      inventario: {
+        ver: "Ver inventario",
+        gestionar: "Administrar inventario",
+      },
+      usuarios: {
+        invitar: "Invitar al equipo",
+        gestionar: "Administrar al equipo y sus roles",
+      },
+      roles: { gestionar: "Crear y editar roles" },
+      tareas: { ver: "Ver tareas", gestionar: "Crear y asignar tareas" },
+      comunicaciones: {
+        ver: "Ver comunicaciones",
+        gestionar: "Enviar avisos y campañas",
+      },
+      automatizaciones: { gestionar: "Configurar automatizaciones" },
+      lealtad: {
+        ver: "Ver el programa de lealtad",
+        gestionar: "Administrar el programa de lealtad",
+      },
+      estudio: { gestionar: "Configurar el negocio" },
+      sucursales: {
+        ver: "Ver sucursales",
+        gestionar: "Administrar sucursales",
+      },
+      organizaciones: { ver: "Ver marcas", gestionar: "Administrar marcas" },
+      integraciones: { configurar: "Configurar integraciones" },
+      auditoria: { ver: "Ver la bitácora" },
+    },
+  },
   // Rol activo: quien tiene varios roles elige con cuál entra y lo cambia arriba.
   rolActivo: {
     titulo: "¿Cómo quieres entrar?",

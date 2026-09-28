@@ -364,6 +364,14 @@ export const MENU: MenuItem[] = [
         permiso: "usuarios.gestionar",
       },
       {
+        // Roles propios del negocio y sus permisos (ADR 0057).
+        clave: "roles",
+        etiqueta: "operacion.rolesPropios.titulo",
+        icono: "usuarios",
+        ruta: "roles",
+        permiso: "roles.gestionar",
+      },
+      {
         clave: "datos-fiscales",
         etiqueta: "nav.datosFiscales",
         icono: "datosFiscales",

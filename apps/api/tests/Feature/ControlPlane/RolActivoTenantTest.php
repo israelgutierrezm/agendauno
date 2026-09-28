@@ -58,8 +58,8 @@ it('al entrar con varios roles recibe el principal, sus permisos y los roles dis
     $login->assertJsonPath('data.usuario.rol', 'propietario')
         ->assertJsonPath('data.usuario.permisos', ['*'])
         ->assertJsonPath('data.usuario.roles_disponibles', [
-            ['clave' => 'propietario', 'faceta' => 'equipo'],
-            ['clave' => 'miembro', 'faceta' => 'miembro'],
+            ['clave' => 'propietario', 'faceta' => 'equipo', 'nombre' => null],
+            ['clave' => 'miembro', 'faceta' => 'miembro', 'nombre' => null],
         ]);
 });
 

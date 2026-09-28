@@ -59,6 +59,34 @@ class CatalogoDePermisosTenant
         ];
     }
 
+    /**
+     * Todos los permisos del negocio, agrupados por área, para armar roles propios.
+     * Cada permiso que se exige en una ruta debe estar aquí (lo revisa una prueba).
+     *
+     * @return array<string, list<string>>
+     */
+    public static function catalogo(): array
+    {
+        return [
+            'agenda' => ['agenda.ver', 'agenda.gestionar', 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar'],
+            'clientes' => ['miembros.ver', 'miembros.gestionar', 'derechos.ver', 'documentos.subir', 'documentos.gestionar', 'formularios.responder', 'formularios.gestionar'],
+            'membresias' => ['catalogo.ver', 'catalogo.gestionar', 'productos.ver', 'productos.gestionar', 'membresias.gestionar', 'creditos.gestionar', 'promociones.gestionar'],
+            'cobros' => ['ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'facturacion.ver'],
+            'punto_venta' => ['pos.vender', 'inventario.ver', 'inventario.gestionar'],
+            'equipo' => ['usuarios.invitar', 'usuarios.gestionar', 'roles.gestionar', 'tareas.ver', 'tareas.gestionar'],
+            'marketing' => ['comunicaciones.ver', 'comunicaciones.gestionar', 'automatizaciones.gestionar', 'lealtad.ver', 'lealtad.gestionar'],
+            'negocio' => ['estudio.gestionar', 'sucursales.ver', 'sucursales.gestionar', 'organizaciones.ver', 'organizaciones.gestionar', 'integraciones.configurar', 'pagos.configurar', 'auditoria.ver'],
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function permisosDelCatalogo(): array
+    {
+        return array_merge(...array_values(self::catalogo()));
+    }
+
     public static function puede(string $rol, string $permiso): bool
     {
         $permisos = self::roles()[$rol] ?? [];

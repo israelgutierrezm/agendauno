@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
-use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
+use App\Modules\Tenancy\Application\RolesTenant;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -60,7 +60,7 @@ class Usuario extends Authenticatable
      */
     public function puede(string $permiso): bool
     {
-        return CatalogoDePermisosTenant::puedeAlguno($this->rolesVigentes(), $permiso);
+        return app(RolesTenant::class)->puedeAlguno($this->rolesVigentes(), $permiso);
     }
 
     /**
@@ -89,7 +89,7 @@ class Usuario extends Authenticatable
 
         return is_string($this->ultimo_rol) && in_array($this->ultimo_rol, $roles, true)
             ? $this->ultimo_rol
-            : CatalogoDePermisosTenant::rolPrincipal($roles);
+            : app(RolesTenant::class)->principal($roles);
     }
 
     /**

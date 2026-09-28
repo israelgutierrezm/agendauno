@@ -13,6 +13,7 @@ import type { MenuItem, NavEstado } from "@/components/nav";
 import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
 import { esVisible, MENU } from "@/lib/menu";
 import { identidadDeSesion, reiniciarMiCuenta } from "@/lib/miCuenta";
+import { nombreDeRol } from "@/lib/roles";
 import { plural } from "@/lib/terminologia";
 import { slugDeContexto } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -388,9 +389,11 @@ onMounted(() => {
                   class="block text-[11px] truncate"
                   :style="{ color: 'var(--texto-suave)' }"
                   >{{
-                    $te(`usuarios.rol.${sesion.usuario?.rol}`)
-                      ? $t(`usuarios.rol.${sesion.usuario?.rol}`)
-                      : sesion.usuario?.rol
+                    nombreDeRol(
+                      sesion.usuario?.rol ?? "",
+                      sesion.usuario?.roles_disponibles,
+                      (llave) => ($te(llave) ? $t(llave) : null),
+                    )
                   }}</span
                 >
               </span>

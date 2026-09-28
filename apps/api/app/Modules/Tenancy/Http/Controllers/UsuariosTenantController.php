@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
+use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\AsignacionPersonalTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -45,6 +46,7 @@ class UsuariosTenantController
         private readonly PersonaDeUsuarioTenant $personas,
         private readonly BajasTenant $bajas,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly RolesTenant $roles,
     ) {}
 
     /**
@@ -181,9 +183,16 @@ class UsuariosTenantController
         $usuarios = ($deBaja ? Usuario::onlyTrashed() : Usuario::query())->orderBy('name')->get();
         $quienes = $this->nombresDe($usuarios->pluck('eliminado_por')->filter()->all());
 
+        $roles = $this->roles->todos();
+
         return response()->json([
             'data' => $usuarios->map(fn (Usuario $u): array => $this->presentar($u, $quienes))->all(),
-            'roles' => CatalogoDePermisosTenant::todosLosRoles(),
+            'roles' => array_keys($roles),
+            // Los propios traen su nombre; los de sistema se nombran en la app.
+            'roles_detalle' => array_values(array_map(
+                static fn (array $r): array => ['clave' => $r['clave'], 'nombre' => $r['nombre'], 'sistema' => $r['sistema']],
+                $roles,
+            )),
         ]);
     }
 
@@ -217,10 +226,11 @@ class UsuariosTenantController
         $validado = $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
-            'rol' => ['required', Rule::in(CatalogoDePermisosTenant::rolesAsignables())],
+            'rol' => ['required', Rule::in([...CatalogoDePermisosTenant::rolesAsignables(), ...$this->clavesPropias()])],
             // Sede opcional: si viene, el usuario queda ACOTADO a ella desde el alta (R19).
             'sucursal_id' => ['nullable', 'string'],
         ]);
+        $this->exigirQuePuedaDar($this->actor($request), [(string) $validado['rol']]);
 
         // Email único dentro de la BD del tenant (también el de alguien dado de baja:
         // ese correo es suyo y se reactiva su cuenta).
@@ -316,18 +326,21 @@ class UsuariosTenantController
 
         $validado = $request->validate([
             'roles' => ['required', 'array', 'min:1'],
-            'roles.*' => ['string', Rule::in(CatalogoDePermisosTenant::todosLosRoles())],
+            'roles.*' => ['string', Rule::in(array_keys($this->roles->todos()))],
         ]);
 
         /** @var list<string> $rolesNuevos */
         $rolesNuevos = array_values(array_unique($validado['roles']));
 
         $this->protegerPropietario($request, $usuario, $rolesNuevos);
-
         $antes = $usuario->rolesEfectivos();
+        // Lo que se da o se quita (el de dueño tiene su propia regla, arriba).
+        $cambios = array_diff([...array_diff($rolesNuevos, $antes), ...array_diff($antes, $rolesNuevos)], ['propietario']);
+        $this->exigirQuePuedaDar($this->actor($request), array_values($cambios));
+
         $usuario->update([
             'roles' => $rolesNuevos,
-            'rol' => CatalogoDePermisosTenant::rolPrincipal($rolesNuevos),
+            'rol' => $this->roles->principal($rolesNuevos),
         ]);
         if ($antes !== $rolesNuevos) {
             $this->auditoria->registrar($this->actor($request), 'usuario.roles', 'usuario', (string) $usuario->ulid,
@@ -380,6 +393,31 @@ class UsuariosTenantController
     private function contarPropietarios(): int
     {
         return Usuario::query()->whereJsonContains('roles', 'propietario')->count();
+    }
+
+    /**
+     * Nadie da (ni quita) un rol con permisos que no tiene en su rol activo.
+     *
+     * @param  list<string>  $roles
+     */
+    private function exigirQuePuedaDar(Usuario $actor, array $roles): void
+    {
+        $propios = $this->roles->permisosDe($actor->rolesVigentes());
+        foreach ($roles as $rol) {
+            if (! RolesTenant::cabenEn($this->roles->permisosDe([$rol]), $propios)) {
+                throw ValidationException::withMessages([
+                    'roles' => ['No puedes dar ni quitar un rol con permisos que tú no tienes.'],
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function clavesPropias(): array
+    {
+        return array_keys(array_filter($this->roles->todos(), static fn (array $r): bool => ! $r['sistema']));
     }
 
     private function actor(Request $request): Usuario

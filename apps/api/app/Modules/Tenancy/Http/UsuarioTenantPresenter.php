@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http;
 
-use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
+use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\CatalogoTemas;
 use App\Modules\Tenancy\Models\Usuario;
 
@@ -20,6 +20,7 @@ class UsuarioTenantPresenter
     public static function datos(Usuario $usuario): array
     {
         $roles = $usuario->rolesEfectivos();
+        $catalogo = app(RolesTenant::class);
 
         return [
             'ulid' => $usuario->ulid,
@@ -40,10 +41,10 @@ class UsuarioTenantPresenter
             'tiene_contrasena' => $usuario->password !== null && $usuario->password !== '',
             // El rol con el que trabaja en esta sesión, sus permisos y los roles con
             // los que puede entrar (quien tiene varios elige y cambia).
-            'rol' => $usuario->rolActivo() ?? CatalogoDePermisosTenant::rolPrincipal($roles),
+            'rol' => $usuario->rolActivo() ?? $catalogo->principal($roles),
             'roles' => $roles,
-            'roles_disponibles' => CatalogoDePermisosTenant::rolesDisponibles($roles),
-            'permisos' => CatalogoDePermisosTenant::permisosDe($usuario->rolesVigentes()),
+            'roles_disponibles' => $catalogo->disponibles($roles),
+            'permisos' => $catalogo->permisosDe($usuario->rolesVigentes()),
             // Tema y colores propios: el front los aplica al entrar (ver /apariencia).
             'apariencia' => CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion),
         ];

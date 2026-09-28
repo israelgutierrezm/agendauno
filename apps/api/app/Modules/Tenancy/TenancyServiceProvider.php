@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy;
 
+use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\Application\VerificadorGoogle;
 use App\Modules\Tenancy\Application\VerificadorGoogleTokeninfo;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
@@ -25,6 +26,8 @@ class TenancyServiceProvider extends ServiceProvider
         // Gestor de conexión del data plane: un estado activo por request/job para
         // que no se filtre la conexión de un tenant a otro (control plane nuevo).
         $this->app->scoped(GestorDeConexionTenant::class);
+        // Roles del negocio (de sistema y propios), leídos una vez por petición/job.
+        $this->app->scoped(RolesTenant::class);
 
         // Verificador de ID token de Google (SSO tenant-local); intercambiable en
         // pruebas por un doble que devuelve una identidad conocida.

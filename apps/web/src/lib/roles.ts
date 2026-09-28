@@ -8,6 +8,8 @@ export type Faceta = "equipo" | "instructor" | "miembro";
 export interface RolDisponible {
   clave: string;
   faceta: Faceta;
+  // Nombre de los roles propios del negocio; los de sistema se nombran con i18n.
+  nombre?: string | null;
 }
 
 interface UsuarioConRol {
@@ -37,6 +39,19 @@ export function facetaActiva(usuario: UsuarioConRol | null): Faceta | null {
   );
 
   return disponible?.faceta ?? FACETA_DE_SISTEMA[usuario.rol] ?? "equipo";
+}
+
+/**
+ * Nombre visible de un rol: el propio del negocio si lo tiene; si no, la etiqueta
+ * traducida del rol de sistema; si no, su clave.
+ */
+export function nombreDeRol(
+  clave: string,
+  roles: RolDisponible[] | undefined,
+  traducir: (llave: string) => string | null,
+): string {
+  const propio = roles?.find((r) => r.clave === clave)?.nombre;
+  return propio ?? traducir(`usuarios.rol.${clave}`) ?? clave;
 }
 
 /** ¿Entró como quien imparte clases o atiende citas? */

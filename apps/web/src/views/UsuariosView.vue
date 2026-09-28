@@ -53,10 +53,8 @@ const verBajas = ref(false);
 // La asignación por sede solo aplica con varias sucursales (con una, es moot).
 const hayMultiSucursal = computed(() => sucursales.value.length > 1);
 
-// El usuario actual solo puede conceder/quitar el rol de dueño si él mismo lo tiene.
-const soyDueno = computed(() =>
-  (sesion.usuario?.roles ?? []).includes("propietario"),
-);
+// Solo quien actúa como dueño (su rol activo) concede o quita el rol de dueño.
+const soyDueno = computed(() => sesion.usuario?.rol === "propietario");
 
 const editando = ref<UsuarioRow | null>(null);
 const seleccion = ref<Set<string>>(new Set());
@@ -70,8 +68,10 @@ const columnas = computed(() => [
   { clave: "acciones", etiqueta: "", alinear: "derecha" as const },
 ]);
 
+// Nombres de los roles propios del negocio (los de sistema se traducen).
+const nombresPropios = ref<Record<string, string>>({});
 function nombreRol(rol: string): string {
-  return t(`usuarios.rol.${rol}`);
+  return nombresPropios.value[rol] ?? t(`usuarios.rol.${rol}`);
 }
 
 // Filtros estilo Acadion para la tabla (rol + estado). La coincidencia se resuelve
@@ -120,14 +120,26 @@ async function cargar(): Promise<void> {
   error.value = null;
   try {
     const [u, s] = await Promise.all([
-      api.get<{ data: UsuarioRow[]; roles: string[] }>(
-        `${base.value}/usuarios`,
-        { params: { estado: verBajas.value ? "baja" : undefined } },
-      ),
+      api.get<{
+        data: UsuarioRow[];
+        roles: string[];
+        roles_detalle?: {
+          clave: string;
+          nombre: string | null;
+          sistema: boolean;
+        }[];
+      }>(`${base.value}/usuarios`, {
+        params: { estado: verBajas.value ? "baja" : undefined },
+      }),
       api.get<{ data: Sucursal[] }>(`${base.value}/sucursales`),
     ]);
     usuarios.value = u.data.data;
     rolesDisponibles.value = u.data.roles;
+    nombresPropios.value = Object.fromEntries(
+      (u.data.roles_detalle ?? [])
+        .filter((r) => r.nombre !== null)
+        .map((r) => [r.clave, r.nombre as string]),
+    );
     sucursales.value = s.data.data;
     // Las asignaciones por sede solo importan con varias sucursales.
     if (hayMultiSucursal.value) {

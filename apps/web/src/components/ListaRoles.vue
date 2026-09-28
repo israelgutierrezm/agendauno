@@ -32,9 +32,10 @@ const emit = defineEmits<{ elegir: [clave: string] }>();
         <span class="lr-texto">
           <span class="lr-nombre">
             {{
-              $te(`usuarios.rol.${rol.clave}`)
+              rol.nombre ??
+              ($te(`usuarios.rol.${rol.clave}`)
                 ? $t(`usuarios.rol.${rol.clave}`)
-                : rol.clave
+                : rol.clave)
             }}
           </span>
           <span class="lr-detalle">

@@ -6,6 +6,7 @@ import { useRouter } from "vue-router";
 import ListaRoles from "@/components/ListaRoles.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { mensajeDeError } from "@/lib/api";
+import { nombreDeRol } from "@/lib/roles";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -33,9 +34,11 @@ async function elegir(clave: string): Promise<void> {
     await sesion.cambiarRol(clave);
     emit("cerrar");
     await router.push({ name: sesion.rutaInicio });
-    const nombre = te(`usuarios.rol.${clave}`)
-      ? t(`usuarios.rol.${clave}`)
-      : clave;
+    const nombre = nombreDeRol(
+      clave,
+      sesion.usuario?.roles_disponibles,
+      (llave) => (te(llave) ? t(llave) : null),
+    );
     toast.exito(t("operacion.rolActivo.cambiado", { rol: nombre }));
   } catch (e) {
     toast.error(mensajeDeError(e, t("operacion.rolActivo.error")));
