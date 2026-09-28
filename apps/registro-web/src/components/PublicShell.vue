@@ -196,16 +196,6 @@ defineEmits<{ alternarTema: [] }>();
 .dark .tu-public-nav {
   background: var(--superficie);
 }
-.dark
-  .agendauno-logo--adaptable
-  .agendauno-logo__imagen.agendauno-logo__imagen--clara {
-  display: none;
-}
-.dark
-  .agendauno-logo--adaptable
-  .agendauno-logo__imagen.agendauno-logo__imagen--oscura {
-  display: block;
-}
 .tu-public-footer {
   background: var(--superficie);
   color: var(--texto-suave);

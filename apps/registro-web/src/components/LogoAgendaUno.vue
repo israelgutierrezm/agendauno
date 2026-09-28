@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from "vue";
+
 type Variante =
   | "horizontal"
   | "horizontal-slogan"
@@ -6,7 +8,7 @@ type Variante =
   | "isotipo"
   | "negativo-slogan";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     variante?: Variante;
     ancho?: number;
@@ -20,18 +22,41 @@ withDefaults(
     adaptable: true,
   },
 );
+
+const RUTA = "/assets/brand/agendauno/final-v2";
+const archivo = computed(() =>
+  props.variante === "isotipo"
+    ? "isotipo"
+    : props.variante === "horizontal"
+      ? "logo"
+      : "logo-slogan",
+);
+// El logo horizontal tiene versión blanca: en modo oscuro se usa esa, sin placa.
+const conVersionOscura = computed(
+  () => props.adaptable && props.variante === "horizontal",
+);
 </script>
 
 <template>
   <span
     class="agendauno-logo"
-    :class="{ 'agendauno-logo--isotipo': variante === 'isotipo' }"
+    :class="{
+      'agendauno-logo--isotipo': variante === 'isotipo',
+      'agendauno-logo--adaptable': conVersionOscura,
+    }"
     :style="{ width: `${ancho}px` }"
   >
     <!-- Recursos institucionales originales, sin filtros ni redibujado. -->
     <img
       class="agendauno-logo__imagen"
-      :src="`/assets/brand/agendauno/final-v2/${variante === 'isotipo' ? 'isotipo' : variante === 'horizontal' ? 'logo' : 'logo-slogan'}.png`"
+      :class="{ 'agendauno-logo__imagen--clara': conVersionOscura }"
+      :src="`${RUTA}/${archivo}.png`"
+      :alt="alt"
+    />
+    <img
+      v-if="conVersionOscura"
+      class="agendauno-logo__imagen agendauno-logo__imagen--oscura"
+      :src="`${RUTA}/logo-blanco.png`"
       :alt="alt"
     />
   </span>
@@ -53,5 +78,18 @@ withDefaults(
 }
 .agendauno-logo--isotipo {
   background: transparent;
+}
+.agendauno-logo__imagen--oscura {
+  display: none;
+}
+/* `.dark` vive en <html>; el alcance solo marca el último selector. */
+.dark .agendauno-logo--adaptable {
+  background: transparent;
+}
+.dark .agendauno-logo__imagen--clara {
+  display: none;
+}
+.dark .agendauno-logo__imagen--oscura {
+  display: block;
 }
 </style>
