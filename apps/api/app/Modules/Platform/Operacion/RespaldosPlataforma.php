@@ -40,6 +40,9 @@ class RespaldosPlataforma
     /** Dónde queda el resultado del último simulacro (configuración de plataforma). */
     public const CLAVE_SIMULACRO = 'simulacro_restauracion';
 
+    /** Conexión aparte para crear y borrar la base temporal del simulacro en MySQL. */
+    private const SERVIDOR = 'simulacro_servidor';
+
     public function __construct(
         private readonly VolcadoBaseDatos $volcado,
         private readonly RespaldosEstudio $estudios,
@@ -288,13 +291,18 @@ class RespaldosPlataforma
         $nombre = 'tenant_simulacro_'.Str::lower(Str::random(10));
         /** @var array<string, mixed> $config */
         $config = DB::connection()->getConfig();
-        DB::statement("CREATE DATABASE `{$nombre}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        // CREATE y DROP DATABASE confirman en MySQL la transacción abierta en su
+        // conexión: van por una aparte para no confirmar la de quien llama.
+        config(['database.connections.'.self::SERVIDOR => $config]);
+        $servidor = DB::connection(self::SERVIDOR);
+        $servidor->statement("CREATE DATABASE `{$nombre}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
         try {
             $this->volcado->cargar([...$config, 'database' => $nombre], $volcado);
 
             return $revisar([...$config, 'database' => $nombre]);
         } finally {
-            DB::statement("DROP DATABASE IF EXISTS `{$nombre}`");
+            $servidor->statement("DROP DATABASE IF EXISTS `{$nombre}`");
+            DB::purge(self::SERVIDOR);
         }
     }
 
