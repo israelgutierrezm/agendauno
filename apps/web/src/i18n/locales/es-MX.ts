@@ -1043,7 +1043,8 @@ export default {
     sinServicios:
       "Este estudio aún no ofrece servicios para agendar en línea. Contáctalo para reservar.",
     titulo: "Agendar una cita",
-    intro: "Elige el servicio, con quién y a qué hora. Te toma un minuto.",
+    intro:
+      "Elige el servicio, el día y la hora, y con quién. Te toma un minuto.",
     servicio: "Elige un servicio",
     sucursal: "Sucursal",
     barbero: "¿Con quién?",

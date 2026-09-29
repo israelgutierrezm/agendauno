@@ -49,5 +49,19 @@ elegir: le importa la hora, no quién lo atiende. Sin esa opción:
 - Calcular los horarios cuesta una consulta de disponibilidad por profesional de la
   sede. Es aceptable para equipos de pocas personas; si crece, se puede calcular en
   un solo paso.
-- Pendiente (fuera de este paso): elegir primero la hora, varios servicios en una
-  cita y un selector semanal de horarios.
+- Pendiente (fuera de este paso): varios servicios en una cita y un selector
+  semanal de horarios.
+
+## Actualización: primero la hora (2026-09-28)
+
+En la página pública el orden pasa a ser sede → servicio → día y hora → con quién →
+datos, como en AgendaPro:
+
+- Las horas son las de todo el equipo. Quien ya tiene a alguien de preferencia
+  filtra con «Ver horarios de» y ya no se le pregunta con quién.
+- Tras elegir la hora, «¿Con quién?» muestra «Cualquier profesional disponible» (de
+  partida) y solo a quienes están libres a esa hora (`profesionales` del hueco).
+- Si se cambia a una hora en que la persona elegida ya no está libre, se vuelve a
+  «cualquiera».
+- No cambia el API. La cuenta del cliente (web) y la app siguen con el profesional
+  arriba, con «cualquiera» de partida.

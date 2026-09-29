@@ -102,6 +102,9 @@ export default {
     cualquiera: "Cualquier profesional disponible",
     cualquieraDesc: "Te atiende quien esté libre a esa hora.",
     teAtiende: "Te atenderá {nombre}.",
+    verHorariosDe: "Ver horarios de",
+    todoElEquipo: "Todo el equipo",
+    libresALas: "Libres a las {hora}.",
   },
   enlaces: {
     cargando: "Cargando…",

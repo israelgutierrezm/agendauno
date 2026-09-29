@@ -37,7 +37,7 @@ interface Opciones {
 interface Slot {
   inicia: string;
   termina: string;
-  // Con «cualquier profesional»: quiénes están libres en ese hueco.
+  // Con los horarios de todo el equipo: quiénes están libres en ese hueco.
   profesionales?: string[];
 }
 // Sin preferencia: el negocio asigna a quien esté libre a esa hora.
@@ -65,6 +65,10 @@ const gruposServicios = computed(() => {
   return [...grupos.entries()].map(([nombre, lista]) => ({ nombre, lista }));
 });
 const sucursalId = ref("");
+// Primero la hora: se ven los horarios de todo el equipo ("") o, si el cliente ya
+// tiene a alguien de preferencia, solo los de esa persona.
+const filtro = ref("");
+// Con quién: CUALQUIERA (lo asigna el negocio) o un profesional libre a esa hora.
 const barberoId = ref("");
 const fecha = ref("");
 const slotSel = ref<string>("");
@@ -98,6 +102,21 @@ const barberoSel = computed(
   () =>
     opciones.value?.instructores.find((b) => b.id === barberoId.value) ?? null,
 );
+const variosProfesionales = computed(
+  () => (opciones.value?.instructores.length ?? 0) > 1,
+);
+// Tras elegir la hora se elige con quién, salvo que ya se filtró por alguien.
+const eligeConQuien = computed(
+  () => variosProfesionales.value && filtro.value === "",
+);
+const slotActual = computed(
+  () => slots.value.find((s) => s.inicia === slotSel.value) ?? null,
+);
+// Quienes están libres a la hora elegida.
+const libresEnHora = computed(() => {
+  const ids = slotActual.value?.profesionales ?? [];
+  return (opciones.value?.instructores ?? []).filter((b) => ids.includes(b.id));
+});
 const zona = computed(
   () => sucursalSel.value?.zona_horaria ?? "America/Mexico_City",
 );
@@ -183,7 +202,7 @@ async function buscarSlots(): Promise<void> {
   slots.value = [];
   slotsCargados.value = false;
   buscandoSlots.value = false;
-  if (barberoId.value === "" || sucursalId.value === "" || fecha.value === "") {
+  if (sucursalId.value === "" || fecha.value === "") {
     return;
   }
   buscandoSlots.value = true;
@@ -193,9 +212,8 @@ async function buscarSlots(): Promise<void> {
       `/api/v1/app/${slug.value}/citas/disponibilidad`,
       {
         params: {
-          ...(barberoId.value !== CUALQUIERA
-            ? { instructor_id: barberoId.value }
-            : {}),
+          // Sin filtro, los horarios de todo el equipo.
+          ...(filtro.value !== "" ? { instructor_id: filtro.value } : {}),
           sucursal_id: sucursalId.value,
           fecha: fecha.value,
           duracion_minutos: duracion.value,
@@ -214,14 +232,33 @@ async function buscarSlots(): Promise<void> {
   }
 }
 
-// Recalcula huecos al cambiar barbero, sucursal, fecha o servicio (por su duración).
-// Con más de un profesional se parte de «cualquiera»: se puede elegir a alguien.
+// Con quién de partida: el del filtro, el único profesional o «cualquiera».
+function profesionalDePartida(): string {
+  const lista = opciones.value?.instructores ?? [];
+  if (filtro.value !== "") return filtro.value;
+  return lista.length === 1 ? lista[0].id : CUALQUIERA;
+}
 watch(sucursalId, () => {
-  barberoId.value =
-    (opciones.value?.instructores.length ?? 0) > 1 ? CUALQUIERA : "";
+  filtro.value = "";
+  barberoId.value = profesionalDePartida();
   fecha.value = "";
 });
-watch([barberoId, sucursalId, fecha, servicioId], buscarSlots);
+watch(filtro, () => {
+  barberoId.value = profesionalDePartida();
+});
+// Al cambiar de hora, quien se eligió sigue solo si está libre a la nueva hora.
+watch(slotSel, () => {
+  if (
+    slotSel.value !== "" &&
+    eligeConQuien.value &&
+    barberoId.value !== CUALQUIERA &&
+    !libresEnHora.value.some((b) => b.id === barberoId.value)
+  ) {
+    barberoId.value = CUALQUIERA;
+  }
+});
+// Recalcula huecos al cambiar filtro, sucursal, fecha o servicio (por su duración).
+watch([filtro, sucursalId, fecha, servicioId], buscarSlots);
 
 async function agendar(): Promise<void> {
   if (!listoParaAgendar.value) {
@@ -560,65 +597,55 @@ onMounted(cargar);
           </div>
         </div>
 
-        <!-- Profesional con su foto real o inicial de respaldo. -->
-        <fieldset
-          v-if="servicioId !== '' && sucursalId !== ''"
-          class="tu-card p-5 reserva-opciones"
+        <p
+          v-if="
+            servicioId !== '' &&
+            sucursalId !== '' &&
+            opciones.instructores.length === 0
+          "
+          class="tu-card p-5 reserva-ayuda"
         >
-          <legend class="tu-label">{{ $t("reservar.barbero") }}</legend>
-          <p v-if="opciones.instructores.length === 0" class="reserva-ayuda">
-            {{ $t("reservar.sinProfesionales") }}
-          </p>
-          <div v-else class="reserva-tarjetas">
-            <label
-              v-if="opciones.instructores.length > 1"
-              class="reserva-eleccion"
-              :class="{ 'reserva-eleccion--activa': barberoId === CUALQUIERA }"
-              data-prueba="cualquiera"
-            >
-              <input
-                v-model="barberoId"
-                type="radio"
-                name="profesional"
-                :value="CUALQUIERA"
-              />
-              <AvatarIniciales :nombre="null" tam="md" />
-              <span class="reserva-eleccion-texto"
-                ><strong>{{ $t("perfilPublico.agendar.cualquiera") }}</strong>
-                <span class="block text-xs font-normal">{{
-                  $t("perfilPublico.agendar.cualquieraDesc")
-                }}</span></span
-              >
-            </label>
-            <label
-              v-for="b in opciones.instructores"
-              :key="b.id"
-              class="reserva-eleccion"
-              :class="{ 'reserva-eleccion--activa': barberoId === b.id }"
-            >
-              <input
-                v-model="barberoId"
-                type="radio"
-                name="profesional"
-                :value="b.id"
-              />
-              <AvatarIniciales :nombre="b.nombre" :foto="b.foto_url" tam="md" />
-              <span class="reserva-eleccion-texto"
-                ><strong>{{ b.nombre }}</strong></span
-              >
-            </label>
-          </div>
-        </fieldset>
+          {{ $t("reservar.sinProfesionales") }}
+        </p>
 
-        <!-- Día + hora -->
+        <!-- Día + hora (de todo el equipo o de quien se prefiera) -->
         <div
-          v-if="barberoId !== '' && sucursalId !== '' && servicioId !== ''"
+          v-else-if="sucursalId !== '' && servicioId !== ''"
           class="tu-card p-5"
         >
-          <label class="tu-label" for="rc-fecha">{{
-            $t("reservar.cuando")
-          }}</label>
-          <input id="rc-fecha" v-model="fecha" type="date" class="tu-input" />
+          <div
+            class="grid gap-3"
+            :class="{ 'sm:grid-cols-2': variosProfesionales }"
+          >
+            <div>
+              <label class="tu-label" for="rc-fecha">{{
+                $t("reservar.cuando")
+              }}</label>
+              <input
+                id="rc-fecha"
+                v-model="fecha"
+                type="date"
+                class="tu-input"
+              />
+            </div>
+            <div v-if="variosProfesionales">
+              <label class="tu-label" for="rc-filtro">{{
+                $t("perfilPublico.agendar.verHorariosDe")
+              }}</label>
+              <select id="rc-filtro" v-model="filtro" class="tu-input">
+                <option value="">
+                  {{ $t("perfilPublico.agendar.todoElEquipo") }}
+                </option>
+                <option
+                  v-for="b in opciones.instructores"
+                  :key="b.id"
+                  :value="b.id"
+                >
+                  {{ b.nombre }}
+                </option>
+              </select>
+            </div>
+          </div>
 
           <p
             v-if="error && !slotSel"
@@ -676,6 +703,60 @@ onMounted(cargar);
             </div>
           </template>
         </div>
+
+        <!-- Con quién: tras la hora, solo quienes están libres entonces (foto real o
+             inicial de respaldo). -->
+        <fieldset
+          v-if="slotSel !== '' && eligeConQuien"
+          class="tu-card p-5 reserva-opciones"
+        >
+          <legend class="tu-label">{{ $t("reservar.barbero") }}</legend>
+          <p class="reserva-ayuda">
+            {{
+              $t("perfilPublico.agendar.libresALas", {
+                hora: horaLocal(slotSel),
+              })
+            }}
+          </p>
+          <div class="reserva-tarjetas">
+            <label
+              class="reserva-eleccion"
+              :class="{ 'reserva-eleccion--activa': barberoId === CUALQUIERA }"
+              data-prueba="cualquiera"
+            >
+              <input
+                v-model="barberoId"
+                type="radio"
+                name="profesional"
+                :value="CUALQUIERA"
+              />
+              <AvatarIniciales :nombre="null" tam="md" />
+              <span class="reserva-eleccion-texto"
+                ><strong>{{ $t("perfilPublico.agendar.cualquiera") }}</strong>
+                <span class="block text-xs font-normal">{{
+                  $t("perfilPublico.agendar.cualquieraDesc")
+                }}</span></span
+              >
+            </label>
+            <label
+              v-for="b in libresEnHora"
+              :key="b.id"
+              class="reserva-eleccion"
+              :class="{ 'reserva-eleccion--activa': barberoId === b.id }"
+            >
+              <input
+                v-model="barberoId"
+                type="radio"
+                name="profesional"
+                :value="b.id"
+              />
+              <AvatarIniciales :nombre="b.nombre" :foto="b.foto_url" tam="md" />
+              <span class="reserva-eleccion-texto"
+                ><strong>{{ b.nombre }}</strong></span
+              >
+            </label>
+          </div>
+        </fieldset>
 
         <!-- Datos -->
         <div v-if="slotSel !== ''" class="tu-card p-5">
