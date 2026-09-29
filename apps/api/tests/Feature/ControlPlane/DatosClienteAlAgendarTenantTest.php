@@ -117,6 +117,28 @@ it('desde su cuenta el cliente también deja una nota', function (): void {
     expect(citaEnAgenda($ctx, (string) $cita['sesion_id'])['nota'])->toBe('Llego 5 minutos tarde.');
 });
 
+it('una cita para otra persona es de quien agenda y dice quién asiste', function (): void {
+    $ctx = barberiaParaDatos();
+
+    // En línea: la agenda la mamá para su hijo; los avisos le llegan a ella.
+    $cita = agendarConDatos($ctx, '10:00', ['nombre' => 'Laura', 'email' => 'laura@correo.mx', 'asiste' => 'Juanito'])
+        ->assertCreated()->json('data');
+    $sesion = collect($this->getJson("/api/v1/app/{$ctx['e']['slug']}/sesiones?desde={$ctx['dia']}&hasta={$ctx['dia']}", conBearer($ctx['e']['bearer']))
+        ->json('data'))->first(fn (array $s): bool => ($s['cita']['reserva_id'] ?? null) === $cita['reserva']);
+    expect($sesion['cita']['cliente'])->toBe('Laura')
+        ->and($sesion['cita']['asiste'])->toBe('Juanito');
+
+    // Desde su cuenta, y la ve en sus reservas.
+    $cliente = alumnoConSesion($ctx['e'], 'Vale', 'vale@correo.mx');
+    $this->postJson("/api/v1/app/{$ctx['e']['slug']}/mi/citas", [
+        'oferta_id' => $ctx['sede']['oferta'], 'sucursal_id' => $ctx['sede']['sucursal'], 'instructor_id' => $ctx['pro'],
+        'inicia_en_local' => "{$ctx['dia']} 12:00:00", 'duracion_minutos' => 30, 'asiste' => 'Mi papá',
+    ], conBearer($cliente['bearer']))->assertCreated()->assertJsonPath('data.asiste', 'Mi papá');
+
+    agendarConDatos($ctx, '11:00', ['asiste' => str_repeat('a', 121)])->assertUnprocessable()
+        ->assertJsonValidationErrors(['asiste'], 'meta.errors');
+});
+
 it('valida la lada, cómo nos conoció y el largo de la nota', function (): void {
     $ctx = barberiaParaDatos();
 

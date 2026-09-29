@@ -117,7 +117,13 @@ const eventos = computed<Evento[]>(() => {
   const mias: Evento[] = cuenta.proximas.value.map((r) => ({
     id: r.id,
     mia: true,
-    titulo: r.oferta ?? "—",
+    // Si es para otra persona, se dice para quién.
+    titulo: r.asiste
+      ? t("perfilPublico.agendar.tituloPara", {
+          oferta: r.oferta ?? "—",
+          nombre: r.asiste,
+        })
+      : (r.oferta ?? "—"),
     inicia: r.inicia_en ?? "",
     termina: r.termina_en ?? null,
     zona: r.zona_horaria ?? "America/Mexico_City",

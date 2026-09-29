@@ -151,11 +151,15 @@ class ReservaMiembro {
     this.ofertaExpiraEn,
     this.ordenId,
     this.tipo,
+    this.asiste,
   });
 
   final String id;
   final String estado;
   final String? sesionId;
+
+  /// Si la agendó para otra persona: quién asiste (la cita es suya).
+  final String? asiste;
 
   /// Clase o cita (de la sesión): se nombra por lo que es.
   final String? tipo;
@@ -196,6 +200,7 @@ class ReservaMiembro {
     ofertaExpiraEn: j['oferta_expira_en'] as String?,
     ordenId: j['orden_id'] as String?,
     tipo: j['tipo'] as String?,
+    asiste: j['asiste'] as String?,
   );
 }
 

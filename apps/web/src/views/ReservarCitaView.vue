@@ -134,6 +134,9 @@ function datosVacios() {
 const datos = ref(datosVacios());
 // Nota para el negocio (también con cuenta): llega al detalle de la cita.
 const nota = ref("");
+// Para otra persona (ADR 0068): la cita es de quien agenda; se guarda quién asiste.
+const paraOtra = ref(false);
+const asiste = ref("");
 const LADAS = ["+52", "+1", "+57", "+34", "+54", "+56", "+51", "+593", "+502"];
 const ORIGENES = [
   "instagram",
@@ -568,6 +571,9 @@ async function agendar(): Promise<void> {
     inicia_en_local: relojLocal(slotSel.value),
     duracion_minutos: duracion.value,
     ...(nota.value.trim() !== "" ? { nota: nota.value.trim() } : {}),
+    ...(paraOtra.value && asiste.value.trim() !== ""
+      ? { asiste: asiste.value.trim() }
+      : {}),
   };
   try {
     if (clienteConCuenta.value) {
@@ -685,6 +691,8 @@ function otra(): void {
   slotsCargados.value = false;
   datos.value = datosVacios();
   nota.value = "";
+  paraOtra.value = false;
+  asiste.value = "";
   dias.value = [];
   fecha.value = "";
   ir("horario");
@@ -1660,6 +1668,32 @@ onMounted(cargar);
                   </div>
                 </div>
               </template>
+
+              <!-- Para otra persona: la cita es de quien agenda (ADR 0068). -->
+              <div class="mt-3">
+                <label class="flex items-center gap-2 text-sm">
+                  <input
+                    v-model="paraOtra"
+                    type="checkbox"
+                    data-prueba="para-otra"
+                  />
+                  {{ $t("perfilPublico.agendar.paraOtra") }}
+                </label>
+                <div v-if="paraOtra" class="mt-2">
+                  <label class="tu-label" for="rc-asiste">{{
+                    $t("perfilPublico.agendar.quienAsiste")
+                  }}</label>
+                  <input
+                    id="rc-asiste"
+                    v-model="asiste"
+                    class="tu-input"
+                    maxlength="120"
+                  />
+                  <span class="tu-hint">{{
+                    $t("perfilPublico.agendar.paraOtraAyuda")
+                  }}</span>
+                </div>
+              </div>
 
               <!-- Nota para el negocio (opcional), con o sin cuenta. -->
               <div class="mt-3">

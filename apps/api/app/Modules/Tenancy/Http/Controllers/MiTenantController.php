@@ -373,8 +373,10 @@ class MiTenantController
             'instructor_id' => ['nullable', 'string'],
             'inicia_en_local' => ['required', 'date'],
             'duracion_minutos' => ['required', 'integer', 'min:5', 'max:1440'],
-            // Nota para el negocio (ADR 0067).
+            // Nota para el negocio (ADR 0067) y, si es para otra persona, quién asiste
+            // (ADR 0068).
             'nota' => ['nullable', 'string', 'max:500'],
+            'asiste' => ['nullable', 'string', 'max:120'],
         ]);
 
         $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
@@ -386,9 +388,12 @@ class MiTenantController
         $reserva = $instructor instanceof Usuario
             ? $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, (int) $validado['duracion_minutos'])
             : $agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, (int) $validado['duracion_minutos']);
-        $nota = trim((string) ($validado['nota'] ?? ''));
-        if ($nota !== '') {
-            $reserva->update(['nota_cliente' => $nota]);
+        $cambios = array_filter([
+            'nota_cliente' => trim((string) ($validado['nota'] ?? '')),
+            'asiste' => trim((string) ($validado['asiste'] ?? '')),
+        ], static fn (string $v): bool => $v !== '');
+        if ($cambios !== []) {
+            $reserva->update($cambios);
         }
         $reserva->load(['sesion.oferta', 'sesion.instructor', 'orden']);
         $profesional = $reserva->sesion?->instructor;
@@ -521,6 +526,8 @@ class MiTenantController
             // Fin y profesional: para verla en su calendario y agregarla al del teléfono.
             'termina_en' => $reserva->sesion?->termina_en->toIso8601String(),
             'instructor' => $reserva->sesion?->instructor?->name,
+            // Si la agendó para otra persona: quién asiste (ADR 0068).
+            'asiste' => $reserva->asiste,
             'zona_horaria' => $reserva->sesion?->zona_horaria,
             // Vencimiento de la oferta de lista de espera (si la reserva está ofrecida).
             'oferta_expira_en' => $reserva->oferta_expira_en?->toIso8601String(),

@@ -85,7 +85,8 @@ el esquema.
 
 **Reservas y asistencia**
 - `reservas` — con lista de espera, reprogramación e idempotencia (ADR 0011, 0038) y la
-  nota del cliente para el negocio (ADR 0067).
+  nota del cliente para el negocio (ADR 0067) y quién asiste si es para otra persona
+  (ADR 0068).
 - `asistencias`, `checkins`, `accesos` — pase de lista, llegada y QR de acceso.
 - `politicas_cancelacion` — reglas de cancelación (ADR 0034).
 - `resenas` — reseñas de una clase o cita.

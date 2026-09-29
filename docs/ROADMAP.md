@@ -29,6 +29,8 @@
   página del negocio.
 - **Datos del cliente al agendar** (ADR 0067): apellidos, lada, cómo nos conoció y
   nota para el negocio.
+- **Agendar para otra persona** (ADR 0068): la cita es de quien agenda y guarda
+  quién asiste.
 - **Experiencia**: web única (sitio, panel, portal, superadmin) y app Flutter;
   roles propios y rol activo por sesión (ADR 0055, 0057); nombre AgendaUno
   (ADR 0056).
@@ -44,8 +46,7 @@
 
 - Conciliar el guardado de tarjeta de Stripe (pago automático) cuando no llega su
   aviso; hoy la conciliación cubre los cobros.
-- Reserva pública: agendar para otra persona (sin volver a familias, ADR 0059) y
-  reporte de clientes por cómo nos conocieron.
+- Reporte de clientes por cómo nos conocieron.
 - Avisos por WhatsApp (proveedor por decidir).
 - Separar «editar» y «eliminar» en el catálogo de permisos.
 - Roles propios con faceta de instructor.

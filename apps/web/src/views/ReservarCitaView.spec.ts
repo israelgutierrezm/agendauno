@@ -582,6 +582,36 @@ describe("datos del cliente", () => {
   });
 });
 
+describe("para otra persona", () => {
+  it("manda quién asiste solo si marca que es para otra persona", async () => {
+    api(opciones(1));
+    mocks.post.mockResolvedValue({
+      data: {
+        data: {
+          estado: "pendiente_pago",
+          orden_id: "orden",
+          total_minor: 20000,
+          moneda: "MXN",
+        },
+      },
+    });
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await elegirHora(vista, "09:00");
+    await continuar(vista);
+    expect(vista.find("#rc-asiste").exists()).toBe(false);
+    await vista.get('[data-prueba="para-otra"]').setValue(true);
+    await vista.get("#rc-asiste").setValue("Juanito");
+    await agendarComo(vista);
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/citas",
+      expect.objectContaining({ asiste: "Juanito" }),
+    );
+    vista.unmount();
+  });
+});
+
 describe("cliente con cuenta", () => {
   it("con sesión en el negocio no pide datos y agenda desde su cuenta", async () => {
     mocks.sesion.autenticado = true;

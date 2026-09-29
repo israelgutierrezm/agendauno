@@ -12,6 +12,7 @@ export interface CitaTitular {
   orden_id?: string | null; // orden del servicio (si es de pago)
   por_cobrar?: boolean; // agendada por el negocio y aún sin cobrar en caja
   nota?: string | null; // lo que el cliente pidió que supiéramos al agendar
+  asiste?: string | null; // si la agendó para otra persona: quién asiste
 }
 
 export interface SesionAgenda {

@@ -112,6 +112,22 @@ void main() {
     });
   });
 
+  group('ReservaMiembro', () {
+    test('una cita para otra persona dice quién asiste', () {
+      final r = ReservaMiembro.desdeJson({
+        'id': 'r1',
+        'estado': 'confirmada',
+        'asiste': 'Juanito',
+      });
+
+      expect(r.asiste, 'Juanito');
+      expect(
+        ReservaMiembro.desdeJson({'id': 'r2', 'estado': 'confirmada'}).asiste,
+        isNull,
+      );
+    });
+  });
+
   group('OpcionCita', () {
     test('un paquete trae los servicios que incluye, en orden', () {
       final o = OpcionCita.desdeJson({

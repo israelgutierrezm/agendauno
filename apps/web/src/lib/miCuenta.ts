@@ -28,6 +28,8 @@ export interface Reserva {
   inicia_en: string | null;
   termina_en?: string | null;
   instructor?: string | null;
+  // Si la agendó para otra persona: quién asiste.
+  asiste?: string | null;
   zona_horaria: string | null;
   oferta_expira_en: string | null;
   orden_id: string | null;

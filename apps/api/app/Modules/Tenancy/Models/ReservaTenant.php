@@ -27,7 +27,7 @@ class ReservaTenant extends Model
         'estado', 'canal', 'lugar', 'unidades', 'costo_unidades', 'idempotency_key',
         'horas_limite', 'penaliza_tarde', 'penaliza_no_show', 'oferta_expira_en',
         'motivo_cancelacion', 'cancelada_en', 'cancelada_por', 'cancelada_por_usuario_id', 'reprogramaciones_cliente',
-        'nota_cliente',
+        'nota_cliente', 'asiste',
     ];
 
     /**

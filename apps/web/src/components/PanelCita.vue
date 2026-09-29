@@ -248,6 +248,10 @@ function cancelar(por: "cliente" | "negocio" | null): void {
         </template>
         <dt>{{ $t("agendaVisual.cita.pago") }}</dt>
         <dd>{{ pago }}</dd>
+        <template v-if="cita?.asiste">
+          <dt>{{ $t("perfilPublico.agendar.asiste") }}</dt>
+          <dd data-prueba="asiste">{{ cita.asiste }}</dd>
+        </template>
         <template v-if="cita?.nota">
           <dt>{{ $t("perfilPublico.agendar.notaDelCliente") }}</dt>
           <dd data-prueba="nota-cliente">{{ cita.nota }}</dd>

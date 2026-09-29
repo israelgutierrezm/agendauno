@@ -429,6 +429,8 @@ class AgendaTenantController
                 'por_cobrar' => $titular->orden !== null && $titular->orden->estado === EstadoOrden::Pendiente,
                 // Lo que el cliente pidió que supiéramos al agendar (ADR 0067).
                 'nota' => $titular->nota_cliente,
+                // Si la agendó para otra persona: quién asiste (ADR 0068).
+                'asiste' => $titular->asiste,
             ] : null,
         ];
     }

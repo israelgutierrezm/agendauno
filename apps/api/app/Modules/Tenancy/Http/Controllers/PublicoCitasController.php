@@ -154,6 +154,8 @@ class PublicoCitasController
             'como_nos_conocio' => ['nullable', Rule::enum(OrigenCliente::class)],
             // Para el negocio: alergias, preferencias, si es su primera vez… (ADR 0067).
             'nota' => ['nullable', 'string', 'max:500'],
+            // Para otra persona: quién asiste (la cita es de quien agenda, ADR 0068).
+            'asiste' => ['nullable', 'string', 'max:120'],
             'oferta_id' => ['required', 'string'],
             'sucursal_id' => ['required', 'string'],
             'instructor_id' => ['nullable', 'string'],
@@ -175,7 +177,7 @@ class PublicoCitasController
         $reserva = $instructor instanceof Usuario
             ? $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, (int) $validado['duracion_minutos'])
             : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, (int) $validado['duracion_minutos']);
-        $this->anotar($reserva, $validado['nota'] ?? null);
+        $this->anotar($reserva, $validado['nota'] ?? null, $validado['asiste'] ?? null);
         $reserva->load(['orden', 'sesion.instructor']);
         $profesional = $reserva->sesion?->instructor;
 
@@ -334,13 +336,17 @@ class PublicoCitasController
     }
 
     /**
-     * La nota del cliente para el negocio queda en su cita (ADR 0067).
+     * Lo que el cliente dejó para su cita: la nota para el negocio (ADR 0067) y, si es
+     * para otra persona, quién asiste (ADR 0068).
      */
-    private function anotar(ReservaTenant $reserva, mixed $nota): void
+    private function anotar(ReservaTenant $reserva, mixed $nota, mixed $asiste): void
     {
-        $texto = trim((string) $nota);
-        if ($texto !== '') {
-            $reserva->update(['nota_cliente' => $texto]);
+        $cambios = array_filter([
+            'nota_cliente' => trim((string) $nota),
+            'asiste' => trim((string) $asiste),
+        ], static fn (string $v): bool => $v !== '');
+        if ($cambios !== []) {
+            $reserva->update($cambios);
         }
     }
 }

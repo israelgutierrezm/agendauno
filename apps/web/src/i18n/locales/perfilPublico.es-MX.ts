@@ -174,6 +174,12 @@ export default {
     prefieroNoDecir: "Prefiero no decir",
     nota: "Nota para el negocio (opcional)",
     notaDelCliente: "Nota del cliente",
+    paraOtra: "Es para otra persona",
+    quienAsiste: "¿Quién asiste?",
+    paraOtraAyuda:
+      "La cita queda a tu nombre: te llegan los avisos y la pagas tú.",
+    asiste: "Asiste",
+    tituloPara: "{oferta} · para {nombre}",
     nosConocioPor: "Nos conoció por",
     notaPh:
       "Algo que debamos saber: alergias, preferencias, si es tu primera vez…",

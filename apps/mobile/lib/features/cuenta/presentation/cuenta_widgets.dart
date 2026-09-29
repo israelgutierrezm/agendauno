@@ -293,6 +293,7 @@ class _DetalleReserva extends ConsumerWidget {
               [
                 r.sucursal,
                 if (r.instructor != null) 'con ${r.instructor}',
+                if (r.asiste != null) 'para ${r.asiste}',
               ].whereType<String>().join(' · '),
               style: const TextStyle(color: TemaAgendaUno.textoSuave),
             ),
