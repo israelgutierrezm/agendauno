@@ -7,17 +7,21 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
+use App\Modules\Tenancy\Application\CobroDeCitasTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
+use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
@@ -44,6 +48,8 @@ class PublicoCitasController
         private readonly CalcularDisponibilidadTenant $disponibilidad,
         private readonly OpcionesCitaTenant $opciones,
         private readonly RegistroDePasarelasTenant $pasarelas,
+        private readonly CobroDeCitasTenant $cobro,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -174,6 +180,52 @@ class PublicoCitasController
             // Quién atenderá: el elegido o el que se asignó.
             'profesional' => $profesional instanceof Usuario ? ['id' => $profesional->ulid, 'nombre' => (string) $profesional->name] : null,
         ]], 201);
+    }
+
+    /**
+     * La cita de una orden por la sesión (el enlace del correo de apartado): qué es,
+     * dónde, cuánto y hasta cuándo se puede pagar. El ULID de la orden es la
+     * capacidad, igual que al pagar; no expone datos de la persona. Solo directorio.
+     */
+    public function orden(Request $request): JsonResponse
+    {
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+        abort_unless($estudio->enDirectorio(), 404);
+
+        $orden = OrdenTenant::query()
+            ->where('ulid', (string) $request->route('orden'))
+            ->whereNotNull('sesion_id')
+            ->firstOrFail();
+        $reserva = ReservaTenant::query()
+            ->where('orden_id', $orden->getKey())
+            ->with(['sesion.oferta', 'sesion.sucursal'])
+            ->latest('id')
+            ->firstOrFail();
+        $sesion = $reserva->sesion;
+        $sede = $sesion?->sucursal;
+        // Apartada: se libera si no se paga a tiempo (ver expirarReservasPendientes).
+        $vence = $reserva->estado === EstadoReserva::PendientePago && $reserva->created_at !== null
+            ? CarbonImmutable::instance($reserva->created_at)->addMinutes($this->parametros->entero('reservas.minutos_para_pagar'))
+            : null;
+
+        return response()->json(['data' => [
+            'orden_id' => $orden->ulid,
+            'estado_orden' => $orden->estado->value,
+            'estado_reserva' => $reserva->estado->value,
+            'servicio' => $sesion?->oferta?->nombre,
+            'inicia_en' => $sesion?->inicia_en->toIso8601String(),
+            'zona_horaria' => $sesion->zona_horaria ?? $sede?->zona_horaria,
+            'sucursal' => $sede instanceof SucursalTenant ? [
+                'nombre' => $sede->nombre,
+                'direccion' => $sede->direccion,
+                'mapa_url' => $sede->enlaceMapa(),
+            ] : null,
+            'total_minor' => $orden->total_minor,
+            'moneda' => $orden->moneda,
+            'vence_en' => $vence?->toIso8601String(),
+            'pago_en_linea' => $this->cobro->pagoEnLinea(),
+        ]]);
     }
 
     public function pagar(Request $request): JsonResponse

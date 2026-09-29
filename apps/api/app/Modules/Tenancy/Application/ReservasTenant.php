@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Comunicaciones\DatosDeSesion;
 use App\Modules\Tenancy\Creditos\EstadoRetencion;
 use App\Modules\Tenancy\Creditos\Exceptions\SaldoInsuficiente;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
@@ -145,7 +146,7 @@ class ReservasTenant
 
             $this->emitirCreada($reserva, $bloqueada, $persona);
             if ($estado === EstadoReserva::PendientePago) {
-                $this->emitirApartada($reserva, $bloqueada, $persona, $orden->total_minor, $moneda);
+                $this->emitirApartada($reserva, $bloqueada, $persona, $orden, $moneda);
             }
 
             return $reserva;
@@ -153,11 +154,13 @@ class ReservasTenant
     }
 
     /**
-     * Aviso de lugar apartado (ADR 0065): qué se apartó, cuánto se paga y hasta qué
-     * hora; si no se paga, el lugar se libera.
+     * Aviso de lugar apartado (ADR 0065): qué se apartó, cuánto se paga, hasta qué
+     * hora y el enlace para pagarlo después (la página de agendar con la orden: su
+     * ULID es la capacidad para pagar); si no se paga, el lugar se libera.
      */
-    private function emitirApartada(ReservaTenant $reserva, SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda): void
+    private function emitirApartada(ReservaTenant $reserva, SesionTenant $sesion, PersonaTenant $persona, OrdenTenant $orden, string $moneda): void
     {
+        $slug = (string) app(GestorDeConexionTenant::class)->actual()?->slug;
         $datos = DatosDeSesion::para($sesion);
         $vence = now()->addMinutes($this->parametros->entero('reservas.minutos_para_pagar'))
             ->setTimezone((string) ($sesion->zona_horaria ?: DatosDeSesion::zonaDelNegocio()));
@@ -165,8 +168,9 @@ class ReservasTenant
         $this->eventos->registrar('reserva.apartada', 'reserva', (string) $reserva->ulid, [
             'persona_id' => (string) $persona->ulid,
             ...$datos,
-            'total' => DatosDeOrden::dinero($montoMinor, $moneda),
+            'total' => DatosDeOrden::dinero($orden->total_minor, $moneda),
             'vence' => $vence->format('H:i'),
+            'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/agendar/'.rawurlencode($slug).'?pagar='.rawurlencode((string) $orden->ulid),
         ]);
     }
 

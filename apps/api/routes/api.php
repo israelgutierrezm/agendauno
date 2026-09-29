@@ -203,6 +203,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/citas/dias', [PublicoCitasController::class, 'dias'])->middleware('throttle:60,1')->name('citas.dias');
         Route::post('/citas', [PublicoCitasController::class, 'agendar'])->middleware('throttle:login')->name('citas.agendar');
         Route::post('/citas/pagar', [PublicoCitasController::class, 'pagar'])->middleware('throttle:login')->name('citas.pagar');
+        // La cita por pagar del enlace del correo de apartado (el ULID de la orden es la capacidad).
+        Route::get('/citas/orden/{orden}', [PublicoCitasController::class, 'orden'])->middleware('throttle:60,1')->name('citas.orden');
 
         // Calendario personal (iCal) que leen Google Calendar, Apple u Outlook con el
         // enlace privado de cada quien (sin sesión).

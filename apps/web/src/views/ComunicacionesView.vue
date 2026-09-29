@@ -254,7 +254,7 @@ const MARCADORES_SESION = [
 ];
 const MARCADORES_POR_EVENTO: Record<string, string[]> = {
   "reserva.confirmada": MARCADORES_SESION,
-  "reserva.apartada": [...MARCADORES_SESION, "total", "vence"],
+  "reserva.apartada": [...MARCADORES_SESION, "total", "vence", "enlace"],
   "reserva.recordatorio_24h": MARCADORES_SESION,
   "reserva.recordatorio_2h": MARCADORES_SESION,
   "reserva.cancelada": [...MARCADORES_SESION, "credito"],

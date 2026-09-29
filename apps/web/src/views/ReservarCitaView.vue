@@ -51,6 +51,24 @@ interface Opciones {
   // Si se paga en línea para confirmar o se puede pagar en la sucursal.
   cobro?: { pago_obligatorio: boolean; pago_en_linea: boolean };
 }
+// La cita por pagar del enlace del correo de apartado (?pagar=<orden>).
+interface PorPagar {
+  orden_id: string;
+  estado_orden: string;
+  estado_reserva: string;
+  servicio: string | null;
+  inicia_en: string | null;
+  zona_horaria: string | null;
+  sucursal: {
+    nombre: string;
+    direccion: string | null;
+    mapa_url: string | null;
+  } | null;
+  total_minor: number | null;
+  moneda: string | null;
+  vence_en: string | null;
+  pago_en_linea: boolean;
+}
 // Un día del calendario: se puede elegir si alguien atiende y no pasó.
 interface Dia {
   fecha: string;
@@ -215,18 +233,18 @@ function dinero(minor: number | null, moneda: string | null): string {
     currency: moneda ?? "MXN",
   }).format((minor ?? 0) / 100);
 }
-function horaLocal(iso: string): string {
+function horaLocal(iso: string, tz = zona.value): string {
   return new Intl.DateTimeFormat("es-MX", {
-    timeZone: zona.value,
+    timeZone: tz,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   }).format(new Date(iso));
 }
 // "Jueves, 1 de octubre" en la zona de la sede.
-function diaLocal(iso: string): string {
+function diaLocal(iso: string, tz = zona.value): string {
   const texto = new Intl.DateTimeFormat("es-MX", {
-    timeZone: zona.value,
+    timeZone: tz,
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -276,7 +294,7 @@ async function cargar(): Promise<void> {
       sucursalId.value = data.data.sucursales[0].id;
     }
     paso.value = sucursalId.value !== "" ? "servicio" : "sucursal";
-    await retomar();
+    await Promise.all([retomar(), cargarPorPagar()]);
   } catch {
     noDisponible.value = true;
   } finally {
@@ -567,8 +585,37 @@ async function agendar(): Promise<void> {
   }
 }
 
-async function pagar(): Promise<void> {
-  if (resultado.value?.orden_id == null) {
+// Cita por pagar del enlace del correo: qué es, dónde, cuánto y hasta cuándo.
+const porPagar = ref<PorPagar | null>(null);
+const enlaceInvalido = ref(false);
+async function cargarPorPagar(): Promise<void> {
+  const orden = String(route.query.pagar ?? "");
+  if (orden === "") return;
+  try {
+    const { data } = await api.get<{ data: PorPagar }>(
+      `/api/v1/app/${slug.value}/citas/orden/${encodeURIComponent(orden)}`,
+    );
+    porPagar.value = data.data;
+  } catch {
+    enlaceInvalido.value = true;
+  }
+}
+// Se puede pagar si la orden sigue pendiente y la cita no se liberó.
+const sePuedePagar = computed(
+  () =>
+    porPagar.value !== null &&
+    porPagar.value.pago_en_linea &&
+    porPagar.value.estado_orden === "pendiente" &&
+    ["pendiente_pago", "confirmada"].includes(porPagar.value.estado_reserva),
+);
+function agendarDeNuevo(): void {
+  porPagar.value = null;
+  enlaceInvalido.value = false;
+  void router.replace({ path: route.path, query: {} });
+}
+
+async function pagar(ordenId: string | null | undefined): Promise<void> {
+  if (ordenId == null) {
     return;
   }
   pagando.value = true;
@@ -578,7 +625,7 @@ async function pagar(): Promise<void> {
       data: { checkout?: { tipo?: string; url?: string } | null };
     }>(`/api/v1/app/${slug.value}/citas/pagar`, {
       // Sin proveedor: el API usa la pasarela en línea con la que cobra el negocio.
-      orden_id: resultado.value.orden_id,
+      orden_id: ordenId,
       metodo: "tarjeta",
     });
     const checkout = data.data.checkout ?? {};
@@ -706,6 +753,116 @@ onMounted(cargar);
         {{ $t("reservar.sinServicios") }}
       </p>
 
+      <!-- ===== Pagar una cita apartada (enlace del correo) ===== -->
+      <div
+        v-else-if="porPagar || enlaceInvalido"
+        class="mt-8 tu-card p-6"
+        data-prueba="por-pagar"
+      >
+        <template v-if="porPagar">
+          <h2 class="text-xl font-semibold">
+            {{ $t("perfilPublico.agendar.pagaTuCita") }}
+          </h2>
+          <p class="mt-2 font-medium">{{ porPagar.servicio }}</p>
+          <p v-if="porPagar.inicia_en" class="text-sm">
+            {{ diaLocal(porPagar.inicia_en, porPagar.zona_horaria ?? zona) }} ·
+            {{ horaLocal(porPagar.inicia_en, porPagar.zona_horaria ?? zona) }}
+          </p>
+          <p
+            v-if="porPagar.sucursal"
+            class="text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ porPagar.sucursal.nombre
+            }}<template v-if="porPagar.sucursal.direccion">
+              · {{ porPagar.sucursal.direccion }}</template
+            >
+            <a
+              v-if="porPagar.sucursal.mapa_url"
+              :href="porPagar.sucursal.mapa_url"
+              target="_blank"
+              rel="noopener"
+              class="tu-enlace ml-1"
+              >{{ $t("perfilPublico.agendar.comoLlegar") }}</a
+            >
+          </p>
+
+          <p
+            v-if="porPagar.estado_orden === 'pagada'"
+            class="mt-4 text-sm"
+            data-prueba="ya-pagada"
+          >
+            {{ $t("perfilPublico.agendar.yaPagada") }}
+          </p>
+          <template v-else-if="sePuedePagar">
+            <p
+              v-if="porPagar.vence_en"
+              class="mt-4 text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{
+                $t("perfilPublico.agendar.pagaAntesDe", {
+                  hora: horaLocal(
+                    porPagar.vence_en,
+                    porPagar.zona_horaria ?? zona,
+                  ),
+                })
+              }}
+            </p>
+            <p
+              v-if="pendientePago"
+              class="mt-4 text-sm rounded-lg p-3"
+              :style="{
+                background: 'var(--primario-suave)',
+                color: 'var(--primario-fuerte)',
+              }"
+            >
+              {{ $t("reservar.pendientePago") }}
+            </p>
+            <button
+              v-else
+              class="tu-btn tu-btn-primario mt-3 w-full"
+              type="button"
+              :disabled="pagando"
+              @click="pagar(porPagar.orden_id)"
+            >
+              {{
+                pagando
+                  ? $t("reservar.pagando")
+                  : `${$t("reservar.pagar")} · ${dinero(porPagar.total_minor, porPagar.moneda)}`
+              }}
+            </button>
+          </template>
+          <template v-else>
+            <p class="mt-4 text-sm" data-prueba="vencida">
+              {{ $t("perfilPublico.agendar.vencida") }}
+            </p>
+            <button
+              class="tu-btn tu-btn-primario mt-3 w-full"
+              type="button"
+              @click="agendarDeNuevo"
+            >
+              {{ $t("perfilPublico.agendar.agendarDeNuevo") }}
+            </button>
+          </template>
+        </template>
+        <template v-else>
+          <p class="text-sm" data-prueba="enlace-invalido">
+            {{ $t("perfilPublico.agendar.enlaceInvalido") }}
+          </p>
+          <button
+            class="tu-btn tu-btn-primario mt-3 w-full"
+            type="button"
+            @click="agendarDeNuevo"
+          >
+            {{ $t("perfilPublico.agendar.agendarDeNuevo") }}
+          </button>
+        </template>
+        <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
+          {{ error }}
+        </p>
+      </div>
+
       <!-- ===== Confirmación ===== -->
       <div
         v-else-if="resultado"
@@ -785,7 +942,7 @@ onMounted(cargar);
             class="tu-btn tu-btn-fantasma mt-3 w-full"
             type="button"
             :disabled="pagando"
-            @click="pagar"
+            @click="pagar(resultado.orden_id)"
           >
             {{
               pagando
@@ -802,7 +959,7 @@ onMounted(cargar);
             class="tu-btn tu-btn-primario mt-3 w-full"
             type="button"
             :disabled="pagando"
-            @click="pagar"
+            @click="pagar(resultado.orden_id)"
           >
             {{
               pagando

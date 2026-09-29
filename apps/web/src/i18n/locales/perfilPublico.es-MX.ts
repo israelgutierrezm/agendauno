@@ -154,6 +154,15 @@ export default {
     entrar: "Entra y no escribas tus datos",
     correo: "Correo",
     correoAyuda: "Te enviamos ahí la confirmación de tu cita.",
+    pagaTuCita: "Paga tu cita",
+    pagaAntesDe:
+      "Págala antes de las {hora} para confirmarla; después el horario se libera.",
+    yaPagada: "Esta cita ya está pagada. ¡Te esperamos!",
+    vencida:
+      "Este apartado venció y el horario se liberó. Puedes agendar de nuevo.",
+    agendarDeNuevo: "Agendar de nuevo",
+    enlaceInvalido:
+      "No encontramos esta cita. Revisa el enlace de tu correo o agenda de nuevo.",
   },
   enlaces: {
     cargando: "Cargando…",

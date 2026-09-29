@@ -60,5 +60,10 @@ Al revisar la página pública para agendar salieron estos puntos:
 - Un negocio que no quiere cobrar por adelantado recibe citas confirmadas.
 - Con el pago opcional, un cliente puede apartar horarios sin pagar. Si hace falta,
   el siguiente paso es un límite de citas por pagar por cliente (parámetro).
-- El correo al apartar no trae un enlace para pagar después; hoy el pago se hace en
-  el momento. Un enlace de pago es trabajo aparte.
+- **Enlace para pagar después** (actualización): el correo de apartado trae
+  `{{enlace}}` → `/agendar/{slug}?pagar={orden}`.
+  - La página consulta `GET /citas/orden/{orden}`; el ULID de la orden es la
+    capacidad, como al pagar, y no expone datos de la persona.
+  - Muestra qué, cuándo, dónde, cuánto y hasta qué hora pagar, con «Pagar ahora».
+  - Si ya está pagada, lo dice; si venció, ofrece agendar de nuevo.
+  - El texto inicial de la plantilla se actualiza solo si el negocio no lo editó.

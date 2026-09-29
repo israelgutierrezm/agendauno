@@ -83,14 +83,44 @@ it('con cobro en línea y el pago para confirmar, la cita se aparta y le llega e
 
     $this->getJson("/api/v1/app/{$ctx['e']['slug']}/citas/opciones")->assertOk()
         ->assertJsonPath('data.cobro', ['pago_obligatorio' => true, 'pago_en_linea' => true]);
-    agendarEnLinea($ctx)->assertCreated()->assertJsonPath('data.estado', 'pendiente_pago');
+    $orden = agendarEnLinea($ctx)->assertCreated()->assertJsonPath('data.estado', 'pendiente_pago')->json('data.orden_id');
 
     $apartada = correosDeCita($ctx['e'], 'Apartamos tu lugar');
     expect($apartada)->toHaveCount(1)
         ->and($apartada[0]['destinatario'])->toBe('beto@correo.mx')
         ->and($apartada[0]['cuerpo'])->toContain('a las 10:00 en Roma Norte')
         ->toContain('completa el pago de $250.00 MXN antes de las')
+        // Con el enlace para pagarlo después.
+        ->toContain("/agendar/{$ctx['e']['slug']}?pagar={$orden}")
         ->and(correosDeCita($ctx['e'], 'Reserva confirmada'))->toBe([]);
+});
+
+it('el enlace del correo muestra la cita por pagar y hasta cuándo, y ya no si venció', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-10-01 09:00:00', 'America/Mexico_City'));
+    $ctx = barberiaParaCobrar();
+    activarCobroEnLinea($ctx['e']);
+    $orden = agendarEnLinea($ctx)->assertCreated()->json('data.orden_id');
+
+    $this->getJson("/api/v1/app/{$ctx['e']['slug']}/citas/orden/{$orden}")->assertOk()
+        ->assertJsonPath('data.estado_orden', 'pendiente')
+        ->assertJsonPath('data.estado_reserva', 'pendiente_pago')
+        ->assertJsonPath('data.servicio', 'Nivel 1')
+        ->assertJsonPath('data.sucursal.nombre', 'Roma Norte')
+        ->assertJsonPath('data.total_minor', 25000)
+        ->assertJsonPath('data.pago_en_linea', true)
+        // 30 minutos para pagar (parámetro de reservas).
+        ->assertJsonPath('data.vence_en', '2026-10-01T15:30:00+00:00')
+        ->assertJsonMissingPath('data.persona');
+
+    // Pasado el plazo se libera: la página ya no ofrece pagarla.
+    $this->travelTo(CarbonImmutable::parse('2026-10-01 09:45:00', 'America/Mexico_City'));
+    $this->artisan('agendauno:expirar-reservas-pago')->assertSuccessful();
+    $this->getJson("/api/v1/app/{$ctx['e']['slug']}/citas/orden/{$orden}")->assertOk()
+        ->assertJsonPath('data.estado_reserva', 'cancelada')
+        ->assertJsonPath('data.vence_en', null);
+
+    // Una orden que no existe (o que no es de una cita) no se encuentra.
+    $this->getJson("/api/v1/app/{$ctx['e']['slug']}/citas/orden/01J0000000000000000000000Z")->assertNotFound();
 });
 
 it('si el negocio no pide pagar en línea, la cita queda confirmada con su orden por cobrar y llega la confirmación', function (): void {

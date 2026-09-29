@@ -29,6 +29,7 @@ vi.mock("vue-router", () => ({
     params: { slug: "demo" },
     query: mocks.query,
     fullPath: "/agendar/demo",
+    path: "/agendar/demo",
   }),
   useRouter: () => ({ replace: vi.fn(), push: mocks.push }),
   RouterLink: { template: "<a><slot /></a>" },
@@ -118,14 +119,42 @@ const horarios = {
 function api(
   op = opciones(),
   huecos: () => Promise<unknown> = () => Promise.resolve(horarios),
+  porPagar: () => Promise<unknown> = () => Promise.reject(new Error("404")),
 ) {
   mocks.get.mockImplementation((url: string) =>
     url.endsWith("/citas/opciones")
       ? Promise.resolve(op)
       : url.endsWith("/citas/dias")
         ? Promise.resolve(dias)
-        : huecos(),
+        : url.includes("/citas/orden/")
+          ? porPagar()
+          : huecos(),
   );
+}
+// La cita del enlace del correo de apartado.
+function citaPorPagar(extra: Record<string, unknown> = {}) {
+  return {
+    data: {
+      data: {
+        orden_id: "orden-1",
+        estado_orden: "pendiente",
+        estado_reserva: "pendiente_pago",
+        servicio: "Corte",
+        inicia_en: "2030-01-07T16:00:00+00:00",
+        zona_horaria: "America/Mexico_City",
+        sucursal: {
+          nombre: "Centro",
+          direccion: "Av. Juárez 10, Centro",
+          mapa_url: "https://maps.app.goo.gl/centro",
+        },
+        total_minor: 20000,
+        moneda: "MXN",
+        vence_en: "2030-01-06T18:30:00+00:00",
+        pago_en_linea: true,
+        ...extra,
+      },
+    },
+  };
 }
 function montar() {
   return mount(ReservarCitaView, {
@@ -587,6 +616,80 @@ describe("cliente con cuenta", () => {
     await continuar(vista);
     expect(vista.find('[data-prueba="con-cuenta"]').exists()).toBe(false);
     expect(vista.find("#rc-nom").exists()).toBe(true);
+    vista.unmount();
+  });
+});
+
+describe("enlace para pagar una cita apartada", () => {
+  it("muestra la cita, hasta qué hora se paga y la paga", async () => {
+    mocks.query = { pagar: "orden-1" };
+    api(opciones(), undefined, () => Promise.resolve(citaPorPagar()));
+    mocks.post.mockResolvedValue({ data: { data: { checkout: null } } });
+    const vista = montar();
+    await flushPromises();
+
+    expect(mocks.get).toHaveBeenCalledWith(
+      "/api/v1/app/demo/citas/orden/orden-1",
+    );
+    const tarjeta = vista.get('[data-prueba="por-pagar"]');
+    expect(tarjeta.text()).toContain("Paga tu cita");
+    expect(tarjeta.text()).toContain("Corte");
+    expect(tarjeta.text()).toContain("10:00");
+    expect(tarjeta.text()).toContain("Av. Juárez 10, Centro");
+    expect(tarjeta.text()).toContain("Págala antes de las 12:30");
+    // No se muestra el asistente.
+    expect(vista.find('[data-prueba="pasos"]').exists()).toBe(false);
+
+    await tarjeta
+      .findAll("button")
+      .find((b) => b.text().startsWith("Pagar ahora"))!
+      .trigger("click");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith("/api/v1/app/demo/citas/pagar", {
+      orden_id: "orden-1",
+      metodo: "tarjeta",
+    });
+    vista.unmount();
+  });
+
+  it("si ya se pagó lo dice; si venció, ofrece agendar de nuevo", async () => {
+    mocks.query = { pagar: "orden-1" };
+    api(opciones(), undefined, () =>
+      Promise.resolve(citaPorPagar({ estado_orden: "pagada" })),
+    );
+    let vista = montar();
+    await flushPromises();
+    expect(vista.find('[data-prueba="ya-pagada"]').exists()).toBe(true);
+    expect(
+      vista.findAll("button").some((b) => b.text().startsWith("Pagar ahora")),
+    ).toBe(false);
+    vista.unmount();
+
+    api(opciones(), undefined, () =>
+      Promise.resolve(
+        citaPorPagar({
+          estado_orden: "cancelada",
+          estado_reserva: "cancelada",
+          vence_en: null,
+        }),
+      ),
+    );
+    vista = montar();
+    await flushPromises();
+    expect(vista.find('[data-prueba="vencida"]').exists()).toBe(true);
+    await vista
+      .findAll("button")
+      .find((b) => b.text() === "Agendar de nuevo")!
+      .trigger("click");
+    expect(vista.find('[data-prueba="pasos"]').exists()).toBe(true);
+    vista.unmount();
+  });
+
+  it("un enlace que no existe lo dice y deja agendar", async () => {
+    mocks.query = { pagar: "no-existe" };
+    const vista = montar();
+    await flushPromises();
+    expect(vista.find('[data-prueba="enlace-invalido"]').exists()).toBe(true);
     vista.unmount();
   });
 });
