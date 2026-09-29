@@ -171,6 +171,12 @@ const RUTAS: Record<string, string[]> = {
   ],
   chevron: ["M9 6l6 6-6 6"],
   cerrar: ["M6 6l12 12", "M18 6 6 18"],
+  ampliar: [
+    "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z",
+    "M20 20l-3.6-3.6",
+    "M11 8v6",
+    "M8 11h6",
+  ],
   buscar: ["M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z", "M20 20l-3.6-3.6"],
   lista: [
     "M9 6h11",

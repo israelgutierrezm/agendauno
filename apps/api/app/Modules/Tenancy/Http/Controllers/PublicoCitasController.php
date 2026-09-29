@@ -71,6 +71,8 @@ class PublicoCitasController
                 'slug' => $estudio->slug,
                 'nombre' => $estudio->nombre,
                 'logo_url' => $estudio->logo_url,
+                // Cómo llama el negocio a quien atiende (p. ej. «Barbero»).
+                'profesional' => (string) ($estudio->perfilConfig()['terminologia']['instructor'] ?? ''),
             ],
             ...$this->opciones->listar(),
         ]]);

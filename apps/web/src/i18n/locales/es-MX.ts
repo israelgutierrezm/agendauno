@@ -1203,6 +1203,12 @@ export default {
     },
     verPdf: "PDF",
   },
+  // Foto con lupa para verla en grande (p. ej. el profesional al agendar).
+  fotoAmpliable: {
+    ver: "Ver la foto de {nombre} en grande",
+    titulo: "Foto de {nombre}",
+    cerrar: "Cerrar",
+  },
   plataforma: {
     titulo: "Administración de plataforma",
     subtitulo: "Todos los estudios y la configuración global de AgendaUno.",

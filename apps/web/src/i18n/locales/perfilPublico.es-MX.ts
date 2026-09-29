@@ -137,6 +137,8 @@ export default {
     teAtiende: "Te atenderá {nombre}.",
     verHorariosDe: "Ver horarios de",
     todoElEquipo: "Todo el equipo",
+    cualquierProfesional: "Cualquier profesional",
+    quienTeAtiende: "¿Quién te atiende?",
     libresALas: "Libres a las {hora}.",
     pasosEtiqueta: "Pasos para agendar",
     pasos: {

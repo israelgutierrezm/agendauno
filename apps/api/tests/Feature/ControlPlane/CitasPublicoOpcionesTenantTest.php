@@ -60,7 +60,9 @@ it('expone las opciones públicas para agendar (servicios de pago, sucursales y 
     // Público: sin bearer.
     $data = $this->getJson("/api/v1/app/{$e['slug']}/citas/opciones")->assertOk()->json('data');
 
-    expect($data['estudio']['slug'])->toBe($e['slug']);
+    expect($data['estudio']['slug'])->toBe($e['slug'])
+        // Cómo llama el negocio a quien atiende (el subtítulo de cada profesional).
+        ->and($data['estudio']['profesional'])->toBeString()->not->toBe('');
     // El único servicio de pago aparece con precio + duración.
     expect($data['servicios'])->toHaveCount(1);
     expect($data['servicios'][0])->toMatchArray([

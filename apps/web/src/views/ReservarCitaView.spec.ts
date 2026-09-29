@@ -256,11 +256,15 @@ describe("agenda pública por pasos", () => {
     await elegirHora(vista, "09:30");
     // Los dos libres a esa hora y, antes, «cualquier profesional disponible».
     expect(vista.findAll('input[name="profesional"]')).toHaveLength(3);
-    const foto = vista.get('img[src="/storage/ana.webp"]');
-    await foto.trigger("error");
+    // Si la foto no carga (aquí y en «Ver horarios de»), queda la inicial.
+    for (const foto of vista.findAll('img[src="/storage/ana.webp"]')) {
+      await foto.trigger("error");
+    }
     expect(vista.find('img[src="/storage/ana.webp"]').exists()).toBe(false);
     expect(
-      vista.get('input[value="ana"]').element.closest("label")?.textContent,
+      vista
+        .get('input[name="profesional"][value="ana"]')
+        .element.closest("label")?.textContent,
     ).toContain("A");
     vista.unmount();
   });
@@ -355,7 +359,7 @@ describe("agenda pública por pasos", () => {
     await vista.get('input[value="centro"]').setValue();
     await hastaHorario(vista);
     await elegirHora(vista, "09:00");
-    await vista.get('input[value="ana"]').setValue();
+    await vista.get('input[name="profesional"][value="ana"]').setValue();
     await continuar(vista);
 
     const donde = vista.get('[data-prueba="donde"]');
@@ -462,14 +466,16 @@ describe("agenda pública por pasos", () => {
     await flushPromises();
     await hastaHorario(vista);
     await elegirHora(vista, "09:30");
-    await vista.get('input[value="luis"]').setValue();
+    await vista.get('input[name="profesional"][value="luis"]').setValue();
     await elegirHora(vista, "09:00");
     expect(vista.text()).toContain("Libres a las 09:00.");
-    expect(vista.find('input[value="luis"]').exists()).toBe(false);
+    expect(vista.find('input[name="profesional"][value="luis"]').exists()).toBe(
+      false,
+    );
     expect(marcado(vista, '[data-prueba="cualquiera"] input')).toBe(true);
-    await vista.get('input[value="ana"]').setValue();
+    await vista.get('input[name="profesional"][value="ana"]').setValue();
     await elegirHora(vista, "09:30");
-    expect(marcado(vista, 'input[value="ana"]')).toBe(true);
+    expect(marcado(vista, 'input[name="profesional"][value="ana"]')).toBe(true);
     vista.unmount();
   });
 
@@ -481,7 +487,9 @@ describe("agenda pública por pasos", () => {
     const vista = montar();
     await flushPromises();
     await hastaHorario(vista);
-    await vista.get("#rc-filtro").setValue("luis");
+    await vista
+      .get('[data-prueba="filtro-luis"] input[type="radio"]')
+      .setValue();
     await flushPromises();
     expect(mocks.get).toHaveBeenCalledWith("/api/v1/app/demo/citas/dias", {
       params: expect.objectContaining({ instructor_id: "luis" }),
@@ -502,6 +510,46 @@ describe("agenda pública por pasos", () => {
     vista.unmount();
   });
 
+  it("ver horarios de muestra a cada profesional con su foto y la lupa la abre en grande", async () => {
+    api(opciones(1));
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+
+    const tarjetas = vista.get('[data-prueba="ver-horarios-de"]');
+    expect(tarjetas.text()).toContain("Todo el equipo");
+    expect(tarjetas.text()).toContain("Cualquier profesional");
+    expect(vista.get('[data-prueba="filtro-ana"] img').attributes("src")).toBe(
+      "/storage/ana.webp",
+    );
+    // Sin foto no hay nada que ampliar.
+    expect(
+      vista
+        .find('[data-prueba="filtro-luis"] [data-prueba="ampliar-foto"]')
+        .exists(),
+    ).toBe(false);
+
+    // La lupa no elige a la persona: solo muestra la foto en grande.
+    await vista
+      .get('[data-prueba="filtro-ana"] [data-prueba="ampliar-foto"]')
+      .trigger("click");
+    const grande = document.querySelector('[data-prueba="foto-grande"]');
+    expect(grande?.querySelector("img")?.getAttribute("src")).toBe(
+      "/storage/ana.webp",
+    );
+    expect(grande?.textContent).toContain("Ana Pérez");
+    expect(
+      (
+        vista.get('[data-prueba="filtro-todos"] input')
+          .element as HTMLInputElement
+      ).checked,
+    ).toBe(true);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await flushPromises();
+    expect(document.querySelector('[data-prueba="foto-grande"]')).toBeNull();
+    vista.unmount();
+  });
+
   it("descarta horarios tardíos al cambiar de sede y vuelve a ver todo el equipo", async () => {
     let resolver!: (value: typeof horarios) => void;
     api(
@@ -515,7 +563,9 @@ describe("agenda pública por pasos", () => {
     await flushPromises();
     await vista.get('input[value="centro"]').setValue();
     await hastaHorario(vista);
-    await vista.get("#rc-filtro").setValue("ana");
+    await vista
+      .get('[data-prueba="filtro-ana"] input[type="radio"]')
+      .setValue();
     await flushPromises();
     // Vuelve a la sede desde el mapa de pasos y elige otra.
     await vista.get('button[data-paso="sucursal"]').trigger("click");
@@ -526,9 +576,12 @@ describe("agenda pública por pasos", () => {
     // El servicio ya estaba elegido: tocarlo de nuevo lleva a la fecha y hora.
     await vista.get('input[value="servicio"]').trigger("click");
     await flushPromises();
-    expect((vista.get("#rc-filtro").element as HTMLSelectElement).value).toBe(
-      "",
-    );
+    expect(
+      (
+        vista.get('[data-prueba="filtro-todos"] input')
+          .element as HTMLInputElement
+      ).checked,
+    ).toBe(true);
     expect(vista.find("#rc-nom").exists()).toBe(false);
     vista.unmount();
   });
@@ -703,7 +756,7 @@ describe("cliente con cuenta", () => {
     await flushPromises();
     await hastaHorario(vista);
     await elegirHora(vista, "09:30");
-    await vista.get('input[value="luis"]').setValue();
+    await vista.get('input[name="profesional"][value="luis"]').setValue();
     await continuar(vista);
     await vista.get('[data-prueba="entrar"]').trigger("click");
     expect(mocks.push).toHaveBeenCalledWith({

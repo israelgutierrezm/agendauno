@@ -7,8 +7,8 @@ import { useRetornoPago } from "@/lib/retornoPago";
 import { recordarNegocio } from "@/lib/negociosRecientes";
 import { esMiembro } from "@/lib/roles";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
-import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import CalendarioDias from "@/components/CalendarioDias.vue";
+import FotoAmpliable from "@/components/FotoAmpliable.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import IconoRed from "@/components/IconoRed.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
@@ -46,7 +46,13 @@ interface Persona {
   foto_url?: string | null;
 }
 interface Opciones {
-  estudio: { slug: string; nombre: string; logo_url: string | null };
+  estudio: {
+    slug: string;
+    nombre: string;
+    logo_url: string | null;
+    // Cómo llama el negocio a quien atiende (p. ej. «Barbero»).
+    profesional?: string;
+  };
   servicios: Servicio[];
   sucursales: Sucursal[];
   instructores: Persona[];
@@ -1177,23 +1183,67 @@ onMounted(cargar);
                   {{ $t("perfilPublico.agendar.cambiar") }}
                 </button>
               </p>
-              <div v-if="variosProfesionales" class="mb-4">
-                <label class="tu-label" for="rc-filtro">{{
-                  $t("perfilPublico.agendar.verHorariosDe")
-                }}</label>
-                <select id="rc-filtro" v-model="filtro" class="tu-input">
-                  <option value="">
-                    {{ $t("perfilPublico.agendar.todoElEquipo") }}
-                  </option>
-                  <option
+              <!-- Ver horarios de: todo el equipo o alguien, con su foto por si no
+                   recuerdan su nombre (la lupa la muestra en grande). -->
+              <fieldset
+                v-if="variosProfesionales"
+                class="mb-4"
+                data-prueba="ver-horarios-de"
+              >
+                <legend class="tu-label">
+                  {{ $t("perfilPublico.agendar.verHorariosDe") }}
+                </legend>
+                <div class="rc-quien">
+                  <label
+                    class="reserva-eleccion rc-quien-tarjeta"
+                    :class="{ 'reserva-eleccion--activa': filtro === '' }"
+                    data-prueba="filtro-todos"
+                  >
+                    <span class="rc-equipo" aria-hidden="true">
+                      <IconoNav nombre="personas" :tam="22" />
+                    </span>
+                    <span class="reserva-eleccion-texto">
+                      <strong>{{
+                        $t("perfilPublico.agendar.todoElEquipo")
+                      }}</strong>
+                      <span class="block text-xs font-normal rc-suave">{{
+                        $t("perfilPublico.agendar.cualquierProfesional")
+                      }}</span>
+                    </span>
+                    <input
+                      v-model="filtro"
+                      type="radio"
+                      name="ver-horarios-de"
+                      value=""
+                      class="rc-quien-radio"
+                    />
+                  </label>
+                  <label
                     v-for="b in opciones.instructores"
                     :key="b.id"
-                    :value="b.id"
+                    class="reserva-eleccion rc-quien-tarjeta"
+                    :class="{ 'reserva-eleccion--activa': filtro === b.id }"
+                    :data-prueba="`filtro-${b.id}`"
                   >
-                    {{ b.nombre }}
-                  </option>
-                </select>
-              </div>
+                    <FotoAmpliable :nombre="b.nombre" :foto="b.foto_url" />
+                    <span class="reserva-eleccion-texto">
+                      <strong>{{ b.nombre }}</strong>
+                      <span
+                        v-if="opciones.estudio.profesional"
+                        class="block text-xs font-normal rc-suave"
+                        >{{ opciones.estudio.profesional }}</span
+                      >
+                    </span>
+                    <input
+                      v-model="filtro"
+                      type="radio"
+                      name="ver-horarios-de"
+                      :value="b.id"
+                      class="rc-quien-radio"
+                    />
+                  </label>
+                </div>
+              </fieldset>
               <span class="tu-label">{{ $t("reservar.cuando") }}</span>
               <!-- Días desde hoy; los que no tienen atención no se eligen. -->
               <CalendarioDias
@@ -1259,7 +1309,9 @@ onMounted(cargar);
               v-if="slotSel !== '' && eligeConQuien"
               class="tu-card p-5 reserva-opciones"
             >
-              <legend class="tu-label">{{ $t("reservar.barbero") }}</legend>
+              <legend class="tu-label">
+                {{ $t("perfilPublico.agendar.quienTeAtiende") }}
+              </legend>
               <p class="reserva-ayuda">
                 {{
                   $t("perfilPublico.agendar.libresALas", {
@@ -1281,7 +1333,9 @@ onMounted(cargar);
                     name="profesional"
                     :value="CUALQUIERA"
                   />
-                  <AvatarIniciales :nombre="null" tam="md" />
+                  <span class="rc-equipo" aria-hidden="true">
+                    <IconoNav nombre="personas" :tam="22" />
+                  </span>
                   <span class="reserva-eleccion-texto"
                     ><strong>{{
                       $t("perfilPublico.agendar.cualquiera")
@@ -1303,11 +1357,7 @@ onMounted(cargar);
                     name="profesional"
                     :value="b.id"
                   />
-                  <AvatarIniciales
-                    :nombre="b.nombre"
-                    :foto="b.foto_url"
-                    tam="md"
-                  />
+                  <FotoAmpliable :nombre="b.nombre" :foto="b.foto_url" />
                   <span class="reserva-eleccion-texto"
                     ><strong>{{ b.nombre }}</strong></span
                   >
@@ -1698,6 +1748,39 @@ onMounted(cargar);
   display: block;
   font-weight: 500;
   font-size: 0.9rem;
+}
+
+/* Ver horarios de: tarjetas con la foto; el círculo de selección a la derecha. */
+.rc-quien {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.75rem;
+}
+.rc-quien-tarjeta {
+  min-height: 0;
+  padding: 0.75rem 0.9rem;
+}
+.rc-quien-tarjeta .reserva-eleccion-texto {
+  flex: 1;
+}
+.rc-quien-radio {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.rc-equipo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  color: var(--texto-suave);
+}
+.rc-suave {
+  color: var(--texto-suave);
 }
 
 /* Tarjeta de sede: foto arriba (o el pin), nombre y dirección. */
