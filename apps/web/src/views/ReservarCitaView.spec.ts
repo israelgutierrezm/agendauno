@@ -41,12 +41,18 @@ function opciones(sedes = 2) {
             nombre: "Centro",
             region: "Ciudad de México",
             zona_horaria: "America/Mexico_City",
+            direccion: "Av. Juárez 10, Centro",
+            foto_url: "/storage/centro.webp",
+            mapa_url: "https://maps.app.goo.gl/centro",
           },
           {
             id: "norte",
             nombre: "Norte",
             region: null,
             zona_horaria: "America/Mexico_City",
+            direccion: null,
+            foto_url: null,
+            mapa_url: null,
           },
         ].slice(0, sedes),
         instructores: [
@@ -99,6 +105,15 @@ async function elegirHora(vista: Vista, hora: string): Promise<void> {
 function marcado(vista: Vista, selector: string): boolean {
   return (vista.get(selector).element as HTMLInputElement).checked;
 }
+// Del servicio a la hora (y la fecha).
+async function hastaHorario(vista: Vista): Promise<void> {
+  await vista.get('input[value="servicio"]').setValue();
+  await vista.get("#rc-fecha").setValue("2030-01-07");
+  await flushPromises();
+}
+async function continuar(vista: Vista): Promise<void> {
+  await vista.get('[data-prueba="continuar"]').trigger("click");
+}
 async function agendarComo(vista: Vista): Promise<void> {
   await vista.get("#rc-nom").setValue("Cliente de prueba");
   await vista
@@ -107,26 +122,40 @@ async function agendarComo(vista: Vista): Promise<void> {
     .trigger("click");
   await flushPromises();
 }
+function pasos(vista: Vista): string[] {
+  return vista
+    .findAll('[data-prueba="pasos"] li')
+    .map((li) => li.text().trim());
+}
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.query = {};
   mocks.get.mockResolvedValue(opciones());
 });
 
-describe("agenda pública visual", () => {
-  it("elige sucursal antes del servicio y, tras la hora, muestra con foto o inicial a quienes están libres", async () => {
+describe("agenda pública por pasos", () => {
+  it("con varias sedes empieza por la sede (con su foto y dirección) y luego el servicio", async () => {
     mocks.get.mockResolvedValueOnce(opciones()).mockResolvedValue(horarios);
     const vista = montar();
     await flushPromises();
+    expect(pasos(vista)).toEqual([
+      "1Sucursal",
+      "2Servicio",
+      "3Fecha y hora",
+      "4Confirmación",
+    ]);
     expect(vista.findAll('input[name="sucursal"]')).toHaveLength(2);
-    expect(vista.text()).toContain("Ciudad de México");
+    expect(vista.get('img[src="/storage/centro.webp"]').exists()).toBe(true);
+    expect(vista.text()).toContain("Av. Juárez 10, Centro");
     expect(vista.find('input[value="servicio"]').exists()).toBe(false);
+
     await vista.get('input[value="centro"]').setValue();
-    await vista.get('input[value="servicio"]').setValue();
-    // Primero el día y la hora: todavía no se pregunta con quién.
+    // Paso 2: el servicio, con la sede elegida a la vista.
+    expect(vista.find('input[name="sucursal"]').exists()).toBe(false);
+    expect(vista.get('[data-prueba="contexto"]').text()).toContain("Centro");
+    await hastaHorario(vista);
+    // Paso 3: primero el día y la hora; todavía no se pregunta con quién.
     expect(vista.find('input[name="profesional"]').exists()).toBe(false);
-    await vista.get("#rc-fecha").setValue("2030-01-07");
-    await flushPromises();
     await elegirHora(vista, "09:30");
     // Los dos libres a esa hora y, antes, «cualquier profesional disponible».
     expect(vista.findAll('input[name="profesional"]')).toHaveLength(3);
@@ -142,36 +171,75 @@ describe("agenda pública visual", () => {
     vista.unmount();
   });
 
-  it("selecciona automáticamente la única sede y respeta una sede del enlace", async () => {
+  it("con una sola sede (o la del enlace) empieza por el servicio", async () => {
     mocks.get.mockResolvedValueOnce(opciones(1));
     let vista = montar();
     await flushPromises();
+    expect(pasos(vista)).toEqual([
+      "1Servicio",
+      "2Fecha y hora",
+      "3Confirmación",
+    ]);
     expect(vista.find('input[name="sucursal"]').exists()).toBe(false);
     expect(vista.find('input[value="servicio"]').exists()).toBe(true);
     vista.unmount();
+
     mocks.query = { sucursal: "norte" };
     vista = montar();
     await flushPromises();
-    expect(marcado(vista, 'input[value="norte"]')).toBe(true);
     expect(vista.find('input[value="servicio"]').exists()).toBe(true);
+    expect(vista.get('[data-prueba="contexto"]').text()).toContain("Norte");
     vista.unmount();
   });
 
-  it("confirma en success sin confundir una cita apartada con un pago realizado", async () => {
+  it("solo deja volver a los pasos hechos y no continúa sin hora", async () => {
     mocks.get.mockResolvedValueOnce(opciones(1)).mockResolvedValue(horarios);
+    const vista = montar();
+    await flushPromises();
+    // Los pasos pendientes no son botones.
+    expect(vista.find('button[data-paso="horario"]').exists()).toBe(false);
+    await hastaHorario(vista);
+    expect(
+      vista.get('[data-prueba="continuar"]').attributes("disabled"),
+    ).toBeDefined();
+    await elegirHora(vista, "09:00");
+    expect(
+      vista.get('[data-prueba="continuar"]').attributes("disabled"),
+    ).toBeUndefined();
+    // Volver al servicio desde el mapa de pasos.
+    await vista.get('button[data-paso="servicio"]').trigger("click");
+    expect(vista.find('input[value="servicio"]').exists()).toBe(true);
+    expect(vista.find("#rc-fecha").exists()).toBe(false);
+    vista.unmount();
+  });
+
+  it("confirma con el resumen de dónde es la cita y no confunde una cita apartada con un pago", async () => {
+    mocks.get.mockResolvedValueOnce(opciones()).mockResolvedValue(horarios);
     mocks.post.mockResolvedValue({
       data: { data: { orden_id: "orden", total_minor: 20000, moneda: "MXN" } },
     });
     const vista = montar();
     await flushPromises();
-    await vista.get('input[value="servicio"]').setValue();
-    await vista.get("#rc-fecha").setValue("2030-01-07");
-    await flushPromises();
+    await vista.get('input[value="centro"]').setValue();
+    await hastaHorario(vista);
     await elegirHora(vista, "09:00");
     await vista.get('input[value="ana"]').setValue();
+    await continuar(vista);
+
+    const donde = vista.get('[data-prueba="donde"]');
+    expect(donde.text()).toContain("Centro");
+    expect(donde.text()).toContain("Av. Juárez 10, Centro");
+    expect(donde.get('[data-prueba="como-llegar"]').attributes("href")).toBe(
+      "https://maps.app.goo.gl/centro",
+    );
+    expect(vista.get('[data-prueba="resumen"]').text()).toContain("Ana Pérez");
+
     await agendarComo(vista);
     expect(vista.get("h2.text-success").text()).toBe(es.reservar.listoTitulo);
     expect(vista.get('[role="status"]').text()).toContain(es.reservar.apartado);
+    expect(vista.get('[data-prueba="donde-listo"]').text()).toContain(
+      "Av. Juárez 10, Centro",
+    );
     expect(mocks.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/citas",
       expect.objectContaining({
@@ -197,9 +265,7 @@ describe("agenda pública visual", () => {
     });
     const vista = montar();
     await flushPromises();
-    await vista.get('input[value="servicio"]').setValue();
-    await vista.get("#rc-fecha").setValue("2030-01-07");
-    await flushPromises();
+    await hastaHorario(vista);
     expect(mocks.get).toHaveBeenLastCalledWith(
       "/api/v1/app/demo/citas/disponibilidad",
       {
@@ -210,7 +276,10 @@ describe("agenda pública visual", () => {
     );
     await elegirHora(vista, "09:30");
     expect(marcado(vista, '[data-prueba="cualquiera"] input')).toBe(true);
-    expect(vista.text()).toContain("Cualquier profesional disponible · 09:30");
+    await continuar(vista);
+    expect(vista.get('[data-prueba="resumen"]').text()).toContain(
+      "Cualquier profesional disponible",
+    );
     await agendarComo(vista);
     expect(mocks.post.mock.calls[0][1]).not.toHaveProperty("instructor_id");
     expect(vista.get('[role="status"]').text()).toContain(
@@ -223,9 +292,7 @@ describe("agenda pública visual", () => {
     mocks.get.mockResolvedValueOnce(opciones(1)).mockResolvedValue(horarios);
     const vista = montar();
     await flushPromises();
-    await vista.get('input[value="servicio"]').setValue();
-    await vista.get("#rc-fecha").setValue("2030-01-07");
-    await flushPromises();
+    await hastaHorario(vista);
     await elegirHora(vista, "09:30");
     await vista.get('input[value="luis"]').setValue();
     // A las 09:00 Luis está ocupado: ya no aparece y se vuelve a «cualquiera».
@@ -258,7 +325,8 @@ describe("agenda pública visual", () => {
     );
     await elegirHora(vista, "09:30");
     expect(vista.find('input[name="profesional"]').exists()).toBe(false);
-    expect(vista.text()).toContain("Luis López · 09:30");
+    await continuar(vista);
+    expect(vista.get('[data-prueba="resumen"]').text()).toContain("Luis López");
     await agendarComo(vista);
     expect(mocks.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/citas",
@@ -267,7 +335,7 @@ describe("agenda pública visual", () => {
     vista.unmount();
   });
 
-  it("descarta horarios tardíos al cambiar sucursal y vuelve a ver todo el equipo", async () => {
+  it("descarta horarios tardíos al cambiar de sede y vuelve a ver todo el equipo", async () => {
     let resolver!: (value: typeof horarios) => void;
     mocks.get.mockResolvedValueOnce(opciones()).mockImplementation(
       () =>
@@ -281,9 +349,13 @@ describe("agenda pública visual", () => {
     await vista.get('input[value="servicio"]').setValue();
     await vista.get("#rc-filtro").setValue("ana");
     await vista.get("#rc-fecha").setValue("2030-01-07");
+    // Vuelve a la sede desde el mapa de pasos y elige otra.
+    await vista.get('button[data-paso="sucursal"]').trigger("click");
     await vista.get('input[value="norte"]').setValue();
     resolver(horarios);
     await flushPromises();
+    // El servicio ya estaba elegido: tocarlo de nuevo lleva a la fecha y hora.
+    await vista.get('input[value="servicio"]').trigger("click");
     expect((vista.get("#rc-filtro").element as HTMLSelectElement).value).toBe(
       "",
     );

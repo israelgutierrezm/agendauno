@@ -47,6 +47,10 @@ class OpcionesCitaTenant
                     'nombre' => $s->nombre,
                     'zona_horaria' => $s->zona_horaria,
                     'region' => $s->region,
+                    // Para reconocerla y llegar a la correcta (ADR 0064).
+                    'direccion' => $s->direccion,
+                    'foto_url' => $s->fotoUrl(),
+                    'mapa_url' => $s->enlaceMapa(),
                 ])->values()->all(),
             'instructores' => Usuario::query()
                 ->whereJsonContains('roles', 'instructor')

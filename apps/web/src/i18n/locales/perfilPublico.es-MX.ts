@@ -20,8 +20,9 @@ export default {
     portadaSubiendo: "Subiendo…",
     portadaQuitar: "Quitar portada",
     redes: "Redes y sitio web",
+    // La arroba va como literal: vue-i18n lee «@» como mensaje enlazado.
     redesAyuda:
-      "Escribe tu usuario (@tu_negocio) o pega el enlace de tu perfil.",
+      "Escribe tu usuario ({'@'}tu_negocio) o pega el enlace de tu perfil.",
     guardar: "Guardar perfil",
     guardando: "Guardando…",
     guardado: "Perfil guardado.",
@@ -38,10 +39,10 @@ export default {
     sitio_web: "Sitio web",
   },
   redesPh: {
-    instagram: "@tu_negocio",
+    instagram: "{'@'}tu_negocio",
     facebook: "facebook.com/tu_negocio",
-    tiktok: "@tu_negocio",
-    youtube: "@tu_canal",
+    tiktok: "{'@'}tu_negocio",
+    youtube: "{'@'}tu_canal",
     sitio_web: "tunegocio.mx",
   },
   sucursal: {
@@ -49,6 +50,15 @@ export default {
     ayuda: "Dirección, contacto, redes y horario que ve el público.",
     direccion: "Dirección",
     direccionPh: "Calle, número, colonia y ciudad",
+    foto: "Foto de la sede",
+    fotoArrastra: "Arrastra la foto aquí o haz clic para elegir",
+    fotoAyuda:
+      "La fachada o la entrada: así tus clientes eligen la sede correcta. PNG, JPG o WebP de hasta 4 MB.",
+    fotoQuitar: "Quitar foto",
+    fotoAlGuardar: "Guarda la sede para agregar su foto.",
+    mapa: "Enlace de Google Maps",
+    mapaAyuda:
+      "En Google Maps busca tu sede, toca Compartir y pega aquí el enlace. Si lo dejas vacío, se usa la dirección.",
     telefono: "Teléfono",
     whatsapp: "WhatsApp",
     whatsappPh: "Con lada, por ejemplo 52 55 1234 5678",
@@ -114,6 +124,21 @@ export default {
     verHorariosDe: "Ver horarios de",
     todoElEquipo: "Todo el equipo",
     libresALas: "Libres a las {hora}.",
+    pasosEtiqueta: "Pasos para agendar",
+    pasos: {
+      sucursal: "Sucursal",
+      servicio: "Servicio",
+      horario: "Fecha y hora",
+      confirmar: "Confirmación",
+    },
+    cambiar: "Cambiar",
+    atras: "← Atrás",
+    continuar: "Continuar",
+    revisa: "Revisa tu cita",
+    servicio: "Servicio",
+    cuando: "Cuándo",
+    donde: "Dónde",
+    comoLlegar: "Cómo llegar →",
   },
   enlaces: {
     cargando: "Cargando…",

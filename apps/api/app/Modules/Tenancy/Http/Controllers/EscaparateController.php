@@ -100,19 +100,14 @@ class EscaparateController
             ->orderBy('nombre')
             ->get()
             ->map(static function (SucursalTenant $s): array {
-                $mapa = match (true) {
-                    $s->direccion !== null && $s->direccion !== '' => $s->direccion,
-                    $s->latitud !== null && $s->longitud !== null => $s->latitud.','.$s->longitud,
-                    default => null,
-                };
-
                 return [
                     'id' => $s->ulid,
                     'nombre' => $s->nombre,
                     'zona_horaria' => $s->zona_horaria,
                     'region' => $s->region,
                     'direccion' => $s->direccion,
-                    'mapa_url' => $mapa !== null ? 'https://www.google.com/maps/search/?api=1&query='.rawurlencode($mapa) : null,
+                    'foto_url' => $s->fotoUrl(),
+                    'mapa_url' => $s->enlaceMapa(),
                     'telefono' => $s->telefono,
                     'whatsapp' => $s->whatsapp,
                     'whatsapp_url' => self::enlaceWhatsapp($s->whatsapp),

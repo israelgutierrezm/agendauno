@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import CargadorImagen from "@/components/CargadorImagen.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -21,6 +22,9 @@ interface Sucursal {
   whatsapp?: string | null;
   redes?: Partial<Record<Red, string>>;
   horario?: { dia: number; abre: string; cierra: string }[];
+  // La foto que ve el cliente al elegirla y su enlace de Google Maps.
+  foto_url?: string | null;
+  mapa_url?: string | null;
 }
 // Redes que puede tener la sede (si tiene cuentas propias).
 const REDES = [
@@ -98,11 +102,21 @@ const form = ref({
   iva: "16",
   ubicacion: "",
   direccion: "",
+  mapa_url: "",
   telefono: "",
   whatsapp: "",
   redes: redesVacias(),
   horario: horarioVacio(),
 });
+// Foto de la sede en edición (se sube aparte, al momento).
+const fotoSede = ref<string | null>(null);
+function fotoCambiada(url: string | null): void {
+  fotoSede.value = url;
+  for (const o of organizaciones.value) {
+    const s = o.sucursales.find((x) => x.id === editandoId.value);
+    if (s) s.foto_url = url;
+  }
+}
 const errores = ref<Record<string, string>>({});
 // El error de un día abierto: la API numera solo los días que se envían.
 function errorDelDia(d: DiaHorario): string | undefined {
@@ -141,11 +155,13 @@ function abrirNueva(): void {
     iva: "16",
     ubicacion: "",
     direccion: "",
+    mapa_url: "",
     telefono: "",
     whatsapp: "",
     redes: redesVacias(),
     horario: horarioVacio(),
   };
+  fotoSede.value = null;
   errores.value = {};
   abierto.value = true;
 }
@@ -163,6 +179,7 @@ function abrirEdicion(s: Sucursal): void {
         ? `${s.latitud}, ${s.longitud}`
         : "",
     direccion: s.direccion ?? "",
+    mapa_url: s.mapa_url ?? "",
     telefono: s.telefono ?? "",
     whatsapp: s.whatsapp ?? "",
     redes: { ...redesVacias(), ...(s.redes ?? {}) },
@@ -178,6 +195,7 @@ function abrirEdicion(s: Sucursal): void {
         : d;
     }),
   };
+  fotoSede.value = s.foto_url ?? null;
   errores.value = {};
   abierto.value = true;
 }
@@ -256,6 +274,7 @@ async function guardar(): Promise<void> {
       longitud: coordenadas.value === null ? null : coordenadas.value.longitud,
       // Perfil público de la sede.
       direccion: form.value.direccion.trim(),
+      mapa_url: form.value.mapa_url.trim(),
       telefono: form.value.telefono.trim(),
       whatsapp: form.value.whatsapp.trim(),
       redes: form.value.redes,
@@ -343,7 +362,13 @@ onMounted(cargar);
             :key="s.id"
             class="tu-card p-4 flex items-center justify-between gap-3"
           >
-            <div class="min-w-0">
+            <img
+              v-if="s.foto_url"
+              :src="s.foto_url"
+              alt=""
+              class="h-12 w-16 shrink-0 rounded-lg object-cover"
+            />
+            <div class="min-w-0 flex-1">
               <div class="font-semibold truncate">{{ s.nombre }}</div>
               <div
                 class="text-sm truncate"
@@ -500,6 +525,27 @@ onMounted(cargar);
               {{ $t("perfilPublico.sucursal.ayuda") }}
             </p>
           </div>
+          <div data-prueba="foto-sede">
+            <span class="tu-label">{{
+              $t("perfilPublico.sucursal.foto")
+            }}</span>
+            <CargadorImagen
+              v-if="!esNueva"
+              :url="fotoSede"
+              :ruta="`sucursales/${editandoId}/foto`"
+              campo="foto"
+              clave="foto_url"
+              proporcion="16 / 9"
+              :arrastra="$t('perfilPublico.sucursal.fotoArrastra')"
+              :ayuda="$t('perfilPublico.sucursal.fotoAyuda')"
+              :quitar-texto="$t('perfilPublico.sucursal.fotoQuitar')"
+              :puede-gestionar="puedeGestionar"
+              @update:url="fotoCambiada"
+            />
+            <p v-else class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("perfilPublico.sucursal.fotoAlGuardar") }}
+            </p>
+          </div>
           <div>
             <label class="tu-label" for="s-direccion">{{
               $t("perfilPublico.sucursal.direccion")
@@ -511,6 +557,33 @@ onMounted(cargar);
               maxlength="255"
               :placeholder="$t('perfilPublico.sucursal.direccionPh')"
             />
+          </div>
+          <div>
+            <label class="tu-label" for="s-mapa">{{
+              $t("perfilPublico.sucursal.mapa")
+            }}</label>
+            <input
+              id="s-mapa"
+              v-model="form.mapa_url"
+              class="tu-input"
+              inputmode="url"
+              maxlength="500"
+              placeholder="https://maps.app.goo.gl/…"
+            />
+            <p
+              v-if="errores.mapa_url"
+              class="mt-1 text-xs"
+              style="color: var(--error)"
+            >
+              {{ errores.mapa_url }}
+            </p>
+            <p
+              v-else
+              class="mt-1 text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("perfilPublico.sucursal.mapaAyuda") }}
+            </p>
           </div>
           <div class="grid gap-3 grid-cols-2">
             <div>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 
-import CargadorPortada from "@/components/CargadorPortada.vue";
+import CargadorImagen from "@/components/CargadorImagen.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { urlPublicaEstudio } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -130,10 +130,10 @@ onMounted(cargar);
     <form v-else class="mt-5 space-y-5" @submit.prevent="guardar">
       <div>
         <span class="tu-label">{{ $t("perfilPublico.config.portada") }}</span>
-        <CargadorPortada
-          :portada-url="portadaUrl"
+        <CargadorImagen
+          :url="portadaUrl"
           :puede-gestionar="puedeGestionar"
-          @update:portada-url="portadaUrl = $event"
+          @update:url="portadaUrl = $event"
         />
       </div>
 

@@ -424,6 +424,9 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/sucursales', [OrganizacionesTenantController::class, 'sucursales'])->middleware('puede:sucursales.ver')->name('sucursales.index');
             // Multi-sucursal (R18): editar la sucursal como unidad de negocio (moneda/impuesto/region).
             Route::put('/sucursales/{sucursal}', [OrganizacionesTenantController::class, 'actualizarSucursal'])->middleware('puede:sucursales.gestionar')->name('sucursales.update');
+            // Foto de la sede (la que ve el cliente al elegirla, ADR 0064).
+            Route::post('/sucursales/{sucursal}/foto', [OrganizacionesTenantController::class, 'subirFoto'])->middleware('puede:sucursales.gestionar')->name('sucursales.foto.store');
+            Route::delete('/sucursales/{sucursal}/foto', [OrganizacionesTenantController::class, 'eliminarFoto'])->middleware('puede:sucursales.gestionar')->name('sucursales.foto.destroy');
             // Reporte consolidado por sucursal (R18).
             Route::get('/reportes/sucursales', ReporteSucursalesTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.sucursales');
             // Reporte de negocio (R29): metricas del periodo (ingresos, ocupacion, no-show, ARPU).

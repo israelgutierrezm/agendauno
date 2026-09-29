@@ -6,15 +6,36 @@ import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
- * Portada de la página pública por ARCHIVO (arrastrar o elegir, nunca por URL). Sube
- * a `POST /marca/portada` (PNG/JPG/WebP ≤ 4 MB) y la quita con `DELETE`. Emite la
- * nueva `portada_url` al padre.
+ * Una imagen por ARCHIVO (arrastrar o elegir, nunca por URL): la portada de la página
+ * pública (`marca/portada`) o la foto de una sede (`sucursales/{id}/foto`). Sube por
+ * `POST {ruta}` (PNG/JPG/WebP ≤ 4 MB) en el campo `campo`, la quita con `DELETE` y
+ * emite la nueva URL (`clave` de la respuesta) al padre.
  */
 const props = withDefaults(
-  defineProps<{ portadaUrl: string | null; puedeGestionar?: boolean }>(),
-  { puedeGestionar: true },
+  defineProps<{
+    url: string | null;
+    ruta?: string;
+    campo?: string;
+    clave?: string;
+    // Textos propios (la portada usa los suyos si no se dan).
+    arrastra?: string;
+    ayuda?: string;
+    quitarTexto?: string;
+    proporcion?: string;
+    puedeGestionar?: boolean;
+  }>(),
+  {
+    ruta: "marca/portada",
+    campo: "portada",
+    clave: "portada_url",
+    arrastra: undefined,
+    ayuda: undefined,
+    quitarTexto: undefined,
+    proporcion: "8 / 3",
+    puedeGestionar: true,
+  },
 );
-const emit = defineEmits<{ "update:portadaUrl": [string | null] }>();
+const emit = defineEmits<{ "update:url": [string | null] }>();
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -52,12 +73,13 @@ async function procesar(archivo: File | undefined | null): Promise<void> {
   subiendo.value = true;
   try {
     const cuerpo = new FormData();
-    cuerpo.append("portada", archivo);
-    const { data } = await api.post<{ data: { portada_url: string } }>(
-      `${base.value}/marca/portada`,
+    cuerpo.append(props.campo, archivo);
+    const { data } = await api.post<{ data: Record<string, unknown> }>(
+      `${base.value}/${props.ruta}`,
       cuerpo,
     );
-    emit("update:portadaUrl", data.data.portada_url);
+    const url = data.data[props.clave];
+    emit("update:url", typeof url === "string" ? url : null);
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -75,8 +97,8 @@ async function quitar(): Promise<void> {
   subiendo.value = true;
   error.value = null;
   try {
-    await api.delete(`${base.value}/marca/portada`);
-    emit("update:portadaUrl", null);
+    await api.delete(`${base.value}/${props.ruta}`);
+    emit("update:url", null);
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -92,7 +114,7 @@ async function quitar(): Promise<void> {
       :class="{ 'cursor-pointer': habilitado, 'cp-arrastrando': arrastrando }"
       role="button"
       :tabindex="habilitado ? 0 : -1"
-      :aria-label="$t('perfilPublico.config.portadaArrastra')"
+      :aria-label="arrastra ?? $t('perfilPublico.config.portadaArrastra')"
       @click="elegir"
       @keydown.enter.prevent="elegir"
       @keydown.space.prevent="elegir"
@@ -104,12 +126,12 @@ async function quitar(): Promise<void> {
         habilitado && procesar($event.dataTransfer?.files?.[0]);
       "
     >
-      <img v-if="portadaUrl" :src="portadaUrl" alt="" class="cp-imagen" />
+      <img v-if="url" :src="url" alt="" class="cp-imagen" />
       <p v-else class="text-sm" :style="{ color: 'var(--texto-suave)' }">
         {{
           subiendo
             ? $t("perfilPublico.config.portadaSubiendo")
-            : $t("perfilPublico.config.portadaArrastra")
+            : (arrastra ?? $t("perfilPublico.config.portadaArrastra"))
         }}
       </p>
     </div>
@@ -122,16 +144,16 @@ async function quitar(): Promise<void> {
     />
     <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
       <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("perfilPublico.config.portadaAyuda") }}
+        {{ ayuda ?? $t("perfilPublico.config.portadaAyuda") }}
       </p>
       <button
-        v-if="portadaUrl && puedeGestionar"
+        v-if="url && puedeGestionar"
         type="button"
         class="tu-enlace text-sm"
         :disabled="subiendo"
         @click="quitar"
       >
-        {{ $t("perfilPublico.config.portadaQuitar") }}
+        {{ quitarTexto ?? $t("perfilPublico.config.portadaQuitar") }}
       </button>
     </div>
     <p v-if="error" class="mt-1 text-sm" style="color: var(--error)">
@@ -145,7 +167,7 @@ async function quitar(): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 8 / 3;
+  aspect-ratio: v-bind(proporcion);
   overflow: hidden;
   border-radius: 1rem;
   border: 1px dashed var(--borde);

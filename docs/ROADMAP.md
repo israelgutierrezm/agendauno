@@ -19,6 +19,8 @@
   página pública se elige primero la hora y luego con quién.
 - **Paquetes de servicios** (ADR 0063): un servicio incluye otros del catálogo
   (p. ej. limpieza, flúor y diagnóstico) con un solo precio y una sola cita.
+- **Agendar por pasos** (ADR 0064): sucursal, servicio, fecha y hora y
+  confirmación; la sede con foto y enlace de Google Maps para no llegar a otra.
 - **Experiencia**: web única (sitio, panel, portal, superadmin) y app Flutter;
   roles propios y rol activo por sesión (ADR 0055, 0057); nombre AgendaUno
   (ADR 0056).

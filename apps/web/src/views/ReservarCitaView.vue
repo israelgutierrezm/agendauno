@@ -6,6 +6,7 @@ import { api, mensajeDeError } from "@/lib/api";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { recordarNegocio } from "@/lib/negociosRecientes";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 
 interface Servicio {
@@ -26,6 +27,10 @@ interface Sucursal {
   nombre: string;
   zona_horaria: string | null;
   region?: string | null;
+  // Para reconocerla (foto, dirección) y llegar a la correcta.
+  direccion?: string | null;
+  foto_url?: string | null;
+  mapa_url?: string | null;
 }
 interface Persona {
   id: string;
@@ -46,6 +51,8 @@ interface Slot {
 }
 // Sin preferencia: el negocio asigna a quien esté libre a esa hora.
 const CUALQUIERA = "cualquiera";
+// Pasos del asistente; la sucursal solo se pregunta si hay más de una.
+type Paso = "sucursal" | "servicio" | "horario" | "confirmar";
 
 const route = useRoute();
 // Al volver de la página de pago: avisa cómo quedó.
@@ -57,7 +64,8 @@ const cargando = ref(true);
 const noDisponible = ref(false);
 const error = ref<string | null>(null);
 
-// Selección del wizard.
+// Selección del asistente.
+const paso = ref<Paso>("sucursal");
 const servicioId = ref("");
 // Servicios agrupados por su categoría (la actividad del catálogo).
 const gruposServicios = computed(() => {
@@ -106,6 +114,13 @@ const barberoSel = computed(
   () =>
     opciones.value?.instructores.find((b) => b.id === barberoId.value) ?? null,
 );
+const variasSedes = computed(
+  () => (opciones.value?.sucursales.length ?? 0) > 1,
+);
+// Si ninguna sede tiene foto, las tarjetas van compactas (sin hueco de imagen).
+const sedesConFoto = computed(() =>
+  (opciones.value?.sucursales ?? []).some((s) => s.foto_url),
+);
 const variosProfesionales = computed(
   () => (opciones.value?.instructores.length ?? 0) > 1,
 );
@@ -126,6 +141,27 @@ const zona = computed(
 );
 // Duración del servicio; respaldo de 60 min si el servicio no la definió.
 const duracion = computed(() => servicioSel.value?.duracion_minutos ?? 60);
+
+// Mapa de pasos: los que ya pasaron se pueden volver a abrir.
+const pasos = computed<Paso[]>(() =>
+  variasSedes.value
+    ? ["sucursal", "servicio", "horario", "confirmar"]
+    : ["servicio", "horario", "confirmar"],
+);
+const indicePaso = computed(() => pasos.value.indexOf(paso.value));
+const pasoTitulo = ref<HTMLElement | null>(null);
+function ir(p: Paso): void {
+  paso.value = p;
+  error.value = null;
+  // Al cambiar de paso, arriba (el título del paso recibe el foco).
+  pasoTitulo.value?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+}
+function volverA(p: Paso): void {
+  if (pasos.value.indexOf(p) < indicePaso.value) ir(p);
+}
+const puedeContinuar = computed(
+  () => slotSel.value !== "" && barberoId.value !== "",
+);
 
 const listoParaAgendar = computed(
   () =>
@@ -149,6 +185,16 @@ function horaLocal(iso: string): string {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(iso));
+}
+// "Jueves, 1 de octubre" en la zona de la sede.
+function diaLocal(iso: string): string {
+  const texto = new Intl.DateTimeFormat("es-MX", {
+    timeZone: zona.value,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date(iso));
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 // Reloj de pared local de la sucursal ("YYYY-MM-DD HH:MM:SS"), como lo espera el backend.
 function relojLocal(iso: string): string {
@@ -185,13 +231,14 @@ async function cargar(): Promise<void> {
       pais: null,
     });
     // Sede pre-seleccionada desde el selector de sucursal (?sucursal=<ulid>), o
-    // la única si solo hay una.
+    // la única si solo hay una: entonces se empieza por el servicio.
     const preSuc = String(route.query.sucursal ?? "");
     if (preSuc !== "" && data.data.sucursales.some((s) => s.id === preSuc)) {
       sucursalId.value = preSuc;
     } else if (data.data.sucursales.length === 1) {
       sucursalId.value = data.data.sucursales[0].id;
     }
+    paso.value = sucursalId.value !== "" ? "servicio" : "sucursal";
   } catch {
     noDisponible.value = true;
   } finally {
@@ -264,6 +311,17 @@ watch(slotSel, () => {
 // Recalcula huecos al cambiar filtro, sucursal, fecha o servicio (por su duración).
 watch([filtro, sucursalId, fecha, servicioId], buscarSlots);
 
+// Elegir sede o servicio lleva al paso siguiente (también si se vuelve a tocar la
+// que ya estaba elegida).
+function elegirSede(id: string): void {
+  sucursalId.value = id;
+  ir("servicio");
+}
+function elegirServicio(id: string): void {
+  servicioId.value = id;
+  ir("horario");
+}
+
 async function agendar(): Promise<void> {
   if (!listoParaAgendar.value) {
     error.value = null;
@@ -333,6 +391,7 @@ async function pagar(): Promise<void> {
   }
 }
 
+// Otra cita: misma sede y servicio, se vuelve a elegir el horario.
 function otra(): void {
   resultado.value = null;
   pendientePago.value = false;
@@ -341,6 +400,7 @@ function otra(): void {
   slots.value = [];
   slotsCargados.value = false;
   datos.value = { nombre: "", celular: "", email: "" };
+  ir("horario");
 }
 
 function iniciales(nombre: string): string {
@@ -439,10 +499,10 @@ onMounted(cargar);
         aria-live="polite"
       >
         <div
-          class="mx-auto h-12 w-12 rounded-full inline-flex items-center justify-center text-white text-xl"
+          class="mx-auto h-12 w-12 rounded-full inline-flex items-center justify-center text-white"
           :style="{ background: 'var(--exito)' }"
         >
-          ✓
+          <IconoNav nombre="hecho" :tam="24" />
         </div>
         <h2 class="mt-3 text-2xl font-semibold text-success">
           {{ $t("reservar.listoTitulo") }}
@@ -457,8 +517,28 @@ onMounted(cargar);
           }}
         </p>
         <p class="mt-1 font-medium">
-          {{ horaLocal(slotSel) }} ·
+          {{ diaLocal(slotSel) }} · {{ horaLocal(slotSel) }} ·
           {{ dinero(resultado.total_minor, resultado.moneda) }}
+        </p>
+        <!-- Dónde: para no llegar a otra sede. -->
+        <p
+          v-if="sucursalSel"
+          class="mt-2 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+          data-prueba="donde-listo"
+        >
+          {{ sucursalSel.nombre
+          }}<template v-if="sucursalSel.direccion">
+            · {{ sucursalSel.direccion }}</template
+          >
+          <a
+            v-if="sucursalSel.mapa_url"
+            :href="sucursalSel.mapa_url"
+            target="_blank"
+            rel="noopener"
+            class="tu-enlace ml-1"
+            >{{ $t("perfilPublico.agendar.comoLlegar") }}</a
+          >
         </p>
 
         <template v-if="pendientePago">
@@ -498,358 +578,555 @@ onMounted(cargar);
         </p>
       </div>
 
-      <!-- ===== Wizard ===== -->
-      <div v-else class="mt-6 space-y-4">
+      <!-- ===== Asistente por pasos ===== -->
+      <div v-else class="mt-6">
         <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("reservar.intro") }}
         </p>
 
-        <!-- Si hay varias sedes, elegir primero el lugar de la cita. -->
-        <fieldset
-          v-if="opciones.sucursales.length > 1"
-          class="tu-card p-5 reserva-opciones"
+        <!-- Mapa de pasos: hechos (se pueden reabrir), actual y pendientes. -->
+        <ol
+          class="rc-pasos mt-5"
+          :aria-label="$t('perfilPublico.agendar.pasosEtiqueta')"
+          data-prueba="pasos"
         >
-          <legend class="tu-label">{{ $t("sucursalesPub.titulo") }}</legend>
-          <p class="reserva-ayuda">{{ $t("sucursalesPub.subtitulo") }}</p>
-          <div class="reserva-tarjetas">
-            <label
-              v-for="s in opciones.sucursales"
-              :key="s.id"
-              class="reserva-eleccion"
-              :class="{ 'reserva-eleccion--activa': sucursalId === s.id }"
-            >
-              <input
-                v-model="sucursalId"
-                type="radio"
-                name="sucursal"
-                :value="s.id"
-              />
-              <span class="reserva-sede-icono" aria-hidden="true">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.7"
-                >
-                  <path d="M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0Z" />
-                  <circle cx="12" cy="10" r="2.5" />
-                </svg>
-              </span>
-              <span class="reserva-eleccion-texto"
-                ><strong>{{ s.nombre }}</strong
-                ><small v-if="s.region">{{ s.region }}</small></span
-              >
-            </label>
-          </div>
-        </fieldset>
-
-        <!-- Servicio: conserva su presentación. -->
-        <div v-if="sucursalId !== ''" class="tu-card p-5">
-          <label class="tu-label">{{ $t("reservar.servicio") }}</label>
-          <div
-            v-for="g in gruposServicios"
-            :key="g.nombre"
-            class="mt-1 space-y-2"
+          <li
+            v-for="(p, i) in pasos"
+            :key="p"
+            class="rc-paso"
+            :class="{
+              'rc-paso--hecho': i < indicePaso,
+              'rc-paso--actual': i === indicePaso,
+            }"
+            :aria-current="i === indicePaso ? 'step' : undefined"
           >
-            <p
-              v-if="g.nombre && gruposServicios.length > 1"
-              class="pt-2 text-xs font-semibold"
-              :style="{ color: 'var(--texto-suave)' }"
+            <button
+              v-if="i < indicePaso"
+              type="button"
+              class="rc-paso-marca"
+              :data-paso="p"
+              @click="volverA(p)"
             >
-              {{ g.nombre }}
-            </p>
-            <label
-              v-for="s in g.lista"
-              :key="s.id"
-              class="flex items-center justify-between gap-3 rounded-lg p-3 cursor-pointer border"
-              :style="{
-                borderColor:
-                  servicioId === s.id ? 'var(--primario)' : 'var(--borde)',
-                background:
-                  servicioId === s.id ? 'var(--primario-suave)' : 'transparent',
-              }"
-            >
-              <span class="flex items-center gap-2 min-w-0">
-                <input
-                  v-model="servicioId"
-                  type="radio"
-                  :value="s.id"
-                  class="shrink-0"
-                />
-                <span class="min-w-0">
-                  <span class="font-medium block truncate">{{ s.nombre }}</span>
-                  <span
-                    v-if="s.duracion_minutos"
-                    class="text-sm"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{
-                      $t("reservar.duracionMin", { n: s.duracion_minutos })
-                    }}</span
-                  >
-                  <span
-                    v-if="s.descripcion"
-                    class="block text-sm"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{ s.descripcion }}</span
-                  >
-                  <ServicioIncluye
-                    :incluye="s.incluye"
-                    :precio-minor="s.precio_minor"
-                    :por-separado-minor="s.precio_por_separado_minor"
-                    :moneda="s.moneda"
-                  />
-                </span>
-              </span>
-              <span class="font-semibold shrink-0">{{
-                dinero(s.precio_minor, s.moneda)
+              <span class="rc-paso-num"
+                ><IconoNav nombre="hecho" :tam="14"
+              /></span>
+              <span class="rc-paso-texto">{{
+                $t(`perfilPublico.agendar.pasos.${p}`)
               }}</span>
-            </label>
-          </div>
-        </div>
+            </button>
+            <span v-else class="rc-paso-marca" :data-paso="p">
+              <span class="rc-paso-num">{{ i + 1 }}</span>
+              <span class="rc-paso-texto">{{
+                $t(`perfilPublico.agendar.pasos.${p}`)
+              }}</span>
+            </span>
+          </li>
+        </ol>
 
-        <p
-          v-if="
-            servicioId !== '' &&
-            sucursalId !== '' &&
-            opciones.instructores.length === 0
-          "
-          class="tu-card p-5 reserva-ayuda"
-        >
-          {{ $t("reservar.sinProfesionales") }}
-        </p>
-
-        <!-- Día + hora (de todo el equipo o de quien se prefiera) -->
-        <div
-          v-else-if="sucursalId !== '' && servicioId !== ''"
-          class="tu-card p-5"
-        >
-          <div
-            class="grid gap-3"
-            :class="{ 'sm:grid-cols-2': variosProfesionales }"
+        <div ref="pasoTitulo" class="mt-5 space-y-4 scroll-mt-4">
+          <!-- Paso: sucursal (con foto si la tiene) -->
+          <fieldset
+            v-if="paso === 'sucursal'"
+            class="tu-card p-5 reserva-opciones"
           >
-            <div>
-              <label class="tu-label" for="rc-fecha">{{
-                $t("reservar.cuando")
-              }}</label>
-              <input
-                id="rc-fecha"
-                v-model="fecha"
-                type="date"
-                class="tu-input"
-              />
+            <legend class="tu-label">{{ $t("sucursalesPub.titulo") }}</legend>
+            <p class="reserva-ayuda">{{ $t("sucursalesPub.subtitulo") }}</p>
+            <div class="reserva-tarjetas">
+              <label
+                v-for="s in opciones.sucursales"
+                :key="s.id"
+                class="rc-sede"
+                :class="{
+                  'rc-sede--activa': sucursalId === s.id,
+                  'rc-sede--compacta': !sedesConFoto,
+                }"
+              >
+                <input
+                  :checked="sucursalId === s.id"
+                  type="radio"
+                  name="sucursal"
+                  :value="s.id"
+                  class="sr-only"
+                  @change="elegirSede(s.id)"
+                  @click="sucursalId === s.id && elegirSede(s.id)"
+                />
+                <img
+                  v-if="s.foto_url"
+                  :src="s.foto_url"
+                  alt=""
+                  class="rc-sede-foto"
+                />
+                <span v-else class="rc-sede-foto rc-sede-sinfoto">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.7"
+                    aria-hidden="true"
+                  >
+                    <path d="M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0Z" />
+                    <circle cx="12" cy="10" r="2.5" />
+                  </svg>
+                </span>
+                <span class="rc-sede-texto">
+                  <strong>{{ s.nombre }}</strong>
+                  <small v-if="s.direccion">{{ s.direccion }}</small>
+                  <small v-else-if="s.region">{{ s.region }}</small>
+                </span>
+              </label>
             </div>
-            <div v-if="variosProfesionales">
-              <label class="tu-label" for="rc-filtro">{{
-                $t("perfilPublico.agendar.verHorariosDe")
-              }}</label>
-              <select id="rc-filtro" v-model="filtro" class="tu-input">
-                <option value="">
-                  {{ $t("perfilPublico.agendar.todoElEquipo") }}
-                </option>
-                <option
-                  v-for="b in opciones.instructores"
-                  :key="b.id"
-                  :value="b.id"
-                >
-                  {{ b.nombre }}
-                </option>
-              </select>
-            </div>
-          </div>
+          </fieldset>
 
-          <p
-            v-if="error && !slotSel"
-            class="mt-3 text-sm"
-            role="alert"
-            style="color: var(--error)"
-          >
-            {{ error }}
-          </p>
-
-          <p
-            v-if="fecha === ''"
-            class="mt-3 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("reservar.sinHorario") }}
-          </p>
-          <p
-            v-else-if="buscandoSlots"
-            class="mt-3 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("reservar.calculando") }}
-          </p>
-          <template v-else-if="slotsCargados">
+          <!-- Paso: servicio -->
+          <div v-else-if="paso === 'servicio'" class="tu-card p-5">
             <p
-              v-if="slots.length === 0"
-              class="mt-3 text-sm"
-              :style="{ color: 'var(--texto-suave)' }"
+              v-if="variasSedes && sucursalSel"
+              class="rc-contexto"
+              data-prueba="contexto"
             >
-              {{ $t("reservar.sinHuecos") }}
+              {{ sucursalSel.nombre }} ·
+              <button
+                type="button"
+                class="tu-enlace"
+                @click="volverA('sucursal')"
+              >
+                {{ $t("perfilPublico.agendar.cambiar") }}
+              </button>
             </p>
-            <div v-else class="mt-3">
-              <label class="tu-label">{{ $t("reservar.hora") }}</label>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="s in slots"
-                  :key="s.inicia"
-                  type="button"
-                  class="px-3 py-1.5 rounded-lg text-sm font-medium border"
-                  :style="
-                    slotSel === s.inicia
-                      ? {
-                          background: 'var(--primario)',
-                          color: 'var(--primario-contraste)',
-                          borderColor: 'var(--primario)',
-                        }
-                      : { borderColor: 'var(--borde)' }
-                  "
-                  @click="slotSel = s.inicia"
+            <label class="tu-label">{{ $t("reservar.servicio") }}</label>
+            <div
+              v-for="g in gruposServicios"
+              :key="g.nombre"
+              class="mt-1 space-y-2"
+            >
+              <p
+                v-if="g.nombre && gruposServicios.length > 1"
+                class="pt-2 text-xs font-semibold"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ g.nombre }}
+              </p>
+              <label
+                v-for="s in g.lista"
+                :key="s.id"
+                class="flex items-center justify-between gap-3 rounded-lg p-3 cursor-pointer border"
+                :style="{
+                  borderColor:
+                    servicioId === s.id ? 'var(--primario)' : 'var(--borde)',
+                  background:
+                    servicioId === s.id
+                      ? 'var(--primario-suave)'
+                      : 'transparent',
+                }"
+              >
+                <span class="flex items-center gap-2 min-w-0">
+                  <input
+                    :checked="servicioId === s.id"
+                    type="radio"
+                    name="servicio"
+                    :value="s.id"
+                    class="shrink-0"
+                    @change="elegirServicio(s.id)"
+                    @click="servicioId === s.id && elegirServicio(s.id)"
+                  />
+                  <span class="min-w-0">
+                    <span class="font-medium block truncate">{{
+                      s.nombre
+                    }}</span>
+                    <span
+                      v-if="s.duracion_minutos"
+                      class="text-sm"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{
+                        $t("reservar.duracionMin", { n: s.duracion_minutos })
+                      }}</span
+                    >
+                    <span
+                      v-if="s.descripcion"
+                      class="block text-sm"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{ s.descripcion }}</span
+                    >
+                    <ServicioIncluye
+                      :incluye="s.incluye"
+                      :precio-minor="s.precio_minor"
+                      :por-separado-minor="s.precio_por_separado_minor"
+                      :moneda="s.moneda"
+                    />
+                  </span>
+                </span>
+                <span class="font-semibold shrink-0">{{
+                  dinero(s.precio_minor, s.moneda)
+                }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Paso: fecha y hora (de todo el equipo o de quien se prefiera) -->
+          <template v-else-if="paso === 'horario'">
+            <p
+              v-if="opciones.instructores.length === 0"
+              class="tu-card p-5 reserva-ayuda"
+            >
+              {{ $t("reservar.sinProfesionales") }}
+            </p>
+            <div v-else class="tu-card p-5">
+              <p class="rc-contexto" data-prueba="contexto">
+                {{ servicioSel?.nombre
+                }}<template v-if="variasSedes && sucursalSel">
+                  · {{ sucursalSel.nombre }}</template
                 >
-                  {{ horaLocal(s.inicia) }}
+                ·
+                <button
+                  type="button"
+                  class="tu-enlace"
+                  @click="volverA('servicio')"
+                >
+                  {{ $t("perfilPublico.agendar.cambiar") }}
                 </button>
+              </p>
+              <div
+                class="grid gap-3"
+                :class="{ 'sm:grid-cols-2': variosProfesionales }"
+              >
+                <div>
+                  <label class="tu-label" for="rc-fecha">{{
+                    $t("reservar.cuando")
+                  }}</label>
+                  <input
+                    id="rc-fecha"
+                    v-model="fecha"
+                    type="date"
+                    class="tu-input"
+                  />
+                </div>
+                <div v-if="variosProfesionales">
+                  <label class="tu-label" for="rc-filtro">{{
+                    $t("perfilPublico.agendar.verHorariosDe")
+                  }}</label>
+                  <select id="rc-filtro" v-model="filtro" class="tu-input">
+                    <option value="">
+                      {{ $t("perfilPublico.agendar.todoElEquipo") }}
+                    </option>
+                    <option
+                      v-for="b in opciones.instructores"
+                      :key="b.id"
+                      :value="b.id"
+                    >
+                      {{ b.nombre }}
+                    </option>
+                  </select>
+                </div>
               </div>
+
+              <p
+                v-if="error && !slotSel"
+                class="mt-3 text-sm"
+                role="alert"
+                style="color: var(--error)"
+              >
+                {{ error }}
+              </p>
+
+              <p
+                v-if="fecha === ''"
+                class="mt-3 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("reservar.sinHorario") }}
+              </p>
+              <p
+                v-else-if="buscandoSlots"
+                class="mt-3 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("reservar.calculando") }}
+              </p>
+              <template v-else-if="slotsCargados">
+                <p
+                  v-if="slots.length === 0"
+                  class="mt-3 text-sm"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ $t("reservar.sinHuecos") }}
+                </p>
+                <div v-else class="mt-3">
+                  <label class="tu-label">{{ $t("reservar.hora") }}</label>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      v-for="s in slots"
+                      :key="s.inicia"
+                      type="button"
+                      class="px-3 py-1.5 rounded-lg text-sm font-medium border"
+                      :style="
+                        slotSel === s.inicia
+                          ? {
+                              background: 'var(--primario)',
+                              color: 'var(--primario-contraste)',
+                              borderColor: 'var(--primario)',
+                            }
+                          : { borderColor: 'var(--borde)' }
+                      "
+                      @click="slotSel = s.inicia"
+                    >
+                      {{ horaLocal(s.inicia) }}
+                    </button>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- Con quién: tras la hora, solo quienes están libres entonces. -->
+            <fieldset
+              v-if="slotSel !== '' && eligeConQuien"
+              class="tu-card p-5 reserva-opciones"
+            >
+              <legend class="tu-label">{{ $t("reservar.barbero") }}</legend>
+              <p class="reserva-ayuda">
+                {{
+                  $t("perfilPublico.agendar.libresALas", {
+                    hora: horaLocal(slotSel),
+                  })
+                }}
+              </p>
+              <div class="reserva-tarjetas">
+                <label
+                  class="reserva-eleccion"
+                  :class="{
+                    'reserva-eleccion--activa': barberoId === CUALQUIERA,
+                  }"
+                  data-prueba="cualquiera"
+                >
+                  <input
+                    v-model="barberoId"
+                    type="radio"
+                    name="profesional"
+                    :value="CUALQUIERA"
+                  />
+                  <AvatarIniciales :nombre="null" tam="md" />
+                  <span class="reserva-eleccion-texto"
+                    ><strong>{{
+                      $t("perfilPublico.agendar.cualquiera")
+                    }}</strong>
+                    <span class="block text-xs font-normal">{{
+                      $t("perfilPublico.agendar.cualquieraDesc")
+                    }}</span></span
+                  >
+                </label>
+                <label
+                  v-for="b in libresEnHora"
+                  :key="b.id"
+                  class="reserva-eleccion"
+                  :class="{ 'reserva-eleccion--activa': barberoId === b.id }"
+                >
+                  <input
+                    v-model="barberoId"
+                    type="radio"
+                    name="profesional"
+                    :value="b.id"
+                  />
+                  <AvatarIniciales
+                    :nombre="b.nombre"
+                    :foto="b.foto_url"
+                    tam="md"
+                  />
+                  <span class="reserva-eleccion-texto"
+                    ><strong>{{ b.nombre }}</strong></span
+                  >
+                </label>
+              </div>
+            </fieldset>
+
+            <div class="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                class="tu-enlace text-sm"
+                @click="volverA('servicio')"
+              >
+                {{ $t("perfilPublico.agendar.atras") }}
+              </button>
+              <button
+                type="button"
+                class="tu-btn tu-btn-primario"
+                :disabled="!puedeContinuar"
+                data-prueba="continuar"
+                @click="ir('confirmar')"
+              >
+                {{ $t("perfilPublico.agendar.continuar") }}
+              </button>
             </div>
           </template>
-        </div>
 
-        <!-- Con quién: tras la hora, solo quienes están libres entonces (foto real o
-             inicial de respaldo). -->
-        <fieldset
-          v-if="slotSel !== '' && eligeConQuien"
-          class="tu-card p-5 reserva-opciones"
-        >
-          <legend class="tu-label">{{ $t("reservar.barbero") }}</legend>
-          <p class="reserva-ayuda">
-            {{
-              $t("perfilPublico.agendar.libresALas", {
-                hora: horaLocal(slotSel),
-              })
-            }}
-          </p>
-          <div class="reserva-tarjetas">
-            <label
-              class="reserva-eleccion"
-              :class="{ 'reserva-eleccion--activa': barberoId === CUALQUIERA }"
-              data-prueba="cualquiera"
-            >
-              <input
-                v-model="barberoId"
-                type="radio"
-                name="profesional"
-                :value="CUALQUIERA"
-              />
-              <AvatarIniciales :nombre="null" tam="md" />
-              <span class="reserva-eleccion-texto"
-                ><strong>{{ $t("perfilPublico.agendar.cualquiera") }}</strong>
-                <span class="block text-xs font-normal">{{
-                  $t("perfilPublico.agendar.cualquieraDesc")
-                }}</span></span
-              >
-            </label>
-            <label
-              v-for="b in libresEnHora"
-              :key="b.id"
-              class="reserva-eleccion"
-              :class="{ 'reserva-eleccion--activa': barberoId === b.id }"
-            >
-              <input
-                v-model="barberoId"
-                type="radio"
-                name="profesional"
-                :value="b.id"
-              />
-              <AvatarIniciales :nombre="b.nombre" :foto="b.foto_url" tam="md" />
-              <span class="reserva-eleccion-texto"
-                ><strong>{{ b.nombre }}</strong></span
-              >
-            </label>
-          </div>
-        </fieldset>
-
-        <!-- Datos -->
-        <div v-if="slotSel !== ''" class="tu-card p-5">
-          <label class="tu-label">{{ $t("reservar.datos") }}</label>
-          <div class="space-y-3">
-            <div>
-              <label class="tu-label" for="rc-nom">{{
-                $t("reservar.nombre")
-              }}</label>
-              <input
-                id="rc-nom"
-                v-model="datos.nombre"
-                class="tu-input"
-                required
-              />
+          <!-- Paso: confirmación (lo elegido, dónde es y tus datos) -->
+          <template v-else-if="paso === 'confirmar'">
+            <div class="tu-card p-5" data-prueba="resumen">
+              <h2 class="font-semibold">
+                {{ $t("perfilPublico.agendar.revisa") }}
+              </h2>
+              <dl class="rc-resumen mt-3">
+                <div>
+                  <dt>{{ $t("perfilPublico.agendar.servicio") }}</dt>
+                  <dd>
+                    <span class="font-medium">{{ servicioSel?.nombre }}</span>
+                    ·
+                    {{
+                      dinero(
+                        servicioSel?.precio_minor ?? null,
+                        servicioSel?.moneda ?? null,
+                      )
+                    }}
+                    <ServicioIncluye
+                      :incluye="servicioSel?.incluye"
+                      :precio-minor="servicioSel?.precio_minor"
+                      :por-separado-minor="
+                        servicioSel?.precio_por_separado_minor
+                      "
+                      :moneda="servicioSel?.moneda"
+                    />
+                  </dd>
+                  <button
+                    type="button"
+                    class="tu-enlace text-sm"
+                    @click="volverA('servicio')"
+                  >
+                    {{ $t("perfilPublico.agendar.cambiar") }}
+                  </button>
+                </div>
+                <div>
+                  <dt>{{ $t("perfilPublico.agendar.cuando") }}</dt>
+                  <dd>
+                    <span class="font-medium">{{ diaLocal(slotSel) }}</span>
+                    · {{ horaLocal(slotSel) }}
+                    <span
+                      class="block text-sm"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{
+                        barberoId === CUALQUIERA
+                          ? $t("perfilPublico.agendar.cualquiera")
+                          : barberoSel?.nombre
+                      }}</span
+                    >
+                  </dd>
+                  <button
+                    type="button"
+                    class="tu-enlace text-sm"
+                    @click="volverA('horario')"
+                  >
+                    {{ $t("perfilPublico.agendar.cambiar") }}
+                  </button>
+                </div>
+                <div v-if="sucursalSel" data-prueba="donde">
+                  <dt>{{ $t("perfilPublico.agendar.donde") }}</dt>
+                  <dd>
+                    <span class="flex items-start gap-3">
+                      <img
+                        v-if="sucursalSel.foto_url"
+                        :src="sucursalSel.foto_url"
+                        alt=""
+                        class="h-14 w-20 shrink-0 rounded-lg object-cover"
+                      />
+                      <span class="min-w-0">
+                        <span class="font-medium block">{{
+                          sucursalSel.nombre
+                        }}</span>
+                        <span
+                          v-if="sucursalSel.direccion"
+                          class="block text-sm"
+                          :style="{ color: 'var(--texto-suave)' }"
+                          >{{ sucursalSel.direccion }}</span
+                        >
+                        <a
+                          v-if="sucursalSel.mapa_url"
+                          :href="sucursalSel.mapa_url"
+                          target="_blank"
+                          rel="noopener"
+                          class="tu-enlace text-sm"
+                          data-prueba="como-llegar"
+                          >{{ $t("perfilPublico.agendar.comoLlegar") }}</a
+                        >
+                      </span>
+                    </span>
+                  </dd>
+                  <button
+                    v-if="variasSedes"
+                    type="button"
+                    class="tu-enlace text-sm"
+                    @click="volverA('sucursal')"
+                  >
+                    {{ $t("perfilPublico.agendar.cambiar") }}
+                  </button>
+                </div>
+              </dl>
             </div>
-            <div class="grid sm:grid-cols-2 gap-3">
-              <div>
-                <label class="tu-label" for="rc-cel">{{
-                  $t("reservar.celular")
-                }}</label>
-                <input
-                  id="rc-cel"
-                  v-model="datos.celular"
-                  class="tu-input"
-                  inputmode="tel"
-                />
+
+            <div class="tu-card p-5">
+              <label class="tu-label">{{ $t("reservar.datos") }}</label>
+              <div class="space-y-3">
+                <div>
+                  <label class="tu-label" for="rc-nom">{{
+                    $t("reservar.nombre")
+                  }}</label>
+                  <input
+                    id="rc-nom"
+                    v-model="datos.nombre"
+                    class="tu-input"
+                    autocomplete="name"
+                    required
+                  />
+                </div>
+                <div class="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="tu-label" for="rc-cel">{{
+                      $t("reservar.celular")
+                    }}</label>
+                    <input
+                      id="rc-cel"
+                      v-model="datos.celular"
+                      class="tu-input"
+                      inputmode="tel"
+                      autocomplete="tel"
+                    />
+                  </div>
+                  <div>
+                    <label class="tu-label" for="rc-email">{{
+                      $t("reservar.email")
+                    }}</label>
+                    <input
+                      id="rc-email"
+                      v-model="datos.email"
+                      type="email"
+                      class="tu-input"
+                      autocomplete="email"
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label class="tu-label" for="rc-email">{{
-                  $t("reservar.email")
-                }}</label>
-                <input
-                  id="rc-email"
-                  v-model="datos.email"
-                  type="email"
-                  class="tu-input"
-                />
-              </div>
-            </div>
-          </div>
 
-          <!-- Resumen -->
-          <div
-            class="mt-4 border-t pt-4 text-sm"
-            :style="{ borderColor: 'var(--borde)' }"
-          >
-            <div class="flex items-center justify-between">
-              <span :style="{ color: 'var(--texto-suave)' }">{{
-                servicioSel?.nombre
-              }}</span>
-              <span class="font-semibold">{{
-                dinero(
-                  servicioSel?.precio_minor ?? null,
-                  servicioSel?.moneda ?? null,
-                )
-              }}</span>
+              <button
+                class="tu-btn tu-btn-primario mt-4 w-full"
+                type="button"
+                :disabled="agendando || !listoParaAgendar"
+                @click="agendar"
+              >
+                {{
+                  agendando
+                    ? $t("reservar.agendando")
+                    : $t("reservar.agendarYPagar")
+                }}
+              </button>
+              <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
+                {{ error }}
+              </p>
             </div>
-            <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
-              {{
-                barberoId === CUALQUIERA
-                  ? $t("perfilPublico.agendar.cualquiera")
-                  : barberoSel?.nombre
-              }}
-              · {{ horaLocal(slotSel) }}
-            </p>
-          </div>
 
-          <button
-            class="tu-btn tu-btn-primario mt-4 w-full"
-            type="button"
-            :disabled="agendando || !listoParaAgendar"
-            @click="agendar"
-          >
-            {{
-              agendando
-                ? $t("reservar.agendando")
-                : $t("reservar.agendarYPagar")
-            }}
-          </button>
-          <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
-            {{ error }}
-          </p>
+            <button
+              type="button"
+              class="tu-enlace text-sm"
+              @click="volverA('horario')"
+            >
+              {{ $t("perfilPublico.agendar.atras") }}
+            </button>
+          </template>
         </div>
       </div>
     </section>
@@ -911,28 +1188,195 @@ onMounted(cargar);
   font-weight: 500;
   font-size: 0.9rem;
 }
-.reserva-eleccion-texto small {
-  display: block;
-  color: var(--texto-suave);
-  margin-top: 0.2rem;
+
+/* Tarjeta de sede: foto arriba (o el pin), nombre y dirección. */
+.rc-sede {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  cursor: pointer;
+  background: var(--superficie);
 }
-.reserva-sede-icono {
+.rc-sede:hover {
+  border-color: var(--primario);
+}
+.rc-sede--activa {
+  border-color: var(--primario);
+  box-shadow: inset 0 0 0 1px var(--primario);
+}
+.rc-sede:focus-within {
+  outline: 2px solid var(--primario);
+  outline-offset: 3px;
+}
+.rc-sede-foto {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--fondo);
+}
+.rc-sede-sinfoto {
   display: grid;
   place-items: center;
+  color: var(--texto-suave);
+}
+.rc-sede-sinfoto svg {
+  width: 28px;
+  height: 28px;
+}
+.rc-sede-texto {
+  padding: 0.75rem 1rem 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rc-sede-texto strong {
+  display: block;
+  font-weight: 500;
+}
+.rc-sede--compacta {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+.rc-sede--compacta .rc-sede-foto {
   width: 36px;
   height: 36px;
+  aspect-ratio: auto;
   flex-shrink: 0;
   border-radius: 10px;
   background: var(--primario-suave);
   color: var(--enlace);
 }
-.reserva-sede-icono svg {
+.rc-sede--compacta .rc-sede-sinfoto svg {
   width: 21px;
   height: 21px;
 }
-@media (max-width: 480px) {
+.rc-sede--compacta .rc-sede-texto {
+  padding: 0;
+}
+.rc-sede-texto small {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* Mapa de pasos */
+.rc-pasos {
+  display: flex;
+  gap: 0.5rem;
+}
+.rc-paso {
+  flex: 1;
+  min-width: 0;
+  padding-top: 0.6rem;
+  border-top: 3px solid var(--borde);
+}
+.rc-paso--hecho,
+.rc-paso--actual {
+  border-top-color: var(--primario);
+}
+.rc-paso-marca {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  font-size: 0.8rem;
+  color: var(--texto-suave);
+  text-align: left;
+}
+button.rc-paso-marca {
+  cursor: pointer;
+}
+button.rc-paso-marca:hover .rc-paso-texto {
+  text-decoration: underline;
+}
+.rc-paso--actual .rc-paso-marca {
+  color: var(--texto);
+  font-weight: 600;
+}
+.rc-paso-num {
+  display: inline-grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--borde);
+  font-size: 0.72rem;
+}
+.rc-paso--actual .rc-paso-num {
+  border-color: var(--primario);
+  color: var(--primario);
+}
+.rc-paso--hecho .rc-paso-num {
+  border-color: var(--primario);
+  background: var(--primario-suave);
+  color: var(--primario-fuerte);
+}
+.rc-paso-texto {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rc-contexto {
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+}
+
+/* Resumen de la confirmación */
+.rc-resumen > div {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--borde);
+}
+.rc-resumen dt {
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+}
+.rc-resumen dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
   .reserva-tarjetas {
     grid-template-columns: 1fr;
+  }
+  /* En pantallas angostas solo se nombra el paso actual, que toma el espacio. */
+  .rc-paso--actual {
+    flex: 4;
+  }
+  .rc-paso--actual .rc-paso-texto {
+    white-space: normal;
+  }
+  .rc-paso:not(.rc-paso--actual) .rc-paso-texto {
+    display: none;
+  }
+  /* El título y «Cambiar» en una línea; lo elegido abajo, a todo lo ancho. */
+  .rc-resumen > div {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 0.25rem;
+  }
+  .rc-resumen dt {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .rc-resumen > div > button {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .rc-resumen dd {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 }
 </style>

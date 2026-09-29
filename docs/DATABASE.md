@@ -53,7 +53,7 @@ el esquema.
 - `solicitudes_privacidad` — derechos ARCO.
 
 **Estructura**
-- `organizaciones`, `sucursales` (con ubicación, zona horaria y perfil público: dirección, teléfono, WhatsApp, redes y horario; ADR 0061).
+- `organizaciones`, `sucursales` (con ubicación, zona horaria y perfil público: dirección, teléfono, WhatsApp, redes y horario, ADR 0061; foto y enlace de Google Maps, ADR 0064).
 - `asignaciones_personal` — rol de una persona del equipo en una sucursal.
 - `horarios_atencion` — horario de cada sucursal o profesional.
 

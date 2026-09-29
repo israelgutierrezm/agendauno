@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
+use App\Modules\Tenancy\Support\EnlaceMapa;
 use App\Modules\Tenancy\Support\HorarioSucursal;
 use App\Modules\Tenancy\Support\RedesSociales;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Organizaciones y sucursales del estudio, tenant-local (BD del tenant). Base para
@@ -119,6 +124,8 @@ class OrganizacionesTenantController
             'whatsapp' => ['nullable', 'string', 'max:30', 'regex:/^[0-9 +()-]*$/'],
             ...RedesSociales::reglas(),
             ...HorarioSucursal::reglas(),
+            // Enlace de Google Maps para llegar (ADR 0064).
+            ...EnlaceMapa::reglas(),
         ]);
     }
 
@@ -145,6 +152,55 @@ class OrganizacionesTenantController
             $horario = $validado['horario'];
             $sucursal->horario = HorarioSucursal::normalizar($horario);
         }
+        if (array_key_exists('mapa_url', $validado)) {
+            $sucursal->mapa_url = EnlaceMapa::normalizar(is_string($validado['mapa_url']) ? $validado['mapa_url'] : null);
+        }
+    }
+
+    /**
+     * Una foto de la sede (la que ve el cliente al elegirla). SVG excluido a propósito
+     * (riesgo de XSS al servirse en el navegador).
+     */
+    public function subirFoto(Request $request): JsonResponse
+    {
+        $sucursal = SucursalTenant::query()->where('ulid', (string) $request->route('sucursal'))->firstOrFail();
+        $request->validate([
+            'foto' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+        ]);
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+
+        $archivo = $request->file('foto');
+        abort_unless($archivo instanceof UploadedFile, 422);
+        // Carpeta propia por negocio y nombre no enumerable.
+        $ruta = $archivo->storeAs(
+            'sucursales/'.$estudio->getKey(),
+            Str::lower(Str::random(40)).'.'.$archivo->extension(),
+            'public',
+        );
+
+        $this->borrarFoto($sucursal);
+        $sucursal->foto_ruta = (string) $ruta;
+        $sucursal->save();
+
+        return response()->json(['data' => $this->presentarSucursal($sucursal)]);
+    }
+
+    public function eliminarFoto(Request $request): JsonResponse
+    {
+        $sucursal = SucursalTenant::query()->where('ulid', (string) $request->route('sucursal'))->firstOrFail();
+        $this->borrarFoto($sucursal);
+        $sucursal->foto_ruta = null;
+        $sucursal->save();
+
+        return response()->json(['data' => $this->presentarSucursal($sucursal)]);
+    }
+
+    private function borrarFoto(SucursalTenant $sucursal): void
+    {
+        if ($sucursal->foto_ruta !== null && $sucursal->foto_ruta !== '') {
+            Storage::disk('public')->delete($sucursal->foto_ruta);
+        }
     }
 
     /**
@@ -166,6 +222,8 @@ class OrganizacionesTenantController
             'whatsapp' => $sucursal->whatsapp,
             'redes' => (object) ($sucursal->redes ?? []),
             'horario' => $sucursal->horario ?? [],
+            'foto_url' => $sucursal->fotoUrl(),
+            'mapa_url' => $sucursal->mapa_url,
         ];
     }
 }
