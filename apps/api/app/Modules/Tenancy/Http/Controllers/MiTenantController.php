@@ -333,13 +333,15 @@ class MiTenantController
 
     /**
      * Horarios libres de un profesional en una fecha, para elegir la hora de la cita.
+     * Sin profesional («cualquier profesional disponible»), los de todo el equipo de
+     * la sede.
      */
     public function disponibilidadCita(Request $request, CalcularDisponibilidadTenant $disponibilidad): JsonResponse
     {
         abort_unless($this->persona($request) instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
 
         $validado = $request->validate([
-            'instructor_id' => ['required', 'string'],
+            'instructor_id' => ['nullable', 'string'],
             'sucursal_id' => ['required', 'string'],
             'fecha' => ['required', 'date_format:Y-m-d'],
             // Con el servicio, su duración y sus márgenes (2.3); sin él, la duración.
@@ -347,14 +349,16 @@ class MiTenantController
             'duracion_minutos' => ['required_without:oferta_id', 'nullable', 'integer', 'min:5', 'max:1440'],
         ]);
 
-        $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
+        $instructor = ($validado['instructor_id'] ?? '') !== '' ? Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail() : null;
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
         $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail() : null;
         [$duracion, $margenes] = $disponibilidad->duracionYMargenes($oferta, isset($validado['duracion_minutos']) ? (int) $validado['duracion_minutos'] : null);
 
         return response()->json(['data' => [
             'fecha' => $validado['fecha'],
-            'slots' => $disponibilidad->paraFecha((int) $instructor->getKey(), $sucursal, $validado['fecha'], $duracion, null, $margenes, $oferta),
+            'slots' => $instructor instanceof Usuario
+                ? $disponibilidad->paraFecha((int) $instructor->getKey(), $sucursal, $validado['fecha'], $duracion, null, $margenes, $oferta)
+                : $disponibilidad->paraCualquiera($sucursal, $validado['fecha'], $duracion, null, $margenes, $oferta),
         ]]);
     }
 
@@ -366,19 +370,28 @@ class MiTenantController
         $validado = $request->validate([
             'oferta_id' => ['required', 'string'],
             'sucursal_id' => ['required', 'string'],
-            'instructor_id' => ['required', 'string'],
+            'instructor_id' => ['nullable', 'string'],
             'inicia_en_local' => ['required', 'date'],
             'duracion_minutos' => ['required', 'integer', 'min:5', 'max:1440'],
         ]);
 
         $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
-        $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
+        // Sin profesional («cualquier profesional disponible»), se asigna uno libre.
+        $instructor = ($validado['instructor_id'] ?? '') !== '' ? Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail() : null;
         $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sucursal->zona_horaria)->utc();
 
-        $reserva = $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, (int) $validado['duracion_minutos']);
+        $reserva = $instructor instanceof Usuario
+            ? $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, (int) $validado['duracion_minutos'])
+            : $agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, (int) $validado['duracion_minutos']);
+        $reserva->load(['sesion.oferta', 'sesion.instructor', 'orden']);
+        $profesional = $reserva->sesion?->instructor;
 
-        return response()->json(['data' => $this->presentarReserva($reserva->load(['sesion.oferta', 'orden']))], 201);
+        return response()->json(['data' => [
+            ...$this->presentarReserva($reserva),
+            // Quién atenderá: el elegido o el que se asignó.
+            'profesional' => $profesional instanceof Usuario ? ['id' => $profesional->ulid, 'nombre' => (string) $profesional->name] : null,
+        ]], 201);
     }
 
     public function cancelar(Request $request): JsonResponse

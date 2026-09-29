@@ -377,8 +377,10 @@ class CuentaRepository {
 
   /// Horarios libres (inicio en ISO UTC) de un profesional en una fecha (AAAA-MM-DD).
   /// Con el servicio, el negocio aplica su duración y su preparación/limpieza.
+  /// Sin [profesionalId] («cualquier profesional») salen los huecos en que alguien
+  /// del equipo está libre.
   Future<List<String>> horariosLibres({
-    required String profesionalId,
+    required String? profesionalId,
     required String sucursalId,
     required String fecha,
     required int duracionMinutos,
@@ -387,7 +389,7 @@ class CuentaRepository {
     final res = await _dio.get<Map<String, dynamic>>(
       '$_base/mi/citas/disponibilidad',
       queryParameters: {
-        'instructor_id': profesionalId,
+        'instructor_id': ?profesionalId,
         'sucursal_id': sucursalId,
         'fecha': fecha,
         'duracion_minutos': duracionMinutos,
@@ -402,11 +404,12 @@ class CuentaRepository {
         .toList();
   }
 
-  /// Agenda la cita; devuelve su estado (`pendiente_pago` si se paga para reservar).
-  Future<String> agendarCita({
+  /// Agenda la cita; devuelve su estado (`pendiente_pago` si se paga para reservar)
+  /// y quién la atenderá (sin [profesionalId], el negocio asigna a quien esté libre).
+  Future<({String estado, String? profesional})> agendarCita({
     required String servicioId,
     required String sucursalId,
-    required String profesionalId,
+    required String? profesionalId,
     required String iniciaEnLocal,
     required int duracionMinutos,
   }) async {
@@ -415,14 +418,19 @@ class CuentaRepository {
       data: {
         'oferta_id': servicioId,
         'sucursal_id': sucursalId,
-        'instructor_id': profesionalId,
+        'instructor_id': ?profesionalId,
         'inicia_en_local': iniciaEnLocal,
         'duracion_minutos': duracionMinutos,
       },
     );
 
-    return (((res.data?['data'] ?? {}) as Map<String, dynamic>)['estado'] ?? '')
-        as String;
+    final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
+    final profesional = data['profesional'] as Map<String, dynamic>?;
+
+    return (
+      estado: (data['estado'] ?? '') as String,
+      profesional: profesional?['nombre'] as String?,
+    );
   }
 }
 

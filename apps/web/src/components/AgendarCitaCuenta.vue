@@ -28,6 +28,8 @@ interface Slot {
   inicia: string;
   termina: string;
 }
+// Sin preferencia: el negocio asigna a quien esté libre a esa hora.
+const CUALQUIERA = "cualquiera";
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -106,7 +108,9 @@ async function buscarHorarios(): Promise<void> {
       `${base.value}/mi/citas/disponibilidad`,
       {
         params: {
-          instructor_id: profesionalId.value,
+          ...(profesionalId.value !== CUALQUIERA
+            ? { instructor_id: profesionalId.value }
+            : {}),
           sucursal_id: sucursalId.value,
           fecha: fecha.value,
           // El servicio aporta su duración y su preparación/limpieza.
@@ -131,20 +135,25 @@ async function agendar(): Promise<void> {
   agendando.value = true;
   error.value = null;
   try {
-    const { data } = await api.post<{ data: { estado: string } }>(
-      `${base.value}/mi/citas`,
-      {
-        oferta_id: servicio.value.id,
-        sucursal_id: sucursalId.value,
-        instructor_id: profesionalId.value,
-        inicia_en_local: horaLocal(slotSel.value),
-        duracion_minutos: servicio.value.duracion_minutos ?? 60,
-      },
-    );
+    const { data } = await api.post<{
+      data: { estado: string; profesional?: { nombre: string } | null };
+    }>(`${base.value}/mi/citas`, {
+      oferta_id: servicio.value.id,
+      sucursal_id: sucursalId.value,
+      ...(profesionalId.value !== CUALQUIERA
+        ? { instructor_id: profesionalId.value }
+        : {}),
+      inicia_en_local: horaLocal(slotSel.value),
+      duracion_minutos: servicio.value.duracion_minutos ?? 60,
+    });
     aviso.value =
       data.data.estado === "pendiente_pago"
         ? t("citaCuenta.apartada")
         : t("citaCuenta.agendada");
+    // Con «cualquiera», se dice quién la atenderá.
+    if (profesionalId.value === CUALQUIERA && data.data.profesional) {
+      aviso.value += ` ${t("perfilPublico.agendar.teAtiende", { nombre: data.data.profesional.nombre })}`;
+    }
     slotSel.value = "";
     await buscarHorarios();
     emit("agendada");
@@ -167,6 +176,9 @@ onMounted(async () => {
     servicios.value = data.data.servicios;
     sucursales.value = data.data.sucursales;
     profesionales.value = data.data.instructores;
+    if (profesionales.value.length > 1) {
+      profesionalId.value = CUALQUIERA;
+    }
     if (sucursales.value.length === 1) {
       sucursalId.value = sucursales.value[0].id;
     }
@@ -222,6 +234,9 @@ onMounted(async () => {
             required
           >
             <option value="" disabled>{{ $t("citaCuenta.elegir") }}</option>
+            <option v-if="profesionales.length > 1" :value="CUALQUIERA">
+              {{ $t("perfilPublico.agendar.cualquiera") }}
+            </option>
             <option v-for="p in profesionales" :key="p.id" :value="p.id">
               {{ p.nombre }}
             </option>

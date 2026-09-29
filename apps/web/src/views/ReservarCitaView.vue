@@ -37,7 +37,11 @@ interface Opciones {
 interface Slot {
   inicia: string;
   termina: string;
+  // Con «cualquier profesional»: quiénes están libres en ese hueco.
+  profesionales?: string[];
 }
+// Sin preferencia: el negocio asigna a quien esté libre a esa hora.
+const CUALQUIERA = "cualquiera";
 
 const route = useRoute();
 // Al volver de la página de pago: avisa cómo quedó.
@@ -77,6 +81,8 @@ const resultado = ref<{
   orden_id: string | null;
   total_minor: number | null;
   moneda: string | null;
+  // Quién atenderá (el elegido o el que asignó el negocio).
+  profesional?: { id: string; nombre: string } | null;
 } | null>(null);
 const pendientePago = ref(false);
 
@@ -187,7 +193,9 @@ async function buscarSlots(): Promise<void> {
       `/api/v1/app/${slug.value}/citas/disponibilidad`,
       {
         params: {
-          instructor_id: barberoId.value,
+          ...(barberoId.value !== CUALQUIERA
+            ? { instructor_id: barberoId.value }
+            : {}),
           sucursal_id: sucursalId.value,
           fecha: fecha.value,
           duracion_minutos: duracion.value,
@@ -207,8 +215,10 @@ async function buscarSlots(): Promise<void> {
 }
 
 // Recalcula huecos al cambiar barbero, sucursal, fecha o servicio (por su duración).
+// Con más de un profesional se parte de «cualquiera»: se puede elegir a alguien.
 watch(sucursalId, () => {
-  barberoId.value = "";
+  barberoId.value =
+    (opciones.value?.instructores.length ?? 0) > 1 ? CUALQUIERA : "";
   fecha.value = "";
 });
 watch([barberoId, sucursalId, fecha, servicioId], buscarSlots);
@@ -226,6 +236,7 @@ async function agendar(): Promise<void> {
         orden_id: string | null;
         total_minor: number | null;
         moneda: string | null;
+        profesional?: { id: string; nombre: string } | null;
       };
     }>(`/api/v1/app/${slug.value}/citas`, {
       nombre: datos.value.nombre.trim(),
@@ -234,7 +245,9 @@ async function agendar(): Promise<void> {
       email: datos.value.email.trim() !== "" ? datos.value.email.trim() : null,
       oferta_id: servicioId.value,
       sucursal_id: sucursalId.value,
-      instructor_id: barberoId.value,
+      ...(barberoId.value !== CUALQUIERA
+        ? { instructor_id: barberoId.value }
+        : {}),
       inicia_en_local: relojLocal(slotSel.value),
       duracion_minutos: duracion.value,
     });
@@ -397,7 +410,8 @@ onMounted(cargar);
           {{
             $t("reservar.listoResumen", {
               servicio: servicioSel?.nombre ?? "",
-              barbero: barberoSel?.nombre ?? "",
+              barbero:
+                resultado.profesional?.nombre ?? barberoSel?.nombre ?? "",
             })
           }}
         </p>
@@ -557,6 +571,26 @@ onMounted(cargar);
           </p>
           <div v-else class="reserva-tarjetas">
             <label
+              v-if="opciones.instructores.length > 1"
+              class="reserva-eleccion"
+              :class="{ 'reserva-eleccion--activa': barberoId === CUALQUIERA }"
+              data-prueba="cualquiera"
+            >
+              <input
+                v-model="barberoId"
+                type="radio"
+                name="profesional"
+                :value="CUALQUIERA"
+              />
+              <AvatarIniciales :nombre="null" tam="md" />
+              <span class="reserva-eleccion-texto"
+                ><strong>{{ $t("perfilPublico.agendar.cualquiera") }}</strong>
+                <span class="block text-xs font-normal">{{
+                  $t("perfilPublico.agendar.cualquieraDesc")
+                }}</span></span
+              >
+            </label>
+            <label
               v-for="b in opciones.instructores"
               :key="b.id"
               class="reserva-eleccion"
@@ -577,7 +611,10 @@ onMounted(cargar);
         </fieldset>
 
         <!-- Día + hora -->
-        <div v-if="barberoId !== '' && sucursalId !== ''" class="tu-card p-5">
+        <div
+          v-if="barberoId !== '' && sucursalId !== '' && servicioId !== ''"
+          class="tu-card p-5"
+        >
           <label class="tu-label" for="rc-fecha">{{
             $t("reservar.cuando")
           }}</label>
@@ -698,7 +735,12 @@ onMounted(cargar);
               }}</span>
             </div>
             <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
-              {{ barberoSel?.nombre }} · {{ horaLocal(slotSel) }}
+              {{
+                barberoId === CUALQUIERA
+                  ? $t("perfilPublico.agendar.cualquiera")
+                  : barberoSel?.nombre
+              }}
+              · {{ horaLocal(slotSel) }}
             </p>
           </div>
 

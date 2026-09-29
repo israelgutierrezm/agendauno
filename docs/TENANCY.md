@@ -62,7 +62,8 @@ por defecto.
 - `estudios.version_migraciones` guarda la última migración de cada negocio.
 - MySQL corre en READ COMMITTED (ADR 0052). `agendauno:verificar-concurrencia`
   prueba con procesos concurrentes reales: último lugar, mismo profesional y
-  horario, cancelaciones, reprogramaciones y migraciones de varios negocios.
+  horario, misma hora con cualquier profesional, cancelaciones, reprogramaciones
+  y migraciones de varios negocios.
 
 ## Respaldos
 

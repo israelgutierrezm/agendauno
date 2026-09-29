@@ -118,6 +118,7 @@ class VerificarConcurrencia extends Command
             $this->caso('Dos personas por el último lugar de una clase', fn () => $this->ultimoLugar($escenarios, $rondas, $procesos));
             $this->caso('Reservas a la vez con el último crédito del paquete', fn () => $this->ultimoCredito($escenarios, $rondas));
             $this->caso('Mismo profesional y horario (agendar y reprogramar)', fn () => $this->mismaCita($escenarios, $rondas, $procesos));
+            $this->caso('Misma hora con cualquier profesional disponible', fn () => $this->cualquierProfesional($escenarios, $rondas, $procesos));
             $this->caso('Cancelar y reprogramar la misma reserva a la vez', fn () => $this->cancelarYReprogramar($escenarios, $rondas));
             $this->caso('Reprogramaciones y reservas por el último lugar', fn () => $this->reprogramarAlUltimoLugar($escenarios, $rondas, $procesos));
             $this->caso('Una cancelación libera lugar mientras otros lo piden', fn () => $this->cancelacionLiberaLugar($escenarios, $rondas));
@@ -238,6 +239,40 @@ class VerificarConcurrencia extends Command
             $this->inesperados($fallas, $res);
             $tipo = $moviendo > 0 ? " ({$moviendo} reprogramando)" : '';
             $this->detalle('ronda '.($r + 1).": {$procesos} solicitudes{$tipo} → {$encimadas} cita", $res);
+        }
+
+        return $fallas;
+    }
+
+    /**
+     * Varios clientes piden la misma hora con «cualquier profesional»: cada uno de los
+     * dos profesionales queda con una cita (no dos encimadas) y los demás clientes
+     * reciben que ya no hay nadie libre.
+     *
+     * @return list<string>
+     */
+    private function cualquierProfesional(EscenariosConcurrencia $e, int $rondas, int $procesos): array
+    {
+        $fallas = [];
+        $e->abrirAtencion($this->base['sucursal'], $this->base['profesionales']);
+        for ($r = 0; $r < $rondas; $r++) {
+            $hueco = $e->hueco(60 + $r, 10);
+            $res = $this->competir(collect(range(1, $procesos))->map(fn (): array => [
+                'accion' => 'agendar-cualquiera', 'servicio' => $this->base['servicio'], 'sucursal' => $this->base['sucursal'],
+                'persona' => $e->alumno(0)->getKey(), 'inicia' => $hueco->toIso8601String(),
+            ])->all());
+
+            $esperadas = min(count($this->base['profesionales']), $procesos);
+            $porProfesional = array_map(
+                fn (int $p): int => $e->citasEncimadas($p, $hueco, $hueco->addMinutes(30)),
+                $this->base['profesionales'],
+            );
+            $total = array_sum($porProfesional);
+            $this->comprobar($fallas, max($porProfesional) <= 1, 'un profesional quedó con citas encimadas ('.implode(' + ', $porProfesional).')');
+            $this->comprobar($fallas, $total === $esperadas, "{$total} citas a esa hora (debían ser {$esperadas})");
+            $this->comprobar($fallas, $this->hechos($res) === $esperadas, "{$this->hechos($res)} procesos dicen haber agendado");
+            $this->inesperados($fallas, $res);
+            $this->detalle('ronda '.($r + 1).": {$procesos} clientes a la misma hora → ".implode(' + ', $porProfesional).' citas', $res);
         }
 
         return $fallas;

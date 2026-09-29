@@ -89,3 +89,9 @@ anyone else, and release the professional's slot when their booking ends
 (cancelled or unpaid). Paid services booked online start `pendiente_pago` and
 expire; booked by the business they start confirmed with an order to collect at
 the counter. See ADR 0018.
+
+A client may book with "any available professional" (no `instructor_id`): the
+slots are the union of every professional who works at that branch that day, and
+the booking goes to the least busy one that day (then by name). Each attempt is a
+normal booking under that professional's lock; if the slot was just taken, the
+next candidate is tried. See ADR 0062.

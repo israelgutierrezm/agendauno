@@ -98,6 +98,11 @@ export default {
     agendar: "Agendar",
     redes: "Síguenos",
   },
+  agendar: {
+    cualquiera: "Cualquier profesional disponible",
+    cualquieraDesc: "Te atiende quien esté libre a esa hora.",
+    teAtiende: "Te atenderá {nombre}.",
+  },
   enlaces: {
     cargando: "Cargando…",
     noDisponible: "Este negocio no está disponible por ahora.",

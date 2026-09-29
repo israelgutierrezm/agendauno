@@ -14,6 +14,8 @@
 - **Perfil público** (ADR 0061): portada, descripción y redes del negocio y de cada
   sede, horario, fotos del equipo, servicios por categoría, horario semanal de clases
   y página de enlaces para Instagram.
+- **Cualquier profesional disponible** (ADR 0062): al agendar sin elegir a nadie,
+  se asigna a quien está libre y con menos trabajo ese día (web y app).
 - **Experiencia**: web única (sitio, panel, portal, superadmin) y app Flutter;
   roles propios y rol activo por sesión (ADR 0055, 0057); nombre AgendaUno
   (ADR 0056).
@@ -29,9 +31,9 @@
 
 - Conciliar el guardado de tarjeta de Stripe (pago automático) cuando no llega su
   aviso; hoy la conciliación cubre los cobros.
-- Reserva pública: «cualquier profesional disponible», elegir primero la hora,
-  varios servicios en una cita, selector semanal de horarios y más datos del
-  cliente (apellido, lada, cómo se enteró, notas).
+- Reserva pública: elegir primero la hora, varios servicios en una cita, selector
+  semanal de horarios y más datos del cliente (apellido, lada, cómo se enteró,
+  notas).
 - Avisos por WhatsApp (proveedor por decidir) y foto por servicio.
 - Separar «editar» y «eliminar» en el catálogo de permisos.
 - Roles propios con faceta de instructor.

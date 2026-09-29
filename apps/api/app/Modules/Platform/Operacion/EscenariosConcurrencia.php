@@ -18,6 +18,7 @@ use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -155,6 +156,23 @@ class EscenariosConcurrencia
     }
 
     /**
+     * Los dos profesionales atienden en la sede toda la semana (para las citas que
+     * agenda el cliente, que deben caer en su horario).
+     *
+     * @param  list<int>  $profesionales
+     */
+    public function abrirAtencion(int $sucursalId, array $profesionales): void
+    {
+        foreach ($profesionales as $profesional) {
+            foreach (range(1, 7) as $dia) {
+                HorarioAtencionTenant::query()->firstOrCreate([
+                    'instructor_id' => $profesional, 'sucursal_id' => $sucursalId, 'dia_semana' => $dia,
+                ], ['hora_inicio' => '07:00', 'hora_fin' => '22:00']);
+            }
+        }
+    }
+
+    /**
      * Agenda una cita en el acto (para preparar un caso).
      */
     public function cita(int $servicioId, int $sucursalId, PersonaTenant $persona, int $profesionalId, CarbonImmutable $inicia): ReservaTenant
@@ -263,6 +281,7 @@ class EscenariosConcurrencia
         return match ($paso['accion']) {
             'reservar' => $this->prepararReservar((int) $paso['sesion'], (int) $paso['persona']),
             'agendar' => $this->prepararAgendar($paso),
+            'agendar-cualquiera' => $this->prepararAgendarConCualquiera($paso),
             'cancelar' => $this->prepararCancelar((int) $paso['reserva']),
             'mover-clase' => $this->prepararMoverClase((int) $paso['reserva'], (int) $paso['sesion']),
             'mover-cita' => $this->prepararMoverCita((int) $paso['reserva'], (string) $paso['inicia']),
@@ -292,6 +311,23 @@ class EscenariosConcurrencia
 
         return fn (): string => $this->agendar
             ->agendar($oferta, $sucursal, $persona, (int) $paso['profesional'], $inicia, 30, porNegocio: true)
+            ->estado->value;
+    }
+
+    /**
+     * Como la cliente en línea: sin elegir profesional.
+     *
+     * @param  array<string, mixed>  $paso
+     */
+    private function prepararAgendarConCualquiera(array $paso): callable
+    {
+        $oferta = OfertaTenant::query()->findOrFail((int) $paso['servicio']);
+        $sucursal = SucursalTenant::query()->findOrFail((int) $paso['sucursal']);
+        $persona = PersonaTenant::query()->findOrFail((int) $paso['persona']);
+        $inicia = CarbonImmutable::parse((string) $paso['inicia']);
+
+        return fn (): string => $this->agendar
+            ->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, 30)
             ->estado->value;
     }
 

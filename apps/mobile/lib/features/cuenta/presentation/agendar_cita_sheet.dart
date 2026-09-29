@@ -10,12 +10,19 @@ import 'cuenta_screen.dart';
 
 /// Agendar una cita desde la cuenta: servicio, profesional, sede, día y hora libre.
 /// Si el servicio se paga para reservar, la cita queda apartada hasta pagarla.
+/// Con más de un profesional se parte de «cualquier profesional disponible».
 class AgendarCitaSheet extends ConsumerStatefulWidget {
   const AgendarCitaSheet({super.key});
 
   @override
   ConsumerState<AgendarCitaSheet> createState() => _AgendarCitaSheetState();
 }
+
+/// Sin preferencia: el negocio asigna a quien esté libre a esa hora.
+const _cualquiera = OpcionCita(
+  id: '',
+  nombre: 'Cualquier profesional disponible',
+);
 
 class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
   OpcionesCita? _opciones;
@@ -49,9 +56,15 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
       _sede = opciones.sucursales.length == 1
           ? opciones.sucursales.first
           : null;
+      if (opciones.profesionales.length > 1) {
+        _profesional = _cualquiera;
+      }
       _cargando = false;
     });
   }
+
+  String? get _idProfesional =>
+      identical(_profesional, _cualquiera) ? null : _profesional?.id;
 
   bool get _listo =>
       _servicio != null &&
@@ -70,7 +83,7 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     }
     setState(() => _buscando = true);
     final horarios = await repo.horariosLibres(
-      profesionalId: _profesional!.id,
+      profesionalId: _idProfesional,
       sucursalId: _sede!.id,
       fecha: Formato.iso(_dia!),
       duracionMinutos: _servicio!.duracionMinutos ?? 60,
@@ -92,26 +105,29 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     }
     setState(() => _agendando = true);
     final navegador = Navigator.of(context);
+    final mensajero = ScaffoldMessenger.of(context);
     await hacerConAviso(context, () async {
       // El API recibe la hora local de la sede; el dispositivo está en la misma zona.
       final inicio = DateTime.parse(hora).toLocal();
-      final estado = await repo.agendarCita(
+      final cita = await repo.agendarCita(
         servicioId: _servicio!.id,
         sucursalId: _sede!.id,
-        profesionalId: _profesional!.id,
+        profesionalId: _idProfesional,
         iniciaEnLocal: '${Formato.iso(inicio)}T${Formato.hora(inicio)}',
         duracionMinutos: _servicio!.duracionMinutos ?? 60,
       );
       await ref.read(cuentaProvider.notifier).recargar();
       navegador.pop();
-      if (estado == 'pendiente_pago' && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Tu cita quedó apartada. Págala para confirmarla.'),
-          ),
-        );
-      }
-    }, exito: '¡Listo! Agendamos tu cita.');
+      // Un solo aviso: si quedó apartada o agendada y, con «cualquiera», con quién.
+      final quien = cita.profesional;
+      final conQuien = identical(_profesional, _cualquiera) && quien != null
+          ? ' Te atenderá $quien.'
+          : '';
+      final aviso = cita.estado == 'pendiente_pago'
+          ? 'Tu cita quedó apartada. Págala para confirmarla.'
+          : '¡Listo! Agendamos tu cita.';
+      mensajero.showSnackBar(SnackBar(content: Text('$aviso$conQuien')));
+    });
     if (mounted) {
       setState(() => _agendando = false);
     }
@@ -169,7 +185,10 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                   }),
                   _selector(
                     'Profesional',
-                    opciones.profesionales,
+                    [
+                      if (opciones.profesionales.length > 1) _cualquiera,
+                      ...opciones.profesionales,
+                    ],
                     _profesional,
                     (v) {
                       setState(() => _profesional = v);

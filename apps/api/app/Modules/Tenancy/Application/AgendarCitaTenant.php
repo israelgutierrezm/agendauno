@@ -40,6 +40,9 @@ use Illuminate\Support\Facades\DB;
  * por intervalo (cualquier solapamiento, no solo la misma hora de inicio). Si aun así
  * la base reporta un choque de concurrencia, se responde que el horario ya no está
  * disponible.
+ *
+ * Con «cualquier profesional disponible» ({@see agendarConCualquiera}) se intenta con
+ * cada candidato, uno tras otro y cada uno con su candado.
  */
 class AgendarCitaTenant
 {
@@ -92,6 +95,54 @@ class AgendarCitaTenant
 
             throw $e;
         }
+    }
+
+    /**
+     * El cliente no eligió profesional: se asigna, entre quienes atienden en la sede a
+     * esa hora, al que tiene menos citas y clases ese día (reparte el trabajo) y, a
+     * igualdad, por nombre. Cada intento es el agendado normal: si el hueco de uno ya
+     * se ocupó (otro cliente llegó antes), se intenta con el siguiente. Un rechazo que
+     * no depende del profesional (sin derechos, fuera de la ventana) se responde tal
+     * cual. Solo para el cliente: el negocio siempre agenda con alguien.
+     */
+    public function agendarConCualquiera(
+        OfertaTenant $oferta,
+        SucursalTenant $sucursal,
+        PersonaTenant $persona,
+        CarbonImmutable $inicia,
+        int $duracionMin,
+    ): ReservaTenant {
+        if (! $inicia->isFuture()) {
+            throw new SesionNoReservable('Ese horario ya pasó.');
+        }
+
+        [$duracion] = $this->disponibilidad->duracionYMargenes($oferta, $duracionMin);
+        $termina = $inicia->addMinutes($duracion);
+        $dia = $inicia->setTimezone((string) ($sucursal->zona_horaria ?? config('app.timezone', 'UTC')));
+
+        $candidatos = $this->disponibilidad->profesionalesDeSede($sucursal, $dia->toDateString())
+            ->filter(fn (Usuario $u): bool => $this->disponibilidad->cabeEnHorario((int) $u->getKey(), $sucursal, $inicia, $termina));
+
+        // Carga del día de cada candidato; el orden estable conserva el de nombre.
+        $carga = SesionTenant::query()
+            ->whereIn('instructor_id', $candidatos->modelKeys())
+            ->where('estado', EstadoSesionTenant::Programada->value)
+            ->where('inicia_en', '>=', $dia->startOfDay()->utc())
+            ->where('inicia_en', '<', $dia->addDay()->startOfDay()->utc())
+            ->selectRaw('instructor_id, count(*) as total')
+            ->groupBy('instructor_id')
+            ->pluck('total', 'instructor_id');
+
+        $ultimo = null;
+        foreach ($candidatos->sortBy(static fn (Usuario $u): int => (int) ($carga[$u->getKey()] ?? 0)) as $profesional) {
+            try {
+                return $this->agendar($oferta, $sucursal, $persona, (int) $profesional->getKey(), $inicia, $duracionMin);
+            } catch (SesionNoReservable $e) {
+                $ultimo = $e;
+            }
+        }
+
+        throw $ultimo ?? new SesionNoReservable('No hay profesionales disponibles a esa hora.');
     }
 
     private function agendarEnTransaccion(

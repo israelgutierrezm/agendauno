@@ -66,7 +66,8 @@ class PublicoCitasController
 
     /**
      * Huecos libres de un proveedor en una fecha (guest), para elegir hora antes de
-     * agendar. Reusa el mismo motor que la vista de staff. Solo directorio.
+     * agendar. Reusa el mismo motor que la vista de staff. Sin proveedor («cualquier
+     * profesional disponible»), los de todo el equipo de la sede. Solo directorio.
      */
     public function disponibilidad(Request $request): JsonResponse
     {
@@ -75,7 +76,7 @@ class PublicoCitasController
         abort_unless($estudio->enDirectorio(), 404);
 
         $validado = $request->validate([
-            'instructor_id' => ['required', 'string'],
+            'instructor_id' => ['nullable', 'string'],
             'sucursal_id' => ['required', 'string'],
             'fecha' => ['required', 'date_format:Y-m-d'],
             // Con el servicio, su duración y sus márgenes (2.3); sin él, la duración.
@@ -84,21 +85,16 @@ class PublicoCitasController
             'paso_minutos' => ['nullable', 'integer', 'min:5', 'max:1440'],
         ]);
 
-        $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
+        $instructor = $this->profesionalElegido($validado);
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
 
         $oferta = ($validado['oferta_id'] ?? '') !== '' ? OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail() : null;
         [$duracion, $margenes] = $this->disponibilidad->duracionYMargenes($oferta, isset($validado['duracion_minutos']) ? (int) $validado['duracion_minutos'] : null);
+        $paso = isset($validado['paso_minutos']) ? (int) $validado['paso_minutos'] : null;
 
-        $slots = $this->disponibilidad->paraFecha(
-            (int) $instructor->getKey(),
-            $sucursal,
-            $validado['fecha'],
-            $duracion,
-            isset($validado['paso_minutos']) ? (int) $validado['paso_minutos'] : null,
-            $margenes,
-            $oferta,
-        );
+        $slots = $instructor instanceof Usuario
+            ? $this->disponibilidad->paraFecha((int) $instructor->getKey(), $sucursal, $validado['fecha'], $duracion, $paso, $margenes, $oferta)
+            : $this->disponibilidad->paraCualquiera($sucursal, $validado['fecha'], $duracion, $paso, $margenes, $oferta);
 
         return response()->json(['data' => ['fecha' => $validado['fecha'], 'slots' => $slots]]);
     }
@@ -115,7 +111,7 @@ class PublicoCitasController
             'celular' => ['nullable', 'string', 'max:40'],
             'oferta_id' => ['required', 'string'],
             'sucursal_id' => ['required', 'string'],
-            'instructor_id' => ['required', 'string'],
+            'instructor_id' => ['nullable', 'string'],
             'inicia_en_local' => ['required', 'date'],
             'duracion_minutos' => ['required', 'integer', 'min:5', 'max:1440'],
         ]);
@@ -127,12 +123,15 @@ class PublicoCitasController
             throw new SesionNoReservable('Este servicio se reserva desde tu cuenta.');
         }
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
-        $instructor = Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail();
+        $instructor = $this->profesionalElegido($validado);
         $persona = $this->personaGuest($validado);
         $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sucursal->zona_horaria)->utc();
 
-        $reserva = $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, (int) $validado['duracion_minutos']);
-        $reserva->load('orden');
+        $reserva = $instructor instanceof Usuario
+            ? $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, (int) $validado['duracion_minutos'])
+            : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, (int) $validado['duracion_minutos']);
+        $reserva->load(['orden', 'sesion.instructor']);
+        $profesional = $reserva->sesion?->instructor;
 
         return response()->json(['data' => [
             'reserva' => $reserva->ulid,
@@ -140,6 +139,8 @@ class PublicoCitasController
             'orden_id' => $reserva->orden?->ulid,
             'total_minor' => $reserva->orden?->total_minor,
             'moneda' => $reserva->orden?->moneda,
+            // Quién atenderá: el elegido o el que se asignó.
+            'profesional' => $profesional instanceof Usuario ? ['id' => $profesional->ulid, 'nombre' => (string) $profesional->name] : null,
         ]], 201);
     }
 
@@ -187,6 +188,19 @@ class PublicoCitasController
             'estado' => $pago->estado->value,
             'checkout' => $pago->checkout,
         ]], 201);
+    }
+
+    /**
+     * El profesional que eligió el cliente; null si no eligió («cualquier profesional
+     * disponible»).
+     *
+     * @param  array<string, mixed>  $validado
+     */
+    private function profesionalElegido(array $validado): ?Usuario
+    {
+        $ulid = (string) ($validado['instructor_id'] ?? '');
+
+        return $ulid !== '' ? Usuario::query()->where('ulid', $ulid)->firstOrFail() : null;
     }
 
     /**

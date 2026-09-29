@@ -8,7 +8,9 @@ use App\Modules\Tenancy\Models\ExcepcionHorarioTenant;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Motor de disponibilidad para citas (F-08): calcula los HUECOS LIBRES de un proveedor
@@ -16,6 +18,9 @@ use Carbon\CarbonImmutable;
  * salen de sus ventanas de atención ({@see HorarioAtencionTenant}, hora local de la
  * sucursal) troceadas en pasos, descartando los que ya inician o chocan con una
  * clase/cita del instructor (reusa {@see VerificarAgendaTenant}). Devuelve horas en UTC.
+ *
+ * Con «cualquier profesional disponible» ({@see paraCualquiera}) los huecos son los de
+ * todo el equipo que atiende en la sede ese día.
  */
 class CalcularDisponibilidadTenant
 {
@@ -96,6 +101,49 @@ class CalcularDisponibilidadTenant
         }
 
         return $slots;
+    }
+
+    /**
+     * Quienes atienden en la sede el día de esa fecha (tienen ventana de atención
+     * ahí), por nombre: los candidatos de «cualquier profesional disponible».
+     *
+     * @return Collection<int, Usuario>
+     */
+    public function profesionalesDeSede(SucursalTenant $sucursal, string $fecha): Collection
+    {
+        $zona = (string) ($sucursal->zona_horaria ?? config('app.timezone', 'UTC'));
+        $diaSemana = (int) CarbonImmutable::parse($fecha, $zona)->isoWeekday();
+
+        return Usuario::query()
+            ->whereJsonContains('roles', 'instructor')
+            ->whereIn('id', HorarioAtencionTenant::query()
+                ->where('sucursal_id', $sucursal->getKey())
+                ->where('dia_semana', $diaSemana)
+                ->select('instructor_id'))
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Huecos en que al menos un profesional de la sede está libre: la unión de los de
+     * cada uno, por hora, con quiénes pueden atender en cada hueco (ULID).
+     *
+     * @return list<array{inicia: string, termina: string, profesionales: list<string>}> ISO-8601 UTC
+     */
+    public function paraCualquiera(SucursalTenant $sucursal, string $fecha, int $duracionMin, ?int $pasoMin = null, ?MargenesServicio $margenes = null, ?OfertaTenant $servicio = null): array
+    {
+        $porHora = [];
+        foreach ($this->profesionalesDeSede($sucursal, $fecha) as $profesional) {
+            foreach ($this->paraFecha((int) $profesional->getKey(), $sucursal, $fecha, $duracionMin, $pasoMin, $margenes, $servicio) as $slot) {
+                $porHora[$slot['inicia']] ??= [...$slot, 'profesionales' => []];
+                $porHora[$slot['inicia']]['profesionales'][] = (string) $profesional->ulid;
+            }
+        }
+        // Mismo formato UTC en todas las horas: el orden de texto es el cronológico.
+        ksort($porHora);
+
+        return array_values($porHora);
     }
 
     /**
