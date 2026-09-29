@@ -18,6 +18,11 @@ namespace App\Modules\Tenancy\Comunicaciones\WhatsApp;
 final class PlantillasWhatsApp
 {
     /**
+     * Código para que un dueño confirme su número al registrarse (ADR 0070).
+     */
+    public const CODIGO_VERIFICACION = 'agendauno_codigo_verificacion';
+
+    /**
      * @var array<string, array{nombre: string, titulo: string, texto: string}>
      */
     private const CATALOGO = [
@@ -115,11 +120,12 @@ final class PlantillasWhatsApp
     }
 
     /**
-     * Para el superadministrador: qué registrar en Meta por cada aviso.
+     * Para el superadministrador: qué registrar en Meta para los avisos de los
+     * negocios a sus clientes.
      *
      * @return list<array{evento: string, nombre: string, titulo: string, texto: string, idioma: string, categoria: string}>
      */
-    public static function paraRegistrar(): array
+    public static function paraNegocios(): array
     {
         $lista = [];
         foreach (self::CATALOGO as $evento => $plantilla) {
@@ -134,5 +140,25 @@ final class PlantillasWhatsApp
         }
 
         return $lista;
+    }
+
+    /**
+     * Para el superadministrador: qué registrar en Meta para hablar con los dueños
+     * (ADR 0070). El código de verificación usa la categoría Autenticación: Meta pone
+     * el texto, con recomendación de seguridad, vigencia de 10 minutos y botón «Copiar
+     * código».
+     *
+     * @return list<array{evento: string, nombre: string, titulo: string, texto: string, idioma: string, categoria: string}>
+     */
+    public static function paraDuenos(): array
+    {
+        return [[
+            'evento' => 'registro.codigo',
+            'nombre' => self::CODIGO_VERIFICACION,
+            'titulo' => 'Código de verificación',
+            'texto' => '{{1}} es tu código de verificación. Por tu seguridad, no lo compartas. Este código caduca en 10 minutos.',
+            'idioma' => ClienteWhatsApp::IDIOMA,
+            'categoria' => 'AUTHENTICATION',
+        ]];
     }
 }

@@ -72,6 +72,8 @@ class PlataformaEstudiosController
                 'nombre' => $modelo->nombreContacto(),
                 'email' => $modelo->contacto_email,
                 'whatsapp' => $modelo->whatsappCompleto(),
+                // Confirmó su número con un código y aceptó avisos (ADR 0070).
+                'whatsapp_verificado' => $modelo->contacto_whatsapp_verificado_en !== null,
             ],
             'onboarding_completo' => (bool) $modelo->onboarding_completo,
             'uso' => $uso,

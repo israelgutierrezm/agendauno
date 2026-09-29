@@ -32,7 +32,7 @@ enum CanalComunicacion: string
         if (app(ClienteFcm::class)->configurado()) {
             $canales[] = self::Push;
         }
-        if (app(ClienteWhatsApp::class)->activo()) {
+        if (app(ClienteWhatsApp::class)->activoParaNegocios()) {
             $canales[] = self::WhatsApp;
         }
 

@@ -51,7 +51,7 @@ class EnviarMensajesTenant
             ->limit(self::LOTE)
             ->get()
             ->each(function (MensajeTenant $mensaje) use (&$enviados): void {
-                if ($mensaje->canal === CanalComunicacion::WhatsApp && ! $this->whatsapp->activo()) {
+                if ($mensaje->canal === CanalComunicacion::WhatsApp && ! $this->whatsapp->activoParaNegocios()) {
                     $mensaje->estado = EstadoMensaje::Descartado;
                     $mensaje->ultimo_error = 'WhatsApp se apagó en la plataforma.';
                     $mensaje->save();

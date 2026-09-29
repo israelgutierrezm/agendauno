@@ -16,7 +16,10 @@ opción.
   intermediario. Hay un solo número de WhatsApp Business para toda la plataforma,
   igual que FCM para push.
 - **Interruptor del superadministrador:**
-  - Está en Configuración → «Avisos por WhatsApp» (`GET/PUT /plataforma/whatsapp`).
+  - Está en Configuración → «WhatsApp» (`GET/PUT /plataforma/whatsapp`), en el
+    apartado «De los negocios a sus clientes» (`negocios`). Desde el ADR 0070 hay
+    otro apartado, con los dueños, que se enciende por separado sobre la misma
+    conexión.
   - Guarda si está encendido, el identificador del número (Phone number ID) y el
     token de acceso. Todo queda cifrado en `configuracion_plataforma`.
   - El token nunca se devuelve; si se deja vacío, se conserva el anterior.

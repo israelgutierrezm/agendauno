@@ -26,7 +26,7 @@ class WhatsAppTenant
 
     public function enUso(): bool
     {
-        return $this->cliente->activo()
+        return $this->cliente->activoParaNegocios()
             && PlantillaMensajeTenant::query()
                 ->where('canal', CanalComunicacion::WhatsApp->value)
                 ->where('destinatario', DestinatarioMensaje::Persona->value)

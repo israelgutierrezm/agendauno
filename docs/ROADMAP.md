@@ -50,6 +50,9 @@
   aviso; hoy la conciliación cubre los cobros.
 - WhatsApp: procesar el webhook de estados de Meta (entregado, leído, fallido) y,
   si conviene, número propio por negocio o cobrarlo como extra del plan (ADR 0069).
+- WhatsApp con los dueños: avisos de la plataforma (fin de la prueba, cobro y pago
+  fallido de la renta) a quien lo aceptó, y verificar el número desde el panel si
+  no se hizo al registrarse (ADR 0070).
 - Separar «editar» y «eliminar» en el catálogo de permisos.
 - Roles propios con faceta de instructor.
 - Monitoreo de errores más completo y despliegue automático desde el CI.

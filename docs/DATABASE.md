@@ -22,13 +22,14 @@ el esquema.
 
 | Tabla | Para qué |
 |---|---|
-| `estudios` | Cada negocio: slug, estado, prueba, perfil y terminología, modalidad de cobro, contacto, perfil público (logo, portada, descripción, redes), base de datos y `version_migraciones` |
+| `estudios` | Cada negocio: slug, estado, prueba, perfil y terminología, modalidad de cobro, contacto (con WhatsApp verificado y aceptación de avisos, ADR 0070), perfil público (logo, portada, descripción, redes), base de datos y `version_migraciones` |
 | `tarifas_saas` | Tarifas del SaaS por modalidad, versionadas (ADR 0019) |
 | `mediciones_uso` | Alumnos o profesionales activos medidos por periodo |
 | `cargos_renta` | Renta mensual de cada negocio, inmutable una vez emitida (ADR 0032) |
 | `facturas_plataforma` | Facturas de la plataforma al negocio |
 | `configuraciones_pasarela_plataforma` | Pasarela con la que la plataforma cobra la renta |
-| `configuracion_plataforma` | Parámetros de plataforma (valores por defecto de los límites) |
+| `configuracion_plataforma` | Parámetros de plataforma (valores por defecto de los límites) y conexión de WhatsApp (cifrada) |
+| `verificaciones_whatsapp` | Códigos para que el dueño confirme su WhatsApp al registrarse (solo hashes, ADR 0070) |
 | `alertas_plataforma` | Alertas de operación agrupadas (ADR 0051) |
 | `documentos_legales`, `aceptaciones_legales` | Aviso de privacidad y términos versionados, y quién los aceptó |
 | `users`, `cache`, `jobs`, `failed_jobs`… | Tablas de Laravel |

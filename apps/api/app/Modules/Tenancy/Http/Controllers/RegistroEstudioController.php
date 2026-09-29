@@ -9,6 +9,7 @@ use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\AprovisionarEstudio;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\RegistrarEstudio;
+use App\Modules\Tenancy\Application\VerificacionWhatsAppDueno;
 use App\Modules\Tenancy\Application\VerificarRecaptcha;
 use App\Modules\Tenancy\Http\Requests\RegistrarEstudioRequest;
 use App\Modules\Tenancy\Models\Estudio;
@@ -31,6 +32,7 @@ class RegistroEstudioController
         private readonly EnviarActivacionTenant $enviarActivacion,
         private readonly VerificarRecaptcha $recaptcha,
         private readonly DocumentosLegales $legales,
+        private readonly VerificacionWhatsAppDueno $whatsapp,
     ) {}
 
     public function disponibilidad(Request $request): JsonResponse
@@ -68,6 +70,19 @@ class RegistroEstudioController
             }
         }
 
+        // Confirmó su WhatsApp (ADR 0070): el comprobante es de ese número y sigue vigente.
+        $verificacion = null;
+        $comprobante = $request->validated('whatsapp_verificacion');
+        if (is_string($comprobante) && $comprobante !== '') {
+            $telefono = VerificacionWhatsAppDueno::telefono((string) $request->validated('contacto_whatsapp_pais'), (string) $request->validated('contacto_telefono'));
+            $verificacion = $telefono !== null ? $this->whatsapp->comprobanteValido($telefono, $comprobante) : null;
+            if ($verificacion === null) {
+                throw ValidationException::withMessages([
+                    'whatsapp_verificacion' => ['La verificación de tu WhatsApp venció. Vuelve a verificar tu número.'],
+                ]);
+            }
+        }
+
         $estudio = $this->registrar->ejecutar([
             'nombre' => (string) $request->validated('nombre'),
             'slug' => (string) $request->validated('slug'),
@@ -85,6 +100,13 @@ class RegistroEstudioController
         ]);
 
         $this->legales->registrarAceptacion($estudio, (string) $estudio->contacto_email, $request->ip(), $request->userAgent());
+        if ($verificacion !== null) {
+            $this->whatsapp->usar($verificacion);
+            $estudio->forceFill([
+                'contacto_whatsapp_verificado_en' => now(),
+                'contacto_whatsapp_aceptado_en' => now(),
+            ])->save();
+        }
 
         // BD del tenant creada de forma síncrona (SQLite barato). En producción con
         // MySQL esto se despacharía a una cola; el estado permite reanudar.

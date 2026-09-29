@@ -50,6 +50,9 @@ class RegistrarEstudioRequest extends FormRequest
             'contacto_whatsapp_pais' => ['required', 'string', 'regex:/^\d{1,4}$/'],
             'contacto_telefono' => ['required', 'string', 'regex:/^[0-9 \-]{7,15}$/'],
             'contacto_email' => ['required', 'email', 'max:255'],
+            // Comprobante de que confirmó su WhatsApp con el código (ADR 0070): con él
+            // queda verificado y acepta avisos de la plataforma por WhatsApp.
+            'whatsapp_verificacion' => ['nullable', 'string', 'max:100'],
             'pais' => ['nullable', 'string', 'size:2'],
             'ciudad' => ['nullable', 'string', 'max:120'],
             'zona_horaria' => ['nullable', 'timezone'],

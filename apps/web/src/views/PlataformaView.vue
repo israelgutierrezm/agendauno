@@ -53,7 +53,13 @@ interface Cargo {
   estudio_slug?: string | null;
 }
 interface FichaApi extends Omit<Estudio, "uso"> {
-  contacto: { nombre: string; email: string | null; whatsapp: string | null };
+  contacto: {
+    nombre: string;
+    email: string | null;
+    whatsapp: string | null;
+    // Confirmó su número con un código al registrarse (ADR 0070).
+    whatsapp_verificado?: boolean;
+  };
   onboarding_completo: boolean;
   uso: { periodo: string; metrica: string; cantidad: number }[];
   cargos: Cargo[];
@@ -1301,6 +1307,14 @@ function borrar(): void {
                 class="tu-enlace block"
                 >WhatsApp {{ ficha.contacto.whatsapp }}</a
               >
+              <span
+                v-if="ficha.contacto.whatsapp_verificado"
+                class="pf-verificado text-xs"
+                data-prueba="whatsapp-verificado"
+              >
+                <span class="pf-punto" aria-hidden="true"></span>
+                {{ $t("plataformaAdmin.ficha.whatsappVerificado") }}
+              </span>
             </div>
           </section>
 
@@ -1484,6 +1498,18 @@ function borrar(): void {
 </template>
 
 <style scoped>
+.pf-verificado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--texto-suave);
+}
+.pf-punto {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--exito);
+}
 .pl-fila {
   display: flex;
   flex-wrap: wrap;

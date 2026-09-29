@@ -54,6 +54,8 @@ class Estudio extends Model
         'contacto_email',
         'contacto_whatsapp_pais',
         'contacto_telefono',
+        'contacto_whatsapp_verificado_en',
+        'contacto_whatsapp_aceptado_en',
         'trial_inicia_en',
         'trial_termina_en',
         'plan',
@@ -88,6 +90,8 @@ class Estudio extends Model
         'cuota_fija_minor' => 'integer',
         'onboarding_pasos' => 'array',
         'onboarding_completo' => 'boolean',
+        'contacto_whatsapp_verificado_en' => 'datetime',
+        'contacto_whatsapp_aceptado_en' => 'datetime',
     ];
 
     /**

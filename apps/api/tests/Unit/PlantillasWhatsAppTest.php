@@ -10,7 +10,7 @@ use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 */
 
 it('cada plantilla es válida para Meta: no abre ni cierra con un valor y no repite marcadores', function (): void {
-    foreach (PlantillasWhatsApp::paraRegistrar() as $plantilla) {
+    foreach (PlantillasWhatsApp::paraNegocios() as $plantilla) {
         expect($plantilla['nombre'])->toMatch('/^[a-z0-9_]+$/')
             ->and($plantilla['texto'])->not->toMatch('/^\s*\{\{/')
             ->and($plantilla['texto'])->not->toMatch('/\}\}[\s.]*$/');

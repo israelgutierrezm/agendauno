@@ -204,6 +204,10 @@ corre el comando a mano.
   (`hello_world`). Luego enciende «Reserva confirmada» por WhatsApp en Automáticos.
   Agenda en la página pública con celular y marca la casilla: llega el WhatsApp.
   Apágalo con un aviso en cola: queda `descartado`.
+- [ ] **WhatsApp del dueño** (ADR 0070). Con «Con los dueños» encendido, registra
+  un negocio: en «Contacto» marca «Recibir avisos de AgendaUno por WhatsApp», pide
+  el código y escríbelo. Aparece «WhatsApp verificado», y la ficha del negocio en
+  el superadmin lo muestra. Apagado, el registro no muestra la casilla.
 
 Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado»,
 «membresía suspendida» al cliente y «reserva creada».

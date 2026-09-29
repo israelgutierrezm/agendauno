@@ -11,14 +11,18 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Cliente de WhatsApp (Meta Cloud API) de la plataforma (ADR 0069): un solo número
- * de WhatsApp Business para todos los negocios, que el superadministrador enciende o
- * apaga. Cada mensaje cuesta, así que apagado no se genera ni se envía nada y los
- * negocios no ven la opción (sus avisos siguen por correo y push). Los avisos son
- * plantillas aprobadas por Meta ({@see PlantillasWhatsApp}).
+ * Cliente de WhatsApp (Meta Cloud API) de la plataforma: un solo número de WhatsApp
+ * Business para toda la plataforma, con dos usos que el superadministrador enciende
+ * por separado (cada mensaje cuesta):
  *
- * La configuración vive cifrada en el control plane (`configuracion_plataforma`):
- * encendido, identificador del número y token de acceso (nunca se devuelve).
+ * - `duenos` (ADR 0070): la plataforma con los dueños; verifican su número al
+ *   registrarse y aceptan sus avisos.
+ * - `negocios` (ADR 0069): cada negocio con sus clientes. Apagado, ningún negocio ve
+ *   la opción y sus avisos siguen por correo y push.
+ *
+ * Los mensajes son plantillas aprobadas por Meta ({@see PlantillasWhatsApp}). La
+ * configuración vive cifrada en el control plane (`configuracion_plataforma`): los
+ * dos interruptores, el identificador del número y el token (nunca se devuelve).
  */
 class ClienteWhatsApp
 {
@@ -27,27 +31,44 @@ class ClienteWhatsApp
     public const IDIOMA = 'es_MX';
 
     /**
-     * ¿Se pueden mandar avisos por WhatsApp? Encendido y con número y token.
+     * ¿Hay número y token para hablar con Meta?
      */
-    public function activo(): bool
+    public function conectado(): bool
     {
         $config = $this->config();
 
-        return $config['encendido'] && $config['phone_number_id'] !== '' && $config['token'] !== '';
+        return $config['phone_number_id'] !== '' && $config['token'] !== '';
+    }
+
+    /**
+     * ¿Los negocios pueden mandar avisos a sus clientes?
+     */
+    public function activoParaNegocios(): bool
+    {
+        return $this->config()['negocios'] && $this->conectado();
+    }
+
+    /**
+     * ¿La plataforma verifica y avisa a los dueños por WhatsApp?
+     */
+    public function activoParaDuenos(): bool
+    {
+        return $this->config()['duenos'] && $this->conectado();
     }
 
     /**
      * Lo que ve el superadministrador (sin el token).
      *
-     * @return array{encendido: bool, activo: bool, phone_number_id: string, token_configurado: bool}
+     * @return array{negocios: bool, duenos: bool, conectado: bool, phone_number_id: string, token_configurado: bool}
      */
     public function paraEditar(): array
     {
         $config = $this->config();
 
         return [
-            'encendido' => $config['encendido'],
-            'activo' => $this->activo(),
+            'negocios' => $config['negocios'],
+            'duenos' => $config['duenos'],
+            'conectado' => $this->conectado(),
             'phone_number_id' => $config['phone_number_id'],
             'token_configurado' => $config['token'] !== '',
         ];
@@ -56,13 +77,14 @@ class ClienteWhatsApp
     /**
      * Guarda la configuración. Un token vacío conserva el que ya estaba.
      */
-    public function guardar(bool $encendido, string $phoneNumberId, ?string $token): void
+    public function guardar(bool $negocios, bool $duenos, string $phoneNumberId, ?string $token): void
     {
         $actual = $this->config();
         $token = is_string($token) && trim($token) !== '' ? trim($token) : $actual['token'];
 
         ConfiguracionPlataforma::establecer(self::CLAVE, (string) json_encode([
-            'encendido' => $encendido,
+            'negocios' => $negocios,
+            'duenos' => $duenos,
             'phone_number_id' => trim($phoneNumberId),
             'token' => $token,
         ]));
@@ -77,15 +99,35 @@ class ClienteWhatsApp
      */
     public function enviarPlantilla(string $telefono, string $plantilla, array $parametros, string $idioma = self::IDIOMA): void
     {
-        if (! $this->activo()) {
-            throw new RuntimeException('WhatsApp está apagado en la plataforma.');
-        }
-        $config = $this->config();
-
         $componentes = $parametros === [] ? [] : [[
             'type' => 'body',
             'parameters' => array_map(static fn (string $valor): array => ['type' => 'text', 'text' => $valor], $parametros),
         ]];
+
+        $this->enviar($telefono, $plantilla, $idioma, $componentes);
+    }
+
+    /**
+     * Código de verificación con la plantilla de autenticación: Meta pone el texto y
+     * el botón «Copiar código», que también lleva el código.
+     */
+    public function enviarCodigo(string $telefono, string $plantilla, string $codigo): void
+    {
+        $this->enviar($telefono, $plantilla, self::IDIOMA, [
+            ['type' => 'body', 'parameters' => [['type' => 'text', 'text' => $codigo]]],
+            ['type' => 'button', 'sub_type' => 'url', 'index' => '0', 'parameters' => [['type' => 'text', 'text' => $codigo]]],
+        ]);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $componentes
+     */
+    private function enviar(string $telefono, string $plantilla, string $idioma, array $componentes): void
+    {
+        if (! $this->conectado()) {
+            throw new RuntimeException('WhatsApp no está conectado en la plataforma.');
+        }
+        $config = $this->config();
 
         $respuesta = Http::withToken($config['token'])
             ->timeout(10)
@@ -131,7 +173,7 @@ class ClienteWhatsApp
      * Se lee cada vez (sin memoria): un proceso largo (cola, relay) ve al momento
      * que el superadministrador lo apagó.
      *
-     * @return array{encendido: bool, phone_number_id: string, token: string}
+     * @return array{negocios: bool, duenos: bool, phone_number_id: string, token: string}
      */
     private function config(): array
     {
@@ -144,7 +186,9 @@ class ClienteWhatsApp
         $datos = is_array($datos) ? $datos : [];
 
         return [
-            'encendido' => (bool) ($datos['encendido'] ?? false),
+            // `encendido` era el interruptor único antes de separar a los dueños.
+            'negocios' => (bool) ($datos['negocios'] ?? $datos['encendido'] ?? false),
+            'duenos' => (bool) ($datos['duenos'] ?? false),
             'phone_number_id' => is_string($datos['phone_number_id'] ?? null) ? $datos['phone_number_id'] : '',
             'token' => is_string($datos['token'] ?? null) ? $datos['token'] : '',
         ];

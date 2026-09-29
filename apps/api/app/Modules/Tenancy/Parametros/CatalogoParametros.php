@@ -111,6 +111,12 @@ final class CatalogoParametros
                 'Horas.', $e, 24, 1, 168, 'h', porNegocio: false),
             new DefinicionParametro('cuentas.minutos_restablecer_contrasena', 'Cuentas', 'Vigencia del enlace para restablecer la contraseña',
                 'Minutos.', $e, 60, 10, 1440, 'min', porNegocio: false),
+
+            // WhatsApp con los dueños (ADR 0070): cada código cuesta (solo la plataforma).
+            new DefinicionParametro('whatsapp.codigos_por_numero_hora', 'WhatsApp', 'Códigos de verificación por número en una hora',
+                'Al registrarse. Pasado el tope, el dueño sigue sin verificar.', $e, 3, 1, 10, 'códigos', porNegocio: false),
+            new DefinicionParametro('whatsapp.codigos_por_dia', 'WhatsApp', 'Códigos de verificación al día (toda la plataforma)',
+                'Protege el costo si alguien abusa del registro; al llegar, avisa al superadministrador.', $e, 300, 10, 100000, 'códigos', porNegocio: false),
         ];
 
         $porClave = [];

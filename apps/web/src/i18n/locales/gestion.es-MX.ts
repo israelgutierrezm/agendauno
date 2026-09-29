@@ -469,6 +469,7 @@ export const plataformaAdmin = {
       incidencia_cobro: "Incidencia de cobro",
       aviso_de_pago_perdido: "Aviso de pago perdido",
       correo_fallido: "Correo que no salió",
+      whatsapp_fallido: "WhatsApp que no salió",
       webhook_saliente_fallido: "Webhook de un negocio",
       respaldo_fallido: "Respaldo",
       simulacro_fallido: "Simulacro",
@@ -496,6 +497,7 @@ export const plataformaAdmin = {
   },
   pruebaHasta: "Prueba hasta el {fecha}",
   ficha: {
+    whatsappVerificado: "WhatsApp verificado",
     negocio: "Negocio",
     tipo: "Tipo",
     ciudad: "Ciudad",
@@ -559,18 +561,26 @@ export const plataformaAdmin = {
     webhook_password: "Contraseña del webhook",
   },
   whatsapp: {
-    titulo: "Avisos por WhatsApp",
+    titulo: "WhatsApp",
     subtitulo:
-      "Con la API de WhatsApp de Meta. Cada mensaje tiene costo; apagado, ningún negocio ve la opción y sus avisos siguen por correo y notificación en la app.",
+      "Con la API de WhatsApp de Meta, un solo número para toda la plataforma. Cada mensaje tiene costo: enciende solo lo que convenga.",
+    conectado: "Conectado",
+    sinConectar: "Sin conectar",
     encendido: "Encendido",
     apagado: "Apagado",
-    incompleto: "Encendido, falta el número o el token",
-    enviar: "Mandar avisos por WhatsApp",
     numero: "Identificador del número (Phone number ID)",
     token: "Token de acceso",
     tokenGuardado: "Guardado; escribe uno nuevo para reemplazarlo",
     tokenAyuda:
       "Usa un token permanente de un usuario del sistema. Se guarda cifrado y nunca se vuelve a mostrar.",
+    duenos: "Con los dueños",
+    duenosActivar: "Verificar el número de los dueños y mandarles avisos",
+    duenosAyuda:
+      "Al crear su negocio, el dueño puede confirmar su WhatsApp con un código y aceptar avisos de AgendaUno.",
+    negocios: "De los negocios a sus clientes",
+    negociosActivar: "Los negocios pueden mandar avisos a sus clientes",
+    negociosAyuda:
+      "Apagado, ningún negocio ve la opción y sus avisos siguen por correo y notificación en la app.",
     guardar: "Guardar",
     guardado: "WhatsApp guardado.",
     prueba: "Mandar una prueba",
@@ -580,8 +590,12 @@ export const plataformaAdmin = {
     pruebaEnviada: "Prueba enviada. Revisa ese WhatsApp.",
     plantillas: "Plantillas a registrar en Meta ({n})",
     plantillasAyuda:
-      "Regístralas en WhatsApp Manager con este nombre exacto, categoría Utilidad e idioma español (MEX). Un aviso sale solo cuando Meta la aprobó.",
-    categoria: "Utilidad · {idioma}",
+      "Regístralas en WhatsApp Manager con este nombre exacto e idioma español (MEX). Un mensaje sale solo cuando Meta la aprobó.",
+    categorias: {
+      UTILITY: "Utilidad",
+      AUTHENTICATION:
+        "Autenticación, con botón «Copiar código» y vigencia de 10 minutos",
+    },
   },
 };
 

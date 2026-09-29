@@ -40,10 +40,13 @@ afterEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
 });
 
-function encenderWhatsApp(bool $encendido = true): void
+/**
+ * Conecta WhatsApp y enciende (o apaga) los avisos de los negocios a sus clientes.
+ */
+function encenderWhatsApp(bool $negocios = true, bool $duenos = false): void
 {
     test()->putJson('/api/v1/plataforma/whatsapp', [
-        'encendido' => $encendido, 'phone_number_id' => '109876543210', 'token' => $encendido ? 'EAAG-token-de-prueba' : null,
+        'negocios' => $negocios, 'duenos' => $duenos, 'phone_number_id' => '109876543210', 'token' => 'EAAG-token-de-prueba',
     ], conPlataforma())->assertOk();
 }
 
@@ -96,11 +99,12 @@ function avisosWhatsApp(array $e): array
     return enNegocioWhatsApp($e, fn (): array => MensajeTenant::query()->where('canal', 'whatsapp')->orderBy('id')->get()->all());
 }
 
-it('el superadmin lo enciende con número y token; el token nunca se devuelve', function (): void {
+it('el superadmin lo conecta y enciende cada uso por separado; el token nunca se devuelve', function (): void {
     $r = $this->getJson('/api/v1/plataforma/whatsapp', conPlataforma())->assertOk();
-    expect($r->json('data'))->toMatchArray(['encendido' => false, 'activo' => false, 'token_configurado' => false])
+    expect($r->json('data'))->toMatchArray(['negocios' => false, 'duenos' => false, 'conectado' => false, 'token_configurado' => false])
         // Qué registrar en Meta: nombre y texto con {{1}}, {{2}}, …
-        ->and($r->json('data.plantillas.0'))->toMatchArray([
+        ->and($r->json('data.plantillas.duenos.0'))->toMatchArray(['nombre' => 'agendauno_codigo_verificacion', 'categoria' => 'AUTHENTICATION'])
+        ->and($r->json('data.plantillas.negocios.0'))->toMatchArray([
             'evento' => 'reserva.confirmada',
             'nombre' => 'agendauno_reserva_confirmada',
             'idioma' => 'es_MX',
@@ -109,18 +113,21 @@ it('el superadmin lo enciende con número y token; el token nunca se devuelve', 
         ]);
 
     // Sin token no se puede encender.
-    $this->putJson('/api/v1/plataforma/whatsapp', ['encendido' => true, 'phone_number_id' => '109876543210'], conPlataforma())
-        ->assertUnprocessable()->assertJsonValidationErrors(['encendido'], 'meta.errors');
+    $this->putJson('/api/v1/plataforma/whatsapp', ['negocios' => true, 'duenos' => false, 'phone_number_id' => '109876543210'], conPlataforma())
+        ->assertUnprocessable()->assertJsonValidationErrors(['phone_number_id'], 'meta.errors');
 
     $r = $this->putJson('/api/v1/plataforma/whatsapp', [
-        'encendido' => true, 'phone_number_id' => '109876543210', 'token' => 'EAAG-token-de-prueba',
+        'negocios' => false, 'duenos' => true, 'phone_number_id' => '109876543210', 'token' => 'EAAG-token-de-prueba',
     ], conPlataforma())->assertOk();
-    expect($r->json('data'))->toMatchArray(['encendido' => true, 'activo' => true, 'phone_number_id' => '109876543210', 'token_configurado' => true])
+    expect($r->json('data'))->toMatchArray(['negocios' => false, 'duenos' => true, 'conectado' => true, 'phone_number_id' => '109876543210', 'token_configurado' => true])
         ->and(json_encode($r->json()))->not->toContain('EAAG-token-de-prueba');
+    // Con los dueños encendido, los negocios siguen sin verlo.
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    expect($this->getJson("/api/v1/app/{$e['slug']}/plantillas-mensaje", conBearer($e['bearer']))->json('canales'))->not->toContain('whatsapp');
 
-    // Apagarlo conserva el token para volver a encenderlo.
-    $this->putJson('/api/v1/plataforma/whatsapp', ['encendido' => false, 'phone_number_id' => '109876543210'], conPlataforma())
-        ->assertOk()->assertJsonPath('data.activo', false)->assertJsonPath('data.token_configurado', true);
+    // Apagarlo conserva la conexión para volver a encenderlo.
+    $this->putJson('/api/v1/plataforma/whatsapp', ['negocios' => false, 'duenos' => false, 'phone_number_id' => '109876543210'], conPlataforma())
+        ->assertOk()->assertJsonPath('data.duenos', false)->assertJsonPath('data.conectado', true)->assertJsonPath('data.token_configurado', true);
 
     // Sin el token de plataforma no se entra.
     $this->getJson('/api/v1/plataforma/whatsapp')->assertUnauthorized();

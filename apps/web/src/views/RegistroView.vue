@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
@@ -49,6 +49,85 @@ const whatsappPais = ref("52");
 const whatsappNumero = ref("");
 const contactoEmail = ref("");
 const aceptaTerminos = ref(false);
+
+// WhatsApp con los dueños (ADR 0070): si la plataforma lo tiene encendido, el dueño
+// puede aceptar avisos por WhatsApp; para eso confirma su número con un código. Es
+// opcional: sin marcarlo, el registro sigue igual.
+const whatsappDisponible = ref(false);
+const quiereWhatsApp = ref(false);
+const codigoEnviado = ref(false);
+const codigo = ref("");
+// Comprobante de que el número se verificó (se manda al crear el negocio).
+const verificacion = ref<string | null>(null);
+const enviandoCodigo = ref(false);
+const errorWhatsApp = ref<string | null>(null);
+const esperaReenvio = ref(0);
+let cuentaRegresiva: ReturnType<typeof setInterval> | undefined;
+
+function reiniciarWhatsApp(): void {
+  codigoEnviado.value = false;
+  codigo.value = "";
+  verificacion.value = null;
+  errorWhatsApp.value = null;
+}
+
+async function enviarCodigo(): Promise<void> {
+  enviandoCodigo.value = true;
+  errorWhatsApp.value = null;
+  try {
+    await api.post("/api/v1/registro/whatsapp/codigo", {
+      contacto_whatsapp_pais: whatsappPais.value,
+      contacto_telefono: whatsappNumero.value,
+      recaptcha_token: await tokenRecaptcha(),
+    });
+    codigoEnviado.value = true;
+    codigo.value = "";
+    esperaReenvio.value = 60;
+    clearInterval(cuentaRegresiva);
+    cuentaRegresiva = setInterval(() => {
+      esperaReenvio.value = Math.max(0, esperaReenvio.value - 1);
+      if (esperaReenvio.value === 0) {
+        clearInterval(cuentaRegresiva);
+      }
+    }, 1000);
+  } catch (e) {
+    errorWhatsApp.value = mensajeDeError(e);
+  } finally {
+    enviandoCodigo.value = false;
+  }
+}
+
+async function verificarCodigo(): Promise<void> {
+  errorWhatsApp.value = null;
+  try {
+    const { data } = await api.post<{ data: { verificacion: string } }>(
+      "/api/v1/registro/whatsapp/verificar",
+      {
+        contacto_whatsapp_pais: whatsappPais.value,
+        contacto_telefono: whatsappNumero.value,
+        codigo: codigo.value,
+      },
+    );
+    verificacion.value = data.data.verificacion;
+    clearInterval(cuentaRegresiva);
+  } catch (e) {
+    errorWhatsApp.value = mensajeDeError(e);
+  }
+}
+
+// Con los 6 dígitos se verifica solo.
+watch(codigo, (valor) => {
+  if (/^\d{6}$/.test(valor) && verificacion.value === null) {
+    void verificarCodigo();
+  }
+});
+// Otro número (u otra lada), o ya no lo quiere: la verificación ya no aplica.
+watch([whatsappPais, whatsappNumero], reiniciarWhatsApp);
+watch(quiereWhatsApp, (quiere) => {
+  if (!quiere) {
+    reiniciarWhatsApp();
+  }
+});
 
 // Documentos legales (aviso de privacidad y términos) que edita el superadmin y se
 // muestran al dar clic en el enlace correspondiente del registro.
@@ -208,7 +287,12 @@ const paso2Valido = computed(
     contactoPrimerApellido.value.trim() !== "",
 );
 const paso3Valido = computed(
-  () => whatsappValido.value && emailValido.value && aceptaTerminos.value,
+  () =>
+    whatsappValido.value &&
+    emailValido.value &&
+    aceptaTerminos.value &&
+    // Si quiere avisos por WhatsApp, primero confirma su número.
+    (!quiereWhatsApp.value || verificacion.value !== null),
 );
 
 const pasoValido = computed(() =>
@@ -259,6 +343,10 @@ async function enviar(): Promise<void> {
       contacto_whatsapp_pais: whatsappPais.value,
       contacto_telefono: whatsappNumero.value,
       contacto_email: contactoEmail.value,
+      whatsapp_verificacion:
+        quiereWhatsApp.value && verificacion.value !== null
+          ? verificacion.value
+          : undefined,
       acepta_terminos: aceptaTerminos.value,
       aviso_version: legales.value.versiones?.aviso_privacidad?.version,
       terminos_version: legales.value.versiones?.terminos?.version,
@@ -328,7 +416,17 @@ onMounted(() => {
     .catch(() => {
       // Sin legales configurados por el superadmin: los enlaces mostrarán un aviso.
     });
+  void api
+    .get<{ data: { disponible?: boolean } }>("/api/v1/registro/whatsapp")
+    .then(({ data }) => {
+      whatsappDisponible.value = data.data.disponible === true;
+    })
+    .catch(() => {
+      whatsappDisponible.value = false;
+    });
 });
+
+onBeforeUnmount(() => clearInterval(cuentaRegresiva));
 </script>
 
 <template>
@@ -613,11 +711,92 @@ onMounted(() => {
                   />
                 </div>
                 <p
+                  v-if="!whatsappDisponible"
                   class="mt-1 text-xs"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
                   {{ $t("registro.whatsappAyuda") }}
                 </p>
+                <!-- Avisos por WhatsApp: opcional, confirma el número con un código. -->
+                <div v-else class="mt-2 text-sm" data-prueba="whatsapp-dueno">
+                  <p
+                    v-if="verificacion"
+                    class="registro-wa-ok"
+                    data-prueba="whatsapp-verificado"
+                  >
+                    <span class="registro-wa-punto" aria-hidden="true"></span>
+                    {{ $t("registro.whatsappVerificado") }}
+                  </p>
+                  <label v-else class="flex items-center gap-2 cursor-pointer">
+                    <input
+                      v-model="quiereWhatsApp"
+                      type="checkbox"
+                      data-prueba="quiere-whatsapp"
+                    />
+                    <span :style="{ color: 'var(--texto-suave)' }">{{
+                      $t("registro.whatsappAvisos")
+                    }}</span>
+                  </label>
+                  <div v-if="quiereWhatsApp && !verificacion" class="mt-2 pl-6">
+                    <template v-if="!codigoEnviado">
+                      <p
+                        class="text-xs"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        {{ $t("registro.whatsappExplica") }}
+                      </p>
+                      <button
+                        type="button"
+                        class="tu-enlace mt-1 text-sm"
+                        data-prueba="enviar-codigo"
+                        :disabled="!whatsappValido || enviandoCodigo"
+                        @click="enviarCodigo"
+                      >
+                        {{ $t("registro.whatsappEnviar") }}
+                      </button>
+                    </template>
+                    <template v-else>
+                      <label class="tu-label" for="wa-codigo">{{
+                        $t("registro.whatsappCodigo")
+                      }}</label>
+                      <input
+                        id="wa-codigo"
+                        v-model="codigo"
+                        class="tu-input registro-codigo"
+                        inputmode="numeric"
+                        autocomplete="one-time-code"
+                        maxlength="6"
+                      />
+                      <p
+                        class="mt-1 text-xs"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        <span v-if="esperaReenvio > 0">{{
+                          $t("registro.whatsappReenviarEn", {
+                            s: esperaReenvio,
+                          })
+                        }}</span>
+                        <button
+                          v-else
+                          type="button"
+                          class="tu-enlace"
+                          :disabled="enviandoCodigo"
+                          @click="enviarCodigo"
+                        >
+                          {{ $t("registro.whatsappReenviar") }}
+                        </button>
+                      </p>
+                    </template>
+                    <p
+                      v-if="errorWhatsApp"
+                      class="mt-1 text-xs"
+                      role="alert"
+                      style="color: var(--error)"
+                    >
+                      {{ errorWhatsApp }}
+                    </p>
+                  </div>
+                </div>
               </div>
               <div>
                 <label class="tu-label" for="cemail">{{
@@ -987,6 +1166,22 @@ onMounted(() => {
 .registro-mini-cita span > span {
   font-size: 0.875rem;
   color: var(--texto-suave);
+}
+.registro-wa-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.registro-wa-punto {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--exito);
+}
+.registro-codigo {
+  max-width: 9rem;
+  letter-spacing: 0.3em;
+  font-variant-numeric: tabular-nums;
 }
 .registro-legales {
   line-height: 1.8;

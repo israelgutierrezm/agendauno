@@ -7,11 +7,12 @@ import { mensajeDeError } from "@/lib/api";
 import { useToastStore } from "@/stores/toast";
 
 /**
- * WhatsApp de la plataforma (ADR 0069), para el superadmin: encenderlo o apagarlo
- * para todos los negocios (cada mensaje cuesta; apagado, ningún negocio ve la opción
- * y sus avisos siguen por correo y push), el número y el token de la cuenta de
- * WhatsApp Business (el token no se vuelve a mostrar), una prueba y las plantillas
- * que hay que registrar en Meta.
+ * WhatsApp de la plataforma, para el superadmin: la conexión con Meta (número y
+ * token; el token no se vuelve a mostrar), una prueba y dos usos que se encienden por
+ * separado porque cada mensaje cuesta:
+ * - con los dueños: verifican su número al registrarse y aceptan avisos (ADR 0070);
+ * - de los negocios a sus clientes (ADR 0069); apagado, ningún negocio lo ve.
+ * Debajo de cada uso, las plantillas que hay que registrar en Meta.
  */
 const props = defineProps<{ apiUrl: string; token: string }>();
 
@@ -21,15 +22,19 @@ interface Plantilla {
   titulo: string;
   texto: string;
   idioma: string;
-  categoria: string;
+  categoria: "UTILITY" | "AUTHENTICATION";
 }
+type Uso = "duenos" | "negocios";
 interface Config {
-  encendido: boolean;
-  activo: boolean;
+  negocios: boolean;
+  duenos: boolean;
+  conectado: boolean;
   phone_number_id: string;
   token_configurado: boolean;
-  plantillas: Plantilla[];
+  plantillas: Record<Uso, Plantilla[]>;
 }
+
+const USOS: Uso[] = ["duenos", "negocios"];
 
 const { t } = useI18n();
 const toast = useToastStore();
@@ -42,24 +47,27 @@ const auth = (): { headers: Record<string, string> } => ({
 });
 
 const config = ref<Config | null>(null);
-const borrador = ref({ encendido: false, phone_number_id: "", token: "" });
+const borrador = ref({
+  duenos: false,
+  negocios: false,
+  phone_number_id: "",
+  token: "",
+});
 const telefono = ref("");
 const ocupado = ref<"guardar" | "prueba" | null>(null);
 const error = ref<string | null>(null);
 
-const estado = computed<{ texto: string; tono: string }>(() => {
-  if (!config.value?.encendido) {
-    return { texto: t("plataformaAdmin.whatsapp.apagado"), tono: "wa-gris" };
-  }
-  return config.value.activo
-    ? { texto: t("plataformaAdmin.whatsapp.encendido"), tono: "wa-exito" }
-    : { texto: t("plataformaAdmin.whatsapp.incompleto"), tono: "wa-aviso" };
-});
+const conexion = computed<{ texto: string; tono: string }>(() =>
+  config.value?.conectado
+    ? { texto: t("plataformaAdmin.whatsapp.conectado"), tono: "wa-exito" }
+    : { texto: t("plataformaAdmin.whatsapp.sinConectar"), tono: "wa-gris" },
+);
 
 function aplicar(c: Config): void {
   config.value = c;
   borrador.value = {
-    encendido: c.encendido,
+    duenos: c.duenos,
+    negocios: c.negocios,
     phone_number_id: c.phone_number_id,
     token: "",
   };
@@ -83,7 +91,8 @@ async function guardar(): Promise<void> {
     const { data } = await cliente.put<{ data: Config }>(
       "/api/v1/plataforma/whatsapp",
       {
-        encendido: borrador.value.encendido,
+        duenos: borrador.value.duenos,
+        negocios: borrador.value.negocios,
         phone_number_id: borrador.value.phone_number_id.trim(),
         token: borrador.value.token.trim() || null,
       },
@@ -133,8 +142,8 @@ onMounted(cargar);
         class="wa-estado text-sm shrink-0"
         data-prueba="estado"
       >
-        <span class="wa-punto" :class="estado.tono"></span>
-        {{ estado.texto }}
+        <span class="wa-punto" :class="conexion.tono"></span>
+        {{ conexion.texto }}
       </span>
     </div>
 
@@ -147,15 +156,7 @@ onMounted(cargar);
       {{ error }}
     </p>
 
-    <form v-if="config" class="mt-4 space-y-3" @submit.prevent="guardar">
-      <label class="flex items-center gap-2 text-sm">
-        <input
-          v-model="borrador.encendido"
-          type="checkbox"
-          data-prueba="encendido"
-        />
-        {{ $t("plataformaAdmin.whatsapp.enviar") }}
-      </label>
+    <form v-if="config" class="mt-4 space-y-4" @submit.prevent="guardar">
       <div class="grid gap-3 sm:grid-cols-2">
         <div>
           <label class="tu-label" for="wa-numero">{{
@@ -187,9 +188,86 @@ onMounted(cargar);
           />
         </div>
       </div>
-      <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+      <p class="-mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("plataformaAdmin.whatsapp.tokenAyuda") }}
       </p>
+
+      <!-- Cada uso se enciende aparte; debajo, lo que hay que registrar en Meta. -->
+      <section
+        v-for="uso in USOS"
+        :key="uso"
+        class="wa-uso"
+        :data-prueba="`uso-${uso}`"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-medium">
+              {{ $t(`plataformaAdmin.whatsapp.${uso}`) }}
+            </h3>
+            <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t(`plataformaAdmin.whatsapp.${uso}Ayuda`) }}
+            </p>
+          </div>
+          <span class="wa-estado text-sm shrink-0">
+            <span
+              class="wa-punto"
+              :class="config[uso] && config.conectado ? 'wa-exito' : 'wa-gris'"
+            ></span>
+            {{
+              config[uso] && config.conectado
+                ? $t("plataformaAdmin.whatsapp.encendido")
+                : $t("plataformaAdmin.whatsapp.apagado")
+            }}
+          </span>
+        </div>
+        <label class="mt-2 flex items-center gap-2 text-sm">
+          <input
+            v-model="borrador[uso]"
+            type="checkbox"
+            :data-prueba="`activar-${uso}`"
+          />
+          {{ $t(`plataformaAdmin.whatsapp.${uso}Activar`) }}
+        </label>
+        <details class="mt-2">
+          <summary
+            class="text-xs cursor-pointer"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{
+              $t("plataformaAdmin.whatsapp.plantillas", {
+                n: config.plantillas[uso].length,
+              })
+            }}
+          </summary>
+          <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("plataformaAdmin.whatsapp.plantillasAyuda") }}
+          </p>
+          <ul class="mt-1">
+            <li
+              v-for="p in config.plantillas[uso]"
+              :key="p.nombre"
+              class="wa-fila"
+            >
+              <p class="text-sm font-medium">{{ p.titulo }}</p>
+              <p class="mt-0.5 font-mono text-xs select-all">{{ p.nombre }}</p>
+              <p
+                class="mt-1 text-xs select-all"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ p.texto }}
+              </p>
+              <p
+                class="mt-0.5 text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t(`plataformaAdmin.whatsapp.categorias.${p.categoria}`) }}
+                · {{ p.idioma }}
+              </p>
+            </li>
+          </ul>
+        </details>
+      </section>
+
       <button
         class="tu-btn tu-btn-primario"
         type="submit"
@@ -199,7 +277,7 @@ onMounted(cargar);
       </button>
     </form>
 
-    <template v-if="config?.activo">
+    <template v-if="config?.conectado">
       <form
         class="mt-5 flex flex-col sm:flex-row gap-3 sm:items-end"
         data-prueba="prueba"
@@ -231,34 +309,6 @@ onMounted(cargar);
         {{ $t("plataformaAdmin.whatsapp.pruebaAyuda") }}
       </p>
     </template>
-
-    <details v-if="config" class="mt-5" data-prueba="plantillas">
-      <summary class="text-sm font-medium cursor-pointer">
-        {{
-          $t("plataformaAdmin.whatsapp.plantillas", {
-            n: config.plantillas.length,
-          })
-        }}
-      </summary>
-      <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("plataformaAdmin.whatsapp.plantillasAyuda") }}
-      </p>
-      <ul class="mt-2">
-        <li v-for="p in config.plantillas" :key="p.nombre" class="wa-fila">
-          <p class="text-sm font-medium">{{ p.titulo }}</p>
-          <p class="mt-0.5 font-mono text-xs select-all">{{ p.nombre }}</p>
-          <p
-            class="mt-1 text-xs select-all"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ p.texto }}
-          </p>
-          <p class="mt-0.5 text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("plataformaAdmin.whatsapp.categoria", { idioma: p.idioma }) }}
-          </p>
-        </li>
-      </ul>
-    </details>
   </div>
 </template>
 
@@ -280,11 +330,12 @@ onMounted(cargar);
 .wa-exito {
   background: var(--exito);
 }
-.wa-aviso {
-  background: var(--aviso);
+.wa-uso {
+  padding-top: 1rem;
+  border-top: 1px solid var(--borde);
 }
 .wa-fila {
-  padding: 0.75rem 0;
+  padding: 0.6rem 0;
   border-top: 1px solid var(--borde);
 }
 .wa-fila:first-child {

@@ -13,10 +13,11 @@ use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
- * WhatsApp de la plataforma (ADR 0069), para el superadministrador: encenderlo o
- * apagarlo para todos los negocios, cargar el número (Phone number ID) y el token de
- * la cuenta de WhatsApp Business (el token nunca se devuelve), ver qué plantillas
- * registrar en Meta y mandar una prueba.
+ * WhatsApp de la plataforma, para el superadministrador: la conexión (número o Phone
+ * number ID y token de la cuenta de WhatsApp Business; el token nunca se devuelve) y
+ * dos interruptores: con los dueños (verificar su número al registrarse, ADR 0070) y
+ * de los negocios a sus clientes (ADR 0069). También las plantillas a registrar en
+ * Meta y una prueba.
  */
 class PlataformaWhatsAppController
 {
@@ -30,7 +31,9 @@ class PlataformaWhatsAppController
     public function guardar(Request $request): JsonResponse
     {
         $validado = $request->validate([
-            'encendido' => ['required', 'boolean'],
+            // Los dos usos se encienden por separado (cada mensaje cuesta).
+            'negocios' => ['required', 'boolean'],
+            'duenos' => ['required', 'boolean'],
             'phone_number_id' => ['nullable', 'string', 'max:40', 'regex:/^[0-9]*$/'],
             // Vacío conserva el que ya estaba.
             'token' => ['nullable', 'string', 'max:1000'],
@@ -39,11 +42,11 @@ class PlataformaWhatsAppController
         $token = $validado['token'] ?? null;
         $conToken = (is_string($token) && trim($token) !== '') || $this->whatsapp->paraEditar()['token_configurado'];
 
-        if ($validado['encendido'] && ($numero === '' || ! $conToken)) {
-            throw ValidationException::withMessages(['encendido' => ['Para encenderlo carga el identificador del número y el token.']]);
+        if (($validado['negocios'] || $validado['duenos']) && ($numero === '' || ! $conToken)) {
+            throw ValidationException::withMessages(['phone_number_id' => ['Para encenderlo carga el identificador del número y el token.']]);
         }
 
-        $this->whatsapp->guardar((bool) $validado['encendido'], $numero, $token);
+        $this->whatsapp->guardar((bool) $validado['negocios'], (bool) $validado['duenos'], $numero, $token);
 
         return response()->json(['data' => $this->presentar()]);
     }
@@ -74,7 +77,10 @@ class PlataformaWhatsAppController
     {
         return [
             ...$this->whatsapp->paraEditar(),
-            'plantillas' => PlantillasWhatsApp::paraRegistrar(),
+            'plantillas' => [
+                'duenos' => PlantillasWhatsApp::paraDuenos(),
+                'negocios' => PlantillasWhatsApp::paraNegocios(),
+            ],
         ];
     }
 }

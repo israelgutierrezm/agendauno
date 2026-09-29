@@ -168,7 +168,7 @@ class GenerarComunicaciones
         EventoDeDominioTenant $evento,
     ): void {
         $meta = PlantillasWhatsApp::para($evento->tipo);
-        if ($meta === null || ! $persona instanceof PersonaTenant || $persona->whatsapp_aceptado_en === null || ! $this->whatsapp->activo()) {
+        if ($meta === null || ! $persona instanceof PersonaTenant || $persona->whatsapp_aceptado_en === null || ! $this->whatsapp->activoParaNegocios()) {
             return;
         }
         $telefono = TelefonoWhatsApp::normalizar($persona->celular);

@@ -125,3 +125,85 @@ describe("presentación del registro", () => {
     expect(mocks.post).not.toHaveBeenCalled();
   });
 });
+describe("WhatsApp del dueño", () => {
+  async function hastaContacto(vista: ReturnType<typeof montar>) {
+    await flushPromises();
+    await avanzarADatos(vista);
+    await vista.get("#cnombre").setValue("Ana");
+    await vista.get("#cpaterno").setValue("Pérez");
+    await vista.get("form").trigger("submit");
+    await vista.get('input[type="tel"]').setValue("55 1234 5678");
+    await vista.get("#cemail").setValue("ana@correo.mx");
+    await vista.get("#acepta").setValue(true);
+  }
+
+  it("si la plataforma lo usa, confirma el número con un código y lo manda al crear el negocio", async () => {
+    mocks.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data:
+            url === "/api/v1/registro/whatsapp"
+              ? { disponible: true }
+              : { terminos: "T", aviso_privacidad: "A" },
+        },
+      }),
+    );
+    mocks.post.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/whatsapp/verificar")
+            ? { verificacion: "comprobante" }
+            : url.endsWith("/whatsapp/codigo")
+              ? { enviado: true }
+              : {
+                  estudio: { slug: "mi-barberia", nombre: "Mi barbería" },
+                  activacion: null,
+                },
+        },
+      }),
+    );
+    const vista = montar();
+    await hastaContacto(vista);
+
+    await vista.get('[data-prueba="quiere-whatsapp"]').setValue(true);
+    // Marcó la casilla: sin confirmar el código no se crea el negocio.
+    await vista.get("form").trigger("submit");
+    expect(mocks.post).not.toHaveBeenCalled();
+
+    await vista.get('[data-prueba="enviar-codigo"]').trigger("click");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/registro/whatsapp/codigo",
+      expect.objectContaining({
+        contacto_whatsapp_pais: "52",
+        contacto_telefono: "55 1234 5678",
+      }),
+    );
+    expect(vista.text()).toContain("Puedes pedir otro en 60 s");
+
+    await vista.get("#wa-codigo").setValue("123456");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/registro/whatsapp/verificar",
+      expect.objectContaining({ codigo: "123456" }),
+    );
+    expect(vista.get('[data-prueba="whatsapp-verificado"]').text()).toBe(
+      "WhatsApp verificado",
+    );
+
+    await vista.get("form").trigger("submit");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenLastCalledWith(
+      "/api/v1/registro",
+      expect.objectContaining({ whatsapp_verificacion: "comprobante" }),
+    );
+  });
+
+  it("si la plataforma no lo usa, queda la ayuda de siempre", async () => {
+    const vista = montar();
+    await hastaContacto(vista);
+
+    expect(vista.find('[data-prueba="whatsapp-dueno"]').exists()).toBe(false);
+    expect(vista.text()).toContain(es.registro.whatsappAyuda);
+  });
+});

@@ -79,6 +79,7 @@ use App\Modules\Tenancy\Http\Controllers\RecursosTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReembolsosTenantController;
 use App\Modules\Tenancy\Http\Controllers\RegistroAlumnoController;
 use App\Modules\Tenancy\Http\Controllers\RegistroEstudioController;
+use App\Modules\Tenancy\Http\Controllers\RegistroWhatsAppController;
 use App\Modules\Tenancy\Http\Controllers\ReporteCohortesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteDemandaTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteNegocioTenantController;
@@ -132,6 +133,11 @@ Route::prefix('v1')->group(function (): void {
 
     Route::post('/registro', [RegistroEstudioController::class, 'store'])->middleware('throttle:login')->name('api.v1.registro');
     Route::get('/registro/slug', [RegistroEstudioController::class, 'disponibilidad'])->middleware('throttle:60,1')->name('api.v1.registro.slug');
+    // WhatsApp del dueño (ADR 0070): verificar su número con un código al registrarse.
+    Route::get('/registro/whatsapp', [RegistroWhatsAppController::class, 'disponible'])->middleware('throttle:60,1')->name('api.v1.registro.whatsapp');
+    // Con prefijo: cada una lleva su propia cuenta por IP (no la comparte con otras rutas).
+    Route::post('/registro/whatsapp/codigo', [RegistroWhatsAppController::class, 'codigo'])->middleware('throttle:5,10,whatsapp-codigo')->name('api.v1.registro.whatsapp.codigo');
+    Route::post('/registro/whatsapp/verificar', [RegistroWhatsAppController::class, 'verificar'])->middleware('throttle:20,10,whatsapp-verificar')->name('api.v1.registro.whatsapp.verificar');
     Route::get('/directorio', [DirectorioController::class, 'index'])->middleware('throttle:60,1')->name('api.v1.directorio');
     // Documentos legales públicos (aviso de privacidad y términos) para el registro.
     Route::get('/legales', LegalesPublicoController::class)->middleware('throttle:60,1')->name('api.v1.legales');
