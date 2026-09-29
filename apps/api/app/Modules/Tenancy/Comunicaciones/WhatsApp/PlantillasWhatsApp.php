@@ -23,6 +23,40 @@ final class PlantillasWhatsApp
     public const CODIGO_VERIFICACION = 'agendauno_codigo_verificacion';
 
     /**
+     * Avisos de la plataforma a los dueños (ADR 0071). Marcadores: {{nombre}} (del
+     * dueño), {{negocio}}, {{fecha}}, {{periodo}}, {{monto}} y {{enlace}} (a la renta
+     * en su panel).
+     *
+     * @var array<string, array{nombre: string, titulo: string, asunto: string, texto: string}>
+     */
+    private const DUENOS = [
+        'prueba_por_terminar' => [
+            'nombre' => 'agendauno_prueba_por_terminar',
+            'titulo' => 'Prueba gratis por terminar',
+            'asunto' => 'Tu prueba gratis de AgendaUno termina el {{fecha}}',
+            'texto' => 'Hola {{nombre}}, la prueba gratis de {{negocio}} en AgendaUno termina el {{fecha}}. Desde ese día lo que uses cuenta para tu renta mensual; revisa tu plan aquí: {{enlace}} Gracias por usar AgendaUno.',
+        ],
+        'renta_emitida' => [
+            'nombre' => 'agendauno_renta_emitida',
+            'titulo' => 'Renta lista para pagar',
+            'asunto' => 'Tu renta de {{periodo}} está lista',
+            'texto' => 'Hola {{nombre}}, ya está la renta de {{negocio}} de {{periodo}}: {{monto}}, con vencimiento el {{fecha}}. Puedes pagarla aquí: {{enlace}} Gracias por usar AgendaUno.',
+        ],
+        'renta_vencida' => [
+            'nombre' => 'agendauno_renta_vencida',
+            'titulo' => 'Renta vencida',
+            'asunto' => 'Tu renta de {{periodo}} venció',
+            'texto' => 'Hola {{nombre}}, la renta de {{negocio}} de {{periodo}} por {{monto}} venció el {{fecha}}. Págala aquí para mantener tu cuenta al corriente: {{enlace}} Si ya la pagaste, ignora este mensaje.',
+        ],
+        'pago_recibido' => [
+            'nombre' => 'agendauno_pago_recibido',
+            'titulo' => 'Pago de la renta recibido',
+            'asunto' => 'Recibimos tu pago de {{periodo}}',
+            'texto' => 'Hola {{nombre}}, recibimos el pago de la renta de {{negocio}} de {{periodo}} por {{monto}}. Puedes ver tu recibo y pedir tu factura aquí: {{enlace}} Gracias por usar AgendaUno.',
+        ],
+    ];
+
+    /**
      * @var array<string, array{nombre: string, titulo: string, texto: string}>
      */
     private const CATALOGO = [
@@ -143,16 +177,35 @@ final class PlantillasWhatsApp
     }
 
     /**
-     * Para el superadministrador: qué registrar en Meta para hablar con los dueños
-     * (ADR 0070). El código de verificación usa la categoría Autenticación: Meta pone
+     * El aviso de la plataforma a un dueño de ese tipo (ADR 0071): nombre en Meta,
+     * asunto del correo y texto (el mismo por correo y por WhatsApp).
+     *
+     * @return array{nombre: string, titulo: string, asunto: string, texto: string}|null
+     */
+    public static function paraDueno(string $tipo): ?array
+    {
+        return self::DUENOS[$tipo] ?? null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function tiposDeDuenos(): array
+    {
+        return array_keys(self::DUENOS);
+    }
+
+    /**
+     * Para el superadministrador: qué registrar en Meta para hablar con los dueños.
+     * El código de verificación (ADR 0070) usa la categoría Autenticación: Meta pone
      * el texto, con recomendación de seguridad, vigencia de 10 minutos y botón «Copiar
-     * código».
+     * código». Los avisos (ADR 0071) son de Utilidad.
      *
      * @return list<array{evento: string, nombre: string, titulo: string, texto: string, idioma: string, categoria: string}>
      */
     public static function paraDuenos(): array
     {
-        return [[
+        $lista = [[
             'evento' => 'registro.codigo',
             'nombre' => self::CODIGO_VERIFICACION,
             'titulo' => 'Código de verificación',
@@ -160,5 +213,17 @@ final class PlantillasWhatsApp
             'idioma' => ClienteWhatsApp::IDIOMA,
             'categoria' => 'AUTHENTICATION',
         ]];
+        foreach (self::DUENOS as $tipo => $plantilla) {
+            $lista[] = [
+                'evento' => $tipo,
+                'nombre' => $plantilla['nombre'],
+                'titulo' => $plantilla['titulo'],
+                'texto' => self::textoParaMeta($plantilla['texto']),
+                'idioma' => ClienteWhatsApp::IDIOMA,
+                'categoria' => 'UTILITY',
+            ];
+        }
+
+        return $lista;
     }
 }

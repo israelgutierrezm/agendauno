@@ -498,6 +498,15 @@ export const plataformaAdmin = {
   pruebaHasta: "Prueba hasta el {fecha}",
   ficha: {
     whatsappVerificado: "WhatsApp verificado",
+    avisos: "Avisos al dueño",
+    sinAvisos: "Aún no se le ha avisado nada.",
+    tiposAviso: {
+      prueba_por_terminar: "Prueba por terminar",
+      renta_emitida: "Renta lista",
+      renta_vencida: "Renta vencida",
+      pago_recibido: "Pago recibido",
+    },
+    canalesAviso: { email: "Correo", whatsapp: "WhatsApp" },
     negocio: "Negocio",
     tipo: "Tipo",
     ciudad: "Ciudad",
@@ -576,7 +585,7 @@ export const plataformaAdmin = {
     duenos: "Con los dueños",
     duenosActivar: "Verificar el número de los dueños y mandarles avisos",
     duenosAyuda:
-      "Al crear su negocio, el dueño puede confirmar su WhatsApp con un código y aceptar avisos de AgendaUno.",
+      "Al crear su negocio, el dueño puede confirmar su WhatsApp con un código y aceptar avisos de AgendaUno: prueba por terminar, renta lista, renta vencida y pago recibido. El correo le llega siempre.",
     negocios: "De los negocios a sus clientes",
     negociosActivar: "Los negocios pueden mandar avisos a sus clientes",
     negociosAyuda:

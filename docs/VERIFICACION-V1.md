@@ -208,6 +208,11 @@ corre el comando a mano.
   un negocio: en «Contacto» marca «Recibir avisos de AgendaUno por WhatsApp», pide
   el código y escríbelo. Aparece «WhatsApp verificado», y la ficha del negocio en
   el superadmin lo muestra. Apagado, el registro no muestra la casilla.
+- [ ] **Avisos al dueño** (ADR 0071). Con la prueba a 3 días o menos de terminar,
+  `agendauno:avisar-duenos` manda el correo «Tu prueba gratis de AgendaUno termina
+  el …», y el WhatsApp si el dueño lo aceptó. Al emitirse la renta llega «Tu renta
+  de … está lista»; si vence sin pagarse, «venció»; al pagarla, «Recibimos tu
+  pago». Ninguno se repite, y la ficha del negocio en el superadmin los lista.
 
 Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado»,
 «membresía suspendida» al cliente y «reserva creada».

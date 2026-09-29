@@ -61,9 +61,8 @@ usos distintos, con costos distintos, y cada uno debe poder encenderse por separ
 
 - La plataforma ya sabe qué dueños tienen un WhatsApp verificado y aceptaron
   avisos, sin frenar a quien no quiere.
-- Todavía no hay avisos de la plataforma a los dueños (fin de la prueba, cobro de
-  la renta, pago fallido). Cada uno necesita su plantilla de utilidad y se agrega
-  aparte, solo para quien aceptó.
+- Los avisos de la plataforma a los dueños (prueba por terminar y renta) están en
+  el ADR 0071: por correo siempre y por WhatsApp a quien aceptó.
 - Un dueño que no verificó al registrarse no puede hacerlo después desde su panel.
   Es trabajo aparte si hace falta.
 - El número del registro sigue siendo del negocio (`estudios`). Si el dueño lo

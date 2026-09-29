@@ -62,6 +62,11 @@ Schedule::command('agendauno:avisar-renovaciones')->dailyAt('15:00')->withoutOve
 // medición); un cargo emitido no se vuelve a calcular, así que solo emite los que falten.
 Schedule::command('agendauno:generar-cargos-renta')->dailyAt('08:00')->withoutOverlapping();
 
+// Avisos de la plataforma a los dueños (ADR 0071): prueba por terminar, renta lista,
+// renta vencida y pago recibido, por correo y WhatsApp. Cada hora de 09:00 a 20:00 de
+// CDMX; no repite ninguno.
+Schedule::command('agendauno:avisar-duenos')->hourlyAt(20)->between('15:00', '02:00')->withoutOverlapping();
+
 // Respalda la base central y los archivos subidos (03:05) y la base de cada negocio
 // (03:15), en el disco de respaldos (en producción, fuera del servidor), y borra los
 // viejos (retención).

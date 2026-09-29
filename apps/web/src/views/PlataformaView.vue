@@ -63,6 +63,14 @@ interface FichaApi extends Omit<Estudio, "uso"> {
   onboarding_completo: boolean;
   uso: { periodo: string; metrica: string; cantidad: number }[];
   cargos: Cargo[];
+  // Últimos avisos de la plataforma al dueño (ADR 0071).
+  avisos?: {
+    id: number;
+    tipo: string;
+    canal: string;
+    estado: string;
+    fecha: string | null;
+  }[];
 }
 interface ResumenCobros {
   pendiente_minor: number;
@@ -1370,6 +1378,47 @@ function borrar(): void {
                     :style="{ color: colorCargo(c) }"
                     >{{ estadoCargo(c) }}</span
                   >
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <!-- Avisos al dueño -->
+          <section data-prueba="avisos-dueno">
+            <h3
+              class="text-xs font-medium uppercase tracking-wide"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("plataformaAdmin.ficha.avisos") }}
+            </h3>
+            <p
+              v-if="(ficha.avisos ?? []).length === 0"
+              class="mt-2"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("plataformaAdmin.ficha.sinAvisos") }}
+            </p>
+            <dl v-else class="mt-2 divide-y divide-[var(--borde)]">
+              <div v-for="a in ficha.avisos" :key="a.id" class="pl-dato">
+                <dt>
+                  {{ $t(`plataformaAdmin.ficha.tiposAviso.${a.tipo}`) }}
+                  <span
+                    class="block text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ $t(`plataformaAdmin.ficha.canalesAviso.${a.canal}`) }} ·
+                    {{ fecha(a.fecha) }}</span
+                  >
+                </dt>
+                <dd
+                  class="text-right text-xs"
+                  :style="{
+                    color:
+                      a.estado === 'fallido'
+                        ? 'var(--error)'
+                        : 'var(--texto-suave)',
+                  }"
+                >
+                  {{ $t(`comunicacionesAuto.estados.${a.estado}`) }}
                 </dd>
               </div>
             </dl>

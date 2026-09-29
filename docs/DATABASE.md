@@ -30,6 +30,7 @@ el esquema.
 | `configuraciones_pasarela_plataforma` | Pasarela con la que la plataforma cobra la renta |
 | `configuracion_plataforma` | Parámetros de plataforma (valores por defecto de los límites) y conexión de WhatsApp (cifrada) |
 | `verificaciones_whatsapp` | Códigos para que el dueño confirme su WhatsApp al registrarse (solo hashes, ADR 0070) |
+| `avisos_duenos` | Avisos de la plataforma al dueño por correo y WhatsApp: prueba por terminar, renta lista, vencida y pagada (uno por tipo, referencia y canal, ADR 0071) |
 | `alertas_plataforma` | Alertas de operación agrupadas (ADR 0051) |
 | `documentos_legales`, `aceptaciones_legales` | Aviso de privacidad y términos versionados, y quién los aceptó |
 | `users`, `cache`, `jobs`, `failed_jobs`… | Tablas de Laravel |

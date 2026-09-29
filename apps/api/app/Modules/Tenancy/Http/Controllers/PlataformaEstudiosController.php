@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\TerminologiaEstudio;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
+use App\Modules\Tenancy\Models\AvisoDueno;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FacturaPlataforma;
@@ -78,6 +79,19 @@ class PlataformaEstudiosController
             'onboarding_completo' => (bool) $modelo->onboarding_completo,
             'uso' => $uso,
             'cargos' => $cargos,
+            // Los últimos avisos de la plataforma al dueño (ADR 0071), para soporte.
+            'avisos' => AvisoDueno::query()
+                ->where('estudio_id', $modelo->getKey())
+                ->latest('id')
+                ->limit(10)
+                ->get()
+                ->map(static fn (AvisoDueno $a): array => [
+                    'id' => $a->getKey(),
+                    'tipo' => $a->tipo,
+                    'canal' => $a->canal->value,
+                    'estado' => $a->estado->value,
+                    'fecha' => ($a->enviado_en ?? $a->created_at)?->toIso8601String(),
+                ])->all(),
         ]]);
     }
 

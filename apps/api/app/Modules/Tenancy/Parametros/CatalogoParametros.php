@@ -112,6 +112,10 @@ final class CatalogoParametros
             new DefinicionParametro('cuentas.minutos_restablecer_contrasena', 'Cuentas', 'Vigencia del enlace para restablecer la contraseña',
                 'Minutos.', $e, 60, 10, 1440, 'min', porNegocio: false),
 
+            // Avisos a los dueños (ADR 0071, solo la plataforma).
+            new DefinicionParametro('duenos.dias_aviso_prueba', 'Dueños', 'Días antes del fin de la prueba para avisar al dueño',
+                'Por correo y, si lo aceptó, por WhatsApp.', $e, 3, 1, 14, 'días', porNegocio: false),
+
             // WhatsApp con los dueños (ADR 0070): cada código cuesta (solo la plataforma).
             new DefinicionParametro('whatsapp.codigos_por_numero_hora', 'WhatsApp', 'Códigos de verificación por número en una hora',
                 'Al registrarse. Pasado el tope, el dueño sigue sin verificar.', $e, 3, 1, 10, 'códigos', porNegocio: false),

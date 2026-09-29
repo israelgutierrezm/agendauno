@@ -41,7 +41,8 @@
   (`docs/VERIFICACION-V1.md`).
 - Instalar en un servidor real y correr `actualizar.sh` / `volver.sh`.
 - WhatsApp (si se enciende): cuenta de WhatsApp Business en Meta, token permanente
-  y las plantillas de Configuración → «Avisos por WhatsApp» aprobadas (ADR 0069).
+  y las plantillas de Configuración → «WhatsApp» aprobadas, de cada uso que se
+  encienda (ADR 0069, 0070 y 0071).
 - Proyecto de Firebase para push; llave de subida de Android (la firma ya lee `android/key.properties`, ver `docs/MOBILE.md`) y publicación de la app.
 
 ## Después
@@ -50,9 +51,8 @@
   aviso; hoy la conciliación cubre los cobros.
 - WhatsApp: procesar el webhook de estados de Meta (entregado, leído, fallido) y,
   si conviene, número propio por negocio o cobrarlo como extra del plan (ADR 0069).
-- WhatsApp con los dueños: avisos de la plataforma (fin de la prueba, cobro y pago
-  fallido de la renta) a quien lo aceptó, y verificar el número desde el panel si
-  no se hizo al registrarse (ADR 0070).
+- WhatsApp con los dueños: verificar el número desde el panel si no se hizo al
+  registrarse y que el dueño pueda dejar de recibir los WhatsApp (ADR 0070 y 0071).
 - Separar «editar» y «eliminar» en el catálogo de permisos.
 - Roles propios con faceta de instructor.
 - Monitoreo de errores más completo y despliegue automático desde el CI.

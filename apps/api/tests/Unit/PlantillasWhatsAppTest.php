@@ -21,6 +21,20 @@ it('cada plantilla es válida para Meta: no abre ni cierra con un valor y no rep
     }
 });
 
+it('los avisos a los dueños también son válidos para Meta', function (): void {
+    foreach (PlantillasWhatsApp::tiposDeDuenos() as $tipo) {
+        $plantilla = PlantillasWhatsApp::paraDueno($tipo);
+        $meta = PlantillasWhatsApp::textoParaMeta((string) $plantilla['texto']);
+        preg_match_all('/\{\{(\w+)\}\}/', (string) $plantilla['texto'], $todos);
+
+        expect($plantilla['nombre'])->toMatch('/^agendauno_[a-z0-9_]+$/')
+            ->and($meta)->not->toMatch('/^\s*\{\{/')
+            ->and($meta)->not->toMatch('/\}\}[\s.]*$/')
+            ->and($todos[1])->toBe(array_values(array_unique($todos[1])));
+    }
+    expect(array_column(PlantillasWhatsApp::paraDuenos(), 'categoria'))->toBe(['AUTHENTICATION', 'UTILITY', 'UTILITY', 'UTILITY', 'UTILITY']);
+});
+
 it('los valores van en orden, sin saltos de línea y nunca vacíos', function (): void {
     $texto = 'Hola {{persona_nombre}}, tu {{actividad}} en {{sucursal}} te espera.';
 
