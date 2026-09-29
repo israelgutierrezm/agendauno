@@ -367,6 +367,20 @@ function dnsFalso(array $mapa): void
 }
 
 /**
+ * Activa el cobro en línea (Stripe en modo de prueba). Con él, la cita que agenda el
+ * cliente se aparta hasta pagarla; sin él, queda confirmada y se paga en la sucursal
+ * (ADR 0065).
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ */
+function activarCobroEnLinea(array $e): void
+{
+    test()->putJson("/api/v1/app/{$e['slug']}/pasarelas/stripe", [
+        'activa' => true, 'modo' => 'test', 'credenciales' => ['secret_key' => 'sk_test_x'],
+    ], conBearer($e['bearer']))->assertOk();
+}
+
+/**
  * Abre la atención del profesional en esa sede todos los días de 08:00 a 20:00 (el
  * cliente solo agenda dentro del horario de atención).
  *

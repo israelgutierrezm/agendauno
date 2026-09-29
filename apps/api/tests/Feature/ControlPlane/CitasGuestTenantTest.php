@@ -91,7 +91,7 @@ it('el pago público de una cita rechaza el efectivo (solo en línea)', function
     ['e' => $e, 'sede' => $sede, 'coach' => $coach] = estudioGuestCitas();
 
     $r = $this->postJson("/api/v1/app/{$e['slug']}/citas", [
-        'nombre' => 'Cliente Guest',
+        'nombre' => 'Cliente Guest', 'email' => 'guest2@correo.mx',
         'oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'], 'instructor_id' => $coach,
         'inicia_en_local' => '2026-10-05 11:00:00', 'duracion_minutos' => 60,
     ])->assertCreated()->json('data');

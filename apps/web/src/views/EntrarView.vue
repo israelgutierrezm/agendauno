@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import {
+  RouterLink,
+  useRoute,
+  useRouter,
+  type RouteLocationRaw,
+} from "vue-router";
 
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import LogoAgendaUno from "@/components/LogoAgendaUno.vue";
@@ -62,7 +67,13 @@ const contenedorGoogle = ref<HTMLElement | null>(null);
 const googleRenderizadoPara = ref("");
 
 // Con más de un rol, primero «¿Cómo quieres entrar?».
-function destino(): { name: string } {
+// Tras entrar: de vuelta a donde venía (p. ej. agendar una cita) o a su inicio. Solo
+// rutas internas: un enlace no puede mandar a otro sitio.
+function destino(): RouteLocationRaw {
+  const volver = String(route.query.volver ?? "");
+  if (/^\/(?![/\\])/.test(volver)) {
+    return volver;
+  }
   return { name: sesion.destinoAlEntrar };
 }
 

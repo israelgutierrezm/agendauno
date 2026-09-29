@@ -98,9 +98,9 @@ it('bloquear no cancela lo ya agendado: lo advierte antes y al crearlo', functio
         ->assertJsonPath('data.desde', '2030-01-08T06:00:00+00:00')->assertJsonPath('data.hasta', '2030-01-11T06:00:00+00:00')
         ->json('data.id');
 
-    // La cita sigue en pie; esos días ya no se ofrecen.
+    // La cita sigue en pie (sin cobro en línea, confirmada); esos días ya no se ofrecen.
     $cita = collect($this->getJson("/api/v1/app/{$e['slug']}/mi/perfil", conBearer($n['ana']['bearer']))->json('data.reservas'))->first();
-    expect($cita['estado'])->toBe('pendiente_pago')
+    expect($cita['estado'])->toBe('confirmada')
         ->and(libresConBloqueo($n, '2030-01-09'))->toBe([]);
 
     // Quién lo puso y, al quitarlo, se vuelve a ofrecer.

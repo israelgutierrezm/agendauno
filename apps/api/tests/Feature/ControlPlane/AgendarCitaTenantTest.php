@@ -38,6 +38,8 @@ function estudioDeCitas(): array
         ->assertOk()->json('data.0.id');
 
     abrirHorarioDeCitas($e, $coach, $sede['sucursal']);
+    // Se paga en línea para confirmar (la cita se aparta hasta pagarla).
+    activarCobroEnLinea($e);
 
     return ['e' => $e, 'sede' => $sede, 'coach' => $coach];
 }

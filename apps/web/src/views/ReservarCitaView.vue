@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { RouterLink, useRoute } from "vue-router";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { recordarNegocio } from "@/lib/negociosRecientes";
+import { esMiembro } from "@/lib/roles";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import IconoRed from "@/components/IconoRed.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 
 interface Servicio {
@@ -31,6 +35,8 @@ interface Sucursal {
   direccion?: string | null;
   foto_url?: string | null;
   mapa_url?: string | null;
+  // Instagram y Facebook de la sede, si los tiene.
+  redes?: { red: "instagram" | "facebook"; url: string }[];
 }
 interface Persona {
   id: string;
@@ -42,6 +48,13 @@ interface Opciones {
   servicios: Servicio[];
   sucursales: Sucursal[];
   instructores: Persona[];
+  // Si se paga en línea para confirmar o se puede pagar en la sucursal.
+  cobro?: { pago_obligatorio: boolean; pago_en_linea: boolean };
+}
+// Un día del calendario: se puede elegir si alguien atiende y no pasó.
+interface Dia {
+  fecha: string;
+  abierto: boolean;
 }
 interface Slot {
   inicia: string;
@@ -55,6 +68,9 @@ const CUALQUIERA = "cualquiera";
 type Paso = "sucursal" | "servicio" | "horario" | "confirmar";
 
 const route = useRoute();
+const router = useRouter();
+const { t } = useI18n();
+const sesion = useSesionTenantStore();
 // Al volver de la página de pago: avisa cómo quedó.
 const retornoPago = useRetornoPago();
 const slug = computed(() => String(route.params.slug));
@@ -94,6 +110,8 @@ const agendando = ref(false);
 const pagando = ref(false);
 // Resultado de agendar (cita creada, pendiente de pago).
 const resultado = ref<{
+  // Confirmada (se paga en línea o en la sucursal) o apartada hasta pagar.
+  estado?: string;
   orden_id: string | null;
   total_minor: number | null;
   moneda: string | null;
@@ -141,6 +159,23 @@ const zona = computed(
 );
 // Duración del servicio; respaldo de 60 min si el servicio no la definió.
 const duracion = computed(() => servicioSel.value?.duracion_minutos ?? 60);
+// Cómo se cobra (ADR 0065): sin el dato (API anterior), se paga para confirmar.
+const pagoObligatorio = computed(
+  () => opciones.value?.cobro?.pago_obligatorio ?? true,
+);
+const pagoEnLinea = computed(
+  () => opciones.value?.cobro?.pago_en_linea ?? true,
+);
+// Cliente con cuenta en este negocio: se agenda a su nombre, sin pedir datos.
+const comoInvitado = ref(false);
+const clienteConCuenta = computed(
+  () =>
+    !comoInvitado.value &&
+    sesion.autenticado &&
+    sesion.slug === slug.value &&
+    esMiembro(sesion.usuario),
+);
+const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Mapa de pasos: los que ya pasaron se pueden volver a abrir.
 const pasos = computed<Paso[]>(() =>
@@ -169,7 +204,9 @@ const listoParaAgendar = computed(
     sucursalId.value !== "" &&
     barberoId.value !== "" &&
     slotSel.value !== "" &&
-    datos.value.nombre.trim() !== "",
+    (clienteConCuenta.value ||
+      (datos.value.nombre.trim() !== "" &&
+        CORREO.test(datos.value.email.trim()))),
 );
 
 function dinero(minor: number | null, moneda: string | null): string {
@@ -239,10 +276,79 @@ async function cargar(): Promise<void> {
       sucursalId.value = data.data.sucursales[0].id;
     }
     paso.value = sucursalId.value !== "" ? "servicio" : "sucursal";
+    await retomar();
   } catch {
     noDisponible.value = true;
   } finally {
     cargando.value = false;
+  }
+}
+
+// Lo elegido se guarda mientras el cliente entra a su cuenta y se retoma al volver.
+const claveAsistente = computed(() => `agendar:${slug.value}`);
+function entrarParaAgendar(): void {
+  try {
+    sessionStorage.setItem(
+      claveAsistente.value,
+      JSON.stringify({
+        sucursalId: sucursalId.value,
+        servicioId: servicioId.value,
+        filtro: filtro.value,
+        fecha: fecha.value,
+        slotSel: slotSel.value,
+        barberoId: barberoId.value,
+        guardado: Date.now(),
+      }),
+    );
+  } catch {
+    // Sin almacenamiento: al volver, elige de nuevo.
+  }
+  void router.push({
+    name: "entrar",
+    query: { estudio: slug.value, volver: route.fullPath },
+  });
+}
+async function retomar(): Promise<void> {
+  let guardado: Record<string, string | number> | null = null;
+  try {
+    guardado = JSON.parse(
+      sessionStorage.getItem(claveAsistente.value) ?? "null",
+    );
+    sessionStorage.removeItem(claveAsistente.value);
+  } catch {
+    return;
+  }
+  const o = opciones.value;
+  if (
+    guardado === null ||
+    o === null ||
+    Date.now() - Number(guardado.guardado) > 30 * 60 * 1000 ||
+    !o.sucursales.some((x) => x.id === guardado?.sucursalId) ||
+    !o.servicios.some((x) => x.id === guardado?.servicioId)
+  ) {
+    return;
+  }
+  sucursalId.value = String(guardado.sucursalId);
+  await nextTick();
+  servicioId.value = String(guardado.servicioId);
+  filtro.value = String(guardado.filtro ?? "");
+  await nextTick();
+  fecha.value = String(guardado.fecha ?? "");
+  await nextTick();
+  await busquedaEnCurso;
+  if (slots.value.some((x) => x.inicia === guardado?.slotSel)) {
+    slotSel.value = String(guardado.slotSel);
+    await nextTick();
+    const quien = String(guardado.barberoId ?? "");
+    if (
+      quien === CUALQUIERA ||
+      libresEnHora.value.some((b) => b.id === quien)
+    ) {
+      barberoId.value = quien;
+    }
+    ir("confirmar");
+  } else {
+    ir("horario");
   }
 }
 
@@ -309,7 +415,88 @@ watch(slotSel, () => {
   }
 });
 // Recalcula huecos al cambiar filtro, sucursal, fecha o servicio (por su duración).
-watch([filtro, sucursalId, fecha, servicioId], buscarSlots);
+let busquedaEnCurso: Promise<void> = Promise.resolve();
+watch([filtro, sucursalId, fecha, servicioId], () => {
+  busquedaEnCurso = buscarSlots();
+});
+
+// Calendario: días desde hoy en la zona de la sede; los que no tienen atención (o
+// ya pasaron) no se pueden elegir. Se abre en el primero con atención.
+const DIAS_POR_TANDA = 14;
+const dias = ref<Dia[]>([]);
+const cargandoDias = ref(false);
+let consultaDias = 0;
+function hoySede(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: zona.value,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+function diaSiguiente(f: string): string {
+  const d = new Date(`${f}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+async function cargarDias(mas = false): Promise<void> {
+  if (sucursalId.value === "") return;
+  const consulta = ++consultaDias;
+  const ultimo = dias.value[dias.value.length - 1];
+  const desde = mas && ultimo ? diaSiguiente(ultimo.fecha) : hoySede();
+  cargandoDias.value = true;
+  try {
+    const { data } = await api.get<{ data: Dia[] }>(
+      `/api/v1/app/${slug.value}/citas/dias`,
+      {
+        params: {
+          sucursal_id: sucursalId.value,
+          desde,
+          dias: DIAS_POR_TANDA,
+          ...(filtro.value !== "" ? { instructor_id: filtro.value } : {}),
+        },
+      },
+    );
+    if (consulta !== consultaDias) return;
+    dias.value = mas ? [...dias.value, ...data.data] : data.data;
+    if (!mas && !dias.value.some((d) => d.fecha === fecha.value && d.abierto)) {
+      fecha.value = dias.value.find((d) => d.abierto)?.fecha ?? "";
+    }
+  } catch (e) {
+    if (consulta === consultaDias) error.value = mensajeDeError(e);
+  } finally {
+    if (consulta === consultaDias) cargandoDias.value = false;
+  }
+}
+function etiquetaDia(f: string): {
+  semana: string;
+  numero: string;
+  mes: string;
+} {
+  const d = new Date(`${f}T12:00:00Z`);
+  const hoy = hoySede();
+  const corto = (op: Intl.DateTimeFormatOptions): string =>
+    new Intl.DateTimeFormat("es-MX", { ...op, timeZone: "UTC" })
+      .format(d)
+      .replace(".", "");
+  return {
+    semana:
+      f === hoy
+        ? t("perfilPublico.agendar.hoy")
+        : f === diaSiguiente(hoy)
+          ? t("perfilPublico.agendar.manana")
+          : corto({ weekday: "short" }),
+    numero: String(d.getUTCDate()),
+    mes: corto({ month: "short" }),
+  };
+}
+watch([sucursalId, filtro], () => {
+  dias.value = [];
+  if (paso.value === "horario") void cargarDias();
+});
+watch(paso, (p) => {
+  if (p === "horario" && dias.value.length === 0) void cargarDias();
+});
 
 // Elegir sede o servicio lleva al paso siguiente (también si se vuelve a tocar la
 // que ya estaba elegida).
@@ -329,28 +516,50 @@ async function agendar(): Promise<void> {
   }
   agendando.value = true;
   error.value = null;
+  const cita = {
+    oferta_id: servicioId.value,
+    sucursal_id: sucursalId.value,
+    ...(barberoId.value !== CUALQUIERA
+      ? { instructor_id: barberoId.value }
+      : {}),
+    inicia_en_local: relojLocal(slotSel.value),
+    duracion_minutos: duracion.value,
+  };
   try {
-    const { data } = await api.post<{
-      data: {
-        orden_id: string | null;
-        total_minor: number | null;
-        moneda: string | null;
-        profesional?: { id: string; nombre: string } | null;
+    if (clienteConCuenta.value) {
+      // Con su cuenta: queda en su historial y no se le piden datos.
+      const { data } = await api.post<{
+        data: {
+          estado: string;
+          orden_id: string | null;
+          profesional?: { id: string; nombre: string } | null;
+        };
+      }>(`/api/v1/app/${slug.value}/mi/citas`, cita);
+      resultado.value = {
+        estado: data.data.estado,
+        orden_id: data.data.orden_id,
+        total_minor: servicioSel.value?.precio_minor ?? null,
+        moneda: servicioSel.value?.moneda ?? null,
+        profesional: data.data.profesional ?? null,
       };
-    }>(`/api/v1/app/${slug.value}/citas`, {
-      nombre: datos.value.nombre.trim(),
-      celular:
-        datos.value.celular.trim() !== "" ? datos.value.celular.trim() : null,
-      email: datos.value.email.trim() !== "" ? datos.value.email.trim() : null,
-      oferta_id: servicioId.value,
-      sucursal_id: sucursalId.value,
-      ...(barberoId.value !== CUALQUIERA
-        ? { instructor_id: barberoId.value }
-        : {}),
-      inicia_en_local: relojLocal(slotSel.value),
-      duracion_minutos: duracion.value,
-    });
-    resultado.value = data.data;
+    } else {
+      const { data } = await api.post<{
+        data: {
+          estado?: string;
+          orden_id: string | null;
+          total_minor: number | null;
+          moneda: string | null;
+          profesional?: { id: string; nombre: string } | null;
+        };
+      }>(`/api/v1/app/${slug.value}/citas`, {
+        nombre: datos.value.nombre.trim(),
+        celular:
+          datos.value.celular.trim() !== "" ? datos.value.celular.trim() : null,
+        email: datos.value.email.trim(),
+        ...cita,
+      });
+      resultado.value = data.data;
+    }
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -396,12 +605,18 @@ function otra(): void {
   resultado.value = null;
   pendientePago.value = false;
   slotSel.value = "";
-  fecha.value = "";
   slots.value = [];
   slotsCargados.value = false;
   datos.value = { nombre: "", celular: "", email: "" };
+  dias.value = [];
+  fecha.value = "";
   ir("horario");
+  void cargarDias();
 }
+// Apartada: se paga en línea para confirmar. Confirmada: ya está agendada.
+const apartada = computed(
+  () => (resultado.value?.estado ?? "pendiente_pago") === "pendiente_pago",
+);
 
 function iniciales(nombre: string): string {
   return nombre
@@ -552,6 +767,33 @@ onMounted(cargar);
             {{ $t("reservar.pendientePago") }}
           </p>
         </template>
+        <!-- Confirmada: se paga en la sucursal o, si quiere, en línea. -->
+        <template v-else-if="!apartada">
+          <p
+            class="mt-4 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="confirmada"
+          >
+            {{
+              resultado.orden_id && pagoEnLinea
+                ? $t("perfilPublico.agendar.pagaAhoraOEnSucursal")
+                : $t("perfilPublico.agendar.pagaEnSucursal")
+            }}
+          </p>
+          <button
+            v-if="resultado.orden_id && pagoEnLinea"
+            class="tu-btn tu-btn-fantasma mt-3 w-full"
+            type="button"
+            :disabled="pagando"
+            @click="pagar"
+          >
+            {{
+              pagando
+                ? $t("reservar.pagando")
+                : `${$t("reservar.pagar")} · ${dinero(resultado.total_minor, resultado.moneda)}`
+            }}
+          </button>
+        </template>
         <template v-else>
           <p class="mt-4 text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{ $t("reservar.apartado") }}
@@ -672,6 +914,29 @@ onMounted(cargar);
                   <strong>{{ s.nombre }}</strong>
                   <small v-if="s.direccion">{{ s.direccion }}</small>
                   <small v-else-if="s.region">{{ s.region }}</small>
+                  <!-- Sus redes: abren aparte, sin elegir la sede. -->
+                  <span
+                    v-if="(s.redes ?? []).length > 0"
+                    class="rc-sede-redes"
+                    data-prueba="redes-sede"
+                  >
+                    <a
+                      v-for="r in s.redes"
+                      :key="r.red"
+                      :href="r.url"
+                      target="_blank"
+                      rel="noopener"
+                      :aria-label="
+                        $t('perfilPublico.agendar.redDe', {
+                          red: $t(`perfilPublico.redes.${r.red}`),
+                          sede: s.nombre,
+                        })
+                      "
+                      @click.stop
+                    >
+                      <IconoRed :red="r.red" :tamano="18" />
+                    </a>
+                  </span>
                 </span>
               </label>
             </div>
@@ -785,38 +1050,53 @@ onMounted(cargar);
                   {{ $t("perfilPublico.agendar.cambiar") }}
                 </button>
               </p>
-              <div
-                class="grid gap-3"
-                :class="{ 'sm:grid-cols-2': variosProfesionales }"
-              >
-                <div>
-                  <label class="tu-label" for="rc-fecha">{{
-                    $t("reservar.cuando")
-                  }}</label>
-                  <input
-                    id="rc-fecha"
-                    v-model="fecha"
-                    type="date"
-                    class="tu-input"
-                  />
-                </div>
-                <div v-if="variosProfesionales">
-                  <label class="tu-label" for="rc-filtro">{{
-                    $t("perfilPublico.agendar.verHorariosDe")
-                  }}</label>
-                  <select id="rc-filtro" v-model="filtro" class="tu-input">
-                    <option value="">
-                      {{ $t("perfilPublico.agendar.todoElEquipo") }}
-                    </option>
-                    <option
-                      v-for="b in opciones.instructores"
-                      :key="b.id"
-                      :value="b.id"
-                    >
-                      {{ b.nombre }}
-                    </option>
-                  </select>
-                </div>
+              <div v-if="variosProfesionales" class="mb-4">
+                <label class="tu-label" for="rc-filtro">{{
+                  $t("perfilPublico.agendar.verHorariosDe")
+                }}</label>
+                <select id="rc-filtro" v-model="filtro" class="tu-input">
+                  <option value="">
+                    {{ $t("perfilPublico.agendar.todoElEquipo") }}
+                  </option>
+                  <option
+                    v-for="b in opciones.instructores"
+                    :key="b.id"
+                    :value="b.id"
+                  >
+                    {{ b.nombre }}
+                  </option>
+                </select>
+              </div>
+              <span class="tu-label">{{ $t("reservar.cuando") }}</span>
+              <!-- Días desde hoy; los que no tienen atención no se eligen. -->
+              <div class="rc-dias" data-prueba="dias">
+                <button
+                  v-for="d in dias"
+                  :key="d.fecha"
+                  type="button"
+                  class="rc-dia"
+                  :class="{ 'rc-dia--activo': fecha === d.fecha }"
+                  :disabled="!d.abierto"
+                  :data-fecha="d.fecha"
+                  :aria-pressed="fecha === d.fecha"
+                  @click="fecha = d.fecha"
+                >
+                  <span class="rc-dia-semana">{{
+                    etiquetaDia(d.fecha).semana
+                  }}</span>
+                  <strong>{{ etiquetaDia(d.fecha).numero }}</strong>
+                  <span class="rc-dia-mes">{{ etiquetaDia(d.fecha).mes }}</span>
+                </button>
+                <button
+                  v-if="dias.length > 0"
+                  type="button"
+                  class="rc-dia rc-dia-mas"
+                  :disabled="cargandoDias"
+                  data-prueba="mas-fechas"
+                  @click="cargarDias(true)"
+                >
+                  {{ $t("perfilPublico.agendar.masFechas") }}
+                </button>
               </div>
 
               <p
@@ -833,7 +1113,13 @@ onMounted(cargar);
                 class="mt-3 text-sm"
                 :style="{ color: 'var(--texto-suave)' }"
               >
-                {{ $t("reservar.sinHorario") }}
+                {{
+                  cargandoDias
+                    ? $t("reservar.calculando")
+                    : dias.length > 0
+                      ? $t("perfilPublico.agendar.sinDias")
+                      : $t("reservar.sinHorario")
+                }}
               </p>
               <p
                 v-else-if="buscandoSlots"
@@ -1060,47 +1346,84 @@ onMounted(cargar);
             </div>
 
             <div class="tu-card p-5">
-              <label class="tu-label">{{ $t("reservar.datos") }}</label>
-              <div class="space-y-3">
-                <div>
-                  <label class="tu-label" for="rc-nom">{{
-                    $t("reservar.nombre")
-                  }}</label>
-                  <input
-                    id="rc-nom"
-                    v-model="datos.nombre"
-                    class="tu-input"
-                    autocomplete="name"
-                    required
-                  />
-                </div>
-                <div class="grid sm:grid-cols-2 gap-3">
-                  <div>
-                    <label class="tu-label" for="rc-cel">{{
-                      $t("reservar.celular")
-                    }}</label>
-                    <input
-                      id="rc-cel"
-                      v-model="datos.celular"
-                      class="tu-input"
-                      inputmode="tel"
-                      autocomplete="tel"
-                    />
-                  </div>
-                  <div>
-                    <label class="tu-label" for="rc-email">{{
-                      $t("reservar.email")
-                    }}</label>
-                    <input
-                      id="rc-email"
-                      v-model="datos.email"
-                      type="email"
-                      class="tu-input"
-                      autocomplete="email"
-                    />
-                  </div>
-                </div>
+              <!-- Con su cuenta: no se piden datos, solo confirmar que es él. -->
+              <div v-if="clienteConCuenta" data-prueba="con-cuenta">
+                <label class="tu-label">{{
+                  $t("perfilPublico.agendar.agendarasComo")
+                }}</label>
+                <p class="font-medium">{{ sesion.usuario?.nombre }}</p>
+                <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+                  {{ sesion.usuario?.email }}
+                </p>
+                <button
+                  type="button"
+                  class="tu-enlace mt-1 text-sm"
+                  @click="comoInvitado = true"
+                >
+                  {{ $t("perfilPublico.agendar.usarOtrosDatos") }}
+                </button>
               </div>
+              <template v-else>
+                <label class="tu-label">{{ $t("reservar.datos") }}</label>
+                <p
+                  class="-mt-1 mb-3 text-sm"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ $t("perfilPublico.agendar.tienesCuenta") }}
+                  <button
+                    type="button"
+                    class="tu-enlace"
+                    data-prueba="entrar"
+                    @click="entrarParaAgendar"
+                  >
+                    {{ $t("perfilPublico.agendar.entrar") }}
+                  </button>
+                </p>
+                <div class="space-y-3">
+                  <div>
+                    <label class="tu-label" for="rc-nom">{{
+                      $t("reservar.nombre")
+                    }}</label>
+                    <input
+                      id="rc-nom"
+                      v-model="datos.nombre"
+                      class="tu-input"
+                      autocomplete="name"
+                      required
+                    />
+                  </div>
+                  <div class="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <label class="tu-label" for="rc-cel">{{
+                        $t("reservar.celular")
+                      }}</label>
+                      <input
+                        id="rc-cel"
+                        v-model="datos.celular"
+                        class="tu-input"
+                        inputmode="tel"
+                        autocomplete="tel"
+                      />
+                    </div>
+                    <div>
+                      <label class="tu-label" for="rc-email">{{
+                        $t("perfilPublico.agendar.correo")
+                      }}</label>
+                      <input
+                        id="rc-email"
+                        v-model="datos.email"
+                        type="email"
+                        class="tu-input"
+                        autocomplete="email"
+                        required
+                      />
+                      <span class="tu-hint">{{
+                        $t("perfilPublico.agendar.correoAyuda")
+                      }}</span>
+                    </div>
+                  </div>
+                </div>
+              </template>
 
               <button
                 class="tu-btn tu-btn-primario mt-4 w-full"
@@ -1111,7 +1434,9 @@ onMounted(cargar);
                 {{
                   agendando
                     ? $t("reservar.agendando")
-                    : $t("reservar.agendarYPagar")
+                    : pagoObligatorio
+                      ? $t("reservar.agendarYPagar")
+                      : $t("perfilPublico.agendar.agendar")
                 }}
               </button>
               <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
@@ -1230,15 +1555,73 @@ onMounted(cargar);
   padding: 0.75rem 1rem 1rem;
   min-width: 0;
   overflow-wrap: anywhere;
+  text-align: center;
+}
+.rc-sede-redes {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+  color: var(--texto-suave);
+}
+.rc-sede-redes a:hover {
+  color: var(--texto);
+}
+
+/* Calendario: tira de días desde hoy. */
+.rc-dias {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scroll-snap-type: x proximity;
+}
+.rc-dia {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 3.6rem;
+  padding: 0.45rem 0.4rem;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  scroll-snap-align: start;
+  line-height: 1.2;
+}
+.rc-dia strong {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.rc-dia-semana,
+.rc-dia-mes {
+  font-size: 0.72rem;
+  color: var(--texto-suave);
+}
+.rc-dia--activo {
+  border-color: var(--primario);
+  background: var(--primario);
+  color: var(--primario-contraste);
+}
+.rc-dia--activo .rc-dia-semana,
+.rc-dia--activo .rc-dia-mes {
+  color: inherit;
+}
+.rc-dia:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.rc-dia-mas {
+  justify-content: center;
+  font-size: 0.8rem;
+  color: var(--enlace);
 }
 .rc-sede-texto strong {
   display: block;
   font-weight: 500;
 }
 .rc-sede--compacta {
-  flex-direction: row;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
   padding: 1rem;
 }
 .rc-sede--compacta .rc-sede-foto {
@@ -1283,11 +1666,13 @@ onMounted(cargar);
 .rc-paso-marca {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
+  width: 100%;
   min-width: 0;
   font-size: 0.8rem;
   color: var(--texto-suave);
-  text-align: left;
+  text-align: center;
 }
 button.rc-paso-marca {
   cursor: pointer;

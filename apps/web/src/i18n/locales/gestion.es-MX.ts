@@ -107,6 +107,7 @@ export const conexiones = {
     tipos: {
       reserva: {
         creada: "Reserva creada",
+        apartada: "Lugar apartado (por pagar)",
         confirmada: "Reserva confirmada",
         ofrecida: "Lugar ofrecido (lista de espera)",
         recordatorio_24h: "Recordatorio 24 h antes",

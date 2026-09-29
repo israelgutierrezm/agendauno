@@ -44,9 +44,9 @@ it('la cita guest guarda el celular del cliente', function (): void {
         ->assertOk()->json('data.0.id');
     abrirHorarioDeCitas($e, $coach, $sede['sucursal']);
 
-    // Guest agenda dejando nombre + celular (sin correo).
+    // Guest agenda dejando nombre, correo y celular.
     $this->postJson("/api/v1/app/{$e['slug']}/citas", [
-        'nombre' => 'Cliente Guest', 'celular' => '5533334444',
+        'nombre' => 'Cliente Guest', 'email' => 'guest@correo.mx', 'celular' => '5533334444',
         'oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'], 'instructor_id' => $coach,
         'inicia_en_local' => '2026-10-05 10:00:00', 'duracion_minutos' => 60,
     ])->assertCreated();

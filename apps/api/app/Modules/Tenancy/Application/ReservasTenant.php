@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Comunicaciones\DatosDeOrden;
 use App\Modules\Tenancy\Comunicaciones\DatosDeSesion;
 use App\Modules\Tenancy\Creditos\EstadoRetencion;
 use App\Modules\Tenancy\Creditos\Exceptions\SaldoInsuficiente;
@@ -81,12 +82,13 @@ class ReservasTenant
     }
 
     /**
-     * Cita agendada POR EL NEGOCIO (recepción, teléfono, mostrador) de un servicio de
-     * pago: la reserva nace CONFIRMADA — no expira, porque se cobra en caja (casi
-     * siempre al terminar el servicio) — y la orden por la sesión queda pendiente de
-     * cobro. Atómico y bajo lock, igual que el pago en línea.
+     * Cita de un servicio de pago que NO se aparta: la agenda el negocio (recepción,
+     * teléfono, mostrador) o el negocio no pide pagar en línea para confirmar (ADR
+     * 0065). La reserva nace CONFIRMADA — no expira, se cobra en caja (casi siempre al
+     * terminar el servicio) o en línea si el cliente quiere — y la orden por la sesión
+     * queda pendiente de cobro. Atómico y bajo lock, igual que el pago en línea.
      */
-    public function reservarPorNegocio(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId = null): ReservaTenant
+    public function reservarPorCobrar(SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda, ?int $sucursalId = null): ReservaTenant
     {
         return $this->reservarConOrden($sesion, $persona, $montoMinor, $moneda, $sucursalId, 'directo', EstadoReserva::Confirmada);
     }
@@ -142,9 +144,30 @@ class ReservasTenant
             ]);
 
             $this->emitirCreada($reserva, $bloqueada, $persona);
+            if ($estado === EstadoReserva::PendientePago) {
+                $this->emitirApartada($reserva, $bloqueada, $persona, $orden->total_minor, $moneda);
+            }
 
             return $reserva;
         });
+    }
+
+    /**
+     * Aviso de lugar apartado (ADR 0065): qué se apartó, cuánto se paga y hasta qué
+     * hora; si no se paga, el lugar se libera.
+     */
+    private function emitirApartada(ReservaTenant $reserva, SesionTenant $sesion, PersonaTenant $persona, int $montoMinor, string $moneda): void
+    {
+        $datos = DatosDeSesion::para($sesion);
+        $vence = now()->addMinutes($this->parametros->entero('reservas.minutos_para_pagar'))
+            ->setTimezone((string) ($sesion->zona_horaria ?: DatosDeSesion::zonaDelNegocio()));
+
+        $this->eventos->registrar('reserva.apartada', 'reserva', (string) $reserva->ulid, [
+            'persona_id' => (string) $persona->ulid,
+            ...$datos,
+            'total' => DatosDeOrden::dinero($montoMinor, $moneda),
+            'vence' => $vence->format('H:i'),
+        ]);
     }
 
     public function crear(SesionTenant $sesion, PersonaTenant $persona, ?string $idempotencyKey = null, bool $permitirEspera = false, ?int $unidades = null, string $canal = 'directo', ?int $lugar = null): ReservaTenant

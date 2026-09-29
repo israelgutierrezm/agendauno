@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\CobroDeCitasTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -42,7 +43,9 @@ it('expone solo la foto pública del profesional y la región de la sede dentro 
         foreach (['Ana' => ['instructor', 'tenants/demo/perfiles/ana.webp'], 'Luis' => ['instructor', null], 'Cliente' => ['miembro', 'privada.webp']] as $nombre => [$rol, $foto]) {
             DB::connection('tenant')->table('users')->insert(['ulid' => $nombre, 'name' => $nombre, 'email' => $nombre.'@example.test', 'roles' => json_encode([$rol]), 'foto_ruta' => $foto]);
         }
-        $opciones = (new OpcionesCitaTenant)->listar();
+        $cobro = Mockery::mock(CobroDeCitasTenant::class);
+        $cobro->shouldReceive('paraPantalla')->andReturn(['pago_obligatorio' => true, 'pago_en_linea' => true]);
+        $opciones = (new OpcionesCitaTenant($cobro))->listar();
         expect($opciones['instructores'])->toBe([
             ['id' => 'Ana', 'nombre' => 'Ana', 'foto_url' => Storage::disk('public')->url('tenants/demo/perfiles/ana.webp')],
             ['id' => 'Luis', 'nombre' => 'Luis', 'foto_url' => null],

@@ -95,3 +95,8 @@ slots are the union of every professional who works at that branch that day, and
 the booking goes to the least busy one that day (then by name). Each attempt is a
 normal booking under that professional's lock; if the slot was just taken, the
 next candidate is tried. See ADR 0062.
+
+Whether a client-booked paid appointment is held until paid online depends on the
+business setting `citas.pago_en_linea_obligatorio` and on having an active online
+gateway. Otherwise it is confirmed on booking with its order left to collect
+(online later or at the branch). See ADR 0065.

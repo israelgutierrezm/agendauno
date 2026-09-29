@@ -200,6 +200,7 @@ Route::prefix('v1')->group(function (): void {
         // orden_id devuelto es la capacidad para pagar). Solo directorio.
         Route::get('/citas/opciones', [PublicoCitasController::class, 'opciones'])->middleware('throttle:60,1')->name('citas.opciones');
         Route::get('/citas/disponibilidad', [PublicoCitasController::class, 'disponibilidad'])->middleware('throttle:60,1')->name('citas.disponibilidad');
+        Route::get('/citas/dias', [PublicoCitasController::class, 'dias'])->middleware('throttle:60,1')->name('citas.dias');
         Route::post('/citas', [PublicoCitasController::class, 'agendar'])->middleware('throttle:login')->name('citas.agendar');
         Route::post('/citas/pagar', [PublicoCitasController::class, 'pagar'])->middleware('throttle:login')->name('citas.pagar');
 

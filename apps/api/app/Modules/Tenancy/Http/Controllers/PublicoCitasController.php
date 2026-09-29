@@ -35,6 +35,9 @@ use Illuminate\Validation\ValidationException;
  */
 class PublicoCitasController
 {
+    /** Días que se piden a la vez para el calendario. */
+    private const MAX_DIAS = 62;
+
     public function __construct(
         private readonly AgendarCitaTenant $agendar,
         private readonly CobrarOrdenTenant $cobrar,
@@ -99,6 +102,34 @@ class PublicoCitasController
         return response()->json(['data' => ['fecha' => $validado['fecha'], 'slots' => $slots]]);
     }
 
+    /**
+     * Días en que se puede agendar en la sede (desde hoy), para el calendario: los
+     * que ya pasaron, en que nadie atiende o que el negocio cerró van como no
+     * disponibles. Con `instructor_id`, los de esa persona. Solo directorio.
+     */
+    public function dias(Request $request): JsonResponse
+    {
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+        abort_unless($estudio->enDirectorio(), 404);
+
+        $validado = $request->validate([
+            'sucursal_id' => ['required', 'string'],
+            'desde' => ['required', 'date_format:Y-m-d'],
+            'dias' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_DIAS],
+            'instructor_id' => ['nullable', 'string'],
+        ]);
+        $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
+        $instructor = $this->profesionalElegido($validado);
+
+        return response()->json(['data' => $this->disponibilidad->diasConAtencion(
+            $sucursal,
+            $validado['desde'],
+            (int) ($validado['dias'] ?? 14),
+            $instructor instanceof Usuario ? (int) $instructor->getKey() : null,
+        )]);
+    }
+
     public function agendar(Request $request): JsonResponse
     {
         $estudio = $request->attributes->get('estudio');
@@ -107,7 +138,8 @@ class PublicoCitasController
 
         $validado = $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
+            // Para mandarle la confirmación y ligar sus citas si luego crea su cuenta.
+            'email' => ['required', 'email', 'max:255'],
             'celular' => ['nullable', 'string', 'max:40'],
             'oferta_id' => ['required', 'string'],
             'sucursal_id' => ['required', 'string'],

@@ -54,6 +54,7 @@ class AgendarCitaTenant
         private readonly CalcularDisponibilidadTenant $disponibilidad,
         private readonly ElegirRecursoTenant $recursos,
         private readonly ParametrosTenant $parametros,
+        private readonly CobroDeCitasTenant $cobro,
     ) {}
 
     public function agendar(
@@ -195,10 +196,12 @@ class AgendarCitaTenant
             ]);
 
             if ($oferta->politica_reserva === PoliticaReservaTenant::Pago) {
-                // El negocio agenda y cobra en caja (confirmada); el cliente en línea
-                // paga para confirmar (pendiente de pago, expira si no paga).
-                if ($porNegocio) {
-                    return $this->reservas->reservarPorNegocio(
+                // El negocio agenda y cobra en caja (confirmada). El cliente paga en
+                // línea para confirmar (pendiente de pago, expira si no paga) solo si el
+                // negocio lo pide y puede cobrar en línea; si no, queda confirmada y
+                // paga en línea o en la sucursal (ADR 0065).
+                if ($porNegocio || ! $this->cobro->pagoObligatorio()) {
+                    return $this->reservas->reservarPorCobrar(
                         $sesion,
                         $persona,
                         (int) ($oferta->precio_clase_minor ?? 0),

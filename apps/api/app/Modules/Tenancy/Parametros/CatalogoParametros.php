@@ -40,6 +40,9 @@ final class CatalogoParametros
             // Citas.
             new DefinicionParametro('citas.duracion_defecto', 'Citas', 'Duración de una cita si el servicio no la define',
                 'Minutos.', $e, 30, 5, 480, 'min'),
+            // ADR 0065.
+            new DefinicionParametro('citas.pago_en_linea_obligatorio', 'Citas', 'Pedir el pago en línea para confirmar una cita',
+                'Si lo apagas, la cita queda confirmada al agendar y el cliente paga en línea o en la sucursal. Sin cobro en línea activo, siempre se paga en la sucursal.', $sn, 1),
 
             // Clases recurrentes (ADR 0045).
             new DefinicionParametro('agenda.dias_a_generar', 'Clases recurrentes', 'Fechas creadas por adelantado',

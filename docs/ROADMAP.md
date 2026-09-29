@@ -21,6 +21,10 @@
   (p. ej. limpieza, flúor y diagnóstico) con un solo precio y una sola cita.
 - **Agendar por pasos** (ADR 0064): sucursal, servicio, fecha y hora y
   confirmación; la sede con foto y enlace de Google Maps para no llegar a otra.
+- **Cobro al agendar** (ADR 0065): el negocio decide si pide el pago en línea para
+  confirmar; sin pasarela, la cita queda confirmada. Correo obligatorio con aviso al
+  apartar, calendario solo con días de atención y cliente con cuenta sin reescribir
+  datos.
 - **Experiencia**: web única (sitio, panel, portal, superadmin) y app Flutter;
   roles propios y rol activo por sesión (ADR 0055, 0057); nombre AgendaUno
   (ADR 0056).
@@ -36,8 +40,9 @@
 
 - Conciliar el guardado de tarjeta de Stripe (pago automático) cuando no llega su
   aviso; hoy la conciliación cubre los cobros.
-- Reserva pública: selector semanal de horarios y más datos del cliente (apellido,
-  lada, cómo se enteró, notas).
+- Reserva pública: más datos del cliente (apellido, lada, cómo se enteró, notas),
+  agendar para otra persona, enlace para pagar una cita apartada y límite de citas
+  por pagar por cliente.
 - Avisos por WhatsApp (proveedor por decidir) y foto por servicio.
 - Separar «editar» y «eliminar» en el catálogo de permisos.
 - Roles propios con faceta de instructor.

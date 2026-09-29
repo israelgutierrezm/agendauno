@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\PoliticaReservaTenant;
+use App\Modules\Tenancy\Support\RedesSociales;
 
 /**
  * Lo que se puede elegir al agendar una cita: los servicios agendables, las sedes y
@@ -15,8 +16,13 @@ use App\Modules\Tenancy\PoliticaReservaTenant;
  */
 class OpcionesCitaTenant
 {
+    /** Redes que se muestran en la tarjeta de la sede al agendar. */
+    private const REDES_EN_TARJETA = ['instagram', 'facebook'];
+
+    public function __construct(private readonly CobroDeCitasTenant $cobro) {}
+
     /**
-     * @return array{servicios: list<array<string, mixed>>, sucursales: list<array<string, mixed>>, instructores: list<array<string, mixed>>}
+     * @return array{servicios: list<array<string, mixed>>, sucursales: list<array<string, mixed>>, instructores: list<array<string, mixed>>, cobro: array{pago_obligatorio: bool, pago_en_linea: bool}}
      */
     public function listar(): array
     {
@@ -51,6 +57,10 @@ class OpcionesCitaTenant
                     'direccion' => $s->direccion,
                     'foto_url' => $s->fotoUrl(),
                     'mapa_url' => $s->enlaceMapa(),
+                    'redes' => array_values(array_filter(
+                        RedesSociales::publicas($s->redes),
+                        static fn (array $r): bool => in_array($r['red'], self::REDES_EN_TARJETA, true),
+                    )),
                 ])->values()->all(),
             'instructores' => Usuario::query()
                 ->whereJsonContains('roles', 'instructor')
@@ -61,6 +71,8 @@ class OpcionesCitaTenant
                     'nombre' => (string) $u->name,
                     'foto_url' => $u->fotoUrl(),
                 ])->values()->all(),
+            // Si se paga en línea para confirmar o se puede pagar en la sucursal.
+            'cobro' => $this->cobro->paraPantalla(),
         ];
     }
 }

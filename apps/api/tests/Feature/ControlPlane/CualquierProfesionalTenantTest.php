@@ -81,7 +81,7 @@ function citaDelNegocio(array $ctx, string $hora, string $profesional): void
 function agendarPublico(array $ctx, string $hora): TestResponse
 {
     return test()->postJson("/api/v1/app/{$ctx['e']['slug']}/citas", [
-        'nombre' => 'Cliente', 'oferta_id' => $ctx['sede']['oferta'], 'sucursal_id' => $ctx['sede']['sucursal'],
+        'nombre' => 'Cliente', 'email' => 'cliente@correo.mx', 'oferta_id' => $ctx['sede']['oferta'], 'sucursal_id' => $ctx['sede']['sucursal'],
         'inicia_en_local' => "{$ctx['fecha']} {$hora}:00", 'duracion_minutos' => 30,
     ]);
 }
@@ -145,7 +145,8 @@ it('desde su cuenta el cliente también agenda con cualquier profesional', funct
         'oferta_id' => $ctx['sede']['oferta'], 'sucursal_id' => $ctx['sede']['sucursal'],
         'inicia_en_local' => "{$ctx['fecha']} 11:30:00", 'duracion_minutos' => 30,
     ], conBearer($cliente['bearer']))->assertCreated()
-        ->assertJsonPath('data.estado', 'pendiente_pago')
+        // Sin cobro en línea, queda confirmada y se paga en la sucursal (ADR 0065).
+        ->assertJsonPath('data.estado', 'confirmada')
         ->assertJsonPath('data.instructor', 'Carla')
         ->assertJsonPath('data.profesional.id', $ctx['carla']);
 });

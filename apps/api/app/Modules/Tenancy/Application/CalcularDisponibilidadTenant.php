@@ -126,6 +126,55 @@ class CalcularDisponibilidadTenant
     }
 
     /**
+     * Días en que se puede agendar en la sede (ADR 0065), para el calendario: alguien
+     * atiende ese día de la semana (o la persona elegida), el negocio no cerró y el
+     * día no pasó. Hoy solo cuenta si todavía queda atención. No calcula los huecos
+     * (eso lo hace el día elegido): es para no ofrecer días en que nadie atiende.
+     *
+     * @return list<array{fecha: string, abierto: bool}>
+     */
+    public function diasConAtencion(SucursalTenant $sucursal, string $desde, int $dias, ?int $instructorId = null): array
+    {
+        $zona = (string) ($sucursal->zona_horaria ?? config('app.timezone', 'UTC'));
+        $ahora = CarbonImmutable::now($zona);
+        $inicio = CarbonImmutable::parse($desde, $zona)->startOfDay();
+        $fin = $inicio->addDays($dias - 1);
+
+        // Hasta qué hora atiende alguien cada día de la semana (1–7).
+        $cierre = HorarioAtencionTenant::query()
+            ->where('sucursal_id', $sucursal->getKey())
+            ->when(
+                $instructorId !== null,
+                fn ($q) => $q->where('instructor_id', $instructorId),
+                // Todo el equipo: quienes atienden citas (como en «cualquier profesional»).
+                fn ($q) => $q->whereIn('instructor_id', Usuario::query()->whereJsonContains('roles', 'instructor')->select('id')),
+            )
+            ->get(['dia_semana', 'hora_fin'])
+            ->groupBy('dia_semana')
+            ->map(static fn ($ventanas): string => (string) $ventanas->map(static fn (HorarioAtencionTenant $v): string => self::hora((string) $v->hora_fin))->max());
+
+        $cerrados = ExcepcionHorarioTenant::query()
+            ->whereDate('fecha', '>=', $inicio->toDateString())
+            ->whereDate('fecha', '<=', $fin->toDateString())
+            ->get(['fecha'])
+            ->map(static fn (ExcepcionHorarioTenant $e): string => CarbonImmutable::parse((string) $e->fecha)->toDateString())
+            ->all();
+
+        $lista = [];
+        for ($dia = $inicio; $dia->lessThanOrEqualTo($fin); $dia = $dia->addDay()) {
+            $fecha = $dia->toDateString();
+            $hastaLas = $cierre[$dia->isoWeekday()] ?? null;
+            $abierto = $hastaLas !== null
+                && ! in_array($fecha, $cerrados, true)
+                && ! $dia->isBefore($ahora->startOfDay())
+                && (! $dia->isSameDay($ahora) || $hastaLas > $ahora->format('H:i:s'));
+            $lista[] = ['fecha' => $fecha, 'abierto' => $abierto];
+        }
+
+        return $lista;
+    }
+
+    /**
      * Huecos en que al menos un profesional de la sede está libre: la unión de los de
      * cada uno, por hora, con quiénes pueden atender en cada hueco (ULID).
      *
