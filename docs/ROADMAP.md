@@ -17,6 +17,8 @@
 - **Cualquier profesional disponible** (ADR 0062): al agendar sin elegir a nadie,
   se asigna a quien está libre y con menos trabajo ese día (web y app). En la
   página pública se elige primero la hora y luego con quién.
+- **Paquetes de servicios** (ADR 0063): un servicio incluye otros del catálogo
+  (p. ej. limpieza, flúor y diagnóstico) con un solo precio y una sola cita.
 - **Experiencia**: web única (sitio, panel, portal, superadmin) y app Flutter;
   roles propios y rol activo por sesión (ADR 0055, 0057); nombre AgendaUno
   (ADR 0056).
@@ -32,8 +34,8 @@
 
 - Conciliar el guardado de tarjeta de Stripe (pago automático) cuando no llega su
   aviso; hoy la conciliación cubre los cobros.
-- Reserva pública: varios servicios en una cita, selector semanal de horarios y más
-  datos del cliente (apellido, lada, cómo se enteró, notas).
+- Reserva pública: selector semanal de horarios y más datos del cliente (apellido,
+  lada, cómo se enteró, notas).
 - Avisos por WhatsApp (proveedor por decidir) y foto por servicio.
 - Separar «editar» y «eliminar» en el catálogo de permisos.
 - Roles propios con faceta de instructor.

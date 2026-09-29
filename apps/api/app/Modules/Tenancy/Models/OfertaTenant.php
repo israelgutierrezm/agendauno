@@ -13,7 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * Oferta de una actividad (clase vendible/agendable), tenant-local. La descripción
- * la ve quien la elige en línea.
+ * la ve quien la elige en línea. Un servicio puede incluir otros (paquete, ADR 0063)
+ * y sigue siendo uno: su precio, su duración y una sola cita.
  *
  * @property string|null $descripcion
  */
@@ -49,6 +50,43 @@ class OfertaTenant extends Model
     public function recursos(): BelongsToMany
     {
         return $this->belongsToMany(RecursoTenant::class, 'oferta_recursos', 'oferta_id', 'recurso_id')->withTimestamps();
+    }
+
+    /**
+     * Servicios que incluye (paquete, ADR 0063), en orden; vacío = servicio simple.
+     *
+     * @return BelongsToMany<OfertaTenant, $this>
+     */
+    public function incluidas(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'oferta_incluidos', 'oferta_id', 'incluida_id')
+            ->withPivot('posicion')
+            ->orderByPivot('posicion')
+            ->withTimestamps();
+    }
+
+    /**
+     * Paquetes que incluyen este servicio.
+     *
+     * @return BelongsToMany<OfertaTenant, $this>
+     */
+    public function incluidaEn(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'oferta_incluidos', 'incluida_id', 'oferta_id');
+    }
+
+    /**
+     * Lo que costarían por separado los servicios que incluye. Null si no incluye
+     * ninguno o si alguno no tiene precio: sin eso no hay con qué comparar.
+     */
+    public function precioPorSeparadoMinor(): ?int
+    {
+        $incluidas = $this->incluidas;
+        if ($incluidas->isEmpty() || $incluidas->contains(static fn (self $o): bool => (int) $o->precio_clase_minor <= 0)) {
+            return null;
+        }
+
+        return (int) $incluidas->sum('precio_clase_minor');
     }
 
     /**

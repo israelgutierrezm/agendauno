@@ -183,6 +183,14 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                     setState(() => _servicio = v);
                     _buscarHorarios();
                   }),
+                  if (_servicio?.incluye.isNotEmpty ?? false)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'Incluye: ${_servicio!.incluye.join(' · ')}',
+                        style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                      ),
+                    ),
                   _selector(
                     'Profesional',
                     [

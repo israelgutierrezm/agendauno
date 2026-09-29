@@ -61,6 +61,7 @@ el esquema.
 - `programas`, `actividades`, `niveles`, `ofertas` (clases y servicios; modalidad
   grupal o privada, duración, márgenes, política de reserva y descripción pública).
 - `recursos`, `oferta_recursos` — salas, camillas, carriles (ADR 0039).
+- `oferta_incluidos` — servicios que incluye un paquete, en orden (ADR 0063).
 
 **Agenda**
 - `plantillas_horario`, `excepciones_horario` — clases recurrentes y sus cambios.

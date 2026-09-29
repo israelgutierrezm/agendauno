@@ -111,4 +111,23 @@ void main() {
       expect(no.motivo, contains('12 h'));
     });
   });
+
+  group('OpcionCita', () {
+    test('un paquete trae los servicios que incluye, en orden', () {
+      final o = OpcionCita.desdeJson({
+        'id': 'o1',
+        'nombre': 'Limpieza dental completa',
+        'duracion_minutos': 60,
+        'incluye': ['Limpieza dental', 'Aplicación de flúor'],
+      });
+
+      expect(o.incluye, ['Limpieza dental', 'Aplicación de flúor']);
+    });
+
+    test('un servicio simple (o un API anterior) no incluye nada', () {
+      final o = OpcionCita.desdeJson({'id': 'o2', 'nombre': 'Corte'});
+
+      expect(o.incluye, isEmpty);
+    });
+  });
 }

@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import IconoRed from "@/components/IconoRed.vue";
+import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import { recordarNegocio } from "@/lib/negociosRecientes";
@@ -55,6 +56,9 @@ interface Servicio {
   nombre: string;
   descripcion: string | null;
   categoria: string | null;
+  // Paquete: qué incluye y cuánto costaría por separado.
+  incluye?: string[];
+  precio_por_separado_minor?: number | null;
   grupal: boolean;
   duracion_minutos: number | null;
   precio_minor: number | null;
@@ -647,6 +651,13 @@ onMounted(cargar);
                 <p v-if="x.descripcion" class="mt-1 text-sm">
                   {{ x.descripcion }}
                 </p>
+                <ServicioIncluye
+                  class="mt-1"
+                  :incluye="x.incluye"
+                  :precio-minor="x.precio_minor"
+                  :por-separado-minor="x.precio_por_separado_minor"
+                  :moneda="x.moneda"
+                />
               </div>
               <div class="flex items-center gap-3">
                 <span

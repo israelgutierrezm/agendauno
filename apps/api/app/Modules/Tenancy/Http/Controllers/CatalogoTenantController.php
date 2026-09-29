@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -27,6 +28,9 @@ class CatalogoTenantController
 {
     /** Descripción de un servicio o clase para la página pública. */
     private const MAX_DESCRIPCION = 600;
+
+    /** Servicios que puede incluir un paquete. */
+    private const MAX_INCLUIDOS = 20;
 
     public function programas(): JsonResponse
     {
@@ -148,6 +152,9 @@ class CatalogoTenantController
             // Espacios o equipos que puede usar (2.4); [] = no requiere.
             'recursos' => ['sometimes', 'array'],
             'recursos.*' => ['string'],
+            // Servicios que incluye (paquete, ADR 0063), en orden; [] = ninguno.
+            'incluye' => ['sometimes', 'array', 'max:'.self::MAX_INCLUIDOS],
+            'incluye.*' => ['string', 'distinct'],
         ]);
 
         $cambios = ['lugares' => (int) $validado['lugares']];
@@ -157,6 +164,9 @@ class CatalogoTenantController
                 throw ValidationException::withMessages(['recursos' => ['Algún espacio no existe.']]);
             }
             $oferta->recursos()->sync($ids);
+        }
+        if (array_key_exists('incluye', $validado)) {
+            $this->incluir($oferta, array_values($validado['incluye']));
         }
         // Los márgenes solo se tocan si vienen; aplican a lo que se agende desde ahora.
         foreach (['preparacion_min', 'limpieza_min'] as $campo) {
@@ -186,7 +196,7 @@ class CatalogoTenantController
 
     public function ofertas(): JsonResponse
     {
-        $ofertas = OfertaTenant::query()->with(['actividad', 'recursos'])->orderBy('nombre')->get();
+        $ofertas = OfertaTenant::query()->with(['actividad', 'recursos', 'incluidas'])->orderBy('nombre')->get();
 
         return response()->json([
             'data' => $ofertas->map(fn (OfertaTenant $oferta): array => array_merge(
@@ -194,6 +204,39 @@ class CatalogoTenantController
                 ['actividad' => $oferta->actividad?->nombre, 'actividad_id' => $oferta->actividad?->ulid],
             ))->all(),
         ]);
+    }
+
+    /**
+     * Guarda qué servicios incluye, en el orden recibido. Sin anidar: un paquete no
+     * incluye paquetes ni se incluye en otro. Bajo candado de los servicios
+     * involucrados (en orden de id), para que dos cambios a la vez no armen uno
+     * dentro de otro.
+     *
+     * @param  list<string>  $ulids
+     */
+    private function incluir(OfertaTenant $oferta, array $ulids): void
+    {
+        DB::connection('tenant')->transaction(function () use ($oferta, $ulids): void {
+            $incluidas = OfertaTenant::query()->whereIn('ulid', $ulids)->orderBy('id')->lockForUpdate()->get()->keyBy('ulid');
+            OfertaTenant::query()->whereKey($oferta->getKey())->lockForUpdate()->first();
+
+            if ($incluidas->count() !== count($ulids)) {
+                throw ValidationException::withMessages(['incluye' => ['Algún servicio no existe.']]);
+            }
+            if ($incluidas->has((string) $oferta->ulid)) {
+                throw ValidationException::withMessages(['incluye' => ['Un servicio no puede incluirse a sí mismo.']]);
+            }
+            if ($ulids !== [] && $oferta->incluidaEn()->exists()) {
+                throw ValidationException::withMessages(['incluye' => ['Este servicio ya está incluido en un paquete; no puede incluir otros.']]);
+            }
+            if ($incluidas->contains(static fn (OfertaTenant $o): bool => $o->incluidas()->exists())) {
+                throw ValidationException::withMessages(['incluye' => ['Un paquete no puede incluir otro paquete.']]);
+            }
+
+            $oferta->incluidas()->sync(collect($ulids)->mapWithKeys(
+                static fn (string $ulid, int $posicion): array => [(int) $incluidas[$ulid]->getKey() => ['posicion' => $posicion]],
+            )->all());
+        });
     }
 
     private function descripcion(mixed $valor): ?string
@@ -226,6 +269,8 @@ class CatalogoTenantController
             'preparacion_min' => (int) $oferta->preparacion_min,
             'limpieza_min' => (int) $oferta->limpieza_min,
             'recursos' => $oferta->recursos->pluck('ulid')->values()->all(),
+            // Servicios que incluye (paquete), en orden.
+            'incluye' => $oferta->incluidas->pluck('ulid')->values()->all(),
         ];
     }
 }

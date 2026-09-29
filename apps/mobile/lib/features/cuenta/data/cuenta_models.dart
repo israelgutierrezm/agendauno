@@ -268,6 +268,7 @@ class OpcionCita {
     required this.nombre,
     this.duracionMinutos,
     this.zonaHoraria,
+    this.incluye = const [],
   });
 
   final String id;
@@ -275,11 +276,15 @@ class OpcionCita {
   final int? duracionMinutos;
   final String? zonaHoraria;
 
+  /// Paquete: los servicios que incluye, en orden (vacío en un servicio simple).
+  final List<String> incluye;
+
   factory OpcionCita.desdeJson(Map<String, dynamic> j) => OpcionCita(
     id: (j['id'] ?? '') as String,
     nombre: (j['nombre'] ?? '') as String,
     duracionMinutos: j['duracion_minutos'] as int?,
     zonaHoraria: j['zona_horaria'] as String?,
+    incluye: ((j['incluye'] ?? const []) as List).whereType<String>().toList(),
   );
 }
 

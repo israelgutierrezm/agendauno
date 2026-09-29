@@ -6,6 +6,7 @@ import { api, mensajeDeError } from "@/lib/api";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { recordarNegocio } from "@/lib/negociosRecientes";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import ServicioIncluye from "@/components/ServicioIncluye.vue";
 
 interface Servicio {
   id: string;
@@ -13,6 +14,9 @@ interface Servicio {
   // Qué incluye y en qué grupo va (catálogo del negocio).
   descripcion?: string | null;
   categoria?: string | null;
+  // Paquete: qué incluye y cuánto costaría por separado.
+  incluye?: string[];
+  precio_por_separado_minor?: number | null;
   precio_minor: number | null;
   moneda: string;
   duracion_minutos: number | null;
@@ -588,6 +592,12 @@ onMounted(cargar);
                     :style="{ color: 'var(--texto-suave)' }"
                     >{{ s.descripcion }}</span
                   >
+                  <ServicioIncluye
+                    :incluye="s.incluye"
+                    :precio-minor="s.precio_minor"
+                    :por-separado-minor="s.precio_por_separado_minor"
+                    :moneda="s.moneda"
+                  />
                 </span>
               </span>
               <span class="font-semibold shrink-0">{{

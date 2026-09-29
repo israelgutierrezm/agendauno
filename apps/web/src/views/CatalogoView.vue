@@ -24,6 +24,8 @@ interface Oferta {
   actividad: string | null;
   // Lo que ve quien la elige en línea (página pública y agendar).
   descripcion?: string | null;
+  // Paquete: servicios que incluye, en orden (ADR 0063).
+  incluye?: string[];
 }
 interface Recurso {
   id: string;
@@ -44,6 +46,25 @@ function nombresDe(ids: string[] | undefined): string {
     .filter(Boolean)
     .join(", ");
 }
+function serviciosDe(ids: string[] | undefined): string {
+  return (ids ?? [])
+    .map((id) => ofertas.value.find((x) => x.id === id)?.nombre)
+    .filter(Boolean)
+    .join(", ");
+}
+// Lo que puede incluir un paquete: los demás servicios que no son paquete.
+function incluibles(o: Oferta): Oferta[] {
+  return ofertas.value.filter(
+    (x) => x.id !== o.id && (x.incluye ?? []).length === 0,
+  );
+}
+// Paquetes que ya lo incluyen (entonces no puede incluir otros).
+function paquetesCon(o: Oferta): string {
+  return ofertas.value
+    .filter((x) => (x.incluye ?? []).includes(o.id))
+    .map((x) => x.nombre)
+    .join(", ");
+}
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
@@ -58,6 +79,7 @@ const form = ref<{
   preparacion: string;
   limpieza: string;
   recursos: string[];
+  incluye: string[];
 }>({
   descripcion: "",
   politica: "entitlement",
@@ -67,6 +89,7 @@ const form = ref<{
   preparacion: "0",
   limpieza: "0",
   recursos: [],
+  incluye: [],
 });
 const guardando = ref(false);
 const guardadoId = ref<string | null>(null);
@@ -120,6 +143,7 @@ function configurar(o: Oferta): void {
     preparacion: String(o.preparacion_min ?? 0),
     limpieza: String(o.limpieza_min ?? 0),
     recursos: [...(o.recursos ?? [])],
+    incluye: [...(o.incluye ?? [])],
   };
 }
 function cerrar(): void {
@@ -146,6 +170,8 @@ async function guardar(o: Oferta): Promise<void> {
       preparacion_min: Math.max(0, Number(form.value.preparacion) || 0),
       limpieza_min: Math.max(0, Number(form.value.limpieza) || 0),
       ...(recursos.value.length > 0 ? { recursos: form.value.recursos } : {}),
+      // En el orden en que se marcaron.
+      incluye: form.value.incluye,
     });
     guardadoId.value = o.id;
     editandoId.value = null;
@@ -220,6 +246,13 @@ onMounted(cargar);
                   {{
                     $t("recursosServicio.resumen", {
                       lista: nombresDe(o.recursos),
+                    })
+                  }}</template
+                ><template v-if="(o.incluye ?? []).length > 0">
+                  ·
+                  {{
+                    $t("perfilPublico.catalogo.incluyeResumen", {
+                      lista: serviciosDe(o.incluye),
                     })
                   }}</template
                 >
@@ -457,6 +490,42 @@ onMounted(cargar);
                   </label>
                 </div>
                 <span class="tu-hint">{{ $t("recursosServicio.ayuda") }}</span>
+              </fieldset>
+              <!-- Paquete (ADR 0063): servicios que incluye, sin anidar. -->
+              <fieldset
+                v-if="paquetesCon(o) || incluibles(o).length > 0"
+                class="sm:col-span-2"
+                data-prueba="incluye"
+              >
+                <legend class="tu-label">
+                  {{ $t("perfilPublico.catalogo.incluye") }}
+                </legend>
+                <p v-if="paquetesCon(o)" class="tu-hint">
+                  {{
+                    $t("perfilPublico.catalogo.incluidoEn", {
+                      lista: paquetesCon(o),
+                    })
+                  }}
+                </p>
+                <template v-else>
+                  <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                    <label
+                      v-for="x in incluibles(o)"
+                      :key="x.id"
+                      class="flex items-center gap-2"
+                    >
+                      <input
+                        v-model="form.incluye"
+                        type="checkbox"
+                        :value="x.id"
+                      />
+                      {{ x.nombre }}
+                    </label>
+                  </div>
+                  <span class="tu-hint">{{
+                    $t("perfilPublico.catalogo.incluyeAyuda")
+                  }}</span>
+                </template>
               </fieldset>
             </div>
 

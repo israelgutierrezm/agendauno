@@ -23,7 +23,7 @@ class OpcionesCitaTenant
         return [
             'servicios' => OfertaTenant::query()
                 ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
-                ->with('actividad')
+                ->with(['actividad', 'incluidas'])
                 ->orderBy('nombre')
                 ->get()
                 ->map(static fn (OfertaTenant $o): array => [
@@ -32,6 +32,9 @@ class OpcionesCitaTenant
                     // Para elegir con información: qué incluye y en qué grupo va.
                     'descripcion' => $o->descripcion,
                     'categoria' => $o->actividad?->nombre,
+                    // Paquete: qué incluye y cuánto costaría por separado.
+                    'incluye' => $o->incluidas->pluck('nombre')->values()->all(),
+                    'precio_por_separado_minor' => $o->precioPorSeparadoMinor(),
                     'precio_minor' => $o->precio_clase_minor,
                     'moneda' => 'MXN',
                     'duracion_minutos' => $o->duracion_minutos,

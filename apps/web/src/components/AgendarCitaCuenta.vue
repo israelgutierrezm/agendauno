@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -15,6 +16,9 @@ const emit = defineEmits<{ agendada: [] }>();
 interface Servicio {
   id: string;
   nombre: string;
+  // Paquete: qué incluye y cuánto costaría por separado.
+  incluye?: string[];
+  precio_por_separado_minor?: number | null;
   precio_minor: number | null;
   moneda: string;
   duracion_minutos: number | null;
@@ -222,6 +226,14 @@ onMounted(async () => {
               >
             </option>
           </select>
+          <ServicioIncluye
+            v-if="servicio"
+            class="mt-1"
+            :incluye="servicio.incluye"
+            :precio-minor="servicio.precio_minor"
+            :por-separado-minor="servicio.precio_por_separado_minor"
+            :moneda="servicio.moneda"
+          />
         </div>
         <div>
           <label class="tu-label" for="cc-profesional">{{

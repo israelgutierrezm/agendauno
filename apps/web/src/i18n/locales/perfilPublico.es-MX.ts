@@ -68,6 +68,15 @@ export default {
     descripcion: "Descripción para tus clientes",
     descripcionPh:
       "Qué incluye, para quién es o qué necesita traer. Se ve en tu página y al agendar.",
+    incluye: "Servicios que incluye (paquete)",
+    incluyeAyuda:
+      "Para un paquete con un solo precio y una sola cita, p. ej. limpieza, flúor y diagnóstico. Se incluyen en el orden en que los marques; el precio y la duración son los de este servicio.",
+    incluidoEn: "Está incluido en {lista}, así que no puede incluir otros.",
+    incluyeResumen: "Incluye {lista}",
+  },
+  incluye: {
+    lista: "Incluye: {lista}",
+    porSeparado: "Por separado:",
   },
   dias: {
     1: "Lunes",
