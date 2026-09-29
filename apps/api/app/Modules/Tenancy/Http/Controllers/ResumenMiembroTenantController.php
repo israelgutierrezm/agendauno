@@ -81,6 +81,8 @@ class ResumenMiembroTenantController
             'id' => $persona->ulid,
             'nombre_completo' => $persona->nombreCompleto(),
             'email' => $persona->email,
+            // Cómo conoció al negocio (ADR 0067).
+            'como_nos_conocio' => $persona->como_nos_conocio,
             'tipo' => $persona->tipo->value,
             'activo' => $persona->activo,
             'asistencias' => $asistencias,

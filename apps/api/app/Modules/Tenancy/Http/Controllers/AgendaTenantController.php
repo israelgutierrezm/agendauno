@@ -427,6 +427,8 @@ class AgendaTenantController
                 // Orden de la cita (servicio de pago) y si falta cobrarla en caja.
                 'orden_id' => $titular->orden?->ulid,
                 'por_cobrar' => $titular->orden !== null && $titular->orden->estado === EstadoOrden::Pendiente,
+                // Lo que el cliente pidió que supiéramos al agendar (ADR 0067).
+                'nota' => $titular->nota_cliente,
             ] : null,
         ];
     }

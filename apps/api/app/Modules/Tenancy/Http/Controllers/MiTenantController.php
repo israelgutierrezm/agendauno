@@ -373,6 +373,8 @@ class MiTenantController
             'instructor_id' => ['nullable', 'string'],
             'inicia_en_local' => ['required', 'date'],
             'duracion_minutos' => ['required', 'integer', 'min:5', 'max:1440'],
+            // Nota para el negocio (ADR 0067).
+            'nota' => ['nullable', 'string', 'max:500'],
         ]);
 
         $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
@@ -384,6 +386,10 @@ class MiTenantController
         $reserva = $instructor instanceof Usuario
             ? $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, (int) $validado['duracion_minutos'])
             : $agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, (int) $validado['duracion_minutos']);
+        $nota = trim((string) ($validado['nota'] ?? ''));
+        if ($nota !== '') {
+            $reserva->update(['nota_cliente' => $nota]);
+        }
         $reserva->load(['sesion.oferta', 'sesion.instructor', 'orden']);
         $profesional = $reserva->sesion?->instructor;
 

@@ -59,6 +59,7 @@ interface Servicio {
   // Paquete: qué incluye y cuánto costaría por separado.
   incluye?: string[];
   precio_por_separado_minor?: number | null;
+  foto_url?: string | null;
   grupal: boolean;
   duracion_minutos: number | null;
   precio_minor: number | null;
@@ -628,6 +629,12 @@ onMounted(cargar);
               :key="x.id"
               class="flex flex-wrap items-start justify-between gap-3 py-4"
             >
+              <img
+                v-if="x.foto_url"
+                :src="x.foto_url"
+                alt=""
+                class="h-16 w-16 shrink-0 rounded-xl object-cover"
+              />
               <div class="min-w-0 flex-1">
                 <p class="font-semibold">{{ x.nombre }}</p>
                 <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">

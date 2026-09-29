@@ -22,6 +22,8 @@ interface Servicio {
   // Paquete: qué incluye y cuánto costaría por separado.
   incluye?: string[];
   precio_por_separado_minor?: number | null;
+  // Su foto, si el negocio la subió.
+  foto_url?: string | null;
   precio_minor: number | null;
   moneda: string;
   duracion_minutos: number | null;
@@ -118,7 +120,30 @@ const filtro = ref("");
 const barberoId = ref("");
 const fecha = ref("");
 const slotSel = ref<string>("");
-const datos = ref({ nombre: "", celular: "", email: "" });
+// Datos del invitado (ADR 0067): apellidos, lada del celular y cómo nos conoció.
+function datosVacios() {
+  return {
+    nombre: "",
+    apellidos: "",
+    lada: "+52",
+    celular: "",
+    email: "",
+    origen: "",
+  };
+}
+const datos = ref(datosVacios());
+// Nota para el negocio (también con cuenta): llega al detalle de la cita.
+const nota = ref("");
+const LADAS = ["+52", "+1", "+57", "+34", "+54", "+56", "+51", "+593", "+502"];
+const ORIGENES = [
+  "instagram",
+  "facebook",
+  "tiktok",
+  "google",
+  "recomendacion",
+  "paso_por_aqui",
+  "otro",
+];
 
 const slots = ref<Slot[]>([]);
 const buscandoSlots = ref(false);
@@ -542,6 +567,7 @@ async function agendar(): Promise<void> {
       : {}),
     inicia_en_local: relojLocal(slotSel.value),
     duracion_minutos: duracion.value,
+    ...(nota.value.trim() !== "" ? { nota: nota.value.trim() } : {}),
   };
   try {
     if (clienteConCuenta.value) {
@@ -571,9 +597,12 @@ async function agendar(): Promise<void> {
         };
       }>(`/api/v1/app/${slug.value}/citas`, {
         nombre: datos.value.nombre.trim(),
+        apellidos: datos.value.apellidos.trim() || null,
         celular:
           datos.value.celular.trim() !== "" ? datos.value.celular.trim() : null,
+        lada: datos.value.celular.trim() !== "" ? datos.value.lada : null,
         email: datos.value.email.trim(),
+        como_nos_conocio: datos.value.origen || null,
         ...cita,
       });
       resultado.value = data.data;
@@ -654,7 +683,8 @@ function otra(): void {
   slotSel.value = "";
   slots.value = [];
   slotsCargados.value = false;
-  datos.value = { nombre: "", celular: "", email: "" };
+  datos.value = datosVacios();
+  nota.value = "";
   dias.value = [];
   fecha.value = "";
   ir("horario");
@@ -1151,6 +1181,13 @@ onMounted(cargar);
                     @change="elegirServicio(s.id)"
                     @click="servicioId === s.id && elegirServicio(s.id)"
                   />
+                  <img
+                    v-if="s.foto_url"
+                    :src="s.foto_url"
+                    alt=""
+                    class="h-14 w-14 shrink-0 rounded-lg object-cover"
+                    data-prueba="foto-servicio"
+                  />
                   <span class="min-w-0">
                     <span class="font-medium block truncate">{{
                       s.nombre
@@ -1537,30 +1574,55 @@ onMounted(cargar);
                   </button>
                 </p>
                 <div class="space-y-3">
-                  <div>
-                    <label class="tu-label" for="rc-nom">{{
-                      $t("reservar.nombre")
-                    }}</label>
-                    <input
-                      id="rc-nom"
-                      v-model="datos.nombre"
-                      class="tu-input"
-                      autocomplete="name"
-                      required
-                    />
+                  <div class="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <label class="tu-label" for="rc-nom">{{
+                        $t("reservar.nombre")
+                      }}</label>
+                      <input
+                        id="rc-nom"
+                        v-model="datos.nombre"
+                        class="tu-input"
+                        autocomplete="given-name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label class="tu-label" for="rc-ape">{{
+                        $t("perfilPublico.agendar.apellidos")
+                      }}</label>
+                      <input
+                        id="rc-ape"
+                        v-model="datos.apellidos"
+                        class="tu-input"
+                        autocomplete="family-name"
+                      />
+                    </div>
                   </div>
                   <div class="grid sm:grid-cols-2 gap-3">
                     <div>
                       <label class="tu-label" for="rc-cel">{{
                         $t("reservar.celular")
                       }}</label>
-                      <input
-                        id="rc-cel"
-                        v-model="datos.celular"
-                        class="tu-input"
-                        inputmode="tel"
-                        autocomplete="tel"
-                      />
+                      <div class="flex gap-2">
+                        <select
+                          id="rc-lada"
+                          v-model="datos.lada"
+                          class="tu-input w-auto"
+                          :aria-label="$t('perfilPublico.agendar.lada')"
+                        >
+                          <option v-for="l in LADAS" :key="l" :value="l">
+                            {{ l }}
+                          </option>
+                        </select>
+                        <input
+                          id="rc-cel"
+                          v-model="datos.celular"
+                          class="tu-input"
+                          inputmode="tel"
+                          autocomplete="tel-national"
+                        />
+                      </div>
                     </div>
                     <div>
                       <label class="tu-label" for="rc-email">{{
@@ -1579,8 +1641,40 @@ onMounted(cargar);
                       }}</span>
                     </div>
                   </div>
+                  <div>
+                    <label class="tu-label" for="rc-origen">{{
+                      $t("perfilPublico.agendar.comoNosConociste")
+                    }}</label>
+                    <select
+                      id="rc-origen"
+                      v-model="datos.origen"
+                      class="tu-input"
+                    >
+                      <option value="">
+                        {{ $t("perfilPublico.agendar.prefieroNoDecir") }}
+                      </option>
+                      <option v-for="o in ORIGENES" :key="o" :value="o">
+                        {{ $t(`perfilPublico.origenes.${o}`) }}
+                      </option>
+                    </select>
+                  </div>
                 </div>
               </template>
+
+              <!-- Nota para el negocio (opcional), con o sin cuenta. -->
+              <div class="mt-3">
+                <label class="tu-label" for="rc-nota">{{
+                  $t("perfilPublico.agendar.nota")
+                }}</label>
+                <textarea
+                  id="rc-nota"
+                  v-model="nota"
+                  class="tu-input"
+                  rows="2"
+                  maxlength="500"
+                  :placeholder="$t('perfilPublico.agendar.notaPh')"
+                />
+              </div>
 
               <button
                 class="tu-btn tu-btn-primario mt-4 w-full"

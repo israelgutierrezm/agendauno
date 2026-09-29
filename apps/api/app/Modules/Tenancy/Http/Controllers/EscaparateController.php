@@ -153,6 +153,7 @@ class EscaparateController
                 // Paquete: qué incluye y cuánto costaría por separado.
                 'incluye' => $o->incluidas->pluck('nombre')->values()->all(),
                 'precio_por_separado_minor' => $o->precioPorSeparadoMinor(),
+                'foto_url' => $o->fotoUrl(),
                 'grupal' => $o->modalidad === ModalidadOfertaTenant::Grupal,
                 'duracion_minutos' => $o->duracion_minutos,
                 'precio_minor' => $o->precio_clase_minor,

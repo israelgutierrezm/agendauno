@@ -47,6 +47,7 @@ function opciones(
           {
             id: "servicio",
             nombre: "Corte",
+            foto_url: "/storage/corte.webp",
             precio_minor: 20000,
             moneda: "MXN",
             duracion_minutos: 30,
@@ -245,6 +246,10 @@ describe("agenda pública por pasos", () => {
     // Paso 2: el servicio, con la sede elegida a la vista.
     expect(vista.find('input[name="sucursal"]').exists()).toBe(false);
     expect(vista.get('[data-prueba="contexto"]').text()).toContain("Centro");
+    // El servicio con su foto.
+    expect(vista.get('[data-prueba="foto-servicio"]').attributes("src")).toBe(
+      "/storage/corte.webp",
+    );
     await hastaHorario(vista);
     // Paso 3: primero el día y la hora; todavía no se pregunta con quién.
     expect(vista.find('input[name="profesional"]').exists()).toBe(false);
@@ -529,6 +534,54 @@ describe("agenda pública por pasos", () => {
   });
 });
 
+describe("datos del cliente", () => {
+  it("manda apellidos, lada, cómo nos conoció y la nota para el negocio", async () => {
+    api(opciones(1));
+    mocks.post.mockResolvedValue({
+      data: {
+        data: {
+          estado: "pendiente_pago",
+          orden_id: "orden",
+          total_minor: 20000,
+          moneda: "MXN",
+        },
+      },
+    });
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await elegirHora(vista, "09:00");
+    await continuar(vista);
+
+    await vista.get("#rc-nom").setValue("Beto");
+    await vista.get("#rc-ape").setValue("López García");
+    await vista.get("#rc-lada").setValue("+1");
+    await vista.get("#rc-cel").setValue("555 123 4567");
+    await vista.get("#rc-email").setValue("beto@correo.mx");
+    await vista.get("#rc-origen").setValue("instagram");
+    await vista.get("#rc-nota").setValue("Es mi primera vez.");
+    await vista
+      .findAll("button")
+      .find((b) => b.text() === es.reservar.agendarYPagar)!
+      .trigger("click");
+    await flushPromises();
+
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/citas",
+      expect.objectContaining({
+        nombre: "Beto",
+        apellidos: "López García",
+        lada: "+1",
+        celular: "555 123 4567",
+        email: "beto@correo.mx",
+        como_nos_conocio: "instagram",
+        nota: "Es mi primera vez.",
+      }),
+    );
+    vista.unmount();
+  });
+});
+
 describe("cliente con cuenta", () => {
   it("con sesión en el negocio no pide datos y agenda desde su cuenta", async () => {
     mocks.sesion.autenticado = true;
@@ -564,6 +617,7 @@ describe("cliente con cuenta", () => {
       expect.objectContaining({ oferta_id: "servicio", sucursal_id: "centro" }),
     );
     expect(mocks.post.mock.calls[0][1]).not.toHaveProperty("email");
+    expect(mocks.post.mock.calls[0][1]).not.toHaveProperty("nota");
     // El total sale del servicio (la cuenta no lo devuelve).
     expect(vista.text()).toContain("$200.00");
     vista.unmount();

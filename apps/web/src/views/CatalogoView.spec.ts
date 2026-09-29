@@ -109,4 +109,15 @@ describe("catálogo", () => {
     expect(incluye.text()).toContain("Está incluido en Limpieza completa");
     expect(incluye.find('input[type="checkbox"]').exists()).toBe(false);
   });
+
+  it("la foto del servicio se ve en la lista y se cambia al configurarlo", async () => {
+    const w = await montar([
+      oferta({ id: "o1", nombre: "Corte", foto_url: "/storage/corte.webp" }),
+    ]);
+    expect(w.find('li img[src="/storage/corte.webp"]').exists()).toBe(true);
+    await w.findAll("button")[0].trigger("click");
+    const foto = w.get('[data-prueba="foto-servicio"]');
+    expect(foto.find('img[src="/storage/corte.webp"]').exists()).toBe(true);
+    expect(foto.text()).toContain("Quitar foto");
+  });
 });

@@ -11,6 +11,8 @@ interface Resumen {
   id: string;
   nombre_completo: string;
   email: string | null;
+  // Cómo conoció al negocio (lo dijo al agendar en línea).
+  como_nos_conocio?: string | null;
   tipo: string;
   activo: boolean;
   asistencias: number;
@@ -317,6 +319,18 @@ watch(
               :style="{ color: 'var(--aviso)' }"
               >{{ $t("agenda.roster.primeraVez") }}</span
             >
+          </dd>
+        </div>
+        <div
+          v-if="resumen.como_nos_conocio"
+          class="flex items-center justify-between gap-3 py-2.5"
+          data-prueba="como-nos-conocio"
+        >
+          <dt :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("perfilPublico.agendar.nosConocioPor") }}
+          </dt>
+          <dd class="text-right font-medium">
+            {{ $t(`perfilPublico.origenes.${resumen.como_nos_conocio}`) }}
           </dd>
         </div>
         <div

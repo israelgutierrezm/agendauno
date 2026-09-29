@@ -544,6 +544,8 @@ class MiembrosTenantController
             'nombre_completo' => $persona->nombreCompleto(),
             'email' => $persona->email,
             'celular' => $persona->celular,
+            // Cómo conoció al negocio (lo dijo al agendar en línea, ADR 0067).
+            'como_nos_conocio' => $persona->como_nos_conocio,
             'tipo' => $persona->tipo->value,
             'activo' => $persona->activo,
             'es_facturable' => $persona->es_facturable,

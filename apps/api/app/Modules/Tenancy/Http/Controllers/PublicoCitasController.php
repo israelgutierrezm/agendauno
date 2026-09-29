@@ -18,6 +18,7 @@ use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\OrigenCliente;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
@@ -144,9 +145,15 @@ class PublicoCitasController
 
         $validado = $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
+            'apellidos' => ['nullable', 'string', 'max:120'],
             // Para mandarle la confirmación y ligar sus citas si luego crea su cuenta.
             'email' => ['required', 'email', 'max:255'],
-            'celular' => ['nullable', 'string', 'max:40'],
+            'celular' => ['nullable', 'string', 'max:30', 'regex:/^[0-9 ()-]*$/'],
+            // Lada del país del celular (+52 México por omisión).
+            'lada' => ['nullable', 'string', 'regex:/^\+[0-9]{1,4}$/'],
+            'como_nos_conocio' => ['nullable', Rule::enum(OrigenCliente::class)],
+            // Para el negocio: alergias, preferencias, si es su primera vez… (ADR 0067).
+            'nota' => ['nullable', 'string', 'max:500'],
             'oferta_id' => ['required', 'string'],
             'sucursal_id' => ['required', 'string'],
             'instructor_id' => ['nullable', 'string'],
@@ -168,6 +175,7 @@ class PublicoCitasController
         $reserva = $instructor instanceof Usuario
             ? $this->agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, (int) $validado['duracion_minutos'])
             : $this->agendar->agendarConCualquiera($oferta, $sucursal, $persona, $inicia, (int) $validado['duracion_minutos']);
+        $this->anotar($reserva, $validado['nota'] ?? null);
         $reserva->load(['orden', 'sesion.instructor']);
         $profesional = $reserva->sesion?->instructor;
 
@@ -306,14 +314,33 @@ class PublicoCitasController
             }
         }
 
+        // Apellidos: el primero es el paterno; lo demás, el materno.
+        $apellidos = preg_split('/\s+/', trim((string) ($datos['apellidos'] ?? '')), 2) ?: [];
+        $celular = trim((string) ($datos['celular'] ?? ''));
+        $lada = (string) ($datos['lada'] ?? '');
+
         return PersonaTenant::query()->create([
             'nombre' => (string) $datos['nombre'],
+            'primer_apellido' => ($apellidos[0] ?? '') !== '' ? $apellidos[0] : null,
+            'segundo_apellido' => $apellidos[1] ?? null,
             'email' => $email,
-            'celular' => isset($datos['celular']) && $datos['celular'] !== '' ? (string) $datos['celular'] : null,
+            'celular' => $celular === '' ? null : ($lada !== '' ? $lada.' '.$celular : $celular),
+            'como_nos_conocio' => $datos['como_nos_conocio'] ?? null,
             'tipo' => TipoPersonaTenant::Miembro->value,
             'activo' => true,
             'es_facturable' => true,
             'archivado' => false,
         ]);
+    }
+
+    /**
+     * La nota del cliente para el negocio queda en su cita (ADR 0067).
+     */
+    private function anotar(ReservaTenant $reserva, mixed $nota): void
+    {
+        $texto = trim((string) $nota);
+        if ($texto !== '') {
+            $reserva->update(['nota_cliente' => $texto]);
+        }
     }
 }

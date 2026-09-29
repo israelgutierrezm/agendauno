@@ -96,5 +96,20 @@ void main() {
     expect(cita.profesional, 'Carla');
     final enviado = api.peticiones.single.data as Map<String, dynamic>;
     expect(enviado.containsKey('instructor_id'), isFalse);
+    expect(enviado.containsKey('nota'), isFalse);
+  });
+
+  test('manda la nota para el negocio si la escribió', () async {
+    await repo.agendarCita(
+      servicioId: 'o1',
+      sucursalId: 's1',
+      profesionalId: 'p1',
+      iniciaEnLocal: '2026-10-05T10:00',
+      duracionMinutos: 30,
+      nota: 'Es mi primera vez.',
+    );
+
+    final enviado = api.peticiones.single.data as Map<String, dynamic>;
+    expect(enviado['nota'], 'Es mi primera vez.');
   });
 }

@@ -14,7 +14,9 @@ use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -194,6 +196,49 @@ class CatalogoTenantController
         return response()->json(['data' => $this->presentarOferta($oferta->refresh())]);
     }
 
+    /**
+     * Una foto del servicio (ADR 0066). SVG excluido a propósito (riesgo de XSS al
+     * servirse en el navegador); carpeta por negocio y nombre no enumerable; la nueva
+     * reemplaza a la anterior.
+     */
+    public function subirFoto(Request $request): JsonResponse
+    {
+        $oferta = OfertaTenant::query()->where('ulid', (string) $request->route('oferta'))->firstOrFail();
+        $request->validate([
+            'foto' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+        ]);
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+        $archivo = $request->file('foto');
+        abort_unless($archivo instanceof UploadedFile, 422);
+
+        $ruta = $archivo->storeAs(
+            'servicios/'.$estudio->getKey(),
+            Str::lower(Str::random(40)).'.'.$archivo->extension(),
+            'public',
+        );
+        $this->borrarFoto($oferta);
+        $oferta->update(['foto_ruta' => (string) $ruta]);
+
+        return response()->json(['data' => $this->presentarOferta($oferta->refresh())]);
+    }
+
+    public function eliminarFoto(Request $request): JsonResponse
+    {
+        $oferta = OfertaTenant::query()->where('ulid', (string) $request->route('oferta'))->firstOrFail();
+        $this->borrarFoto($oferta);
+        $oferta->update(['foto_ruta' => null]);
+
+        return response()->json(['data' => $this->presentarOferta($oferta->refresh())]);
+    }
+
+    private function borrarFoto(OfertaTenant $oferta): void
+    {
+        if ($oferta->foto_ruta !== null && $oferta->foto_ruta !== '') {
+            Storage::disk('public')->delete($oferta->foto_ruta);
+        }
+    }
+
     public function ofertas(): JsonResponse
     {
         $ofertas = OfertaTenant::query()->with(['actividad', 'recursos', 'incluidas'])->orderBy('nombre')->get();
@@ -271,6 +316,7 @@ class CatalogoTenantController
             'recursos' => $oferta->recursos->pluck('ulid')->values()->all(),
             // Servicios que incluye (paquete), en orden.
             'incluye' => $oferta->incluidas->pluck('ulid')->values()->all(),
+            'foto_url' => $oferta->fotoUrl(),
         ];
     }
 }

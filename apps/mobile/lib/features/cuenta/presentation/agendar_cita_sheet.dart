@@ -35,11 +35,19 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
   bool _cargando = true;
   bool _buscando = false;
   bool _agendando = false;
+  // Nota para el negocio (opcional): alergias, preferencias, primera vez…
+  final _nota = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _cargarOpciones();
+  }
+
+  @override
+  void dispose() {
+    _nota.dispose();
+    super.dispose();
   }
 
   Future<void> _cargarOpciones() async {
@@ -115,6 +123,7 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
         profesionalId: _idProfesional,
         iniciaEnLocal: '${Formato.iso(inicio)}T${Formato.hora(inicio)}',
         duracionMinutos: _servicio!.duracionMinutos ?? 60,
+        nota: _nota.text.trim().isEmpty ? null : _nota.text.trim(),
       );
       await ref.read(cuentaProvider.notifier).recargar();
       navegador.pop();
@@ -239,7 +248,17 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                           )
                           .toList(),
                     ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _nota,
+                    maxLength: 500,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Nota para el negocio (opcional)',
+                      hintText: 'Alergias, preferencias, si es tu primera vez…',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   FilledButton(
                     onPressed: _hora == null || _agendando ? null : _agendar,
                     child: const Text('Agendar'),

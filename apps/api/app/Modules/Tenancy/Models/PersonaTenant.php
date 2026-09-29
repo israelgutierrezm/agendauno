@@ -31,7 +31,7 @@ class PersonaTenant extends Model
     protected $fillable = [
         'sucursal_id', 'nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido',
         'email', 'celular', 'tipo', 'activo', 'es_facturable', 'archivado', 'usuario_id',
-        'recibe_promociones',
+        'recibe_promociones', 'como_nos_conocio',
     ];
 
     /**

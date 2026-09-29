@@ -46,7 +46,8 @@ el esquema.
 - `dispositivos_push` — tokens FCM (ADR 0025).
 
 **Personas y expediente**
-- `personas` — la persona (alumno, cliente, profesional), separada de su cuenta.
+- `personas` — la persona (alumno, cliente, profesional), separada de su cuenta; guarda
+  cómo conoció al negocio (ADR 0067).
 - `tipos_documento`, `documentos` — expediente del alumno.
 - `formularios`, `campos_formulario`, `respuestas_formulario` — formularios dinámicos.
 - `waivers`, `aceptaciones_waiver` — responsivas.
@@ -59,7 +60,8 @@ el esquema.
 
 **Catálogo y recursos**
 - `programas`, `actividades`, `niveles`, `ofertas` (clases y servicios; modalidad
-  grupal o privada, duración, márgenes, política de reserva y descripción pública).
+  grupal o privada, duración, márgenes, política de reserva, descripción pública y
+  foto, ADR 0066).
 - `recursos`, `oferta_recursos` — salas, camillas, carriles (ADR 0039).
 - `oferta_incluidos` — servicios que incluye un paquete, en orden (ADR 0063).
 
@@ -82,7 +84,8 @@ el esquema.
 - `retenciones_credito` — holds. Disponible = saldo − retenciones activas.
 
 **Reservas y asistencia**
-- `reservas` — con lista de espera, reprogramación e idempotencia (ADR 0011, 0038).
+- `reservas` — con lista de espera, reprogramación e idempotencia (ADR 0011, 0038) y la
+  nota del cliente para el negocio (ADR 0067).
 - `asistencias`, `checkins`, `accesos` — pase de lista, llegada y QR de acceso.
 - `politicas_cancelacion` — reglas de cancelación (ADR 0034).
 - `resenas` — reseñas de una clase o cita.

@@ -83,6 +83,20 @@ export default {
       "Para un paquete con un solo precio y una sola cita, p. ej. limpieza, flúor y diagnóstico. Se incluyen en el orden en que los marques; el precio y la duración son los de este servicio.",
     incluidoEn: "Está incluido en {lista}, así que no puede incluir otros.",
     incluyeResumen: "Incluye {lista}",
+    foto: "Foto del servicio",
+    fotoArrastra: "Arrastra la foto aquí o haz clic para elegir",
+    fotoAyuda: "La ven tus clientes al elegir. PNG, JPG o WebP de hasta 4 MB.",
+    fotoQuitar: "Quitar foto",
+  },
+  // Cómo conoció el cliente al negocio (se guarda en su ficha).
+  origenes: {
+    instagram: "Instagram",
+    facebook: "Facebook",
+    tiktok: "TikTok",
+    google: "Google",
+    recomendacion: "Recomendación de alguien",
+    paso_por_aqui: "Pasé por el local",
+    otro: "Otro",
   },
   incluye: {
     lista: "Incluye: {lista}",
@@ -154,6 +168,15 @@ export default {
     entrar: "Entra y no escribas tus datos",
     correo: "Correo",
     correoAyuda: "Te enviamos ahí la confirmación de tu cita.",
+    apellidos: "Apellidos",
+    lada: "Lada",
+    comoNosConociste: "¿Cómo nos conociste? (opcional)",
+    prefieroNoDecir: "Prefiero no decir",
+    nota: "Nota para el negocio (opcional)",
+    notaDelCliente: "Nota del cliente",
+    nosConocioPor: "Nos conoció por",
+    notaPh:
+      "Algo que debamos saber: alergias, preferencias, si es tu primera vez…",
     pagaTuCita: "Paga tu cita",
     pagaAntesDe:
       "Págala antes de las {hora} para confirmarla; después el horario se libera.",

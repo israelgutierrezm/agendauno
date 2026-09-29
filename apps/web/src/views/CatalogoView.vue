@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 
+import CargadorImagen from "@/components/CargadorImagen.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -26,6 +27,8 @@ interface Oferta {
   descripcion?: string | null;
   // Paquete: servicios que incluye, en orden (ADR 0063).
   incluye?: string[];
+  // Foto que ve quien lo elige (ADR 0066).
+  foto_url?: string | null;
 }
 interface Recurso {
   id: string;
@@ -93,6 +96,10 @@ const form = ref<{
 });
 const guardando = ref(false);
 const guardadoId = ref<string | null>(null);
+// La foto se sube aparte, al momento.
+function fotoCambiada(o: Oferta, url: string | null): void {
+  o.foto_url = url;
+}
 
 function dinero(minor: number | null): string {
   return new Intl.NumberFormat("es-MX", {
@@ -212,7 +219,13 @@ onMounted(cargar);
       <ul v-else class="mt-6 space-y-3">
         <li v-for="o in ofertas" :key="o.id" class="tu-card p-5">
           <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
+            <img
+              v-if="o.foto_url"
+              :src="o.foto_url"
+              alt=""
+              class="h-12 w-16 shrink-0 rounded-lg object-cover"
+            />
+            <div class="min-w-0 flex-1">
               <h3 class="font-semibold">{{ o.nombre }}</h3>
               <!-- Una sola línea de datos: actividad · modalidad · cómo se reserva -->
               <p
@@ -288,6 +301,23 @@ onMounted(cargar);
             class="mt-4 border-t pt-4"
             :style="{ borderColor: 'var(--borde)' }"
           >
+            <div class="mb-4" data-prueba="foto-servicio">
+              <span class="tu-label">{{
+                $t("perfilPublico.catalogo.foto")
+              }}</span>
+              <CargadorImagen
+                :url="o.foto_url ?? null"
+                :ruta="`ofertas/${o.id}/foto`"
+                campo="foto"
+                clave="foto_url"
+                proporcion="4 / 3"
+                :arrastra="$t('perfilPublico.catalogo.fotoArrastra')"
+                :ayuda="$t('perfilPublico.catalogo.fotoAyuda')"
+                :quitar-texto="$t('perfilPublico.catalogo.fotoQuitar')"
+                :puede-gestionar="puedeGestionar"
+                @update:url="fotoCambiada(o, $event)"
+              />
+            </div>
             <label class="tu-label" :for="`c-desc-${o.id}`">{{
               $t("perfilPublico.catalogo.descripcion")
             }}</label>

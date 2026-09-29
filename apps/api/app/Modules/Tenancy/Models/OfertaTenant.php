@@ -10,6 +10,7 @@ use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Oferta de una actividad (clase vendible/agendable), tenant-local. La descripción
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * y sigue siendo uno: su precio, su duración y una sola cita.
  *
  * @property string|null $descripcion
+ * @property string|null $foto_ruta
  */
 class OfertaTenant extends Model
 {
@@ -26,7 +28,7 @@ class OfertaTenant extends Model
 
     protected $table = 'ofertas';
 
-    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min'];
+    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min', 'foto_ruta'];
 
     /**
      * @var array<string, string>
@@ -73,6 +75,14 @@ class OfertaTenant extends Model
     public function incluidaEn(): BelongsToMany
     {
         return $this->belongsToMany(self::class, 'oferta_incluidos', 'incluida_id', 'oferta_id');
+    }
+
+    /** Su foto (ADR 0066), la que ve quien elige al agendar. */
+    public function fotoUrl(): ?string
+    {
+        return $this->foto_ruta !== null && $this->foto_ruta !== ''
+            ? Storage::disk('public')->url($this->foto_ruta)
+            : null;
     }
 
     /**

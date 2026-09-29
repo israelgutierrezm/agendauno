@@ -414,6 +414,9 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/actividades/{actividad}/ofertas', [CatalogoTenantController::class, 'crearOferta'])->middleware('puede:catalogo.gestionar')->name('ofertas.store');
             Route::get('/ofertas', [CatalogoTenantController::class, 'ofertas'])->middleware('puede:catalogo.ver')->name('ofertas.index');
             Route::put('/ofertas/{oferta}', [CatalogoTenantController::class, 'actualizarOferta'])->middleware('puede:catalogo.gestionar')->name('ofertas.update');
+            // Foto del servicio (la que ve el cliente al elegirlo, ADR 0066).
+            Route::post('/ofertas/{oferta}/foto', [CatalogoTenantController::class, 'subirFoto'])->middleware('puede:catalogo.gestionar')->name('ofertas.foto.store');
+            Route::delete('/ofertas/{oferta}/foto', [CatalogoTenantController::class, 'eliminarFoto'])->middleware('puede:catalogo.gestionar')->name('ofertas.foto.destroy');
 
             // Capacidad por canal / marketplace (R20): reserva cupos de una oferta para un canal.
             Route::get('/ofertas/{oferta}/capacidad-canal', [CapacidadCanalTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('ofertas.capacidad-canal.index');
