@@ -168,6 +168,17 @@ class CuentaRepository {
     );
   }
 
+  /// Aceptar o retirar los avisos por WhatsApp.
+  Future<Privacidad> cambiarWhatsapp(bool acepta) async {
+    final res = await _dio.put<Map<String, dynamic>>(
+      '$_base/mi/privacidad',
+      data: {'acepta_whatsapp': acepta},
+    );
+    return Privacidad.desdeJson(
+      (res.data?['data'] ?? {}) as Map<String, dynamic>,
+    );
+  }
+
   /// Todo lo que el negocio tiene de él (derecho de acceso).
   Future<Map<String, dynamic>> misDatos() async {
     final res = await _dio.get<Map<String, dynamic>>('$_base/mi/datos');

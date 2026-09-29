@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\CobroDeCitasTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
@@ -51,6 +52,7 @@ class PublicoCitasController
         private readonly RegistroDePasarelasTenant $pasarelas,
         private readonly CobroDeCitasTenant $cobro,
         private readonly ParametrosTenant $parametros,
+        private readonly WhatsAppTenant $whatsapp,
     ) {}
 
     /**
@@ -156,6 +158,8 @@ class PublicoCitasController
             'nota' => ['nullable', 'string', 'max:500'],
             // Para otra persona: quién asiste (la cita es de quien agenda, ADR 0068).
             'asiste' => ['nullable', 'string', 'max:120'],
+            // Aceptó recibir los avisos de su cita por WhatsApp (ADR 0069).
+            'acepta_whatsapp' => ['boolean'],
             'oferta_id' => ['required', 'string'],
             'sucursal_id' => ['required', 'string'],
             'instructor_id' => ['nullable', 'string'],
@@ -172,6 +176,9 @@ class PublicoCitasController
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
         $instructor = $this->profesionalElegido($validado);
         $persona = $this->personaGuest($validado);
+        if (($validado['acepta_whatsapp'] ?? false) && $this->whatsapp->enUso()) {
+            $this->whatsapp->aceptar($persona, true);
+        }
         $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sucursal->zona_horaria)->utc();
 
         $reserva = $instructor instanceof Usuario

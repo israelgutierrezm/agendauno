@@ -31,7 +31,7 @@ class PersonaTenant extends Model
     protected $fillable = [
         'sucursal_id', 'nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido',
         'email', 'celular', 'tipo', 'activo', 'es_facturable', 'archivado', 'usuario_id',
-        'recibe_promociones', 'como_nos_conocio',
+        'recibe_promociones', 'como_nos_conocio', 'whatsapp_aceptado_en',
     ];
 
     /**
@@ -56,6 +56,7 @@ class PersonaTenant extends Model
         'activo' => 'boolean',
         'es_facturable' => 'boolean',
         'archivado' => 'boolean',
+        'whatsapp_aceptado_en' => 'datetime',
     ];
 
     /**

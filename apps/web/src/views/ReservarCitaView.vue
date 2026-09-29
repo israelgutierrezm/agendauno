@@ -52,6 +52,8 @@ interface Opciones {
   instructores: Persona[];
   // Si se paga en línea para confirmar o se puede pagar en la sucursal.
   cobro?: { pago_obligatorio: boolean; pago_en_linea: boolean };
+  // Si el negocio manda los avisos de la cita por WhatsApp (ADR 0069).
+  whatsapp?: boolean;
 }
 // La cita por pagar del enlace del correo de apartado (?pagar=<orden>).
 interface PorPagar {
@@ -114,7 +116,8 @@ const filtro = ref("");
 const barberoId = ref("");
 const fecha = ref("");
 const slotSel = ref<string>("");
-// Datos del invitado (ADR 0067): apellidos, lada del celular y cómo nos conoció.
+// Datos del invitado (ADR 0067): apellidos, lada del celular y cómo nos conoció; y si
+// acepta los avisos por WhatsApp (ADR 0069).
 function datosVacios() {
   return {
     nombre: "",
@@ -123,8 +126,13 @@ function datosVacios() {
     celular: "",
     email: "",
     origen: "",
+    whatsapp: false,
   };
 }
+// Solo si el negocio los usa y dejó su celular.
+const ofrecerWhatsApp = computed(
+  () => opciones.value?.whatsapp === true && datos.value.celular.trim() !== "",
+);
 const datos = ref(datosVacios());
 // Nota para el negocio (también con cuenta): llega al detalle de la cita.
 const nota = ref("");
@@ -525,6 +533,9 @@ async function agendar(): Promise<void> {
         lada: datos.value.celular.trim() !== "" ? datos.value.lada : null,
         email: datos.value.email.trim(),
         como_nos_conocio: datos.value.origen || null,
+        ...(ofrecerWhatsApp.value && datos.value.whatsapp
+          ? { acepta_whatsapp: true }
+          : {}),
         ...cita,
       });
       resultado.value = data.data;
@@ -1545,6 +1556,17 @@ onMounted(cargar);
                       </option>
                     </select>
                   </div>
+                  <label
+                    v-if="ofrecerWhatsApp"
+                    class="flex items-center gap-2 text-sm"
+                  >
+                    <input
+                      v-model="datos.whatsapp"
+                      type="checkbox"
+                      data-prueba="acepta-whatsapp"
+                    />
+                    {{ $t("perfilPublico.agendar.aceptaWhatsApp") }}
+                  </label>
                 </div>
               </template>
 

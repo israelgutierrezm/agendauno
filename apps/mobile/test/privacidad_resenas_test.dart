@@ -22,6 +22,20 @@ void main() {
     expect(p.baja, isNull);
   });
 
+  test('los avisos por WhatsApp solo se ofrecen si el negocio los usa', () {
+    final sin = Privacidad.desdeJson({'recibe_promociones': true});
+    final con = Privacidad.desdeJson({
+      'recibe_promociones': true,
+      'whatsapp_disponible': true,
+      'acepta_whatsapp': true,
+    });
+
+    expect(sin.whatsappDisponible, isFalse);
+    expect(sin.aceptaWhatsapp, isFalse);
+    expect(con.whatsappDisponible, isTrue);
+    expect(con.aceptaWhatsapp, isTrue);
+  });
+
   test('el estado de la solicitud de baja se explica en palabras', () {
     SolicitudBaja baja(String estado, [String? respuesta]) =>
         Privacidad.desdeJson({

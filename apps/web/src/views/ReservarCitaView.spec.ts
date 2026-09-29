@@ -582,6 +582,50 @@ describe("datos del cliente", () => {
   });
 });
 
+describe("avisos por WhatsApp", () => {
+  it("si el negocio los usa, los ofrece a quien deja su celular y manda que aceptó", async () => {
+    const op = opciones(1);
+    const conWhatsApp = { data: { data: { ...op.data.data, whatsapp: true } } };
+    api(conWhatsApp);
+    mocks.post.mockResolvedValue({
+      data: { data: { estado: "pendiente_pago", orden_id: "orden" } },
+    });
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await elegirHora(vista, "09:00");
+    await continuar(vista);
+
+    // Sin celular no hay a dónde mandarlos.
+    expect(vista.find('[data-prueba="acepta-whatsapp"]').exists()).toBe(false);
+    await vista.get("#rc-cel").setValue("55 1234 5678");
+    await vista.get('[data-prueba="acepta-whatsapp"]').setValue(true);
+    await agendarComo(vista);
+
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/citas",
+      expect.objectContaining({
+        celular: "55 1234 5678",
+        acepta_whatsapp: true,
+      }),
+    );
+    vista.unmount();
+  });
+
+  it("si el negocio no los usa, no aparecen", async () => {
+    api(opciones(1));
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await elegirHora(vista, "09:00");
+    await continuar(vista);
+    await vista.get("#rc-cel").setValue("55 1234 5678");
+
+    expect(vista.find('[data-prueba="acepta-whatsapp"]').exists()).toBe(false);
+    vista.unmount();
+  });
+});
+
 describe("para otra persona", () => {
   it("manda quién asiste solo si marca que es para otra persona", async () => {
     api(opciones(1));

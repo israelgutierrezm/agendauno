@@ -34,7 +34,7 @@ interface Difusion {
   enviada_en: string | null;
 }
 
-type Canal = "interno" | "email" | "push";
+type Canal = "interno" | "email" | "push" | "whatsapp";
 // A quién va el mensaje automático: la persona del evento, el profesional de la cita
 // o el equipo del negocio (a quien puede atenderlo).
 type Destinatario = "persona" | "profesional" | "equipo";
@@ -118,6 +118,9 @@ const marcadoresTexto = computed(() =>
 function canalTexto(canal: string): string {
   if (canal === "push") {
     return t("comunicacionesAuto.canalPush");
+  }
+  if (canal === "whatsapp") {
+    return t("comunicacionesAuto.canalWhatsApp");
   }
   return canal === "email"
     ? t("comunicaciones.canalEmail")
@@ -205,11 +208,17 @@ const borrador = ref<{
   activo: true,
 });
 
-// Al equipo se le avisa por correo o en la app (no tiene bandeja en la app).
+// WhatsApp (si la plataforma lo encendió): el texto fijo de cada aviso que lo admite.
+const textosWhatsApp = ref<Record<string, string>>({});
+// Al equipo se le avisa por correo o en la app (no tiene bandeja en la app). WhatsApp
+// solo al cliente y solo en los avisos con plantilla aprobada.
 const canalesDelBorrador = computed(() =>
-  borrador.value.destinatario === "persona"
-    ? canalesAuto.value
-    : canalesAuto.value.filter((c) => c !== "interno"),
+  canalesAuto.value.filter((c) =>
+    c === "whatsapp"
+      ? borrador.value.destinatario === "persona" &&
+        editor.value.clave in textosWhatsApp.value
+      : borrador.value.destinatario === "persona" || c !== "interno",
+  ),
 );
 // Qué eventos admiten avisar al profesional de la cita o al equipo (del servidor).
 const eventosPorDestinatario = ref<Record<"profesional" | "equipo", string[]>>({
@@ -352,6 +361,9 @@ function elegirCanal(canal: Canal): void {
   cargarBorrador();
 }
 
+// Configurado por WhatsApp: su texto no se edita (lo pone el servidor).
+const esWhatsApp = computed(() => borrador.value.canal === "whatsapp");
+
 function elegirDestinatario(destinatario: Destinatario): void {
   borrador.value.destinatario = destinatario;
   const canales = canalesDelBorrador.value;
@@ -370,10 +382,12 @@ async function cargarAutomaticos(): Promise<void> {
     eventos_disponibles: string[];
     canales?: Canal[];
     destinatarios?: Record<"profesional" | "equipo", string[]>;
+    whatsapp?: Record<string, string> | null;
   }>(`${base.value}/plantillas-mensaje`);
   plantillas.value = data.data;
   eventos.value = data.eventos_disponibles;
   canalesAuto.value = data.canales ?? ["interno", "email"];
+  textosWhatsApp.value = data.whatsapp ?? {};
   eventosPorDestinatario.value = data.destinatarios ?? {
     profesional: [],
     equipo: [],
@@ -868,7 +882,18 @@ onMounted(cargar);
             </button>
           </div>
         </div>
-        <div>
+        <div v-if="esWhatsApp" data-prueba="texto-whatsapp">
+          <span class="tu-label">{{
+            $t("comunicacionesAuto.textoWhatsApp")
+          }}</span>
+          <p class="com-fijo text-sm">
+            {{ textosWhatsApp[editor.clave] }}
+          </p>
+          <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("comunicacionesAuto.ayudaWhatsApp") }}
+          </p>
+        </div>
+        <div v-if="!esWhatsApp">
           <label class="tu-label" for="pl-asunto">{{
             borrador.canal === "push"
               ? $t("comunicacionesAuto.asuntoPush")
@@ -882,7 +907,7 @@ onMounted(cargar);
             required
           />
         </div>
-        <div>
+        <div v-if="!esWhatsApp">
           <label class="tu-label" for="pl-cuerpo">{{
             $t("comunicacionesAuto.cuerpo")
           }}</label>
@@ -947,5 +972,11 @@ onMounted(cargar);
 }
 .com-fila:first-child {
   border-top: 0;
+}
+.com-fijo {
+  padding: 0.75rem;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  white-space: pre-line;
 }
 </style>

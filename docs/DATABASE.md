@@ -47,7 +47,8 @@ el esquema.
 
 **Personas y expediente**
 - `personas` — la persona (alumno, cliente, profesional), separada de su cuenta; guarda
-  cómo conoció al negocio (ADR 0067).
+  cómo conoció al negocio (ADR 0067) y cuándo aceptó los avisos por WhatsApp
+  (`whatsapp_aceptado_en`, ADR 0069).
 - `tipos_documento`, `documentos` — expediente del alumno.
 - `formularios`, `campos_formulario`, `respuestas_formulario` — formularios dinámicos.
 - `waivers`, `aceptaciones_waiver` — responsivas.
@@ -110,7 +111,9 @@ el esquema.
 - `tareas`, `reglas_automatizacion`.
 
 **Comunicaciones e integraciones**
-- `plantillas_mensaje`, `mensajes`, `difusiones` — correos, recordatorios y avisos.
+- `plantillas_mensaje`, `mensajes`, `difusiones` — correos, recordatorios y avisos
+  (interno, correo, push y WhatsApp; `mensajes.parametros` guarda la plantilla de Meta
+  y sus valores, ADR 0069).
 - `eventos_outbox` — outbox transaccional (ADR 0004).
 - `webhooks_salientes`, `entregas_webhook`, `integraciones`.
 

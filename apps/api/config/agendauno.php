@@ -50,6 +50,16 @@ return [
     ],
 
     /*
+    | WhatsApp (Meta Cloud API, ADR 0069): el superadministrador lo enciende y carga el
+    | número y el token desde su panel (se guardan cifrados en la BD). Aquí solo la
+    | versión de la Graph API y la lada que se asume cuando un celular no la trae.
+    */
+    'whatsapp' => [
+        'version' => env('WHATSAPP_GRAPH_VERSION', 'v23.0'),
+        'lada' => env('WHATSAPP_LADA', '52'),
+    ],
+
+    /*
     | Administración de plataforma (PlatformAdmin): el operador de AgendaUno ve
     | todos los estudios y carga credenciales globales (p. ej. la cuenta
     | FacturAPI). Se autentica con un token dedicado (env). Sin token, el apartado

@@ -153,6 +153,7 @@ class BajaDePersonaTenant
                 'archivado' => true,
                 'es_facturable' => false,
                 'recibe_promociones' => false,
+                'whatsapp_aceptado_en' => null,
                 'usuario_id' => null,
                 'eliminado_por' => $actor?->getKey(),
             ])->save();

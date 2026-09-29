@@ -8,6 +8,7 @@ use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
+use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use Illuminate\Support\Carbon;
@@ -20,9 +21,11 @@ use Throwable;
  * Relay de comunicaciones (R28): envia los mensajes ENCOLADOS (y reintenta los
  * FALLIDOS que no agotaron intentos) de la BD del tenant. `interno` = queda como
  * bandeja in-app de la persona (se marca enviado); `email` = se envia por correo;
- * `push` = notificación a los teléfonos con la app ({@see EntregarPushTenant}). Un
- * fallo deja el mensaje `fallido` para reintento (no rompe el lote). Debe correr con
- * la conexion del tenant ya activa (ver el comando que lo orquesta).
+ * `push` = notificación a los teléfonos con la app ({@see EntregarPushTenant});
+ * `whatsapp` = plantilla de Meta ({@see ClienteWhatsApp}); si la plataforma lo apagó
+ * mientras estaba en cola, se descarta (no se cobra ni se reintenta). Un fallo deja
+ * el mensaje `fallido` para reintento (no rompe el lote). Debe correr con la conexion
+ * del tenant ya activa (ver el comando que lo orquesta).
  */
 class EnviarMensajesTenant
 {
@@ -34,6 +37,7 @@ class EnviarMensajesTenant
         private readonly GestorDeConexionTenant $gestor,
         private readonly EntregarPushTenant $push,
         private readonly AlertasPlataforma $alertas,
+        private readonly ClienteWhatsApp $whatsapp,
     ) {}
 
     public function ejecutar(): int
@@ -47,6 +51,13 @@ class EnviarMensajesTenant
             ->limit(self::LOTE)
             ->get()
             ->each(function (MensajeTenant $mensaje) use (&$enviados): void {
+                if ($mensaje->canal === CanalComunicacion::WhatsApp && ! $this->whatsapp->activo()) {
+                    $mensaje->estado = EstadoMensaje::Descartado;
+                    $mensaje->ultimo_error = 'WhatsApp se apagó en la plataforma.';
+                    $mensaje->save();
+
+                    return;
+                }
                 $mensaje->intentos++;
 
                 try {
@@ -82,6 +93,15 @@ class EnviarMensajesTenant
         }
         if ($mensaje->canal === CanalComunicacion::Push) {
             $this->push->entregar($mensaje);
+
+            return;
+        }
+        if ($mensaje->canal === CanalComunicacion::WhatsApp) {
+            $plantilla = $mensaje->parametros['plantilla'] ?? '';
+            if ($plantilla === '' || ! is_string($mensaje->destinatario) || $mensaje->destinatario === '') {
+                throw new RuntimeException('El aviso de WhatsApp no tiene plantilla o número.');
+            }
+            $this->whatsapp->enviarPlantilla($mensaje->destinatario, $plantilla, $mensaje->parametros['valores'] ?? []);
 
             return;
         }

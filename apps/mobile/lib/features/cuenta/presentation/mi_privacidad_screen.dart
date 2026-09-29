@@ -74,6 +74,13 @@ class _MiPrivacidadScreenState extends ConsumerState<MiPrivacidadScreen> {
     }
   });
 
+  Future<void> _whatsapp(bool acepta) => _conRepo((repo) async {
+    final datos = await repo.cambiarWhatsapp(acepta);
+    if (mounted) {
+      setState(() => _datos = datos);
+    }
+  });
+
   Future<void> _verDatos() => _conRepo((repo) async {
     final datos = await repo.misDatos();
     if (!mounted) {
@@ -196,6 +203,18 @@ class _MiPrivacidadScreenState extends ConsumerState<MiPrivacidadScreen> {
                     onChanged: _ocupado ? null : _promociones,
                   ),
                 ),
+                if (datos.whatsappDisponible)
+                  Card(
+                    child: SwitchListTile(
+                      title: const Text('Avisos por WhatsApp'),
+                      subtitle: const Text(
+                        'Confirmaciones y recordatorios a tu celular. Sin esto '
+                        'te llegan por correo o en la app.',
+                      ),
+                      value: datos.aceptaWhatsapp,
+                      onChanged: _ocupado ? null : _whatsapp,
+                    ),
+                  ),
                 Card(
                   child: ListTile(
                     leading: const Icon(Icons.download_outlined),

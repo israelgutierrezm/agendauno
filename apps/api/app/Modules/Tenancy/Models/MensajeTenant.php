@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Mensaje tenant-local (R28): una comunicacion concreta generada (normalmente por un
  * evento via plantilla) hacia una persona/destinatario por un canal, con su ciclo de
  * vida (encolado → enviado/fallido). `canal=interno` es la bandeja in-app de la persona.
+ *
+ * @property array{plantilla?: string, valores?: list<string>}|null $parametros
  */
 class MensajeTenant extends Model
 {
@@ -25,7 +27,7 @@ class MensajeTenant extends Model
 
     protected $fillable = [
         'persona_id', 'usuario_id', 'plantilla_id', 'difusion_id', 'canal', 'destinatario', 'asunto', 'cuerpo',
-        'estado', 'intentos', 'ultimo_error', 'evento_ulid', 'enviado_en', 'clave_envio',
+        'estado', 'intentos', 'ultimo_error', 'evento_ulid', 'enviado_en', 'clave_envio', 'parametros',
     ];
 
     /**
@@ -36,6 +38,8 @@ class MensajeTenant extends Model
         'estado' => EstadoMensaje::class,
         'intentos' => 'integer',
         'enviado_en' => 'datetime',
+        // WhatsApp: {plantilla, valores} de la plantilla de Meta con que sale.
+        'parametros' => 'array',
     ];
 
     /**

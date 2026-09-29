@@ -70,6 +70,7 @@ use App\Modules\Tenancy\Http\Controllers\PlataformaCobrosController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaEstudiosController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaOperacionController;
+use App\Modules\Tenancy\Http\Controllers\PlataformaWhatsAppController;
 use App\Modules\Tenancy\Http\Controllers\PoliticasCancelacionTenantController;
 use App\Modules\Tenancy\Http\Controllers\PromocionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\PublicoCitasController;
@@ -152,6 +153,10 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/estudios/{estudio}', [PlataformaController::class, 'actualizarEstudio'])->name('estudios.actualizar');
         Route::get('/configuracion', [PlataformaController::class, 'configuracion'])->name('configuracion');
         Route::put('/configuracion', [PlataformaController::class, 'guardarConfiguracion'])->name('configuracion.guardar');
+        // WhatsApp (Meta Cloud API): encenderlo para todos, número, token y prueba (ADR 0069).
+        Route::get('/whatsapp', [PlataformaWhatsAppController::class, 'mostrar'])->name('whatsapp');
+        Route::put('/whatsapp', [PlataformaWhatsAppController::class, 'guardar'])->name('whatsapp.guardar');
+        Route::post('/whatsapp/prueba', [PlataformaWhatsAppController::class, 'probar'])->name('whatsapp.probar');
         // Documentos legales (aviso de privacidad y términos) mostrados en el registro.
         Route::get('/parametros', [PlataformaController::class, 'parametros'])->name('parametros');
         Route::put('/parametros', [PlataformaController::class, 'guardarParametros'])->name('parametros.guardar');

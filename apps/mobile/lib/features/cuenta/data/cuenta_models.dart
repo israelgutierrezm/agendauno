@@ -526,9 +526,20 @@ class ResenaPendiente {
 
 /// Privacidad del alumno frente al negocio (derechos ARCO).
 class Privacidad {
-  const Privacidad({required this.recibePromociones, this.baja});
+  const Privacidad({
+    required this.recibePromociones,
+    this.whatsappDisponible = false,
+    this.aceptaWhatsapp = false,
+    this.baja,
+  });
 
   final bool recibePromociones;
+
+  /// El negocio manda avisos por WhatsApp (y la plataforma lo tiene encendido).
+  final bool whatsappDisponible;
+
+  /// Aceptó recibir sus avisos por WhatsApp.
+  final bool aceptaWhatsapp;
 
   /// Su solicitud de baja de datos, si hizo una.
   final SolicitudBaja? baja;
@@ -537,6 +548,8 @@ class Privacidad {
     final baja = j['baja'];
     return Privacidad(
       recibePromociones: (j['recibe_promociones'] ?? true) as bool,
+      whatsappDisponible: (j['whatsapp_disponible'] ?? false) as bool,
+      aceptaWhatsapp: (j['acepta_whatsapp'] ?? false) as bool,
       baja: baja is Map<String, dynamic> ? SolicitudBaja.desdeJson(baja) : null,
     );
   }

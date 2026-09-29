@@ -9,6 +9,7 @@ import ParametrosPlataforma from "@/components/ParametrosPlataforma.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import TarifasPlataforma from "@/components/TarifasPlataforma.vue";
 import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
+import WhatsAppPlataforma from "@/components/WhatsAppPlataforma.vue";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import type { DatosTerminologia } from "@/lib/terminologia";
@@ -964,6 +965,8 @@ function borrar(): void {
             {{ $t("plataforma.facturapi.ayuda") }}
           </p>
         </div>
+
+        <WhatsAppPlataforma :api-url="apiUrl" :token="token" />
 
         <div>
           <h2 class="font-light text-lg">

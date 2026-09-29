@@ -199,6 +199,11 @@ corre el comando a mano.
   los nuevos salen.
 - [ ] **Push** (si FCM está configurado): la app con sesión iniciada recibe la
   confirmación, el recordatorio de 2 h y la cancelación de una clase.
+- [ ] **WhatsApp** (ADR 0069). Con WhatsApp apagado en la plataforma, el negocio
+  no ve el canal. Enciéndelo con el número y el token, y manda la prueba
+  (`hello_world`). Luego enciende «Reserva confirmada» por WhatsApp en Automáticos.
+  Agenda en la página pública con celular y marca la casilla: llega el WhatsApp.
+  Apágalo con un aviso en cola: queda `descartado`.
 
 Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado»,
 «membresía suspendida» al cliente y «reserva creada».

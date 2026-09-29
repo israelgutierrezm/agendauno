@@ -176,6 +176,8 @@ export default {
     notaDelCliente: "Nota del cliente",
     paraOtra: "Es para otra persona",
     quienAsiste: "¿Quién asiste?",
+    aceptaWhatsApp:
+      "Quiero recibir la confirmación y los recordatorios de mi cita por WhatsApp",
     paraOtraAyuda:
       "La cita queda a tu nombre: te llegan los avisos y la pagas tú.",
     asiste: "Asiste",

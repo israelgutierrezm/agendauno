@@ -39,6 +39,7 @@ class ExportarDatosPersonaTenant
                 'email' => $persona->email,
                 'celular' => $persona->celular,
                 'recibe_promociones' => (bool) $persona->recibe_promociones,
+                'acepta_whatsapp_desde' => $fecha($persona->whatsapp_aceptado_en),
                 'alta' => $fecha($persona->created_at),
             ],
             'membresias_y_paquetes' => AcuerdoTenant::query()->where('persona_id', $id)->with('producto')->get()

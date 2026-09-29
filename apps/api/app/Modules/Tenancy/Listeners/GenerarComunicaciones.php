@@ -10,6 +10,9 @@ use App\Modules\Tenancy\Comunicaciones\AvisosAlEquipo;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\DestinatarioMensaje;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
+use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
+use App\Modules\Tenancy\Comunicaciones\WhatsApp\PlantillasWhatsApp;
+use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
@@ -34,6 +37,7 @@ class GenerarComunicaciones
     public function __construct(
         private readonly GestorDeConexionTenant $gestor,
         private readonly EntregarPushTenant $push,
+        private readonly ClienteWhatsApp $whatsapp,
     ) {}
 
     public function handle(EventoDeDominioTenant $evento): void
@@ -66,6 +70,11 @@ class GenerarComunicaciones
                 foreach (AvisosAlEquipo::destinatarios($evento->tipo) as $usuario) {
                     $this->avisarAUsuario($plantilla, $usuario, $persona, $contexto, $evento);
                 }
+
+                continue;
+            }
+            if ($plantilla->canal === CanalComunicacion::WhatsApp) {
+                $this->avisarPorWhatsApp($plantilla, $persona, $contexto, $evento);
 
                 continue;
             }
@@ -140,6 +149,50 @@ class GenerarComunicaciones
             'destinatario' => $destinatario,
             'asunto' => $this->render($plantilla->asunto, $contexto),
             'cuerpo' => $this->render($plantilla->cuerpo, $contexto),
+            'estado' => EstadoMensaje::Encolado->value,
+            'evento_ulid' => $evento->eventoUlid,
+        ]);
+    }
+
+    /**
+     * Aviso por WhatsApp (ADR 0069): solo con la plataforma encendida, a quien aceptó
+     * recibirlos y tiene un celular válido, con la plantilla aprobada del evento. El
+     * cuerpo guarda el texto tal como le llega.
+     *
+     * @param  array<string, string>  $contexto
+     */
+    private function avisarPorWhatsApp(
+        PlantillaMensajeTenant $plantilla,
+        ?PersonaTenant $persona,
+        array $contexto,
+        EventoDeDominioTenant $evento,
+    ): void {
+        $meta = PlantillasWhatsApp::para($evento->tipo);
+        if ($meta === null || ! $persona instanceof PersonaTenant || $persona->whatsapp_aceptado_en === null || ! $this->whatsapp->activo()) {
+            return;
+        }
+        $telefono = TelefonoWhatsApp::normalizar($persona->celular);
+        if ($telefono === null) {
+            return;
+        }
+
+        $clave = self::claveEnvio($evento, $plantilla, null);
+        if ($this->yaGenerado($clave)) {
+            return;
+        }
+
+        MensajeTenant::query()->create([
+            'clave_envio' => $clave,
+            'persona_id' => $persona->getKey(),
+            'plantilla_id' => $plantilla->getKey(),
+            'canal' => CanalComunicacion::WhatsApp->value,
+            'destinatario' => $telefono,
+            'asunto' => $meta['titulo'],
+            'cuerpo' => $this->render($meta['texto'], $contexto),
+            'parametros' => [
+                'plantilla' => $meta['nombre'],
+                'valores' => PlantillasWhatsApp::parametros($meta['texto'], $contexto),
+            ],
             'estado' => EstadoMensaje::Encolado->value,
             'evento_ulid' => $evento->eventoUlid,
         ]);

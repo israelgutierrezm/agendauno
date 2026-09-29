@@ -19,10 +19,13 @@ class OpcionesCitaTenant
     /** Redes que se muestran en la tarjeta de la sede al agendar. */
     private const REDES_EN_TARJETA = ['instagram', 'facebook'];
 
-    public function __construct(private readonly CobroDeCitasTenant $cobro) {}
+    public function __construct(
+        private readonly CobroDeCitasTenant $cobro,
+        private readonly WhatsAppTenant $whatsapp,
+    ) {}
 
     /**
-     * @return array{servicios: list<array<string, mixed>>, sucursales: list<array<string, mixed>>, instructores: list<array<string, mixed>>, cobro: array{pago_obligatorio: bool, pago_en_linea: bool}}
+     * @return array{servicios: list<array<string, mixed>>, sucursales: list<array<string, mixed>>, instructores: list<array<string, mixed>>, cobro: array{pago_obligatorio: bool, pago_en_linea: bool}, whatsapp: bool}
      */
     public function listar(): array
     {
@@ -74,6 +77,8 @@ class OpcionesCitaTenant
                 ])->values()->all(),
             // Si se paga en línea para confirmar o se puede pagar en la sucursal.
             'cobro' => $this->cobro->paraPantalla(),
+            // Si se ofrece recibir los avisos de la cita por WhatsApp (ADR 0069).
+            'whatsapp' => $this->whatsapp->enUso(),
         ];
     }
 }

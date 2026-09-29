@@ -165,6 +165,10 @@ export const comunicacionesAuto = {
   canalPush: "Notificación en la app",
   ayudaPush:
     "Llega al teléfono de quien tiene la app con sesión. Usa un título corto y una sola línea.",
+  canalWhatsApp: "WhatsApp",
+  textoWhatsApp: "Texto del mensaje",
+  ayudaWhatsApp:
+    "Es el texto aprobado por WhatsApp; no se puede cambiar, solo encender o apagar. Le llega a quien aceptó recibir avisos por WhatsApp y tiene su celular registrado.",
   asunto: "Asunto",
   asuntoPush: "Título",
   cuerpo: "Mensaje",
@@ -544,6 +548,31 @@ export const plataformaAdmin = {
     webhook_user: "Usuario del webhook",
     webhook_password: "Contraseña del webhook",
   },
+  whatsapp: {
+    titulo: "Avisos por WhatsApp",
+    subtitulo:
+      "Con la API de WhatsApp de Meta. Cada mensaje tiene costo; apagado, ningún negocio ve la opción y sus avisos siguen por correo y notificación en la app.",
+    encendido: "Encendido",
+    apagado: "Apagado",
+    incompleto: "Encendido, falta el número o el token",
+    enviar: "Mandar avisos por WhatsApp",
+    numero: "Identificador del número (Phone number ID)",
+    token: "Token de acceso",
+    tokenGuardado: "Guardado; escribe uno nuevo para reemplazarlo",
+    tokenAyuda:
+      "Usa un token permanente de un usuario del sistema. Se guarda cifrado y nunca se vuelve a mostrar.",
+    guardar: "Guardar",
+    guardado: "WhatsApp guardado.",
+    prueba: "Mandar una prueba",
+    pruebaTelefono: "Celular de prueba",
+    pruebaAyuda:
+      "Manda la plantilla de muestra hello_world (en inglés) para comprobar el número y el token.",
+    pruebaEnviada: "Prueba enviada. Revisa ese WhatsApp.",
+    plantillas: "Plantillas a registrar en Meta ({n})",
+    plantillasAyuda:
+      "Regístralas en WhatsApp Manager con este nombre exacto, categoría Utilidad e idioma español (MEX). Un aviso sale solo cuando Meta la aprobó.",
+    categoria: "Utilidad · {idioma}",
+  },
 };
 
 export const recuperarContrasena = {
@@ -662,6 +691,9 @@ export const miPrivacidad = {
   promociones: "Recibir promociones",
   promocionesAyuda:
     "Ofertas y novedades del negocio. Los avisos de tus reservas y pagos te siguen llegando.",
+  whatsapp: "Avisos por WhatsApp",
+  whatsappAyuda:
+    "Confirmaciones y recordatorios de tus reservas a tu celular. Sin esto te llegan por correo o en la app.",
   descargar: "Descargar mis datos",
   baja: "Pedir la baja de mis datos",
   bajaExplica:

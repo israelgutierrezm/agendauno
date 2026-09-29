@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\BajaDePersonaTenant;
 use App\Modules\Tenancy\Application\ExportarDatosPersonaTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
+use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SolicitudPrivacidadTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -16,7 +17,8 @@ use Illuminate\Support\Str;
 
 /**
  * Privacidad del alumno (derechos ARCO frente al negocio): descargar sus datos
- * (acceso/portabilidad), oponerse a promociones y pedir la baja de sus datos
+ * (acceso/portabilidad), oponerse a promociones, aceptar o retirar los avisos por
+ * WhatsApp (si el negocio los usa, ADR 0069) y pedir la baja de sus datos
  * (cancelación). La rectificación está en "Mi perfil".
  */
 class MiPrivacidadTenantController
@@ -25,6 +27,7 @@ class MiPrivacidadTenantController
         private readonly PersonaDeUsuarioTenant $personas,
         private readonly ExportarDatosPersonaTenant $exportar,
         private readonly BajaDePersonaTenant $baja,
+        private readonly WhatsAppTenant $whatsapp,
     ) {}
 
     public function mostrar(Request $request): JsonResponse
@@ -35,8 +38,17 @@ class MiPrivacidadTenantController
     public function actualizar(Request $request): JsonResponse
     {
         $persona = $this->persona($request);
-        $validado = $request->validate(['recibe_promociones' => ['required', 'boolean']]);
-        $persona->update(['recibe_promociones' => (bool) $validado['recibe_promociones']]);
+        $validado = $request->validate([
+            'recibe_promociones' => ['sometimes', 'boolean'],
+            'acepta_whatsapp' => ['sometimes', 'boolean'],
+        ]);
+        if (array_key_exists('recibe_promociones', $validado)) {
+            $persona->update(['recibe_promociones' => (bool) $validado['recibe_promociones']]);
+        }
+        // Retirarlo se puede siempre; aceptarlo, solo si el negocio los usa.
+        if (array_key_exists('acepta_whatsapp', $validado) && (! $validado['acepta_whatsapp'] || $this->whatsapp->enUso())) {
+            $this->whatsapp->aceptar($persona, (bool) $validado['acepta_whatsapp']);
+        }
 
         return response()->json(['data' => $this->presentar($persona)]);
     }
@@ -70,6 +82,9 @@ class MiPrivacidadTenantController
 
         return [
             'recibe_promociones' => (bool) ($persona->recibe_promociones ?? true),
+            // Solo si el negocio manda avisos por WhatsApp (y la plataforma lo tiene).
+            'whatsapp_disponible' => $this->whatsapp->enUso(),
+            'acepta_whatsapp' => $persona->whatsapp_aceptado_en !== null,
             'baja' => $solicitud instanceof SolicitudPrivacidadTenant ? [
                 'estado' => $solicitud->estado,
                 'solicitada_en' => $solicitud->created_at?->toIso8601String(),

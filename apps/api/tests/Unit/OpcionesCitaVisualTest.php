@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Application\CobroDeCitasTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
+use App\Modules\Tenancy\Application\WhatsAppTenant;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -45,7 +46,9 @@ it('expone solo la foto pública del profesional y la región de la sede dentro 
         }
         $cobro = Mockery::mock(CobroDeCitasTenant::class);
         $cobro->shouldReceive('paraPantalla')->andReturn(['pago_obligatorio' => true, 'pago_en_linea' => true]);
-        $opciones = (new OpcionesCitaTenant($cobro))->listar();
+        $whatsapp = Mockery::mock(WhatsAppTenant::class);
+        $whatsapp->shouldReceive('enUso')->andReturn(false);
+        $opciones = (new OpcionesCitaTenant($cobro, $whatsapp))->listar();
         expect($opciones['instructores'])->toBe([
             ['id' => 'Ana', 'nombre' => 'Ana', 'foto_url' => Storage::disk('public')->url('tenants/demo/perfiles/ana.webp')],
             ['id' => 'Luis', 'nombre' => 'Luis', 'foto_url' => null],

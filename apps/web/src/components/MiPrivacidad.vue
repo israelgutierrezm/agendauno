@@ -8,11 +8,14 @@ import { useToastStore } from "@/stores/toast";
 
 /**
  * Privacidad del alumno (derechos ARCO frente al negocio): recibir o no promociones
- * (oposición), descargar sus datos (acceso) y pedir la baja de sus datos
- * (cancelación). La rectificación está en "Mi perfil".
+ * (oposición), aceptar los avisos por WhatsApp (solo si el negocio los usa, ADR
+ * 0069), descargar sus datos (acceso) y pedir la baja de sus datos (cancelación). La
+ * rectificación está en "Mi perfil".
  */
 interface Privacidad {
   recibe_promociones: boolean;
+  whatsapp_disponible?: boolean;
+  acepta_whatsapp?: boolean;
   baja: {
     estado: "pendiente" | "atendida" | "rechazada";
     solicitada_en: string | null;
@@ -41,12 +44,14 @@ async function cargar(): Promise<void> {
   }
 }
 
-async function cambiarPromociones(valor: boolean): Promise<void> {
+async function cambiar(
+  cambio: { recibe_promociones: boolean } | { acepta_whatsapp: boolean },
+): Promise<void> {
   ocupado.value = true;
   try {
     const { data } = await api.put<{ data: Privacidad }>(
       `${base.value}/mi/privacidad`,
-      { recibe_promociones: valor },
+      cambio,
     );
     datos.value = data.data;
   } catch (e) {
@@ -112,7 +117,33 @@ onMounted(cargar);
         :checked="datos.recibe_promociones"
         :disabled="ocupado"
         @change="
-          cambiarPromociones(($event.target as HTMLInputElement).checked)
+          cambiar({
+            recibe_promociones: ($event.target as HTMLInputElement).checked,
+          })
+        "
+      />
+    </label>
+
+    <label
+      v-if="datos.whatsapp_disponible"
+      class="mt-3 flex items-center justify-between gap-3 text-sm"
+    >
+      <span>
+        {{ $t("miPrivacidad.whatsapp") }}
+        <span class="block text-xs" :style="{ color: 'var(--texto-suave)' }">{{
+          $t("miPrivacidad.whatsappAyuda")
+        }}</span>
+      </span>
+      <input
+        type="checkbox"
+        class="h-5 w-5"
+        data-prueba="acepta-whatsapp"
+        :checked="datos.acepta_whatsapp"
+        :disabled="ocupado"
+        @change="
+          cambiar({
+            acepta_whatsapp: ($event.target as HTMLInputElement).checked,
+          })
         "
       />
     </label>
