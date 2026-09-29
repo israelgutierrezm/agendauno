@@ -13,7 +13,10 @@ use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\PoliticaReservaTenant;
+use App\Modules\Tenancy\Reservas\EstadoReserva;
+use App\Modules\Tenancy\Reservas\Exceptions\LimiteCitasPorPagar;
 use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
@@ -146,6 +149,32 @@ class AgendarCitaTenant
         throw $ultimo ?? new SesionNoReservable('No hay profesionales disponibles a esa hora.');
     }
 
+    /**
+     * Cuenta sus citas próximas con la orden sin pagar (apartadas o confirmadas por
+     * cobrar) bajo el candado de su ficha: dos solicitudes a la vez del mismo cliente
+     * no rebasan el límite. Debe llamarse dentro de la transacción.
+     */
+    private function verificarCitasPorPagar(PersonaTenant $persona): void
+    {
+        $maximo = $this->parametros->entero('citas.maximo_por_pagar');
+        if ($maximo <= 0) {
+            return;
+        }
+
+        PersonaTenant::query()->whereKey($persona->getKey())->lockForUpdate()->first();
+        $porPagar = ReservaTenant::query()
+            ->where('persona_id', $persona->getKey())
+            ->whereIn('estado', [EstadoReserva::PendientePago->value, EstadoReserva::Confirmada->value])
+            ->whereHas('orden', fn ($q) => $q->where('estado', EstadoOrden::Pendiente->value))
+            ->whereHas('sesion', fn ($q) => $q->where('tipo', TipoSesionTenant::Cita->value)->where('inicia_en', '>', now()))
+            ->count();
+
+        if ($porPagar >= $maximo) {
+            throw new LimiteCitasPorPagar(($porPagar === 1 ? 'Ya tienes una cita por pagar.' : "Ya tienes {$porPagar} citas por pagar.")
+                .' Paga o cancela alguna para agendar otra.');
+        }
+    }
+
     private function agendarEnTransaccion(
         OfertaTenant $oferta,
         SucursalTenant $sucursal,
@@ -164,6 +193,11 @@ class AgendarCitaTenant
             // de baja ya no se encuentra.
             if (! $profesional instanceof Usuario || ! in_array('instructor', $profesional->rolesEfectivos(), true)) {
                 throw new SesionNoReservable('Esa persona no atiende citas.');
+            }
+
+            // El cliente no aparta sin fin citas que no paga (ADR 0065).
+            if (! $porNegocio && $oferta->politica_reserva === PoliticaReservaTenant::Pago) {
+                $this->verificarCitasPorPagar($persona);
             }
 
             // El hueco debe seguir libre (el proveedor no puede tener dos cosas a la vez),

@@ -154,6 +154,48 @@ it('sin cobro en línea activo nunca se aparta: se paga en la sucursal', functio
     ], conBearer($cliente['bearer']))->assertCreated()->assertJsonPath('data.estado', 'confirmada');
 });
 
+it('un cliente no aparta más citas por pagar de las que permite el negocio', function (): void {
+    $ctx = barberiaParaCobrar();
+    $slug = $ctx['e']['slug'];
+    $this->putJson("/api/v1/app/{$slug}/parametros", ['valores' => ['citas.maximo_por_pagar' => 2]], conBearer($ctx['e']['bearer']))
+        ->assertOk();
+    $cliente = alumnoConSesion($ctx['e'], 'Beto', 'beto@correo.mx');
+    $dia = now('America/Mexico_City')->addDays(3)->format('Y-m-d');
+    $a = fn (string $hora, array $extra = []) => $this->postJson("/api/v1/app/{$slug}/mi/citas", [
+        'oferta_id' => $ctx['sede']['oferta'], 'sucursal_id' => $ctx['sede']['sucursal'], 'instructor_id' => $ctx['pro'],
+        'inicia_en_local' => "{$dia} {$hora}:00", 'duracion_minutos' => 30, ...$extra,
+    ], conBearer($cliente['bearer']));
+
+    $primera = $a('10:00')->assertCreated()->json('data.id');
+    $a('11:00')->assertCreated();
+    $a('12:00')->assertUnprocessable()
+        ->assertJsonPath('message', 'Ya tienes 2 citas por pagar. Paga o cancela alguna para agendar otra.');
+    // Tampoco con «cualquier profesional» (no se reintenta con otro).
+    $a('12:00', ['instructor_id' => null])->assertUnprocessable();
+    // Ni en la página pública con su correo.
+    agendarEnLinea($ctx, ['inicia_en_local' => "{$dia} 12:00:00"])->assertUnprocessable();
+
+    // El negocio sí le agenda aunque esté en el límite (y esa también está por pagar).
+    $persona = collect($this->getJson("/api/v1/app/{$slug}/miembros", conBearer($ctx['e']['bearer']))->json('data'))
+        ->firstWhere('email', 'beto@correo.mx')['id'];
+    $delNegocio = $this->postJson("/api/v1/app/{$slug}/agenda/citas", [
+        'persona_id' => $persona, 'oferta_id' => $ctx['sede']['oferta'], 'sucursal_id' => $ctx['sede']['sucursal'],
+        'instructor_id' => $ctx['pro'], 'inicia_en_local' => "{$dia} 13:00:00",
+    ], conBearer($ctx['e']['bearer']))->assertCreated()->json('data.cita.reserva_id');
+
+    // Al cancelar, se libera lugar para agendar otra.
+    $this->postJson("/api/v1/app/{$slug}/mi/reservas/{$primera}/cancelar", [], conBearer($cliente['bearer']))->assertOk();
+    $a('14:00')->assertUnprocessable();
+    $this->postJson("/api/v1/app/{$slug}/reservas/{$delNegocio}/cancelar", [], conBearer($ctx['e']['bearer']))->assertOk();
+    $a('14:00')->assertCreated();
+
+    // 0 = sin límite.
+    $this->putJson("/api/v1/app/{$slug}/parametros", ['valores' => ['citas.maximo_por_pagar' => 0]], conBearer($ctx['e']['bearer']))
+        ->assertOk();
+    $a('15:00')->assertCreated();
+    $a('16:00')->assertCreated();
+});
+
 it('en la página pública el correo es obligatorio', function (): void {
     $ctx = barberiaParaCobrar();
 

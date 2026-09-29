@@ -58,8 +58,16 @@ Al revisar la página pública para agendar salieron estos puntos:
 
 - Un negocio sin pasarela ya no pierde citas en línea.
 - Un negocio que no quiere cobrar por adelantado recibe citas confirmadas.
-- Con el pago opcional, un cliente puede apartar horarios sin pagar. Si hace falta,
-  el siguiente paso es un límite de citas por pagar por cliente (parámetro).
+- **Límite de citas por pagar** (actualización): parámetro `citas.maximo_por_pagar`
+  (por negocio, inicial 5, 0 = sin límite).
+  - Con esas citas próximas sin pagar (apartadas o confirmadas por cobrar), el
+    cliente ya no agenda otra en línea ni desde su cuenta: `LimiteCitasPorPagar`,
+    422.
+  - Se cuenta bajo el candado de su ficha, para que dos solicitudes a la vez no lo
+    rebasen.
+  - Con «cualquier profesional» no se reintenta con otro.
+  - El negocio sí puede agendarle; las reservas no guardan quién las agendó, así que
+    esas citas también cuentan.
 - **Enlace para pagar después** (actualización): el correo de apartado trae
   `{{enlace}}` → `/agendar/{slug}?pagar={orden}`.
   - La página consulta `GET /citas/orden/{orden}`; el ULID de la orden es la

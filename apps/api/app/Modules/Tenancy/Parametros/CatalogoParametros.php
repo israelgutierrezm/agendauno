@@ -43,6 +43,8 @@ final class CatalogoParametros
             // ADR 0065.
             new DefinicionParametro('citas.pago_en_linea_obligatorio', 'Citas', 'Pedir el pago en línea para confirmar una cita',
                 'Si lo apagas, la cita queda confirmada al agendar y el cliente paga en línea o en la sucursal. Sin cobro en línea activo, siempre se paga en la sucursal.', $sn, 1),
+            new DefinicionParametro('citas.maximo_por_pagar', 'Citas', 'Citas por pagar que puede tener un cliente',
+                'Con estas citas próximas sin pagar, el cliente ya no puede agendar otra en línea ni desde su cuenta (el negocio sí puede agendarle). 0 = sin límite.', $e, 5, 0, 50, 'citas'),
 
             // Clases recurrentes (ADR 0045).
             new DefinicionParametro('agenda.dias_a_generar', 'Clases recurrentes', 'Fechas creadas por adelantado',
