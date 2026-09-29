@@ -22,7 +22,7 @@ el esquema.
 
 | Tabla | Para qué |
 |---|---|
-| `estudios` | Cada negocio: slug, estado, prueba, perfil y terminología, modalidad de cobro, contacto, base de datos y `version_migraciones` |
+| `estudios` | Cada negocio: slug, estado, prueba, perfil y terminología, modalidad de cobro, contacto, perfil público (logo, portada, descripción, redes), base de datos y `version_migraciones` |
 | `tarifas_saas` | Tarifas del SaaS por modalidad, versionadas (ADR 0019) |
 | `mediciones_uso` | Alumnos o profesionales activos medidos por periodo |
 | `cargos_renta` | Renta mensual de cada negocio, inmutable una vez emitida (ADR 0032) |
@@ -53,13 +53,13 @@ el esquema.
 - `solicitudes_privacidad` — derechos ARCO.
 
 **Estructura**
-- `organizaciones`, `sucursales` (con ubicación y zona horaria).
+- `organizaciones`, `sucursales` (con ubicación, zona horaria y perfil público: dirección, teléfono, WhatsApp, redes y horario; ADR 0061).
 - `asignaciones_personal` — rol de una persona del equipo en una sucursal.
 - `horarios_atencion` — horario de cada sucursal o profesional.
 
 **Catálogo y recursos**
 - `programas`, `actividades`, `niveles`, `ofertas` (clases y servicios; modalidad
-  grupal o privada, duración, márgenes, política de reserva).
+  grupal o privada, duración, márgenes, política de reserva y descripción pública).
 - `recursos`, `oferta_recursos` — salas, camillas, carriles (ADR 0039).
 
 **Agenda**

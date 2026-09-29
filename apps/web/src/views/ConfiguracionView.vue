@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 
 import CargadorLogo from "@/components/CargadorLogo.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import PerfilPublicoNegocio from "@/components/PerfilPublicoNegocio.vue";
 import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import type { DatosTerminologia, TerminosNegocio } from "@/lib/terminologia";
@@ -131,6 +132,8 @@ onMounted(cargar);
         </div>
       </div>
 
+      <!-- Portada, descripción y redes: la página pública y la de enlaces -->
+      <PerfilPublicoNegocio v-if="puedeGestionar" class="mt-6" />
       <!-- Cómo se llaman las cosas en el negocio -->
       <TerminologiaNegocio
         v-if="puedeGestionar"

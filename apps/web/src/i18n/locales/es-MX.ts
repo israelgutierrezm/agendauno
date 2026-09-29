@@ -1791,7 +1791,8 @@ export default {
     },
     roster: {
       vacio: "Sin reservas.",
-      sinPermiso: "Tu rol no incluye ver reservas: aquí no se muestra quién va.",
+      sinPermiso:
+        "Tu rol no incluye ver reservas: aquí no se muestra quién va.",
       confirmada: "Confirmada",
       en_espera: "En espera",
       ofrecida: "Oferta",

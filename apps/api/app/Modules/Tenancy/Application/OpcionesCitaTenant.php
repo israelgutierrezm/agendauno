@@ -23,11 +23,15 @@ class OpcionesCitaTenant
         return [
             'servicios' => OfertaTenant::query()
                 ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
+                ->with('actividad')
                 ->orderBy('nombre')
                 ->get()
                 ->map(static fn (OfertaTenant $o): array => [
                     'id' => $o->ulid,
                     'nombre' => $o->nombre,
+                    // Para elegir con información: qué incluye y en qué grupo va.
+                    'descripcion' => $o->descripcion,
+                    'categoria' => $o->actividad?->nombre,
                     'precio_minor' => $o->precio_clase_minor,
                     'moneda' => 'MXN',
                     'duracion_minutos' => $o->duracion_minutos,

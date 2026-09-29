@@ -16,6 +16,43 @@ interface Sucursal {
   impuesto_tasa_bps: number;
   latitud?: number | null;
   longitud?: number | null;
+  direccion?: string | null;
+  telefono?: string | null;
+  whatsapp?: string | null;
+  redes?: Partial<Record<Red, string>>;
+  horario?: { dia: number; abre: string; cierra: string }[];
+}
+// Redes que puede tener la sede (si tiene cuentas propias).
+const REDES = [
+  "instagram",
+  "facebook",
+  "tiktok",
+  "youtube",
+  "sitio_web",
+] as const;
+type Red = (typeof REDES)[number];
+interface DiaHorario {
+  dia: number;
+  abierto: boolean;
+  abre: string;
+  cierra: string;
+}
+function horarioVacio(): DiaHorario[] {
+  return [1, 2, 3, 4, 5, 6, 7].map((dia) => ({
+    dia,
+    abierto: false,
+    abre: "09:00",
+    cierra: "20:00",
+  }));
+}
+function redesVacias(): Record<Red, string> {
+  return {
+    instagram: "",
+    facebook: "",
+    tiktok: "",
+    youtube: "",
+    sitio_web: "",
+  };
 }
 interface Organizacion {
   id: string;
@@ -60,7 +97,18 @@ const form = ref({
   moneda: "MXN",
   iva: "16",
   ubicacion: "",
+  direccion: "",
+  telefono: "",
+  whatsapp: "",
+  redes: redesVacias(),
+  horario: horarioVacio(),
 });
+const errores = ref<Record<string, string>>({});
+// El error de un día abierto: la API numera solo los días que se envían.
+function errorDelDia(d: DiaHorario): string | undefined {
+  const i = form.value.horario.filter((x) => x.abierto).indexOf(d);
+  return errores.value[`horario.${i}.cierra`];
+}
 
 const esNueva = computed(() => editandoId.value === null);
 
@@ -92,7 +140,13 @@ function abrirNueva(): void {
     moneda: "MXN",
     iva: "16",
     ubicacion: "",
+    direccion: "",
+    telefono: "",
+    whatsapp: "",
+    redes: redesVacias(),
+    horario: horarioVacio(),
   };
+  errores.value = {};
   abierto.value = true;
 }
 
@@ -108,7 +162,23 @@ function abrirEdicion(s: Sucursal): void {
       s.latitud != null && s.longitud != null
         ? `${s.latitud}, ${s.longitud}`
         : "",
+    direccion: s.direccion ?? "",
+    telefono: s.telefono ?? "",
+    whatsapp: s.whatsapp ?? "",
+    redes: { ...redesVacias(), ...(s.redes ?? {}) },
+    horario: horarioVacio().map((d) => {
+      const guardado = (s.horario ?? []).find((h) => h.dia === d.dia);
+      return guardado
+        ? {
+            dia: d.dia,
+            abierto: true,
+            abre: guardado.abre,
+            cierra: guardado.cierra,
+          }
+        : d;
+    }),
   };
+  errores.value = {};
   abierto.value = true;
 }
 
@@ -171,6 +241,7 @@ async function guardar(): Promise<void> {
   }
   guardando.value = true;
   error.value = null;
+  errores.value = {};
   try {
     const cuerpo = {
       nombre: form.value.nombre.trim(),
@@ -183,6 +254,14 @@ async function guardar(): Promise<void> {
       impuesto_tasa_bps: Math.round((Number(form.value.iva) || 0) * 100),
       latitud: coordenadas.value === null ? null : coordenadas.value.latitud,
       longitud: coordenadas.value === null ? null : coordenadas.value.longitud,
+      // Perfil público de la sede.
+      direccion: form.value.direccion.trim(),
+      telefono: form.value.telefono.trim(),
+      whatsapp: form.value.whatsapp.trim(),
+      redes: form.value.redes,
+      horario: form.value.horario
+        .filter((d) => d.abierto)
+        .map((d) => ({ dia: d.dia, abre: d.abre, cierra: d.cierra })),
     };
     if (esNueva.value) {
       await api.post(
@@ -195,6 +274,14 @@ async function guardar(): Promise<void> {
     abierto.value = false;
     await cargar();
   } catch (e) {
+    const detalle = (
+      e as {
+        response?: { data?: { meta?: { errors?: Record<string, string[]> } } };
+      }
+    ).response?.data?.meta?.errors;
+    errores.value = Object.fromEntries(
+      Object.entries(detalle ?? {}).map(([k, v]) => [k, v[0] ?? ""]),
+    );
     error.value = mensajeDeError(e);
   } finally {
     guardando.value = false;
@@ -397,6 +484,148 @@ onMounted(cargar);
           >
             {{ errorUbicacion }}
           </p>
+        </div>
+
+        <!-- Perfil público de la sede -->
+        <div
+          class="border-t pt-4 space-y-4"
+          :style="{ borderColor: 'var(--borde)' }"
+          data-prueba="perfil-sede"
+        >
+          <div>
+            <h3 class="text-sm font-semibold">
+              {{ $t("perfilPublico.sucursal.titulo") }}
+            </h3>
+            <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("perfilPublico.sucursal.ayuda") }}
+            </p>
+          </div>
+          <div>
+            <label class="tu-label" for="s-direccion">{{
+              $t("perfilPublico.sucursal.direccion")
+            }}</label>
+            <input
+              id="s-direccion"
+              v-model="form.direccion"
+              class="tu-input"
+              maxlength="255"
+              :placeholder="$t('perfilPublico.sucursal.direccionPh')"
+            />
+          </div>
+          <div class="grid gap-3 grid-cols-2">
+            <div>
+              <label class="tu-label" for="s-telefono">{{
+                $t("perfilPublico.sucursal.telefono")
+              }}</label>
+              <input
+                id="s-telefono"
+                v-model="form.telefono"
+                class="tu-input"
+                inputmode="tel"
+                maxlength="30"
+              />
+            </div>
+            <div>
+              <label class="tu-label" for="s-whatsapp">{{
+                $t("perfilPublico.sucursal.whatsapp")
+              }}</label>
+              <input
+                id="s-whatsapp"
+                v-model="form.whatsapp"
+                class="tu-input"
+                inputmode="tel"
+                maxlength="30"
+                :placeholder="$t('perfilPublico.sucursal.whatsappPh')"
+              />
+            </div>
+          </div>
+          <p
+            v-if="errores.telefono || errores.whatsapp"
+            class="-mt-2 text-xs"
+            style="color: var(--error)"
+          >
+            {{ errores.telefono || errores.whatsapp }}
+          </p>
+
+          <fieldset>
+            <legend class="tu-label">
+              {{ $t("perfilPublico.sucursal.redes") }}
+            </legend>
+            <p
+              class="-mt-1 mb-2 text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("perfilPublico.sucursal.redesAyuda") }}
+            </p>
+            <div class="grid gap-2 grid-cols-2">
+              <label v-for="r in REDES" :key="r" class="block">
+                <span class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+                  {{ $t(`perfilPublico.redes.${r}`) }}
+                </span>
+                <input
+                  v-model="form.redes[r]"
+                  class="tu-input"
+                  :placeholder="$t(`perfilPublico.redesPh.${r}`)"
+                />
+                <span
+                  v-if="errores[`redes.${r}`]"
+                  class="text-xs"
+                  style="color: var(--error)"
+                >
+                  {{ errores[`redes.${r}`] }}
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend class="tu-label">
+              {{ $t("perfilPublico.sucursal.horario") }}
+            </legend>
+            <p
+              class="-mt-1 mb-2 text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("perfilPublico.sucursal.horarioAyuda") }}
+            </p>
+            <ul class="space-y-1.5" data-prueba="horario-sede">
+              <li
+                v-for="d in form.horario"
+                :key="d.dia"
+                class="flex flex-wrap items-center gap-2 text-sm"
+              >
+                <label class="flex w-28 items-center gap-2">
+                  <input v-model="d.abierto" type="checkbox" />
+                  {{ $t(`perfilPublico.dias.${d.dia}`) }}
+                </label>
+                <template v-if="d.abierto">
+                  <input
+                    v-model="d.abre"
+                    type="time"
+                    class="tu-input w-auto"
+                    :aria-label="$t('perfilPublico.sucursal.abre')"
+                  />
+                  <span :style="{ color: 'var(--texto-suave)' }">–</span>
+                  <input
+                    v-model="d.cierra"
+                    type="time"
+                    class="tu-input w-auto"
+                    :aria-label="$t('perfilPublico.sucursal.cierra')"
+                  />
+                  <span
+                    v-if="errorDelDia(d)"
+                    class="text-xs"
+                    style="color: var(--error)"
+                  >
+                    {{ errorDelDia(d) }}
+                  </span>
+                </template>
+                <span v-else :style="{ color: 'var(--texto-suave)' }">{{
+                  $t("perfilPublico.publico.cerrado")
+                }}</span>
+              </li>
+            </ul>
+          </fieldset>
         </div>
       </form>
 

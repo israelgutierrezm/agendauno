@@ -62,6 +62,7 @@ use App\Modules\Tenancy\Http\Controllers\PagosTenantController;
 use App\Modules\Tenancy\Http\Controllers\ParametrosTenantController;
 use App\Modules\Tenancy\Http\Controllers\PasarelasTenantController;
 use App\Modules\Tenancy\Http\Controllers\PausasMembresiaTenantController;
+use App\Modules\Tenancy\Http\Controllers\PerfilPublicoController;
 use App\Modules\Tenancy\Http\Controllers\PerfilTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasHorarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasMensajeTenantController;
@@ -369,6 +370,11 @@ Route::prefix('v1')->group(function (): void {
             // Logo del estudio (branding): lo gestiona el administrador.
             Route::post('/marca/logo', [MarcaEstudioController::class, 'subirLogo'])->middleware('puede:estudio.gestionar')->name('marca.logo.store');
             Route::delete('/marca/logo', [MarcaEstudioController::class, 'eliminarLogo'])->middleware('puede:estudio.gestionar')->name('marca.logo.destroy');
+            // Perfil público: portada, descripción y redes (página pública y de enlaces).
+            Route::post('/marca/portada', [MarcaEstudioController::class, 'subirPortada'])->middleware('puede:estudio.gestionar')->name('marca.portada.store');
+            Route::delete('/marca/portada', [MarcaEstudioController::class, 'eliminarPortada'])->middleware('puede:estudio.gestionar')->name('marca.portada.destroy');
+            Route::get('/perfil-publico', [PerfilPublicoController::class, 'mostrar'])->middleware('puede:estudio.gestionar')->name('perfil-publico.show');
+            Route::put('/perfil-publico', [PerfilPublicoController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('perfil-publico.guardar');
 
             // Documentos: el admin define tipos requeridos; se cargan por persona y
             // el staff los valida (tenant-local, aislado).

@@ -25,6 +25,9 @@ use Illuminate\Validation\ValidationException;
  */
 class CatalogoTenantController
 {
+    /** Descripción de un servicio o clase para la página pública. */
+    private const MAX_DESCRIPCION = 600;
+
     public function programas(): JsonResponse
     {
         $programas = ProgramaTenant::query()->with('actividades.ofertas')->orderBy('id')->get();
@@ -88,6 +91,8 @@ class CatalogoTenantController
         $actividad = ActividadTenant::query()->where('ulid', (string) $request->route('actividad'))->firstOrFail();
         $validado = $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
+            // Lo que ve quien la elige en línea (página pública y agendar).
+            'descripcion' => ['nullable', 'string', 'max:'.self::MAX_DESCRIPCION],
             'modalidad' => ['required', Rule::enum(ModalidadOfertaTenant::class)],
             'capacidad' => ['nullable', 'integer', 'min:1'],
             'lugares' => ['nullable', 'integer', 'min:0', 'max:1000'],
@@ -109,6 +114,7 @@ class CatalogoTenantController
 
         $oferta = $actividad->ofertas()->create([
             'nombre' => $validado['nombre'],
+            'descripcion' => $this->descripcion($validado['descripcion'] ?? null),
             'modalidad' => $validado['modalidad'],
             'capacidad' => $validado['capacidad'] ?? null,
             'lugares' => (int) ($validado['lugares'] ?? 0),
@@ -133,6 +139,7 @@ class CatalogoTenantController
         $oferta = OfertaTenant::query()->where('ulid', (string) $request->route('oferta'))->firstOrFail();
         $validado = $request->validate([
             'lugares' => ['required', 'integer', 'min:0', 'max:1000'],
+            'descripcion' => ['nullable', 'string', 'max:'.self::MAX_DESCRIPCION],
             'precio_clase_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
             'politica_reserva' => ['nullable', Rule::enum(PoliticaReservaTenant::class)],
             'duracion_minutos' => ['nullable', 'integer', 'min:5', 'max:1440'],
@@ -164,6 +171,10 @@ class CatalogoTenantController
         if (isset($validado['politica_reserva'])) {
             $cambios['politica_reserva'] = $validado['politica_reserva'];
         }
+        // La descripción solo se toca si viene (vacía la quita).
+        if ($request->has('descripcion')) {
+            $cambios['descripcion'] = $this->descripcion($validado['descripcion'] ?? null);
+        }
         // La duración de la cita solo se toca si viene (null la limpia).
         if ($request->has('duracion_minutos')) {
             $cambios['duracion_minutos'] = $validado['duracion_minutos'] !== null ? (int) $validado['duracion_minutos'] : null;
@@ -185,6 +196,13 @@ class CatalogoTenantController
         ]);
     }
 
+    private function descripcion(mixed $valor): ?string
+    {
+        $texto = trim((string) $valor);
+
+        return $texto === '' ? null : $texto;
+    }
+
     private function slug(string $nombre): string
     {
         return Str::slug($nombre).'-'.Str::lower(Str::random(5));
@@ -198,6 +216,7 @@ class CatalogoTenantController
         return [
             'id' => $oferta->ulid,
             'nombre' => $oferta->nombre,
+            'descripcion' => $oferta->descripcion,
             'modalidad' => $oferta->modalidad->value,
             'capacidad' => $oferta->capacidad,
             'lugares' => $oferta->lugares,

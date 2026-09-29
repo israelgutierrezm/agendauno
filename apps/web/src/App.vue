@@ -45,6 +45,8 @@ const RUTAS_PUBLICAS_DE_NEGOCIO = new Set([
   "estudio-corto",
   "agendar-cita",
   "sucursales-estudio",
+  "enlaces-estudio",
+  "enlaces-subdominio",
 ]);
 const esRutaPublicaDeNegocio = computed(
   () =>

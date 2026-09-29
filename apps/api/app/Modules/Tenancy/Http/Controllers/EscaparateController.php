@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
+use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\ResenaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
@@ -14,6 +16,8 @@ use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
+use App\Modules\Tenancy\Support\HorarioSucursal;
+use App\Modules\Tenancy\Support\RedesSociales;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -21,8 +25,10 @@ use Illuminate\Http\Request;
 
 /**
  * Escaparate PÚBLICO del estudio (embudo público, P0 #3): la página que ve un
- * prospecto antes de registrarse — identidad, próximas clases (con cupo), precios,
- * instructores y ubicación. Sin auth, pero SOLO para estudios listados en el
+ * prospecto antes de registrarse — identidad (descripción, portada, redes), sus
+ * sucursales (dirección, mapa, WhatsApp, redes y horario), profesionales con foto,
+ * servicios o clases con su descripción, el horario semanal de clases, próximas clases
+ * (con cupo), precios y reseñas. Sin auth, pero SOLO para estudios listados en el
  * directorio ({@see Estudio::enDirectorio()}); un estudio privado o no publicado no
  * tiene escaparate. Expone únicamente datos públicos (nunca IDs internos, correos ni
  * datos sensibles). Opera sobre la BD del estudio ya resuelto por `estudio.resolver`.
@@ -44,11 +50,15 @@ class EscaparateController
                 'slug' => $estudio->slug,
                 'nombre' => $estudio->nombre,
                 'logo_url' => $estudio->logo_url,
+                'portada_url' => $estudio->portada_url,
+                'descripcion' => $estudio->descripcion,
+                'redes' => RedesSociales::publicas($estudio->redes),
                 'perfil' => $estudio->perfil_negocio->value,
                 'perfil_config' => $estudio->perfilConfig(),
                 'ciudad' => $estudio->ciudad,
                 'pais' => $estudio->pais,
                 'whatsapp' => $estudio->whatsappCompleto(),
+                'whatsapp_url' => self::enlaceWhatsapp($estudio->whatsappCompleto()),
                 // ¿Ofrece servicios agendables como cita en línea? (para el CTA de reserva).
                 'tiene_citas' => OfertaTenant::query()
                     ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
@@ -56,6 +66,8 @@ class EscaparateController
             ],
             'sucursales' => $this->sucursales(),
             'instructores' => $this->instructores(),
+            'servicios' => $this->servicios(),
+            'horario_clases' => $this->horarioClases(),
             'productos' => $this->productos(),
             'proximas_sesiones' => $this->proximasSesiones(),
             'resenas' => $this->resenas(),
@@ -63,33 +75,129 @@ class EscaparateController
     }
 
     /**
+     * Enlace de WhatsApp (wa.me) desde un número capturado con o sin lada; un número
+     * de 10 dígitos se toma como de México.
+     */
+    public static function enlaceWhatsapp(?string $numero): ?string
+    {
+        $digitos = preg_replace('/\D+/', '', (string) $numero) ?? '';
+        if (strlen($digitos) < 10) {
+            return null;
+        }
+
+        return 'https://wa.me/'.(strlen($digitos) === 10 ? '52'.$digitos : $digitos);
+    }
+
+    /**
+     * Cada sede con lo que necesita quien la busca: dónde está (con enlace al mapa),
+     * cómo escribirle, sus redes y a qué hora atiende.
+     *
      * @return list<array<string, mixed>>
      */
     private function sucursales(): array
     {
         return SucursalTenant::query()
             ->orderBy('nombre')
-            ->get(['nombre', 'zona_horaria', 'region'])
-            ->map(static fn (SucursalTenant $s): array => [
-                'nombre' => $s->nombre,
-                'zona_horaria' => $s->zona_horaria,
-                'region' => $s->region,
-            ])->all();
+            ->get()
+            ->map(static function (SucursalTenant $s): array {
+                $mapa = match (true) {
+                    $s->direccion !== null && $s->direccion !== '' => $s->direccion,
+                    $s->latitud !== null && $s->longitud !== null => $s->latitud.','.$s->longitud,
+                    default => null,
+                };
+
+                return [
+                    'id' => $s->ulid,
+                    'nombre' => $s->nombre,
+                    'zona_horaria' => $s->zona_horaria,
+                    'region' => $s->region,
+                    'direccion' => $s->direccion,
+                    'mapa_url' => $mapa !== null ? 'https://www.google.com/maps/search/?api=1&query='.rawurlencode($mapa) : null,
+                    'telefono' => $s->telefono,
+                    'whatsapp' => $s->whatsapp,
+                    'whatsapp_url' => self::enlaceWhatsapp($s->whatsapp),
+                    'redes' => RedesSociales::publicas($s->redes),
+                    'horario' => HorarioSucursal::publico($s),
+                ];
+            })->all();
     }
 
     /**
-     * Instructores por nombre (nunca correo ni datos sensibles).
+     * Profesionales o instructores por nombre y foto (nunca correo ni datos sensibles).
      *
-     * @return list<string>
+     * @return list<array{nombre: string, foto_url: string|null}>
      */
     private function instructores(): array
     {
         return Usuario::query()
             ->whereJsonContains('roles', 'instructor')
             ->orderBy('name')
-            ->pluck('name')
-            ->map(static fn ($n): string => (string) $n)
+            ->get()
+            ->map(static fn (Usuario $u): array => ['nombre' => (string) $u->name, 'foto_url' => $u->fotoUrl()])
+            ->values()
             ->all();
+    }
+
+    /**
+     * Servicios o clases con su descripción, agrupables por categoría (la actividad del
+     * catálogo) y con sus niveles; los de cita dicen si se agendan en línea.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function servicios(): array
+    {
+        return OfertaTenant::query()
+            ->with(['actividad.niveles'])
+            ->orderBy('nombre')
+            ->get()
+            ->map(static fn (OfertaTenant $o): array => [
+                'id' => $o->ulid,
+                'nombre' => $o->nombre,
+                'descripcion' => $o->descripcion,
+                'categoria' => $o->actividad?->nombre,
+                'grupal' => $o->modalidad === ModalidadOfertaTenant::Grupal,
+                'duracion_minutos' => $o->duracion_minutos,
+                'precio_minor' => $o->precio_clase_minor,
+                'moneda' => 'MXN',
+                'agendable' => $o->politica_reserva === PoliticaReservaTenant::Pago,
+                'niveles' => $o->actividad?->niveles->sortBy('orden')->pluck('nombre')->values()->all() ?? [],
+            ])->values()->all();
+    }
+
+    /**
+     * El horario semanal de clases (las recurrentes vigentes): por día, hora, clase,
+     * quién la da y en qué sede. Es lo que un estudio publica en sus redes.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function horarioClases(): array
+    {
+        $hoy = CarbonImmutable::today();
+        $filas = [];
+        PlantillaHorarioTenant::query()
+            ->where('activo', true)
+            ->where(fn ($q) => $q->whereNull('vigente_hasta')->orWhereDate('vigente_hasta', '>=', $hoy))
+            ->with(['oferta.actividad', 'sucursal', 'instructor'])
+            ->get()
+            ->each(function (PlantillaHorarioTenant $p) use (&$filas): void {
+                if ($p->oferta === null || $p->oferta->modalidad !== ModalidadOfertaTenant::Grupal) {
+                    return;
+                }
+                foreach ($p->dias_semana ?? [] as $dia) {
+                    $filas[] = [
+                        'dia' => (int) $dia,
+                        'hora' => (string) $p->hora_local,
+                        'duracion_minutos' => $p->duracion_minutos,
+                        'clase' => $p->oferta->nombre,
+                        'categoria' => $p->oferta->actividad?->nombre,
+                        'instructor' => $p->instructor?->name,
+                        'sucursal' => $p->sucursal?->nombre,
+                    ];
+                }
+            });
+        usort($filas, static fn (array $a, array $b): int => [$a['dia'], $a['hora']] <=> [$b['dia'], $b['hora']]);
+
+        return $filas;
     }
 
     /**

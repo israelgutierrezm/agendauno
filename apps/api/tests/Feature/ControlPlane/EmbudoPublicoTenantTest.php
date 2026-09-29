@@ -38,7 +38,7 @@ it('el escaparate público muestra identidad, próximas clases, precios e instru
     expect($data['proximas_sesiones'])->toHaveCount(1);
     expect($data['proximas_sesiones'][0]['clase'])->toBe('Nivel 1');
     expect($data['proximas_sesiones'][0]['lugares_libres'])->toBe(12);
-    expect($data['instructores'])->toContain('Personal');
+    expect(collect($data['instructores'])->pluck('nombre'))->toContain('Personal');
     // Sin servicios de pago, no hay citas en línea (no se muestra el CTA).
     expect($data['estudio']['tiene_citas'])->toBeFalse();
 });

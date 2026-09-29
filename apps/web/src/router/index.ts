@@ -63,6 +63,18 @@ const router = createRouter({
       component: () => import("@/views/ReservarCitaView.vue"),
     },
     {
+      // Página de enlaces del negocio (la de la bio de Instagram):
+      // agendauno.mx/{slug}/enlaces o {slug}.agendauno.mx/enlaces.
+      path: "/:slug/enlaces",
+      name: "enlaces-estudio",
+      component: () => import("@/views/EnlacesEstudioView.vue"),
+    },
+    {
+      path: "/enlaces",
+      name: "enlaces-subdominio",
+      component: () => import("@/views/EnlacesEstudioView.vue"),
+    },
+    {
       // Selector de sucursal (público): raíz del subdominio con varias sedes.
       path: "/sucursales/:slug",
       name: "sucursales-estudio",

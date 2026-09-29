@@ -12,7 +12,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
- * Oferta de una actividad (clase vendible/agendable), tenant-local.
+ * Oferta de una actividad (clase vendible/agendable), tenant-local. La descripción
+ * la ve quien la elige en línea.
+ *
+ * @property string|null $descripcion
  */
 class OfertaTenant extends Model
 {
@@ -22,7 +25,7 @@ class OfertaTenant extends Model
 
     protected $table = 'ofertas';
 
-    protected $fillable = ['actividad_id', 'nombre', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min'];
+    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min'];
 
     /**
      * @var array<string, string>

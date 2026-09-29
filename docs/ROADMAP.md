@@ -11,6 +11,9 @@
 - **Fase 1 (operación)** y **fase 2 (agenda cotidiana)** cerradas (ADR 0035–0046).
 - **Plataforma**: registro, onboarding, directorio, subdominios, superadmin, cobro
   del SaaS, documentos legales, respaldos, alertas, despliegue con Docker.
+- **Perfil público** (ADR 0061): portada, descripción y redes del negocio y de cada
+  sede, horario, fotos del equipo, servicios por categoría, horario semanal de clases
+  y página de enlaces para Instagram.
 - **Experiencia**: web única (sitio, panel, portal, superadmin) y app Flutter;
   roles propios y rol activo por sesión (ADR 0055, 0057); nombre AgendaUno
   (ADR 0056).
@@ -26,6 +29,10 @@
 
 - Conciliar el guardado de tarjeta de Stripe (pago automático) cuando no llega su
   aviso; hoy la conciliación cubre los cobros.
+- Reserva pública: «cualquier profesional disponible», elegir primero la hora,
+  varios servicios en una cita, selector semanal de horarios y más datos del
+  cliente (apellido, lada, cómo se enteró, notas).
+- Avisos por WhatsApp (proveedor por decidir) y foto por servicio.
 - Separar «editar» y «eliminar» en el catálogo de permisos.
 - Roles propios con faceta de instructor.
 - Monitoreo de errores más completo y despliegue automático desde el CI.

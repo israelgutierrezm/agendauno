@@ -6,6 +6,8 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Models\OrganizacionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
+use App\Modules\Tenancy\Support\HorarioSucursal;
+use App\Modules\Tenancy\Support\RedesSociales;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -53,6 +55,8 @@ class OrganizacionesTenantController
             'latitud' => $validado['latitud'] ?? null,
             'longitud' => $validado['longitud'] ?? null,
         ]);
+        $this->aplicarPerfilPublico($sucursal, $validado);
+        $sucursal->save();
 
         return response()->json(['data' => $this->presentarSucursal($sucursal)], 201);
     }
@@ -79,6 +83,7 @@ class OrganizacionesTenantController
             $sucursal->latitud = $validado['latitud'];
             $sucursal->longitud = $validado['longitud'] ?? null;
         }
+        $this->aplicarPerfilPublico($sucursal, $validado);
 
         $sucursal->save();
 
@@ -108,7 +113,38 @@ class OrganizacionesTenantController
             // Ubicación del local (para el clima): las dos o ninguna.
             'latitud' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitud'],
             'longitud' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitud'],
+            // Perfil público de la sede.
+            'direccion' => ['nullable', 'string', 'max:255'],
+            'telefono' => ['nullable', 'string', 'max:30', 'regex:/^[0-9 +()-]*$/'],
+            'whatsapp' => ['nullable', 'string', 'max:30', 'regex:/^[0-9 +()-]*$/'],
+            ...RedesSociales::reglas(),
+            ...HorarioSucursal::reglas(),
         ]);
+    }
+
+    /**
+     * Perfil público de la sede: lo enviado se guarda (vacío = se quita).
+     *
+     * @param  array<string, mixed>  $validado
+     */
+    private function aplicarPerfilPublico(SucursalTenant $sucursal, array $validado): void
+    {
+        foreach (['direccion', 'telefono', 'whatsapp'] as $campo) {
+            if (array_key_exists($campo, $validado)) {
+                $valor = trim((string) $validado[$campo]);
+                $sucursal->{$campo} = $valor === '' ? null : $valor;
+            }
+        }
+        if (array_key_exists('redes', $validado)) {
+            /** @var array<string, mixed>|null $redes */
+            $redes = $validado['redes'];
+            $sucursal->redes = RedesSociales::normalizar($redes);
+        }
+        if (array_key_exists('horario', $validado)) {
+            /** @var list<array<string, mixed>>|null $horario */
+            $horario = $validado['horario'];
+            $sucursal->horario = HorarioSucursal::normalizar($horario);
+        }
     }
 
     /**
@@ -125,6 +161,11 @@ class OrganizacionesTenantController
             'impuesto_tasa_bps' => (int) $sucursal->impuesto_tasa_bps,
             'latitud' => $sucursal->latitud,
             'longitud' => $sucursal->longitud,
+            'direccion' => $sucursal->direccion,
+            'telefono' => $sucursal->telefono,
+            'whatsapp' => $sucursal->whatsapp,
+            'redes' => (object) ($sucursal->redes ?? []),
+            'horario' => $sucursal->horario ?? [],
         ];
     }
 }

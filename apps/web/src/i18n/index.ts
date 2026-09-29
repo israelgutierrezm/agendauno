@@ -64,6 +64,7 @@ import {
 } from "./locales/gestion.es-MX";
 import asistente from "./locales/asistente.es-MX";
 import operacion from "./locales/operacion.es-MX";
+import perfilPublico from "./locales/perfilPublico.es-MX";
 import planes from "./locales/planes.es-MX";
 import portal from "./locales/portal.es-MX";
 import recepcionVisual from "./locales/recepcionVisual.es-MX";
@@ -127,6 +128,7 @@ const mensajesBase = {
   planes,
   asistente,
   operacion,
+  perfilPublico,
 };
 
 export const i18n = createI18n({

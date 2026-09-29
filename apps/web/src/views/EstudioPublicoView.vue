@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import CampoContrasena from "@/components/CampoContrasena.vue";
+import IconoRed from "@/components/IconoRed.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import { recordarNegocio } from "@/lib/negociosRecientes";
@@ -26,10 +27,49 @@ interface Producto {
   ilimitado: boolean;
   creditos_incluidos: number | null;
 }
+type NombreRed = "instagram" | "facebook" | "tiktok" | "youtube" | "sitio_web";
+interface Red {
+  red: NombreRed;
+  url: string;
+}
+interface DiaAbierto {
+  dia: number;
+  abre: string;
+  cierra: string;
+}
 interface Sucursal {
+  id?: string;
   nombre: string;
   zona_horaria: string | null;
   region: string | null;
+  direccion?: string | null;
+  mapa_url?: string | null;
+  telefono?: string | null;
+  whatsapp_url?: string | null;
+  redes?: Red[];
+  // Null: no hay horario capturado ni de sus profesionales.
+  horario?: DiaAbierto[] | null;
+}
+interface Servicio {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  categoria: string | null;
+  grupal: boolean;
+  duracion_minutos: number | null;
+  precio_minor: number | null;
+  moneda: string;
+  agendable: boolean;
+  niveles: string[];
+}
+interface ClaseHorario {
+  dia: number;
+  hora: string;
+  duracion_minutos: number | null;
+  clase: string;
+  categoria: string | null;
+  instructor: string | null;
+  sucursal: string | null;
 }
 interface Resena {
   calificacion: number;
@@ -43,6 +83,10 @@ interface Escaparate {
     slug: string;
     nombre: string;
     logo_url: string | null;
+    portada_url?: string | null;
+    descripcion?: string | null;
+    redes?: Red[];
+    whatsapp_url?: string | null;
     perfil: string;
     perfil_config: { terminologia?: Record<string, string> };
     ciudad: string | null;
@@ -51,7 +95,9 @@ interface Escaparate {
     tiene_citas: boolean;
   };
   sucursales: Sucursal[];
-  instructores: string[];
+  instructores: { nombre: string; foto_url: string | null }[];
+  servicios?: Servicio[];
+  horario_clases?: ClaseHorario[];
   productos: Producto[];
   proximas_sesiones: Sesion[];
   // Solo las que el negocio deja visibles (promedio de todas; comentarios recientes).
@@ -84,6 +130,63 @@ const ubicacion = computed(() => {
   return e ? [e.ciudad, e.pais].filter(Boolean).join(", ") : "";
 });
 const usaCitas = computed(() => escaparate.value?.estudio.tiene_citas === true);
+
+// Descripción larga: se recorta y se abre con «Leer más».
+const descripcionAbierta = ref(false);
+const descripcionLarga = computed(
+  () => (escaparate.value?.estudio.descripcion ?? "").length > 280,
+);
+
+// Servicios o clases, por categoría y con buscador.
+const busqueda = ref("");
+const categoria = ref<string | null>(null);
+const servicios = computed(() => escaparate.value?.servicios ?? []);
+const categorias = computed(() => [
+  ...new Set(
+    servicios.value
+      .map((x) => x.categoria)
+      .filter((c): c is string => c !== null && c !== ""),
+  ),
+]);
+const serviciosVisibles = computed(() => {
+  const q = busqueda.value.trim().toLocaleLowerCase("es-MX");
+  return servicios.value.filter(
+    (x) =>
+      (categoria.value === null || x.categoria === categoria.value) &&
+      (q === "" ||
+        `${x.nombre} ${x.descripcion ?? ""}`
+          .toLocaleLowerCase("es-MX")
+          .includes(q)),
+  );
+});
+const gruposServicios = computed(() => {
+  const grupos = new Map<string, Servicio[]>();
+  for (const x of serviciosVisibles.value) {
+    const clave = x.categoria ?? "";
+    grupos.set(clave, [...(grupos.get(clave) ?? []), x]);
+  }
+  return [...grupos.entries()].map(([nombre, lista]) => ({ nombre, lista }));
+});
+
+// Horario semanal de clases, por día (lunes a domingo).
+const horarioPorDia = computed(() => {
+  const filas = escaparate.value?.horario_clases ?? [];
+  return [1, 2, 3, 4, 5, 6, 7]
+    .map((dia) => ({ dia, clases: filas.filter((f) => f.dia === dia) }))
+    .filter((d) => d.clases.length > 0);
+});
+const variasSedes = computed(
+  () => (escaparate.value?.sucursales.length ?? 0) > 1,
+);
+function horaCorta(hora: string): string {
+  return hora.slice(0, 5);
+}
+function horarioDeSede(su: Sucursal): { dia: number; texto: string | null }[] {
+  return [1, 2, 3, 4, 5, 6, 7].map((dia) => {
+    const d = (su.horario ?? []).find((h) => h.dia === dia);
+    return { dia, texto: d ? `${d.abre} – ${d.cierra}` : null };
+  });
+}
 const etiquetaProfesional = computed(
   () =>
     escaparate.value?.estudio.perfil_config.terminologia?.instructor ??
@@ -150,7 +253,7 @@ async function cargar(): Promise<void> {
         ? `Consulta servicios, profesionales y horarios disponibles de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}. Reserva tu cita en línea.`
         : `Consulta próximas clases, instructores y precios de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}.`,
       path: `/estudio/${estudio.slug}`,
-      image: estudio.logo_url ?? undefined,
+      image: estudio.portada_url ?? estudio.logo_url ?? undefined,
       type: "profile",
       jsonLd: {
         "@context": "https://schema.org",
@@ -159,6 +262,8 @@ async function cargar(): Promise<void> {
         url: `https://agendauno.mx/estudio/${estudio.slug}`,
         image: estudio.logo_url ?? undefined,
         address: lugar || undefined,
+        description: estudio.descripcion ?? undefined,
+        sameAs: (estudio.redes ?? []).map((r) => r.url),
       },
     });
     trackEvent("public_studio_viewed", { business_profile: estudio.perfil });
@@ -221,11 +326,22 @@ onMounted(cargar);
 
     <template v-else-if="escaparate">
       <!-- Hero -->
+      <div
+        v-if="escaparate.estudio.portada_url"
+        class="ep-portada"
+        :style="{ backgroundImage: `url(${escaparate.estudio.portada_url})` }"
+        role="img"
+        :aria-label="escaparate.estudio.nombre"
+      ></div>
       <section
         class="px-4 py-14 text-center"
+        :class="{ 'pt-0': escaparate.estudio.portada_url }"
         :style="{ background: 'var(--superficie)' }"
       >
-        <div class="mx-auto max-w-3xl">
+        <div
+          class="mx-auto max-w-3xl"
+          :class="{ 'ep-sobre-portada': escaparate.estudio.portada_url }"
+        >
           <img
             v-if="escaparate.estudio.logo_url"
             :src="escaparate.estudio.logo_url"
@@ -257,6 +373,65 @@ onMounted(cargar);
           >
             {{ ubicacion }}
           </p>
+          <div
+            v-if="escaparate.estudio.descripcion"
+            class="mx-auto mt-5 max-w-2xl text-left sm:text-center"
+          >
+            <p
+              class="whitespace-pre-line"
+              :class="{
+                'ep-recortada': descripcionLarga && !descripcionAbierta,
+              }"
+              data-prueba="descripcion"
+            >
+              {{ escaparate.estudio.descripcion }}
+            </p>
+            <button
+              v-if="descripcionLarga"
+              type="button"
+              class="tu-enlace mt-1 text-sm"
+              @click="descripcionAbierta = !descripcionAbierta"
+            >
+              {{
+                descripcionAbierta
+                  ? $t("perfilPublico.publico.leerMenos")
+                  : $t("perfilPublico.publico.leerMas")
+              }}
+            </button>
+          </div>
+          <ul
+            v-if="
+              (escaparate.estudio.redes ?? []).length > 0 ||
+              escaparate.estudio.whatsapp_url
+            "
+            class="mt-5 flex flex-wrap justify-center gap-2"
+            data-prueba="redes"
+          >
+            <li v-for="r in escaparate.estudio.redes ?? []" :key="r.red">
+              <a
+                :href="r.url"
+                target="_blank"
+                rel="noopener"
+                class="ep-red"
+                :aria-label="$t(`perfilPublico.redes.${r.red}`)"
+                :title="$t(`perfilPublico.redes.${r.red}`)"
+              >
+                <IconoRed :red="r.red" />
+              </a>
+            </li>
+            <li v-if="escaparate.estudio.whatsapp_url">
+              <a
+                :href="escaparate.estudio.whatsapp_url"
+                target="_blank"
+                rel="noopener"
+                class="ep-red"
+                :aria-label="$t('perfilPublico.publico.whatsapp')"
+                :title="$t('perfilPublico.publico.whatsapp')"
+              >
+                <IconoRed red="whatsapp" />
+              </a>
+            </li>
+          </ul>
 
           <div class="mt-7 flex flex-wrap justify-center gap-3">
             <RouterLink
@@ -383,8 +558,167 @@ onMounted(cargar);
         </ul>
       </section>
 
+      <!-- Servicios o clases, por categoría -->
+      <section
+        v-if="servicios.length > 0"
+        class="mx-auto max-w-5xl px-4 py-12"
+        data-prueba="servicios"
+      >
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <h2 class="text-2xl font-light">
+            {{
+              usaCitas
+                ? $t("perfilPublico.publico.servicios")
+                : $t("perfilPublico.publico.clases")
+            }}
+          </h2>
+          <input
+            v-if="servicios.length > 5"
+            v-model="busqueda"
+            type="search"
+            class="tu-input w-full sm:w-64"
+            :placeholder="$t('perfilPublico.publico.buscar')"
+            :aria-label="$t('perfilPublico.publico.buscar')"
+          />
+        </div>
+        <div
+          v-if="categorias.length > 1"
+          class="tu-segmentado mt-4 flex-wrap"
+          role="group"
+        >
+          <button
+            type="button"
+            :aria-pressed="categoria === null"
+            @click="categoria = null"
+          >
+            {{ $t("perfilPublico.publico.todos") }}
+          </button>
+          <button
+            v-for="c in categorias"
+            :key="c"
+            type="button"
+            :aria-pressed="categoria === c"
+            @click="categoria = c"
+          >
+            {{ c }}
+          </button>
+        </div>
+        <p
+          v-if="serviciosVisibles.length === 0"
+          class="mt-6"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("perfilPublico.publico.sinCoincidencias") }}
+        </p>
+        <div v-for="g in gruposServicios" :key="g.nombre" class="mt-6">
+          <h3
+            v-if="g.nombre && categorias.length > 1 && categoria === null"
+            class="text-sm font-semibold"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ g.nombre }}
+          </h3>
+          <ul class="mt-2 divide-y divide-[var(--borde)]">
+            <li
+              v-for="x in g.lista"
+              :key="x.id"
+              class="flex flex-wrap items-start justify-between gap-3 py-4"
+            >
+              <div class="min-w-0 flex-1">
+                <p class="font-semibold">{{ x.nombre }}</p>
+                <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+                  {{
+                    [
+                      x.duracion_minutos
+                        ? $t("perfilPublico.publico.duracion", {
+                            n: x.duracion_minutos,
+                          })
+                        : null,
+                      x.niveles.length > 0
+                        ? $t("perfilPublico.publico.niveles", {
+                            lista: x.niveles.join(", "),
+                          })
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")
+                  }}
+                </p>
+                <p v-if="x.descripcion" class="mt-1 text-sm">
+                  {{ x.descripcion }}
+                </p>
+              </div>
+              <div class="flex items-center gap-3">
+                <span
+                  v-if="x.precio_minor !== null"
+                  class="font-semibold tabular-nums"
+                  >{{ dinero(x.precio_minor, x.moneda) }}</span
+                >
+                <RouterLink
+                  v-if="x.agendable"
+                  :to="{ name: 'agendar-cita', params: { slug } }"
+                  class="tu-btn tu-btn-fantasma"
+                  @click="
+                    trackEvent('book_appointment_clicked', {
+                      source: 'service',
+                    })
+                  "
+                >
+                  {{ $t("perfilPublico.publico.agendar") }}
+                </RouterLink>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Horario semanal de clases -->
+      <section
+        v-if="horarioPorDia.length > 0"
+        id="horario"
+        class="py-12"
+        :style="{ background: 'var(--superficie)' }"
+        data-prueba="horario-clases"
+      >
+        <div class="mx-auto max-w-5xl px-4">
+          <h2 class="text-2xl font-light">
+            {{ $t("perfilPublico.publico.horarioClases") }}
+          </h2>
+          <div class="ep-semana mt-6">
+            <div v-for="d in horarioPorDia" :key="d.dia">
+              <h3 class="text-sm font-semibold">
+                {{ $t(`perfilPublico.dias.${d.dia}`) }}
+              </h3>
+              <ul class="mt-2 space-y-2">
+                <li v-for="(c, i) in d.clases" :key="i" class="ep-clase">
+                  <p class="text-sm font-semibold tabular-nums">
+                    {{ horaCorta(c.hora) }}
+                  </p>
+                  <p class="text-sm">{{ c.clase }}</p>
+                  <p
+                    v-if="c.instructor || (variasSedes && c.sucursal)"
+                    class="text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    {{
+                      [c.instructor, variasSedes ? c.sucursal : null]
+                        .filter(Boolean)
+                        .join(" · ")
+                    }}
+                  </p>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Precios -->
-      <section class="py-12" :style="{ background: 'var(--superficie)' }">
+      <section
+        id="precios"
+        class="py-12"
+        :style="{ background: 'var(--superficie)' }"
+      >
         <div class="mx-auto max-w-5xl px-4">
           <h2 class="text-2xl font-light">{{ $t("escaparate.precios") }}</h2>
           <p
@@ -452,20 +786,27 @@ onMounted(cargar);
         </p>
         <ul class="mt-6 flex flex-wrap gap-4">
           <li
-            v-for="(nombre, i) in escaparate.instructores"
+            v-for="(p, i) in escaparate.instructores"
             :key="i"
             class="flex items-center gap-3"
           >
+            <img
+              v-if="p.foto_url"
+              :src="p.foto_url"
+              alt=""
+              class="h-11 w-11 rounded-full object-cover"
+            />
             <span
+              v-else
               class="flex h-11 w-11 items-center justify-center rounded-full font-bold"
               :style="{
                 background: 'var(--primario)',
                 color: 'var(--primario-contraste)',
               }"
               aria-hidden="true"
-              >{{ iniciales(nombre) }}</span
+              >{{ iniciales(p.nombre) }}</span
             >
-            <span class="font-semibold">{{ nombre }}</span>
+            <span class="font-semibold">{{ p.nombre }}</span>
           </li>
         </ul>
       </section>
@@ -535,15 +876,78 @@ onMounted(cargar);
               v-for="(su, i) in escaparate.sucursales"
               :key="i"
               class="tu-card p-4"
+              data-prueba="sede"
             >
               <p class="font-semibold">{{ su.nombre }}</p>
               <p
-                v-if="su.region"
+                v-if="su.direccion || su.region"
                 class="text-sm"
                 :style="{ color: 'var(--texto-suave)' }"
               >
-                {{ su.region }}
+                {{ su.direccion ?? su.region }}
               </p>
+              <div
+                v-if="su.mapa_url || su.whatsapp_url || su.telefono"
+                class="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm"
+              >
+                <a
+                  v-if="su.mapa_url"
+                  :href="su.mapa_url"
+                  target="_blank"
+                  rel="noopener"
+                  class="tu-enlace inline-flex items-center gap-1.5"
+                >
+                  <IconoRed red="mapa" :tamano="16" />
+                  {{ $t("perfilPublico.publico.comoLlegar") }}
+                </a>
+                <a
+                  v-if="su.whatsapp_url"
+                  :href="su.whatsapp_url"
+                  target="_blank"
+                  rel="noopener"
+                  class="tu-enlace inline-flex items-center gap-1.5"
+                >
+                  <IconoRed red="whatsapp" :tamano="16" />
+                  {{ $t("perfilPublico.publico.whatsapp") }}
+                </a>
+                <a
+                  v-if="su.telefono"
+                  :href="`tel:${su.telefono.replace(/[^0-9+]/g, '')}`"
+                  class="tu-enlace inline-flex items-center gap-1.5"
+                >
+                  <IconoRed red="telefono" :tamano="16" />
+                  {{ su.telefono }}
+                </a>
+              </div>
+              <ul
+                v-if="(su.redes ?? []).length > 0"
+                class="mt-3 flex flex-wrap gap-2"
+              >
+                <li v-for="r in su.redes" :key="r.red">
+                  <a
+                    :href="r.url"
+                    target="_blank"
+                    rel="noopener"
+                    class="ep-red ep-red-chica"
+                    :aria-label="`${$t(`perfilPublico.redes.${r.red}`)} · ${su.nombre}`"
+                  >
+                    <IconoRed :red="r.red" :tamano="16" />
+                  </a>
+                </li>
+              </ul>
+              <dl
+                v-if="su.horario"
+                class="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm"
+              >
+                <template v-for="h in horarioDeSede(su)" :key="h.dia">
+                  <dt :style="{ color: 'var(--texto-suave)' }">
+                    {{ $t(`perfilPublico.dias.${h.dia}`) }}
+                  </dt>
+                  <dd class="tabular-nums">
+                    {{ h.texto ?? $t("perfilPublico.publico.cerrado") }}
+                  </dd>
+                </template>
+              </dl>
             </li>
           </ul>
         </div>
@@ -689,6 +1093,49 @@ onMounted(cargar);
 </template>
 
 <style scoped>
+.ep-portada {
+  height: clamp(9rem, 28vw, 18rem);
+  background-size: cover;
+  background-position: center;
+}
+.ep-sobre-portada {
+  margin-top: -2.5rem;
+}
+.ep-recortada {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ep-red {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--borde);
+  color: var(--texto);
+  background: var(--superficie);
+}
+.ep-red:hover {
+  border-color: var(--texto-suave);
+}
+.ep-red-chica {
+  width: 2rem;
+  height: 2rem;
+}
+.ep-semana {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+.ep-clase {
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.75rem;
+  border-left: 3px solid var(--primario);
+  background: color-mix(in srgb, var(--primario) 7%, var(--superficie));
+}
 .tu-agenda-citas {
   background:
     radial-gradient(

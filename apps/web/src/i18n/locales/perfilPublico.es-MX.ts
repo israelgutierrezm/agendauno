@@ -1,0 +1,115 @@
+/**
+ * Perfil público del negocio y de sus sedes: lo que se edita en Configuración y
+ * Sucursales, y lo que ve el público en la página del negocio y en su página de
+ * enlaces (la del link de Instagram).
+ */
+export default {
+  config: {
+    titulo: "Perfil público",
+    ayuda:
+      "Lo que ven tus clientes en tu página y en tu página de enlaces para redes.",
+    descripcion: "Descripción",
+    descripcionPh:
+      "Cuéntales quiénes son, qué ofrecen y qué los hace distintos.",
+    portada: "Portada",
+    portadaAyuda:
+      "Imagen horizontal (por ejemplo 1600 × 600). PNG, JPG o WebP, hasta 4 MB.",
+    portadaArrastra: "Arrastra la portada aquí o haz clic para elegir",
+    portadaTipo: "Usa una imagen PNG, JPG o WebP.",
+    portadaPeso: "La imagen no debe pesar más de 4 MB.",
+    portadaSubiendo: "Subiendo…",
+    portadaQuitar: "Quitar portada",
+    redes: "Redes y sitio web",
+    redesAyuda:
+      "Escribe tu usuario (@tu_negocio) o pega el enlace de tu perfil.",
+    guardar: "Guardar perfil",
+    guardando: "Guardando…",
+    guardado: "Perfil guardado.",
+    paginaPublica: "Tu página",
+    paginaEnlaces: "Página de enlaces (para la bio de Instagram)",
+    copiar: "Copiar",
+    copiado: "Copiado",
+  },
+  redes: {
+    instagram: "Instagram",
+    facebook: "Facebook",
+    tiktok: "TikTok",
+    youtube: "YouTube",
+    sitio_web: "Sitio web",
+  },
+  redesPh: {
+    instagram: "@tu_negocio",
+    facebook: "facebook.com/tu_negocio",
+    tiktok: "@tu_negocio",
+    youtube: "@tu_canal",
+    sitio_web: "tunegocio.mx",
+  },
+  sucursal: {
+    titulo: "Perfil público de la sede",
+    ayuda: "Dirección, contacto, redes y horario que ve el público.",
+    direccion: "Dirección",
+    direccionPh: "Calle, número, colonia y ciudad",
+    telefono: "Teléfono",
+    whatsapp: "WhatsApp",
+    whatsappPh: "Con lada, por ejemplo 52 55 1234 5678",
+    redes: "Redes de esta sede",
+    redesAyuda:
+      "Solo si la sede tiene cuentas propias; si no, se muestran las del negocio.",
+    horario: "Horario de atención",
+    horarioAyuda:
+      "Si lo dejas vacío y atiendes con citas, se muestra el horario de tus profesionales.",
+    abierto: "Abierto",
+    abre: "Abre",
+    cierra: "Cierra",
+    guardar: "Guardar perfil de la sede",
+    guardado: "Perfil de la sede guardado.",
+  },
+  catalogo: {
+    descripcion: "Descripción para tus clientes",
+    descripcionPh:
+      "Qué incluye, para quién es o qué necesita traer. Se ve en tu página y al agendar.",
+  },
+  dias: {
+    1: "Lunes",
+    2: "Martes",
+    3: "Miércoles",
+    4: "Jueves",
+    5: "Viernes",
+    6: "Sábado",
+    7: "Domingo",
+  },
+  publico: {
+    leerMas: "Leer más",
+    leerMenos: "Leer menos",
+    comoLlegar: "Cómo llegar",
+    whatsapp: "WhatsApp",
+    llamar: "Llamar",
+    horario: "Horario",
+    cerrado: "Cerrado",
+    servicios: "Servicios",
+    clases: "Clases",
+    buscar: "Busca por nombre",
+    sinCoincidencias: "Nada coincide con tu búsqueda.",
+    todos: "Todos",
+    duracion: "{n} min",
+    niveles: "Niveles: {lista}",
+    horarioClases: "Horario de clases",
+    sinHorarioClases: "Aún no hay clases en el horario.",
+    agendar: "Agendar",
+    redes: "Síguenos",
+  },
+  enlaces: {
+    cargando: "Cargando…",
+    noDisponible: "Este negocio no está disponible por ahora.",
+    agendar: "Agenda tu cita",
+    reservarClase: "Reserva tu clase",
+    horario: "Horario de clases",
+    precios: "Planes y precios",
+    conocer: "Conoce más de nosotros",
+    web: "Visita nuestra web",
+    whatsapp: "Escríbenos por WhatsApp",
+    ubicacion: "Nuestra ubicación",
+    ubicacionDe: "Ubicación · {sede}",
+    crearTuya: "Crea la página de tu negocio",
+  },
+};

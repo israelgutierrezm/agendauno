@@ -31,6 +31,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
+use App\Modules\Tenancy\Support\RedesSociales;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
@@ -116,8 +117,23 @@ class SembrarEstudioDemo extends Command
             $this->generarLogoDemo($estudio);
         }
 
+        // 3c. Perfil público de muestra (su página y la de enlaces), sin pisar lo que
+        // el usuario ya haya capturado.
+        if ($estudio->descripcion === null) {
+            $estudio->update([
+                'descripcion' => $soloCitas
+                    ? 'Barbería de barrio con oficio: cortes clásicos y modernos, barba con toalla caliente y un buen café mientras esperas.'
+                    : 'Estudio de pole y flexibilidad para todos los niveles. Grupos pequeños, instructoras certificadas y un ambiente seguro para empezar o perfeccionar tu técnica.',
+                'redes' => $estudio->redes ?? RedesSociales::normalizar([
+                    'instagram' => '@'.str_replace('-', '_', $slug).'_demo',
+                    'facebook' => str_replace('-', '', $slug).'demo',
+                    'sitio_web' => 'agendauno.mx',
+                ]),
+            ]);
+        }
+
         // 4. Datos operativos dentro de la BD del tenant.
-        $gestor->ejecutarEn($estudio, function () use ($password, $ownerEmail, $instructorEmail, $miembroEmail, $equipo, $soloCitas): void {
+        $gestor->ejecutarEn($estudio, function () use ($password, $ownerEmail, $instructorEmail, $miembroEmail, $equipo, $soloCitas, $slug): void {
             $this->sembrarPersonal($password, $ownerEmail, $instructorEmail, $miembroEmail);
             $this->sembrarEquipo($password, $equipo);
             [$oferta, $sucursal] = $this->sembrarCatalogoYSucursal($soloCitas);
@@ -129,6 +145,7 @@ class SembrarEstudioDemo extends Command
                 $this->sembrarClases($oferta, $sucursal, $instructorEmail);
             }
             $this->sembrarCitas([$instructorEmail, $equipo['profesional'][0]], $miembroEmail);
+            $this->sembrarPerfilPublico($slug);
         });
 
         $this->componentInfo($estudio, $slug, $password, $ownerEmail, $instructorEmail, $miembroEmail, $equipo);
@@ -228,6 +245,47 @@ class SembrarEstudioDemo extends Command
         );
 
         return [$oferta, $sucursal];
+    }
+
+    /**
+     * Perfil público de las sedes (dirección, WhatsApp, redes y horario) y descripción
+     * de los servicios y clases, para ver completa la página pública y la de enlaces.
+     * Solo rellena lo vacío.
+     */
+    private function sembrarPerfilPublico(string $slug): void
+    {
+        $sedes = [
+            'Roma Norte' => ['Av. Álvaro Obregón 120, Roma Norte, Ciudad de México', '55 1234 5678', null],
+            'Condesa' => ['Av. Tamaulipas 45, Condesa, Ciudad de México', '55 8765 4321', '@'.str_replace('-', '_', $slug).'_condesa'],
+        ];
+        $horario = [
+            ['dia' => 1, 'abre' => '07:00', 'cierra' => '21:00'], ['dia' => 2, 'abre' => '07:00', 'cierra' => '21:00'],
+            ['dia' => 3, 'abre' => '07:00', 'cierra' => '21:00'], ['dia' => 4, 'abre' => '07:00', 'cierra' => '21:00'],
+            ['dia' => 5, 'abre' => '07:00', 'cierra' => '20:00'], ['dia' => 6, 'abre' => '09:00', 'cierra' => '14:00'],
+        ];
+        foreach ($sedes as $nombre => [$direccion, $whatsapp, $instagram]) {
+            $sede = SucursalTenant::query()->where('nombre', $nombre)->first();
+            if ($sede === null || $sede->direccion !== null) {
+                continue;
+            }
+            $sede->fill([
+                'direccion' => $direccion,
+                'whatsapp' => $whatsapp,
+                'redes' => $instagram !== null ? RedesSociales::normalizar(['instagram' => $instagram]) : null,
+                'horario' => $horario,
+            ])->save();
+        }
+
+        $descripciones = [
+            'Nivel 1' => 'Tu primera clase de pole: giros básicos, trepa y fuerza de agarre. No necesitas experiencia.',
+            'Nivel 2' => 'Combinaciones de giros, primeras inversiones y trabajo de flexibilidad.',
+            'Nivel 3' => 'Inversiones controladas, figuras en el aire y transiciones fluidas.',
+            'Nivel 4' => 'Figuras avanzadas, combos y coreografía. Requiere dominar inversiones.',
+            'Corte de cabello' => 'Corte a tijera o máquina con lavado y peinado. Incluye asesoría de estilo.',
+        ];
+        foreach ($descripciones as $nombre => $texto) {
+            OfertaTenant::query()->where('nombre', $nombre)->whereNull('descripcion')->update(['descripcion' => $texto]);
+        }
     }
 
     /**

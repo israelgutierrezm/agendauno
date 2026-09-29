@@ -17,7 +17,12 @@ use Illuminate\Database\Eloquent\Model;
  * Registro central de un estudio (tenant SaaS) en el control plane. Vive en la
  * conexión por defecto (central); su BD operativa (data plane) es independiente
  * y se describe con `db_driver` + `db_database`. No usa BelongsToTenant: ES el
- * catálogo de tenants, no un dato tenant-scoped.
+ * catálogo de tenants, no un dato tenant-scoped. Guarda su identidad pública: logo,
+ * portada, descripción y redes.
+ *
+ * @property string|null $descripcion
+ * @property string|null $portada_url
+ * @property array<string, string>|null $redes
  */
 class Estudio extends Model
 {
@@ -31,6 +36,9 @@ class Estudio extends Model
         'perfil_negocio',
         'terminologia',
         'logo_url',
+        'descripcion',
+        'portada_url',
+        'redes',
         'estado',
         'paso_aprovisionamiento',
         'aprovisionado_en',
@@ -68,6 +76,7 @@ class Estudio extends Model
         'estado' => EstadoEstudio::class,
         'perfil_negocio' => PerfilNegocio::class,
         'terminologia' => 'array',
+        'redes' => 'array',
         'estado_facturacion' => EstadoFacturacion::class,
         'publicado' => 'boolean',
         'privado' => 'boolean',

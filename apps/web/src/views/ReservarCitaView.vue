@@ -10,6 +10,9 @@ import AvatarIniciales from "@/components/AvatarIniciales.vue";
 interface Servicio {
   id: string;
   nombre: string;
+  // Qué incluye y en qué grupo va (catálogo del negocio).
+  descripcion?: string | null;
+  categoria?: string | null;
   precio_minor: number | null;
   moneda: string;
   duracion_minutos: number | null;
@@ -48,6 +51,15 @@ const error = ref<string | null>(null);
 
 // Selección del wizard.
 const servicioId = ref("");
+// Servicios agrupados por su categoría (la actividad del catálogo).
+const gruposServicios = computed(() => {
+  const grupos = new Map<string, Servicio[]>();
+  for (const s of opciones.value?.servicios ?? []) {
+    const clave = s.categoria ?? "";
+    grupos.set(clave, [...(grupos.get(clave) ?? []), s]);
+  }
+  return [...grupos.entries()].map(([nombre, lista]) => ({ nombre, lista }));
+});
 const sucursalId = ref("");
 const barberoId = ref("");
 const fecha = ref("");
@@ -479,9 +491,20 @@ onMounted(cargar);
         <!-- Servicio: conserva su presentación. -->
         <div v-if="sucursalId !== ''" class="tu-card p-5">
           <label class="tu-label">{{ $t("reservar.servicio") }}</label>
-          <div class="mt-1 space-y-2">
+          <div
+            v-for="g in gruposServicios"
+            :key="g.nombre"
+            class="mt-1 space-y-2"
+          >
+            <p
+              v-if="g.nombre && gruposServicios.length > 1"
+              class="pt-2 text-xs font-semibold"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ g.nombre }}
+            </p>
             <label
-              v-for="s in opciones.servicios"
+              v-for="s in g.lista"
               :key="s.id"
               class="flex items-center justify-between gap-3 rounded-lg p-3 cursor-pointer border"
               :style="{
@@ -507,6 +530,12 @@ onMounted(cargar);
                     >{{
                       $t("reservar.duracionMin", { n: s.duracion_minutos })
                     }}</span
+                  >
+                  <span
+                    v-if="s.descripcion"
+                    class="block text-sm"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ s.descripcion }}</span
                   >
                 </span>
               </span>

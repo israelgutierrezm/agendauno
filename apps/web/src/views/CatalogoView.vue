@@ -22,6 +22,8 @@ interface Oferta {
   // Espacios o equipos que puede usar (2.4); vacío = no requiere.
   recursos?: string[];
   actividad: string | null;
+  // Lo que ve quien la elige en línea (página pública y agendar).
+  descripcion?: string | null;
 }
 interface Recurso {
   id: string;
@@ -48,6 +50,7 @@ const error = ref<string | null>(null);
 // Oferta en edición (una a la vez) + su formulario.
 const editandoId = ref<string | null>(null);
 const form = ref<{
+  descripcion: string;
   politica: Politica;
   precio: string;
   duracion: string;
@@ -56,6 +59,7 @@ const form = ref<{
   limpieza: string;
   recursos: string[];
 }>({
+  descripcion: "",
   politica: "entitlement",
   precio: "",
   duracion: "",
@@ -107,6 +111,7 @@ function configurar(o: Oferta): void {
   editandoId.value = o.id;
   guardadoId.value = null;
   form.value = {
+    descripcion: o.descripcion ?? "",
     politica: o.politica_reserva,
     precio:
       o.precio_clase_minor !== null ? String(o.precio_clase_minor / 100) : "",
@@ -132,6 +137,7 @@ async function guardar(o: Oferta): Promise<void> {
     const duracion = Number(form.value.duracion) || 0;
     await api.put(`${base.value}/ofertas/${o.id}`, {
       lugares: Number(form.value.lugares) || 0,
+      descripcion: form.value.descripcion.trim(),
       // Con pago, mandamos el precio; sin precio lo limpiamos (null).
       precio_clase_minor: precioMinor > 0 ? precioMinor : null,
       politica_reserva: form.value.politica,
@@ -235,12 +241,31 @@ onMounted(cargar);
             </button>
           </div>
 
+          <p
+            v-if="o.descripcion && editandoId !== o.id"
+            class="mt-2 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ o.descripcion }}
+          </p>
+
           <!-- Editor inline -->
           <div
             v-if="editandoId === o.id"
             class="mt-4 border-t pt-4"
             :style="{ borderColor: 'var(--borde)' }"
           >
+            <label class="tu-label" :for="`c-desc-${o.id}`">{{
+              $t("perfilPublico.catalogo.descripcion")
+            }}</label>
+            <textarea
+              :id="`c-desc-${o.id}`"
+              v-model="form.descripcion"
+              class="tu-input mb-4"
+              rows="3"
+              maxlength="600"
+              :placeholder="$t('perfilPublico.catalogo.descripcionPh')"
+            />
             <label class="tu-label">{{
               $t("catalogo.politica.etiqueta")
             }}</label>
