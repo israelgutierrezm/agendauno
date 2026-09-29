@@ -43,6 +43,8 @@ class CrearMiembroRequest extends FormRequest
             'celular' => ['nullable', 'string', 'max:40', Rule::unique(PersonaTenant::class, 'celular')->whereNull('deleted_at')],
             // El celular es de alguien dado de baja pero es otra persona: se le quita.
             'liberar_celular' => ['sometimes', 'boolean'],
+            // El cliente pidió los avisos por WhatsApp (ADR 0069).
+            'acepta_whatsapp' => ['sometimes', 'boolean'],
             'tipo' => ['nullable', 'in:miembro,instructor,staff'],
             'es_facturable' => ['nullable', 'boolean'],
             'sucursal_id' => ['nullable', 'string'],

@@ -13,6 +13,8 @@ interface Resumen {
   email: string | null;
   // Cómo conoció al negocio (lo dijo al agendar en línea).
   como_nos_conocio?: string | null;
+  // Avisos por WhatsApp (ADR 0069): solo si el negocio los usa.
+  whatsapp?: { disponible: boolean; acepta: boolean; con_celular: boolean };
   tipo: string;
   activo: boolean;
   asistencias: number;
@@ -56,6 +58,27 @@ const puedeVender = computed(
 const puedeRegistrarEntrada = computed(() =>
   sesionStore.puede("checkins.registrar"),
 );
+const puedeEditar = computed(() => sesionStore.puede("miembros.gestionar"));
+
+// El cliente pidió (o ya no quiere) los avisos por WhatsApp: lo marca recepción.
+const guardandoWhatsApp = ref(false);
+async function cambiarWhatsApp(acepta: boolean): Promise<void> {
+  guardandoWhatsApp.value = true;
+  error.value = null;
+  try {
+    const { data } = await api.put<{ data: { acepta_whatsapp: boolean } }>(
+      `${base.value}/miembros/${props.personaId}`,
+      { acepta_whatsapp: acepta },
+    );
+    if (resumen.value?.whatsapp) {
+      resumen.value.whatsapp.acepta = data.data.acepta_whatsapp;
+    }
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    guardandoWhatsApp.value = false;
+  }
+}
 
 // Control de acceso: la entrada se permite por reserva vigente o acceso libre.
 const entrada = ref<{ permitido: boolean; codigo: string } | null>(null);
@@ -331,6 +354,36 @@ watch(
           </dt>
           <dd class="text-right font-medium">
             {{ $t(`perfilPublico.origenes.${resumen.como_nos_conocio}`) }}
+          </dd>
+        </div>
+        <div
+          v-if="resumen.whatsapp?.disponible"
+          class="flex items-center justify-between gap-3 py-2.5"
+          data-prueba="whatsapp"
+        >
+          <dt :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("avisosWhatsApp.fila") }}
+          </dt>
+          <dd class="text-right">
+            <label
+              v-if="resumen.whatsapp.con_celular"
+              class="inline-flex items-center gap-2"
+              :title="$t('avisosWhatsApp.ayudaCliente')"
+            >
+              <input
+                type="checkbox"
+                data-prueba="acepta-whatsapp"
+                :checked="resumen.whatsapp.acepta"
+                :disabled="guardandoWhatsApp || !puedeEditar"
+                @change="
+                  cambiarWhatsApp(($event.target as HTMLInputElement).checked)
+                "
+              />
+              {{ $t("avisosWhatsApp.acepta") }}
+            </label>
+            <span v-else :style="{ color: 'var(--texto-suave)' }">{{
+              $t("avisosWhatsApp.sinCelular")
+            }}</span>
           </dd>
         </div>
         <div

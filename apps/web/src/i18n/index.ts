@@ -20,6 +20,7 @@ import esMX from "./locales/es-MX";
 import {
   accesoRecepcion,
   agendaOperacion,
+  avisosWhatsApp,
   bitacora,
   citaCuenta,
   comunicacionesAuto,
@@ -86,6 +87,7 @@ const mensajesBase = {
   formulariosRespuestas,
   conexiones,
   comunicacionesAuto,
+  avisosWhatsApp,
   reglasAgenda,
   creditosFicha,
   inventarioExtra,

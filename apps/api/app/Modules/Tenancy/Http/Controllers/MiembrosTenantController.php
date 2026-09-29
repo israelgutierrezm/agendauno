@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\MedirUsoSaas;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\ResumenMembresiasTenant;
+use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\EstadoSesionTenant;
@@ -44,6 +45,7 @@ class MiembrosTenantController
         private readonly ResolverAccesoTenant $acceso,
         private readonly BajasTenant $bajas,
         private readonly ResumenMembresiasTenant $membresias,
+        private readonly WhatsAppTenant $whatsapp,
     ) {}
 
     /**
@@ -261,6 +263,9 @@ class MiembrosTenantController
                 'segundo_apellido' => $request->validated('segundo_apellido'),
                 'celular' => $request->validated('celular'),
             ], static fn (mixed $v): bool => $v !== null && $v !== '') + ['activo' => true, 'archivado' => false]);
+            if ($request->boolean('acepta_whatsapp')) {
+                $this->whatsapp->registrarPorEquipo($conCorreo, true, $actor);
+            }
 
             return response()->json(['data' => [...$this->presentar($conCorreo->refresh()->load('sucursal')), 'reactivado' => true]], 201);
         }
@@ -292,6 +297,9 @@ class MiembrosTenantController
             'archivado' => false,
             'sucursal_id' => $sucursalId,
         ]);
+        if ($request->boolean('acepta_whatsapp')) {
+            $this->whatsapp->registrarPorEquipo($persona, true, $actor);
+        }
 
         return response()->json(['data' => [...$this->presentar($persona->load('sucursal')), 'reactivado' => false]], 201);
     }
@@ -403,6 +411,8 @@ class MiembrosTenantController
             'activo' => ['sometimes', 'boolean'],
             'es_facturable' => ['sometimes', 'boolean'],
             'archivado' => ['sometimes', 'boolean'],
+            // El cliente pidió (o ya no quiere) los avisos por WhatsApp (ADR 0069).
+            'acepta_whatsapp' => ['sometimes', 'boolean'],
         ], [
             'email.unique' => 'Ya existe una persona con ese correo en este estudio.',
             'celular.unique' => 'Ya existe una persona con ese teléfono en este estudio.',
@@ -432,6 +442,9 @@ class MiembrosTenantController
         }
 
         $actor = $request->attributes->get('usuario_tenant');
+        if (array_key_exists('acepta_whatsapp', $validado)) {
+            $this->whatsapp->registrarPorEquipo($persona, (bool) $validado['acepta_whatsapp'], $actor instanceof Usuario ? $actor : null);
+        }
         $this->auditoria->registrar(
             $actor instanceof Usuario ? $actor : null,
             'miembro.actualizado',
@@ -546,6 +559,8 @@ class MiembrosTenantController
             'celular' => $persona->celular,
             // Cómo conoció al negocio (lo dijo al agendar en línea, ADR 0067).
             'como_nos_conocio' => $persona->como_nos_conocio,
+            // Aceptó los avisos por WhatsApp (ADR 0069).
+            'acepta_whatsapp' => $persona->whatsapp_aceptado_en !== null,
             'tipo' => $persona->tipo->value,
             'activo' => $persona->activo,
             'es_facturable' => $persona->es_facturable,

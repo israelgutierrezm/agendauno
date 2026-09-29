@@ -314,10 +314,17 @@ const form = ref({
   segundo_apellido: "",
   email: "",
   celular: "",
+  whatsapp: false,
   tipo: "miembro",
 });
 const guardando = ref(false);
 const abiertoAlta = ref(false);
+// Avisos por WhatsApp (ADR 0069): si el negocio los usa y el cliente dejó celular.
+const ofrecerWhatsApp = computed(
+  () =>
+    sesion.estudio?.whatsapp_clientes === true &&
+    form.value.celular.trim() !== "",
+);
 // El celular es de alguien dado de baja: el negocio decide (reactivarlo u otra persona).
 const coincidencia = ref<{
   id: string;
@@ -333,6 +340,7 @@ function abrirAlta(): void {
     segundo_apellido: "",
     email: "",
     celular: "",
+    whatsapp: false,
     tipo: tipo.value,
   };
   mensaje.value = null;
@@ -359,6 +367,9 @@ async function crear(liberarCelular = false): Promise<void> {
       segundo_apellido: form.value.segundo_apellido || null,
       email: form.value.email || null,
       celular: form.value.celular || null,
+      ...(ofrecerWhatsApp.value && form.value.whatsapp
+        ? { acepta_whatsapp: true }
+        : {}),
       tipo: form.value.tipo,
       liberar_celular: liberarCelular || undefined,
     });
@@ -376,6 +387,7 @@ async function crear(liberarCelular = false): Promise<void> {
       segundo_apellido: "",
       email: "",
       celular: "",
+      whatsapp: false,
       tipo: tipo.value,
     };
     abiertoAlta.value = false;
@@ -849,6 +861,22 @@ onMounted(() => {
           <label class="tu-label" for="mc">{{ $t("miembros.celular") }}</label>
           <input id="mc" v-model="form.celular" class="tu-input" type="tel" />
         </div>
+        <label v-if="ofrecerWhatsApp" class="flex items-start gap-2 text-sm">
+          <input
+            v-model="form.whatsapp"
+            type="checkbox"
+            class="mt-1"
+            data-prueba="acepta-whatsapp"
+          />
+          <span>
+            {{ $t("avisosWhatsApp.aceptaCliente") }}
+            <span
+              class="block text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              >{{ $t("avisosWhatsApp.ayudaCliente") }}</span
+            >
+          </span>
+        </label>
         <p v-if="mensaje" class="text-sm" :style="{ color: 'var(--exito)' }">
           {{ $t("miembros.creado") }}
         </p>

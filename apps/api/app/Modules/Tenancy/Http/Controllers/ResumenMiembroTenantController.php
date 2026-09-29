@@ -7,7 +7,9 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\ResumenMembresiasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
+use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -31,6 +33,7 @@ class ResumenMiembroTenantController
         private readonly WaiversTenant $waivers,
         private readonly ResolverAccesoTenant $acceso,
         private readonly ResumenMembresiasTenant $membresias,
+        private readonly WhatsAppTenant $whatsapp,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -83,6 +86,12 @@ class ResumenMiembroTenantController
             'email' => $persona->email,
             // Cómo conoció al negocio (ADR 0067).
             'como_nos_conocio' => $persona->como_nos_conocio,
+            // Avisos por WhatsApp (ADR 0069): solo si el negocio los usa.
+            'whatsapp' => [
+                'disponible' => $this->whatsapp->enUso(),
+                'acepta' => $persona->whatsapp_aceptado_en !== null,
+                'con_celular' => TelefonoWhatsApp::normalizar($persona->celular) !== null,
+            ],
             'tipo' => $persona->tipo->value,
             'activo' => $persona->activo,
             'asistencias' => $asistencias,

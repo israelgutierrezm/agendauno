@@ -190,6 +190,16 @@ export const comunicacionesAuto = {
   },
 };
 
+// Consentimiento de avisos por WhatsApp que registra el equipo (ADR 0069).
+export const avisosWhatsApp = {
+  fila: "Avisos por WhatsApp",
+  acepta: "Aceptó",
+  sinCelular: "Falta su celular",
+  aceptaCliente: "Acepta recibir avisos por WhatsApp",
+  ayudaCliente:
+    "Márcalo solo si el cliente te lo pidió. Le llegan la confirmación y los recordatorios de sus citas.",
+};
+
 export const reglasAgenda = {
   titulo: "Reglas de la agenda",
   cancelaciones: "Cancelaciones",

@@ -42,6 +42,10 @@ opción.
     manda nada.
   - Se acepta al agendar en la página pública (casilla que aparece al escribir el
     celular) o en «Mi privacidad», en la web o la app. Ahí también se retira.
+  - Si el cliente lo pide en persona o por teléfono, lo marca el equipo: en la
+    ficha de recepción, al darlo de alta o al agendarle una cita con cliente nuevo
+    (`acepta_whatsapp` en `POST/PUT /miembros`, con `miembros.gestionar`). Queda
+    en la bitácora quién lo marcó o lo retiró.
   - Solo se ofrece si el negocio tiene algún aviso por WhatsApp encendido.
   - La baja de datos borra el consentimiento, y la descarga de datos lo incluye.
 - **Envío:**

@@ -62,6 +62,8 @@ export interface EstudioSesion {
   en_directorio?: boolean;
   perfil?: string;
   perfil_config?: PerfilConfig;
+  // El negocio manda avisos por WhatsApp a sus clientes (ADR 0069).
+  whatsapp_clientes?: boolean;
 }
 
 const TERMINOLOGIA_DEFAULT: Terminologia = {

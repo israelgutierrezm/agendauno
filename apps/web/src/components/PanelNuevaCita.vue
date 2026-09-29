@@ -54,7 +54,13 @@ const nuevo = ref(false);
 const puedeCrearCliente = computed(() =>
   useSesionTenantStore().puede("miembros.gestionar"),
 );
-const nuevoCliente = ref({ nombre: "", celular: "" });
+const nuevoCliente = ref({ nombre: "", celular: "", whatsapp: false });
+// Avisos por WhatsApp (ADR 0069): si el negocio los usa y el cliente dejó celular.
+const ofrecerWhatsApp = computed(
+  () =>
+    useSesionTenantStore().estudio?.whatsapp_clientes === true &&
+    nuevoCliente.value.celular.trim() !== "",
+);
 const guardando = ref(false);
 const error = ref<string | null>(null);
 
@@ -78,7 +84,7 @@ watch(
     };
     busqueda.value = "";
     nuevo.value = false;
-    nuevoCliente.value = { nombre: "", celular: "" };
+    nuevoCliente.value = { nombre: "", celular: "", whatsapp: false };
     error.value = null;
   },
 );
@@ -156,6 +162,9 @@ async function agendar(): Promise<void> {
         {
           nombre: nuevoCliente.value.nombre.trim(),
           celular: nuevoCliente.value.celular.trim() || null,
+          ...(ofrecerWhatsApp.value && nuevoCliente.value.whatsapp
+            ? { acepta_whatsapp: true }
+            : {}),
           tipo: "miembro",
           sucursal_id: form.value.sucursalId,
         },
@@ -260,6 +269,22 @@ async function agendar(): Promise<void> {
               type="tel"
               inputmode="tel"
             />
+          </label>
+          <label v-if="ofrecerWhatsApp" class="flex items-start gap-2 text-sm">
+            <input
+              v-model="nuevoCliente.whatsapp"
+              type="checkbox"
+              class="mt-1"
+              data-prueba="acepta-whatsapp"
+            />
+            <span>
+              {{ $t("avisosWhatsApp.aceptaCliente") }}
+              <span
+                class="block text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{ $t("avisosWhatsApp.ayudaCliente") }}</span
+              >
+            </span>
           </label>
           <button
             type="button"

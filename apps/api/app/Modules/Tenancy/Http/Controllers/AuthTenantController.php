@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\AutenticacionTenant;
 use App\Modules\Tenancy\Application\CambiarCorreoTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\RestablecerContrasenaTenant;
+use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Http\Requests\ActivarTenantRequest;
 use App\Modules\Tenancy\Http\Requests\LoginTenantRequest;
 use App\Modules\Tenancy\Http\UsuarioTenantPresenter;
@@ -224,6 +225,8 @@ class AuthTenantController
             // Perfil de negocio (R35): el frontend adapta terminologia/flags sin forks.
             'perfil' => $estudio->perfil_negocio->value,
             'perfil_config' => $estudio->perfilConfig(),
+            // Manda avisos por WhatsApp a sus clientes (ADR 0069).
+            'whatsapp_clientes' => app(WhatsAppTenant::class)->enUso(),
         ];
     }
 }

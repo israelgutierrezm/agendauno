@@ -262,3 +262,49 @@ it('al agendar en la página pública se puede aceptar recibir los avisos por Wh
         ->and($avisos[0]->estado->value)->toBe('enviado')
         ->and(enNegocioWhatsApp($e, fn () => PersonaTenant::query()->where('email', 'beto@correo.mx')->value('whatsapp_aceptado_en')))->not->toBeNull();
 });
+
+it('recepción marca que el cliente pidió los avisos por WhatsApp y queda en la bitácora', function (): void {
+    $m = negocioConAlumnas();
+    $ficha = fn (): array => $this->getJson("/api/v1/app/{$m['slug']}/miembros/{$m['caro']}/resumen", conBearer($m['bearer']))
+        ->assertOk()->json('data.whatsapp');
+
+    // Sin WhatsApp en el negocio no se ofrece ni se puede marcar.
+    expect($ficha()['disponible'])->toBeFalse()
+        ->and($this->getJson("/api/v1/app/{$m['slug']}/yo", conBearer($m['bearer']))->json('data.estudio.whatsapp_clientes'))->toBeFalse();
+    $this->putJson("/api/v1/app/{$m['slug']}/miembros/{$m['caro']}", ['acepta_whatsapp' => true], conBearer($m['bearer']))
+        ->assertOk()->assertJsonPath('data.acepta_whatsapp', false);
+
+    encenderWhatsApp();
+    avisoPorWhatsApp($m);
+    expect($ficha())->toBe(['disponible' => true, 'acepta' => false, 'con_celular' => true])
+        ->and($this->getJson("/api/v1/app/{$m['slug']}/yo", conBearer($m['bearer']))->json('data.estudio.whatsapp_clientes'))->toBeTrue();
+
+    $this->putJson("/api/v1/app/{$m['slug']}/miembros/{$m['caro']}", ['acepta_whatsapp' => true], conBearer($m['bearer']))
+        ->assertOk()->assertJsonPath('data.acepta_whatsapp', true);
+    expect($ficha()['acepta'])->toBeTrue();
+
+    // Ya le llegan: la confirmación de su reserva sale por WhatsApp.
+    $this->postJson("/api/v1/app/{$m['slug']}/sesiones/{$m['sesion']}/reservas", ['persona_id' => $m['caro']], conBearer($m['bearer']))->assertCreated();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    expect(array_map(fn (MensajeTenant $a): ?string => $a->destinatario, avisosWhatsApp($m)))->toBe(['525587654321']);
+
+    // Quién lo marcó y cuándo; retirarlo también queda.
+    $this->putJson("/api/v1/app/{$m['slug']}/miembros/{$m['caro']}", ['acepta_whatsapp' => false], conBearer($m['bearer']))
+        ->assertOk()->assertJsonPath('data.acepta_whatsapp', false);
+    $bitacora = collect($this->getJson("/api/v1/app/{$m['slug']}/auditorias", conBearer($m['bearer']))->json('data'))
+        ->whereIn('accion', ['miembro.whatsapp_aceptado', 'miembro.whatsapp_retirado'])->pluck('accion')->sort()->values()->all();
+    expect($bitacora)->toBe(['miembro.whatsapp_aceptado', 'miembro.whatsapp_retirado']);
+});
+
+it('al dar de alta un cliente con su celular, recepción puede registrar que acepta WhatsApp', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    encenderWhatsApp();
+    avisoPorWhatsApp($e);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/miembros", [
+        'nombre' => 'Luis', 'celular' => '55 2222 3333', 'acepta_whatsapp' => true,
+    ], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.acepta_whatsapp', true);
+    $this->postJson("/api/v1/app/{$e['slug']}/miembros", [
+        'nombre' => 'Toño', 'celular' => '55 4444 5555',
+    ], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.acepta_whatsapp', false);
+});
