@@ -46,7 +46,6 @@
 
 - Conciliar el guardado de tarjeta de Stripe (pago automático) cuando no llega su
   aviso; hoy la conciliación cubre los cobros.
-- Reporte de clientes por cómo nos conocieron.
 - Avisos por WhatsApp (proveedor por decidir).
 - Separar «editar» y «eliminar» en el catálogo de permisos.
 - Roles propios con faceta de instructor.

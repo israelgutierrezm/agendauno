@@ -116,6 +116,9 @@ interface Cohortes {
   meses: number;
   cohortes: Cohorte[];
   conversion: { registrados: number; compraron: number; activos: number };
+  // Cómo conocieron al negocio las altas de la ventana (ADR 0067).
+  origenes?: { origen: string; total: number }[];
+  origenes_sin_dato?: number;
 }
 
 const sesion = useSesionTenantStore();
@@ -142,6 +145,14 @@ const tendencias = ref<Tendencias | null>(null);
 const agrupacion = ref<"dia" | "semana" | "mes">("dia");
 const exportando = ref(false);
 const cohortes = ref<Cohortes | null>(null);
+// Porcentaje de cada origen sobre quienes dijeron cómo nos conocieron.
+function pctOrigen(total: number): string {
+  const conDato = (cohortes.value?.origenes ?? []).reduce(
+    (n, o) => n + o.total,
+    0,
+  );
+  return conDato > 0 ? `${Math.round((total / conDato) * 100)} %` : "—";
+}
 
 // Etiqueta corta del mes de una cohorte ('2026-09' → 'sep 26').
 function mesCorto(iso: string): string {
@@ -674,6 +685,39 @@ onMounted(cargar);
             </div>
           </div>
         </div>
+
+        <!-- Cómo nos conocieron (lo dicen al agendar en línea) -->
+        <template v-if="(cohortes.origenes ?? []).length > 0">
+          <h3 class="mt-6 font-semibold">
+            {{ $t("operacion.reportes.origenes.titulo") }}
+          </h3>
+          <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+            {{
+              $t("operacion.reportes.origenes.subtitulo", {
+                n: cohortes.meses,
+                sinDato: cohortes.origenes_sin_dato ?? 0,
+              })
+            }}
+          </p>
+          <ul
+            class="mt-3 tu-card px-5 py-2 divide-y divide-[var(--borde)]"
+            data-prueba="origenes"
+          >
+            <li
+              v-for="o in cohortes.origenes"
+              :key="o.origen"
+              class="flex items-center justify-between gap-3 py-2.5 text-sm"
+            >
+              <span>{{ $t(`perfilPublico.origenes.${o.origen}`) }}</span>
+              <span class="tabular-nums font-medium">
+                {{ o.total }}
+                <span :style="{ color: 'var(--texto-suave)' }"
+                  >· {{ pctOrigen(o.total) }}</span
+                >
+              </span>
+            </li>
+          </ul>
+        </template>
 
         <h3 class="mt-6 font-semibold">{{ $t("reportes.cohortes.titulo") }}</h3>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">

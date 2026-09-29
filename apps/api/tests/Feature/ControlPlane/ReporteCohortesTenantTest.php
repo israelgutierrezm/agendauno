@@ -29,6 +29,36 @@ function comprarPack(array $e, string $persona, string $pack): void
     ], conBearer($e['bearer']))->assertOk();
 }
 
+it('dice cómo conocieron al negocio los clientes nuevos, de más a menos', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $sede = agendaSemilla($e);
+    $this->putJson("/api/v1/app/{$e['slug']}/ofertas/{$sede['oferta']}", [
+        'lugares' => 0, 'politica_reserva' => 'pago', 'precio_clase_minor' => 25000, 'duracion_minutos' => 30,
+    ], conBearer($e['bearer']))->assertOk();
+    personalConSesion($e['slug'], $e['bearer'], 'barbero@correo.mx', 'instructor');
+    $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    abrirHorarioDeCitas($e, $pro, $sede['sucursal']);
+    $dia = now('America/Mexico_City')->addDays(3)->format('Y-m-d');
+    // Clientes nuevos que agendan en línea y dicen cómo nos conocieron.
+    foreach ([['a@x.mx', 'instagram', '10:00'], ['b@x.mx', 'instagram', '11:00'], ['c@x.mx', 'google', '12:00']] as [$correo, $origen, $hora]) {
+        $this->postJson("/api/v1/app/{$e['slug']}/citas", [
+            'nombre' => 'Cliente', 'email' => $correo, 'como_nos_conocio' => $origen,
+            'oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'], 'instructor_id' => $pro,
+            'inicia_en_local' => "{$dia} {$hora}:00", 'duracion_minutos' => 30,
+        ])->assertCreated();
+    }
+    // Uno que dio de alta recepción: sin dato.
+    crearMiembroTenant($e, 'Dani');
+
+    $data = $this->getJson("/api/v1/app/{$e['slug']}/reportes/cohortes?meses=6", conBearer($e['bearer']))
+        ->assertOk()->json('data');
+
+    expect($data['origenes'])->toBe([
+        ['origen' => 'instagram', 'total' => 2],
+        ['origen' => 'google', 'total' => 1],
+    ])->and($data['origenes_sin_dato'])->toBe(1);
+});
+
 it('calcula el embudo de conversión y la retención de la cohorte del mes', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $pack = crearPackTenant($e, 8000);

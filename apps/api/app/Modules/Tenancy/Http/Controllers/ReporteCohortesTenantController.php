@@ -47,7 +47,7 @@ class ReporteCohortesTenantController
             ->where('tipo', TipoPersonaTenant::Miembro->value)
             ->where('archivado', false)
             ->where('created_at', '>=', $primerMes->utc())
-            ->get(['id', 'created_at']);
+            ->get(['id', 'created_at', 'como_nos_conocio']);
 
         // Meses con asistencia (presente) por persona, dentro de la ventana.
         $mesesActivos = $this->mesesActivosPorPersona($primerMes, $zona);
@@ -89,6 +89,15 @@ class ReporteCohortesTenantController
             'meses' => $n,
             'cohortes' => $cohortes,
             'conversion' => $this->embudo($miembros, $mesesActivos, $compradores),
+            // Cómo conocieron al negocio las altas de la ventana (ADR 0067): de más a
+            // menos, y cuántas no lo dijeron.
+            'origenes' => $miembros->whereNotNull('como_nos_conocio')
+                ->countBy('como_nos_conocio')
+                ->sortDesc()
+                ->map(static fn (int $total, string $origen): array => ['origen' => $origen, 'total' => $total])
+                ->values()
+                ->all(),
+            'origenes_sin_dato' => $miembros->whereNull('como_nos_conocio')->count(),
         ]]);
     }
 

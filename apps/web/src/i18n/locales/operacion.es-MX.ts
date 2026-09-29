@@ -241,6 +241,12 @@ export default {
     sinPermiso: "No pudimos obtener tu ubicación desde este dispositivo.",
   },
   reportes: {
+    // Cómo conocieron al negocio los clientes nuevos (ADR 0067).
+    origenes: {
+      titulo: "Cómo nos conocieron",
+      subtitulo:
+        "Clientes nuevos de los últimos {n} meses que lo dijeron al agendar en línea. Sin dato: {sinDato}.",
+    },
     sinSucursal: "Sin sucursal asignada",
     total: "Total",
     estadoActual: "Estado actual: no depende del periodo elegido.",

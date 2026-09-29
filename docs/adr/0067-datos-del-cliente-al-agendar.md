@@ -34,8 +34,8 @@ más:
 
 ## Consecuencias
 
-- El negocio sabe qué canal le trae clientes. Un reporte por origen es el paso
-  natural.
+- El negocio sabe qué canal le trae clientes: Reportes → Clientes muestra «Cómo nos
+  conocieron» sobre las altas de los últimos meses (`origenes` y
+  `origenes_sin_dato` en `/reportes/cohortes`).
 - El celular con lada queda listo para avisos por WhatsApp o SMS.
-- «Agendar para otra persona» sigue fuera: pide decidir cómo se relaciona con la
-  ficha de quien agenda sin volver a familias (ADR 0059).
+- «Agendar para otra persona» se resolvió aparte, sin volver a familias (ADR 0068).
