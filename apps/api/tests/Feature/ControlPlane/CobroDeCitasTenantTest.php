@@ -245,4 +245,17 @@ it('el calendario ofrece desde hoy los días en que alguien atiende, sin los cer
     // Un rango razonable.
     $this->getJson('/api/v1/app/'.$e['slug'].'/citas/dias?'.http_build_query(['sucursal_id' => $sede['sucursal'], 'desde' => '2030-01-06', 'dias' => 100]))
         ->assertUnprocessable();
+
+    // Desde la cuenta del cliente, lo mismo (también fuera del directorio).
+    $cliente = alumnoConSesion($e, 'Vale', 'vale@correo.mx');
+    $this->putJson("/api/v1/app/{$e['slug']}/publicacion", ['publicado' => false, 'privado' => true], conBearer($e['bearer']))->assertOk();
+    $mios = collect($this->getJson('/api/v1/app/'.$e['slug'].'/mi/citas/dias?'.http_build_query([
+        'sucursal_id' => $sede['sucursal'], 'desde' => '2030-01-06', 'dias' => 7,
+    ]), conBearer($cliente['bearer']))->assertOk()->json('data'))->pluck('abierto', 'fecha')->all();
+    expect($mios['2030-01-08'])->toBeTrue()
+        ->and($mios['2030-01-09'])->toBeFalse()
+        ->and($mios['2030-01-07'])->toBeFalse();
+    // El equipo (sin perfil de cliente) no usa esta ruta.
+    $this->getJson('/api/v1/app/'.$e['slug'].'/mi/citas/dias?'.http_build_query(['sucursal_id' => $sede['sucursal'], 'desde' => '2030-01-06']), conBearer($e['bearer']))
+        ->assertForbidden();
 });

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -142,13 +143,56 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     }
   }
 
+  /// Días hacia adelante que ofrece el calendario (lo que el API da de una vez).
+  static const _diasCalendario = 62;
+
   Future<void> _elegirDia() async {
-    final hoy = DateTime.now();
+    final ahora = DateTime.now();
+    final hoy = DateTime(ahora.year, ahora.month, ahora.day);
+    final ultimo = hoy.add(const Duration(days: _diasCalendario - 1));
+    // Solo los días en que alguien atiende (ADR 0065); si no se pueden saber (sin
+    // sede o sin red), cualquiera: el horario lo vuelve a revisar.
+    Set<String>? abiertos;
+    final repo = ref.read(cuentaRepositoryProvider);
+    final sede = _sede;
+    if (repo != null && sede != null) {
+      try {
+        abiertos = await repo.diasConAtencion(
+          sucursalId: sede.id,
+          desde: Formato.iso(hoy),
+          dias: _diasCalendario,
+          profesionalId: _idProfesional,
+        );
+      } on DioException {
+        abiertos = null;
+      }
+    }
+    if (!mounted) {
+      return;
+    }
+    bool sePuede(DateTime d) =>
+        abiertos == null || abiertos.contains(Formato.iso(d));
+    DateTime? inicial = _dia != null && sePuede(_dia!) ? _dia : null;
+    for (var i = 0; inicial == null && i < _diasCalendario; i++) {
+      final d = hoy.add(Duration(days: i));
+      if (sePuede(d)) {
+        inicial = d;
+      }
+    }
+    if (inicial == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay días con atención en los próximos dos meses.'),
+        ),
+      );
+      return;
+    }
     final dia = await showDatePicker(
       context: context,
-      initialDate: _dia ?? hoy,
+      initialDate: inicial,
       firstDate: hoy,
-      lastDate: hoy.add(const Duration(days: 90)),
+      lastDate: ultimo,
+      selectableDayPredicate: sePuede,
     );
     if (dia != null) {
       setState(() => _dia = dia);

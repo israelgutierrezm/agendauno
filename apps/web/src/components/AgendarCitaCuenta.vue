@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import CalendarioDias from "@/components/CalendarioDias.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -55,7 +56,6 @@ const buscando = ref(false);
 const slotSel = ref("");
 const agendando = ref(false);
 
-const hoy = new Date().toISOString().slice(0, 10);
 const servicio = computed(
   () => servicios.value.find((s) => s.id === servicioId.value) ?? null,
 );
@@ -265,19 +265,22 @@ onMounted(async () => {
             </option>
           </select>
         </div>
-        <div>
-          <label class="tu-label" for="cc-fecha">{{
-            $t("citaCuenta.dia")
-          }}</label>
-          <input
-            id="cc-fecha"
-            v-model="fecha"
-            class="tu-input"
-            type="date"
-            :min="hoy"
-            required
-          />
-        </div>
+      </div>
+
+      <!-- Días desde hoy; los que no tienen atención no se eligen (ADR 0065). -->
+      <div v-if="sucursalId !== ''">
+        <p class="tu-label">{{ $t("citaCuenta.dia") }}</p>
+        <CalendarioDias
+          v-model="fecha"
+          :ruta="`${base}/mi/citas/dias`"
+          :sucursal-id="sucursalId"
+          :instructor-id="
+            profesionalId !== CUALQUIERA && profesionalId !== ''
+              ? profesionalId
+              : null
+          "
+          :zona="sucursal?.zona_horaria ?? 'America/Mexico_City'"
+        />
       </div>
 
       <div v-if="listo">

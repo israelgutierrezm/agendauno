@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
@@ -9,6 +8,7 @@ import { recordarNegocio } from "@/lib/negociosRecientes";
 import { esMiembro } from "@/lib/roles";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import CalendarioDias from "@/components/CalendarioDias.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import IconoRed from "@/components/IconoRed.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
@@ -71,11 +71,6 @@ interface PorPagar {
   vence_en: string | null;
   pago_en_linea: boolean;
 }
-// Un día del calendario: se puede elegir si alguien atiende y no pasó.
-interface Dia {
-  fecha: string;
-  abierto: boolean;
-}
 interface Slot {
   inicia: string;
   termina: string;
@@ -89,7 +84,6 @@ type Paso = "sucursal" | "servicio" | "horario" | "confirmar";
 
 const route = useRoute();
 const router = useRouter();
-const { t } = useI18n();
 const sesion = useSesionTenantStore();
 // Al volver de la página de pago: avisa cómo quedó.
 const retornoPago = useRetornoPago();
@@ -466,84 +460,6 @@ watch([filtro, sucursalId, fecha, servicioId], () => {
   busquedaEnCurso = buscarSlots();
 });
 
-// Calendario: días desde hoy en la zona de la sede; los que no tienen atención (o
-// ya pasaron) no se pueden elegir. Se abre en el primero con atención.
-const DIAS_POR_TANDA = 14;
-const dias = ref<Dia[]>([]);
-const cargandoDias = ref(false);
-let consultaDias = 0;
-function hoySede(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: zona.value,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
-function diaSiguiente(f: string): string {
-  const d = new Date(`${f}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-}
-async function cargarDias(mas = false): Promise<void> {
-  if (sucursalId.value === "") return;
-  const consulta = ++consultaDias;
-  const ultimo = dias.value[dias.value.length - 1];
-  const desde = mas && ultimo ? diaSiguiente(ultimo.fecha) : hoySede();
-  cargandoDias.value = true;
-  try {
-    const { data } = await api.get<{ data: Dia[] }>(
-      `/api/v1/app/${slug.value}/citas/dias`,
-      {
-        params: {
-          sucursal_id: sucursalId.value,
-          desde,
-          dias: DIAS_POR_TANDA,
-          ...(filtro.value !== "" ? { instructor_id: filtro.value } : {}),
-        },
-      },
-    );
-    if (consulta !== consultaDias) return;
-    dias.value = mas ? [...dias.value, ...data.data] : data.data;
-    if (!mas && !dias.value.some((d) => d.fecha === fecha.value && d.abierto)) {
-      fecha.value = dias.value.find((d) => d.abierto)?.fecha ?? "";
-    }
-  } catch (e) {
-    if (consulta === consultaDias) error.value = mensajeDeError(e);
-  } finally {
-    if (consulta === consultaDias) cargandoDias.value = false;
-  }
-}
-function etiquetaDia(f: string): {
-  semana: string;
-  numero: string;
-  mes: string;
-} {
-  const d = new Date(`${f}T12:00:00Z`);
-  const hoy = hoySede();
-  const corto = (op: Intl.DateTimeFormatOptions): string =>
-    new Intl.DateTimeFormat("es-MX", { ...op, timeZone: "UTC" })
-      .format(d)
-      .replace(".", "");
-  return {
-    semana:
-      f === hoy
-        ? t("perfilPublico.agendar.hoy")
-        : f === diaSiguiente(hoy)
-          ? t("perfilPublico.agendar.manana")
-          : corto({ weekday: "short" }),
-    numero: String(d.getUTCDate()),
-    mes: corto({ month: "short" }),
-  };
-}
-watch([sucursalId, filtro], () => {
-  dias.value = [];
-  if (paso.value === "horario") void cargarDias();
-});
-watch(paso, (p) => {
-  if (p === "horario" && dias.value.length === 0) void cargarDias();
-});
-
 // Elegir sede o servicio lleva al paso siguiente (también si se vuelve a tocar la
 // que ya estaba elegida).
 function elegirSede(id: string): void {
@@ -693,10 +609,8 @@ function otra(): void {
   nota.value = "";
   paraOtra.value = false;
   asiste.value = "";
-  dias.value = [];
   fecha.value = "";
   ir("horario");
-  void cargarDias();
 }
 // Apartada: se paga en línea para confirmar. Confirmada: ya está agendada.
 const apartada = computed(
@@ -1271,35 +1185,13 @@ onMounted(cargar);
               </div>
               <span class="tu-label">{{ $t("reservar.cuando") }}</span>
               <!-- Días desde hoy; los que no tienen atención no se eligen. -->
-              <div class="rc-dias" data-prueba="dias">
-                <button
-                  v-for="d in dias"
-                  :key="d.fecha"
-                  type="button"
-                  class="rc-dia"
-                  :class="{ 'rc-dia--activo': fecha === d.fecha }"
-                  :disabled="!d.abierto"
-                  :data-fecha="d.fecha"
-                  :aria-pressed="fecha === d.fecha"
-                  @click="fecha = d.fecha"
-                >
-                  <span class="rc-dia-semana">{{
-                    etiquetaDia(d.fecha).semana
-                  }}</span>
-                  <strong>{{ etiquetaDia(d.fecha).numero }}</strong>
-                  <span class="rc-dia-mes">{{ etiquetaDia(d.fecha).mes }}</span>
-                </button>
-                <button
-                  v-if="dias.length > 0"
-                  type="button"
-                  class="rc-dia rc-dia-mas"
-                  :disabled="cargandoDias"
-                  data-prueba="mas-fechas"
-                  @click="cargarDias(true)"
-                >
-                  {{ $t("perfilPublico.agendar.masFechas") }}
-                </button>
-              </div>
+              <CalendarioDias
+                v-model="fecha"
+                :ruta="`/api/v1/app/${slug}/citas/dias`"
+                :sucursal-id="sucursalId"
+                :instructor-id="filtro || null"
+                :zona="zona"
+              />
 
               <p
                 v-if="error && !slotSel"
@@ -1311,26 +1203,13 @@ onMounted(cargar);
               </p>
 
               <p
-                v-if="fecha === ''"
-                class="mt-3 text-sm"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{
-                  cargandoDias
-                    ? $t("reservar.calculando")
-                    : dias.length > 0
-                      ? $t("perfilPublico.agendar.sinDias")
-                      : $t("reservar.sinHorario")
-                }}
-              </p>
-              <p
-                v-else-if="buscandoSlots"
+                v-if="fecha !== '' && buscandoSlots"
                 class="mt-3 text-sm"
                 :style="{ color: 'var(--texto-suave)' }"
               >
                 {{ $t("reservar.calculando") }}
               </p>
-              <template v-else-if="slotsCargados">
+              <template v-else-if="fecha !== '' && slotsCargados">
                 <p
                   v-if="slots.length === 0"
                   class="mt-3 text-sm"
@@ -1853,53 +1732,6 @@ onMounted(cargar);
   color: var(--texto);
 }
 
-/* Calendario: tira de días desde hoy. */
-.rc-dias {
-  display: flex;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding-bottom: 0.25rem;
-  scroll-snap-type: x proximity;
-}
-.rc-dia {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 0 0 auto;
-  min-width: 3.6rem;
-  padding: 0.45rem 0.4rem;
-  border: 1px solid var(--borde);
-  border-radius: 12px;
-  scroll-snap-align: start;
-  line-height: 1.2;
-}
-.rc-dia strong {
-  font-size: 1.05rem;
-  font-weight: 600;
-}
-.rc-dia-semana,
-.rc-dia-mes {
-  font-size: 0.72rem;
-  color: var(--texto-suave);
-}
-.rc-dia--activo {
-  border-color: var(--primario);
-  background: var(--primario);
-  color: var(--primario-contraste);
-}
-.rc-dia--activo .rc-dia-semana,
-.rc-dia--activo .rc-dia-mes {
-  color: inherit;
-}
-.rc-dia:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.rc-dia-mas {
-  justify-content: center;
-  font-size: 0.8rem;
-  color: var(--enlace);
-}
 .rc-sede-texto strong {
   display: block;
   font-weight: 500;

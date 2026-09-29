@@ -44,6 +44,9 @@ Al revisar la página pública para agendar salieron estos puntos:
   - La página muestra una tira de días desde hoy, con «Más fechas».
   - Abre en el primer día con atención; los demás días no se pueden elegir.
   - Las horas pasadas y las ocupadas ya no se ofrecían.
+  - En la cuenta y la app también (`GET /mi/citas/dias`, que funciona aunque el
+    negocio no esté en el directorio). La web usa el componente `CalendarioDias`
+    en la página pública y en Mi cuenta; la app bloquea esos días en su calendario.
 - **Cliente con cuenta**:
   - En la confirmación, «¿Ya tienes cuenta? Entra».
   - Lo elegido se guarda en `sessionStorage` y se retoma al volver.

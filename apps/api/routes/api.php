@@ -240,6 +240,7 @@ Route::prefix('v1')->group(function (): void {
             // Agenda una cita desde un hueco de disponibilidad (F-08): crea la sesión + reserva/pago.
             Route::get('/mi/citas/opciones', [MiTenantController::class, 'opcionesCita'])->name('mi.citas.opciones');
             Route::get('/mi/citas/disponibilidad', [MiTenantController::class, 'disponibilidadCita'])->name('mi.citas.disponibilidad');
+            Route::get('/mi/citas/dias', [MiTenantController::class, 'diasCita'])->name('mi.citas.dias');
             Route::post('/mi/citas', [MiTenantController::class, 'agendarCita'])->name('mi.citas.store');
             Route::post('/mi/reservas/{reserva}/cancelar', [MiTenantController::class, 'cancelar'])->name('mi.reservas.cancelar');
             // Cambiar el horario desde su cuenta (ADR 0044).

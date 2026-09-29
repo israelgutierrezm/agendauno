@@ -332,6 +332,33 @@ class MiTenantController
     }
 
     /**
+     * Días en que se puede agendar en la sede (desde hoy), para el calendario de la
+     * cuenta y la app: los que ya pasaron, en que nadie atiende o que el negocio
+     * cerró van como no disponibles (ADR 0065). Con `instructor_id`, los de esa
+     * persona. También en negocios que no están en el directorio.
+     */
+    public function diasCita(Request $request, CalcularDisponibilidadTenant $disponibilidad): JsonResponse
+    {
+        abort_unless($this->persona($request) instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+
+        $validado = $request->validate([
+            'sucursal_id' => ['required', 'string'],
+            'desde' => ['required', 'date_format:Y-m-d'],
+            'dias' => ['nullable', 'integer', 'min:1', 'max:62'],
+            'instructor_id' => ['nullable', 'string'],
+        ]);
+        $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
+        $instructor = ($validado['instructor_id'] ?? '') !== '' ? Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail() : null;
+
+        return response()->json(['data' => $disponibilidad->diasConAtencion(
+            $sucursal,
+            $validado['desde'],
+            (int) ($validado['dias'] ?? 14),
+            $instructor instanceof Usuario ? (int) $instructor->getKey() : null,
+        )]);
+    }
+
+    /**
      * Horarios libres de un profesional en una fecha, para elegir la hora de la cita.
      * Sin profesional («cualquier profesional disponible»), los de todo el equipo de
      * la sede.

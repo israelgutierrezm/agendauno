@@ -377,6 +377,31 @@ class CuentaRepository {
 
   /// Horarios libres (inicio en ISO UTC) de un profesional en una fecha (AAAA-MM-DD).
   /// Con el servicio, el negocio aplica su duración y su preparación/limpieza.
+  /// Días (AAAA-MM-DD) desde [desde] en que se puede agendar en la sede: alguien
+  /// atiende (o [profesionalId]), el negocio no cerró y no pasaron (ADR 0065).
+  Future<Set<String>> diasConAtencion({
+    required String sucursalId,
+    required String desde,
+    int dias = 62,
+    String? profesionalId,
+  }) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/citas/dias',
+      queryParameters: {
+        'sucursal_id': sucursalId,
+        'desde': desde,
+        'dias': dias,
+        'instructor_id': ?profesionalId,
+      },
+    );
+
+    return ((res.data?['data'] ?? const []) as List)
+        .cast<Map<String, dynamic>>()
+        .where((d) => d['abierto'] == true)
+        .map((d) => (d['fecha'] ?? '') as String)
+        .toSet();
+  }
+
   /// Sin [profesionalId] («cualquier profesional») salen los huecos en que alguien
   /// del equipo está libre.
   Future<List<String>> horariosLibres({

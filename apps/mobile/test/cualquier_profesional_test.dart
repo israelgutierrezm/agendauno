@@ -20,7 +20,12 @@ class _Api implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     peticiones.add(options);
-    final data = options.method == 'POST'
+    final Object data = options.path.endsWith('/mi/citas/dias')
+        ? [
+            {'fecha': '2030-01-06', 'abierto': false},
+            {'fecha': '2030-01-07', 'abierto': true},
+          ]
+        : options.method == 'POST'
         ? {
             'estado': 'pendiente_pago',
             'profesional': {'id': 'p2', 'nombre': 'Carla'},
@@ -97,6 +102,20 @@ void main() {
     final enviado = api.peticiones.single.data as Map<String, dynamic>;
     expect(enviado.containsKey('instructor_id'), isFalse);
     expect(enviado.containsKey('nota'), isFalse);
+  });
+
+  test('pide los días con atención y devuelve solo los abiertos', () async {
+    final dias = await repo.diasConAtencion(
+      sucursalId: 's1',
+      desde: '2030-01-06',
+      profesionalId: 'p1',
+    );
+
+    final pedido = api.peticiones.single;
+    expect(pedido.path, endsWith('/mi/citas/dias'));
+    expect(pedido.queryParameters['instructor_id'], 'p1');
+    expect(pedido.queryParameters['dias'], 62);
+    expect(dias, {'2030-01-07'});
   });
 
   test('manda la nota para el negocio si la escribió', () async {
