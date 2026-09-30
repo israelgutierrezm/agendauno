@@ -69,6 +69,9 @@ composer test       # Pest
   `php artisan agendauno:sembrar-demo --slug=barberia --perfil=barberia --nombre="Barbería Demo"`
   (solo citas). Crean una cuenta por rol (dueño, administradora, recepción, profesionales,
   alumna); la contraseña es la opción `--password` del comando y lo imprime al terminar.
+  También siembran el último mes de historia (citas y clases con asistencia, cobros,
+  compras de paquetes, bloqueos y esquemas de pago) para ver los reportes con datos. No
+  borran nada: se pueden volver a correr y no repiten la historia.
 
 ### 3. Web
 
