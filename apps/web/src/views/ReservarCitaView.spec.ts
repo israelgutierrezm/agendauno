@@ -520,9 +520,13 @@ describe("agenda pública por pasos", () => {
 
     const tarjetas = vista.get('[data-prueba="ver-horarios-de"]');
     expect(tarjetas.text()).toContain("Todo el equipo");
-    // El selector es compacto: no repite un subtítulo por cada opción.
-    expect(tarjetas.text()).not.toContain("Cualquier profesional");
-    expect(tarjetas.text()).toContain("Elegir a alguien específico");
+    // Cada opción dice qué es.
+    expect(tarjetas.get('[data-prueba="filtro-todos"]').text()).toContain(
+      "Cualquier profesional",
+    );
+    expect(tarjetas.get('[data-prueba="filtro-alguien"]').text()).toBe(
+      "Elegir a alguien específicoSelecciona un profesionista",
+    );
     // Con todo el equipo no se piden fotos.
     expect(vista.find('[data-prueba="filtro-ana"]').exists()).toBe(false);
 

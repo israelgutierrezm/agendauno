@@ -51,7 +51,7 @@ function nombreTarjeta(p: Profesional): string {
     <legend class="tu-label">
       {{ $t("perfilPublico.agendar.verHorariosDe") }}
     </legend>
-    <!-- Selector compacto de dos opciones, sin repetir las instrucciones. -->
+    <!-- Dos tarjetas: ícono, qué es y el círculo de la opción a la derecha. -->
     <div class="ep-modo">
       <label
         class="ep-opcion"
@@ -63,11 +63,12 @@ function nombreTarjeta(p: Profesional): string {
         </span>
         <span class="ep-texto">
           <strong>{{ $t("perfilPublico.agendar.todoElEquipo") }}</strong>
+          <small>{{ $t("perfilPublico.agendar.cualquierProfesional") }}</small>
         </span>
         <input
           type="radio"
           :name="`${id}-modo`"
-          class="ep-oculto"
+          class="ep-radio"
           :checked="!conAlguien"
           @change="verTodos"
         />
@@ -82,11 +83,14 @@ function nombreTarjeta(p: Profesional): string {
         </span>
         <span class="ep-texto">
           <strong>{{ $t("perfilPublico.agendar.alguienEspecifico") }}</strong>
+          <small>{{
+            $t("perfilPublico.agendar.seleccionaProfesionista")
+          }}</small>
         </span>
         <input
           type="radio"
           :name="`${id}-modo`"
-          class="ep-oculto"
+          class="ep-radio"
           :checked="conAlguien"
           @change="verAlguien"
         />
@@ -131,23 +135,21 @@ function nombreTarjeta(p: Profesional): string {
 .ep-modo {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
+  gap: 1rem;
 }
 .ep-opcion {
-  position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  min-height: 3.6rem;
-  padding: 0.65rem 1rem;
+  gap: 1rem;
+  min-width: 0;
+  padding: 0.85rem 1rem 0.85rem 0.9rem;
   border: 1px solid var(--borde);
-  border-radius: 0 10px 10px 0;
+  border-radius: 12px;
   background: var(--superficie);
   cursor: pointer;
-}
-.ep-opcion:first-child {
-  border-radius: 10px 0 0 10px;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
 }
 .ep-opcion:hover {
   border-color: var(--primario);
@@ -166,44 +168,90 @@ function nombreTarjeta(p: Profesional): string {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
+  width: 3.25rem;
+  height: 3.25rem;
   flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--fondo);
   color: var(--texto-suave);
 }
 .ep-opcion--activa .ep-icono {
+  background: color-mix(in srgb, var(--primario) 12%, var(--superficie));
   color: var(--primario);
 }
 .ep-texto {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.15rem;
   min-width: 0;
   overflow-wrap: anywhere;
-  text-align: center;
 }
 .ep-texto strong {
-  display: block;
   font-weight: 500;
-  font-size: 0.95rem;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+.ep-texto small {
+  font-size: 0.85rem;
+  line-height: 1.3;
+  color: var(--texto-suave);
+}
+/* El círculo de la opción, a la derecha. */
+.ep-radio {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  flex-shrink: 0;
+  margin: 0;
+  border: 1.5px solid var(--texto-suave);
+  border-radius: 999px;
+  background: var(--superficie);
+  cursor: pointer;
+}
+.ep-radio::before {
+  content: "";
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  transform: scale(0);
+  transition: transform 120ms ease;
+  background: var(--primario);
+}
+.ep-radio:checked {
+  border-color: var(--primario);
+  border-width: 2px;
+}
+.ep-radio:checked::before {
+  transform: scale(1);
+}
+.ep-radio:focus-visible {
+  outline: none;
 }
 .ep-profesionales {
   display: flex;
-  gap: 0.6rem;
+  gap: 0.75rem;
   overflow-x: auto;
   padding: 0.25rem 0.2rem 0.65rem;
   scroll-snap-type: x proximity;
   scrollbar-width: thin;
   scrollbar-color: var(--borde) transparent;
+  overscroll-behavior-x: contain;
 }
 .ep-profesional {
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
-  gap: 0.6rem;
-  flex: 1 0 8.5rem;
-  min-width: 0;
-  max-width: 13rem;
-  padding: 0.75rem;
+  gap: 0.5rem;
+  /* Un quinto de la fila cada una, sin estirarlas: cinco la llenan y, si son
+     más, se desplazan. */
+  flex: 0 0 calc((100% - 3rem) / 5);
+  min-width: 7.5rem;
+  padding: 0.75rem 0.5rem 0.65rem;
   border: 1px solid var(--borde);
   border-radius: 12px;
   background: var(--superficie);
@@ -213,6 +261,11 @@ function nombreTarjeta(p: Profesional): string {
   transition:
     border-color 150ms ease,
     background-color 150ms ease;
+}
+.ep-profesional :deep(.fa-foto--xl > img),
+.ep-profesional :deep(.fa-foto--xl > span) {
+  width: 4.25rem;
+  height: 4.25rem;
 }
 .ep-profesional:hover {
   border-color: var(--primario);
@@ -229,7 +282,7 @@ function nombreTarjeta(p: Profesional): string {
   font-size: 0.95rem;
   line-height: 1.3;
 }
-/* El círculo de la opción no se ve: toda la tarjeta es la opción. */
+/* En los profesionales el círculo no se ve: toda la tarjeta es la opción. */
 .ep-oculto {
   position: absolute;
   width: 1px;
@@ -237,22 +290,44 @@ function nombreTarjeta(p: Profesional): string {
   opacity: 0;
   pointer-events: none;
 }
-@media (max-width: 520px) {
+@media (max-width: 640px) {
+  .ep-modo {
+    gap: 0.6rem;
+  }
   .ep-opcion {
-    padding: 0.65rem 0.5rem;
-    gap: 0.4rem;
+    gap: 0.6rem;
+    padding: 0.7rem 0.75rem 0.7rem 0.6rem;
+  }
+  .ep-icono {
+    width: 2.5rem;
+    height: 2.5rem;
   }
   .ep-texto strong {
-    font-size: 0.8rem;
+    font-size: 0.875rem;
+  }
+  .ep-texto small {
+    font-size: 0.75rem;
+  }
+  .ep-radio {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+  .ep-radio::before {
+    width: 0.6rem;
+    height: 0.6rem;
   }
   .ep-profesional {
     flex-basis: 6.5rem;
-    padding: 0.75rem 0.5rem;
   }
   .ep-profesional :deep(.fa-foto--xl > img),
   .ep-profesional :deep(.fa-foto--xl > span) {
     width: 3.5rem;
     height: 3.5rem;
+  }
+}
+@media (max-width: 420px) {
+  .ep-modo {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

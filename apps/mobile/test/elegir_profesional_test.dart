@@ -35,10 +35,13 @@ void main() {
     (tester) async {
       final cambios = await montar(tester, null);
 
+      // Cada opción dice qué es; con todo el equipo no se ven las tarjetas.
       expect(find.text('Todo el equipo'), findsOneWidget);
-      expect(find.text('Selecciona un profesionista'), findsNothing);
+      expect(find.text('Cualquier profesional'), findsOneWidget);
+      expect(find.text('Selecciona un profesionista'), findsOneWidget);
+      expect(find.text('Ana'), findsNothing);
 
-      await tester.tap(find.text('Alguien específico'));
+      await tester.tap(find.text('Elegir a alguien específico'));
       expect(cambios, ['ana']);
     },
   );

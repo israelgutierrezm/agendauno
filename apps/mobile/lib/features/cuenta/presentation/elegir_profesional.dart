@@ -39,29 +39,40 @@ class ElegirProfesional extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        SegmentedButton<bool>(
-          showSelectedIcon: false,
-          segments: const [
-            ButtonSegment(
-              value: false,
-              icon: Icon(Icons.groups_outlined),
-              label: Text('Todo el equipo'),
-            ),
-            ButtonSegment(
-              value: true,
-              icon: Icon(Icons.person_outline),
-              label: Text('Alguien específico'),
-            ),
-          ],
-          selected: {conAlguien},
-          onSelectionChanged: (valor) {
-            if (valor.first) {
-              if (!conAlguien && profesionales.isNotEmpty) {
-                alCambiar(profesionales.first.id);
-              }
-            } else {
-              alCambiar(null);
+        // Dos tarjetas, lado a lado si caben; en un teléfono, una bajo otra.
+        LayoutBuilder(
+          builder: (context, espacio) {
+            final todos = _OpcionModo(
+              icono: Icons.groups_outlined,
+              titulo: 'Todo el equipo',
+              detalle: 'Cualquier profesional',
+              activa: !conAlguien,
+              alTocar: () => alCambiar(null),
+            );
+            final alguien = _OpcionModo(
+              icono: Icons.person_outline,
+              titulo: 'Elegir a alguien específico',
+              detalle: 'Selecciona un profesionista',
+              activa: conAlguien,
+              alTocar: () {
+                if (!conAlguien && profesionales.isNotEmpty) {
+                  alCambiar(profesionales.first.id);
+                }
+              },
+            );
+            if (espacio.maxWidth < 520) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [todos, const SizedBox(height: 10), alguien],
+              );
             }
+            return Row(
+              children: [
+                Expanded(child: todos),
+                const SizedBox(width: 12),
+                Expanded(child: alguien),
+              ],
+            );
           },
         ),
         if (conAlguien) ...[
@@ -90,6 +101,123 @@ class ElegirProfesional extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Una de las dos opciones de «Ver horarios de»: su ícono en un círculo, qué es y
+/// el círculo de la opción a la derecha.
+class _OpcionModo extends StatelessWidget {
+  const _OpcionModo({
+    required this.icono,
+    required this.titulo,
+    required this.detalle,
+    required this.activa,
+    required this.alTocar,
+  });
+
+  final IconData icono;
+  final String titulo;
+  final String detalle;
+  final bool activa;
+  final VoidCallback alTocar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      selected: activa,
+      button: true,
+      label: titulo,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: alTocar,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+          decoration: BoxDecoration(
+            color: activa
+                ? TemaAgendaUno.acentoSuave
+                : TemaAgendaUno.superficie,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: activa ? TemaAgendaUno.acento : TemaAgendaUno.borde,
+              width: activa ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: activa
+                    ? TemaAgendaUno.acento.withValues(alpha: 0.12)
+                    : TemaAgendaUno.fondo,
+                child: Icon(
+                  icono,
+                  size: 22,
+                  color: activa
+                      ? TemaAgendaUno.acento
+                      : TemaAgendaUno.textoSuave,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      titulo,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      detalle,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: TemaAgendaUno.textoSuave,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _CirculoOpcion(activa: activa),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// El círculo de una opción: vacío o con el punto del acento.
+class _CirculoOpcion extends StatelessWidget {
+  const _CirculoOpcion({required this.activa});
+
+  final bool activa;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: TemaAgendaUno.superficie,
+        border: Border.all(
+          color: activa ? TemaAgendaUno.acento : TemaAgendaUno.textoSuave,
+          width: activa ? 2 : 1.5,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: activa
+          ? Container(
+              width: 11,
+              height: 11,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: TemaAgendaUno.acento,
+              ),
+            )
+          : null,
     );
   }
 }
