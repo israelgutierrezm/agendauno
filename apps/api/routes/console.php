@@ -78,6 +78,10 @@ Schedule::command('agendauno:avisar-duenos')->hourlyAt(20)->between('15:00', '02
 Schedule::command('agendauno:respaldar-plataforma')->dailyAt('03:05')->withoutOverlapping();
 Schedule::command('agendauno:respaldar-estudios')->dailyAt('03:15')->withoutOverlapping();
 
+// Borra los registros técnicos vencidos (envíos y códigos de WhatsApp, sesiones de
+// tarjeta), con los plazos de los parámetros de plataforma (ADR 0079). 03:40 de CDMX.
+Schedule::command('agendauno:limpiar-registros')->dailyAt('09:40')->withoutOverlapping();
+
 // Simulacro de restauración (domingos): prueba que los respaldos se pueden restaurar.
 Schedule::command('agendauno:simulacro-restauracion')->weeklyOn(0, '04:30')->withoutOverlapping();
 

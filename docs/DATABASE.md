@@ -29,9 +29,9 @@ el esquema.
 | `facturas_plataforma` | Facturas de la plataforma al negocio |
 | `configuraciones_pasarela_plataforma` | Pasarela con la que la plataforma cobra la renta |
 | `configuracion_plataforma` | Parámetros de plataforma (valores por defecto de los límites) y conexión de WhatsApp (cifrada) |
-| `verificaciones_whatsapp` | Códigos para que el dueño confirme su WhatsApp al registrarse (solo hashes, ADR 0070) |
+| `verificaciones_whatsapp` | Códigos para que el dueño confirme su WhatsApp al registrarse (solo hashes, ADR 0070); se limpia a los 7 días (ADR 0079) |
 | `avisos_duenos` | Avisos de la plataforma al dueño por correo y WhatsApp: prueba por terminar, renta lista, vencida y pagada (uno por tipo, referencia y canal, ADR 0071); entrega y lectura del WhatsApp (ADR 0074) |
-| `whatsapp_envios` | Cada WhatsApp enviado: el `wamid` de Meta, el negocio y el mensaje o aviso al que corresponde, y su último estado (ADR 0074) |
+| `whatsapp_envios` | Cada WhatsApp enviado: el `wamid` de Meta, el negocio y el mensaje o aviso al que corresponde, y su último estado (ADR 0074); se limpia a los 30 días (ADR 0079) |
 | `alertas_plataforma` | Alertas de operación agrupadas (ADR 0051) |
 | `documentos_legales`, `aceptaciones_legales` | Aviso de privacidad y términos versionados, y quién los aceptó |
 | `users`, `cache`, `jobs`, `failed_jobs`… | Tablas de Laravel |
@@ -102,7 +102,7 @@ el esquema.
 - `configuraciones_pasarela` — llaves cifradas por pasarela (ADR 0014, 0021).
 - `clientes_pasarela`, `domiciliaciones`, `procesos_dunning` — cobro automático
   (ADR 0020); `sesiones_tarjeta` — sesiones de Stripe para autorizar la tarjeta, por
-  conciliar si su aviso no llega (ADR 0076).
+  conciliar si su aviso no llega (ADR 0076); se limpia a los 30 días (ADR 0079).
 - `datos_fiscales`, `facturas` — facturación del negocio a sus clientes.
 - `promociones` — descuentos.
 

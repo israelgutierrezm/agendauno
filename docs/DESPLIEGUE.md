@@ -192,6 +192,13 @@ dentro del volumen `storage` (`private/` → `storage/app/private`, `public/` �
 
 Además de esto, conviene que el proveedor de MySQL haga sus instantáneas diarias.
 
+### Limpieza de registros técnicos
+
+`agendauno:limpiar-registros` (diario, 03:40 de CDMX) borra los envíos y códigos de
+WhatsApp y las sesiones para autorizar tarjetas que ya cumplieron su plazo. Los plazos
+se ajustan en el superadmin, «Parámetros» → «Limpieza de registros» (ADR 0079). No
+borra historial de los negocios.
+
 ## Alertas y monitoreo
 
 El superadmin (pestaña **Operación**) muestra lo mismo que la consola y los correos:

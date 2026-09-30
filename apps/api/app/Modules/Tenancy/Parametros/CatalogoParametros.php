@@ -127,6 +127,14 @@ final class CatalogoParametros
                 'Al registrarse. Pasado el tope, el dueño sigue sin verificar.', $e, 3, 1, 10, 'códigos', porNegocio: false),
             new DefinicionParametro('whatsapp.codigos_por_dia', 'WhatsApp', 'Códigos de verificación al día (toda la plataforma)',
                 'Protege el costo si alguien abusa del registro; al llegar, avisa al superadministrador.', $e, 300, 10, 100000, 'códigos', porNegocio: false),
+
+            // Limpieza de registros técnicos (ADR 0079, solo la plataforma).
+            new DefinicionParametro('limpieza.dias_envios_whatsapp', 'Limpieza de registros', 'Días que se guarda el registro de cada WhatsApp enviado',
+                'Sirve para saber si se entregó o se leyó. Después, lo que Meta avise de ese mensaje se ignora.', $e, 30, 7, 365, 'días', porNegocio: false),
+            new DefinicionParametro('limpieza.dias_verificaciones_whatsapp', 'Limpieza de registros', 'Días que se guardan los códigos de verificación de WhatsApp',
+                'Solo se guarda su huella, nunca el código. Cuentan para los topes de códigos por hora y por día.', $e, 7, 2, 90, 'días', porNegocio: false),
+            new DefinicionParametro('limpieza.dias_sesiones_tarjeta', 'Limpieza de registros', 'Días que se guardan las sesiones para autorizar tarjetas',
+                'Sirven para registrar la tarjeta del pago automático si el aviso de Stripe no llega; se revisan hasta 48 horas.', $e, 30, 3, 365, 'días', porNegocio: false),
         ];
 
         $porClave = [];

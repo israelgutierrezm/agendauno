@@ -58,7 +58,6 @@ un webhook, que no se procesaba.
   el negocio puede pedir otro dato o avisar por otro canal.
 - Hay que configurar el webhook en la app de Meta y suscribirse al campo
   `messages`. Sin eso, todo sigue funcionando como antes, sin estados de entrega.
-- `whatsapp_envios` crece con cada envío. Purgar filas viejas queda para cuando haga
-  falta; hoy no se usa después de que el mensaje llega a su estado final.
+- `whatsapp_envios` crece con cada envío; se limpia pasado su plazo (ADR 0079).
 - Los mensajes que entran (respuestas de los clientes) llegan al mismo webhook y se
   ignoran; atenderlos sería otro trabajo.
