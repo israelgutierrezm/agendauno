@@ -107,6 +107,12 @@ const error = ref<string | null>(null);
 const paso = ref<Paso>("sucursal");
 const servicioId = ref("");
 // Servicios agrupados por su categoría (la actividad del catálogo).
+// Con alguna foto, cada servicio lleva su miniatura (o su inicial) para alinearlos;
+// sin ninguna, no se reserva ese espacio.
+const serviciosConFoto = computed(() =>
+  (opciones.value?.servicios ?? []).some((s) => s.foto_url),
+);
+
 const gruposServicios = computed(() => {
   const grupos = new Map<string, Servicio[]>();
   for (const s of opciones.value?.servicios ?? []) {
@@ -1125,22 +1131,28 @@ onMounted(cargar);
                     @change="elegirServicio(s.id)"
                     @click="servicioId === s.id && elegirServicio(s.id)"
                   />
-                  <img
-                    v-if="s.foto_url"
-                    :src="s.foto_url"
-                    alt=""
-                    class="h-14 w-14 shrink-0 rounded-lg object-cover"
-                    data-prueba="foto-servicio"
-                  />
+                  <!-- Miniatura pequeña: aprovecha el ancho sin hacer más alta la fila. -->
+                  <span
+                    v-if="serviciosConFoto"
+                    class="rc-servicio-foto"
+                    aria-hidden="true"
+                  >
+                    <img
+                      v-if="s.foto_url"
+                      :src="s.foto_url"
+                      alt=""
+                      data-prueba="foto-servicio"
+                    />
+                    <template v-else>{{
+                      s.nombre.trim().charAt(0).toUpperCase()
+                    }}</template>
+                  </span>
                   <span class="min-w-0">
                     <span class="font-medium block truncate">{{
                       s.nombre
                     }}</span>
-                    <span
-                      v-if="s.duracion_minutos"
-                      class="text-sm"
-                      :style="{ color: 'var(--texto-suave)' }"
-                      >{{
+                    <span v-if="s.duracion_minutos" class="rc-duracion"
+                      ><IconoNav nombre="reloj" :tam="13" />{{
                         $t("reservar.duracionMin", { n: s.duracion_minutos })
                       }}</span
                     >
@@ -1714,6 +1726,38 @@ onMounted(cargar);
   display: block;
   font-weight: 500;
   font-size: 0.9rem;
+}
+
+/* Servicio: miniatura redonda y duración en una etiqueta. */
+.rc-servicio-foto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  color: var(--texto-suave);
+  font-weight: 600;
+}
+.rc-servicio-foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.rc-duracion {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  background: var(--fondo);
+  color: var(--texto-suave);
+  font-size: 0.75rem;
 }
 
 /* Horas en cuadrícula pareja. */

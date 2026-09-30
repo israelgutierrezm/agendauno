@@ -246,10 +246,11 @@ describe("agenda pública por pasos", () => {
     // Paso 2: el servicio, con la sede elegida a la vista.
     expect(vista.find('input[name="sucursal"]').exists()).toBe(false);
     expect(vista.get('[data-prueba="contexto"]').text()).toContain("Centro");
-    // El servicio con su foto.
+    // El servicio con su foto en miniatura y su duración.
     expect(vista.get('[data-prueba="foto-servicio"]').attributes("src")).toBe(
       "/storage/corte.webp",
     );
+    expect(vista.get(".rc-duracion").text()).toContain("30");
     await hastaHorario(vista);
     // Paso 3: primero el día y la hora; todavía no se pregunta con quién.
     expect(vista.find('input[name="profesional"]').exists()).toBe(false);
