@@ -223,6 +223,10 @@ corre el comando a mano.
   desactiva «Recibirlos también por WhatsApp». Captura el correo en Configuración
   del superadmin: al vencer una renta llega la alerta «Renta vencida». En Cobros →
   «Vencidos», «Suspender» suspende el negocio y luego muestra «Negocio suspendido».
+- [ ] **Cambiar el WhatsApp del negocio** (ADR 0075). En «Avisos de AgendaUno»,
+  «Cambiar» con otro número: llega el código a ese WhatsApp y, al escribirlo, el
+  número cambia verificado; la página del negocio muestra el nuevo. Con WhatsApp
+  apagado en la plataforma se guarda sin código y queda sin verificar.
 - [ ] **Suspensión automática** (ADR 0073). Con una renta vencida hace 12 días,
   el dueño recibe «Tu negocio se suspenderá el …». A los 15,
   `agendauno:suspender-por-renta` lo suspende. La página pública y el panel dan

@@ -1217,6 +1217,18 @@ export default {
     reenviar: "Enviar otro código",
     reenviarEn: "Puedes pedir otro en {s} s",
     verificado: "Tu WhatsApp quedó verificado.",
+    cambiar: "Cambiar",
+    enTuPagina: "Es el que aparece en tu página para que te escriban.",
+    numeroNuevo: "Número nuevo",
+    lada: "Lada",
+    cambioConCodigo:
+      "Te mandamos un código a ese WhatsApp; el número cambia al confirmarlo. También es el que aparece en tu página.",
+    cambioSinCodigo: "También es el que aparece en tu página.",
+    enviarCodigo: "Enviar código",
+    guardar: "Guardar",
+    cancelar: "Cancelar",
+    codigoNuevo: "Código de 6 dígitos que te llegó a {numero}",
+    cambiado: "Tu WhatsApp quedó actualizado.",
   },
   // Foto con lupa para verla en grande (p. ej. el profesional al agendar).
   fotoAmpliable: {

@@ -37,7 +37,8 @@
   código; el webhook de estados marca entregado, leído o fallido.
 - **Avisos de la plataforma al dueño** (ADR 0071, 0072): prueba por terminar y
   renta lista, vencida y pagada, por correo y WhatsApp; el dueño los ve y decide
-  en su panel; alerta de renta vencida al correo del superadministrador.
+  en su panel, donde también cambia su WhatsApp con un código (ADR 0075); alerta de
+  renta vencida al correo del superadministrador.
 - **Suspensión automática por renta** (ADR 0073): con días de gracia y aviso previo;
   suspendido, el dueño solo entra a pagar y se reactiva al pagar.
 - **Experiencia**: web única (sitio, panel, portal, superadmin) y app Flutter;
@@ -62,8 +63,6 @@
   aviso; hoy la conciliación cubre los cobros.
 - WhatsApp: si conviene, número propio por negocio o cobrarlo como extra del plan
   (ADR 0069); atender las respuestas de los clientes (ADR 0074).
-- Cambiar el WhatsApp del negocio desde el panel del dueño (hoy se verifica el del
-  registro, ADR 0072).
 - Separar «editar» y «eliminar» en el catálogo de permisos.
 - Roles propios con faceta de instructor.
 - Monitoreo de errores más completo y despliegue automático desde el CI.

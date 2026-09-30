@@ -375,6 +375,11 @@ Route::prefix('v1')->group(function (): void {
                 ->middleware(['puede:facturacion.ver', 'throttle:5,10,panel-whatsapp-codigo'])->name('avisos-plataforma.codigo');
             Route::post('/avisos-plataforma/whatsapp/verificar', [AvisosPlataformaTenantController::class, 'verificar'])
                 ->middleware(['puede:facturacion.ver', 'throttle:20,10,panel-whatsapp-verificar'])->name('avisos-plataforma.verificar');
+            // Cambiar el WhatsApp del negocio: con código al número nuevo si hay WhatsApp con los dueños (ADR 0075).
+            Route::post('/avisos-plataforma/whatsapp/cambio/codigo', [AvisosPlataformaTenantController::class, 'codigoCambio'])
+                ->middleware(['puede:estudio.gestionar', 'throttle:5,10,panel-whatsapp-cambio-codigo'])->name('avisos-plataforma.cambio.codigo');
+            Route::put('/avisos-plataforma/whatsapp', [AvisosPlataformaTenantController::class, 'cambiar'])
+                ->middleware(['puede:estudio.gestionar', 'throttle:20,10,panel-whatsapp-cambio'])->name('avisos-plataforma.cambio');
             // Transparencia del cobro: a quién se contó en el periodo (alumnos o profesionales).
             Route::get('/renta/quien-cuenta', [FacturacionController::class, 'quienCuenta'])->middleware('puede:facturacion.ver')->name('renta.quien-cuenta');
             // Pago de la renta del SaaS con la pasarela de la plataforma (async -> pendiente

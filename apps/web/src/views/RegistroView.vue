@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { PAISES } from "@/lib/ladas";
 import { trackEvent } from "@/lib/analytics";
 import AvisoPrivacidadContenido from "@/components/AvisoPrivacidadContenido.vue";
 
@@ -195,17 +196,6 @@ async function tokenRecaptcha(): Promise<string | null> {
     return null;
   }
 }
-
-// Ladas frecuentes (México por defecto).
-const PAISES = [
-  { lada: "52", nombre: "México", bandera: "🇲🇽" },
-  { lada: "1", nombre: "EE. UU. / Canadá", bandera: "🇺🇸" },
-  { lada: "57", nombre: "Colombia", bandera: "🇨🇴" },
-  { lada: "54", nombre: "Argentina", bandera: "🇦🇷" },
-  { lada: "56", nombre: "Chile", bandera: "🇨🇱" },
-  { lada: "51", nombre: "Perú", bandera: "🇵🇪" },
-  { lada: "34", nombre: "España", bandera: "🇪🇸" },
-];
 
 const slugDisponible = ref<boolean | null>(null);
 const verificandoSlug = ref(false);

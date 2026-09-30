@@ -31,6 +31,7 @@ class ResolverEstudio
         'yo', 'yo.rol-activo', 'apariencia',
         'renta', 'renta.quien-cuenta', 'renta.pagar', 'renta.factura', 'renta.factura.descargar',
         'avisos-plataforma', 'avisos-plataforma.guardar', 'avisos-plataforma.codigo', 'avisos-plataforma.verificar',
+        'avisos-plataforma.cambio.codigo', 'avisos-plataforma.cambio',
     ];
 
     public function __construct(private readonly GestorDeConexionTenant $gestor) {}

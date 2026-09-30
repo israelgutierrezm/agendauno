@@ -89,3 +89,60 @@ it('un alumno no ve ni cambia los avisos del negocio', function (): void {
     $this->getJson("/api/v1/app/{$e['slug']}/avisos-plataforma", conBearer($alumna['bearer']))->assertForbidden();
     $this->putJson("/api/v1/app/{$e['slug']}/avisos-plataforma", ['acepta_whatsapp' => false], conBearer($alumna['bearer']))->assertForbidden();
 });
+
+it('el dueño cambia su WhatsApp con el código que llega al número nuevo', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $this->putJson('/api/v1/plataforma/whatsapp', [
+        'negocios' => false, 'duenos' => true, 'phone_number_id' => '109876543210', 'token' => 'EAAG-token-de-prueba',
+    ], conPlataforma())->assertOk();
+    $url = "/api/v1/app/{$e['slug']}/avisos-plataforma";
+    $nuevo = ['contacto_whatsapp_pais' => '+52', 'contacto_telefono' => '55 8765 4321'];
+
+    $this->postJson("{$url}/whatsapp/cambio/codigo", $nuevo, conBearer($e['bearer']))->assertCreated();
+    $envio = $this->meta->envios[0];
+    expect($envio['to'])->toBe('525587654321');
+    $codigo = (string) $envio['template']['components'][0]['parameters'][0]['text'];
+
+    // Con un código equivocado el número no cambia.
+    $this->putJson("{$url}/whatsapp", [...$nuevo, 'codigo' => $codigo === '000000' ? '111111' : '000000'], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonPath('meta.errors.codigo.0', 'El código no es correcto.');
+    expect(Estudio::query()->where('slug', 'estudio-a')->value('contacto_telefono'))->toBe('5512345678');
+
+    $this->putJson("{$url}/whatsapp", [...$nuevo, 'codigo' => $codigo], conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.numero', '+52 55 8765 4321')
+        ->assertJsonPath('data.whatsapp', ['numero' => '+52 55 8765 4321', 'verificado' => true, 'acepta' => true]);
+    // Es el mismo que aparece en su página.
+    expect(Estudio::query()->where('slug', 'estudio-a')->firstOrFail()->whatsappCompleto())->toBe('+52 55 8765 4321');
+
+    // Ya es el suyo: no se manda otro código.
+    $this->postJson("{$url}/whatsapp/cambio/codigo", ['contacto_telefono' => '5587654321'], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonPath('meta.errors.contacto_telefono.0', 'Ese ya es el WhatsApp de tu negocio.');
+    expect($this->meta->envios)->toHaveCount(1);
+
+    $acciones = collect($this->getJson("/api/v1/app/{$e['slug']}/auditorias", conBearer($e['bearer']))->json('data'))->pluck('accion');
+    expect($acciones)->toContain('negocio.whatsapp_cambiado');
+});
+
+it('sin WhatsApp con los dueños el número se cambia sin código y queda sin verificar', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    Estudio::query()->where('slug', 'estudio-a')->update(['contacto_whatsapp_verificado_en' => now(), 'contacto_whatsapp_aceptado_en' => now()]);
+
+    $this->putJson("/api/v1/app/{$e['slug']}/avisos-plataforma/whatsapp", ['contacto_whatsapp_pais' => '57', 'contacto_telefono' => '300 123 4567'], conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.numero', '+57 300 123 4567')
+        ->assertJsonPath('data.pais', '57')
+        ->assertJsonPath('data.whatsapp', null);
+    $estudio = Estudio::query()->where('slug', 'estudio-a')->firstOrFail();
+    expect($estudio->contacto_whatsapp_verificado_en)->toBeNull()
+        ->and($estudio->contacto_whatsapp_aceptado_en)->toBeNull()
+        ->and($this->meta->envios)->toBe([]);
+});
+
+it('cambiar el WhatsApp del negocio pide gestionar el negocio', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $recepcion = personalConSesion($e['slug'], $e['bearer'], 'recepcion@correo.mx', 'recepcionista');
+
+    $this->putJson("/api/v1/app/{$e['slug']}/avisos-plataforma/whatsapp", ['contacto_telefono' => '5587654321'], conBearer($recepcion))
+        ->assertForbidden();
+    expect(Estudio::query()->where('slug', 'estudio-a')->value('contacto_telefono'))->toBe('5512345678');
+});

@@ -28,7 +28,7 @@ Con los ADR 0070 y 0071 quedaron tres huecos:
     - `POST /avisos-plataforma/whatsapp/codigo`;
     - `POST /avisos-plataforma/whatsapp/verificar`.
   - Todas piden `facturacion.ver`, y cada cambio queda en la bitácora del negocio.
-  - Se verifica el número del registro. Cambiarlo no está en el panel.
+  - Se verifica el número del registro. Cambiarlo llegó en el ADR 0075.
 - **Correo del superadministrador, capturable:** Configuración → «Correo del
   superadministrador» (`correo_alertas` en `configuracion_plataforma`).
   - Tiene prioridad sobre `ALERTAS_CORREO`, que queda de respaldo.
