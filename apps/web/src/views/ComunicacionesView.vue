@@ -69,6 +69,7 @@ const puedeAutomaticos = computed(() =>
   sesion.puede("comunicaciones.gestionar"),
 );
 const puedeSalida = computed(() => sesion.puede("comunicaciones.ver"));
+const puedeEliminar = computed(() => sesion.puede("comunicaciones.eliminar"));
 const pestana = ref<Pestana>("difusion");
 
 const segmentos = ref<Segmento[]>([]);
@@ -970,7 +971,7 @@ onMounted(cargar);
             {{ $t("comunicacionesAuto.guardar") }}
           </button>
           <button
-            v-if="plantillaDe(editor.clave, borrador.canal)"
+            v-if="puedeEliminar && plantillaDe(editor.clave, borrador.canal)"
             type="button"
             class="tu-btn tu-btn-fantasma w-full"
             style="color: var(--error)"

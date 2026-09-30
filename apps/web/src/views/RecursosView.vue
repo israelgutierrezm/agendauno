@@ -26,6 +26,7 @@ const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
+const puedeEliminar = computed(() => sesion.puede("agenda.eliminar"));
 
 const recursos = ref<Recurso[]>([]);
 const sucursales = ref<Sucursal[]>([]);
@@ -163,7 +164,7 @@ onMounted(cargar);
               }}
             </span>
             <button
-              v-if="puedeGestionar"
+              v-if="puedeEliminar"
               class="tu-enlace text-sm"
               style="color: var(--error)"
               @click="eliminar(r)"

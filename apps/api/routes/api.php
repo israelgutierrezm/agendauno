@@ -316,7 +316,7 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/roles/{rol}', [RolesTenantController::class, 'destroy'])->middleware('puede:roles.gestionar')->name('roles.destroy');
             Route::put('/usuarios/{usuario}/roles', [UsuariosTenantController::class, 'actualizarRoles'])->middleware('puede:usuarios.gestionar')->name('usuarios.roles');
             // Baja lógica del equipo (quita el acceso, conserva el historial) y reactivación.
-            Route::delete('/usuarios/{usuario}', [UsuariosTenantController::class, 'darDeBaja'])->middleware('puede:usuarios.gestionar')->name('usuarios.baja');
+            Route::delete('/usuarios/{usuario}', [UsuariosTenantController::class, 'darDeBaja'])->middleware('puede:usuarios.eliminar')->name('usuarios.baja');
             Route::post('/usuarios/{usuario}/reactivar', [UsuariosTenantController::class, 'reactivar'])->middleware('puede:usuarios.gestionar')->name('usuarios.reactivar');
 
             // RBAC con scope por sucursal (R19): asigna a un usuario un rol EN una
@@ -340,7 +340,7 @@ Route::prefix('v1')->group(function (): void {
             // Editar datos y estado del alumno (suspender/archivar/no-facturable) con auditoría (P0).
             Route::put('/miembros/{persona}', [MiembrosTenantController::class, 'actualizar'])->middleware('puede:miembros.gestionar')->name('miembros.update');
             // Baja lógica del alumno (cierra lo vigente, conserva su historial) y reactivación.
-            Route::delete('/miembros/{persona}', [MiembrosTenantController::class, 'darDeBaja'])->middleware('puede:miembros.gestionar')->name('miembros.baja');
+            Route::delete('/miembros/{persona}', [MiembrosTenantController::class, 'darDeBaja'])->middleware('puede:miembros.eliminar')->name('miembros.baja');
             Route::post('/miembros/{persona}/reactivar', [MiembrosTenantController::class, 'reactivar'])->middleware('puede:miembros.gestionar')->name('miembros.reactivar');
             // Importacion CSV de miembros (R37): preview (valida) e import (todo-o-nada).
             Route::post('/importaciones/miembros/preview', [ImportacionesTenantController::class, 'previewMiembros'])->middleware('puede:miembros.gestionar')->name('importaciones.miembros.preview');
@@ -359,7 +359,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/automatizaciones', [AutomatizacionesTenantController::class, 'index'])->middleware('puede:automatizaciones.gestionar')->name('automatizaciones.index');
             Route::post('/automatizaciones', [AutomatizacionesTenantController::class, 'store'])->middleware('puede:automatizaciones.gestionar')->name('automatizaciones.store');
             Route::put('/automatizaciones/{regla}', [AutomatizacionesTenantController::class, 'actualizar'])->middleware('puede:automatizaciones.gestionar')->name('automatizaciones.update');
-            Route::delete('/automatizaciones/{regla}', [AutomatizacionesTenantController::class, 'eliminar'])->middleware('puede:automatizaciones.gestionar')->name('automatizaciones.destroy');
+            Route::delete('/automatizaciones/{regla}', [AutomatizacionesTenantController::class, 'eliminar'])->middleware('puede:automatizaciones.eliminar')->name('automatizaciones.destroy');
 
             // El día de hoy para el Inicio del negocio: cada bloque según los permisos.
             Route::get('/inicio/hoy', InicioHoyTenantController::class)->name('inicio.hoy');
@@ -452,7 +452,7 @@ Route::prefix('v1')->group(function (): void {
             // Capacidad por canal / marketplace (R20): reserva cupos de una oferta para un canal.
             Route::get('/ofertas/{oferta}/capacidad-canal', [CapacidadCanalTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('ofertas.capacidad-canal.index');
             Route::put('/ofertas/{oferta}/capacidad-canal', [CapacidadCanalTenantController::class, 'guardar'])->middleware('puede:agenda.gestionar')->name('ofertas.capacidad-canal.guardar');
-            Route::delete('/capacidad-canal/{regla}', [CapacidadCanalTenantController::class, 'eliminar'])->middleware('puede:agenda.gestionar')->name('capacidad-canal.destroy');
+            Route::delete('/capacidad-canal/{regla}', [CapacidadCanalTenantController::class, 'eliminar'])->middleware('puede:agenda.eliminar')->name('capacidad-canal.destroy');
 
             // Estructura del estudio (data plane del tenant): Organización → Sucursal.
             Route::get('/organizaciones', [OrganizacionesTenantController::class, 'organizaciones'])->middleware('puede:organizaciones.ver')->name('organizaciones.index');
@@ -511,7 +511,7 @@ Route::prefix('v1')->group(function (): void {
             // serie_id), excepciones (feriados/cierres) y generacion bajo demanda.
             Route::get('/plantillas-horario', [PlantillasHorarioTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('plantillas-horario.index');
             Route::post('/plantillas-horario', [PlantillasHorarioTenantController::class, 'crear'])->middleware('puede:agenda.gestionar')->name('plantillas-horario.store');
-            Route::delete('/plantillas-horario/{plantilla}', [PlantillasHorarioTenantController::class, 'eliminar'])->middleware('puede:agenda.gestionar')->name('plantillas-horario.eliminar');
+            Route::delete('/plantillas-horario/{plantilla}', [PlantillasHorarioTenantController::class, 'eliminar'])->middleware('puede:agenda.eliminar')->name('plantillas-horario.eliminar');
             // "Esta y las siguientes" (2.5), con vista previa.
             Route::post('/plantillas-horario/{plantilla}/cambiar', [PlantillasHorarioTenantController::class, 'cambiar'])->middleware('puede:agenda.gestionar')->name('plantillas-horario.cambiar');
             Route::post('/plantillas-horario/{plantilla}/generar', [PlantillasHorarioTenantController::class, 'generar'])->middleware('puede:agenda.gestionar')->name('plantillas-horario.generar');
@@ -519,10 +519,10 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/bloqueos', [BloqueosAgendaTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('bloqueos.index');
             Route::post('/bloqueos/previsualizar', [BloqueosAgendaTenantController::class, 'previsualizar'])->middleware('puede:agenda.gestionar')->name('bloqueos.previsualizar');
             Route::post('/bloqueos', [BloqueosAgendaTenantController::class, 'crear'])->middleware('puede:agenda.gestionar')->name('bloqueos.store');
-            Route::delete('/bloqueos/{bloqueo}', [BloqueosAgendaTenantController::class, 'eliminar'])->middleware('puede:agenda.gestionar')->name('bloqueos.eliminar');
+            Route::delete('/bloqueos/{bloqueo}', [BloqueosAgendaTenantController::class, 'eliminar'])->middleware('puede:agenda.eliminar')->name('bloqueos.eliminar');
             Route::get('/excepciones-horario', [ExcepcionesHorarioTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('excepciones-horario.index');
             Route::post('/excepciones-horario', [ExcepcionesHorarioTenantController::class, 'crear'])->middleware('puede:agenda.gestionar')->name('excepciones-horario.store');
-            Route::delete('/excepciones-horario/{excepcion}', [ExcepcionesHorarioTenantController::class, 'eliminar'])->middleware('puede:agenda.gestionar')->name('excepciones-horario.eliminar');
+            Route::delete('/excepciones-horario/{excepcion}', [ExcepcionesHorarioTenantController::class, 'eliminar'])->middleware('puede:agenda.eliminar')->name('excepciones-horario.eliminar');
 
             // Staff multi + sustitucion + nomina (R17): asignar staff a una sesion (rol/
             // sustitucion), esquema de pago por staff y nomina de un periodo.
@@ -542,7 +542,7 @@ Route::prefix('v1')->group(function (): void {
             // agenda evita sobre-reservarlos (unidad = 1; pool = capacidad).
             Route::get('/recursos', [RecursosTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('recursos.index');
             Route::post('/recursos', [RecursosTenantController::class, 'crear'])->middleware('puede:agenda.gestionar')->name('recursos.store');
-            Route::delete('/recursos/{recurso}', [RecursosTenantController::class, 'eliminar'])->middleware('puede:agenda.gestionar')->name('recursos.eliminar');
+            Route::delete('/recursos/{recurso}', [RecursosTenantController::class, 'eliminar'])->middleware('puede:agenda.eliminar')->name('recursos.eliminar');
             Route::put('/sesiones/{sesion}/instructor', [AgendaTenantController::class, 'asignarInstructor'])->middleware('puede:agenda.gestionar')->name('sesiones.instructor');
 
             // Membresias (data plane del tenant): producto comercial → acuerdo →
@@ -624,7 +624,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/promociones', [PromocionesTenantController::class, 'index'])->middleware('puede:promociones.gestionar')->name('promociones.index');
             Route::post('/promociones', [PromocionesTenantController::class, 'store'])->middleware('puede:promociones.gestionar')->name('promociones.store');
             Route::put('/promociones/{promocion}', [PromocionesTenantController::class, 'actualizar'])->middleware('puede:promociones.gestionar')->name('promociones.update');
-            Route::delete('/promociones/{promocion}', [PromocionesTenantController::class, 'eliminar'])->middleware('puede:promociones.gestionar')->name('promociones.destroy');
+            Route::delete('/promociones/{promocion}', [PromocionesTenantController::class, 'eliminar'])->middleware('puede:promociones.eliminar')->name('promociones.destroy');
             Route::post('/promociones/validar', [PromocionesTenantController::class, 'validar'])->middleware('puede:ordenes.gestionar')->name('promociones.validar');
 
             // Inventario + punto de venta minorista (R21): stock por sucursal (ledger) y tickets de caja.
@@ -703,7 +703,7 @@ Route::prefix('v1')->group(function (): void {
             // mensajes generados/enviados (consumidor del outbox).
             Route::get('/plantillas-mensaje', [PlantillasMensajeTenantController::class, 'index'])->middleware('puede:comunicaciones.gestionar')->name('plantillas-mensaje.index');
             Route::put('/plantillas-mensaje', [PlantillasMensajeTenantController::class, 'guardar'])->middleware('puede:comunicaciones.gestionar')->name('plantillas-mensaje.guardar');
-            Route::delete('/plantillas-mensaje/{plantilla}', [PlantillasMensajeTenantController::class, 'eliminar'])->middleware('puede:comunicaciones.gestionar')->name('plantillas-mensaje.eliminar');
+            Route::delete('/plantillas-mensaje/{plantilla}', [PlantillasMensajeTenantController::class, 'eliminar'])->middleware('puede:comunicaciones.eliminar')->name('plantillas-mensaje.eliminar');
             Route::get('/mensajes', [MensajesTenantController::class, 'index'])->middleware('puede:comunicaciones.ver')->name('mensajes.index');
 
             // Comunicaciones segmentadas (difusiones): audiencia dinámica (todos/por

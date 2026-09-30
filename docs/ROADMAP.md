@@ -43,7 +43,8 @@
 - **Suspensión automática por renta** (ADR 0073): con días de gracia y aviso previo;
   suspendido, el dueño solo entra a pagar y se reactiva al pagar.
 - **Experiencia**: web única (sitio, panel, portal, superadmin) y app Flutter;
-  roles propios y rol activo por sesión (ADR 0055, 0057); nombre AgendaUno
+  roles propios y rol activo por sesión (ADR 0055, 0057), con «eliminar» aparte
+  de «gestionar» (ADR 0077); nombre AgendaUno
   (ADR 0056).
 
 ## Antes de abrir
@@ -62,7 +63,6 @@
 
 - WhatsApp: si conviene, número propio por negocio o cobrarlo como extra del plan
   (ADR 0069); atender las respuestas de los clientes (ADR 0074).
-- Separar «editar» y «eliminar» en el catálogo de permisos.
 - Roles propios con faceta de instructor.
 - Monitoreo de errores más completo y despliegue automático desde el CI.
 - Analítica: ocupación, rentabilidad, demanda.

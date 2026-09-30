@@ -527,6 +527,7 @@ onMounted(cargarReferencias);
           :sucursal-nombre="sucursalActual?.nombre ?? ''"
           :zona="sucursalActual?.zona_horaria ?? 'America/Mexico_City'"
           :puede-gestionar="puedeGestionar"
+          :puede-eliminar="sesion.puede('agenda.eliminar')"
         />
 
         <!-- Vista previa de huecos -->

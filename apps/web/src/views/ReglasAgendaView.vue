@@ -60,6 +60,8 @@ const sesion = useSesionTenantStore();
 const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedePoliticas = computed(() => sesion.puede("estudio.gestionar"));
+// Quitar un día o dejar de repetir un horario es borrarlo (ADR 0077).
+const puedeEliminar = computed(() => sesion.puede("agenda.eliminar"));
 
 const cargando = ref(true);
 const error = ref<string | null>(null);
@@ -550,6 +552,7 @@ onMounted(cargar);
               </p>
             </div>
             <button
+              v-if="puedeEliminar"
               type="button"
               class="tu-enlace shrink-0"
               style="color: var(--error)"
@@ -603,6 +606,7 @@ onMounted(cargar);
               </p>
             </div>
             <button
+              v-if="puedeEliminar"
               type="button"
               class="tu-enlace shrink-0"
               style="color: var(--error)"

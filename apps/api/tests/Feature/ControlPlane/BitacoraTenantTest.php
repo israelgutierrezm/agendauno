@@ -22,7 +22,8 @@ afterEach(function (): void {
 
 it('filtra por persona del equipo, categoría y fechas, pagina y describe lo que pasó', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    $recepcion = personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista');
+    // Dar de baja pide `miembros.eliminar` (ADR 0077): lo tiene la administración.
+    $recepcion = personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'admin');
     $recepcionId = usuarioIdPorEmail($e, 'recep@correo.mx');
     $ana = crearMiembroTenant($e, 'Ana');
 

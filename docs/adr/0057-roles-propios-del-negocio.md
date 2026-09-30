@@ -80,5 +80,5 @@ catálogo, las sucursales y los alumnos, y quedaba a medias. Se decidió:
   crea roles solo dentro de sus permisos.
 - Los roles por sede (asignaciones de personal) siguen aceptando solo los roles de
   sistema.
-- Los permisos siguen siendo «ver» y «gestionar» por área. Separar «editar» de
-  «eliminar» es un cambio posterior del catálogo que no toca este esquema.
+- Los permisos eran «ver» y «gestionar» por área. «Eliminar» se separó donde se
+  borra en el ADR 0077, sin tocar este esquema.

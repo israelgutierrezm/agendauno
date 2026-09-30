@@ -43,6 +43,9 @@ interface Regla {
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeReglas = computed(() => sesion.puede("automatizaciones.gestionar"));
+const puedeEliminarReglas = computed(() =>
+  sesion.puede("automatizaciones.eliminar"),
+);
 const puedeGestionar = computed(() => sesion.puede("tareas.gestionar"));
 
 const tab = ref<"pendientes" | "reglas">("pendientes");
@@ -694,6 +697,7 @@ onMounted(cargarTareas);
                 {{ $t("tareas.reglas.editar") }}
               </button>
               <button
+                v-if="puedeEliminarReglas"
                 class="tu-enlace"
                 style="color: var(--error)"
                 type="button"

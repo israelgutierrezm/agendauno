@@ -576,7 +576,11 @@ onMounted(cargar);
       </p>
       <!-- Baja lógica (no a uno mismo) -->
       <div
-        v-if="editando && editando.id !== sesion.usuario?.ulid"
+        v-if="
+          editando &&
+          editando.id !== sesion.usuario?.ulid &&
+          sesion.puede('usuarios.eliminar')
+        "
         class="mt-5 border-t pt-4 space-y-2"
         :style="{ borderColor: 'var(--borde)' }"
       >

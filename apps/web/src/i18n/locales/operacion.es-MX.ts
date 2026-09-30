@@ -49,6 +49,7 @@ export default {
       agenda: {
         ver: "Ver la agenda",
         gestionar: "Programar y editar la agenda",
+        eliminar: "Borrar horarios, bloqueos y recursos",
       },
       reservas: {
         ver: "Ver reservas",
@@ -59,6 +60,7 @@ export default {
       miembros: {
         ver: "Ver alumnos y su ficha",
         gestionar: "Dar de alta y editar alumnos",
+        eliminar: "Dar de baja alumnos",
       },
       derechos: { ver: "Ver paquetes y créditos de cada alumno" },
       documentos: {
@@ -76,10 +78,14 @@ export default {
       productos: {
         ver: "Ver planes y paquetes",
         gestionar: "Crear y editar planes y paquetes",
+        eliminar: "Archivar planes y paquetes",
       },
       membresias: { gestionar: "Vender y administrar membresías" },
       creditos: { gestionar: "Ajustar créditos" },
-      promociones: { gestionar: "Crear promociones" },
+      promociones: {
+        gestionar: "Crear promociones",
+        eliminar: "Borrar promociones",
+      },
       ordenes: {
         ver: "Ver ventas",
         gestionar: "Registrar ventas y cobros",
@@ -97,14 +103,19 @@ export default {
       usuarios: {
         invitar: "Invitar al equipo",
         gestionar: "Administrar al equipo y sus roles",
+        eliminar: "Dar de baja al equipo",
       },
       roles: { gestionar: "Crear y editar roles" },
       tareas: { ver: "Ver tareas", gestionar: "Crear y asignar tareas" },
       comunicaciones: {
         ver: "Ver comunicaciones",
         gestionar: "Enviar avisos y campañas",
+        eliminar: "Borrar plantillas de mensajes",
       },
-      automatizaciones: { gestionar: "Configurar automatizaciones" },
+      automatizaciones: {
+        gestionar: "Configurar automatizaciones",
+        eliminar: "Borrar automatizaciones",
+      },
       lealtad: {
         ver: "Ver el programa de lealtad",
         gestionar: "Administrar el programa de lealtad",

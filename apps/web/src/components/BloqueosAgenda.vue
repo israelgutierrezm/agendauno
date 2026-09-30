@@ -44,6 +44,8 @@ const props = defineProps<{
   sucursalNombre: string;
   zona: string;
   puedeGestionar: boolean;
+  // Quitar un bloqueo es borrarlo (ADR 0077).
+  puedeEliminar?: boolean;
 }>();
 
 const bloqueos = ref<Bloqueo[]>([]);
@@ -232,7 +234,7 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
           >
         </span>
         <button
-          v-if="puedeGestionar"
+          v-if="puedeEliminar ?? puedeGestionar"
           type="button"
           class="tu-enlace text-xs shrink-0"
           @click="quitar(b)"

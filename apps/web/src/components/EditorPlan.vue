@@ -468,7 +468,11 @@ onMounted(async () => {
             />
           </div>
         </template>
-        <label v-if="plan" class="flex items-center gap-2 sm:col-span-2">
+        <!-- Archivar es la baja del plan (ADR 0077); reactivarlo es editar. -->
+        <label
+          v-if="plan && (plan.archivado || sesion.puede('productos.eliminar'))"
+          class="flex items-center gap-2 sm:col-span-2"
+        >
           <input v-model="form.archivado" type="checkbox" />
           {{ $t("planes.editor.archivar") }}
         </label>

@@ -110,6 +110,8 @@ const sesion = useSesionTenantStore();
 const { t } = useI18n();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
+// Borrar va aparte de gestionar (ADR 0077).
+const puedeEliminar = computed(() => sesion.puede("agenda.eliminar"));
 // Lugares y precio por clase viven en la oferta: los edita quien gestiona el catálogo.
 const puedeCatalogo = computed(() => sesion.puede("catalogo.gestionar"));
 const puedeReservar = computed(() => sesion.puede("reservas.gestionar"));
@@ -2314,6 +2316,7 @@ onMounted(async () => {
                 >
               </span>
               <button
+                v-if="puedeEliminar"
                 class="tu-enlace"
                 style="color: var(--error)"
                 type="button"

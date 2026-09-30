@@ -194,6 +194,7 @@ async function guardar(): Promise<void> {
         </button>
 
         <div
+          v-if="sesion.puede('miembros.eliminar')"
           class="border-t pt-4 space-y-2"
           :style="{ borderColor: 'var(--borde)' }"
         >

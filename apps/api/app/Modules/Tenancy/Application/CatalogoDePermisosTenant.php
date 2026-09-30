@@ -19,21 +19,21 @@ class CatalogoDePermisosTenant
         return [
             'propietario' => ['*'],
             'admin' => [
-                'estudio.gestionar', 'miembros.gestionar', 'miembros.ver',
+                'estudio.gestionar', 'miembros.gestionar', 'miembros.ver', 'miembros.eliminar',
                 'documentos.gestionar', 'documentos.subir',
                 'formularios.gestionar', 'formularios.responder',
                 'catalogo.ver', 'catalogo.gestionar',
                 'organizaciones.ver', 'organizaciones.gestionar',
                 'sucursales.ver', 'sucursales.gestionar',
-                'agenda.ver', 'agenda.gestionar',
-                'productos.ver', 'productos.gestionar',
+                'agenda.ver', 'agenda.gestionar', 'agenda.eliminar',
+                'productos.ver', 'productos.gestionar', 'productos.eliminar',
                 'membresias.gestionar', 'creditos.gestionar', 'derechos.ver',
                 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar',
                 'ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar',
-                'facturacion.ver', 'usuarios.invitar', 'usuarios.gestionar', 'auditoria.ver',
-                'comunicaciones.gestionar', 'comunicaciones.ver',
-                'automatizaciones.gestionar', 'tareas.ver', 'tareas.gestionar',
-                'promociones.gestionar',
+                'facturacion.ver', 'usuarios.invitar', 'usuarios.gestionar', 'usuarios.eliminar', 'auditoria.ver',
+                'comunicaciones.gestionar', 'comunicaciones.ver', 'comunicaciones.eliminar',
+                'automatizaciones.gestionar', 'automatizaciones.eliminar', 'tareas.ver', 'tareas.gestionar',
+                'promociones.gestionar', 'promociones.eliminar',
                 'lealtad.ver', 'lealtad.gestionar',
                 'inventario.ver', 'inventario.gestionar', 'pos.vender',
             ],
@@ -62,19 +62,20 @@ class CatalogoDePermisosTenant
     /**
      * Todos los permisos del negocio, agrupados por área, para armar roles propios.
      * Cada permiso que se exige en una ruta debe estar aquí (lo revisa una prueba).
+     * Donde se borra o se da de baja, «eliminar» va aparte de «gestionar» (ADR 0077).
      *
      * @return array<string, list<string>>
      */
     public static function catalogo(): array
     {
         return [
-            'agenda' => ['agenda.ver', 'agenda.gestionar', 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar'],
-            'clientes' => ['miembros.ver', 'miembros.gestionar', 'derechos.ver', 'documentos.subir', 'documentos.gestionar', 'formularios.responder', 'formularios.gestionar'],
-            'membresias' => ['catalogo.ver', 'catalogo.gestionar', 'productos.ver', 'productos.gestionar', 'membresias.gestionar', 'creditos.gestionar', 'promociones.gestionar'],
+            'agenda' => ['agenda.ver', 'agenda.gestionar', 'agenda.eliminar', 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar'],
+            'clientes' => ['miembros.ver', 'miembros.gestionar', 'miembros.eliminar', 'derechos.ver', 'documentos.subir', 'documentos.gestionar', 'formularios.responder', 'formularios.gestionar'],
+            'membresias' => ['catalogo.ver', 'catalogo.gestionar', 'productos.ver', 'productos.gestionar', 'productos.eliminar', 'membresias.gestionar', 'creditos.gestionar', 'promociones.gestionar', 'promociones.eliminar'],
             'cobros' => ['ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'facturacion.ver'],
             'punto_venta' => ['pos.vender', 'inventario.ver', 'inventario.gestionar'],
-            'equipo' => ['usuarios.invitar', 'usuarios.gestionar', 'roles.gestionar', 'tareas.ver', 'tareas.gestionar'],
-            'marketing' => ['comunicaciones.ver', 'comunicaciones.gestionar', 'automatizaciones.gestionar', 'lealtad.ver', 'lealtad.gestionar'],
+            'equipo' => ['usuarios.invitar', 'usuarios.gestionar', 'usuarios.eliminar', 'roles.gestionar', 'tareas.ver', 'tareas.gestionar'],
+            'marketing' => ['comunicaciones.ver', 'comunicaciones.gestionar', 'comunicaciones.eliminar', 'automatizaciones.gestionar', 'automatizaciones.eliminar', 'lealtad.ver', 'lealtad.gestionar'],
             'negocio' => ['estudio.gestionar', 'sucursales.ver', 'sucursales.gestionar', 'organizaciones.ver', 'organizaciones.gestionar', 'integraciones.configurar', 'pagos.configurar', 'auditoria.ver'],
         ];
     }
@@ -99,17 +100,21 @@ class CatalogoDePermisosTenant
     {
         return [
             'agenda.gestionar' => ['agenda.ver', 'catalogo.ver', 'sucursales.ver'],
+            'agenda.eliminar' => ['agenda.gestionar', 'agenda.ver', 'catalogo.ver', 'sucursales.ver'],
             'reservas.ver' => ['agenda.ver'],
             'reservas.gestionar' => ['agenda.ver', 'reservas.ver', 'miembros.ver', 'catalogo.ver', 'sucursales.ver'],
             'asistencia.marcar' => ['agenda.ver', 'reservas.ver'],
             'checkins.registrar' => ['miembros.ver'],
             'miembros.gestionar' => ['miembros.ver'],
+            'miembros.eliminar' => ['miembros.gestionar', 'miembros.ver'],
             'derechos.ver' => ['miembros.ver'],
             'documentos.subir' => ['miembros.ver'],
             'documentos.gestionar' => ['documentos.subir', 'miembros.ver'],
             'formularios.gestionar' => ['formularios.responder'],
             'catalogo.gestionar' => ['catalogo.ver', 'agenda.ver'],
             'productos.gestionar' => ['productos.ver', 'catalogo.ver', 'sucursales.ver'],
+            'productos.eliminar' => ['productos.gestionar', 'productos.ver', 'catalogo.ver', 'sucursales.ver'],
+            'promociones.eliminar' => ['promociones.gestionar'],
             'ordenes.gestionar' => ['ordenes.ver', 'productos.ver', 'miembros.ver', 'derechos.ver'],
             'pagos.reembolsar' => ['ordenes.ver'],
             'inventario.ver' => ['sucursales.ver'],
@@ -118,9 +123,12 @@ class CatalogoDePermisosTenant
             'lealtad.ver' => ['miembros.ver'],
             'lealtad.gestionar' => ['lealtad.ver', 'miembros.ver'],
             'comunicaciones.gestionar' => ['comunicaciones.ver'],
+            'comunicaciones.eliminar' => ['comunicaciones.gestionar', 'comunicaciones.ver'],
+            'automatizaciones.eliminar' => ['automatizaciones.gestionar'],
             'sucursales.gestionar' => ['sucursales.ver', 'organizaciones.ver'],
             'organizaciones.gestionar' => ['organizaciones.ver'],
             'usuarios.gestionar' => ['usuarios.invitar', 'sucursales.ver', 'miembros.ver'],
+            'usuarios.eliminar' => ['usuarios.gestionar', 'usuarios.invitar', 'sucursales.ver', 'miembros.ver'],
             'tareas.gestionar' => ['tareas.ver'],
         ];
     }

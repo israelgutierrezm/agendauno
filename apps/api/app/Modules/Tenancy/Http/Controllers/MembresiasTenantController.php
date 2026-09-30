@@ -105,7 +105,8 @@ class MembresiasTenantController
     /**
      * Editor completo: actualiza la plantilla del producto (precio, acceso, vigencia,
      * ciclos/rollover, restricciones) o lo archiva/reactiva. Solo cambia ventas futuras
-     * (no toca acuerdos ya vendidos). Cambio sensible → queda en la bitácora.
+     * (no toca acuerdos ya vendidos). Cambio sensible → queda en la bitácora. Archivarlo
+     * es su baja: pide `productos.eliminar` (ADR 0077).
      */
     public function actualizarProducto(Request $request): JsonResponse
     {
@@ -130,6 +131,10 @@ class MembresiasTenantController
             'ofertas' => ['sometimes', 'array', 'max:200'],
             'ofertas.*' => ['string', 'distinct'],
         ]);
+
+        $actor = $request->attributes->get('usuario_tenant');
+        $archiva = (bool) ($validado['archivado'] ?? false) && ! $producto->archivado;
+        abort_if($archiva && ! ($actor instanceof Usuario && $actor->puede('productos.eliminar')), 403);
 
         $atributos = [];
         foreach (['nombre', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos', 'vigencia_cantidad', 'unidades_por_ciclo', 'rollover_max', 'archivado'] as $campo) {
@@ -163,7 +168,6 @@ class MembresiasTenantController
             $request->has('ofertas') ? $this->ofertasDe($validado['ofertas'] ?? []) : null,
         );
 
-        $actor = $request->attributes->get('usuario_tenant');
         $this->auditoria->registrar(
             $actor instanceof Usuario ? $actor : null,
             'producto.actualizado',

@@ -13,7 +13,7 @@ datos (`docs/TENANCY.md`); dentro de ella decide el rol activo de la sesión.
 |---|---|---|
 | `propietario` | equipo | Todo (`*`). Solo otro dueño cambia a un dueño. |
 | `admin` | equipo | Todo lo operativo y la configuración, menos pasarelas de pago, integraciones y roles |
-| `recepcionista` | equipo | Alumnos, ventas, reservas, pase de lista, punto de venta |
+| `recepcionista` | equipo | Alumnos (sin darlos de baja), ventas, reservas, pase de lista, punto de venta |
 | `instructor` | instructor | Su agenda, sus clases o citas y pase de lista (alcance propio) |
 | `miembro` | miembro | Su cuenta: reservar, comprar, sus documentos |
 
@@ -53,6 +53,11 @@ Formato `area.accion`. El catálogo completo, agrupado por área, está en
   `integraciones.configurar`, `pagos.configurar`, `auditoria.ver`
 
 Una prueba exige que todo permiso usado en una ruta esté en el catálogo.
+
+**Eliminar aparte.** Donde se borra o se da de baja hay un permiso `*.eliminar` que
+pide el `*.gestionar` de su área: alumnos, equipo, agenda, planes (archivar),
+promociones, plantillas de mensajes y automatizaciones (ADR 0077). Reactivar y
+cancelar siguen en «gestionar».
 
 **Requisitos.** Algunos permisos necesitan otros para que sus pantallas sirvan: por
 ejemplo, «gestionar agenda» arma clases con el catálogo y las sucursales

@@ -24,6 +24,7 @@ interface Promo {
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
+const puedeEliminar = computed(() => sesion.puede("promociones.eliminar"));
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 const promos = ref<Promo[]>([]);
@@ -362,6 +363,7 @@ onMounted(cargar);
             {{ $t("promociones.editar") }}
           </button>
           <button
+            v-if="puedeEliminar"
             class="tu-enlace"
             style="color: var(--error)"
             type="button"
