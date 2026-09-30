@@ -18,6 +18,7 @@ use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\AvisoDueno;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\WhatsAppEnvio;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Facades\Mail;
@@ -41,7 +42,7 @@ use Throwable;
  */
 class AvisosDuenos
 {
-    private const MAX_INTENTOS = 3;
+    public const MAX_INTENTOS = 3;
 
     /** Una renta recién emitida se avisa si se emitió en estos días. */
     private const DIAS_RENTA_EMITIDA = 3;
@@ -193,7 +194,15 @@ class AvisosDuenos
             if ($plantilla === '') {
                 throw new RuntimeException('El aviso de WhatsApp no tiene plantilla.');
             }
-            $this->whatsapp->enviarPlantilla($aviso->destinatario, $plantilla, $aviso->parametros['valores'] ?? []);
+            $wamid = $this->whatsapp->enviarPlantilla($aviso->destinatario, $plantilla, $aviso->parametros['valores'] ?? []);
+            // Para ubicarlo cuando Meta avise si se entregó, se leyó o falló (ADR 0074).
+            if ($wamid !== null) {
+                WhatsAppEnvio::query()->firstOrCreate(['wamid' => $wamid], [
+                    'estudio_id' => $aviso->estudio_id,
+                    'origen' => WhatsAppEnvio::ORIGEN_AVISO_DUENO,
+                    'referencia_id' => $aviso->getKey(),
+                ]);
+            }
 
             return;
         }

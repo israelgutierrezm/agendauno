@@ -26,6 +26,8 @@ use Illuminate\Support\Carbon;
  * @property int $intentos
  * @property string|null $ultimo_error
  * @property Carbon|null $enviado_en
+ * @property Carbon|null $entregado_en
+ * @property Carbon|null $leido_en
  */
 class AvisoDueno extends Model
 {
@@ -33,7 +35,7 @@ class AvisoDueno extends Model
 
     protected $fillable = [
         'estudio_id', 'tipo', 'referencia', 'canal', 'destinatario', 'asunto', 'cuerpo', 'parametros',
-        'estado', 'intentos', 'ultimo_error', 'enviado_en',
+        'estado', 'intentos', 'ultimo_error', 'enviado_en', 'entregado_en', 'leido_en',
     ];
 
     /**
@@ -45,6 +47,8 @@ class AvisoDueno extends Model
         'parametros' => 'array',
         'intentos' => 'integer',
         'enviado_en' => 'datetime',
+        'entregado_en' => 'datetime',
+        'leido_en' => 'datetime',
     ];
 
     /**

@@ -31,6 +31,15 @@
   nota para el negocio.
 - **Agendar para otra persona** (ADR 0068): la cita es de quien agenda y guarda
   quién asiste.
+- **WhatsApp con Meta Cloud API** (ADR 0069, 0070, 0074): el superadministrador lo
+  enciende por separado para los dueños y para los negocios con sus clientes; el
+  cliente acepta al agendar o en recepción; el dueño verifica su número con un
+  código; el webhook de estados marca entregado, leído o fallido.
+- **Avisos de la plataforma al dueño** (ADR 0071, 0072): prueba por terminar y
+  renta lista, vencida y pagada, por correo y WhatsApp; el dueño los ve y decide
+  en su panel; alerta de renta vencida al correo del superadministrador.
+- **Suspensión automática por renta** (ADR 0073): con días de gracia y aviso previo;
+  suspendido, el dueño solo entra a pagar y se reactiva al pagar.
 - **Experiencia**: web única (sitio, panel, portal, superadmin) y app Flutter;
   roles propios y rol activo por sesión (ADR 0055, 0057); nombre AgendaUno
   (ADR 0056).
@@ -42,15 +51,17 @@
 - Instalar en un servidor real y correr `actualizar.sh` / `volver.sh`.
 - WhatsApp (si se enciende): cuenta de WhatsApp Business en Meta, token permanente
   y las plantillas de Configuración → «WhatsApp» aprobadas, de cada uso que se
-  encienda (ADR 0069, 0070 y 0071).
+  encienda (ADR 0069, 0070 y 0071). En la app de Meta, el webhook con la dirección,
+  el token de verificación y el App Secret de «Webhook de estados», suscrito a
+  `messages` (ADR 0074).
 - Proyecto de Firebase para push; llave de subida de Android (la firma ya lee `android/key.properties`, ver `docs/MOBILE.md`) y publicación de la app.
 
 ## Después
 
 - Conciliar el guardado de tarjeta de Stripe (pago automático) cuando no llega su
   aviso; hoy la conciliación cubre los cobros.
-- WhatsApp: procesar el webhook de estados de Meta (entregado, leído, fallido) y,
-  si conviene, número propio por negocio o cobrarlo como extra del plan (ADR 0069).
+- WhatsApp: si conviene, número propio por negocio o cobrarlo como extra del plan
+  (ADR 0069); atender las respuestas de los clientes (ADR 0074).
 - Cambiar el WhatsApp del negocio desde el panel del dueño (hoy se verifica el del
   registro, ADR 0072).
 - Separar «editar» y «eliminar» en el catálogo de permisos.

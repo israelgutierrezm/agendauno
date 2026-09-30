@@ -204,6 +204,11 @@ corre el comando a mano.
   (`hello_world`). Luego enciende «Reserva confirmada» por WhatsApp en Automáticos.
   Agenda en la página pública con celular y marca la casilla: llega el WhatsApp.
   Apágalo con un aviso en cola: queda `descartado`.
+- [ ] **Estados de WhatsApp** (ADR 0074). En la app de Meta, configura el webhook
+  con la dirección y el token de «Webhook de estados» y suscríbete a `messages`;
+  guarda el App Secret. Al llegar el WhatsApp de una reserva, la salida de
+  Comunicaciones dice «Entregado» y, al abrirlo, «Leído». A un número sin WhatsApp
+  queda «Falló» con el motivo de Meta y no se reintenta.
 - [ ] **WhatsApp del dueño** (ADR 0070). Con «Con los dueños» encendido, registra
   un negocio: en «Contacto» marca «Recibir avisos de AgendaUno por WhatsApp», pide
   el código y escríbelo. Aparece «WhatsApp verificado», y la ficha del negocio en

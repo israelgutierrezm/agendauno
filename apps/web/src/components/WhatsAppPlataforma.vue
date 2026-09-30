@@ -32,6 +32,12 @@ interface Config {
   phone_number_id: string;
   token_configurado: boolean;
   plantillas: Record<Uso, Plantilla[]>;
+  // Webhook de estados de entrega (ADR 0074): lo que se carga en Meta.
+  webhook?: {
+    url: string;
+    token_verificacion: string;
+    app_secret_configurado: boolean;
+  };
 }
 
 const USOS: Uso[] = ["duenos", "negocios"];
@@ -52,6 +58,7 @@ const borrador = ref({
   negocios: false,
   phone_number_id: "",
   token: "",
+  app_secret: "",
 });
 const telefono = ref("");
 const ocupado = ref<"guardar" | "prueba" | null>(null);
@@ -70,6 +77,7 @@ function aplicar(c: Config): void {
     negocios: c.negocios,
     phone_number_id: c.phone_number_id,
     token: "",
+    app_secret: "",
   };
 }
 
@@ -95,6 +103,7 @@ async function guardar(): Promise<void> {
         negocios: borrador.value.negocios,
         phone_number_id: borrador.value.phone_number_id.trim(),
         token: borrador.value.token.trim() || null,
+        app_secret: borrador.value.app_secret.trim() || null,
       },
       auth(),
     );
@@ -191,6 +200,59 @@ onMounted(cargar);
       <p class="-mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("plataformaAdmin.whatsapp.tokenAyuda") }}
       </p>
+
+      <!-- Webhook de estados: entregado, leído o fallido (ADR 0074). -->
+      <section v-if="config.webhook" class="wa-uso" data-prueba="webhook">
+        <h3 class="text-sm font-medium">
+          {{ $t("plataformaAdmin.whatsapp.webhook") }}
+        </h3>
+        <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("plataformaAdmin.whatsapp.webhookAyuda") }}
+        </p>
+        <div class="mt-2 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="tu-label" for="wa-webhook-url">{{
+              $t("plataformaAdmin.whatsapp.webhookUrl")
+            }}</label>
+            <input
+              id="wa-webhook-url"
+              class="tu-input"
+              :value="config.webhook.url"
+              readonly
+              @focus="($event.target as HTMLInputElement).select()"
+            />
+          </div>
+          <div>
+            <label class="tu-label" for="wa-webhook-token">{{
+              $t("plataformaAdmin.whatsapp.webhookToken")
+            }}</label>
+            <input
+              id="wa-webhook-token"
+              class="tu-input font-mono"
+              :value="config.webhook.token_verificacion"
+              readonly
+              @focus="($event.target as HTMLInputElement).select()"
+            />
+          </div>
+          <div>
+            <label class="tu-label" for="wa-app-secret">{{
+              $t("plataformaAdmin.whatsapp.appSecret")
+            }}</label>
+            <input
+              id="wa-app-secret"
+              v-model="borrador.app_secret"
+              class="tu-input"
+              type="password"
+              autocomplete="off"
+              :placeholder="
+                config.webhook.app_secret_configurado
+                  ? $t('plataformaAdmin.whatsapp.tokenGuardado')
+                  : ''
+              "
+            />
+          </div>
+        </div>
+      </section>
 
       <!-- Cada uso se enciende aparte; debajo, lo que hay que registrar en Meta. -->
       <section

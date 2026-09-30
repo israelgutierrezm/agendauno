@@ -91,6 +91,9 @@ class PlataformaEstudiosController
                     'tipo' => $a->tipo,
                     'canal' => $a->canal->value,
                     'estado' => $a->estado->value,
+                    // WhatsApp (ADR 0074): si le llegó y si lo leyó.
+                    'entregado' => $a->entregado_en !== null,
+                    'leido' => $a->leido_en !== null,
                     'fecha' => ($a->enviado_en ?? $a->created_at)?->toIso8601String(),
                 ])->all(),
         ]]);

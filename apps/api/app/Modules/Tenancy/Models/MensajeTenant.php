@@ -27,7 +27,7 @@ class MensajeTenant extends Model
 
     protected $fillable = [
         'persona_id', 'usuario_id', 'plantilla_id', 'difusion_id', 'canal', 'destinatario', 'asunto', 'cuerpo',
-        'estado', 'intentos', 'ultimo_error', 'evento_ulid', 'enviado_en', 'clave_envio', 'parametros',
+        'estado', 'intentos', 'ultimo_error', 'evento_ulid', 'enviado_en', 'clave_envio', 'parametros', 'entregado_en', 'leido_en',
     ];
 
     /**
@@ -38,6 +38,9 @@ class MensajeTenant extends Model
         'estado' => EstadoMensaje::class,
         'intentos' => 'integer',
         'enviado_en' => 'datetime',
+        // WhatsApp (ADR 0074): según el aviso de Meta.
+        'entregado_en' => 'datetime',
+        'leido_en' => 'datetime',
         // WhatsApp: {plantilla, valores} de la plantilla de Meta con que sale.
         'parametros' => 'array',
     ];

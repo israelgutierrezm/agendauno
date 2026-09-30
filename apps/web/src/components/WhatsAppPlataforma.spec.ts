@@ -44,6 +44,11 @@ function config(extra: Record<string, unknown> = {}) {
         phone_number_id: "",
         token_configurado: false,
         plantillas,
+        webhook: {
+          url: "http://api/api/v1/webhooks/whatsapp",
+          token_verificacion: "token-de-verificacion",
+          app_secret_configurado: false,
+        },
         ...extra,
       },
     },
@@ -115,6 +120,7 @@ describe("WhatsApp de la plataforma", () => {
         negocios: false,
         phone_number_id: "109876543210",
         token: "EAAG-token",
+        app_secret: null,
       },
       { headers: { Authorization: "Bearer tk" } },
     );
@@ -125,5 +131,41 @@ describe("WhatsApp de la plataforma", () => {
     expect(w.get("#wa-token").attributes("placeholder")).toContain("Guardado");
     // Conectado: ya se puede mandar una prueba.
     expect(w.find('[data-prueba="prueba"]').exists()).toBe(true);
+  });
+
+  it("muestra lo que se carga en Meta para el webhook y guarda el App Secret sin mostrarlo", async () => {
+    http.put.mockResolvedValue(
+      config({
+        webhook: {
+          url: "http://api/api/v1/webhooks/whatsapp",
+          token_verificacion: "token-de-verificacion",
+          app_secret_configurado: true,
+        },
+      }),
+    );
+    const w = montar();
+    await flushPromises();
+
+    expect(w.get('[data-prueba="webhook"]').text()).toContain(
+      "Webhook de estados",
+    );
+    expect((w.get("#wa-webhook-url").element as HTMLInputElement).value).toBe(
+      "http://api/api/v1/webhooks/whatsapp",
+    );
+    expect((w.get("#wa-webhook-token").element as HTMLInputElement).value).toBe(
+      "token-de-verificacion",
+    );
+
+    await w.get("#wa-app-secret").setValue("secreto");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(http.put.mock.calls[0][1]).toMatchObject({ app_secret: "secreto" });
+    expect((w.get("#wa-app-secret").element as HTMLInputElement).value).toBe(
+      "",
+    );
+    expect(w.get("#wa-app-secret").attributes("placeholder")).toContain(
+      "Guardado",
+    );
   });
 });

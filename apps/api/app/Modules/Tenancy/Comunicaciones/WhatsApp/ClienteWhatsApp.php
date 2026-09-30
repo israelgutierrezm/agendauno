@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Comunicaciones\WhatsApp;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -57,9 +58,11 @@ class ClienteWhatsApp
     }
 
     /**
-     * Lo que ve el superadministrador (sin el token).
+     * Lo que ve el superadministrador (sin el token ni el App Secret). Del webhook de
+     * estados (ADR 0074): la dirección y el token de verificación que se cargan en
+     * Meta.
      *
-     * @return array{negocios: bool, duenos: bool, conectado: bool, phone_number_id: string, token_configurado: bool}
+     * @return array{negocios: bool, duenos: bool, conectado: bool, phone_number_id: string, token_configurado: bool, webhook: array{url: string, token_verificacion: string, app_secret_configurado: bool}}
      */
     public function paraEditar(): array
     {
@@ -71,23 +74,55 @@ class ClienteWhatsApp
             'conectado' => $this->conectado(),
             'phone_number_id' => $config['phone_number_id'],
             'token_configurado' => $config['token'] !== '',
+            'webhook' => [
+                'url' => route('api.v1.webhooks.whatsapp'),
+                'token_verificacion' => $config['verify_token'],
+                'app_secret_configurado' => $config['app_secret'] !== '',
+            ],
         ];
     }
 
     /**
-     * Guarda la configuración. Un token vacío conserva el que ya estaba.
+     * Guarda la configuración. Un token o App Secret vacío conserva el que ya
+     * estaba. El token de verificación del webhook se genera una vez.
      */
-    public function guardar(bool $negocios, bool $duenos, string $phoneNumberId, ?string $token): void
+    public function guardar(bool $negocios, bool $duenos, string $phoneNumberId, ?string $token, ?string $appSecret = null): void
     {
         $actual = $this->config();
-        $token = is_string($token) && trim($token) !== '' ? trim($token) : $actual['token'];
+        $conservar = static fn (?string $nuevo, string $anterior): string => is_string($nuevo) && trim($nuevo) !== '' ? trim($nuevo) : $anterior;
 
         ConfiguracionPlataforma::establecer(self::CLAVE, (string) json_encode([
             'negocios' => $negocios,
             'duenos' => $duenos,
             'phone_number_id' => trim($phoneNumberId),
-            'token' => $token,
+            'token' => $conservar($token, $actual['token']),
+            'app_secret' => $conservar($appSecret, $actual['app_secret']),
+            'verify_token' => $actual['verify_token'] !== '' ? $actual['verify_token'] : Str::random(40),
         ]));
+    }
+
+    /**
+     * ¿Es Meta quien verifica el webhook? El token que mandó es el nuestro.
+     */
+    public function tokenDeVerificacionValido(string $token): bool
+    {
+        $esperado = $this->config()['verify_token'];
+
+        return $esperado !== '' && hash_equals($esperado, $token);
+    }
+
+    /**
+     * Firma del aviso (`X-Hub-Signature-256: sha256=…`, HMAC del cuerpo con el App
+     * Secret). Sin App Secret no se puede verificar: null.
+     */
+    public function firmaValida(string $cuerpo, ?string $firma): ?bool
+    {
+        $secreto = $this->config()['app_secret'];
+        if ($secreto === '') {
+            return null;
+        }
+
+        return is_string($firma) && hash_equals('sha256='.hash_hmac('sha256', $cuerpo, $secreto), $firma);
     }
 
     /**
@@ -95,16 +130,19 @@ class ClienteWhatsApp
      * número inválido, red) lanza excepción: el relay reintenta y, si se agotan los
      * intentos, avisa a la plataforma.
      *
+     * Devuelve el id del mensaje en Meta (wamid), con el que luego avisa si se
+     * entregó, se leyó o falló.
+     *
      * @param  list<string>  $parametros  valores de {{1}}, {{2}}, … en orden
      */
-    public function enviarPlantilla(string $telefono, string $plantilla, array $parametros, string $idioma = self::IDIOMA): void
+    public function enviarPlantilla(string $telefono, string $plantilla, array $parametros, string $idioma = self::IDIOMA): ?string
     {
         $componentes = $parametros === [] ? [] : [[
             'type' => 'body',
             'parameters' => array_map(static fn (string $valor): array => ['type' => 'text', 'text' => $valor], $parametros),
         ]];
 
-        $this->enviar($telefono, $plantilla, $idioma, $componentes);
+        return $this->enviar($telefono, $plantilla, $idioma, $componentes);
     }
 
     /**
@@ -121,8 +159,9 @@ class ClienteWhatsApp
 
     /**
      * @param  list<array<string, mixed>>  $componentes
+     * @return string|null el wamid del mensaje
      */
-    private function enviar(string $telefono, string $plantilla, string $idioma, array $componentes): void
+    private function enviar(string $telefono, string $plantilla, string $idioma, array $componentes): ?string
     {
         if (! $this->conectado()) {
             throw new RuntimeException('WhatsApp no está conectado en la plataforma.');
@@ -146,6 +185,10 @@ class ClienteWhatsApp
         if (! $respuesta->successful()) {
             throw new RuntimeException(self::error($respuesta));
         }
+
+        $wamid = $respuesta->json('messages.0.id');
+
+        return is_string($wamid) && $wamid !== '' ? $wamid : null;
     }
 
     private function url(string $phoneNumberId): string
@@ -173,7 +216,7 @@ class ClienteWhatsApp
      * Se lee cada vez (sin memoria): un proceso largo (cola, relay) ve al momento
      * que el superadministrador lo apagó.
      *
-     * @return array{negocios: bool, duenos: bool, phone_number_id: string, token: string}
+     * @return array{negocios: bool, duenos: bool, phone_number_id: string, token: string, app_secret: string, verify_token: string}
      */
     private function config(): array
     {
@@ -191,6 +234,8 @@ class ClienteWhatsApp
             'duenos' => (bool) ($datos['duenos'] ?? false),
             'phone_number_id' => is_string($datos['phone_number_id'] ?? null) ? $datos['phone_number_id'] : '',
             'token' => is_string($datos['token'] ?? null) ? $datos['token'] : '',
+            'app_secret' => is_string($datos['app_secret'] ?? null) ? $datos['app_secret'] : '',
+            'verify_token' => is_string($datos['verify_token'] ?? null) ? $datos['verify_token'] : '',
         ];
     }
 }

@@ -230,3 +230,20 @@ it('guardar el correo del superadmin no borra la llave de FacturAPI', function (
     $this->putJson('/api/v1/plataforma/configuracion', ['correo_alertas' => null], conPlataforma())
         ->assertOk()->assertJsonPath('data.correo_alertas', 'env@agendauno.mx');
 });
+
+it('el superadmin ve si el dueño recibió y leyó el aviso por WhatsApp', function (): void {
+    $this->travelTo('2026-10-10 17:00:00');
+    estudioConSesion('estudio-a', 'a@correo.mx');
+    Estudio::query()->where('slug', 'estudio-a')->update(['trial_termina_en' => '2026-10-12']);
+    duenoAceptoWhatsApp('estudio-a');
+    whatsAppParaDuenos();
+    $this->artisan('agendauno:avisar-duenos')->assertSuccessful();
+
+    // Sin App Secret, fuera de producción se acepta sin firma.
+    $this->postJson('/api/v1/webhooks/whatsapp', ['object' => 'whatsapp_business_account', 'entry' => [[
+        'changes' => [['field' => 'messages', 'value' => ['statuses' => [['id' => 'wamid.prueba', 'status' => 'read', 'timestamp' => '1791000000']]]]],
+    ]]])->assertOk()->assertJsonPath('data.aplicados', 1);
+
+    $aviso = collect($this->getJson('/api/v1/plataforma/estudios/estudio-a', conPlataforma())->json('data.avisos'))->firstWhere('canal', 'whatsapp');
+    expect($aviso)->toMatchArray(['estado' => 'enviado', 'entregado' => true, 'leido' => true]);
+});

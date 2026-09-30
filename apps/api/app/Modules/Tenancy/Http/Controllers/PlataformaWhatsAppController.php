@@ -37,6 +37,9 @@ class PlataformaWhatsAppController
             'phone_number_id' => ['nullable', 'string', 'max:40', 'regex:/^[0-9]*$/'],
             // Vacío conserva el que ya estaba.
             'token' => ['nullable', 'string', 'max:1000'],
+            // App Secret de la app de Meta: firma los avisos de estado (ADR 0074).
+            // Vacío conserva el que ya estaba.
+            'app_secret' => ['nullable', 'string', 'max:255'],
         ]);
         $numero = (string) ($validado['phone_number_id'] ?? '');
         $token = $validado['token'] ?? null;
@@ -46,7 +49,7 @@ class PlataformaWhatsAppController
             throw ValidationException::withMessages(['phone_number_id' => ['Para encenderlo carga el identificador del número y el token.']]);
         }
 
-        $this->whatsapp->guardar((bool) $validado['negocios'], (bool) $validado['duenos'], $numero, $token);
+        $this->whatsapp->guardar((bool) $validado['negocios'], (bool) $validado['duenos'], $numero, $token, $validado['app_secret'] ?? null);
 
         return response()->json(['data' => $this->presentar()]);
     }

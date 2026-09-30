@@ -56,6 +56,10 @@ interface Mensaje {
   estado: "encolado" | "enviado" | "fallido" | "descartado";
   intentos: number;
   enviado_en: string | null;
+  // Lo que Meta avisa de un WhatsApp (ADR 0074).
+  entregado_en?: string | null;
+  leido_en?: string | null;
+  ultimo_error?: string | null;
 }
 type Pestana = "difusion" | "automaticos" | "salida";
 
@@ -114,6 +118,17 @@ const marcadoresTexto = computed(() =>
     b: "{{persona_email}}",
   }),
 );
+
+// Un WhatsApp enviado dice además si llegó o si ya lo leyeron.
+function estadoDeMensaje(m: Mensaje): string {
+  if (m.estado === "enviado" && m.leido_en) {
+    return t("comunicacionesAuto.estados.leido");
+  }
+  if (m.estado === "enviado" && m.entregado_en) {
+    return t("comunicacionesAuto.estados.entregado");
+  }
+  return t(`comunicacionesAuto.estados.${m.estado}`);
+}
 
 function canalTexto(canal: string): string {
   if (canal === "push") {
@@ -816,6 +831,15 @@ onMounted(cargar);
               {{ m.persona ?? m.destinatario ?? "—" }} ·
               {{ canalTexto(m.canal) }} · {{ fecha(m.enviado_en) }}
             </p>
+            <p
+              v-if="m.estado === 'fallido' && m.ultimo_error"
+              class="mt-0.5 text-xs truncate"
+              style="color: var(--error)"
+              :title="m.ultimo_error"
+              data-prueba="error-mensaje"
+            >
+              {{ m.ultimo_error }}
+            </p>
           </div>
           <span
             class="tu-badge shrink-0"
@@ -823,7 +847,7 @@ onMounted(cargar);
               'tu-badge-exito': m.estado === 'enviado',
               'tu-badge-aviso': m.estado === 'encolado',
             }"
-            >{{ $t(`comunicacionesAuto.estados.${m.estado}`) }}</span
+            >{{ estadoDeMensaje(m) }}</span
           >
         </li>
       </ul>

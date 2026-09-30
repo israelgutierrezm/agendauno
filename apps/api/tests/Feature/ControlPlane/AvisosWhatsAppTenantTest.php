@@ -10,6 +10,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 
 /*
 | Avisos por WhatsApp (Meta Cloud API, ADR 0069). El superadministrador lo enciende o
@@ -47,7 +48,25 @@ function encenderWhatsApp(bool $negocios = true, bool $duenos = false): void
 {
     test()->putJson('/api/v1/plataforma/whatsapp', [
         'negocios' => $negocios, 'duenos' => $duenos, 'phone_number_id' => '109876543210', 'token' => 'EAAG-token-de-prueba',
+        'app_secret' => 'secreto-de-la-app',
     ], conPlataforma())->assertOk();
+}
+
+/**
+ * Aviso de estados de Meta, firmado con el App Secret (ADR 0074).
+ *
+ * @param  list<array<string, mixed>>  $estados
+ */
+function avisoDeMeta(array $estados, string $secreto = 'secreto-de-la-app'): TestResponse
+{
+    $cuerpo = (string) json_encode(['object' => 'whatsapp_business_account', 'entry' => [[
+        'id' => 'waba', 'changes' => [['field' => 'messages', 'value' => ['messaging_product' => 'whatsapp', 'statuses' => $estados]]],
+    ]]]);
+
+    return test()->call('POST', '/api/v1/webhooks/whatsapp', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_X_HUB_SIGNATURE_256' => 'sha256='.hash_hmac('sha256', $cuerpo, $secreto),
+    ], $cuerpo);
 }
 
 /**
@@ -344,4 +363,61 @@ it('al dar de alta un cliente con su celular, recepción puede registrar que ace
     $this->postJson("/api/v1/app/{$e['slug']}/miembros", [
         'nombre' => 'Toño', 'celular' => '55 4444 5555',
     ], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.acepta_whatsapp', false);
+});
+
+it('Meta verifica el webhook con el token que muestra el superadmin', function (): void {
+    encenderWhatsApp();
+    $webhook = $this->getJson('/api/v1/plataforma/whatsapp', conPlataforma())->assertOk()->json('data.webhook');
+    expect($webhook['url'])->toEndWith('/api/v1/webhooks/whatsapp')
+        ->and($webhook['token_verificacion'])->toHaveLength(40)
+        ->and($webhook['app_secret_configurado'])->toBeTrue()
+        ->and(json_encode($webhook))->not->toContain('secreto-de-la-app');
+
+    $this->get('/api/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token='.$webhook['token_verificacion'].'&hub.challenge=12345')
+        ->assertOk()->assertSee('12345');
+    $this->get('/api/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=otro&hub.challenge=12345')->assertForbidden();
+});
+
+it('Meta avisa que le llegó y que lo leyó; un aviso con otra firma se rechaza', function (): void {
+    $m = negocioConAlumnas();
+    encenderWhatsApp();
+    avisoPorWhatsApp($m);
+    $this->putJson("/api/v1/app/{$m['slug']}/mi/privacidad", ['acepta_whatsapp' => true], conBearer($m['alumna']))->assertOk();
+    $this->postJson("/api/v1/app/{$m['slug']}/sesiones/{$m['sesion']}/reservas", ['persona_id' => $m['vale']], conBearer($m['bearer']))->assertCreated();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
+
+    avisoDeMeta([['id' => 'wamid.prueba', 'status' => 'delivered', 'timestamp' => '1790000000']], 'otro-secreto')->assertForbidden();
+    avisoDeMeta([['id' => 'wamid.prueba', 'status' => 'delivered', 'timestamp' => '1790000000']])->assertOk();
+    // Meta no garantiza el orden: un «enviado» tardío no borra nada.
+    avisoDeMeta([['id' => 'wamid.prueba', 'status' => 'sent', 'timestamp' => '1789999990']])->assertOk();
+    avisoDeMeta([['id' => 'wamid.prueba', 'status' => 'read', 'timestamp' => '1790000100']])->assertOk();
+    // Un wamid que no es nuestro se ignora.
+    avisoDeMeta([['id' => 'wamid.ajeno', 'status' => 'read', 'timestamp' => '1790000100']])->assertOk()->assertJsonPath('data.aplicados', 0);
+
+    $salida = collect($this->getJson("/api/v1/app/{$m['slug']}/mensajes", conBearer($m['bearer']))->assertOk()->json('data'))
+        ->firstWhere('canal', 'whatsapp');
+    expect($salida['estado'])->toBe('enviado')
+        ->and($salida['entregado_en'])->not->toBeNull()
+        ->and($salida['leido_en'])->not->toBeNull();
+});
+
+it('si Meta no lo pudo entregar queda fallido con el motivo y no se reintenta', function (): void {
+    $m = negocioConAlumnas();
+    encenderWhatsApp();
+    avisoPorWhatsApp($m);
+    $this->putJson("/api/v1/app/{$m['slug']}/mi/privacidad", ['acepta_whatsapp' => true], conBearer($m['alumna']))->assertOk();
+    $this->postJson("/api/v1/app/{$m['slug']}/sesiones/{$m['sesion']}/reservas", ['persona_id' => $m['vale']], conBearer($m['bearer']))->assertCreated();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
+
+    avisoDeMeta([['id' => 'wamid.prueba', 'status' => 'failed', 'timestamp' => '1790000000', 'errors' => [[
+        'code' => 131026, 'title' => 'Message undeliverable', 'error_data' => ['details' => 'El número no tiene WhatsApp.'],
+    ]]]])->assertOk();
+
+    $aviso = avisosWhatsApp($m)[0];
+    expect($aviso->estado->value)->toBe('fallido')
+        ->and($aviso->ultimo_error)->toContain('131026')->toContain('no tiene WhatsApp');
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
+    expect($this->meta->envios)->toHaveCount(1);
 });

@@ -68,8 +68,8 @@ opción.
 - El dueño de la plataforma controla el costo con un interruptor. Apagarlo no deja
   a nadie sin avisos, porque el correo y el push siguen igual.
 - «Enviado» significa que Meta aceptó el mensaje. La entrega y la lectura llegan
-  por el webhook de estados de Meta, que aún no se procesa. Un número sin WhatsApp
-  solo se nota ahí.
+  por el webhook de estados de Meta (ADR 0074); un número sin WhatsApp queda
+  fallido con el motivo.
 - Todos los negocios usan el mismo número. Un número propio por negocio
   (Embedded Signup) o cobrar el WhatsApp como extra del plan es trabajo aparte.
 - Cambiar el texto de un aviso exige registrar una plantilla nueva en Meta y

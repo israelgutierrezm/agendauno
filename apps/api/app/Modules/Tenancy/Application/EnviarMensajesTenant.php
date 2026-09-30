@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
+use App\Modules\Tenancy\Models\WhatsAppEnvio;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -29,7 +30,7 @@ use Throwable;
  */
 class EnviarMensajesTenant
 {
-    private const MAX_INTENTOS = 6;
+    public const MAX_INTENTOS = 6;
 
     private const LOTE = 500;
 
@@ -101,7 +102,15 @@ class EnviarMensajesTenant
             if ($plantilla === '' || ! is_string($mensaje->destinatario) || $mensaje->destinatario === '') {
                 throw new RuntimeException('El aviso de WhatsApp no tiene plantilla o número.');
             }
-            $this->whatsapp->enviarPlantilla($mensaje->destinatario, $plantilla, $mensaje->parametros['valores'] ?? []);
+            $wamid = $this->whatsapp->enviarPlantilla($mensaje->destinatario, $plantilla, $mensaje->parametros['valores'] ?? []);
+            // Para ubicarlo cuando Meta avise si se entregó, se leyó o falló (ADR 0074).
+            if ($wamid !== null) {
+                WhatsAppEnvio::query()->firstOrCreate(['wamid' => $wamid], [
+                    'estudio_id' => $this->gestor->actual()?->getKey(),
+                    'origen' => WhatsAppEnvio::ORIGEN_MENSAJE,
+                    'referencia_id' => $mensaje->getKey(),
+                ]);
+            }
 
             return;
         }

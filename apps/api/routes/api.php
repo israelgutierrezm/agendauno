@@ -106,6 +106,7 @@ use App\Modules\Tenancy\Http\Controllers\WaiversTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\WebhooksSalientesTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookTenantController;
+use App\Modules\Tenancy\Http\Controllers\WebhookWhatsAppController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -131,6 +132,11 @@ Route::prefix('v1')->group(function (): void {
     // SaaS (plataforma -> dueño) -> pagado. Sin sesion; idempotente.
     Route::post('/webhooks/plataforma/{proveedor}', WebhookPlataformaController::class)
         ->name('api.v1.webhooks.plataforma');
+    // Estados de entrega de WhatsApp (Meta): verificación (GET) y avisos (POST), ADR 0074.
+    Route::get('/webhooks/whatsapp', [WebhookWhatsAppController::class, 'verificar'])
+        ->middleware('throttle:60,1,whatsapp-webhook-verificar')->name('api.v1.webhooks.whatsapp.verificar');
+    Route::post('/webhooks/whatsapp', [WebhookWhatsAppController::class, 'recibir'])
+        ->middleware('throttle:600,1,whatsapp-webhook')->name('api.v1.webhooks.whatsapp');
 
     Route::post('/registro', [RegistroEstudioController::class, 'store'])->middleware('throttle:login')->name('api.v1.registro');
     Route::get('/registro/slug', [RegistroEstudioController::class, 'disponibilidad'])->middleware('throttle:60,1')->name('api.v1.registro.slug');

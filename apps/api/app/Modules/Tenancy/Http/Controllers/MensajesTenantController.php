@@ -46,6 +46,10 @@ class MensajesTenantController
                 'intentos' => $m->intentos,
                 'evento_ulid' => $m->evento_ulid,
                 'enviado_en' => $m->enviado_en?->toIso8601String(),
+                // WhatsApp (ADR 0074): según el aviso de Meta.
+                'entregado_en' => $m->entregado_en?->toIso8601String(),
+                'leido_en' => $m->leido_en?->toIso8601String(),
+                'ultimo_error' => $m->ultimo_error,
             ])->all(),
         ]);
     }

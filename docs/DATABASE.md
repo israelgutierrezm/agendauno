@@ -30,7 +30,8 @@ el esquema.
 | `configuraciones_pasarela_plataforma` | Pasarela con la que la plataforma cobra la renta |
 | `configuracion_plataforma` | Parámetros de plataforma (valores por defecto de los límites) y conexión de WhatsApp (cifrada) |
 | `verificaciones_whatsapp` | Códigos para que el dueño confirme su WhatsApp al registrarse (solo hashes, ADR 0070) |
-| `avisos_duenos` | Avisos de la plataforma al dueño por correo y WhatsApp: prueba por terminar, renta lista, vencida y pagada (uno por tipo, referencia y canal, ADR 0071) |
+| `avisos_duenos` | Avisos de la plataforma al dueño por correo y WhatsApp: prueba por terminar, renta lista, vencida y pagada (uno por tipo, referencia y canal, ADR 0071); entrega y lectura del WhatsApp (ADR 0074) |
+| `whatsapp_envios` | Cada WhatsApp enviado: el `wamid` de Meta, el negocio y el mensaje o aviso al que corresponde, y su último estado (ADR 0074) |
 | `alertas_plataforma` | Alertas de operación agrupadas (ADR 0051) |
 | `documentos_legales`, `aceptaciones_legales` | Aviso de privacidad y términos versionados, y quién los aceptó |
 | `users`, `cache`, `jobs`, `failed_jobs`… | Tablas de Laravel |
@@ -115,7 +116,7 @@ el esquema.
 **Comunicaciones e integraciones**
 - `plantillas_mensaje`, `mensajes`, `difusiones` — correos, recordatorios y avisos
   (interno, correo, push y WhatsApp; `mensajes.parametros` guarda la plantilla de Meta
-  y sus valores, ADR 0069).
+  y sus valores, ADR 0069; `entregado_en` y `leido_en` los avisa Meta, ADR 0074).
 - `eventos_outbox` — outbox transaccional (ADR 0004).
 - `webhooks_salientes`, `entregas_webhook`, `integraciones`.
 

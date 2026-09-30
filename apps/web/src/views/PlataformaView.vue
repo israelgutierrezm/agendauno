@@ -76,6 +76,9 @@ interface FichaApi extends Omit<Estudio, "uso"> {
     canal: string;
     estado: string;
     fecha: string | null;
+    // Lo que Meta avisa del WhatsApp (ADR 0074).
+    entregado?: boolean;
+    leido?: boolean;
   }[];
 }
 interface ResumenCobros {
@@ -1552,7 +1555,13 @@ function borrar(): void {
                         : 'var(--texto-suave)',
                   }"
                 >
-                  {{ $t(`comunicacionesAuto.estados.${a.estado}`) }}
+                  {{
+                    a.leido
+                      ? $t("comunicacionesAuto.estados.leido")
+                      : a.entregado
+                        ? $t("comunicacionesAuto.estados.entregado")
+                        : $t(`comunicacionesAuto.estados.${a.estado}`)
+                  }}
                 </dd>
               </div>
             </dl>
