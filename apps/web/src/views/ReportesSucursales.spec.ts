@@ -68,13 +68,12 @@ describe("reporte por sucursal", () => {
     });
     await flushPromises();
 
-    // Resumen primero; el periodo no aplica a sucursales (estado actual).
-    expect(w.find('input[type="date"]').exists()).toBe(true);
+    // El periodo aplica a la agenda del equipo; las sucursales son el estado actual.
     await w
       .findAll(".tu-segmentado button")
       .find((b) => b.text() === "Equipo y sucursales")!
       .trigger("click");
-    expect(w.find('input[type="date"]').exists()).toBe(false);
+    expect(w.find('input[type="date"]').exists()).toBe(true);
     expect(w.text()).toContain("Estado actual");
 
     const filas = w

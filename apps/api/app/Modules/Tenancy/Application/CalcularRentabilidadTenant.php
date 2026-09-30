@@ -4,27 +4,25 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\EstadoSesionTenant;
-use App\Modules\Tenancy\Models\AsignacionSesionTenant;
-use App\Modules\Tenancy\Models\EsquemaPagoTenant;
-use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
-use App\Modules\Tenancy\Nomina\TipoPago;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Collection;
 
 /**
  * Rentabilidad por clase (R30): por cada oferta impartida en un periodo, cruza el
  * INGRESO (asistentes × precio de clase si el estudio lo configuró; si no, aproximado
- * por los créditos consumidos × precio por crédito del pack) contra el COSTO del
- * instructor (nómina por clase/asistente/hora, R17). El margen es ingreso − costo.
- * `sin_costo_unitario` cuenta a los asistentes sin valor por crédito (membresías
- * ilimitadas o cortesías) para no engañar con el número. Montos en minor (entero).
+ * por los créditos consumidos × precio por crédito del pack) contra el COSTO de quien
+ * la trabajó (nómina por clase/asistente/hora, R17; incluye al profesional de la
+ * sesión, ADR 0081). El margen es ingreso − costo. `sin_costo_unitario` cuenta a los
+ * asistentes sin valor por crédito (membresías ilimitadas o cortesías) para no engañar
+ * con el número. El valor de cada sesión sale de {@see ValorDeSesionesTenant}. Montos
+ * en minor (entero).
  */
 class CalcularRentabilidadTenant
 {
+    public function __construct(private readonly ValorDeSesionesTenant $valor) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -40,19 +38,7 @@ class CalcularRentabilidadTenant
             ->where('estado', '!=', EstadoSesionTenant::Cancelada->value)
             ->with('oferta')
             ->get();
-        $sesionIds = $sesiones->pluck('id')->all();
-
-        // Esquemas de pago activos por usuario (para el costo del instructor).
-        $esquemas = EsquemaPagoTenant::query()->where('activo', true)->get()->keyBy('usuario_id');
-        // Asignaciones de staff por sesión.
-        $asignaciones = AsignacionSesionTenant::query()->whereIn('sesion_id', $sesionIds)->get()->groupBy('sesion_id');
-        // Reservas ASISTIDAS (presente) con la cadena de producto para el ingreso por créditos.
-        $presentesPorSesion = ReservaTenant::query()
-            ->whereIn('sesion_id', $sesionIds)
-            ->whereHas('asistencia', fn ($q) => $q->where('estado', EstadoAsistencia::Presente->value))
-            ->with('derecho.acuerdo.producto')
-            ->get()
-            ->groupBy('sesion_id');
+        $valores = $this->valor->calcular($sesiones);
 
         /** @var array<string, array<string, mixed>> $ofertas */
         $ofertas = [];
@@ -60,12 +46,7 @@ class CalcularRentabilidadTenant
         foreach ($sesiones as $sesion) {
             $oferta = $sesion->oferta;
             $clave = $oferta->ulid;
-            /** @var Collection<int, ReservaTenant> $presentes */
-            $presentes = $presentesPorSesion->get($sesion->id) ?? collect();
-            $numPresentes = $presentes->count();
-
-            [$ingreso, $sinCosto] = $this->ingresoDe($oferta->precio_clase_minor, $numPresentes, $presentes);
-            $costo = $this->costoDe($sesion, $numPresentes, $asignaciones->get($sesion->id) ?? collect(), $esquemas);
+            $valor = $valores[(int) $sesion->id];
 
             if (! isset($ofertas[$clave])) {
                 $ofertas[$clave] = [
@@ -77,10 +58,10 @@ class CalcularRentabilidadTenant
                 ];
             }
             $ofertas[$clave]['sesiones']++;
-            $ofertas[$clave]['asistentes'] += $numPresentes;
-            $ofertas[$clave]['ingreso_minor'] += $ingreso;
-            $ofertas[$clave]['costo_minor'] += $costo;
-            $ofertas[$clave]['sin_costo_unitario'] += $sinCosto;
+            $ofertas[$clave]['asistentes'] += $valor['presentes'];
+            $ofertas[$clave]['ingreso_minor'] += $valor['ingreso'];
+            $ofertas[$clave]['costo_minor'] += array_sum($valor['pagos']);
+            $ofertas[$clave]['sin_costo_unitario'] += $valor['sin_costo'];
         }
 
         $lista = array_map(static function (array $o): array {
@@ -107,58 +88,5 @@ class CalcularRentabilidadTenant
             'totales' => $totales,
             'ofertas' => $lista,
         ];
-    }
-
-    /**
-     * Ingreso de una sesión y cuántos asistentes quedaron sin valor unitario.
-     *
-     * @param  Collection<int, ReservaTenant>  $presentes
-     * @return array{0: int, 1: int} [ingreso_minor, sin_costo_unitario]
-     */
-    private function ingresoDe(?int $precioClase, int $numPresentes, Collection $presentes): array
-    {
-        if ($precioClase !== null && $precioClase > 0) {
-            return [$numPresentes * $precioClase, 0];
-        }
-
-        $ingreso = 0;
-        $sinCosto = 0;
-        foreach ($presentes as $reserva) {
-            $producto = $reserva->derecho?->acuerdo?->producto;
-            $precioMinor = (int) ($producto->precio_minor ?? 0);
-            $creditos = (int) ($producto->creditos_incluidos ?? 0);
-            if ($precioMinor > 0 && $creditos > 0) {
-                $ingreso += intdiv($precioMinor * (int) $reserva->costo_unidades, $creditos);
-            } else {
-                $sinCosto++;
-            }
-        }
-
-        return [$ingreso, $sinCosto];
-    }
-
-    /**
-     * Costo del instructor de una sesión (suma de los esquemas de pago de su staff).
-     *
-     * @param  Collection<int, AsignacionSesionTenant>  $asignaciones
-     * @param  Collection<int, EsquemaPagoTenant>  $esquemas  keyBy usuario_id
-     */
-    private function costoDe(SesionTenant $sesion, int $numPresentes, Collection $asignaciones, Collection $esquemas): int
-    {
-        $costo = 0;
-        foreach ($asignaciones as $asignacion) {
-            $esquema = $esquemas->get($asignacion->usuario_id);
-            if (! $esquema instanceof EsquemaPagoTenant) {
-                continue;
-            }
-            $monto = (int) $esquema->monto_minor;
-            $costo += match ($esquema->tipo) {
-                TipoPago::PorClase => $monto,
-                TipoPago::PorAsistente => $monto * $numPresentes,
-                TipoPago::PorHora => intdiv($monto * (int) $sesion->inicia_en->diffInMinutes($sesion->termina_en), 60),
-            };
-        }
-
-        return $costo;
     }
 }

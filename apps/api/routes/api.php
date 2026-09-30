@@ -85,6 +85,7 @@ use App\Modules\Tenancy\Http\Controllers\RegistroEstudioController;
 use App\Modules\Tenancy\Http\Controllers\RegistroWhatsAppController;
 use App\Modules\Tenancy\Http\Controllers\ReporteCohortesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteDemandaTenantController;
+use App\Modules\Tenancy\Http\Controllers\ReporteEquipoTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteNegocioTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteRentabilidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReporteSucursalesTenantController;
@@ -478,6 +479,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/reportes/negocio', ReporteNegocioTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.negocio');
             // Reporte de rentabilidad por clase (R30): ingreso vs costo de instructor por oferta.
             Route::get('/reportes/rentabilidad', ReporteRentabilidadTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.rentabilidad');
+            // Agenda del equipo (ADR 0081): ocupación, asistencia, valor, pago y margen por profesional.
+            Route::get('/reportes/equipo', ReporteEquipoTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.equipo');
             // Analitica de demanda (R31): mapa dia x hora + por actividad (ocupacion y espera).
             Route::get('/reportes/demanda', ReporteDemandaTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.demanda');
             // Tendencias de ingresos (Etapa 2): serie temporal (dia/semana/mes) + desglose por producto. `?formato=csv`.

@@ -40,6 +40,9 @@
   renta lista, vencida y pagada, por correo y WhatsApp; el dueño los ve y decide
   en su panel, donde también cambia su WhatsApp con un código (ADR 0075); alerta de
   renta vencida al correo del superadministrador.
+- **Analítica**: ingresos, tendencias, cohortes, rentabilidad por clase, demanda por
+  horario y agenda del equipo por profesional, con ocupación por agenda en negocios
+  de citas y una sola regla de quién cobra cada sesión (ADR 0081).
 - **Operación**: monitoreo de errores propio de la API, la web y la app (ADR 0080) y
   limpieza diaria de registros técnicos (ADR 0079).
 - **Suspensión automática por renta** (ADR 0073): con días de gracia y aviso previo;
@@ -66,6 +69,5 @@
 - WhatsApp: si conviene, número propio por negocio o cobrarlo como extra del plan
   (ADR 0069); atender las respuestas de los clientes (ADR 0074).
 - Despliegue automático desde el CI.
-- Analítica: ocupación, rentabilidad, demanda.
 - Marketplace a partir del directorio.
 - Opciones empresariales: marca blanca, OAuth para terceros.

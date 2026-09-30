@@ -1582,6 +1582,12 @@ export default {
       hora: "Hora",
       leyenda:
         "El color indica la ocupación; el punto marca clases con lista de espera.",
+      subtituloAgenda:
+        "Cuándo está más llena la agenda de tu equipo: horas agendadas entre las disponibles, por día y hora.",
+      leyendaAgenda:
+        "El color indica qué parte del horario de atención estuvo agendada, sin días cerrados ni bloqueos.",
+      resumenAgenda:
+        "Agenda ocupada al {pct}: {agendadas} de {disponibles} disponibles.",
       porActividad: "Demanda por actividad",
       colActividad: "Actividad",
       colSesiones: "Sesiones",
@@ -1597,6 +1603,27 @@ export default {
       alumnos: "Alumnos activos",
       arpu: "ARPU",
       clases: "Clases",
+    },
+    // Agenda del equipo (ADR 0081).
+    equipo: {
+      titulo: "Agenda del equipo",
+      subtitulo:
+        "Qué tan llena estuvo la agenda de cada instructor, cuánto dejó lo que atendió y cuánto se le paga.",
+      vacio: "No hay instructores ni clases en el periodo.",
+      colProfesional: "Instructor",
+      colOcupacion: "Ocupación",
+      colSesiones: "Clases y citas",
+      colInasistencia: "Inasistencias",
+      colValor: "Valor atendido",
+      colPago: "Pago",
+      colMargen: "Margen",
+      sinHorario: "Sin horario",
+      sinProfesional: "Sin instructor asignado",
+      clases: "1 clase | {n} clases",
+      citas: "1 cita | {n} citas",
+      total: "Total",
+      leyenda:
+        "Ocupación: horas agendadas dentro de su horario de atención entre las disponibles, sin días cerrados ni bloqueos. El valor atendido es el precio de lo que se atendió (o los créditos que se usaron); el pago sale de su esquema en Nómina, incluidas las clases que cubre o donde apoya.",
     },
     porSucursal: "Por sucursal",
     colSucursal: "Sucursal",

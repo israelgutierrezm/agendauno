@@ -21,9 +21,16 @@ use Illuminate\Support\Collection;
  *    (en_espera + ofrecida + expirada), es decir demanda que NO cupo.
  * El bucketeo por día×hora se hace en PHP con la zona horaria SNAPSHOT de cada
  * sesión (multi-sucursal, multi-zona; y portable a SQLite del tenant).
+ *
+ * Cada franja trae además la ocupación de la agenda de quienes atienden
+ * (`disponible_min`, `agendado_min`, `utilizacion_pct`; ADR 0081): en citas el cupo
+ * es 1 y la ocupación por cupo no dice nada. Aparecen también las franjas con
+ * horario y sin nada agendado.
  */
 class CalcularDemandaTenant
 {
+    public function __construct(private readonly OcupacionDeAgendaTenant $ocupacion) {}
+
     // Reservas que en algún momento pasaron por lista de espera = demanda no satisfecha.
     // Instancias de enum (no strings): `estado` viene casteado a EstadoReserva.
     private const ESTADOS_ESPERA = [
@@ -100,6 +107,17 @@ class CalcularDemandaTenant
             $totales['espera'] += $espera;
         }
 
+        // Ocupación de la agenda por franja, con las horas disponibles sin nada agendado.
+        $totales['disponible_min'] = 0;
+        $totales['agendado_min'] = 0;
+        foreach ($this->ocupacion->calcular($desde, $hasta, $sesiones)['por_franja'] as $clave => $franja) {
+            $matriz[$clave] ??= ['dia' => $franja['dia'], 'hora' => $franja['hora'], 'sesiones' => 0, 'capacidad' => 0, 'confirmadas' => 0, 'espera' => 0];
+            $matriz[$clave]['disponible_min'] = $franja['disponible'];
+            $matriz[$clave]['agendado_min'] = $franja['agendado'];
+            $totales['disponible_min'] += $franja['disponible'];
+            $totales['agendado_min'] += $franja['agendado'];
+        }
+
         $celdas = array_map(fn (array $c): array => $this->conOcupacion($c), array_values($matriz));
         // Orden estable: por día y luego por hora.
         usort($celdas, static fn (array $a, array $b): int => [$a['dia'], $a['hora']] <=> [$b['dia'], $b['hora']]);
@@ -117,7 +135,8 @@ class CalcularDemandaTenant
     }
 
     /**
-     * Añade `ocupacion_pct` (confirmadas/capacidad, null si no hay capacidad medible).
+     * Añade `ocupacion_pct` (confirmadas/capacidad, null si no hay capacidad medible)
+     * y, en franjas y totales, `utilizacion_pct` de la agenda (null sin horario).
      *
      * @param  array<string, mixed>  $fila
      * @return array<string, mixed>
@@ -126,6 +145,11 @@ class CalcularDemandaTenant
     {
         $capacidad = (int) $fila['capacidad'];
         $fila['ocupacion_pct'] = $capacidad > 0 ? (int) round((int) $fila['confirmadas'] / $capacidad * 100) : null;
+        if (array_key_exists('disponible_min', $fila) || array_key_exists('dia', $fila)) {
+            $fila['disponible_min'] = (int) ($fila['disponible_min'] ?? 0);
+            $fila['agendado_min'] = (int) ($fila['agendado_min'] ?? 0);
+            $fila['utilizacion_pct'] = OcupacionDeAgendaTenant::porcentaje($fila['agendado_min'], $fila['disponible_min']);
+        }
 
         return $fila;
     }

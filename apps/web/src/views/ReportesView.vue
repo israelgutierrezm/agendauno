@@ -14,6 +14,8 @@ interface Negocio {
   ordenes_pagadas: number;
   clases: number;
   ocupacion_pct: number | null;
+  // Horas agendadas entre las disponibles (ADR 0081): la de negocios de citas.
+  ocupacion_agenda_pct?: number | null;
   no_show_pct: number | null;
   alumnos_activos: number;
   arpu_minor: number | null;
@@ -66,6 +68,10 @@ interface DemandaCelda {
   confirmadas: number;
   espera: number;
   ocupacion_pct: number | null;
+  // Ocupación de la agenda de quienes atienden (ADR 0081).
+  disponible_min?: number;
+  agendado_min?: number;
+  utilizacion_pct?: number | null;
 }
 interface DemandaActividad {
   id: string | null;
@@ -83,9 +89,38 @@ interface Demanda {
     confirmadas: number;
     espera: number;
     ocupacion_pct: number | null;
+    disponible_min?: number;
+    agendado_min?: number;
+    utilizacion_pct?: number | null;
   };
   matriz: DemandaCelda[];
   actividades: DemandaActividad[];
+}
+// `GET /reportes/equipo` (ADR 0081): la agenda de cada quien atiende.
+interface CifrasEquipo {
+  clases: number;
+  citas: number;
+  agendado_min: number;
+  disponible_min: number;
+  agendado_en_horario_min: number;
+  presentes: number;
+  ausentes: number;
+  canceladas: number;
+  ingreso_minor: number;
+  costo_minor: number;
+  margen_minor: number;
+  ocupacion_pct: number | null;
+  inasistencia_pct: number | null;
+}
+interface ProfesionalEquipo extends CifrasEquipo {
+  id: string | null;
+  nombre: string | null;
+  foto_url: string | null;
+}
+interface Equipo {
+  moneda: string;
+  totales: CifrasEquipo;
+  profesionales: ProfesionalEquipo[];
 }
 interface PuntoSerie {
   fecha: string;
@@ -141,6 +176,7 @@ const sinSucursal = ref(0);
 const totalesSucursales = ref<ReporteSucursales["totales"] | null>(null);
 const rentabilidad = ref<Rentabilidad | null>(null);
 const demanda = ref<Demanda | null>(null);
+const equipo = ref<Equipo | null>(null);
 const tendencias = ref<Tendencias | null>(null);
 const agrupacion = ref<"dia" | "semana" | "mes">("dia");
 const exportando = ref(false);
@@ -192,14 +228,44 @@ function fechaBucket(iso: string): string {
 
 // Etiquetas de días (lun..dom) desde i18n; el índice 0 corresponde a `dia = 1`.
 const diasSemana = computed(() => t("reportes.demanda.dias").split(","));
+// En citas cada cita tiene cupo 1: el mapa mide la agenda del equipo (horas
+// agendadas entre las disponibles), no el cupo (ADR 0081).
+const porAgenda = computed(() => sesion.modalidad === "citas");
+const celdasDemanda = computed(() =>
+  (demanda.value?.matriz ?? []).filter((c) =>
+    porAgenda.value
+      ? (c.disponible_min ?? 0) > 0 || c.sesiones > 0
+      : c.sesiones > 0,
+  ),
+);
 // Horas presentes en la matriz (unión, ordenadas) → filas del heatmap.
 const horasDemanda = computed(() => {
   const set = new Set<number>();
-  demanda.value?.matriz.forEach((c) => set.add(c.hora));
+  celdasDemanda.value.forEach((c) => set.add(c.hora));
   return [...set].sort((a, b) => a - b);
 });
 function celdaDemanda(dia: number, hora: number): DemandaCelda | undefined {
-  return demanda.value?.matriz.find((c) => c.dia === dia && c.hora === hora);
+  return celdasDemanda.value.find((c) => c.dia === dia && c.hora === hora);
+}
+function valorCelda(c: DemandaCelda): number | null {
+  return porAgenda.value ? (c.utilizacion_pct ?? null) : c.ocupacion_pct;
+}
+function detalleCelda(c: DemandaCelda): string {
+  return porAgenda.value
+    ? `${horas(c.agendado_min ?? 0)} / ${horas(c.disponible_min ?? 0)}`
+    : `${c.confirmadas}/${c.capacidad}`;
+}
+// «3 clases · 2 citas», solo lo que hubo.
+function sesionesTexto(c: CifrasEquipo): string {
+  const partes = [
+    c.clases > 0 ? t("reportes.equipo.clases", c.clases) : "",
+    c.citas > 0 ? t("reportes.equipo.citas", c.citas) : "",
+  ].filter((p) => p !== "");
+  return partes.length > 0 ? partes.join(" · ") : "—";
+}
+// Minutos en horas con un decimal ('90' → '1.5 h').
+function horas(minutos: number): string {
+  return `${new Intl.NumberFormat("es-MX", { maximumFractionDigits: 1 }).format(minutos / 60)} h`;
 }
 // Fondo del heatmap: más ocupación = acento más intenso (12%..92%).
 function colorOcupacion(pct: number | null): string {
@@ -230,7 +296,12 @@ const tarjetas = computed(() => {
   }
   return [
     { clave: "ingresos", valor: dinero(n.ingresos_minor, n.moneda) },
-    { clave: "ocupacion", valor: pct(n.ocupacion_pct) },
+    {
+      clave: "ocupacion",
+      valor: pct(
+        porAgenda.value ? (n.ocupacion_agenda_pct ?? null) : n.ocupacion_pct,
+      ),
+    },
     { clave: "noShow", valor: pct(n.no_show_pct) },
     { clave: "alumnos", valor: String(n.alumnos_activos) },
     { clave: "arpu", valor: dinero(n.arpu_minor, n.moneda) },
@@ -278,6 +349,21 @@ async function cargarDemanda(): Promise<void> {
       },
     );
     demanda.value = data.data;
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
+
+async function cargarEquipo(): Promise<void> {
+  error.value = null;
+  try {
+    const { data } = await api.get<{ data: Equipo }>(
+      `${base.value}/reportes/equipo`,
+      {
+        params: { desde: desde.value, hasta: hasta.value },
+      },
+    );
+    equipo.value = data.data;
   } catch (e) {
     error.value = mensajeDeError(e);
   }
@@ -353,6 +439,7 @@ async function cargar(): Promise<void> {
       cargarDemanda(),
       cargarTendencias(),
       cargarCohortes(),
+      cargarEquipo(),
     ]);
     sucursales.value = s.data.data.sucursales;
     sinSucursal.value = s.data.data.sin_sucursal.miembros_activos;
@@ -365,9 +452,10 @@ async function cargar(): Promise<void> {
 }
 
 /**
- * Pestañas: Resumen, Ingresos y Ocupación dependen del periodo elegido; Clientes
- * (cohortes por mes de alta) y Equipo y sucursales (estado actual), no. El selector
- * de periodo solo aparece donde cuenta, y cada pestaña dice de qué son sus cifras.
+ * Pestañas: Resumen, Ingresos, Ocupación y la agenda del equipo dependen del periodo
+ * elegido; Clientes (cohortes por mes de alta) y las sucursales (estado actual), no.
+ * El selector de periodo solo aparece donde cuenta, y cada sección dice de qué son
+ * sus cifras.
  */
 type Pestana = "resumen" | "ingresos" | "ocupacion" | "clientes" | "equipo";
 const PESTANAS: Pestana[] = [
@@ -382,7 +470,8 @@ const usaPeriodo = computed(
   () =>
     pestana.value === "resumen" ||
     pestana.value === "ingresos" ||
-    pestana.value === "ocupacion",
+    pestana.value === "ocupacion" ||
+    pestana.value === "equipo",
 );
 const periodoTexto = computed(() => {
   const f = (ymd: string) =>
@@ -407,6 +496,7 @@ watch([desde, hasta], () => {
   void cargarRentabilidad();
   void cargarDemanda();
   void cargarTendencias();
+  void cargarEquipo();
 });
 watch(agrupacion, () => void cargarTendencias());
 
@@ -777,8 +867,167 @@ onMounted(cargar);
       </template>
 
       <!-- Por sucursal -->
+      <!-- Agenda del equipo (ADR 0081) -->
       <template v-if="pestana === 'equipo'">
-        <h2 class="mt-6 font-light text-lg">
+        <h2 class="mt-4 font-light text-lg">
+          {{ $t("reportes.equipo.titulo") }}
+        </h2>
+        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("reportes.equipo.subtitulo") }}
+        </p>
+        <p
+          v-if="!equipo || equipo.profesionales.length === 0"
+          class="mt-3 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("reportes.equipo.vacio") }}
+        </p>
+        <template v-else>
+          <div class="mt-3 tu-card overflow-x-auto">
+            <table class="w-full text-sm" data-prueba="equipo">
+              <thead>
+                <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
+                  <th class="px-4 py-2 font-medium">
+                    {{ $t("reportes.equipo.colProfesional") }}
+                  </th>
+                  <th class="px-4 py-2 font-medium">
+                    {{ $t("reportes.equipo.colOcupacion") }}
+                  </th>
+                  <th
+                    class="px-4 py-2 font-medium text-right hidden sm:table-cell"
+                  >
+                    {{ $t("reportes.equipo.colSesiones") }}
+                  </th>
+                  <th
+                    class="px-4 py-2 font-medium text-right hidden md:table-cell"
+                  >
+                    {{ $t("reportes.equipo.colInasistencia") }}
+                  </th>
+                  <th class="px-4 py-2 font-medium text-right">
+                    {{ $t("reportes.equipo.colValor") }}
+                  </th>
+                  <th
+                    class="px-4 py-2 font-medium text-right hidden sm:table-cell"
+                  >
+                    {{ $t("reportes.equipo.colPago") }}
+                  </th>
+                  <th class="px-4 py-2 font-medium text-right">
+                    {{ $t("reportes.equipo.colMargen") }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="p in equipo.profesionales"
+                  :key="p.id ?? 'sin'"
+                  class="border-t"
+                  :style="{ borderColor: 'var(--borde)' }"
+                  data-prueba="profesional"
+                >
+                  <td class="px-4 py-2">
+                    <span class="flex items-center gap-2 font-semibold">
+                      <img
+                        v-if="p.foto_url"
+                        :src="p.foto_url"
+                        alt=""
+                        class="h-7 w-7 rounded-full object-cover shrink-0"
+                      />
+                      {{ p.nombre ?? $t("reportes.equipo.sinProfesional") }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-2 re-ocupacion">
+                    <template v-if="p.ocupacion_pct !== null">
+                      <span class="font-semibold tabular-nums">{{
+                        pct(p.ocupacion_pct)
+                      }}</span>
+                      <span class="re-barra" aria-hidden="true"
+                        ><span :style="{ width: `${p.ocupacion_pct}%` }"
+                      /></span>
+                      <span
+                        class="block text-xs"
+                        :style="{ color: 'var(--texto-suave)' }"
+                        >{{ horas(p.agendado_en_horario_min) }} /
+                        {{ horas(p.disponible_min) }}</span
+                      >
+                    </template>
+                    <span
+                      v-else
+                      class="text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{ $t("reportes.equipo.sinHorario") }} ·
+                      {{ horas(p.agendado_min) }}</span
+                    >
+                  </td>
+                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                    {{ sesionesTexto(p) }}
+                  </td>
+                  <td
+                    class="px-4 py-2 text-right hidden md:table-cell"
+                    :title="`${p.presentes} / ${p.ausentes}`"
+                  >
+                    {{ pct(p.inasistencia_pct) }}
+                  </td>
+                  <td class="px-4 py-2 text-right">
+                    {{ dinero(p.ingreso_minor, equipo.moneda) }}
+                  </td>
+                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                    {{ dinero(p.costo_minor, equipo.moneda) }}
+                  </td>
+                  <td
+                    class="px-4 py-2 text-right font-semibold"
+                    :style="{
+                      color:
+                        p.margen_minor >= 0 ? 'var(--exito)' : 'var(--error)',
+                    }"
+                  >
+                    {{ dinero(p.margen_minor, equipo.moneda) }}
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr
+                  class="border-t font-bold"
+                  :style="{ borderColor: 'var(--borde)' }"
+                >
+                  <td class="px-4 py-2">{{ $t("reportes.equipo.total") }}</td>
+                  <td class="px-4 py-2">
+                    {{ pct(equipo.totales.ocupacion_pct) }}
+                  </td>
+                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                    {{ sesionesTexto(equipo.totales) }}
+                  </td>
+                  <td class="px-4 py-2 text-right hidden md:table-cell">
+                    {{ pct(equipo.totales.inasistencia_pct) }}
+                  </td>
+                  <td class="px-4 py-2 text-right">
+                    {{ dinero(equipo.totales.ingreso_minor, equipo.moneda) }}
+                  </td>
+                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                    {{ dinero(equipo.totales.costo_minor, equipo.moneda) }}
+                  </td>
+                  <td
+                    class="px-4 py-2 text-right"
+                    :style="{
+                      color:
+                        equipo.totales.margen_minor >= 0
+                          ? 'var(--exito)'
+                          : 'var(--error)',
+                    }"
+                  >
+                    {{ dinero(equipo.totales.margen_minor, equipo.moneda) }}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("reportes.equipo.leyenda") }}
+          </p>
+        </template>
+      </template>
+
+      <template v-if="pestana === 'equipo'">
+        <h2 class="mt-8 font-light text-lg">
           {{ $t("reportes.porSucursal") }}
         </h2>
         <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
@@ -1002,10 +1251,27 @@ onMounted(cargar);
           {{ $t("reportes.demanda.titulo") }}
         </h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("reportes.demanda.subtitulo") }}
+          {{
+            porAgenda
+              ? $t("reportes.demanda.subtituloAgenda")
+              : $t("reportes.demanda.subtitulo")
+          }}
         </p>
         <p
-          v-if="!demanda || demanda.matriz.length === 0"
+          v-if="porAgenda && demanda?.totales.utilizacion_pct != null"
+          class="mt-2 text-sm"
+          data-prueba="resumen-agenda"
+        >
+          {{
+            $t("reportes.demanda.resumenAgenda", {
+              pct: pct(demanda.totales.utilizacion_pct ?? null),
+              agendadas: horas(demanda.totales.agendado_min ?? 0),
+              disponibles: horas(demanda.totales.disponible_min ?? 0),
+            })
+          }}
+        </p>
+        <p
+          v-if="!demanda || celdasDemanda.length === 0"
           class="mt-3 text-sm"
           :style="{ color: 'var(--texto-suave)' }"
         >
@@ -1052,12 +1318,13 @@ onMounted(cargar);
                       class="relative rounded-lg py-1.5 text-xs font-semibold"
                       :style="{
                         background: colorOcupacion(
-                          celdaDemanda(dia, h)!.ocupacion_pct,
+                          valorCelda(celdaDemanda(dia, h)!),
                         ),
                       }"
-                      :title="`${celdaDemanda(dia, h)!.confirmadas}/${celdaDemanda(dia, h)!.capacidad}`"
+                      :title="detalleCelda(celdaDemanda(dia, h)!)"
+                      :data-prueba="`celda-${dia}-${h}`"
                     >
-                      {{ pct(celdaDemanda(dia, h)!.ocupacion_pct) }}
+                      {{ pct(valorCelda(celdaDemanda(dia, h)!)) }}
                       <span
                         v-if="celdaDemanda(dia, h)!.espera > 0"
                         class="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full"
@@ -1071,7 +1338,11 @@ onMounted(cargar);
             </table>
           </div>
           <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("reportes.demanda.leyenda") }}
+            {{
+              porAgenda
+                ? $t("reportes.demanda.leyendaAgenda")
+                : $t("reportes.demanda.leyenda")
+            }}
           </p>
 
           <!-- Por actividad -->
@@ -1153,3 +1424,22 @@ onMounted(cargar);
     </template>
   </section>
 </template>
+
+<style scoped>
+.re-ocupacion {
+  min-width: 8rem;
+}
+.re-barra {
+  display: block;
+  height: 0.25rem;
+  margin-top: 0.3rem;
+  border-radius: 999px;
+  background: var(--borde);
+  overflow: hidden;
+}
+.re-barra > span {
+  display: block;
+  height: 100%;
+  background: var(--primario);
+}
+</style>

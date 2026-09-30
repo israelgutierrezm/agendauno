@@ -74,7 +74,9 @@ el esquema.
 - `plantillas_horario`, `excepciones_horario` — clases recurrentes y sus cambios.
 - `sesiones` — cada clase o cita con fecha, en UTC; se materializan desde las
   plantillas (ADR 0010).
-- `asignaciones_sesion` — profesionales de una sesión.
+- `asignaciones_sesion` — personal de una sesión (instructor, asistente, sustituto);
+  el profesional de la sesión (`sesiones.instructor_id`) la imparte y cobra aunque no
+  esté aquí, salvo que lo reemplace un sustituto (ADR 0081).
 - `bloqueos_agenda` — días u horas sin servicio (ADR 0037).
 - `grupos`, `inscripciones_grupo` — grupos fijos.
 - `reglas_capacidad_canal` — lugares por canal.

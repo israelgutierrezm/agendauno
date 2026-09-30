@@ -16,9 +16,11 @@ use Illuminate\Support\Collection;
 
 /**
  * Calcula la nomina del staff en un periodo (R17): por cada esquema de pago activo,
- * toma las sesiones (no canceladas) que el staff impartio en el rango (via
- * asignaciones_sesion) y aplica su tipo: por clase (numero de sesiones), por asistente
- * (presentes) o por hora (horas de clase). Opera sobre la BD del tenant resuelto.
+ * toma las sesiones (no canceladas) que el staff trabajo en el rango y aplica su tipo:
+ * por clase (numero de sesiones), por asistente (presentes) o por hora (horas de
+ * clase). Trabajo una sesion quien es su profesional o esta asignado como personal,
+ * salvo que un sustituto lo reemplace ({@see PersonalDeSesionTenant}, ADR 0081).
+ * Opera sobre la BD del tenant resuelto.
  */
 class CalcularNominaTenant
 {
@@ -55,15 +57,20 @@ class CalcularNominaTenant
      */
     private function sesionesDe(int $usuarioId, CarbonImmutable $inicio, CarbonImmutable $fin): Collection
     {
-        return AsignacionSesionTenant::query()
-            ->where('usuario_id', $usuarioId)
-            ->whereHas('sesion', fn ($q) => $q
-                ->whereBetween('inicia_en', [$inicio, $fin])
-                ->where('estado', '!=', EstadoSesionTenant::Cancelada->value))
-            ->with('sesion')
-            ->get()
-            ->pluck('sesion')
-            ->filter()
+        $sesiones = SesionTenant::query()
+            ->whereBetween('inicia_en', [$inicio, $fin])
+            ->where('estado', '!=', EstadoSesionTenant::Cancelada->value)
+            ->where(fn ($q) => $q
+                ->where('instructor_id', $usuarioId)
+                ->orWhereIn('id', AsignacionSesionTenant::query()->where('usuario_id', $usuarioId)->select('sesion_id')))
+            ->get();
+        $asignaciones = AsignacionSesionTenant::query()->whereIn('sesion_id', $sesiones->pluck('id'))->get()->groupBy('sesion_id');
+
+        return $sesiones
+            ->filter(fn (SesionTenant $s): bool => array_key_exists(
+                $usuarioId,
+                PersonalDeSesionTenant::participantes($s, $asignaciones->get($s->id) ?? collect()),
+            ))
             ->values();
     }
 

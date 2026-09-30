@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\OcupacionDeAgendaTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\AsistenciaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -20,10 +22,14 @@ use Illuminate\Http\Request;
  * Reporte de negocio del estudio (R29): métricas de un periodo — ingresos, órdenes
  * pagadas, ocupación, no-show, alumnos activos y ARPU — calculadas desde los datos
  * del propio tenant (consultas agregadas, sin N+1). Montos en minor (entero).
+ *
+ * `ocupacion_agenda_pct` es la ocupación de la agenda de quienes atienden (horas
+ * agendadas entre las disponibles, ADR 0081): la que importa en negocios de citas,
+ * donde el cupo de cada cita es 1.
  */
 class ReporteNegocioTenantController
 {
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request, OcupacionDeAgendaTenant $ocupacion): JsonResponse
     {
         $validado = $request->validate([
             'desde' => ['required', 'date'],
@@ -62,6 +68,13 @@ class ReporteNegocioTenantController
         $ausentes = AsistenciaTenant::query()->whereIn('reserva_id', $reservaIds)->where('estado', EstadoAsistencia::Ausente->value)->count();
         $marcadas = $presentes + $ausentes;
 
+        $agenda = $ocupacion->calcular($validado['desde'], $validado['hasta'], SesionTenant::query()
+            ->whereBetween('inicia_en', [$inicio, $fin])
+            ->where('estado', '!=', EstadoSesionTenant::Cancelada->value)
+            ->get())['por_profesional'];
+        $disponible = array_sum(array_column($agenda, 'disponible'));
+        $agendado = array_sum(array_column($agenda, 'agendado'));
+
         return response()->json(['data' => [
             'periodo' => ['desde' => $validado['desde'], 'hasta' => $validado['hasta']],
             'moneda' => $moneda,
@@ -71,6 +84,7 @@ class ReporteNegocioTenantController
             'capacidad_total' => $capacidad,
             'confirmadas' => $confirmadas,
             'ocupacion_pct' => $capacidad > 0 ? (int) round($confirmadas / $capacidad * 100) : null,
+            'ocupacion_agenda_pct' => OcupacionDeAgendaTenant::porcentaje($agendado, $disponible),
             'presentes' => $presentes,
             'ausentes' => $ausentes,
             'no_show_pct' => $marcadas > 0 ? (int) round($ausentes / $marcadas * 100) : null,
