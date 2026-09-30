@@ -13,7 +13,7 @@ const props = withDefaults(
   defineProps<{
     nombre: string;
     foto?: string | null;
-    tam?: "md" | "lg" | "xl";
+    tam?: "md" | "lg";
   }>(),
   { foto: null, tam: "lg" },
 );
@@ -112,12 +112,6 @@ onBeforeUnmount(() => window.removeEventListener("keydown", alTeclear));
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
   opacity: 0;
   transition: opacity 0.15s ease;
-}
-.fa-foto--xl .fa-lupa {
-  right: 0;
-  bottom: 0;
-  width: 1.8rem;
-  height: 1.8rem;
 }
 .fa-foto--md .fa-lupa {
   width: 1.3rem;

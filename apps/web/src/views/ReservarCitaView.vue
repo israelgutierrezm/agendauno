@@ -1291,7 +1291,7 @@ onMounted(cargar);
                       <FotoAmpliable
                         :nombre="b.nombre"
                         :foto="b.foto_url"
-                        tam="xl"
+                        tam="lg"
                       />
                       <span class="rc-profesional-nombre">{{
                         nombreTarjeta(b)
@@ -1813,23 +1813,28 @@ onMounted(cargar);
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
 }
+/* Mismo alto que las dos opciones de arriba: foto del tamaño de su círculo y
+   el mismo relleno. */
 .rc-profesionales {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
   gap: 0.75rem;
+}
+.rc-profesional,
+.rc-quien-tarjeta {
+  min-height: 5.35rem;
 }
 .rc-profesional {
   position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.85rem 0.5rem 0.75rem;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.75rem 0.9rem;
   border: 1px solid var(--borde);
   border-radius: 12px;
   background: var(--superficie);
   cursor: pointer;
-  text-align: center;
 }
 .rc-profesional:hover {
   border-color: var(--primario);
@@ -1844,7 +1849,7 @@ onMounted(cargar);
   outline-offset: 3px;
 }
 .rc-profesional-nombre {
-  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1873,7 +1878,6 @@ onMounted(cargar);
   background: var(--superficie);
 }
 .rc-quien-tarjeta {
-  min-height: 0;
   padding: 0.75rem 0.9rem;
 }
 .rc-quien-tarjeta .reserva-eleccion-texto {
