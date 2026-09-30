@@ -5,7 +5,8 @@
 - **Base**: monolito modular, una base por negocio, identidad por negocio, RBAC con
   alcance, bitácora, outbox.
 - **Núcleo comercial**: catálogo, membresías, derechos, ledger de créditos, órdenes,
-  pagos y reembolsos idempotentes, tres pasarelas, pago automático, conciliación.
+  pagos y reembolsos idempotentes, tres pasarelas, pago automático, conciliación
+  de cobros y de la tarjeta del pago automático (ADR 0053, 0076).
 - **Agenda y reservas**: clases y citas, series, recursos, bloqueos, lista de
   espera, reprogramar, cancelaciones, pase de lista, QR.
 - **Fase 1 (operación)** y **fase 2 (agenda cotidiana)** cerradas (ADR 0035–0046).
@@ -59,8 +60,6 @@
 
 ## Después
 
-- Conciliar el guardado de tarjeta de Stripe (pago automático) cuando no llega su
-  aviso; hoy la conciliación cubre los cobros.
 - WhatsApp: si conviene, número propio por negocio o cobrarlo como extra del plan
   (ADR 0069); atender las respuestas de los clientes (ADR 0074).
 - Separar «editar» y «eliminar» en el catálogo de permisos.

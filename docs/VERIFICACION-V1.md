@@ -144,6 +144,9 @@ aviso; nunca cobra ni cancela.
   2 horas después) mientras la referencia esté vigente; al pagarse, se confirma.
 - [ ] Deja vencer una sesión sin pagar: el intento queda cerrado y la compra sigue
   en «Por pagar».
+- [ ] Con el webhook de Stripe roto, la alumna activa el pago automático y autoriza
+  su tarjeta (ADR 0076). En 10–25 minutos «Pago automático» muestra la tarjeta y la
+  membresía queda activa; la bitácora registra «tarjeta.conciliada».
 - [ ] Restaura el webhook y reenvía un aviso ya conciliado: no se duplica nada.
 
 ### 7. Reembolso y conciliación

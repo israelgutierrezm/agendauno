@@ -18,11 +18,12 @@ interface PasarelaDomiciliable
 {
     /**
      * Página de la pasarela donde el cliente autoriza su tarjeta, sin cobrar. Al
-     * terminar, la pasarela avisa por webhook con la tarjeta y la `metadata`.
+     * terminar, la pasarela avisa por webhook con la tarjeta y la `metadata`. La
+     * `referencia` de la sesión permite conciliarla si el aviso no llega (ADR 0076).
      *
      * @param  array<string, string>  $metadata
      * @param  array<string, string>  $llaves
-     * @return array{tipo: string, url: string}
+     * @return array{tipo: string, url: string, referencia?: string}
      */
     public function iniciarGuardado(PersonaTenant $persona, ?string $retorno, array $metadata, array $llaves): array;
 

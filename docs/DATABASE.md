@@ -101,7 +101,8 @@ el esquema.
 - `reembolsos` (ADR 0029), `incidencias_cobro` (ADR 0030).
 - `configuraciones_pasarela` — llaves cifradas por pasarela (ADR 0014, 0021).
 - `clientes_pasarela`, `domiciliaciones`, `procesos_dunning` — cobro automático
-  (ADR 0020).
+  (ADR 0020); `sesiones_tarjeta` — sesiones de Stripe para autorizar la tarjeta, por
+  conciliar si su aviso no llega (ADR 0076).
 - `datos_fiscales`, `facturas` — facturación del negocio a sus clientes.
 - `promociones` — descuentos.
 

@@ -141,7 +141,7 @@ class PasarelaStripeTenant implements PasarelaCancelable, PasarelaConsultable, P
 
         $sesion = $api->crearSesionGuardado(self::cliente($persona, $api), $urls['exito'], $urls['cancelado'], $metadata);
 
-        return ['tipo' => 'redirect', 'url' => $sesion['url']];
+        return ['tipo' => 'redirect', 'url' => $sesion['url'], 'referencia' => $sesion['id']];
     }
 
     public function cobrarDomiciliado(PagoTenant $pago, DomiciliacionTenant $domiciliacion, string $idempotencia, array $llaves): ResultadoPago

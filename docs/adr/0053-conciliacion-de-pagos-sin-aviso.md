@@ -59,5 +59,5 @@ Solo los reembolsos y los cobros de suscripciones se conciliaban solos.
 - Consultas extra a la pasarela: una por intento en Stripe y Mercado Pago cuando se
   cierra con su confirmación; los pagos en tienda se consultan hasta que se resuelven
   o vence su referencia.
-- Las sesiones de Stripe en modo `setup` (autorizar tarjeta sin pagar) no son pagos
-  y no se concilian: si su aviso se pierde, la persona vuelve a autorizar la tarjeta.
+- Las sesiones de Stripe en modo `setup` (autorizar tarjeta sin pagar) no son pagos;
+  se concilian aparte desde el ADR 0076.

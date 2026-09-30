@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Models\ClientePasarelaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\SesionTarjetaTenant;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\Pasarelas\TarjetaGuardada;
 
@@ -19,7 +20,8 @@ use App\Modules\Tenancy\Pasarelas\TarjetaGuardada;
  * con `domiciliar`), la tarjeta pasa a cobrar sus membresías domiciliadas.
  *
  * La persona se identifica por su cliente de Stripe (no por la metadata); solo se
- * domicilian membresías suyas.
+ * domicilian membresías suyas. Si el aviso no llega, la conciliación hace lo mismo
+ * ({@see ConciliarTarjetasStripe}, ADR 0076).
  */
 class TarjetasStripe
 {
@@ -45,6 +47,11 @@ class TarjetasStripe
             return;
         }
         $datos = (new ClienteStripe($secretKey))->tarjetaDeSesion($sesionId);
+        // Ya se sabe cómo terminó: la conciliación no vuelve a preguntar.
+        SesionTarjetaTenant::query()
+            ->where('referencia', $sesionId)
+            ->where('estado', SesionTarjetaTenant::PENDIENTE)
+            ->update(['estado' => SesionTarjetaTenant::COMPLETADA, 'revisada_en' => now()]);
         if ($datos === null) {
             return;
         }

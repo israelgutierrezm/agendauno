@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Models\EventoOutboxTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
+use App\Modules\Tenancy\Models\SesionTarjetaTenant;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -51,7 +52,7 @@ beforeEach(function (): void {
             $modo = $stripe->modo[$m[1]] ?? 'payment';
 
             return Http::response([
-                'id' => $m[1], 'mode' => $modo, 'customer' => 'cus_1',
+                'id' => $m[1], 'mode' => $modo, 'customer' => 'cus_1', 'status' => $stripe->estadoSesion ?? 'complete',
                 'metadata' => $stripe->metadata ?? [],
                 'setup_intent' => $modo === 'setup' ? ['id' => 'seti_1', 'payment_method' => $metodo] : null,
                 'payment_intent' => $modo === 'payment' ? ['id' => 'pi_compra', 'setup_future_usage' => 'off_session', 'payment_method' => $metodo] : null,
@@ -336,4 +337,45 @@ it('el negocio ve quién paga en automático, lo invita a activarlo o se lo quit
     $this->deleteJson("/api/v1/app/{$m['slug']}/suscripciones/{$m['acuerdo']}/pago-automatico", [], conBearer($m['bearer']))->assertOk();
     $this->getJson("/api/v1/app/{$m['slug']}/suscripciones", conBearer($m['bearer']))
         ->assertJsonPath('data.0.pago_automatico', null);
+});
+
+it('si el aviso de Stripe no llega, la conciliación registra la tarjeta del pago automático', function (): void {
+    $m = alumnoConMembresia();
+    $this->postJson("/api/v1/app/{$m['slug']}/mi/pago-automatico/{$m['acuerdo']}", [], conBearer($m['alumno']))
+        ->assertOk()->assertJsonPath('data.estado', 'redirect');
+    $this->stripe->metadata = ['acuerdos' => $m['acuerdo']];
+    $consultas = fn (): int => Http::recorded(fn (Request $r): bool => $r->method() === 'GET' && str_contains($r->url(), '/checkout/sessions/'))->count();
+
+    // Primero se le da tiempo al aviso.
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
+    expect($consultas())->toBe(0);
+
+    $this->travel(11)->minutes();
+    $this->artisan('agendauno:conciliar-pagos')->expectsOutputToContain('Tarjetas registradas: 1.')->assertSuccessful();
+
+    $pago = $this->getJson("/api/v1/app/{$m['slug']}/mi/pago-automatico", conBearer($m['alumno']))->assertOk()->json('data');
+    expect($pago['tarjeta'])->toBe(['marca' => 'visa', 'ultimos4' => '4242', 'expira' => '08/30'])
+        ->and($pago['membresias'][0]['automatico'])->toBeTrue()
+        ->and(enEstudioPago($m, fn () => SesionTarjetaTenant::query()->value('estado')))->toBe('completada');
+
+    // Ya se sabe cómo terminó: no se vuelve a preguntar.
+    $antes = $consultas();
+    $this->travel(20)->minutes();
+    $this->artisan('agendauno:conciliar-pagos')->expectsOutputToContain('Tarjetas registradas: 0.')->assertSuccessful();
+    expect($consultas())->toBe($antes);
+});
+
+it('con el aviso de Stripe la sesión queda resuelta y una que venció se deja de revisar', function (): void {
+    $m = alumnoConMembresia();
+    autorizarTarjeta($m);
+    expect(enEstudioPago($m, fn () => SesionTarjetaTenant::query()->value('estado')))->toBe('completada');
+
+    // Otra sesión que el alumno abrió y no terminó: Stripe la vence.
+    $this->postJson("/api/v1/app/{$m['slug']}/mi/pago-automatico/tarjeta", [], conBearer($m['alumno']))->assertOk();
+    $this->stripe->estadoSesion = 'expired';
+    $this->travel(11)->minutes();
+    $this->artisan('agendauno:conciliar-pagos')->assertSuccessful();
+
+    expect(enEstudioPago($m, fn () => SesionTarjetaTenant::query()->orderBy('id')->pluck('estado')->all()))
+        ->toBe(['completada', 'expirada']);
 });

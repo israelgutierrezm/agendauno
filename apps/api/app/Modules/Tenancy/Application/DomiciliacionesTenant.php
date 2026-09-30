@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\ClientePasarelaTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\SesionTarjetaTenant;
 use App\Modules\Tenancy\Pasarelas\PasarelaConSuscripcion;
 use App\Modules\Tenancy\Pasarelas\PasarelaDomiciliable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
@@ -132,6 +133,7 @@ class DomiciliacionesTenant
             ['persona' => (string) $persona->ulid, 'acuerdos' => (string) $acuerdo->ulid],
             $this->registro->llaves($proveedor),
         );
+        $this->recordarSesion($persona, $proveedor, $checkout);
 
         return ['estado' => 'redirect', 'url' => $checkout['url']];
     }
@@ -153,8 +155,26 @@ class DomiciliacionesTenant
             ['persona' => (string) $persona->ulid, 'acuerdos' => ''],
             $this->registro->llaves($proveedor),
         );
+        $this->recordarSesion($persona, $proveedor, $checkout);
 
         return ['url' => $checkout['url']];
+    }
+
+    /**
+     * La sesión queda pendiente para conciliarla si su aviso no llega (ADR 0076).
+     *
+     * @param  array{tipo: string, url: string, referencia?: string}  $checkout
+     */
+    private function recordarSesion(PersonaTenant $persona, string $proveedor, array $checkout): void
+    {
+        $referencia = (string) ($checkout['referencia'] ?? '');
+        if ($referencia === '') {
+            return;
+        }
+        SesionTarjetaTenant::query()->firstOrCreate(
+            ['referencia' => $referencia],
+            ['persona_id' => $persona->getKey(), 'proveedor' => $proveedor, 'estado' => SesionTarjetaTenant::PENDIENTE],
+        );
     }
 
     /**
