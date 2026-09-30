@@ -11,6 +11,7 @@ import '../../cuenta/presentation/tarjeta_principal.dart';
 import '../../perfil/presentation/perfil_screen.dart';
 import '../data/inicio_repository.dart';
 import '../data/resumen_hoy.dart';
+import 'resumen_mes_card.dart';
 
 enum PestanaEquipo { inicio, agenda }
 
@@ -118,7 +119,10 @@ class _InicioNegocio extends ConsumerWidget {
         final enCurso = agenda?.enCurso != null;
 
         return RefreshIndicator(
-          onRefresh: () => ref.refresh(resumenHoyProvider.future),
+          onRefresh: () {
+            ref.invalidate(resumenMesProvider);
+            return ref.refresh(resumenHoyProvider.future);
+          },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
@@ -181,6 +185,18 @@ class _InicioNegocio extends ConsumerWidget {
               if (hoy != null &&
                   (hoy.cobros != null || hoy.renovaciones != null))
                 _Pendientes(hoy: hoy),
+              // Los números del mes, para quien los ve (ADR 0081).
+              ...switch (ref.watch(resumenMesProvider)) {
+                AsyncData(:final value?) => [
+                  ResumenMesCard(
+                    mes: value,
+                    clientes: terminos.miembros,
+                    hoy: DateTime.now(),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _ => const <Widget>[],
+              },
               const SizedBox(height: 4),
               RejillaAccesos([
                 if (verAgenda)
