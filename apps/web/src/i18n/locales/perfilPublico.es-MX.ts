@@ -138,6 +138,8 @@ export default {
     verHorariosDe: "Ver horarios de",
     todoElEquipo: "Todo el equipo",
     cualquierProfesional: "Cualquier profesional",
+    alguienEspecifico: "Elegir a alguien específico",
+    seleccionaProfesionista: "Selecciona un profesionista",
     quienTeAtiende: "¿Quién te atiende?",
     libresALas: "Libres a las {hora}.",
     pasosEtiqueta: "Pasos para agendar",

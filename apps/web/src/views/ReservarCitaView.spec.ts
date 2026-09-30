@@ -487,6 +487,7 @@ describe("agenda pública por pasos", () => {
     const vista = montar();
     await flushPromises();
     await hastaHorario(vista);
+    await vista.get('[data-prueba="filtro-alguien"] input').setValue();
     await vista
       .get('[data-prueba="filtro-luis"] input[type="radio"]')
       .setValue();
@@ -510,7 +511,7 @@ describe("agenda pública por pasos", () => {
     vista.unmount();
   });
 
-  it("ver horarios de muestra a cada profesional con su foto y la lupa la abre en grande", async () => {
+  it("ver horarios de: todo el equipo o alguien específico, elegido por su foto (la lupa la abre en grande)", async () => {
     api(opciones(1));
     const vista = montar();
     await flushPromises();
@@ -519,9 +520,29 @@ describe("agenda pública por pasos", () => {
     const tarjetas = vista.get('[data-prueba="ver-horarios-de"]');
     expect(tarjetas.text()).toContain("Todo el equipo");
     expect(tarjetas.text()).toContain("Cualquier profesional");
+    expect(tarjetas.text()).toContain("Elegir a alguien específico");
+    // Con todo el equipo no se piden fotos.
+    expect(vista.find('[data-prueba="filtro-ana"]').exists()).toBe(false);
+
+    // Alguien específico: queda el primero y se ven todos por su primer nombre.
+    await vista.get('[data-prueba="filtro-alguien"] input').setValue();
+    await flushPromises();
+    expect(mocks.get).toHaveBeenCalledWith(
+      "/api/v1/app/demo/citas/disponibilidad",
+      { params: expect.objectContaining({ instructor_id: "ana" }) },
+    );
+    expect(
+      vista.get('[data-prueba="filtro-ana"] .rc-profesional-nombre').text(),
+    ).toBe("Ana");
+    expect(
+      vista.get('[data-prueba="filtro-luis"] .rc-profesional-nombre').text(),
+    ).toBe("Luis");
     expect(vista.get('[data-prueba="filtro-ana"] img').attributes("src")).toBe(
       "/storage/ana.webp",
     );
+    await vista
+      .get('[data-prueba="filtro-luis"] input[type="radio"]')
+      .setValue();
     // Sin foto no hay nada que ampliar.
     expect(
       vista
@@ -540,7 +561,7 @@ describe("agenda pública por pasos", () => {
     expect(grande?.textContent).toContain("Ana Pérez");
     expect(
       (
-        vista.get('[data-prueba="filtro-todos"] input')
+        vista.get('[data-prueba="filtro-luis"] input')
           .element as HTMLInputElement
       ).checked,
     ).toBe(true);
@@ -563,9 +584,7 @@ describe("agenda pública por pasos", () => {
     await flushPromises();
     await vista.get('input[value="centro"]').setValue();
     await hastaHorario(vista);
-    await vista
-      .get('[data-prueba="filtro-ana"] input[type="radio"]')
-      .setValue();
+    await vista.get('[data-prueba="filtro-alguien"] input').setValue();
     await flushPromises();
     // Vuelve a la sede desde el mapa de pasos y elige otra.
     await vista.get('button[data-paso="sucursal"]').trigger("click");
