@@ -1,5 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
 import es from "@/i18n/locales/es-MX";
@@ -46,8 +46,66 @@ beforeEach(() => {
   vi.clearAllMocks();
   api.get.mockResolvedValue({ data: { data: dias } });
 });
+afterEach(() => w?.unmount());
 
 describe("calendario de días", () => {
+  it("las flechas desplazan las fechas sin cambiar el día seleccionado", async () => {
+    w = montar();
+    const tira = w.get('[data-prueba="dias"]').element;
+    const scrollBy = vi.fn();
+    Object.defineProperties(tira, {
+      clientWidth: { value: 300 },
+      scrollWidth: { value: 1200 },
+      scrollLeft: { value: 0, writable: true },
+      scrollBy: { value: scrollBy },
+    });
+    await flushPromises();
+    const atras = w.get('[aria-label="Ver días anteriores"]');
+    const adelante = w.get('[aria-label="Ver días siguientes"]');
+    expect(atras.attributes("disabled")).toBeDefined();
+    expect(adelante.attributes("disabled")).toBeUndefined();
+    const seleccion = w.emitted("update:modelValue")?.length;
+    await adelante.trigger("click");
+    expect(scrollBy).toHaveBeenCalledWith(
+      expect.objectContaining({ left: 225 }),
+    );
+    expect(w.emitted("update:modelValue")?.length).toBe(seleccion);
+    tira.scrollLeft = 900;
+    await w.get('[data-prueba="dias"]').trigger("scroll");
+    expect(adelante.attributes("disabled")).toBeDefined();
+    await atras.trigger("click");
+    expect(scrollBy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ left: -225 }),
+    );
+  });
+
+  it("anuncia la fecha completa y si el negocio no atiende ese día", async () => {
+    w = montar();
+    await flushPromises();
+    expect(
+      w.get('[data-fecha="2030-01-06"]').attributes("aria-label"),
+    ).toContain("6 de enero de 2030, Sin atención");
+    expect(
+      w.get('[data-fecha="2030-01-07"]').attributes("aria-label"),
+    ).toContain("7 de enero de 2030");
+  });
+
+  it("descarta la respuesta anterior si se quita la sucursal mientras carga", async () => {
+    let responder!: (value: { data: { data: typeof dias } }) => void;
+    api.get.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          responder = resolve;
+        }),
+    );
+    w = montar();
+    await w.setProps({ sucursalId: "" });
+    responder({ data: { data: dias } });
+    await flushPromises();
+    expect(w.findAll("[data-fecha]")).toHaveLength(0);
+    expect(w.emitted("update:modelValue")).toBeUndefined();
+  });
+
   it("pide los días de la sede, no deja elegir los que no tienen atención y abre en el primero que sí", async () => {
     w = montar();
     await flushPromises();

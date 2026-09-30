@@ -687,7 +687,10 @@ onMounted(cargar);
       >
     </section>
 
-    <section v-else-if="opciones" class="mx-auto max-w-2xl px-4 py-10">
+    <section
+      v-else-if="opciones"
+      class="rc-contenedor mx-auto px-4 py-8 sm:py-10"
+    >
       <p
         v-if="retornoPago"
         class="mb-4 rounded-xl p-3 text-sm"
@@ -992,6 +995,7 @@ onMounted(cargar);
               type="button"
               class="rc-paso-marca"
               :data-paso="p"
+              :aria-label="$t(`perfilPublico.agendar.pasos.${p}`)"
               @click="volverA(p)"
             >
               <span class="rc-paso-num"
@@ -1187,7 +1191,7 @@ onMounted(cargar);
             >
               {{ $t("reservar.sinProfesionales") }}
             </p>
-            <div v-else class="tu-card p-5">
+            <div v-else class="tu-card rc-panel-horario">
               <p class="rc-contexto" data-prueba="contexto">
                 {{ servicioSel?.nombre
                 }}<template v-if="variasSedes && sucursalSel">
@@ -1225,14 +1229,11 @@ onMounted(cargar);
                       <strong>{{
                         $t("perfilPublico.agendar.todoElEquipo")
                       }}</strong>
-                      <span class="block text-xs font-normal rc-suave">{{
-                        $t("perfilPublico.agendar.cualquierProfesional")
-                      }}</span>
                     </span>
                     <input
                       type="radio"
                       name="ver-horarios-de"
-                      class="rc-quien-radio"
+                      class="rc-oculto"
                       :checked="!conAlguien"
                       @change="verTodos"
                     />
@@ -1249,14 +1250,11 @@ onMounted(cargar);
                       <strong>{{
                         $t("perfilPublico.agendar.alguienEspecifico")
                       }}</strong>
-                      <span class="block text-xs font-normal rc-suave">{{
-                        $t("perfilPublico.agendar.seleccionaProfesionista")
-                      }}</span>
                     </span>
                     <input
                       type="radio"
                       name="ver-horarios-de"
-                      class="rc-quien-radio"
+                      class="rc-oculto"
                       :checked="conAlguien"
                       @change="verAlguien"
                     />
@@ -1291,7 +1289,7 @@ onMounted(cargar);
                       <FotoAmpliable
                         :nombre="b.nombre"
                         :foto="b.foto_url"
-                        tam="lg"
+                        tam="xl"
                       />
                       <span class="rc-profesional-nombre">{{
                         nombreTarjeta(b)
@@ -1342,6 +1340,7 @@ onMounted(cargar);
                       :key="s.inicia"
                       type="button"
                       class="rc-hora border"
+                      :aria-pressed="slotSel === s.inicia"
                       :style="
                         slotSel === s.inicia
                           ? {
@@ -1751,6 +1750,20 @@ onMounted(cargar);
 </template>
 
 <style scoped>
+.rc-contenedor {
+  max-width: 66rem;
+}
+.rc-panel-horario {
+  padding: clamp(1rem, 3vw, 1.75rem);
+}
+.rc-panel-horario .tu-label {
+  margin-bottom: 0.65rem;
+  font-size: 0.95rem;
+}
+.rc-panel-horario .rc-contexto {
+  margin-bottom: 1.35rem;
+  font-size: 0.95rem;
+}
 .reserva-opciones legend {
   float: left;
   width: 100%;
@@ -1788,7 +1801,7 @@ onMounted(cargar);
   background: var(--primario-suave);
   box-shadow: inset 0 0 0 1px var(--primario);
 }
-.reserva-eleccion:focus-within {
+.reserva-eleccion:has(:focus-visible) {
   outline: 2px solid var(--primario);
   outline-offset: 3px;
 }
@@ -1806,35 +1819,41 @@ onMounted(cargar);
   font-size: 0.9rem;
 }
 
-/* Ver horarios de: dos tarjetas (todo el equipo o alguien), el círculo a la
-   derecha; con alguien, sus fotos en tarjetas pequeñas. */
+/* Selector compacto de dos opciones, sin repetir las instrucciones. */
 .rc-modo {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: 0;
 }
-/* Mismo alto que las dos opciones de arriba: foto del tamaño de su círculo y
-   el mismo relleno. */
 .rc-profesionales {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-  gap: 0.75rem;
-}
-.rc-profesional,
-.rc-quien-tarjeta {
-  min-height: 5.35rem;
+  display: flex;
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.2rem 0.65rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--borde) transparent;
 }
 .rc-profesional {
   position: relative;
   display: flex;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
+  flex: 1 0 8.5rem;
   min-width: 0;
-  padding: 0.75rem 0.9rem;
+  max-width: 13rem;
+  padding: 0.75rem;
   border: 1px solid var(--borde);
   border-radius: 12px;
   background: var(--superficie);
   cursor: pointer;
+  text-align: center;
+  scroll-snap-align: start;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
 }
 .rc-profesional:hover {
   border-color: var(--primario);
@@ -1844,16 +1863,16 @@ onMounted(cargar);
   background: var(--primario-suave);
   box-shadow: inset 0 0 0 1px var(--primario);
 }
-.rc-profesional:focus-within {
+.rc-profesional:has(:focus-visible) {
   outline: 2px solid var(--primario);
   outline-offset: 3px;
 }
 .rc-profesional-nombre {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.9rem;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+  line-height: 1.3;
 }
 /* El círculo de la opción no se ve: toda la tarjeta es la opción. */
 .rc-oculto {
@@ -1866,26 +1885,55 @@ onMounted(cargar);
 /* Horas en cuadrícula pareja. */
 .rc-horas {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(5.25rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
   gap: 0.6rem;
 }
 .rc-hora {
+  min-height: 44px;
   padding: 0.6rem 0.5rem;
   border-radius: 10px;
   font-size: 0.9rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   background: var(--superficie);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+.rc-hora:hover {
+  border-color: var(--primario) !important;
+  background: var(--primario-suave);
+}
+.rc-hora:focus-visible {
+  outline: 2px solid var(--primario);
+  outline-offset: 3px;
 }
 .rc-quien-tarjeta {
-  padding: 0.75rem 0.9rem;
+  position: relative;
+  min-height: 3.6rem;
+  padding: 0.65rem 1rem;
+  justify-content: center;
+  gap: 0.75rem;
+  border-radius: 0 10px 10px 0;
+}
+.rc-quien-tarjeta:first-child {
+  border-radius: 10px 0 0 10px;
+}
+.rc-quien-tarjeta .rc-equipo {
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 0;
+  background: transparent;
+}
+.rc-quien-tarjeta.reserva-eleccion--activa .rc-equipo {
+  color: var(--primario);
 }
 .rc-quien-tarjeta .reserva-eleccion-texto {
-  flex: 1;
+  text-align: center;
 }
-.rc-quien-radio {
-  width: 1.1rem;
-  height: 1.1rem;
+.rc-quien-tarjeta .reserva-eleccion-texto strong {
+  font-size: 0.95rem;
 }
 .rc-equipo {
   display: inline-flex;
@@ -2075,9 +2123,24 @@ button.rc-paso-marca:hover .rc-paso-texto {
 }
 
 @media (max-width: 520px) {
-  .reserva-tarjetas,
-  .rc-modo {
+  .reserva-tarjetas {
     grid-template-columns: 1fr;
+  }
+  .rc-quien-tarjeta {
+    padding: 0.65rem 0.5rem;
+    gap: 0.4rem;
+  }
+  .rc-quien-tarjeta .reserva-eleccion-texto strong {
+    font-size: 0.8rem;
+  }
+  .rc-profesional {
+    flex-basis: 6.5rem;
+    padding: 0.75rem 0.5rem;
+  }
+  .rc-profesional :deep(.fa-foto--xl > img),
+  .rc-profesional :deep(.fa-foto--xl > span) {
+    width: 3.5rem;
+    height: 3.5rem;
   }
   /* En pantallas angostas solo se nombra el paso actual, que toma el espacio. */
   .rc-paso--actual {

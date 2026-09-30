@@ -13,7 +13,7 @@ const props = withDefaults(
   defineProps<{
     nombre: string;
     foto?: string | null;
-    tam?: "md" | "lg";
+    tam?: "md" | "lg" | "xl";
   }>(),
   { foto: null, tam: "lg" },
 );
