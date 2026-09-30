@@ -25,7 +25,8 @@ class RolesTenant
 
     /**
      * Todos los roles del negocio, del más amplio al más acotado: dueño, admin,
-     * recepción, los propios del equipo (por nombre), instructor y miembro.
+     * recepción, los propios del equipo (por nombre), instructor, los propios de
+     * quien imparte (ADR 0078) y miembro.
      *
      * @return array<string, Rol>
      */
@@ -50,10 +51,16 @@ class RolesTenant
             }
         }
 
+        $deEquipo = array_filter($propios, static fn (array $rol): bool => $rol['faceta'] !== 'instructor');
+        $deInstructor = array_filter($propios, static fn (array $rol): bool => $rol['faceta'] === 'instructor');
+
         $roles = [];
         foreach (CatalogoDePermisosTenant::jerarquia() as $clave) {
             if ($clave === 'instructor') {
-                $roles += $propios;
+                $roles += $deEquipo;
+            }
+            if ($clave === 'miembro') {
+                $roles += $deInstructor;
             }
             $roles[$clave] = [
                 'clave' => $clave,
@@ -65,6 +72,27 @@ class RolesTenant
         }
 
         return $this->leidos[$negocio] = $roles;
+    }
+
+    /**
+     * Las claves de los roles de una faceta, de sistema y propios. Con `instructor`:
+     * quienes imparten clases o atienden citas (ADR 0078).
+     *
+     * @return list<string>
+     */
+    public function clavesConFaceta(string $faceta): array
+    {
+        return array_keys(array_filter($this->todos(), static fn (array $rol): bool => $rol['faceta'] === $faceta));
+    }
+
+    /**
+     * ¿Alguno de esos roles es de esa faceta?
+     *
+     * @param  list<string>  $claves
+     */
+    public function tieneFaceta(array $claves, string $faceta): bool
+    {
+        return array_intersect($claves, $this->clavesConFaceta($faceta)) !== [];
     }
 
     /** Tras crear, editar o borrar un rol propio. */

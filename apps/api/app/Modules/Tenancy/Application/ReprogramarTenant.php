@@ -58,7 +58,7 @@ class ReprogramarTenant
             // Con otro profesional: debe atender citas (uno dado de baja ya no se encuentra).
             if ($instructorId !== null && $instructorId !== (int) $sesion->instructor_id) {
                 $profesional = Usuario::query()->find($instructorId);
-                if (! $profesional instanceof Usuario || ! in_array('instructor', $profesional->rolesEfectivos(), true)) {
+                if (! $profesional instanceof Usuario || ! $profesional->esProfesional()) {
                     throw new SesionNoReservable('Esa persona no atiende citas.');
                 }
             }

@@ -67,7 +67,7 @@ class OpcionesCitaTenant
                     )),
                 ])->values()->all(),
             'instructores' => Usuario::query()
-                ->whereJsonContains('roles', 'instructor')
+                ->profesionales()
                 ->orderBy('name')
                 ->get()
                 ->map(static fn (Usuario $u): array => [

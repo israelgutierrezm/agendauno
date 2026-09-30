@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Support;
 
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
+use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 
@@ -18,7 +19,10 @@ use App\Modules\Tenancy\Models\Usuario;
  */
 class AccesoSesionTenant
 {
-    public function __construct(private readonly ResolverAccesoTenant $acceso) {}
+    public function __construct(
+        private readonly ResolverAccesoTenant $acceso,
+        private readonly RolesTenant $roles,
+    ) {}
 
     public function puedeOperar(SesionTenant $sesion, ?Usuario $usuario): bool
     {
@@ -41,8 +45,8 @@ class AccesoSesionTenant
 
     /**
      * ¿El usuario es instructor ACOTADO (alcance limitado a sus propias sesiones)?
-     * Lo está si actúa como instructor sin un rol de staff amplio
-     * (propietario/admin/recepcionista): en una sesión cuenta solo su rol activo.
+     * Lo está si actúa con un rol de quien imparte (el de sistema o uno propio, ADR
+     * 0078) sin un rol del equipo: en una sesión cuenta solo su rol activo.
      */
     public function esInstructorAcotado(?Usuario $usuario): bool
     {
@@ -51,8 +55,7 @@ class AccesoSesionTenant
         }
 
         $roles = $usuario->rolesVigentes();
-        $amplios = ['propietario', 'admin', 'recepcionista'];
 
-        return in_array('instructor', $roles, true) && array_intersect($amplios, $roles) === [];
+        return $this->roles->tieneFaceta($roles, 'instructor') && ! $this->roles->tieneFaceta($roles, 'equipo');
     }
 }

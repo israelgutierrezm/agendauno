@@ -21,7 +21,8 @@ negocio a mano. El sistema propio ya decide todo con `puede()`.
     recepción, los propios, instructor y miembro.
   - Resuelve permisos, faceta y rol principal para cualquier rol.
   - Guarda lo leído por negocio mientras dura la petición o el trabajo.
-- **En V1, los roles propios son del equipo** (faceta `equipo`). Instructor y miembro
+- **En V1, los roles propios son del equipo** (faceta `equipo`; desde el ADR 0078
+  también pueden ser de quien imparte). Instructor y miembro
   tienen reglas propias: se le agenda como profesional, portal del alumno, alcance a
   sus clases. Quien imparte y además coordina tiene los dos roles y cambia entre ellos
   (rol activo).

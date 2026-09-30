@@ -125,7 +125,7 @@ class EscaparateController
     private function instructores(): array
     {
         return Usuario::query()
-            ->whereJsonContains('roles', 'instructor')
+            ->profesionales()
             ->orderBy('name')
             ->get()
             ->map(static fn (Usuario $u): array => ['nombre' => (string) $u->name, 'foto_url' => $u->fotoUrl()])

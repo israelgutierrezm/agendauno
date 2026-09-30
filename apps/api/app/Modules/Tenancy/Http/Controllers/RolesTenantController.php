@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Models\RolTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * «Roles y permisos»: los roles del negocio (los de sistema, de solo lectura, y los
@@ -56,7 +57,9 @@ class RolesTenantController
     public function store(Request $request): JsonResponse
     {
         $validado = $this->validar($request);
-        $rol = $this->gestionar->crear($this->actor($request), $validado['nombre'], $validado['permisos']);
+        // Del equipo o de quien imparte (ADR 0078); no cambia al editarlo.
+        $faceta = (string) ($request->validate(['faceta' => ['sometimes', 'string', Rule::in(GestionarRolesTenant::FACETAS)]])['faceta'] ?? 'equipo');
+        $rol = $this->gestionar->crear($this->actor($request), $validado['nombre'], $validado['permisos'], $faceta);
 
         return response()->json(['data' => $this->presentar($rol)], 201);
     }

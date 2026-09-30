@@ -17,6 +17,9 @@ use Illuminate\Validation\ValidationException;
  *   mismo tiene (evita quedarse fuera o subirse de nivel por la puerta de atrás);
  * - no se borra un rol que alguien tiene asignado.
  * Los roles de sistema no se tocan. Todo queda en la bitácora.
+ *
+ * Un rol propio es del equipo o de quien imparte (ADR 0078): el segundo agenda a la
+ * persona como profesional y la acota a sus sesiones. La faceta no cambia después.
  */
 class GestionarRolesTenant
 {
@@ -25,16 +28,27 @@ class GestionarRolesTenant
         private readonly RegistrarAuditoria $auditoria,
     ) {}
 
+    /** Las facetas que puede tener un rol propio. */
+    public const FACETAS = ['equipo', 'instructor'];
+
+    /**
+     * Lo mínimo de un rol de quien imparte: su portal muestra sus clases o citas.
+     */
+    private const MINIMO_INSTRUCTOR = ['agenda.ver'];
+
     /**
      * @param  list<string>  $permisos
      */
-    public function crear(Usuario $actor, string $nombre, array $permisos): RolTenant
+    public function crear(Usuario $actor, string $nombre, array $permisos, string $faceta = 'equipo'): RolTenant
     {
-        $permisos = $this->validar($actor, $nombre, $permisos, null);
+        if (! in_array($faceta, self::FACETAS, true)) {
+            throw ValidationException::withMessages(['faceta' => ['Un rol propio es del equipo o de quien imparte.']]);
+        }
+        $permisos = $this->validar($actor, $nombre, $permisos, null, $faceta);
         $rol = RolTenant::query()->create([
             'clave' => $this->claveNueva($nombre),
             'nombre' => trim($nombre),
-            'faceta' => 'equipo',
+            'faceta' => $faceta,
             'permisos' => $permisos,
         ]);
         $this->roles->olvidar();
@@ -49,7 +63,7 @@ class GestionarRolesTenant
     public function actualizar(Usuario $actor, RolTenant $rol, string $nombre, array $permisos): RolTenant
     {
         $this->exigirQuePuedaCambiarlo($actor, $rol);
-        $permisos = $this->validar($actor, $nombre, $permisos, $rol);
+        $permisos = $this->validar($actor, $nombre, $permisos, $rol, $rol->faceta);
         $antes = $this->datos($rol);
         $rol->update(['nombre' => trim($nombre), 'permisos' => $permisos]);
         $this->roles->olvidar();
@@ -90,7 +104,7 @@ class GestionarRolesTenant
      * @param  list<string>  $permisos
      * @return list<string>
      */
-    private function validar(Usuario $actor, string $nombre, array $permisos, ?RolTenant $rol): array
+    private function validar(Usuario $actor, string $nombre, array $permisos, ?RolTenant $rol, string $faceta): array
     {
         $nombre = trim($nombre);
         $repetido = RolTenant::query()
@@ -119,6 +133,11 @@ class GestionarRolesTenant
                     array_keys($incompletos),
                     $incompletos,
                 ),
+            ]);
+        }
+        if ($faceta === 'instructor' && array_diff(self::MINIMO_INSTRUCTOR, $permisos) !== []) {
+            throw ValidationException::withMessages([
+                'permisos' => ['Quien imparte necesita ver la agenda para ver sus clases o citas.'],
             ]);
         }
         $propios = $this->roles->permisosDe($actor->rolesVigentes());
@@ -155,10 +174,10 @@ class GestionarRolesTenant
     }
 
     /**
-     * @return array{nombre: string, permisos: list<string>}
+     * @return array{nombre: string, faceta: string, permisos: list<string>}
      */
     private function datos(RolTenant $rol): array
     {
-        return ['nombre' => $rol->nombre, 'permisos' => $rol->permisos];
+        return ['nombre' => $rol->nombre, 'faceta' => $rol->faceta, 'permisos' => $rol->permisos];
     }
 }

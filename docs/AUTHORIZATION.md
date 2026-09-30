@@ -18,7 +18,10 @@ datos (`docs/TENANCY.md`); dentro de ella decide el rol activo de la sesión.
 | `miembro` | miembro | Su cuenta: reservar, comprar, sus documentos |
 
 **Propios del negocio** (tabla `roles`, ADR 0057): el negocio los arma con los
-permisos del catálogo, p. ej. «Coordinación». En V1 son de la faceta equipo.
+permisos del catálogo, p. ej. «Coordinación». Son del equipo o de quien imparte
+(ADR 0078). Los de quien imparte necesitan `agenda.ver`, se agendan como
+profesional y quedan acotados a sus sesiones; la faceta no cambia después de crear
+el rol.
 
 La faceta decide qué parte de la app ve la sesión: el panel (equipo), el portal de
 quien imparte (instructor) o la cuenta del alumno (miembro).
@@ -33,6 +36,8 @@ servidor solo concede lo de ese rol (ADR 0055).
 - `$usuario->puede('permiso')` y el middleware `puede:permiso` usan el rol activo.
 - `rolesEfectivos()` dice lo que la persona ES (se le agenda como profesional, reglas
   del dueño); no se usa para conceder permisos.
+- «Es profesional» se decide por faceta, no por nombre: `Usuario::esProfesional()` y
+  la consulta `Usuario::profesionales()` (ADR 0078).
 
 ## Permisos
 
@@ -69,8 +74,8 @@ funcionan con su permiso mínimo y el menú muestra cada una solo con lo que su 
 
 - **Por sucursal** (`ResolverAccesoTenant`): un rol asignado en una sucursal
   (`asignaciones_personal`) concede sus permisos solo ahí.
-- **Por profesional** (`AccesoSesionTenant`): el instructor ve y opera solo sus
-  clases y citas.
+- **Por profesional** (`AccesoSesionTenant`): quien actúa con un rol de quien imparte
+  (el de sistema o uno propio) ve y opera solo sus clases y citas.
 - **El alumno** solo ve lo suyo (sus reservas, compras y documentos).
 - **Llaves de API**: alcances propios (`alcance:miembros.ver`), solo lectura.
 

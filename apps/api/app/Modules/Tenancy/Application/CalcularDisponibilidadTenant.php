@@ -115,7 +115,7 @@ class CalcularDisponibilidadTenant
         $diaSemana = (int) CarbonImmutable::parse($fecha, $zona)->isoWeekday();
 
         return Usuario::query()
-            ->whereJsonContains('roles', 'instructor')
+            ->profesionales()
             ->whereIn('id', HorarioAtencionTenant::query()
                 ->where('sucursal_id', $sucursal->getKey())
                 ->where('dia_semana', $diaSemana)
@@ -147,7 +147,7 @@ class CalcularDisponibilidadTenant
                 $instructorId !== null,
                 fn ($q) => $q->where('instructor_id', $instructorId),
                 // Todo el equipo: quienes atienden citas (como en «cualquier profesional»).
-                fn ($q) => $q->whereIn('instructor_id', Usuario::query()->whereJsonContains('roles', 'instructor')->select('id')),
+                fn ($q) => $q->whereIn('instructor_id', Usuario::query()->profesionales()->select('id')),
             )
             ->get(['dia_semana', 'hora_fin'])
             ->groupBy('dia_semana')

@@ -13,12 +13,15 @@ import { useToastStore } from "@/stores/toast";
  * «Roles y permisos» (ADR 0057): los roles del sistema (solo lectura) y los propios
  * del negocio. Al armar uno solo se pueden marcar los permisos que tiene quien lo
  * arma; los demás aparecen deshabilitados. La API aplica las mismas reglas.
+ * Un rol propio es del equipo o de quien imparte (ADR 0078); eso se elige al crearlo.
  */
+type FacetaPropia = "equipo" | "instructor";
 interface Rol {
   id: string | null;
   clave: string;
   nombre: string | null;
   sistema: boolean;
+  faceta?: string;
   permisos: string[];
   personas: number;
   puede_cambiar: boolean;
@@ -45,6 +48,7 @@ const deSistema = computed(() => roles.value.filter((r) => r.sistema));
 const editorAbierto = ref(false);
 const editandoId = ref<string | null>(null);
 const nombre = ref("");
+const faceta = ref<FacetaPropia>("equipo");
 const seleccion = ref<Set<string>>(new Set());
 const guardando = ref(false);
 const errorEditor = ref<string | null>(null);
@@ -119,6 +123,7 @@ async function cargar(): Promise<void> {
 function abrirNuevo(): void {
   editandoId.value = null;
   nombre.value = "";
+  faceta.value = "equipo";
   seleccion.value = new Set();
   errorEditor.value = null;
   editorAbierto.value = true;
@@ -127,6 +132,7 @@ function abrirNuevo(): void {
 function abrirEdicion(rol: Rol): void {
   editandoId.value = rol.id;
   nombre.value = rol.nombre ?? "";
+  faceta.value = rol.faceta === "instructor" ? "instructor" : "equipo";
   seleccion.value = new Set(rol.permisos);
   errorEditor.value = null;
   editorAbierto.value = true;
@@ -145,7 +151,13 @@ const faltantes = computed<Record<string, string[]>>(() => {
   }
   return r;
 });
-const incompleto = computed(() => Object.keys(faltantes.value).length > 0);
+// Quien imparte ve sus clases o citas en su portal: necesita ver la agenda.
+const sinAgenda = computed(
+  () => faceta.value === "instructor" && !seleccion.value.has("agenda.ver"),
+);
+const incompleto = computed(
+  () => Object.keys(faltantes.value).length > 0 || sinAgenda.value,
+);
 
 // A la vista y a petición: nunca se agregan solos.
 function agregarNecesarios(permiso: string): void {
@@ -174,7 +186,10 @@ async function guardar(): Promise<void> {
   const cuerpo = { nombre: nombre.value, permisos: [...seleccion.value] };
   try {
     if (editandoId.value === null) {
-      await api.post(`${base.value}/roles`, cuerpo);
+      await api.post(`${base.value}/roles`, {
+        ...cuerpo,
+        faceta: faceta.value,
+      });
     } else {
       await api.put(`${base.value}/roles/${editandoId.value}`, cuerpo);
     }
@@ -248,6 +263,9 @@ onMounted(cargar);
             <div class="min-w-0">
               <p class="rp-nombre">{{ nombreDe(rol) }}</p>
               <p class="rp-detalle">
+                <template v-if="rol.faceta === 'instructor'"
+                  >{{ $t("operacion.rolesPropios.deInstructor") }} ·
+                </template>
                 {{ cuantos(rol) }} ·
                 {{ $t("operacion.rolesPropios.personas", rol.personas) }}
               </p>
@@ -363,6 +381,45 @@ onMounted(cargar);
             required
           />
         </div>
+        <!-- Del equipo o de quien imparte (ADR 0078): se elige al crearlo. -->
+        <fieldset v-if="editandoId === null" data-prueba="faceta">
+          <legend class="rp-grupo">
+            {{ $t("operacion.rolesPropios.facetaTitulo") }}
+          </legend>
+          <label
+            v-for="f in ['equipo', 'instructor'] as const"
+            :key="f"
+            class="rp-faceta"
+          >
+            <input
+              v-model="faceta"
+              type="radio"
+              name="rol-faceta"
+              :value="f"
+              :data-prueba="`faceta-${f}`"
+            />
+            <span>
+              {{ $t(`operacion.rolesPropios.facetas.${f}`) }}
+              <span class="rp-detalle block">{{
+                $t(`operacion.rolesPropios.facetasAyuda.${f}`)
+              }}</span>
+            </span>
+          </label>
+        </fieldset>
+        <p v-else-if="faceta === 'instructor'" class="rp-detalle">
+          {{ $t("operacion.rolesPropios.facetaFija") }}
+        </p>
+        <p v-if="sinAgenda" class="rp-necesita" data-prueba="necesita-agenda">
+          {{ $t("operacion.rolesPropios.instructorAgenda") }}
+          <button
+            v-if="puedeDar('agenda.ver')"
+            type="button"
+            class="rp-agregar"
+            @click="alternarPermiso('agenda.ver')"
+          >
+            {{ $t("operacion.rolesPropios.agregarNecesarios") }}
+          </button>
+        </p>
         <fieldset v-for="(permisos, grupo) in catalogo" :key="grupo">
           <legend class="rp-grupo">
             {{ $t(`operacion.rolesPropios.grupos.${grupo}`) }}
@@ -505,5 +562,16 @@ onMounted(cargar);
 .rp-opcion--bloqueada {
   cursor: not-allowed;
   opacity: 0.5;
+}
+.rp-faceta {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.35rem 0;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.rp-faceta input {
+  margin-top: 0.25rem;
 }
 </style>

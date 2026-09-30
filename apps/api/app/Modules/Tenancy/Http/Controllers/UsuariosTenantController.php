@@ -50,13 +50,14 @@ class UsuariosTenantController
     ) {}
 
     /**
-     * Lista los instructores del estudio (usuarios con el rol instructor) para poder
-     * asignarlos a sesiones. Solo ulid + nombre; nunca datos sensibles.
+     * Lista los instructores del estudio (con un rol de quien imparte, de sistema o
+     * propio, ADR 0078) para poder asignarlos a sesiones. Solo ulid + nombre; nunca
+     * datos sensibles.
      */
     public function instructores(Request $request): JsonResponse
     {
         $instructores = Usuario::query()
-            ->whereJsonContains('roles', 'instructor')
+            ->profesionales()
             ->orderBy('name')
             ->get(['id', 'ulid', 'name', 'nombre', 'primer_apellido', 'foto_ruta']);
 
@@ -157,7 +158,7 @@ class UsuariosTenantController
     {
         $usuario = Usuario::query()
             ->where('ulid', (string) $request->route('usuario'))
-            ->whereJsonContains('roles', 'instructor')
+            ->profesionales()
             ->firstOrFail();
 
         $persona = $this->personas->asegurar($usuario, TipoPersonaTenant::Instructor);

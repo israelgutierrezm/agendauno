@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\Application\RolesTenant;
 use App\Support\Concerns\HasPublicId;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -127,6 +128,30 @@ class Usuario extends Authenticatable
         }
 
         return $this->rol !== null && $this->rol !== '' ? [(string) $this->rol] : [];
+    }
+
+    /**
+     * ¿Imparte clases o atiende citas? Tiene un rol de la faceta de quien imparte: el
+     * de sistema o uno propio (ADR 0078). Se le agenda como profesional.
+     */
+    public function esProfesional(): bool
+    {
+        return app(RolesTenant::class)->tieneFaceta($this->rolesEfectivos(), 'instructor');
+    }
+
+    /**
+     * Quienes imparten clases o atienden citas (ver {@see esProfesional()}).
+     *
+     * @param  Builder<self>  $consulta
+     */
+    public function scopeProfesionales(Builder $consulta): void
+    {
+        $claves = app(RolesTenant::class)->clavesConFaceta('instructor');
+        $consulta->where(function (Builder $q) use ($claves): void {
+            foreach ($claves as $clave) {
+                $q->orWhereJsonContains('roles', $clave);
+            }
+        });
     }
 
     /**

@@ -191,7 +191,7 @@ class AgendarCitaTenant
             $profesional = $instructorId !== null ? Usuario::query()->find($instructorId) : null;
             // Un profesional invitado que aún no activa su cuenta sí atiende; uno dado
             // de baja ya no se encuentra.
-            if (! $profesional instanceof Usuario || ! in_array('instructor', $profesional->rolesEfectivos(), true)) {
+            if (! $profesional instanceof Usuario || ! $profesional->esProfesional()) {
                 throw new SesionNoReservable('Esa persona no atiende citas.');
             }
 

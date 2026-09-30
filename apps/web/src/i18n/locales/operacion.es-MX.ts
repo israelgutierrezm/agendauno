@@ -31,6 +31,21 @@ export default {
     agregarNecesarios: "Agregar lo que necesita",
     incompleto:
       "Algunos permisos necesitan otros para que sus pantallas funcionen. Agrégalos o quita esos permisos para guardar.",
+    facetaTitulo: "Para quién es",
+    facetas: {
+      equipo: "Del equipo",
+      instructor: "De quien imparte",
+    },
+    facetasAyuda: {
+      equipo: "Trabaja en el panel del negocio con los permisos que elijas.",
+      instructor:
+        "Se le agenda como instructor y solo ve sus propias clases, con los permisos que elijas.",
+    },
+    facetaFija:
+      "Es un rol de quien imparte: se le agenda como instructor y solo ve sus propias clases.",
+    deInstructor: "De quien imparte",
+    instructorAgenda:
+      "Quien imparte necesita «Ver la agenda» para ver sus clases.",
     guardar: "Guardar rol",
     guardado: "Rol guardado.",
     eliminado: "Rol eliminado.",

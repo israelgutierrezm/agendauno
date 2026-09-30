@@ -131,6 +131,7 @@ describe("roles y permisos", () => {
     expect(api.post).toHaveBeenCalledWith("/api/v1/app/demo/roles", {
       nombre: "Recepción de tarde",
       permisos: ["miembros.ver"],
+      faceta: "equipo",
     });
     expect(toast.exito).toHaveBeenCalled();
   });
@@ -164,5 +165,21 @@ describe("roles y permisos", () => {
       ).checked,
     ).toBe(true);
     expect(guardar()).toBeUndefined();
+  });
+
+  it("un rol de quien imparte pide ver la agenda y guarda su faceta", async () => {
+    const w = montar();
+    await flushPromises();
+    await w.find(".tu-btn-primario").trigger("click");
+    const editor = w.find('[data-prueba="editor"]');
+    await editor.find("#rol-nombre").setValue("Instructor en formación");
+    await editor.find('[data-prueba="faceta-instructor"]').setValue(true);
+    await editor.findAll("label.rp-opcion")[0].find("input").trigger("change");
+
+    // Sin «Ver la agenda» no ve sus clases: se explica y no deja guardar.
+    expect(editor.find('[data-prueba="necesita-agenda"]').exists()).toBe(true);
+    expect(
+      w.findAll(".tu-btn-primario").at(-1)!.attributes("disabled"),
+    ).toBeDefined();
   });
 });
