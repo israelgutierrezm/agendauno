@@ -38,6 +38,7 @@ class ErroresPlataforma
         private readonly AlertasPlataforma $alertas,
         private readonly GestorDeConexionTenant $gestor,
         private readonly ParametrosTenant $parametros,
+        private readonly MapasDeOrigen $mapas,
     ) {}
 
     /**
@@ -79,10 +80,19 @@ class ErroresPlataforma
             $tipo = Str::limit(trim((string) ($datos['tipo'] ?? '')) ?: 'Error', 120, '');
             $mensaje = Tachador::texto($datos['mensaje'], 500);
             $lugar = isset($datos['lugar']) ? Str::limit($datos['lugar'], 250, '') : null;
+            $traza = $datos['traza'] ?? null;
+            // En la web, el archivo y la línea originales con los mapas de origen (ADR
+            // 0082): la huella ya no cambia con cada compilación.
+            $compilado = null;
+            if ($origen === 'web' && $lugar !== null && ($original = $this->mapas->original($lugar)) !== null) {
+                [$compilado, $lugar] = [$lugar, Str::limit($original, 250, '')];
+                $traza = $traza !== null ? $this->mapas->traza($traza) : null;
+            }
             $contexto = array_filter([
                 'ruta' => isset($datos['ruta']) ? Tachador::texto($datos['ruta'], 300) : null,
                 'estudio' => $datos['estudio'] ?? null,
                 'navegador' => isset($datos['navegador']) ? Str::limit($datos['navegador'], 250) : null,
+                'compilado' => $compilado,
             ], static fn (mixed $v): bool => $v !== null && $v !== '');
 
             $error = $this->registrar(
@@ -90,7 +100,7 @@ class ErroresPlataforma
                 $tipo,
                 $mensaje,
                 $lugar,
-                isset($datos['traza']) ? Tachador::texto($datos['traza'], self::MAX_TRAZA) : null,
+                $traza !== null ? Tachador::texto($traza, self::MAX_TRAZA) : null,
                 $contexto,
                 isset($datos['version']) ? Str::limit($datos['version'], 40, '') : null,
                 $this->quedanNuevosDeClientes(),

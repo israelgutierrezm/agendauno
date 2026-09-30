@@ -17,6 +17,11 @@ export default defineConfig({
     port: 5175,
     strictPort: true,
   },
+  // Mapas de origen sin anunciarlos al navegador: la imagen de producción los saca
+  // de lo público y la API los usa para traducir los errores (ADR 0082).
+  build: {
+    sourcemap: "hidden",
+  },
   test: {
     environment: "jsdom",
     globals: true,

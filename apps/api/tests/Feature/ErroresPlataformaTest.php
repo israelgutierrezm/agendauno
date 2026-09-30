@@ -6,6 +6,7 @@ use App\Modules\Platform\Operacion\AlertaPlataforma;
 use App\Modules\Platform\Operacion\ErrorPlataforma;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -128,4 +129,32 @@ it('un error que dejó de pasar se borra con la limpieza de registros', function
 
     $this->artisan('agendauno:limpiar-registros')->expectsOutputToContain('Errores: 1.')->assertSuccessful();
     expect(ErrorPlataforma::query()->pluck('tipo')->all())->toBe([LogicException::class]);
+});
+
+it('los errores de la web se traducen a su archivo original y se agrupan entre compilaciones', function (): void {
+    $carpeta = storage_path('framework/testing/mapas-web');
+    File::ensureDirectoryExists($carpeta.'/assets');
+    // Columna 0 → línea 1; desde la columna 10 → línea 11 de src/views/Ejemplo.vue.
+    $mapa = json_encode(['version' => 3, 'sources' => ['../../src/views/Ejemplo.vue'], 'names' => [], 'mappings' => 'AAAA,UAUA']);
+    File::put($carpeta.'/assets/index-abc.js.map', (string) $mapa);
+    File::put($carpeta.'/assets/index-def.js.map', (string) $mapa);
+    Config::set('agendauno.errores.mapas_web', $carpeta);
+
+    foreach (['abc', 'def'] as $compilacion) {
+        $this->postJson('/api/v1/errores', [
+            'origen' => 'web', 'tipo' => 'TypeError', 'mensaje' => 'No se pudo leer «total»',
+            'lugar' => "assets/index-{$compilacion}.js:1:12",
+            'traza' => "TypeError: x\n    at f (http://localhost:5175/assets/index-{$compilacion}.js:1:12)\n    at g (http://localhost:5175/assets/sin-mapa.js:3:4)",
+            'version' => $compilacion,
+        ])->assertStatus(202);
+    }
+
+    $error = ErrorPlataforma::query()->sole();
+    expect($error->lugar)->toBe('src/views/Ejemplo.vue:11:1')
+        ->and($error->veces)->toBe(2)
+        ->and($error->contexto['compilado'])->toBe('assets/index-def.js:1:12')
+        ->and($error->traza)->toContain('at f (src/views/Ejemplo.vue:11:1)')
+        ->and($error->traza)->toContain('assets/sin-mapa.js:3:4');
+
+    File::deleteDirectory($carpeta);
 });

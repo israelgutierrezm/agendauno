@@ -93,6 +93,15 @@ return [
         'correo' => env('ALERTAS_CORREO'),
     ],
 
+    /*
+    | Monitoreo de errores (ADR 0080, 0082). `mapas_web`: la carpeta con los mapas de
+    | origen de la web compilada (la imagen web los deja ahí; no se publican), para
+    | traducir sus errores al archivo y la línea originales.
+    */
+    'errores' => [
+        'mapas_web' => env('MAPAS_WEB_DIR', storage_path('app/mapas-web')),
+    ],
+
     'respaldos' => [
         'disco' => env('RESPALDOS_DISCO', 'local'),
         'carpeta' => env('RESPALDOS_CARPETA', 'respaldos'),

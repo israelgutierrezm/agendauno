@@ -71,8 +71,7 @@ dependencias ni costo, y los datos de los negocios no salen de nuestros servidor
 
 - Un error se investiga desde el superadmin, con traza y contexto, sin entrar al
   servidor a leer logs. El log normal sigue igual.
-- La traza de la web apunta a los archivos compilados (sin source maps). Sirve para
-  agrupar y ubicar la pantalla; para la línea exacta hay que compilar la misma
-  versión.
+- La traza de la web se traduce al archivo y la línea originales con los mapas de
+  origen, que no se publican (ADR 0082).
 - Cualquiera puede mandar errores falsos a la entrada pública. Los topes lo acotan y
   un error falso se ignora en un clic.

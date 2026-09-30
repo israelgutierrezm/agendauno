@@ -220,7 +220,10 @@ del último simulacro y las alertas de los últimos 30 días
   agrupados, con traza, contexto y versión, y lo sensible tachado. Se marcan
   resueltos o ignorados; uno resuelto que vuelve en otra versión se reabre y avisa.
   La web lleva la versión de la compilación (`VITE_APP_VERSION`, la misma `VERSION`
-  de `actualizar.sh`); la app, la de `--dart-define=APP_VERSION`.
+  de `actualizar.sh`); la app, la de `--dart-define=APP_VERSION`. Los errores de la
+  web se traducen al archivo y la línea originales con los mapas de origen, que la
+  imagen web deja en el volumen `mapas-web` (solo lo lee la API; no se publican ni se
+  respaldan, ADR 0082).
 - Si se detiene el **programador de tareas**, él mismo no puede avisar: registra
   `https://DOMINIO/api/v1/health?estricto=1` en un monitor externo (UptimeRobot,
   Better Stack…). Responde 503 si la base, la caché, el programador o la cola fallan.

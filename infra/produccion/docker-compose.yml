@@ -23,8 +23,11 @@ x-api: &api
   environment:
     # Los latidos llevan la versión: al publicar solo cuentan los procesos nuevos.
     APP_VERSION: ${VERSION:-latest}
+    # Mapas de origen de la web, para traducir sus errores (ADR 0082).
+    MAPAS_WEB_DIR: /var/www/mapas-web
   volumes:
     - storage:/var/www/html/storage
+    - mapas-web:/var/www/mapas-web:ro
   depends_on:
     redis:
       condition: service_healthy
@@ -91,6 +94,8 @@ services:
     volumes:
       # Solo lectura; nginx sirve únicamente app/public (URLs /storage/…).
       - storage:/var/www/storage-laravel:ro
+      # Aquí deja los mapas de origen de su compilación para la API; no se publican.
+      - mapas-web:/mapas-compartidos
     depends_on:
       - api
     restart: unless-stopped
@@ -111,4 +116,6 @@ volumes:
   # storage de Laravel: archivos de los negocios (documentos, fotos, logos),
   # respaldos locales y logs. Respáldalo junto con MySQL.
   storage:
+  # Mapas de origen de la web (ADR 0082): se regeneran al publicar; no se respaldan.
+  mapas-web:
   redis:
