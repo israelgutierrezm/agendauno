@@ -51,8 +51,9 @@
   aviso; hoy la conciliación cubre los cobros.
 - WhatsApp: procesar el webhook de estados de Meta (entregado, leído, fallido) y,
   si conviene, número propio por negocio o cobrarlo como extra del plan (ADR 0069).
-- WhatsApp con los dueños: verificar el número desde el panel si no se hizo al
-  registrarse y que el dueño pueda dejar de recibir los WhatsApp (ADR 0070 y 0071).
+- Cambiar el WhatsApp del negocio desde el panel del dueño (hoy se verifica el del
+  registro) y, si se quiere, suspensión automática tras días de gracia de una renta
+  vencida (ADR 0072).
 - Separar «editar» y «eliminar» en el catálogo de permisos.
 - Roles propios con faceta de instructor.
 - Monitoreo de errores más completo y despliegue automático desde el CI.

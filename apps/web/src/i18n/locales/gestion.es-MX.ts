@@ -470,6 +470,7 @@ export const plataformaAdmin = {
       aviso_de_pago_perdido: "Aviso de pago perdido",
       correo_fallido: "Correo que no salió",
       whatsapp_fallido: "WhatsApp que no salió",
+      renta_vencida: "Renta vencida",
       webhook_saliente_fallido: "Webhook de un negocio",
       respaldo_fallido: "Respaldo",
       simulacro_fallido: "Simulacro",
@@ -553,6 +554,9 @@ export const plataformaAdmin = {
   cobros: {
     porCobrar: "Por cobrar",
     vencido: "Vencido",
+    vencidos: "Vencidos",
+    suspendido: "Negocio suspendido",
+    motivoRenta: "Renta de {periodo} vencida sin pagar.",
     cobradoMes: "Cobrado este mes",
     conAdeudo: "Estudios con adeudo",
     todos: "Todos los estados",
@@ -568,6 +572,14 @@ export const plataformaAdmin = {
     private_key: "Llave privada",
     webhook_user: "Usuario del webhook",
     webhook_password: "Contraseña del webhook",
+  },
+  correoAlertas: {
+    titulo: "Correo del superadministrador",
+    ayuda:
+      "Aquí llegan las alertas de la operación y las rentas vencidas. Vacío, se usa el de ALERTAS_CORREO.",
+    correo: "Correo",
+    guardar: "Guardar correo",
+    guardado: "Correo guardado.",
   },
   whatsapp: {
     titulo: "WhatsApp",

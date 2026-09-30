@@ -173,23 +173,40 @@ class PlataformaController
 
     public function configuracion(): JsonResponse
     {
-        return response()->json(['data' => [
-            // Nunca se devuelve la llave; solo si está configurada.
-            'facturapi_configurada' => ConfiguracionPlataforma::llaveFacturapi() !== null,
-        ]]);
+        return response()->json(['data' => $this->presentarConfiguracion()]);
     }
 
+    /**
+     * Guarda solo lo que viene: la llave de FacturAPI y/o el correo del
+     * superadministrador (vacío vuelve al de ALERTAS_CORREO).
+     */
     public function guardarConfiguracion(Request $request): JsonResponse
     {
         $validado = $request->validate([
             'facturapi_llave' => ['nullable', 'string', 'max:255'],
+            'correo_alertas' => ['nullable', 'email', 'max:255'],
         ]);
 
-        ConfiguracionPlataforma::establecer('facturapi_llave', $validado['facturapi_llave'] ?? null);
+        foreach (['facturapi_llave', 'correo_alertas'] as $clave) {
+            if ($request->exists($clave)) {
+                ConfiguracionPlataforma::establecer($clave, $validado[$clave] ?? null);
+            }
+        }
 
-        return response()->json(['data' => [
+        return response()->json(['data' => $this->presentarConfiguracion()]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentarConfiguracion(): array
+    {
+        return [
+            // Nunca se devuelve la llave; solo si está configurada.
             'facturapi_configurada' => ConfiguracionPlataforma::llaveFacturapi() !== null,
-        ]]);
+            // A dónde llegan las alertas y las rentas vencidas (ADR 0072).
+            'correo_alertas' => ConfiguracionPlataforma::correoAlertas(),
+        ];
     }
 
     /**

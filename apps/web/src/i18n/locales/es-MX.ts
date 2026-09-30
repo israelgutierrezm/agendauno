@@ -1203,6 +1203,21 @@ export default {
     },
     verPdf: "PDF",
   },
+  // Avisos de AgendaUno al dueño, en su página de Renta (ADR 0072).
+  avisosAgendaUno: {
+    titulo: "Avisos de AgendaUno",
+    ayuda:
+      "Te avisamos cuando tu prueba está por terminar, cuando tu renta está lista, si vence y cuando recibimos tu pago. Te llegan a {correo}.",
+    whatsapp: "WhatsApp",
+    verificadoEstado: "Verificado",
+    sinVerificar: "Sin verificar",
+    recibir: "Recibirlos también por WhatsApp",
+    verificar: "Verificar por WhatsApp",
+    codigo: "Código de 6 dígitos que te llegó por WhatsApp",
+    reenviar: "Enviar otro código",
+    reenviarEn: "Puedes pedir otro en {s} s",
+    verificado: "Tu WhatsApp quedó verificado.",
+  },
   // Foto con lupa para verla en grande (p. ej. el profesional al agendar).
   fotoAmpliable: {
     ver: "Ver la foto de {nombre} en grande",

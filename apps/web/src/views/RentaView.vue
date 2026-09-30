@@ -3,6 +3,7 @@ import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisosAgendaUno from "@/components/AvisosAgendaUno.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useRetornoPago } from "@/lib/retornoPago";
@@ -633,6 +634,9 @@ onMounted(() => {
       <p class="mt-3 text-xs" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("renta.pagoNota") }}
       </p>
+
+      <!-- Avisos de AgendaUno al dueño: correo y WhatsApp (ADR 0072). -->
+      <AvisosAgendaUno class="mt-8" />
     </template>
   </section>
 </template>

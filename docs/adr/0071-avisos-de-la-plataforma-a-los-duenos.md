@@ -48,8 +48,8 @@ recibir estos avisos por ahí.
 ## Consecuencias
 
 - El dueño se entera de su prueba y de su renta sin tener que entrar al panel.
-- El dueño no puede dejar de recibir los WhatsApp desde su panel. Hoy se apaga
-  para todos desde el superadministrador. Darle la opción, junto con verificar su
-  número desde el panel, es trabajo aparte.
+- Desde su panel, el dueño deja de recibir los WhatsApp o verifica su número
+  (ADR 0072).
 - No hay suspensión automática por renta vencida. El aviso de vencida no amenaza
-  con suspender; solo pide ponerse al corriente.
+  con suspender; solo pide ponerse al corriente. El superadministrador recibe la
+  alerta y suspende a mano desde Cobros → Vencidos (ADR 0072).

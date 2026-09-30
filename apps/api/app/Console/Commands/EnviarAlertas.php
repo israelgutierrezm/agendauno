@@ -8,6 +8,7 @@ use App\Modules\Platform\Operacion\AlertaPlataforma;
 use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Platform\Operacion\LatidoOperacion;
 use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -43,7 +44,8 @@ class EnviarAlertas extends Command
         if ($pendientes->isEmpty()) {
             return self::SUCCESS;
         }
-        $correo = (string) config('agendauno.alertas.correo');
+        // El que capturó el superadmin en su panel o, si no, ALERTAS_CORREO.
+        $correo = (string) ConfiguracionPlataforma::correoAlertas();
         if (filter_var($correo, FILTER_VALIDATE_EMAIL) === false) {
             $this->warn("Hay {$pendientes->count()} alerta(s) pero no hay ALERTAS_CORREO: nadie las recibe.");
 

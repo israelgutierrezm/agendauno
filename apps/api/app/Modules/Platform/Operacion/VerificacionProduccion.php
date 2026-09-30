@@ -9,6 +9,7 @@ use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\RespaldosEstudio;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
@@ -282,7 +283,7 @@ class VerificacionProduccion
     private function alertas(): array
     {
         return [
-            $this->punto('Alertas', 'Correo para alertas de la plataforma', filter_var((string) config('agendauno.alertas.correo'), FILTER_VALIDATE_EMAIL) !== false, 'Define ALERTAS_CORREO (quién recibe los avisos de pagos, correos, respaldos y cola que fallan).'),
+            $this->punto('Alertas', 'Correo para alertas de la plataforma', ConfiguracionPlataforma::correoAlertas() !== null, 'Captúralo en Configuración del superadmin o define ALERTAS_CORREO (quién recibe los avisos de pagos, correos, respaldos, cola y rentas vencidas).'),
         ];
     }
 

@@ -26,6 +26,8 @@ class PlataformaCobrosController
         $validado = $request->validate([
             'estado' => ['nullable', Rule::enum(EstadoCargoRenta::class)],
             'periodo' => ['nullable', 'date_format:Y-m'],
+            // Solo las rentas vencidas y sin pagar (para decidir si se suspende).
+            'vencidos' => ['nullable', 'boolean'],
         ]);
         $hoy = Carbon::today();
 
@@ -45,6 +47,9 @@ class PlataformaCobrosController
             ->with('estudio')
             ->when(isset($validado['estado']), fn ($q) => $q->where('estado', $validado['estado']))
             ->when(isset($validado['periodo']), fn ($q) => $q->where('periodo', $validado['periodo']))
+            ->when($request->boolean('vencidos'), fn ($q) => $q
+                ->where('estado', EstadoCargoRenta::Pendiente->value)
+                ->whereDate('vence_en', '<', $hoy))
             ->orderByDesc('periodo')
             ->orderByDesc('id')
             ->limit(self::LIMITE)
@@ -61,6 +66,8 @@ class PlataformaCobrosController
                 'id' => $c->ulid,
                 'estudio' => $c->estudio?->nombre,
                 'estudio_slug' => $c->estudio?->slug,
+                // Para suspenderlo (o ver que ya lo está) desde la lista.
+                'estudio_estado' => $c->estudio?->estado->value,
                 'periodo' => $c->periodo,
                 'monto_minor' => $c->monto_minor,
                 'moneda' => $c->moneda,

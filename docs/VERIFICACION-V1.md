@@ -213,6 +213,11 @@ corre el comando a mano.
   el …», y el WhatsApp si el dueño lo aceptó. Al emitirse la renta llega «Tu renta
   de … está lista»; si vence sin pagarse, «venció»; al pagarla, «Recibimos tu
   pago». Ninguno se repite, y la ficha del negocio en el superadmin los lista.
+- [ ] **Panel del dueño y rentas vencidas** (ADR 0072). En «Renta» →
+  «Avisos de AgendaUno», el dueño verifica su WhatsApp con el código y activa o
+  desactiva «Recibirlos también por WhatsApp». Captura el correo en Configuración
+  del superadmin: al vencer una renta llega la alerta «Renta vencida». En Cobros →
+  «Vencidos», «Suspender» suspende el negocio y luego muestra «Negocio suspendido».
 
 Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado»,
 «membresía suspendida» al cliente y «reserva creada».

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Platform\Operacion\AlertaPlataforma;
 use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\DatosDeOrden;
@@ -89,6 +90,7 @@ class AvisosDuenos
             ->where('vence_en', '>=', $hoy->subDays(self::DIAS_RENTA_VENCIDA)->toDateString())
             ->each(function (CargoRenta $cargo) use (&$nuevos): void {
                 $nuevos += $this->avisarCargo($cargo, 'renta_vencida');
+                $this->alertarRentaVencida($cargo);
             });
 
         // Pago recibido.
@@ -161,6 +163,29 @@ class AvisosDuenos
         }
 
         Mail::to($aviso->destinatario)->send(new MensajeMailable($aviso->asunto, $aviso->cuerpo, 'AgendaUno'));
+    }
+
+    /**
+     * El superadministrador se entera una vez por cargo (alerta «Renta vencida», que
+     * le llega por correo con las demás) para decidir si suspende el negocio desde
+     * Cobros → Vencidos (ADR 0072).
+     */
+    private function alertarRentaVencida(CargoRenta $cargo): void
+    {
+        $clave = 'cargo-'.$cargo->getKey();
+        $estudio = $cargo->estudio;
+        if (! $estudio instanceof Estudio || AlertaPlataforma::query()->where('tipo', 'renta_vencida')->where('clave', $clave)->exists()) {
+            return;
+        }
+
+        $fecha = $cargo->vence_en instanceof DateTimeInterface ? self::fecha(CarbonImmutable::instance($cargo->vence_en)) : '';
+        $this->alertas->registrar(
+            'renta_vencida',
+            $clave,
+            "{$estudio->nombre}: la renta de ".self::periodo($cargo->periodo).' por '.DatosDeOrden::dinero($cargo->monto_minor, $cargo->moneda)
+                ." venció el {$fecha} y sigue sin pagarse. Si hace falta, suspéndelo desde Cobros → Vencidos.",
+            (string) $estudio->slug,
+        );
     }
 
     private function avisarCargo(CargoRenta $cargo, string $tipo): int

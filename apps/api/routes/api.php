@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Http\Controllers\AsistenciaTenantController;
 use App\Modules\Tenancy\Http\Controllers\AuditoriaController;
 use App\Modules\Tenancy\Http\Controllers\AuthTenantController;
 use App\Modules\Tenancy\Http\Controllers\AutomatizacionesTenantController;
+use App\Modules\Tenancy\Http\Controllers\AvisosPlataformaTenantController;
 use App\Modules\Tenancy\Http\Controllers\BloqueosAgendaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CalendarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\CapacidadCanalTenantController;
@@ -361,6 +362,13 @@ Route::prefix('v1')->group(function (): void {
             // Facturación SaaS del estudio (control plane; separada de pagos de alumnos).
             Route::get('/facturacion', [FacturacionController::class, 'show'])->middleware('puede:facturacion.ver')->name('facturacion');
             Route::get('/renta', [FacturacionController::class, 'renta'])->middleware('puede:facturacion.ver')->name('renta');
+            // Avisos de AgendaUno al dueño: correo y WhatsApp, y verificar su número (ADR 0072).
+            Route::get('/avisos-plataforma', [AvisosPlataformaTenantController::class, 'mostrar'])->middleware('puede:facturacion.ver')->name('avisos-plataforma');
+            Route::put('/avisos-plataforma', [AvisosPlataformaTenantController::class, 'guardar'])->middleware('puede:facturacion.ver')->name('avisos-plataforma.guardar');
+            Route::post('/avisos-plataforma/whatsapp/codigo', [AvisosPlataformaTenantController::class, 'codigo'])
+                ->middleware(['puede:facturacion.ver', 'throttle:5,10,panel-whatsapp-codigo'])->name('avisos-plataforma.codigo');
+            Route::post('/avisos-plataforma/whatsapp/verificar', [AvisosPlataformaTenantController::class, 'verificar'])
+                ->middleware(['puede:facturacion.ver', 'throttle:20,10,panel-whatsapp-verificar'])->name('avisos-plataforma.verificar');
             // Transparencia del cobro: a quién se contó en el periodo (alumnos o profesionales).
             Route::get('/renta/quien-cuenta', [FacturacionController::class, 'quienCuenta'])->middleware('puede:facturacion.ver')->name('renta.quien-cuenta');
             // Pago de la renta del SaaS con la pasarela de la plataforma (async -> pendiente

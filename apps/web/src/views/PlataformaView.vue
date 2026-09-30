@@ -51,6 +51,8 @@ interface Cargo {
   vencido?: boolean;
   estudio?: string | null;
   estudio_slug?: string | null;
+  // Para suspenderlo desde Cobros → Vencidos (ADR 0072).
+  estudio_estado?: string | null;
 }
 interface FichaApi extends Omit<Estudio, "uso"> {
   contacto: {
@@ -320,6 +322,40 @@ async function suspender(): Promise<void> {
   );
 }
 
+// Suspender desde Cobros → Vencidos, sin abrir la ficha del negocio.
+const suspendiendo = ref<string | null>(null);
+async function suspenderPorRenta(c: Cargo): Promise<void> {
+  if (
+    !c.estudio_slug ||
+    !(await confirmar(
+      t("plataformaAdmin.ficha.confirmarSuspender", {
+        estudio: c.estudio ?? c.estudio_slug,
+      }),
+      { peligro: true },
+    ))
+  ) {
+    return;
+  }
+  suspendiendo.value = c.id;
+  try {
+    await cliente.post(
+      `/api/v1/plataforma/estudios/${c.estudio_slug}/suspender`,
+      {
+        motivo: t("plataformaAdmin.cobros.motivoRenta", {
+          periodo: periodo(c.periodo),
+        }),
+      },
+      encabezados(),
+    );
+    toast.exito(t("plataformaAdmin.ficha.suspendido"));
+    await cargarCobros();
+  } catch (err) {
+    toast.error(mensajeDeError(err));
+  } finally {
+    suspendiendo.value = null;
+  }
+}
+
 function reactivar(): void {
   const f = ficha.value;
   if (f === null) {
@@ -349,7 +385,12 @@ async function cargarCobros(): Promise<void> {
     }>("/api/v1/plataforma/cobros", {
       ...encabezados(),
       params: {
-        estado: filtro.value.estado || undefined,
+        // «Vencidos» no es un estado del cargo: por pagar y ya vencido.
+        estado:
+          filtro.value.estado !== "" && filtro.value.estado !== "vencidos"
+            ? filtro.value.estado
+            : undefined,
+        vencidos: filtro.value.estado === "vencidos" ? 1 : undefined,
         periodo: filtro.value.periodo || undefined,
       },
     });
@@ -376,6 +417,8 @@ function colorCargo(c: Cargo): string {
 // ---- Configuración: FacturAPI, pasarelas y legales ----
 const facturapiConfigurada = ref(false);
 const llaveInput = ref("");
+// A dónde llegan las alertas y las rentas vencidas (ADR 0072).
+const correoAlertas = ref("");
 // Documentos legales: el borrador (texto y responsable) y lo publicado. Guardar no
 // cambia lo que ven los usuarios; publicar crea la versión siguiente.
 interface Publicado {
@@ -407,10 +450,9 @@ const guardando = ref<string | null>(null);
 
 async function cargarConfiguracion(): Promise<void> {
   const [cfg, pas, leg] = await Promise.all([
-    cliente.get<{ data: { facturapi_configurada: boolean } }>(
-      "/api/v1/plataforma/configuracion",
-      encabezados(),
-    ),
+    cliente.get<{
+      data: { facturapi_configurada: boolean; correo_alertas?: string | null };
+    }>("/api/v1/plataforma/configuracion", encabezados()),
     cliente.get<{ data: Pasarela[] }>(
       "/api/v1/plataforma/pasarelas",
       encabezados(),
@@ -433,6 +475,7 @@ async function cargarConfiguracion(): Promise<void> {
     }>("/api/v1/plataforma/legales", encabezados()),
   ]);
   facturapiConfigurada.value = cfg.data.data.facturapi_configurada;
+  correoAlertas.value = cfg.data.data.correo_alertas ?? "";
   pasarelas.value = pas.data.data;
   legales.value = {
     aviso_privacidad: leg.data.data.aviso_privacidad ?? "",
@@ -470,6 +513,25 @@ async function guardarLlave(): Promise<void> {
     facturapiConfigurada.value = data.data.facturapi_configurada;
     llaveInput.value = "";
     toast.exito(t("plataforma.facturapi.guardado"));
+  } catch (err) {
+    toast.error(mensajeDeError(err));
+  } finally {
+    guardando.value = null;
+  }
+}
+
+async function guardarCorreoAlertas(): Promise<void> {
+  guardando.value = "correo";
+  try {
+    const { data } = await cliente.put<{
+      data: { correo_alertas: string | null };
+    }>(
+      "/api/v1/plataforma/configuracion",
+      { correo_alertas: correoAlertas.value.trim() || null },
+      encabezados(),
+    );
+    correoAlertas.value = data.data.correo_alertas ?? "";
+    toast.exito(t("plataformaAdmin.correoAlertas.guardado"));
   } catch (err) {
     toast.error(mensajeDeError(err));
   } finally {
@@ -834,6 +896,9 @@ function borrar(): void {
               >
                 {{ $t(`plataformaAdmin.cargos.${e}`) }}
               </option>
+              <option value="vencidos">
+                {{ $t("plataformaAdmin.cobros.vencidos") }}
+              </option>
             </select>
             <input
               v-model="filtro.periodo"
@@ -897,6 +962,26 @@ function borrar(): void {
                     aria-hidden="true"
                   />{{ estadoCargo(c) }}</span
                 >
+                <template v-if="c.vencido && c.estudio_slug">
+                  <span
+                    v-if="c.estudio_estado === 'suspended'"
+                    class="text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    data-prueba="ya-suspendido"
+                    >{{ $t("plataformaAdmin.cobros.suspendido") }}</span
+                  >
+                  <button
+                    v-else
+                    type="button"
+                    class="tu-btn tu-btn-fantasma text-xs"
+                    style="color: var(--error)"
+                    data-prueba="suspender-por-renta"
+                    :disabled="suspendiendo === c.id"
+                    @click="suspenderPorRenta(c)"
+                  >
+                    {{ $t("plataformaAdmin.ficha.suspender") }}
+                  </button>
+                </template>
               </span>
             </li>
           </ul>
@@ -979,6 +1064,41 @@ function borrar(): void {
             {{ $t("plataforma.facturapi.ayuda") }}
           </p>
         </div>
+
+        <!-- Correo del superadministrador: alertas y rentas vencidas. -->
+        <form
+          class="tu-card p-5"
+          data-prueba="correo-alertas"
+          @submit.prevent="guardarCorreoAlertas"
+        >
+          <h2 class="font-light text-lg">
+            {{ $t("plataformaAdmin.correoAlertas.titulo") }}
+          </h2>
+          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("plataformaAdmin.correoAlertas.ayuda") }}
+          </p>
+          <div class="mt-4 flex flex-col sm:flex-row gap-3 sm:items-end">
+            <div class="flex-1">
+              <label class="tu-label" for="correo-alertas">{{
+                $t("plataformaAdmin.correoAlertas.correo")
+              }}</label>
+              <input
+                id="correo-alertas"
+                v-model="correoAlertas"
+                class="tu-input"
+                type="email"
+                autocomplete="email"
+              />
+            </div>
+            <button
+              class="tu-btn tu-btn-primario"
+              type="submit"
+              :disabled="guardando === 'correo'"
+            >
+              {{ $t("plataformaAdmin.correoAlertas.guardar") }}
+            </button>
+          </div>
+        </form>
 
         <WhatsAppPlataforma :api-url="apiUrl" :token="token" />
 

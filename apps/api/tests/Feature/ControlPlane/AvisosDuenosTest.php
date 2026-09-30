@@ -184,3 +184,49 @@ it('si un aviso no sale tras varios intentos, el superadmin recibe una alerta', 
     expect($this->meta->envios)->toHaveCount(3)
         ->and(AlertaPlataforma::query()->where('tipo', 'whatsapp_fallido')->value('mensaje'))->toContain('prueba_por_terminar');
 });
+
+it('una renta vencida le llega al superadmin por correo y la puede suspender desde Cobros', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    // El correo que el superadmin capturó en su panel (gana sobre ALERTAS_CORREO).
+    Config::set('agendauno.alertas.correo', 'env@agendauno.mx');
+    $this->putJson('/api/v1/plataforma/configuracion', ['correo_alertas' => 'super@agendauno.mx'], conPlataforma())
+        ->assertOk()->assertJsonPath('data.correo_alertas', 'super@agendauno.mx');
+    $cargo = cargoRentaPendiente($e);
+    $renta = CargoRenta::query()->where('ulid', $cargo)->firstOrFail();
+
+    // Aún no vence: no hay alerta ni aparece en «Vencidos».
+    $this->artisan('agendauno:avisar-duenos')->assertSuccessful();
+    expect(AlertaPlataforma::query()->where('tipo', 'renta_vencida')->exists())->toBeFalse();
+    $this->getJson('/api/v1/plataforma/cobros?vencidos=1', conPlataforma())->assertOk()->assertJsonCount(0, 'data');
+
+    $this->travelTo($renta->vence_en->copy()->addDays(2)->setTime(18, 0));
+    $this->artisan('agendauno:avisar-duenos')->assertSuccessful();
+    $this->artisan('agendauno:avisar-duenos')->assertSuccessful();
+    $alerta = AlertaPlataforma::query()->where('tipo', 'renta_vencida')->sole();
+    expect($alerta->mensaje)->toContain('Estudio estudio-a')->toContain('$1,499.00 MXN')->toContain('Cobros')
+        ->and($alerta->veces)->toBe(1);
+
+    $this->artisan('agendauno:enviar-alertas')->assertSuccessful();
+    Mail::assertSent(MensajeMailable::class, fn (MensajeMailable $m): bool => $m->hasTo('super@agendauno.mx')
+        && str_contains($m->cuerpoMensaje, 'venció'));
+
+    // En Cobros → Vencidos, con el estado del negocio para suspenderlo.
+    $vencidos = $this->getJson('/api/v1/plataforma/cobros?vencidos=1', conPlataforma())->assertOk()->json('data');
+    expect($vencidos)->toHaveCount(1)
+        ->and($vencidos[0])->toMatchArray(['id' => $cargo, 'estudio_slug' => 'estudio-a', 'vencido' => true]);
+    $this->postJson('/api/v1/plataforma/estudios/estudio-a/suspender', [], conPlataforma())->assertOk();
+    expect($this->getJson('/api/v1/plataforma/cobros?vencidos=1', conPlataforma())->json('data.0.estudio_estado'))->toBe('suspended');
+});
+
+it('guardar el correo del superadmin no borra la llave de FacturAPI', function (): void {
+    $this->putJson('/api/v1/plataforma/configuracion', ['facturapi_llave' => 'sk_test_llave'], conPlataforma())
+        ->assertOk()->assertJsonPath('data.facturapi_configurada', true);
+    $this->putJson('/api/v1/plataforma/configuracion', ['correo_alertas' => 'super@agendauno.mx'], conPlataforma())
+        ->assertOk()
+        ->assertJsonPath('data.facturapi_configurada', true)
+        ->assertJsonPath('data.correo_alertas', 'super@agendauno.mx');
+    // Vacío vuelve al de ALERTAS_CORREO.
+    Config::set('agendauno.alertas.correo', 'env@agendauno.mx');
+    $this->putJson('/api/v1/plataforma/configuracion', ['correo_alertas' => null], conPlataforma())
+        ->assertOk()->assertJsonPath('data.correo_alertas', 'env@agendauno.mx');
+});

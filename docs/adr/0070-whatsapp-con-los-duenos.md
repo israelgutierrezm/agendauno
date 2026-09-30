@@ -63,8 +63,8 @@ usos distintos, con costos distintos, y cada uno debe poder encenderse por separ
   avisos, sin frenar a quien no quiere.
 - Los avisos de la plataforma a los dueños (prueba por terminar y renta) están en
   el ADR 0071: por correo siempre y por WhatsApp a quien aceptó.
-- Un dueño que no verificó al registrarse no puede hacerlo después desde su panel.
-  Es trabajo aparte si hace falta.
+- Un dueño que no verificó al registrarse puede hacerlo después desde su panel, en
+  «Renta» → «Avisos de AgendaUno» (ADR 0072).
 - El número del registro sigue siendo del negocio (`estudios`). Si el dueño lo
   cambia, la verificación debería volver a pedirse; hoy el cambio no está en el
   panel.

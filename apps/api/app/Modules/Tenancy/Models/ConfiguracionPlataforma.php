@@ -67,4 +67,25 @@ class ConfiguracionPlataforma extends Model
 
         return is_string($env) && $env !== '' ? $env : null;
     }
+
+    /**
+     * Correo del superadministrador: ahí llegan las alertas de la operación y las
+     * rentas vencidas. El que capturó en su panel tiene prioridad; si no, el de
+     * ALERTAS_CORREO. Tolera que la tabla aún no exista.
+     */
+    public static function correoAlertas(): ?string
+    {
+        try {
+            $valor = static::obtener('correo_alertas');
+            if (is_string($valor) && filter_var($valor, FILTER_VALIDATE_EMAIL) !== false) {
+                return $valor;
+            }
+        } catch (Throwable) {
+            // Tabla ausente: usa el respaldo de entorno.
+        }
+
+        $env = config('agendauno.alertas.correo');
+
+        return is_string($env) && filter_var($env, FILTER_VALIDATE_EMAIL) !== false ? $env : null;
+    }
 }
