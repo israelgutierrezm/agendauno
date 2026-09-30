@@ -48,5 +48,4 @@ Con los ADR 0070 y 0071 quedaron tres huecos:
 
 - El dueño controla su canal y el superadministrador decide, con la información a
   la mano, si suspende.
-- No hay suspensión automática. Si más adelante se quiere, sería un parámetro de
-  plataforma, por ejemplo días de gracia antes de suspender.
+- La suspensión automática tras días de gracia llegó en el ADR 0073.

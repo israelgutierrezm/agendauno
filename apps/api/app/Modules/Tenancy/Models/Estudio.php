@@ -56,6 +56,9 @@ class Estudio extends Model
         'contacto_telefono',
         'contacto_whatsapp_verificado_en',
         'contacto_whatsapp_aceptado_en',
+        'suspendido_por',
+        'suspendido_en',
+        'sin_suspension_hasta',
         'trial_inicia_en',
         'trial_termina_en',
         'plan',
@@ -92,7 +95,18 @@ class Estudio extends Model
         'onboarding_completo' => 'boolean',
         'contacto_whatsapp_verificado_en' => 'datetime',
         'contacto_whatsapp_aceptado_en' => 'datetime',
+        'suspendido_en' => 'datetime',
+        'sin_suspension_hasta' => 'date',
     ];
+
+    /**
+     * ¿Se suspendió solo por una renta vencida? Entonces el dueño aún puede entrar a
+     * pagarla y, al pagarla, se reactiva (ADR 0073).
+     */
+    public function suspendidoPorRenta(): bool
+    {
+        return $this->estado === EstadoEstudio::Suspended && $this->suspendido_por === 'renta';
+    }
 
     /**
      * ¿El estudio aparece en el directorio público?

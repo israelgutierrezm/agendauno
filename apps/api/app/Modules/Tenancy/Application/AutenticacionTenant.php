@@ -24,7 +24,10 @@ class AutenticacionTenant
     /**
      * Crea un token para el usuario y devuelve el valor en claro (solo una vez).
      */
-    public function emitir(Usuario $usuario, string $nombre = 'app'): string
+    /**
+     * `$rol`: con el que entra (si aún lo tiene); si no, el de la última vez.
+     */
+    public function emitir(Usuario $usuario, string $nombre = 'app', ?string $rol = null): string
     {
         $secreto = Str::random(48);
 
@@ -32,7 +35,7 @@ class AutenticacionTenant
             'tokenable_type' => Usuario::class,
             'tokenable_id' => $usuario->getKey(),
             'name' => $nombre,
-            'rol_activo' => $usuario->usarRol(null),
+            'rol_activo' => $usuario->usarRol($rol),
             'token' => hash('sha256', $secreto),
         ]);
 

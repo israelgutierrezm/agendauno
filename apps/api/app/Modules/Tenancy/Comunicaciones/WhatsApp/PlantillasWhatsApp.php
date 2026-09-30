@@ -48,6 +48,18 @@ final class PlantillasWhatsApp
             'asunto' => 'Tu renta de {{periodo}} venció',
             'texto' => 'Hola {{nombre}}, la renta de {{negocio}} de {{periodo}} por {{monto}} venció el {{fecha}}. Págala aquí para mantener tu cuenta al corriente: {{enlace}} Si ya la pagaste, ignora este mensaje.',
         ],
+        'suspension_proxima' => [
+            'nombre' => 'agendauno_suspension_proxima',
+            'titulo' => 'Suspensión próxima por renta',
+            'asunto' => 'Tu negocio se suspenderá el {{fecha}}',
+            'texto' => 'Hola {{nombre}}, la renta de {{negocio}} de {{periodo}} por {{monto}} sigue sin pagarse. Si no se paga antes del {{fecha}}, el negocio se suspenderá y nadie podrá agendar. Págala aquí: {{enlace}} Si ya la pagaste, ignora este mensaje.',
+        ],
+        'cuenta_suspendida' => [
+            'nombre' => 'agendauno_cuenta_suspendida',
+            'titulo' => 'Negocio suspendido por renta',
+            'asunto' => 'Suspendimos {{negocio}} por la renta sin pagar',
+            'texto' => 'Hola {{nombre}}, suspendimos {{negocio}} en AgendaUno porque la renta de {{periodo}} por {{monto}} sigue sin pagarse. Entra y págala aquí para reactivarlo al momento: {{enlace}} Tu información está a salvo.',
+        ],
         'pago_recibido' => [
             'nombre' => 'agendauno_pago_recibido',
             'titulo' => 'Pago de la renta recibido',

@@ -113,10 +113,16 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
    * recepción → operación de hoy; instructor → su Inicio (sus clases); alumno →
    * su cuenta.
    */
+  // Suspendido por renta vencida (ADR 0073): solo se entra a pagarla.
+  const suspendido = computed(() => estudio.value?.estado === "suspended");
+
   const rutaInicio = computed<string>(() => {
     const u = usuario.value;
     if (u === null) {
       return "entrar";
+    }
+    if (suspendido.value) {
+      return "renta";
     }
     if (esMiembro(u)) {
       return "mi-cuenta";
@@ -420,6 +426,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     validando,
     puede,
     rutaInicio,
+    suspendido,
     tieneVariosRoles,
     destinoAlEntrar,
     modalidad,

@@ -469,6 +469,10 @@ export function esAlumno(sesion: Sesion): boolean {
 }
 
 export function esVisible(item: MenuItem, sesion: Sesion): boolean {
+  // Suspendido por renta vencida: solo la renta, para pagarla (ADR 0073).
+  if (sesion.suspendido) {
+    return item.ruta === "renta";
+  }
   if (item.soloMiembro === true) {
     return esAlumno(sesion);
   }
@@ -497,6 +501,9 @@ export function esVisible(item: MenuItem, sesion: Sesion): boolean {
  * visibilidad; las demás, su permiso (si piden uno).
  */
 export function puedeEntrar(nombreRuta: string, sesion: Sesion): boolean {
+  if (sesion.suspendido) {
+    return nombreRuta === "renta";
+  }
   const hoja = hojas(MENU).find((h) => h.ruta === nombreRuta);
   if (hoja !== undefined) {
     return esVisible(hoja, sesion);

@@ -16,9 +16,23 @@ use Symfony\Component\HttpFoundation\Response;
  * (`/app/{estudio}/...`), y activa su conexión de data plane. Falla de forma
  * segura (404) si el estudio no existe o no está operativo, sin revelar otros
  * tenants. Limpia la conexión al terminar.
+ *
+ * Suspendido por renta vencida (ADR 0073), solo queda abierto lo necesario para
+ * entrar y pagarla; todo lo demás (página pública, clientes, equipo) responde 404.
  */
 class ResolverEstudio
 {
+    /**
+     * Rutas (sin el prefijo `api.v1.app.` o `api.v1.sub.`) que siguen abiertas con el
+     * negocio suspendido por renta.
+     */
+    private const ABIERTAS_SUSPENDIDO_POR_RENTA = [
+        'login', 'auth.google', 'logout', 'marca', 'recuperar-contrasena', 'restablecer-contrasena',
+        'yo', 'yo.rol-activo', 'apariencia',
+        'renta', 'renta.quien-cuenta', 'renta.pagar', 'renta.factura', 'renta.factura.descargar',
+        'avisos-plataforma', 'avisos-plataforma.guardar', 'avisos-plataforma.codigo', 'avisos-plataforma.verificar',
+    ];
+
     public function __construct(private readonly GestorDeConexionTenant $gestor) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -30,7 +44,7 @@ class ResolverEstudio
         // Falla seguro (404) si el estudio no existe, no esta operativo, o su BD no
         // esta disponible (aprovisionamiento pendiente/incompleto): nunca un 500.
         if (! $estudio instanceof Estudio
-            || ! $estudio->estado->operativo()
+            || ! ($estudio->estado->operativo() || ($estudio->suspendidoPorRenta() && self::abiertaSuspendido($request)))
             || ! $this->gestor->baseDeDatosExiste($estudio)) {
             abort(404, 'Estudio no encontrado.');
         }
@@ -47,5 +61,13 @@ class ResolverEstudio
         } finally {
             $this->gestor->desconectar();
         }
+    }
+
+    private static function abiertaSuspendido(Request $request): bool
+    {
+        $nombre = (string) $request->route()?->getName();
+        $ruta = (string) preg_replace('/^api\.v1\.(app|sub)\./', '', $nombre);
+
+        return in_array($ruta, self::ABIERTAS_SUSPENDIDO_POR_RENTA, true);
     }
 }

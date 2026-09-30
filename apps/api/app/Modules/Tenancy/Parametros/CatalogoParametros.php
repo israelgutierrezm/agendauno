@@ -112,6 +112,12 @@ final class CatalogoParametros
             new DefinicionParametro('cuentas.minutos_restablecer_contrasena', 'Cuentas', 'Vigencia del enlace para restablecer la contraseña',
                 'Minutos.', $e, 60, 10, 1440, 'min', porNegocio: false),
 
+            // Suspensión automática por renta vencida (ADR 0073, solo la plataforma).
+            new DefinicionParametro('renta.dias_gracia_suspension', 'Renta', 'Días de gracia antes de suspender por renta vencida',
+                'Pasados estos días desde el vencimiento, el negocio se suspende solo hasta que la pague. 0 = nunca.', $e, 15, 0, 90, 'días', porNegocio: false),
+            new DefinicionParametro('renta.dias_aviso_suspension', 'Renta', 'Días antes de la suspensión para avisar al dueño',
+                'Por correo y, si lo aceptó, por WhatsApp.', $e, 3, 1, 14, 'días', porNegocio: false),
+
             // Avisos a los dueños (ADR 0071, solo la plataforma).
             new DefinicionParametro('duenos.dias_aviso_prueba', 'Dueños', 'Días antes del fin de la prueba para avisar al dueño',
                 'Por correo y, si lo aceptó, por WhatsApp.', $e, 3, 1, 14, 'días', porNegocio: false),

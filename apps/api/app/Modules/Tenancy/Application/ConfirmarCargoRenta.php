@@ -12,24 +12,27 @@ use Illuminate\Support\Facades\DB;
 /**
  * Confirma un cargo de renta pendiente a partir de la referencia del intento (la que
  * envia el webhook de la pasarela de la plataforma) y lo marca `pagado`.
- * Idempotente: un cargo que no esta pendiente no se reprocesa.
+ * Idempotente: un cargo que no esta pendiente no se reprocesa. Si el negocio estaba
+ * suspendido por renta y ya no debe, se reactiva al momento (ADR 0073).
  */
 class ConfirmarCargoRenta
 {
+    public function __construct(private readonly SuspensionPorRenta $suspension) {}
+
     public function porReferencia(string $referencia, string $proveedor): void
     {
         if ($referencia === '') {
             return;
         }
 
-        DB::transaction(function () use ($referencia, $proveedor): void {
+        $pagado = DB::transaction(function () use ($referencia, $proveedor): ?CargoRenta {
             $cargo = CargoRenta::query()
                 ->where('referencia_pago', $referencia)
                 ->lockForUpdate()
                 ->first();
 
             if (! $cargo instanceof CargoRenta || $cargo->estado !== EstadoCargoRenta::Pendiente) {
-                return;
+                return null;
             }
 
             $cargo->update([
@@ -37,7 +40,11 @@ class ConfirmarCargoRenta
                 'pagado_en' => Carbon::now(),
                 'metodo_pago' => $proveedor,
             ]);
+
+            return $cargo;
         });
+
+        $this->suspension->reactivarSiPago($pagado?->estudio);
     }
 
     /**

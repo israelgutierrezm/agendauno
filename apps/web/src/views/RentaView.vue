@@ -261,6 +261,17 @@ onMounted(() => {
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion :titulo="$t('renta.titulo')" />
 
+    <!-- Suspendido por renta vencida: qué pasa y cómo reactivarlo (ADR 0073). -->
+    <div
+      v-if="sesion.suspendido"
+      class="rt-suspendido mt-4"
+      role="alert"
+      data-prueba="suspendido"
+    >
+      <p class="font-medium">{{ $t("renta.suspendidoTitulo") }}</p>
+      <p class="mt-1 text-sm">{{ $t("renta.suspendidoAyuda") }}</p>
+    </div>
+
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
     </p>
@@ -659,5 +670,11 @@ onMounted(() => {
 }
 .rt-suave {
   color: var(--texto-suave);
+}
+.rt-suspendido {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--error);
+  border-radius: 0.75rem;
+  background: var(--superficie);
 }
 </style>

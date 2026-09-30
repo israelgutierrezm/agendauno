@@ -218,6 +218,11 @@ corre el comando a mano.
   desactiva «Recibirlos también por WhatsApp». Captura el correo en Configuración
   del superadmin: al vencer una renta llega la alerta «Renta vencida». En Cobros →
   «Vencidos», «Suspender» suspende el negocio y luego muestra «Negocio suspendido».
+- [ ] **Suspensión automática** (ADR 0073). Con una renta vencida hace 12 días,
+  el dueño recibe «Tu negocio se suspenderá el …». A los 15,
+  `agendauno:suspender-por-renta` lo suspende. La página pública y el panel dan
+  404; un alumno no puede entrar y el dueño entra directo a «Renta», con el
+  aviso de suspendido. Al pagar, se reactiva solo.
 
 Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado»,
 «membresía suspendida» al cliente y «reserva creada».

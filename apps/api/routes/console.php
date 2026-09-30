@@ -62,6 +62,11 @@ Schedule::command('agendauno:avisar-renovaciones')->dailyAt('15:00')->withoutOve
 // medición); un cargo emitido no se vuelve a calcular, así que solo emite los que falten.
 Schedule::command('agendauno:generar-cargos-renta')->dailyAt('08:00')->withoutOverlapping();
 
+// Suspensión automática por renta vencida tras los días de gracia (ADR 0073), a las
+// 09:30 de CDMX, antes de los avisos a los dueños (que avisan la suspensión). Al pagar
+// se reactiva al momento; esto también reactiva a quien ya pagó, por si acaso.
+Schedule::command('agendauno:suspender-por-renta')->dailyAt('15:30')->withoutOverlapping();
+
 // Avisos de la plataforma a los dueños (ADR 0071): prueba por terminar, renta lista,
 // renta vencida y pago recibido, por correo y WhatsApp. Cada hora de 09:00 a 20:00 de
 // CDMX; no repite ninguno.

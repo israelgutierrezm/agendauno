@@ -27,7 +27,8 @@ use Throwable;
 
 /**
  * Avisos de la plataforma a los dueños (ADR 0071): prueba por terminar, renta lista,
- * renta vencida y pago recibido.
+ * renta vencida y pago recibido; y, con la suspensión automática (ADR 0073), la
+ * suspensión próxima y el negocio suspendido.
  *
  * - Siempre por correo, al contacto del negocio. Por WhatsApp además, si el
  *   superadministrador encendió WhatsApp con los dueños y el dueño lo aceptó al
@@ -55,6 +56,7 @@ class AvisosDuenos
         private readonly ClienteWhatsApp $whatsapp,
         private readonly ParametrosTenant $parametros,
         private readonly AlertasPlataforma $alertas,
+        private readonly SuspensionPorRenta $suspension,
     ) {}
 
     /**
@@ -99,6 +101,40 @@ class AvisosDuenos
             ->where('pagado_en', '>=', now()->subDays(self::DIAS_PAGO_RECIBIDO))
             ->each(function (CargoRenta $cargo) use (&$nuevos): void {
                 $nuevos += $this->avisarCargo($cargo, 'pago_recibido');
+            });
+
+        // La suspensión por renta se acerca (ADR 0073): unos días antes.
+        if ($this->suspension->diasGracia() > 0) {
+            $diasAviso = $this->parametros->entero('renta.dias_aviso_suspension');
+            CargoRenta::query()->with('estudio')
+                ->where('estado', EstadoCargoRenta::Pendiente->value)
+                ->where('vence_en', '<', $hoy->toDateString())
+                ->each(function (CargoRenta $cargo) use (&$nuevos, $hoy, $diasAviso): void {
+                    $fecha = $this->suspension->fechaDeSuspension($cargo);
+                    if ($fecha === null || $hoy->gte($fecha) || $hoy->lt($fecha->subDays($diasAviso))
+                        || ! $cargo->estudio instanceof Estudio || ! $cargo->estudio->estado->operativo()) {
+                        return;
+                    }
+                    $nuevos += $this->avisar($cargo->estudio, 'suspension_proxima', 'cargo-'.$cargo->getKey(), [
+                        ...self::datosCargo($cargo),
+                        'fecha' => self::fecha($fecha),
+                    ]);
+                });
+        }
+
+        // Se suspendió por la renta: cómo reactivarlo.
+        Estudio::query()
+            ->where('estado', EstadoEstudio::Suspended->value)
+            ->where('suspendido_por', SuspensionPorRenta::POR_RENTA)
+            ->where('suspendido_en', '>=', now()->subDays(2))
+            ->each(function (Estudio $estudio) use (&$nuevos): void {
+                $cargo = $this->suspension->rentaFueraDeGracia($estudio);
+                $nuevos += $this->avisar(
+                    $estudio,
+                    'cuenta_suspendida',
+                    'suspension-'.$estudio->suspendido_en?->format('YmdHis'),
+                    $cargo instanceof CargoRenta ? self::datosCargo($cargo) : [],
+                );
             });
 
         return $nuevos;
@@ -195,11 +231,21 @@ class AvisosDuenos
             return 0;
         }
 
-        return $this->avisar($estudio, $tipo, 'cargo-'.$cargo->getKey(), [
+        return $this->avisar($estudio, $tipo, 'cargo-'.$cargo->getKey(), self::datosCargo($cargo));
+    }
+
+    /**
+     * Periodo, monto y vencimiento de una renta, para el texto del aviso.
+     *
+     * @return array{periodo: string, monto: string, fecha: string}
+     */
+    private static function datosCargo(CargoRenta $cargo): array
+    {
+        return [
             'periodo' => self::periodo($cargo->periodo),
             'monto' => DatosDeOrden::dinero($cargo->monto_minor, $cargo->moneda),
             'fecha' => $cargo->vence_en instanceof DateTimeInterface ? self::fecha(CarbonImmutable::instance($cargo->vence_en)) : '',
-        ]);
+        ];
     }
 
     /**

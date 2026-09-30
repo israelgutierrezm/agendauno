@@ -25,6 +25,7 @@ class CobrarCargoRenta
     public function __construct(
         private readonly RegistroDePasarelasPlataforma $registro,
         private readonly PasarelaStripePlataforma $stripe,
+        private readonly SuspensionPorRenta $suspension,
     ) {}
 
     public function ejecutar(CargoRenta $cargo, string $proveedor): CargoRenta
@@ -33,7 +34,7 @@ class CobrarCargoRenta
             throw new PasarelaNoDisponible('La pasarela de la plataforma no esta activa.');
         }
 
-        return DB::transaction(function () use ($cargo, $proveedor): CargoRenta {
+        $cobrado = DB::transaction(function () use ($cargo, $proveedor): CargoRenta {
             $bloqueado = CargoRenta::query()->whereKey($cargo->getKey())->lockForUpdate()->firstOrFail();
 
             if ($bloqueado->estado !== EstadoCargoRenta::Pendiente) {
@@ -68,5 +69,12 @@ class CobrarCargoRenta
 
             return $bloqueado;
         });
+
+        // Pagado al momento: si estaba suspendido por renta y ya no debe, se reactiva.
+        if ($cobrado->estado === EstadoCargoRenta::Pagado) {
+            $this->suspension->reactivarSiPago($cobrado->estudio);
+        }
+
+        return $cobrado;
     }
 }

@@ -1479,6 +1479,9 @@ export default {
   },
   renta: {
     titulo: "Suscripción a AgendaUno",
+    suspendidoTitulo: "Tu negocio está suspendido por una renta sin pagar",
+    suspendidoAyuda:
+      "Mientras tanto nadie puede agendar ni entrar al panel. Paga la renta pendiente aquí abajo y se reactiva solo en unos minutos; tu información está a salvo.",
     historial: "Historial de cargos",
     sinCargos: "Aún no hay cargos generados.",
     colPeriodo: "Periodo",

@@ -50,6 +50,5 @@ recibir estos avisos por ahí.
 - El dueño se entera de su prueba y de su renta sin tener que entrar al panel.
 - Desde su panel, el dueño deja de recibir los WhatsApp o verifica su número
   (ADR 0072).
-- No hay suspensión automática por renta vencida. El aviso de vencida no amenaza
-  con suspender; solo pide ponerse al corriente. El superadministrador recibe la
-  alerta y suspende a mano desde Cobros → Vencidos (ADR 0072).
+- El aviso de renta vencida solo pide ponerse al corriente. La suspensión
+  automática tras los días de gracia avisa aparte, antes y al suspender (ADR 0073).

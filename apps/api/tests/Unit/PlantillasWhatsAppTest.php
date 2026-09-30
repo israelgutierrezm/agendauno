@@ -32,7 +32,11 @@ it('los avisos a los dueños también son válidos para Meta', function (): void
             ->and($meta)->not->toMatch('/\}\}[\s.]*$/')
             ->and($todos[1])->toBe(array_values(array_unique($todos[1])));
     }
-    expect(array_column(PlantillasWhatsApp::paraDuenos(), 'categoria'))->toBe(['AUTHENTICATION', 'UTILITY', 'UTILITY', 'UTILITY', 'UTILITY']);
+    // El código es de autenticación; los avisos, de utilidad.
+    $categorias = array_column(PlantillasWhatsApp::paraDuenos(), 'categoria');
+    expect($categorias[0])->toBe('AUTHENTICATION')
+        ->and(array_unique(array_slice($categorias, 1)))->toBe(['UTILITY'])
+        ->and(count($categorias))->toBe(1 + count(PlantillasWhatsApp::tiposDeDuenos()));
 });
 
 it('los valores van en orden, sin saltos de línea y nunca vacíos', function (): void {

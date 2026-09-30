@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\AutenticacionTenant;
 use App\Modules\Tenancy\Application\CambiarCorreoTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\RestablecerContrasenaTenant;
+use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Http\Requests\ActivarTenantRequest;
 use App\Modules\Tenancy\Http\Requests\LoginTenantRequest;
@@ -112,7 +113,7 @@ class AuthTenantController
         }
 
         return response()->json(['data' => [
-            'token' => $this->auth->emitir($usuario),
+            'token' => $this->auth->emitir($usuario, rol: $this->rolSiSuspendido($estudio, $usuario)),
             'usuario' => UsuarioTenantPresenter::datos($usuario),
             'estudio' => $this->presentarEstudio($estudio),
         ]]);
@@ -127,7 +128,7 @@ class AuthTenantController
         $usuario = $this->google->ejecutar((string) $validado['credential']);
 
         return response()->json(['data' => [
-            'token' => $this->auth->emitir($usuario),
+            'token' => $this->auth->emitir($usuario, rol: $this->rolSiSuspendido($estudio, $usuario)),
             'usuario' => UsuarioTenantPresenter::datos($usuario),
             'estudio' => $this->presentarEstudio($estudio),
         ]]);
@@ -191,6 +192,26 @@ class AuthTenantController
         }
 
         return response()->json(['data' => ['ok' => true]]);
+    }
+
+    /**
+     * Suspendido por renta (ADR 0073): solo entra quien puede ver la facturación, para
+     * pagarla, y entra con ese rol. Los demás ven que el negocio está suspendido.
+     */
+    private function rolSiSuspendido(Estudio $estudio, Usuario $usuario): ?string
+    {
+        if (! $estudio->suspendidoPorRenta()) {
+            return null;
+        }
+
+        $roles = app(RolesTenant::class);
+        foreach ($usuario->rolesEfectivos() as $rol) {
+            if ($roles->puedeAlguno([$rol], 'facturacion.ver')) {
+                return $rol;
+            }
+        }
+
+        throw ValidationException::withMessages(['email' => ['Este negocio está suspendido por ahora. Vuelve a intentarlo más tarde.']]);
     }
 
     private function usuarioTenant(Request $request): ?Usuario

@@ -25,6 +25,8 @@ interface Estudio {
   slug: string;
   nombre: string;
   estado: string;
+  // Suspendido solo por renta (se reactiva al pagar) o por la plataforma (ADR 0073).
+  suspendido_por?: string | null;
   estado_facturacion: string;
   perfil: string;
   modalidad: "clases" | "citas";
@@ -53,6 +55,8 @@ interface Cargo {
   estudio_slug?: string | null;
   // Para suspenderlo desde Cobros → Vencidos (ADR 0072).
   estudio_estado?: string | null;
+  // `renta`: se suspendió solo y se reactiva al pagar (ADR 0073).
+  estudio_suspendido_por?: string | null;
 }
 interface FichaApi extends Omit<Estudio, "uso"> {
   contacto: {
@@ -968,7 +972,11 @@ function borrar(): void {
                     class="text-xs"
                     :style="{ color: 'var(--texto-suave)' }"
                     data-prueba="ya-suspendido"
-                    >{{ $t("plataformaAdmin.cobros.suspendido") }}</span
+                    >{{
+                      c.estudio_suspendido_por === "renta"
+                        ? $t("plataformaAdmin.cobros.suspendidoPorRenta")
+                        : $t("plataformaAdmin.cobros.suspendido")
+                    }}</span
                   >
                   <button
                     v-else
@@ -1350,6 +1358,12 @@ function borrar(): void {
                 :style="{ background: colorEstado(ficha.estado) }"
                 aria-hidden="true"
               />{{ $t(`plataformaAdmin.estados.${ficha.estado}`) }}</span
+            >
+            <span
+              v-if="ficha.suspendido_por === 'renta'"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="suspendido-por-renta"
+              >{{ $t("plataformaAdmin.cobros.suspendidoPorRenta") }}</span
             >
             <span :style="{ color: 'var(--texto-suave)' }">{{
               $t(`panel.estados.${ficha.estado_facturacion}`)

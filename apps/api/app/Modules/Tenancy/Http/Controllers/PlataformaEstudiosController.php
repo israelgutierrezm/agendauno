@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\SuspensionPorRenta;
 use App\Modules\Tenancy\Application\TerminologiaEstudio;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
@@ -97,6 +98,7 @@ class PlataformaEstudiosController
 
     /**
      * Suspende el acceso al estudio (todas sus rutas responden 404 mientras tanto).
+     * Es una suspensión de la plataforma: no se reactiva sola al pagar.
      */
     public function suspender(Request $request, string $estudio): JsonResponse
     {
@@ -106,16 +108,22 @@ class PlataformaEstudiosController
             throw ValidationException::withMessages(['estado' => ['El estudio no está activo.']]);
         }
 
-        $modelo->update(['estado' => EstadoEstudio::Suspended->value]);
+        $modelo->update([
+            'estado' => EstadoEstudio::Suspended->value,
+            'suspendido_por' => SuspensionPorRenta::POR_PLATAFORMA,
+            'suspendido_en' => now(),
+        ]);
         Log::info('plataforma.estudio.suspendido', ['estudio' => $modelo->slug, 'motivo' => $validado['motivo'] ?? null]);
 
         return response()->json(['data' => self::resumen($modelo->refresh())]);
     }
 
     /**
-     * Devuelve el acceso: vuelve a prueba si aún no termina; si no, queda activo.
+     * Devuelve el acceso: vuelve a prueba si aún no termina; si no, queda activo. Si
+     * estaba suspendido por renta, no se vuelve a suspender solo en otros días de
+     * gracia (ADR 0073).
      */
-    public function reactivar(string $estudio): JsonResponse
+    public function reactivar(string $estudio, SuspensionPorRenta $suspension): JsonResponse
     {
         $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
         if ($modelo->estado !== EstadoEstudio::Suspended) {
@@ -123,7 +131,14 @@ class PlataformaEstudiosController
         }
 
         $enPrueba = $modelo->trial_termina_en !== null && ! $modelo->trial_termina_en->isPast();
-        $modelo->update(['estado' => ($enPrueba ? EstadoEstudio::Trialing : EstadoEstudio::Active)->value]);
+        $modelo->update([
+            'estado' => ($enPrueba ? EstadoEstudio::Trialing : EstadoEstudio::Active)->value,
+            'suspendido_por' => null,
+            'suspendido_en' => null,
+            'sin_suspension_hasta' => $modelo->suspendido_por === SuspensionPorRenta::POR_RENTA
+                ? now()->addDays(max(1, $suspension->diasGracia()))->toDateString()
+                : $modelo->sin_suspension_hasta,
+        ]);
         Log::info('plataforma.estudio.reactivado', ['estudio' => $modelo->slug]);
 
         return response()->json(['data' => self::resumen($modelo->refresh())]);
@@ -189,6 +204,8 @@ class PlataformaEstudiosController
             'slug' => $e->slug,
             'nombre' => $e->nombre,
             'estado' => $e->estado->value,
+            // Suspendido solo por renta vencida o por la plataforma (ADR 0073).
+            'suspendido_por' => $e->estado === EstadoEstudio::Suspended ? $e->suspendido_por : null,
             'estado_facturacion' => $e->estado_facturacion->value,
             'perfil' => $e->perfil_negocio->value,
             'modalidad' => $e->modalidad()->value,

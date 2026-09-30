@@ -68,6 +68,7 @@ class PlataformaCobrosController
                 'estudio_slug' => $c->estudio?->slug,
                 // Para suspenderlo (o ver que ya lo está) desde la lista.
                 'estudio_estado' => $c->estudio?->estado->value,
+                'estudio_suspendido_por' => $c->estudio?->suspendido_por,
                 'periodo' => $c->periodo,
                 'monto_minor' => $c->monto_minor,
                 'moneda' => $c->moneda,
