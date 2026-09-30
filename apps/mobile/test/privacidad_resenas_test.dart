@@ -36,6 +36,22 @@ void main() {
     expect(con.aceptaWhatsapp, isTrue);
   });
 
+  test(
+    'al agendar se ofrecen si el negocio los usa, aún no los aceptó y tiene celular',
+    () {
+      Privacidad p(bool acepta, bool celular) => Privacidad.desdeJson({
+        'whatsapp_disponible': true,
+        'acepta_whatsapp': acepta,
+        'whatsapp_con_celular': celular,
+      });
+
+      expect(p(false, true).ofrecerWhatsapp, isTrue);
+      expect(p(true, true).ofrecerWhatsapp, isFalse);
+      expect(p(false, false).ofrecerWhatsapp, isFalse);
+      expect(Privacidad.desdeJson({}).ofrecerWhatsapp, isFalse);
+    },
+  );
+
   test('el estado de la solicitud de baja se explica en palabras', () {
     SolicitudBaja baja(String estado, [String? respuesta]) =>
         Privacidad.desdeJson({

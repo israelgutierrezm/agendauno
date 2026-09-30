@@ -10,7 +10,8 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 /**
  * Agendar una cita desde la cuenta del cliente: servicio, profesional, sede, día y
  * hora libre. Si el servicio se paga para reservar, la cita queda apartada hasta
- * pagarla (aparece en "Mis reservas").
+ * pagarla (aparece en "Mis reservas"). Si el negocio manda avisos por WhatsApp y el
+ * cliente aún no los aceptó (y tiene celular), se le ofrecen al agendar (ADR 0069).
  */
 const emit = defineEmits<{ agendada: [] }>();
 
@@ -55,6 +56,8 @@ const slots = ref<Slot[]>([]);
 const buscando = ref(false);
 const slotSel = ref("");
 const agendando = ref(false);
+const ofrecerWhatsApp = ref(false);
+const aceptaWhatsApp = ref(false);
 
 const servicio = computed(
   () => servicios.value.find((s) => s.id === servicioId.value) ?? null,
@@ -149,7 +152,14 @@ async function agendar(): Promise<void> {
         : {}),
       inicia_en_local: horaLocal(slotSel.value),
       duracion_minutos: servicio.value.duracion_minutos ?? 60,
+      ...(ofrecerWhatsApp.value && aceptaWhatsApp.value
+        ? { acepta_whatsapp: true }
+        : {}),
     });
+    // Ya los aceptó: no se le vuelve a preguntar.
+    if (ofrecerWhatsApp.value && aceptaWhatsApp.value) {
+      ofrecerWhatsApp.value = false;
+    }
     aviso.value =
       data.data.estado === "pendiente_pago"
         ? t("citaCuenta.apartada")
@@ -190,6 +200,21 @@ onMounted(async () => {
     error.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
+  }
+  try {
+    const { data } = await api.get<{
+      data: {
+        whatsapp_disponible?: boolean;
+        acepta_whatsapp?: boolean;
+        whatsapp_con_celular?: boolean;
+      };
+    }>(`${base.value}/mi/privacidad`);
+    ofrecerWhatsApp.value =
+      data.data.whatsapp_disponible === true &&
+      data.data.acepta_whatsapp !== true &&
+      data.data.whatsapp_con_celular === true;
+  } catch {
+    ofrecerWhatsApp.value = false;
   }
 });
 </script>
@@ -327,6 +352,14 @@ onMounted(async () => {
       >
         {{ aviso }}
       </p>
+      <label v-if="ofrecerWhatsApp" class="flex items-center gap-2 text-sm">
+        <input
+          v-model="aceptaWhatsApp"
+          type="checkbox"
+          data-prueba="acepta-whatsapp"
+        />
+        {{ $t("perfilPublico.agendar.aceptaWhatsApp") }}
+      </label>
       <button
         type="submit"
         class="tu-btn tu-btn-primario"

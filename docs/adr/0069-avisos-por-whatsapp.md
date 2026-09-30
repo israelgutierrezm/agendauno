@@ -45,6 +45,9 @@ opción.
     manda nada.
   - Se acepta al agendar en la página pública (casilla que aparece al escribir el
     celular) o en «Mi privacidad», en la web o la app. Ahí también se retira.
+  - Con cuenta, al agendar en «Mi cuenta» o en la app también se ofrece la casilla
+    si aún no los aceptó y tiene celular (`whatsapp_con_celular` en
+    `/mi/privacidad`, `acepta_whatsapp` en `POST /mi/citas`).
   - Si el cliente lo pide en persona o por teléfono, lo marca el equipo: en la
     ficha de recepción, al darlo de alta o al agendarle una cita con cliente nuevo
     (`acepta_whatsapp` en `POST/PUT /miembros`, con `miembros.gestionar`). Queda

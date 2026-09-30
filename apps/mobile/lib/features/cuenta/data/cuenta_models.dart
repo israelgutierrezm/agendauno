@@ -530,6 +530,7 @@ class Privacidad {
     required this.recibePromociones,
     this.whatsappDisponible = false,
     this.aceptaWhatsapp = false,
+    this.whatsappConCelular = false,
     this.baja,
   });
 
@@ -541,6 +542,14 @@ class Privacidad {
   /// Aceptó recibir sus avisos por WhatsApp.
   final bool aceptaWhatsapp;
 
+  /// Tiene un celular válido para WhatsApp (sin él no hay a dónde mandarlos).
+  final bool whatsappConCelular;
+
+  /// Al agendar se le ofrecen los avisos por WhatsApp: el negocio los usa, aún no
+  /// los aceptó y tiene celular.
+  bool get ofrecerWhatsapp =>
+      whatsappDisponible && !aceptaWhatsapp && whatsappConCelular;
+
   /// Su solicitud de baja de datos, si hizo una.
   final SolicitudBaja? baja;
 
@@ -550,6 +559,7 @@ class Privacidad {
       recibePromociones: (j['recibe_promociones'] ?? true) as bool,
       whatsappDisponible: (j['whatsapp_disponible'] ?? false) as bool,
       aceptaWhatsapp: (j['acepta_whatsapp'] ?? false) as bool,
+      whatsappConCelular: (j['whatsapp_con_celular'] ?? false) as bool,
       baja: baja is Map<String, dynamic> ? SolicitudBaja.desdeJson(baja) : null,
     );
   }

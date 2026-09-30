@@ -36,6 +36,10 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
   bool _cargando = true;
   bool _buscando = false;
   bool _agendando = false;
+  // Avisos por WhatsApp (ADR 0069): se ofrecen si el negocio los usa, aún no los
+  // aceptó y tiene celular.
+  bool _ofrecerWhatsapp = false;
+  bool _aceptaWhatsapp = false;
   // Nota para el negocio (opcional): alergias, preferencias, primera vez…
   final _nota = TextEditingController();
 
@@ -57,6 +61,12 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
       return;
     }
     final opciones = await repo.opcionesCita();
+    var ofrecerWhatsapp = false;
+    try {
+      ofrecerWhatsapp = (await repo.privacidad()).ofrecerWhatsapp;
+    } on DioException {
+      ofrecerWhatsapp = false;
+    }
     if (!mounted) {
       return;
     }
@@ -68,6 +78,7 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
       if (opciones.profesionales.length > 1) {
         _profesional = _cualquiera;
       }
+      _ofrecerWhatsapp = ofrecerWhatsapp;
       _cargando = false;
     });
   }
@@ -125,6 +136,7 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
         iniciaEnLocal: '${Formato.iso(inicio)}T${Formato.hora(inicio)}',
         duracionMinutos: _servicio!.duracionMinutos ?? 60,
         nota: _nota.text.trim().isEmpty ? null : _nota.text.trim(),
+        aceptaWhatsapp: _ofrecerWhatsapp && _aceptaWhatsapp,
       );
       await ref.read(cuentaProvider.notifier).recargar();
       navegador.pop();
@@ -302,6 +314,17 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                       hintText: 'Alergias, preferencias, si es tu primera vez…',
                     ),
                   ),
+                  if (_ofrecerWhatsapp)
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      value: _aceptaWhatsapp,
+                      onChanged: (v) =>
+                          setState(() => _aceptaWhatsapp = v ?? false),
+                      title: const Text(
+                        'Quiero recibir la confirmación y los recordatorios de mi cita por WhatsApp',
+                      ),
+                    ),
                   const SizedBox(height: 12),
                   FilledButton(
                     onPressed: _hora == null || _agendando ? null : _agendar,

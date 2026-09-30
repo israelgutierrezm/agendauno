@@ -19,6 +19,7 @@ use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\PresentarMovimientosCreditoTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
+use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
@@ -389,7 +390,7 @@ class MiTenantController
         ]]);
     }
 
-    public function agendarCita(Request $request, AgendarCitaTenant $agendar): JsonResponse
+    public function agendarCita(Request $request, AgendarCitaTenant $agendar, WhatsAppTenant $whatsapp): JsonResponse
     {
         $persona = $this->persona($request);
         abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
@@ -404,7 +405,12 @@ class MiTenantController
             // (ADR 0068).
             'nota' => ['nullable', 'string', 'max:500'],
             'asiste' => ['nullable', 'string', 'max:120'],
+            // Pidió los avisos por WhatsApp al agendar (ADR 0069); sin marcar no cambia nada.
+            'acepta_whatsapp' => ['boolean'],
         ]);
+        if (($validado['acepta_whatsapp'] ?? false) && $whatsapp->enUso()) {
+            $whatsapp->aceptar($persona, true);
+        }
 
         $oferta = OfertaTenant::query()->where('ulid', $validado['oferta_id'])->firstOrFail();
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();

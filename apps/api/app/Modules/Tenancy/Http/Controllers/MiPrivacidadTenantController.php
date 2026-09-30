@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\BajaDePersonaTenant;
 use App\Modules\Tenancy\Application\ExportarDatosPersonaTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
+use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SolicitudPrivacidadTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -85,6 +86,8 @@ class MiPrivacidadTenantController
             // Solo si el negocio manda avisos por WhatsApp (y la plataforma lo tiene).
             'whatsapp_disponible' => $this->whatsapp->enUso(),
             'acepta_whatsapp' => $persona->whatsapp_aceptado_en !== null,
+            // Sin un celular válido no hay a dónde mandarlos.
+            'whatsapp_con_celular' => TelefonoWhatsApp::normalizar($persona->celular) !== null,
             'baja' => $solicitud instanceof SolicitudPrivacidadTenant ? [
                 'estado' => $solicitud->estado,
                 'solicitada_en' => $solicitud->created_at?->toIso8601String(),

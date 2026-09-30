@@ -102,6 +102,21 @@ void main() {
     final enviado = api.peticiones.single.data as Map<String, dynamic>;
     expect(enviado.containsKey('instructor_id'), isFalse);
     expect(enviado.containsKey('nota'), isFalse);
+    expect(enviado.containsKey('acepta_whatsapp'), isFalse);
+  });
+
+  test('si pidió los avisos por WhatsApp al agendar, lo manda', () async {
+    await repo.agendarCita(
+      servicioId: 'o1',
+      sucursalId: 's1',
+      profesionalId: 'p1',
+      iniciaEnLocal: '2026-10-05T10:00',
+      duracionMinutos: 30,
+      aceptaWhatsapp: true,
+    );
+
+    final enviado = api.peticiones.single.data as Map<String, dynamic>;
+    expect(enviado['acepta_whatsapp'], isTrue);
   });
 
   test('pide los días con atención y devuelve solo los abiertos', () async {

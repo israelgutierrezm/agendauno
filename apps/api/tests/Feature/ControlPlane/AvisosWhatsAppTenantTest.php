@@ -237,6 +237,36 @@ it('si la plataforma lo apaga con avisos en cola, se descartan sin enviarse', fu
         ->assertOk()->assertJsonPath('data.whatsapp_disponible', false);
 });
 
+it('con cuenta, al agendar se puede aceptar WhatsApp si tiene celular', function (): void {
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
+    $sede = agendaSemilla($e);
+    $this->putJson("/api/v1/app/{$e['slug']}/ofertas/{$sede['oferta']}", [
+        'lugares' => 0, 'politica_reserva' => 'pago', 'precio_clase_minor' => 25000, 'duracion_minutos' => 30,
+    ], conBearer($e['bearer']))->assertOk();
+    personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia.mx', 'instructor');
+    $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    abrirHorarioDeCitas($e, $pro, $sede['sucursal']);
+    $cliente = alumnoConSesion($e);
+    encenderWhatsApp();
+    avisoPorWhatsApp($e);
+
+    // Sin celular no se le ofrece; con celular, sí.
+    $privacidad = fn (): array => $this->getJson("/api/v1/app/{$e['slug']}/mi/privacidad", conBearer($cliente['bearer']))->assertOk()->json('data');
+    expect($privacidad())->toMatchArray(['whatsapp_disponible' => true, 'acepta_whatsapp' => false, 'whatsapp_con_celular' => false]);
+    enNegocioWhatsApp($e, fn () => PersonaTenant::query()->where('email', 'vale@correo.mx')->update(['celular' => '55 1234 5678']));
+    expect($privacidad()['whatsapp_con_celular'])->toBeTrue();
+
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/citas", [
+        'oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'], 'instructor_id' => $pro,
+        'inicia_en_local' => now('America/Mexico_City')->addDays(3)->format('Y-m-d').' 10:00:00', 'duracion_minutos' => 30,
+        'acepta_whatsapp' => true,
+    ], conBearer($cliente['bearer']))->assertCreated();
+
+    expect($privacidad()['acepta_whatsapp'])->toBeTrue();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    expect(array_map(fn (MensajeTenant $a): ?string => $a->destinatario, avisosWhatsApp($e)))->toBe(['525512345678']);
+});
+
 it('al agendar en la página pública se puede aceptar recibir los avisos por WhatsApp', function (): void {
     $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
     $sede = agendaSemilla($e);

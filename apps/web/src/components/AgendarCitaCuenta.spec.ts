@@ -15,8 +15,15 @@ vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({ slug: "demo" }),
 }));
 
+const privacidad = vi.hoisted(() => ({
+  datos: {} as Record<string, unknown>,
+}));
+
 function respuestas(): void {
   api.get.mockImplementation((url: string) => {
+    if (url.endsWith("/mi/privacidad")) {
+      return Promise.resolve({ data: { data: privacidad.datos } });
+    }
     if (url.endsWith("/mi/citas/opciones")) {
       return Promise.resolve({
         data: {
@@ -66,24 +73,68 @@ function respuestas(): void {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  privacidad.datos = {};
   respuestas();
 });
 
+function montar() {
+  return mount(AgendarCitaCuenta, {
+    global: {
+      plugins: [
+        createI18n({
+          legacy: false,
+          locale: "es",
+          missingWarn: false,
+          fallbackWarn: false,
+          messages: { es: { ...es, perfilPublico } },
+        }),
+      ],
+    },
+  });
+}
+
 describe("agendar desde la cuenta", () => {
+  it("ofrece los avisos por WhatsApp solo si el negocio los usa, aún no los aceptó y tiene celular", async () => {
+    privacidad.datos = {
+      whatsapp_disponible: true,
+      acepta_whatsapp: false,
+      whatsapp_con_celular: true,
+    };
+    api.post.mockResolvedValue({ data: { data: { estado: "confirmada" } } });
+    const w = montar();
+    await flushPromises();
+    await w.get("#cc-servicio").setValue("corte");
+    await w.get("#cc-profesional").setValue("ana");
+    await flushPromises();
+    await w.get("[data-prueba='acepta-whatsapp']").setValue(true);
+    await w
+      .findAll("button")
+      .find((b) => b.text().includes("16:00") || b.text().includes("10:00"))
+      ?.trigger("click");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/mi/citas",
+      expect.objectContaining({ acepta_whatsapp: true }),
+    );
+    // Ya los aceptó: no se le vuelve a preguntar.
+    expect(w.find("[data-prueba='acepta-whatsapp']").exists()).toBe(false);
+  });
+
+  it("sin celular no se le ofrecen", async () => {
+    privacidad.datos = {
+      whatsapp_disponible: true,
+      acepta_whatsapp: false,
+      whatsapp_con_celular: false,
+    };
+    const w = montar();
+    await flushPromises();
+    expect(w.find("[data-prueba='acepta-whatsapp']").exists()).toBe(false);
+  });
+
   it("el calendario solo deja elegir días con atención y abre en el primero", async () => {
-    const w = mount(AgendarCitaCuenta, {
-      global: {
-        plugins: [
-          createI18n({
-            legacy: false,
-            locale: "es",
-            missingWarn: false,
-            fallbackWarn: false,
-            messages: { es: { ...es, perfilPublico } },
-          }),
-        ],
-      },
-    });
+    const w = montar();
     await flushPromises();
     await w.get("#cc-servicio").setValue("corte");
     await w.get("#cc-profesional").setValue("ana");

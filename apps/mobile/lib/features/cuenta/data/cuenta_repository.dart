@@ -449,6 +449,7 @@ class CuentaRepository {
     required String iniciaEnLocal,
     required int duracionMinutos,
     String? nota,
+    bool aceptaWhatsapp = false,
   }) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '$_base/mi/citas',
@@ -460,6 +461,8 @@ class CuentaRepository {
         'duracion_minutos': duracionMinutos,
         // Lo que el cliente quiere que sepa el negocio (ADR 0067).
         'nota': ?nota,
+        // Pidió los avisos por WhatsApp al agendar (ADR 0069).
+        if (aceptaWhatsapp) 'acepta_whatsapp': true,
       },
     );
 
