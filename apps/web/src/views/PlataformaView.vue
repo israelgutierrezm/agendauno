@@ -3,6 +3,7 @@ import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import ErroresPlataforma from "@/components/ErroresPlataforma.vue";
 import OperacionPlataforma from "@/components/OperacionPlataforma.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import ParametrosPlataforma from "@/components/ParametrosPlataforma.vue";
@@ -102,7 +103,8 @@ type Pestana =
   | "tarifas"
   | "parametros"
   | "configuracion"
-  | "operacion";
+  | "operacion"
+  | "errores";
 
 const ESTADOS_FACT = [
   "trial",
@@ -751,6 +753,7 @@ function borrar(): void {
             'parametros',
             'configuracion',
             'operacion',
+            'errores',
           ] as const"
           :key="p"
           type="button"
@@ -1002,6 +1005,14 @@ function borrar(): void {
       <!-- Operación: versión, procesos, verificación, respaldos y alertas -->
       <OperacionPlataforma
         v-if="pestana === 'operacion'"
+        class="mt-5"
+        :api-url="apiUrl"
+        :token="token"
+      />
+
+      <!-- Errores de la API, la web y la app (ADR 0080) -->
+      <ErroresPlataforma
+        v-if="pestana === 'errores'"
         class="mt-5"
         :api-url="apiUrl"
         :token="token"

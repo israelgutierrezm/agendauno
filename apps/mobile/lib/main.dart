@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/auth/application/sesion_controller.dart';
+import 'core/errores/reporte_errores.dart';
 import 'core/network/auth_token.dart';
 import 'core/storage/almacen_sesion.dart';
 import 'core/theme/tema_agendauno.dart';
@@ -15,6 +16,8 @@ import 'features/notificaciones/application/push_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Los errores que nadie atrapa llegan al monitoreo de la plataforma (ADR 0080).
+  ReporteErrores.instancia.instalar();
 
   // Restaura la sesión guardada (cifrada) para no pedir iniciar sesión cada vez.
   final almacen = AlmacenSesion();
@@ -49,6 +52,7 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
     super.initState();
     // Una sesión restaurada se valida con el servidor (token revocado → login).
     ref.read(sesionProvider.notifier).refrescar();
+    ReporteErrores.instancia.estudio = () => ref.read(sesionProvider)?.slug;
     _iniciarPush();
   }
 

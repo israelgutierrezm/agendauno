@@ -419,6 +419,53 @@ export const plataformaAdmin = {
     parametros: "Parámetros",
     configuracion: "Configuración",
     operacion: "Operación",
+    errores: "Errores",
+  },
+  // Monitoreo de errores (ADR 0080).
+  errores: {
+    titulo: "Errores",
+    subtitulo:
+      "Lo que falló en la API, la web y la app, agrupado. Los datos sensibles llegan tachados.",
+    actualizar: "Actualizar",
+    estados: {
+      abierto: "Abiertos",
+      resuelto: "Resueltos",
+      ignorado: "Ignorados",
+    },
+    estado: {
+      abierto: "Abierto",
+      resuelto: "Resuelto",
+      ignorado: "Ignorado",
+    },
+    origen: "Origen",
+    todos: "Todos los orígenes",
+    origenes: { api: "API", web: "Web", app: "App" },
+    vacio: {
+      abierto: "No hay errores abiertos.",
+      resuelto: "No hay errores resueltos.",
+      ignorado: "No hay errores ignorados.",
+    },
+    veces: "1 vez | {n} veces",
+    volvio:
+      "Volvió después de resolverse | Volvió {n} veces después de resolverse",
+    verMas: "Ver más",
+    clase: "Tipo",
+    lugar: "Dónde",
+    cuantas: "Cuántas",
+    primera: "Primera vez",
+    ultima: "Última vez",
+    regresiones: "Regresiones",
+    contexto: "Contexto de la última vez",
+    traza: "Traza",
+    resolver: "Resuelto",
+    ignorar: "Ignorar",
+    reabrir: "Reabrir",
+    marcado: {
+      abierto: "Error reabierto.",
+      resuelto:
+        "Marcado como resuelto. Si vuelve en otra versión, se reabre solo.",
+      ignorado: "Ignorado: se sigue contando, pero ya no avisa.",
+    },
   },
   operacion: {
     actualizar: "Actualizar",
@@ -480,6 +527,10 @@ export const plataformaAdmin = {
       cola_detenida: "Cola detenida",
       trabajos_fallidos: "Trabajos fallidos",
       trabajo_fallido: "Trabajo de la cola",
+      error_web: "Error en la web",
+      error_app: "Error en la app",
+      error_regresion: "Error que volvió",
+      errores_clientes_tope: "Tope de errores de la web y la app",
     },
   },
   estudios: {

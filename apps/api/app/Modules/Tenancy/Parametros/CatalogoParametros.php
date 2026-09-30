@@ -135,6 +135,12 @@ final class CatalogoParametros
                 'Solo se guarda su huella, nunca el código. Cuentan para los topes de códigos por hora y por día.', $e, 7, 2, 90, 'días', porNegocio: false),
             new DefinicionParametro('limpieza.dias_sesiones_tarjeta', 'Limpieza de registros', 'Días que se guardan las sesiones para autorizar tarjetas',
                 'Sirven para registrar la tarjeta del pago automático si el aviso de Stripe no llega; se revisan hasta 48 horas.', $e, 30, 3, 365, 'días', porNegocio: false),
+            new DefinicionParametro('limpieza.dias_errores', 'Limpieza de registros', 'Días que se guarda un error que dejó de pasar',
+                'Contados desde la última vez que pasó, esté abierto, resuelto o ignorado.', $e, 90, 7, 730, 'días', porNegocio: false),
+
+            // Monitoreo de errores (ADR 0080, solo la plataforma).
+            new DefinicionParametro('errores.nuevos_clientes_por_dia', 'Monitoreo de errores', 'Errores nuevos de la web y la app al día',
+                'Protege el monitoreo si alguien manda errores falsos. Los errores ya conocidos se siguen contando; al llegar al tope, avisa al superadministrador.', $e, 200, 10, 10000, 'errores', porNegocio: false),
         ];
 
         $porClave = [];

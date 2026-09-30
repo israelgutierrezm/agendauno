@@ -47,6 +47,8 @@ flutter build appbundle --dart-define=API_BASE_URL=https://DOMINIO \
 
 - `API_BASE_URL` — la API (por defecto `http://localhost:8000`).
 - `WEB_BASE_URL` — el sitio (fotos del inicio); por defecto, la misma que la API.
+- `APP_VERSION` — la versión que viaja en los errores de la app al monitoreo de la
+  plataforma (ADR 0080); por defecto `dev`.
 
 ## Notificaciones push (Firebase)
 

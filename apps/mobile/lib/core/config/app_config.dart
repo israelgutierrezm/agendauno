@@ -19,4 +19,11 @@ class AppConfig {
     'WEB_BASE_URL',
     defaultValue: apiBaseUrl,
   );
+
+  /// Versión de la app que viaja en sus errores (ADR 0080):
+  ///   flutter build appbundle --dart-define=APP_VERSION=1.4.0
+  static const String version = String.fromEnvironment(
+    'APP_VERSION',
+    defaultValue: 'dev',
+  );
 }

@@ -195,7 +195,8 @@ Además de esto, conviene que el proveedor de MySQL haga sus instantáneas diari
 ### Limpieza de registros técnicos
 
 `agendauno:limpiar-registros` (diario, 03:40 de CDMX) borra los envíos y códigos de
-WhatsApp y las sesiones para autorizar tarjetas que ya cumplieron su plazo. Los plazos
+WhatsApp, las sesiones para autorizar tarjetas y los errores que dejaron de pasar,
+cuando ya cumplieron su plazo. Los plazos
 se ajustan en el superadmin, «Parámetros» → «Limpieza de registros» (ADR 0079). No
 borra historial de los negocios.
 
@@ -215,6 +216,11 @@ del último simulacro y las alertas de los últimos 30 días
   webhooks de los negocios que dejaron de responder, respaldos fallidos, trabajos de
   la cola fallidos y la cola detenida. Lo
   que sigue pasando se vuelve a avisar a las 6 horas, no a cada vez.
+- **Errores** (pestaña del superadmin, ADR 0080): los de la API, la web y la app,
+  agrupados, con traza, contexto y versión, y lo sensible tachado. Se marcan
+  resueltos o ignorados; uno resuelto que vuelve en otra versión se reabre y avisa.
+  La web lleva la versión de la compilación (`VITE_APP_VERSION`, la misma `VERSION`
+  de `actualizar.sh`); la app, la de `--dart-define=APP_VERSION`.
 - Si se detiene el **programador de tareas**, él mismo no puede avisar: registra
   `https://DOMINIO/api/v1/health?estricto=1` en un monitor externo (UptimeRobot,
   Better Stack…). Responde 503 si la base, la caché, el programador o la cola fallan.
@@ -239,6 +245,4 @@ del último simulacro y las alertas de los últimos 30 días
 ## Pendiente de decidir
 
 - Proveedor del servidor, de MySQL y del correo.
-- Monitoreo de errores más completo (Sentry u otro; dependencia nueva). Por ahora las
-  alertas llegan por correo.
 - Despliegue automático desde el CI (hoy el CI solo prueba).

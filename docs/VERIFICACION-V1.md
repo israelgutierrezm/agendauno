@@ -247,3 +247,12 @@ Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado�
 - [ ] Con un negocio fuera de prueba y un mes cerrado,
   `php artisan agendauno:generar-cargos-renta --periodo=AAAA-MM` crea su cargo. El
   dueño lo paga en «Suscripción» (`/renta`) y el cargo pasa a `pagado`.
+
+### 11. Monitoreo de errores (ADR 0080)
+
+- [ ] En la web, abre la consola del navegador y ejecuta
+  `setTimeout(() => { throw new Error("prueba") })`. En el superadmin, pestaña
+  «Errores», aparece en «Abiertos» con origen Web, la ruta y la versión.
+- [ ] Márcalo «Resuelto». Tras publicar otra versión, repítelo: vuelve a «Abiertos»
+  con «Volvió después de resolverse» y llega la alerta «Error que volvió».
+- [ ] Márcalo «Ignorar» y repítelo: se cuenta, pero no llega alerta.

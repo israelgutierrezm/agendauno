@@ -40,6 +40,8 @@
   renta lista, vencida y pagada, por correo y WhatsApp; el dueño los ve y decide
   en su panel, donde también cambia su WhatsApp con un código (ADR 0075); alerta de
   renta vencida al correo del superadministrador.
+- **Operación**: monitoreo de errores propio de la API, la web y la app (ADR 0080) y
+  limpieza diaria de registros técnicos (ADR 0079).
 - **Suspensión automática por renta** (ADR 0073): con días de gracia y aviso previo;
   suspendido, el dueño solo entra a pagar y se reactiva al pagar.
 - **Experiencia**: web única (sitio, panel, portal, superadmin) y app Flutter;
@@ -63,7 +65,7 @@
 
 - WhatsApp: si conviene, número propio por negocio o cobrarlo como extra del plan
   (ADR 0069); atender las respuestas de los clientes (ADR 0074).
-- Monitoreo de errores más completo y despliegue automático desde el CI.
+- Despliegue automático desde el CI.
 - Analítica: ocupación, rentabilidad, demanda.
 - Marketplace a partir del directorio.
 - Opciones empresariales: marca blanca, OAuth para terceros.

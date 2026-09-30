@@ -24,6 +24,8 @@ use Illuminate\Support\Carbon;
  *   para los topes de envío de la última hora y del día.
  * - `sesiones_tarjeta` de cada negocio: las sesiones de Stripe para autorizar una
  *   tarjeta (ADR 0076), que se concilian hasta 48 horas.
+ * - `errores_plataforma`: los errores que dejaron de pasar (ADR 0080), por su última
+ *   vez.
  * Borra por lotes para no bloquear las tablas. No toca historial del negocio: los
  * mensajes, los pagos y la bitácora se quedan.
  */
@@ -37,7 +39,7 @@ class LimpiezaDeRegistros
     ) {}
 
     /**
-     * @return array{envios_whatsapp: int, verificaciones_whatsapp: int, sesiones_tarjeta: int}
+     * @return array{envios_whatsapp: int, verificaciones_whatsapp: int, sesiones_tarjeta: int, errores: int}
      */
     public function ejecutar(): array
     {
@@ -48,6 +50,8 @@ class LimpiezaDeRegistros
             'verificaciones_whatsapp' => $this->borrar(VerificacionWhatsApp::query()
                 ->where('created_at', '<', $this->limite($ahora, 'limpieza.dias_verificaciones_whatsapp'))),
             'sesiones_tarjeta' => 0,
+            'errores' => $this->borrar(ErrorPlataforma::query()
+                ->where('ultima_en', '<', $this->limite($ahora, 'limpieza.dias_errores'))),
         ];
 
         $limiteSesiones = $this->limite($ahora, 'limpieza.dias_sesiones_tarjeta');

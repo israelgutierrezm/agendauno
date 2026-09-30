@@ -33,6 +33,7 @@ el esquema.
 | `avisos_duenos` | Avisos de la plataforma al dueño por correo y WhatsApp: prueba por terminar, renta lista, vencida y pagada (uno por tipo, referencia y canal, ADR 0071); entrega y lectura del WhatsApp (ADR 0074) |
 | `whatsapp_envios` | Cada WhatsApp enviado: el `wamid` de Meta, el negocio y el mensaje o aviso al que corresponde, y su último estado (ADR 0074); se limpia a los 30 días (ADR 0079) |
 | `alertas_plataforma` | Alertas de operación agrupadas (ADR 0051) |
+| `errores_plataforma` | Errores de la API, la web y la app agrupados por huella, con traza, contexto tachado, versiones y estado (ADR 0080) |
 | `documentos_legales`, `aceptaciones_legales` | Aviso de privacidad y términos versionados, y quién los aceptó |
 | `users`, `cache`, `jobs`, `failed_jobs`… | Tablas de Laravel |
 

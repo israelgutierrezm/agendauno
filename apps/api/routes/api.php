@@ -25,6 +25,7 @@ use App\Modules\Tenancy\Http\Controllers\DirectorioController;
 use App\Modules\Tenancy\Http\Controllers\DisponibilidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\DocumentosController;
 use App\Modules\Tenancy\Http\Controllers\DunningTenantController;
+use App\Modules\Tenancy\Http\Controllers\ErroresClienteController;
 use App\Modules\Tenancy\Http\Controllers\EscaparateController;
 use App\Modules\Tenancy\Http\Controllers\ExcepcionesHorarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\ExpedienteTenantController;
@@ -69,6 +70,7 @@ use App\Modules\Tenancy\Http\Controllers\PlantillasHorarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasMensajeTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaCobrosController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaController;
+use App\Modules\Tenancy\Http\Controllers\PlataformaErroresController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaEstudiosController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaOperacionController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaWhatsAppController;
@@ -148,6 +150,8 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/directorio', [DirectorioController::class, 'index'])->middleware('throttle:60,1')->name('api.v1.directorio');
     // Documentos legales públicos (aviso de privacidad y términos) para el registro.
     Route::get('/legales', LegalesPublicoController::class)->middleware('throttle:60,1')->name('api.v1.legales');
+    // Errores de la web y la app para el monitoreo (ADR 0080): sin sesión, con tope por IP.
+    Route::post('/errores', ErroresClienteController::class)->middleware('throttle:30,1,errores-cliente')->name('api.v1.errores');
 
     // Administracion de plataforma (PlatformAdmin): token global, sin tenant. Ve todos
     // los estudios y gestiona credenciales globales (cuenta FacturAPI).
@@ -163,6 +167,10 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/cobros', PlataformaCobrosController::class)->name('cobros');
         // Estado de la operación: versión, procesos, verificación, respaldos y alertas.
         Route::get('/operacion', PlataformaOperacionController::class)->name('operacion');
+        // Monitoreo de errores de la API, la web y la app (ADR 0080).
+        Route::get('/errores', [PlataformaErroresController::class, 'index'])->name('errores');
+        Route::get('/errores/{error}', [PlataformaErroresController::class, 'show'])->name('errores.show');
+        Route::put('/errores/{error}', [PlataformaErroresController::class, 'update'])->name('errores.update');
         Route::put('/estudios/{estudio}', [PlataformaController::class, 'actualizarEstudio'])->name('estudios.actualizar');
         Route::get('/configuracion', [PlataformaController::class, 'configuracion'])->name('configuracion');
         Route::put('/configuracion', [PlataformaController::class, 'guardarConfiguracion'])->name('configuracion.guardar');

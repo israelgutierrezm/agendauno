@@ -78,6 +78,8 @@ services:
         VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
         VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY:-}
         VITE_ANALYTICS_ENDPOINT: ${VITE_ANALYTICS_ENDPOINT:-}
+        # La versión viaja en los errores de la web (ADR 0080).
+        VITE_APP_VERSION: ${VERSION:-latest}
         GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
     image: agendauno-web:${VERSION:-latest}
     environment:

@@ -9,6 +9,7 @@ Scramble en `/docs/api`. Rutas en `apps/api/routes/api.php`.
 |---|---|---|
 | `/api/v1/health` | Monitores (`?estricto=1` falla con 503) | — |
 | `/api/v1/registro`, `/directorio`, `/legales` | Alta pública de negocios y directorio | — |
+| `/api/v1/errores` | Errores de la web y la app para el monitoreo (ADR 0080) | — (tope por IP y diario) |
 | `/api/v1/webhooks/tenant/{slug}/{proveedor}` | Pasarelas de cada negocio | Verificación con la pasarela |
 | `/api/v1/webhooks/plataforma/{proveedor}` | Pasarela de la plataforma (renta) | Verificación con la pasarela |
 | `/api/v1/plataforma/*` | Superadmin | `PLATFORM_ADMIN_TOKEN` |
