@@ -18,6 +18,9 @@ vi.mock("@/stores/sesionTenant", () => ({
 const privacidad = vi.hoisted(() => ({
   datos: {} as Record<string, unknown>,
 }));
+const equipo = vi.hoisted(() => ({
+  lista: [] as { id: string; nombre: string; foto_url?: string | null }[],
+}));
 
 function respuestas(): void {
   api.get.mockImplementation((url: string) => {
@@ -44,7 +47,7 @@ function respuestas(): void {
                 zona_horaria: "America/Mexico_City",
               },
             ],
-            instructores: [{ id: "ana", nombre: "Ana" }],
+            instructores: equipo.lista,
           },
         },
       });
@@ -74,6 +77,7 @@ function respuestas(): void {
 beforeEach(() => {
   vi.clearAllMocks();
   privacidad.datos = {};
+  equipo.lista = [{ id: "ana", nombre: "Ana" }];
   respuestas();
 });
 
@@ -104,7 +108,6 @@ describe("agendar desde la cuenta", () => {
     const w = montar();
     await flushPromises();
     await w.get("#cc-servicio").setValue("corte");
-    await w.get("#cc-profesional").setValue("ana");
     await flushPromises();
     await w.get("[data-prueba='acepta-whatsapp']").setValue(true);
     await w
@@ -122,6 +125,34 @@ describe("agendar desde la cuenta", () => {
     expect(w.find("[data-prueba='acepta-whatsapp']").exists()).toBe(false);
   });
 
+  it("con varios profesionales, ve los horarios de todo el equipo o de alguien por su foto", async () => {
+    equipo.lista = [
+      { id: "ana", nombre: "Ana Pérez", foto_url: "/storage/ana.webp" },
+      { id: "luis", nombre: "Luis López" },
+    ];
+    const w = montar();
+    await flushPromises();
+    await w.get("#cc-servicio").setValue("corte");
+    await flushPromises();
+    // La última búsqueda de horarios (el calendario también pide sus días).
+    const ultimaBusqueda = (): Record<string, unknown> =>
+      (
+        api.get.mock.calls
+          .filter(([url]) => String(url).endsWith("/mi/citas/disponibilidad"))
+          .at(-1)?.[1] as { params: Record<string, unknown> }
+      ).params;
+    // Parte de todo el equipo: sin profesional en la búsqueda.
+    expect(ultimaBusqueda()).not.toHaveProperty("instructor_id");
+
+    await w.get('[data-prueba="filtro-alguien"] input').setValue();
+    await w.get('[data-prueba="filtro-luis"] input').setValue();
+    await flushPromises();
+    expect(ultimaBusqueda().instructor_id).toBe("luis");
+    expect(
+      w.get('[data-prueba="filtro-ana"] [data-prueba="ampliar-foto"]').exists(),
+    ).toBe(true);
+  });
+
   it("sin celular no se le ofrecen", async () => {
     privacidad.datos = {
       whatsapp_disponible: true,
@@ -137,7 +168,6 @@ describe("agendar desde la cuenta", () => {
     const w = montar();
     await flushPromises();
     await w.get("#cc-servicio").setValue("corte");
-    await w.get("#cc-profesional").setValue("ana");
     await flushPromises();
 
     expect(api.get).toHaveBeenCalledWith("/api/v1/app/demo/mi/citas/dias", {

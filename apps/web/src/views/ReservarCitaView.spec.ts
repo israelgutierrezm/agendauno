@@ -532,12 +532,12 @@ describe("agenda pública por pasos", () => {
       "/api/v1/app/demo/citas/disponibilidad",
       { params: expect.objectContaining({ instructor_id: "ana" }) },
     );
-    expect(
-      vista.get('[data-prueba="filtro-ana"] .rc-profesional-nombre').text(),
-    ).toBe("Ana");
-    expect(
-      vista.get('[data-prueba="filtro-luis"] .rc-profesional-nombre').text(),
-    ).toBe("Luis");
+    expect(vista.get('[data-prueba="filtro-ana"] .ep-nombre').text()).toBe(
+      "Ana",
+    );
+    expect(vista.get('[data-prueba="filtro-luis"] .ep-nombre').text()).toBe(
+      "Luis",
+    );
     expect(vista.get('[data-prueba="filtro-ana"] img').attributes("src")).toBe(
       "/storage/ana.webp",
     );

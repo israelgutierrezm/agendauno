@@ -274,12 +274,16 @@ class OpcionCita {
     this.duracionMinutos,
     this.zonaHoraria,
     this.incluye = const [],
+    this.fotoUrl,
   });
 
   final String id;
   final String nombre;
   final int? duracionMinutos;
   final String? zonaHoraria;
+
+  /// Foto pública del profesional (para elegirlo por su foto al agendar).
+  final String? fotoUrl;
 
   /// Paquete: los servicios que incluye, en orden (vacío en un servicio simple).
   final List<String> incluye;
@@ -290,6 +294,7 @@ class OpcionCita {
     duracionMinutos: j['duracion_minutos'] as int?,
     zonaHoraria: j['zona_horaria'] as String?,
     incluye: ((j['incluye'] ?? const []) as List).whereType<String>().toList(),
+    fotoUrl: j['foto_url'] as String?,
   );
 }
 

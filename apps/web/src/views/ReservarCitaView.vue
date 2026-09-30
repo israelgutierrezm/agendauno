@@ -8,6 +8,7 @@ import { recordarNegocio } from "@/lib/negociosRecientes";
 import { esMiembro } from "@/lib/roles";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import CalendarioDias from "@/components/CalendarioDias.vue";
+import ElegirProfesional from "@/components/ElegirProfesional.vue";
 import FotoAmpliable from "@/components/FotoAmpliable.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import IconoRed from "@/components/IconoRed.vue";
@@ -118,25 +119,6 @@ const sucursalId = ref("");
 // Primero la hora: se ven los horarios de todo el equipo ("") o, si el cliente ya
 // tiene a alguien de preferencia, solo los de esa persona.
 const filtro = ref("");
-// Ver horarios de alguien específico (si no, de todo el equipo). Al elegir esa
-// opción queda el primero; luego se cambia por su foto.
-const conAlguien = computed(() => filtro.value !== "");
-function verTodos(): void {
-  filtro.value = "";
-}
-function verAlguien(): void {
-  if (filtro.value === "") {
-    filtro.value = opciones.value?.instructores[0]?.id ?? "";
-  }
-}
-// En su tarjeta, el primer nombre; el completo si dos lo comparten.
-function nombreTarjeta(p: Persona): string {
-  const primero = (n: string): string => n.trim().split(/\s+/)[0] ?? n;
-  const iguales = (opciones.value?.instructores ?? []).filter(
-    (o) => primero(o.nombre) === primero(p.nombre),
-  ).length;
-  return iguales > 1 ? p.nombre : primero(p.nombre);
-}
 // Con quién: CUALQUIERA (lo asigna el negocio) o un profesional libre a esa hora.
 const barberoId = ref("");
 const fecha = ref("");
@@ -1206,98 +1188,13 @@ onMounted(cargar);
                   {{ $t("perfilPublico.agendar.cambiar") }}
                 </button>
               </p>
-              <!-- Ver horarios de: todo el equipo o alguien específico; a ese se le
-                   elige por su foto (la lupa la muestra en grande). -->
-              <fieldset
+              <!-- Ver horarios de: todo el equipo o alguien, por su foto. -->
+              <ElegirProfesional
                 v-if="variosProfesionales"
+                v-model="filtro"
                 class="mb-4"
-                data-prueba="ver-horarios-de"
-              >
-                <legend class="tu-label">
-                  {{ $t("perfilPublico.agendar.verHorariosDe") }}
-                </legend>
-                <div class="rc-modo">
-                  <label
-                    class="reserva-eleccion rc-quien-tarjeta"
-                    :class="{ 'reserva-eleccion--activa': !conAlguien }"
-                    data-prueba="filtro-todos"
-                  >
-                    <span class="rc-equipo" aria-hidden="true">
-                      <IconoNav nombre="personas" :tam="22" />
-                    </span>
-                    <span class="reserva-eleccion-texto">
-                      <strong>{{
-                        $t("perfilPublico.agendar.todoElEquipo")
-                      }}</strong>
-                    </span>
-                    <input
-                      type="radio"
-                      name="ver-horarios-de"
-                      class="rc-oculto"
-                      :checked="!conAlguien"
-                      @change="verTodos"
-                    />
-                  </label>
-                  <label
-                    class="reserva-eleccion rc-quien-tarjeta"
-                    :class="{ 'reserva-eleccion--activa': conAlguien }"
-                    data-prueba="filtro-alguien"
-                  >
-                    <span class="rc-equipo" aria-hidden="true">
-                      <IconoNav nombre="miembros" :tam="22" />
-                    </span>
-                    <span class="reserva-eleccion-texto">
-                      <strong>{{
-                        $t("perfilPublico.agendar.alguienEspecifico")
-                      }}</strong>
-                    </span>
-                    <input
-                      type="radio"
-                      name="ver-horarios-de"
-                      class="rc-oculto"
-                      :checked="conAlguien"
-                      @change="verAlguien"
-                    />
-                  </label>
-                </div>
-
-                <template v-if="conAlguien">
-                  <p id="rc-profesionista" class="tu-label mt-4">
-                    {{ $t("perfilPublico.agendar.seleccionaProfesionista") }}
-                  </p>
-                  <div
-                    class="rc-profesionales"
-                    role="radiogroup"
-                    aria-labelledby="rc-profesionista"
-                  >
-                    <label
-                      v-for="b in opciones.instructores"
-                      :key="b.id"
-                      class="rc-profesional"
-                      :class="{ 'rc-profesional--activo': filtro === b.id }"
-                      :data-prueba="`filtro-${b.id}`"
-                      :title="b.nombre"
-                    >
-                      <input
-                        v-model="filtro"
-                        type="radio"
-                        name="profesionista"
-                        :value="b.id"
-                        class="rc-oculto"
-                        :aria-label="b.nombre"
-                      />
-                      <FotoAmpliable
-                        :nombre="b.nombre"
-                        :foto="b.foto_url"
-                        tam="xl"
-                      />
-                      <span class="rc-profesional-nombre">{{
-                        nombreTarjeta(b)
-                      }}</span>
-                    </label>
-                  </div>
-                </template>
-              </fieldset>
+                :profesionales="opciones.instructores"
+              />
               <span class="tu-label">{{ $t("reservar.cuando") }}</span>
               <!-- Días desde hoy; los que no tienen atención no se eligen. -->
               <CalendarioDias
@@ -1819,69 +1716,6 @@ onMounted(cargar);
   font-size: 0.9rem;
 }
 
-/* Selector compacto de dos opciones, sin repetir las instrucciones. */
-.rc-modo {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
-}
-.rc-profesionales {
-  display: flex;
-  gap: 0.6rem;
-  overflow-x: auto;
-  padding: 0.25rem 0.2rem 0.65rem;
-  scroll-snap-type: x proximity;
-  scrollbar-width: thin;
-  scrollbar-color: var(--borde) transparent;
-}
-.rc-profesional {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 0.6rem;
-  flex: 1 0 8.5rem;
-  min-width: 0;
-  max-width: 13rem;
-  padding: 0.75rem;
-  border: 1px solid var(--borde);
-  border-radius: 12px;
-  background: var(--superficie);
-  cursor: pointer;
-  text-align: center;
-  scroll-snap-align: start;
-  transition:
-    border-color 150ms ease,
-    background-color 150ms ease;
-}
-.rc-profesional:hover {
-  border-color: var(--primario);
-}
-.rc-profesional--activo {
-  border-color: var(--primario);
-  background: var(--primario-suave);
-  box-shadow: inset 0 0 0 1px var(--primario);
-}
-.rc-profesional:has(:focus-visible) {
-  outline: 2px solid var(--primario);
-  outline-offset: 3px;
-}
-.rc-profesional-nombre {
-  min-width: 0;
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  font-size: 0.95rem;
-  line-height: 1.3;
-}
-/* El círculo de la opción no se ve: toda la tarjeta es la opción. */
-.rc-oculto {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
 /* Horas en cuadrícula pareja. */
 .rc-horas {
   display: grid;
@@ -1909,32 +1743,6 @@ onMounted(cargar);
   outline: 2px solid var(--primario);
   outline-offset: 3px;
 }
-.rc-quien-tarjeta {
-  position: relative;
-  min-height: 3.6rem;
-  padding: 0.65rem 1rem;
-  justify-content: center;
-  gap: 0.75rem;
-  border-radius: 0 10px 10px 0;
-}
-.rc-quien-tarjeta:first-child {
-  border-radius: 10px 0 0 10px;
-}
-.rc-quien-tarjeta .rc-equipo {
-  width: 1.6rem;
-  height: 1.6rem;
-  border: 0;
-  background: transparent;
-}
-.rc-quien-tarjeta.reserva-eleccion--activa .rc-equipo {
-  color: var(--primario);
-}
-.rc-quien-tarjeta .reserva-eleccion-texto {
-  text-align: center;
-}
-.rc-quien-tarjeta .reserva-eleccion-texto strong {
-  font-size: 0.95rem;
-}
 .rc-equipo {
   display: inline-flex;
   align-items: center;
@@ -1945,9 +1753,6 @@ onMounted(cargar);
   border-radius: 999px;
   background: var(--fondo);
   border: 1px solid var(--borde);
-  color: var(--texto-suave);
-}
-.rc-suave {
   color: var(--texto-suave);
 }
 
@@ -2125,22 +1930,6 @@ button.rc-paso-marca:hover .rc-paso-texto {
 @media (max-width: 520px) {
   .reserva-tarjetas {
     grid-template-columns: 1fr;
-  }
-  .rc-quien-tarjeta {
-    padding: 0.65rem 0.5rem;
-    gap: 0.4rem;
-  }
-  .rc-quien-tarjeta .reserva-eleccion-texto strong {
-    font-size: 0.8rem;
-  }
-  .rc-profesional {
-    flex-basis: 6.5rem;
-    padding: 0.75rem 0.5rem;
-  }
-  .rc-profesional :deep(.fa-foto--xl > img),
-  .rc-profesional :deep(.fa-foto--xl > span) {
-    width: 3.5rem;
-    height: 3.5rem;
   }
   /* En pantallas angostas solo se nombra el paso actual, que toma el espacio. */
   .rc-paso--actual {

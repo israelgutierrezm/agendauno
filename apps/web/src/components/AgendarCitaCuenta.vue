@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import CalendarioDias from "@/components/CalendarioDias.vue";
+import ElegirProfesional from "@/components/ElegirProfesional.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -29,6 +30,7 @@ interface Opcion {
   id: string;
   nombre: string;
   zona_horaria?: string | null;
+  foto_url?: string | null;
 }
 interface Slot {
   inicia: string;
@@ -58,6 +60,14 @@ const slotSel = ref("");
 const agendando = ref(false);
 const ofrecerWhatsApp = ref(false);
 const aceptaWhatsApp = ref(false);
+
+// «Ver horarios de» (el mismo selector que la página pública): "" = todo el equipo.
+const verHorariosDe = computed<string>({
+  get: () => (profesionalId.value === CUALQUIERA ? "" : profesionalId.value),
+  set: (id) => {
+    profesionalId.value = id === "" ? CUALQUIERA : id;
+  },
+});
 
 const servicio = computed(
   () => servicios.value.find((s) => s.id === servicioId.value) ?? null,
@@ -190,9 +200,11 @@ onMounted(async () => {
     servicios.value = data.data.servicios;
     sucursales.value = data.data.sucursales;
     profesionales.value = data.data.instructores;
-    if (profesionales.value.length > 1) {
-      profesionalId.value = CUALQUIERA;
-    }
+    // Con varios, se parte de todo el equipo; con uno, es esa persona.
+    profesionalId.value =
+      profesionales.value.length > 1
+        ? CUALQUIERA
+        : (profesionales.value[0]?.id ?? "");
     if (sucursales.value.length === 1) {
       sucursalId.value = sucursales.value[0].id;
     }
@@ -260,25 +272,6 @@ onMounted(async () => {
             :moneda="servicio.moneda"
           />
         </div>
-        <div>
-          <label class="tu-label" for="cc-profesional">{{
-            $t("citaCuenta.profesional")
-          }}</label>
-          <select
-            id="cc-profesional"
-            v-model="profesionalId"
-            class="tu-input"
-            required
-          >
-            <option value="" disabled>{{ $t("citaCuenta.elegir") }}</option>
-            <option v-if="profesionales.length > 1" :value="CUALQUIERA">
-              {{ $t("perfilPublico.agendar.cualquiera") }}
-            </option>
-            <option v-for="p in profesionales" :key="p.id" :value="p.id">
-              {{ p.nombre }}
-            </option>
-          </select>
-        </div>
         <div v-if="sucursales.length > 1">
           <label class="tu-label" for="cc-sede">{{
             $t("citaCuenta.sede")
@@ -291,6 +284,13 @@ onMounted(async () => {
           </select>
         </div>
       </div>
+
+      <!-- Ver horarios de: todo el equipo o alguien, por su foto. -->
+      <ElegirProfesional
+        v-if="profesionales.length > 1"
+        v-model="verHorariosDe"
+        :profesionales="profesionales"
+      />
 
       <!-- Días desde hoy; los que no tienen atención no se eligen (ADR 0065). -->
       <div v-if="sucursalId !== ''">
@@ -324,15 +324,13 @@ onMounted(async () => {
         >
           {{ $t("citaCuenta.sinHorarios") }}
         </p>
-        <div v-else class="flex flex-wrap gap-2" role="group">
+        <div v-else class="cc-horas" role="group">
           <button
             v-for="s in slots"
             :key="s.inicia"
             type="button"
-            class="tu-btn text-sm"
-            :class="
-              slotSel === s.inicia ? 'tu-btn-primario' : 'tu-btn-fantasma'
-            "
+            class="cc-hora"
+            :class="{ 'cc-hora--activa': slotSel === s.inicia }"
             :aria-pressed="slotSel === s.inicia"
             @click="slotSel = s.inicia"
           >
@@ -370,3 +368,40 @@ onMounted(async () => {
     </form>
   </div>
 </template>
+
+<style scoped>
+/* Horas en cuadrícula pareja, como en la página pública. */
+.cc-horas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+  gap: 0.6rem;
+}
+.cc-hora {
+  min-height: 44px;
+  padding: 0.6rem 0.5rem;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  background: var(--superficie);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+.cc-hora:hover {
+  border-color: var(--primario);
+  background: var(--primario-suave);
+}
+.cc-hora:focus-visible {
+  outline: 2px solid var(--primario);
+  outline-offset: 3px;
+}
+.cc-hora--activa,
+.cc-hora--activa:hover {
+  border-color: var(--primario);
+  background: var(--primario);
+  color: var(--primario-contraste);
+}
+</style>

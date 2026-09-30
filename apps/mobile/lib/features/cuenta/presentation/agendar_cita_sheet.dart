@@ -8,10 +8,11 @@ import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
 import 'cuenta_screen.dart';
+import 'elegir_profesional.dart';
 
-/// Agendar una cita desde la cuenta: servicio, profesional, sede, día y hora libre.
-/// Si el servicio se paga para reservar, la cita queda apartada hasta pagarla.
-/// Con más de un profesional se parte de «cualquier profesional disponible».
+/// Agendar una cita desde la cuenta: servicio, sede, de quién ver horarios (todo el
+/// equipo o alguien, por su foto, como en la web), día y hora libre. Si el servicio
+/// se paga para reservar, la cita queda apartada hasta pagarla.
 class AgendarCitaSheet extends ConsumerStatefulWidget {
   const AgendarCitaSheet({super.key});
 
@@ -75,9 +76,10 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
       _sede = opciones.sucursales.length == 1
           ? opciones.sucursales.first
           : null;
-      if (opciones.profesionales.length > 1) {
-        _profesional = _cualquiera;
-      }
+      // Con varios, se parte de todo el equipo; con uno, es esa persona.
+      _profesional = opciones.profesionales.length > 1
+          ? _cualquiera
+          : opciones.profesionales.firstOrNull;
       _ofrecerWhatsapp = ofrecerWhatsapp;
       _cargando = false;
     });
@@ -256,23 +258,28 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                         style: const TextStyle(color: TemaAgendaUno.textoSuave),
                       ),
                     ),
-                  _selector(
-                    'Profesional',
-                    [
-                      if (opciones.profesionales.length > 1) _cualquiera,
-                      ...opciones.profesionales,
-                    ],
-                    _profesional,
-                    (v) {
-                      setState(() => _profesional = v);
-                      _buscarHorarios();
-                    },
-                  ),
                   if (opciones.sucursales.length > 1)
                     _selector('Sede', opciones.sucursales, _sede, (v) {
                       setState(() => _sede = v);
                       _buscarHorarios();
                     }),
+                  if (opciones.profesionales.length > 1) ...[
+                    ElegirProfesional(
+                      profesionales: opciones.profesionales,
+                      seleccionado: _idProfesional,
+                      alCambiar: (id) {
+                        setState(
+                          () => _profesional = id == null
+                              ? _cualquiera
+                              : opciones.profesionales.firstWhere(
+                                  (p) => p.id == id,
+                                ),
+                        );
+                        _buscarHorarios();
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   OutlinedButton.icon(
                     icon: const Icon(Icons.calendar_today_outlined, size: 18),
                     label: Text(
@@ -289,20 +296,43 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                       style: TextStyle(color: TemaAgendaUno.textoSuave),
                     )
                   else
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _horarios
-                          .map(
-                            (h) => ChoiceChip(
-                              label: Text(
-                                Formato.hora(DateTime.parse(h).toLocal()),
-                              ),
-                              selected: _hora == h,
-                              onSelected: (_) => setState(() => _hora = h),
-                            ),
-                          )
-                          .toList(),
+                    // Horas en cuadrícula pareja, como en la web.
+                    LayoutBuilder(
+                      builder: (context, caja) {
+                        const separacion = 8.0;
+                        final columnas = (caja.maxWidth / 88).floor().clamp(
+                          3,
+                          6,
+                        );
+                        final ancho =
+                            (caja.maxWidth - separacion * (columnas - 1)) /
+                            columnas;
+                        return Wrap(
+                          spacing: separacion,
+                          runSpacing: separacion,
+                          children: _horarios.map((h) {
+                            final elegida = _hora == h;
+                            final texto = Formato.hora(
+                              DateTime.parse(h).toLocal(),
+                            );
+                            return SizedBox(
+                              width: ancho,
+                              height: 44,
+                              child: elegida
+                                  ? FilledButton(
+                                      onPressed: () =>
+                                          setState(() => _hora = h),
+                                      child: Text(texto),
+                                    )
+                                  : OutlinedButton(
+                                      onPressed: () =>
+                                          setState(() => _hora = h),
+                                      child: Text(texto),
+                                    ),
+                            );
+                          }).toList(),
+                        );
+                      },
                     ),
                   const SizedBox(height: 16),
                   TextField(
