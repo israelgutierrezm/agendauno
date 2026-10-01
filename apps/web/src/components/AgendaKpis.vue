@@ -20,7 +20,7 @@ defineProps<{
 </script>
 
 <template>
-  <dl class="kp">
+  <dl class="kp" :style="{ '--kp-n': String(Math.max(tarjetas.length, 1)) }">
     <div
       v-for="k in tarjetas"
       :key="k.clave"
@@ -42,11 +42,23 @@ defineProps<{
 </template>
 
 <style scoped>
+/* Uno por fila en el teléfono, de dos en dos en mediano y todos en una fila en
+   pantalla grande (sin que quede uno solo abajo). */
 .kp {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.85rem;
   margin: 0;
+}
+@media (min-width: 640px) {
+  .kp {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1200px) {
+  .kp {
+    grid-template-columns: repeat(var(--kp-n), minmax(0, 1fr));
+  }
 }
 .kp-tarjeta {
   position: relative;
