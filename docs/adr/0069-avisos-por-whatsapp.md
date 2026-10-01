@@ -70,7 +70,9 @@ opción.
 - «Enviado» significa que Meta aceptó el mensaje. La entrega y la lectura llegan
   por el webhook de estados de Meta (ADR 0074); un número sin WhatsApp queda
   fallido con el motivo.
-- Todos los negocios usan el mismo número. Un número propio por negocio
-  (Embedded Signup) o cobrar el WhatsApp como extra del plan es trabajo aparte.
+- Todos los negocios usan el mismo número, el de AgendaUno. Se descartó un número
+  propio por negocio (Embedded Signup, 2026-09-30): Meta le cobraría a cada negocio
+  por su cuenta, el gasto podría crecer sin control y muchos no querrían pagarlo.
+  El costo lo controla el superadministrador con los interruptores.
 - Cambiar el texto de un aviso exige registrar una plantilla nueva en Meta y
   cambiar su nombre en `PlantillasWhatsApp`.

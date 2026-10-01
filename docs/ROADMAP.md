@@ -66,8 +66,8 @@
 
 ## Después
 
-- WhatsApp: si conviene, número propio por negocio o cobrarlo como extra del plan
-  (ADR 0069); atender las respuestas de los clientes (ADR 0074).
+- WhatsApp: atender las respuestas de los clientes al número de AgendaUno
+  (ADR 0074). No habrá número propio por negocio (ADR 0069).
 - Despliegue automático desde el CI.
 - Marketplace a partir del directorio.
 - Opciones empresariales: marca blanca, OAuth para terceros.
