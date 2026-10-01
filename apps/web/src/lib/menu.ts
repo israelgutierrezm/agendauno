@@ -9,6 +9,7 @@ import type { useSesionTenantStore } from "@/stores/sesionTenant";
 type Sesion = ReturnType<typeof useSesionTenantStore>;
 
 // Menu lateral en ARBOL (3 niveles): grupos por area -> secciones -> sub-secciones.
+// Un grupo al que solo le queda una opción visible se muestra como esa opción.
 export const MENU: MenuItem[] = [
   {
     // Portal del alumno o cliente (su cuenta en este negocio), una pantalla por tema.
@@ -175,74 +176,83 @@ export const MENU: MenuItem[] = [
     ],
   },
   {
-    // Lo que se vende para reservar (ADR 0050): planes y paquetes y su venta.
-    clave: "membresias",
-    etiqueta: "planes.nav.membresias",
-    icono: "etiqueta",
+    // Todo lo que entra de dinero: lo que se vende para reservar (ADR 0050), el
+    // mostrador y la cobranza, cada uno en su subgrupo.
+    clave: "ventas-grupo",
+    etiqueta: "nav.grupos.ventas",
+    icono: "ventas",
     hijos: [
       {
-        clave: "planes",
-        etiqueta: "planes.nav.planes",
+        clave: "membresias",
+        etiqueta: "planes.nav.membresias",
         icono: "etiqueta",
-        ruta: "planes",
-        permiso: "productos.ver",
+        hijos: [
+          {
+            clave: "planes",
+            etiqueta: "planes.nav.planes",
+            icono: "etiqueta",
+            ruta: "planes",
+            permiso: "productos.ver",
+          },
+          {
+            clave: "ventas",
+            etiqueta: "planes.nav.vender",
+            icono: "ventas",
+            ruta: "ventas",
+            // Vende a un alumno y muestra las órdenes: sin eso la pantalla queda a medias.
+            permiso: ["productos.ver", "ordenes.ver", "miembros.ver"],
+          },
+        ],
       },
+      // Artículos del mostrador (agua, ropa…): nada que ver con la agenda.
       {
-        clave: "ventas",
-        etiqueta: "planes.nav.vender",
-        icono: "ventas",
-        ruta: "ventas",
-        // Vende a un alumno y muestra las órdenes: sin eso la pantalla queda a medias.
-        permiso: ["productos.ver", "ordenes.ver", "miembros.ver"],
-      },
-    ],
-  },
-  {
-    // Artículos del mostrador (agua, ropa…): nada que ver con la agenda.
-    clave: "punto-venta",
-    etiqueta: "planes.nav.puntoVenta",
-    icono: "pos",
-    hijos: [
-      {
-        clave: "pos",
-        etiqueta: "planes.nav.mostrador",
+        clave: "punto-venta",
+        etiqueta: "planes.nav.puntoVenta",
         icono: "pos",
-        ruta: "pos",
-        // El mostrador es para cobrar.
-        permiso: ["inventario.ver", "pos.vender"],
+        hijos: [
+          {
+            clave: "pos",
+            etiqueta: "planes.nav.mostrador",
+            icono: "pos",
+            ruta: "pos",
+            // El mostrador es para cobrar.
+            permiso: ["inventario.ver", "pos.vender"],
+          },
+          {
+            clave: "inventario",
+            etiqueta: "planes.nav.inventario",
+            icono: "lista",
+            ruta: "inventario",
+            permiso: "inventario.gestionar",
+          },
+        ],
       },
       {
-        clave: "inventario",
-        etiqueta: "planes.nav.inventario",
-        icono: "lista",
-        ruta: "inventario",
-        permiso: "inventario.gestionar",
+        clave: "cobros",
+        etiqueta: "planes.nav.cobros",
+        icono: "facturas",
+        hijos: [
+          {
+            clave: "cobranza",
+            etiqueta: "nav.cobranza",
+            icono: "facturas",
+            ruta: "cobranza",
+            permiso: "facturacion.ver",
+          },
+          {
+            clave: "facturas",
+            etiqueta: "nav.facturas",
+            icono: "facturas",
+            ruta: "facturas",
+            permiso: "ordenes.ver",
+          },
+        ],
       },
     ],
   },
   {
-    clave: "cobros",
-    etiqueta: "planes.nav.cobros",
-    icono: "facturas",
-    hijos: [
-      {
-        clave: "cobranza",
-        etiqueta: "nav.cobranza",
-        icono: "facturas",
-        ruta: "cobranza",
-        permiso: "facturacion.ver",
-      },
-      {
-        clave: "facturas",
-        etiqueta: "nav.facturas",
-        icono: "facturas",
-        ruta: "facturas",
-        permiso: "ordenes.ver",
-      },
-    ],
-  },
-  {
-    // Quien imparte o atiende: sus horarios y lo que se le paga.
+    // Quien imparte o atiende (sus horarios y lo que se le paga) y quién entra al
+    // panel con qué permisos.
     clave: "equipo",
     etiqueta: "operacion.menu.equipo",
     icono: "instructores",
@@ -271,6 +281,28 @@ export const MENU: MenuItem[] = [
         icono: "nomina",
         ruta: "nomina",
         permiso: ["estudio.gestionar", "usuarios.gestionar"],
+      },
+      {
+        clave: "usuarios-grupo",
+        etiqueta: "nav.grupos.usuarios",
+        icono: "usuarios",
+        hijos: [
+          {
+            clave: "usuarios",
+            etiqueta: "nav.usuarios",
+            icono: "usuarios",
+            ruta: "usuarios",
+            permiso: "usuarios.gestionar",
+          },
+          {
+            // Roles propios del negocio y sus permisos (ADR 0057).
+            clave: "roles",
+            etiqueta: "operacion.rolesPropios.titulo",
+            icono: "usuarios",
+            ruta: "roles",
+            permiso: "roles.gestionar",
+          },
+        ],
       },
     ],
   },
@@ -318,98 +350,112 @@ export const MENU: MenuItem[] = [
     permiso: "facturacion.ver",
   },
   {
-    // Cómo está armado el negocio: se configura una vez y se revisa de vez en cuando.
+    // Cómo está armado el negocio: se configura una vez y se revisa de vez en
+    // cuando. Por tema, para no tener una lista larga.
     clave: "ajustes",
     etiqueta: "nav.configuracion",
     icono: "ajustes",
     hijos: [
       {
-        clave: "configuracion",
-        etiqueta: "operacion.menu.negocio",
+        clave: "negocio-grupo",
+        etiqueta: "nav.grupos.negocio",
         icono: "configuracion",
-        ruta: "configuracion",
-        permiso: "estudio.gestionar",
+        hijos: [
+          {
+            clave: "configuracion",
+            etiqueta: "operacion.menu.negocio",
+            icono: "configuracion",
+            ruta: "configuracion",
+            permiso: "estudio.gestionar",
+          },
+          {
+            clave: "sedes",
+            etiqueta: "nav.sedes",
+            icono: "ubicacion",
+            ruta: "sedes",
+            permiso: "sucursales.gestionar",
+          },
+          {
+            clave: "datos-fiscales",
+            etiqueta: "nav.datosFiscales",
+            icono: "datosFiscales",
+            ruta: "datos-fiscales",
+            permiso: "estudio.gestionar",
+          },
+        ],
       },
       {
-        // Cómo se reservan las clases/servicios y a qué precio.
-        clave: "catalogo",
-        etiqueta: "planes.nav.clasesServicios",
-        icono: "etiqueta",
-        ruta: "catalogo",
-        permiso: "catalogo.gestionar",
-      },
-      {
-        clave: "reglas-agenda",
-        etiqueta: "reglasAgenda.titulo",
+        clave: "servicios-grupo",
+        etiqueta: "nav.grupos.servicios",
         icono: "agenda",
-        ruta: "reglas-agenda",
-        permiso: "agenda.gestionar",
+        hijos: [
+          {
+            // Cómo se reservan las clases/servicios y a qué precio.
+            clave: "catalogo",
+            etiqueta: "planes.nav.clasesServicios",
+            icono: "etiqueta",
+            ruta: "catalogo",
+            permiso: "catalogo.gestionar",
+          },
+          {
+            clave: "reglas-agenda",
+            etiqueta: "reglasAgenda.titulo",
+            icono: "agenda",
+            ruta: "reglas-agenda",
+            permiso: "agenda.gestionar",
+          },
+          {
+            // Salas y equipo: se configuran, no se operan.
+            clave: "recursos",
+            etiqueta: "nav.recursos",
+            icono: "recursos",
+            ruta: "recursos",
+            permiso: "agenda.gestionar",
+          },
+        ],
       },
       {
-        // Salas y equipo: se configuran, no se operan.
-        clave: "recursos",
-        etiqueta: "nav.recursos",
-        icono: "recursos",
-        ruta: "recursos",
-        permiso: "agenda.gestionar",
-      },
-      {
-        clave: "sedes",
-        etiqueta: "nav.sedes",
-        icono: "ubicacion",
-        ruta: "sedes",
-        permiso: "sucursales.gestionar",
-      },
-      {
-        clave: "usuarios",
-        etiqueta: "nav.usuarios",
-        icono: "usuarios",
-        ruta: "usuarios",
-        permiso: "usuarios.gestionar",
-      },
-      {
-        // Roles propios del negocio y sus permisos (ADR 0057).
-        clave: "roles",
-        etiqueta: "operacion.rolesPropios.titulo",
-        icono: "usuarios",
-        ruta: "roles",
-        permiso: "roles.gestionar",
-      },
-      {
-        clave: "datos-fiscales",
-        etiqueta: "nav.datosFiscales",
-        icono: "datosFiscales",
-        ruta: "datos-fiscales",
-        permiso: "estudio.gestionar",
-      },
-      {
-        clave: "pasarelas",
-        etiqueta: "nav.pasarelas",
+        clave: "pagos-grupo",
+        etiqueta: "nav.grupos.pagos",
         icono: "pasarelas",
-        ruta: "pasarelas",
-        permiso: "pagos.configurar",
+        hijos: [
+          {
+            clave: "pasarelas",
+            etiqueta: "nav.pasarelas",
+            icono: "pasarelas",
+            ruta: "pasarelas",
+            permiso: "pagos.configurar",
+          },
+          {
+            clave: "integraciones",
+            etiqueta: "nav.integraciones",
+            icono: "integraciones",
+            ruta: "integraciones",
+            permiso: "integraciones.configurar",
+          },
+        ],
       },
       {
-        clave: "integraciones",
-        etiqueta: "nav.integraciones",
-        icono: "integraciones",
-        ruta: "integraciones",
-        permiso: "integraciones.configurar",
-      },
-      {
-        clave: "bitacora",
-        etiqueta: "bitacora.titulo",
+        clave: "registros-grupo",
+        etiqueta: "nav.grupos.registros",
         icono: "lista",
-        ruta: "bitacora",
-        permiso: "auditoria.ver",
-      },
-      {
-        // Derechos ARCO: bajas de datos que pidieron los alumnos.
-        clave: "privacidad",
-        etiqueta: "privacidadNegocio.titulo",
-        icono: "documentos",
-        ruta: "privacidad",
-        permiso: "miembros.gestionar",
+        hijos: [
+          {
+            clave: "bitacora",
+            etiqueta: "bitacora.titulo",
+            icono: "lista",
+            ruta: "bitacora",
+            permiso: "auditoria.ver",
+          },
+          {
+            // Derechos ARCO: bajas de datos que pidieron los alumnos.
+            clave: "privacidad",
+            etiqueta: "privacidadNegocio.titulo",
+            icono: "documentos",
+            ruta: "privacidad",
+            permiso: "miembros.gestionar",
+          },
+        ],
       },
     ],
   },

@@ -12,14 +12,34 @@ describe("menú lateral del panel", () => {
       "panel",
       "operacion",
       "clientes",
-      "membresias",
-      "punto-venta",
-      "cobros",
+      "ventas-grupo",
       "equipo",
       "marketing",
       "reportes",
       "ajustes",
       "suscripcion",
+    ]);
+  });
+
+  it("agrupa en un tercer nivel: ventas, usuarios del equipo y la configuración", () => {
+    const hijos = (clave: string): string[] =>
+      MENU.find((i) => i.clave === clave)?.hijos?.map((h) => h.clave) ?? [];
+
+    expect(hijos("ventas-grupo")).toEqual([
+      "membresias",
+      "punto-venta",
+      "cobros",
+    ]);
+    // Accesos y roles viven con el equipo, en «Usuarios».
+    const usuarios = MENU.find((i) => i.clave === "equipo")?.hijos?.find(
+      (h) => h.clave === "usuarios-grupo",
+    );
+    expect(usuarios?.hijos?.map((h) => h.ruta)).toEqual(["usuarios", "roles"]);
+    expect(hijos("ajustes")).toEqual([
+      "negocio-grupo",
+      "servicios-grupo",
+      "pagos-grupo",
+      "registros-grupo",
     ]);
   });
 

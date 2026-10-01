@@ -82,6 +82,12 @@ export default {
     grupos: {
       operacion: "Operación",
       suscripcion: "Mi suscripción",
+      ventas: "Ventas",
+      usuarios: "Usuarios",
+      negocio: "Negocio",
+      servicios: "Servicios y agenda",
+      pagos: "Pagos e integraciones",
+      registros: "Registros y privacidad",
     },
   },
   tema: {

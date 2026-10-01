@@ -19,7 +19,7 @@ const compacto = (): boolean => estado?.compacto.value ?? false;
 
 <template>
   <template v-for="item in items" :key="item.clave">
-    <!-- Grupo (nivel 1/2): boton que expande/colapsa sus hijos -->
+    <!-- Grupo (nivel 1/2, o subgrupo de tercer nivel): expande/colapsa sus hijos -->
     <div v-if="item.hijos && item.hijos.length > 0">
       <button
         type="button"
@@ -30,7 +30,11 @@ const compacto = (): boolean => estado?.compacto.value ?? false;
         :aria-expanded="!compacto() && abierto(item.clave)"
         @click="estado?.alternar(item.clave)"
       >
-        <IconoNav :nombre="item.icono ?? 'punto'" :tam="20" class="shrink-0" />
+        <IconoNav
+          :nombre="item.icono ?? 'punto'"
+          :tam="nivel > 1 ? 18 : 20"
+          class="shrink-0"
+        />
         <span v-show="!compacto()" class="truncate flex-1 text-left">{{
           item.texto ?? t(item.etiqueta)
         }}</span>

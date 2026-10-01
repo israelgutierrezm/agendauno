@@ -113,19 +113,21 @@ const puedeConfigurar = computed(() => sesion.puede("estudio.gestionar"));
 // ---- Estado del arbol (expandir/colapsar grupos) ----
 const abiertos = ref<Set<string>>(new Set());
 
-// La clave del grupo que contiene la ruta activa (para auto-expandirlo).
-function grupoDe(ruta: string, items: MenuItem[] = MENU): string | null {
+// Los grupos que contienen la ruta activa, del principal al subgrupo (para
+// abrirlos todos con el tercer nivel).
+function gruposDe(ruta: string, items: MenuItem[] = MENU): string[] {
   for (const item of items) {
     if (item.hijos !== undefined) {
-      if (
-        item.hijos.some((h) => h.ruta === ruta) ||
-        grupoDe(ruta, item.hijos) !== null
-      ) {
-        return item.clave;
+      if (item.hijos.some((h) => h.ruta === ruta)) {
+        return [item.clave];
+      }
+      const dentro = gruposDe(ruta, item.hijos);
+      if (dentro.length > 0) {
+        return [item.clave, ...dentro];
       }
     }
   }
-  return null;
+  return [];
 }
 
 function alternar(clave: string): void {
@@ -143,9 +145,9 @@ function alternar(clave: string): void {
 }
 
 function abrirGrupoActivo(): void {
-  const g = grupoDe(String(route.name));
-  if (g !== null) {
-    abiertos.value = new Set(abiertos.value).add(g);
+  const grupos = gruposDe(String(route.name));
+  if (grupos.length > 0) {
+    abiertos.value = new Set([...abiertos.value, ...grupos]);
   }
 }
 
