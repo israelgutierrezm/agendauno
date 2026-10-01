@@ -355,31 +355,43 @@
   }
 
   /* Pestañas de página: subrayadas, la activa en el color de la marca. */
+  /* Pestañas: texto con subrayado, no botones. La activa, en el color de acción. */
   .tu-pestanas {
     display: flex;
-    gap: 0.25rem;
+    gap: 1.6rem;
     max-width: 100%;
     overflow-x: auto;
+    scrollbar-width: none;
     border-bottom: 1px solid var(--borde);
   }
-  .tu-pestanas > button {
+  .tu-pestanas > button,
+  .tu-pestanas > a {
     margin-bottom: -1px;
-    padding: 0.6rem 1.1rem;
+    padding: 0.7rem 0.1rem 0.65rem;
     border: 0;
     border-bottom: 2px solid transparent;
-    border-radius: 0.6rem 0.6rem 0 0;
     background: transparent;
     color: var(--texto-suave);
     font-size: 0.92rem;
     font-weight: 500;
     white-space: nowrap;
+    text-decoration: none;
     cursor: pointer;
+    transition:
+      color 0.15s,
+      border-color 0.15s;
   }
-  .tu-pestanas > button:hover {
+  .tu-pestanas > button:hover,
+  .tu-pestanas > a:hover {
     color: var(--texto);
+    border-bottom-color: color-mix(
+      in srgb,
+      var(--texto-suave) 35%,
+      transparent
+    );
   }
-  .tu-pestanas > button[aria-pressed="true"] {
-    background: var(--primario-suave);
+  .tu-pestanas > button[aria-pressed="true"],
+  .tu-pestanas > a[aria-current="page"] {
     border-bottom-color: var(--primario);
     color: var(--primario);
     font-weight: 600;

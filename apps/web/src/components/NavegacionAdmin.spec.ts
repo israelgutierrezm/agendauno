@@ -1,13 +1,15 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it } from "vitest";
-import { h } from "vue";
+import { defineComponent, h } from "vue";
 import { createI18n } from "vue-i18n";
 import { createMemoryHistory, createRouter, RouterView } from "vue-router";
 
 import esMX from "@/i18n/locales/es-MX";
 import { POLITICAS } from "@/lib/acceso";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useUbicacionActual } from "@/lib/ubicacionActual";
+import { i18n as i18nApp } from "@/i18n";
 import LayoutConfiguracion from "./LayoutConfiguracion.vue";
 import NavLateral from "./NavLateral.vue";
 import PestanasArea from "./PestanasArea.vue";
@@ -127,7 +129,7 @@ describe("pestañas del área", () => {
 });
 
 describe("configuración del negocio", () => {
-  it("abre la categoría de la opción actual y muestra su ubicación", async () => {
+  it("abre la categoría de la opción actual", async () => {
     entrar(["*"]);
     const { w } = await montar(LayoutConfiguracion, { name: "pasarelas" });
 
@@ -135,9 +137,6 @@ describe("configuración del negocio", () => {
     expect(abierta.text()).toBe("Pagos e integraciones");
     expect(w.find('.lc-lateral [aria-current="page"]').text()).toBe(
       "Pasarelas de pago",
-    );
-    expect(w.get('[data-prueba="ubicacion-config"]').text()).toContain(
-      "Configuración del negocio/Pagos e integraciones/Pasarelas de pago",
     );
   });
 
@@ -162,5 +161,79 @@ describe("configuración del negocio", () => {
     expect(w.find(".lc-lateral .lc-resultado").text()).toContain(
       "Pasarelas de pago",
     );
+  });
+});
+
+// La barra superior: el área y la ruta de ubicación (enlaces menos el último).
+const BarraUbicacion = defineComponent({
+  setup() {
+    const lugar = useUbicacionActual();
+    return () =>
+      h("div", [
+        h("p", { class: "titulo" }, lugar.titulo.value),
+        ...lugar.migas.value.map((m) =>
+          h("span", { class: m.destino ? "miga enlace" : "miga" }, m.texto),
+        ),
+      ]);
+  },
+});
+
+// Con los textos completos de la app (las áreas usan claves de varios archivos).
+async function montarBarra(ruta: {
+  name: string;
+  query?: Record<string, string>;
+}) {
+  const router = crearRouter();
+  await router.push(ruta);
+  const w = mount(BarraUbicacion, { global: { plugins: [router, i18nApp] } });
+  await flushPromises();
+  return w;
+}
+
+describe("barra superior", () => {
+  it("en Configuración: el área, la categoría y la opción", async () => {
+    entrar(["*"]);
+    const w = await montarBarra({ name: "pasarelas" });
+
+    expect(w.get(".titulo").text()).toBe("Configuración del negocio");
+    expect(w.findAll(".miga").map((m) => m.text())).toEqual([
+      "Configuración del negocio",
+      "Pagos e integraciones",
+      "Pasarelas de pago",
+    ]);
+    // Solo el área se abre; la categoría no es una pantalla y la última es esta.
+    expect(w.findAll(".miga.enlace").map((m) => m.text())).toEqual([
+      "Configuración del negocio",
+    ]);
+  });
+
+  it("en un área: su nombre (con el término del negocio) y la vista", async () => {
+    entrar(["*"]);
+    const w = await montarBarra({
+      name: "cobranza",
+      query: { vista: "caja" },
+    });
+
+    expect(w.get(".titulo").text()).toBe("Cobros");
+    expect(w.findAll(".miga").map((m) => m.text())).toEqual([
+      "Cobros",
+      "Caja",
+    ]);
+  });
+
+  it("en una ficha: el área, la vista de la que es y «Ficha»", async () => {
+    entrar(["*"]);
+    const w = await montarBarra({ name: "ficha-miembro" });
+
+    expect(w.get(".titulo").text()).toBe("Miembros");
+    expect(w.findAll(".miga").map((m) => m.text())).toEqual([
+      "Miembros",
+      "Directorio",
+      "Ficha",
+    ]);
+    expect(w.findAll(".miga.enlace").map((m) => m.text())).toEqual([
+      "Miembros",
+      "Directorio",
+    ]);
   });
 });

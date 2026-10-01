@@ -3,16 +3,16 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
-import IconoNav from "@/components/IconoNav.vue";
 import { destinoDe, ubicacion, vistasVisibles, type Vista } from "@/lib/menu";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
- * Las vistas del área actual (Agenda: Calendario, Recepción…), arriba de la pantalla.
- * Son enlaces: cada vista tiene su dirección, así que recargar o volver conserva la
- * vista. Solo se muestran las permitidas; con una sola, no hay pestañas. En un
- * teléfono, una lista con la vista activa. Configuración usa su propia navegación.
+ * Las vistas del área actual (Agenda: Calendario, Recepción…), en una franja bajo la
+ * barra superior (que ya dice el área). Son enlaces: cada vista tiene su dirección,
+ * así que recargar o volver conserva la vista. Solo se muestran las permitidas; con
+ * una sola, no hay pestañas. En un teléfono, una lista con la vista activa.
+ * Configuración usa su propia navegación.
  */
 const { t } = useI18n();
 const route = useRoute();
@@ -61,10 +61,6 @@ function irA(clave: string): void {
     :aria-label="nombreArea"
     data-prueba="pestanas-area"
   >
-    <span class="pa-area">
-      <IconoNav :nombre="actual.area.icono" :tam="18" />
-      {{ nombreArea }}
-    </span>
     <div class="tu-pestanas pa-pestanas">
       <RouterLink
         v-for="x in vistas"
@@ -90,41 +86,35 @@ function irA(clave: string): void {
 </template>
 
 <style scoped>
+/* Franja de pestañas de lado a lado, alineada con el título de la barra. */
 .pa {
   display: flex;
-  align-items: flex-end;
-  gap: 1.25rem;
-  padding: 1rem 1rem 0;
-}
-.pa-area {
-  display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding-bottom: 0.65rem;
-  color: var(--texto-suave);
-  font-size: 0.85rem;
-  font-weight: 600;
-  white-space: nowrap;
+  padding: 0 1rem;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borde);
 }
 .pa-pestanas {
   flex: 1;
+  border-bottom: 0;
+}
+.pa-pestanas > a {
+  margin-bottom: 0;
+  padding: 0.85rem 0.1rem 0.75rem;
+  border-bottom-width: 2.5px;
 }
 .pa-lista {
   display: none;
 }
 @media (min-width: 640px) {
   .pa {
-    padding: 1.25rem 1.5rem 0;
+    padding: 0 1.5rem;
   }
 }
 /* En el teléfono: la vista activa en una lista, no una fila apretada. */
 @media (max-width: 639px) {
   .pa {
-    align-items: center;
-    gap: 0.75rem;
-  }
-  .pa-area {
-    padding-bottom: 0;
+    padding: 0.6rem 1rem;
   }
   .pa-pestanas {
     display: none;

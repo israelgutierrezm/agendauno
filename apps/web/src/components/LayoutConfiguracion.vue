@@ -19,7 +19,8 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 /**
  * Configuración del negocio, tercer nivel: a la izquierda las categorías (una
  * abierta a la vez, la de la pantalla actual al llegar) con sus opciones y «Buscar
- * ajuste»; arriba la ruta de ubicación. Solo categorías y opciones permitidas.
+ * ajuste». La ruta de ubicación va en la barra superior. Solo categorías y opciones
+ * permitidas.
  *
  * Con poco ancho (menos de 1280 px, con el menú principal al lado no cabe un
  * formulario cómodo), la navegación se abre con «Secciones de configuración» en un
@@ -167,25 +168,7 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
     </aside>
 
     <div class="lc-contenido">
-      <!-- Ruta de ubicación: solo los tramos con destino son enlaces. -->
-      <nav
-        class="lc-ubicacion"
-        :aria-label="t('configNegocio.ubicacion')"
-        data-prueba="ubicacion-config"
-      >
-        <RouterLink :to="{ name: 'ajustes' }" class="lc-miga">{{
-          t("nav.areas.configuracion")
-        }}</RouterLink>
-        <template v-if="actual?.categoria">
-          <span aria-hidden="true">/</span>
-          <span>{{ t(actual.categoria.etiqueta) }}</span>
-          <span aria-hidden="true">/</span>
-          <span aria-current="page" class="lc-miga-actual">{{
-            t(actual.vista.etiqueta)
-          }}</span>
-        </template>
-      </nav>
-
+      <!-- La ruta de ubicación va en la barra superior (lib/ubicacionActual). -->
       <!-- Con poco ancho: las secciones en un panel dentro de la página -->
       <button
         ref="botonSecciones"
@@ -271,27 +254,6 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
 .lc-contenido {
   flex: 1;
   min-width: 0;
-}
-.lc-ubicacion {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0 1rem;
-  font-size: 0.82rem;
-  color: var(--texto-suave);
-}
-.lc-miga {
-  color: var(--texto-suave);
-  text-decoration: none;
-}
-.lc-miga:hover {
-  color: var(--texto);
-  text-decoration: underline;
-}
-.lc-miga-actual {
-  color: var(--texto);
-  font-weight: 500;
 }
 .lc-boton {
   margin: 0.75rem 1rem 0;

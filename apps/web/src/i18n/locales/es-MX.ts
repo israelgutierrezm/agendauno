@@ -80,6 +80,8 @@ export default {
     renta: "Suscripción",
     padron: "Padrón",
     importar: "Importar",
+    // Último tramo de la ruta de ubicación en una pantalla de paso.
+    paso: { ficha: "Ficha" },
     datosFiscales: "Datos fiscales",
     documentos: "Documentos",
     formularios: "Formularios",

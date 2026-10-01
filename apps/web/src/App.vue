@@ -14,6 +14,7 @@ import PanelRoles from "@/components/PanelRoles.vue";
 import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
 import { puedeEntrar } from "@/lib/acceso";
 import { ubicacion } from "@/lib/menu";
+import { useUbicacionActual } from "@/lib/ubicacionActual";
 import { identidadDeSesion, reiniciarMiCuenta } from "@/lib/miCuenta";
 import { nombreDeRol } from "@/lib/roles";
 import { slugDeContexto } from "@/lib/tenant";
@@ -64,6 +65,8 @@ if (sesion.bearer !== null) {
 }
 
 const hogar = computed(() => ({ name: sesion.rutaInicio }));
+// Barra superior: el área donde se está y la ruta de ubicación.
+const lugar = useUbicacionActual();
 
 // El panel es para las pantallas privadas. Las públicas (la página del negocio,
 // agendar, el directorio…) se ven como las ve cualquier visitante aunque haya
@@ -235,7 +238,7 @@ onMounted(() => {
         <div class="flex items-center gap-3 min-w-0">
           <button
             type="button"
-            class="lg:hidden tu-icono-btn"
+            class="tu-icono-btn tu-barra-menu"
             :aria-label="$t('nav.menu')"
             @click="menuLateral = true"
           >
@@ -251,9 +254,56 @@ onMounted(() => {
               <path d="M4 7h16M4 12h16M4 17h16" />
             </svg>
           </button>
+          <!-- Dónde está: el área (su ícono y su nombre). -->
+          <div
+            v-if="lugar.titulo.value"
+            class="tu-barra-titulo"
+            data-prueba="titulo-barra"
+          >
+            <span v-if="lugar.icono.value" class="tu-barra-icono">
+              <IconoNav :nombre="lugar.icono.value" :tam="18" />
+            </span>
+            <span class="truncate">{{ lugar.titulo.value }}</span>
+          </div>
         </div>
 
         <div class="flex items-center gap-1 sm:gap-2 shrink-0">
+          <!-- Ruta de ubicación, al final (con ancho de sobra). -->
+          <nav
+            v-if="lugar.migas.value.length > 1"
+            class="tu-migas"
+            :aria-label="$t('configNegocio.ubicacion')"
+            data-prueba="migas"
+          >
+            <template v-for="(m, i) in lugar.migas.value" :key="i">
+              <IconoNav
+                v-if="i > 0"
+                nombre="chevron"
+                :tam="12"
+                class="tu-migas-sep"
+                aria-hidden="true"
+              />
+              <RouterLink v-if="m.destino" :to="m.destino" class="tu-miga">{{
+                m.texto
+              }}</RouterLink>
+              <span
+                v-else
+                class="tu-miga"
+                :class="{
+                  'tu-miga-actual': i === lugar.migas.value.length - 1,
+                }"
+                :aria-current="
+                  i === lugar.migas.value.length - 1 ? 'page' : undefined
+                "
+                >{{ m.texto }}</span
+              >
+            </template>
+          </nav>
+          <span
+            v-if="lugar.migas.value.length > 1"
+            class="tu-barra-division"
+            aria-hidden="true"
+          />
           <!-- Cambiar de rol: solo si puede entrar con más de uno -->
           <button
             v-if="sesion.tieneVariosRoles"
@@ -380,9 +430,9 @@ onMounted(() => {
       </header>
 
       <main class="flex-1" :style="{ background: 'var(--fondo)' }">
-        <div class="mx-auto max-w-7xl md:px-4 lg:px-8">
-          <!-- Las vistas del área (Agenda: Calendario, Recepción…) -->
-          <PestanasArea />
+        <!-- Las vistas del área (Agenda: Calendario, Recepción…), bajo la barra -->
+        <PestanasArea />
+        <div class="tu-lienzo">
           <LayoutConfiguracion v-if="enConfiguracion">
             <RouterView />
           </LayoutConfiguracion>
@@ -432,6 +482,108 @@ onMounted(() => {
 </template>
 
 <style>
+/* Barra superior: el área donde se está, con su ícono en un cuadro neutro. */
+.tu-barra-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  color: var(--texto);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.tu-barra-icono {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  flex-shrink: 0;
+  border: 1px solid var(--borde);
+  border-radius: 0.65rem;
+  background: var(--superficie);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
+}
+/* Ruta de ubicación: discreta, al final de la barra (con ancho de sobra). */
+.tu-migas {
+  display: none;
+  align-items: center;
+  gap: 0.15rem;
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.tu-migas-sep {
+  opacity: 0.5;
+}
+.tu-miga {
+  padding: 0.2rem 0.35rem;
+  border-radius: 0.4rem;
+  color: var(--texto-suave);
+  text-decoration: none;
+}
+a.tu-miga:hover {
+  background: var(--fondo);
+  color: var(--texto);
+}
+.tu-miga-actual {
+  color: var(--texto);
+  font-weight: 500;
+}
+.tu-barra-division {
+  display: none;
+  width: 1px;
+  height: 1.5rem;
+  margin: 0 0.4rem;
+  background: var(--borde);
+}
+@media (min-width: 1280px) {
+  .tu-migas {
+    display: flex;
+  }
+  .tu-barra-division {
+    display: block;
+  }
+}
+
+/*
+ * El lienzo del panel: poco margen a los lados, sin quedar pegado. Cada pantalla
+ * deja la mitad del margen que le daba su ancho máximo: su ancho + la mitad de lo
+ * que sobraba (calc(50% + ancho/2)). Los formularios angostos (2xl, 3xl) y los de
+ * Configuración, que van junto a su navegación, conservan su ancho.
+ */
+.tu-lienzo {
+  padding: 0 0.25rem;
+}
+.tu-lienzo > :not([class*="max-w-"]),
+.tu-lienzo > .mx-auto.max-w-7xl {
+  max-width: calc(50% + 40rem);
+  margin-inline: auto;
+}
+.tu-lienzo > .mx-auto.max-w-6xl {
+  max-width: calc(50% + 36rem);
+}
+.tu-lienzo > .mx-auto.max-w-5xl {
+  max-width: calc(50% + 32rem);
+}
+.tu-lienzo > .mx-auto.max-w-4xl {
+  max-width: calc(50% + 28rem);
+}
+/* En Configuración, la pantalla va junto a su navegación, no centrada en lo que sobra. */
+.lc-contenido > .mx-auto {
+  margin-inline-start: 0;
+}
+@media (min-width: 768px) {
+  .tu-lienzo {
+    padding: 0 0.75rem;
+  }
+}
+@media (min-width: 1024px) {
+  .tu-lienzo {
+    padding: 0 1rem;
+  }
+}
+
 /* Enlaces de la barra lateral (clara u oscura según el tema). */
 .tu-side-link {
   display: flex;
@@ -473,6 +625,13 @@ onMounted(() => {
 .tu-icono-btn:hover {
   background: var(--superficie-2);
   color: var(--texto);
+}
+/* El menú móvil (cajón) no existe en escritorio: ahí el lateral siempre se ve.
+   Va aquí y no como `lg:hidden` porque `.tu-icono-btn` no está en una capa. */
+@media (min-width: 1024px) {
+  .tu-barra-menu {
+    display: none;
+  }
 }
 
 /* Elementos de menús flotantes (perfil, apariencia) sobre fondo claro. */
