@@ -764,7 +764,11 @@ onMounted(cargar);
                   $t("escaparate.ilimitado")
                 }}</template>
                 <template v-else-if="p.creditos_incluidos">{{
-                  $t("escaparate.creditos", { n: p.creditos_incluidos / 1000 })
+                  $t(
+                    "escaparate.creditos",
+                    { n: p.creditos_incluidos / 1000 },
+                    p.creditos_incluidos === 1000 ? 1 : 2,
+                  )
                 }}</template>
               </p>
               <button

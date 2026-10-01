@@ -46,22 +46,35 @@ export const useAparienciaStore = defineStore("apariencia", () => {
   const disponibles = ref<TemaDisponible[]>([]);
   const personalizables = ref<string[]>([]);
   let aplicados: string[] = [];
+  // Fuera del panel (páginas públicas con sesión) se ve la apariencia pública.
+  let enPausa = false;
 
-  function activar(apariencia: Apariencia | null | undefined): void {
-    if (apariencia == null) {
-      return;
-    }
+  function quitar(): void {
     const raiz = document.documentElement;
     for (const nombre of aplicados) {
       raiz.style.removeProperty(nombre);
     }
     aplicados = [];
+  }
+
+  function pintar(apariencia: Apariencia): void {
+    quitar();
+    const raiz = document.documentElement;
     for (const [token, valor] of Object.entries(apariencia.tokens)) {
       const nombre = variable(token);
       raiz.style.setProperty(nombre, valor);
       aplicados.push(nombre);
     }
     raiz.classList.toggle("dark", apariencia.oscuro);
+  }
+
+  function activar(apariencia: Apariencia | null | undefined): void {
+    if (apariencia == null) {
+      return;
+    }
+    if (!enPausa) {
+      pintar(apariencia);
+    }
     actual.value = apariencia;
     try {
       localStorage.setItem(CLAVE_CACHE, JSON.stringify(apariencia));
@@ -82,13 +95,26 @@ export const useAparienciaStore = defineStore("apariencia", () => {
     }
   }
 
+  /**
+   * Las páginas públicas (la del negocio, agendar, el directorio…) se ven igual para
+   * todos, aunque haya sesión: se pausa el tema del usuario y vuelve en el panel.
+   */
+  function pausar(pausa: boolean): void {
+    if (pausa === enPausa) {
+      return;
+    }
+    enPausa = pausa;
+    if (pausa) {
+      quitar();
+      useTemaStore().inicializar();
+    } else if (actual.value !== null) {
+      pintar(actual.value);
+    }
+  }
+
   /** Al cerrar sesión se vuelve a la apariencia pública (modo claro/oscuro). */
   function desactivar(): void {
-    const raiz = document.documentElement;
-    for (const nombre of aplicados) {
-      raiz.style.removeProperty(nombre);
-    }
-    aplicados = [];
+    quitar();
     actual.value = null;
     try {
       localStorage.removeItem(CLAVE_CACHE);
@@ -143,6 +169,7 @@ export const useAparienciaStore = defineStore("apariencia", () => {
     personalizables,
     activar,
     restaurar,
+    pausar,
     desactivar,
     cargarCatalogo,
     elegir,

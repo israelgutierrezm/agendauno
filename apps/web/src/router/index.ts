@@ -484,12 +484,25 @@ router.beforeEach(async (to) => {
   }
 
   // Un usuario autenticado no debe quedarse en las páginas públicas de acceso
-  // (landing/login/registro): se le lleva a su inicio según rol (P0).
+  // (landing/login/registro): se le lleva a su inicio según rol (P0). Salvo entrar a
+  // OTRO negocio (su `?estudio=` o su subdominio): la sesión es de un solo negocio y
+  // entrar al otro la reemplaza en este navegador.
   if (
     sesion.autenticado &&
     ["inicio", "entrar", "registro"].includes(String(to.name))
   ) {
-    return { name: sesion.rutaInicio };
+    const otro =
+      to.name === "entrar"
+        ? slugDeContexto(
+            window.location.hostname,
+            typeof to.query.estudio === "string"
+              ? `?estudio=${encodeURIComponent(to.query.estudio)}`
+              : "",
+          )
+        : null;
+    if (otro === null || otro === sesion.slug) {
+      return { name: sesion.rutaInicio };
+    }
   }
 
   // En el subdominio de un estudio (`{slug}.agendauno.mx`), la raíz no es la

@@ -64,6 +64,16 @@ if (sesion.bearer !== null) {
 
 const hogar = computed(() => ({ name: sesion.rutaInicio }));
 
+// El panel es para las pantallas privadas. Las públicas (la página del negocio,
+// agendar, el directorio…) se ven como las ve cualquier visitante aunque haya
+// sesión: quien abre su enlace de agendar ve lo que ven sus clientes.
+const enPanel = computed(
+  () => sesion.autenticado && route.meta.requiereSesion === true,
+);
+watch(enPanel, (panel) => useAparienciaStore().pausar(!panel), {
+  immediate: true,
+});
+
 // Configuración del negocio en el menú del usuario: si alguna opción se puede abrir.
 const puedeConfigurar = computed(() => puedeEntrar("ajustes", sesion));
 
@@ -122,7 +132,7 @@ onMounted(() => {
 
 <template>
   <!-- ===================== APP AUTENTICADA (panel con barra lateral) ===================== -->
-  <div v-if="sesion.autenticado" class="flex min-h-screen">
+  <div v-if="enPanel" class="flex min-h-screen">
     <!-- Velo del cajón (móvil) -->
     <div
       v-if="menuLateral"
@@ -388,7 +398,7 @@ onMounted(() => {
 
   <!-- Sesión guardada aún sin confirmar (recarga): ni panel ni cara pública. -->
   <div
-    v-else-if="sesion.validando"
+    v-else-if="sesion.validando && route.meta.requiereSesion === true"
     class="min-h-screen"
     :style="{ background: 'var(--fondo)' }"
     aria-busy="true"

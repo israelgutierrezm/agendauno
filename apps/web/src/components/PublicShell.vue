@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import LogoAgendaUno from "@/components/LogoAgendaUno.vue";
 import { trackEvent } from "@/lib/analytics";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const props = defineProps<{
   pagina?: string;
@@ -21,6 +22,17 @@ const comercial = computed(
 );
 const mostrarAcceso = computed(
   () => !props.esAcceso && props.pagina !== "entrar",
+);
+// Con sesión no se ofrece «Iniciar sesión»: se ofrece volver a su panel.
+const sesion = useSesionTenantStore();
+const acceso = computed(() =>
+  sesion.autenticado
+    ? {
+        to: { name: sesion.rutaInicio },
+        largo: "nav.irAMiPanel",
+        corto: "nav.miPanel",
+      }
+    : { to: { name: "entrar" }, largo: "nav.entrar", corto: "nav.entrarCorto" },
 );
 defineEmits<{ alternarTema: [] }>();
 </script>
@@ -76,12 +88,10 @@ defineEmits<{ alternarTema: [] }>();
           <RouterLink
             v-if="mostrarAcceso"
             class="tu-btn tu-btn-fantasma"
-            :to="{ name: 'entrar' }"
+            :to="acceso.to"
           >
-            <span class="tu-public-login-full">{{ $t("nav.entrar") }}</span>
-            <span class="tu-public-login-short">{{
-              $t("nav.entrarCorto")
-            }}</span>
+            <span class="tu-public-login-full">{{ $t(acceso.largo) }}</span>
+            <span class="tu-public-login-short">{{ $t(acceso.corto) }}</span>
           </RouterLink>
 
           <RouterLink
@@ -161,9 +171,9 @@ defineEmits<{ alternarTema: [] }>();
           <RouterLink
             v-if="!esRutaPublicaDeNegocio"
             class="tu-public-footer-link"
-            :to="{ name: 'entrar' }"
+            :to="acceso.to"
           >
-            {{ $t("nav.entrar") }}
+            {{ $t(acceso.largo) }}
           </RouterLink>
           <RouterLink
             v-if="!esRutaPublicaDeNegocio"

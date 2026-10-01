@@ -1,11 +1,16 @@
 import { mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 import es from "@/i18n/locales/es-MX";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 import PublicShell from "./PublicShell.vue";
 import LogoAgendaUno from "./LogoAgendaUno.vue";
 
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
+beforeEach(() => {
+  setActivePinia(createPinia());
+});
 function montar(props = {}) {
   return mount(PublicShell, {
     props,
@@ -16,6 +21,24 @@ function montar(props = {}) {
   });
 }
 describe("encabezado público", () => {
+  it("con sesión ofrece volver a su panel, no iniciar sesión", () => {
+    const sesion = useSesionTenantStore();
+    sesion.$patch({
+      bearer: "simulado",
+      usuario: {
+        ulid: "u1",
+        nombre: "Dueño",
+        email: "duena@demo.test",
+        rol: "propietario",
+        permisos: ["*"],
+      },
+    });
+    const vista = montar({ pagina: "directorio" });
+    expect(vista.get(".tu-public-nav .tu-btn-fantasma").text()).toContain(
+      "Ir a mi panel",
+    );
+    expect(vista.text()).not.toContain("Iniciar sesión");
+  });
   it("evita repetir el CTA comercial en registro y acceso", () => {
     for (const pagina of [
       "registro",

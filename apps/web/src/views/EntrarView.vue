@@ -443,6 +443,19 @@ onMounted(async () => {
                 : $t("entrar.subtituloEstudio")
             }}
           </p>
+          <!-- Con sesión en otro negocio: entrar aquí la cambia en este navegador. -->
+          <p
+            v-if="sesion.autenticado && sesion.slug !== slug.trim()"
+            class="mt-3 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{
+              $t("entrar.otraSesion", { negocio: sesion.estudio?.nombre ?? "" })
+            }}
+            <RouterLink :to="{ name: sesion.rutaInicio }" class="tu-enlace">{{
+              $t("entrar.volverAlPanel")
+            }}</RouterLink>
+          </p>
 
           <form class="tu-login-form mt-8 space-y-5" @submit.prevent="enviar">
             <div>

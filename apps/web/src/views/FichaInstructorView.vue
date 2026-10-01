@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import ExpedientePersona from "@/components/ExpedientePersona.vue";
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
+import { useRegreso } from "@/lib/regreso";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -28,6 +30,15 @@ const route = useRoute();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const id = computed(() => String(route.params.id));
+// «Volver»: a la pantalla de donde se llegó o a la lista del equipo.
+const { t } = useI18n();
+const regreso = useRegreso({
+  name: "instructores",
+  etiqueta: () =>
+    t("profesional.volver", {
+      grupo: plural(sesion.terminologia.instructor).toLowerCase(),
+    }),
+});
 
 const profesional = ref<Profesional | null>(null);
 const cargando = ref(true);
@@ -63,13 +74,8 @@ function fecha(iso: string | null): string {
 
 <template>
   <section class="mx-auto max-w-4xl px-4 py-8">
-    <RouterLink :to="{ name: 'instructores' }" class="tu-enlace text-sm"
-      >←
-      {{
-        $t("profesional.volver", {
-          grupo: plural(sesion.terminologia.instructor).toLowerCase(),
-        })
-      }}</RouterLink
+    <RouterLink :to="regreso.destino.value" class="tu-enlace text-sm"
+      >← {{ regreso.etiqueta.value }}</RouterLink
     >
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">

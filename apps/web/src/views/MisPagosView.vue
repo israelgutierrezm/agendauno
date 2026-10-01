@@ -293,9 +293,11 @@ onMounted(() => void cuenta.asegurar());
                 $t("miCuenta.ilimitado")
               }}</template>
               <template v-else-if="p.creditos_incluidos">{{
-                $t("miCuenta.comprar.creditos", {
-                  n: p.creditos_incluidos / 1000,
-                })
+                $t(
+                  "miCuenta.comprar.creditos",
+                  { n: p.creditos_incluidos / 1000 },
+                  p.creditos_incluidos === 1000 ? 1 : 2,
+                )
               }}</template>
             </p>
             <p

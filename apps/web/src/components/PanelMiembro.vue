@@ -43,6 +43,8 @@ const props = defineProps<{
   incrustado?: boolean;
   // Sede donde se registra la entrada (la que se está atendiendo en recepción).
   sucursalId?: string;
+  // Desde la ficha: abre directo en la venta y no repite los enlaces a la ficha.
+  venta?: boolean;
 }>();
 const emit = defineEmits<{ (e: "cerrar"): void }>();
 
@@ -240,6 +242,18 @@ watch(
   },
   { immediate: true },
 );
+if (props.venta && puedeVender.value) {
+  void abrirVenta();
+}
+
+// Cancelar la venta: desde la ficha cierra el panel (se abrió solo para vender).
+function cancelarVenta(): void {
+  if (props.venta) {
+    emit("cerrar");
+    return;
+  }
+  vendiendo.value = false;
+}
 </script>
 
 <template>
@@ -302,9 +316,11 @@ watch(
           </dt>
           <dd class="text-right font-medium">
             {{
-              $t("recepcion.miembro.creditos", {
-                n: resumen.saldo_creditos,
-              })
+              $t(
+                "recepcion.miembro.creditos",
+                { n: resumen.saldo_creditos },
+                resumen.saldo_creditos === 1 ? 1 : 2,
+              )
             }}
           </dd>
         </div>
@@ -399,7 +415,7 @@ watch(
         </div>
       </dl>
 
-      <p class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+      <p v-if="!venta" class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
         <RouterLink
           :to="{ name: 'ficha-miembro', params: { id: personaId } }"
           class="tu-enlace"
@@ -497,7 +513,7 @@ watch(
               type="button"
               class="tu-btn tu-btn-fantasma text-sm"
               :disabled="procesando"
-              @click="vendiendo = false"
+              @click="cancelarVenta"
             >
               {{ $t("comun.cancelar") }}
             </button>

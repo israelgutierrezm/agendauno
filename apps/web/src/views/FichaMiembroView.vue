@@ -11,6 +11,8 @@ import PanelEditarMiembro, {
 } from "@/components/PanelEditarMiembro.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { useRegreso } from "@/lib/regreso";
+import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -311,12 +313,21 @@ function onCerrarVenta(): void {
 }
 
 watch(personaId, cargar, { immediate: true });
+
+// «Volver»: a la pantalla de donde se llegó (Recepción, respuestas…) o al directorio.
+const regreso = useRegreso({
+  name: "miembros",
+  etiqueta: () =>
+    t("ficha.volver", {
+      grupo: plural(sesion.terminologia.miembro).toLowerCase(),
+    }),
+});
 </script>
 
 <template>
   <section class="mx-auto max-w-6xl px-4 py-8">
-    <RouterLink :to="{ name: 'miembros' }" class="tu-enlace text-sm"
-      >← {{ $t("ficha.volver") }}</RouterLink
+    <RouterLink :to="regreso.destino.value" class="tu-enlace text-sm"
+      >← {{ regreso.etiqueta.value }}</RouterLink
     >
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
@@ -494,7 +505,11 @@ watch(personaId, cargar, { immediate: true });
                       <template v-else>
                         <p class="font-semibold tabular-nums">
                           {{
-                            $t("ficha.creditos", { n: d.saldo_creditos ?? 0 })
+                            $t(
+                              "ficha.creditos",
+                              { n: d.saldo_creditos ?? 0 },
+                              d.saldo_creditos === 1 ? 1 : 2,
+                            )
                           }}
                         </p>
                         <p
@@ -502,9 +517,11 @@ watch(personaId, cargar, { immediate: true });
                           :style="{ color: 'var(--texto-suave)' }"
                         >
                           {{
-                            $t("ficha.derechos.disponible", {
-                              n: (d.disponible_unidades ?? 0) / 1000,
-                            })
+                            $t(
+                              "ficha.derechos.disponible",
+                              { n: (d.disponible_unidades ?? 0) / 1000 },
+                              d.disponible_unidades === 1000 ? 1 : 2,
+                            )
                           }}
                         </p>
                       </template>
@@ -886,7 +903,13 @@ watch(personaId, cargar, { immediate: true });
               <div class="fi-dato">
                 <dt>{{ $t("ficha.saldo") }}</dt>
                 <dd>
-                  {{ $t("ficha.creditos", { n: resumen.saldo_creditos }) }}
+                  {{
+                    $t(
+                      "ficha.creditos",
+                      { n: resumen.saldo_creditos },
+                      resumen.saldo_creditos === 1 ? 1 : 2,
+                    )
+                  }}
                 </dd>
               </div>
               <div class="fi-dato">
@@ -954,6 +977,7 @@ watch(personaId, cargar, { immediate: true });
       v-if="vendiendo && ficha"
       :persona-id="personaId"
       :nombre="ficha.persona.nombre_completo"
+      venta
       @cerrar="onCerrarVenta"
     />
   </section>

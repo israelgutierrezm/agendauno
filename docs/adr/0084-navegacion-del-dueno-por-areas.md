@@ -85,6 +85,13 @@ abrirlo:
 - Agenda lleva a «Disponibilidad del equipo» (solo en citas) y a «Reglas de reserva».
 - Equipo y la ficha del instructor llevan a «Administrar acceso», en Configuración ›
   Accesos y permisos.
+- **«Volver» de las fichas** (`lib/regreso.ts`):
+  - Regresa a la pantalla del menú de donde se llegó: «Volver a recepción», «Volver
+    a respuestas de formularios».
+  - Así no se pierde la bandeja de trabajo.
+  - Entrando directo o desde la lista, vuelve a la lista con el término del negocio.
+- **Vender desde la ficha** abre directo la venta, sin el resumen intermedio que
+  repetía la ficha.
 
 ### Cambios sin guardar
 
