@@ -54,6 +54,15 @@ describe("entrar con una sesión abierta", () => {
     expect(router.currentRoute.value.name).toBe("panel");
   });
 
+  it("con `volver`, al acceso de su negocio regresa a donde venía", async () => {
+    const router = await routerConSesion();
+    await router.push("/entrar?estudio=demo&volver=/agendar/demo");
+    expect(router.currentRoute.value.fullPath).toBe("/agendar/demo");
+    // Solo rutas internas: un enlace no manda a otro sitio.
+    await router.push("/entrar?estudio=demo&volver=//otro.sitio");
+    expect(router.currentRoute.value.name).toBe("panel");
+  });
+
   it("al acceso de OTRO negocio sí entra, para cambiar de negocio", async () => {
     const router = await routerConSesion();
     await router.push("/entrar?estudio=barberia");
@@ -73,6 +82,34 @@ describe("entrar con una sesión abierta", () => {
       await router.push(ruta);
       expect(router.currentRoute.value.meta.requiereSesion).not.toBe(true);
     }
+  });
+});
+
+describe("palabras del negocio fuera del panel", () => {
+  it("en pausa rigen los textos base; al volver al panel, las del negocio", async () => {
+    const { aplicarTerminologia, i18n, pausarTerminologia } =
+      await import("@/i18n");
+    const t = (llave: string) => i18n.global.t(llave);
+    aplicarTerminologia({
+      sesion: "Cita",
+      miembro: "Cliente",
+      instructor: "Barbero",
+    });
+    expect(t("agenda.nuevaClase")).toBe("Nueva cita");
+
+    pausarTerminologia(true);
+    expect(t("agenda.nuevaClase")).toBe("Nueva clase");
+    // Lo que llegue mientras tanto (p. ej. /yo) no se pinta hasta volver.
+    aplicarTerminologia({
+      sesion: "Sesión",
+      miembro: "Paciente",
+      instructor: "Terapeuta",
+    });
+    expect(t("agenda.nuevaClase")).toBe("Nueva clase");
+
+    pausarTerminologia(false);
+    expect(t("agenda.nuevaClase")).toBe("Nueva sesión");
+    aplicarTerminologia(null);
   });
 });
 

@@ -17,6 +17,7 @@ import { ubicacion } from "@/lib/menu";
 import { identidadDeSesion, reiniciarMiCuenta } from "@/lib/miCuenta";
 import { nombreDeRol } from "@/lib/roles";
 import { slugDeContexto } from "@/lib/tenant";
+import { pausarTerminologia } from "@/i18n";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useAparienciaStore } from "@/stores/apariencia";
 import { useTemaStore } from "@/stores/tema";
@@ -70,9 +71,14 @@ const hogar = computed(() => ({ name: sesion.rutaInicio }));
 const enPanel = computed(
   () => sesion.autenticado && route.meta.requiereSesion === true,
 );
-watch(enPanel, (panel) => useAparienciaStore().pausar(!panel), {
-  immediate: true,
-});
+watch(
+  enPanel,
+  (panel) => {
+    useAparienciaStore().pausar(!panel);
+    pausarTerminologia(!panel);
+  },
+  { immediate: true },
+);
 
 // Configuración del negocio en el menú del usuario: si alguna opción se puede abrir.
 const puedeConfigurar = computed(() => puedeEntrar("ajustes", sesion));

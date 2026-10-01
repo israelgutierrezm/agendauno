@@ -173,6 +173,9 @@ export default {
     usarOtrosDatos: "Agendar con otros datos",
     tienesCuenta: "¿Ya tienes cuenta?",
     entrar: "Entra y no escribas tus datos",
+    sesionEquipo:
+      "Tienes la sesión abierta como {rol} de {negocio}: aquí la cita se agenda con los datos del cliente.",
+    desdeAgenda: "Agendar desde la agenda",
     correo: "Correo",
     correoAyuda: "Te enviamos ahí la confirmación de tu cita.",
     apellidos: "Apellidos",

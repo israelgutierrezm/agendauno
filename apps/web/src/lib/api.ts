@@ -19,16 +19,39 @@ export const api = axios.create({
 });
 
 let bearer: string | null = null;
+let negocioDelBearer: string | null = null;
 
-/** Fija (o limpia) el bearer tenant-local para las siguientes peticiones. */
-export function fijarBearer(token: string | null): void {
+/**
+ * Fija (o limpia) el bearer tenant-local y el negocio al que pertenece. Solo viaja a
+ * las rutas de ESE negocio (`/api/v1/app/{slug}/…`): nunca a las de otro negocio (sus
+ * páginas públicas) ni a la plataforma, que manda su propia credencial.
+ */
+export function fijarBearer(
+  token: string | null,
+  slug: string | null = null,
+): void {
   bearer = token;
+  negocioDelBearer = token === null ? null : slug;
+}
+
+/** ¿La petición va a las rutas de este negocio? */
+export function esDelNegocio(url: string | undefined, slug: string): boolean {
+  const ruta = (url ?? "").replace(/^https?:\/\/[^/]+/, "");
+  const base = `/api/v1/app/${slug}`;
+  return (
+    ruta === base || ruta.startsWith(`${base}/`) || ruta.startsWith(`${base}?`)
+  );
 }
 
 api.interceptors.request.use((config) => {
   config.headers.set("X-Correlation-ID", getCorrelationId());
 
-  if (bearer !== null) {
+  if (
+    bearer !== null &&
+    negocioDelBearer !== null &&
+    !config.headers.has("Authorization") &&
+    esDelNegocio(config.url, negocioDelBearer)
+  ) {
     config.headers.set("Authorization", `Bearer ${bearer}`);
   }
 

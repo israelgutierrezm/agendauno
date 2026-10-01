@@ -176,7 +176,12 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     { immediate: true, deep: true },
   );
 
-  fijarBearer(bearer.value);
+  // El bearer va solo a las rutas de su negocio (lib/api); se mantiene al día con
+  // la sesión aunque cambie por otra vía.
+  watch([bearer, slug], ([b, s]) => fijarBearer(b, s), {
+    immediate: true,
+    flush: "sync",
+  });
 
   function establecer(datos: RespuestaAuth): void {
     bearer.value = datos.token;
@@ -185,7 +190,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     estudio.value = datos.estudio;
     useAparienciaStore().activar(datos.usuario.apariencia);
     verificado.value = true;
-    fijarBearer(datos.token);
+    fijarBearer(datos.token, datos.estudio.slug);
     guardar(CLAVE_BEARER, datos.token);
     guardar(CLAVE_SLUG, datos.estudio.slug);
   }

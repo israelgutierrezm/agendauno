@@ -32,6 +32,23 @@ documento de reformulación apareció el efecto:
   - El de otro negocio (por `?estudio=` o su subdominio) se muestra, con un aviso: la
     sesión es de un solo negocio y entrar al otro la cambia en este navegador.
 
+- **Las palabras del negocio en sesión también se pausan.**
+  - La terminología (ADR 0049) adapta todos los textos y los errores de la API.
+  - En una página pública rigen los textos base: la página de otro negocio no habla
+    con las palabras del negocio en sesión (`pausarTerminologia`).
+- **El token solo viaja a su negocio.**
+  - El cliente HTTP lo agrega únicamente a `/api/v1/app/{slug de la sesión}/…`.
+  - Nunca va a las rutas de otro negocio ni a la plataforma.
+  - Tampoco pisa una credencial que la petición ya traiga: antes reemplazaba la del
+    superadmin si había sesión de un negocio.
+  - El backend ya rechaza un token de otro negocio (cada token se valida en la base
+    del negocio de la URL); esto evita mandarlo.
+- **Agendar con una sesión del equipo del mismo negocio.**
+  - Si alguien del equipo (no como cliente) agenda en la página pública, no se le
+    ofrece «¿Ya tienes cuenta? Entra», que solo lo llevaba a su panel sin explicar.
+  - En su lugar se le dice con qué sesión está y se enlaza la agenda del panel.
+  - Si llega al acceso de su propio negocio con `volver`, regresa a esa página.
+
 ## Consecuencias
 
 - Un dueño puede revisar su enlace de agendar o su página tal como la ven sus

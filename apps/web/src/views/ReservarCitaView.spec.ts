@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
     autenticado: false,
     slug: null as string | null,
     usuario: null as Record<string, unknown> | null,
+    puede: () => false,
   },
 }));
 vi.mock("@/lib/api", () => ({
@@ -822,6 +823,11 @@ describe("cliente con cuenta", () => {
     await continuar(vista);
     expect(vista.find('[data-prueba="con-cuenta"]').exists()).toBe(false);
     expect(vista.find("#rc-nom").exists()).toBe(true);
+    // No ofrece «entrar» (solo lo llevaría a su panel): explica con qué sesión está.
+    expect(vista.find('[data-prueba="entrar"]').exists()).toBe(false);
+    expect(vista.get('[data-prueba="sesion-equipo"]').text()).toContain(
+      "Tienes la sesión abierta como",
+    );
     vista.unmount();
   });
 });

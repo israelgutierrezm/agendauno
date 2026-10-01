@@ -164,6 +164,17 @@ const SIN_ADAPTAR = new Set([
  * barbería, "Próximas clases" se lee "Próximas citas". Sin negocio, los textos base.
  */
 export function aplicarTerminologia(terminos: TerminosNegocio | null): void {
+  terminosDeSesion = terminos;
+  pintarTerminologia();
+}
+
+// Fuera del panel (páginas públicas con sesión) rigen los textos base: la página de
+// otro negocio no habla con las palabras del negocio en sesión.
+let terminosDeSesion: TerminosNegocio | null = null;
+let terminologiaEnPausa = false;
+
+function pintarTerminologia(): void {
+  const terminos = terminologiaEnPausa ? null : terminosDeSesion;
   fijarTerminosActuales(terminos);
   i18n.global.setLocaleMessage(
     "es-MX",
@@ -171,4 +182,11 @@ export function aplicarTerminologia(terminos: TerminosNegocio | null): void {
       ? mensajesBase
       : adaptarMensajes(mensajesBase, terminos, SIN_ADAPTAR),
   );
+}
+
+export function pausarTerminologia(pausa: boolean): void {
+  if (pausa !== terminologiaEnPausa) {
+    terminologiaEnPausa = pausa;
+    pintarTerminologia();
+  }
 }

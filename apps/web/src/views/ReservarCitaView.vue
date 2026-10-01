@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { recordarNegocio } from "@/lib/negociosRecientes";
-import { esMiembro } from "@/lib/roles";
+import { puedeEntrar } from "@/lib/acceso";
+import { esMiembro, nombreDeRol } from "@/lib/roles";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import CalendarioDias from "@/components/CalendarioDias.vue";
 import ElegirProfesional from "@/components/ElegirProfesional.vue";
@@ -94,6 +96,7 @@ type Paso = "sucursal" | "servicio" | "horario" | "confirmar";
 const route = useRoute();
 const router = useRouter();
 const sesion = useSesionTenantStore();
+const { t, te } = useI18n();
 // Al volver de la página de pago: avisa cómo quedó.
 const retornoPago = useRetornoPago();
 const slug = computed(() => String(route.params.slug));
@@ -235,6 +238,21 @@ const clienteConCuenta = computed(
     sesion.autenticado &&
     sesion.slug === slug.value &&
     esMiembro(sesion.usuario),
+);
+// Con sesión del equipo de ESTE negocio (no como cliente): la cita va con los datos
+// del cliente; «entrar» no aplica (solo lo llevaría a su panel).
+const sesionDelEquipo = computed(
+  () =>
+    sesion.autenticado &&
+    sesion.slug === slug.value &&
+    !esMiembro(sesion.usuario),
+);
+const rolDeSesion = computed(() =>
+  nombreDeRol(
+    sesion.usuario?.rol ?? "",
+    sesion.usuario?.roles_disponibles,
+    (llave) => (te(llave) ? t(llave) : null),
+  ),
 );
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -1472,6 +1490,26 @@ onMounted(cargar);
               <template v-else>
                 <label class="tu-label">{{ $t("reservar.datos") }}</label>
                 <p
+                  v-if="sesionDelEquipo"
+                  class="-mt-1 mb-3 text-sm"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  data-prueba="sesion-equipo"
+                >
+                  {{
+                    $t("perfilPublico.agendar.sesionEquipo", {
+                      rol: rolDeSesion,
+                      negocio: sesion.estudio?.nombre ?? "",
+                    })
+                  }}
+                  <RouterLink
+                    v-if="puedeEntrar('agenda', sesion)"
+                    :to="{ name: 'agenda' }"
+                    class="tu-enlace"
+                    >{{ $t("perfilPublico.agendar.desdeAgenda") }}</RouterLink
+                  >
+                </p>
+                <p
+                  v-else
                   class="-mt-1 mb-3 text-sm"
                   :style="{ color: 'var(--texto-suave)' }"
                 >

@@ -501,6 +501,12 @@ router.beforeEach(async (to) => {
           )
         : null;
     if (otro === null || otro === sesion.slug) {
+      // Ya tiene sesión en este negocio: de vuelta a donde venía (p. ej. agendar,
+      // que le explica cómo seguir) o a su inicio. Solo rutas internas.
+      const volver = String(to.query.volver ?? "");
+      if (to.name === "entrar" && /^\/(?![/\\])/.test(volver)) {
+        return volver;
+      }
       return { name: sesion.rutaInicio };
     }
   }
