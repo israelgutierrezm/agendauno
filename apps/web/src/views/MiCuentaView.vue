@@ -6,9 +6,10 @@ import { RouterLink } from "vue-router";
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaseEntrada from "@/components/PaseEntrada.vue";
-import TarjetaAcceso from "@/components/TarjetaAcceso.vue";
+import TarjetaOperacion, {
+  type Ilustracion,
+} from "@/components/TarjetaOperacion.vue";
 import TarjetaPrincipal from "@/components/TarjetaPrincipal.vue";
-import { PALETA_SERVICIO } from "@/lib/agenda";
 import { lugarDelClima, useClima } from "@/lib/clima";
 import { fotoNegocio } from "@/lib/fotoNegocio";
 import { cuandoCorto, useMiCuenta } from "@/lib/miCuenta";
@@ -79,15 +80,24 @@ const creditos = computed<{ ilimitado: boolean; n: number } | null>(() => {
   };
 });
 
-// Un color por acceso, de la misma paleta de la agenda.
+// Un color y una ilustración por acceso.
 const TONO = {
-  reservar: PALETA_SERVICIO[0].tinta,
-  reservas: PALETA_SERVICIO[2].tinta,
-  creditos: PALETA_SERVICIO[1].tinta,
-  pagos: PALETA_SERVICIO[4].tinta,
-  pase: PALETA_SERVICIO[5].tinta,
-  expediente: PALETA_SERVICIO[3].tinta,
-  configuracion: PALETA_SERVICIO[7].tinta,
+  reservar: "azul",
+  reservas: "morado",
+  creditos: "verde",
+  pagos: "naranja",
+  pase: "cielo",
+  expediente: "rosa",
+  configuracion: "azul",
+};
+const ILUSTRACION: Record<string, Ilustracion> = {
+  reservar: "agenda",
+  reservas: "reservas",
+  creditos: "creditos",
+  pagos: "pagos",
+  pase: "pase",
+  expediente: "expediente",
+  configuracion: "configuracion",
 };
 
 interface Acceso {
@@ -332,13 +342,14 @@ onMounted(() => {
       <!-- Accesos directos -->
       <ul class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <li v-for="a in accesos" :key="a.clave">
-          <TarjetaAcceso
+          <TarjetaOperacion
             :to="a.ruta ? { name: a.ruta } : undefined"
             :icono="a.icono"
             :titulo="a.titulo"
-            :valor="a.valor"
+            :texto="a.valor"
             :atencion="a.atencion"
             :tono="a.tono"
+            :ilustracion="ILUSTRACION[a.clave] ?? 'agenda'"
             @tocar="a.alTocar?.()"
           />
         </li>

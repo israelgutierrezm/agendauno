@@ -6,9 +6,10 @@ import { RouterLink, type RouteLocationRaw } from "vue-router";
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
 import PanelCita from "@/components/PanelCita.vue";
 import PanelClase from "@/components/PanelClase.vue";
-import TarjetaAcceso from "@/components/TarjetaAcceso.vue";
+import TarjetaOperacion, {
+  type Ilustracion,
+} from "@/components/TarjetaOperacion.vue";
 import TarjetaPrincipal from "@/components/TarjetaPrincipal.vue";
-import { PALETA_SERVICIO } from "@/lib/agenda";
 import { lugarDelClima, useClima } from "@/lib/clima";
 import { fotoNegocio } from "@/lib/fotoNegocio";
 import { cuandoCorto } from "@/lib/miCuenta";
@@ -85,12 +86,20 @@ const etiqueta = computed(() => {
 
 // Un color por acceso, de la misma paleta de la agenda (como el Inicio del alumno).
 const TONOS: Record<string, string> = {
-  hoy: PALETA_SERVICIO[0].tinta,
-  alumnos: PALETA_SERVICIO[1].tinta,
-  semana: PALETA_SERVICIO[2].tinta,
-  calendario: PALETA_SERVICIO[5].tinta,
-  agenda: PALETA_SERVICIO[4].tinta,
-  perfil: PALETA_SERVICIO[3].tinta,
+  hoy: "azul",
+  alumnos: "morado",
+  semana: "verde",
+  calendario: "cielo",
+  agenda: "naranja",
+  perfil: "rosa",
+};
+const ILUSTRACIONES: Record<string, Ilustracion> = {
+  hoy: "agenda",
+  alumnos: "alumnos",
+  semana: "semana",
+  calendario: "calendario",
+  agenda: "horarios",
+  perfil: "perfil",
 };
 
 interface Acceso {
@@ -294,12 +303,13 @@ onUnmounted(() => clearInterval(reloj));
       <!-- Accesos directos -->
       <ul class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <li v-for="a in accesos" :key="a.clave">
-          <TarjetaAcceso
+          <TarjetaOperacion
             :to="a.to"
             :icono="a.icono"
             :titulo="a.titulo"
-            :valor="a.valor"
-            :tono="TONOS[a.clave]"
+            :texto="a.valor"
+            :tono="TONOS[a.clave] ?? 'azul'"
+            :ilustracion="ILUSTRACIONES[a.clave] ?? 'agenda'"
           />
         </li>
       </ul>
