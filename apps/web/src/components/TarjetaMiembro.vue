@@ -148,6 +148,8 @@ const contacto = computed(() =>
 .tm-datos {
   margin-top: 0.6rem;
   display: grid;
+  /* Sin minmax(0, …) la columna crece al ancho del texto y se sale de la tarjeta. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.3rem;
   font-size: 0.75rem;
 }
