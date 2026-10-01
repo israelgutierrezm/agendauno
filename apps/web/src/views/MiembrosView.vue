@@ -11,6 +11,9 @@ import BotonImportar from "@/components/BotonImportar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
+import TarjetasIndicadores, {
+  type Indicador,
+} from "@/components/TarjetasIndicadores.vue";
 import PanelEditarMiembro, {
   type MiembroEditable,
 } from "@/components/PanelEditarMiembro.vue";
@@ -209,6 +212,82 @@ async function cargar(): Promise<void> {
     cargando.value = false;
   }
 }
+
+// Los números de arriba (`GET /miembros/resumen`): solo para clientes.
+interface ResumenClientes {
+  total: number;
+  con_plan: number;
+  nuevos_mes: number;
+  por_vencer: number;
+  vencidas: number;
+  con_adeudo: number;
+  dias_por_vencer: number;
+}
+const resumenClientes = ref<ResumenClientes | null>(null);
+async function cargarResumen(): Promise<void> {
+  try {
+    const { data } = await api.get<{ data: ResumenClientes }>(
+      `${base.value}/miembros/resumen`,
+    );
+    resumenClientes.value = data.data;
+  } catch {
+    // Sin el resumen, la lista sigue igual.
+    resumenClientes.value = null;
+  }
+}
+const indicadores = computed<Indicador[]>(() => {
+  const r = resumenClientes.value;
+  if (r === null) {
+    return [];
+  }
+  return [
+    {
+      clave: "total",
+      etiqueta: t("miembros.resumen.total", {
+        grupo: plural(sesion.terminologia.miembro).toLowerCase(),
+      }),
+      valor: String(r.total),
+      icono: "miembros",
+      tono: "azul",
+    },
+    {
+      clave: "conPlan",
+      etiqueta: t("miembros.resumen.conPlan"),
+      valor: String(r.con_plan),
+      icono: "etiqueta",
+      tono: "verde",
+    },
+    {
+      clave: "nuevos",
+      etiqueta: t("miembros.resumen.nuevos"),
+      valor: String(r.nuevos_mes),
+      icono: "personas",
+      tono: "morado",
+    },
+    {
+      clave: "porVencer",
+      etiqueta: t("miembros.resumen.porVencer", { dias: r.dias_por_vencer }),
+      valor:
+        r.vencidas > 0
+          ? t("miembros.resumen.porVencerValor", {
+              n: r.por_vencer,
+              vencidas: r.vencidas,
+            })
+          : String(r.por_vencer),
+      icono: "reloj",
+      tono: "naranja",
+      aviso: r.por_vencer + r.vencidas > 0,
+    },
+    {
+      clave: "adeudo",
+      etiqueta: t("miembros.resumen.adeudo"),
+      valor: String(r.con_adeudo),
+      icono: "dinero",
+      tono: "rosa",
+      aviso: r.con_adeudo > 0,
+    },
+  ];
+});
 
 function recargarDesde1(): void {
   page.value = 1;
@@ -440,6 +519,9 @@ onMounted(() => {
   form.value.tipo = tipo.value;
   void cargarSucursales();
   void cargar();
+  if (tipo.value === "miembro") {
+    void cargarResumen();
+  }
 });
 </script>
 
@@ -449,6 +531,7 @@ onMounted(() => {
       <EncabezadoSeccion
         :titulo="plural(sesion.terminologia.miembro)"
         :total="meta?.total ?? 0"
+        :subtitulo="$t('miembros.subtitulo')"
       />
       <BotonImportar
         v-if="puedeGestionar"
@@ -456,6 +539,13 @@ onMounted(() => {
         :texto="$t('nav.importar')"
       />
     </div>
+
+    <!-- Cuántos hay y qué pide atención -->
+    <TarjetasIndicadores
+      v-if="tipo === 'miembro' && indicadores.length > 0"
+      class="mt-6"
+      :tarjetas="indicadores"
+    />
 
     <div class="mt-6">
       <div class="min-w-0">
@@ -610,22 +700,34 @@ onMounted(() => {
                     <td class="px-4 py-2">
                       <div class="flex items-center gap-3 whitespace-nowrap">
                         <AvatarIniciales :nombre="m.nombre" tam="md" />
-                        <RouterLink
-                          v-if="tipo === 'miembro'"
-                          :to="{ name: 'ficha-miembro', params: { id: m.id } }"
-                          class="font-medium hover:underline"
-                          >{{ nombreCompleto(m) }}</RouterLink
-                        >
-                        <span v-else class="font-medium">{{
-                          nombreCompleto(m)
-                        }}</span>
-                        <span
-                          v-if="tipo === 'miembro' && m.primera_vez"
-                          class="text-xs font-medium"
-                          :style="{ color: 'var(--aviso)' }"
-                          :title="$t('miembros.nuevoAyuda')"
-                          >{{ $t("miembros.nuevo") }}</span
-                        >
+                        <span class="min-w-0">
+                          <span class="flex items-center gap-2">
+                            <RouterLink
+                              v-if="tipo === 'miembro'"
+                              :to="{
+                                name: 'ficha-miembro',
+                                params: { id: m.id },
+                              }"
+                              class="font-semibold hover:underline"
+                              >{{ nombreCompleto(m) }}</RouterLink
+                            >
+                            <span v-else class="font-semibold">{{
+                              nombreCompleto(m)
+                            }}</span>
+                            <span
+                              v-if="tipo === 'miembro' && m.primera_vez"
+                              class="mb-etiqueta-nuevo"
+                              :title="$t('miembros.nuevoAyuda')"
+                              >{{ $t("miembros.nuevo") }}</span
+                            >
+                          </span>
+                          <span
+                            v-if="tipo === 'miembro' && (m.email || m.celular)"
+                            class="block text-xs"
+                            :style="{ color: 'var(--texto-suave)' }"
+                            >{{ m.email ?? m.celular }}</span
+                          >
+                        </span>
                       </div>
                     </td>
                     <td
@@ -711,14 +813,20 @@ onMounted(() => {
                     >
                       {{ detalleBaja(m) }}
                     </td>
-                    <td v-else class="px-4 py-2">
-                      <span
-                        :style="{
-                          color: m.activo
-                            ? 'var(--texto-suave)'
-                            : 'var(--aviso)',
-                        }"
-                        >{{
+                    <td v-else class="px-4 py-2 whitespace-nowrap">
+                      <span class="mb-estado">
+                        <span
+                          class="mb-punto"
+                          :style="{
+                            background: m.archivado
+                              ? 'var(--texto-suave)'
+                              : m.activo
+                                ? 'var(--exito)'
+                                : 'var(--aviso)',
+                          }"
+                          aria-hidden="true"
+                        ></span>
+                        {{
                           m.activo
                             ? $t("miembros.activo")
                             : $t("miembros.suspendido")
@@ -942,6 +1050,26 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* «Nuevo» (aún no asiste): etiqueta suave en ámbar. */
+.mb-etiqueta-nuevo {
+  padding: 0.05rem 0.45rem;
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--aviso) 14%, var(--superficie));
+  color: var(--aviso);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.mb-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.mb-punto {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+}
 .tu-tabla-cuerpo tr {
   transition: background-color 0.12s ease;
 }

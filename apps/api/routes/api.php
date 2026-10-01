@@ -94,6 +94,7 @@ use App\Modules\Tenancy\Http\Controllers\ReprogramarTenantController;
 use App\Modules\Tenancy\Http\Controllers\ResenasTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReservasTenantController;
 use App\Modules\Tenancy\Http\Controllers\RespuestasFormularioController;
+use App\Modules\Tenancy\Http\Controllers\ResumenClientesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ResumenMiembroTenantController;
 use App\Modules\Tenancy\Http\Controllers\RetencionTenantController;
 use App\Modules\Tenancy\Http\Controllers\RolesTenantController;
@@ -347,6 +348,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/solicitudes-privacidad/{solicitud}/rechazar', [SolicitudesPrivacidadTenantController::class, 'rechazar'])->middleware('puede:miembros.gestionar')->name('solicitudes-privacidad.rechazar');
             // Padrón facturable (P0): base de la renta SaaS; `?formato=csv` para exportar. Ruta literal antes de {persona}.
             Route::get('/miembros/padron', [MiembrosTenantController::class, 'padron'])->middleware('puede:facturacion.ver')->name('miembros.padron');
+            // Números del directorio de clientes. Ruta literal antes de {persona}.
+            Route::get('/miembros/resumen', ResumenClientesTenantController::class)->middleware('puede:miembros.ver')->name('miembros.resumen');
             Route::post('/miembros', [MiembrosTenantController::class, 'store'])->middleware('puede:miembros.gestionar')->name('miembros.store');
             // Editar datos y estado del alumno (suspender/archivar/no-facturable) con auditoría (P0).
             Route::put('/miembros/{persona}', [MiembrosTenantController::class, 'actualizar'])->middleware('puede:miembros.gestionar')->name('miembros.update');

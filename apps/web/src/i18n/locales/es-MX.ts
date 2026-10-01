@@ -695,6 +695,16 @@ export default {
     },
   },
   miembros: {
+    subtitulo:
+      "Consulta y administra a tus miembros: sus planes, sus pagos y su asistencia.",
+    resumen: {
+      total: "Total de {grupo}",
+      conPlan: "Con plan vigente",
+      nuevos: "Nuevos este mes",
+      porVencer: "Por vencer ({dias} días)",
+      porVencerValor: "{n} · {vencidas} vencidas",
+      adeudo: "Con pagos pendientes",
+    },
     nuevoTitulo: "Nuevo miembro",
     nombre: "Nombre",
     primerApellido: "Primer apellido",
