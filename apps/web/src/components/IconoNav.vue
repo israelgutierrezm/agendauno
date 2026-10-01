@@ -196,6 +196,18 @@ const RUTAS: Record<string, string[]> = {
     "M4 7.5A1.5 1.5 0 0 1 5.5 6H10l2 2h6.5A1.5 1.5 0 0 1 20 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z",
   ],
   hecho: ["M4.5 12.75l6 6 9-13.5"],
+  mas: ["M12 5v14", "M5 12h14"],
+  dinero: [
+    "M12 3.5v17",
+    "M16.5 7.5c0-1.7-2-2.9-4.5-2.9S7.5 5.8 7.5 7.6c0 4.4 9 2.4 9 6.8 0 1.9-2 3.1-4.5 3.1s-4.5-1.2-4.5-3",
+  ],
+  // Quien no llegó: una persona y una equis.
+  ausente: [
+    "M10 11a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5z",
+    "M3.5 20a6.5 6.5 0 0 1 10.6-5",
+    "M16 15.5l4.5 4.5",
+    "M20.5 15.5 16 20",
+  ],
   punto: ["M12 12h.01"],
   // Cambiar de rol: dos flechas en sentidos opuestos.
   intercambio: ["M7 4 4 7l3 3", "M4 7h13", "M17 20l3-3-3-3", "M20 17H7"],

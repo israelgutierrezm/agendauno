@@ -700,21 +700,29 @@ const tarjetasKpi = computed(() => {
     return [
       {
         clave: "citas",
+        icono: "agenda",
+        tono: "azul" as const,
         valor: String(k.citas),
         etiqueta: t("agendaVisual.kpis.citas"),
       },
       {
         clave: "local",
+        icono: "personas",
+        tono: "verde" as const,
         valor: String(k.enLocal),
         etiqueta: t("agendaVisual.kpis.enLocal"),
       },
       {
         clave: "cobrar",
+        icono: "dinero",
+        tono: "naranja" as const,
         valor: dineroMx(k.porCobrarMinor),
         etiqueta: t("agendaVisual.kpis.porCobrar", { n: k.pendientesPago }),
       },
       {
         clave: "ausentes",
+        icono: "ausente",
+        tono: "morado" as const,
         valor: String(k.noAsistieron),
         etiqueta: t("agendaVisual.kpis.noAsistieron"),
       },
@@ -724,26 +732,36 @@ const tarjetasKpi = computed(() => {
   return [
     {
       clave: "clases",
+      icono: "agenda",
+      tono: "azul" as const,
       valor: String(k.clases),
       etiqueta: t("agendaVisual.kpis.clases"),
     },
     {
       clave: "ocupacion",
+      icono: "pulso",
+      tono: "verde" as const,
       valor: k.ocupacionPct !== null ? `${k.ocupacionPct}%` : "—",
       etiqueta: t("agendaVisual.kpis.ocupacion"),
     },
     {
       clave: "reservados",
+      icono: "hecho",
+      tono: "morado" as const,
       valor: String(k.reservados),
       etiqueta: t("agendaVisual.kpis.reservados"),
     },
     {
       clave: "espera",
+      icono: "reloj",
+      tono: "naranja" as const,
       valor: String(k.enEspera),
       etiqueta: t("agendaVisual.kpis.enEspera"),
     },
     {
       clave: "libres",
+      icono: "etiqueta",
+      tono: "rosa" as const,
       valor: String(k.libresPorLlenar),
       etiqueta: t("agendaVisual.kpis.libres"),
     },
@@ -1483,14 +1501,14 @@ onMounted(async () => {
       <!-- Citas: el negocio agenda al cliente. Clases: se programa una clase. -->
       <button
         v-if="sesion.esCitas && puedeReservar"
-        class="tu-btn tu-btn-primario"
+        class="tu-btn tu-btn-primario tu-btn-crear"
         @click="abrirNuevaCita()"
       >
         {{ $t("agendaVisual.nuevaCita.boton") }}
       </button>
       <button
         v-else-if="!sesion.esCitas && puedeGestionar"
-        class="tu-btn tu-btn-primario"
+        class="tu-btn tu-btn-primario tu-btn-crear"
         @click="mostrarNueva = true"
       >
         {{ $t("agenda.nuevaClase") }}
@@ -1518,49 +1536,56 @@ onMounted(async () => {
     <template v-if="!cargando">
       <!-- Barra de herramientas: filtros + navegacion + vista -->
       <div class="mt-6 flex flex-wrap items-center gap-2 sm:gap-3">
-        <select
-          v-model="sucursalFiltro"
-          class="tu-input w-auto"
-          :aria-label="$t('agenda.nueva.sucursal')"
-        >
-          <option value="">{{ $t("agenda.todasSucursales") }}</option>
-          <option v-for="s in sucursalesAgenda" :key="s.id" :value="s.id">
-            {{ s.nombre }}
-          </option>
-        </select>
-        <select
-          v-if="instructores.length > 0"
-          v-model="instructorFiltro"
-          class="tu-input w-auto"
-          :aria-label="$t('agenda.nueva.instructor')"
-        >
-          <option value="">
-            {{
-              $t("agendaVisual.todosLos", {
-                grupo: plural(sesion.terminologia.instructor).toLowerCase(),
-              })
-            }}
-          </option>
-          <option v-for="i in instructores" :key="i.id" :value="i.id">
-            {{ i.nombre }}
-          </option>
-        </select>
+        <span class="tu-select-icono">
+          <IconoNav nombre="ubicacion" :tam="18" />
+          <select
+            v-model="sucursalFiltro"
+            class="tu-input w-auto"
+            :aria-label="$t('agenda.nueva.sucursal')"
+          >
+            <option value="">{{ $t("agenda.todasSucursales") }}</option>
+            <option v-for="s in sucursalesAgenda" :key="s.id" :value="s.id">
+              {{ s.nombre }}
+            </option>
+          </select>
+        </span>
+        <span v-if="instructores.length > 0" class="tu-select-icono">
+          <IconoNav nombre="instructores" :tam="18" />
+          <select
+            v-model="instructorFiltro"
+            class="tu-input w-auto"
+            :aria-label="$t('agenda.nueva.instructor')"
+          >
+            <option value="">
+              {{
+                $t("agendaVisual.todosLos", {
+                  grupo: plural(sesion.terminologia.instructor).toLowerCase(),
+                })
+              }}
+            </option>
+            <option v-for="i in instructores" :key="i.id" :value="i.id">
+              {{ i.nombre }}
+            </option>
+          </select>
+        </span>
 
-        <select
-          v-if="ofertasAgenda.length > 1"
-          v-model="ofertaFiltro"
-          class="tu-input w-auto"
-          :aria-label="$t('agendaOperacion.servicio')"
-        >
-          <option value="">{{ $t("agendaOperacion.todosServicios") }}</option>
-          <option v-for="o in ofertasAgenda" :key="o.id" :value="o.id">
-            {{ o.nombre }}
-          </option>
-        </select>
+        <span v-if="ofertasAgenda.length > 1" class="tu-select-icono">
+          <IconoNav nombre="etiqueta" :tam="18" />
+          <select
+            v-model="ofertaFiltro"
+            class="tu-input w-auto"
+            :aria-label="$t('agendaOperacion.servicio')"
+          >
+            <option value="">{{ $t("agendaOperacion.todosServicios") }}</option>
+            <option v-for="o in ofertasAgenda" :key="o.id" :value="o.id">
+              {{ o.nombre }}
+            </option>
+          </select>
+        </span>
 
         <div class="flex items-center gap-1 ml-auto">
           <button
-            class="tu-icono-btn"
+            class="tu-btn tu-btn-fantasma ag-paso"
             :aria-label="
               vista === 'profesionales'
                 ? $t('agendaVisual.diaAnterior')
@@ -1572,11 +1597,11 @@ onMounted(async () => {
           >
             <IconoNav nombre="chevron" :tam="18" class="rotate-180" />
           </button>
-          <button class="tu-btn tu-btn-fantasma px-3 py-1.5" @click="irHoy">
+          <button class="tu-btn tu-btn-fantasma ag-hoy" @click="irHoy">
             {{ $t("agenda.hoy") }}
           </button>
           <button
-            class="tu-icono-btn"
+            class="tu-btn tu-btn-fantasma ag-paso"
             :aria-label="
               vista === 'profesionales'
                 ? $t('agendaVisual.diaSiguiente')
@@ -1589,14 +1614,16 @@ onMounted(async () => {
             <IconoNav nombre="chevron" :tam="18" />
           </button>
           <span
-            class="text-sm font-medium ml-1 hidden sm:inline first-letter:uppercase"
+            class="text-sm font-medium ml-2 hidden sm:inline first-letter:uppercase"
             :style="{ color: 'var(--texto-suave)' }"
             >{{ vista === "profesionales" ? diaTexto : rangoTexto }}</span
           >
         </div>
+      </div>
 
-        <!-- Alternar vista según la modalidad (citas: por profesional / semana;
-             clases: semana / día). En móvil, las clases siempre se ven por día. -->
+      <!-- Alternar vista según la modalidad (citas: por profesional / semana;
+           clases: semana / día). En móvil, las clases siempre se ven por día. -->
+      <div class="mt-3">
         <div
           class="tu-segmentado"
           :class="{ 'hidden lg:inline-flex': !sesion.esCitas }"
@@ -2993,6 +3020,13 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* Navegación de fechas: botones de borde del mismo alto que los filtros. */
+.ag-paso {
+  padding: 0.55rem;
+}
+.ag-hoy {
+  padding: 0.55rem 1rem;
+}
 .tu-bloque {
   position: absolute;
   border-radius: 0.5rem;

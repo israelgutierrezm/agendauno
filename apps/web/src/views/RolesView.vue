@@ -228,7 +228,11 @@ onMounted(cargar);
   <section class="mx-auto max-w-4xl px-4 sm:px-6 py-8">
     <div class="flex items-start justify-between gap-3 flex-wrap">
       <EncabezadoSeccion :titulo="$t('operacion.rolesPropios.titulo')" />
-      <button class="tu-btn tu-btn-primario" type="button" @click="abrirNuevo">
+      <button
+        class="tu-btn tu-btn-primario tu-btn-crear"
+        type="button"
+        @click="abrirNuevo"
+      >
         {{ $t("operacion.rolesPropios.nuevo") }}
       </button>
     </div>

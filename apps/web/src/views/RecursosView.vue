@@ -119,7 +119,7 @@ onMounted(cargar);
       />
       <button
         v-if="puedeGestionar && sucursales.length > 0"
-        class="tu-btn tu-btn-primario"
+        class="tu-btn tu-btn-primario tu-btn-crear"
         type="button"
         @click="abrir"
       >

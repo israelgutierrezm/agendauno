@@ -164,7 +164,7 @@ onMounted(cargar);
     <div class="flex items-start justify-between gap-3">
       <EncabezadoSeccion :titulo="$t('promociones.titulo')" />
       <button
-        class="tu-btn tu-btn-primario shrink-0"
+        class="tu-btn tu-btn-primario tu-btn-crear shrink-0"
         type="button"
         @click="nueva"
       >

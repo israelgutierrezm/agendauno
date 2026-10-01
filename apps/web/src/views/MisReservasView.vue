@@ -238,7 +238,7 @@ onMounted(() => void cuenta.asegurar());
         <button
           v-if="sesion.esCitas"
           type="button"
-          class="tu-btn tu-btn-primario"
+          class="tu-btn tu-btn-primario tu-btn-crear"
           @click="agendando = true"
         >
           {{ $t("portal.reservas.agendarCita") }}

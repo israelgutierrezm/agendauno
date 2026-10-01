@@ -10,6 +10,7 @@ import {
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import {
   aHora,
   aMinutos,
@@ -297,6 +298,10 @@ const lineaAhora = computed<number | null>(() => {
   const min = minutosLocal(iso, props.zona);
   return min >= rango.value.ini && min <= rango.value.fin ? y(min) : null;
 });
+// Dónde va el aviso de columna vacía: bajo la línea de ahora o arriba del día.
+const topVacio = computed(() =>
+  Math.max(24, Math.min((lineaAhora.value ?? 0) + 40, alto.value - 220)),
+);
 const horaAhora = computed(() =>
   aHora(minutosLocal(ahora.value.toISOString(), props.zona)),
 );
@@ -485,6 +490,22 @@ watch(() => props.fecha, enfocar);
             ></div>
           </template>
 
+          <!-- Nada en el día: qué hacer, sin tapar los huecos (los clics pasan). -->
+          <EstadoVacio
+            v-if="c.tarjetas.length === 0"
+            class="ag-vacio"
+            :style="{ top: `${topVacio}px` }"
+            icono="agenda"
+            compacto
+            :mas="puedeCrear"
+            :titulo="$t('agendaVisual.profesionales.vacioTitulo')"
+            :texto="
+              puedeCrear
+                ? $t('agendaVisual.profesionales.vacioTexto')
+                : undefined
+            "
+          />
+
           <button
             v-for="tj in c.tarjetas"
             :key="tj.sesion.id"
@@ -568,6 +589,12 @@ watch(() => props.fecha, enfocar);
 </template>
 
 <style scoped>
+.ag-vacio {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
 .ag-scroll {
   max-height: calc(100vh - 17rem);
   min-height: 24rem;

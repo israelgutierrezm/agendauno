@@ -322,7 +322,7 @@ onMounted(cargar);
       >
         <button
           type="button"
-          class="tu-btn tu-btn-primario text-sm"
+          class="tu-btn tu-btn-primario tu-btn-crear text-sm"
           @click="nuevoConsentimiento"
         >
           {{ $t("consentimientos.nuevo") }}

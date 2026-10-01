@@ -152,7 +152,7 @@ function esActivo(clave: string): boolean {
         <slot name="acciones" />
         <button
           v-if="puedeCrear"
-          class="tu-btn tu-btn-primario shrink-0"
+          class="tu-btn tu-btn-primario tu-btn-crear shrink-0"
           type="button"
           @click="emit('nuevo')"
         >

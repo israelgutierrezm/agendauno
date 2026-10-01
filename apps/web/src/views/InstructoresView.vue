@@ -166,7 +166,11 @@ onMounted(cargar);
           ruta="importar-instructores"
           :texto="$t('nav.importar')"
         />
-        <button class="tu-btn tu-btn-primario" type="button" @click="abrir">
+        <button
+          class="tu-btn tu-btn-primario tu-btn-crear"
+          type="button"
+          @click="abrir"
+        >
           {{ $t("instructores.invitar.enviar") }}
         </button>
       </div>

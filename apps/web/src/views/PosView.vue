@@ -433,7 +433,7 @@ onMounted(cargar);
       <div v-else-if="tab === 'inventario'" class="mt-6">
         <div class="flex justify-end">
           <button
-            class="tu-btn tu-btn-primario"
+            class="tu-btn tu-btn-primario tu-btn-crear"
             type="button"
             @click="mostrarNuevo = !mostrarNuevo"
           >

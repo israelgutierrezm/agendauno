@@ -259,6 +259,60 @@
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--acento) 18%, transparent);
   }
 
+  /* Listas desplegables: un ícono genérico a la izquierda y la flecha propia a la
+   derecha, en todas. Dentro de .tu-select-icono el ícono es el del campo. */
+  select.tu-input:not([multiple]) {
+    appearance: none;
+    padding-left: 2.35rem;
+    padding-right: 2.25rem;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237C8597' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6h11'/%3E%3Cpath d='M9 12h11'/%3E%3Cpath d='M9 18h11'/%3E%3Cpath d='M4.5 6h.01'/%3E%3Cpath d='M4.5 12h.01'/%3E%3Cpath d='M4.5 18h.01'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237C8597' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat, no-repeat;
+    background-position:
+      left 0.8rem center,
+      right 0.75rem center;
+    background-size:
+      1rem 1rem,
+      1rem 1rem;
+  }
+  .dark select.tu-input:not([multiple]) {
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6h11'/%3E%3Cpath d='M9 12h11'/%3E%3Cpath d='M9 18h11'/%3E%3Cpath d='M4.5 6h.01'/%3E%3Cpath d='M4.5 12h.01'/%3E%3Cpath d='M4.5 18h.01'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  }
+  .tu-select-icono {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+  .tu-select-icono > svg {
+    position: absolute;
+    left: 0.8rem;
+    color: var(--texto-suave);
+    pointer-events: none;
+  }
+  .tu-select-icono > select.tu-input:not([multiple]) {
+    padding-left: 2.5rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237C8597' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-position: right 0.75rem center;
+    background-size: 1rem 1rem;
+  }
+  .dark .tu-select-icono > select.tu-input:not([multiple]) {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  }
+
+  /* Botón de crear: el «+» antes del texto. */
+  .tu-btn-crear::before {
+    content: "";
+    width: 1.05em;
+    height: 1.05em;
+    flex-shrink: 0;
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14'/%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+
   /* Texto de ayuda debajo de un campo. */
   .tu-hint {
     display: block;

@@ -159,7 +159,7 @@ onMounted(cargar);
       <EncabezadoSeccion :titulo="$t('cursos.titulo')" :total="grupos.length" />
       <button
         v-if="puedeGestionar && plantillas.length > 0"
-        class="tu-btn tu-btn-primario"
+        class="tu-btn tu-btn-primario tu-btn-crear"
         type="button"
         @click="abrir"
       >

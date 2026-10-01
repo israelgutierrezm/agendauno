@@ -121,7 +121,7 @@ onMounted(cargar);
         <button
           v-if="puedeEditar"
           type="button"
-          class="tu-btn tu-btn-primario"
+          class="tu-btn tu-btn-primario tu-btn-crear"
           @click="abrir(null)"
         >
           {{ $t("planes.nuevo") }}

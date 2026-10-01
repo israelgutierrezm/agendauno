@@ -323,7 +323,7 @@ onMounted(cargar);
       />
       <button
         v-if="puedeGestionar"
-        class="tu-btn tu-btn-primario"
+        class="tu-btn tu-btn-primario tu-btn-crear"
         type="button"
         @click="abrirNueva"
       >

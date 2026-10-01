@@ -45,6 +45,8 @@ export default {
     ahora: "Ahora",
     sinCliente: "Sin cliente",
     lugares: "{ocupados}/{capacidad} lugares",
+    vacioTitulo: "No hay citas en este día",
+    vacioTexto: "Haz clic en un horario para agendar una nueva cita.",
   },
   semana: {
     manana: "Mañana",
