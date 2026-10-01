@@ -469,19 +469,21 @@ onMounted(cargar);
         </p>
       </form>
       <template #pie>
-        <button
-          class="tu-btn tu-btn-primario w-full"
-          type="button"
-          :disabled="
-            guardando ||
-            nombre.trim() === '' ||
-            seleccion.size === 0 ||
-            incompleto
-          "
-          @click="guardar"
-        >
-          {{ $t("operacion.rolesPropios.guardar") }}
-        </button>
+        <div class="flex justify-end">
+          <button
+            class="tu-btn tu-btn-primario"
+            type="button"
+            :disabled="
+              guardando ||
+              nombre.trim() === '' ||
+              seleccion.size === 0 ||
+              incompleto
+            "
+            @click="guardar"
+          >
+            {{ $t("operacion.rolesPropios.guardar") }}
+          </button>
+        </div>
       </template>
     </PanelLateral>
   </section>

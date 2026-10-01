@@ -761,14 +761,16 @@ onMounted(cargar);
         </p>
       </form>
       <template #pie>
-        <button
-          type="submit"
-          form="form-consentimiento"
-          class="tu-btn tu-btn-primario w-full"
-          :disabled="publicando"
-        >
-          {{ $t("consentimientos.publicar") }}
-        </button>
+        <div class="flex justify-end">
+          <button
+            type="submit"
+            form="form-consentimiento"
+            class="tu-btn tu-btn-primario"
+            :disabled="publicando"
+          >
+            {{ $t("consentimientos.publicar") }}
+          </button>
+        </div>
       </template>
     </PanelLateral>
   </section>

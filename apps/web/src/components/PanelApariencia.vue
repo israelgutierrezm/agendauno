@@ -69,6 +69,7 @@ function restablecer(): void {
   <PanelLateral
     :abierto="abierto"
     :titulo="$t('apariencia.titulo')"
+    lateral
     @cerrar="emit('cerrar')"
   >
     <div class="space-y-7 p-5">

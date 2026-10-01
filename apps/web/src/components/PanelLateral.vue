@@ -5,12 +5,17 @@ import IconoNav from "@/components/IconoNav.vue";
 import { useFocoPanel } from "@/lib/focoPanel";
 
 /**
- * Panel lateral deslizante (drawer) anclado a la DERECHA, para altas/ediciones
- * sin salir de la lista. Se cierra con la tecla Escape o tocando el fondo, y
- * bloquea el scroll de la página mientras está abierto. Reutilizable en cualquier
- * vista: el contenido va en el slot por defecto y las acciones en el slot `pie`.
+ * Ventana para altas, ediciones y detalles sin salir de la lista. Por omisión es un
+ * modal centrado y amplio (~768 px); solo la apariencia la usa anclada a la derecha
+ * (`lateral`), para ver el cambio de tema sobre la pantalla. Se cierra con Escape o
+ * tocando el fondo, atrapa el foco y bloquea el scroll de atrás. El contenido va en
+ * el slot por defecto y las acciones en el slot `pie`.
  */
-const props = defineProps<{ abierto: boolean; titulo?: string }>();
+const props = defineProps<{
+  abierto: boolean;
+  titulo?: string;
+  lateral?: boolean;
+}>();
 const emit = defineEmits<{ cerrar: [] }>();
 
 const panel = ref<HTMLElement | null>(null);
@@ -23,12 +28,19 @@ useFocoPanel(
 
 <template>
   <Teleport to="body">
-    <Transition name="tu-drawer">
-      <div v-if="abierto" class="fixed inset-0 z-50 flex justify-end">
+    <Transition :name="lateral ? 'tu-drawer' : 'tu-ventana'">
+      <div
+        v-if="abierto"
+        class="fixed inset-0 z-50 flex"
+        :class="lateral ? 'justify-end' : 'items-center justify-center p-4'"
+      >
         <div class="absolute inset-0 bg-black/50" @click="emit('cerrar')" />
         <aside
           ref="panel"
-          class="tu-drawer-panel relative flex h-full w-full max-w-md flex-col overflow-y-auto shadow-xl"
+          class="tu-drawer-panel relative flex w-full flex-col overflow-y-auto shadow-xl"
+          :class="
+            lateral ? 'h-full max-w-md' : 'max-h-[92vh] max-w-3xl rounded-2xl'
+          "
           :style="{ background: 'var(--superficie)' }"
           role="dialog"
           aria-modal="true"
@@ -36,13 +48,14 @@ useFocoPanel(
           tabindex="-1"
         >
           <header
-            class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b p-5"
+            class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b"
+            :class="lateral ? 'p-5' : 'px-6 py-4'"
             :style="{
               borderColor: 'var(--borde)',
               background: 'var(--superficie)',
             }"
           >
-            <h2 class="text-lg font-light">{{ titulo }}</h2>
+            <h2 class="text-lg font-semibold">{{ titulo }}</h2>
             <button
               class="tu-icono-btn"
               type="button"
@@ -53,13 +66,14 @@ useFocoPanel(
             </button>
           </header>
 
-          <div class="flex-1 p-5">
+          <div class="flex-1" :class="lateral ? 'p-5' : 'px-6 py-5'">
             <slot />
           </div>
 
           <footer
             v-if="$slots.pie"
-            class="sticky bottom-0 border-t p-5"
+            class="sticky bottom-0 border-t"
+            :class="lateral ? 'p-5' : 'px-6 py-4'"
             :style="{
               borderColor: 'var(--borde)',
               background: 'var(--superficie)',
@@ -75,26 +89,42 @@ useFocoPanel(
 
 <style scoped>
 .tu-drawer-enter-active,
-.tu-drawer-leave-active {
+.tu-drawer-leave-active,
+.tu-ventana-enter-active,
+.tu-ventana-leave-active {
   transition: opacity 0.2s ease;
 }
 .tu-drawer-enter-active .tu-drawer-panel,
 .tu-drawer-leave-active .tu-drawer-panel {
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
+.tu-ventana-enter-active .tu-drawer-panel,
+.tu-ventana-leave-active .tu-drawer-panel {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
 .tu-drawer-enter-from,
-.tu-drawer-leave-to {
+.tu-drawer-leave-to,
+.tu-ventana-enter-from,
+.tu-ventana-leave-to {
   opacity: 0;
 }
 .tu-drawer-enter-from .tu-drawer-panel,
 .tu-drawer-leave-to .tu-drawer-panel {
   transform: translateX(100%);
 }
+.tu-ventana-enter-from .tu-drawer-panel,
+.tu-ventana-leave-to .tu-drawer-panel {
+  transform: translateY(0.75rem) scale(0.98);
+}
 @media (prefers-reduced-motion: reduce) {
   .tu-drawer-enter-active,
   .tu-drawer-leave-active,
   .tu-drawer-enter-active .tu-drawer-panel,
-  .tu-drawer-leave-active .tu-drawer-panel {
+  .tu-drawer-leave-active .tu-drawer-panel,
+  .tu-ventana-enter-active,
+  .tu-ventana-leave-active,
+  .tu-ventana-enter-active .tu-drawer-panel,
+  .tu-ventana-leave-active .tu-drawer-panel {
     transition: none;
   }
 }

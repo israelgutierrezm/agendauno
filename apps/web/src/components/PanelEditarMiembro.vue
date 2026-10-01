@@ -2,6 +2,7 @@
 import { reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -94,131 +95,105 @@ async function guardar(): Promise<void> {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 flex justify-end">
-    <div class="absolute inset-0 bg-black/40" @click="emit('cerrar')" />
-    <aside
-      class="relative flex h-full w-full max-w-md flex-col overflow-y-auto"
-      :style="{ background: 'var(--superficie)', boxShadow: 'var(--sombra)' }"
-    >
-      <header
-        class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b px-5 py-4"
-        :style="{
-          background: 'var(--superficie)',
-          borderColor: 'var(--borde)',
-        }"
+  <PanelLateral
+    :abierto="true"
+    :titulo="$t('miembros.editar.titulo')"
+    @cerrar="emit('cerrar')"
+  >
+    <form class="space-y-4" @submit.prevent="guardar">
+      <div>
+        <label class="tu-label" for="en">{{ $t("miembros.nombre") }}</label>
+        <input id="en" v-model="form.nombre" class="tu-input" required />
+      </div>
+      <div>
+        <label class="tu-label" for="ep">{{
+          $t("miembros.primerApellido")
+        }}</label>
+        <input id="ep" v-model="form.primer_apellido" class="tu-input" />
+      </div>
+      <div>
+        <label class="tu-label" for="ee">{{ $t("miembros.email") }}</label>
+        <input id="ee" v-model="form.email" class="tu-input" type="email" />
+      </div>
+
+      <div
+        class="border-t pt-4 space-y-3"
+        :style="{ borderColor: 'var(--borde)' }"
       >
-        <p class="text-lg font-light truncate">
-          {{ $t("miembros.editar.titulo") }}
+        <p class="text-sm font-semibold">
+          {{ $t("miembros.editar.estado") }}
         </p>
+        <label class="flex items-center justify-between gap-3 text-sm">
+          <span>
+            {{ $t("miembros.editar.activo") }}
+            <span
+              class="block text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              >{{ $t("miembros.editar.activoAyuda") }}</span
+            >
+          </span>
+          <input v-model="form.activo" type="checkbox" class="h-5 w-5" />
+        </label>
+        <label class="flex items-center justify-between gap-3 text-sm">
+          <span>
+            {{ $t("miembros.editar.facturable") }}
+            <span
+              class="block text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              >{{ $t("miembros.editar.facturableAyuda") }}</span
+            >
+          </span>
+          <input v-model="form.es_facturable" type="checkbox" class="h-5 w-5" />
+        </label>
+        <label class="flex items-center justify-between gap-3 text-sm">
+          <span>
+            {{ $t("miembros.editar.archivado") }}
+            <span
+              class="block text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              >{{ $t("miembros.editar.archivadoAyuda") }}</span
+            >
+          </span>
+          <input v-model="form.archivado" type="checkbox" class="h-5 w-5" />
+        </label>
+      </div>
+
+      <p v-if="error" class="text-sm" style="color: var(--error)">
+        {{ error }}
+      </p>
+      <button
+        class="tu-btn tu-btn-primario w-full"
+        type="submit"
+        :disabled="guardando"
+      >
+        {{ guardando ? $t("comun.guardar") + "…" : $t("comun.guardar") }}
+      </button>
+
+      <div
+        v-if="sesion.puede('miembros.eliminar')"
+        class="border-t pt-4 space-y-2"
+        :style="{ borderColor: 'var(--borde)' }"
+      >
+        <p class="text-sm font-semibold">{{ $t("bajas.darDeBaja") }}</p>
+        <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("bajas.ayudaMiembro") }}
+        </p>
+        <input
+          v-model="motivoBaja"
+          class="tu-input"
+          maxlength="500"
+          :placeholder="$t('bajas.motivo')"
+        />
         <button
           type="button"
-          class="tu-icono-btn shrink-0"
-          :aria-label="$t('recepcion.panel.cerrar')"
-          @click="emit('cerrar')"
+          class="tu-btn tu-btn-fantasma w-full"
+          style="color: var(--error)"
+          :disabled="dandoDeBaja"
+          @click="darDeBaja"
         >
-          <span aria-hidden="true">✕</span>
+          {{ $t("bajas.darDeBaja") }}
         </button>
-      </header>
-
-      <form class="flex-1 space-y-4 px-5 py-4" @submit.prevent="guardar">
-        <div>
-          <label class="tu-label" for="en">{{ $t("miembros.nombre") }}</label>
-          <input id="en" v-model="form.nombre" class="tu-input" required />
-        </div>
-        <div>
-          <label class="tu-label" for="ep">{{
-            $t("miembros.primerApellido")
-          }}</label>
-          <input id="ep" v-model="form.primer_apellido" class="tu-input" />
-        </div>
-        <div>
-          <label class="tu-label" for="ee">{{ $t("miembros.email") }}</label>
-          <input id="ee" v-model="form.email" class="tu-input" type="email" />
-        </div>
-
-        <div
-          class="border-t pt-4 space-y-3"
-          :style="{ borderColor: 'var(--borde)' }"
-        >
-          <p class="text-sm font-semibold">
-            {{ $t("miembros.editar.estado") }}
-          </p>
-          <label class="flex items-center justify-between gap-3 text-sm">
-            <span>
-              {{ $t("miembros.editar.activo") }}
-              <span
-                class="block text-xs"
-                :style="{ color: 'var(--texto-suave)' }"
-                >{{ $t("miembros.editar.activoAyuda") }}</span
-              >
-            </span>
-            <input v-model="form.activo" type="checkbox" class="h-5 w-5" />
-          </label>
-          <label class="flex items-center justify-between gap-3 text-sm">
-            <span>
-              {{ $t("miembros.editar.facturable") }}
-              <span
-                class="block text-xs"
-                :style="{ color: 'var(--texto-suave)' }"
-                >{{ $t("miembros.editar.facturableAyuda") }}</span
-              >
-            </span>
-            <input
-              v-model="form.es_facturable"
-              type="checkbox"
-              class="h-5 w-5"
-            />
-          </label>
-          <label class="flex items-center justify-between gap-3 text-sm">
-            <span>
-              {{ $t("miembros.editar.archivado") }}
-              <span
-                class="block text-xs"
-                :style="{ color: 'var(--texto-suave)' }"
-                >{{ $t("miembros.editar.archivadoAyuda") }}</span
-              >
-            </span>
-            <input v-model="form.archivado" type="checkbox" class="h-5 w-5" />
-          </label>
-        </div>
-
-        <p v-if="error" class="text-sm" style="color: var(--error)">
-          {{ error }}
-        </p>
-        <button
-          class="tu-btn tu-btn-primario w-full"
-          type="submit"
-          :disabled="guardando"
-        >
-          {{ guardando ? $t("comun.guardar") + "…" : $t("comun.guardar") }}
-        </button>
-
-        <div
-          v-if="sesion.puede('miembros.eliminar')"
-          class="border-t pt-4 space-y-2"
-          :style="{ borderColor: 'var(--borde)' }"
-        >
-          <p class="text-sm font-semibold">{{ $t("bajas.darDeBaja") }}</p>
-          <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("bajas.ayudaMiembro") }}
-          </p>
-          <input
-            v-model="motivoBaja"
-            class="tu-input"
-            maxlength="500"
-            :placeholder="$t('bajas.motivo')"
-          />
-          <button
-            type="button"
-            class="tu-btn tu-btn-fantasma w-full"
-            style="color: var(--error)"
-            :disabled="dandoDeBaja"
-            @click="darDeBaja"
-          >
-            {{ $t("bajas.darDeBaja") }}
-          </button>
-        </div>
-      </form>
-    </aside>
-  </div>
+      </div>
+    </form>
+  </PanelLateral>
 </template>

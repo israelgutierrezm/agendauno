@@ -2000,12 +2000,18 @@ onMounted(async () => {
       </div>
     </template>
 
-    <!-- ===== Panel de detalle (drawer) ===== -->
-    <div v-if="detalle" class="fixed inset-0 z-50 flex justify-end">
+    <!-- ===== Detalle de la sesión (modal centrado y amplio) ===== -->
+    <div
+      v-if="detalle"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    >
       <div class="absolute inset-0 bg-black/50" @click="cerrarDetalle" />
       <aside
-        class="relative w-full max-w-md h-full overflow-y-auto p-5"
+        class="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl p-6 shadow-xl"
         :style="{ background: 'var(--superficie)' }"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="detalle.oferta ?? $t('comun.detalle')"
       >
         <div class="flex items-start justify-between gap-3">
           <div>

@@ -961,23 +961,23 @@ onMounted(cargar);
         </label>
       </form>
       <template #pie>
-        <div class="flex flex-col gap-2">
-          <button
-            type="submit"
-            form="form-plantilla"
-            class="tu-btn tu-btn-primario w-full"
-            :disabled="guardandoPlantilla"
-          >
-            {{ $t("comunicacionesAuto.guardar") }}
-          </button>
+        <div class="flex flex-wrap items-center justify-end gap-2">
           <button
             v-if="puedeEliminar && plantillaDe(editor.clave, borrador.canal)"
             type="button"
-            class="tu-btn tu-btn-fantasma w-full"
+            class="tu-btn tu-btn-fantasma mr-auto"
             style="color: var(--error)"
             @click="eliminarPlantilla"
           >
             {{ $t("comunicacionesAuto.eliminar") }}
+          </button>
+          <button
+            type="submit"
+            form="form-plantilla"
+            class="tu-btn tu-btn-primario"
+            :disabled="guardandoPlantilla"
+          >
+            {{ $t("comunicacionesAuto.guardar") }}
           </button>
         </div>
       </template>
