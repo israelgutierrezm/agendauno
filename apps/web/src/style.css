@@ -281,12 +281,14 @@
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6h11'/%3E%3Cpath d='M9 12h11'/%3E%3Cpath d='M9 18h11'/%3E%3Cpath d='M4.5 6h.01'/%3E%3Cpath d='M4.5 12h.01'/%3E%3Cpath d='M4.5 18h.01'/%3E%3C/svg%3E"),
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   }
-  .tu-select-icono {
+  .tu-select-icono,
+  .tu-campo-icono {
     position: relative;
     display: inline-flex;
     align-items: center;
   }
-  .tu-select-icono > svg {
+  .tu-select-icono > svg,
+  .tu-campo-icono > svg {
     position: absolute;
     left: 0.8rem;
     color: var(--texto-suave);
@@ -336,6 +338,51 @@
       var(--superficie)
     );
     color: var(--tono, var(--primario));
+  }
+
+  /* Campo con ícono a la izquierda (fechas, búsquedas). En fechas, toda la caja abre
+   el calendario y no se repite el ícono del navegador. */
+  .tu-campo-icono > input.tu-input {
+    padding-left: 2.5rem;
+  }
+  .tu-campo-icono > input[type="date"]::-webkit-calendar-picker-indicator {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  /* Pestañas de página: subrayadas, la activa en el color de la marca. */
+  .tu-pestanas {
+    display: flex;
+    gap: 0.25rem;
+    max-width: 100%;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--borde);
+  }
+  .tu-pestanas > button {
+    margin-bottom: -1px;
+    padding: 0.6rem 1.1rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0.6rem 0.6rem 0 0;
+    background: transparent;
+    color: var(--texto-suave);
+    font-size: 0.92rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .tu-pestanas > button:hover {
+    color: var(--texto);
+  }
+  .tu-pestanas > button[aria-pressed="true"] {
+    background: var(--primario-suave);
+    border-bottom-color: var(--primario);
+    color: var(--primario);
+    font-weight: 600;
   }
 
   /* Botón de crear: el «+» antes del texto. */

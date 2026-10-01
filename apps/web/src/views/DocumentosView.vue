@@ -331,7 +331,7 @@ onMounted(cargar);
       </template>
     </EncabezadoSeccion>
 
-    <div class="tu-segmentado mt-6" role="group">
+    <div class="tu-pestanas mt-6" role="group">
       <button
         type="button"
         :aria-pressed="pestana === 'documentos'"

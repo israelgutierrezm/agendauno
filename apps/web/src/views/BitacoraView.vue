@@ -192,7 +192,7 @@ onMounted(cargar);
 
     <div
       v-if="puedeCambios && puedeAccesos"
-      class="tu-segmentado mt-6"
+      class="tu-pestanas mt-6"
       role="group"
     >
       <button

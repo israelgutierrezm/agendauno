@@ -3,6 +3,12 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
+import IconoNav from "@/components/IconoNav.vue";
+import MapaDemanda from "@/components/MapaDemanda.vue";
+import TarjetasIndicadores, {
+  type Indicador,
+} from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -226,8 +232,6 @@ function fechaBucket(iso: string): string {
       }).format(d);
 }
 
-// Etiquetas de días (lun..dom) desde i18n; el índice 0 corresponde a `dia = 1`.
-const diasSemana = computed(() => t("reportes.demanda.dias").split(","));
 // En citas cada cita tiene cupo 1: el mapa mide la agenda del equipo (horas
 // agendadas entre las disponibles), no el cupo (ADR 0081).
 const porAgenda = computed(() => sesion.modalidad === "citas");
@@ -238,23 +242,6 @@ const celdasDemanda = computed(() =>
       : c.sesiones > 0,
   ),
 );
-// Horas presentes en la matriz (unión, ordenadas) → filas del heatmap.
-const horasDemanda = computed(() => {
-  const set = new Set<number>();
-  celdasDemanda.value.forEach((c) => set.add(c.hora));
-  return [...set].sort((a, b) => a - b);
-});
-function celdaDemanda(dia: number, hora: number): DemandaCelda | undefined {
-  return celdasDemanda.value.find((c) => c.dia === dia && c.hora === hora);
-}
-function valorCelda(c: DemandaCelda): number | null {
-  return porAgenda.value ? (c.utilizacion_pct ?? null) : c.ocupacion_pct;
-}
-function detalleCelda(c: DemandaCelda): string {
-  return porAgenda.value
-    ? `${horas(c.agendado_min ?? 0)} / ${horas(c.disponible_min ?? 0)}`
-    : `${c.confirmadas}/${c.capacidad}`;
-}
 // «3 clases · 2 citas», solo lo que hubo.
 function sesionesTexto(c: CifrasEquipo): string {
   const partes = [
@@ -289,24 +276,55 @@ function pct(v: number | null): string {
   return v !== null ? `${v}%` : "—";
 }
 
-const tarjetas = computed(() => {
+const tarjetas = computed<Indicador[]>(() => {
   const n = negocio.value;
   if (n === null) {
     return [];
   }
-  return [
-    { clave: "ingresos", valor: dinero(n.ingresos_minor, n.moneda) },
+  const lista: Omit<Indicador, "etiqueta">[] = [
+    {
+      clave: "ingresos",
+      valor: dinero(n.ingresos_minor, n.moneda),
+      icono: "dinero",
+      tono: "verde",
+    },
     {
       clave: "ocupacion",
       valor: pct(
         porAgenda.value ? (n.ocupacion_agenda_pct ?? null) : n.ocupacion_pct,
       ),
+      icono: "pulso",
+      tono: "morado",
     },
-    { clave: "noShow", valor: pct(n.no_show_pct) },
-    { clave: "alumnos", valor: String(n.alumnos_activos) },
-    { clave: "arpu", valor: dinero(n.arpu_minor, n.moneda) },
-    { clave: "clases", valor: String(n.clases) },
+    {
+      clave: "noShow",
+      valor: pct(n.no_show_pct),
+      icono: "ausente",
+      tono: "rosa",
+    },
+    {
+      clave: "alumnos",
+      valor: String(n.alumnos_activos),
+      icono: "personas",
+      tono: "azul",
+    },
+    {
+      clave: "arpu",
+      valor: dinero(n.arpu_minor, n.moneda),
+      icono: "facturas",
+      tono: "naranja",
+    },
+    {
+      clave: "clases",
+      valor: String(n.clases),
+      icono: "agenda",
+      tono: "cielo",
+    },
   ];
+  return lista.map((k) => ({
+    ...k,
+    etiqueta: t(`reportes.metricas.${k.clave}`),
+  }));
 });
 
 async function cargarNegocio(): Promise<void> {
@@ -507,7 +525,7 @@ onMounted(cargar);
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion :titulo="$t('reportes.titulo')" />
 
-    <div class="tu-segmentado mt-6 max-w-full overflow-x-auto" role="group">
+    <div class="tu-pestanas mt-6" role="group">
       <button
         v-for="p in PESTANAS"
         :key="p"
@@ -523,13 +541,20 @@ onMounted(cargar);
     <div v-if="usaPeriodo" class="mt-4 flex flex-wrap items-end gap-3">
       <div>
         <label class="tu-label" for="rd">{{ $t("reportes.desde") }}</label>
-        <input id="rd" v-model="desde" type="date" class="tu-input w-auto" />
+        <span class="tu-campo-icono">
+          <IconoNav nombre="agenda" :tam="18" />
+          <input id="rd" v-model="desde" type="date" class="tu-input w-auto" />
+        </span>
       </div>
       <div>
         <label class="tu-label" for="rh">{{ $t("reportes.hasta") }}</label>
-        <input id="rh" v-model="hasta" type="date" class="tu-input w-auto" />
+        <span class="tu-campo-icono">
+          <IconoNav nombre="agenda" :tam="18" />
+          <input id="rh" v-model="hasta" type="date" class="tu-input w-auto" />
+        </span>
       </div>
       <button class="tu-btn tu-btn-fantasma" type="button" @click="esteMes">
+        <IconoNav nombre="agenda" :tam="18" />
         {{ $t("reportes.esteMes") }}
       </button>
     </div>
@@ -555,17 +580,11 @@ onMounted(cargar);
       </p>
 
       <!-- Métricas del negocio -->
-      <div
+      <TarjetasIndicadores
         v-if="pestana === 'resumen'"
-        class="mt-4 tu-card px-5 py-4 grid grid-cols-3 lg:grid-cols-6 gap-4"
-      >
-        <div v-for="card in tarjetas" :key="card.clave">
-          <div class="text-xl font-semibold tabular-nums">{{ card.valor }}</div>
-          <div class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t(`reportes.metricas.${card.clave}`) }}
-          </div>
-        </div>
-      </div>
+        class="mt-4"
+        :tarjetas="tarjetas"
+      />
 
       <!-- Tendencias de ingresos (Etapa 2) -->
       <template v-if="pestana === 'ingresos'">
@@ -1247,106 +1266,44 @@ onMounted(cargar);
 
       <!-- Demanda por horario (R31) -->
       <template v-if="pestana === 'ocupacion'">
-        <h2 class="mt-4 font-light text-lg">
-          {{ $t("reportes.demanda.titulo") }}
-        </h2>
-        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{
-            porAgenda
-              ? $t("reportes.demanda.subtituloAgenda")
-              : $t("reportes.demanda.subtitulo")
-          }}
-        </p>
-        <p
-          v-if="porAgenda && demanda?.totales.utilizacion_pct != null"
-          class="mt-2 text-sm"
-          data-prueba="resumen-agenda"
-        >
-          {{
-            $t("reportes.demanda.resumenAgenda", {
-              pct: pct(demanda.totales.utilizacion_pct ?? null),
-              agendadas: horas(demanda.totales.agendado_min ?? 0),
-              disponibles: horas(demanda.totales.disponible_min ?? 0),
-            })
-          }}
-        </p>
-        <p
-          v-if="!demanda || celdasDemanda.length === 0"
-          class="mt-3 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("reportes.demanda.vacio") }}
-        </p>
-        <template v-else>
-          <!-- Heatmap día × hora -->
-          <div class="mt-3 tu-card overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr
-                  class="text-center"
-                  :style="{ color: 'var(--texto-suave)' }"
-                >
-                  <th class="px-3 py-2 font-medium text-left">
-                    {{ $t("reportes.demanda.hora") }}
-                  </th>
-                  <th
-                    v-for="(d, i) in diasSemana"
-                    :key="i"
-                    class="px-2 py-2 font-medium"
-                  >
-                    {{ d }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="h in horasDemanda"
-                  :key="h"
-                  class="border-t"
-                  :style="{ borderColor: 'var(--borde)' }"
-                >
-                  <td class="px-3 py-1.5 font-semibold whitespace-nowrap">
-                    {{ String(h).padStart(2, "0") }}:00
-                  </td>
-                  <td
-                    v-for="dia in [1, 2, 3, 4, 5, 6, 7]"
-                    :key="dia"
-                    class="px-1 py-1 text-center"
-                  >
-                    <div
-                      v-if="celdaDemanda(dia, h)"
-                      class="relative rounded-lg py-1.5 text-xs font-semibold"
-                      :style="{
-                        background: colorOcupacion(
-                          valorCelda(celdaDemanda(dia, h)!),
-                        ),
-                      }"
-                      :title="detalleCelda(celdaDemanda(dia, h)!)"
-                      :data-prueba="`celda-${dia}-${h}`"
-                    >
-                      {{ pct(valorCelda(celdaDemanda(dia, h)!)) }}
-                      <span
-                        v-if="celdaDemanda(dia, h)!.espera > 0"
-                        class="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full"
-                        :style="{ background: 'var(--aviso)' }"
-                        :title="$t('reportes.demanda.colEspera')"
-                      />
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{
+        <div class="mt-4 tu-card p-5 sm:p-6">
+          <template v-if="!demanda || celdasDemanda.length === 0">
+            <h2 class="text-xl font-semibold">
+              {{ $t("reportes.demanda.titulo") }}
+            </h2>
+            <EstadoVacio
+              icono="reportes"
+              :titulo="$t('reportes.demanda.vacio')"
+            />
+          </template>
+          <MapaDemanda
+            v-else
+            :celdas="celdasDemanda"
+            :por-agenda="porAgenda"
+            :promedio-pct="
               porAgenda
-                ? $t("reportes.demanda.leyendaAgenda")
-                : $t("reportes.demanda.leyenda")
+                ? (demanda.totales.utilizacion_pct ?? null)
+                : demanda.totales.ocupacion_pct
+            "
+          />
+          <p
+            v-if="porAgenda && demanda?.totales.utilizacion_pct != null"
+            class="mt-3 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="resumen-agenda"
+          >
+            {{
+              $t("reportes.demanda.resumenAgenda", {
+                pct: pct(demanda.totales.utilizacion_pct ?? null),
+                agendadas: horas(demanda.totales.agendado_min ?? 0),
+                disponibles: horas(demanda.totales.disponible_min ?? 0),
+              })
             }}
           </p>
-
+        </div>
+        <template v-if="demanda && celdasDemanda.length > 0">
           <!-- Por actividad -->
-          <h3 class="mt-6 font-semibold">
+          <h3 class="mt-6 text-lg font-semibold">
             {{ $t("reportes.demanda.porActividad") }}
           </h3>
           <div class="mt-3 tu-card overflow-hidden">

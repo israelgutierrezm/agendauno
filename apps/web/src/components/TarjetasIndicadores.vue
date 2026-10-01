@@ -22,15 +22,28 @@ export interface Indicador {
 
 const props = defineProps<{ tarjetas: Indicador[] }>();
 
-// En pantalla grande, todos en una fila hasta 5; con 6, dos filas de 3.
+// En pantalla grande, todos en una fila hasta 5; con 6, dos filas de 3. En mediano,
+// de dos en dos, salvo que sean 3 o menos (caben en una fila).
 const columnas = computed(() => {
   const n = Math.max(props.tarjetas.length, 1);
   return n <= 5 ? n : Math.ceil(n / 2);
 });
+const columnasMedio = computed(() =>
+  Math.min(
+    props.tarjetas.length <= 3 ? 3 : 2,
+    Math.max(props.tarjetas.length, 1),
+  ),
+);
 </script>
 
 <template>
-  <dl class="ti" :style="{ '--ti-n': String(columnas) }">
+  <dl
+    class="ti"
+    :style="{
+      '--ti-n': String(columnas),
+      '--ti-n-medio': String(columnasMedio),
+    }"
+  >
     <div
       v-for="k in tarjetas"
       :key="k.clave"
@@ -68,7 +81,7 @@ const columnas = computed(() => {
 }
 @media (min-width: 640px) {
   .ti {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--ti-n-medio), minmax(0, 1fr));
   }
 }
 @media (min-width: 1200px) {

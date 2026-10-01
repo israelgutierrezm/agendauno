@@ -486,7 +486,7 @@ onMounted(cargar);
 
     <div
       v-if="puedeAutomaticos || puedeSalida"
-      class="tu-segmentado mt-6"
+      class="tu-pestanas mt-6"
       role="group"
     >
       <button

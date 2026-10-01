@@ -148,7 +148,7 @@ async function irA(
   pestana: string,
 ): Promise<void> {
   await w
-    .findAll(".tu-segmentado button")
+    .findAll(".tu-pestanas button")
     .find((b) => b.text() === pestana)!
     .trigger("click");
 }

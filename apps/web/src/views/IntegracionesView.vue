@@ -278,7 +278,7 @@ onMounted(cargar);
   <section class="mx-auto max-w-5xl px-4 py-10">
     <EncabezadoSeccion :titulo="$t('conexiones.titulo')" />
 
-    <div class="tu-segmentado mt-6" role="group">
+    <div class="tu-pestanas mt-6" role="group">
       <button
         type="button"
         :aria-pressed="pestana === 'bienestar'"

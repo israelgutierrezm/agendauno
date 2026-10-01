@@ -70,7 +70,7 @@ describe("reporte por sucursal", () => {
 
     // El periodo aplica a la agenda del equipo; las sucursales son el estado actual.
     await w
-      .findAll(".tu-segmentado button")
+      .findAll(".tu-pestanas button")
       .find((b) => b.text() === "Equipo y sucursales")!
       .trigger("click");
     expect(w.find('input[type="date"]').exists()).toBe(true);
