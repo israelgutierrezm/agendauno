@@ -70,6 +70,10 @@ ejemplo, «gestionar agenda» arma clases con el catálogo y las sucursales
 uno incompleto y el editor lo explica; no se agregan solos (ADR 0057). Las pantallas
 funcionan con su permiso mínimo y el menú muestra cada una solo con lo que su carga pide.
 
+**En la web.** Cada ruta privada tiene su regla en `apps/web/src/lib/acceso.ts`
+(permisos, modalidad, faceta); sin regla, no se entra. El menú, las pestañas de cada
+área y la configuración solo la consultan para decidir qué ofrecer (ADR 0084).
+
 ## Alcance
 
 - **Por sucursal** (`ResolverAccesoTenant`): un rol asignado en una sucursal

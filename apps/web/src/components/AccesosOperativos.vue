@@ -3,7 +3,7 @@ import { computed } from "vue";
 import TarjetaOperacion, {
   type Ilustracion,
 } from "@/components/TarjetaOperacion.vue";
-import { esVisible, hojas, MENU } from "@/lib/menu";
+import { puedeEntrar } from "@/lib/acceso";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -31,31 +31,40 @@ const ILUSTRACIONES: Record<string, Ilustracion> = {
   horarios: "horarios",
   ventas: "ventas",
 };
-const accesos = computed(() => {
-  const rutas = [
+// Los accesos: la ruta (también su regla de acceso), su ícono y su nombre.
+const DEFINICION: Record<
+  string,
+  { icono: string; etiqueta: string; termino?: "miembro" }
+> = {
+  agenda: { icono: "agenda", etiqueta: "nav.agenda" },
+  miembros: { icono: "miembros", etiqueta: "nav.miembros", termino: "miembro" },
+  recepcion: { icono: "recepcion", etiqueta: "nav.recepcion" },
+  horarios: { icono: "reloj", etiqueta: "nav.horarios" },
+  ventas: { icono: "ventas", etiqueta: "planes.nav.vender" },
+};
+const accesos = computed(() =>
+  [
     "agenda",
     "miembros",
     sesion.modalidad === "citas" ? "horarios" : "recepcion",
     "ventas",
-  ];
-  return rutas.flatMap((ruta) => {
-    const item = hojas(MENU).find((hoja) => hoja.ruta === ruta);
-    if (!item || !esVisible(item, sesion)) {
-      return [];
-    }
-    // Suelto, fuera del menú: "Alumnos" o "Clientes", no "Directorio".
-    const termino = item.termino ?? item.terminoSuelto;
-    return [
-      {
-        ...item,
+  ]
+    .filter((ruta) => puedeEntrar(ruta, sesion))
+    .map((ruta) => {
+      const d = DEFINICION[ruta];
+      return {
+        clave: ruta,
+        ruta,
+        icono: d.icono,
+        etiqueta: d.etiqueta,
+        // Suelto, fuera del menú: "Alumnos" o "Clientes", no "Directorio".
         texto:
-          termino !== undefined
-            ? plural(sesion.terminologia[termino])
+          d.termino !== undefined
+            ? plural(sesion.terminologia[d.termino])
             : undefined,
-      },
-    ];
-  });
-});
+      };
+    }),
+);
 </script>
 
 <template>
@@ -70,7 +79,7 @@ const accesos = computed(() => {
     <ul class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <li v-for="item in accesos" :key="item.clave">
         <TarjetaOperacion
-          :to="{ name: item.ruta! }"
+          :to="{ name: item.ruta }"
           :icono="item.icono ?? 'punto'"
           :titulo="item.texto ?? $t(item.etiqueta)"
           :texto="

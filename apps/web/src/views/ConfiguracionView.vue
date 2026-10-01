@@ -116,8 +116,8 @@ onMounted(cargar);
     </p>
 
     <template v-if="!cargando">
-      <!-- Logo del estudio -->
-      <div class="mt-6 tu-card p-6">
+      <!-- Logo del estudio (Configuración › Negocio › Datos e imagen) -->
+      <div id="datos" class="mt-6 tu-card p-6 scroll-mt-24">
         <h2 class="font-light text-lg">{{ $t("configuracion.logoTitulo") }}</h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("configuracion.logoDesc") }}
@@ -133,11 +133,16 @@ onMounted(cargar);
       </div>
 
       <!-- Portada, descripción y redes: la página pública y la de enlaces -->
-      <PerfilPublicoNegocio v-if="puedeGestionar" class="mt-6" />
+      <PerfilPublicoNegocio
+        v-if="puedeGestionar"
+        id="pagina-publica"
+        class="mt-6 scroll-mt-24"
+      />
       <!-- Cómo se llaman las cosas en el negocio -->
       <TerminologiaNegocio
         v-if="puedeGestionar"
-        class="mt-6"
+        id="terminologia"
+        class="mt-6 scroll-mt-24"
         :cargar="cargarTerminologia"
         :guardar="guardarTerminologia"
         @guardado="terminologiaGuardada"

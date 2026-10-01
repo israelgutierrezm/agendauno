@@ -1,20 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, provide, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 
 import IconoNav from "@/components/IconoNav.vue";
 import PublicShell from "@/components/PublicShell.vue";
-import NavArbol from "@/components/NavArbol.vue";
+import LayoutConfiguracion from "@/components/LayoutConfiguracion.vue";
+import NavLateral from "@/components/NavLateral.vue";
+import PestanasArea from "@/components/PestanasArea.vue";
 import AppToaster from "@/components/AppToaster.vue";
 import DialogoConfirmar from "@/components/DialogoConfirmar.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import PanelRoles from "@/components/PanelRoles.vue";
-import type { MenuItem, NavEstado } from "@/components/nav";
 import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
-import { esVisible, MENU } from "@/lib/menu";
+import { puedeEntrar } from "@/lib/acceso";
+import { ubicacion } from "@/lib/menu";
 import { identidadDeSesion, reiniciarMiCuenta } from "@/lib/miCuenta";
 import { nombreDeRol } from "@/lib/roles";
-import { plural } from "@/lib/terminologia";
 import { slugDeContexto } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useAparienciaStore } from "@/stores/apariencia";
@@ -61,107 +62,16 @@ if (sesion.bearer !== null) {
   useAparienciaStore().restaurar();
 }
 
-function visible(item: MenuItem): boolean {
-  return esVisible(item, sesion);
-}
-
-// Filtra el arbol por permisos: una hoja se ve si pasa su permiso; un grupo, si le
-// queda al menos un hijo visible.
-function filtrar(items: MenuItem[]): MenuItem[] {
-  return items
-    .map((item): MenuItem | null => {
-      if (item.hijos !== undefined) {
-        const hijos = filtrar(item.hijos);
-        // Un grupo con una sola opción visible es esa opción (sin carpeta de más).
-        if (hijos.length === 1) {
-          const unico = hijos[0];
-          return unico.terminoSuelto !== undefined
-            ? {
-                ...unico,
-                texto: plural(sesion.terminologia[unico.terminoSuelto]),
-              }
-            : unico;
-        }
-        if (hijos.length === 0) {
-          return null;
-        }
-        return item.termino !== undefined
-          ? {
-              ...item,
-              hijos,
-              texto: plural(sesion.terminologia[item.termino]),
-            }
-          : { ...item, hijos };
-      }
-      if (!visible(item)) {
-        return null;
-      }
-      // Rótulo con la terminología del perfil (p. ej. Barberos en vez de Instructores).
-      return item.termino !== undefined
-        ? { ...item, texto: plural(sesion.terminologia[item.termino]) }
-        : item;
-    })
-    .filter((item): item is MenuItem => item !== null);
-}
-
-const menuVisible = computed(() => filtrar(MENU));
-
 const hogar = computed(() => ({ name: sesion.rutaInicio }));
 
-const puedeConfigurar = computed(() => sesion.puede("estudio.gestionar"));
+// Configuración del negocio en el menú del usuario: si alguna opción se puede abrir.
+const puedeConfigurar = computed(() => puedeEntrar("ajustes", sesion));
 
-// ---- Estado del arbol (expandir/colapsar grupos) ----
-const abiertos = ref<Set<string>>(new Set());
-
-// Los grupos que contienen la ruta activa, del principal al subgrupo (para
-// abrirlos todos con el tercer nivel).
-function gruposDe(ruta: string, items: MenuItem[] = MENU): string[] {
-  for (const item of items) {
-    if (item.hijos !== undefined) {
-      if (item.hijos.some((h) => h.ruta === ruta)) {
-        return [item.clave];
-      }
-      const dentro = gruposDe(ruta, item.hijos);
-      if (dentro.length > 0) {
-        return [item.clave, ...dentro];
-      }
-    }
-  }
-  return [];
-}
-
-function alternar(clave: string): void {
-  // En modo rail, expandir un grupo primero descompacta la barra.
-  if (compacto.value) {
-    compacto.value = false;
-  }
-  const s = new Set(abiertos.value);
-  if (s.has(clave)) {
-    s.delete(clave);
-  } else {
-    s.add(clave);
-  }
-  abiertos.value = s;
-}
-
-function abrirGrupoActivo(): void {
-  const grupos = gruposDe(String(route.name));
-  if (grupos.length > 0) {
-    abiertos.value = new Set([...abiertos.value, ...grupos]);
-  }
-}
-
-watch(() => route.name, abrirGrupoActivo);
-
-const navEstado: NavEstado = {
-  abiertos,
-  compacto: computed(() => compactoEfectivo.value),
-  alternar,
-  cerrarCajon: () => {
-    menuLateral.value = false;
-  },
-};
-provide("navEstado", navEstado);
+// Una opción de Configuración (no su portada) va con la navegación secundaria.
+const enConfiguracion = computed(() => {
+  const u = ubicacion(route);
+  return u?.area.clave === "configuracion" && u.vista.clave !== "portada";
+});
 
 function siglas(nombre: string | undefined): string {
   return (
@@ -207,7 +117,6 @@ onMounted(() => {
   } catch {
     // Ignora.
   }
-  abrirGrupoActivo();
 });
 </script>
 
@@ -266,10 +175,13 @@ onMounted(() => {
         </span>
       </RouterLink>
 
-      <!-- Navegación (árbol de 3 niveles: grupos por área → secciones → sub-secciones) -->
-      <nav class="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-        <NavArbol :items="menuVisible" :nivel="1" />
-      </nav>
+      <!-- Navegación: grupos con un enlace por área -->
+      <div class="flex-1 overflow-y-auto px-3 py-4">
+        <NavLateral
+          :compacto="compactoEfectivo"
+          @navegar="menuLateral = false"
+        />
+      </div>
 
       <!-- Contraer (solo escritorio) -->
       <div
@@ -298,7 +210,7 @@ onMounted(() => {
     <div class="flex-1 flex flex-col min-w-0">
       <!-- Encabezado (claro, translúcido) -->
       <header
-        class="sticky top-0 z-30 h-16 flex items-center justify-between gap-3 px-4 sm:px-6 border-b backdrop-blur"
+        class="tu-barra-superior sticky top-0 z-30 h-16 flex items-center justify-between gap-3 px-4 sm:px-6 border-b backdrop-blur"
         :style="{
           background: 'color-mix(in srgb, var(--superficie) 85%, transparent)',
           borderColor: 'var(--borde)',
@@ -431,7 +343,7 @@ onMounted(() => {
               <RouterLink
                 v-if="puedeConfigurar"
                 class="tu-menu-item"
-                :to="{ name: 'configuracion' }"
+                :to="{ name: 'ajustes' }"
                 @click="menuPerfil = false"
               >
                 <IconoNav nombre="configuracion" :tam="16" />
@@ -453,7 +365,12 @@ onMounted(() => {
 
       <main class="flex-1" :style="{ background: 'var(--fondo)' }">
         <div class="mx-auto max-w-7xl md:px-4 lg:px-8">
-          <RouterView />
+          <!-- Las vistas del área (Agenda: Calendario, Recepción…) -->
+          <PestanasArea />
+          <LayoutConfiguracion v-if="enConfiguracion">
+            <RouterView />
+          </LayoutConfiguracion>
+          <RouterView v-else />
         </div>
       </main>
     </div>
@@ -520,7 +437,7 @@ onMounted(() => {
   background: var(--barra-suave);
   color: var(--barra-titulo, #ffffff);
 }
-.tu-side-link.router-link-active {
+.tu-side-link.tu-side-activo {
   background: var(--barra-activo);
   color: var(--barra-activo-texto, #ffffff);
   font-weight: 600;

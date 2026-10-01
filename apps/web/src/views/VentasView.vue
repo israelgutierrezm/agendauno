@@ -6,6 +6,7 @@ import { RouterLink } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
+import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
 import { SECCIONES, fechaLarga, seccionDe, type Plan } from "@/lib/planes";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -219,7 +220,17 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-7xl px-4 py-10">
-    <EncabezadoSeccion :titulo="$t('planes.nav.vender')" />
+    <EncabezadoSeccion
+      :titulo="$t('planes.nav.vender')"
+      :subtitulo="$t('ventas.vender.subtitulo')"
+    >
+      <!-- Los planes se definen en Configuración › Servicios y catálogos. -->
+      <template v-if="puedeEntrar('planes', sesion)" #acciones>
+        <RouterLink :to="{ name: 'planes' }" class="tu-btn tu-btn-fantasma">
+          {{ $t("ventas.vender.administrarPlanes") }}
+        </RouterLink>
+      </template>
+    </EncabezadoSeccion>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}

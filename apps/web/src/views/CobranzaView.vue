@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 
 import CorteDeCaja from "@/components/CorteDeCaja.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -104,21 +105,56 @@ function fecha(iso: string | null): string {
   return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(d);
 }
 
+/**
+ * Cobros se divide en vistas (`?vista=`): por cobrar (morosos y cargos recurrentes),
+ * movimientos (pagos y reembolsos), conciliación y caja. Cada una carga solo lo
+ * suyo al abrirse; la conciliación y la caja cargan sus propios datos.
+ */
+type VistaCobros = "por-cobrar" | "movimientos" | "conciliacion" | "caja";
+const VISTAS: VistaCobros[] = [
+  "por-cobrar",
+  "movimientos",
+  "conciliacion",
+  "caja",
+];
+const route = useRoute();
+const vista = computed<VistaCobros>(() => {
+  const v = route.query.vista;
+  return typeof v === "string" && (VISTAS as string[]).includes(v)
+    ? (v as VistaCobros)
+    : "por-cobrar";
+});
+const TITULOS: Record<VistaCobros, string> = {
+  "por-cobrar": "nav.vistas.porCobrar",
+  movimientos: "nav.vistas.movimientos",
+  conciliacion: "nav.vistas.conciliacion",
+  caja: "nav.vistas.caja",
+};
+
 async function cargar(): Promise<void> {
-  cargando.value = true;
   error.value = null;
+  if (vista.value === "conciliacion" || vista.value === "caja") {
+    cargando.value = false;
+    return;
+  }
+  cargando.value = true;
   try {
-    const [d, p, s] = await Promise.all([
-      api.get<{ data: Moroso[] }>(`${base.value}/dunning`),
-      api.get<{ data: Pago[] }>(`${base.value}/pagos`),
-      api.get<{ data: Suscripcion[]; pago_automatico_disponible?: boolean }>(
-        `${base.value}/suscripciones`,
-      ),
-    ]);
-    morosos.value = d.data.data;
-    pagos.value = p.data.data;
-    suscripciones.value = s.data.data;
-    pagoAutomaticoDisponible.value = s.data.pago_automatico_disponible === true;
+    if (vista.value === "movimientos") {
+      const p = await api.get<{ data: Pago[] }>(`${base.value}/pagos`);
+      pagos.value = p.data.data;
+    } else {
+      const [d, s] = await Promise.all([
+        api.get<{ data: Moroso[] }>(`${base.value}/dunning`),
+        api.get<{
+          data: Suscripcion[];
+          pago_automatico_disponible?: boolean;
+        }>(`${base.value}/suscripciones`),
+      ]);
+      morosos.value = d.data.data;
+      suscripciones.value = s.data.data;
+      pagoAutomaticoDisponible.value =
+        s.data.pago_automatico_disponible === true;
+    }
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -262,12 +298,12 @@ async function reembolsar(): Promise<void> {
   }
 }
 
-onMounted(cargar);
+watch(vista, cargar, { immediate: true });
 </script>
 
 <template>
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion :titulo="$t('cobranza.titulo')" />
+    <EncabezadoSeccion :titulo="$t(TITULOS[vista])" />
 
     <p
       v-if="avisoReembolso"
@@ -289,392 +325,409 @@ onMounted(cargar);
     </p>
 
     <template v-else>
-      <!-- Morosos (dunning) -->
-      <div class="mt-6 flex items-center gap-3">
-        <h2 class="font-light text-lg">{{ $t("cobranza.morosos") }}</h2>
-        <span
-          class="tu-badge"
-          :class="morosos.length > 0 ? 'tu-badge-aviso' : 'tu-badge-exito'"
-          >{{ morosos.length }}</span
-        >
-      </div>
-      <EstadoVacio
-        v-if="morosos.length === 0"
-        class="tu-card mt-3"
-        icono="hecho"
-        :titulo="$t('cobranza.sinMorosos')"
-      />
-      <div v-else class="mt-3 tu-card overflow-hidden">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-              <th class="px-4 py-2 font-medium">
-                {{ $t("cobranza.colAlumno") }}
-              </th>
-              <th class="px-4 py-2 font-medium">
-                {{ $t("cobranza.colEstado") }}
-              </th>
-              <th class="px-4 py-2 font-medium text-right hidden sm:table-cell">
-                {{ $t("cobranza.colIntentos") }}
-              </th>
-              <th class="px-4 py-2 font-medium hidden md:table-cell">
-                {{ $t("cobranza.colGracia") }}
-              </th>
-              <th class="px-4 py-2 font-medium text-right"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="m in morosos"
-              :key="m.id"
-              class="border-t"
-              :style="{ borderColor: 'var(--borde)' }"
-            >
-              <td class="px-4 py-2">
-                <span class="font-semibold">{{
-                  m.persona?.nombre ?? "—"
-                }}</span>
-                <span
-                  v-if="m.ultimo_motivo"
-                  class="block text-xs"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  >{{ m.ultimo_motivo }}</span
+      <template v-if="vista === 'por-cobrar'">
+        <!-- Morosos (dunning) -->
+        <div class="mt-6 flex items-center gap-3">
+          <h2 class="font-light text-lg">{{ $t("cobranza.morosos") }}</h2>
+          <span
+            class="tu-badge"
+            :class="morosos.length > 0 ? 'tu-badge-aviso' : 'tu-badge-exito'"
+            >{{ morosos.length }}</span
+          >
+        </div>
+        <EstadoVacio
+          v-if="morosos.length === 0"
+          class="tu-card mt-3"
+          icono="hecho"
+          :titulo="$t('cobranza.sinMorosos')"
+        />
+        <div v-else class="mt-3 tu-card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
+                <th class="px-4 py-2 font-medium">
+                  {{ $t("cobranza.colAlumno") }}
+                </th>
+                <th class="px-4 py-2 font-medium">
+                  {{ $t("cobranza.colEstado") }}
+                </th>
+                <th
+                  class="px-4 py-2 font-medium text-right hidden sm:table-cell"
                 >
-              </td>
-              <td class="px-4 py-2">
-                <span
-                  class="tu-badge"
-                  :style="
-                    m.estado === 'suspendido'
-                      ? {
-                          background: 'var(--error-suave)',
-                          color: 'var(--error)',
-                        }
-                      : {
-                          background: 'var(--aviso-suave)',
-                          color: 'var(--aviso)',
-                        }
-                  "
-                >
-                  {{ $t(`cobranza.estados.${m.estado}`) }}
-                </span>
-              </td>
-              <td class="px-4 py-2 text-right hidden sm:table-cell">
-                {{ m.intentos }}
-              </td>
-              <td
-                class="px-4 py-2 hidden md:table-cell"
-                :style="{ color: 'var(--texto-suave)' }"
+                  {{ $t("cobranza.colIntentos") }}
+                </th>
+                <th class="px-4 py-2 font-medium hidden md:table-cell">
+                  {{ $t("cobranza.colGracia") }}
+                </th>
+                <th class="px-4 py-2 font-medium text-right"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="m in morosos"
+                :key="m.id"
+                class="border-t"
+                :style="{ borderColor: 'var(--borde)' }"
               >
-                {{ fecha(m.gracia_hasta) }}
-              </td>
-              <td class="px-4 py-2 text-right">
-                <button
-                  v-if="puedeRegularizar && m.acuerdo"
-                  class="tu-enlace text-sm"
-                  type="button"
-                  :disabled="accionando === m.id"
-                  @click="regularizar(m)"
-                >
-                  {{
-                    accionando === m.id
-                      ? $t("cobranza.regularizando")
-                      : $t("cobranza.regularizar")
-                  }}
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Pagos / reembolsos -->
-      <!-- Por conciliar: lo del dinero que alguien debe revisar -->
-      <PorConciliar
-        v-if="sesion.puede('facturacion.ver')"
-        ref="porConciliar"
-        @cambio="cargar"
-      />
-
-      <!-- Corte de caja: movimientos por fecha y por quién -->
-      <CorteDeCaja v-if="sesion.puede('facturacion.ver')" class="mt-8" />
-
-      <h2 class="mt-8 font-light text-lg">{{ $t("cobranza.pagos") }}</h2>
-      <EstadoVacio
-        v-if="pagos.length === 0"
-        class="tu-card mt-3"
-        icono="dinero"
-        :titulo="$t('cobranza.sinPagos')"
-      />
-      <div v-else class="mt-3 tu-card overflow-hidden">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-              <th class="px-4 py-2 font-medium">
-                {{ $t("cobranza.colFecha") }}
-              </th>
-              <th class="px-4 py-2 font-medium">
-                {{ $t("cobranza.colAlumno") }}
-              </th>
-              <th class="px-4 py-2 font-medium text-right">
-                {{ $t("cobranza.colMonto") }}
-              </th>
-              <th class="px-4 py-2 font-medium">
-                {{ $t("cobranza.colEstado") }}
-              </th>
-              <th class="px-4 py-2 font-medium text-right"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-for="p in pagos" :key="p.id">
-              <tr class="border-t" :style="{ borderColor: 'var(--borde)' }">
-                <td
-                  class="px-4 py-2 whitespace-nowrap"
-                  :style="{ color: 'var(--texto-suave)' }"
-                >
-                  {{ fechaHora(p.fecha) }}
-                </td>
                 <td class="px-4 py-2">
-                  <span class="font-semibold">{{ p.persona ?? "—" }}</span>
+                  <span class="font-semibold">{{
+                    m.persona?.nombre ?? "—"
+                  }}</span>
                   <span
-                    v-if="p.registrado_por"
+                    v-if="m.ultimo_motivo"
                     class="block text-xs"
                     :style="{ color: 'var(--texto-suave)' }"
-                    >{{
-                      $t("corteCaja.registro", { quien: p.registrado_por })
-                    }}</span
+                    >{{ m.ultimo_motivo }}</span
                   >
-                </td>
-                <td class="px-4 py-2 text-right">
-                  {{ dinero(p.monto_minor, p.moneda) }}
-                  <span
-                    v-if="p.con_reembolsos && !puedeReembolsar"
-                    class="block ml-auto text-xs"
-                    :style="{ color: 'var(--texto-suave)' }"
-                  >
-                    −{{ dinero(p.reembolsado_minor, p.moneda) }}
-                  </span>
-                  <button
-                    v-else-if="p.con_reembolsos"
-                    type="button"
-                    class="block ml-auto text-xs underline-offset-2 hover:underline"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    :aria-expanded="reembolsosDe === p.id"
-                    :title="
-                      reembolsosDe === p.id
-                        ? $t('reembolsosPago.ocultar')
-                        : $t('reembolsosPago.ver')
-                    "
-                    @click="verReembolsos(p)"
-                  >
-                    −{{ dinero(p.reembolsado_minor, p.moneda) }}
-                  </button>
                 </td>
                 <td class="px-4 py-2">
                   <span
                     class="tu-badge"
-                    :class="
-                      p.estado === 'aprobado'
-                        ? 'tu-badge-exito'
-                        : 'tu-badge-aviso'
+                    :style="
+                      m.estado === 'suspendido'
+                        ? {
+                            background: 'var(--error-suave)',
+                            color: 'var(--error)',
+                          }
+                        : {
+                            background: 'var(--aviso-suave)',
+                            color: 'var(--aviso)',
+                          }
                     "
-                    >{{ $t(`cobranza.pagoEstados.${p.estado}`) }}</span
                   >
+                    {{ $t(`cobranza.estados.${m.estado}`) }}
+                  </span>
+                </td>
+                <td class="px-4 py-2 text-right hidden sm:table-cell">
+                  {{ m.intentos }}
+                </td>
+                <td
+                  class="px-4 py-2 hidden md:table-cell"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ fecha(m.gracia_hasta) }}
                 </td>
                 <td class="px-4 py-2 text-right">
                   <button
-                    v-if="puedeReembolsar && p.reembolsable_minor > 0"
+                    v-if="puedeRegularizar && m.acuerdo"
                     class="tu-enlace text-sm"
                     type="button"
-                    @click="abrirReembolso(p)"
+                    :disabled="accionando === m.id"
+                    @click="regularizar(m)"
                   >
-                    {{ $t("cobranza.reembolsar") }}
+                    {{
+                      accionando === m.id
+                        ? $t("cobranza.regularizando")
+                        : $t("cobranza.regularizar")
+                    }}
                   </button>
                 </td>
               </tr>
-              <tr v-if="reembolsosDe === p.id">
-                <td colspan="5" class="px-4 pb-3">
-                  <div
-                    class="rounded-xl border px-4 text-xs"
-                    :style="{
-                      borderColor: 'var(--borde)',
-                      background: 'var(--fondo)',
-                    }"
-                  >
-                    <div
-                      v-for="r in reembolsos"
-                      :key="r.id"
-                      class="flex items-center justify-between gap-3 border-t py-2 first:border-t-0"
-                      :style="{ borderColor: 'var(--borde)' }"
-                    >
-                      <span class="min-w-0">
-                        <span class="block font-medium">{{
-                          r.motivo ?? "—"
-                        }}</span>
-                        <span
-                          class="block"
-                          :style="{ color: 'var(--texto-suave)' }"
-                          >{{ fechaHora(r.fecha) }}
-                          <template v-if="r.actor">
-                            ·
-                            {{
-                              $t("reembolsosPago.por", { actor: r.actor })
-                            }}</template
-                          >
-                          <template v-if="r.via">
-                            ·
-                            {{ $t(`reembolsosPago.via.${r.via}`) }}</template
-                          >
-                          <template v-if="r.revirtio_creditos">
-                            ·
-                            {{
-                              $t("reembolsosPago.creditosRevertidos")
-                            }}</template
-                          ></span
-                        >
-                        <span
-                          v-if="r.motivo_fallo"
-                          class="block"
-                          style="color: var(--error)"
-                          >{{ r.motivo_fallo }}</span
-                        >
-                      </span>
-                      <span class="flex items-center gap-2 shrink-0">
-                        <span class="font-semibold tabular-nums">{{
-                          dinero(r.monto_minor, r.moneda)
-                        }}</span>
-                        <span
-                          class="tu-badge"
-                          :class="
-                            r.estado === 'aprobado'
-                              ? 'tu-badge-exito'
-                              : 'tu-badge-aviso'
-                          "
-                          >{{ $t(`reembolsosPago.estados.${r.estado}`) }}</span
-                        >
-                      </span>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-      <!-- Próximas renovaciones (cobro recurrente) -->
-      <h2 class="mt-8 font-light text-lg">{{ $t("cobranza.renovaciones") }}</h2>
-      <p
-        v-if="avisoRenovacion"
-        class="mt-2 text-sm"
-        role="status"
-        :style="{ color: 'var(--exito)' }"
-      >
-        {{ avisoRenovacion }}
-      </p>
-      <EstadoVacio
-        v-if="suscripciones.length === 0"
-        class="tu-card mt-3"
-        icono="reloj"
-        :titulo="$t('cobranza.sinRenovaciones')"
+            </tbody>
+          </table>
+        </div>
+      </template>
+
+      <!-- Por conciliar: lo del dinero que alguien debe revisar -->
+      <PorConciliar
+        v-if="vista === 'conciliacion' && sesion.puede('facturacion.ver')"
+        ref="porConciliar"
+        class="mt-6"
+        @cambio="cargar"
       />
-      <div v-else class="mt-3 tu-card overflow-hidden">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-              <th class="px-4 py-2 font-medium">
-                {{ $t("cobranza.colAlumno") }}
-              </th>
-              <th class="px-4 py-2 font-medium hidden sm:table-cell">
-                {{ $t("cobranza.colMembresia") }}
-              </th>
-              <th class="px-4 py-2 font-medium text-right">
-                {{ $t("cobranza.colMonto") }}
-              </th>
-              <th class="px-4 py-2 font-medium">
-                {{ $t("cobranza.colProxima") }}
-              </th>
-              <th class="px-4 py-2 font-medium">
-                {{ $t("pagoAutomatico.colCobro") }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="s in suscripciones"
-              :key="s.id"
-              class="border-t"
-              :style="{ borderColor: 'var(--borde)' }"
-            >
-              <td class="px-4 py-2 font-semibold">{{ s.persona ?? "—" }}</td>
-              <td
-                class="px-4 py-2 hidden sm:table-cell"
-                :style="{ color: 'var(--texto-suave)' }"
+
+      <!-- Corte de caja: movimientos por fecha y por quién -->
+      <CorteDeCaja
+        v-if="vista === 'caja' && sesion.puede('facturacion.ver')"
+        class="mt-6"
+      />
+
+      <!-- Pagos / reembolsos -->
+      <template v-if="vista === 'movimientos'">
+        <h2 class="mt-6 font-light text-lg">{{ $t("cobranza.pagos") }}</h2>
+        <EstadoVacio
+          v-if="pagos.length === 0"
+          class="tu-card mt-3"
+          icono="dinero"
+          :titulo="$t('cobranza.sinPagos')"
+        />
+        <div v-else class="mt-3 tu-card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
+                <th class="px-4 py-2 font-medium">
+                  {{ $t("cobranza.colFecha") }}
+                </th>
+                <th class="px-4 py-2 font-medium">
+                  {{ $t("cobranza.colAlumno") }}
+                </th>
+                <th class="px-4 py-2 font-medium text-right">
+                  {{ $t("cobranza.colMonto") }}
+                </th>
+                <th class="px-4 py-2 font-medium">
+                  {{ $t("cobranza.colEstado") }}
+                </th>
+                <th class="px-4 py-2 font-medium text-right"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="p in pagos" :key="p.id">
+                <tr class="border-t" :style="{ borderColor: 'var(--borde)' }">
+                  <td
+                    class="px-4 py-2 whitespace-nowrap"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    {{ fechaHora(p.fecha) }}
+                  </td>
+                  <td class="px-4 py-2">
+                    <span class="font-semibold">{{ p.persona ?? "—" }}</span>
+                    <span
+                      v-if="p.registrado_por"
+                      class="block text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{
+                        $t("corteCaja.registro", { quien: p.registrado_por })
+                      }}</span
+                    >
+                  </td>
+                  <td class="px-4 py-2 text-right">
+                    {{ dinero(p.monto_minor, p.moneda) }}
+                    <span
+                      v-if="p.con_reembolsos && !puedeReembolsar"
+                      class="block ml-auto text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                    >
+                      −{{ dinero(p.reembolsado_minor, p.moneda) }}
+                    </span>
+                    <button
+                      v-else-if="p.con_reembolsos"
+                      type="button"
+                      class="block ml-auto text-xs underline-offset-2 hover:underline"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      :aria-expanded="reembolsosDe === p.id"
+                      :title="
+                        reembolsosDe === p.id
+                          ? $t('reembolsosPago.ocultar')
+                          : $t('reembolsosPago.ver')
+                      "
+                      @click="verReembolsos(p)"
+                    >
+                      −{{ dinero(p.reembolsado_minor, p.moneda) }}
+                    </button>
+                  </td>
+                  <td class="px-4 py-2">
+                    <span
+                      class="tu-badge"
+                      :class="
+                        p.estado === 'aprobado'
+                          ? 'tu-badge-exito'
+                          : 'tu-badge-aviso'
+                      "
+                      >{{ $t(`cobranza.pagoEstados.${p.estado}`) }}</span
+                    >
+                  </td>
+                  <td class="px-4 py-2 text-right">
+                    <button
+                      v-if="puedeReembolsar && p.reembolsable_minor > 0"
+                      class="tu-enlace text-sm"
+                      type="button"
+                      @click="abrirReembolso(p)"
+                    >
+                      {{ $t("cobranza.reembolsar") }}
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="reembolsosDe === p.id">
+                  <td colspan="5" class="px-4 pb-3">
+                    <div
+                      class="rounded-xl border px-4 text-xs"
+                      :style="{
+                        borderColor: 'var(--borde)',
+                        background: 'var(--fondo)',
+                      }"
+                    >
+                      <div
+                        v-for="r in reembolsos"
+                        :key="r.id"
+                        class="flex items-center justify-between gap-3 border-t py-2 first:border-t-0"
+                        :style="{ borderColor: 'var(--borde)' }"
+                      >
+                        <span class="min-w-0">
+                          <span class="block font-medium">{{
+                            r.motivo ?? "—"
+                          }}</span>
+                          <span
+                            class="block"
+                            :style="{ color: 'var(--texto-suave)' }"
+                            >{{ fechaHora(r.fecha) }}
+                            <template v-if="r.actor">
+                              ·
+                              {{
+                                $t("reembolsosPago.por", { actor: r.actor })
+                              }}</template
+                            >
+                            <template v-if="r.via">
+                              ·
+                              {{ $t(`reembolsosPago.via.${r.via}`) }}</template
+                            >
+                            <template v-if="r.revirtio_creditos">
+                              ·
+                              {{
+                                $t("reembolsosPago.creditosRevertidos")
+                              }}</template
+                            ></span
+                          >
+                          <span
+                            v-if="r.motivo_fallo"
+                            class="block"
+                            style="color: var(--error)"
+                            >{{ r.motivo_fallo }}</span
+                          >
+                        </span>
+                        <span class="flex items-center gap-2 shrink-0">
+                          <span class="font-semibold tabular-nums">{{
+                            dinero(r.monto_minor, r.moneda)
+                          }}</span>
+                          <span
+                            class="tu-badge"
+                            :class="
+                              r.estado === 'aprobado'
+                                ? 'tu-badge-exito'
+                                : 'tu-badge-aviso'
+                            "
+                            >{{
+                              $t(`reembolsosPago.estados.${r.estado}`)
+                            }}</span
+                          >
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </template>
+
+      <!-- Próximas renovaciones (cobro recurrente) -->
+      <template v-if="vista === 'por-cobrar'">
+        <h2 class="mt-8 font-light text-lg">
+          {{ $t("cobranza.renovaciones") }}
+        </h2>
+        <p
+          v-if="avisoRenovacion"
+          class="mt-2 text-sm"
+          role="status"
+          :style="{ color: 'var(--exito)' }"
+        >
+          {{ avisoRenovacion }}
+        </p>
+        <EstadoVacio
+          v-if="suscripciones.length === 0"
+          class="tu-card mt-3"
+          icono="reloj"
+          :titulo="$t('cobranza.sinRenovaciones')"
+        />
+        <div v-else class="mt-3 tu-card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
+                <th class="px-4 py-2 font-medium">
+                  {{ $t("cobranza.colAlumno") }}
+                </th>
+                <th class="px-4 py-2 font-medium hidden sm:table-cell">
+                  {{ $t("cobranza.colMembresia") }}
+                </th>
+                <th class="px-4 py-2 font-medium text-right">
+                  {{ $t("cobranza.colMonto") }}
+                </th>
+                <th class="px-4 py-2 font-medium">
+                  {{ $t("cobranza.colProxima") }}
+                </th>
+                <th class="px-4 py-2 font-medium">
+                  {{ $t("pagoAutomatico.colCobro") }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="s in suscripciones"
+                :key="s.id"
+                class="border-t"
+                :style="{ borderColor: 'var(--borde)' }"
               >
-                {{ s.producto ?? "—" }}
-              </td>
-              <td class="px-4 py-2 text-right">
-                {{
-                  s.precio_minor !== null
-                    ? dinero(s.precio_minor, s.moneda ?? "MXN")
-                    : "—"
-                }}
-              </td>
-              <td class="px-4 py-2">
-                {{ fecha(s.proxima_cobro_en) }}
-                <span
-                  v-if="s.estado !== 'activo'"
-                  class="tu-badge ml-1"
-                  :style="{
-                    background: 'var(--error-suave)',
-                    color: 'var(--error)',
-                  }"
-                  >{{ $t(`cobranza.estados.${s.estado}`, s.estado) }}</span
+                <td class="px-4 py-2 font-semibold">{{ s.persona ?? "—" }}</td>
+                <td
+                  class="px-4 py-2 hidden sm:table-cell"
+                  :style="{ color: 'var(--texto-suave)' }"
                 >
-              </td>
-              <td class="px-4 py-2">
-                <template v-if="s.pago_automatico">
-                  <span class="tu-badge tu-badge-exito">{{
-                    $t("pagoAutomatico.tarjeta", {
-                      marca: marca(s.pago_automatico.marca),
-                      ultimos4: s.pago_automatico.ultimos4 ?? "····",
-                    })
-                  }}</span>
-                  <button
-                    v-if="puedeRegularizar"
-                    type="button"
-                    class="tu-enlace ml-2 text-xs"
-                    :disabled="accionando !== null"
-                    @click="quitarPagoAutomatico(s)"
+                  {{ s.producto ?? "—" }}
+                </td>
+                <td class="px-4 py-2 text-right">
+                  {{
+                    s.precio_minor !== null
+                      ? dinero(s.precio_minor, s.moneda ?? "MXN")
+                      : "—"
+                  }}
+                </td>
+                <td class="px-4 py-2">
+                  {{ fecha(s.proxima_cobro_en) }}
+                  <span
+                    v-if="s.estado !== 'activo'"
+                    class="tu-badge ml-1"
+                    :style="{
+                      background: 'var(--error-suave)',
+                      color: 'var(--error)',
+                    }"
+                    >{{ $t(`cobranza.estados.${s.estado}`, s.estado) }}</span
                   >
-                    {{ $t("pagoAutomatico.quitar") }}
-                  </button>
-                  <p
-                    v-if="s.pago_automatico.error"
-                    class="text-xs"
-                    style="color: var(--error)"
-                  >
-                    {{ s.pago_automatico.error }}
-                  </p>
-                </template>
-                <template v-else>
-                  <span :style="{ color: 'var(--texto-suave)' }">{{
-                    $t("pagoAutomatico.pagoManual")
-                  }}</span>
-                  <button
-                    v-if="puedeRegularizar && pagoAutomaticoDisponible"
-                    type="button"
-                    class="tu-enlace ml-2 text-xs"
-                    :disabled="accionando !== null"
-                    @click="invitarPagoAutomatico(s)"
-                  >
-                    {{ $t("pagoAutomatico.invitar") }}
-                  </button>
-                </template>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                </td>
+                <td class="px-4 py-2">
+                  <template v-if="s.pago_automatico">
+                    <span class="tu-badge tu-badge-exito">{{
+                      $t("pagoAutomatico.tarjeta", {
+                        marca: marca(s.pago_automatico.marca),
+                        ultimos4: s.pago_automatico.ultimos4 ?? "····",
+                      })
+                    }}</span>
+                    <button
+                      v-if="puedeRegularizar"
+                      type="button"
+                      class="tu-enlace ml-2 text-xs"
+                      :disabled="accionando !== null"
+                      @click="quitarPagoAutomatico(s)"
+                    >
+                      {{ $t("pagoAutomatico.quitar") }}
+                    </button>
+                    <p
+                      v-if="s.pago_automatico.error"
+                      class="text-xs"
+                      style="color: var(--error)"
+                    >
+                      {{ s.pago_automatico.error }}
+                    </p>
+                  </template>
+                  <template v-else>
+                    <span :style="{ color: 'var(--texto-suave)' }">{{
+                      $t("pagoAutomatico.pagoManual")
+                    }}</span>
+                    <button
+                      v-if="puedeRegularizar && pagoAutomaticoDisponible"
+                      type="button"
+                      class="tu-enlace ml-2 text-xs"
+                      :disabled="accionando !== null"
+                      @click="invitarPagoAutomatico(s)"
+                    >
+                      {{ $t("pagoAutomatico.invitar") }}
+                    </button>
+                  </template>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
     </template>
 
     <!-- Modal de reembolso -->

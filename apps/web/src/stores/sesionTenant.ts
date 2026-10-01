@@ -130,7 +130,9 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     if (puede("facturacion.ver")) {
       return "panel";
     }
-    if (u.rol === "recepcionista" || puede("reservas.gestionar")) {
+    // El inicio también pasa por las reglas de acceso: Recepción solo con su
+    // permiso (no por llamarse «recepcionista» el rol).
+    if (puede("reservas.gestionar")) {
       return "recepcion";
     }
     if (esInstructor(u)) {

@@ -267,8 +267,8 @@ onMounted(cargar);
     </p>
 
     <template v-if="!cargando">
-      <!-- Cancelaciones -->
-      <div class="mt-6 tu-card p-5">
+      <!-- Cancelaciones (Configuración › Agenda y reservas › Políticas) -->
+      <div id="politicas" class="mt-6 tu-card p-5 scroll-mt-24">
         <h2 class="font-semibold">{{ $t("reglasAgenda.cancelaciones") }}</h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("reglasAgenda.cancelacionesAyuda") }}
@@ -488,7 +488,7 @@ onMounted(cargar);
       </div>
 
       <!-- Días cerrados -->
-      <div class="mt-5 tu-card p-5">
+      <div id="cierres" class="mt-5 tu-card p-5 scroll-mt-24">
         <h2 class="font-semibold">{{ $t("reglasAgenda.cerrados") }}</h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("reglasAgenda.cerradosAyuda") }}
@@ -565,7 +565,11 @@ onMounted(cargar);
       </div>
 
       <!-- Clases que se repiten -->
-      <div v-if="!sesion.esCitas || series.length > 0" class="mt-5 tu-card p-5">
+      <div
+        v-if="!sesion.esCitas || series.length > 0"
+        id="programacion"
+        class="mt-5 tu-card p-5 scroll-mt-24"
+      >
         <h2 class="font-semibold">{{ $t("reglasAgenda.series") }}</h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("reglasAgenda.seriesAyuda") }}

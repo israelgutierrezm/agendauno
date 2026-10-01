@@ -5,7 +5,7 @@ import { createI18n } from "vue-i18n";
 
 import esMX from "@/i18n/locales/es-MX";
 import operacion from "@/i18n/locales/operacion.es-MX";
-import { esVisible, hojas, MENU } from "@/lib/menu";
+import { menuVisible } from "@/lib/menu";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import ElegirRolView from "./ElegirRolView.vue";
 
@@ -66,10 +66,11 @@ describe("rol activo", () => {
 
   it("el inicio y el menú son del rol activo, no de la suma de roles", () => {
     const sesion = useSesionTenantStore();
+    // Las pantallas que ofrece el menú: cada vista permitida de cada área.
     const visibles = () =>
-      hojas(MENU)
-        .filter((h) => esVisible(h, sesion))
-        .map((h) => h.ruta);
+      menuVisible(sesion).flatMap((g) =>
+        g.areas.flatMap((a) => a.vistas.map((v) => v.ruta)),
+      );
 
     sesion.usuario = usuario("miembro", ["formularios.responder"]);
     expect(sesion.rutaInicio).toBe("mi-cuenta");

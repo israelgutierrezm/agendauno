@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 
 import LandingView from "@/views/LandingView.vue";
 import { trackPageView } from "@/lib/analytics";
-import { puedeEntrar } from "@/lib/menu";
+import { puedeEntrar } from "@/lib/acceso";
 import { updateSeo } from "@/lib/seo";
 import { seoParaRuta } from "@/marketing/seoConfig";
 import { soluciones, rutaSolucion } from "@/marketing/soluciones";
@@ -20,9 +20,11 @@ const router = createRouter({
   scrollBehavior(to, _from, savedPosition) {
     if (savedPosition) return savedPosition;
     if (to.hash) {
+      // La barra fija de arriba: la de la página pública o la del panel.
       const headerHeight =
-        document.querySelector(".tu-public-nav")?.getBoundingClientRect()
-          .height ?? 0;
+        document
+          .querySelector(".tu-public-nav, .tu-barra-superior")
+          ?.getBoundingClientRect().height ?? 0;
       return { el: to.hash, top: headerHeight + 16, behavior: "smooth" };
     }
     return { top: 0 };
@@ -359,6 +361,13 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Portada de Configuración del negocio: sus categorías y opciones.
+      path: "/ajustes",
+      name: "ajustes",
+      component: () => import("@/views/ConfiguracionNegocioView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/sedes",
       name: "sedes",
       component: () => import("@/views/SucursalesView.vue"),
@@ -458,14 +467,20 @@ router.beforeEach(async (to) => {
     return { name: "entrar" };
   }
 
-  // Pantallas con permiso: el menú ya no las muestra a quien no lo tiene; esto
-  // cubre la URL escrita a mano. El inicio de cada quien siempre se permite.
+  // Cada pantalla privada tiene su regla en lib/acceso (sin regla, no se entra).
+  // Cubre la URL escrita a mano: el menú solo ofrece lo permitido. Sin permiso se
+  // va al inicio de quien entra, que también se valida; si ni ese se puede, a su
+  // perfil (siempre permitido con sesión), sin ciclos.
   if (
     to.meta.requiereSesion === true &&
-    to.name !== sesion.rutaInicio &&
     !puedeEntrar(String(to.name), sesion)
   ) {
-    return { name: sesion.rutaInicio };
+    if (to.name !== sesion.rutaInicio) {
+      return { name: sesion.rutaInicio };
+    }
+    if (to.name !== "mi-perfil") {
+      return { name: "mi-perfil" };
+    }
   }
 
   // Un usuario autenticado no debe quedarse en las páginas públicas de acceso

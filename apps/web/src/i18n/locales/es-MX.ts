@@ -86,11 +86,73 @@ export default {
       operacion: "Operación",
       suscripcion: "Mi suscripción",
       ventas: "Ventas",
-      usuarios: "Usuarios",
+      operacionDiaria: "Operación diaria",
+      gestion: "Gestión",
+      configuracion: "Configuración",
+    },
+    // Áreas del lateral (una por tema) y sus vistas en pestañas.
+    areas: {
+      inicio: "Inicio",
+      configuracion: "Configuración del negocio",
+    },
+    vistas: {
+      resumen: "Resumen",
+      calendario: "Calendario",
+      lugares: "Lugares disponibles",
+      expedientes: "Expedientes",
+      porCobrar: "Por cobrar",
+      movimientos: "Movimientos",
+      conciliacion: "Conciliación",
+      caja: "Caja",
+      disponibilidad: "Disponibilidad",
+      membresias: "Membresías y paquetes",
+      suscripcion: "Suscripción y pagos",
+      usoFacturable: "Uso facturable",
+    },
+  },
+  // Configuración del negocio: portada, categorías y opciones.
+  configNegocio: {
+    subtitulo: "Organiza cómo funciona tu negocio.",
+    buscar: "Buscar ajuste",
+    sinResultados: "No encontramos ese ajuste.",
+    secciones: "Secciones de configuración",
+    ubicacion: "Ubicación",
+    categorias: {
       negocio: "Negocio",
-      servicios: "Servicios y agenda",
+      servicios: "Servicios y catálogos",
+      agenda: "Agenda y reservas",
       pagos: "Pagos e integraciones",
-      registros: "Registros y privacidad",
+      accesos: "Accesos y permisos",
+      documentos: "Documentos y privacidad",
+    },
+    descripciones: {
+      negocio:
+        "Datos, imagen y página pública del negocio, sus sucursales, datos fiscales y cómo se llaman las cosas.",
+      servicios:
+        "Qué se ofrece y a qué precio: clases o servicios, planes y paquetes, y los espacios que usan.",
+      agenda:
+        "Reglas para reservar y cancelar, días de cierre y la programación recurrente.",
+      pagos:
+        "Cómo cobra el negocio en línea y sus conexiones con otros sistemas.",
+      accesos: "Quién entra al panel y con qué permisos.",
+      documentos:
+        "Requisitos y consentimientos, formularios, solicitudes de privacidad y bitácora.",
+    },
+    opciones: {
+      datos: "Datos e imagen del negocio",
+      pagina: "Página pública",
+      sucursales: "Sucursales",
+      fiscales: "Datos fiscales",
+      terminologia: "Terminología",
+      planes: "Planes y paquetes",
+      recursos: "Espacios y recursos",
+      politicas: "Políticas de reserva y cancelación",
+      cierres: "Días de cierre",
+      programacion: "Programación recurrente",
+      pasarelas: "Pasarelas de pago",
+      usuarios: "Usuarios con acceso",
+      requisitos: "Requisitos documentales",
+      consentimientos: "Consentimientos",
     },
   },
   tema: {
@@ -930,6 +992,8 @@ export default {
     titulo: "Ventas",
     vender: {
       titulo: "Vender",
+      subtitulo: "Vende un plan o paquete a un alumno.",
+      administrarPlanes: "Administrar planes y paquetes",
       miembro: "Alumno",
       producto: "Producto",
       metodo: "Método de pago",

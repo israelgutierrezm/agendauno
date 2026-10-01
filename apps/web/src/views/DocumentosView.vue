@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -57,7 +58,33 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("documentos.gestionar"));
 const puedeSubir = computed(() => sesion.puede("documentos.subir"));
 
-const pestana = ref<Pestana>("documentos");
+// La vista va en la dirección (`?vista=`): Clientes › Expedientes es la de
+// documentos; Configuración › Documentos y privacidad abre requisitos o
+// consentimientos. Recargar o volver conserva la vista.
+const route = useRoute();
+const router = useRouter();
+const pestana = computed<Pestana>({
+  get: () => {
+    const v = route.query.vista;
+    if (v === "requisitos") {
+      return "requisitos";
+    }
+    // Sin permiso de gestión no hay consentimientos: se queda en documentos.
+    return v === "consentimientos" && puedeGestionar.value
+      ? "consentimientos"
+      : "documentos";
+  },
+  set: (p) => {
+    void router.push({
+      query: { ...route.query, vista: p === "documentos" ? undefined : p },
+    });
+  },
+});
+const TITULOS: Record<Pestana, string> = {
+  documentos: "nav.vistas.expedientes",
+  requisitos: "configNegocio.opciones.requisitos",
+  consentimientos: "configNegocio.opciones.consentimientos",
+};
 const tipos = ref<TipoDoc[]>([]);
 const docs = ref<Doc[]>([]);
 const miembros = ref<Miembro[]>([]);
@@ -316,7 +343,7 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-5xl px-4 py-10">
-    <EncabezadoSeccion :titulo="$t('documentos.titulo')">
+    <EncabezadoSeccion :titulo="$t(TITULOS[pestana])">
       <template
         v-if="pestana === 'consentimientos' && puedeGestionar"
         #acciones
@@ -330,31 +357,6 @@ onMounted(cargar);
         </button>
       </template>
     </EncabezadoSeccion>
-
-    <div class="tu-pestanas mt-6" role="group">
-      <button
-        type="button"
-        :aria-pressed="pestana === 'documentos'"
-        @click="pestana = 'documentos'"
-      >
-        {{ $t("documentosTabs.documentos") }}
-      </button>
-      <button
-        type="button"
-        :aria-pressed="pestana === 'requisitos'"
-        @click="pestana = 'requisitos'"
-      >
-        {{ $t("documentosTabs.requisitos") }}
-      </button>
-      <button
-        v-if="puedeGestionar"
-        type="button"
-        :aria-pressed="pestana === 'consentimientos'"
-        @click="pestana = 'consentimientos'"
-      >
-        {{ $t("documentosTabs.consentimientos") }}
-      </button>
-    </div>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
