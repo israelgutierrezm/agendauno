@@ -93,6 +93,15 @@ const TONOS: Record<string, string> = {
   agenda: "naranja",
   perfil: "rosa",
 };
+// Su imagen, si se agregó (Hoy y la agenda del negocio reutilizan las del negocio).
+const IMAGENES = computed<Record<string, string[]>>(() => ({
+  hoy: ["acceso-hoy", `acceso-agenda-${sesion.modalidad}`, "acceso-agenda"],
+  alumnos: ["acceso-alumnos"],
+  semana: ["acceso-semana"],
+  calendario: ["acceso-calendario"],
+  agenda: ["acceso-agenda-negocio", "acceso-horarios"],
+  perfil: ["acceso-perfil"],
+}));
 const ILUSTRACIONES: Record<string, Ilustracion> = {
   hoy: "agenda",
   alumnos: "alumnos",
@@ -310,6 +319,7 @@ onUnmounted(() => clearInterval(reloj));
             :texto="a.valor"
             :tono="TONOS[a.clave] ?? 'azul'"
             :ilustracion="ILUSTRACIONES[a.clave] ?? 'agenda'"
+            :imagen="IMAGENES[a.clave]"
           />
         </li>
       </ul>

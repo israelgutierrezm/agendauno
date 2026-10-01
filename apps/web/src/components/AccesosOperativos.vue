@@ -16,6 +16,14 @@ const TONOS: Record<string, string> = {
   horarios: "cielo",
   ventas: "naranja",
 };
+// Su imagen, si se agregó (la Agenda puede tener una por modalidad).
+const IMAGENES = computed<Record<string, string[]>>(() => ({
+  agenda: [`acceso-agenda-${sesion.modalidad}`, "acceso-agenda"],
+  miembros: ["acceso-clientes"],
+  recepcion: ["acceso-recepcion"],
+  horarios: ["acceso-horarios"],
+  ventas: ["acceso-vender"],
+}));
 const ILUSTRACIONES: Record<string, Ilustracion> = {
   agenda: "agenda",
   miembros: "miembros",
@@ -72,6 +80,7 @@ const accesos = computed(() => {
           "
           :tono="TONOS[item.clave] ?? 'azul'"
           :ilustracion="ILUSTRACIONES[item.clave] ?? 'agenda'"
+          :imagen="IMAGENES[item.clave]"
         />
       </li>
     </ul>

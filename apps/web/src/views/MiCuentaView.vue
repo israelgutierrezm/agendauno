@@ -90,6 +90,16 @@ const TONO = {
   expediente: "rosa",
   configuracion: "azul",
 };
+// Su imagen, si se agregó.
+const IMAGEN: Record<string, string> = {
+  reservar: "acceso-reservar",
+  reservas: "acceso-mis-reservas",
+  creditos: "acceso-creditos",
+  pagos: "acceso-pagos",
+  pase: "acceso-pase",
+  expediente: "acceso-expediente",
+  configuracion: "acceso-configuracion",
+};
 const ILUSTRACION: Record<string, Ilustracion> = {
   reservar: "agenda",
   reservas: "reservas",
@@ -350,6 +360,7 @@ onMounted(() => {
             :atencion="a.atencion"
             :tono="a.tono"
             :ilustracion="ILUSTRACION[a.clave] ?? 'agenda'"
+            :imagen="IMAGEN[a.clave]"
             @tocar="a.alTocar?.()"
           />
         </li>

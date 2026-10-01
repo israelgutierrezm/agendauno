@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { RouterLink, type RouteLocationRaw } from "vue-router";
 
 import IconoNav from "@/components/IconoNav.vue";
 import IlustracionAcceso, {
   type Ilustracion,
 } from "@/components/IlustracionAcceso.vue";
+import { imagenAcceso } from "@/lib/imagenesAcceso";
 
 export type { Ilustracion };
 
@@ -13,7 +15,8 @@ export type { Ilustracion };
  * de color, el título, su dato o qué se hace ahí y un botón con flecha, sobre un
  * fondo suave del mismo color con una ilustración a la derecha. Lleva a una pantalla
  * (`to`) o hace algo al tocarla (`tocar`, p. ej. mostrar el pase). El dato va en
- * ámbar cuando pide atención.
+ * ámbar cuando pide atención. Si existe su imagen (`imagen`, la primera que haya de
+ * las candidatas en `src/assets/accesos/`), va en lugar de la ilustración.
  */
 const props = defineProps<{
   to?: RouteLocationRaw;
@@ -23,8 +26,10 @@ const props = defineProps<{
   tono: string;
   ilustracion: Ilustracion;
   atencion?: boolean;
+  imagen?: string | string[];
 }>();
 const emit = defineEmits<{ tocar: [] }>();
+const foto = computed(() => imagenAcceso(props.imagen));
 </script>
 
 <template>
@@ -37,7 +42,15 @@ const emit = defineEmits<{ tocar: [] }>();
     @click="props.to ? undefined : emit('tocar')"
   >
     <span class="to-fondo" aria-hidden="true"></span>
-    <IlustracionAcceso :nombre="ilustracion" class="to-dibujo" />
+    <img
+      v-if="foto"
+      :src="foto"
+      alt=""
+      class="to-dibujo to-foto"
+      loading="lazy"
+      decoding="async"
+    />
+    <IlustracionAcceso v-else :nombre="ilustracion" class="to-dibujo" />
 
     <span class="to-contenido">
       <span class="tu-icono-tono to-icono" aria-hidden="true">
@@ -105,6 +118,10 @@ const emit = defineEmits<{ tocar: [] }>();
   width: 58%;
   max-width: 15rem;
   height: 92%;
+}
+.to-foto {
+  object-fit: contain;
+  object-position: right bottom;
 }
 .to-contenido {
   position: relative;
