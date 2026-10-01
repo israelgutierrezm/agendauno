@@ -6,12 +6,14 @@ namespace App\Modules\Tenancy\Comunicaciones;
 
 use App\Modules\Tenancy\Comunicaciones\Push\ClienteFcm;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 
 /**
  * Canal por el que se entrega un mensaje al destinatario. `Interno` = bandeja
  * in-app del miembro (sin dependencia externa); `Email` = correo; `Push` =
  * notificación en los teléfonos donde tiene la app (FCM); `WhatsApp` = plantilla
- * aprobada por Meta al celular (ADR 0069), solo si la plataforma lo tiene encendido.
+ * aprobada por Meta al celular (ADR 0069), solo si la plataforma lo tiene encendido y
+ * el superadministrador lo activó en el negocio (ADR 0083).
  */
 enum CanalComunicacion: string
 {
@@ -21,8 +23,9 @@ enum CanalComunicacion: string
     case WhatsApp = 'whatsapp';
 
     /**
-     * Los canales que se pueden usar ahora: push solo si la plataforma tiene FCM;
-     * WhatsApp solo si el superadministrador lo encendió (si no, el negocio ni lo ve).
+     * Los canales que se pueden usar ahora en el negocio: push solo si la plataforma
+     * tiene FCM; WhatsApp solo si el superadministrador lo encendió en la plataforma y
+     * en este negocio (si no, el negocio ni lo ve).
      *
      * @return list<self>
      */
@@ -32,7 +35,7 @@ enum CanalComunicacion: string
         if (app(ClienteFcm::class)->configurado()) {
             $canales[] = self::Push;
         }
-        if (app(ClienteWhatsApp::class)->activoParaNegocios()) {
+        if (app(ClienteWhatsApp::class)->activoPara(app(GestorDeConexionTenant::class)->actual())) {
             $canales[] = self::WhatsApp;
         }
 

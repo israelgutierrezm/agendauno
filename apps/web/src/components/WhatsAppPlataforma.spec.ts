@@ -77,6 +77,7 @@ beforeEach(() => {
 
 describe("WhatsApp de la plataforma", () => {
   it("sin conectar lo dice, separa los dos usos con sus plantillas y no ofrece la prueba", async () => {
+    http.get.mockResolvedValue(config({ negocios_habilitados: 2 }));
     const w = montar();
     await flushPromises();
 
@@ -92,6 +93,10 @@ describe("WhatsApp de la plataforma", () => {
     const negocios = w.get('[data-prueba="uso-negocios"]').text();
     expect(negocios).toContain("De los negocios a sus clientes");
     expect(negocios).toContain("agendauno_reserva_confirmada");
+    // Se activa negocio por negocio (ADR 0083).
+    expect(w.get('[data-prueba="negocios-habilitados"]').text()).toBe(
+      "Activado en 2 negocios",
+    );
     expect(w.find('[data-prueba="prueba"]').exists()).toBe(false);
   });
 

@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $referencia_id
  * @property string $estado enviado | entregado | leido | fallido
  * @property string|null $error
+ * @property string|null $telefono_huella HMAC del número, para saber a qué aviso contesta alguien (ADR 0083)
  */
 class WhatsAppEnvio extends Model
 {
@@ -26,7 +27,7 @@ class WhatsAppEnvio extends Model
 
     protected $table = 'whatsapp_envios';
 
-    protected $fillable = ['wamid', 'estudio_id', 'origen', 'referencia_id', 'estado', 'error'];
+    protected $fillable = ['wamid', 'estudio_id', 'origen', 'referencia_id', 'estado', 'error', 'telefono_huella'];
 
     /**
      * @var array<string, string>

@@ -73,6 +73,7 @@ opción.
 - Todos los negocios usan el mismo número, el de AgendaUno. Se descartó un número
   propio por negocio (Embedded Signup, 2026-09-30): Meta le cobraría a cada negocio
   por su cuenta, el gasto podría crecer sin control y muchos no querrían pagarlo.
-  El costo lo controla el superadministrador con los interruptores.
+  El costo lo controla el superadministrador con los interruptores y, desde el ADR
+  0083, activando negocio por negocio.
 - Cambiar el texto de un aviso exige registrar una plantilla nueva en Meta y
   cambiar su nombre en `PlantillasWhatsApp`.

@@ -162,6 +162,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/estudios/{estudio}/suspender', [PlataformaEstudiosController::class, 'suspender'])->name('estudios.suspender');
         Route::post('/estudios/{estudio}/reactivar', [PlataformaEstudiosController::class, 'reactivar'])->name('estudios.reactivar');
         Route::post('/estudios/{estudio}/extender-prueba', [PlataformaEstudiosController::class, 'extenderPrueba'])->name('estudios.extender-prueba');
+        // Avisos por WhatsApp del negocio a sus clientes: solo los activa la plataforma (ADR 0083).
+        Route::put('/estudios/{estudio}/whatsapp', [PlataformaEstudiosController::class, 'whatsapp'])->name('estudios.whatsapp');
         // Cómo se llaman las cosas en el negocio (ADR 0049).
         Route::get('/estudios/{estudio}/terminologia', [PlataformaEstudiosController::class, 'terminologia'])->name('estudios.terminologia');
         Route::put('/estudios/{estudio}/terminologia', [PlataformaEstudiosController::class, 'guardarTerminologia'])->name('estudios.terminologia.guardar');

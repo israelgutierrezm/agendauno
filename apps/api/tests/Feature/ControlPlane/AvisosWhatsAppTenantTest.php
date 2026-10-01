@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\WhatsAppEnvio;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -14,9 +16,10 @@ use Illuminate\Testing\TestResponse;
 
 /*
 | Avisos por WhatsApp (Meta Cloud API, ADR 0069). El superadministrador lo enciende o
-| lo apaga para todos: apagado, ningún negocio lo ve ni se manda nada (los avisos
-| siguen por correo y push). Encendido, el negocio enciende avisos con el texto fijo
-| de la plantilla aprobada, y le llegan a quien aceptó recibirlos y tiene celular.
+| lo apaga para todos y lo activa negocio por negocio (ADR 0083): apagado, el negocio
+| no lo ve ni se manda nada (los avisos siguen por correo y push). Activado, el negocio
+| enciende avisos con el texto fijo de la plantilla aprobada, y le llegan a quien
+| aceptó recibirlos y tiene celular. A quien contesta se le responde solo (ADR 0083).
 | La clase de prueba es el jueves 1 de octubre a las 08:00 de CDMX.
 */
 
@@ -50,6 +53,51 @@ function encenderWhatsApp(bool $negocios = true, bool $duenos = false): void
         'negocios' => $negocios, 'duenos' => $duenos, 'phone_number_id' => '109876543210', 'token' => 'EAAG-token-de-prueba',
         'app_secret' => 'secreto-de-la-app',
     ], conPlataforma())->assertOk();
+}
+
+/**
+ * El superadministrador activa (o desactiva) WhatsApp en el negocio (ADR 0083).
+ *
+ * @param  array{slug: string}  $e
+ */
+function habilitarWhatsApp(array $e, bool $habilitado = true): void
+{
+    test()->putJson("/api/v1/plataforma/estudios/{$e['slug']}/whatsapp", ['habilitado' => $habilitado], conPlataforma())
+        ->assertOk()->assertJsonPath('data.habilitado', $habilitado);
+}
+
+/**
+ * Alguien le escribe al número de AgendaUno (ADR 0083), firmado como lo manda Meta.
+ *
+ * @param  array<string, mixed>  $mensaje
+ */
+function mensajeDeMeta(string $de, array $mensaje): TestResponse
+{
+    $cuerpo = (string) json_encode(['object' => 'whatsapp_business_account', 'entry' => [[
+        'id' => 'waba', 'changes' => [['field' => 'messages', 'value' => [
+            'messaging_product' => 'whatsapp',
+            'contacts' => [['wa_id' => $de, 'profile' => ['name' => 'Alguien']]],
+            'messages' => [['from' => $de, 'timestamp' => '1790000000', ...$mensaje]],
+        ]]],
+    ]]]);
+
+    return test()->call('POST', '/api/v1/webhooks/whatsapp', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_X_HUB_SIGNATURE_256' => 'sha256='.hash_hmac('sha256', $cuerpo, 'secreto-de-la-app'),
+    ], $cuerpo);
+}
+
+/**
+ * Los textos libres que salieron (las respuestas automáticas), en orden.
+ *
+ * @return list<array{to: string, body: string}>
+ */
+function respuestasEnviadas(): array
+{
+    return array_values(array_map(
+        static fn (array $envio): array => ['to' => (string) $envio['to'], 'body' => (string) $envio['text']['body']],
+        array_filter(test()->meta->envios, static fn (array $envio): bool => ($envio['type'] ?? '') === 'text'),
+    ));
 }
 
 /**
@@ -105,6 +153,7 @@ function negocioConAlumnas(): array
         enNegocioWhatsApp($e, fn () => PersonaTenant::query()->where('ulid', $persona)->update(['celular' => $celular]));
     }
     $sesion = crearSesionTenant($e, agendaSemilla($e), 5, '2026-10-01 08:00:00');
+    habilitarWhatsApp($e);
 
     return [...$e, 'alumna' => $alumna['bearer'], 'vale' => $vale, 'caro' => $caro, 'sesion' => $sesion];
 }
@@ -166,6 +215,7 @@ it('la prueba manda la plantilla de muestra al número indicado', function (): v
 
 it('apagado, el negocio no ve WhatsApp; encendido, solo enciende avisos con el texto fijo', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    habilitarWhatsApp($e);
     $url = "/api/v1/app/{$e['slug']}/plantillas-mensaje";
 
     $r = $this->getJson($url, conBearer($e['bearer']))->assertOk();
@@ -266,6 +316,7 @@ it('con cuenta, al agendar se puede aceptar WhatsApp si tiene celular', function
     $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
     abrirHorarioDeCitas($e, $pro, $sede['sucursal']);
     $cliente = alumnoConSesion($e);
+    habilitarWhatsApp($e);
     encenderWhatsApp();
     avisoPorWhatsApp($e);
 
@@ -296,8 +347,10 @@ it('al agendar en la página pública se puede aceptar recibir los avisos por Wh
     $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
     abrirHorarioDeCitas($e, $pro, $sede['sucursal']);
 
-    // Solo se ofrece con la plataforma encendida y algún aviso por WhatsApp encendido.
+    // Solo se ofrece con la plataforma encendida, el negocio activado y algún aviso
+    // por WhatsApp encendido.
     expect($this->getJson("/api/v1/app/{$e['slug']}/citas/opciones")->json('data.whatsapp'))->toBeFalse();
+    habilitarWhatsApp($e);
     encenderWhatsApp();
     expect($this->getJson("/api/v1/app/{$e['slug']}/citas/opciones")->json('data.whatsapp'))->toBeFalse();
     avisoPorWhatsApp($e);
@@ -354,6 +407,7 @@ it('recepción marca que el cliente pidió los avisos por WhatsApp y queda en la
 
 it('al dar de alta un cliente con su celular, recepción puede registrar que acepta WhatsApp', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    habilitarWhatsApp($e);
     encenderWhatsApp();
     avisoPorWhatsApp($e);
 
@@ -420,4 +474,141 @@ it('si Meta no lo pudo entregar queda fallido con el motivo y no se reintenta', 
         ->and($aviso->ultimo_error)->toContain('131026')->toContain('no tiene WhatsApp');
     $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
     expect($this->meta->envios)->toHaveCount(1);
+});
+
+it('el superadmin lo activa negocio por negocio: apagado por omisión y el negocio no puede activarlo', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    encenderWhatsApp();
+    $url = "/api/v1/app/{$e['slug']}/plantillas-mensaje";
+
+    // Con la plataforma encendida, un negocio nuevo no lo tiene ni lo puede usar.
+    expect($this->getJson("/api/v1/plataforma/estudios/{$e['slug']}", conPlataforma())->assertOk()->json('data.whatsapp_clientes'))
+        ->toBe(['habilitado' => false, 'plataforma' => true])
+        ->and($this->getJson($url, conBearer($e['bearer']))->json('canales'))->not->toContain('whatsapp');
+    $this->putJson($url, ['clave' => 'reserva.confirmada', 'canal' => 'whatsapp'], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['canal'], 'meta.errors');
+    // Solo con el token de la plataforma.
+    $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}/whatsapp", ['habilitado' => true], conBearer($e['bearer']))->assertUnauthorized();
+
+    habilitarWhatsApp($e);
+    expect($this->getJson($url, conBearer($e['bearer']))->json('canales'))->toContain('whatsapp')
+        ->and($this->getJson('/api/v1/plataforma/whatsapp', conPlataforma())->json('data.negocios_habilitados'))->toBe(1);
+    avisoPorWhatsApp($e);
+
+    habilitarWhatsApp($e, false);
+    expect($this->getJson($url, conBearer($e['bearer']))->json('canales'))->not->toContain('whatsapp')
+        ->and($this->getJson('/api/v1/plataforma/whatsapp', conPlataforma())->json('data.negocios_habilitados'))->toBe(0);
+});
+
+it('si el superadmin lo desactiva en el negocio, sus avisos en cola se descartan', function (): void {
+    $m = negocioConAlumnas();
+    encenderWhatsApp();
+    avisoPorWhatsApp($m);
+    $this->putJson("/api/v1/app/{$m['slug']}/mi/privacidad", ['acepta_whatsapp' => true], conBearer($m['alumna']))->assertOk();
+    $this->postJson("/api/v1/app/{$m['slug']}/sesiones/{$m['sesion']}/reservas", ['persona_id' => $m['vale']], conBearer($m['bearer']))->assertCreated();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+
+    habilitarWhatsApp($m, false);
+    $this->artisan('agendauno:enviar-mensajes')->assertSuccessful();
+
+    $avisos = avisosWhatsApp($m);
+    expect($avisos[0]->estado->value)->toBe('descartado')
+        ->and($avisos[0]->ultimo_error)->toBe('WhatsApp no está activo en este negocio.')
+        ->and($this->meta->envios)->toBe([]);
+    $this->getJson("/api/v1/app/{$m['slug']}/mi/privacidad", conBearer($m['alumna']))
+        ->assertOk()->assertJsonPath('data.whatsapp_disponible', false);
+});
+
+/**
+ * Vale recibe por WhatsApp la confirmación de su reserva (wamid.prueba).
+ *
+ * @return array{slug: string, bearer: string, alumna: string, vale: string, caro: string, sesion: string, reserva: string}
+ */
+function valeRecibioSuAviso(): array
+{
+    $m = negocioConAlumnas();
+    encenderWhatsApp();
+    avisoPorWhatsApp($m);
+    avisoPorWhatsApp($m, 'reserva.cancelada');
+    test()->putJson("/api/v1/app/{$m['slug']}/mi/privacidad", ['acepta_whatsapp' => true], conBearer($m['alumna']))->assertOk();
+    $reserva = (string) test()->postJson("/api/v1/app/{$m['slug']}/sesiones/{$m['sesion']}/reservas", ['persona_id' => $m['vale']], conBearer($m['bearer']))
+        ->assertCreated()->json('data.id');
+    test()->artisan('agendauno:despachar-outbox')->assertSuccessful();
+    test()->artisan('agendauno:enviar-mensajes')->assertSuccessful();
+
+    return [...$m, 'reserva' => $reserva];
+}
+
+it('a quien contesta se le responde una vez con el WhatsApp del negocio y el enlace a su cuenta', function (): void {
+    $m = valeRecibioSuAviso();
+
+    // Meta manda el celular mexicano con el 1 de antes (521…); es el mismo número.
+    mensajeDeMeta('5215512345678', ['id' => 'wamid.entrante.1', 'type' => 'text', 'text' => ['body' => '¿Puedo cambiar mi clase?']])
+        ->assertOk()->assertJsonPath('data.respuestas', 1);
+
+    $respuestas = respuestasEnviadas();
+    expect($respuestas)->toHaveCount(1)
+        ->and($respuestas[0]['to'])->toBe('5215512345678')
+        ->and($respuestas[0]['body'])->toStartWith('Hola. Este WhatsApp solo envía los avisos de Estudio estudio-a y no recibe mensajes.')
+        ->toContain('escríbele a Estudio estudio-a al +52 5512345678')
+        ->toContain('/entrar?estudio=estudio-a')
+        ->toContain('responde BAJA');
+
+    // Si vuelve a escribir, o Meta reintenta el mismo aviso, no se le contesta otra vez.
+    mensajeDeMeta('5215512345678', ['id' => 'wamid.entrante.1', 'type' => 'text', 'text' => ['body' => '¿Puedo cambiar mi clase?']])
+        ->assertOk()->assertJsonPath('data.respuestas', 0);
+    mensajeDeMeta('5215512345678', ['id' => 'wamid.entrante.2', 'type' => 'image', 'image' => ['id' => 'media']])
+        ->assertOk()->assertJsonPath('data.respuestas', 0);
+    // Una reacción no pide respuesta.
+    mensajeDeMeta('5215587654321', ['id' => 'wamid.entrante.3', 'type' => 'reaction', 'reaction' => ['message_id' => 'wamid.prueba', 'emoji' => 'ok']])
+        ->assertOk()->assertJsonPath('data.respuestas', 0);
+    expect(respuestasEnviadas())->toHaveCount(1);
+
+    // Pasado el plazo (12 horas por omisión) se le vuelve a contestar.
+    $this->travel(13)->hours();
+    mensajeDeMeta('5215512345678', ['id' => 'wamid.entrante.4', 'type' => 'text', 'text' => ['body' => 'Hola']])
+        ->assertOk()->assertJsonPath('data.respuestas', 1);
+    // Y quien nunca recibió un aviso sabe que debe ir con el negocio.
+    mensajeDeMeta('5215599990000', ['id' => 'wamid.entrante.5', 'type' => 'text', 'text' => ['body' => 'Hola']])
+        ->assertOk()->assertJsonPath('data.respuestas', 1);
+    expect(respuestasEnviadas()[2]['body'])->toContain('comunícate directamente con el negocio');
+});
+
+it('BAJA retira el consentimiento, queda en la bitácora y descarta lo que iba a salir', function (): void {
+    $m = valeRecibioSuAviso();
+    // Su cancelación queda en cola por WhatsApp.
+    $this->postJson("/api/v1/app/{$m['slug']}/reservas/{$m['reserva']}/cancelar", ['por' => 'cliente'], conBearer($m['bearer']))->assertOk();
+    $this->artisan('agendauno:despachar-outbox')->assertSuccessful();
+
+    mensajeDeMeta('5215512345678', ['id' => 'wamid.baja', 'type' => 'text', 'text' => ['body' => ' Baja. ']])
+        ->assertOk()->assertJsonPath('data.respuestas', 1);
+
+    expect(respuestasEnviadas()[0]['body'])
+        ->toBe('Listo. Ya no te enviaremos por WhatsApp los avisos de Estudio estudio-a. Te seguirán llegando por correo o en la app.')
+        ->and(enNegocioWhatsApp($m, fn () => PersonaTenant::query()->where('ulid', $m['vale'])->value('whatsapp_aceptado_en')))->toBeNull()
+        ->and(array_map(fn (MensajeTenant $a): string => $a->estado->value, avisosWhatsApp($m)))->toBe(['enviado', 'descartado']);
+    $this->getJson("/api/v1/app/{$m['slug']}/mi/privacidad", conBearer($m['alumna']))->assertOk()->assertJsonPath('data.acepta_whatsapp', false);
+
+    $baja = collect($this->getJson("/api/v1/app/{$m['slug']}/auditorias", conBearer($m['bearer']))->json('data'))
+        ->firstWhere('accion', 'miembro.whatsapp_retirado');
+    expect($baja['motivo'])->toBe('Lo pidió contestando BAJA por WhatsApp.');
+});
+
+it('al dueño que contesta se le manda a su panel, y con BAJA deja de recibir los avisos de la plataforma', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    encenderWhatsApp(false, true);
+    $estudio = Estudio::query()->where('slug', $e['slug'])->firstOrFail();
+    $estudio->forceFill(['contacto_whatsapp_aceptado_en' => now()])->save();
+    WhatsAppEnvio::query()->create([
+        'wamid' => 'wamid.renta', 'estudio_id' => $estudio->getKey(), 'origen' => WhatsAppEnvio::ORIGEN_AVISO_DUENO,
+        'referencia_id' => 1, 'telefono_huella' => TelefonoWhatsApp::huella('525512345678'),
+    ]);
+
+    mensajeDeMeta('5215512345678', ['id' => 'wamid.dueno.1', 'type' => 'text', 'text' => ['body' => '¿Cuánto debo?']])->assertOk();
+    expect(respuestasEnviadas()[0]['body'])->toStartWith('Hola. Este WhatsApp solo envía los avisos de AgendaUno')
+        ->toContain('/entrar?estudio=estudio-a&volver=%2Frenta');
+
+    mensajeDeMeta('5215512345678', ['id' => 'wamid.dueno.2', 'type' => 'text', 'text' => ['body' => 'STOP']])->assertOk();
+    expect(respuestasEnviadas()[1]['body'])->toStartWith('Listo. Ya no te enviaremos por WhatsApp los avisos de AgendaUno.')
+        ->and($estudio->refresh()->contacto_whatsapp_aceptado_en)->toBeNull();
 });

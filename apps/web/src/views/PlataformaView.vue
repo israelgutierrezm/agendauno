@@ -10,6 +10,9 @@ import ParametrosPlataforma from "@/components/ParametrosPlataforma.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import TarifasPlataforma from "@/components/TarifasPlataforma.vue";
 import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
+import WhatsAppNegocio, {
+  type EstadoWhatsAppNegocio,
+} from "@/components/WhatsAppNegocio.vue";
 import WhatsAppPlataforma from "@/components/WhatsAppPlataforma.vue";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -68,6 +71,8 @@ interface FichaApi extends Omit<Estudio, "uso"> {
     whatsapp_verificado?: boolean;
   };
   onboarding_completo: boolean;
+  // Sus avisos por WhatsApp a clientes: solo los activa el superadmin (ADR 0083).
+  whatsapp_clientes?: EstadoWhatsAppNegocio;
   uso: { periodo: string; metrica: string; cantidad: number }[];
   cargos: Cargo[];
   // Últimos avisos de la plataforma al dueño (ADR 0071).
@@ -1577,6 +1582,17 @@ function borrar(): void {
               </div>
             </dl>
           </section>
+
+          <!-- WhatsApp con sus clientes (ADR 0083) -->
+          <WhatsAppNegocio
+            v-if="ficha.whatsapp_clientes"
+            :key="`wa-${ficha.slug}`"
+            :api-url="apiUrl"
+            :token="token"
+            :slug="ficha.slug"
+            :nombre="ficha.nombre"
+            :inicial="ficha.whatsapp_clientes"
+          />
 
           <!-- Facturación -->
           <form class="space-y-3" @submit.prevent="guardarCobro">

@@ -22,7 +22,7 @@ el esquema.
 
 | Tabla | Para qué |
 |---|---|
-| `estudios` | Cada negocio: slug, estado, prueba, perfil y terminología, modalidad de cobro, contacto (con WhatsApp verificado y aceptación de avisos, ADR 0070), suspensión (por renta o por la plataforma, ADR 0073), perfil público (logo, portada, descripción, redes), base de datos y `version_migraciones` |
+| `estudios` | Cada negocio: slug, estado, prueba, perfil y terminología, modalidad de cobro, contacto (con WhatsApp verificado y aceptación de avisos, ADR 0070), WhatsApp con sus clientes activado por la plataforma (`whatsapp_habilitado`, ADR 0083), suspensión (por renta o por la plataforma, ADR 0073), perfil público (logo, portada, descripción, redes), base de datos y `version_migraciones` |
 | `tarifas_saas` | Tarifas del SaaS por modalidad, versionadas (ADR 0019) |
 | `mediciones_uso` | Alumnos o profesionales activos medidos por periodo |
 | `cargos_renta` | Renta mensual de cada negocio, inmutable una vez emitida (ADR 0032) |
@@ -31,7 +31,7 @@ el esquema.
 | `configuracion_plataforma` | Parámetros de plataforma (valores por defecto de los límites) y conexión de WhatsApp (cifrada) |
 | `verificaciones_whatsapp` | Códigos para que el dueño confirme su WhatsApp al registrarse (solo hashes, ADR 0070); se limpia a los 7 días (ADR 0079) |
 | `avisos_duenos` | Avisos de la plataforma al dueño por correo y WhatsApp: prueba por terminar, renta lista, vencida y pagada (uno por tipo, referencia y canal, ADR 0071); entrega y lectura del WhatsApp (ADR 0074) |
-| `whatsapp_envios` | Cada WhatsApp enviado: el `wamid` de Meta, el negocio y el mensaje o aviso al que corresponde, y su último estado (ADR 0074); se limpia a los 30 días (ADR 0079) |
+| `whatsapp_envios` | Cada WhatsApp enviado: el `wamid` de Meta, el negocio y el mensaje o aviso al que corresponde, y su último estado (ADR 0074); la huella del número (HMAC) para contestar a quien responde (ADR 0083); se limpia a los 30 días (ADR 0079) |
 | `alertas_plataforma` | Alertas de operación agrupadas (ADR 0051) |
 | `errores_plataforma` | Errores de la API, la web y la app agrupados por huella, con traza, contexto tachado, versiones y estado (ADR 0080) |
 | `documentos_legales`, `aceptaciones_legales` | Aviso de privacidad y términos versionados, y quién los aceptó |

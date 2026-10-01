@@ -155,7 +155,8 @@ class GenerarComunicaciones
     }
 
     /**
-     * Aviso por WhatsApp (ADR 0069): solo con la plataforma encendida, a quien aceptó
+     * Aviso por WhatsApp (ADR 0069): solo con la plataforma encendida y el negocio
+     * activado por el superadministrador (ADR 0083), a quien aceptó
      * recibirlos y tiene un celular válido, con la plantilla aprobada del evento. El
      * cuerpo guarda el texto tal como le llega.
      *
@@ -168,7 +169,7 @@ class GenerarComunicaciones
         EventoDeDominioTenant $evento,
     ): void {
         $meta = PlantillasWhatsApp::para($evento->tipo);
-        if ($meta === null || ! $persona instanceof PersonaTenant || $persona->whatsapp_aceptado_en === null || ! $this->whatsapp->activoParaNegocios()) {
+        if ($meta === null || ! $persona instanceof PersonaTenant || $persona->whatsapp_aceptado_en === null || ! $this->whatsapp->activoPara($this->gestor->actual())) {
             return;
         }
         $telefono = TelefonoWhatsApp::normalizar($persona->celular);

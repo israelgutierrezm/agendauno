@@ -11,7 +11,8 @@ import { useToastStore } from "@/stores/toast";
  * token; el token no se vuelve a mostrar), una prueba y dos usos que se encienden por
  * separado porque cada mensaje cuesta:
  * - con los dueños: verifican su número al registrarse y aceptan avisos (ADR 0070);
- * - de los negocios a sus clientes (ADR 0069); apagado, ningún negocio lo ve.
+ * - de los negocios a sus clientes (ADR 0069); apagado, ningún negocio lo ve, y
+ *   encendido solo lo usan los negocios activados en su ficha (ADR 0083).
  * Debajo de cada uso, las plantillas que hay que registrar en Meta.
  */
 const props = defineProps<{ apiUrl: string; token: string }>();
@@ -31,6 +32,8 @@ interface Config {
   conectado: boolean;
   phone_number_id: string;
   token_configurado: boolean;
+  // En cuántos negocios está activado (ADR 0083).
+  negocios_habilitados?: number;
   plantillas: Record<Uso, Plantilla[]>;
   // Webhook de estados de entrega (ADR 0074): lo que se carga en Meta.
   webhook?: {
@@ -282,6 +285,18 @@ onMounted(cargar);
             }}
           </span>
         </div>
+        <p
+          v-if="uso === 'negocios' && config.negocios_habilitados !== undefined"
+          class="mt-1 text-xs"
+          data-prueba="negocios-habilitados"
+        >
+          {{
+            $t(
+              "plataformaAdmin.whatsapp.negociosHabilitados",
+              config.negocios_habilitados,
+            )
+          }}
+        </p>
         <label class="mt-2 flex items-center gap-2 text-sm">
           <input
             v-model="borrador[uso]"

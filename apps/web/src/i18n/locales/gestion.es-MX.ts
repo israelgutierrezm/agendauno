@@ -596,6 +596,20 @@ export const plataformaAdmin = {
     reactivado: "Estudio reactivado.",
     guardado: "Cobro actualizado.",
     abrirPagina: "Ver su página",
+    whatsappClientes: "WhatsApp con sus clientes",
+    whatsappActivo: "Activo",
+    whatsappSinPlataforma: "Activado; apagado en la plataforma",
+    whatsappInactivo: "Desactivado",
+    whatsappActivar: "Activar",
+    whatsappDesactivar: "Desactivar",
+    whatsappAyuda:
+      "Cada aviso por WhatsApp a sus clientes lo paga la plataforma. El negocio no puede activarlo; ya activado, elige qué avisos manda.",
+    whatsappAyudaPlataforma:
+      "Para que salgan, enciende también «De los negocios a sus clientes» en Configuración → WhatsApp.",
+    confirmarWhatsApp:
+      "¿Activar WhatsApp para {estudio}? Cada aviso que mande a sus clientes lo paga la plataforma.",
+    whatsappActivado: "WhatsApp activado en el negocio.",
+    whatsappDesactivado: "WhatsApp desactivado en el negocio.",
   },
   cargos: {
     pendiente: "Pendiente",
@@ -653,7 +667,7 @@ export const plataformaAdmin = {
       "Usa un token permanente de un usuario del sistema. Se guarda cifrado y nunca se vuelve a mostrar.",
     webhook: "Webhook de estados",
     webhookAyuda:
-      "En la app de Meta, en WhatsApp → Configuración, pega esta dirección y el token de verificación, y suscríbete a «messages». Así se sabe si cada mensaje se entregó, se leyó o falló. El App Secret firma los avisos; sin él, en producción se rechazan.",
+      "En la app de Meta, en WhatsApp → Configuración, pega esta dirección y el token de verificación, y suscríbete a «messages». Así se sabe si cada mensaje se entregó, se leyó o falló, y a quien contesta se le responde solo con el contacto del negocio (si escribe BAJA, deja de recibir los avisos). El App Secret firma los avisos; sin él, en producción se rechazan.",
     webhookUrl: "Dirección (callback URL)",
     webhookToken: "Token de verificación",
     appSecret: "App Secret de la app de Meta",
@@ -662,9 +676,12 @@ export const plataformaAdmin = {
     duenosAyuda:
       "Al crear su negocio, el dueño puede confirmar su WhatsApp con un código y aceptar avisos de AgendaUno: prueba por terminar, renta lista, renta vencida y pago recibido. El correo le llega siempre.",
     negocios: "De los negocios a sus clientes",
-    negociosActivar: "Los negocios pueden mandar avisos a sus clientes",
+    negociosActivar:
+      "Los negocios que actives pueden mandar avisos a sus clientes",
     negociosAyuda:
-      "Apagado, ningún negocio ve la opción y sus avisos siguen por correo y notificación en la app.",
+      "Se activa negocio por negocio desde su ficha en Estudios; ninguno lo tiene al crearse ni puede activarlo. Apagado aquí, ningún negocio lo usa y sus avisos siguen por correo y notificación en la app.",
+    negociosHabilitados:
+      "Ningún negocio lo tiene activado | Activado en 1 negocio | Activado en {n} negocios",
     guardar: "Guardar",
     guardado: "WhatsApp guardado.",
     prueba: "Mandar una prueba",

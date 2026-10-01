@@ -201,6 +201,8 @@ class AvisosDuenos
                     'estudio_id' => $aviso->estudio_id,
                     'origen' => WhatsAppEnvio::ORIGEN_AVISO_DUENO,
                     'referencia_id' => $aviso->getKey(),
+                    // Para reconocerlo si contesta (ADR 0083).
+                    'telefono_huella' => TelefonoWhatsApp::huella($aviso->destinatario),
                 ]);
             }
 

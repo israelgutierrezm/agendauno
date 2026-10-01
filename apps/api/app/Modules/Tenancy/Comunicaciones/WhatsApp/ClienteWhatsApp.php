@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Comunicaciones\WhatsApp;
 
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
+use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -19,7 +20,11 @@ use Throwable;
  * - `duenos` (ADR 0070): la plataforma con los dueños; verifican su número al
  *   registrarse y aceptan sus avisos.
  * - `negocios` (ADR 0069): cada negocio con sus clientes. Apagado, ningún negocio ve
- *   la opción y sus avisos siguen por correo y push.
+ *   la opción y sus avisos siguen por correo y push. Encendido, solo lo usan los
+ *   negocios que el superadministrador activó en su ficha (ADR 0083).
+ *
+ * A quien contesta se le responde con texto libre ({@see enviarTexto}), que no es
+ * plantilla porque va dentro de las 24 horas de su mensaje.
  *
  * Los mensajes son plantillas aprobadas por Meta ({@see PlantillasWhatsApp}). La
  * configuración vive cifrada en el control plane (`configuracion_plataforma`): los
@@ -47,6 +52,15 @@ class ClienteWhatsApp
     public function activoParaNegocios(): bool
     {
         return $this->config()['negocios'] && $this->conectado();
+    }
+
+    /**
+     * ¿Este negocio manda avisos por WhatsApp a sus clientes? La plataforma lo tiene
+     * encendido y el superadministrador lo activó en el negocio (ADR 0083).
+     */
+    public function activoPara(?Estudio $estudio): bool
+    {
+        return $estudio instanceof Estudio && $estudio->whatsapp_habilitado && $this->activoParaNegocios();
     }
 
     /**
@@ -158,10 +172,40 @@ class ClienteWhatsApp
     }
 
     /**
+     * Texto libre, solo para contestar a quien acaba de escribir (ADR 0083): Meta lo
+     * permite sin plantilla dentro de las 24 horas de su mensaje.
+     *
+     * @return string|null el wamid del mensaje
+     */
+    public function enviarTexto(string $telefono, string $texto): ?string
+    {
+        return $this->publicar($telefono, [
+            'type' => 'text',
+            'text' => ['preview_url' => false, 'body' => $texto],
+        ]);
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $componentes
      * @return string|null el wamid del mensaje
      */
     private function enviar(string $telefono, string $plantilla, string $idioma, array $componentes): ?string
+    {
+        return $this->publicar($telefono, [
+            'type' => 'template',
+            'template' => [
+                'name' => $plantilla,
+                'language' => ['code' => $idioma],
+                'components' => $componentes,
+            ],
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $contenido
+     * @return string|null el wamid del mensaje
+     */
+    private function publicar(string $telefono, array $contenido): ?string
     {
         if (! $this->conectado()) {
             throw new RuntimeException('WhatsApp no está conectado en la plataforma.');
@@ -174,12 +218,7 @@ class ClienteWhatsApp
                 'messaging_product' => 'whatsapp',
                 'recipient_type' => 'individual',
                 'to' => $telefono,
-                'type' => 'template',
-                'template' => [
-                    'name' => $plantilla,
-                    'language' => ['code' => $idioma],
-                    'components' => $componentes,
-                ],
+                ...$contenido,
             ]);
 
         if (! $respuesta->successful()) {

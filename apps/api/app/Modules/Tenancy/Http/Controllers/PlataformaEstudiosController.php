@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\SuspensionPorRenta;
 use App\Modules\Tenancy\Application\TerminologiaEstudio;
+use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\Models\AvisoDueno;
@@ -23,7 +24,7 @@ use Illuminate\Validation\ValidationException;
  * Ficha de un estudio para el operador de la plataforma (PlatformAdmin): datos del
  * negocio y su contacto, uso medido, cargos de renta y facturas; y las acciones de
  * soporte sobre su cuenta (suspender, reactivar, extender la prueba gratis, cambiar
- * su terminología).
+ * su terminología, activar sus avisos por WhatsApp).
  */
 class PlataformaEstudiosController
 {
@@ -31,7 +32,7 @@ class PlataformaEstudiosController
 
     private const CARGOS = 12;
 
-    public function show(string $estudio): JsonResponse
+    public function show(string $estudio, ClienteWhatsApp $whatsapp): JsonResponse
     {
         $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
 
@@ -78,6 +79,7 @@ class PlataformaEstudiosController
                 'whatsapp_verificado' => $modelo->contacto_whatsapp_verificado_en !== null,
             ],
             'onboarding_completo' => (bool) $modelo->onboarding_completo,
+            'whatsapp_clientes' => self::whatsappClientes($modelo, $whatsapp),
             'uso' => $uso,
             'cargos' => $cargos,
             // Los últimos avisos de la plataforma al dueño (ADR 0071), para soporte.
@@ -171,6 +173,37 @@ class PlataformaEstudiosController
         Log::info('plataforma.estudio.prueba_extendida', ['estudio' => $modelo->slug, 'dias' => $validado['dias']]);
 
         return response()->json(['data' => self::resumen($modelo->refresh())]);
+    }
+
+    /**
+     * Activa o desactiva los avisos por WhatsApp del negocio a sus clientes (ADR
+     * 0083). Solo el superadministrador lo decide, porque cada mensaje lo paga la
+     * plataforma; el negocio no puede activarlo. Desactivado, sus avisos en cola se
+     * descartan y ya no se ofrece a sus clientes.
+     */
+    public function whatsapp(Request $request, string $estudio, ClienteWhatsApp $whatsapp): JsonResponse
+    {
+        $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
+        $habilitado = (bool) $request->validate(['habilitado' => ['required', 'boolean']])['habilitado'];
+
+        if ($modelo->whatsapp_habilitado !== $habilitado) {
+            $modelo->forceFill(['whatsapp_habilitado' => $habilitado])->save();
+            Log::info('plataforma.estudio.whatsapp', ['estudio' => $modelo->slug, 'habilitado' => $habilitado]);
+        }
+
+        return response()->json(['data' => self::whatsappClientes($modelo, $whatsapp)]);
+    }
+
+    /**
+     * @return array{habilitado: bool, plataforma: bool}
+     */
+    private static function whatsappClientes(Estudio $estudio, ClienteWhatsApp $whatsapp): array
+    {
+        return [
+            'habilitado' => $estudio->whatsapp_habilitado,
+            // Encendido en Configuración → WhatsApp; sin eso, ningún negocio lo usa.
+            'plataforma' => $whatsapp->activoParaNegocios(),
+        ];
     }
 
     /**

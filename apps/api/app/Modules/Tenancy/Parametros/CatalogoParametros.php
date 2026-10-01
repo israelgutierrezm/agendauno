@@ -127,6 +127,9 @@ final class CatalogoParametros
                 'Al registrarse. Pasado el tope, el dueño sigue sin verificar.', $e, 3, 1, 10, 'códigos', porNegocio: false),
             new DefinicionParametro('whatsapp.codigos_por_dia', 'WhatsApp', 'Códigos de verificación al día (toda la plataforma)',
                 'Protege el costo si alguien abusa del registro; al llegar, avisa al superadministrador.', $e, 300, 10, 100000, 'códigos', porNegocio: false),
+            // Respuesta automática a quien contesta al número de AgendaUno (ADR 0083).
+            new DefinicionParametro('whatsapp.horas_entre_respuestas', 'WhatsApp', 'Horas antes de volver a contestar a la misma persona',
+                'A quien le escribe al número de AgendaUno se le contesta solo, una vez en este plazo aunque escriba varias veces. BAJA siempre se contesta.', $e, 12, 1, 168, 'h', porNegocio: false),
 
             // Limpieza de registros técnicos (ADR 0079, solo la plataforma).
             new DefinicionParametro('limpieza.dias_envios_whatsapp', 'Limpieza de registros', 'Días que se guarda el registro de cada WhatsApp enviado',

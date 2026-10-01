@@ -32,10 +32,12 @@
   nota para el negocio.
 - **Agendar para otra persona** (ADR 0068): la cita es de quien agenda y guarda
   quién asiste.
-- **WhatsApp con Meta Cloud API** (ADR 0069, 0070, 0074): el superadministrador lo
-  enciende por separado para los dueños y para los negocios con sus clientes; el
-  cliente acepta al agendar o en recepción; el dueño verifica su número con un
-  código; el webhook de estados marca entregado, leído o fallido.
+- **WhatsApp con Meta Cloud API** (ADR 0069, 0070, 0074, 0083): un solo número, el
+  de AgendaUno. El superadministrador lo enciende por separado para los dueños y
+  para los negocios con sus clientes, y lo activa negocio por negocio; el cliente
+  acepta al agendar o en recepción; el dueño verifica su número con un código; el
+  webhook de estados marca entregado, leído o fallido; a quien contesta se le
+  responde solo, y con BAJA deja de recibir los avisos.
 - **Avisos de la plataforma al dueño** (ADR 0071, 0072): prueba por terminar y
   renta lista, vencida y pagada, por correo y WhatsApp; el dueño los ve y decide
   en su panel, donde también cambia su WhatsApp con un código (ADR 0075); alerta de
@@ -66,8 +68,8 @@
 
 ## Después
 
-- WhatsApp: atender las respuestas de los clientes al número de AgendaUno
-  (ADR 0074). No habrá número propio por negocio (ADR 0069).
+- WhatsApp: mostrar al negocio lo que le contestan sus clientes (hoy se les responde
+  solo, ADR 0083). No habrá número propio por negocio (ADR 0069).
 - Despliegue automático desde el CI.
 - Marketplace a partir del directorio.
 - Opciones empresariales: marca blanca, OAuth para terceros.

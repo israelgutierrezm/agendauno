@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\EstadoMensaje;
 use App\Modules\Tenancy\Comunicaciones\Mail\MensajeMailable;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
+use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\WhatsAppEnvio;
@@ -52,9 +53,11 @@ class EnviarMensajesTenant
             ->limit(self::LOTE)
             ->get()
             ->each(function (MensajeTenant $mensaje) use (&$enviados): void {
-                if ($mensaje->canal === CanalComunicacion::WhatsApp && ! $this->whatsapp->activoParaNegocios()) {
+                if ($mensaje->canal === CanalComunicacion::WhatsApp && ! $this->whatsapp->activoPara($this->gestor->actual())) {
                     $mensaje->estado = EstadoMensaje::Descartado;
-                    $mensaje->ultimo_error = 'WhatsApp se apagó en la plataforma.';
+                    $mensaje->ultimo_error = $this->whatsapp->activoParaNegocios()
+                        ? 'WhatsApp no está activo en este negocio.'
+                        : 'WhatsApp se apagó en la plataforma.';
                     $mensaje->save();
 
                     return;
@@ -109,6 +112,8 @@ class EnviarMensajesTenant
                     'estudio_id' => $this->gestor->actual()?->getKey(),
                     'origen' => WhatsAppEnvio::ORIGEN_MENSAJE,
                     'referencia_id' => $mensaje->getKey(),
+                    // Para reconocerlo si contesta (ADR 0083).
+                    'telefono_huella' => TelefonoWhatsApp::huella($mensaje->destinatario),
                 ]);
             }
 

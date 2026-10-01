@@ -34,4 +34,16 @@ final class TelefonoWhatsApp
 
         return strlen($digitos) >= 8 && strlen($digitos) <= 15 ? $digitos : null;
     }
+
+    /**
+     * Huella del número (HMAC con la llave de la app) para reconocerlo cuando contesta
+     * sin guardarlo (ADR 0083). Acepta el número como lo manda Meta (`from`, solo
+     * dígitos con lada, a veces 521… en México) o ya normalizado.
+     */
+    public static function huella(string $telefono): string
+    {
+        $digitos = (string) preg_replace('/\D/', '', $telefono);
+
+        return hash_hmac('sha256', self::normalizar('+'.$digitos) ?? $digitos, (string) config('app.key'));
+    }
 }

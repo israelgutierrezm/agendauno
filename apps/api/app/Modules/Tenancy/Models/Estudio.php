@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $descripcion
  * @property string|null $portada_url
  * @property array<string, string>|null $redes
+ * @property bool $whatsapp_habilitado los avisos por WhatsApp a sus clientes; solo los activa el superadministrador (ADR 0083)
  */
 class Estudio extends Model
 {
@@ -56,6 +57,7 @@ class Estudio extends Model
         'contacto_telefono',
         'contacto_whatsapp_verificado_en',
         'contacto_whatsapp_aceptado_en',
+        'whatsapp_habilitado',
         'suspendido_por',
         'suspendido_en',
         'sin_suspension_hasta',
@@ -95,6 +97,7 @@ class Estudio extends Model
         'onboarding_completo' => 'boolean',
         'contacto_whatsapp_verificado_en' => 'datetime',
         'contacto_whatsapp_aceptado_en' => 'datetime',
+        'whatsapp_habilitado' => 'boolean',
         'suspendido_en' => 'datetime',
         'sin_suspension_hasta' => 'date',
     ];

@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\PlantillasWhatsApp;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
+use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -16,8 +17,8 @@ use RuntimeException;
  * WhatsApp de la plataforma, para el superadministrador: la conexión (número o Phone
  * number ID y token de la cuenta de WhatsApp Business; el token nunca se devuelve) y
  * dos interruptores: con los dueños (verificar su número al registrarse, ADR 0070) y
- * de los negocios a sus clientes (ADR 0069). También las plantillas a registrar en
- * Meta y una prueba.
+ * de los negocios a sus clientes (ADR 0069), que además se activa negocio por negocio
+ * en su ficha (ADR 0083). También las plantillas a registrar en Meta y una prueba.
  */
 class PlataformaWhatsAppController
 {
@@ -80,6 +81,8 @@ class PlataformaWhatsAppController
     {
         return [
             ...$this->whatsapp->paraEditar(),
+            // En cuántos negocios está activado (ADR 0083).
+            'negocios_habilitados' => Estudio::query()->where('whatsapp_habilitado', true)->count(),
             'plantillas' => [
                 'duenos' => PlantillasWhatsApp::paraDuenos(),
                 'negocios' => PlantillasWhatsApp::paraNegocios(),
