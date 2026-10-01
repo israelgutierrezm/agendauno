@@ -1425,7 +1425,9 @@ export default {
     titulo: "Pon tu negocio en marcha",
     guiada: "Configuración guiada",
     ir: "Ir",
-    opcional: "opcional",
+    opcionales: "Opcionales:",
+    hecho: "(hecho)",
+    pendiente: "(pendiente)",
     tareas: {
       sucursal: "Crea tu primera sucursal",
       catalogo: "Define una clase (oferta)",
