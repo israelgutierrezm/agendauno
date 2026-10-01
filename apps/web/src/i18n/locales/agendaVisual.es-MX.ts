@@ -25,6 +25,9 @@ export default {
     reservados: "Lugares reservados",
     enEspera: "En lista de espera",
     libres: "Lugares libres por llenar",
+    puntos: "{n} pts",
+    vsSemana: "Contra la semana anterior",
+    vsDia: "Contra el mismo día de la semana pasada",
   },
   estadosCita: {
     confirmada: "Agendada",
@@ -49,10 +52,6 @@ export default {
     vacioTexto: "Haz clic en un horario para agendar una nueva cita.",
   },
   semana: {
-    manana: "Mañana",
-    tarde: "Tarde",
-    rangoManana: "hasta 14 h",
-    rangoTarde: "desde 14 h",
     resumenDia: "{n} clase · {pct}% lleno | {n} clases · {pct}% lleno",
     sinClasesDia: "Sin clases",
     llena: "Llena",

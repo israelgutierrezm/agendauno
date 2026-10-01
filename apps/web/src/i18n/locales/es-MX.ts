@@ -1795,6 +1795,8 @@ export default {
   },
   agenda: {
     titulo: "Agenda",
+    subtitulo:
+      "Gestiona y visualiza todas tus clases, instructores y espacios en un solo lugar.",
     hoy: "Hoy",
     semanaAnterior: "Semana anterior",
     semanaSiguiente: "Semana siguiente",

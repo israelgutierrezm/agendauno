@@ -4,6 +4,10 @@ import { useI18n } from "vue-i18n";
 
 import AgendaClasesSemana from "@/components/AgendaClasesSemana.vue";
 import AgendaKpis from "@/components/AgendaKpis.vue";
+import type {
+  Indicador,
+  Tendencia,
+} from "@/components/TarjetasIndicadores.vue";
 import AgendaMes from "@/components/AgendaMes.vue";
 import AgendaProfesionales from "@/components/AgendaProfesionales.vue";
 import CambiarHorario from "@/components/CambiarHorario.vue";
@@ -243,9 +247,8 @@ function nombreMiembro(m: Miembro): string {
 // horarias), así que se recorta a las fechas LOCALES del periodo. Calendario,
 // indicadores y leyenda salen de esta misma lista (mismo periodo y filtros).
 // Profesional y servicio se filtran aquí; la sucursal ya la filtra el servidor.
-const sesionesVisibles = computed(() => {
-  const { desde, hasta } = rangoCarga.value;
-  return sesiones.value.filter((s) => {
+function visiblesEn(lista: Sesion[], desde: string, hasta: string): Sesion[] {
+  return lista.filter((s) => {
     const fecha = fechaLocalSesion(s.inicia_en, s.zona_horaria);
     return (
       fecha >= desde &&
@@ -255,7 +258,24 @@ const sesionesVisibles = computed(() => {
       (ofertaFiltro.value === "" || s.oferta_id === ofertaFiltro.value)
     );
   });
-});
+}
+const sesionesVisibles = computed(() =>
+  visiblesEn(sesiones.value, rangoCarga.value.desde, rangoCarga.value.hasta),
+);
+// La semana anterior, con los mismos filtros: contra ella se comparan los
+// indicadores (en citas, el mismo día de la semana pasada).
+const sesionesPrevias = ref<Sesion[]>([]);
+const rangoPrevio = computed(() => ({
+  desde: isoDe(sumarDias(new Date(`${dias.value[0].iso}T12:00:00`), -7)),
+  hasta: isoDe(sumarDias(new Date(`${dias.value[6].iso}T12:00:00`), -7)),
+}));
+const visiblesPrevias = computed(() =>
+  visiblesEn(
+    sesionesPrevias.value,
+    rangoPrevio.value.desde,
+    rangoPrevio.value.hasta,
+  ),
+);
 function sesionesDe(iso: string): Sesion[] {
   return sesionesVisibles.value
     .filter((s) => fechaLocalSesion(s.inicia_en, s.zona_horaria) === iso)
@@ -517,11 +537,19 @@ async function cargarSesiones(): Promise<void> {
     if (sucursalFiltro.value !== "") {
       params.sucursal_id = sucursalFiltro.value;
     }
-    const { data } = await api.get<{ data: Sesion[] }>(
-      `${base.value}/sesiones`,
-      { params },
-    );
+    const [{ data }, previas] = await Promise.all([
+      api.get<{ data: Sesion[] }>(`${base.value}/sesiones`, { params }),
+      // Para la tendencia de los indicadores; si falla, solo no se muestra.
+      vista.value === "mes"
+        ? Promise.resolve(null)
+        : api
+            .get<{ data: Sesion[] }>(`${base.value}/sesiones`, {
+              params: { ...params, ...rangoPrevio.value },
+            })
+            .catch(() => null),
+    ]);
     sesiones.value = data.data;
+    sesionesPrevias.value = previas?.data.data ?? [];
     if (sesion.esCitas) {
       const b = await api.get<{ data: BloqueoAgenda[] }>(
         `${base.value}/bloqueos`,
@@ -686,82 +714,133 @@ function dineroMx(minor: number): string {
     maximumFractionDigits: 0,
   }).format(minor / 100);
 }
-const tarjetasKpi = computed(() => {
+/**
+ * Cómo va un indicador contra la semana anterior: porcentaje de cambio, o puntos
+ * si el indicador ya es un porcentaje. Sin dato anterior (o en cero), no hay.
+ */
+function tendencia(
+  actual: number | null,
+  previo: number | null,
+  mejorSiSube: boolean,
+  puntos = false,
+): Tendencia | undefined {
+  if (actual === null || previo === null || (!puntos && previo === 0)) {
+    return undefined;
+  }
+  const cambio = puntos
+    ? actual - previo
+    : Math.round(((actual - previo) / previo) * 100);
+  const direccion = cambio > 0 ? "sube" : cambio < 0 ? "baja" : "igual";
+  return {
+    direccion,
+    texto: puntos
+      ? t("agendaVisual.kpis.puntos", { n: Math.abs(cambio) })
+      : `${Math.abs(cambio)}%`,
+    buena:
+      direccion === "igual" ? null : (direccion === "sube") === mejorSiSube,
+    titulo: sesion.esCitas
+      ? t("agendaVisual.kpis.vsDia")
+      : t("agendaVisual.kpis.vsSemana"),
+  };
+}
+
+const tarjetasKpi = computed<Indicador[]>(() => {
   const ahora = new Date();
   if (sesion.esCitas) {
-    const k = kpisCitas(
-      sesionesVisibles.value.filter(
+    const delDia = (lista: Sesion[], iso: string): Sesion[] =>
+      lista.filter(
         (s) =>
           s.tipo === "cita" &&
-          fechaLocalSesion(s.inicia_en, s.zona_horaria) === diaSel.value,
-      ),
-      ahora,
+          fechaLocalSesion(s.inicia_en, s.zona_horaria) === iso,
+      );
+    const k = kpisCitas(delDia(sesionesVisibles.value, diaSel.value), ahora);
+    const mismoDiaAntes = isoDe(
+      sumarDias(new Date(`${diaSel.value}T12:00:00`), -7),
     );
+    const previas = delDia(visiblesPrevias.value, mismoDiaAntes);
     return [
       {
         clave: "citas",
         icono: "agenda",
-        tono: "azul" as const,
+        tono: "azul",
         valor: String(k.citas),
         etiqueta: t("agendaVisual.kpis.citas"),
+        tendencia: tendencia(
+          k.citas,
+          sesionesPrevias.value.length > 0 ? previas.length : null,
+          true,
+        ),
       },
       {
         clave: "local",
         icono: "personas",
-        tono: "verde" as const,
+        tono: "verde",
         valor: String(k.enLocal),
         etiqueta: t("agendaVisual.kpis.enLocal"),
       },
       {
         clave: "cobrar",
         icono: "dinero",
-        tono: "naranja" as const,
+        tono: "naranja",
         valor: dineroMx(k.porCobrarMinor),
         etiqueta: t("agendaVisual.kpis.porCobrar", { n: k.pendientesPago }),
       },
       {
         clave: "ausentes",
         icono: "ausente",
-        tono: "morado" as const,
+        tono: "morado",
         valor: String(k.noAsistieron),
         etiqueta: t("agendaVisual.kpis.noAsistieron"),
       },
     ];
   }
   const k = kpisClases(sesionesVisibles.value, ahora);
+  const hayPrevias = sesionesPrevias.value.length > 0;
+  const p = kpisClases(visiblesPrevias.value, ahora);
   return [
     {
       clave: "clases",
       icono: "agenda",
-      tono: "azul" as const,
+      tono: "azul",
       valor: String(k.clases),
       etiqueta: t("agendaVisual.kpis.clases"),
+      tendencia: hayPrevias ? tendencia(k.clases, p.clases, true) : undefined,
     },
     {
       clave: "ocupacion",
       icono: "pulso",
-      tono: "verde" as const,
+      tono: "verde",
       valor: k.ocupacionPct !== null ? `${k.ocupacionPct}%` : "—",
       etiqueta: t("agendaVisual.kpis.ocupacion"),
+      tendencia: hayPrevias
+        ? tendencia(k.ocupacionPct, p.ocupacionPct, true, true)
+        : undefined,
     },
     {
       clave: "reservados",
-      icono: "hecho",
-      tono: "morado" as const,
+      icono: "personas",
+      tono: "morado",
       valor: String(k.reservados),
       etiqueta: t("agendaVisual.kpis.reservados"),
+      tendencia: hayPrevias
+        ? tendencia(k.reservados, p.reservados, true)
+        : undefined,
     },
     {
       clave: "espera",
       icono: "reloj",
-      tono: "naranja" as const,
+      tono: "naranja",
       valor: String(k.enEspera),
       etiqueta: t("agendaVisual.kpis.enEspera"),
+      // Más gente esperando es demanda sin atender: pide abrir otra clase.
+      tendencia: hayPrevias
+        ? tendencia(k.enEspera, p.enEspera, false)
+        : undefined,
     },
     {
       clave: "libres",
       icono: "etiqueta",
-      tono: "rosa" as const,
+      tono: "rosa",
       valor: String(k.libresPorLlenar),
       etiqueta: t("agendaVisual.kpis.libres"),
     },
@@ -1497,7 +1576,10 @@ onMounted(async () => {
 <template>
   <section class="px-4 sm:px-6 py-8">
     <div class="flex items-start justify-between gap-3 flex-wrap">
-      <EncabezadoSeccion :titulo="$t('agenda.titulo')" />
+      <EncabezadoSeccion
+        :titulo="$t('agenda.titulo')"
+        :subtitulo="$t('agenda.subtitulo')"
+      />
       <!-- Citas: el negocio agenda al cliente. Clases: se programa una clase. -->
       <button
         v-if="sesion.esCitas && puedeReservar"

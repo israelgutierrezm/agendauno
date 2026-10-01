@@ -46,6 +46,34 @@ describe("Tarjetas de indicadores", () => {
       },
     });
 
-    expect(w.get("dd").attributes("style")).toContain("var(--aviso)");
+    expect(w.get("dd > span").attributes("style")).toContain("var(--aviso)");
+  });
+
+  it("la tendencia contra el periodo anterior va en verde si es buena y en rojo si no", () => {
+    const w = mount(TarjetasIndicadores, {
+      props: {
+        tarjetas: [
+          {
+            clave: "clases",
+            valor: "28",
+            etiqueta: "Clases",
+            tendencia: { direccion: "sube", texto: "12%", buena: true },
+          },
+          {
+            clave: "espera",
+            valor: "12",
+            etiqueta: "En espera",
+            tendencia: { direccion: "sube", texto: "2%", buena: false },
+          },
+        ],
+        decoracion: "barras",
+      },
+    });
+
+    const [clases, espera] = w.findAll('[data-prueba="tendencia"]');
+    expect(clases.text()).toBe("12%");
+    expect(clases.classes()).toContain("ti-buena");
+    expect(espera.classes()).toContain("ti-mala");
+    expect(w.findAll(".ti-barras")).toHaveLength(2);
   });
 });

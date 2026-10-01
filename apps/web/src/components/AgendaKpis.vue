@@ -11,5 +11,5 @@ defineProps<{ tarjetas: Indicador[] }>();
 </script>
 
 <template>
-  <TarjetasIndicadores :tarjetas="tarjetas" />
+  <TarjetasIndicadores :tarjetas="tarjetas" decoracion="barras" />
 </template>

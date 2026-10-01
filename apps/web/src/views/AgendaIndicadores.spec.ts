@@ -103,4 +103,57 @@ describe("indicadores de la agenda", () => {
     expect(kpis).toContain("reservados=4");
     expect(kpis).toContain("ocupacion=40%");
   });
+
+  it("comparan contra la semana anterior con los mismos filtros", async () => {
+    // La semana anterior (31 dic – 6 ene): dos clases con 3 de 10 cada una.
+    api.get.mockImplementation(
+      (url: string, opciones?: { params?: { desde?: string } }) =>
+        Promise.resolve({
+          data: {
+            data: !url.endsWith("/sesiones")
+              ? []
+              : opciones?.params?.desde === "2029-12-31"
+                ? [
+                    sesion("antes1", "2030-01-02T17:00:00Z", 3),
+                    sesion("antes2", "2030-01-03T17:00:00Z", 3),
+                  ]
+                : [sesion("dentro", "2030-01-10T17:00:00Z", 4)],
+          },
+        }),
+    );
+    const w = mount(AgendaView, {
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            missingWarn: false,
+            fallbackWarn: false,
+            messages: { es: esMX },
+          }),
+        ],
+        stubs: {
+          teleport: true,
+          EncabezadoSeccion: true,
+          AgendaProfesionales: true,
+          PanelCita: true,
+          PanelNuevaCita: true,
+          AgendaClasesSemana: true,
+          AgendaKpis: {
+            props: ["tarjetas"],
+            template:
+              "<div class='kpis'>{{ tarjetas.filter((t) => t.tendencia).map((t) => t.clave + '=' + t.tendencia.direccion + ':' + t.tendencia.texto + ':' + t.tendencia.buena).join(' ') }}</div>",
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    const kpis = w.find(".kpis").text();
+    // Una clase contra dos: bajó a la mitad, y eso no es bueno.
+    expect(kpis).toContain("clases=baja:50%:false");
+    // 40 % contra 30 %: diez puntos más.
+    expect(kpis).toMatch(/ocupacion=sube:[^ ]+:true/);
+    expect(kpis).toContain("reservados=baja:33%:false");
+  });
 });
