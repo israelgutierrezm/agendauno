@@ -13,6 +13,9 @@ export default {
     ventas: "Consulta ventas, pagos y saldos pendientes.",
   },
   comun: {
+    cambiosSinGuardar:
+      "Tienes cambios sin guardar. Si sales ahora, se pierden.",
+    salirSinGuardar: "Salir sin guardar",
     cargando: "Cargando…",
     cancelar: "Cancelar",
     guardar: "Guardar",
@@ -100,6 +103,7 @@ export default {
       calendario: "Calendario",
       lugares: "Lugares disponibles",
       expedientes: "Expedientes",
+      respuestas: "Respuestas de formularios",
       porCobrar: "Por cobrar",
       movimientos: "Movimientos",
       conciliacion: "Conciliación",
@@ -1038,6 +1042,7 @@ export default {
     },
   },
   instructores: {
+    administrarAcceso: "Administrar acceso",
     vacio: "Aún no hay instructores. Invita al primero.",
     invitar: {
       titulo: "Invitar instructor",
@@ -1871,6 +1876,8 @@ export default {
     titulo: "Agenda",
     subtitulo:
       "Gestiona y visualiza todas tus clases, instructores y espacios en un solo lugar.",
+    disponibilidadEquipo: "Disponibilidad del equipo",
+    reglasReserva: "Reglas de reserva",
     hoy: "Hoy",
     semanaAnterior: "Semana anterior",
     semanaSiguiente: "Semana siguiente",
@@ -2054,6 +2061,8 @@ export default {
     },
   },
   formularios: {
+    disenar: "Diseñar formularios",
+    verRespuestas: "Ver respuestas",
     titulo: "Formularios",
     nuevo: "Nuevo formulario",
     nombrePh: "Ficha médica",

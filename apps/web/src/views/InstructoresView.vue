@@ -9,6 +9,7 @@ import BotonImportar from "@/components/BotonImportar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
 import { plural } from "@/lib/terminologia";
 import { useVistaListado } from "@/lib/vistaListado";
@@ -162,18 +163,30 @@ onMounted(cargar);
         :titulo="plural(sesion.terminologia.instructor)"
         :total="instructores.length"
       />
-      <div v-if="puedeInvitar" class="flex items-center gap-2 flex-wrap">
-        <BotonImportar
-          ruta="importar-instructores"
-          :texto="$t('nav.importar')"
-        />
-        <button
-          class="tu-btn tu-btn-primario tu-btn-crear"
-          type="button"
-          @click="abrir"
+      <div
+        v-if="puedeInvitar || puedeEntrar('usuarios', sesion)"
+        class="flex items-center gap-2 flex-wrap"
+      >
+        <!-- Quién entra al panel y con qué permisos vive en Configuración. -->
+        <RouterLink
+          v-if="puedeEntrar('usuarios', sesion)"
+          :to="{ name: 'usuarios' }"
+          class="tu-btn tu-btn-fantasma"
+          >{{ $t("instructores.administrarAcceso") }}</RouterLink
         >
-          {{ $t("instructores.invitar.enviar") }}
-        </button>
+        <template v-if="puedeInvitar">
+          <BotonImportar
+            ruta="importar-instructores"
+            :texto="$t('nav.importar')"
+          />
+          <button
+            class="tu-btn tu-btn-primario tu-btn-crear"
+            type="button"
+            @click="abrir"
+          >
+            {{ $t("instructores.invitar.enviar") }}
+          </button>
+        </template>
       </div>
     </div>
 

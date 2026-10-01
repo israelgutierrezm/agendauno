@@ -3,6 +3,7 @@ import { computed, onMounted, ref, useTemplateRef } from "vue";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { instantanea, useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface DatosFiscales {
@@ -22,6 +23,9 @@ const form = ref({
   regimen_fiscal: "",
   codigo_postal: "",
 });
+// Cambios sin guardar: el formulario distinto de lo último cargado o guardado.
+const fotoForm = instantanea(() => form.value);
+useCambiosPendientes(() => fotoForm.cambio());
 const sellosCargados = ref(false);
 const guardado = ref(false);
 const cargando = ref(true);
@@ -45,6 +49,7 @@ function aplicar(d: DatosFiscales): void {
   };
   sellosCargados.value = d.sellos_cargados;
   guardado.value = true;
+  fotoForm.fijar();
 }
 
 async function cargar(): Promise<void> {

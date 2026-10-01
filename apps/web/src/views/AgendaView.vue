@@ -30,6 +30,7 @@ import {
   type BloqueoAgenda,
   type VentanaAtencion,
 } from "@/lib/agenda";
+import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import { plural } from "@/lib/terminologia";
@@ -1580,21 +1581,36 @@ onMounted(async () => {
         :titulo="$t('agenda.titulo')"
         :subtitulo="$t('agenda.subtitulo')"
       />
-      <!-- Citas: el negocio agenda al cliente. Clases: se programa una clase. -->
-      <button
-        v-if="sesion.esCitas && puedeReservar"
-        class="tu-btn tu-btn-primario tu-btn-crear"
-        @click="abrirNuevaCita()"
-      >
-        {{ $t("agendaVisual.nuevaCita.boton") }}
-      </button>
-      <button
-        v-else-if="!sesion.esCitas && puedeGestionar"
-        class="tu-btn tu-btn-primario tu-btn-crear"
-        @click="mostrarNueva = true"
-      >
-        {{ $t("agenda.nuevaClase") }}
-      </button>
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- De paso, a donde se configuran (cada una guarda sus datos). -->
+        <RouterLink
+          v-if="puedeEntrar('horarios', sesion)"
+          :to="{ name: 'horarios' }"
+          class="tu-btn tu-btn-fantasma"
+          >{{ $t("agenda.disponibilidadEquipo") }}</RouterLink
+        >
+        <RouterLink
+          v-if="puedeEntrar('reglas-agenda', sesion)"
+          :to="{ name: 'reglas-agenda', hash: '#politicas' }"
+          class="tu-btn tu-btn-fantasma"
+          >{{ $t("agenda.reglasReserva") }}</RouterLink
+        >
+        <!-- Citas: el negocio agenda al cliente. Clases: se programa una clase. -->
+        <button
+          v-if="sesion.esCitas && puedeReservar"
+          class="tu-btn tu-btn-primario tu-btn-crear"
+          @click="abrirNuevaCita()"
+        >
+          {{ $t("agendaVisual.nuevaCita.boton") }}
+        </button>
+        <button
+          v-else-if="!sesion.esCitas && puedeGestionar"
+          class="tu-btn tu-btn-primario tu-btn-crear"
+          @click="mostrarNueva = true"
+        >
+          {{ $t("agenda.nuevaClase") }}
+        </button>
+      </div>
     </div>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">

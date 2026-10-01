@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -43,6 +44,11 @@ interface Respuesta {
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("formularios.gestionar"));
+// Dos vistas de la misma pantalla (`?vista=`): el diseño de los formularios
+// (Configuración › Documentos y privacidad) y la revisión de sus respuestas
+// (Alumnos o Clientes › Respuestas de formularios).
+const route = useRoute();
+const soloRespuestas = computed(() => route.query.vista === "respuestas");
 
 const formularios = ref<Formulario[]>([]);
 const seleccionadoId = ref<string | null>(null);
@@ -182,7 +188,12 @@ async function agregarCampo(): Promise<void> {
 async function cargarRespuestas(): Promise<void> {
   respuestas.value = [];
   abierta.value = null;
-  if (!puedeGestionar.value || seleccionadoId.value === null) {
+  // Solo en la vista de respuestas: el diseño no las consulta.
+  if (
+    !soloRespuestas.value ||
+    !puedeGestionar.value ||
+    seleccionadoId.value === null
+  ) {
     return;
   }
   cargandoRespuestas.value = true;
@@ -197,14 +208,36 @@ async function cargarRespuestas(): Promise<void> {
     cargandoRespuestas.value = false;
   }
 }
-watch(seleccionadoId, cargarRespuestas);
+watch([seleccionadoId, soloRespuestas], cargarRespuestas);
 
 onMounted(cargar);
 </script>
 
 <template>
   <section class="mx-auto max-w-6xl px-4 py-10">
-    <EncabezadoSeccion :titulo="$t('formularios.titulo')" />
+    <EncabezadoSeccion
+      :titulo="
+        soloRespuestas ? $t('nav.vistas.respuestas') : $t('formularios.titulo')
+      "
+    >
+      <template v-if="puedeGestionar" #acciones>
+        <!-- Misma ruta, otra vista: el router las daría por «página actual». -->
+        <RouterLink
+          v-if="soloRespuestas"
+          :to="{ name: 'formularios' }"
+          aria-current-value="false"
+          class="tu-btn tu-btn-fantasma"
+          >{{ $t("formularios.disenar") }}</RouterLink
+        >
+        <RouterLink
+          v-else
+          :to="{ name: 'formularios', query: { vista: 'respuestas' } }"
+          aria-current-value="false"
+          class="tu-btn tu-btn-fantasma"
+          >{{ $t("formularios.verRespuestas") }}</RouterLink
+        >
+      </template>
+    </EncabezadoSeccion>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -246,7 +279,7 @@ onMounted(cargar);
         </ul>
 
         <form
-          v-if="puedeGestionar"
+          v-if="puedeGestionar && !soloRespuestas"
           class="mt-4 border-t pt-3 space-y-2"
           :style="{ borderColor: 'var(--borde)' }"
           @submit.prevent="crearFormulario"
@@ -277,8 +310,8 @@ onMounted(cargar);
 
       <!-- Detalle del formulario -->
       <div v-if="seleccionado" class="space-y-6">
-        <!-- Constructor de campos -->
-        <div class="tu-card p-6">
+        <!-- Constructor de campos (diseño) -->
+        <div v-if="!soloRespuestas" class="tu-card p-6">
           <h2 class="font-light text-lg">
             {{ seleccionado.nombre }} · {{ $t("formularios.campos.titulo") }}
           </h2>
@@ -359,7 +392,7 @@ onMounted(cargar);
         </div>
 
         <!-- Respuestas: se llenan desde el expediente de cada persona -->
-        <div class="tu-card p-6">
+        <div v-if="soloRespuestas" class="tu-card p-6">
           <h2 class="font-light text-lg">
             {{ $t("formularios.respuestas.titulo") }}
             <span

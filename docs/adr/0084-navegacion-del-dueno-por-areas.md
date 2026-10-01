@@ -72,6 +72,37 @@ quedaba abierta por omisión, así que moverla de lugar podía quitarle su prote
   de cierre y programación recurrente (esta, solo en clases).
 - **Planes y paquetes** pasan a Configuración › Servicios y catálogos. Ventas los
   enlaza («Administrar planes y paquetes») a quien los puede abrir.
+- **Formularios:** el diseño es Configuración › Documentos y privacidad y la
+  revisión de respuestas es Clientes › Respuestas de formularios
+  (`/formularios?vista=respuestas`). Cada vista enlaza a la otra, y solo la de
+  respuestas las consulta.
+
+### Enlaces de paso
+
+Lo que se configura en otra área se enlaza desde donde se usa, a quien puede
+abrirlo:
+
+- Agenda lleva a «Disponibilidad del equipo» (solo en citas) y a «Reglas de reserva».
+- Equipo y la ficha del instructor llevan a «Administrar acceso», en Configuración ›
+  Accesos y permisos.
+
+### Cambios sin guardar
+
+`lib/cambiosPendientes.ts` avisa antes de perder lo editado:
+
+- Cada formulario declara cuándo tiene cambios. Casi siempre lo hace comparando con
+  una foto de lo último cargado o guardado.
+- Con cambios, preguntan:
+  - salir a otra pantalla;
+  - cambiar de rol;
+  - cerrar o recargar la pestaña (el aviso del propio navegador).
+- Moverse entre anclas de la misma pantalla no pregunta.
+- Lo usan:
+  - datos fiscales;
+  - página pública;
+  - terminología;
+  - reglas de agenda (política general y la excepción abierta);
+  - pasarelas (llaves escritas, activa o modo).
 
 ## Consecuencias
 

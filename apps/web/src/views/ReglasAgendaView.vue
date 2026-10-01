@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ParametrosNegocio from "@/components/ParametrosNegocio.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { instantanea, useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -80,6 +81,14 @@ const general = ref<FormPolitica>({
 });
 const editando = ref<FormPolitica | null>(null);
 const guardando = ref(false);
+// Cambios sin guardar: la política general distinta de la guardada, o la
+// excepción abierta distinta de como se abrió.
+const fotoGeneral = instantanea(() => general.value);
+const fotoExcepcion = instantanea(() => editando.value);
+useCambiosPendientes(
+  () =>
+    fotoGeneral.cambio() || (editando.value !== null && fotoExcepcion.cambio()),
+);
 const nuevaActividad = ref("");
 
 const nuevoDia = ref({ fecha: "", motivo: "" });
@@ -174,6 +183,7 @@ async function cargar(): Promise<void> {
       // Sin política propia: se parte de la que fija la plataforma.
       general.value = { actividad_id: null, ...defecto };
     }
+    fotoGeneral.fijar();
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -205,6 +215,7 @@ function editarExcepcion(p: Politica): void {
     tolerancia_no_show: p.tolerancia_no_show,
     ventana_no_show_dias: p.ventana_no_show_dias,
   };
+  fotoExcepcion.fijar();
 }
 
 function agregarExcepcion(): void {
@@ -212,6 +223,7 @@ function agregarExcepcion(): void {
     return;
   }
   editando.value = { ...general.value, actividad_id: nuevaActividad.value };
+  fotoExcepcion.fijar();
 }
 
 function nombreActividad(id: string | null): string {

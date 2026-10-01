@@ -6,6 +6,7 @@ import { useRouter } from "vue-router";
 import ListaRoles from "@/components/ListaRoles.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { mensajeDeError } from "@/lib/api";
+import { confirmarSinGuardar } from "@/lib/cambiosPendientes";
 import { nombreDeRol } from "@/lib/roles";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -27,6 +28,14 @@ const aplicando = ref<string | null>(null);
 async function elegir(clave: string): Promise<void> {
   if (clave === sesion.usuario?.rol) {
     emit("cerrar");
+    return;
+  }
+  if (
+    !(await confirmarSinGuardar(
+      t("comun.cambiosSinGuardar"),
+      t("comun.salirSinGuardar"),
+    ))
+  ) {
     return;
   }
   aplicando.value = clave;

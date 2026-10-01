@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 
 import CargadorImagen from "@/components/CargadorImagen.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { instantanea, useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { urlPublicaEstudio } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -35,6 +36,12 @@ const redes = ref<Record<Red, string>>({
   youtube: "",
   sitio_web: "",
 });
+// Cambios sin guardar: descripción o redes distintas de lo guardado.
+const fotoPerfil = instantanea(() => ({
+  descripcion: descripcion.value,
+  redes: redes.value,
+}));
+useCambiosPendientes(() => fotoPerfil.cambio());
 const portadaUrl = ref<string | null>(null);
 const cargando = ref(true);
 const guardando = ref(false);
@@ -58,6 +65,7 @@ function aplicar(datos: {
   for (const r of REDES) {
     redes.value[r] = datos.redes[r] ?? "";
   }
+  fotoPerfil.fijar();
 }
 
 async function cargar(): Promise<void> {

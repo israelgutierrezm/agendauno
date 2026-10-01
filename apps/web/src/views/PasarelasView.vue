@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Pasarela {
@@ -61,6 +62,19 @@ const edicion = reactive<
     { activa: boolean; modo: string; llaves: Record<string, string> }
   >
 >({});
+
+// Cambios sin guardar: alguna llave escrita, o activa/modo distintos de lo guardado.
+useCambiosPendientes(() =>
+  pasarelas.value.some((p) => {
+    const ed = edicion[p.proveedor];
+    return (
+      ed !== undefined &&
+      (ed.activa !== p.activa ||
+        ed.modo !== p.modo ||
+        Object.values(ed.llaves).some((v) => v.trim() !== ""))
+    );
+  }),
+);
 
 async function cargar(): Promise<void> {
   cargando.value = true;

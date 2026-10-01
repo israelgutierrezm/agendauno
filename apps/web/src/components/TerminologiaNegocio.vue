@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 
 import { mensajeDeError } from "@/lib/api";
+import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import type {
   DatosTerminologia,
   TerminoEditable,
@@ -54,6 +55,7 @@ function tomar(d: DatosTerminologia): void {
 const hayCambios = computed(() =>
   TERMINOS.some((t) => elegidos.value[t] !== (datos.value?.propia[t] ?? "")),
 );
+useCambiosPendientes(() => hayCambios.value);
 
 async function enviar(): Promise<void> {
   guardando.value = true;

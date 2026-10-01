@@ -297,6 +297,9 @@ export const MENU_NEGOCIO: GrupoMenu[] = [
           v("directorio", "miembros", "operacion.menu.directorio"),
           v("renovaciones", "retencion", "operacion.renovaciones.titulo"),
           v("expedientes", "documentos", "nav.vistas.expedientes"),
+          v("respuestas", "formularios", "nav.vistas.respuestas", {
+            query: { vista: "respuestas" },
+          }),
         ],
       },
       {

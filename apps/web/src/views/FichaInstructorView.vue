@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from "vue-router";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import ExpedientePersona from "@/components/ExpedientePersona.vue";
+import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -108,6 +109,13 @@ function fecha(iso: string | null): string {
             {{ $t("profesional.inactivo") }}
           </p>
         </div>
+        <!-- Su acceso al panel se administra en Configuración › Accesos. -->
+        <RouterLink
+          v-if="puedeEntrar('usuarios', sesion)"
+          :to="{ name: 'usuarios' }"
+          class="tu-btn tu-btn-fantasma ml-auto shrink-0"
+          >{{ $t("instructores.administrarAcceso") }}</RouterLink
+        >
       </header>
 
       <div class="px-5 pt-5">
