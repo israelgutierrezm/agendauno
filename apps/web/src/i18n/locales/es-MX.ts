@@ -1,7 +1,10 @@
 export default {
   marca: "AgendaUno",
   accesos: {
+    etiqueta: "Accesos rápidos",
     titulo: "Tu operación, a mano",
+    subtitulo:
+      "Accede rápidamente a las herramientas más importantes de tu negocio.",
     agendaClases: "Consulta clases, horarios y lugares disponibles.",
     agendaCitas: "Consulta citas y la agenda de tu equipo.",
     miembros: "Encuentra una ficha y consulta su información.",
