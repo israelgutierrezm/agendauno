@@ -43,6 +43,21 @@ final class CatalogoTemas
                 'borde' => '#E6E9F0', 'texto' => '#1E2A3B', 'texto_suave' => '#6B7385',
             ],
         ],
+        // Los colores de la página comercial (agendauno.mx): barra azul marino, lo
+        // activo en el rosa de sus botones y el azul petróleo en las acciones.
+        'agendauno_alternativo' => [
+            'nombre' => 'Agenda Uno Alternativo',
+            'oscuro' => false,
+            'permite_personalizar' => true,
+            'tokens' => [
+                'barra' => '#182B39', 'barra_suave' => '#20384A', 'barra_texto' => '#B9C7CC',
+                'barra_activo' => '#C43B80', 'barra_activo_texto' => '#FFFFFF',
+                'barra_borde' => 'rgb(255 255 255 / 10%)', 'barra_titulo' => '#FFFFFF',
+                'acento' => '#007E91', 'acento_texto' => '#FFFFFF',
+                'fondo' => '#F6F8FC', 'superficie' => '#FFFFFF', 'superficie_2' => '#E9EDF5',
+                'borde' => '#DCE1DE', 'texto' => '#182B39', 'texto_suave' => '#59666B',
+            ],
+        ],
         'oceano' => [
             'nombre' => 'Océano',
             'oscuro' => false,

@@ -32,8 +32,16 @@ it('un usuario nuevo ve el tema predeterminado y el catálogo de temas', functio
 
     $data = $this->getJson("/api/v1/app/{$e['slug']}/apariencia", conBearer($e['bearer']))->assertOk()->json('data');
     expect(collect($data['disponibles'])->pluck('clave')->all())
-        ->toContain('agendauno', 'oceano', 'medianoche', 'alto_contraste')
+        ->toContain('agendauno', 'agendauno_alternativo', 'oceano', 'medianoche', 'alto_contraste')
         ->not->toContain('agendauno_marino', 'agendauno_noche', 'indigo');
+    // Con los colores de la página comercial: azul marino, rosa y azul petróleo.
+    expect(collect($data['disponibles'])->firstWhere('clave', 'agendauno_alternativo'))->toMatchArray([
+        'nombre' => 'Agenda Uno Alternativo',
+        'oscuro' => false,
+        'muestra' => ['barra' => '#182B39', 'acento' => '#007E91', 'fondo' => '#F6F8FC', 'superficie' => '#FFFFFF'],
+    ]);
+    $this->putJson("/api/v1/app/{$e['slug']}/apariencia", ['tema' => 'agendauno_alternativo'], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.tokens.barra_activo', '#C43B80');
     expect($data['personalizables'])->toBe(['acento', 'barra', 'barra_activo']);
 });
 
