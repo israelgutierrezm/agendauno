@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -495,13 +496,12 @@ onMounted(cargar);
           </div>
         </form>
 
-        <p
+        <EstadoVacio
           v-if="articulos.length === 0"
-          class="mt-6 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("pos.inventario.sinArticulos") }}
-        </p>
+          class="tu-card mt-6"
+          icono="pos"
+          :titulo="$t('pos.inventario.sinArticulos')"
+        />
         <ul v-else class="mt-4 space-y-2">
           <li v-for="a in articulos" :key="a.id" class="tu-card p-3">
             <div class="flex items-start justify-between gap-3">
@@ -690,13 +690,13 @@ onMounted(cargar);
 
         <!-- Ventas recientes -->
         <h2 class="mt-8 font-light text-lg">{{ $t("pos.ventas.titulo") }}</h2>
-        <p
+        <EstadoVacio
           v-if="ventas.length === 0"
-          class="mt-3 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("pos.ventas.vacio") }}
-        </p>
+          class="mt-3 py-6"
+          icono="ventas"
+          compacto
+          :titulo="$t('pos.ventas.vacio')"
+        />
         <div v-else class="mt-3 tu-card overflow-hidden">
           <table class="w-full text-sm">
             <thead>

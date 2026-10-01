@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -280,13 +281,13 @@ onMounted(cargar);
         <!-- Recompensas -->
         <div class="tu-card p-5">
           <h2 class="font-light">{{ $t("lealtad.recompensas.titulo") }}</h2>
-          <p
+          <EstadoVacio
             v-if="recompensas.length === 0"
-            class="mt-3 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("lealtad.recompensas.vacio") }}
-          </p>
+            class="mt-3 py-6"
+            icono="lealtad"
+            compacto
+            :titulo="$t('lealtad.recompensas.vacio')"
+          />
           <ul v-else class="mt-3 space-y-2">
             <li
               v-for="r in recompensas"
@@ -450,13 +451,13 @@ onMounted(cargar);
 
       <!-- Canjes recientes -->
       <h2 class="mt-8 font-light text-lg">{{ $t("lealtad.canjes.titulo") }}</h2>
-      <p
+      <EstadoVacio
         v-if="canjes.length === 0"
-        class="mt-3 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("lealtad.canjes.vacio") }}
-      </p>
+        class="mt-3 py-6"
+        icono="lealtad"
+        compacto
+        :titulo="$t('lealtad.canjes.vacio')"
+      />
       <div v-else class="mt-3 tu-card overflow-hidden">
         <table class="w-full text-sm">
           <thead>

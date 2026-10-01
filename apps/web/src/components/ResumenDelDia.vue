@@ -3,7 +3,12 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import EstadoVacio from "@/components/EstadoVacio.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import TarjetaPrincipal from "@/components/TarjetaPrincipal.vue";
+import TarjetasIndicadores, {
+  type Indicador,
+} from "@/components/TarjetasIndicadores.vue";
 import { aHora, fechaLocal, minutosLocal } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import { lugarDelClima, useClima } from "@/lib/clima";
@@ -140,17 +145,43 @@ const porCobrar = computed(() =>
     .join(" + "),
 );
 
-const indicadores = computed(() => {
+// Los indicadores del día en tarjetas, cada uno con su ícono y su color.
+const indicadores = computed<Indicador[]>(() => {
   const tot = hoy.value?.agenda?.totales;
   if (!tot) {
     return [];
   }
-  return [
-    { clave: "sesiones", valor: tot.sesiones, aviso: false },
-    { clave: "esperados", valor: tot.esperados, aviso: false },
-    { clave: "llegaron", valor: tot.llegaron, aviso: false },
-    { clave: "sinMarcar", valor: tot.sin_marcar, aviso: tot.sin_marcar > 0 },
-  ].map((i) => ({ ...i, etiqueta: t(`operacion.hoy.indicadores.${i.clave}`) }));
+  const lista: Omit<Indicador, "etiqueta">[] = [
+    {
+      clave: "sesiones",
+      valor: String(tot.sesiones),
+      icono: "agenda",
+      tono: "azul",
+    },
+    {
+      clave: "esperados",
+      valor: String(tot.esperados),
+      icono: "personas",
+      tono: "morado",
+    },
+    {
+      clave: "llegaron",
+      valor: String(tot.llegaron),
+      icono: "hecho",
+      tono: "verde",
+    },
+    {
+      clave: "sinMarcar",
+      valor: String(tot.sin_marcar),
+      icono: "reloj",
+      tono: "naranja",
+      aviso: tot.sin_marcar > 0,
+    },
+  ];
+  return lista.map((i) => ({
+    ...i,
+    etiqueta: t(`operacion.hoy.indicadores.${i.clave}`),
+  }));
 });
 
 const hayPendientes = computed(() => {
@@ -204,19 +235,6 @@ onMounted(() => {
           }}</span
         >
       </p>
-      <dl class="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-        <div v-for="i in indicadores" :key="i.clave">
-          <dt class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ i.etiqueta }}
-          </dt>
-          <dd
-            class="mt-0.5 text-xl font-semibold tabular-nums"
-            :style="i.aviso ? { color: 'var(--aviso)' } : undefined"
-          >
-            {{ i.valor }}
-          </dd>
-        </div>
-      </dl>
       <div class="mt-6 flex flex-wrap items-center gap-4">
         <RouterLink
           :to="{ name: 'agenda' }"
@@ -234,6 +252,12 @@ onMounted(() => {
       </div>
     </TarjetaPrincipal>
 
+    <TarjetasIndicadores
+      v-if="indicadores.length > 0"
+      class="mt-4"
+      :tarjetas="indicadores"
+    />
+
     <div class="mt-6 grid gap-6 lg:grid-cols-3">
       <!-- Agenda de hoy -->
       <section
@@ -249,13 +273,13 @@ onMounted(() => {
             {{ $t("operacion.hoy.verAgenda") }}
           </RouterLink>
         </div>
-        <p
+        <EstadoVacio
           v-if="hoy.agenda.sesiones.length === 0"
-          class="mt-3 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("operacion.hoy.sinSesiones") }}
-        </p>
+          icono="agenda"
+          compacto
+          class="py-8"
+          :titulo="$t('operacion.hoy.sinSesiones')"
+        />
         <ul v-else class="mt-3 divide-y divide-[var(--borde)]">
           <li
             v-for="s in hoy.agenda.sesiones"
@@ -325,32 +349,41 @@ onMounted(() => {
         <h2 id="hoy-pendientes" class="font-semibold">
           {{ $t("operacion.hoy.pendientes") }}
         </h2>
-        <p
+        <EstadoVacio
           v-if="!hayPendientes"
-          class="mt-3 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("operacion.hoy.alDia") }}
-        </p>
-        <ul v-else class="mt-3 space-y-3 text-sm">
+          icono="hecho"
+          compacto
+          class="py-8"
+          :titulo="$t('operacion.hoy.alDia')"
+        />
+        <ul v-else class="mt-3 space-y-2 text-sm">
           <li v-if="hoy.cobros && hoy.cobros.ordenes_pendientes > 0">
             <RouterLink :to="{ name: 'cobranza' }" class="hoy-pendiente">
-              <span>{{
+              <span class="tu-icono-tono tu-tono-naranja" aria-hidden="true">
+                <IconoNav nombre="dinero" :tam="18" />
+              </span>
+              <span class="hoy-texto">{{
                 $t("operacion.hoy.porCobrar", hoy.cobros.ordenes_pendientes)
               }}</span>
-              <span class="tabular-nums">{{ porCobrar }}</span>
+              <span class="tabular-nums font-medium">{{ porCobrar }}</span>
             </RouterLink>
           </li>
           <li v-if="hoy.cobros && hoy.cobros.en_mora > 0">
             <RouterLink :to="{ name: 'cobranza' }" class="hoy-pendiente">
-              <span :style="{ color: 'var(--aviso)' }">{{
+              <span class="tu-icono-tono tu-tono-rosa" aria-hidden="true">
+                <IconoNav nombre="facturas" :tam="18" />
+              </span>
+              <span class="hoy-texto" :style="{ color: 'var(--aviso)' }">{{
                 $t("operacion.hoy.enMora", hoy.cobros.en_mora)
               }}</span>
             </RouterLink>
           </li>
           <li v-if="hoy.renovaciones && hoy.renovaciones.por_vencer > 0">
             <RouterLink :to="{ name: 'retencion' }" class="hoy-pendiente">
-              <span>{{
+              <span class="tu-icono-tono tu-tono-morado" aria-hidden="true">
+                <IconoNav nombre="reloj" :tam="18" />
+              </span>
+              <span class="hoy-texto">{{
                 $t(
                   "operacion.hoy.porVencer",
                   {
@@ -364,7 +397,10 @@ onMounted(() => {
           </li>
           <li v-if="hoy.renovaciones && hoy.renovaciones.vencidas > 0">
             <RouterLink :to="{ name: 'retencion' }" class="hoy-pendiente">
-              <span :style="{ color: 'var(--aviso)' }">{{
+              <span class="tu-icono-tono tu-tono-rosa" aria-hidden="true">
+                <IconoNav nombre="pulso" :tam="18" />
+              </span>
+              <span class="hoy-texto" :style="{ color: 'var(--aviso)' }">{{
                 $t("operacion.hoy.vencidas", hoy.renovaciones.vencidas)
               }}</span>
             </RouterLink>
@@ -378,12 +414,17 @@ onMounted(() => {
 <style scoped>
 .hoy-pendiente {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
   gap: 0.75rem;
+  padding: 0.35rem;
+  border-radius: 0.75rem;
   color: var(--texto);
 }
-.hoy-pendiente:hover span:first-child {
-  text-decoration: underline;
-  text-underline-offset: 2px;
+.hoy-pendiente:hover {
+  background: var(--superficie-2);
+}
+.hoy-texto {
+  flex: 1;
+  min-width: 0;
 }
 </style>

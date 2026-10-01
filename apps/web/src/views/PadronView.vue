@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -108,13 +109,12 @@ onMounted(cargar);
     </p>
 
     <template v-else>
-      <p
+      <EstadoVacio
         v-if="filas.length === 0"
-        class="mt-6 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("padron.vacio") }}
-      </p>
+        class="tu-card mt-6"
+        icono="facturas"
+        :titulo="$t('padron.vacio')"
+      />
       <div v-else class="mt-4 tu-card overflow-hidden">
         <table class="w-full text-sm">
           <thead>

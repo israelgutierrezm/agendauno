@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -210,13 +211,13 @@ onMounted(cargarStaff);
       </div>
 
       <div v-if="calculado" class="mt-4">
-        <p
+        <EstadoVacio
           v-if="filas.length === 0"
-          class="text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("nomina.vacio") }}
-        </p>
+          class="py-6"
+          icono="nomina"
+          compacto
+          :titulo="$t('nomina.vacio')"
+        />
         <table v-else class="w-full text-sm">
           <thead>
             <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">

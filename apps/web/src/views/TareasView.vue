@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -648,13 +649,12 @@ onMounted(cargarTareas);
       >
         {{ $t("comun.cargando") }}
       </p>
-      <p
+      <EstadoVacio
         v-else-if="reglas.length === 0"
-        class="mt-10 text-center text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("tareas.reglas.sinReglas") }}
-      </p>
+        class="mt-10"
+        icono="tareas"
+        :titulo="$t('tareas.reglas.sinReglas')"
+      />
       <ul v-else class="mt-4 space-y-2">
         <li v-for="r in reglas" :key="r.id" class="tu-card p-3">
           <div class="flex items-start justify-between gap-3">

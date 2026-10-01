@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -270,13 +271,13 @@ onMounted(cargar);
 
       <!-- Cambios -->
       <template v-else-if="pestana === 'cambios'">
-        <p
+        <EstadoVacio
           v-if="cambios.length === 0"
-          class="text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("bitacora.sinCambios") }}
-        </p>
+          class="py-6"
+          icono="lista"
+          compacto
+          :titulo="$t('bitacora.sinCambios')"
+        />
         <ul v-else>
           <li v-for="c in cambios" :key="c.id" class="bi-fila text-sm">
             <div class="flex w-full items-start justify-between gap-3">
@@ -364,13 +365,13 @@ onMounted(cargar);
 
       <!-- Accesos -->
       <template v-else>
-        <p
+        <EstadoVacio
           v-if="accesos.length === 0"
-          class="text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("bitacora.sinAccesos") }}
-        </p>
+          class="py-6"
+          icono="lista"
+          compacto
+          :titulo="$t('bitacora.sinAccesos')"
+        />
         <ul v-else>
           <li v-for="a in accesos" :key="a.id" class="bi-fila text-sm">
             <div class="min-w-0">

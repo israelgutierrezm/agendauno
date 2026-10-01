@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import EditorPlan from "@/components/EditorPlan.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import {
@@ -138,13 +139,12 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-6" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
-    <p
+    <EstadoVacio
       v-else-if="secciones.length === 0"
-      class="mt-6"
-      :style="{ color: 'var(--texto-suave)' }"
-    >
-      {{ $t("planes.vacio") }}
-    </p>
+      class="tu-card mt-6"
+      icono="etiqueta"
+      :titulo="$t('planes.vacio')"
+    />
 
     <div v-for="s in secciones" :key="s.clave" class="mt-8">
       <h2 class="font-semibold">{{ $t(`planes.secciones.${s.clave}`) }}</h2>

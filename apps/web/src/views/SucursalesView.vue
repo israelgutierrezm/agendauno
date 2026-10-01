@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import CargadorImagen from "@/components/CargadorImagen.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -348,13 +349,13 @@ onMounted(cargar);
           {{ org.nombre }}
         </h2>
 
-        <p
+        <EstadoVacio
           v-if="org.sucursales.length === 0"
-          class="text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("sedes.vacio") }}
-        </p>
+          class="py-6"
+          icono="ubicacion"
+          compacto
+          :titulo="$t('sedes.vacio')"
+        />
 
         <ul v-else class="space-y-2">
           <li

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import CorteDeCaja from "@/components/CorteDeCaja.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import PorConciliar from "@/components/PorConciliar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
@@ -297,13 +298,12 @@ onMounted(cargar);
           >{{ morosos.length }}</span
         >
       </div>
-      <p
+      <EstadoVacio
         v-if="morosos.length === 0"
-        class="mt-3 tu-card p-6 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("cobranza.sinMorosos") }}
-      </p>
+        class="tu-card mt-3"
+        icono="hecho"
+        :titulo="$t('cobranza.sinMorosos')"
+      />
       <div v-else class="mt-3 tu-card overflow-hidden">
         <table class="w-full text-sm">
           <thead>
@@ -400,13 +400,12 @@ onMounted(cargar);
       <CorteDeCaja v-if="sesion.puede('facturacion.ver')" class="mt-8" />
 
       <h2 class="mt-8 font-light text-lg">{{ $t("cobranza.pagos") }}</h2>
-      <p
+      <EstadoVacio
         v-if="pagos.length === 0"
-        class="mt-3 tu-card p-6 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("cobranza.sinPagos") }}
-      </p>
+        class="tu-card mt-3"
+        icono="dinero"
+        :titulo="$t('cobranza.sinPagos')"
+      />
       <div v-else class="mt-3 tu-card overflow-hidden">
         <table class="w-full text-sm">
           <thead>
@@ -572,13 +571,12 @@ onMounted(cargar);
       >
         {{ avisoRenovacion }}
       </p>
-      <p
+      <EstadoVacio
         v-if="suscripciones.length === 0"
-        class="mt-3 tu-card p-6 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("cobranza.sinRenovaciones") }}
-      </p>
+        class="tu-card mt-3"
+        icono="reloj"
+        :titulo="$t('cobranza.sinRenovaciones')"
+      />
       <div v-else class="mt-3 tu-card overflow-hidden">
         <table class="w-full text-sm">
           <thead>

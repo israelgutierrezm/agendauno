@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -111,13 +112,13 @@ onMounted(cargar);
       >
         {{ $t("comun.cargando") }}
       </p>
-      <p
+      <EstadoVacio
         v-else-if="solicitudes.length === 0"
-        class="text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("privacidadNegocio.vacio") }}
-      </p>
+        class="py-6"
+        icono="documentos"
+        compacto
+        :titulo="$t('privacidadNegocio.vacio')"
+      />
       <ul v-else>
         <li
           v-for="s in solicitudes"

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -120,13 +121,13 @@ onMounted(cargar);
       >
         {{ $t("comun.cargando") }}
       </p>
-      <p
+      <EstadoVacio
         v-else-if="resenas.length === 0"
-        class="text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("resenas.vacio") }}
-      </p>
+        class="py-6"
+        icono="mensaje"
+        compacto
+        :titulo="$t('resenas.vacio')"
+      />
       <ul v-else>
         <li
           v-for="r in resenas"

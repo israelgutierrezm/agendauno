@@ -5,9 +5,13 @@ import { RouterLink } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EscanerPase from "@/components/EscanerPase.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PanelClase from "@/components/PanelClase.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
+import TarjetasIndicadores, {
+  type Indicador,
+} from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useAnchoMinimo } from "@/lib/pantalla";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -259,22 +263,55 @@ async function cargar(): Promise<void> {
   }
 }
 
-const tarjetas = computed(() => {
+// Las métricas del día en tarjetas, cada una con su ícono y su color.
+const tarjetas = computed<Indicador[]>(() => {
   const m = metricas.value;
   if (m === null) {
     return [];
   }
-  return [
-    { clave: "sesiones", valor: String(m.sesiones) },
+  const lista: Omit<Indicador, "etiqueta">[] = [
+    {
+      clave: "sesiones",
+      valor: String(m.sesiones),
+      icono: "agenda",
+      tono: "azul",
+    },
     {
       clave: "ocupacion",
       valor: m.ocupacion_pct !== null ? `${m.ocupacion_pct}%` : "—",
+      icono: "pulso",
+      tono: "morado",
     },
-    { clave: "confirmadas", valor: String(m.confirmadas) },
-    { clave: "enEspera", valor: String(m.en_espera) },
-    { clave: "presentes", valor: String(m.presentes) },
-    { clave: "ausentes", valor: String(m.ausentes) },
+    {
+      clave: "confirmadas",
+      valor: String(m.confirmadas),
+      icono: "hecho",
+      tono: "cielo",
+    },
+    {
+      clave: "enEspera",
+      valor: String(m.en_espera),
+      icono: "reloj",
+      tono: "naranja",
+      aviso: m.en_espera > 0,
+    },
+    {
+      clave: "presentes",
+      valor: String(m.presentes),
+      icono: "personas",
+      tono: "verde",
+    },
+    {
+      clave: "ausentes",
+      valor: String(m.ausentes),
+      icono: "ausente",
+      tono: "rosa",
+    },
   ];
+  return lista.map((k) => ({
+    ...k,
+    etiqueta: t(`recepcion.metricas.${k.clave}`),
+  }));
 });
 
 watch([fecha, sucursalFiltro], cargar);
@@ -382,7 +419,14 @@ onMounted(async () => {
       {{ error }}
     </p>
 
-    <!-- El día: navegación, indicadores y clases con su detalle a un lado -->
+    <!-- Métricas del día -->
+    <TarjetasIndicadores
+      v-if="tarjetas.length > 0"
+      class="mt-5"
+      :tarjetas="tarjetas"
+    />
+
+    <!-- El día: navegación y clases con su detalle a un lado -->
     <div class="mt-5 tu-card overflow-hidden">
       <div
         class="flex flex-wrap items-center gap-1.5 px-4 py-3 border-b"
@@ -390,7 +434,7 @@ onMounted(async () => {
       >
         <button
           type="button"
-          class="tu-icono-btn"
+          class="tu-btn tu-btn-fantasma fd-paso"
           :aria-label="$t('recepcionVisual.diaAnterior')"
           @click="moverDia(-1)"
         >
@@ -398,14 +442,14 @@ onMounted(async () => {
         </button>
         <button
           type="button"
-          class="tu-btn tu-btn-fantasma px-3 py-1.5 text-sm"
+          class="tu-btn tu-btn-fantasma fd-hoy text-sm"
           @click="fecha = isoHoy()"
         >
           {{ $t("recepcion.hoy") }}
         </button>
         <button
           type="button"
-          class="tu-icono-btn"
+          class="tu-btn tu-btn-fantasma fd-paso"
           :aria-label="$t('recepcionVisual.diaSiguiente')"
           @click="moverDia(1)"
         >
@@ -427,34 +471,20 @@ onMounted(async () => {
           tabindex="-1"
           :aria-label="$t('recepcion.fecha')"
         />
-        <select
-          v-if="sucursales.length > 1"
-          v-model="sucursalFiltro"
-          class="tu-input w-auto ml-auto py-1.5 text-sm"
-          :aria-label="$t('recepcion.todasSucursales')"
-        >
-          <option value="">{{ $t("recepcion.todasSucursales") }}</option>
-          <option v-for="s in sucursales" :key="s.id" :value="s.id">
-            {{ s.nombre }}
-          </option>
-        </select>
+        <span v-if="sucursales.length > 1" class="tu-select-icono ml-auto">
+          <IconoNav nombre="ubicacion" :tam="16" />
+          <select
+            v-model="sucursalFiltro"
+            class="tu-input w-auto py-1.5 text-sm"
+            :aria-label="$t('recepcion.todasSucursales')"
+          >
+            <option value="">{{ $t("recepcion.todasSucursales") }}</option>
+            <option v-for="s in sucursales" :key="s.id" :value="s.id">
+              {{ s.nombre }}
+            </option>
+          </select>
+        </span>
       </div>
-
-      <!-- Métricas del día en una franja -->
-      <dl
-        v-if="tarjetas.length > 0"
-        class="grid grid-cols-3 lg:grid-cols-6 gap-4 px-5 py-4 border-b"
-        :style="{ borderColor: 'var(--borde)' }"
-      >
-        <div v-for="k in tarjetas" :key="k.clave">
-          <dt class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t(`recepcion.metricas.${k.clave}`) }}
-          </dt>
-          <dd class="mt-0.5 text-xl font-semibold tabular-nums">
-            {{ k.valor }}
-          </dd>
-        </div>
-      </dl>
 
       <div
         class="lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_24rem]"
@@ -474,24 +504,22 @@ onMounted(async () => {
               {{ $t("comun.reintentar") }}
             </button>
           </p>
-          <div
+          <EstadoVacio
             v-else-if="sesiones.length === 0"
-            class="px-5 py-12 text-center text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
+            class="py-12"
+            icono="agenda"
+            :titulo="
+              sucursalFiltro !== ''
+                ? $t('operacion.recepcion.sinActividadFiltros')
+                : $t('operacion.recepcion.sinActividad')
+            "
           >
-            <p>
-              {{
-                sucursalFiltro !== ""
-                  ? $t("operacion.recepcion.sinActividadFiltros")
-                  : $t("operacion.recepcion.sinActividad")
-              }}
-            </p>
             <RouterLink
               :to="{ name: 'agenda' }"
-              class="tu-enlace mt-2 inline-block"
+              class="tu-btn tu-btn-fantasma"
               >{{ $t("operacion.recepcion.irAgenda") }}</RouterLink
             >
-          </div>
+          </EstadoVacio>
           <ul v-else>
             <li v-for="s in sesiones" :key="s.id">
               <button
@@ -565,13 +593,12 @@ onMounted(async () => {
             @cambio="cargar"
           />
           <!-- Pedir que elija una clase solo tiene sentido si hay alguna. -->
-          <p
+          <EstadoVacio
             v-else-if="!cargando && !error && sesiones.length > 0"
-            class="px-6 py-10 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("recepcionVisual.seleccionaClase") }}
-          </p>
+            class="py-14"
+            icono="recepcion"
+            :titulo="$t('recepcionVisual.seleccionaClase')"
+          />
         </div>
       </div>
     </div>
@@ -601,6 +628,13 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* Navegación de días: botones de borde, como en la Agenda. */
+.fd-paso {
+  padding: 0.45rem;
+}
+.fd-hoy {
+  padding: 0.45rem 0.9rem;
+}
 .fd-dia {
   padding: 0.3rem 0.5rem;
   border-radius: 0.5rem;

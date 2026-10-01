@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -176,13 +177,12 @@ onMounted(cargar);
 
     <template v-if="!cargando">
       <!-- Lista de grupos -->
-      <p
+      <EstadoVacio
         v-if="grupos.length === 0"
-        class="mt-8 text-center text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("cursos.vacio") }}
-      </p>
+        class="mt-8"
+        icono="grupos"
+        :titulo="$t('cursos.vacio')"
+      />
       <div v-else class="mt-6 grid sm:grid-cols-2 gap-3">
         <button
           v-for="g in grupos"

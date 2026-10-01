@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -136,13 +137,12 @@ onMounted(cargar);
 
     <template v-if="!cargando">
       <!-- Lista -->
-      <p
+      <EstadoVacio
         v-if="recursos.length === 0"
-        class="mt-8 text-center text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("recursos.vacio") }}
-      </p>
+        class="mt-8"
+        icono="recursos"
+        :titulo="$t('recursos.vacio')"
+      />
       <ul v-else class="mt-6 space-y-2">
         <li
           v-for="r in recursos"

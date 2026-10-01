@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -697,13 +698,12 @@ onMounted(cargar);
       <h3 class="mt-8 text-sm font-semibold">
         {{ $t("comunicaciones.historial") }}
       </h3>
-      <p
+      <EstadoVacio
         v-if="!cargando && difusiones.length === 0"
-        class="mt-3 tu-card p-6 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("comunicaciones.historialVacio") }}
-      </p>
+        class="tu-card mt-3"
+        icono="mensaje"
+        :titulo="$t('comunicaciones.historialVacio')"
+      />
       <div
         v-else-if="difusiones.length > 0"
         class="mt-3 tu-card overflow-hidden"

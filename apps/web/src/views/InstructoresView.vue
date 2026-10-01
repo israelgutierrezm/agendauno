@@ -7,6 +7,7 @@ import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import BarraListado from "@/components/BarraListado.vue";
 import BotonImportar from "@/components/BotonImportar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { plural } from "@/lib/terminologia";
@@ -185,13 +186,12 @@ onMounted(cargar);
 
     <template v-if="!cargando">
       <!-- Lista -->
-      <p
+      <EstadoVacio
         v-if="instructores.length === 0"
-        class="mt-8 text-center text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("instructores.vacio") }}
-      </p>
+        class="mt-8"
+        icono="instructores"
+        :titulo="$t('instructores.vacio')"
+      />
       <template v-else>
         <BarraListado
           v-model:busqueda="busqueda"

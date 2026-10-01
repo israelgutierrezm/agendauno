@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -389,13 +390,13 @@ onMounted(cargar);
           </select>
         </div>
 
-        <p
+        <EstadoVacio
           v-if="docs.length === 0"
-          class="mt-4 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("documentos.docs.vacio") }}
-        </p>
+          class="mt-4 py-6"
+          icono="documentos"
+          compacto
+          :titulo="$t('documentos.docs.vacio')"
+        />
         <ul v-else class="mt-2">
           <li v-for="d in docs" :key="d.id" class="doc-fila text-sm">
             <div class="min-w-0">
@@ -505,13 +506,13 @@ onMounted(cargar);
     >
       <div class="tu-card p-5 min-w-0">
         <h2 class="font-semibold">{{ $t("documentos.tipos.titulo") }}</h2>
-        <p
+        <EstadoVacio
           v-if="tipos.length === 0"
-          class="mt-4 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("documentos.tipos.vacio") }}
-        </p>
+          class="mt-4 py-6"
+          icono="documentos"
+          compacto
+          :titulo="$t('documentos.tipos.vacio')"
+        />
         <ul v-else class="mt-2">
           <li v-for="t2 in tipos" :key="t2.id" class="doc-fila text-sm">
             <form
@@ -654,13 +655,13 @@ onMounted(cargar);
       v-if="!cargando && pestana === 'consentimientos'"
       class="mt-5 tu-card p-5"
     >
-      <p
+      <EstadoVacio
         v-if="consentimientosVigentes.length === 0"
-        class="text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("consentimientos.vacio") }}
-      </p>
+        class="py-6"
+        icono="documentos"
+        compacto
+        :titulo="$t('consentimientos.vacio')"
+      />
       <ul v-else>
         <li
           v-for="c in consentimientosVigentes"

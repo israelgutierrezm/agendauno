@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -249,13 +250,13 @@ onMounted(cargar);
 
     <template v-if="!cargando && error === null">
       <h2 class="rp-subtitulo">{{ $t("operacion.rolesPropios.propio") }}</h2>
-      <p
+      <EstadoVacio
         v-if="propios.length === 0"
-        class="text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("operacion.rolesPropios.vacio") }}
-      </p>
+        class="py-6"
+        icono="usuarios"
+        compacto
+        :titulo="$t('operacion.rolesPropios.vacio')"
+      />
       <ul class="rp-lista">
         <li
           v-for="rol in propios"

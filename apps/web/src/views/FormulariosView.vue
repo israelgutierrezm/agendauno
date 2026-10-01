@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -215,13 +216,13 @@ onMounted(cargar);
     <div v-if="!cargando" class="mt-6 grid gap-6 md:grid-cols-[240px_1fr]">
       <!-- Lista + nuevo -->
       <div class="tu-card p-4 h-max">
-        <p
+        <EstadoVacio
           v-if="formularios.length === 0"
-          class="text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("formularios.vacio") }}
-        </p>
+          class="py-6"
+          icono="formularios"
+          compacto
+          :titulo="$t('formularios.vacio')"
+        />
         <ul v-else class="space-y-1">
           <li v-for="f in formularios" :key="f.id">
             <button

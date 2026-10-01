@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 
 import CargadorImagen from "@/components/CargadorImagen.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -208,13 +209,12 @@ onMounted(cargar);
     </p>
 
     <template v-if="!cargando">
-      <p
+      <EstadoVacio
         v-if="ofertas.length === 0"
-        class="mt-8 text-center text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("catalogo.vacio") }}
-      </p>
+        class="mt-8"
+        icono="etiqueta"
+        :titulo="$t('catalogo.vacio')"
+      />
 
       <ul v-else class="mt-6 space-y-3">
         <li v-for="o in ofertas" :key="o.id" class="tu-card p-5">

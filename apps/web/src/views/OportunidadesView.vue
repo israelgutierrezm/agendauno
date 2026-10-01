@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -122,13 +123,12 @@ onMounted(cargar);
     </p>
 
     <template v-else>
-      <p
+      <EstadoVacio
         v-if="oportunidades.length === 0"
-        class="mt-6 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("oportunidades.vacio") }}
-      </p>
+        class="tu-card mt-6"
+        icono="oportunidades"
+        :titulo="$t('oportunidades.vacio')"
+      />
 
       <div v-else class="mt-6 grid gap-3 sm:grid-cols-2">
         <div v-for="o in oportunidades" :key="o.id" class="tu-card p-4">

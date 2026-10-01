@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -185,13 +186,12 @@ onMounted(cargar);
     </div>
 
     <template v-else>
-      <p
+      <EstadoVacio
         v-if="miembros.length === 0"
-        class="mt-6 tu-card p-6 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("operacion.renovaciones.vacio") }}
-      </p>
+        class="tu-card mt-6"
+        icono="pulso"
+        :titulo="$t('operacion.renovaciones.vacio')"
+      />
       <div v-else class="mt-4 tu-card overflow-hidden">
         <table class="w-full text-sm">
           <thead>

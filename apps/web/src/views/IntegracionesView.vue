@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -399,13 +400,13 @@ onMounted(cargar);
           </div>
         </div>
 
-        <p
+        <EstadoVacio
           v-if="llaves.length === 0"
-          class="mt-4 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("conexiones.llave.vacio") }}
-        </p>
+          class="mt-4 py-6"
+          icono="integraciones"
+          compacto
+          :titulo="$t('conexiones.llave.vacio')"
+        />
         <ul v-else class="mt-3">
           <li v-for="l in llaves" :key="l.id" class="int-fila text-sm">
             <div class="min-w-0">
@@ -530,13 +531,13 @@ onMounted(cargar);
           </div>
         </div>
 
-        <p
+        <EstadoVacio
           v-if="webhooks.length === 0"
-          class="mt-4 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("conexiones.webhook.vacio") }}
-        </p>
+          class="mt-4 py-6"
+          icono="integraciones"
+          compacto
+          :titulo="$t('conexiones.webhook.vacio')"
+        />
         <ul v-else class="mt-3">
           <li v-for="w in webhooks" :key="w.id" class="int-fila text-sm">
             <div class="min-w-0">

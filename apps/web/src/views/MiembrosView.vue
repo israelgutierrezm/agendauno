@@ -9,6 +9,7 @@ import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import BarraListado from "@/components/BarraListado.vue";
 import BotonImportar from "@/components/BotonImportar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelEditarMiembro, {
   type MiembroEditable,
@@ -484,13 +485,12 @@ onMounted(() => {
         </p>
 
         <template v-else>
-          <p
+          <EstadoVacio
             v-if="miembros.length === 0"
-            class="tu-card mt-4 p-6 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("miembros.vacio") }}
-          </p>
+            class="tu-card mt-4"
+            icono="miembros"
+            :titulo="$t('miembros.vacio')"
+          />
           <div
             v-else
             class="mt-4 tu-card overflow-hidden"
