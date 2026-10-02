@@ -670,7 +670,8 @@ onMounted(() => {
                     </th>
                     <template v-else>
                       <th
-                        class="px-4 py-3 whitespace-nowrap hidden md:table-cell"
+                        class="px-4 py-3 whitespace-nowrap hidden"
+                        :class="{ 'md:table-cell': !resumenAlLado }"
                       >
                         {{ $t("operacion.clientes.registro") }}
                       </th>
@@ -757,28 +758,93 @@ onMounted(() => {
                     </td>
                     <template v-else>
                       <td
-                        class="px-4 py-2 whitespace-nowrap hidden md:table-cell"
+                        class="px-4 py-2 whitespace-nowrap hidden"
+                        :class="{ 'md:table-cell': !resumenAlLado }"
                         :style="{ color: 'var(--texto-suave)' }"
                       >
                         {{ m.alta ? diaCorto(m.alta) : "—" }}
                       </td>
                       <td
                         class="px-4 py-2 whitespace-nowrap hidden lg:table-cell"
-                        :style="{ color: 'var(--texto-suave)' }"
                       >
-                        {{
-                          m.acceso_app
-                            ? $t("operacion.clientes.conApp")
-                            : invitados.has(m.id) || m.invitacion_pendiente
-                              ? $t("operacion.clientes.invitacionPendiente")
-                              : $t("operacion.clientes.sinApp")
-                        }}
+                        <span
+                          class="block"
+                          :style="{ color: 'var(--texto-suave)' }"
+                          >{{
+                            m.acceso_app
+                              ? $t("operacion.clientes.conApp")
+                              : invitados.has(m.id) || m.invitacion_pendiente
+                                ? $t("operacion.clientes.invitacionPendiente")
+                                : $t("operacion.clientes.sinApp")
+                          }}</span
+                        >
+                        <button
+                          v-if="
+                            puedeInvitar &&
+                            m.email &&
+                            !m.acceso_app &&
+                            m.invitacion_pendiente &&
+                            !invitados.has(m.id)
+                          "
+                          class="tu-enlace text-xs"
+                          type="button"
+                          data-prueba="reenviar-invitacion"
+                          :disabled="invitandoId === m.id"
+                          @click.stop="reenviarInvitacion(m)"
+                        >
+                          {{
+                            invitandoId === m.id
+                              ? $t("operacion.clientes.reenviando")
+                              : $t("operacion.clientes.reenviarCorto")
+                          }}
+                        </button>
+                        <button
+                          v-else-if="
+                            puedeInvitar &&
+                            m.email &&
+                            !m.acceso_app &&
+                            !invitados.has(m.id)
+                          "
+                          class="tu-enlace text-xs"
+                          type="button"
+                          data-prueba="invitar-cuenta"
+                          :title="$t('operacion.clientes.invitarAyuda')"
+                          :disabled="invitandoId === m.id"
+                          @click.stop="invitar(m)"
+                        >
+                          {{
+                            invitandoId === m.id
+                              ? $t("miembros.invitando")
+                              : $t("operacion.clientes.invitarCorto")
+                          }}
+                        </button>
                       </td>
                       <td class="px-4 py-2 hidden sm:table-cell">
-                        <span class="block max-w-[14rem] truncate">{{
-                          m.resumen?.membresia.plan ??
-                          $t("tarjetas.sinMembresia")
-                        }}</span>
+                        <span class="flex max-w-[16rem] items-center gap-1.5">
+                          <span class="truncate">{{
+                            m.resumen?.membresia.plan ??
+                            $t("tarjetas.sinMembresia")
+                          }}</span>
+                          <span
+                            v-if="
+                              (m.resumen?.membresia.planes?.length ?? 0) > 1
+                            "
+                            class="mb-mas"
+                            data-prueba="mas-planes"
+                            :title="
+                              $t('operacion.clientes.otrosPlanes', {
+                                lista: m
+                                  .resumen!.membresia.planes!.filter(
+                                    (p) => p !== m.resumen!.membresia.plan,
+                                  )
+                                  .join(', '),
+                              })
+                            "
+                            >+{{
+                              m.resumen!.membresia.planes!.length - 1
+                            }}</span
+                          >
+                        </span>
                         <span
                           v-if="
                             m.resumen?.membresia.plan &&
@@ -831,7 +897,15 @@ onMounted(() => {
                     >
                       {{ detalleBaja(m) }}
                     </td>
-                    <td v-else class="px-4 py-2 whitespace-nowrap">
+                    <td
+                      v-else
+                      class="px-4 py-2 whitespace-nowrap"
+                      :title="
+                        tipo === 'miembro'
+                          ? $t('operacion.clientes.estadoAyuda')
+                          : undefined
+                      "
+                    >
                       <span class="mb-estado">
                         <span
                           class="mb-punto"
@@ -878,53 +952,6 @@ onMounted(() => {
                       </button>
                     </td>
                     <td v-else class="px-4 py-2 text-right whitespace-nowrap">
-                      <button
-                        v-if="
-                          puedeInvitar &&
-                          tipo === 'miembro' &&
-                          m.email &&
-                          !m.acceso_app &&
-                          m.invitacion_pendiente &&
-                          !invitados.has(m.id)
-                        "
-                        class="tu-enlace text-sm mr-3"
-                        type="button"
-                        data-prueba="reenviar-invitacion"
-                        :disabled="invitandoId === m.id"
-                        @click="reenviarInvitacion(m)"
-                      >
-                        {{
-                          invitandoId === m.id
-                            ? $t("operacion.clientes.reenviando")
-                            : $t("operacion.clientes.reenviar")
-                        }}
-                      </button>
-                      <button
-                        v-else-if="
-                          puedeInvitar &&
-                          tipo === 'miembro' &&
-                          m.email &&
-                          !m.acceso_app &&
-                          !invitados.has(m.id)
-                        "
-                        class="tu-enlace text-sm mr-3"
-                        type="button"
-                        :title="$t('operacion.clientes.invitarAyuda')"
-                        :disabled="invitandoId === m.id"
-                        @click="invitar(m)"
-                      >
-                        {{
-                          invitandoId === m.id
-                            ? $t("miembros.invitando")
-                            : $t("operacion.clientes.invitar")
-                        }}
-                      </button>
-                      <span
-                        v-else-if="invitados.has(m.id)"
-                        class="text-sm mr-3"
-                        :style="{ color: 'var(--texto-suave)' }"
-                        >{{ $t("miembros.invitado") }}</span
-                      >
                       <button
                         v-if="puedeGestionar"
                         class="tu-enlace text-sm"
@@ -1090,6 +1117,17 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* «+1»: tiene más planes vigentes (el detalle, al pasar el cursor). */
+.mb-mas {
+  flex-shrink: 0;
+  padding: 0 0.35rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.35rem;
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
 /* «Nuevo» (aún no asiste): etiqueta suave en ámbar. */
 .mb-etiqueta-nuevo {
   padding: 0.05rem 0.45rem;

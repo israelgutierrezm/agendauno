@@ -132,4 +132,31 @@ describe("directorio de clientes", () => {
       "/api/v1/app/estudio-a/usuarios/u9/reenviar",
     );
   });
+
+  it("con más de un plan vigente, muestra el principal y «+1» con los demás", async () => {
+    miembro = {
+      ...miembroBase,
+      resumen: {
+        membresia: {
+          estado: "vigente",
+          plan: "Pack 8 clases",
+          planes: ["Pack 8 clases", "2 clases extra"],
+          valido_hasta: null,
+          pausada_hasta: null,
+          ilimitado: false,
+          saldo_unidades: 7000,
+          tiene_acceso: true,
+        },
+        ultima_visita: null,
+        proxima: null,
+        adeudo: false,
+      },
+    };
+    const w = montar();
+    await flushPromises();
+
+    const mas = w.get('[data-prueba="mas-planes"]');
+    expect(mas.text()).toBe("+1");
+    expect(mas.attributes("title")).toBeDefined();
+  });
 });

@@ -18,6 +18,8 @@ export interface ResumenTarjeta {
     ilimitado: boolean;
     saldo_unidades: number;
     tiene_acceso: boolean;
+    // Todos los planes que hoy le dan acceso (puede tener más de uno).
+    planes?: string[];
   };
   ultima_visita: string | null;
   proxima: {

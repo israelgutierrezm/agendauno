@@ -218,6 +218,11 @@ export default {
     reenviar: "Reenviar invitación",
     reenviando: "Reenviando…",
     reenviada: "Invitación reenviada a {email}.",
+    invitarCorto: "Invitar",
+    reenviarCorto: "Reenviar",
+    otrosPlanes: "También: {lista}",
+    estadoAyuda:
+      "Si es cliente activo del negocio (no se refiere a su cuenta).",
     plan: "Plan vigente",
     saldo: "Saldo",
     proxima: "Próxima reserva",

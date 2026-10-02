@@ -99,3 +99,21 @@ it('la lista dice quién ya tiene cuenta para entrar a la app', function (): voi
     expect($filas['Vale']['acceso_app'])->toBeTrue()
         ->and($filas['Beto']['acceso_app'])->toBeFalse();
 });
+
+it('con dos planes vigentes, el resumen trae los dos y suma su saldo', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    agendaSemilla($e);
+    $ana = venderPackAMiembroTenant($e, 8000, 'Ana');
+    $mensual = (string) $this->postJson("/api/v1/app/{$e['slug']}/productos", [
+        'nombre' => 'Paquete 4 clases', 'tipo' => 'paquete', 'precio_minor' => 60000, 'moneda' => 'MXN', 'creditos_incluidos' => 4000,
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $ana['persona'], 'producto_id' => $mensual], conBearer($e['bearer']))
+        ->assertCreated();
+
+    $membresia = collect($this->getJson("/api/v1/app/{$e['slug']}/miembros?page=1&resumen=1", conBearer($e['bearer']))->assertOk()->json('data'))
+        ->firstWhere('id', $ana['persona'])['resumen']['membresia'];
+
+    expect($membresia['planes'])->toHaveCount(2)
+        ->toContain('Paquete 4 clases')
+        ->and($membresia['saldo_unidades'])->toBe(12000);
+});

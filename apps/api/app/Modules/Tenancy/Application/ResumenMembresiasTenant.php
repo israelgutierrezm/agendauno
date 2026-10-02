@@ -25,7 +25,7 @@ final class ResumenMembresiasTenant
 
     /**
      * @param  list<int>  $personaIds
-     * @return array<int, array{estado: string, plan: string|null, valido_hasta: string|null, pausada_hasta: string|null, ilimitado: bool, saldo_unidades: int, tiene_acceso: bool}>
+     * @return array<int, array{estado: string, plan: string|null, valido_hasta: string|null, pausada_hasta: string|null, ilimitado: bool, saldo_unidades: int, tiene_acceso: bool, planes: list<string>}>
      */
     public function deVarias(array $personaIds): array
     {
@@ -33,7 +33,7 @@ final class ResumenMembresiasTenant
         foreach ($personaIds as $id) {
             $resultado[$id] = [
                 'estado' => 'sin', 'plan' => null, 'valido_hasta' => null, 'pausada_hasta' => null,
-                'ilimitado' => false, 'saldo_unidades' => 0, 'tiene_acceso' => false,
+                'ilimitado' => false, 'saldo_unidades' => 0, 'tiene_acceso' => false, 'planes' => [],
             ];
         }
         if ($personaIds === []) {
@@ -65,6 +65,8 @@ final class ResumenMembresiasTenant
             $tieneAcceso = false;
             $ilimitado = false;
             $plan = null;
+            // Todos los planes que hoy le dan acceso (puede tener más de uno).
+            $planes = [];
             $pausadaHasta = null;
             $maxVigencia = null;
             $saldo = 0;
@@ -81,6 +83,7 @@ final class ResumenMembresiasTenant
                     $tieneAcceso = true;
                     $ilimitado = $ilimitado || $derecho->ilimitado;
                     $plan ??= $derecho->acuerdo->producto?->nombre;
+                    $planes[] = (string) $derecho->acuerdo->producto?->nombre;
                 }
                 $pausa = $derecho->acuerdo?->pausaAbierta;
                 if ($pausa !== null && ($pausadaHasta === null || $pausa->hasta->gt($pausadaHasta))) {
@@ -112,6 +115,7 @@ final class ResumenMembresiasTenant
                 'ilimitado' => $ilimitado,
                 'saldo_unidades' => $saldo,
                 'tiene_acceso' => $tieneAcceso,
+                'planes' => array_values(array_unique(array_filter($planes))),
             ];
         }
 
