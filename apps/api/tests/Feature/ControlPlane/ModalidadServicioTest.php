@@ -84,16 +84,16 @@ it('en un estudio de clases, una oferta nueva se reserva con la membresía', fun
         ->assertJsonPath('data.duracion_minutos', null);
 });
 
-it('en citas, el paso de horarios pide el horario de atención de los profesionales', function (): void {
+it('en citas, el paso de equipo pide el horario de atención de los profesionales', function (): void {
     $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
     $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
     $sede = agendaSemilla($e);
 
     // Una clase suelta no cuenta: en citas lo que importa es cuándo atiende cada quién.
     crearSesionTenant($e, $sede);
-    $this->putJson("/api/v1/app/{$e['slug']}/onboarding", ['paso' => 'horarios'], conBearer($e['bearer']))
+    $this->putJson("/api/v1/app/{$e['slug']}/onboarding", ['paso' => 'equipo'], conBearer($e['bearer']))
         ->assertStatus(422)
-        ->assertJsonPath('meta.errors.paso.0', 'Define el horario de atención de al menos un profesional antes de continuar.');
+        ->assertJsonPath('meta.errors.paso.0', 'Define quién atiende y su horario antes de continuar.');
 
     personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia.mx', 'instructor');
     $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->assertOk()->json('data.0.id');
@@ -102,7 +102,7 @@ it('en citas, el paso de horarios pide el horario de atención de los profesiona
         'horarios' => [['dia_semana' => 1, 'hora_inicio' => '10:00', 'hora_fin' => '19:00']],
     ], conBearer($e['bearer']))->assertCreated();
 
-    $this->putJson("/api/v1/app/{$e['slug']}/onboarding", ['paso' => 'horarios'], conBearer($e['bearer']))->assertOk();
+    $this->putJson("/api/v1/app/{$e['slug']}/onboarding", ['paso' => 'equipo'], conBearer($e['bearer']))->assertOk();
 
     $tareas = collect($this->getJson("/api/v1/app/{$e['slug']}/onboarding/quickstart", conBearer($e['bearer']))->assertOk()->json('data.tareas'))
         ->keyBy('clave');

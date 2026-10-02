@@ -72,6 +72,7 @@ import corregirCobro from "./locales/corregirCobro.es-MX";
 import nominaVisual from "./locales/nominaVisual.es-MX";
 import horariosVisual from "./locales/horariosVisual.es-MX";
 import detalleCita from "./locales/detalleCita.es-MX";
+import configuracionInicial from "./locales/configuracionInicial.es-MX";
 import planes from "./locales/planes.es-MX";
 import portal from "./locales/portal.es-MX";
 import recepcionVisual from "./locales/recepcionVisual.es-MX";
@@ -143,6 +144,7 @@ const mensajesBase = {
   nominaVisual,
   horariosVisual,
   detalleCita,
+  configuracionInicial,
 };
 
 export const i18n = createI18n({

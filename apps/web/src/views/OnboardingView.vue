@@ -8,28 +8,72 @@ import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 /**
- * Asistente de configuración: pasos numerados en horizontal, el avance arriba y un
- * pie común (omitir, anterior, guardar y continuar). Cada paso guarda lo suyo.
+ * Configuración inicial por tipo de negocio (ADR 0088). Con citas: tu negocio →
+ * servicios → quién atiende y cuándo → publicar. Con clases: tu negocio → clases →
+ * horario → planes → publicar. Un servicio se da de alta en una línea («Corte de
+ * cabello · 30 min · $250»): la estructura del catálogo se arma por dentro. Cobro en
+ * línea, equipo administrativo, productos y reglas quedan «para cuando lo necesites».
+ * Cada paso guarda lo suyo; el avance sale de los datos reales del negocio.
  */
+type Paso =
+  | "negocio"
+  | "servicios"
+  | "equipo"
+  | "clases"
+  | "horario"
+  | "planes"
+  | "publicacion";
+
+interface Sugerencias {
+  servicios: {
+    nombre: string;
+    duracion_minutos: number;
+    precio_minor: number;
+  }[];
+  clases: { nombre: string; duracion_minutos: number; capacidad: number }[];
+  planes: {
+    clave: string;
+    nombre: string;
+    precio_minor: number;
+    clases: number | null;
+  }[];
+}
+interface Oferta {
+  id: string;
+  nombre: string;
+  modalidad?: string;
+  duracion_minutos?: number | null;
+  precio_clase_minor?: number | null;
+  capacidad?: number | null;
+}
+interface Sucursal {
+  id: string;
+  nombre: string;
+  zona_horaria?: string;
+  direccion?: string | null;
+}
+interface Profesional {
+  id: string;
+  nombre: string;
+}
+
 const { t } = useI18n();
 const router = useRouter();
 const sesion = useSesionTenantStore();
+const toast = useToastStore();
 
-// Ícono de cada paso (el de la tarjeta).
-const ICONOS: Record<string, string> = {
-  marca: "mi-cuenta",
-  sucursal: "ubicacion",
-  actividades: "agenda",
-  horarios: "reloj",
-  productos: "etiqueta",
-  politicas: "documentos",
-  pasarela: "pasarelas",
-  personal: "instructores",
+const ICONOS: Record<Paso, string> = {
+  negocio: "ubicacion",
+  servicios: "etiqueta",
+  equipo: "instructores",
+  clases: "agenda",
+  horario: "reloj",
+  planes: "dinero",
   publicacion: "contenido",
 };
-
 const ZONAS = [
   "America/Mexico_City",
   "America/Tijuana",
@@ -40,38 +84,81 @@ const ZONAS = [
   "America/Santiago",
   "America/Argentina/Buenos_Aires",
 ];
+const DURACIONES = [15, 20, 30, 45, 60, 75, 90, 120, 150, 180];
+const DIAS = [1, 2, 3, 4, 5, 6, 7] as const;
 
-const pasos = ref<string[]>([]);
+const pasos = ref<Paso[]>([]);
 const completados = ref<Set<string>>(new Set());
 const completo = ref(false);
 const indice = ref(0);
 const cargando = ref(true);
 const guardando = ref(false);
 const error = ref<string | null>(null);
-const mensaje = ref<string | null>(null);
 
-const pasoActual = computed(() => pasos.value[indice.value] ?? "");
+const pasoActual = computed<Paso>(() => pasos.value[indice.value] ?? "negocio");
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
+const esCitas = computed(() => pasos.value.includes("servicios"));
 
-// Modelos por paso.
+// ---- Lo que ya existe en el negocio ----
+const sucursales = ref<Sucursal[]>([]);
+const ofertas = ref<Oferta[]>([]);
+const profesionales = ref<Profesional[]>([]);
+const plantillas = ref<
+  {
+    id: string;
+    oferta?: string | null;
+    dias_semana: number[];
+    hora_local: string;
+  }[]
+>([]);
+const productos = ref<{ id: string; nombre: string; precio_minor: number }[]>(
+  [],
+);
+
+// ---- Lo que se captura en cada paso ----
 const logoUrl = ref<string | null>(sesion.estudio?.logo_url ?? null);
-const suc = ref({ nombre: "", zona: "America/Mexico_City" });
-const act = ref({
-  programa: "",
-  actividad: "",
-  oferta: "",
-  modalidad: "grupal",
-  capacidad: "",
+const negocio = ref({
+  sucursal: "",
+  direccion: "",
+  zona: "America/Mexico_City",
 });
-const prod = ref({ nombre: "", tipo: "paquete", precio: "899", creditos: "8" });
-const per = ref({ nombre: "", email: "", rol: "recepcionista" });
-const pub = ref({ publicado: true, privado: false });
-const invitacion = ref<{ email: string; token: string } | null>(null);
-const configReal = ref<{ horarios: boolean; politicas: boolean }>({
-  horarios: false,
-  politicas: false,
+interface Fila {
+  nombre: string;
+  duracion: number;
+  precio: string;
+  cupo: string;
+}
+const filas = ref<Fila[]>([]);
+const equipo = ref({
+  yo: true,
+  otros: [] as { nombre: string; email: string }[],
+  dias: [1, 2, 3, 4, 5, 6] as number[],
+  abre: "10:00",
+  cierra: "19:00",
 });
-const politica = ref({ horas: "6", penalizaTarde: true, penalizaNoShow: true });
+const horario = ref<
+  Record<string, { dias: number[]; hora: string; instructor: string }>
+>({});
+const planes = ref<
+  {
+    clave: string;
+    incluir: boolean;
+    nombre: string;
+    precio: string;
+    clases: string;
+  }[]
+>([]);
+const publicacion = ref({ publicado: true, privado: false });
+
+function pesos(minor: number): string {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  }).format(minor / 100);
+}
+const aCentavos = (texto: string): number =>
+  Math.round(Number(texto.replace(/[^\d.]/g, "")) * 100);
 
 async function cargar(): Promise<void> {
   cargando.value = true;
@@ -79,20 +166,18 @@ async function cargar(): Promise<void> {
   try {
     const { data } = await api.get<{
       data: {
-        pasos: string[];
+        pasos: Paso[];
         completados: string[];
         completo: boolean;
-        config?: { horarios: boolean; politicas: boolean };
+        sugerencias: Sugerencias;
       };
     }>(`${base.value}/onboarding`);
     pasos.value = data.data.pasos;
     completados.value = new Set(data.data.completados);
     completo.value = data.data.completo;
-    configReal.value = data.data.config ?? {
-      horarios: false,
-      politicas: false,
-    };
-    // Empieza en el primer paso no completado.
+    await cargarReferencias();
+    prellenar(data.data.sugerencias);
+    // Empieza en el primer paso pendiente.
     const pendiente = pasos.value.findIndex((p) => !completados.value.has(p));
     indice.value = pendiente === -1 ? pasos.value.length - 1 : pendiente;
   } catch (e) {
@@ -102,53 +187,95 @@ async function cargar(): Promise<void> {
   }
 }
 
-async function marcar(
-  paso: string,
-  datos: Record<string, unknown> | null = null,
-): Promise<void> {
+async function cargarReferencias(): Promise<void> {
+  const pedir = async <T,>(ruta: string, destino: { value: T }) => {
+    try {
+      destino.value = (
+        await api.get<{ data: T }>(`${base.value}${ruta}`)
+      ).data.data;
+    } catch {
+      // Sin permiso o sin datos: el paso funciona igual.
+    }
+  };
+  await Promise.all([
+    pedir("/sucursales", sucursales),
+    pedir("/ofertas", ofertas),
+    pedir("/instructores", profesionales),
+    esCitas.value
+      ? Promise.resolve()
+      : pedir("/plantillas-horario", plantillas),
+    esCitas.value ? Promise.resolve() : pedir("/productos", productos),
+  ]);
+}
+
+function prellenar(s: Sugerencias): void {
+  const sede = sucursales.value[0];
+  negocio.value = {
+    sucursal: sede?.nombre ?? "",
+    direccion: sede?.direccion ?? "",
+    zona: sede?.zona_horaria ?? "America/Mexico_City",
+  };
+  // Con lo más común del giro, si aún no hay nada.
+  if (ofertas.value.length === 0) {
+    filas.value = esCitas.value
+      ? s.servicios.map((x) => ({
+          nombre: x.nombre,
+          duracion: x.duracion_minutos,
+          precio: String(x.precio_minor / 100),
+          cupo: "",
+        }))
+      : s.clases.map((x) => ({
+          nombre: x.nombre,
+          duracion: x.duracion_minutos,
+          precio: "",
+          cupo: String(x.capacidad),
+        }));
+  }
+  equipo.value.yo = profesionales.value.length === 0;
+  planes.value = s.planes.map((p) => ({
+    clave: p.clave,
+    incluir: productos.value.length === 0,
+    nombre: p.nombre,
+    precio: String(p.precio_minor / 100),
+    clases: p.clases !== null ? String(p.clases) : "",
+  }));
+  prepararHorario();
+}
+
+function prepararHorario(): void {
+  const actual = horario.value;
+  horario.value = Object.fromEntries(
+    clasesGrupales.value.map((o) => [
+      o.id,
+      actual[o.id] ?? { dias: [], hora: "19:00", instructor: "" },
+    ]),
+  );
+}
+const clasesGrupales = computed(() =>
+  ofertas.value.filter((o) => o.modalidad !== "individual"),
+);
+
+// ---- Pasos ----
+async function marcar(paso: Paso): Promise<void> {
   const { data } = await api.put<{
     data: { completados: string[]; completo: boolean };
-  }>(`${base.value}/onboarding`, { paso, datos });
+  }>(`${base.value}/onboarding`, { paso });
   completados.value = new Set(data.data.completados);
   completo.value = data.data.completo;
   trackEvent("onboarding_step_completed", {
     step: paso,
     onboarding_complete: data.data.completo,
   });
-  if (data.data.completo) {
-    trackEvent("onboarding_completed");
-  }
 }
 
-function avanzar(): void {
-  mensaje.value = null;
-  if (indice.value < pasos.value.length - 1) {
-    indice.value += 1;
-  }
-}
-function retroceder(): void {
-  mensaje.value = null;
-  if (indice.value > 0) {
-    indice.value -= 1;
-  }
-}
-function irA(i: number): void {
-  mensaje.value = null;
-  indice.value = i;
-}
-
-/** Ejecuta la accion de un paso, lo marca y avanza; muestra errores sin romper. */
-async function ejecutar(
-  paso: string,
-  accion: () => Promise<Record<string, unknown> | null>,
-): Promise<void> {
+async function ejecutar(accion: () => Promise<void>): Promise<void> {
   guardando.value = true;
   error.value = null;
   try {
-    const datos = await accion();
-    await marcar(paso, datos);
-    if (paso !== "publicacion") {
-      avanzar();
+    await accion();
+    await marcar(pasoActual.value);
+    if (indice.value < pasos.value.length - 1) {
+      indice.value += 1;
     }
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -157,243 +284,350 @@ async function ejecutar(
   }
 }
 
-const guardarMarca = () =>
-  ejecutar("marca", async () => ({ logo_url: logoUrl.value || null }));
-
-const crearSucursal = () =>
-  ejecutar("sucursal", async () => {
+async function guardarNegocio(): Promise<void> {
+  const datos = {
+    nombre: negocio.value.sucursal.trim(),
+    direccion: negocio.value.direccion.trim() || null,
+    zona_horaria: negocio.value.zona,
+  };
+  const sede = sucursales.value[0];
+  if (sede !== undefined) {
+    await api.put(`${base.value}/sucursales/${sede.id}`, datos);
+  } else {
     const org = await api.post<{ data: { id: string } }>(
       `${base.value}/organizaciones`,
-      {
-        nombre: "Principal",
-      },
+      { nombre: sesion.estudio?.nombre ?? datos.nombre },
     );
-    const { data } = await api.post<{ data: { id: string; nombre: string } }>(
+    const { data } = await api.post<{ data: Sucursal }>(
       `${base.value}/organizaciones/${org.data.data.id}/sucursales`,
-      { nombre: suc.value.nombre, zona_horaria: suc.value.zona },
+      datos,
     );
-    mensaje.value = "sucursal.creada:" + data.data.nombre;
-    return { sucursal: data.data.id };
-  });
+    sucursales.value = [data.data];
+  }
+}
 
-const crearActividad = () =>
-  ejecutar("actividades", async () => {
-    const programa = await api.post<{ data: { id: string } }>(
-      `${base.value}/programas`,
+const filasValidas = computed(() =>
+  filas.value.filter(
+    (f) =>
+      f.nombre.trim() !== "" &&
+      (esCitas.value ? f.precio.trim() !== "" : Number(f.cupo) > 0),
+  ),
+);
+function agregarFila(): void {
+  filas.value.push({
+    nombre: "",
+    duracion: esCitas.value ? 30 : 60,
+    precio: "",
+    cupo: esCitas.value ? "" : "10",
+  });
+}
+async function guardarCatalogo(): Promise<void> {
+  if (filasValidas.value.length > 0) {
+    const { data } = await api.post<{ data: Oferta[] }>(
+      `${base.value}/onboarding/catalogo`,
       {
-        nombre: act.value.programa,
+        items: filasValidas.value.map((f) =>
+          esCitas.value
+            ? {
+                nombre: f.nombre.trim(),
+                duracion_minutos: f.duracion,
+                precio_minor: aCentavos(f.precio),
+              }
+            : {
+                nombre: f.nombre.trim(),
+                duracion_minutos: f.duracion,
+                capacidad: Number(f.cupo),
+              },
+        ),
       },
     );
-    const actividad = await api.post<{ data: { id: string } }>(
-      `${base.value}/programas/${programa.data.data.id}/actividades`,
-      { nombre: act.value.actividad },
-    );
-    const oferta = await api.post<{ data: { id: string; nombre: string } }>(
-      `${base.value}/actividades/${actividad.data.data.id}/ofertas`,
+    ofertas.value = [
+      ...ofertas.value,
+      ...data.data.map((o) => ({
+        ...o,
+        modalidad: esCitas.value ? "individual" : "grupal",
+        precio_clase_minor:
+          (o as { precio_minor?: number | null }).precio_minor ?? null,
+      })),
+    ];
+    filas.value = [];
+    prepararHorario();
+  }
+}
+
+// Quién atiende: el dueño (si atiende) y a quien invite, con un horario común.
+const soyProfesional = computed(() =>
+  (sesion.usuario?.roles ?? []).includes("instructor"),
+);
+async function guardarEquipo(): Promise<void> {
+  const sede = sucursales.value[0];
+  if (sede === undefined) {
+    throw new Error(t("configuracionInicial.desc.negocio"));
+  }
+  const ids: string[] = [];
+  const yo = sesion.usuario;
+  if (equipo.value.yo && yo) {
+    if (!soyProfesional.value) {
+      await api.put(`${base.value}/usuarios/${yo.ulid}/roles`, {
+        roles: [...(yo.roles ?? [yo.rol]), "instructor"],
+      });
+      await sesion.cargarYo();
+    }
+    ids.push(yo.ulid);
+  }
+  for (const otro of equipo.value.otros) {
+    if (otro.nombre.trim() === "" || otro.email.trim() === "") {
+      continue;
+    }
+    const { data } = await api.post<{ data: { usuario: { id: string } } }>(
+      `${base.value}/usuarios/invitar`,
       {
-        nombre: act.value.oferta,
-        modalidad: act.value.modalidad,
-        capacidad:
-          act.value.capacidad !== "" ? Number(act.value.capacidad) : null,
+        nombre: otro.nombre.trim(),
+        email: otro.email.trim(),
+        rol: "instructor",
+        sucursal_id: sede.id,
       },
     );
-    mensaje.value = "actividades.creada:" + oferta.data.data.nombre;
-    return { oferta: oferta.data.data.id };
-  });
+    ids.push(data.data.usuario.id);
+  }
+  const horarios = [...equipo.value.dias]
+    .sort((a, b) => a - b)
+    .map((dia) => ({
+      dia_semana: dia,
+      hora_inicio: equipo.value.abre,
+      hora_fin: equipo.value.cierra,
+    }));
+  for (const id of ids) {
+    await api.put(`${base.value}/horarios-atencion`, {
+      instructor_id: id,
+      sucursal_id: sede.id,
+      horarios,
+    });
+  }
+  equipo.value.otros = [];
+}
+const equipoListo = computed(
+  () =>
+    (equipo.value.yo ||
+      equipo.value.otros.some(
+        (o) => o.nombre.trim() !== "" && o.email.trim() !== "",
+      )) &&
+    equipo.value.dias.length > 0 &&
+    equipo.value.cierra > equipo.value.abre,
+);
 
-const crearProducto = () =>
-  ejecutar("productos", async () => {
-    const esPaquete = prod.value.tipo === "paquete";
-    const { data } = await api.post<{ data: { id: string; nombre: string } }>(
-      `${base.value}/productos`,
+// Horario de clases: cada clase, sus días y su hora; se repite cada semana.
+const filasHorario = computed(() =>
+  clasesGrupales.value.filter(
+    (o) => (horario.value[o.id]?.dias.length ?? 0) > 0,
+  ),
+);
+async function guardarHorario(): Promise<void> {
+  const sede = sucursales.value[0];
+  if (sede === undefined) {
+    return;
+  }
+  const hoy = new Date();
+  const iso = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const hasta = new Date(hoy.getTime() + 28 * 24 * 3600 * 1000);
+  for (const o of filasHorario.value) {
+    const h = horario.value[o.id]!;
+    const { data } = await api.post<{ data: { id: string } }>(
+      `${base.value}/plantillas-horario`,
       {
-        nombre: prod.value.nombre,
-        tipo: esPaquete ? "paquete" : "membresia",
-        precio_minor: Math.round(Number(prod.value.precio) * 100),
-        moneda: "MXN",
-        ilimitado: !esPaquete,
-        creditos_incluidos: esPaquete
-          ? Math.round(Number(prod.value.creditos) * 1000)
-          : null,
+        oferta_id: o.id,
+        sucursal_id: sede.id,
+        instructor_id: h.instructor || null,
+        dias_semana: [...h.dias].sort((a, b) => a - b),
+        hora_local: h.hora,
+        duracion_minutos: o.duracion_minutos ?? 60,
+        capacidad: o.capacidad ?? null,
+        vigente_desde: iso(hoy),
       },
     );
-    mensaje.value = "productos.creado:" + data.data.nombre;
-    return { producto: data.data.id };
-  });
+    await api.post(`${base.value}/plantillas-horario/${data.data.id}/generar`, {
+      desde: iso(hoy),
+      hasta: iso(hasta),
+    });
+    plantillas.value.push({
+      id: data.data.id,
+      oferta: o.nombre,
+      dias_semana: h.dias,
+      hora_local: h.hora,
+    });
+    horario.value[o.id] = { dias: [], hora: h.hora, instructor: h.instructor };
+  }
+}
 
-const invitarPersonal = () =>
-  ejecutar("personal", async () => {
+async function guardarPlanes(): Promise<void> {
+  for (const p of planes.value.filter((x) => x.incluir)) {
+    const comun = {
+      nombre: p.nombre.trim(),
+      precio_minor: aCentavos(p.precio),
+      moneda: "MXN",
+    };
+    const datos =
+      p.clave === "suelta"
+        ? {
+            ...comun,
+            tipo: "sesion_individual",
+            ilimitado: false,
+            creditos_incluidos: 1000,
+            vigencia_tipo: "dias",
+            vigencia_cantidad: 30,
+          }
+        : p.clave === "paquete"
+          ? {
+              ...comun,
+              tipo: "paquete",
+              ilimitado: false,
+              creditos_incluidos: Number(p.clases) * 1000,
+              vigencia_tipo: "meses",
+              vigencia_cantidad: 1,
+            }
+          : {
+              ...comun,
+              tipo: "membresia",
+              ilimitado: true,
+              creditos_incluidos: null,
+              vigencia_tipo: "meses",
+              vigencia_cantidad: 1,
+            };
     const { data } = await api.post<{
-      data: { activacion: { email: string; token: string } };
-    }>(`${base.value}/usuarios/invitar`, {
-      nombre: per.value.nombre,
-      email: per.value.email,
-      rol: per.value.rol,
-    });
-    invitacion.value = data.data.activacion;
-    return { invitado: per.value.email };
-  });
-
-const publicar = () =>
-  ejecutar("publicacion", async () => {
-    await api.put(`${base.value}/publicacion`, {
-      publicado: pub.value.publicado,
-      privado: pub.value.privado,
-    });
-    trackEvent("studio_publication_updated", {
-      published: pub.value.publicado,
-      private: pub.value.privado,
-    });
-    return { publicado: pub.value.publicado, privado: pub.value.privado };
-  });
-
-function continuarSimple(): void {
-  void ejecutar(pasoActual.value, async () => null);
+      data: { id: string; nombre: string; precio_minor: number };
+    }>(`${base.value}/productos`, datos);
+    productos.value.push(data.data);
+    p.incluir = false;
+  }
 }
 
-// Política de cancelación: config mínima inline (sin salir del asistente).
-const guardarPolitica = () =>
-  ejecutar("politicas", async () => {
-    await api.put(`${base.value}/politicas-cancelacion`, {
-      horas_limite: Number(politica.value.horas) || 0,
-      penaliza_tarde: politica.value.penalizaTarde,
-      penaliza_no_show: politica.value.penalizaNoShow,
-    });
-    configReal.value.politicas = true;
-    return null;
+async function guardarPublicacion(): Promise<void> {
+  await api.put(`${base.value}/publicacion`, publicacion.value);
+  trackEvent("studio_publication_updated", {
+    published: publicacion.value.publicado,
+    private: publicacion.value.privado,
   });
-
-// Horarios: se crean en la Agenda; se abre la pantalla y al volver el paso continúa.
-// En citas, "horarios" es cuándo atiende cada profesional; en clases, la agenda.
-function irAgenda(): void {
-  void router.push({ name: sesion.esCitas ? "horarios" : "agenda" });
+}
+const enlace = computed(() =>
+  esCitas.value
+    ? `${window.location.origin}/agendar/${sesion.slug}`
+    : `${window.location.origin}/estudio/${sesion.slug}`,
+);
+async function copiarEnlace(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(enlace.value);
+    toast.exito(t("configuracionInicial.publicacion.copiado"));
+  } catch {
+    // Sin portapapeles: el enlace queda a la vista para copiarlo a mano.
+  }
 }
 
-// Avance: lo completado del total de pasos.
+// Botón principal según el paso.
+const accion = computed<{
+  deshabilitado: boolean;
+  ejecutar: () => void;
+  texto: string;
+}>(() => {
+  const g = guardando.value;
+  const siguiente = t("configuracionInicial.siguiente");
+  switch (pasoActual.value) {
+    case "negocio":
+      return {
+        texto: siguiente,
+        deshabilitado: g || negocio.value.sucursal.trim() === "",
+        ejecutar: () => void ejecutar(guardarNegocio),
+      };
+    case "servicios":
+    case "clases":
+      return {
+        texto: siguiente,
+        deshabilitado:
+          g || (ofertas.value.length === 0 && filasValidas.value.length === 0),
+        ejecutar: () => void ejecutar(guardarCatalogo),
+      };
+    case "equipo":
+      return {
+        texto: siguiente,
+        deshabilitado:
+          g || (!completados.value.has("equipo") && !equipoListo.value),
+        ejecutar: () =>
+          void ejecutar(
+            equipoListo.value ? guardarEquipo : () => Promise.resolve(),
+          ),
+      };
+    case "horario":
+      return {
+        texto: siguiente,
+        deshabilitado:
+          g ||
+          (plantillas.value.length === 0 && filasHorario.value.length === 0),
+        ejecutar: () => void ejecutar(guardarHorario),
+      };
+    case "planes":
+      return {
+        texto: siguiente,
+        deshabilitado:
+          g ||
+          (productos.value.length === 0 &&
+            !planes.value.some((p) => p.incluir && p.precio.trim() !== "")),
+        ejecutar: () => void ejecutar(guardarPlanes),
+      };
+    default:
+      return {
+        texto: t("configuracionInicial.terminar"),
+        deshabilitado: g,
+        ejecutar: () => void ejecutar(guardarPublicacion),
+      };
+  }
+});
+
 const porcentaje = computed(() =>
   pasos.value.length === 0
     ? 0
     : Math.round((completados.value.size / pasos.value.length) * 100),
 );
-
-/**
- * Botón principal del pie según el paso: guarda lo capturado y avanza; en pasos
- * sin captura (o ya resueltos), solo continúa.
- */
-const accion = computed<{
-  texto: string;
-  deshabilitado: boolean;
-  ejecutar: () => void;
-}>(() => {
-  const g = guardando.value;
-  const guardarYContinuar = t("onboarding.siguiente");
-  switch (pasoActual.value) {
-    case "marca":
-      return {
-        texto: guardarYContinuar,
-        deshabilitado: g,
-        ejecutar: () => void guardarMarca(),
-      };
-    case "sucursal":
-      return completados.value.has("sucursal")
-        ? {
-            texto: t("asistente.continuar"),
-            deshabilitado: g,
-            ejecutar: avanzar,
-          }
-        : {
-            texto: guardarYContinuar,
-            deshabilitado: g || suc.value.nombre.trim() === "",
-            ejecutar: () => void crearSucursal(),
-          };
-    case "actividades":
-      return {
-        texto: guardarYContinuar,
-        deshabilitado:
-          g ||
-          act.value.programa.trim() === "" ||
-          act.value.actividad.trim() === "" ||
-          act.value.oferta.trim() === "",
-        ejecutar: () => void crearActividad(),
-      };
-    case "productos":
-      return {
-        texto: guardarYContinuar,
-        deshabilitado: g || prod.value.nombre.trim() === "",
-        ejecutar: () => void crearProducto(),
-      };
-    case "personal":
-      return {
-        texto: t("asistente.invitarYContinuar"),
-        deshabilitado:
-          g || per.value.nombre.trim() === "" || per.value.email.trim() === "",
-        ejecutar: () => void invitarPersonal(),
-      };
-    case "publicacion":
-      return {
-        texto: t("asistente.guardar"),
-        deshabilitado: g,
-        ejecutar: () => void publicar(),
-      };
-    case "horarios":
-      return {
-        texto: configReal.value.horarios
-          ? t("asistente.continuar")
-          : t("onboarding.horarios.yaListo"),
-        deshabilitado: g,
-        ejecutar: continuarSimple,
-      };
-    case "politicas":
-      return configReal.value.politicas
-        ? {
-            texto: t("asistente.continuar"),
-            deshabilitado: g,
-            ejecutar: continuarSimple,
-          }
-        : {
-            texto: guardarYContinuar,
-            deshabilitado: g,
-            ejecutar: () => void guardarPolitica(),
-          };
-    default:
-      return {
-        texto: t("asistente.continuar"),
-        deshabilitado: g,
-        ejecutar: continuarSimple,
-      };
+function alternarDia(lista: number[], dia: number): void {
+  const i = lista.indexOf(dia);
+  if (i === -1) {
+    lista.push(dia);
+  } else {
+    lista.splice(i, 1);
   }
-});
-
-const mensajeTexto = computed(() => {
-  if (mensaje.value === null) {
-    return null;
-  }
-  const [clave, valor] = mensaje.value.split(/:(.*)/s);
-  return { clave, valor };
-});
+}
+const diasCortos = (dias: number[]): string =>
+  [...dias]
+    .sort((a, b) => a - b)
+    .map((d) => t(`configuracionInicial.diasCortos.${d}`))
+    .join(", ");
 
 onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 py-8 sm:py-10">
+  <section class="mx-auto max-w-5xl px-4 py-8 sm:py-10">
     <!-- Encabezado y avance -->
     <div class="flex flex-wrap items-end justify-between gap-6">
       <div class="min-w-0">
         <h1 class="text-2xl font-semibold sm:text-3xl">
-          {{ $t("onboarding.titulo") }}
+          {{ $t("configuracionInicial.titulo") }}
         </h1>
         <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("onboarding.subtitulo") }}
+          {{ $t("configuracionInicial.subtitulo") }}
         </p>
       </div>
-      <div v-if="!cargando" class="ob-avance">
+      <div v-if="!cargando && pasos.length > 0" class="ci-avance">
         <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("asistente.paso", { n: indice + 1, total: pasos.length }) }}
+          {{
+            $t("configuracionInicial.paso", {
+              n: indice + 1,
+              total: pasos.length,
+            })
+          }}
         </p>
         <div class="mt-2 flex items-center gap-3">
           <div
-            class="ob-barra"
+            class="ci-barra"
             role="progressbar"
             :aria-valuenow="porcentaje"
             aria-valuemin="0"
@@ -413,26 +647,29 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
+    <p v-else-if="pasos.length === 0" class="mt-8" style="color: var(--error)">
+      {{ error }}
+    </p>
 
     <template v-else>
       <!-- Pasos numerados -->
-      <ol class="ob-pasos" :aria-label="$t('onboarding.titulo')">
+      <ol class="ci-pasos" :aria-label="$t('configuracionInicial.titulo')">
         <li
           v-for="(p, i) in pasos"
           :key="p"
-          class="ob-paso"
+          class="ci-paso"
           :class="{
-            'ob-actual': i === indice,
-            'ob-hecho': completados.has(p) && i !== indice,
+            'ci-actual': i === indice,
+            'ci-hecho': completados.has(p) && i !== indice,
           }"
         >
           <button
             type="button"
-            class="ob-paso-boton"
+            class="ci-paso-boton"
             :aria-current="i === indice ? 'step' : undefined"
-            @click="irA(i)"
+            @click="indice = i"
           >
-            <span class="ob-circulo">
+            <span class="ci-circulo">
               <IconoNav
                 v-if="completados.has(p) && i !== indice"
                 nombre="hecho"
@@ -440,7 +677,9 @@ onMounted(cargar);
               />
               <template v-else>{{ i + 1 }}</template>
             </span>
-            <span class="ob-etiqueta">{{ $t(`onboarding.pasos.${p}`) }}</span>
+            <span class="ci-etiqueta">{{
+              $t(`configuracionInicial.pasos.${p}`)
+            }}</span>
           </button>
         </li>
       </ol>
@@ -448,66 +687,55 @@ onMounted(cargar);
       <div
         v-if="completo"
         class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl p-4 text-sm"
-        :style="{ background: 'var(--exito-suave)', color: 'var(--exito)' }"
+        :style="{
+          background: 'color-mix(in srgb, var(--exito) 10%, transparent)',
+          color: 'var(--exito)',
+        }"
       >
-        <span>{{ $t("onboarding.completo") }}</span>
+        <span>{{ $t("configuracionInicial.completo") }}</span>
         <button
           class="tu-btn tu-btn-primario"
           @click="router.push({ name: 'panel' })"
         >
-          {{ $t("onboarding.irPanel") }}
+          {{ $t("configuracionInicial.irPanel") }}
         </button>
       </div>
 
       <!-- Paso actual -->
-      <article class="tu-card mt-6 p-5 sm:p-8">
+      <article class="tu-card mt-6 p-5 sm:p-8" :data-paso="pasoActual">
         <header class="flex items-start gap-4">
-          <span class="ob-icono" aria-hidden="true">
-            <IconoNav
-              :nombre="ICONOS[pasoActual] ?? 'configuracion'"
-              :tam="28"
-            />
+          <span class="ci-icono" aria-hidden="true">
+            <IconoNav :nombre="ICONOS[pasoActual]" :tam="26" />
           </span>
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
               <h2 class="text-xl font-semibold sm:text-2xl">
-                {{ $t(`onboarding.pasos.${pasoActual}`) }}
+                {{ $t(`configuracionInicial.pasos.${pasoActual}`) }}
               </h2>
               <span
                 v-if="completados.has(pasoActual)"
                 class="tu-badge tu-badge-exito"
-                >{{ $t("onboarding.hecho") }}</span
+                >{{ $t("configuracionInicial.hecho") }}</span
               >
             </div>
             <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
-              {{ $t(`onboarding.${pasoActual}.desc`) }}
+              {{ $t(`configuracionInicial.desc.${pasoActual}`) }}
             </p>
           </div>
         </header>
 
-        <p
-          v-if="mensajeTexto"
-          class="mt-5 rounded-lg p-2.5 text-sm"
-          :style="{ background: 'var(--exito-suave)', color: 'var(--exito)' }"
-        >
-          {{
-            $t(`onboarding.${mensajeTexto.clave}`, {
-              nombre: mensajeTexto.valor,
-            })
-          }}
-        </p>
         <p v-if="error" class="mt-5 text-sm" style="color: var(--error)">
           {{ error }}
         </p>
 
-        <div class="mt-6 space-y-4">
-          <!-- marca -->
-          <template v-if="pasoActual === 'marca'">
+        <div class="mt-6 space-y-5">
+          <!-- Tu negocio -->
+          <template v-if="pasoActual === 'negocio'">
             <div>
               <p class="tu-label">
-                {{ $t("asistente.logo.etiqueta") }}
+                {{ $t("configuracionInicial.negocio.logo") }}
                 <span :style="{ color: 'var(--texto-suave)' }">{{
-                  $t("asistente.logo.opcional")
+                  $t("configuracionInicial.negocio.opcional")
                 }}</span>
               </p>
               <div class="mt-1">
@@ -517,328 +745,537 @@ onMounted(cargar);
                 />
               </div>
             </div>
-          </template>
-
-          <!-- sucursal -->
-          <template v-else-if="pasoActual === 'sucursal'">
-            <!-- Ya hay al menos una sede: se puede volver a agregar más desde Sucursales. -->
-            <template v-if="completados.has('sucursal')">
-              <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-                {{ $t("onboarding.sucursal.yaTienes") }}
-              </p>
-              <RouterLink
-                :to="{ name: 'sedes' }"
-                class="tu-btn tu-btn-fantasma inline-flex"
-              >
-                {{ $t("onboarding.sucursal.gestionar") }}
-              </RouterLink>
-            </template>
-            <div v-else class="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label class="tu-label" for="sn">{{
-                  $t("onboarding.sucursal.nombre")
-                }}</label>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="block">
+                <span class="tu-label">{{
+                  $t("configuracionInicial.negocio.sucursal")
+                }}</span>
                 <input
-                  id="sn"
-                  v-model="suc.nombre"
+                  v-model="negocio.sucursal"
                   class="tu-input"
-                  :placeholder="$t('onboarding.sucursal.nombrePh')"
+                  data-campo="sucursal"
+                  maxlength="120"
                 />
-              </div>
-              <div>
-                <label class="tu-label" for="sz">{{
-                  $t("onboarding.sucursal.zona")
-                }}</label>
-                <select id="sz" v-model="suc.zona" class="tu-input">
-                  <option v-for="z in ZONAS" :key="z" :value="z">
-                    {{ z }}
-                  </option>
-                </select>
-              </div>
-            </div>
-          </template>
-
-          <!-- actividades -->
-          <template v-else-if="pasoActual === 'actividades'">
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label class="tu-label" for="ap">{{
-                  $t("onboarding.actividades.programa")
-                }}</label>
-                <input
-                  id="ap"
-                  v-model="act.programa"
-                  class="tu-input"
-                  :placeholder="$t('onboarding.actividades.programaPh')"
-                />
-              </div>
-              <div>
-                <label class="tu-label" for="aa">{{
-                  $t("onboarding.actividades.actividad")
-                }}</label>
-                <input
-                  id="aa"
-                  v-model="act.actividad"
-                  class="tu-input"
-                  :placeholder="$t('onboarding.actividades.actividadPh')"
-                />
-              </div>
-              <div>
-                <label class="tu-label" for="ao">{{
-                  $t("onboarding.actividades.oferta")
-                }}</label>
-                <input
-                  id="ao"
-                  v-model="act.oferta"
-                  class="tu-input"
-                  :placeholder="$t('onboarding.actividades.ofertaPh')"
-                />
-              </div>
-              <div>
-                <label class="tu-label" for="am">{{
-                  $t("onboarding.actividades.modalidad")
-                }}</label>
-                <select id="am" v-model="act.modalidad" class="tu-input">
-                  <option value="grupal">
-                    {{ $t("onboarding.modalidades.grupal") }}
-                  </option>
-                  <option value="privada">
-                    {{ $t("onboarding.modalidades.privada") }}
-                  </option>
-                  <option value="individual">
-                    {{ $t("onboarding.modalidades.individual") }}
-                  </option>
-                </select>
-              </div>
-              <div>
-                <label class="tu-label" for="ac">{{
-                  $t("onboarding.actividades.capacidad")
-                }}</label>
-                <input
-                  id="ac"
-                  v-model="act.capacidad"
-                  class="tu-input"
-                  type="number"
-                  min="1"
-                />
-              </div>
-            </div>
-          </template>
-
-          <!-- productos -->
-          <template v-else-if="pasoActual === 'productos'">
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label class="tu-label" for="pn">{{
-                  $t("onboarding.productos.nombre")
-                }}</label>
-                <input
-                  id="pn"
-                  v-model="prod.nombre"
-                  class="tu-input"
-                  :placeholder="$t('onboarding.productos.nombrePh')"
-                />
-              </div>
-              <div>
-                <label class="tu-label" for="pt">{{
-                  $t("onboarding.productos.tipo")
-                }}</label>
-                <select id="pt" v-model="prod.tipo" class="tu-input">
-                  <option value="paquete">
-                    {{ $t("onboarding.tipos.paquete") }}
-                  </option>
-                  <option value="membresia">
-                    {{ $t("onboarding.tipos.membresia") }}
-                  </option>
-                </select>
-              </div>
-              <div>
-                <label class="tu-label" for="pp">{{
-                  $t("onboarding.productos.precio")
-                }}</label>
-                <input
-                  id="pp"
-                  v-model="prod.precio"
-                  class="tu-input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-              <div v-if="prod.tipo === 'paquete'">
-                <label class="tu-label" for="pc">{{
-                  $t("onboarding.productos.creditos")
-                }}</label>
-                <input
-                  id="pc"
-                  v-model="prod.creditos"
-                  class="tu-input"
-                  type="number"
-                  min="1"
-                />
-                <p
-                  class="mt-1 text-xs"
+                <span
+                  class="mt-1 block text-xs"
                   :style="{ color: 'var(--texto-suave)' }"
+                  >{{ $t("configuracionInicial.negocio.sucursalAyuda") }}</span
                 >
-                  {{ $t("onboarding.productos.creditosAyuda") }}
-                </p>
-              </div>
+              </label>
+              <label class="block">
+                <span class="tu-label">{{
+                  $t("configuracionInicial.negocio.zona")
+                }}</span>
+                <select v-model="negocio.zona" class="tu-input">
+                  <option v-for="z in ZONAS" :key="z" :value="z">
+                    {{ z.replace("America/", "").replace(/_/g, " ") }}
+                  </option>
+                </select>
+              </label>
+              <label class="block sm:col-span-2">
+                <span class="tu-label"
+                  >{{ $t("configuracionInicial.negocio.direccion") }}
+                  <span :style="{ color: 'var(--texto-suave)' }">{{
+                    $t("configuracionInicial.negocio.opcional")
+                  }}</span></span
+                >
+                <input
+                  v-model="negocio.direccion"
+                  class="tu-input"
+                  maxlength="255"
+                />
+              </label>
             </div>
           </template>
 
-          <!-- personal -->
-          <template v-else-if="pasoActual === 'personal'">
-            <div class="grid gap-3 sm:grid-cols-3">
-              <div>
-                <label class="tu-label" for="pen">{{
-                  $t("onboarding.personal.nombre")
-                }}</label>
-                <input id="pen" v-model="per.nombre" class="tu-input" />
+          <!-- Servicios o clases, en una línea -->
+          <template
+            v-else-if="pasoActual === 'servicios' || pasoActual === 'clases'"
+          >
+            <div v-if="ofertas.length > 0" class="ci-existentes">
+              <p class="text-sm font-medium">
+                {{ $t("configuracionInicial.catalogo.yaTienes") }}
+              </p>
+              <ul>
+                <li v-for="o in ofertas" :key="o.id">
+                  <span class="font-medium">{{ o.nombre }}</span>
+                  <span v-if="o.duracion_minutos" class="ci-suave">
+                    ·
+                    {{
+                      $t("configuracionInicial.catalogo.minutos", {
+                        n: o.duracion_minutos,
+                      })
+                    }}</span
+                  >
+                  <span v-if="esCitas && o.precio_clase_minor" class="ci-suave">
+                    · {{ pesos(o.precio_clase_minor) }}</span
+                  >
+                  <span v-else-if="!esCitas && o.capacidad" class="ci-suave">
+                    ·
+                    {{
+                      $t("configuracionInicial.catalogo.lugares", {
+                        n: o.capacidad,
+                      })
+                    }}</span
+                  >
+                </li>
+              </ul>
+              <RouterLink :to="{ name: 'catalogo' }" class="tu-enlace text-sm"
+                >{{
+                  $t("configuracionInicial.catalogo.editarEnCatalogo")
+                }}
+                →</RouterLink
+              >
+            </div>
+            <p v-else class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("configuracionInicial.catalogo.sugerencia") }}
+            </p>
+
+            <div v-if="filas.length > 0" class="ci-filas" data-prueba="filas">
+              <div class="ci-fila ci-fila-cabeza" aria-hidden="true">
+                <span>{{ $t("configuracionInicial.catalogo.nombre") }}</span>
+                <span>{{ $t("configuracionInicial.catalogo.duracion") }}</span>
+                <span>{{
+                  esCitas
+                    ? $t("configuracionInicial.catalogo.precio")
+                    : $t("configuracionInicial.catalogo.cupo")
+                }}</span>
+                <span></span>
               </div>
-              <div>
-                <label class="tu-label" for="pee">{{
-                  $t("onboarding.personal.email")
-                }}</label>
+              <div v-for="(f, i) in filas" :key="i" class="ci-fila">
                 <input
-                  id="pee"
-                  v-model="per.email"
+                  v-model="f.nombre"
+                  class="tu-input"
+                  :aria-label="$t('configuracionInicial.catalogo.nombre')"
+                  maxlength="120"
+                />
+                <div class="tu-select-icono w-full">
+                  <IconoNav nombre="reloj" :tam="16" />
+                  <select
+                    v-model.number="f.duracion"
+                    class="tu-input w-full"
+                    :aria-label="$t('configuracionInicial.catalogo.duracion')"
+                  >
+                    <option v-for="d in DURACIONES" :key="d" :value="d">
+                      {{
+                        $t("configuracionInicial.catalogo.minutos", { n: d })
+                      }}
+                    </option>
+                  </select>
+                </div>
+                <div v-if="esCitas" class="ci-precio">
+                  <span aria-hidden="true">$</span>
+                  <input
+                    v-model="f.precio"
+                    class="tu-input"
+                    inputmode="decimal"
+                    :aria-label="$t('configuracionInicial.catalogo.precio')"
+                  />
+                </div>
+                <input
+                  v-else
+                  v-model="f.cupo"
+                  class="tu-input"
+                  type="number"
+                  min="1"
+                  :aria-label="$t('configuracionInicial.catalogo.cupo')"
+                />
+                <button
+                  type="button"
+                  class="tu-icono-btn"
+                  :aria-label="$t('configuracionInicial.catalogo.quitar')"
+                  @click="filas.splice(i, 1)"
+                >
+                  <IconoNav nombre="cerrar" :tam="16" />
+                </button>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma"
+              @click="agregarFila"
+            >
+              <IconoNav nombre="mas" :tam="16" />
+              {{
+                esCitas
+                  ? $t("configuracionInicial.catalogo.agregarServicio")
+                  : $t("configuracionInicial.catalogo.agregarClase")
+              }}
+            </button>
+          </template>
+
+          <!-- Quién atiende y cuándo (citas) -->
+          <template v-else-if="pasoActual === 'equipo'">
+            <section class="space-y-3">
+              <h3 class="font-medium">
+                {{ $t("configuracionInicial.equipo.quien") }}
+              </h3>
+              <p
+                v-if="profesionales.length > 0"
+                class="text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("configuracionInicial.equipo.yaAtienden") }}:
+                {{ profesionales.map((p) => p.nombre).join(", ") }}
+              </p>
+              <label
+                v-if="!soyProfesional"
+                class="ci-opcion"
+                :class="{ 'ci-opcion-activa': equipo.yo }"
+              >
+                <input v-model="equipo.yo" type="checkbox" />
+                <span>
+                  <span class="block font-medium">{{
+                    $t("configuracionInicial.equipo.yo")
+                  }}</span>
+                  <span class="ci-suave block text-sm">{{
+                    $t("configuracionInicial.equipo.yoAyuda", {
+                      profesional: sesion.terminologia.instructor.toLowerCase(),
+                    })
+                  }}</span>
+                </span>
+              </label>
+              <div
+                v-for="(o, i) in equipo.otros"
+                :key="i"
+                class="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"
+              >
+                <input
+                  v-model="o.nombre"
+                  class="tu-input"
+                  :placeholder="$t('configuracionInicial.equipo.nombre')"
+                  :aria-label="$t('configuracionInicial.equipo.nombre')"
+                />
+                <input
+                  v-model="o.email"
                   class="tu-input"
                   type="email"
+                  :placeholder="$t('configuracionInicial.equipo.correo')"
+                  :aria-label="$t('configuracionInicial.equipo.correo')"
                 />
+                <button
+                  type="button"
+                  class="tu-icono-btn"
+                  :aria-label="$t('configuracionInicial.catalogo.quitar')"
+                  @click="equipo.otros.splice(i, 1)"
+                >
+                  <IconoNav nombre="cerrar" :tam="16" />
+                </button>
               </div>
-              <div>
-                <label class="tu-label" for="per">{{
-                  $t("onboarding.personal.rol")
-                }}</label>
-                <select id="per" v-model="per.rol" class="tu-input">
-                  <option value="admin">
-                    {{ $t("onboarding.roles.admin") }}
-                  </option>
-                  <option value="recepcionista">
-                    {{ $t("onboarding.roles.recepcionista") }}
-                  </option>
-                  <option value="instructor">
-                    {{ $t("onboarding.roles.instructor") }}
-                  </option>
-                </select>
-              </div>
-            </div>
-            <div
-              v-if="invitacion"
-              class="rounded-lg p-3 text-sm break-all"
-              :style="{ background: 'var(--superficie-2)' }"
-            >
-              <p class="font-semibold">
-                {{
-                  $t("onboarding.personal.invitado", {
-                    email: invitacion.email,
-                  })
-                }}
-              </p>
-              <p class="mt-1">{{ $t("onboarding.personal.tokenDev") }}</p>
-              <code>{{ invitacion.token }}</code>
-            </div>
-          </template>
-
-          <!-- publicacion -->
-          <template v-else-if="pasoActual === 'publicacion'">
-            <label class="flex items-center gap-2 text-sm cursor-pointer">
-              <input v-model="pub.publicado" type="checkbox" />
-              <span>{{ $t("onboarding.publicacion.publicar") }}</span>
-            </label>
-            <label class="flex items-center gap-2 text-sm cursor-pointer">
-              <input v-model="pub.privado" type="checkbox" />
-              <span>{{ $t("onboarding.publicacion.privado") }}</span>
-            </label>
-          </template>
-
-          <!-- horarios (guiado: crear en la Agenda; sin callejón) -->
-          <template v-else-if="pasoActual === 'horarios'">
-            <p
-              v-if="configReal.horarios"
-              class="rounded-lg p-3 text-sm"
-              :style="{
-                background: 'var(--exito-suave)',
-                color: 'var(--exito)',
-              }"
-            >
-              {{ $t("onboarding.horarios.listo") }}
-            </p>
-            <template v-else>
-              <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-                {{
-                  sesion.esCitas
-                    ? $t("agendaVisual.onboarding.horariosAyuda")
-                    : $t("onboarding.horarios.ayuda")
-                }}
+              <p
+                v-if="equipo.otros.length > 0"
+                class="text-xs"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("configuracionInicial.equipo.correoAyuda") }}
               </p>
               <button
-                class="tu-btn tu-btn-fantasma"
                 type="button"
-                @click="irAgenda"
+                class="tu-btn tu-btn-fantasma"
+                @click="equipo.otros.push({ nombre: '', email: '' })"
               >
-                {{
-                  sesion.esCitas
-                    ? $t("agendaVisual.onboarding.abrirHorarios")
-                    : $t("onboarding.horarios.abrirAgenda")
-                }}
+                <IconoNav nombre="mas" :tam="16" />
+                {{ $t("configuracionInicial.equipo.otro") }}
               </button>
-            </template>
+            </section>
+
+            <section class="space-y-3">
+              <h3 class="font-medium">
+                {{ $t("configuracionInicial.equipo.cuando") }}
+              </h3>
+              <div
+                class="ci-dias"
+                role="group"
+                :aria-label="$t('configuracionInicial.equipo.dias')"
+              >
+                <button
+                  v-for="d in DIAS"
+                  :key="d"
+                  type="button"
+                  :aria-pressed="equipo.dias.includes(d)"
+                  @click="alternarDia(equipo.dias, d)"
+                >
+                  {{ $t(`configuracionInicial.diasCortos.${d}`) }}
+                </button>
+              </div>
+              <div class="flex flex-wrap items-end gap-3">
+                <label class="block">
+                  <span class="tu-label">{{
+                    $t("configuracionInicial.equipo.abre")
+                  }}</span>
+                  <input
+                    v-model="equipo.abre"
+                    class="tu-input w-36"
+                    type="time"
+                    step="900"
+                  />
+                </label>
+                <label class="block">
+                  <span class="tu-label">{{
+                    $t("configuracionInicial.equipo.cierra")
+                  }}</span>
+                  <input
+                    v-model="equipo.cierra"
+                    class="tu-input w-36"
+                    type="time"
+                    step="900"
+                  />
+                </label>
+              </div>
+              <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("configuracionInicial.equipo.ajustaDespues") }}
+              </p>
+            </section>
           </template>
 
-          <!-- politicas (config minima inline; sin callejón) -->
-          <template v-else-if="pasoActual === 'politicas'">
+          <!-- Horario semanal de clases -->
+          <template v-else-if="pasoActual === 'horario'">
+            <div v-if="plantillas.length > 0" class="ci-existentes">
+              <p class="text-sm font-medium">
+                {{ $t("configuracionInicial.horario.yaProgramadas") }}
+              </p>
+              <ul>
+                <li v-for="p in plantillas" :key="p.id">
+                  <span class="font-medium">{{ p.oferta }}</span>
+                  <span class="ci-suave">
+                    · {{ diasCortos(p.dias_semana) }} ·
+                    {{ p.hora_local.slice(0, 5) }}</span
+                  >
+                </li>
+              </ul>
+            </div>
             <p
-              v-if="configReal.politicas"
-              class="rounded-lg p-3 text-sm"
-              :style="{
-                background: 'var(--exito-suave)',
-                color: 'var(--exito)',
-              }"
+              v-if="clasesGrupales.length === 0"
+              class="text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
             >
-              {{ $t("onboarding.politicas.listo") }}
+              {{ $t("configuracionInicial.horario.sinClases") }}
             </p>
-            <template v-else>
-              <div>
-                <label class="tu-label" for="poh">{{
-                  $t("onboarding.politicas.horas")
-                }}</label>
-                <input
-                  id="poh"
-                  v-model="politica.horas"
-                  class="tu-input w-32"
-                  type="number"
-                  min="0"
-                  max="720"
-                />
-                <p
-                  class="mt-1 text-xs"
-                  :style="{ color: 'var(--texto-suave)' }"
+            <div
+              v-for="o in clasesGrupales"
+              :key="o.id"
+              class="ci-clase"
+              data-prueba="clase-horario"
+            >
+              <p class="font-medium">{{ o.nombre }}</p>
+              <div
+                class="ci-dias"
+                role="group"
+                :aria-label="$t('configuracionInicial.horario.dias')"
+              >
+                <button
+                  v-for="d in DIAS"
+                  :key="d"
+                  type="button"
+                  :aria-pressed="horario[o.id]?.dias.includes(d) ?? false"
+                  @click="alternarDia(horario[o.id]!.dias, d)"
                 >
-                  {{ $t("onboarding.politicas.horasAyuda") }}
-                </p>
+                  {{ $t(`configuracionInicial.diasCortos.${d}`) }}
+                </button>
               </div>
-              <label class="flex items-center gap-2 text-sm cursor-pointer">
-                <input v-model="politica.penalizaTarde" type="checkbox" />
-                <span>{{ $t("onboarding.politicas.penalizaTarde") }}</span>
+              <div class="flex flex-wrap items-end gap-3">
+                <label class="block">
+                  <span class="tu-label">{{
+                    $t("configuracionInicial.horario.hora")
+                  }}</span>
+                  <input
+                    v-model="horario[o.id]!.hora"
+                    class="tu-input w-36"
+                    type="time"
+                    step="900"
+                  />
+                </label>
+                <label class="block">
+                  <span class="tu-label">{{
+                    $t("configuracionInicial.horario.quien")
+                  }}</span>
+                  <div class="tu-select-icono">
+                    <IconoNav nombre="instructores" :tam="16" />
+                    <select
+                      v-model="horario[o.id]!.instructor"
+                      class="tu-input"
+                    >
+                      <option value="">
+                        {{ $t("configuracionInicial.horario.sinAsignar") }}
+                      </option>
+                      <option
+                        v-for="p in profesionales"
+                        :key="p.id"
+                        :value="p.id"
+                      >
+                        {{ p.nombre }}
+                      </option>
+                    </select>
+                  </div>
+                </label>
+              </div>
+            </div>
+            <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("configuracionInicial.horario.ayuda") }}
+            </p>
+          </template>
+
+          <!-- Planes y precios (clases) -->
+          <template v-else-if="pasoActual === 'planes'">
+            <div v-if="productos.length > 0" class="ci-existentes">
+              <p class="text-sm font-medium">
+                {{ $t("configuracionInicial.planes.yaTienes") }}
+              </p>
+              <ul>
+                <li v-for="p in productos" :key="p.id">
+                  <span class="font-medium">{{ p.nombre }}</span>
+                  <span class="ci-suave"> · {{ pesos(p.precio_minor) }}</span>
+                </li>
+              </ul>
+            </div>
+            <div
+              v-for="p in planes"
+              :key="p.clave"
+              class="ci-plan"
+              :class="{ 'ci-opcion-activa': p.incluir }"
+            >
+              <label class="ci-plan-casilla">
+                <input v-model="p.incluir" type="checkbox" />
+                <span class="sr-only">{{
+                  $t("configuracionInicial.planes.incluir")
+                }}</span>
               </label>
-              <label class="flex items-center gap-2 text-sm cursor-pointer">
-                <input v-model="politica.penalizaNoShow" type="checkbox" />
-                <span>{{ $t("onboarding.politicas.penalizaNoShow") }}</span>
+              <label class="block min-w-0 flex-1">
+                <span class="tu-label">{{
+                  $t(`configuracionInicial.planes.vigencia.${p.clave}`)
+                }}</span>
+                <input
+                  v-model="p.nombre"
+                  class="tu-input"
+                  :aria-label="$t('configuracionInicial.catalogo.nombre')"
+                />
               </label>
-            </template>
+              <label v-if="p.clave === 'paquete'" class="block w-24">
+                <span class="tu-label">{{
+                  $t("configuracionInicial.planes.clases")
+                }}</span>
+                <input
+                  v-model="p.clases"
+                  class="tu-input"
+                  type="number"
+                  min="1"
+                />
+              </label>
+              <label class="block w-32">
+                <span class="tu-label">{{
+                  $t("configuracionInicial.catalogo.precio")
+                }}</span>
+                <div class="ci-precio">
+                  <span aria-hidden="true">$</span>
+                  <input
+                    v-model="p.precio"
+                    class="tu-input"
+                    inputmode="decimal"
+                  />
+                </div>
+              </label>
+            </div>
+            <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("configuracionInicial.planes.ayuda") }}
+            </p>
+          </template>
+
+          <!-- Publicar -->
+          <template v-else>
+            <div class="ci-existentes">
+              <p class="text-sm font-medium">
+                {{ $t("configuracionInicial.publicacion.tuPagina") }}
+              </p>
+              <div class="flex flex-wrap items-center gap-3">
+                <code class="ci-enlace">{{ enlace }}</code>
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-fantasma"
+                  @click="copiarEnlace"
+                >
+                  {{ $t("configuracionInicial.publicacion.copiar") }}
+                </button>
+              </div>
+            </div>
+            <label
+              class="ci-opcion"
+              :class="{ 'ci-opcion-activa': publicacion.publicado }"
+            >
+              <input v-model="publicacion.publicado" type="checkbox" />
+              <span>
+                <span class="block font-medium">{{
+                  $t("configuracionInicial.publicacion.directorio")
+                }}</span>
+                <span class="ci-suave block text-sm">{{
+                  $t("configuracionInicial.publicacion.directorioAyuda")
+                }}</span>
+              </span>
+            </label>
+            <label
+              class="ci-opcion"
+              :class="{ 'ci-opcion-activa': publicacion.privado }"
+            >
+              <input v-model="publicacion.privado" type="checkbox" />
+              <span>
+                <span class="block font-medium">{{
+                  $t("configuracionInicial.publicacion.privado")
+                }}</span>
+                <span class="ci-suave block text-sm">{{
+                  $t("configuracionInicial.publicacion.privadoAyuda")
+                }}</span>
+              </span>
+            </label>
+            <div>
+              <p class="text-sm font-medium">
+                {{ $t("configuracionInicial.publicacion.despues") }}
+              </p>
+              <ul class="ci-despues">
+                <li v-if="esCitas">
+                  <RouterLink :to="{ name: 'pasarelas' }" class="tu-enlace"
+                    >{{
+                      $t("configuracionInicial.publicacion.tareas.pasarelas")
+                    }}
+                    →</RouterLink
+                  >
+                </li>
+                <li>
+                  <RouterLink :to="{ name: 'usuarios' }" class="tu-enlace"
+                    >{{
+                      $t("configuracionInicial.publicacion.tareas.usuarios")
+                    }}
+                    →</RouterLink
+                  >
+                </li>
+                <li>
+                  <RouterLink :to="{ name: 'pos' }" class="tu-enlace"
+                    >{{
+                      $t("configuracionInicial.publicacion.tareas.pos")
+                    }}
+                    →</RouterLink
+                  >
+                </li>
+                <li>
+                  <RouterLink :to="{ name: 'reglas-agenda' }" class="tu-enlace"
+                    >{{
+                      $t("configuracionInicial.publicacion.tareas.reglas")
+                    }}
+                    →</RouterLink
+                  >
+                </li>
+              </ul>
+            </div>
           </template>
         </div>
 
         <!-- Pie: omitir · anterior · guardar y continuar -->
-        <footer class="ob-pie">
+        <footer class="ci-pie">
           <button
             v-if="indice < pasos.length - 1"
             type="button"
             class="tu-enlace text-sm"
-            @click="avanzar"
+            @click="indice += 1"
           >
-            {{ $t("onboarding.omitir") }}
+            {{ $t("configuracionInicial.omitir") }}
           </button>
           <span v-else />
           <div class="flex flex-wrap gap-2">
@@ -846,13 +1283,14 @@ onMounted(cargar);
               type="button"
               class="tu-btn tu-btn-fantasma"
               :disabled="indice === 0"
-              @click="retroceder"
+              @click="indice -= 1"
             >
-              {{ $t("onboarding.anterior") }}
+              {{ $t("configuracionInicial.anterior") }}
             </button>
             <button
               type="button"
               class="tu-btn tu-btn-primario"
+              data-prueba="accion"
               :disabled="accion.deshabilitado"
               @click="accion.ejecutar"
             >
@@ -867,36 +1305,38 @@ onMounted(cargar);
 </template>
 
 <style scoped>
-.ob-avance {
-  width: min(100%, 26rem);
+.ci-suave {
+  color: var(--texto-suave);
 }
-.ob-barra {
+.ci-avance {
+  width: min(100%, 24rem);
+}
+.ci-barra {
   flex: 1;
   height: 0.45rem;
   border-radius: 999px;
   background: var(--superficie-2);
   overflow: hidden;
 }
-.ob-barra > span {
+.ci-barra > span {
   display: block;
   height: 100%;
   border-radius: inherit;
   background: var(--primario);
   transition: width 0.3s ease;
 }
-
 /* Pasos: círculos numerados unidos por una línea; en el teléfono se desplazan. */
-.ob-pasos {
+.ci-pasos {
   display: flex;
   margin-top: 2rem;
   overflow-x: auto;
   padding-bottom: 0.25rem;
 }
-.ob-paso {
+.ci-paso {
   position: relative;
   flex: 1 0 5.5rem;
 }
-.ob-paso + .ob-paso::before {
+.ci-paso + .ci-paso::before {
   content: "";
   position: absolute;
   top: 1.25rem;
@@ -905,18 +1345,18 @@ onMounted(cargar);
   height: 1px;
   background: var(--borde);
 }
-.ob-paso.ob-hecho::before,
-.ob-paso.ob-actual::before {
+.ci-paso.ci-hecho::before,
+.ci-paso.ci-actual::before {
   background: color-mix(in srgb, var(--primario) 45%, var(--borde));
 }
-.ob-paso-boton {
+.ci-paso-boton {
   display: flex;
   width: 100%;
   flex-direction: column;
   align-items: center;
   gap: 0.45rem;
 }
-.ob-circulo {
+.ci-circulo {
   display: inline-flex;
   height: 2.5rem;
   width: 2.5rem;
@@ -927,45 +1367,158 @@ onMounted(cargar);
   color: var(--texto-suave);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
 }
-.ob-paso-boton:hover .ob-circulo {
-  color: var(--texto);
-}
-.ob-etiqueta {
+.ci-etiqueta {
   font-size: 0.875rem;
   color: var(--texto-suave);
   white-space: nowrap;
 }
-.ob-hecho .ob-circulo {
+.ci-hecho .ci-circulo {
   background: var(--primario-suave);
   color: var(--primario-fuerte);
 }
-.ob-actual .ob-circulo {
+.ci-actual .ci-circulo {
   background: var(--primario);
   color: var(--primario-contraste, #fff);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--primario) 18%, transparent);
 }
-.ob-actual .ob-etiqueta {
+.ci-actual .ci-etiqueta {
   color: var(--primario);
   font-weight: 600;
 }
-
-.ob-icono {
+.ci-icono {
   display: inline-flex;
-  height: 3.5rem;
-  width: 3.5rem;
+  height: 3.25rem;
+  width: 3.25rem;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 1rem;
+  border-radius: 0.9rem;
   background: var(--primario-suave);
   color: var(--primario-fuerte);
 }
-
-.ob-pie {
+.ci-existentes {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--superficie-2);
+}
+.ci-existentes ul {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.9rem;
+}
+/* Una línea por servicio o clase: nombre, duración, precio o lugares, quitar. */
+.ci-filas {
+  display: grid;
+  gap: 0.6rem;
+}
+.ci-fila {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8rem 8rem auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+.ci-fila-cabeza {
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+}
+@media (max-width: 639px) {
+  .ci-fila {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+  .ci-fila > :first-child {
+    grid-column: 1 / -1;
+  }
+  .ci-fila-cabeza {
+    display: none;
+  }
+}
+.ci-precio {
+  position: relative;
+}
+.ci-precio > span {
+  position: absolute;
+  top: 50%;
+  left: 0.75rem;
+  transform: translateY(-50%);
+  color: var(--texto-suave);
+}
+.ci-precio > input {
+  padding-left: 1.6rem;
+}
+.ci-opcion {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.8rem;
+  cursor: pointer;
+}
+.ci-opcion > input {
+  margin-top: 0.25rem;
+}
+.ci-opcion-activa {
+  border-color: var(--primario);
+  background: color-mix(in srgb, var(--primario) 5%, var(--superficie));
+}
+.ci-dias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.ci-dias > button {
+  min-width: 3.1rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+}
+.ci-dias > button[aria-pressed="true"] {
+  border-color: var(--primario);
+  background: var(--primario-suave);
+  color: var(--primario-fuerte);
+}
+.ci-clase {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.8rem;
+}
+.ci-plan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.8rem;
+}
+/* La casilla, a la altura de los campos (bajo sus etiquetas). */
+.ci-plan-casilla {
+  display: flex;
+  align-items: center;
+  height: 2.75rem;
+}
+.ci-enlace {
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.5rem;
+  background: var(--superficie);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.ci-despues {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  font-size: 0.9rem;
+}
+.ci-pie {
   display: flex;
   flex-wrap: wrap;
   align-items: center;

@@ -68,36 +68,53 @@ it('el directorio permite buscar por ubicación y filtrar por perfil sin exponer
         ->assertJsonPath('data.0.slug', 'casa-yoga');
 });
 
-it('onboarding: guardar y continuar registra el progreso hasta completarlo', function (): void {
+it('configuración inicial de un negocio de clases: sus pasos se dan por hechos con sus datos', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $url = "/api/v1/app/{$e['slug']}/onboarding";
 
-    $this->putJson("/api/v1/app/{$e['slug']}/onboarding", ['paso' => 'marca', 'datos' => ['color' => 'rojo']], conBearer($e['bearer']))
+    $this->getJson($url, conBearer($e['bearer']))
         ->assertOk()
+        ->assertJsonPath('data.modalidad', 'clases')
+        ->assertJsonPath('data.pasos', ['negocio', 'clases', 'horario', 'planes', 'publicacion'])
         ->assertJsonPath('data.completo', false);
 
-    // El progreso persiste (se puede continuar después).
-    $this->getJson("/api/v1/app/{$e['slug']}/onboarding", conBearer($e['bearer']))
-        ->assertOk()
-        ->assertJsonPath('data.completo', false)
-        ->assertJsonFragment(['completados' => ['marca']]);
+    // Un paso con datos no se da por hecho con solo «siguiente».
+    $this->putJson($url, ['paso' => 'horario'], conBearer($e['bearer']))->assertStatus(422);
 
-    // "horarios" y "politicas" exigen configuracion real (no basta "siguiente").
-    $this->putJson("/api/v1/app/{$e['slug']}/onboarding", ['paso' => 'horarios'], conBearer($e['bearer']))->assertStatus(422);
-    $this->putJson("/api/v1/app/{$e['slug']}/onboarding", ['paso' => 'politicas'], conBearer($e['bearer']))->assertStatus(422);
+    // Clases en una línea: el catálogo se arma por dentro, con una política razonable.
+    $this->postJson("{$url}/catalogo", ['items' => [['nombre' => 'Pole Nivel 1', 'duracion_minutos' => 60, 'capacidad' => 8]]], conBearer($e['bearer']))
+        ->assertCreated()
+        ->assertJsonPath('data.0.nombre', 'Pole Nivel 1')
+        ->assertJsonPath('data.0.capacidad', 8);
+    $this->getJson("/api/v1/app/{$e['slug']}/politicas-cancelacion", conBearer($e['bearer']))->assertOk()->assertJsonPath('data.0.horas_limite', 6);
+    $this->getJson($url, conBearer($e['bearer']))->assertJsonFragment(['completados' => ['clases']]);
 
-    // Configura una clase y una politica de cancelacion.
+    // Con sucursal, una clase programada y un plan, y al publicar: completo.
     $semilla = agendaSemilla($e);
     crearSesionTenant($e, $semilla);
-    $this->putJson("/api/v1/app/{$e['slug']}/politicas-cancelacion", [
-        'horas_limite' => 12, 'penaliza_tarde' => true, 'penaliza_no_show' => true,
-    ], conBearer($e['bearer']))->assertCreated();
+    crearPackTenant($e);
+    $this->putJson($url, ['paso' => 'publicacion'], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.completo', true);
+});
 
-    // Ahora si, completar todos los pasos → onboarding completo.
-    foreach (['marca', 'sucursal', 'horarios', 'actividades', 'productos', 'politicas', 'pasarela', 'personal', 'publicacion'] as $paso) {
-        $this->putJson("/api/v1/app/{$e['slug']}/onboarding", ['paso' => $paso], conBearer($e['bearer']))->assertOk();
-    }
+it('configuración inicial de un negocio de citas: servicio, duración y precio en una línea', function (): void {
+    $e = estudioConSesion('barberia-b', 'dueno@barberia-b.mx');
+    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $url = "/api/v1/app/{$e['slug']}/onboarding";
 
-    $this->getJson("/api/v1/app/{$e['slug']}/onboarding", conBearer($e['bearer']))
+    $this->getJson($url, conBearer($e['bearer']))
         ->assertOk()
-        ->assertJsonPath('data.completo', true);
+        ->assertJsonPath('data.pasos', ['negocio', 'servicios', 'equipo', 'publicacion'])
+        ->assertJsonPath('data.sugerencias.servicios.0', ['nombre' => 'Corte de cabello', 'duracion_minutos' => 30, 'precio_minor' => 25000]);
+
+    // En citas no hay cupo: cada servicio lleva su precio.
+    $this->postJson("{$url}/catalogo", ['items' => [['nombre' => 'Corte', 'duracion_minutos' => 30, 'capacidad' => 4]]], conBearer($e['bearer']))
+        ->assertStatus(422);
+    $this->postJson("{$url}/catalogo", ['items' => [
+        ['nombre' => 'Corte de cabello', 'duracion_minutos' => 30, 'precio_minor' => 25000],
+        ['nombre' => 'Corte y barba', 'duracion_minutos' => 60, 'precio_minor' => 38000],
+    ]], conBearer($e['bearer']))->assertCreated()->assertJsonCount(2, 'data');
+
+    $oferta = collect($this->getJson("/api/v1/app/{$e['slug']}/ofertas", conBearer($e['bearer']))->assertOk()->json('data'))
+        ->firstWhere('nombre', 'Corte y barba');
+    expect($oferta)->toMatchArray(['modalidad' => 'individual', 'politica_reserva' => 'pago', 'precio_clase_minor' => 38000, 'duracion_minutos' => 60]);
 });

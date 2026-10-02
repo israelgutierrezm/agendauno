@@ -411,6 +411,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/onboarding', [OnboardingController::class, 'show'])->middleware('puede:estudio.gestionar')->name('onboarding.show');
             Route::get('/onboarding/quickstart', [OnboardingController::class, 'quickstart'])->middleware('puede:estudio.gestionar')->name('onboarding.quickstart');
             Route::put('/onboarding', [OnboardingController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('onboarding.guardar');
+            // Servicios o clases en una línea (configuración inicial, ADR 0088).
+            Route::post('/onboarding/catalogo', [OnboardingController::class, 'catalogo'])->middleware('puede:estudio.gestionar')->name('onboarding.catalogo');
             Route::put('/publicacion', [OnboardingController::class, 'publicacion'])->middleware('puede:estudio.gestionar')->name('publicacion');
             // Perfil de negocio / industria (R35): defaults/terminologia/feature-flags.
             Route::put('/perfil', [OnboardingController::class, 'perfil'])->middleware('puede:estudio.gestionar')->name('perfil');
