@@ -82,6 +82,13 @@ export default {
     agendar: "Agendar cita",
     agendando: "Agendando…",
     agendada: "Cita agendada: {cliente} a las {hora}.",
+    // Avisos del horario elegido (el negocio puede agendar fuera de horario).
+    fueraDeHorario:
+      "Está fuera del horario de atención de {profesional}. Puedes agendarla de todos modos.",
+    noAtiende:
+      "{profesional} no atiende ese día en esta sucursal. Puedes agendarla de todos modos.",
+    conBloqueo:
+      "Choca con un bloqueo de la agenda ({motivo}): no se podrá agendar a esa hora.",
   },
   cita: {
     titulo: "Cita",

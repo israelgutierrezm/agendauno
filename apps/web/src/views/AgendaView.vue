@@ -3121,6 +3121,9 @@ onMounted(async () => {
       :profesionales="instructores"
       :clientes="miembros"
       :inicial="inicialCita"
+      :ventanas="ventanas"
+      :bloqueos="bloqueos"
+      :zona="zonaAgenda"
       @cerrar="mostrarNuevaCita = false"
       @agendada="alAgendarCita"
     />

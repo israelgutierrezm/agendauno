@@ -3,6 +3,13 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import PanelLateral from "@/components/PanelLateral.vue";
+import {
+  diaIso,
+  fechaLocal,
+  minutosLocal,
+  type BloqueoAgenda,
+  type VentanaAtencion,
+} from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -11,6 +18,10 @@ import { useToastStore } from "@/stores/toast";
  * Alta de una CITA por el negocio (recepción, teléfono, mostrador): cliente (se busca
  * o se da de alta al vuelo), servicio, profesional y hora. La cita queda confirmada;
  * si el servicio es de pago, se cobra en caja.
+ *
+ * Avisa antes de guardar si la hora cae fuera de la atención del profesional (el
+ * negocio puede agendarla igual) o choca con un bloqueo de la agenda que ya se cargó
+ * (ese no se podrá: el servidor lo rechaza).
  */
 export interface OfertaCita {
   id: string;
@@ -33,6 +44,10 @@ const props = defineProps<{
     instructorId: string | null;
     sucursalId: string | null;
   };
+  // Horario de atención y bloqueos ya cargados en la agenda, y su zona horaria.
+  ventanas?: VentanaAtencion[];
+  bloqueos?: BloqueoAgenda[];
+  zona?: string;
 }>();
 
 const emit = defineEmits<{ cerrar: []; agendada: [] }>();
@@ -137,6 +152,66 @@ const aviso = computed(() => {
         monto: dinero(o.precio_clase_minor ?? 0),
       })
     : t("agendaVisual.nuevaCita.consumeCredito");
+});
+
+function aMinutos(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+const avisoHorario = computed<{ texto: string; grave: boolean } | null>(() => {
+  const f = form.value;
+  if (f.fecha === "" || f.hora === "" || f.instructorId === "") {
+    return null;
+  }
+  const ini = aMinutos(f.hora);
+  const fin = ini + Math.max(Number(f.duracion) || 0, 1);
+  const zona = props.zona ?? "America/Mexico_City";
+  const bloqueo = (props.bloqueos ?? []).find((b) => {
+    const aplica =
+      (b.ambito === "profesional" && b.instructor_id === f.instructorId) ||
+      (b.ambito === "sede" && b.sucursal_id === f.sucursalId);
+    const diaIni = fechaLocal(b.desde, zona);
+    const diaFin = fechaLocal(b.hasta, zona);
+    if (!aplica || f.fecha < diaIni || f.fecha > diaFin) {
+      return false;
+    }
+    const desde = diaIni < f.fecha ? 0 : minutosLocal(b.desde, zona);
+    const hasta = diaFin > f.fecha ? 24 * 60 : minutosLocal(b.hasta, zona);
+    return ini < hasta && fin > desde;
+  });
+  if (bloqueo !== undefined) {
+    return {
+      texto: t("agendaVisual.nuevaCita.conBloqueo", { motivo: bloqueo.motivo }),
+      grave: true,
+    };
+  }
+  // Sin horario definido para esa persona en esa sede, no hay con qué comparar.
+  const suyas = (props.ventanas ?? []).filter(
+    (v) =>
+      v.instructor_id === f.instructorId &&
+      (v.sucursal_id === null || v.sucursal_id === f.sucursalId),
+  );
+  if (suyas.length === 0) {
+    return null;
+  }
+  const profesional =
+    props.profesionales.find((p) => p.id === f.instructorId)?.nombre ?? "";
+  const delDia = suyas.filter((v) => v.dia_semana === diaIso(f.fecha));
+  if (delDia.length === 0) {
+    return {
+      texto: t("agendaVisual.nuevaCita.noAtiende", { profesional }),
+      grave: false,
+    };
+  }
+  const cabe = delDia.some(
+    (v) => aMinutos(v.hora_inicio) <= ini && fin <= aMinutos(v.hora_fin),
+  );
+  return cabe
+    ? null
+    : {
+        texto: t("agendaVisual.nuevaCita.fueraDeHorario", { profesional }),
+        grave: false,
+      };
 });
 
 const listo = computed(
@@ -365,6 +440,20 @@ async function agendar(): Promise<void> {
         </label>
       </div>
 
+      <p
+        v-if="avisoHorario"
+        class="flex items-start gap-2 text-sm"
+        :style="{ color: avisoHorario.grave ? 'var(--error)' : 'var(--aviso)' }"
+        role="status"
+        data-prueba="aviso-horario"
+      >
+        <span
+          class="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+          :style="{ background: 'currentColor' }"
+          aria-hidden="true"
+        ></span>
+        {{ avisoHorario.texto }}
+      </p>
       <p
         v-if="aviso !== ''"
         class="text-sm rounded-lg px-3 py-2"
