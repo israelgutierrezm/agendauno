@@ -680,6 +680,8 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/suscripciones/{acuerdo}/pago-automatico', [SuscripcionesTenantController::class, 'quitarPagoAutomatico'])->middleware('puede:ordenes.gestionar')->name('suscripciones.pago-automatico.quitar');
             // Corregir la forma de pago de un cobro en caja (ADR 0086): quien cobra en caja.
             Route::put('/pagos/{pago}/metodo', [PagosTenantController::class, 'corregirMetodo'])->middleware('puede:ordenes.gestionar')->name('pagos.metodo.update');
+            // Anular un cobro en caja hecho por error (ADR 0087): corrección financiera.
+            Route::post('/pagos/{pago}/anular', [PagosTenantController::class, 'anular'])->middleware('puede:pagos.reembolsar')->name('pagos.anular');
             Route::get('/pagos/{pago}/reembolsos', [ReembolsosTenantController::class, 'index'])->middleware('puede:pagos.reembolsar')->name('pagos.reembolsos.index');
             Route::post('/pagos/{pago}/reembolsos', [ReembolsosTenantController::class, 'store'])->middleware('puede:pagos.reembolsar')->name('pagos.reembolsos.store');
 

@@ -19,6 +19,7 @@ export interface CitaTitular {
     metodo: string | null;
     en_caja: boolean;
     corregible: boolean;
+    anulable: boolean;
   } | null;
 }
 

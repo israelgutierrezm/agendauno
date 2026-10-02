@@ -1044,7 +1044,7 @@ function borrar(): void {
         <div class="tu-card p-5">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <h2 class="font-light text-lg">
+              <h2 class="font-medium text-lg">
                 {{ $t("plataforma.facturapi.titulo") }}
               </h2>
               <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -1098,7 +1098,7 @@ function borrar(): void {
           data-prueba="correo-alertas"
           @submit.prevent="guardarCorreoAlertas"
         >
-          <h2 class="font-light text-lg">
+          <h2 class="font-medium text-lg">
             {{ $t("plataformaAdmin.correoAlertas.titulo") }}
           </h2>
           <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -1130,7 +1130,7 @@ function borrar(): void {
         <WhatsAppPlataforma :api-url="apiUrl" :token="token" />
 
         <div>
-          <h2 class="font-light text-lg">
+          <h2 class="font-medium text-lg">
             {{ $t("plataforma.pasarelas.titulo") }}
           </h2>
           <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -1142,7 +1142,7 @@ function borrar(): void {
                 v-if="p.disponible === false"
                 class="flex items-center justify-between gap-2"
               >
-                <h3 class="font-light">
+                <h3 class="font-medium">
                   {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
                 </h3>
                 <span class="tu-badge">{{
@@ -1166,7 +1166,7 @@ function borrar(): void {
                   {{ $t("pasarelasEstado.faltaLlave") }}
                 </p>
                 <div class="flex items-center justify-between gap-2">
-                  <h3 class="font-light">
+                  <h3 class="font-medium">
                     {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
                   </h3>
                   <label class="flex items-center gap-1.5 text-xs">
@@ -1230,7 +1230,7 @@ function borrar(): void {
 
         <form class="tu-card p-5 grid gap-4" @submit.prevent="guardarLegales()">
           <div>
-            <h2 class="font-light text-lg">
+            <h2 class="font-medium text-lg">
               {{ $t("plataforma.legales.titulo") }}
             </h2>
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">

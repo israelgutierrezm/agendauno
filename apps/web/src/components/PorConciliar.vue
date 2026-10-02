@@ -99,7 +99,7 @@ defineExpose({ cargar });
 
 <template>
   <section v-if="incidencias.length > 0" class="mt-8">
-    <h2 class="font-light text-lg">{{ $t("porConciliar.titulo") }}</h2>
+    <h2 class="font-medium text-lg">{{ $t("porConciliar.titulo") }}</h2>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("porConciliar.ayuda") }}
     </p>

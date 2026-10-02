@@ -179,7 +179,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
 
 <template>
   <div v-if="avisos" class="tu-card p-5" data-prueba="avisos-agendauno">
-    <h2 class="font-light text-lg">{{ $t("avisosAgendaUno.titulo") }}</h2>
+    <h2 class="font-medium text-lg">{{ $t("avisosAgendaUno.titulo") }}</h2>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("avisosAgendaUno.ayuda", { correo: avisos.correo ?? "—" }) }}
     </p>

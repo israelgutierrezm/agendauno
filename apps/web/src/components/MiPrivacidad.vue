@@ -102,7 +102,7 @@ onMounted(cargar);
 
 <template>
   <div v-if="datos" class="tu-card p-6">
-    <h2 class="font-light text-lg">{{ $t("miPrivacidad.titulo") }}</h2>
+    <h2 class="font-medium text-lg">{{ $t("miPrivacidad.titulo") }}</h2>
 
     <label class="mt-3 flex items-center justify-between gap-3 text-sm">
       <span>

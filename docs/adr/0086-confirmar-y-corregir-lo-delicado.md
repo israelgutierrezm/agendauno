@@ -1,7 +1,6 @@
 # ADR 0086 — Confirmar lo delicado y corregir la forma de pago de un cobro en caja
 
-Estado: Aceptado (2026-10-01). Anular un cobro queda pendiente de decisión (ver al
-final).
+Estado: Aceptado (2026-10-01). Anular un cobro: ADR 0087.
 
 ## Contexto
 
@@ -94,15 +93,7 @@ teclado y muestra a la persona elegida con «Cambiar».
 - Las ventas del punto de venta (tabla propia) no entran en esta corrección. Si se
   necesita, sería el mismo patrón sobre `ventas_pos`.
 
-## Pendiente: anular un cobro hecho por error
+## Anular un cobro hecho por error
 
-Anular un cobro (decir que nunca se cobró) no es lo mismo que corregir su forma de
-pago:
-
-- La orden pagada es un estado final.
-- Su cumplimiento pudo otorgar una membresía o créditos (quizá ya usados), sumar
-  puntos de lealtad y comisiones, y facturarse.
-
-Hoy lo más cercano es reembolsar, con reversa de créditos, que deja la orden pagada y
-reembolsada. Reabrir la orden para volver a cobrarla es una decisión de dominio
-aparte, que se tomará antes de construirla.
+Decidido y construido en el ADR 0087: el cobro en caja queda anulado, la venta vuelve
+a estar por cobrar y se retira lo que concedió.

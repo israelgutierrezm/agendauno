@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Tenancy\Creditos\EstadoRetencion;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Creditos\TipoMovimiento;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
-use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
-use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\IncidenciaCobroTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
@@ -26,7 +23,6 @@ use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Pasarelas\PasarelaReembolsable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -62,9 +58,8 @@ class ReembolsarPagoTenant
         private readonly LibroMayorTenant $libro,
         private readonly RegistroDePasarelasTenant $registro,
         private readonly RegistrarEventoTenant $eventos,
-        private readonly DomiciliacionesTenant $domiciliaciones,
-        private readonly DeudaDeRenovacionTenant $deudas,
         private readonly IncidenciasCobroTenant $incidencias,
+        private readonly DerechosDeOrdenTenant $derechos,
     ) {}
 
     /**
@@ -380,19 +375,7 @@ class ReembolsarPagoTenant
      */
     private function revertirTotal(OrdenTenant $orden, PagoTenant $pago, ?Usuario $actor): void
     {
-        foreach ($this->acuerdosDe($orden) as $acuerdo) {
-            foreach ($acuerdo->derechos as $derecho) {
-                $bloqueado = DerechoTenant::query()->whereKey($derecho->getKey())->lockForUpdate()->firstOrFail();
-                $saldo = $this->libro->saldo($bloqueado);
-                if ($saldo !== 0) {
-                    $this->libro->registrar($bloqueado, TipoMovimiento::Reverso, -$saldo, 'Reembolso total del pago', $this->contexto($pago, $actor));
-                }
-            }
-            $acuerdo->update(['estado' => EstadoAcuerdo::Cancelado->value]);
-            // Cancelada ya no se renueva: sin pago automático ni renovación por cobrar.
-            $this->domiciliaciones->desactivar($acuerdo);
-            $this->deudas->anular([$acuerdo->getKey()], $actor);
-        }
+        $this->derechos->retirarTodo($orden, $this->contexto($pago, $actor), 'Reembolso total del pago', $actor);
     }
 
     /**
@@ -409,10 +392,10 @@ class ReembolsarPagoTenant
         }
         $devuelto = min($total, (int) $pago->reembolsos()->where('estado', EstadoReembolso::Aprobado->value)->sum('monto_minor'));
 
-        foreach ($this->acuerdosDe($orden) as $acuerdo) {
+        foreach ($this->derechos->acuerdosDe($orden) as $acuerdo) {
             foreach ($acuerdo->derechos as $derecho) {
                 $bloqueado = DerechoTenant::query()->whereKey($derecho->getKey())->lockForUpdate()->firstOrFail();
-                if ($this->tuvoUso($bloqueado)) {
+                if ($this->derechos->tuvoUso($bloqueado)) {
                     continue;
                 }
 
@@ -443,43 +426,9 @@ class ReembolsarPagoTenant
 
     private function exigirDerechosIntactos(OrdenTenant $orden): void
     {
-        foreach ($this->acuerdosDe($orden) as $acuerdo) {
-            foreach ($acuerdo->derechos as $derecho) {
-                if ($this->tuvoUso($derecho)) {
-                    throw new DerechoYaUsado('El derecho ya tuvo uso; no se puede reembolsar el pago completo.');
-                }
-            }
+        if ($this->derechos->algunoUsado($orden)) {
+            throw new DerechoYaUsado('El derecho ya tuvo uso; no se puede reembolsar el pago completo.');
         }
-    }
-
-    /**
-     * Acuerdos (con sus derechos) que la orden concedió y siguen activos.
-     *
-     * @return Collection<int, AcuerdoTenant>
-     */
-    private function acuerdosDe(OrdenTenant $orden): Collection
-    {
-        $orden->loadMissing('lineas');
-        $lineaIds = $orden->lineas->pluck('id')->all();
-
-        return AcuerdoTenant::query()
-            ->whereIn('linea_orden_id', $lineaIds)
-            ->where('estado', '!=', EstadoAcuerdo::Cancelado->value)
-            ->with('derechos')
-            ->get();
-    }
-
-    private function tuvoUso(DerechoTenant $derecho): bool
-    {
-        $consumos = $derecho->movimientos()
-            ->where('tipo', TipoMovimiento::Consumo->value)
-            ->exists();
-
-        $holdsActivos = $derecho->retenciones()
-            ->where('estado', EstadoRetencion::Activa->value)
-            ->exists();
-
-        return $consumos || $holdsActivos;
     }
 
     private function contexto(PagoTenant $pago, ?Usuario $actor): ContextoMovimiento

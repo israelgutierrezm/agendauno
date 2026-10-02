@@ -64,7 +64,7 @@ onMounted(cargar);
 
 <template>
   <div class="tu-card p-5">
-    <h2 class="font-light text-lg">
+    <h2 class="font-medium text-lg">
       {{ $t("parametrosConfig.tituloPlataforma") }}
     </h2>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">

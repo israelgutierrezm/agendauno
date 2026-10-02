@@ -106,13 +106,6 @@ export default {
     },
     confirmarCobro:
       "¿Registrar el cobro de {monto} en {metodo} a {cliente}? La cita queda pagada.",
-    corregirMetodo: "Corregir forma de pago",
-    corregirMetodoAyuda:
-      "Si se registró con la forma equivocada. El monto no cambia y queda en la bitácora.",
-    guardarMetodo: "Guardar forma de pago",
-    confirmarMetodo:
-      "¿Cambiar la forma de pago de {antes} a {ahora}? El monto no cambia y queda en la bitácora.",
-    okMetodo: "Forma de pago corregida.",
     confirmarLlegada: "¿Marcar que {cliente} llegó a su cita?",
     confirmarNoAsistio:
       "¿Marcar que {cliente} no asistió? Según la política del negocio, puede perder el crédito o el pago de la cita.",

@@ -67,6 +67,41 @@ class PuntosTenant
     }
 
     /**
+     * Puntos que una compra (orden) dejó vigentes: lo acumulado menos lo retirado.
+     */
+    public function vigentesDeCompra(string $ordenUlid): int
+    {
+        return (int) MovimientoPuntosTenant::query()
+            ->where('origen', OrigenPuntos::Compra->value)
+            ->where('referencia_tipo', 'orden')
+            ->where('referencia_id', $ordenUlid)
+            ->sum('puntos');
+    }
+
+    /**
+     * Retira los puntos que dio una compra cuyo cobro se anuló (ADR 0087). Idempotente
+     * por `evento_ulid`. Si la persona ya gastó parte, retira solo lo que tiene: el
+     * saldo nunca queda en negativo.
+     */
+    public function retirarDeCompra(int $personaId, string $ordenUlid, string $eventoUlid): void
+    {
+        DB::connection('tenant')->transaction(function () use ($personaId, $ordenUlid, $eventoUlid): void {
+            PersonaTenant::query()->whereKey($personaId)->lockForUpdate()->firstOrFail();
+            if (MovimientoPuntosTenant::query()->where('evento_ulid', $eventoUlid)->exists()) {
+                return;
+            }
+            $retirar = min($this->vigentesDeCompra($ordenUlid), $this->libro->saldo($personaId));
+            if ($retirar <= 0) {
+                return;
+            }
+            $this->libro->registrar(
+                $personaId, TipoMovimientoPuntos::Reverso, OrigenPuntos::Compra, -$retirar,
+                'Cobro anulado', 'orden', $ordenUlid, null, null, $eventoUlid,
+            );
+        });
+    }
+
+    /**
      * Canjea una recompensa para un miembro: descuenta sus puntos y crea el canje
      * `pendiente`. Serializa por miembro (lockForUpdate sobre la persona) y valida saldo.
      */

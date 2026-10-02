@@ -82,6 +82,11 @@ final class CatalogoParametros
                 'Si se registró en efectivo y era transferencia (o al revés), se corrige sin cambiar el monto. Queda en la bitácora. No aplica a pagos en línea ni a ventas ya facturadas.', $sn, 1),
             new DefinicionParametro('pagos.horas_para_corregir', 'Cobros en caja', 'La forma de pago se puede corregir hasta',
                 'Horas después del cobro. 0 = sin límite.', $e, 48, 0, 720, 'h'),
+            // ADR 0087: anular un cobro en caja registrado por error.
+            new DefinicionParametro('pagos.permitir_anular_cobro', 'Cobros en caja', 'Permitir anular un cobro registrado por error',
+                'El cobro queda anulado y la venta vuelve a quedar por cobrar; si dio créditos o una membresía sin usar, se retiran. Queda en la bitácora. No aplica a pagos en línea, renovaciones, ventas facturadas ni créditos ya usados.', $sn, 0),
+            new DefinicionParametro('pagos.horas_para_anular', 'Cobros en caja', 'Un cobro se puede anular hasta',
+                'Horas después del cobro. 0 = sin límite.', $e, 24, 0, 720, 'h'),
 
             new DefinicionParametro('cancelacion.devolver_pago_si_cancela_negocio', 'Devoluciones', 'Si el negocio cancela algo ya pagado en línea, devolver el pago',
                 'Se devuelve solo, por la misma pasarela. Lo pagado en efectivo se devuelve en caja.', $sn, 0),

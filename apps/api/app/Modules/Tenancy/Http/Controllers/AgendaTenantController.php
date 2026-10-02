@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
+use App\Modules\Tenancy\Application\AnularCobroTenant;
 use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
 use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\ReservasTenant;
@@ -55,6 +56,7 @@ class AgendaTenantController
         private readonly VerificarAgendaTenant $agenda,
         private readonly ResolverAccesoTenant $resolver,
         private readonly CorregirMetodoPagoTenant $corregirMetodo,
+        private readonly AnularCobroTenant $anularCobro,
     ) {}
 
     /**
@@ -390,7 +392,7 @@ class AgendaTenantController
      * El pago de una cita ya pagada: su forma y si se puede corregir. Sin revisar la
      * factura (una consulta por cita): eso se valida al guardar la corrección.
      *
-     * @return array{id: string, metodo: string|null, en_caja: bool, corregible: bool}|null
+     * @return array{id: string, metodo: string|null, en_caja: bool, corregible: bool, anulable: bool}|null
      */
     private function pagoDeCita(ReservaTenant $titular): ?array
     {
@@ -408,6 +410,7 @@ class AgendaTenantController
             'metodo' => $orden->metodo_pago ?? $pago->metodo?->value,
             'en_caja' => $pago->proveedor === 'manual',
             'corregible' => $this->corregirMetodo->impedimento($pago, conFactura: false) === null,
+            'anulable' => $this->anularCobro->impedimento($pago->setRelation('orden', $orden), completo: false) === null,
         ];
     }
 

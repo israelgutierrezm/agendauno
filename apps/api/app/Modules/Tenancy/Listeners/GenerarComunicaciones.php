@@ -16,10 +16,12 @@ use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Models\MensajeTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\PlantillaMensajeTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 
 /**
  * Consumidor del outbox (R28): ante un {@see EventoDeDominioTenant}, genera un mensaje
@@ -42,6 +44,11 @@ class GenerarComunicaciones
 
     public function handle(EventoDeDominioTenant $evento): void
     {
+        // El relay puede llegar tarde: el recibo de un cobro ya anulado no se manda.
+        if ($evento->tipo === 'orden.pagada' && ! $this->ordenSigueCobrada($evento->payload)) {
+            return;
+        }
+
         $plantillas = PlantillaMensajeTenant::query()
             ->where('clave', $evento->tipo)
             ->where('activo', true)
@@ -292,5 +299,21 @@ class GenerarComunicaciones
         }
 
         return $texto;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function ordenSigueCobrada(array $payload): bool
+    {
+        $ulid = $payload['orden_id'] ?? null;
+
+        if (! is_string($ulid)) {
+            return false;
+        }
+        // `value()` devuelve el estado ya casteado al enum.
+        $estado = OrdenTenant::query()->where('ulid', $ulid)->value('estado');
+
+        return $estado === EstadoOrden::Pagada || $estado === EstadoOrden::Pagada->value;
     }
 }

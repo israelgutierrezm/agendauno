@@ -267,7 +267,7 @@ onMounted(cargar);
       <!-- Programa -->
       <div class="mt-6 tu-card p-5">
         <div class="flex items-center justify-between gap-3">
-          <h2 class="font-light">{{ $t("lealtad.programa.titulo") }}</h2>
+          <h2 class="font-medium">{{ $t("lealtad.programa.titulo") }}</h2>
           <label class="flex items-center gap-2 text-sm font-medium">
             <input
               v-model="programa.activa"
@@ -321,7 +321,7 @@ onMounted(cargar);
       <div class="mt-6 grid gap-6 lg:grid-cols-2">
         <!-- Recompensas -->
         <div class="tu-card p-5">
-          <h2 class="font-light">{{ $t("lealtad.recompensas.titulo") }}</h2>
+          <h2 class="font-medium">{{ $t("lealtad.recompensas.titulo") }}</h2>
           <EstadoVacio
             v-if="recompensas.length === 0"
             class="mt-3 py-6"
@@ -399,7 +399,7 @@ onMounted(cargar);
 
         <!-- Consulta por miembro -->
         <div class="tu-card p-5">
-          <h2 class="font-light">{{ $t("lealtad.miembro.titulo") }}</h2>
+          <h2 class="font-medium">{{ $t("lealtad.miembro.titulo") }}</h2>
           <BuscarPersona
             v-model="miembroSel"
             class="mt-3"
@@ -488,7 +488,7 @@ onMounted(cargar);
       </div>
 
       <!-- Canjes recientes -->
-      <h2 class="mt-8 font-light text-lg">{{ $t("lealtad.canjes.titulo") }}</h2>
+      <h2 class="mt-8 font-medium text-lg">{{ $t("lealtad.canjes.titulo") }}</h2>
       <EstadoVacio
         v-if="canjes.length === 0"
         class="mt-3 py-6"

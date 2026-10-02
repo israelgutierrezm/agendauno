@@ -17,4 +17,5 @@ enum OrigenMovimiento: string
     case Reserva = 'reserva';
     case Ajuste = 'ajuste';
     case Reembolso = 'reembolso';
+    case Anulacion = 'anulacion';
 }

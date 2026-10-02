@@ -94,7 +94,7 @@ onMounted(cargar);
 
 <template>
   <div v-if="requisitos.length > 0" class="tu-card p-6">
-    <h2 class="font-light text-lg">{{ $t("misDocumentos.titulo") }}</h2>
+    <h2 class="font-medium text-lg">{{ $t("misDocumentos.titulo") }}</h2>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("misDocumentos.ayuda") }}
     </p>

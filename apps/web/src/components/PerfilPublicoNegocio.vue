@@ -123,7 +123,7 @@ onMounted(cargar);
 
 <template>
   <div class="tu-card p-6">
-    <h2 class="font-light text-lg">{{ $t("perfilPublico.config.titulo") }}</h2>
+    <h2 class="font-medium text-lg">{{ $t("perfilPublico.config.titulo") }}</h2>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("perfilPublico.config.ayuda") }}
     </p>

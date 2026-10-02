@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
+import CorregirCobro from "@/components/CorregirCobro.vue";
 import CorteDeCaja from "@/components/CorteDeCaja.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PorConciliar from "@/components/PorConciliar.vue";
@@ -36,6 +37,10 @@ interface Pago {
   con_reembolsos?: boolean;
   // Quién registró el cobro (en caja) o quién pagó en línea.
   registrado_por?: string | null;
+  // Cobro en caja con error (ADR 0086/0087): su forma de caja y qué se puede hacer.
+  metodo_caja?: string | null;
+  corregible?: boolean;
+  anulable?: boolean;
 }
 interface Suscripcion {
   id: string;
@@ -263,6 +268,13 @@ async function verReembolsos(p: Pago): Promise<void> {
 // Una llave por intento: repetir el envío (doble clic) no devuelve dos veces.
 const rLlave = ref("");
 
+// Cobro que se está corrigiendo (forma de pago o anulación) en la lista.
+const corrigiendo = ref<string | null>(null);
+async function alCorregirCobro(): Promise<void> {
+  corrigiendo.value = null;
+  await cargar();
+}
+
 function abrirReembolso(p: Pago): void {
   reembolsando.value = p;
   rLlave.value = crypto.randomUUID();
@@ -336,7 +348,7 @@ watch(vista, cargar, { immediate: true });
       <template v-if="vista === 'por-cobrar'">
         <!-- Morosos (dunning) -->
         <div class="mt-6 flex items-center gap-3">
-          <h2 class="font-light text-lg">{{ $t("cobranza.morosos") }}</h2>
+          <h2 class="font-medium text-lg">{{ $t("cobranza.morosos") }}</h2>
           <span
             class="tu-badge"
             :class="morosos.length > 0 ? 'tu-badge-aviso' : 'tu-badge-exito'"
@@ -452,7 +464,7 @@ watch(vista, cargar, { immediate: true });
 
       <!-- Pagos / reembolsos -->
       <template v-if="vista === 'movimientos'">
-        <h2 class="mt-6 font-light text-lg">{{ $t("cobranza.pagos") }}</h2>
+        <h2 class="mt-6 font-medium text-lg">{{ $t("cobranza.pagos") }}</h2>
         <EstadoVacio
           v-if="pagos.length === 0"
           class="tu-card mt-3"
@@ -535,14 +547,42 @@ watch(vista, cargar, { immediate: true });
                     >
                   </td>
                   <td class="px-4 py-2 text-right">
-                    <button
-                      v-if="puedeReembolsar && p.reembolsable_minor > 0"
-                      class="tu-enlace text-sm"
-                      type="button"
-                      @click="abrirReembolso(p)"
-                    >
-                      {{ $t("cobranza.reembolsar") }}
-                    </button>
+                    <span class="inline-flex flex-wrap justify-end gap-x-3">
+                      <button
+                        v-if="p.corregible || p.anulable"
+                        class="tu-enlace text-sm"
+                        type="button"
+                        :aria-expanded="corrigiendo === p.id"
+                        @click="
+                          corrigiendo = corrigiendo === p.id ? null : p.id
+                        "
+                      >
+                        {{ $t("cobranza.corregir") }}
+                      </button>
+                      <button
+                        v-if="puedeReembolsar && p.reembolsable_minor > 0"
+                        class="tu-enlace text-sm"
+                        type="button"
+                        @click="abrirReembolso(p)"
+                      >
+                        {{ $t("cobranza.reembolsar") }}
+                      </button>
+                    </span>
+                  </td>
+                </tr>
+                <!-- Cobro en caja con error: corregir la forma o anularlo -->
+                <tr v-if="corrigiendo === p.id">
+                  <td colspan="5" class="px-4 pb-3">
+                    <CorregirCobro
+                      :base="base"
+                      :pago="{
+                        id: p.id,
+                        metodo: p.metodo_caja ?? null,
+                        corregible: p.corregible === true,
+                        anulable: p.anulable === true,
+                      }"
+                      @cambiado="alCorregirCobro"
+                    />
                   </td>
                 </tr>
                 <tr v-if="reembolsosDe === p.id">
@@ -620,7 +660,7 @@ watch(vista, cargar, { immediate: true });
 
       <!-- Próximas renovaciones (cobro recurrente) -->
       <template v-if="vista === 'por-cobrar'">
-        <h2 class="mt-8 font-light text-lg">
+        <h2 class="mt-8 font-medium text-lg">
           {{ $t("cobranza.renovaciones") }}
         </h2>
         <p

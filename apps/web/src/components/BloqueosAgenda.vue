@@ -205,7 +205,7 @@ watch(() => [props.proveedorId, props.sucursalId], cargar, { immediate: true });
 
 <template>
   <div class="mt-8 tu-card p-6">
-    <h2 class="font-light text-lg">{{ $t("bloqueosAgenda.titulo") }}</h2>
+    <h2 class="font-medium text-lg">{{ $t("bloqueosAgenda.titulo") }}</h2>
     <p class="text-sm mt-1" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("bloqueosAgenda.ayuda") }}
     </p>

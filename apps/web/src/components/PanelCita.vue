@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import CambiarHorario from "@/components/CambiarHorario.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
+import CorregirCobro from "@/components/CorregirCobro.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import {
   aHora,
@@ -17,7 +18,6 @@ import {
 } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
-import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
 /**
@@ -27,7 +27,8 @@ import { useToastStore } from "@/stores/toast";
  *
  * Lo que mueve dinero o créditos se confirma antes (cobrar, marcar asistencia) y se
  * puede corregir después: la asistencia (llegó ↔ no asistió, el crédito se ajusta) y
- * la forma de pago de un cobro en caja, si el negocio lo permite (ADR 0086).
+ * un cobro en caja (su forma de pago o anularlo), si el negocio lo permite (ADR
+ * 0086/0087).
  */
 const props = defineProps<{
   abierto: boolean;
@@ -45,7 +46,6 @@ const emit = defineEmits<{ cerrar: []; cambiada: [] }>();
 
 const { t, te } = useI18n();
 const toast = useToastStore();
-const sesionStore = useSesionTenantStore();
 
 const METODOS = ["efectivo", "transferencia", "manual"] as const;
 const metodo = ref<(typeof METODOS)[number]>("efectivo");
@@ -216,47 +216,6 @@ async function cobrar(): Promise<void> {
     t("agendaVisual.cita.okCobrada"),
   );
 }
-// Corregir la forma de pago de un cobro en caja (ADR 0086): mismo monto.
-const corrigiendoPago = ref(false);
-const metodoCorregido = ref<(typeof METODOS)[number]>("efectivo");
-const puedeCorregirPago = computed(
-  () =>
-    cita.value?.pago?.en_caja === true &&
-    cita.value.pago.corregible &&
-    sesionStore.puede("ordenes.gestionar"),
-);
-function abrirCorreccionPago(): void {
-  const actual = cita.value?.pago?.metodo;
-  metodoCorregido.value = METODOS.find((m) => m !== actual) ?? METODOS[0];
-  corrigiendoPago.value = true;
-}
-async function corregirPago(): Promise<void> {
-  const p = cita.value?.pago;
-  if (!p || metodoCorregido.value === p.metodo) {
-    corrigiendoPago.value = false;
-    return;
-  }
-  if (
-    !(await confirmar(
-      t("agendaVisual.cita.confirmarMetodo", {
-        antes: nombreMetodo(p.metodo),
-        ahora: nombreMetodo(metodoCorregido.value),
-      }),
-      { aceptar: t("agendaVisual.cita.guardarMetodo") },
-    ))
-  ) {
-    return;
-  }
-  await accion(
-    () =>
-      api.put(`${props.base}/pagos/${p.id}/metodo`, {
-        metodo: metodoCorregido.value,
-      }),
-    t("agendaVisual.cita.okMetodo"),
-  );
-  corrigiendoPago.value = false;
-}
-
 // Reprogramar (2.1): misma reserva y pagos, otro horario.
 const reprogramando = ref(false);
 function reprogramada(datos: { antes: string; ahora: string }): void {
@@ -363,50 +322,13 @@ function cancelar(por: "cliente" | "negocio" | null): void {
         </template>
       </dl>
 
-      <!-- Corregir la forma de pago (cobro en caja, si el negocio lo permite) -->
-      <div v-if="puedeCorregirPago">
-        <button
-          v-if="!corrigiendoPago"
-          type="button"
-          class="tu-enlace text-sm"
-          data-prueba="corregir-pago"
-          @click="abrirCorreccionPago"
-        >
-          {{ $t("agendaVisual.cita.corregirMetodo") }}
-        </button>
-        <div v-else class="space-y-2">
-          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("agendaVisual.cita.corregirMetodoAyuda") }}
-          </p>
-          <div class="flex items-stretch gap-2">
-            <select
-              v-model="metodoCorregido"
-              class="tu-input w-auto"
-              :aria-label="$t('agendaVisual.cita.metodo')"
-            >
-              <option v-for="m in METODOS" :key="m" :value="m">
-                {{ $t(`agendaVisual.cita.metodos.${m}`) }}
-              </option>
-            </select>
-            <button
-              type="button"
-              class="tu-btn tu-btn-primario flex-1"
-              :disabled="accionando"
-              @click="corregirPago"
-            >
-              {{ $t("agendaVisual.cita.guardarMetodo") }}
-            </button>
-            <button
-              type="button"
-              class="tu-btn tu-btn-fantasma"
-              :disabled="accionando"
-              @click="corrigiendoPago = false"
-            >
-              {{ $t("comun.cancelar") }}
-            </button>
-          </div>
-        </div>
-      </div>
+      <!-- Cobro en caja con error: corregir la forma o anularlo (ADR 0086/0087) -->
+      <CorregirCobro
+        v-if="cita?.pago?.en_caja"
+        :base="base"
+        :pago="cita.pago"
+        @cambiado="emit('cambiada')"
+      />
 
       <!-- Acciones del día -->
       <div v-if="activa" class="pc-acciones">
@@ -496,11 +418,7 @@ function cancelar(por: "cliente" | "negocio" | null): void {
       </div>
 
       <!-- Ya marcada: se puede corregir (el crédito se ajusta en su saldo) -->
-      <div
-        v-else-if="corregibleAsistencia"
-       
-        data-prueba="corregir-asistencia"
-      >
+      <div v-else-if="corregibleAsistencia" data-prueba="corregir-asistencia">
         <button
           type="button"
           class="tu-btn tu-btn-fantasma w-full"

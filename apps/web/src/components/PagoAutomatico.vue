@@ -169,7 +169,7 @@ onMounted(async () => {
 
 <template>
   <div v-if="disponible && membresias.length > 0" class="tu-card p-6">
-    <h2 class="font-light text-lg">{{ $t("pagoAutomatico.titulo") }}</h2>
+    <h2 class="font-medium text-lg">{{ $t("pagoAutomatico.titulo") }}</h2>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("pagoAutomatico.ayuda") }}
     </p>

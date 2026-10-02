@@ -179,7 +179,7 @@ onMounted(cargar);
 
 <template>
   <div>
-    <h2 class="font-light text-lg">{{ $t("cobro.tarifas.titulo") }}</h2>
+    <h2 class="font-medium text-lg">{{ $t("cobro.tarifas.titulo") }}</h2>
     <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("cobro.tarifas.ayuda") }}
     </p>
@@ -191,7 +191,7 @@ onMounted(cargar);
         @submit.prevent="publicar(m)"
       >
         <div>
-          <h3 class="font-light">{{ $t(`cobro.tarifas.${m}`) }}</h3>
+          <h3 class="font-medium">{{ $t(`cobro.tarifas.${m}`) }}</h3>
           <p
             v-if="vigentes[m]"
             class="text-xs"

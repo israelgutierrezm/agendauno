@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AnularCobroTenant;
 use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -23,7 +24,7 @@ class PagosTenantController
 {
     private const LIMITE = 200;
 
-    public function index(): JsonResponse
+    public function index(AnularCobroTenant $anular, CorregirMetodoPagoTenant $corregir): JsonResponse
     {
         $pagos = PagoTenant::query()
             ->whereIn('estado', [
@@ -42,7 +43,7 @@ class PagosTenantController
             ->get();
 
         return response()->json([
-            'data' => $pagos->map(function (PagoTenant $pago): array {
+            'data' => $pagos->map(function (PagoTenant $pago) use ($anular, $corregir): array {
                 $reembolsado = (int) ($pago->getAttribute('reembolsado_minor') ?? 0);
                 $comprometido = (int) ($pago->getAttribute('comprometido_minor') ?? 0);
 
@@ -59,9 +60,34 @@ class PagosTenantController
                     'reembolsable_minor' => max(0, $pago->monto_minor - $comprometido),
                     'con_reembolsos' => (int) $pago->getAttribute('reembolsos_count') > 0,
                     'registrado_por' => $pago->registradoPor?->name,
+                    // Correcciones de un cobro en caja (ADR 0086/0087); lo que pide
+                    // consultas por fila (factura, uso de créditos) se valida al guardar.
+                    'metodo_caja' => $pago->proveedor === 'manual' ? $pago->orden?->metodo_pago : null,
+                    'corregible' => $corregir->impedimento($pago, conFactura: false) === null,
+                    'anulable' => $anular->impedimento($pago, completo: false) === null,
                 ];
             })->all(),
         ]);
+    }
+
+    /**
+     * Anula un cobro en caja registrado por error (ADR 0087): el pago queda anulado, la
+     * venta vuelve a estar por cobrar y se retira lo que concedió. Motivo obligatorio.
+     */
+    public function anular(Request $request, AnularCobroTenant $anular): JsonResponse
+    {
+        $pago = PagoTenant::query()->where('ulid', (string) $request->route('pago'))->firstOrFail();
+        $validado = $request->validate([
+            'motivo' => ['required', 'string', 'max:255'],
+        ]);
+        $actor = $request->attributes->get('usuario_tenant');
+
+        $pago = $anular->anular($pago, $actor instanceof Usuario ? $actor : null, (string) $validado['motivo']);
+
+        return response()->json(['data' => [
+            'id' => $pago->ulid,
+            'estado' => $pago->estado->value,
+        ]]);
     }
 
     /**

@@ -15,4 +15,6 @@ enum EstadoPago: string
     case Rechazado = 'rechazado';
     case Reembolsado = 'reembolsado';
     case ParcialmenteReembolsado = 'parcialmente_reembolsado';
+    // Cobro en caja registrado por error: nunca entró el dinero (ADR 0087).
+    case Anulado = 'anulado';
 }

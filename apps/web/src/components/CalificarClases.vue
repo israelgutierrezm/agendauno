@@ -73,7 +73,7 @@ onMounted(cargar);
 
 <template>
   <div v-if="pendientes.length > 0" class="tu-card p-6">
-    <h2 class="font-light text-lg">{{ $t("resenas.califica") }}</h2>
+    <h2 class="font-medium text-lg">{{ $t("resenas.califica") }}</h2>
     <ul class="mt-2">
       <li
         v-for="p in pendientes"

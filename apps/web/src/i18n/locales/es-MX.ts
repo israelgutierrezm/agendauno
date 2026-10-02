@@ -4,7 +4,8 @@ export default {
     ver: "Ver en pantalla completa",
     salir: "Salir de pantalla completa",
     noDisponible: "Este navegador no permite activar la pantalla completa.",
-    agendaAlternativa: "Agenda ampliada dentro de la ventana. Este navegador no permite activar la pantalla completa.",
+    agendaAlternativa:
+      "Agenda ampliada dentro de la ventana. Este navegador no permite activar la pantalla completa.",
   },
   accesos: {
     etiqueta: "Accesos rápidos",
@@ -941,6 +942,7 @@ export default {
     regularizar: "Regularizar",
     regularizando: "Regularizando…",
     reembolsar: "Reembolsar",
+    corregir: "Corregir",
     estados: {
       en_mora: "En mora",
       suspendido: "Suspendido",

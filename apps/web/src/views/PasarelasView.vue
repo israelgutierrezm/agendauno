@@ -169,7 +169,7 @@ onMounted(cargar);
         class="tu-card p-6"
       >
         <div class="flex items-center justify-between gap-3">
-          <h2 class="font-light text-lg">
+          <h2 class="font-medium text-lg">
             {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
           </h2>
           <span class="tu-badge">{{ $t("pasarelasEstado.proximamente") }}</span>
@@ -184,7 +184,7 @@ onMounted(cargar);
         class="tu-card p-6"
       >
         <div class="flex items-center justify-between gap-3">
-          <h2 class="font-light text-lg">
+          <h2 class="font-medium text-lg">
             {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
           </h2>
           <label class="flex items-center gap-2 text-sm cursor-pointer">

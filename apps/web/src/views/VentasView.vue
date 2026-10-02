@@ -278,7 +278,7 @@ onMounted(cargar);
     <div v-if="!cargando" class="mt-6 grid gap-6 md:grid-cols-2">
       <!-- Vender -->
       <div v-if="puedeVender" class="tu-card p-6">
-        <h2 class="font-light text-lg">{{ $t("ventas.vender.titulo") }}</h2>
+        <h2 class="font-medium text-lg">{{ $t("ventas.vender.titulo") }}</h2>
 
         <p
           v-if="miembros.length === 0"
@@ -446,7 +446,7 @@ onMounted(cargar);
 
     <!-- Ventas recientes -->
     <div v-if="!cargando" class="mt-6">
-      <h2 class="font-light text-lg mb-3">{{ $t("ventas.ordenes.titulo") }}</h2>
+      <h2 class="font-medium text-lg mb-3">{{ $t("ventas.ordenes.titulo") }}</h2>
       <TablaDatos
         :columnas="columnasOrdenes"
         :filas="ordenes"

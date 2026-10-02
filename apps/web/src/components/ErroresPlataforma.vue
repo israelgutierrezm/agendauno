@@ -152,7 +152,7 @@ onMounted(() => void cargar());
   <div class="tu-card p-5">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h2 class="font-light text-lg">
+        <h2 class="font-medium text-lg">
           {{ $t("plataformaAdmin.errores.titulo") }}
         </h2>
         <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">

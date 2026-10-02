@@ -147,7 +147,7 @@ onMounted(cargar);
 <template>
   <div>
     <div class="flex flex-wrap items-end justify-between gap-3">
-      <h2 class="font-light text-lg">{{ $t("corteCaja.titulo") }}</h2>
+      <h2 class="font-medium text-lg">{{ $t("corteCaja.titulo") }}</h2>
       <button
         type="button"
         class="tu-btn tu-btn-fantasma text-sm"

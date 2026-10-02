@@ -213,7 +213,7 @@ onMounted(cargar);
       <div class="mt-6 tu-card p-6">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <h2 class="font-light">{{ $t("datosFiscales.sellos.titulo") }}</h2>
+            <h2 class="font-medium">{{ $t("datosFiscales.sellos.titulo") }}</h2>
             <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
               {{ $t("datosFiscales.sellos.subtitulo") }}
             </p>
