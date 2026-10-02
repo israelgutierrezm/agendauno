@@ -61,11 +61,11 @@ class AcumularPuntos
             return;
         }
 
-        // orden.pagada: solo si la orden sigue pagada (el relay puede llegar tarde, tras
-        // anular el cobro) y no dejó ya puntos vigentes (si se volvió a cobrar, un
-        // evento viejo no premia dos veces).
+        // orden.pagada: no si su cobro se anuló (el relay puede llegar tarde) ni si ya
+        // dejó puntos vigentes (si se volvió a cobrar, un evento viejo no premia dos
+        // veces).
         $ordenUlid = $this->comoTexto($payload['orden_id'] ?? null);
-        if ($ordenUlid === null || ! $this->sigueCobrada($ordenUlid) || $this->puntos->vigentesDeCompra($ordenUlid) > 0) {
+        if ($ordenUlid === null || $this->cobroAnulado($ordenUlid) || $this->puntos->vigentesDeCompra($ordenUlid) > 0) {
             return;
         }
 
@@ -91,12 +91,15 @@ class AcumularPuntos
         $this->puntos->retirarDeCompra($personaId, $ordenUlid, $evento->eventoUlid);
     }
 
-    private function sigueCobrada(string $ordenUlid): bool
+    /**
+     * Anular deja la orden en pendiente (ADR 0087). Cancelada o reembolsada después,
+     * el pago sí ocurrió. `value()` devuelve el enum ya casteado.
+     */
+    private function cobroAnulado(string $ordenUlid): bool
     {
-        // `value()` devuelve el estado ya casteado al enum.
         $estado = OrdenTenant::query()->where('ulid', $ordenUlid)->value('estado');
 
-        return $estado === EstadoOrden::Pagada || $estado === EstadoOrden::Pagada->value;
+        return $estado === EstadoOrden::Pendiente || $estado === EstadoOrden::Pendiente->value;
     }
 
     private function comoTexto(mixed $valor): ?string

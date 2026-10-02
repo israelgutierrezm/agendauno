@@ -25,7 +25,7 @@ use Illuminate\Support\Collection;
 class CalcularNominaTenant
 {
     /**
-     * @return list<array{usuario: string|null, tipo: string, unidades: float, monto_total_minor: int, moneda: string}>
+     * @return list<array{usuario_id: string|null, usuario: string|null, tipo: string, monto_minor: int, unidades: float, monto_total_minor: int, moneda: string}>
      */
     public function calcular(string $desde, string $hasta): array
     {
@@ -42,8 +42,10 @@ class CalcularNominaTenant
                 [$unidades, $total] = $this->calcularMonto($esquema, $sesiones);
 
                 return [
+                    'usuario_id' => $esquema->usuario?->ulid,
                     'usuario' => $esquema->usuario?->name,
                     'tipo' => $esquema->tipo->value,
+                    'monto_minor' => (int) $esquema->monto_minor,
                     'unidades' => $unidades,
                     'monto_total_minor' => $total,
                     'moneda' => $esquema->moneda,

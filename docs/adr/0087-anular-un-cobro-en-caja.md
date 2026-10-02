@@ -60,11 +60,13 @@ El relay procesa en orden, pero un evento que falla se reintenta después. Por e
 - **Puntos:**
   - Con `pago.anulado` se retiran los puntos de esa compra (`retirarDeCompra`), sin
     dejar el saldo en negativo si ya se gastaron.
-  - Con `orden.pagada` solo se suman si la orden sigue pagada y si esa compra no dejó
-    ya puntos vigentes. Así, un evento que llega tarde no premia un cobro anulado ni
-    paga dos veces una orden que se volvió a cobrar.
-- **Recibo y aviso al equipo:** `orden.pagada` no se envía si la orden ya no está
-  pagada.
+  - Con `orden.pagada` no se suman si su cobro se anuló (la orden volvió a
+    pendiente) ni si esa compra ya dejó puntos vigentes. Así, un evento que llega
+    tarde no premia un cobro anulado ni paga dos veces una orden que se volvió a
+    cobrar.
+- **Recibo y aviso al equipo:** `orden.pagada` no se envía si su cobro se anuló.
+- Una orden cancelada o reembolsada después sí se pagó: su recibo y sus puntos
+  valen. Por eso la guarda mira «pendiente» y no «ya no está pagada».
 - **Webhooks y automatizaciones:** reciben `pago.anulado` (está en el catálogo de
   eventos).
 

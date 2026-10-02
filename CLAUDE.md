@@ -159,6 +159,12 @@ Prefer feature tests around real domain flows over excessive mocking. Locally th
 API suite runs with SQLite (`DB_CONNECTION=sqlite DB_DATABASE=":memory:"`); CI runs
 it with MySQL and also runs the concurrency check.
 
+API tests run on a fixed clock (`Tests\TestCase::AHORA`, 2026-10-01 06:00 Mexico City)
+so literal dates in tests don't expire. A test that needs another moment uses
+`travelTo`; tests that compare with file timestamps on disk call `travelBack`. Test
+helpers are global functions: give them unique names (a duplicate breaks the whole
+suite, not just one file).
+
 ## Workflow for Claude Code
 
 Before coding a new domain module:

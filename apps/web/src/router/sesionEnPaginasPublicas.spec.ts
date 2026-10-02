@@ -39,6 +39,10 @@ async function routerConSesion() {
   return router;
 }
 
+// Importar el router completo (con todas sus pantallas) tarda: con la máquina
+// ocupada pasa de los 5 s por defecto.
+vi.setConfig({ testTimeout: 20_000 });
+
 beforeEach(() => {
   vi.resetModules();
   // jsdom no desplaza la ventana (el router lo pide al navegar).

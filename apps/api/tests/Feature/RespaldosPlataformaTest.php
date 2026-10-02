@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\Storage;
 */
 
 beforeEach(function (): void {
+    // Respaldos comparan fechas de archivos del disco: con el reloj real.
+    $this->travelBack();
     File::deleteDirectory(storage_path('tenants'));
     Storage::fake('local');
     Storage::fake('public');

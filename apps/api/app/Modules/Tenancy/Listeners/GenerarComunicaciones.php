@@ -45,7 +45,7 @@ class GenerarComunicaciones
     public function handle(EventoDeDominioTenant $evento): void
     {
         // El relay puede llegar tarde: el recibo de un cobro ya anulado no se manda.
-        if ($evento->tipo === 'orden.pagada' && ! $this->ordenSigueCobrada($evento->payload)) {
+        if ($evento->tipo === 'orden.pagada' && $this->cobroAnulado($evento->payload)) {
             return;
         }
 
@@ -304,16 +304,17 @@ class GenerarComunicaciones
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function ordenSigueCobrada(array $payload): bool
+    private function cobroAnulado(array $payload): bool
     {
         $ulid = $payload['orden_id'] ?? null;
 
         if (! is_string($ulid)) {
             return false;
         }
-        // `value()` devuelve el estado ya casteado al enum.
+        // Anular deja la orden en pendiente (ADR 0087). Cancelada o reembolsada después,
+        // el pago sí ocurrió y su recibo vale. `value()` devuelve el enum ya casteado.
         $estado = OrdenTenant::query()->where('ulid', $ulid)->value('estado');
 
-        return $estado === EstadoOrden::Pagada || $estado === EstadoOrden::Pagada->value;
+        return $estado === EstadoOrden::Pendiente || $estado === EstadoOrden::Pendiente->value;
     }
 }

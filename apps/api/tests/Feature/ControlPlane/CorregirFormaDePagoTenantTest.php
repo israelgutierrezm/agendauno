@@ -49,7 +49,7 @@ function citaCobradaEnEfectivo(): array
         'metodo' => 'efectivo',
     ], conBearer($e['bearer']))->assertOk();
 
-    $pago = citaEnAgenda($e, $dia, (string) $cita['id'])['cita']['pago'];
+    $pago = citaPagadaEnAgenda($e, $dia, (string) $cita['id'])['cita']['pago'];
     expect($pago['metodo'])->toBe('efectivo');
     expect($pago['en_caja'])->toBeTrue();
 
@@ -60,7 +60,7 @@ function citaCobradaEnEfectivo(): array
  * @param  array{slug: string, bearer: string}  $e
  * @return array<string, mixed>
  */
-function citaEnAgenda(array $e, string $dia, string $sesion): array
+function citaPagadaEnAgenda(array $e, string $dia, string $sesion): array
 {
     return collect(test()->getJson("/api/v1/app/{$e['slug']}/sesiones?desde={$dia}&hasta={$dia}", conBearer($e['bearer']))
         ->assertOk()->json('data'))->firstWhere('id', $sesion);
@@ -68,13 +68,13 @@ function citaEnAgenda(array $e, string $dia, string $sesion): array
 
 it('corrige la forma de pago sin cambiar el monto y lo deja en la bitácora', function (): void {
     $c = citaCobradaEnEfectivo();
-    expect(citaEnAgenda($c['e'], $c['dia'], $c['sesion'])['cita']['pago']['corregible'])->toBeTrue();
+    expect(citaPagadaEnAgenda($c['e'], $c['dia'], $c['sesion'])['cita']['pago']['corregible'])->toBeTrue();
 
     $this->putJson("/api/v1/app/{$c['e']['slug']}/pagos/{$c['pago']}/metodo", [
         'metodo' => 'transferencia', 'motivo' => 'Pagó por transferencia',
     ], conBearer($c['e']['bearer']))->assertOk()->assertJsonPath('data.metodo', 'transferencia');
 
-    expect(citaEnAgenda($c['e'], $c['dia'], $c['sesion'])['cita']['pago']['metodo'])->toBe('transferencia');
+    expect(citaPagadaEnAgenda($c['e'], $c['dia'], $c['sesion'])['cita']['pago']['metodo'])->toBe('transferencia');
     $pago = collect($this->getJson("/api/v1/app/{$c['e']['slug']}/pagos", conBearer($c['e']['bearer']))
         ->assertOk()->json('data'))->firstWhere('id', $c['pago']);
     expect($pago['metodo'])->toBe('spei');
@@ -92,7 +92,7 @@ it('si el negocio no lo permite, no se corrige ni se ofrece', function (): void 
     $this->putJson("/api/v1/app/{$c['e']['slug']}/parametros", ['valores' => ['pagos.permitir_corregir_metodo' => 0]], conBearer($c['e']['bearer']))
         ->assertOk();
 
-    expect(citaEnAgenda($c['e'], $c['dia'], $c['sesion'])['cita']['pago']['corregible'])->toBeFalse();
+    expect(citaPagadaEnAgenda($c['e'], $c['dia'], $c['sesion'])['cita']['pago']['corregible'])->toBeFalse();
     $this->putJson("/api/v1/app/{$c['e']['slug']}/pagos/{$c['pago']}/metodo", ['metodo' => 'transferencia'], conBearer($c['e']['bearer']))
         ->assertStatus(422)->assertJsonPath('code', 'PAYMENT_NOT_CORRECTABLE');
 });
