@@ -1,3 +1,4 @@
+import { createPinia } from "pinia";
 import { createSSRApp, h } from "vue";
 import { renderToString } from "vue/server-renderer";
 import { createMemoryHistory, createRouter, RouterView } from "vue-router";
@@ -37,7 +38,8 @@ export async function render(
   const app = createSSRApp({
     render: () => h(PublicShell, {}, { default: () => h(RouterView) }),
   });
-  app.use(router).use(i18n);
+  // Pinia vacía: la barra pública lee la sesión (ADR 0085) y aquí nunca la hay.
+  app.use(router).use(i18n).use(createPinia());
   await router.push(path);
   await router.isReady();
   const context: { modules?: Set<string> } = {};
