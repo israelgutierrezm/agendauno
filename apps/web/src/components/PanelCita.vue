@@ -16,12 +16,18 @@ import {
   type SesionAgenda,
 } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
 /**
  * Detalle de una CITA para recepción: quién, qué servicio, con quién, a qué hora y
  * cómo va (pagada, por cobrar, llegó…), con las acciones del día: marcar llegada o
  * inasistencia, cobrar en caja y cancelar (libera el horario del profesional).
+ *
+ * Lo que mueve dinero o créditos se confirma antes (cobrar, marcar asistencia) y se
+ * puede corregir después: la asistencia (llegó ↔ no asistió, el crédito se ajusta) y
+ * la forma de pago de un cobro en caja, si el negocio lo permite (ADR 0086).
  */
 const props = defineProps<{
   abierto: boolean;
@@ -37,8 +43,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{ cerrar: []; cambiada: [] }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const toast = useToastStore();
+const sesionStore = useSesionTenantStore();
 
 const METODOS = ["efectivo", "transferencia", "manual"] as const;
 const metodo = ref<(typeof METODOS)[number]>("efectivo");
@@ -90,6 +97,10 @@ const porCobrar = computed(
     cita.value.orden_id != null &&
     (cita.value.estado === "pendiente_pago" || cita.value.por_cobrar === true),
 );
+function nombreMetodo(m: string | null | undefined): string {
+  const llave = `agendaVisual.cita.metodos.${m ?? "manual"}`;
+  return te(llave) ? t(llave) : (m ?? "");
+}
 const pago = computed(() => {
   if (cita.value === null || cita.value.orden_id == null) {
     return t("agendaVisual.cita.pagoMembresia");
@@ -97,8 +108,13 @@ const pago = computed(() => {
   if (cita.value.estado === "pendiente_pago") {
     return t("agendaVisual.cita.pagoEnLinea");
   }
-  return cita.value.por_cobrar === true
-    ? t("agendaVisual.cita.pagoEnCaja")
+  if (cita.value.por_cobrar === true) {
+    return t("agendaVisual.cita.pagoEnCaja");
+  }
+  return cita.value.pago?.metodo
+    ? t("agendaVisual.cita.pagadaCon", {
+        metodo: nombreMetodo(cita.value.pago.metodo),
+      })
     : t("agendaVisual.cita.pagada");
 });
 const activa = computed(
@@ -123,9 +139,33 @@ async function accion(
     accionando.value = false;
   }
 }
-function marcar(asistencia: "presente" | "ausente"): void {
+async function marcar(asistencia: "presente" | "ausente"): Promise<void> {
   const c = cita.value;
   if (c === null) {
+    return;
+  }
+  const cliente = c.cliente ?? t("agendaVisual.profesionales.sinCliente");
+  const nombre = (e: string): string =>
+    e === "presente"
+      ? t("agendaVisual.cita.marcarLlegada")
+      : t("agendaVisual.cita.noAsistio");
+  // Marcar o corregir mueve créditos: se confirma con su efecto a la vista.
+  const mensaje =
+    c.asistencia && c.asistencia !== asistencia
+      ? t("agendaVisual.cita.confirmarCorreccion", {
+          cliente,
+          antes: nombre(c.asistencia),
+          ahora: nombre(asistencia),
+        })
+      : asistencia === "presente"
+        ? t("agendaVisual.cita.confirmarLlegada", { cliente })
+        : t("agendaVisual.cita.confirmarNoAsistio", { cliente });
+  if (
+    !(await confirmar(mensaje, {
+      aceptar: nombre(asistencia),
+      peligro: asistencia === "ausente",
+    }))
+  ) {
     return;
   }
   void accion(
@@ -133,14 +173,38 @@ function marcar(asistencia: "presente" | "ausente"): void {
       api.post(`${props.base}/reservas/${c.reserva_id}/asistencia`, {
         estado: asistencia,
       }),
-    asistencia === "presente"
-      ? t("agendaVisual.cita.okLlego")
-      : t("agendaVisual.cita.okNoAsistio"),
+    c.asistencia
+      ? t("agendaVisual.cita.okCorregida")
+      : asistencia === "presente"
+        ? t("agendaVisual.cita.okLlego")
+        : t("agendaVisual.cita.okNoAsistio"),
   );
 }
-function cobrar(): void {
+// Ya marcada: corregir al otro estado (el crédito se ajusta en el saldo).
+const corregibleAsistencia = computed(
+  () =>
+    props.puedeMarcar &&
+    cita.value !== null &&
+    cita.value.estado === "confirmada" &&
+    (cita.value.asistencia === "presente" ||
+      cita.value.asistencia === "ausente"),
+);
+async function cobrar(): Promise<void> {
   const c = cita.value;
   if (c === null || c.orden_id == null) {
+    return;
+  }
+  // Un cobro en caja no se deshace: se confirma monto, forma y a quién.
+  if (
+    !(await confirmar(
+      t("agendaVisual.cita.confirmarCobro", {
+        monto: precio.value ?? "",
+        metodo: nombreMetodo(metodo.value),
+        cliente: c.cliente ?? t("agendaVisual.profesionales.sinCliente"),
+      }),
+      { aceptar: t("agendaVisual.cita.cobrar", { monto: precio.value ?? "" }) },
+    ))
+  ) {
     return;
   }
   const orden = c.orden_id;
@@ -152,6 +216,47 @@ function cobrar(): void {
     t("agendaVisual.cita.okCobrada"),
   );
 }
+// Corregir la forma de pago de un cobro en caja (ADR 0086): mismo monto.
+const corrigiendoPago = ref(false);
+const metodoCorregido = ref<(typeof METODOS)[number]>("efectivo");
+const puedeCorregirPago = computed(
+  () =>
+    cita.value?.pago?.en_caja === true &&
+    cita.value.pago.corregible &&
+    sesionStore.puede("ordenes.gestionar"),
+);
+function abrirCorreccionPago(): void {
+  const actual = cita.value?.pago?.metodo;
+  metodoCorregido.value = METODOS.find((m) => m !== actual) ?? METODOS[0];
+  corrigiendoPago.value = true;
+}
+async function corregirPago(): Promise<void> {
+  const p = cita.value?.pago;
+  if (!p || metodoCorregido.value === p.metodo) {
+    corrigiendoPago.value = false;
+    return;
+  }
+  if (
+    !(await confirmar(
+      t("agendaVisual.cita.confirmarMetodo", {
+        antes: nombreMetodo(p.metodo),
+        ahora: nombreMetodo(metodoCorregido.value),
+      }),
+      { aceptar: t("agendaVisual.cita.guardarMetodo") },
+    ))
+  ) {
+    return;
+  }
+  await accion(
+    () =>
+      api.put(`${props.base}/pagos/${p.id}/metodo`, {
+        metodo: metodoCorregido.value,
+      }),
+    t("agendaVisual.cita.okMetodo"),
+  );
+  corrigiendoPago.value = false;
+}
+
 // Reprogramar (2.1): misma reserva y pagos, otro horario.
 const reprogramando = ref(false);
 function reprogramada(datos: { antes: string; ahora: string }): void {
@@ -258,8 +363,53 @@ function cancelar(por: "cliente" | "negocio" | null): void {
         </template>
       </dl>
 
+      <!-- Corregir la forma de pago (cobro en caja, si el negocio lo permite) -->
+      <div v-if="puedeCorregirPago">
+        <button
+          v-if="!corrigiendoPago"
+          type="button"
+          class="tu-enlace text-sm"
+          data-prueba="corregir-pago"
+          @click="abrirCorreccionPago"
+        >
+          {{ $t("agendaVisual.cita.corregirMetodo") }}
+        </button>
+        <div v-else class="space-y-2">
+          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+            {{ $t("agendaVisual.cita.corregirMetodoAyuda") }}
+          </p>
+          <div class="flex items-stretch gap-2">
+            <select
+              v-model="metodoCorregido"
+              class="tu-input w-auto"
+              :aria-label="$t('agendaVisual.cita.metodo')"
+            >
+              <option v-for="m in METODOS" :key="m" :value="m">
+                {{ $t(`agendaVisual.cita.metodos.${m}`) }}
+              </option>
+            </select>
+            <button
+              type="button"
+              class="tu-btn tu-btn-primario flex-1"
+              :disabled="accionando"
+              @click="corregirPago"
+            >
+              {{ $t("agendaVisual.cita.guardarMetodo") }}
+            </button>
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma"
+              :disabled="accionando"
+              @click="corrigiendoPago = false"
+            >
+              {{ $t("comun.cancelar") }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Acciones del día -->
-      <div v-if="activa" class="space-y-2">
+      <div v-if="activa" class="pc-acciones">
         <div v-if="porCobrar && puedeCobrar" class="flex items-stretch gap-2">
           <select
             v-model="metodo"
@@ -301,55 +451,81 @@ function cancelar(por: "cliente" | "negocio" | null): void {
             {{ $t("agendaVisual.cita.noAsistio") }}
           </button>
         </div>
+
+        <!-- Cambios de la cita, aparte de lo del día -->
+        <div class="pc-secundarias">
+          <button
+            v-if="puedeCancelar && cita !== null && !cita.asistencia"
+            type="button"
+            class="tu-btn tu-btn-fantasma w-full"
+            :aria-expanded="reprogramando"
+            @click="reprogramando = !reprogramando"
+          >
+            {{ $t("reprogramar.titulo") }}
+          </button>
+          <CambiarHorario
+            v-if="reprogramando && cita !== null && sesion !== null"
+            :url="`${base}/reservas/${cita.reserva_id}/reprogramar`"
+            :zona="sesion.zona_horaria"
+            :inicia-en="sesion.inicia_en"
+            :profesionales="profesionales"
+            :profesional-id="sesion.instructor_id"
+            @hecho="reprogramada"
+            @cerrar="reprogramando = false"
+          />
+          <button
+            v-if="puedeCancelar"
+            type="button"
+            class="tu-btn tu-btn-fantasma w-full"
+            style="color: var(--error)"
+            :disabled="accionando"
+            :aria-expanded="cancelando"
+            @click="cancelando = !cancelando"
+          >
+            {{ $t("agendaVisual.cita.cancelar") }}
+          </button>
+          <ConfirmarCancelacion
+            v-if="cancelando && cita !== null"
+            :url="`${base}/reservas/${cita.reserva_id}/cancelacion`"
+            con-quien
+            :ocupado="accionando"
+            @confirmar="cancelar"
+            @cerrar="cancelando = false"
+          />
+        </div>
+      </div>
+
+      <!-- Ya marcada: se puede corregir (el crédito se ajusta en su saldo) -->
+      <div
+        v-else-if="corregibleAsistencia"
+       
+        data-prueba="corregir-asistencia"
+      >
         <button
-          v-if="puedeCancelar && cita !== null && !cita.asistencia"
           type="button"
           class="tu-btn tu-btn-fantasma w-full"
-          :aria-expanded="reprogramando"
-          @click="reprogramando = !reprogramando"
-        >
-          {{ $t("reprogramar.titulo") }}
-        </button>
-        <CambiarHorario
-          v-if="reprogramando && cita !== null && sesion !== null"
-          :url="`${base}/reservas/${cita.reserva_id}/reprogramar`"
-          :zona="sesion.zona_horaria"
-          :inicia-en="sesion.inicia_en"
-          :profesionales="profesionales"
-          :profesional-id="sesion.instructor_id"
-          @hecho="reprogramada"
-          @cerrar="reprogramando = false"
-        />
-        <button
-          v-if="puedeCancelar"
-          type="button"
-          class="tu-btn tu-btn-fantasma w-full"
-          style="color: var(--error)"
           :disabled="accionando"
-          :aria-expanded="cancelando"
-          @click="cancelando = !cancelando"
+          @click="
+            marcar(cita?.asistencia === 'presente' ? 'ausente' : 'presente')
+          "
         >
-          {{ $t("agendaVisual.cita.cancelar") }}
+          {{
+            cita?.asistencia === "presente"
+              ? $t("agendaVisual.cita.corregirANoAsistio")
+              : $t("agendaVisual.cita.corregirALlego")
+          }}
         </button>
-        <ConfirmarCancelacion
-          v-if="cancelando && cita !== null"
-          :url="`${base}/reservas/${cita.reserva_id}/cancelacion`"
-          con-quien
-          :ocupado="accionando"
-          @confirmar="cancelar"
-          @cerrar="cancelando = false"
-        />
       </div>
     </div>
   </PanelLateral>
 </template>
 
 <style scoped>
+/* Sin `margin`: lo pone el contenedor (space-y); un margin aquí lo anularía. */
 .pc-datos {
   display: grid;
   grid-template-columns: 6.5rem minmax(0, 1fr);
   gap: 0.6rem 0.75rem;
-  margin: 0;
   padding: 0.9rem;
   border-radius: 0.75rem;
   background: var(--superficie-2);
@@ -359,7 +535,21 @@ function cancelar(por: "cliente" | "negocio" | null): void {
   color: var(--texto-suave);
 }
 .pc-datos dd {
-  margin: 0;
   font-weight: 500;
+}
+.pc-acciones {
+  display: grid;
+  gap: 0.6rem;
+}
+/* Reprogramar y cancelar: aparte de lo del día, tras una línea. */
+.pc-secundarias {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--borde);
+}
+.pc-secundarias:empty {
+  display: none;
 }
 </style>

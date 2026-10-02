@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * Pagos capturados del estudio (data plane del tenant): base de la pantalla de
@@ -58,5 +62,31 @@ class PagosTenantController
                 ];
             })->all(),
         ]);
+    }
+
+    /**
+     * Corrige la forma de pago de un cobro en caja (ADR 0086): mismo monto, otra forma.
+     * Con motivo opcional; queda en la bitácora.
+     */
+    public function corregirMetodo(Request $request, CorregirMetodoPagoTenant $corregir): JsonResponse
+    {
+        $pago = PagoTenant::query()->where('ulid', (string) $request->route('pago'))->firstOrFail();
+        $validado = $request->validate([
+            'metodo' => ['required', Rule::in(CorregirMetodoPagoTenant::METODOS)],
+            'motivo' => ['nullable', 'string', 'max:255'],
+        ]);
+        $actor = $request->attributes->get('usuario_tenant');
+
+        $pago = $corregir->corregir(
+            $pago,
+            (string) $validado['metodo'],
+            $actor instanceof Usuario ? $actor : null,
+            $validado['motivo'] ?? null,
+        );
+
+        return response()->json(['data' => [
+            'id' => $pago->ulid,
+            'metodo' => $pago->orden->metodo_pago ?? $pago->metodo->value,
+        ]]);
     }
 }

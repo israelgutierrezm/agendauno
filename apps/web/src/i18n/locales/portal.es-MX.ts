@@ -54,7 +54,7 @@ export default {
       pase: "Pase de entrada",
       paseValor: "Muéstralo al llegar",
       expediente: "Expediente",
-      expedienteValor: "Documentos y formularios",
+      expedienteValor: "Documentos y fichas de datos",
       configuracion: "Configuración",
       configuracionValor: "Privacidad y tu cuenta",
     },
@@ -137,7 +137,7 @@ export default {
   expediente: {
     titulo: "Expediente",
     firmar: "Por firmar",
-    formularios: "Formularios",
+    formularios: "Ficha de datos",
   },
   configuracion: {
     titulo: "Configuración",

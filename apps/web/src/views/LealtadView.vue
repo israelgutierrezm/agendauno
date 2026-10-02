@@ -2,9 +2,11 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Programa {
@@ -38,6 +40,7 @@ interface Movimiento {
 interface Miembro {
   id: string;
   nombre_completo: string;
+  email?: string | null;
 }
 
 const { t } = useI18n();
@@ -57,6 +60,15 @@ const programa = ref<Programa>({
 const recompensas = ref<Recompensa[]>([]);
 const canjes = ref<Canje[]>([]);
 const miembros = ref<Miembro[]>([]);
+
+// Para elegir a alguien escribiendo su nombre o correo (BuscarPersona).
+const personasBuscables = computed(() =>
+  miembros.value.map((m) => ({
+    id: m.id,
+    nombre: m.nombre_completo,
+    detalle: m.email ?? null,
+  })),
+);
 
 const nueva = ref({ nombre: "", descripcion: "", costo_puntos: 100 });
 
@@ -156,6 +168,13 @@ async function canjear(): Promise<void> {
   if (miembroSel.value === "" || recompensaSel.value === "") {
     return;
   }
+  if (
+    !(await confirmar(t("confirmaciones.canjear"), {
+      aceptar: t("confirmaciones.canjearAceptar"),
+    }))
+  ) {
+    return;
+  }
   try {
     await api.post(`${base.value}/lealtad/canjes`, {
       persona_id: miembroSel.value,
@@ -175,6 +194,16 @@ async function ajustar(): Promise<void> {
   if (miembroSel.value === "" || Number(ajuste.value.puntos) === 0) {
     return;
   }
+  if (
+    !(await confirmar(
+      t("confirmaciones.ajustarPuntos", {
+        puntos: Number(ajuste.value.puntos),
+      }),
+      { aceptar: t("confirmaciones.ajustar") },
+    ))
+  ) {
+    return;
+  }
   try {
     await api.post(`${base.value}/miembros/${miembroSel.value}/puntos/ajuste`, {
       puntos: Number(ajuste.value.puntos),
@@ -192,6 +221,18 @@ async function accionCanje(
   c: Canje,
   accion: "entregar" | "cancelar",
 ): Promise<void> {
+  const seguir =
+    accion === "cancelar"
+      ? await confirmar(t("confirmaciones.cancelarCanje"), {
+          aceptar: t("confirmaciones.cancelarCanjeAceptar"),
+          peligro: true,
+        })
+      : await confirmar(t("confirmaciones.entregarCanje"), {
+          aceptar: t("confirmaciones.entregar"),
+        });
+  if (!seguir) {
+    return;
+  }
   error.value = null;
   try {
     await api.post(`${base.value}/lealtad/canjes/${c.id}/${accion}`, {});
@@ -359,16 +400,13 @@ onMounted(cargar);
         <!-- Consulta por miembro -->
         <div class="tu-card p-5">
           <h2 class="font-light">{{ $t("lealtad.miembro.titulo") }}</h2>
-          <select
+          <BuscarPersona
             v-model="miembroSel"
-            class="tu-input mt-3"
-            @change="verMiembro"
-          >
-            <option value="">{{ $t("lealtad.miembro.elige") }}</option>
-            <option v-for="m in miembros" :key="m.id" :value="m.id">
-              {{ m.nombre_completo }}
-            </option>
-          </select>
+            class="mt-3"
+            :personas="personasBuscables"
+            :placeholder="$t('lealtad.miembro.elige')"
+            @update:model-value="verMiembro"
+          />
 
           <template v-if="miembroSel !== '' && saldo !== null">
             <div class="mt-4 flex items-end justify-between">

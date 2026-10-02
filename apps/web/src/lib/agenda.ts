@@ -13,6 +13,13 @@ export interface CitaTitular {
   por_cobrar?: boolean; // agendada por el negocio y aún sin cobrar en caja
   nota?: string | null; // lo que el cliente pidió que supiéramos al agendar
   asiste?: string | null; // si la agendó para otra persona: quién asiste
+  // Ya pagada: con qué y si esa forma se puede corregir (ADR 0086).
+  pago?: {
+    id: string;
+    metodo: string | null;
+    en_caja: boolean;
+    corregible: boolean;
+  } | null;
 }
 
 export interface SesionAgenda {

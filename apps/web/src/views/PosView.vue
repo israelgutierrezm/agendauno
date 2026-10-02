@@ -6,6 +6,7 @@ import { useRoute, useRouter } from "vue-router";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Existencia {
@@ -151,6 +152,17 @@ function quitar(id: string): void {
 
 async function cobrar(): Promise<void> {
   if (carrito.value.length === 0 || sucursalSel.value === "") {
+    return;
+  }
+  if (
+    !(await confirmar(
+      t("confirmaciones.pos", {
+        total: dinero(totalCarrito.value),
+        metodo: t(`pos.metodos.${metodo.value}`),
+      }),
+      { aceptar: t("confirmaciones.cobrar") },
+    ))
+  ) {
     return;
   }
   accionando.value = true;

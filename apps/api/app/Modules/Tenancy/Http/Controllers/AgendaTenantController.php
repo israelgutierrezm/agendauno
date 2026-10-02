@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
+use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
 use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\VerificarAgendaTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -18,6 +20,7 @@ use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use App\Modules\Tenancy\TipoSesionTenant;
@@ -51,6 +54,7 @@ class AgendaTenantController
         private readonly ReservasTenant $reservas,
         private readonly VerificarAgendaTenant $agenda,
         private readonly ResolverAccesoTenant $resolver,
+        private readonly CorregirMetodoPagoTenant $corregirMetodo,
     ) {}
 
     /**
@@ -306,7 +310,7 @@ class AgendaTenantController
         return ReservaTenant::query()
             ->whereIn('sesion_id', $citas)
             ->whereIn('estado', self::OCUPAN_LUGAR)
-            ->with(['persona', 'asistencia', 'orden'])
+            ->with(['persona', 'asistencia', 'orden.pagos'])
             ->get()
             ->keyBy(fn (ReservaTenant $r): int => (int) $r->sesion_id)
             ->all();
@@ -383,6 +387,31 @@ class AgendaTenantController
     }
 
     /**
+     * El pago de una cita ya pagada: su forma y si se puede corregir. Sin revisar la
+     * factura (una consulta por cita): eso se valida al guardar la corrección.
+     *
+     * @return array{id: string, metodo: string|null, en_caja: bool, corregible: bool}|null
+     */
+    private function pagoDeCita(ReservaTenant $titular): ?array
+    {
+        $orden = $titular->orden;
+        if ($orden === null || $orden->estado !== EstadoOrden::Pagada) {
+            return null;
+        }
+        $pago = $orden->pagos->first(fn (PagoTenant $p): bool => $p->estado !== EstadoPago::Pendiente && $p->estado !== EstadoPago::Rechazado);
+        if (! $pago instanceof PagoTenant) {
+            return null;
+        }
+
+        return [
+            'id' => (string) $pago->ulid,
+            'metodo' => $orden->metodo_pago ?? $pago->metodo?->value,
+            'en_caja' => $pago->proveedor === 'manual',
+            'corregible' => $this->corregirMetodo->impedimento($pago, conFactura: false) === null,
+        ];
+    }
+
+    /**
      * @param  array<int, ReservaTenant>  $titulares  titular de cada cita, por id de sesión
      * @return array<string, mixed>
      */
@@ -427,6 +456,8 @@ class AgendaTenantController
                 // Orden de la cita (servicio de pago) y si falta cobrarla en caja.
                 'orden_id' => $titular->orden?->ulid,
                 'por_cobrar' => $titular->orden !== null && $titular->orden->estado === EstadoOrden::Pendiente,
+                // Con qué se pagó y si esa forma se puede corregir (ADR 0086).
+                'pago' => $this->pagoDeCita($titular),
                 // Lo que el cliente pidió que supiéramos al agendar (ADR 0067).
                 'nota' => $titular->nota_cliente,
                 // Si la agendó para otra persona: quién asiste (ADR 0068).

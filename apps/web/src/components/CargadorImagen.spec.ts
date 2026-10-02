@@ -10,6 +10,9 @@ vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: (e: unknown) => String(e),
 }));
+// Quitar la imagen se confirma (no se recupera sin volver a subirla).
+const confirmar = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/confirmar", () => ({ confirmar }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({ slug: "demo" }),
 }));
@@ -65,8 +68,9 @@ describe("cargador de imagen", () => {
     expect(w.emitted("update:url")).toEqual([["/storage/s1.webp"]]);
   });
 
-  it("la quita con DELETE en la misma ruta", async () => {
+  it("la quita con DELETE en la misma ruta, tras confirmar", async () => {
     api.delete.mockResolvedValue({});
+    confirmar.mockResolvedValue(true);
     const w = montar({
       url: "/storage/s1.webp",
       ruta: "sucursales/s1/foto",
@@ -81,6 +85,21 @@ describe("cargador de imagen", () => {
       "/api/v1/app/demo/sucursales/s1/foto",
     );
     expect(w.emitted("update:url")).toEqual([[null]]);
+  });
+
+  it("si no se confirma, no la quita", async () => {
+    confirmar.mockResolvedValue(false);
+    const w = montar({
+      url: "/storage/s1.webp",
+      ruta: "sucursales/s1/foto",
+      quitarTexto: "Quitar foto",
+    });
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Quitar foto")!
+      .trigger("click");
+    await flushPromises();
+    expect(api.delete).not.toHaveBeenCalled();
   });
 
   it("sin ruta es la portada del negocio, y no sube lo que no es imagen", async () => {

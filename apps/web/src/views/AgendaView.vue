@@ -2,6 +2,8 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import BuscarPersona from "@/components/BuscarPersona.vue";
+import BotonPantallaCompleta from "@/components/BotonPantallaCompleta.vue";
 import AgendaClasesSemana from "@/components/AgendaClasesSemana.vue";
 import AgendaKpis from "@/components/AgendaKpis.vue";
 import type {
@@ -32,6 +34,7 @@ import {
 } from "@/lib/agenda";
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmarAsistencia } from "@/lib/confirmarAsistencia";
 import { trackEvent } from "@/lib/analytics";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -85,6 +88,7 @@ interface Miembro {
   id: string;
   nombre: string;
   nombre_completo: string;
+  email?: string | null;
 }
 interface Reserva {
   id: string;
@@ -142,6 +146,15 @@ const ofertas = ref<Oferta[]>([]);
 const sucursales = ref<Sucursal[]>([]);
 const sesiones = ref<Sesion[]>([]);
 const miembros = ref<Miembro[]>([]);
+
+// Para elegir a alguien escribiendo su nombre o correo (BuscarPersona).
+const personasBuscables = computed(() =>
+  miembros.value.map((m) => ({
+    id: m.id,
+    nombre: nombreMiembro(m),
+    detalle: m.email ?? null,
+  })),
+);
 const instructores = ref<{ id: string; nombre: string }[]>([]);
 const recursos = ref<Recurso[]>([]);
 // Horario de atención de cada profesional (sombrea lo que queda fuera en citas).
@@ -1129,6 +1142,9 @@ async function refrescarTras(sesionId: string): Promise<void> {
 }
 
 async function reservar(id: string): Promise<void> {
+  if (reservarModel.value.miembroId === "") {
+    return;
+  }
   accionando.value = true;
   error.value = null;
   try {
@@ -1186,6 +1202,17 @@ async function marcar(
   estado: "presente" | "ausente",
   sesionId: string,
 ): Promise<void> {
+  const r = roster.value.find((x) => x.id === reservaId);
+  if (
+    !(await confirmarAsistencia(
+      t,
+      r?.persona ?? "",
+      r?.asistencia ?? null,
+      estado,
+    ))
+  ) {
+    return;
+  }
   accionando.value = true;
   error.value = null;
   try {
@@ -1582,6 +1609,7 @@ onMounted(async () => {
         :subtitulo="$t('agenda.subtitulo')"
       />
       <div class="flex flex-wrap items-center gap-2">
+        <BotonPantallaCompleta agenda />
         <!-- De paso, a donde se configuran (cada una guarda sus datos). -->
         <RouterLink
           v-if="puedeEntrar('horarios', sesion)"
@@ -2184,19 +2212,11 @@ onMounted(async () => {
               <label class="tu-label" for="rm">{{
                 $t("agenda.reservar.miembro")
               }}</label>
-              <select
-                id="rm"
+              <BuscarPersona
                 v-model="reservarModel.miembroId"
-                class="tu-input"
-                required
-              >
-                <option value="" disabled>
-                  {{ $t("agenda.reservar.elegir") }}
-                </option>
-                <option v-for="m in miembros" :key="m.id" :value="m.id">
-                  {{ nombreMiembro(m) }}
-                </option>
-              </select>
+                campo-id="rm"
+                :personas="personasBuscables"
+              />
             </div>
             <div class="min-w-[120px]">
               <label class="tu-label" for="rcanal">{{
@@ -2369,19 +2389,11 @@ onMounted(async () => {
                   <label class="tu-label" :for="`tr-${r.id}`">{{
                     $t("agenda.roster.transferirA")
                   }}</label>
-                  <select
-                    :id="`tr-${r.id}`"
+                  <BuscarPersona
                     v-model="transferirModel.personaId"
-                    class="tu-input"
-                    required
-                  >
-                    <option value="" disabled>
-                      {{ $t("agenda.reservar.elegir") }}
-                    </option>
-                    <option v-for="m in miembros" :key="m.id" :value="m.id">
-                      {{ nombreMiembro(m) }}
-                    </option>
-                  </select>
+                    :campo-id="`tr-${r.id}`"
+                    :personas="personasBuscables"
+                  />
                 </div>
                 <button
                   class="tu-btn tu-btn-primario"

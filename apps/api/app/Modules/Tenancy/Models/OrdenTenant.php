@@ -65,4 +65,14 @@ class OrdenTenant extends Model
     {
         return $this->belongsTo(SesionTenant::class, 'sesion_id');
     }
+
+    /**
+     * Intentos de pago de la orden (el aprobado es el que la pagó).
+     *
+     * @return HasMany<PagoTenant, $this>
+     */
+    public function pagos(): HasMany
+    {
+        return $this->hasMany(PagoTenant::class, 'orden_id');
+    }
 }

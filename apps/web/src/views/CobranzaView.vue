@@ -208,6 +208,14 @@ async function regularizar(m: Moroso): Promise<void> {
   if (m.acuerdo === null) {
     return;
   }
+  if (
+    !(await confirmar(
+      t("confirmaciones.regularizar", { persona: m.persona?.nombre ?? "" }),
+      { aceptar: t("confirmaciones.regularizarAceptar") },
+    ))
+  ) {
+    return;
+  }
   accionando.value = m.id;
   error.value = null;
   try {

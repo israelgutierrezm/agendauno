@@ -5,6 +5,7 @@ import { RouterLink } from "vue-router";
 
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Resumen {
@@ -146,6 +147,21 @@ async function abrirVenta(): Promise<void> {
 
 async function vender(): Promise<void> {
   if (productoSel.value === "") {
+    return;
+  }
+  // Vender cobra en el momento: se confirma qué, cuánto, cómo y a quién.
+  const producto = productos.value.find((p) => p.id === productoSel.value);
+  if (
+    !(await confirmar(
+      t("confirmaciones.venta", {
+        producto: producto?.nombre ?? "",
+        monto: producto ? dinero(producto.precio_minor, producto.moneda) : "",
+        metodo: t(`recepcion.miembro.${metodo.value}`),
+        persona: resumen.value?.nombre_completo ?? props.nombre,
+      }),
+      { aceptar: t("confirmaciones.cobrar") },
+    ))
+  ) {
     return;
   }
   procesando.value = true;

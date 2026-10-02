@@ -11,6 +11,7 @@ import PanelEditarMiembro, {
 } from "@/components/PanelEditarMiembro.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useRegreso } from "@/lib/regreso";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -161,6 +162,14 @@ function abrirRecarga(d: Derecho): void {
 }
 
 async function recargar(d: Derecho): Promise<void> {
+  if (
+    !(await confirmar(
+      t("confirmaciones.recargar", { n: recarga.value.creditos }),
+      { aceptar: t("confirmaciones.agregar") },
+    ))
+  ) {
+    return;
+  }
   guardandoRecarga.value = true;
   try {
     await api.post(`${base.value}/derechos/${d.id}/topups`, {
@@ -190,6 +199,14 @@ function abrirPausa(d: Derecho): void {
 }
 
 async function pausar(d: Derecho): Promise<void> {
+  if (
+    !(await confirmar(
+      t("confirmaciones.pausar", { fecha: fecha(pausa.value.hasta) }),
+      { aceptar: t("confirmaciones.pausarAceptar") },
+    ))
+  ) {
+    return;
+  }
   guardandoPausa.value = true;
   try {
     await api.post(`${base.value}/acuerdos/${d.acuerdo_id}/pausar`, {

@@ -77,6 +77,12 @@ final class CatalogoParametros
                 '8 % solo si el negocio aplica el estímulo de la región fronteriza.', $e, 16, 8, 16, '%', opciones: [16, 8]),
 
             // Devoluciones (ADR 0046).
+            // Cobros en caja (ADR 0086): corregir la forma de pago de un cobro.
+            new DefinicionParametro('pagos.permitir_corregir_metodo', 'Cobros en caja', 'Permitir corregir la forma de pago de un cobro',
+                'Si se registró en efectivo y era transferencia (o al revés), se corrige sin cambiar el monto. Queda en la bitácora. No aplica a pagos en línea ni a ventas ya facturadas.', $sn, 1),
+            new DefinicionParametro('pagos.horas_para_corregir', 'Cobros en caja', 'La forma de pago se puede corregir hasta',
+                'Horas después del cobro. 0 = sin límite.', $e, 48, 0, 720, 'h'),
+
             new DefinicionParametro('cancelacion.devolver_pago_si_cancela_negocio', 'Devoluciones', 'Si el negocio cancela algo ya pagado en línea, devolver el pago',
                 'Se devuelve solo, por la misma pasarela. Lo pagado en efectivo se devuelve en caja.', $sn, 0),
 

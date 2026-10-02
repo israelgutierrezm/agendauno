@@ -7,6 +7,8 @@ import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import MoverReserva from "@/components/MoverReserva.vue";
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
+import { confirmarAsistencia } from "@/lib/confirmarAsistencia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Reserva {
@@ -153,7 +155,13 @@ async function accion(fn: () => Promise<unknown>): Promise<void> {
   }
 }
 
-function marcar(r: Reserva, estado: "presente" | "ausente"): Promise<void> {
+async function marcar(
+  r: Reserva,
+  estado: "presente" | "ausente",
+): Promise<void> {
+  if (!(await confirmarAsistencia(t, r.persona ?? "", r.asistencia, estado))) {
+    return;
+  }
   return accion(() =>
     api.post(`${base.value}/reservas/${r.id}/asistencia`, { estado }),
   );
@@ -182,6 +190,13 @@ async function cancelar(
 }
 
 async function promover(): Promise<void> {
+  if (
+    !(await confirmar(t("confirmaciones.promover"), {
+      aceptar: t("confirmaciones.promoverAceptar"),
+    }))
+  ) {
+    return;
+  }
   accionando.value = true;
   error.value = null;
   aviso.value = null;

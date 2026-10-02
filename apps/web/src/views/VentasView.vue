@@ -4,10 +4,12 @@ import { useI18n } from "vue-i18n";
 
 import { RouterLink } from "vue-router";
 
+import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { SECCIONES, fechaLarga, seccionDe, type Plan } from "@/lib/planes";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -15,6 +17,7 @@ interface Miembro {
   id: string;
   nombre: string;
   nombre_completo: string;
+  email?: string | null;
 }
 type Producto = Plan;
 type Orden = {
@@ -32,6 +35,15 @@ const puedeVender = computed(() => sesion.puede("ordenes.gestionar"));
 const puedeVerPlanes = computed(() => sesion.puede("productos.ver"));
 
 const miembros = ref<Miembro[]>([]);
+
+// Para elegir a alguien escribiendo su nombre o correo (BuscarPersona).
+const personasBuscables = computed(() =>
+  miembros.value.map((m) => ({
+    id: m.id,
+    nombre: nombreMiembro(m),
+    detalle: m.email ?? null,
+  })),
+);
 const productos = ref<Producto[]>([]);
 const ordenes = ref<Orden[]>([]);
 const cargando = ref(true);
@@ -138,6 +150,30 @@ async function validarPromo(): Promise<void> {
 }
 
 async function vender(): Promise<void> {
+  const producto = productoSel.value;
+  const comprador = miembros.value.find(
+    (m) => m.id === venta.value.compradorId,
+  );
+  if (producto === null || comprador === undefined) {
+    return;
+  }
+  // Vender cobra en el momento: se confirma qué, cuánto, cómo y a quién.
+  if (
+    !(await confirmar(
+      t("confirmaciones.venta", {
+        producto: producto.nombre,
+        monto: dinero(
+          promoPreview.value?.total ?? producto.precio_minor,
+          producto.moneda,
+        ),
+        metodo: t(`ventas.metodos.${venta.value.metodo}`),
+        persona: nombreMiembro(comprador),
+      }),
+      { aceptar: t("confirmaciones.cobrar") },
+    ))
+  ) {
+    return;
+  }
   vendiendo.value = true;
   error.value = null;
   exito.value = null;
@@ -264,19 +300,11 @@ onMounted(cargar);
             <label class="tu-label" for="vm">{{
               $t("ventas.vender.miembro")
             }}</label>
-            <select
-              id="vm"
+            <BuscarPersona
               v-model="venta.compradorId"
-              class="tu-input"
-              required
-            >
-              <option value="" disabled>
-                {{ $t("ventas.vender.elegir") }}
-              </option>
-              <option v-for="m in miembros" :key="m.id" :value="m.id">
-                {{ nombreMiembro(m) }}
-              </option>
-            </select>
+              campo-id="vm"
+              :personas="personasBuscables"
+            />
           </div>
           <div>
             <label class="tu-label" for="vp">{{

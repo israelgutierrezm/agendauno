@@ -79,7 +79,7 @@ describe("volver de una ficha", () => {
   it("regresa a la bandeja de respuestas de donde se llegó", async () => {
     const a = await montar(["/formularios?vista=respuestas", "/miembros/1"]);
     expect(a.attributes("href")).toBe("/formularios?vista=respuestas");
-    expect(a.text()).toBe("Volver a respuestas de formularios");
+    expect(a.text()).toBe("Volver a respuestas de fichas de datos");
   });
 
   it("regresa a Recepción", async () => {

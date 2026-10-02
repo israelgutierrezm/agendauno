@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import BuscarPersona from "@/components/BuscarPersona.vue";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -26,6 +27,7 @@ interface Miembro {
   id: string;
   nombre: string;
   nombre_completo: string;
+  email?: string | null;
 }
 interface Inscripcion {
   id: string;
@@ -41,6 +43,15 @@ const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
 const grupos = ref<Grupo[]>([]);
 const plantillas = ref<Plantilla[]>([]);
 const miembros = ref<Miembro[]>([]);
+
+// Para elegir a alguien escribiendo su nombre o correo (BuscarPersona).
+const personasBuscables = computed(() =>
+  miembros.value.map((m) => ({
+    id: m.id,
+    nombre: nombreMiembro(m),
+    detalle: m.email ?? null,
+  })),
+);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
@@ -220,14 +231,11 @@ onMounted(cargar);
             <label class="tu-label" for="im">{{
               $t("cursos.inscribir")
             }}</label>
-            <select id="im" v-model="miembroId" class="tu-input" required>
-              <option value="" disabled>
-                {{ $t("cursos.elegirMiembro") }}
-              </option>
-              <option v-for="m in miembros" :key="m.id" :value="m.id">
-                {{ nombreMiembro(m) }}
-              </option>
-            </select>
+            <BuscarPersona
+              v-model="miembroId"
+              campo-id="im"
+              :personas="personasBuscables"
+            />
           </div>
           <button
             class="tu-btn tu-btn-primario"

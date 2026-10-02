@@ -66,6 +66,8 @@ import {
 import asistente from "./locales/asistente.es-MX";
 import operacion from "./locales/operacion.es-MX";
 import perfilPublico from "./locales/perfilPublico.es-MX";
+import buscarPersona from "./locales/buscarPersona.es-MX";
+import confirmaciones from "./locales/confirmaciones.es-MX";
 import planes from "./locales/planes.es-MX";
 import portal from "./locales/portal.es-MX";
 import recepcionVisual from "./locales/recepcionVisual.es-MX";
@@ -131,6 +133,8 @@ const mensajesBase = {
   asistente,
   operacion,
   perfilPublico,
+  buscarPersona,
+  confirmaciones,
 };
 
 export const i18n = createI18n({

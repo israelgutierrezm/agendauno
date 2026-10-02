@@ -83,8 +83,8 @@ export default {
         gestionar: "Administrar documentos y plantillas",
       },
       formularios: {
-        responder: "Llenar formularios",
-        gestionar: "Crear y editar formularios",
+        responder: "Llenar fichas de datos",
+        gestionar: "Crear y editar fichas de datos",
       },
       catalogo: {
         ver: "Ver clases y servicios",

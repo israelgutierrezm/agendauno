@@ -41,7 +41,7 @@ export const formulariosRespuestas = {
   abrirExpediente: "Abrir expediente",
   comoLlenar:
     "Para llenar o corregir las respuestas de alguien, ábrelo desde su expediente.",
-  vacio: "Aún nadie responde este formulario.",
+  vacio: "Aún nadie responde esta ficha de datos.",
   cargarError: "No se pudieron cargar las respuestas.",
 };
 

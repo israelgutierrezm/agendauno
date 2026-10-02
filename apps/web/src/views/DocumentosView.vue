@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
+import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
@@ -40,6 +41,7 @@ interface Miembro {
   id: string;
   nombre: string;
   nombre_completo: string;
+  email?: string | null;
 }
 interface Consentimiento {
   id: string;
@@ -88,6 +90,15 @@ const TITULOS: Record<Pestana, string> = {
 const tipos = ref<TipoDoc[]>([]);
 const docs = ref<Doc[]>([]);
 const miembros = ref<Miembro[]>([]);
+
+// Para elegir a alguien escribiendo su nombre o correo (BuscarPersona).
+const personasBuscables = computed(() =>
+  miembros.value.map((m) => ({
+    id: m.id,
+    nombre: m.nombre_completo || m.nombre,
+    detalle: m.email ?? null,
+  })),
+);
 const consentimientosVigentes = ref<Consentimiento[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
@@ -303,6 +314,14 @@ function claveNueva(titulo: string): string {
 }
 
 async function publicar(): Promise<void> {
+  if (
+    !(await confirmar(
+      t("confirmaciones.publicarDocumento", { titulo: borrador.value.titulo }),
+      { aceptar: t("confirmaciones.publicar") },
+    ))
+  ) {
+    return;
+  }
   publicando.value = true;
   try {
     await api.post(`${base.value}/waivers`, {
@@ -452,14 +471,11 @@ onMounted(cargar);
             <label class="tu-label" for="dp">{{
               $t("documentos.docs.persona")
             }}</label>
-            <select id="dp" v-model="subida.persona" class="tu-input" required>
-              <option value="" disabled>
-                {{ $t("documentos.docs.elegir") }}
-              </option>
-              <option v-for="m in miembros" :key="m.id" :value="m.id">
-                {{ m.nombre_completo || m.nombre }}
-              </option>
-            </select>
+            <BuscarPersona
+              v-model="subida.persona"
+              campo-id="dp"
+              :personas="personasBuscables"
+            />
           </div>
           <div>
             <label class="tu-label" for="dt">{{

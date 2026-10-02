@@ -176,6 +176,22 @@ export const CATEGORIAS_CONFIGURACION: CategoriaConfiguracion[] = [
         ["series", "recurrente", "generar clases", "plantilla"],
         { hash: "#programacion", modalidad: "clases" },
       ),
+      // Límites y tiempos del negocio (ADR 0042): pagos, recordatorios, cobros en caja…
+      o(
+        "parametros",
+        "reglas-agenda",
+        "configNegocio.opciones.parametros",
+        [
+          "límites",
+          "tiempos",
+          "parámetros",
+          "recordatorios",
+          "cobros en caja",
+          "forma de pago",
+          "corregir pago",
+        ],
+        { hash: "#parametros", permiso: "estudio.gestionar" },
+      ),
     ],
   },
   {
@@ -242,6 +258,7 @@ export const CATEGORIAS_CONFIGURACION: CategoriaConfiguracion[] = [
         },
       ),
       o("formularios", "formularios", "nav.formularios", [
+        "ficha de datos",
         "formulario",
         "campos",
         "encuesta",

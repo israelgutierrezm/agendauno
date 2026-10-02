@@ -635,7 +635,11 @@ onMounted(cargar);
       </div>
 
       <!-- Límites y tiempos del negocio (ADR 0042) -->
-      <ParametrosNegocio v-if="puedePoliticas" />
+      <ParametrosNegocio
+        v-if="puedePoliticas"
+        id="parametros"
+        class="scroll-mt-24"
+      />
     </template>
   </section>
 </template>

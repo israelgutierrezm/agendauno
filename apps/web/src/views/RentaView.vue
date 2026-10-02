@@ -6,6 +6,7 @@ import { useI18n } from "vue-i18n";
 import AvisosAgendaUno from "@/components/AvisosAgendaUno.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -160,6 +161,16 @@ async function alternarQuien(): Promise<void> {
 }
 
 async function pagar(cargo: Cargo): Promise<void> {
+  if (
+    !(await confirmar(
+      t("confirmaciones.pagarRenta", {
+        monto: dinero(cargo.monto_minor, cargo.moneda),
+      }),
+      { aceptar: t("confirmaciones.pagar") },
+    ))
+  ) {
+    return;
+  }
   pagando.value = cargo.id;
   avisoPago.value = null;
   errorPago.value = null;
@@ -192,6 +203,13 @@ async function pagar(cargo: Cargo): Promise<void> {
 }
 
 async function facturar(cargo: Cargo): Promise<void> {
+  if (
+    !(await confirmar(t("confirmaciones.facturaRenta"), {
+      aceptar: t("confirmaciones.timbrar"),
+    }))
+  ) {
+    return;
+  }
   facturando.value = cargo.id;
   avisoPago.value = null;
   errorPago.value = null;
@@ -653,11 +671,11 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* Sin `margin`: lo dan sus utilidades (mt-4); un margin aquí las anularía. */
 .rt-desglose {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.5rem 1rem;
-  margin: 0;
   padding: 0.9rem 1rem;
   border-radius: 0.75rem;
   background: var(--superficie-2);

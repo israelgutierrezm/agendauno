@@ -76,7 +76,7 @@ class RespuestasFormularioController
         );
         if (! in_array($formulario->aplica_a, [$persona->tipo->value, 'todos'], true)) {
             throw ValidationException::withMessages([
-                'persona_id' => ['Este formulario no aplica a esta persona.'],
+                'persona_id' => ['Esta ficha de datos no aplica a esta persona.'],
             ]);
         }
 

@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -92,6 +93,14 @@ async function procesar(archivo: File | undefined | null): Promise<void> {
 
 async function quitar(): Promise<void> {
   if (!habilitado.value) {
+    return;
+  }
+  if (
+    !(await confirmar(t("confirmaciones.quitarImagen"), {
+      aceptar: t("confirmaciones.quitar"),
+      peligro: true,
+    }))
+  ) {
     return;
   }
   subiendo.value = true;

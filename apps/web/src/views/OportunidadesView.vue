@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const { t } = useI18n();
@@ -65,6 +66,13 @@ async function cargar(): Promise<void> {
 }
 
 async function promover(o: Oportunidad): Promise<void> {
+  if (
+    !(await confirmar(t("confirmaciones.promover"), {
+      aceptar: t("confirmaciones.promoverAceptar"),
+    }))
+  ) {
+    return;
+  }
   promoviendo.value = o.id;
   aviso.value = null;
   error.value = null;

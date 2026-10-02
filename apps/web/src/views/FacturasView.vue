@@ -6,6 +6,7 @@ import { useI18n } from "vue-i18n";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Factura {
@@ -97,6 +98,15 @@ function quitarConcepto(i: number): void {
 }
 
 async function emitir(): Promise<void> {
+  // Un CFDI timbrado no se edita: se confirma antes de timbrar.
+  if (
+    !(await confirmar(
+      t("confirmaciones.factura", { rfc: receptor.value.rfc }),
+      { aceptar: t("confirmaciones.timbrar") },
+    ))
+  ) {
+    return;
+  }
   emitiendo.value = true;
   error.value = null;
   mensaje.value = null;

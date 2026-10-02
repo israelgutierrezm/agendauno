@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -86,6 +87,14 @@ function alSeleccionar(evento: Event): void {
 
 async function quitar(): Promise<void> {
   if (!habilitado.value) {
+    return;
+  }
+  if (
+    !(await confirmar(t("confirmaciones.quitarLogo"), {
+      aceptar: t("confirmaciones.quitar"),
+      peligro: true,
+    }))
+  ) {
     return;
   }
   subiendo.value = true;

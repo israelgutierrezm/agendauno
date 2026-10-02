@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 
 import CargadorLogo from "@/components/CargadorLogo.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PerfilPublicoNegocio from "@/components/PerfilPublicoNegocio.vue";
 import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import type { DatosTerminologia, TerminosNegocio } from "@/lib/terminologia";
 import { urlPublicaEstudio } from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
+const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
@@ -49,6 +52,16 @@ async function alternar(): Promise<void> {
     return;
   }
   const nuevo = !aparece.value;
+  // Ocultarla deja a los clientes sin página ni agenda en línea: se confirma.
+  if (
+    !nuevo &&
+    !(await confirmar(t("confirmaciones.ocultarPagina"), {
+      aceptar: t("confirmaciones.ocultar"),
+      peligro: true,
+    }))
+  ) {
+    return;
+  }
   guardando.value = true;
   guardado.value = false;
   error.value = null;
