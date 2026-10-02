@@ -5,7 +5,11 @@ import { useI18n } from "vue-i18n";
 import EditorPlan from "@/components/EditorPlan.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
+import TarjetasIndicadores, {
+  type Indicador,
+} from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import {
   SECCIONES,
@@ -17,9 +21,9 @@ import {
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
- * Planes y paquetes (ADR 0050): lo que se vende para reservar, agrupado por tipo
- * (paquetes, membresías, clase suelta, clases extra, otros), con su precio, cuántas
- * clases incluye, cuánto dura y para qué clases sirve.
+ * Planes y paquetes (ADR 0050) con el patrón de los listados: indicadores, búsqueda
+ * y filtro por tipo, y la tabla con precio, qué incluye, cuánto dura, para qué sirve
+ * y si está a la venta. Se crean y editan en un diálogo (EditorPlan).
  */
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -33,16 +37,34 @@ const verArchivados = ref(false);
 const editando = ref<Plan | null>(null);
 const abierto = ref(false);
 
-const secciones = computed(() =>
-  SECCIONES.map((s) => ({
-    clave: s,
-    planes: planes.value.filter(
-      (p) => seccionDe(p.tipo) === s && (verArchivados.value || !p.archivado),
-    ),
-  })).filter((s) => s.planes.length > 0),
+const busqueda = ref("");
+const seccion = ref<string>("");
+const seccionesConPlanes = computed(() =>
+  SECCIONES.filter((s) => planes.value.some((p) => seccionDe(p.tipo) === s)),
 );
+const visibles = computed(() => {
+  const q = busqueda.value.trim().toLowerCase();
+  return planes.value
+    .filter(
+      (p) =>
+        (verArchivados.value || !p.archivado) &&
+        (seccion.value === "" || seccionDe(p.tipo) === seccion.value) &&
+        (q === "" || p.nombre.toLowerCase().includes(q)),
+    )
+    .sort(
+      (a, b) =>
+        SECCIONES.indexOf(seccionDe(a.tipo) as (typeof SECCIONES)[number]) -
+          SECCIONES.indexOf(seccionDe(b.tipo) as (typeof SECCIONES)[number]) ||
+        a.nombre.localeCompare(b.nombre),
+    );
+});
 const hayArchivados = computed(() => planes.value.some((p) => p.archivado));
 
+function nombreSeccion(s: string): string {
+  return sesion.esCitas && s === "paquete"
+    ? t("planes.tiposCitas.paquete")
+    : t(`planes.secciones.${s}`);
+}
 function clases(p: Plan): string {
   if (p.tipo === "membresia") {
     return p.ilimitado
@@ -59,12 +81,12 @@ function clases(p: Plan): string {
   const n = clasesDe(p.creditos_incluidos);
   return t("planes.resumen.clases", { n }, n);
 }
-function vigencia(p: Plan): string | null {
+function vigencia(p: Plan): string {
   if (p.tipo === "add_on") {
     return t("planes.resumen.conElPaquete");
   }
   if (p.tipo === "membresia") {
-    return null;
+    return t("planesVisual.mientrasPague");
   }
   const n = p.vigencia_cantidad ?? 0;
   switch (p.vigencia_tipo) {
@@ -78,16 +100,46 @@ function vigencia(p: Plan): string | null {
       return t("planes.resumen.sinVencimiento");
   }
 }
-function aplicaA(p: Plan): string | null {
+function aplicaA(p: Plan): string {
   if (p.tipo === "add_on") {
-    return null;
+    return "—";
   }
   return p.ofertas.length === 0
     ? t("planes.resumen.todas")
-    : t("planes.resumen.soloAlgunas", {
-        clases: p.ofertas.map((o) => o.nombre).join(", "),
-      });
+    : p.ofertas.map((o) => o.nombre).join(", ");
 }
+
+const indicadores = computed<Indicador[]>(() => {
+  const aLaVenta = planes.value.filter((p) => !p.archivado);
+  const contar = (s: string) =>
+    aLaVenta.filter((p) => seccionDe(p.tipo) === s).length;
+  return [
+    {
+      clave: "venta",
+      etiqueta: t("planesVisual.kpi.aLaVenta"),
+      valor: String(aLaVenta.length),
+      icono: "etiqueta",
+    },
+    {
+      clave: "membresias",
+      etiqueta: t("planes.secciones.membresia"),
+      valor: String(contar("membresia")),
+      icono: "reloj",
+    },
+    {
+      clave: "paquetes",
+      etiqueta: nombreSeccion("paquete"),
+      valor: String(contar("paquete")),
+      icono: "ventas",
+    },
+    {
+      clave: "archivados",
+      etiqueta: t("planesVisual.kpi.archivados"),
+      valor: String(planes.value.length - aLaVenta.length),
+      icono: "cerrar",
+    },
+  ];
+});
 
 async function cargar(): Promise<void> {
   error.value = null;
@@ -116,22 +168,23 @@ onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 py-8">
-    <EncabezadoSeccion :titulo="$t('planes.titulo')">
+  <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
+    <EncabezadoSeccion
+      :titulo="$t('planes.titulo')"
+      :subtitulo="$t('planes.subtitulo')"
+    >
       <template #acciones>
         <button
           v-if="puedeEditar"
           type="button"
           class="tu-btn tu-btn-primario tu-btn-crear"
+          data-prueba="nuevo-plan"
           @click="abrir(null)"
         >
           {{ $t("planes.nuevo") }}
         </button>
       </template>
     </EncabezadoSeccion>
-    <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t("planes.subtitulo") }}
-    </p>
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
@@ -140,61 +193,137 @@ onMounted(cargar);
       {{ $t("comun.cargando") }}
     </p>
     <EstadoVacio
-      v-else-if="secciones.length === 0"
+      v-else-if="planes.length === 0"
       class="tu-card mt-6"
       icono="etiqueta"
       :titulo="$t('planes.vacio')"
     />
 
-    <div v-for="s in secciones" :key="s.clave" class="mt-8">
-      <h2 class="font-semibold">{{ $t(`planes.secciones.${s.clave}`) }}</h2>
-      <ul class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <li v-for="p in s.planes" :key="p.id">
-          <article
-            class="pl-tarjeta tu-card"
-            :class="{ 'pl-archivado': p.archivado }"
-          >
-            <div class="flex items-start justify-between gap-2">
-              <h3 class="font-medium">{{ p.nombre }}</h3>
-              <span
-                v-if="p.archivado"
-                class="shrink-0 text-xs"
-                :style="{ color: 'var(--texto-suave)' }"
-                >{{ $t("planes.archivado") }}</span
-              >
-            </div>
-            <p class="mt-1 text-2xl font-semibold tabular-nums">
-              {{ dinero(p.precio_minor, p.moneda) }}
-            </p>
-            <p class="mt-1 text-sm">{{ clases(p) }}</p>
-            <ul
-              class="mt-2 space-y-0.5 text-sm"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              <li v-if="vigencia(p)">{{ vigencia(p) }}</li>
-              <li v-if="aplicaA(p)">{{ aplicaA(p) }}</li>
-            </ul>
-            <button
-              v-if="puedeEditar"
-              type="button"
-              class="tu-enlace mt-3 text-sm"
-              @click="abrir(p)"
-            >
-              {{ $t("planes.editar") }}
-            </button>
-          </article>
-        </li>
-      </ul>
-    </div>
+    <template v-else>
+      <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
 
-    <label
-      v-if="hayArchivados"
-      class="mt-8 inline-flex items-center gap-2 text-sm"
-      :style="{ color: 'var(--texto-suave)' }"
-    >
-      <input v-model="verArchivados" type="checkbox" />
-      {{ $t("planes.verArchivados") }}
-    </label>
+      <div class="tu-card mt-5">
+        <div class="pv-filtros">
+          <label class="pv-buscar">
+            <IconoNav nombre="buscar" :tam="16" />
+            <input
+              v-model="busqueda"
+              type="search"
+              class="tu-input"
+              :placeholder="$t('planesVisual.buscar')"
+              :aria-label="$t('planesVisual.buscar')"
+            />
+          </label>
+          <div
+            v-if="seccionesConPlanes.length > 1"
+            class="tu-segmentado"
+            role="group"
+          >
+            <button
+              type="button"
+              :aria-pressed="seccion === ''"
+              @click="seccion = ''"
+            >
+              {{ $t("planesVisual.todos") }}
+            </button>
+            <button
+              v-for="s in seccionesConPlanes"
+              :key="s"
+              type="button"
+              :aria-pressed="seccion === s"
+              :data-prueba="`seccion-${s}`"
+              @click="seccion = s"
+            >
+              {{ nombreSeccion(s) }}
+            </button>
+          </div>
+          <label
+            v-if="hayArchivados"
+            class="ml-auto inline-flex items-center gap-2 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            <input v-model="verArchivados" type="checkbox" />
+            {{ $t("planes.verArchivados") }}
+          </label>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="pv-tabla">
+            <thead>
+              <tr>
+                <th>{{ $t("planesVisual.col.plan") }}</th>
+                <th class="hidden sm:table-cell">
+                  {{ $t("planesVisual.col.incluye") }}
+                </th>
+                <th class="hidden md:table-cell">
+                  {{ $t("planesVisual.col.dura") }}
+                </th>
+                <th class="hidden lg:table-cell">
+                  {{ $t("planesVisual.col.sirve") }}
+                </th>
+                <th class="text-right">{{ $t("planesVisual.col.precio") }}</th>
+                <th>{{ $t("planesVisual.col.estado") }}</th>
+                <th>
+                  <span class="sr-only">{{
+                    $t("planesVisual.col.acciones")
+                  }}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="p in visibles"
+                :key="p.id"
+                :class="{ 'pv-archivado': p.archivado }"
+                data-prueba="plan"
+              >
+                <td>
+                  <p class="font-medium">{{ p.nombre }}</p>
+                  <p class="pv-sub">{{ nombreSeccion(seccionDe(p.tipo)) }}</p>
+                </td>
+                <td class="hidden sm:table-cell">{{ clases(p) }}</td>
+                <td class="hidden md:table-cell pv-suave">{{ vigencia(p) }}</td>
+                <td class="hidden lg:table-cell pv-suave pv-corta">
+                  {{ aplicaA(p) }}
+                </td>
+                <td class="text-right font-medium tabular-nums">
+                  {{ dinero(p.precio_minor, p.moneda) }}
+                </td>
+                <td>
+                  <span
+                    class="tu-pildora"
+                    :style="{
+                      '--tono': p.archivado
+                        ? 'var(--texto-suave)'
+                        : 'var(--exito)',
+                    }"
+                    >{{
+                      p.archivado
+                        ? $t("planes.archivado")
+                        : $t("planesVisual.aLaVenta")
+                    }}</span
+                  >
+                </td>
+                <td class="text-right">
+                  <button
+                    v-if="puedeEditar"
+                    type="button"
+                    class="tu-enlace text-sm"
+                    data-prueba="editar-plan"
+                    @click="abrir(p)"
+                  >
+                    {{ $t("planes.editar") }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p v-if="visibles.length === 0" class="pv-sin-resultados">
+            {{ $t("planesVisual.sinResultados") }}
+          </p>
+        </div>
+      </div>
+    </template>
 
     <ModalDialogo
       :abierto="abierto"
@@ -203,6 +332,7 @@ onMounted(cargar);
           ? $t('planes.editor.tituloEditar')
           : $t('planes.editor.tituloNuevo')
       "
+      icono="etiqueta"
       @cerrar="abierto = false"
     >
       <EditorPlan
@@ -217,18 +347,69 @@ onMounted(cargar);
 </template>
 
 <style scoped>
-.pl-tarjeta {
+.pv-filtros {
   display: flex;
-  height: 100%;
-  flex-direction: column;
-  padding: 1.1rem 1.2rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--borde);
 }
-.pl-tarjeta > button {
-  align-self: flex-start;
-  margin-top: auto;
-  padding-top: 0.75rem;
+.pv-buscar {
+  position: relative;
+  flex: 1 1 14rem;
+  color: var(--texto-suave);
 }
-.pl-archivado {
-  opacity: 0.6;
+.pv-buscar > :first-child {
+  position: absolute;
+  top: 50%;
+  left: 0.75rem;
+  transform: translateY(-50%);
+}
+.pv-buscar > input {
+  padding-left: 2.25rem;
+}
+.pv-tabla {
+  width: 100%;
+  font-size: 0.9rem;
+  border-collapse: collapse;
+}
+.pv-tabla th {
+  padding: 0.7rem 1rem;
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-align: left;
+}
+.pv-tabla th.text-right {
+  text-align: right;
+}
+.pv-tabla td {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--borde);
+  vertical-align: middle;
+}
+.pv-archivado td {
+  color: var(--texto-suave);
+}
+.pv-sub {
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+}
+.pv-suave {
+  color: var(--texto-suave);
+}
+.pv-corta {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pv-sin-resultados {
+  padding: 2rem 1rem;
+  border-top: 1px solid var(--borde);
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+  text-align: center;
 }
 </style>

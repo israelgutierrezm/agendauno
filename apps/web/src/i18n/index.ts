@@ -79,6 +79,8 @@ import sucursalOperativa from "./locales/sucursalOperativa.es-MX";
 import {
   inventarioVisual,
   mostradorVisual,
+  ventasVisual,
+  planesVisual,
 } from "./locales/mostradorInventario.es-MX";
 import planes from "./locales/planes.es-MX";
 import portal from "./locales/portal.es-MX";
@@ -157,6 +159,8 @@ const mensajesBase = {
   sucursalOperativa,
   inventarioVisual,
   mostradorVisual,
+  ventasVisual,
+  planesVisual,
 };
 
 export const i18n = createI18n({

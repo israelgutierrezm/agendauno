@@ -67,3 +67,44 @@ export const inventarioVisual = {
     acciones: "Acciones",
   },
 };
+
+// Membresías y paquetes (views/VentasView.vue): vender un plan.
+export const ventasVisual = {
+  titulo: "Membresías y paquetes",
+  tituloCitas: "Bonos y membresías",
+  ventaActual: "Venta",
+  eligePlan: "Elige un plan de la lista.",
+  verTodas: "Ver todas en Cobros",
+  kpi: {
+    ventasHoy: "Ventas de hoy",
+    vendidoHoy: "Vendido hoy",
+    porCobrar: "Órdenes por cobrar",
+    planes: "Planes a la venta",
+  },
+  col: {
+    cuando: "Cuándo",
+    plan: "Plan",
+  },
+};
+
+// Planes y paquetes (views/PlanesView.vue) con el patrón de los listados.
+export const planesVisual = {
+  buscar: "Buscar plan",
+  todos: "Todos",
+  aLaVenta: "A la venta",
+  mientrasPague: "Mientras se pague",
+  sinResultados: "Ningún plan coincide con la búsqueda.",
+  kpi: {
+    aLaVenta: "Planes a la venta",
+    archivados: "Archivados",
+  },
+  col: {
+    plan: "Plan",
+    incluye: "Incluye",
+    dura: "Cuánto dura",
+    sirve: "Para qué sirve",
+    precio: "Precio",
+    estado: "Estado",
+    acciones: "Acciones",
+  },
+};
