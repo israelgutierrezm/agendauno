@@ -31,6 +31,30 @@ export default {
     pase_dia: "Pase de día",
     taller: "Taller",
   },
+  // Con citas: un bono de sesiones o una membresía (ADR 0091).
+  tiposCitas: {
+    paquete: "Bono de sesiones",
+    membresia: "Membresía",
+  },
+  tiposAyudaCitas: {
+    paquete: "Varias visitas prepagadas (p. ej. 5 masajes).",
+    membresia: "Una cuota que se renueva con servicios o beneficios.",
+  },
+  editorCitas: {
+    nombrePh: "Bono 5 masajes",
+    clases: "Número de sesiones",
+    clasesPorMes: "Sesiones al mes",
+    aplicaA: "¿Para qué servicios sirve?",
+    todas: "Todos los servicios con bono",
+    algunas: "Solo algunos",
+    eligeClases: "Elige al menos un servicio.",
+    sinClases: "Aún no hay servicios que se tomen con bono o membresía.",
+    servicioOCombo:
+      "Un servicio suelto (un corte) o un combo (corte y barba en la misma visita) se dan de alta en",
+    irCatalogo: "Catálogo",
+    sinServiciosConBono:
+      "Para usar un bono, el servicio debe tomarse «con bono o membresía». Se cambia en",
+  },
   tiposAyuda: {
     paquete: "Un número de clases por un precio (p. ej. 8 clases).",
     membresia: "Se renueva cada mes: ilimitada o con clases por mes.",

@@ -330,6 +330,10 @@ export const bitacora = {
 };
 
 export const citaCuenta = {
+  // Servicio que se toma con su bono o membresía (ADR 0091).
+  conTuBono: "con tu bono",
+  conTuBonoAyuda:
+    "Se descuenta una sesión de tu bono o membresía; no pagas al agendar.",
   servicio: "Servicio",
   profesional: "Profesional",
   sede: "Sede",

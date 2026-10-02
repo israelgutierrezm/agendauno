@@ -2,6 +2,8 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { RouterLink } from "vue-router";
+
 import { api, mensajeDeError } from "@/lib/api";
 import {
   UNIDADES_POR_CLASE,
@@ -17,11 +19,16 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * Alta y edición de un plan (ADR 0050): qué es (paquete, membresía, clase suelta,
  * clases extra u otro), su precio, cuántas clases incluye, cuánto dura (con el
  * ejemplo de "hasta cuándo" si se comprara hoy) y para qué clases sirve.
+ *
+ * Con citas (ADR 0091) solo hay dos: bono de sesiones (varias visitas prepagadas) y
+ * membresía (una cuota con servicios o beneficios); un servicio suelto o un combo se
+ * dan de alta en Catálogo. Un bono sirve para los servicios que se toman «con bono o
+ * membresía», que son los que se pueden elegir aquí.
  */
 const props = defineProps<{ plan: Plan | null }>();
 const emit = defineEmits<{ guardado: []; cerrar: [] }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
@@ -29,6 +36,7 @@ interface Opcion {
   id: string;
   nombre: string;
   actividad?: string | null;
+  politica_reserva?: string;
 }
 const ofertas = ref<Opcion[]>([]);
 const sucursales = ref<Opcion[]>([]);
@@ -62,12 +70,28 @@ const form = reactive({
 const guardando = ref(false);
 const error = ref<string | null>(null);
 
-const TIPOS_PRINCIPALES: TipoPlan[] = [
-  "paquete",
-  "membresia",
-  "sesion_individual",
-  "add_on",
-];
+const esCitas = computed(() => sesion.esCitas === true);
+const TIPOS_PRINCIPALES = computed<TipoPlan[]>(() =>
+  esCitas.value
+    ? ["paquete", "membresia"]
+    : ["paquete", "membresia", "sesion_individual", "add_on"],
+);
+// Los textos del editor en citas hablan de servicios y sesiones, no de clases.
+function tx(clave: string): string {
+  return esCitas.value && te(`planes.editorCitas.${clave}`)
+    ? t(`planes.editorCitas.${clave}`)
+    : t(`planes.editor.${clave}`);
+}
+function nombreTipo(tipo: TipoPlan): string {
+  return esCitas.value && te(`planes.tiposCitas.${tipo}`)
+    ? t(`planes.tiposCitas.${tipo}`)
+    : t(`planes.tipos.${tipo}`);
+}
+function ayudaTipo(tipo: TipoPlan): string {
+  return esCitas.value && te(`planes.tiposAyudaCitas.${tipo}`)
+    ? t(`planes.tiposAyudaCitas.${tipo}`)
+    : t(`planes.tiposAyuda.${tipo}`);
+}
 const esOtro = computed(
   () => form.tipo === "pase_dia" || form.tipo === "taller",
 );
@@ -98,10 +122,16 @@ const ejemplo = computed(() => {
   });
 });
 
+// Con citas, un bono solo sirve para lo que se toma con bono o membresía.
+const ofertasElegibles = computed(() =>
+  esCitas.value
+    ? ofertas.value.filter((o) => o.politica_reserva !== "pago")
+    : ofertas.value,
+);
 // Clases agrupadas por actividad para elegir a cuáles aplica.
 const ofertasPorActividad = computed(() => {
   const grupos = new Map<string, Opcion[]>();
-  for (const o of ofertas.value) {
+  for (const o of ofertasElegibles.value) {
     const clave = o.actividad ?? "";
     grupos.set(clave, [...(grupos.get(clave) ?? []), o]);
   }
@@ -198,15 +228,27 @@ onMounted(async () => {
           type="button"
           class="ep-tipo"
           :aria-pressed="form.tipo === tipo"
+          :data-prueba="`tipo-${tipo}`"
           @click="form.tipo = tipo"
         >
-          <span class="font-medium">{{ $t(`planes.tipos.${tipo}`) }}</span>
+          <span class="font-medium">{{ nombreTipo(tipo) }}</span>
           <span class="text-xs" :style="{ color: 'var(--texto-suave)' }">{{
-            $t(`planes.tiposAyuda.${tipo}`)
+            ayudaTipo(tipo)
           }}</span>
         </button>
       </div>
-      <label class="mt-2 flex items-center gap-2 text-sm">
+      <p
+        v-if="esCitas"
+        class="mt-2 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+        data-prueba="servicio-o-combo"
+      >
+        {{ $t("planes.editorCitas.servicioOCombo") }}
+        <RouterLink :to="{ name: 'catalogo' }" class="tu-enlace">{{
+          $t("planes.editorCitas.irCatalogo")
+        }}</RouterLink>
+      </p>
+      <label v-else class="mt-2 flex items-center gap-2 text-sm">
         <span :style="{ color: 'var(--texto-suave)' }">{{
           $t("planes.editor.otro")
         }}</span>
@@ -235,7 +277,7 @@ onMounted(async () => {
           id="ep-nombre"
           v-model="form.nombre"
           class="tu-input"
-          :placeholder="$t('planes.editor.nombrePh')"
+          :placeholder="tx('nombrePh')"
           required
           maxlength="255"
         />
@@ -264,9 +306,7 @@ onMounted(async () => {
         {{ $t("planes.editor.ilimitada") }}
       </label>
       <div v-if="!form.ilimitado">
-        <label class="tu-label" for="ep-pormes">{{
-          $t("planes.editor.clasesPorMes")
-        }}</label>
+        <label class="tu-label" for="ep-pormes">{{ tx("clasesPorMes") }}</label>
         <input
           id="ep-pormes"
           v-model="form.clasesPorMes"
@@ -298,7 +338,7 @@ onMounted(async () => {
     </p>
     <div v-else class="sm:w-1/2">
       <label class="tu-label" for="ep-clases">{{
-        esExtra ? $t("planes.editor.clasesExtra") : $t("planes.editor.clases")
+        esExtra ? $t("planes.editor.clasesExtra") : tx("clases")
       }}</label>
       <input
         id="ep-clases"
@@ -373,24 +413,35 @@ onMounted(async () => {
 
     <!-- Para qué clases -->
     <fieldset v-if="!esExtra">
-      <legend class="tu-label">{{ $t("planes.editor.aplicaA") }}</legend>
+      <legend class="tu-label">{{ tx("aplicaA") }}</legend>
       <div class="mt-1 flex flex-wrap gap-2">
         <label class="ep-opcion">
           <input v-model="form.todas" type="radio" :value="true" />
-          {{ $t("planes.editor.todas") }}
+          {{ tx("todas") }}
         </label>
         <label class="ep-opcion">
           <input v-model="form.todas" type="radio" :value="false" />
-          {{ $t("planes.editor.algunas") }}
+          {{ tx("algunas") }}
         </label>
       </div>
+      <p
+        v-if="esCitas && ofertasElegibles.length === 0"
+        class="mt-2 text-sm"
+        :style="{ color: 'var(--aviso)' }"
+        data-prueba="sin-servicios-con-bono"
+      >
+        {{ $t("planes.editorCitas.sinServiciosConBono") }}
+        <RouterLink :to="{ name: 'catalogo' }" class="tu-enlace">{{
+          $t("planes.editorCitas.irCatalogo")
+        }}</RouterLink>
+      </p>
       <div v-if="!form.todas" class="mt-3 space-y-3">
         <p
-          v-if="ofertas.length === 0"
+          v-if="ofertasElegibles.length === 0 && !esCitas"
           class="text-sm"
           :style="{ color: 'var(--texto-suave)' }"
         >
-          {{ $t("planes.editor.sinClases") }}
+          {{ tx("sinClases") }}
         </p>
         <div v-for="[actividad, lista] in ofertasPorActividad" :key="actividad">
           <p
@@ -412,11 +463,11 @@ onMounted(async () => {
           </div>
         </div>
         <p
-          v-if="ofertas.length > 0 && form.ofertas.size === 0"
+          v-if="ofertasElegibles.length > 0 && form.ofertas.size === 0"
           class="text-sm"
           :style="{ color: 'var(--aviso)' }"
         >
-          {{ $t("planes.editor.eligeClases") }}
+          {{ tx("eligeClases") }}
         </p>
       </div>
     </fieldset>

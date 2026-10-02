@@ -323,13 +323,15 @@ class MiTenantController
      */
     /**
      * Servicios, sedes y profesionales para agendar una cita desde la cuenta (también
-     * en negocios que no están en el directorio).
+     * en negocios que no están en el directorio), con los que puede tomar con su bono
+     * o membresía (ADR 0091).
      */
     public function opcionesCita(Request $request, OpcionesCitaTenant $opciones): JsonResponse
     {
-        abort_unless($this->persona($request) instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
 
-        return response()->json(['data' => $opciones->listar()]);
+        return response()->json(['data' => $opciones->listar($persona)]);
     }
 
     /**

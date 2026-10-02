@@ -147,4 +147,17 @@ describe("catálogo", () => {
       ],
     });
   });
+
+  it("con citas, pasar un servicio a «con bono» avisa que deja la página para agendar", async () => {
+    const w = await montar([oferta({})]);
+    await w.get('[data-prueba="configurar"]').trigger("click");
+    expect(w.find('[data-prueba="efecto-politica"]').exists()).toBe(false);
+
+    await w.get('[data-prueba="politica-entitlement"]').setValue(true);
+    expect(w.get('[data-prueba="efecto-politica"]').text()).toContain(
+      "politicaCitas.dejaDeAparecer",
+    );
+    // Con citas, la duración se pide igual: la cita ocupa la agenda.
+    expect(w.find('[id="duracion-o1"]').exists()).toBe(true);
+  });
 });

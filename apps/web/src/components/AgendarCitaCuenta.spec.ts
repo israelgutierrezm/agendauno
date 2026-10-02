@@ -18,6 +18,9 @@ vi.mock("@/stores/sesionTenant", () => ({
 const privacidad = vi.hoisted(() => ({
   datos: {} as Record<string, unknown>,
 }));
+const extraServicios = vi.hoisted(() => ({
+  lista: [] as Record<string, unknown>[],
+}));
 const equipo = vi.hoisted(() => ({
   lista: [] as { id: string; nombre: string; foto_url?: string | null }[],
 }));
@@ -39,6 +42,7 @@ function respuestas(): void {
                 moneda: "MXN",
                 duracion_minutos: 30,
               },
+              ...extraServicios.lista,
             ],
             sucursales: [
               {
@@ -78,6 +82,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   privacidad.datos = {};
   equipo.lista = [{ id: "ana", nombre: "Ana" }];
+  extraServicios.lista = [];
   respuestas();
 });
 
@@ -185,5 +190,30 @@ describe("agendar desde la cuenta", () => {
     );
     // Ya no hay calendario nativo.
     expect(w.find('input[type="date"]').exists()).toBe(false);
+  });
+
+  it("un servicio que se toma con su bono no muestra precio: se descuenta del bono", async () => {
+    extraServicios.lista = [
+      {
+        id: "masaje",
+        nombre: "Masaje",
+        precio_minor: 90000,
+        moneda: "MXN",
+        duracion_minutos: 60,
+        con_plan: true,
+      },
+    ];
+    const w = montar();
+    await flushPromises();
+
+    const opcion = w
+      .findAll("#cc-servicio option")
+      .find((o) => o.text().includes("Masaje"))!;
+    expect(opcion.text()).toContain("citaCuenta.conTuBono");
+    expect(opcion.text()).not.toContain("900");
+    await w.get("#cc-servicio").setValue("masaje");
+    expect(w.get('[data-prueba="con-bono"]').text()).toContain(
+      "conTuBonoAyuda",
+    );
   });
 });

@@ -55,6 +55,21 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("catalogo.gestionar"));
 const esCitas = computed(() => sesion.esCitas === true);
 
+// Cómo se reserva: con citas, «se paga» o «con bono o membresía», y lo que cambia
+// en la página para agendar al pasar de uno a otro (ADR 0091).
+const OPCIONES_POLITICA = ["pago", "entitlement"] as const;
+const textosPolitica = computed(() =>
+  esCitas.value ? "catalogo.politicaCitas" : "catalogo.politica",
+);
+function efectoPolitica(o: Oferta): string {
+  if (!esCitas.value || form.value.politica === o.politica_reserva) {
+    return "";
+  }
+  return form.value.politica === "entitlement"
+    ? t("catalogo.politicaCitas.dejaDeAparecer", { servicio: o.nombre })
+    : t("catalogo.politicaCitas.apareceConPrecio", { servicio: o.nombre });
+}
+
 const ofertas = ref<Oferta[]>([]);
 const recursos = ref<Recurso[]>([]);
 function nombresDe(ids: string[] | undefined): string {
@@ -543,66 +558,41 @@ onMounted(cargar);
           :placeholder="$t('perfilPublico.catalogo.descripcionPh')"
         />
         <label class="tu-label">{{ $t("catalogo.politica.etiqueta") }}</label>
-        <div class="mt-1 space-y-2">
+        <div class="mt-1 space-y-2" data-prueba="politica-reserva">
           <label
-            class="flex items-start gap-2 rounded-lg p-3 cursor-pointer border"
-            :style="{
-              borderColor:
-                form.politica === 'entitlement'
-                  ? 'var(--primario)'
-                  : 'var(--borde)',
-              background:
-                form.politica === 'entitlement'
-                  ? 'var(--primario-suave)'
-                  : 'transparent',
-            }"
+            v-for="opcion in OPCIONES_POLITICA"
+            :key="opcion"
+            class="ct-opcion"
+            :class="{ 'ct-opcion-activa': form.politica === opcion }"
           >
             <input
               v-model="form.politica"
               type="radio"
-              value="entitlement"
+              :value="opcion"
               class="mt-1"
+              :data-prueba="`politica-${opcion}`"
             />
             <span>
               <span class="font-medium">{{
-                $t("catalogo.politica.entitlement")
+                $t(`${textosPolitica}.${opcion}`)
               }}</span>
               <span
                 class="block text-sm"
                 :style="{ color: 'var(--texto-suave)' }"
-                >{{ $t("catalogo.politica.entitlementAyuda") }}</span
-              >
-            </span>
-          </label>
-          <label
-            class="flex items-start gap-2 rounded-lg p-3 cursor-pointer border"
-            :style="{
-              borderColor:
-                form.politica === 'pago' ? 'var(--primario)' : 'var(--borde)',
-              background:
-                form.politica === 'pago'
-                  ? 'var(--primario-suave)'
-                  : 'transparent',
-            }"
-          >
-            <input
-              v-model="form.politica"
-              type="radio"
-              value="pago"
-              class="mt-1"
-            />
-            <span>
-              <span class="font-medium">{{
-                $t("catalogo.politica.pago")
-              }}</span>
-              <span
-                class="block text-sm"
-                :style="{ color: 'var(--texto-suave)' }"
-                >{{ $t("catalogo.politica.pagoAyuda") }}</span
+                >{{ $t(`${textosPolitica}.${opcion}Ayuda`) }}</span
               >
             </span>
           </label>
         </div>
+        <!-- Lo que cambia en su página al guardar (ADR 0091). -->
+        <p
+          v-if="efectoPolitica(o)"
+          class="mt-2 text-sm"
+          :style="{ color: 'var(--aviso)' }"
+          data-prueba="efecto-politica"
+        >
+          {{ efectoPolitica(o) }}
+        </p>
 
         <div class="mt-3 grid sm:grid-cols-2 gap-3">
           <div>
@@ -631,7 +621,7 @@ onMounted(cargar);
               >{{ $t("catalogo.precioReq") }}</span
             >
           </div>
-          <div v-if="form.politica === 'pago'">
+          <div v-if="form.politica === 'pago' || esCitas">
             <label class="tu-label" :for="`duracion-${o.id}`">{{
               $t("catalogo.duracion")
             }}</label>
@@ -922,6 +912,18 @@ onMounted(cargar);
   font-size: 0.8rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.ct-opcion {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-boton);
+  cursor: pointer;
+}
+.ct-opcion-activa {
+  border-color: var(--primario);
 }
 .ct-filas {
   display: grid;

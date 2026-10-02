@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\DerechoTenant;
+use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use Carbon\CarbonInterface;
@@ -47,6 +48,39 @@ class ResolverDerechoTenant
         }
 
         return $derechos->first(fn (DerechoTenant $derecho): bool => $derecho->ilimitado);
+    }
+
+    /**
+     * Los servicios (de entre `$ofertas`) que la persona puede reservar HOY con un bono
+     * o membresía: un derecho activo, vigente, con saldo para una sesión (o ilimitado)
+     * y que incluya ese servicio. La sucursal se revisa al agendar (ADR 0091).
+     *
+     * @param  iterable<OfertaTenant>  $ofertas
+     * @return list<int> ids internos de las ofertas cubiertas
+     */
+    public function ofertasCubiertas(PersonaTenant $persona, iterable $ofertas, int $unidades): array
+    {
+        $ahora = now();
+        $derechos = DerechoTenant::query()
+            ->whereHas('acuerdo', function (Builder $consulta) use ($persona): void {
+                $consulta->where('persona_id', $persona->getKey())
+                    ->where('estado', EstadoAcuerdo::Activo->value);
+            })
+            ->with('ofertas:id')
+            ->get()
+            ->filter(fn (DerechoTenant $d): bool => $this->vigente($d, $ahora)
+                && ($d->ilimitado || $this->libro->disponible($d) >= $unidades));
+
+        $cubiertas = [];
+        foreach ($ofertas as $oferta) {
+            $cubre = $derechos->contains(fn (DerechoTenant $d): bool => ($d->actividad_id === null || (int) $d->actividad_id === (int) $oferta->actividad_id)
+                && ($d->ofertas->isEmpty() || $d->ofertas->contains('id', (int) $oferta->getKey())));
+            if ($cubre) {
+                $cubiertas[] = (int) $oferta->getKey();
+            }
+        }
+
+        return $cubiertas;
     }
 
     /**

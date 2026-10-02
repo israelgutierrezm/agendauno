@@ -25,6 +25,8 @@ interface Servicio {
   precio_minor: number | null;
   moneda: string;
   duracion_minutos: number | null;
+  // Se descuenta de su bono o membresía (ADR 0091).
+  con_plan?: boolean;
 }
 interface Opcion {
   id: string;
@@ -258,13 +260,24 @@ onMounted(async () => {
             <option value="" disabled>{{ $t("citaCuenta.elegir") }}</option>
             <option v-for="s in servicios" :key="s.id" :value="s.id">
               {{ s.nombre }}
-              <template v-if="s.precio_minor">
+              <template v-if="s.con_plan">
+                · {{ $t("citaCuenta.conTuBono") }}</template
+              >
+              <template v-else-if="s.precio_minor">
                 · {{ dinero(s.precio_minor, s.moneda) }}</template
               >
             </option>
           </select>
+          <p
+            v-if="servicio?.con_plan"
+            class="mt-1 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+            data-prueba="con-bono"
+          >
+            {{ $t("citaCuenta.conTuBonoAyuda") }}
+          </p>
           <ServicioIncluye
-            v-if="servicio"
+            v-else-if="servicio"
             class="mt-1"
             :incluye="servicio.incluye"
             :precio-minor="servicio.precio_minor"

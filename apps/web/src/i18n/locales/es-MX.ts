@@ -1149,6 +1149,19 @@ export default {
     guardado: "Servicio actualizado.",
     badgePago: "Cita con pago",
     badgeEntitlement: "Con membresía",
+    // Negocio de citas: un servicio se paga o se toma con bono (ADR 0091).
+    politicaCitas: {
+      pago: "Se paga",
+      pagoAyuda:
+        "Aparece con su precio en tu página para agendar; se paga en línea o en la sucursal.",
+      entitlement: "Con bono o membresía",
+      entitlementAyuda:
+        "No aparece en tu página pública: lo agendan desde su cuenta quienes tienen un bono o membresía que lo incluye, o tú desde la agenda.",
+      dejaDeAparecer:
+        "Al guardar, «{servicio}» deja de aparecer en tu página para agendar: solo lo podrán tomar quienes tengan un bono o membresía que lo incluya.",
+      apareceConPrecio:
+        "Al guardar, «{servicio}» aparece en tu página para agendar con su precio.",
+    },
   },
   reservar: {
     cargando: "Cargando…",
