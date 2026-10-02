@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\HistorialCitaTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
@@ -34,6 +35,7 @@ class ReservasTenantController
         private readonly ReservasTenant $reservas,
         private readonly AccesoSesionTenant $acceso,
         private readonly WaiversTenant $waivers,
+        private readonly HistorialCitaTenant $historial,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -216,6 +218,19 @@ class ReservasTenantController
     /**
      * Vista previa: qué pasará con el crédito si se cancela ahora (con el mismo `por`).
      */
+    /**
+     * Historial de una cita (agendada, recordatorios, reprogramaciones, cobro,
+     * asistencia, cancelación). Un instructor acotado solo ve el de SUS sesiones.
+     */
+    public function historial(Request $request): JsonResponse
+    {
+        $reserva = ReservaTenant::query()->with('sesion')->where('ulid', (string) $request->route('reserva'))->firstOrFail();
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($reserva->sesion !== null && $this->acceso->puedeOperar($reserva->sesion, $usuario instanceof Usuario ? $usuario : null), 403);
+
+        return response()->json(['data' => $this->historial->de($reserva)]);
+    }
+
     public function previsualizarCancelacion(Request $request): JsonResponse
     {
         $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->firstOrFail();

@@ -16,8 +16,10 @@ const props = withDefaults(
     abierto: boolean;
     titulo: string;
     tam?: "md" | "lg" | "xl";
+    // Ícono junto al título (p. ej. `agenda` en el detalle de una cita).
+    icono?: string;
   }>(),
-  { tam: "lg" },
+  { tam: "lg", icono: undefined },
 );
 const emit = defineEmits<{ cerrar: [] }>();
 
@@ -56,7 +58,15 @@ const ancho = computed(
             class="flex items-center justify-between gap-3 border-b px-6 py-4"
             :style="{ borderColor: 'var(--borde)' }"
           >
-            <h2 class="text-lg font-semibold">{{ titulo }}</h2>
+            <h2 class="flex items-center gap-2.5 text-lg font-semibold">
+              <IconoNav
+                v-if="icono"
+                :nombre="icono"
+                :tam="22"
+                :style="{ color: 'var(--texto-suave)' }"
+              />
+              {{ titulo }}
+            </h2>
             <button
               class="tu-icono-btn"
               type="button"

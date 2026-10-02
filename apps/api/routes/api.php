@@ -606,6 +606,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/reservas/{reserva}/reprogramar', [ReprogramarTenantController::class, 'reserva'])->middleware('puede:reservas.gestionar')->name('reservas.reprogramar');
             Route::post('/reservas/{reserva}/cancelar', [ReservasTenantController::class, 'cancelar'])->middleware('puede:reservas.gestionar')->name('reservas.cancelar');
             Route::get('/reservas/{reserva}/cancelacion', [ReservasTenantController::class, 'previsualizarCancelacion'])->middleware('puede:reservas.gestionar')->name('reservas.cancelacion');
+            // Historial de una cita para recepción (lo que pasó y quién lo hizo).
+            Route::get('/reservas/{reserva}/historial', [ReservasTenantController::class, 'historial'])->middleware('puede:reservas.ver')->name('reservas.historial');
             // Waitlist robusta (R7): el ofrecido acepta su cupo antes de que expire.
             Route::post('/reservas/{reserva}/aceptar', [ReservasTenantController::class, 'aceptar'])->middleware('puede:reservas.gestionar')->name('reservas.aceptar');
             // Smart-fill (R32): ofrece de golpe los cupos libres al inicio de la lista de espera.

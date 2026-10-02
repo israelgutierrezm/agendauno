@@ -7,6 +7,10 @@
 export interface CitaTitular {
   reserva_id: string;
   cliente: string | null;
+  // Para abrir su ficha; el contacto llega solo a quien puede ver miembros.
+  cliente_id?: string | null;
+  telefono?: string | null;
+  email?: string | null;
   estado: string; // estado de la reserva (confirmada, pendiente_pago…)
   asistencia: string | null; // presente | ausente | null
   orden_id?: string | null; // orden del servicio (si es de pago)
@@ -32,6 +36,7 @@ export interface SesionAgenda {
   instructor: string | null;
   instructor_id: string | null;
   sala: string | null;
+  sucursal?: string | null;
   inicia_en: string;
   termina_en: string;
   // Lo que ocupa con la preparación y la limpieza del servicio (2.3).

@@ -6,7 +6,8 @@ import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import CambiarHorario from "@/components/CambiarHorario.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import CorregirCobro from "@/components/CorregirCobro.vue";
-import PanelLateral from "@/components/PanelLateral.vue";
+import IconoNav from "@/components/IconoNav.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import {
   aHora,
   COLOR_ESTADO_CITA,
@@ -18,17 +19,19 @@ import {
 } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
 /**
- * Detalle de una CITA para recepción: quién, qué servicio, con quién, a qué hora y
- * cómo va (pagada, por cobrar, llegó…), con las acciones del día: marcar llegada o
- * inasistencia, cobrar en caja y cancelar (libera el horario del profesional).
+ * Detalle de una CITA para recepción: quién (con su contacto y su ficha), cuándo,
+ * qué servicio, con quién, dónde y cómo va. En pestañas: la asistencia (llegó, no
+ * asistió o cancelarla) con el resumen del cobro; el cobro y sus movimientos; y el
+ * historial de la cita (lo que pasó y quién lo hizo).
  *
  * Lo que mueve dinero o créditos se confirma antes (cobrar, marcar asistencia) y se
  * puede corregir después: la asistencia (llegó ↔ no asistió, el crédito se ajusta) y
  * un cobro en caja (su forma de pago o anularlo), si el negocio lo permite (ADR
- * 0086/0087).
+ * 0086/0087). Cada acción se guarda al hacerla; «Listo» solo cierra.
  */
 const props = defineProps<{
   abierto: boolean;
@@ -46,19 +49,28 @@ const emit = defineEmits<{ cerrar: []; cambiada: [] }>();
 
 const { t, te } = useI18n();
 const toast = useToastStore();
+const sesionTenant = useSesionTenantStore();
 
 const METODOS = ["efectivo", "transferencia", "manual"] as const;
 const metodo = ref<(typeof METODOS)[number]>("efectivo");
 const accionando = ref(false);
 
-watch(
-  () => props.abierto,
-  () => {
-    metodo.value = "efectivo";
-  },
-);
+type Pestana = "asistencia" | "cobro" | "historial";
+const pestana = ref<Pestana>("asistencia");
+const PESTANAS: { clave: Pestana; icono: string }[] = [
+  { clave: "asistencia", icono: "agenda" },
+  { clave: "cobro", icono: "dinero" },
+  { clave: "historial", icono: "reloj" },
+];
 
 const cita = computed(() => props.sesion?.cita ?? null);
+const cliente = computed(
+  () => cita.value?.cliente ?? t("agendaVisual.profesionales.sinCliente"),
+);
+const verFicha = computed(
+  () => cita.value?.cliente_id != null && sesionTenant.puede("miembros.ver"),
+);
+const verHistorial = computed(() => sesionTenant.puede("reservas.ver"));
 const estado = computed(() =>
   props.sesion !== null ? estadoCita(props.sesion, new Date()) : "cancelada",
 );
@@ -67,29 +79,49 @@ const tono = computed(() =>
     ? tonoServicio(props.sesion.oferta_id, props.catalogo, props.sesion.oferta)
     : null,
 );
-const horario = computed(() => {
+const fechaLarga = computed(() => {
+  const s = props.sesion;
+  return s === null
+    ? ""
+    : new Intl.DateTimeFormat("es-MX", {
+        timeZone: s.zona_horaria,
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }).format(new Date(s.inicia_en));
+});
+const horas = computed(() => {
   const s = props.sesion;
   if (s === null) {
     return "";
   }
   const ini = minutosLocal(s.inicia_en, s.zona_horaria);
-  const fecha = new Intl.DateTimeFormat("es-MX", {
-    timeZone: s.zona_horaria,
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(new Date(s.inicia_en));
-  return `${fecha} · ${aHora(ini)}–${aHora(ini + duracionMin(s))}`;
+  const dur = duracionMin(s);
+  return `${aHora(ini)} – ${aHora(ini + dur)} (${t("detalleCita.minutos", { n: dur })})`;
 });
+function dinero(minor: number, decimales = 0): string {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    minimumFractionDigits: decimales,
+    maximumFractionDigits: decimales,
+  }).format(minor / 100);
+}
 const precio = computed(() =>
   props.sesion?.oferta_precio_clase
-    ? new Intl.NumberFormat("es-MX", {
-        style: "currency",
-        currency: "MXN",
-        maximumFractionDigits: 0,
-      }).format(props.sesion.oferta_precio_clase / 100)
+    ? dinero(props.sesion.oferta_precio_clase)
     : null,
 );
+const total = computed(() =>
+  props.sesion?.oferta_precio_clase
+    ? dinero(props.sesion.oferta_precio_clase, 2)
+    : null,
+);
+const sucursal = computed(() =>
+  [props.sesion?.sucursal, props.sesion?.sala].filter(Boolean).join(" · "),
+);
+
 // Falta cobrarla: pendiente de pago en línea o agendada por el negocio sin cobrar.
 const porCobrar = computed(
   () =>
@@ -101,27 +133,36 @@ function nombreMetodo(m: string | null | undefined): string {
   const llave = `agendaVisual.cita.metodos.${m ?? "manual"}`;
   return te(llave) ? t(llave) : (m ?? "");
 }
-const pago = computed(() => {
-  if (cita.value === null || cita.value.orden_id == null) {
-    return t("agendaVisual.cita.pagoMembresia");
+// Cómo va el pago: color (solo lo que pide atención) y texto.
+const pagoEstado = computed<{ texto: string; color: string } | null>(() => {
+  const c = cita.value;
+  if (c === null || c.orden_id == null) {
+    return null;
   }
-  if (cita.value.estado === "pendiente_pago") {
-    return t("agendaVisual.cita.pagoEnLinea");
+  if (c.estado === "pendiente_pago") {
+    return { texto: t("detalleCita.cobro.porPagar"), color: "var(--aviso)" };
   }
-  if (cita.value.por_cobrar === true) {
-    return t("agendaVisual.cita.pagoEnCaja");
+  if (c.por_cobrar === true) {
+    return { texto: t("detalleCita.cobro.porCobrar"), color: "var(--aviso)" };
   }
-  return cita.value.pago?.metodo
-    ? t("agendaVisual.cita.pagadaCon", {
-        metodo: nombreMetodo(cita.value.pago.metodo),
-      })
-    : t("agendaVisual.cita.pagada");
+  return { texto: t("detalleCita.cobro.pagada"), color: "var(--exito)" };
 });
 const activa = computed(
   () =>
     estado.value !== "cancelada" &&
     estado.value !== "completada" &&
     estado.value !== "no_asistio",
+);
+const sePuedeCobrar = computed(
+  () => activa.value && porCobrar.value && props.puedeCobrar,
+);
+// Reprogramar o cancelar: aún sin asistencia marcada.
+const sePuedeMover = computed(
+  () =>
+    props.puedeCancelar &&
+    activa.value &&
+    cita.value !== null &&
+    !cita.value.asistencia,
 );
 
 async function accion(
@@ -139,27 +180,42 @@ async function accion(
     accionando.value = false;
   }
 }
-async function marcar(asistencia: "presente" | "ausente"): Promise<void> {
+
+// ---- Asistencia: llegó / no asistió (y corregir una ya marcada) ----
+type Asistencia = "presente" | "ausente";
+const marcable = computed(
+  () =>
+    props.puedeMarcar &&
+    cita.value !== null &&
+    cita.value.estado === "confirmada",
+);
+const subtituloLlego = computed(() => {
+  if (cita.value?.asistencia !== "presente") {
+    return t("detalleCita.asistencia.llegoAyuda");
+  }
+  return estado.value === "llego"
+    ? t("detalleCita.asistencia.enEspera")
+    : t(`agendaVisual.estadosCita.${estado.value}`);
+});
+async function marcar(asistencia: Asistencia): Promise<void> {
   const c = cita.value;
-  if (c === null) {
+  if (c === null || c.asistencia === asistencia) {
     return;
   }
-  const cliente = c.cliente ?? t("agendaVisual.profesionales.sinCliente");
   const nombre = (e: string): string =>
     e === "presente"
       ? t("agendaVisual.cita.marcarLlegada")
       : t("agendaVisual.cita.noAsistio");
   // Marcar o corregir mueve créditos: se confirma con su efecto a la vista.
-  const mensaje =
-    c.asistencia && c.asistencia !== asistencia
-      ? t("agendaVisual.cita.confirmarCorreccion", {
-          cliente,
-          antes: nombre(c.asistencia),
-          ahora: nombre(asistencia),
-        })
-      : asistencia === "presente"
-        ? t("agendaVisual.cita.confirmarLlegada", { cliente })
-        : t("agendaVisual.cita.confirmarNoAsistio", { cliente });
+  const mensaje = c.asistencia
+    ? t("agendaVisual.cita.confirmarCorreccion", {
+        cliente: cliente.value,
+        antes: nombre(c.asistencia),
+        ahora: nombre(asistencia),
+      })
+    : asistencia === "presente"
+      ? t("agendaVisual.cita.confirmarLlegada", { cliente: cliente.value })
+      : t("agendaVisual.cita.confirmarNoAsistio", { cliente: cliente.value });
   if (
     !(await confirmar(mensaje, {
       aceptar: nombre(asistencia),
@@ -180,15 +236,8 @@ async function marcar(asistencia: "presente" | "ausente"): Promise<void> {
         : t("agendaVisual.cita.okNoAsistio"),
   );
 }
-// Ya marcada: corregir al otro estado (el crédito se ajusta en el saldo).
-const corregibleAsistencia = computed(
-  () =>
-    props.puedeMarcar &&
-    cita.value !== null &&
-    cita.value.estado === "confirmada" &&
-    (cita.value.asistencia === "presente" ||
-      cita.value.asistencia === "ausente"),
-);
+
+// ---- Cobro en caja ----
 async function cobrar(): Promise<void> {
   const c = cita.value;
   if (c === null || c.orden_id == null) {
@@ -200,7 +249,7 @@ async function cobrar(): Promise<void> {
       t("agendaVisual.cita.confirmarCobro", {
         monto: precio.value ?? "",
         metodo: nombreMetodo(metodo.value),
-        cliente: c.cliente ?? t("agendaVisual.profesionales.sinCliente"),
+        cliente: cliente.value,
       }),
       { aceptar: t("agendaVisual.cita.cobrar", { monto: precio.value ?? "" }) },
     ))
@@ -216,8 +265,122 @@ async function cobrar(): Promise<void> {
     t("agendaVisual.cita.okCobrada"),
   );
 }
-// Reprogramar (2.1): misma reserva y pagos, otro horario.
+
+// ---- Historial (y los movimientos del pago) ----
+interface Hecho {
+  tipo: string;
+  fecha: string;
+  actor: string | null;
+  detalle: Record<string, string | number | boolean | null>;
+}
+const historial = ref<Hecho[] | null>(null);
+const cargandoHistorial = ref(false);
+const errorHistorial = ref(false);
+async function cargarHistorial(): Promise<void> {
+  const c = cita.value;
+  if (c === null || !verHistorial.value) {
+    return;
+  }
+  cargandoHistorial.value = true;
+  errorHistorial.value = false;
+  try {
+    const { data } = await api.get<{ data: Hecho[] }>(
+      `${props.base}/reservas/${c.reserva_id}/historial`,
+    );
+    historial.value = data.data;
+  } catch {
+    errorHistorial.value = true;
+  } finally {
+    cargandoHistorial.value = false;
+  }
+}
+const PAGO = ["cobrada", "metodo_corregido", "cobro_anulado", "reembolsada"];
+const movimientosPago = computed(() =>
+  (historial.value ?? []).filter((h) => PAGO.includes(h.tipo)),
+);
+function tituloHecho(h: Hecho): string {
+  const d = h.detalle;
+  switch (h.tipo) {
+    case "agendada":
+      return t("detalleCita.historial.agendada");
+    case "recordatorio":
+      return t("detalleCita.historial.recordatorio", { horas: d.horas });
+    case "reprogramada":
+      return t("detalleCita.historial.reprogramada");
+    case "cobrada":
+      return d.en_caja
+        ? `${t("detalleCita.historial.cobradaEnCaja")} · ${nombreMetodo(d.metodo as string | null)}`
+        : t("detalleCita.historial.pagadaEnLinea");
+    case "metodo_corregido":
+      return t("detalleCita.historial.metodoCorregido");
+    case "cobro_anulado":
+      return t("detalleCita.historial.cobroAnulado");
+    case "reembolsada":
+      return t("detalleCita.historial.reembolsada");
+    case "asistencia":
+    case "asistencia_corregida": {
+      const llave = `detalleCita.historial.${h.tipo === "asistencia" ? "asistencia" : "asistenciaCorregida"}.${d.estado}`;
+      return te(llave) ? t(llave) : "";
+    }
+    case "cancelada":
+      return t(
+        `detalleCita.historial.cancelada.${d.por === "cliente" ? "cliente" : "negocio"}`,
+      );
+    default:
+      return h.tipo;
+  }
+}
+function detalleHecho(h: Hecho): string | null {
+  const d = h.detalle;
+  switch (h.tipo) {
+    case "reprogramada":
+      return d.de && d.a
+        ? t("detalleCita.historial.deA", { de: d.de, a: d.a })
+        : null;
+    case "cobrada":
+    case "reembolsada":
+      return typeof d.monto_minor === "number"
+        ? dinero(d.monto_minor, 2)
+        : null;
+    case "metodo_corregido":
+      return [
+        t("detalleCita.historial.deA", {
+          de: nombreMetodo(d.de as string | null),
+          a: nombreMetodo(d.a as string | null),
+        }),
+        d.motivo ? t("detalleCita.historial.motivo", { motivo: d.motivo }) : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+    case "cobro_anulado":
+      return d.motivo
+        ? t("detalleCita.historial.motivo", { motivo: d.motivo })
+        : null;
+    default:
+      return null;
+  }
+}
+function cuando(h: Hecho): string {
+  const fecha = new Intl.DateTimeFormat("es-MX", {
+    timeZone: props.sesion?.zona_horaria,
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(h.fecha));
+  return h.actor
+    ? `${fecha} · ${t("detalleCita.historial.por", { actor: h.actor })}`
+    : fecha;
+}
+watch(pestana, (p) => {
+  if (p !== "asistencia" && historial.value === null) {
+    void cargarHistorial();
+  }
+});
+
+// ---- Reprogramar (2.1) y cancelar: en el cuerpo, en lugar de las pestañas ----
 const reprogramando = ref(false);
+const cancelando = ref(false);
 function reprogramada(datos: { antes: string; ahora: string }): void {
   reprogramando.value = false;
   const zona = props.sesion?.zona_horaria ?? "America/Mexico_City";
@@ -235,9 +398,6 @@ function reprogramada(datos: { antes: string; ahora: string }): void {
   );
   emit("cambiada");
 }
-
-// Confirmación en línea con el efecto a la vista (quién cancela y qué pasa).
-const cancelando = ref(false);
 function cancelar(por: "cliente" | "negocio" | null): void {
   const c = cita.value;
   if (c === null) {
@@ -254,220 +414,740 @@ function cancelar(por: "cliente" | "negocio" | null): void {
     cancelando.value = false;
   });
 }
+function abrirCancelacion(): void {
+  reprogramando.value = false;
+  cancelando.value = true;
+}
+function abrirReprogramar(): void {
+  cancelando.value = false;
+  reprogramando.value = true;
+}
+
+watch(
+  () => props.abierto,
+  () => {
+    metodo.value = "efectivo";
+    pestana.value = "asistencia";
+    historial.value = null;
+    reprogramando.value = false;
+    cancelando.value = false;
+  },
+);
+// Tras un cambio llega la cita actualizada: el historial se vuelve a leer.
+watch(
+  () => props.sesion,
+  () => {
+    historial.value = null;
+    if (props.abierto && pestana.value !== "asistencia") {
+      void cargarHistorial();
+    }
+  },
+);
 </script>
 
 <template>
-  <PanelLateral
+  <ModalDialogo
     :abierto="abierto"
     :titulo="$t('agendaVisual.cita.titulo')"
+    icono="agenda"
+    tam="xl"
     @cerrar="emit('cerrar')"
   >
-    <div v-if="sesion !== null" class="space-y-5 p-5">
-      <div class="flex items-center gap-3">
-        <AvatarIniciales :nombre="cita?.cliente" tam="lg" />
-        <div class="min-w-0">
-          <p class="text-xl font-semibold truncate">
-            {{ cita?.cliente ?? $t("agendaVisual.profesionales.sinCliente") }}
-          </p>
-          <p
-            class="text-sm first-letter:uppercase"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ horario }}
-          </p>
-          <p class="mt-1 flex flex-wrap items-center gap-x-3 text-sm">
-            <span class="inline-flex items-center gap-1.5">
-              <span
-                class="h-2 w-2 rounded-full"
-                :style="{ background: COLOR_ESTADO_CITA[estado] }"
-                aria-hidden="true"
-              ></span
-              >{{ $t(`agendaVisual.estadosCita.${estado}`) }}</span
+    <div v-if="sesion !== null" class="pc">
+      <!-- Quién, cuándo y cómo va -->
+      <div class="pc-cabeza">
+        <div class="pc-persona">
+          <AvatarIniciales :nombre="cita?.cliente" tam="xl" />
+          <div class="min-w-0">
+            <p class="pc-nombre">{{ cliente }}</p>
+            <p v-if="cita?.telefono" class="pc-suave">{{ cita.telefono }}</p>
+            <p v-if="cita?.email" class="pc-suave truncate">
+              {{ cita.email }}
+            </p>
+            <RouterLink
+              v-if="verFicha"
+              :to="{ name: 'ficha-miembro', params: { id: cita?.cliente_id } }"
+              class="pc-enlace"
+              >{{ $t("detalleCita.verPerfil") }} →</RouterLink
             >
-            <span v-if="porCobrar" class="tu-badge tu-badge-aviso">{{
-              $t("agendaVisual.cita.porCobrar")
-            }}</span>
-          </p>
+          </div>
+        </div>
+        <div class="pc-cuando">
+          <span class="pc-cuadro" aria-hidden="true">
+            <IconoNav nombre="agenda" :tam="20" />
+          </span>
+          <div class="min-w-0">
+            <p class="font-medium first-letter:uppercase">{{ fechaLarga }}</p>
+            <p class="pc-suave">{{ horas }}</p>
+          </div>
+        </div>
+        <div class="pc-estados">
+          <span
+            class="pc-pildora"
+            :style="{ '--tono': COLOR_ESTADO_CITA[estado] }"
+            data-prueba="estado-cita"
+          >
+            <span class="pc-punto" aria-hidden="true"></span>
+            {{ $t(`agendaVisual.estadosCita.${estado}`) }}
+          </span>
+          <span
+            v-if="pagoEstado"
+            class="pc-pildora"
+            :style="{ '--tono': pagoEstado.color }"
+          >
+            <span class="pc-punto" aria-hidden="true"></span>
+            {{ pagoEstado.texto }}
+          </span>
         </div>
       </div>
 
       <!-- Acciones de quien lo abre (p. ej. agregar a mi calendario) -->
       <slot name="acciones" />
 
-      <dl class="pc-datos">
-        <dt>{{ $t("agendaVisual.nuevaCita.servicio") }}</dt>
-        <dd>
+      <!-- Qué, con quién, cuánto y dónde -->
+      <dl class="pc-franja">
+        <div>
           <span
-            class="inline-block w-2.5 h-2.5 rounded-sm mr-1.5"
-            :style="{ background: tono?.tinta }"
+            class="pc-cuadro"
+            :style="
+              tono ? { background: tono.fondo, color: tono.tinta } : undefined
+            "
             aria-hidden="true"
-          ></span
-          >{{ sesion.oferta ?? "—" }}
-        </dd>
-        <dt>{{ $t("agendaVisual.nuevaCita.profesional") }}</dt>
-        <dd>{{ sesion.instructor ?? "—" }}</dd>
-        <template v-if="precio">
-          <dt>{{ $t("agendaVisual.cita.precio") }}</dt>
-          <dd class="font-semibold">{{ precio }}</dd>
-        </template>
-        <dt>{{ $t("agendaVisual.cita.pago") }}</dt>
-        <dd>{{ pago }}</dd>
-        <template v-if="cita?.asiste">
-          <dt>{{ $t("perfilPublico.agendar.asiste") }}</dt>
-          <dd data-prueba="asiste">{{ cita.asiste }}</dd>
-        </template>
-        <template v-if="cita?.nota">
-          <dt>{{ $t("perfilPublico.agendar.notaDelCliente") }}</dt>
-          <dd data-prueba="nota-cliente">{{ cita.nota }}</dd>
-        </template>
+          >
+            <IconoNav nombre="etiqueta" :tam="20" />
+          </span>
+          <div class="min-w-0">
+            <dt>{{ $t("detalleCita.servicio") }}</dt>
+            <dd>{{ sesion.oferta ?? "—" }}</dd>
+          </div>
+        </div>
+        <div>
+          <span class="pc-cuadro" aria-hidden="true">
+            <IconoNav nombre="instructores" :tam="20" />
+          </span>
+          <div class="min-w-0">
+            <dt>{{ $t("detalleCita.profesional") }}</dt>
+            <dd>{{ sesion.instructor ?? "—" }}</dd>
+          </div>
+        </div>
+        <div>
+          <span class="pc-cuadro" aria-hidden="true">
+            <IconoNav nombre="dinero" :tam="20" />
+          </span>
+          <div class="min-w-0">
+            <dt>{{ $t("detalleCita.precio") }}</dt>
+            <dd class="font-semibold">{{ precio ?? "—" }}</dd>
+          </div>
+        </div>
+        <div>
+          <span class="pc-cuadro" aria-hidden="true">
+            <IconoNav nombre="ubicacion" :tam="20" />
+          </span>
+          <div class="min-w-0">
+            <dt>{{ $t("detalleCita.sucursal") }}</dt>
+            <dd>{{ sucursal || "—" }}</dd>
+          </div>
+        </div>
       </dl>
 
-      <!-- Cobro en caja con error: corregir la forma o anularlo (ADR 0086/0087) -->
-      <CorregirCobro
-        v-if="cita?.pago?.en_caja"
-        :base="base"
-        :pago="cita.pago"
-        @cambiado="emit('cambiada')"
-      />
+      <!-- Reprogramar o cancelar: en lugar de las pestañas, con su confirmación -->
+      <section v-if="reprogramando && cita !== null" class="pc-seccion">
+        <CambiarHorario
+          :url="`${base}/reservas/${cita.reserva_id}/reprogramar`"
+          :zona="sesion.zona_horaria"
+          :inicia-en="sesion.inicia_en"
+          :profesionales="profesionales"
+          :profesional-id="sesion.instructor_id"
+          @hecho="reprogramada"
+          @cerrar="reprogramando = false"
+        />
+      </section>
+      <section v-else-if="cancelando && cita !== null" class="pc-seccion">
+        <ConfirmarCancelacion
+          :url="`${base}/reservas/${cita.reserva_id}/cancelacion`"
+          con-quien
+          :ocupado="accionando"
+          @confirmar="cancelar"
+          @cerrar="cancelando = false"
+        />
+      </section>
 
-      <!-- Acciones del día -->
-      <div v-if="activa" class="pc-acciones">
-        <div v-if="porCobrar && puedeCobrar" class="flex items-stretch gap-2">
-          <select
-            v-model="metodo"
-            class="tu-input w-auto"
-            :aria-label="$t('agendaVisual.cita.metodo')"
-          >
-            <option v-for="m in METODOS" :key="m" :value="m">
-              {{ $t(`agendaVisual.cita.metodos.${m}`) }}
-            </option>
-          </select>
-          <button
-            type="button"
-            class="tu-btn tu-btn-primario flex-1"
-            :disabled="accionando"
-            @click="cobrar"
-          >
-            {{ $t("agendaVisual.cita.cobrar", { monto: precio ?? "" }) }}
-          </button>
-        </div>
-        <div v-if="puedeMarcar" class="grid grid-cols-2 gap-2">
-          <button
-            v-if="cita?.asistencia !== 'presente'"
-            type="button"
-            class="tu-btn"
-            :class="
-              porCobrar && puedeCobrar ? 'tu-btn-fantasma' : 'tu-btn-primario'
-            "
-            :disabled="accionando"
-            @click="marcar('presente')"
-          >
-            {{ $t("agendaVisual.cita.marcarLlegada") }}
-          </button>
-          <button
-            type="button"
-            class="tu-btn tu-btn-fantasma"
-            :disabled="accionando"
-            @click="marcar('ausente')"
-          >
-            {{ $t("agendaVisual.cita.noAsistio") }}
-          </button>
+      <template v-else>
+        <div class="tu-pestanas" role="tablist">
+          <template v-for="p in PESTANAS" :key="p.clave">
+            <button
+              v-if="p.clave === 'asistencia' || verHistorial"
+              type="button"
+              role="tab"
+              class="inline-flex items-center gap-2"
+              :aria-selected="pestana === p.clave"
+              :aria-pressed="pestana === p.clave"
+              @click="pestana = p.clave"
+            >
+              <IconoNav :nombre="p.icono" :tam="18" />
+              {{ $t(`detalleCita.pestanas.${p.clave}`) }}
+            </button>
+          </template>
         </div>
 
-        <!-- Cambios de la cita, aparte de lo del día -->
-        <div class="pc-secundarias">
-          <button
-            v-if="puedeCancelar && cita !== null && !cita.asistencia"
-            type="button"
-            class="tu-btn tu-btn-fantasma w-full"
-            :aria-expanded="reprogramando"
-            @click="reprogramando = !reprogramando"
-          >
-            {{ $t("reprogramar.titulo") }}
-          </button>
-          <CambiarHorario
-            v-if="reprogramando && cita !== null && sesion !== null"
-            :url="`${base}/reservas/${cita.reserva_id}/reprogramar`"
-            :zona="sesion.zona_horaria"
-            :inicia-en="sesion.inicia_en"
-            :profesionales="profesionales"
-            :profesional-id="sesion.instructor_id"
-            @hecho="reprogramada"
-            @cerrar="reprogramando = false"
+        <!-- Asistencia y estado (con el resumen del cobro) -->
+        <template v-if="pestana === 'asistencia'">
+          <section class="pc-seccion">
+            <header>
+              <h3>{{ $t("detalleCita.asistencia.titulo") }}</h3>
+              <p class="pc-suave">{{ $t("detalleCita.asistencia.ayuda") }}</p>
+            </header>
+            <div class="pc-opciones">
+              <button
+                type="button"
+                class="pc-opcion"
+                :class="{ 'pc-opcion-bien': cita?.asistencia === 'presente' }"
+                :aria-pressed="cita?.asistencia === 'presente'"
+                :disabled="
+                  !marcable || accionando || cita?.asistencia === 'presente'
+                "
+                @click="marcar('presente')"
+              >
+                <span class="pc-opcion-icono" aria-hidden="true">
+                  <IconoNav nombre="hecho" :tam="20" />
+                </span>
+                <span class="min-w-0">
+                  <span class="pc-opcion-titulo">{{
+                    $t("detalleCita.asistencia.llego")
+                  }}</span>
+                  <span class="pc-opcion-sub">{{ subtituloLlego }}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="pc-opcion"
+                :class="{ 'pc-opcion-mal': cita?.asistencia === 'ausente' }"
+                :aria-pressed="cita?.asistencia === 'ausente'"
+                :disabled="
+                  !marcable || accionando || cita?.asistencia === 'ausente'
+                "
+                @click="marcar('ausente')"
+              >
+                <span class="pc-opcion-icono" aria-hidden="true">
+                  <IconoNav nombre="cerrar" :tam="20" />
+                </span>
+                <span class="min-w-0">
+                  <span class="pc-opcion-titulo">{{
+                    $t("detalleCita.asistencia.noAsistio")
+                  }}</span>
+                  <span class="pc-opcion-sub">{{
+                    $t("detalleCita.asistencia.noAsistioAyuda")
+                  }}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="pc-opcion"
+                :disabled="!sePuedeMover || accionando"
+                @click="abrirCancelacion"
+              >
+                <span class="pc-opcion-icono" aria-hidden="true">
+                  <IconoNav nombre="ausente" :tam="20" />
+                </span>
+                <span class="min-w-0">
+                  <span class="pc-opcion-titulo">{{
+                    $t("detalleCita.asistencia.cancelada")
+                  }}</span>
+                  <span class="pc-opcion-sub">{{
+                    $t("detalleCita.asistencia.canceladaAyuda")
+                  }}</span>
+                </span>
+              </button>
+            </div>
+
+            <dl v-if="cita?.nota || cita?.asiste" class="pc-notas">
+              <template v-if="cita?.asiste">
+                <dt>{{ $t("detalleCita.asiste") }}</dt>
+                <dd data-prueba="asiste">{{ cita.asiste }}</dd>
+              </template>
+              <template v-if="cita?.nota">
+                <dt>{{ $t("detalleCita.notaCliente") }}</dt>
+                <dd data-prueba="nota-cliente">{{ cita.nota }}</dd>
+              </template>
+            </dl>
+          </section>
+        </template>
+
+        <!-- Cobro y pago: en las dos primeras pestañas -->
+        <section v-if="pestana !== 'historial'" class="pc-seccion">
+          <header>
+            <h3>{{ $t("detalleCita.cobro.titulo") }}</h3>
+            <p class="pc-suave">{{ $t("detalleCita.cobro.ayuda") }}</p>
+          </header>
+          <div class="pc-cobro">
+            <div>
+              <span class="pc-etiqueta">{{
+                $t("detalleCita.cobro.total")
+              }}</span>
+              <span class="pc-total">{{
+                cita?.orden_id != null ? (total ?? "—") : "—"
+              }}</span>
+            </div>
+            <div>
+              <span class="pc-etiqueta">{{
+                $t("detalleCita.cobro.metodo")
+              }}</span>
+              <div
+                v-if="sePuedeCobrar"
+                class="tu-segmentado flex-wrap"
+                role="group"
+                :aria-label="$t('detalleCita.cobro.elige')"
+              >
+                <button
+                  v-for="m in METODOS"
+                  :key="m"
+                  type="button"
+                  :aria-pressed="metodo === m"
+                  @click="metodo = m"
+                >
+                  {{ $t(`agendaVisual.cita.metodos.${m}`) }}
+                </button>
+              </div>
+              <template v-else-if="cita?.pago">
+                <span class="font-medium">{{
+                  nombreMetodo(cita.pago.metodo)
+                }}</span>
+              </template>
+              <template v-else>
+                <span class="font-medium">—</span>
+                <span class="pc-suave text-sm">{{
+                  cita?.orden_id != null
+                    ? $t("detalleCita.cobro.sinPago")
+                    : $t("detalleCita.cobro.membresia")
+                }}</span>
+              </template>
+            </div>
+            <div>
+              <span class="pc-etiqueta">{{
+                $t("detalleCita.cobro.estado")
+              }}</span>
+              <span
+                class="pc-estado-pago"
+                :style="{
+                  '--tono': pagoEstado?.color ?? 'var(--texto-suave)',
+                }"
+              >
+                <span class="pc-punto" aria-hidden="true"></span>
+                {{ pagoEstado?.texto ?? $t("detalleCita.cobro.sinCobro") }}
+              </span>
+            </div>
+            <div v-if="sePuedeCobrar" class="pc-cobrar">
+              <button
+                type="button"
+                class="tu-btn tu-btn-primario w-full"
+                :disabled="accionando"
+                @click="cobrar"
+              >
+                <IconoNav nombre="dinero" :tam="18" />
+                {{ $t("detalleCita.cobro.registrar") }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Cobro en caja con error: corregir la forma o anularlo (ADR 0086/0087) -->
+          <CorregirCobro
+            v-if="cita?.pago?.en_caja"
+            :base="base"
+            :pago="cita.pago"
+            @cambiado="emit('cambiada')"
           />
-          <button
-            v-if="puedeCancelar"
-            type="button"
-            class="tu-btn tu-btn-fantasma w-full"
-            style="color: var(--error)"
-            :disabled="accionando"
-            :aria-expanded="cancelando"
-            @click="cancelando = !cancelando"
-          >
-            {{ $t("agendaVisual.cita.cancelar") }}
-          </button>
-          <ConfirmarCancelacion
-            v-if="cancelando && cita !== null"
-            :url="`${base}/reservas/${cita.reserva_id}/cancelacion`"
-            con-quien
-            :ocupado="accionando"
-            @confirmar="cancelar"
-            @cerrar="cancelando = false"
-          />
-        </div>
-      </div>
 
-      <!-- Ya marcada: se puede corregir (el crédito se ajusta en su saldo) -->
-      <div v-else-if="corregibleAsistencia" data-prueba="corregir-asistencia">
+          <!-- Lo que ha pasado con el pago -->
+          <div v-if="pestana === 'cobro'" class="pc-movimientos">
+            <h4>{{ $t("detalleCita.cobro.movimientos") }}</h4>
+            <p v-if="cargandoHistorial" class="pc-suave text-sm">
+              {{ $t("detalleCita.historial.cargando") }}
+            </p>
+            <p
+              v-else-if="errorHistorial"
+              class="text-sm"
+              :style="{ color: 'var(--error)' }"
+            >
+              {{ $t("detalleCita.historial.error") }}
+            </p>
+            <p
+              v-else-if="movimientosPago.length === 0"
+              class="pc-suave text-sm"
+            >
+              {{ $t("detalleCita.cobro.sinMovimientos") }}
+            </p>
+            <ol v-else class="pc-linea">
+              <li v-for="(h, i) in movimientosPago" :key="i">
+                <span class="pc-linea-punto" aria-hidden="true"></span>
+                <div class="min-w-0">
+                  <p class="font-medium">{{ tituloHecho(h) }}</p>
+                  <p v-if="detalleHecho(h)" class="text-sm">
+                    {{ detalleHecho(h) }}
+                  </p>
+                  <p class="pc-suave text-xs">{{ cuando(h) }}</p>
+                </div>
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <!-- Historial de la cita -->
+        <section v-else class="pc-seccion" data-prueba="historial">
+          <p v-if="cargandoHistorial" class="pc-suave text-sm">
+            {{ $t("detalleCita.historial.cargando") }}
+          </p>
+          <p
+            v-else-if="errorHistorial"
+            class="text-sm"
+            :style="{ color: 'var(--error)' }"
+          >
+            {{ $t("detalleCita.historial.error") }}
+          </p>
+          <p
+            v-else-if="(historial ?? []).length === 0"
+            class="pc-suave text-sm"
+          >
+            {{ $t("detalleCita.historial.vacio") }}
+          </p>
+          <ol v-else class="pc-linea">
+            <li v-for="(h, i) in historial" :key="i">
+              <span class="pc-linea-punto" aria-hidden="true"></span>
+              <div class="min-w-0">
+                <p class="font-medium">{{ tituloHecho(h) }}</p>
+                <p v-if="detalleHecho(h)" class="text-sm">
+                  {{ detalleHecho(h) }}
+                </p>
+                <p class="pc-suave text-xs">{{ cuando(h) }}</p>
+              </div>
+            </li>
+          </ol>
+        </section>
+      </template>
+    </div>
+
+    <template #pie>
+      <div class="mr-auto flex flex-wrap gap-2">
         <button
+          v-if="sePuedeMover"
           type="button"
-          class="tu-btn tu-btn-fantasma w-full"
-          :disabled="accionando"
-          @click="
-            marcar(cita?.asistencia === 'presente' ? 'ausente' : 'presente')
-          "
+          class="tu-btn tu-btn-fantasma"
+          :aria-expanded="reprogramando"
+          @click="abrirReprogramar"
         >
-          {{
-            cita?.asistencia === "presente"
-              ? $t("agendaVisual.cita.corregirANoAsistio")
-              : $t("agendaVisual.cita.corregirALlego")
-          }}
+          <IconoNav nombre="agenda" :tam="18" />
+          {{ $t("detalleCita.reprogramar") }}
+        </button>
+        <button
+          v-if="sePuedeMover"
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          style="color: var(--error)"
+          :disabled="accionando"
+          :aria-expanded="cancelando"
+          @click="abrirCancelacion"
+        >
+          <IconoNav nombre="cerrar" :tam="18" />
+          {{ $t("detalleCita.cancelar") }}
         </button>
       </div>
-    </div>
-  </PanelLateral>
+      <button
+        type="button"
+        class="tu-btn tu-btn-primario"
+        @click="emit('cerrar')"
+      >
+        {{ $t("detalleCita.listo") }}
+      </button>
+    </template>
+  </ModalDialogo>
 </template>
 
 <style scoped>
-/* Sin `margin`: lo pone el contenedor (space-y); un margin aquí lo anularía. */
-.pc-datos {
+/* Sin `margin` en los hijos: el espacio lo pone el `gap` del contenedor. */
+.pc {
   display: grid;
-  grid-template-columns: 6.5rem minmax(0, 1fr);
-  gap: 0.6rem 0.75rem;
-  padding: 0.9rem;
-  border-radius: 0.75rem;
-  background: var(--superficie-2);
-  font-size: 0.875rem;
+  gap: 1.4rem;
 }
-.pc-datos dt {
+.pc-suave {
   color: var(--texto-suave);
 }
-.pc-datos dd {
+.pc-cabeza {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.1rem;
+  align-items: start;
+}
+@media (min-width: 768px) {
+  .pc-cabeza {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) auto;
+  }
+  .pc-cuando {
+    padding-left: 1.25rem;
+    border-left: 1px solid var(--borde);
+  }
+}
+.pc-persona {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.pc-nombre {
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.pc-enlace {
+  display: inline-block;
+  margin-top: 0.15rem;
+  color: var(--primario);
+  font-size: 0.9rem;
   font-weight: 500;
 }
-.pc-acciones {
+.pc-enlace:hover {
+  text-decoration: underline;
+}
+.pc-cuando {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 3rem;
+}
+.pc-cuadro {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.65rem;
+  background: var(--primario-suave);
+  color: var(--primario-fuerte, var(--primario));
+}
+.pc-estados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+@media (min-width: 768px) {
+  .pc-estados {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+}
+.pc-pildora {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tono) 12%, transparent);
+  color: var(--tono);
+  font-size: 0.88rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.pc-punto {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--tono);
+}
+.pc-franja {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 0.85rem;
+  background: var(--superficie-2);
+}
+@media (min-width: 768px) {
+  .pc-franja {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .pc-franja > div + div {
+    padding-left: 1rem;
+    border-left: 1px solid var(--borde);
+  }
+}
+.pc-franja > div {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.pc-franja dt {
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+}
+.pc-franja dd {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.pc-seccion {
+  display: grid;
+  gap: 0.9rem;
+}
+.pc-seccion h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.pc-seccion header p {
+  font-size: 0.9rem;
+}
+.pc-opciones {
+  display: grid;
+  gap: 0.7rem;
+}
+@media (min-width: 640px) {
+  .pc-opciones {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.pc-opcion {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.8rem;
+  background: var(--superficie);
+  text-align: left;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.pc-opcion:not(:disabled):hover {
+  border-color: var(--primario);
+}
+.pc-opcion:disabled {
+  cursor: default;
+}
+.pc-opcion:disabled:not([aria-pressed="true"]) {
+  opacity: 0.55;
+}
+.pc-opcion-icono {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  background: var(--superficie-2);
+  color: var(--texto-suave);
+}
+.pc-opcion-titulo {
+  display: block;
+  font-weight: 600;
+}
+.pc-opcion-sub {
+  display: block;
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+.pc-opcion-bien {
+  --tono: var(--exito);
+}
+.pc-opcion-mal {
+  --tono: var(--error);
+}
+.pc-opcion-bien,
+.pc-opcion-mal {
+  border-color: var(--tono);
+  background: color-mix(in srgb, var(--tono) 7%, var(--superficie));
+}
+.pc-opcion-bien .pc-opcion-icono,
+.pc-opcion-mal .pc-opcion-icono {
+  background: var(--tono);
+  color: #fff;
+}
+.pc-opcion-bien .pc-opcion-titulo,
+.pc-opcion-bien .pc-opcion-sub,
+.pc-opcion-mal .pc-opcion-titulo,
+.pc-opcion-mal .pc-opcion-sub {
+  color: var(--tono);
+}
+.pc-notas {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: 0.5rem 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.8rem;
+  font-size: 0.9rem;
+}
+.pc-notas dt {
+  color: var(--texto-suave);
+}
+.pc-cobro {
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.85rem;
+}
+@media (min-width: 768px) {
+  .pc-cobro {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+  }
+  .pc-cobro > div + div:not(.pc-cobrar) {
+    padding-left: 1.25rem;
+    border-left: 1px solid var(--borde);
+  }
+}
+.pc-cobro > div {
+  display: grid;
+  justify-items: start;
+  gap: 0.3rem;
+}
+.pc-etiqueta {
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+.pc-total {
+  font-size: 1.6rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pc-estado-pago {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--tono);
+  font-weight: 500;
+}
+.pc-cobrar {
+  justify-items: stretch;
+  white-space: nowrap;
+}
+.pc-movimientos {
   display: grid;
   gap: 0.6rem;
 }
-/* Reprogramar y cancelar: aparte de lo del día, tras una línea. */
-.pc-secundarias {
-  display: grid;
-  gap: 0.6rem;
-  margin-top: 0.4rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--borde);
+.pc-movimientos h4 {
+  font-weight: 600;
 }
-.pc-secundarias:empty {
-  display: none;
+.pc-linea {
+  display: grid;
+  gap: 0.9rem;
+}
+.pc-linea > li {
+  position: relative;
+  display: flex;
+  gap: 0.8rem;
+}
+/* La línea une cada punto con el siguiente. */
+.pc-linea > li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 1.25rem;
+  bottom: -0.75rem;
+  left: 0.27rem;
+  border-left: 1px solid var(--borde);
+}
+.pc-linea-punto {
+  flex-shrink: 0;
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-top: 0.45rem;
+  border-radius: 999px;
+  background: var(--primario);
 }
 </style>

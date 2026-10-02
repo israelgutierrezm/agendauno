@@ -9,16 +9,18 @@ import PanelCita from "./PanelCita.vue";
 
 /*
 | Lo delicado de una cita se confirma y se puede corregir: cobrar en caja, marcar
-| asistencia (y corregirla) y la forma de pago de un cobro en caja (ADR 0086).
+| asistencia (y corregirla) y la forma de pago de un cobro en caja (ADR 0086). El
+| detalle muestra el contacto del cliente y el historial de la cita.
 */
 
 const mocks = vi.hoisted(() => ({
+  get: vi.fn(),
   post: vi.fn(),
   put: vi.fn(),
   confirmar: vi.fn(),
 }));
 vi.mock("@/lib/api", () => ({
-  api: { post: mocks.post, put: mocks.put },
+  api: { get: mocks.get, post: mocks.post, put: mocks.put },
   fijarBearer: vi.fn(),
   mensajeDeError: () => "Error",
 }));
@@ -67,9 +69,13 @@ function montar(sesion: SesionAgenda) {
     global: {
       plugins: [i18nApp],
       stubs: {
-        PanelLateral: {
+        ModalDialogo: {
           props: ["abierto", "titulo"],
-          template: '<div v-if="abierto"><slot /></div>',
+          template: '<div v-if="abierto"><slot /><slot name="pie" /></div>',
+        },
+        RouterLink: {
+          props: ["to"],
+          template: '<a data-prueba="ver-perfil"><slot /></a>',
         },
         CambiarHorario: true,
         ConfirmarCancelacion: true,
@@ -90,6 +96,7 @@ beforeEach(() => {
   setActivePinia(createPinia());
   vi.clearAllMocks();
   mocks.post.mockResolvedValue({ data: {} });
+  mocks.get.mockResolvedValue({ data: { data: [] } });
   mocks.put.mockResolvedValue({ data: {} });
   const sesion = useSesionTenantStore();
   sesion.usuario = { rol: "propietario", permisos: ["*"] } as never;
@@ -99,7 +106,7 @@ describe("cobrar en caja", () => {
   it("pregunta antes de cobrar y no cobra si se cancela", async () => {
     mocks.confirmar.mockResolvedValue(false);
     const w = montar(cita());
-    await boton(w, "Cobrar").trigger("click");
+    await boton(w, "Registrar pago").trigger("click");
     await flushPromises();
 
     expect(mocks.confirmar).toHaveBeenCalledWith(
@@ -112,12 +119,13 @@ describe("cobrar en caja", () => {
   it("al confirmar, registra el cobro con la forma elegida", async () => {
     mocks.confirmar.mockResolvedValue(true);
     const w = montar(cita());
-    await boton(w, "Cobrar").trigger("click");
+    await boton(w, "Transferencia").trigger("click");
+    await boton(w, "Registrar pago").trigger("click");
     await flushPromises();
 
     expect(mocks.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/ordenes/ord1/liquidar",
-      { metodo: "efectivo" },
+      { metodo: "transferencia" },
     );
   });
 });
@@ -147,7 +155,9 @@ describe("asistencia", () => {
     (pasada as { termina_en: string }).termina_en = "2020-01-01T10:30:00Z";
     const w = montar(pasada);
 
-    await boton(w, "Corregir: no asistió").trigger("click");
+    // La opción marcada no se vuelve a marcar; la otra corrige.
+    expect(boton(w, "Llegó").attributes("disabled")).toBeDefined();
+    await boton(w, "No asistió").trigger("click");
     await flushPromises();
     expect(mocks.confirmar).toHaveBeenCalledWith(
       expect.stringContaining("¿Cambiarlo a «No asistió»?"),
@@ -169,7 +179,12 @@ describe("forma de pago de un cobro en caja", () => {
         pago: { id: "p1", metodo: "efectivo", en_caja: true, corregible: true },
       }),
     );
-    expect(w.text()).toContain("Pagada · Efectivo");
+    expect(w.get('[data-prueba="estado-cita"]').text()).toBe("Agendada");
+    expect(w.text()).toContain("Pagada");
+    expect(w.text()).toContain("Efectivo");
+    expect(w.findAll("button").some((b) => b.text() === "Registrar pago")).toBe(
+      false,
+    );
 
     await w.get('[data-prueba="corregir-pago"]').trigger("click");
     await w.get("select").setValue("transferencia");
@@ -194,5 +209,60 @@ describe("forma de pago de un cobro en caja", () => {
       }),
     );
     expect(w.find('[data-prueba="corregir-pago"]').exists()).toBe(false);
+  });
+});
+
+describe("quién y qué pasó", () => {
+  it("muestra el contacto y la ficha del cliente", () => {
+    const w = montar(
+      cita({
+        cliente_id: "per1",
+        telefono: "55 1234 5678",
+        email: "diego@correo.mx",
+      }),
+    );
+    expect(w.text()).toContain("55 1234 5678");
+    expect(w.text()).toContain("diego@correo.mx");
+    expect(w.get('[data-prueba="ver-perfil"]').text()).toContain("Ver perfil");
+  });
+
+  it("el historial cuenta lo que pasó y quién lo hizo", async () => {
+    mocks.get.mockResolvedValue({
+      data: {
+        data: [
+          {
+            tipo: "agendada",
+            fecha: "2026-10-01T15:00:00Z",
+            actor: null,
+            detalle: {},
+          },
+          {
+            tipo: "cobrada",
+            fecha: "2026-10-01T16:00:00Z",
+            actor: "Rosa",
+            detalle: { monto_minor: 25000, metodo: "efectivo", en_caja: true },
+          },
+        ],
+      },
+    });
+    const w = montar(cita({ por_cobrar: false }));
+    await boton(w, "Historial").trigger("click");
+    await flushPromises();
+
+    expect(mocks.get).toHaveBeenCalledWith(
+      "/api/v1/app/demo/reservas/r1/historial",
+    );
+    const historial = w.get('[data-prueba="historial"]').text();
+    expect(historial).toContain("Cita agendada");
+    expect(historial).toContain("Cobrada en caja · Efectivo");
+    expect(historial).toContain("por Rosa");
+  });
+
+  it("con la asistencia marcada ya no se cancela ni se reprograma", () => {
+    const w = montar(cita({ asistencia: "presente", por_cobrar: false }));
+    expect(boton(w, "Cancelada").attributes("disabled")).toBeDefined();
+    expect(
+      w.findAll("button").some((b) => b.text() === "Reprogramar cita"),
+    ).toBe(false);
   });
 });

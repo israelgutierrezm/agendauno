@@ -288,9 +288,11 @@ class AgendaTenantController
 
         $sesiones = $consulta->limit(self::LIMITE)->get();
         $titulares = $this->titularesDeCitas($sesiones);
+        // El teléfono y el correo del cliente, solo para quien puede ver miembros.
+        $verContacto = $usuario?->puede('miembros.ver') ?? false;
 
         return response()->json([
-            'data' => $sesiones->map(fn (SesionTenant $sesion): array => $this->presentar($sesion, $titulares))->all(),
+            'data' => $sesiones->map(fn (SesionTenant $sesion): array => $this->presentar($sesion, $titulares, $verContacto))->all(),
         ]);
     }
 
@@ -416,9 +418,10 @@ class AgendaTenantController
 
     /**
      * @param  array<int, ReservaTenant>  $titulares  titular de cada cita, por id de sesión
+     * @param  bool  $verContacto  incluir el teléfono y el correo del cliente
      * @return array<string, mixed>
      */
-    private function presentar(SesionTenant $sesion, array $titulares = []): array
+    private function presentar(SesionTenant $sesion, array $titulares = [], bool $verContacto = false): array
     {
         $titular = $titulares[(int) $sesion->getKey()] ?? null;
 
@@ -453,6 +456,10 @@ class AgendaTenantController
             'cita' => $titular instanceof ReservaTenant ? [
                 'reserva_id' => $titular->ulid,
                 'cliente' => $titular->persona?->nombreCompleto(),
+                // Para abrir su ficha; el contacto, solo si se puede ver miembros.
+                'cliente_id' => $titular->persona?->ulid,
+                'telefono' => $verContacto ? $titular->persona?->celular : null,
+                'email' => $verContacto ? $titular->persona?->email : null,
                 'estado' => $titular->estado->value,
                 // Llegó (presente) / no asistió (ausente); null = aún sin marcar.
                 'asistencia' => $titular->asistencia?->estado->value,
