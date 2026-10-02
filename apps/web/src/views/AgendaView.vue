@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import BuscarPersona from "@/components/BuscarPersona.vue";
@@ -34,6 +34,7 @@ import {
 } from "@/lib/agenda";
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
+import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { confirmarAsistencia } from "@/lib/confirmarAsistencia";
 import { trackEvent } from "@/lib/analytics";
 import { plural } from "@/lib/terminologia";
@@ -1402,7 +1403,14 @@ const form = ref({
   // "Horario por día": un renglón por día con su hora.
   horarios: [] as { dia: number; hora: string }[],
   repetirHasta: "",
-});
+}); // Con una sucursal fija (la de la barra o la única), sus selectores sobran: el
+// filtro y la nueva clase la usan.
+const { mostrarSelect: elegirSucursal, actual: sucursalActual } =
+  useSucursalOperativa({
+    filtro: sucursalFiltro,
+    campo: toRef(form.value, "sucursalId"),
+  });
+
 // Año de la fecha elegida: por defecto la recurrencia llega hasta el 31-dic de ese año.
 const anioRecurrente = computed(() =>
   form.value.fecha !== ""
@@ -1716,7 +1724,7 @@ onMounted(async () => {
     <template v-if="!cargando">
       <!-- Barra de herramientas: filtros + navegacion + vista -->
       <div class="mt-6 flex flex-wrap items-center gap-2 sm:gap-3">
-        <span class="tu-select-icono">
+        <span v-if="elegirSucursal" class="tu-select-icono">
           <IconoNav nombre="ubicacion" :tam="18" />
           <select
             v-model="sucursalFiltro"
@@ -3101,7 +3109,7 @@ onMounted(async () => {
             </option>
           </select>
         </div>
-        <div>
+        <div v-if="elegirSucursal">
           <label class="tu-label" for="as">{{
             $t("agenda.nueva.sucursal")
           }}</label>
@@ -3332,7 +3340,7 @@ onMounted(async () => {
       :abierto="mostrarNuevaCita"
       :base="base"
       :ofertas="ofertas"
-      :sucursales="sucursales"
+      :sucursales="sucursalActual ? [sucursalActual] : sucursales"
       :profesionales="instructores"
       :clientes="miembros"
       :inicial="inicialCita"

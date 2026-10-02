@@ -4,6 +4,7 @@ import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 
 import IconoNav from "@/components/IconoNav.vue";
 import BotonPantallaCompleta from "@/components/BotonPantallaCompleta.vue";
+import SelectorSucursal from "@/components/SelectorSucursal.vue";
 import { agendaAmpliada } from "@/lib/pantallaCompleta";
 import PublicShell from "@/components/PublicShell.vue";
 import LayoutConfiguracion from "@/components/LayoutConfiguracion.vue";
@@ -308,6 +309,8 @@ onMounted(() => {
             class="tu-barra-division"
             aria-hidden="true"
           />
+          <!-- Con qué sucursal se trabaja (con varias); con una, solo su nombre -->
+          <SelectorSucursal class="hidden sm:inline-flex" />
           <!-- Cambiar de rol: solo si puede entrar con más de uno -->
           <button
             v-if="sesion.tieneVariosRoles"

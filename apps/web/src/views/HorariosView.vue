@@ -12,6 +12,7 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -50,6 +51,10 @@ const DIAS = [1, 2, 3, 4, 5, 6, 7] as const;
 const sucursales = ref<Sucursal[]>([]);
 const proveedores = ref<Proveedor[]>([]);
 const sucursalId = ref("");
+// Con una sucursal fija (la de la barra o la única), su selector sobra.
+const { mostrarSelect: elegirSucursal } = useSucursalOperativa({
+  campo: sucursalId,
+});
 const proveedorId = ref("");
 
 // semana[dia] = franjas de atención de ese día.
@@ -501,7 +506,7 @@ onMounted(cargarReferencias);
     <template v-if="!cargando">
       <!-- Sucursal y persona, con las acciones del horario -->
       <div class="hv-filtros mt-6">
-        <div>
+        <div v-if="elegirSucursal">
           <label class="tu-label" for="h-suc">{{
             $t("horarios.sucursal")
           }}</label>

@@ -6,8 +6,17 @@ import { api, fijarBearer, mensajeDeError } from "@/lib/api";
 import { esInstructor, esMiembro, type RolDisponible } from "@/lib/roles";
 import { useAparienciaStore, type Apariencia } from "@/stores/apariencia";
 
+// Sucursal con la que puede trabajar quien entró (todas o las asignadas).
+export interface SucursalSesion {
+  id: string;
+  nombre: string;
+  zona_horaria: string | null;
+}
+
 export interface UsuarioTenant {
   ulid: string;
+  // Sucursales que puede operar: con más de una, elige con cuál trabaja.
+  sucursales?: SucursalSesion[];
   nombre: string;
   email: string;
   // Rol ACTIVO: con el que entró (el menú, su inicio y los permisos son de este).

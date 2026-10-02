@@ -13,6 +13,7 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { useAnchoMinimo } from "@/lib/pantalla";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -60,6 +61,10 @@ function isoHoy(): string {
 
 const fecha = ref(isoHoy());
 const sucursalFiltro = ref("");
+// Con una sucursal fija (la de la barra o la única), su filtro sobra.
+const { mostrarSelect: elegirSucursal } = useSucursalOperativa({
+  filtro: sucursalFiltro,
+});
 const sucursales = ref<Sucursal[]>([]);
 const metricas = ref<Metricas | null>(null);
 const sesiones = ref<SesionDia[]>([]);
@@ -471,7 +476,10 @@ onMounted(async () => {
           tabindex="-1"
           :aria-label="$t('recepcion.fecha')"
         />
-        <span v-if="sucursales.length > 1" class="tu-select-icono ml-auto">
+        <span
+          v-if="elegirSucursal && sucursales.length > 1"
+          class="tu-select-icono ml-auto"
+        >
           <IconoNav nombre="ubicacion" :tam="16" />
           <select
             v-model="sucursalFiltro"

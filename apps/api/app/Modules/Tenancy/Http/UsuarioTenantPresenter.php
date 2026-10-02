@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http;
 
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\CatalogoTemas;
+use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 
 /**
@@ -47,6 +49,29 @@ class UsuarioTenantPresenter
             'permisos' => $catalogo->permisosDe($usuario->rolesVigentes()),
             // Tema y colores propios: el front los aplica al entrar (ver /apariencia).
             'apariencia' => CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion),
+            // Sucursales que puede operar (todas o las que tiene asignadas): con más de
+            // una, el panel ofrece elegir con cuál trabaja; con una, se usa esa.
+            'sucursales' => self::sucursales($usuario),
         ];
+    }
+
+    /**
+     * @return list<array{id: string, nombre: string, zona_horaria: string|null}>
+     */
+    private static function sucursales(Usuario $usuario): array
+    {
+        $permitidas = app(ResolverAccesoTenant::class)->sucursalesPermitidas($usuario);
+
+        return SucursalTenant::query()
+            ->when($permitidas !== null, fn ($q) => $q->whereIn('id', $permitidas))
+            ->orderBy('nombre')
+            ->get(['id', 'ulid', 'nombre', 'zona_horaria'])
+            ->map(static fn (SucursalTenant $s): array => [
+                'id' => (string) $s->ulid,
+                'nombre' => (string) $s->nombre,
+                'zona_horaria' => $s->zona_horaria,
+            ])
+            ->values()
+            ->all();
     }
 }

@@ -21,6 +21,7 @@ import PanelLateral from "@/components/PanelLateral.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
 import TarjetaMiembro from "@/components/TarjetaMiembro.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { useAnchoMinimo } from "@/lib/pantalla";
 import {
   creditosDe,
@@ -80,6 +81,10 @@ const facturable = ref("");
 const estado = ref("");
 const archivado = ref("no");
 const sucursalFiltro = ref("");
+// Con una sucursal fija (la de la barra o la única), el filtro por sede sobra.
+const { mostrarSelect: elegirSucursal } = useSucursalOperativa({
+  filtro: sucursalFiltro,
+});
 const page = ref(1);
 const perPage = 20;
 
@@ -119,7 +124,7 @@ const filtrosDef = computed(() => {
       ],
     },
   ];
-  if (hayMultiSucursal.value) {
+  if (hayMultiSucursal.value && elegirSucursal.value) {
     defs.push({
       clave: "sucursal_id",
       etiqueta: t("miembros.filtros.sede"),

@@ -8,6 +8,7 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Existencia {
@@ -76,6 +77,14 @@ const exito = ref<string | null>(null);
 
 // POS
 const sucursalSel = ref("");
+// Con una sucursal fija (la de la barra o la única), se vende ahí sin preguntar.
+const { mostrarSelect: elegirSucursal, actual: sucursalActual } =
+  useSucursalOperativa({ campo: sucursalSel });
+const ventasVisibles = computed(() =>
+  sucursalActual.value
+    ? ventas.value.filter((v) => v.sucursal === sucursalActual.value!.nombre)
+    : ventas.value,
+);
 const metodo = ref("efectivo");
 const carrito = ref<
   Array<{ id: string; nombre: string; precio: number; cantidad: number }>
@@ -310,12 +319,16 @@ onMounted(cargar);
       <!-- ===== Vender ===== -->
       <div v-else-if="tab === 'vender'" class="mt-6 grid gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2">
-          <label class="tu-label" for="pos-suc">{{ $t("pos.sucursal") }}</label>
-          <select id="pos-suc" v-model="sucursalSel" class="tu-input w-auto">
-            <option v-for="s in sucursales" :key="s.id" :value="s.id">
-              {{ s.nombre }}
-            </option>
-          </select>
+          <template v-if="elegirSucursal">
+            <label class="tu-label" for="pos-suc">{{
+              $t("pos.sucursal")
+            }}</label>
+            <select id="pos-suc" v-model="sucursalSel" class="tu-input w-auto">
+              <option v-for="s in sucursales" :key="s.id" :value="s.id">
+                {{ s.nombre }}
+              </option>
+            </select>
+          </template>
 
           <p
             v-if="articulosVendibles.length === 0"
@@ -682,7 +695,7 @@ onMounted(cargar);
         <!-- Ventas recientes -->
         <h2 class="mt-8 font-medium text-lg">{{ $t("pos.ventas.titulo") }}</h2>
         <EstadoVacio
-          v-if="ventas.length === 0"
+          v-if="ventasVisibles.length === 0"
           class="mt-3 py-6"
           icono="ventas"
           compacto
@@ -705,7 +718,7 @@ onMounted(cargar);
               </tr>
             </thead>
             <tbody>
-              <template v-for="v in ventas" :key="v.id">
+              <template v-for="v in ventasVisibles" :key="v.id">
                 <tr class="border-t" :style="{ borderColor: 'var(--borde)' }">
                   <td class="px-4 py-2">
                     <span class="block">{{ v.sucursal ?? "—" }}</span>
