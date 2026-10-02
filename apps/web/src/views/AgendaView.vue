@@ -15,6 +15,7 @@ import CambiarHorario from "@/components/CambiarHorario.vue";
 import CambiarSerie from "@/components/CambiarSerie.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PanelCita from "@/components/PanelCita.vue";
@@ -900,8 +901,63 @@ const staffSesion = ref<StaffSesion[]>([]);
 const staffModel = ref({ usuarioId: "", rol: "instructor", sustituyeA: "" });
 const asignandoStaff = ref(false);
 
+// Pestaña del detalle de una clase y su ocupación (mismo patrón que una cita).
+type PestanaClase = "asistentes" | "lugares" | "equipo" | "checkins";
+const pestanaClase = ref<PestanaClase>("asistentes");
+const pestanasClase = computed<PestanaClase[]>(() => {
+  const d = detalle.value;
+  const lista: PestanaClase[] = ["asistentes"];
+  if (d?.oferta_id && (puedeGestionar.value || puedeCatalogo.value)) {
+    lista.push("lugares");
+  }
+  if (puedeGestionar.value) {
+    lista.push("equipo");
+  }
+  if (puedeCheckin.value) {
+    lista.push("checkins");
+  }
+  return lista;
+});
+const ICONO_PESTANA_CLASE: Record<PestanaClase, string> = {
+  asistentes: "personas",
+  lugares: "cuadricula",
+  equipo: "instructores",
+  checkins: "hecho",
+};
+const fechaClase = computed(() => {
+  const d = detalle.value;
+  return d === null
+    ? ""
+    : new Intl.DateTimeFormat("es-MX", {
+        timeZone: d.zona_horaria,
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      }).format(new Date(d.inicia_en));
+});
+const minutosClase = computed(() => {
+  const d = detalle.value;
+  return d === null
+    ? 0
+    : Math.round(
+        (new Date(d.termina_en).getTime() - new Date(d.inicia_en).getTime()) /
+          60000,
+      );
+});
+const ocupacionClase = computed(() => {
+  const d = detalle.value;
+  if (d === null || d.capacidad === null || d.capacidad === 0) {
+    return null;
+  }
+  return Math.min(100, Math.round((d.ocupados / d.capacidad) * 100));
+});
+
 async function abrirDetalle(s: Sesion): Promise<void> {
   detalle.value = s;
+  pestanaClase.value = "asistentes";
+  cambiandoHorario.value = false;
+  cambiandoSerie.value = false;
+  cancelandoSesion.value = false;
   roster.value = [];
   checkins.value = [];
   staffSesion.value = [];
@@ -2151,683 +2207,842 @@ onMounted(async () => {
       </div>
     </template>
 
-    <!-- ===== Detalle de la sesión (modal centrado y amplio) ===== -->
-    <div
-      v-if="detalle"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+    <!-- ===== Detalle de una clase (mismo patrón que el de una cita) ===== -->
+    <ModalDialogo
+      :abierto="detalle !== null"
+      :titulo="$t('detalleClase.titulo')"
+      icono="agenda"
+      tam="xl"
+      @cerrar="cerrarDetalle"
     >
-      <div class="absolute inset-0 bg-black/50" @click="cerrarDetalle" />
-      <aside
-        class="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-2xl p-6 shadow-xl"
-        :style="{ background: 'var(--superficie)' }"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="detalle.oferta ?? $t('comun.detalle')"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <h2 class="text-lg font-semibold">
-              {{ detalle.oferta ?? "—" }}
-            </h2>
-            <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ horaCorta(detalle.inicia_en, detalle.zona_horaria) }}–{{
-                horaCorta(detalle.termina_en, detalle.zona_horaria)
-              }}
-              <span v-if="detalle.instructor"> · {{ detalle.instructor }}</span>
-              <span v-if="detalle.sala"> · {{ detalle.sala }}</span>
+      <div v-if="detalle" class="dcl" data-prueba="detalle-clase">
+        <!-- Qué clase, cuándo y cómo va -->
+        <div class="dcl-cabeza">
+          <div class="min-w-0">
+            <p class="dcl-nombre">{{ detalle.oferta ?? "—" }}</p>
+            <p
+              class="first-letter:uppercase"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ fechaClase }} ·
+              {{ horaCorta(detalle.inicia_en, detalle.zona_horaria) }} –
+              {{ horaCorta(detalle.termina_en, detalle.zona_horaria) }}
             </p>
+          </div>
+          <div class="dcl-ocupacion">
+            <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("detalleClase.ocupacion") }}
+            </p>
+            <p class="dcl-cifra">
+              <template v-if="detalle.capacidad !== null">{{
+                $t("detalleClase.deLugares", {
+                  n: detalle.ocupados,
+                  total: detalle.capacidad,
+                })
+              }}</template>
+              <template v-else>{{
+                $t("detalleClase.inscritos", { n: detalle.ocupados })
+              }}</template>
+            </p>
+            <div
+              v-if="ocupacionClase !== null"
+              class="dcl-barra"
+              role="progressbar"
+              :aria-valuenow="ocupacionClase"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              <span
+                :style="{
+                  width: `${ocupacionClase}%`,
+                  background: completo(detalle)
+                    ? 'var(--aviso)'
+                    : 'var(--primario)',
+                }"
+              />
+            </div>
+          </div>
+          <div class="dcl-estados">
             <span
-              class="tu-badge mt-1 inline-block"
-              :class="completo(detalle) ? 'tu-badge-aviso' : 'tu-badge-exito'"
+              class="tu-pildora"
+              :style="{
+                '--tono':
+                  detalle.estado === 'programada'
+                    ? 'var(--exito)'
+                    : 'var(--texto-suave)',
+              }"
+              >{{
+                detalle.estado === "programada"
+                  ? $t("detalleClase.programada")
+                  : $t("detalleClase.cancelada")
+              }}</span
             >
-              {{
-                detalle.capacidad !== null
-                  ? `${detalle.ocupados}/${detalle.capacidad}`
-                  : `${detalle.ocupados}`
-              }}
-              <span v-if="completo(detalle)">
-                · {{ $t("agenda.completo") }}</span
-              >
+            <span
+              v-if="completo(detalle)"
+              class="tu-pildora"
+              :style="{ '--tono': 'var(--aviso)' }"
+              >{{ $t("agenda.completo") }}</span
+            >
+            <span
+              v-if="detalle.en_espera > 0"
+              class="tu-pildora"
+              :style="{ '--tono': 'var(--aviso)' }"
+              >{{ $t("detalleClase.enEspera", { n: detalle.en_espera }) }}</span
+            >
+          </div>
+        </div>
+
+        <!-- Quién la da, dónde y cuánto dura -->
+        <dl class="tu-detalle-franja">
+          <div>
+            <span class="tu-cuadro-icono" aria-hidden="true">
+              <IconoNav nombre="instructores" :tam="20" />
             </span>
+            <div class="min-w-0">
+              <dt>{{ $t("detalleClase.imparte") }}</dt>
+              <dd>{{ detalle.instructor ?? $t("detalleClase.sinAsignar") }}</dd>
+            </div>
           </div>
-          <button
-            class="tu-icono-btn"
-            :aria-label="$t('agenda.cerrarDetalle')"
-            @click="cerrarDetalle"
-          >
-            <IconoNav nombre="cerrar" :tam="18" />
-          </button>
-        </div>
-
-        <div v-if="detalle.estado === 'programada'" class="mt-4">
-          <!-- Reservar -->
-          <form
-            v-if="puedeReservar && miembros.length > 0"
-            class="flex flex-wrap items-end gap-2"
-            @submit.prevent="reservar(detalle.id)"
-          >
-            <div class="flex-1 min-w-[160px]">
-              <label class="tu-label" for="rm">{{
-                $t("agenda.reservar.miembro")
-              }}</label>
-              <BuscarPersona
-                v-model="reservarModel.miembroId"
-                campo-id="rm"
-                :personas="personasBuscables"
-              />
+          <div>
+            <span class="tu-cuadro-icono" aria-hidden="true">
+              <IconoNav nombre="recursos" :tam="20" />
+            </span>
+            <div class="min-w-0">
+              <dt>{{ $t("detalleClase.sala") }}</dt>
+              <dd>{{ detalle.sala ?? "—" }}</dd>
             </div>
-            <div class="min-w-[120px]">
-              <label class="tu-label" for="rcanal">{{
-                $t("agenda.reservar.canal")
-              }}</label>
-              <select
-                id="rcanal"
-                v-model="reservarModel.canal"
-                class="tu-input"
-              >
-                <option v-for="c in CANALES" :key="c" :value="c">
-                  {{ $t(`agenda.canales.${c}`) }}
-                </option>
-              </select>
-            </div>
-            <label class="flex items-center gap-1.5 text-sm pb-2.5">
-              <input v-model="reservarModel.esperar" type="checkbox" />
-              {{ $t("agenda.reservar.esperar") }}
-            </label>
-            <!-- Mapa de lugares (R4): elige el lugar si la clase los asigna -->
-            <div v-if="detalle.oferta_lugares > 0" class="w-full">
-              <label class="tu-label">{{ $t("agenda.lugares.elige") }}</label>
-              <div class="flex flex-wrap gap-1.5">
-                <button
-                  v-for="n in detalle.oferta_lugares"
-                  :key="n"
-                  type="button"
-                  class="h-9 w-9 rounded-md border text-sm font-semibold transition disabled:opacity-40"
-                  :style="
-                    reservarModel.lugar === n
-                      ? {
-                          background: 'var(--primario)',
-                          color: '#fff',
-                          borderColor: 'var(--primario)',
-                        }
-                      : { borderColor: 'var(--borde)' }
-                  "
-                  :disabled="lugaresTomados.has(n)"
-                  :title="
-                    lugaresTomados.has(n) ? $t('agenda.lugares.ocupado') : ''
-                  "
-                  @click="
-                    reservarModel.lugar = reservarModel.lugar === n ? null : n
-                  "
-                >
-                  {{ n }}
-                </button>
-              </div>
-            </div>
-            <button
-              class="tu-btn tu-btn-primario"
-              type="submit"
-              :disabled="accionando || reservarModel.miembroId === ''"
-            >
-              {{ $t("agenda.reservar.reservar") }}
-            </button>
-          </form>
-        </div>
-
-        <!-- Roster -->
-        <div
-          class="mt-4 border-t pt-4"
-          :style="{ borderColor: 'var(--borde)' }"
-        >
-          <h3 class="font-semibold text-sm">
-            {{ $t("agenda.sesion.reservas") }}
-          </h3>
-          <p
-            v-if="!puedeVerReservas"
-            class="mt-2 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("agenda.roster.sinPermiso") }}
-          </p>
-          <p
-            v-else-if="cargandoRoster"
-            class="mt-2 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("comun.cargando") }}
-          </p>
-          <p
-            v-else-if="roster.length === 0"
-            class="mt-2 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("agenda.roster.vacio") }}
-          </p>
-          <ul v-else class="mt-2 space-y-2">
-            <li v-for="r in roster" :key="r.id" class="text-sm">
-              <div class="flex items-center justify-between gap-2">
-                <span class="min-w-0">
-                  <span class="block truncate font-medium">{{
-                    r.persona ?? "—"
-                  }}</span>
-                  <span v-if="lineaRoster(r).length > 0" class="block text-xs">
-                    <span
-                      v-for="(d, i) in lineaRoster(r)"
-                      :key="d.texto"
-                      :style="{ color: d.color }"
-                      >{{ i > 0 ? " · " : "" }}{{ d.texto }}</span
-                    >
-                  </span>
-                </span>
-                <span class="flex items-center gap-2 shrink-0">
-                  <button
-                    v-if="r.estado === 'ofrecida' && puedeReservar"
-                    class="tu-enlace"
-                    :disabled="accionando"
-                    @click="aceptar(r.id, detalle.id)"
-                  >
-                    {{ $t("agenda.roster.aceptar") }}
-                  </button>
-                  <template v-if="r.estado === 'confirmada'">
-                    <button
-                      v-if="puedeMarcar"
-                      class="tu-enlace"
-                      :disabled="accionando"
-                      @click="marcar(r.id, 'presente', detalle.id)"
-                    >
-                      {{ $t("agenda.roster.marcarPresente") }}
-                    </button>
-                    <button
-                      v-if="puedeMarcar"
-                      class="tu-enlace"
-                      :disabled="accionando"
-                      @click="marcar(r.id, 'ausente', detalle.id)"
-                    >
-                      {{ $t("agenda.roster.marcarAusente") }}
-                    </button>
-                  </template>
-                  <button
-                    v-if="
-                      puedeReservar &&
-                      !r.asistencia &&
-                      (r.estado === 'confirmada' || r.estado === 'ofrecida') &&
-                      miembros.length > 0
-                    "
-                    class="tu-enlace"
-                    :disabled="accionando"
-                    @click="abrirTransferir(r.id)"
-                  >
-                    {{ $t("agenda.roster.transferir") }}
-                  </button>
-                  <button
-                    v-if="
-                      puedeReservar && r.estado !== 'cancelada' && !r.asistencia
-                    "
-                    class="tu-enlace"
-                    style="color: var(--error)"
-                    :disabled="accionando"
-                    :aria-expanded="cancelandoReserva === r.id"
-                    @click="
-                      cancelandoReserva =
-                        cancelandoReserva === r.id ? null : r.id
-                    "
-                  >
-                    {{ $t("agenda.roster.cancelarReserva") }}
-                  </button>
-                </span>
-              </div>
-              <!-- Selector inline para transferir (regalar) el lugar a otro miembro -->
-              <form
-                v-if="transferirModel.reservaId === r.id"
-                class="mt-2 flex flex-wrap items-end gap-2 rounded-md p-2"
-                :style="{ background: 'var(--fondo-suave)' }"
-                @submit.prevent="transferir(r.id, detalle.id)"
-              >
-                <div class="min-w-0 grow">
-                  <label class="tu-label" :for="`tr-${r.id}`">{{
-                    $t("agenda.roster.transferirA")
-                  }}</label>
-                  <BuscarPersona
-                    v-model="transferirModel.personaId"
-                    :campo-id="`tr-${r.id}`"
-                    :personas="personasBuscables"
-                  />
-                </div>
-                <button
-                  class="tu-btn tu-btn-primario"
-                  type="submit"
-                  :disabled="accionando || transferirModel.personaId === ''"
-                >
-                  {{ $t("agenda.roster.confirmarTransfer") }}
-                </button>
-                <button
-                  class="tu-btn tu-btn-fantasma"
-                  type="button"
-                  :disabled="accionando"
-                  @click="transferirModel = { reservaId: '', personaId: '' }"
-                >
-                  {{ $t("comun.cancelar") }}
-                </button>
-              </form>
-              <ConfirmarCancelacion
-                v-if="cancelandoReserva === r.id"
-                :url="`${base}/reservas/${r.id}/cancelacion`"
-                con-quien
-                :ocupado="accionando"
-                @confirmar="(por) => cancelarReserva(r.id, detalle!.id, por)"
-                @cerrar="cancelandoReserva = null"
-              />
-            </li>
-          </ul>
-        </div>
-
-        <!-- Cupos por canal / marketplace (R20) -->
-        <div
-          v-if="puedeGestionar && detalle.oferta_id"
-          class="mt-4 border-t pt-4"
-          :style="{ borderColor: 'var(--borde)' }"
-        >
-          <h3 class="font-semibold text-sm">
-            {{ $t("agenda.cuposCanal.titulo") }}
-          </h3>
-          <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("agenda.cuposCanal.ayuda") }}
-          </p>
-
-          <ul v-if="reglasCanal.length > 0" class="mt-2 space-y-1">
-            <li
-              v-for="rc in reglasCanal"
-              :key="rc.id"
-              class="flex items-center justify-between gap-2 text-sm"
-            >
-              <span>
-                <span class="tu-badge">{{
-                  $t(`agenda.canales.${rc.canal}`)
-                }}</span>
-                {{ $t("agenda.cuposCanal.cupos", { n: rc.cupos }) }}
-                <span
-                  v-if="rc.liberar_horas_antes > 0"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  >·
-                  {{
-                    $t("agenda.cuposCanal.libera", {
-                      h: rc.liberar_horas_antes,
-                    })
-                  }}</span
-                >
-              </span>
-              <button
-                v-if="puedeEliminar"
-                class="tu-enlace"
-                style="color: var(--error)"
-                type="button"
-                :disabled="guardandoCanal"
-                @click="eliminarReglaCanal(rc)"
-              >
-                {{ $t("comun.eliminar") }}
-              </button>
-            </li>
-          </ul>
-
-          <form
-            class="mt-2 flex flex-wrap items-end gap-2"
-            @submit.prevent="guardarReglaCanal"
-          >
-            <div class="min-w-[110px]">
-              <label class="tu-label" for="rc-canal">{{
-                $t("agenda.reservar.canal")
-              }}</label>
-              <select
-                id="rc-canal"
-                v-model="reglaCanalModel.canal"
-                class="tu-input"
-              >
-                <option
-                  v-for="c in CANALES.filter((x) => x !== 'directo')"
-                  :key="c"
-                  :value="c"
-                >
-                  {{ $t(`agenda.canales.${c}`) }}
-                </option>
-              </select>
-            </div>
-            <div class="w-20">
-              <label class="tu-label" for="rc-cupos">{{
-                $t("agenda.cuposCanal.campoCupos")
-              }}</label>
-              <input
-                id="rc-cupos"
-                v-model.number="reglaCanalModel.cupos"
-                type="number"
-                min="0"
-                class="tu-input"
-              />
-            </div>
-            <div class="w-24">
-              <label class="tu-label" for="rc-libera">{{
-                $t("agenda.cuposCanal.campoLibera")
-              }}</label>
-              <input
-                id="rc-libera"
-                v-model.number="reglaCanalModel.liberar_horas_antes"
-                type="number"
-                min="0"
-                class="tu-input"
-              />
-            </div>
-            <button
-              class="tu-btn tu-btn-fantasma"
-              type="submit"
-              :disabled="guardandoCanal"
-            >
-              {{ $t("agenda.cuposCanal.guardar") }}
-            </button>
-          </form>
-        </div>
-
-        <!-- Mapa de lugares por clase (R4) -->
-        <div
-          v-if="puedeCatalogo && detalle.oferta_id"
-          class="mt-4 border-t pt-4"
-          :style="{ borderColor: 'var(--borde)' }"
-        >
-          <h3 class="font-semibold text-sm">
-            {{ $t("agenda.lugares.titulo") }}
-          </h3>
-          <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("agenda.lugares.ayuda") }}
-          </p>
-          <form
-            class="mt-2 flex flex-wrap items-end gap-2"
-            @submit.prevent="guardarLugares"
-          >
-            <div class="w-28">
-              <label class="tu-label" for="lug-n">{{
-                $t("agenda.lugares.numero")
-              }}</label>
-              <input
-                id="lug-n"
-                v-model.number="lugaresModel.lugares"
-                type="number"
-                min="0"
-                class="tu-input"
-              />
-            </div>
-            <div class="w-32">
-              <label class="tu-label" for="lug-precio">{{
-                $t("agenda.lugares.precio")
-              }}</label>
-              <input
-                id="lug-precio"
-                v-model.number="lugaresModel.precio"
-                type="number"
-                min="0"
-                step="1"
-                class="tu-input"
-                :placeholder="$t('agenda.lugares.precioPh')"
-              />
-            </div>
-            <button
-              class="tu-btn tu-btn-fantasma"
-              type="submit"
-              :disabled="guardandoLugares"
-            >
-              {{ $t("agenda.lugares.guardar") }}
-            </button>
-          </form>
-          <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("agenda.lugares.precioAyuda") }}
-          </p>
-        </div>
-
-        <!-- Check-ins de bienestar -->
-        <div
-          v-if="puedeCheckin"
-          class="mt-4 border-t pt-4"
-          :style="{ borderColor: 'var(--borde)' }"
-        >
-          <h3 class="font-semibold text-sm">{{ $t("checkins.titulo") }}</h3>
-          <form
-            class="mt-2 flex flex-wrap items-end gap-2"
-            @submit.prevent="registrarCheckin(detalle.id)"
-          >
-            <div class="min-w-[130px]">
-              <label class="tu-label" for="cp">{{
-                $t("checkins.proveedor")
-              }}</label>
-              <select id="cp" v-model="checkinModel.proveedor" class="tu-input">
-                <option value="wellhub">
-                  {{ $t("integraciones.proveedores.wellhub") }}
-                </option>
-                <option value="totalpass">
-                  {{ $t("integraciones.proveedores.totalpass") }}
-                </option>
-              </select>
-            </div>
-            <div class="flex-1 min-w-[150px]">
-              <label class="tu-label" for="cc">{{
-                $t("checkins.codigo")
-              }}</label>
-              <input
-                id="cc"
-                v-model="checkinModel.codigo"
-                class="tu-input"
-                autocomplete="off"
-                required
-              />
-            </div>
-            <button
-              class="tu-btn tu-btn-primario"
-              type="submit"
-              :disabled="registrandoCheckin || checkinModel.codigo === ''"
-            >
-              {{
-                registrandoCheckin
-                  ? $t("checkins.registrando")
-                  : $t("checkins.registrar")
-              }}
-            </button>
-          </form>
-          <p
-            v-if="okCheckin"
-            class="mt-2 text-sm"
-            :style="{ color: 'var(--exito)' }"
-          >
-            {{ $t("checkins.ok") }}
-          </p>
-          <ul v-if="checkins.length > 0" class="mt-3 space-y-2">
-            <li
-              v-for="c in checkins"
-              :key="c.id"
-              class="flex items-center justify-between gap-2 text-sm"
-            >
-              <span class="truncate">{{ c.usuario ?? "—" }}</span>
-              <span class="tu-badge tu-badge-exito shrink-0">{{
-                $t(`checkins.${c.estado}`)
-              }}</span>
-            </li>
-          </ul>
-        </div>
-
-        <!-- Staff / sustituciones (R17) -->
-        <div
-          v-if="puedeGestionar"
-          class="mt-4 border-t pt-4"
-          :style="{ borderColor: 'var(--borde)' }"
-        >
-          <div v-if="detalle.estado === 'programada'" class="mb-4">
-            <label class="tu-label" for="inst-clase">{{
-              $t("instructorClase.titulo")
-            }}</label>
-            <select
-              id="inst-clase"
-              class="tu-input"
-              :value="detalle.instructor_id ?? ''"
-              :disabled="cambiandoInstructor"
-              @change="
-                cambiarInstructor(($event.target as HTMLSelectElement).value)
-              "
-            >
-              <option value="">{{ $t("instructorClase.ninguno") }}</option>
-              <option v-for="i in instructores" :key="i.id" :value="i.id">
-                {{ i.nombre }}
-              </option>
-            </select>
           </div>
-          <h3 class="font-semibold text-sm">{{ $t("agenda.staff.titulo") }}</h3>
-          <ul v-if="staffSesion.length > 0" class="mt-2 space-y-1.5">
-            <li
-              v-for="a in staffSesion"
-              :key="a.id"
-              class="flex items-center gap-2 text-sm"
-            >
-              <span>{{ a.usuario ?? "—" }}</span>
-              <span class="tu-badge">{{
-                $t(`agenda.staff.rol.${a.rol}`)
-              }}</span>
-            </li>
-          </ul>
-          <form
-            v-if="detalle.estado === 'programada' && instructores.length > 0"
-            class="mt-3 grid grid-cols-2 gap-2 items-end"
-            @submit.prevent="asignarStaff(detalle.id)"
-          >
-            <div class="col-span-2">
-              <label class="tu-label" for="stu">{{
-                $t("agenda.staff.persona")
-              }}</label>
-              <select
-                id="stu"
-                v-model="staffModel.usuarioId"
-                class="tu-input"
-                required
-              >
-                <option value="" disabled>
-                  {{ $t("agenda.reservar.elegir") }}
-                </option>
-                <option v-for="i in instructores" :key="i.id" :value="i.id">
-                  {{ i.nombre }}
-                </option>
-              </select>
+          <div>
+            <span class="tu-cuadro-icono" aria-hidden="true">
+              <IconoNav nombre="ubicacion" :tam="20" />
+            </span>
+            <div class="min-w-0">
+              <dt>{{ $t("detalleClase.sucursal") }}</dt>
+              <dd>{{ detalle.sucursal ?? "—" }}</dd>
             </div>
-            <div>
-              <label class="tu-label" for="srol">{{
-                $t("agenda.staff.rolLabel")
-              }}</label>
-              <select id="srol" v-model="staffModel.rol" class="tu-input">
-                <option value="instructor">
-                  {{ $t("agenda.staff.rol.instructor") }}
-                </option>
-                <option value="asistente">
-                  {{ $t("agenda.staff.rol.asistente") }}
-                </option>
-                <option value="sustituto">
-                  {{ $t("agenda.staff.rol.sustituto") }}
-                </option>
-              </select>
+          </div>
+          <div>
+            <span class="tu-cuadro-icono" aria-hidden="true">
+              <IconoNav nombre="reloj" :tam="20" />
+            </span>
+            <div class="min-w-0">
+              <dt>{{ $t("detalleClase.duracion") }}</dt>
+              <dd>{{ $t("detalleClase.minutos", { n: minutosClase }) }}</dd>
             </div>
-            <div v-if="staffModel.rol === 'sustituto'">
-              <label class="tu-label" for="ssub">{{
-                $t("agenda.staff.sustituye")
-              }}</label>
-              <select
-                id="ssub"
-                v-model="staffModel.sustituyeA"
-                class="tu-input"
-              >
-                <option value="">—</option>
-                <option v-for="i in instructores" :key="i.id" :value="i.id">
-                  {{ i.nombre }}
-                </option>
-              </select>
-            </div>
-            <div class="col-span-2 flex justify-end">
-              <button
-                class="tu-btn tu-btn-fantasma text-sm"
-                type="submit"
-                :disabled="asignandoStaff || staffModel.usuarioId === ''"
-              >
-                {{ $t("agenda.staff.asignar") }}
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+        </dl>
 
-        <!-- Cancelar clase -->
-        <div
-          v-if="puedeGestionar && detalle.estado === 'programada'"
-          class="mt-5 border-t pt-4"
-          :style="{ borderColor: 'var(--borde)' }"
+        <!-- Cambiar el horario o la serie, o cancelar: en lugar de las pestañas -->
+        <section
+          v-if="cambiandoSerie && detalle.serie_id && detalle.fecha_serie"
+          class="tu-detalle-seccion"
         >
-          <button
-            class="tu-enlace text-sm"
-            style="color: var(--error)"
-            :disabled="accionando"
-            :aria-expanded="cancelandoSesion"
-            @click="cancelandoSesion = !cancelandoSesion"
-          >
-            {{ $t("agenda.sesion.cancelar") }}
-          </button>
-          <button
-            class="tu-enlace text-sm ml-4"
-            :disabled="accionando"
-            :aria-expanded="cambiandoHorario"
-            @click="cambiandoHorario = !cambiandoHorario"
-          >
-            {{
-              detalle.serie_id
-                ? $t("cambiarSerie.soloEsta")
-                : $t("reprogramar.cambiarHorario")
-            }}
-          </button>
-          <button
-            v-if="detalle.serie_id && detalle.fecha_serie"
-            class="tu-enlace text-sm ml-4"
-            :disabled="accionando"
-            :aria-expanded="cambiandoSerie"
-            @click="cambiandoSerie = !cambiandoSerie"
-          >
-            {{ $t("cambiarSerie.titulo") }}
-          </button>
           <CambiarSerie
-            v-if="cambiandoSerie && detalle.serie_id && detalle.fecha_serie"
             :base="base"
             :serie-id="detalle.serie_id"
             :fecha="detalle.fecha_serie"
             :zona="detalle.zona_horaria"
             :inicia-en="detalle.inicia_en"
-            :duracion="
-              Math.round(
-                (new Date(detalle.termina_en).getTime() -
-                  new Date(detalle.inicia_en).getTime()) /
-                  60000,
-              )
-            "
+            :duracion="minutosClase"
             :profesionales="instructores"
             :profesional-id="detalle.instructor_id"
             :dias="detalle.serie_dias ?? []"
             @hecho="horarioCambiado"
             @cerrar="cambiandoSerie = false"
           />
+        </section>
+        <section v-else-if="cambiandoHorario" class="tu-detalle-seccion">
           <CambiarHorario
-            v-if="cambiandoHorario"
             :url="`${base}/sesiones/${detalle.id}/reprogramar`"
             :zona="detalle.zona_horaria"
             :inicia-en="detalle.inicia_en"
             @hecho="horarioCambiado"
             @cerrar="cambiandoHorario = false"
           />
-          <!-- Antes: cuántas reservas se cancelan y cuántos créditos regresan. -->
+        </section>
+        <!-- Antes: cuántas reservas se cancelan y cuántos créditos regresan. -->
+        <section v-else-if="cancelandoSesion" class="tu-detalle-seccion">
           <ConfirmarCancelacion
-            v-if="cancelandoSesion"
             :url="`${base}/sesiones/${detalle.id}/cancelacion`"
             :ocupado="accionando"
             @confirmar="cancelarSesion(detalle!.id)"
             @cerrar="cancelandoSesion = false"
           />
+        </section>
+
+        <template v-else>
+          <div
+            v-if="pestanasClase.length > 1"
+            class="tu-pestanas"
+            role="tablist"
+          >
+            <button
+              v-for="p in pestanasClase"
+              :key="p"
+              type="button"
+              role="tab"
+              class="inline-flex items-center gap-2"
+              :aria-selected="pestanaClase === p"
+              :aria-pressed="pestanaClase === p"
+              @click="pestanaClase = p"
+            >
+              <IconoNav :nombre="ICONO_PESTANA_CLASE[p]" :tam="18" />
+              {{ $t(`detalleClase.pestanas.${p}`) }}
+            </button>
+          </div>
+
+          <!-- Asistentes: reservar y la lista -->
+          <template v-if="pestanaClase === 'asistentes'">
+            <section
+              v-if="
+                detalle.estado === 'programada' &&
+                puedeReservar &&
+                miembros.length > 0
+              "
+              class="tu-detalle-seccion"
+            >
+              <header>
+                <h3>{{ $t("detalleClase.reservarTitulo") }}</h3>
+              </header>
+              <!-- Reservar -->
+              <form
+                class="flex flex-wrap items-end gap-2"
+                @submit.prevent="reservar(detalle.id)"
+              >
+                <div class="flex-1 min-w-[160px]">
+                  <label class="tu-label" for="rm">{{
+                    $t("agenda.reservar.miembro")
+                  }}</label>
+                  <BuscarPersona
+                    v-model="reservarModel.miembroId"
+                    campo-id="rm"
+                    :personas="personasBuscables"
+                  />
+                </div>
+                <div class="min-w-[120px]">
+                  <label class="tu-label" for="rcanal">{{
+                    $t("agenda.reservar.canal")
+                  }}</label>
+                  <select
+                    id="rcanal"
+                    v-model="reservarModel.canal"
+                    class="tu-input"
+                  >
+                    <option v-for="c in CANALES" :key="c" :value="c">
+                      {{ $t(`agenda.canales.${c}`) }}
+                    </option>
+                  </select>
+                </div>
+                <label class="flex items-center gap-1.5 text-sm pb-2.5">
+                  <input v-model="reservarModel.esperar" type="checkbox" />
+                  {{ $t("agenda.reservar.esperar") }}
+                </label>
+                <!-- Mapa de lugares (R4): elige el lugar si la clase los asigna -->
+                <div v-if="detalle.oferta_lugares > 0" class="w-full">
+                  <label class="tu-label">{{
+                    $t("agenda.lugares.elige")
+                  }}</label>
+                  <div class="flex flex-wrap gap-1.5">
+                    <button
+                      v-for="n in detalle.oferta_lugares"
+                      :key="n"
+                      type="button"
+                      class="h-9 w-9 rounded-md border text-sm font-semibold transition disabled:opacity-40"
+                      :style="
+                        reservarModel.lugar === n
+                          ? {
+                              background: 'var(--primario)',
+                              color: '#fff',
+                              borderColor: 'var(--primario)',
+                            }
+                          : { borderColor: 'var(--borde)' }
+                      "
+                      :disabled="lugaresTomados.has(n)"
+                      :title="
+                        lugaresTomados.has(n)
+                          ? $t('agenda.lugares.ocupado')
+                          : ''
+                      "
+                      @click="
+                        reservarModel.lugar =
+                          reservarModel.lugar === n ? null : n
+                      "
+                    >
+                      {{ n }}
+                    </button>
+                  </div>
+                </div>
+                <button
+                  class="tu-btn tu-btn-primario"
+                  type="submit"
+                  :disabled="accionando || reservarModel.miembroId === ''"
+                >
+                  {{ $t("agenda.reservar.reservar") }}
+                </button>
+              </form>
+            </section>
+
+            <!-- Quién viene: asistencia, lista de espera y cambios de su lugar -->
+            <section class="tu-detalle-seccion" data-prueba="roster">
+              <header>
+                <h3>{{ $t("detalleClase.asistentesTitulo") }}</h3>
+                <p>{{ $t("detalleClase.asistentesAyuda") }}</p>
+              </header>
+              <p
+                v-if="!puedeVerReservas"
+                class="mt-2 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("agenda.roster.sinPermiso") }}
+              </p>
+              <p
+                v-else-if="cargandoRoster"
+                class="mt-2 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("comun.cargando") }}
+              </p>
+              <p
+                v-else-if="roster.length === 0"
+                class="mt-2 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("agenda.roster.vacio") }}
+              </p>
+              <ul v-else class="dcl-roster">
+                <li v-for="r in roster" :key="r.id" class="text-sm">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="flex min-w-0 items-center gap-3">
+                      <AvatarIniciales :nombre="r.persona" tam="md" />
+                      <span class="min-w-0">
+                        <span class="block truncate font-medium">{{
+                          r.persona ?? "—"
+                        }}</span>
+                        <span
+                          v-if="lineaRoster(r).length > 0"
+                          class="block text-xs"
+                        >
+                          <span
+                            v-for="(d, i) in lineaRoster(r)"
+                            :key="d.texto"
+                            :style="{ color: d.color }"
+                            >{{ i > 0 ? " · " : "" }}{{ d.texto }}</span
+                          >
+                        </span>
+                      </span>
+                    </span>
+                    <span class="flex items-center gap-2 shrink-0">
+                      <button
+                        v-if="r.estado === 'ofrecida' && puedeReservar"
+                        class="tu-enlace"
+                        :disabled="accionando"
+                        @click="aceptar(r.id, detalle.id)"
+                      >
+                        {{ $t("agenda.roster.aceptar") }}
+                      </button>
+                      <span
+                        v-if="r.estado === 'confirmada' && puedeMarcar"
+                        class="tu-segmentado"
+                        role="group"
+                        :aria-label="$t('detalleClase.asistencia')"
+                      >
+                        <button
+                          type="button"
+                          :aria-pressed="r.asistencia === 'presente'"
+                          :disabled="accionando || r.asistencia === 'presente'"
+                          @click="marcar(r.id, 'presente', detalle.id)"
+                        >
+                          {{ $t("agendaVisual.cita.marcarLlegada") }}
+                        </button>
+                        <button
+                          type="button"
+                          :aria-pressed="r.asistencia === 'ausente'"
+                          :disabled="accionando || r.asistencia === 'ausente'"
+                          @click="marcar(r.id, 'ausente', detalle.id)"
+                        >
+                          {{ $t("agendaVisual.cita.noAsistio") }}
+                        </button>
+                      </span>
+                      <button
+                        v-if="
+                          puedeReservar &&
+                          !r.asistencia &&
+                          (r.estado === 'confirmada' ||
+                            r.estado === 'ofrecida') &&
+                          miembros.length > 0
+                        "
+                        class="tu-enlace"
+                        :disabled="accionando"
+                        @click="abrirTransferir(r.id)"
+                      >
+                        {{ $t("agenda.roster.transferir") }}
+                      </button>
+                      <button
+                        v-if="
+                          puedeReservar &&
+                          r.estado !== 'cancelada' &&
+                          !r.asistencia
+                        "
+                        class="tu-enlace"
+                        style="color: var(--error)"
+                        :disabled="accionando"
+                        :aria-expanded="cancelandoReserva === r.id"
+                        @click="
+                          cancelandoReserva =
+                            cancelandoReserva === r.id ? null : r.id
+                        "
+                      >
+                        {{ $t("agenda.roster.cancelarReserva") }}
+                      </button>
+                    </span>
+                  </div>
+                  <!-- Selector inline para transferir (regalar) el lugar a otro miembro -->
+                  <form
+                    v-if="transferirModel.reservaId === r.id"
+                    class="mt-2 flex flex-wrap items-end gap-2 rounded-md p-2"
+                    :style="{ background: 'var(--fondo-suave)' }"
+                    @submit.prevent="transferir(r.id, detalle.id)"
+                  >
+                    <div class="min-w-0 grow">
+                      <label class="tu-label" :for="`tr-${r.id}`">{{
+                        $t("agenda.roster.transferirA")
+                      }}</label>
+                      <BuscarPersona
+                        v-model="transferirModel.personaId"
+                        :campo-id="`tr-${r.id}`"
+                        :personas="personasBuscables"
+                      />
+                    </div>
+                    <button
+                      class="tu-btn tu-btn-primario"
+                      type="submit"
+                      :disabled="accionando || transferirModel.personaId === ''"
+                    >
+                      {{ $t("agenda.roster.confirmarTransfer") }}
+                    </button>
+                    <button
+                      class="tu-btn tu-btn-fantasma"
+                      type="button"
+                      :disabled="accionando"
+                      @click="
+                        transferirModel = { reservaId: '', personaId: '' }
+                      "
+                    >
+                      {{ $t("comun.cancelar") }}
+                    </button>
+                  </form>
+                  <ConfirmarCancelacion
+                    v-if="cancelandoReserva === r.id"
+                    :url="`${base}/reservas/${r.id}/cancelacion`"
+                    con-quien
+                    :ocupado="accionando"
+                    @confirmar="
+                      (por) => cancelarReserva(r.id, detalle!.id, por)
+                    "
+                    @cerrar="cancelandoReserva = null"
+                  />
+                </li>
+              </ul>
+            </section>
+          </template>
+
+          <!-- Lugares y canales -->
+          <template v-else-if="pestanaClase === 'lugares'">
+            <!-- Cupos por canal / marketplace (R20) -->
+            <section
+              v-if="puedeGestionar && detalle.oferta_id"
+              class="tu-detalle-seccion"
+            >
+              <h3>
+                {{ $t("agenda.cuposCanal.titulo") }}
+              </h3>
+              <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("agenda.cuposCanal.ayuda") }}
+              </p>
+
+              <ul v-if="reglasCanal.length > 0" class="mt-2 space-y-1">
+                <li
+                  v-for="rc in reglasCanal"
+                  :key="rc.id"
+                  class="flex items-center justify-between gap-2 text-sm"
+                >
+                  <span>
+                    <span class="tu-badge">{{
+                      $t(`agenda.canales.${rc.canal}`)
+                    }}</span>
+                    {{ $t("agenda.cuposCanal.cupos", { n: rc.cupos }) }}
+                    <span
+                      v-if="rc.liberar_horas_antes > 0"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >·
+                      {{
+                        $t("agenda.cuposCanal.libera", {
+                          h: rc.liberar_horas_antes,
+                        })
+                      }}</span
+                    >
+                  </span>
+                  <button
+                    v-if="puedeEliminar"
+                    class="tu-enlace"
+                    style="color: var(--error)"
+                    type="button"
+                    :disabled="guardandoCanal"
+                    @click="eliminarReglaCanal(rc)"
+                  >
+                    {{ $t("comun.eliminar") }}
+                  </button>
+                </li>
+              </ul>
+
+              <form
+                class="mt-2 flex flex-wrap items-end gap-2"
+                @submit.prevent="guardarReglaCanal"
+              >
+                <div class="min-w-[110px]">
+                  <label class="tu-label" for="rc-canal">{{
+                    $t("agenda.reservar.canal")
+                  }}</label>
+                  <select
+                    id="rc-canal"
+                    v-model="reglaCanalModel.canal"
+                    class="tu-input"
+                  >
+                    <option
+                      v-for="c in CANALES.filter((x) => x !== 'directo')"
+                      :key="c"
+                      :value="c"
+                    >
+                      {{ $t(`agenda.canales.${c}`) }}
+                    </option>
+                  </select>
+                </div>
+                <div class="w-20">
+                  <label class="tu-label" for="rc-cupos">{{
+                    $t("agenda.cuposCanal.campoCupos")
+                  }}</label>
+                  <input
+                    id="rc-cupos"
+                    v-model.number="reglaCanalModel.cupos"
+                    type="number"
+                    min="0"
+                    class="tu-input"
+                  />
+                </div>
+                <div class="w-24">
+                  <label class="tu-label" for="rc-libera">{{
+                    $t("agenda.cuposCanal.campoLibera")
+                  }}</label>
+                  <input
+                    id="rc-libera"
+                    v-model.number="reglaCanalModel.liberar_horas_antes"
+                    type="number"
+                    min="0"
+                    class="tu-input"
+                  />
+                </div>
+                <button
+                  class="tu-btn tu-btn-fantasma"
+                  type="submit"
+                  :disabled="guardandoCanal"
+                >
+                  {{ $t("agenda.cuposCanal.guardar") }}
+                </button>
+              </form>
+            </section>
+
+            <!-- Mapa de lugares por clase (R4) -->
+            <section
+              v-if="puedeCatalogo && detalle.oferta_id"
+              class="tu-detalle-seccion"
+            >
+              <h3>
+                {{ $t("agenda.lugares.titulo") }}
+              </h3>
+              <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("agenda.lugares.ayuda") }}
+              </p>
+              <form
+                class="mt-2 flex flex-wrap items-end gap-2"
+                @submit.prevent="guardarLugares"
+              >
+                <div class="w-28">
+                  <label class="tu-label" for="lug-n">{{
+                    $t("agenda.lugares.numero")
+                  }}</label>
+                  <input
+                    id="lug-n"
+                    v-model.number="lugaresModel.lugares"
+                    type="number"
+                    min="0"
+                    class="tu-input"
+                  />
+                </div>
+                <div class="w-32">
+                  <label class="tu-label" for="lug-precio">{{
+                    $t("agenda.lugares.precio")
+                  }}</label>
+                  <input
+                    id="lug-precio"
+                    v-model.number="lugaresModel.precio"
+                    type="number"
+                    min="0"
+                    step="1"
+                    class="tu-input"
+                    :placeholder="$t('agenda.lugares.precioPh')"
+                  />
+                </div>
+                <button
+                  class="tu-btn tu-btn-fantasma"
+                  type="submit"
+                  :disabled="guardandoLugares"
+                >
+                  {{ $t("agenda.lugares.guardar") }}
+                </button>
+              </form>
+              <p class="text-xs mt-1" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("agenda.lugares.precioAyuda") }}
+              </p>
+            </section>
+          </template>
+
+          <!-- Check-ins de bienestar -->
+          <section
+            v-else-if="pestanaClase === 'checkins'"
+            class="tu-detalle-seccion"
+          >
+            <h3>{{ $t("checkins.titulo") }}</h3>
+            <form
+              class="mt-2 flex flex-wrap items-end gap-2"
+              @submit.prevent="registrarCheckin(detalle.id)"
+            >
+              <div class="min-w-[130px]">
+                <label class="tu-label" for="cp">{{
+                  $t("checkins.proveedor")
+                }}</label>
+                <select
+                  id="cp"
+                  v-model="checkinModel.proveedor"
+                  class="tu-input"
+                >
+                  <option value="wellhub">
+                    {{ $t("integraciones.proveedores.wellhub") }}
+                  </option>
+                  <option value="totalpass">
+                    {{ $t("integraciones.proveedores.totalpass") }}
+                  </option>
+                </select>
+              </div>
+              <div class="flex-1 min-w-[150px]">
+                <label class="tu-label" for="cc">{{
+                  $t("checkins.codigo")
+                }}</label>
+                <input
+                  id="cc"
+                  v-model="checkinModel.codigo"
+                  class="tu-input"
+                  autocomplete="off"
+                  required
+                />
+              </div>
+              <button
+                class="tu-btn tu-btn-primario"
+                type="submit"
+                :disabled="registrandoCheckin || checkinModel.codigo === ''"
+              >
+                {{
+                  registrandoCheckin
+                    ? $t("checkins.registrando")
+                    : $t("checkins.registrar")
+                }}
+              </button>
+            </form>
+            <p
+              v-if="okCheckin"
+              class="mt-2 text-sm"
+              :style="{ color: 'var(--exito)' }"
+            >
+              {{ $t("checkins.ok") }}
+            </p>
+            <ul v-if="checkins.length > 0" class="mt-3 space-y-2">
+              <li
+                v-for="c in checkins"
+                :key="c.id"
+                class="flex items-center justify-between gap-2 text-sm"
+              >
+                <span class="truncate">{{ c.usuario ?? "—" }}</span>
+                <span class="tu-badge tu-badge-exito shrink-0">{{
+                  $t(`checkins.${c.estado}`)
+                }}</span>
+              </li>
+            </ul>
+          </section>
+
+          <!-- Equipo: quién la da y sustituciones (R17) -->
+          <section v-else class="tu-detalle-seccion">
+            <div v-if="detalle.estado === 'programada'" class="mb-4">
+              <label class="tu-label" for="inst-clase">{{
+                $t("instructorClase.titulo")
+              }}</label>
+              <select
+                id="inst-clase"
+                class="tu-input"
+                :value="detalle.instructor_id ?? ''"
+                :disabled="cambiandoInstructor"
+                @change="
+                  cambiarInstructor(($event.target as HTMLSelectElement).value)
+                "
+              >
+                <option value="">{{ $t("instructorClase.ninguno") }}</option>
+                <option v-for="i in instructores" :key="i.id" :value="i.id">
+                  {{ i.nombre }}
+                </option>
+              </select>
+            </div>
+            <h3>{{ $t("agenda.staff.titulo") }}</h3>
+            <ul v-if="staffSesion.length > 0" class="mt-2 space-y-1.5">
+              <li
+                v-for="a in staffSesion"
+                :key="a.id"
+                class="flex items-center gap-2 text-sm"
+              >
+                <span>{{ a.usuario ?? "—" }}</span>
+                <span class="tu-badge">{{
+                  $t(`agenda.staff.rol.${a.rol}`)
+                }}</span>
+              </li>
+            </ul>
+            <form
+              v-if="detalle.estado === 'programada' && instructores.length > 0"
+              class="mt-3 grid grid-cols-2 gap-2 items-end"
+              @submit.prevent="asignarStaff(detalle.id)"
+            >
+              <div class="col-span-2">
+                <label class="tu-label" for="stu">{{
+                  $t("agenda.staff.persona")
+                }}</label>
+                <select
+                  id="stu"
+                  v-model="staffModel.usuarioId"
+                  class="tu-input"
+                  required
+                >
+                  <option value="" disabled>
+                    {{ $t("agenda.reservar.elegir") }}
+                  </option>
+                  <option v-for="i in instructores" :key="i.id" :value="i.id">
+                    {{ i.nombre }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="tu-label" for="srol">{{
+                  $t("agenda.staff.rolLabel")
+                }}</label>
+                <select id="srol" v-model="staffModel.rol" class="tu-input">
+                  <option value="instructor">
+                    {{ $t("agenda.staff.rol.instructor") }}
+                  </option>
+                  <option value="asistente">
+                    {{ $t("agenda.staff.rol.asistente") }}
+                  </option>
+                  <option value="sustituto">
+                    {{ $t("agenda.staff.rol.sustituto") }}
+                  </option>
+                </select>
+              </div>
+              <div v-if="staffModel.rol === 'sustituto'">
+                <label class="tu-label" for="ssub">{{
+                  $t("agenda.staff.sustituye")
+                }}</label>
+                <select
+                  id="ssub"
+                  v-model="staffModel.sustituyeA"
+                  class="tu-input"
+                >
+                  <option value="">—</option>
+                  <option v-for="i in instructores" :key="i.id" :value="i.id">
+                    {{ i.nombre }}
+                  </option>
+                </select>
+              </div>
+              <div class="col-span-2 flex justify-end">
+                <button
+                  class="tu-btn tu-btn-fantasma text-sm"
+                  type="submit"
+                  :disabled="asignandoStaff || staffModel.usuarioId === ''"
+                >
+                  {{ $t("agenda.staff.asignar") }}
+                </button>
+              </div>
+            </form>
+          </section>
+        </template>
+      </div>
+
+      <!-- Cambiar horario o serie y cancelar a la izquierda; «Listo» cierra -->
+      <template #pie>
+        <div
+          v-if="detalle && puedeGestionar && detalle.estado === 'programada'"
+          class="mr-auto flex flex-wrap gap-2"
+        >
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            :disabled="accionando"
+            :aria-expanded="cambiandoHorario"
+            @click="
+              cambiandoSerie = false;
+              cancelandoSesion = false;
+              cambiandoHorario = !cambiandoHorario;
+            "
+          >
+            <IconoNav nombre="agenda" :tam="18" />
+            {{
+              detalle.serie_id
+                ? $t("detalleClase.moverEsta")
+                : $t("reprogramar.cambiarHorario")
+            }}
+          </button>
+          <button
+            v-if="detalle.serie_id && detalle.fecha_serie"
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            :disabled="accionando"
+            :aria-expanded="cambiandoSerie"
+            @click="
+              cambiandoHorario = false;
+              cancelandoSesion = false;
+              cambiandoSerie = !cambiandoSerie;
+            "
+          >
+            {{ $t("detalleClase.moverSerie") }}
+          </button>
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            style="color: var(--error)"
+            :disabled="accionando"
+            :aria-expanded="cancelandoSesion"
+            @click="
+              cambiandoHorario = false;
+              cambiandoSerie = false;
+              cancelandoSesion = !cancelandoSesion;
+            "
+          >
+            <IconoNav nombre="cerrar" :tam="18" />
+            {{ $t("agenda.sesion.cancelar") }}
+          </button>
         </div>
-      </aside>
-    </div>
+        <button
+          type="button"
+          class="tu-btn tu-btn-primario"
+          @click="cerrarDetalle"
+        >
+          {{ $t("detalleClase.listo") }}
+        </button>
+      </template>
+    </ModalDialogo>
 
     <!-- ===== Modal Nueva clase ===== -->
     <ModalDialogo
@@ -3131,6 +3346,66 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* Detalle de una clase: mismo patrón que el de una cita (PanelCita). */
+.dcl {
+  display: grid;
+  gap: 1.4rem;
+}
+.dcl-cabeza {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+@media (min-width: 768px) {
+  .dcl-cabeza {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto;
+  }
+  .dcl-ocupacion {
+    padding-left: 1.25rem;
+    border-left: 1px solid var(--borde);
+  }
+}
+.dcl-nombre {
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.dcl-cifra {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+.dcl-barra {
+  height: 0.4rem;
+  margin-top: 0.4rem;
+  border-radius: 999px;
+  background: var(--superficie-2);
+  overflow: hidden;
+}
+.dcl-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+.dcl-estados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+@media (min-width: 768px) {
+  .dcl-estados {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+}
+.dcl-roster {
+  display: grid;
+}
+.dcl-roster > li {
+  padding: 0.6rem 0;
+}
+.dcl-roster > li + li {
+  border-top: 1px solid var(--borde);
+}
 /* Navegación de fechas: botones de borde del mismo alto que los filtros. */
 .ag-paso {
   padding: 0.55rem;

@@ -1,0 +1,30 @@
+// Detalle de una clase en la Agenda (mismo patrón que el de una cita).
+export default {
+  titulo: "Clase",
+  ocupacion: "Ocupación",
+  deLugares: "{n} de {total} lugares",
+  inscritos: "{n} inscritos",
+  programada: "Programada",
+  cancelada: "Cancelada",
+  enEspera: "{n} en espera",
+  imparte: "Imparte",
+  sinAsignar: "Por asignar",
+  sala: "Sala",
+  sucursal: "Sucursal",
+  duracion: "Duración",
+  minutos: "{n} min",
+  pestanas: {
+    asistentes: "Asistentes",
+    lugares: "Lugares y canales",
+    equipo: "Equipo",
+    checkins: "Check-ins",
+  },
+  reservarTitulo: "Reservar un lugar",
+  asistentesTitulo: "Quién viene",
+  asistentesAyuda:
+    "Marca quién llegó; si hay lista de espera, quien sigue aparece aquí.",
+  asistencia: "Asistencia",
+  moverEsta: "Mover solo esta clase",
+  moverSerie: "Mover esta y las siguientes",
+  listo: "Listo",
+};

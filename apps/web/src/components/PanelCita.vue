@@ -473,7 +473,7 @@ watch(
           </div>
         </div>
         <div class="pc-cuando">
-          <span class="pc-cuadro" aria-hidden="true">
+          <span class="tu-cuadro-icono" aria-hidden="true">
             <IconoNav nombre="agenda" :tam="20" />
           </span>
           <div class="min-w-0">
@@ -483,19 +483,17 @@ watch(
         </div>
         <div class="pc-estados">
           <span
-            class="pc-pildora"
+            class="tu-pildora"
             :style="{ '--tono': COLOR_ESTADO_CITA[estado] }"
             data-prueba="estado-cita"
           >
-            <span class="pc-punto" aria-hidden="true"></span>
             {{ $t(`agendaVisual.estadosCita.${estado}`) }}
           </span>
           <span
             v-if="pagoEstado"
-            class="pc-pildora"
+            class="tu-pildora"
             :style="{ '--tono': pagoEstado.color }"
           >
-            <span class="pc-punto" aria-hidden="true"></span>
             {{ pagoEstado.texto }}
           </span>
         </div>
@@ -505,10 +503,10 @@ watch(
       <slot name="acciones" />
 
       <!-- Qué, con quién, cuánto y dónde -->
-      <dl class="pc-franja">
+      <dl class="tu-detalle-franja">
         <div>
           <span
-            class="pc-cuadro"
+            class="tu-cuadro-icono"
             :style="
               tono ? { background: tono.fondo, color: tono.tinta } : undefined
             "
@@ -522,7 +520,7 @@ watch(
           </div>
         </div>
         <div>
-          <span class="pc-cuadro" aria-hidden="true">
+          <span class="tu-cuadro-icono" aria-hidden="true">
             <IconoNav nombre="instructores" :tam="20" />
           </span>
           <div class="min-w-0">
@@ -531,7 +529,7 @@ watch(
           </div>
         </div>
         <div>
-          <span class="pc-cuadro" aria-hidden="true">
+          <span class="tu-cuadro-icono" aria-hidden="true">
             <IconoNav nombre="dinero" :tam="20" />
           </span>
           <div class="min-w-0">
@@ -540,7 +538,7 @@ watch(
           </div>
         </div>
         <div>
-          <span class="pc-cuadro" aria-hidden="true">
+          <span class="tu-cuadro-icono" aria-hidden="true">
             <IconoNav nombre="ubicacion" :tam="20" />
           </span>
           <div class="min-w-0">
@@ -551,7 +549,7 @@ watch(
       </dl>
 
       <!-- Reprogramar o cancelar: en lugar de las pestañas, con su confirmación -->
-      <section v-if="reprogramando && cita !== null" class="pc-seccion">
+      <section v-if="reprogramando && cita !== null" class="tu-detalle-seccion">
         <CambiarHorario
           :url="`${base}/reservas/${cita.reserva_id}/reprogramar`"
           :zona="sesion.zona_horaria"
@@ -562,7 +560,10 @@ watch(
           @cerrar="reprogramando = false"
         />
       </section>
-      <section v-else-if="cancelando && cita !== null" class="pc-seccion">
+      <section
+        v-else-if="cancelando && cita !== null"
+        class="tu-detalle-seccion"
+      >
         <ConfirmarCancelacion
           :url="`${base}/reservas/${cita.reserva_id}/cancelacion`"
           con-quien
@@ -592,7 +593,7 @@ watch(
 
         <!-- Asistencia y estado (con el resumen del cobro) -->
         <template v-if="pestana === 'asistencia'">
-          <section class="pc-seccion">
+          <section class="tu-detalle-seccion">
             <header>
               <h3>{{ $t("detalleCita.asistencia.titulo") }}</h3>
               <p class="pc-suave">{{ $t("detalleCita.asistencia.ayuda") }}</p>
@@ -674,7 +675,7 @@ watch(
         </template>
 
         <!-- Cobro y pago: en las dos primeras pestañas -->
-        <section v-if="pestana !== 'historial'" class="pc-seccion">
+        <section v-if="pestana !== 'historial'" class="tu-detalle-seccion">
           <header>
             <h3>{{ $t("detalleCita.cobro.titulo") }}</h3>
             <p class="pc-suave">{{ $t("detalleCita.cobro.ayuda") }}</p>
@@ -792,7 +793,7 @@ watch(
         </section>
 
         <!-- Historial de la cita -->
-        <section v-else class="pc-seccion" data-prueba="historial">
+        <section v-else class="tu-detalle-seccion" data-prueba="historial">
           <p v-if="cargandoHistorial" class="pc-suave text-sm">
             {{ $t("detalleCita.historial.cargando") }}
           </p>
@@ -911,16 +912,6 @@ watch(
   gap: 0.8rem;
   min-height: 3rem;
 }
-.pc-cuadro {
-  display: inline-grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 2.6rem;
-  height: 2.6rem;
-  border-radius: 0.65rem;
-  background: var(--primario-suave);
-  color: var(--primario-fuerte, var(--primario));
-}
 .pc-estados {
   display: flex;
   flex-wrap: wrap;
@@ -932,64 +923,11 @@ watch(
     align-items: flex-end;
   }
 }
-.pc-pildora {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.35rem 0.8rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--tono) 12%, transparent);
-  color: var(--tono);
-  font-size: 0.88rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
 .pc-punto {
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 999px;
   background: var(--tono);
-}
-.pc-franja {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  padding: 1rem 1.1rem;
-  border-radius: 0.85rem;
-  background: var(--superficie-2);
-}
-@media (min-width: 768px) {
-  .pc-franja {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  .pc-franja > div + div {
-    padding-left: 1rem;
-    border-left: 1px solid var(--borde);
-  }
-}
-.pc-franja > div {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-.pc-franja dt {
-  color: var(--texto-suave);
-  font-size: 0.8rem;
-}
-.pc-franja dd {
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-.pc-seccion {
-  display: grid;
-  gap: 0.9rem;
-}
-.pc-seccion h3 {
-  font-size: 1.05rem;
-  font-weight: 600;
-}
-.pc-seccion header p {
-  font-size: 0.9rem;
 }
 .pc-opciones {
   display: grid;

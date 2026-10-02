@@ -497,4 +497,83 @@
     color: var(--primario-fuerte);
     box-shadow: 0 1px 3px rgb(16 24 40 / 8%);
   }
+
+  /* Detalle de una cita, una clase o una persona: un mismo patrón. Franja de datos
+     con su ícono, píldoras de estado (el color va en --tono) y secciones con título. */
+  .tu-detalle-franja {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    border-radius: 0.85rem;
+    background: var(--superficie-2);
+  }
+  @media (min-width: 768px) {
+    .tu-detalle-franja {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .tu-detalle-franja > div + div {
+      padding-left: 1rem;
+      border-left: 1px solid var(--borde);
+    }
+  }
+  .tu-detalle-franja > div {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+  .tu-detalle-franja dt {
+    color: var(--texto-suave);
+    font-size: 0.8rem;
+  }
+  .tu-detalle-franja dd {
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+  .tu-cuadro-icono {
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 0.65rem;
+    background: var(--primario-suave);
+    color: var(--primario-fuerte, var(--primario));
+  }
+  .tu-pildora {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    background: color-mix(
+      in srgb,
+      var(--tono, var(--texto-suave)) 12%,
+      transparent
+    );
+    color: var(--tono, var(--texto-suave));
+    font-size: 0.88rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .tu-pildora::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: currentColor;
+  }
+  .tu-detalle-seccion {
+    display: grid;
+    gap: 0.9rem;
+  }
+  .tu-detalle-seccion h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .tu-detalle-seccion > header p {
+    color: var(--texto-suave);
+    font-size: 0.9rem;
+  }
 }
