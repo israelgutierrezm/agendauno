@@ -262,8 +262,7 @@ function nombreTarjeta(p: Profesional): string {
     border-color 150ms ease,
     background-color 150ms ease;
 }
-.ep-profesional :deep(.fa-foto--xl > img),
-.ep-profesional :deep(.fa-foto--xl > span) {
+.ep-profesional :deep(.fa-foto--xl .fa-avatar) {
   width: 4.25rem;
   height: 4.25rem;
 }
@@ -319,8 +318,7 @@ function nombreTarjeta(p: Profesional): string {
   .ep-profesional {
     flex-basis: 6.5rem;
   }
-  .ep-profesional :deep(.fa-foto--xl > img),
-  .ep-profesional :deep(.fa-foto--xl > span) {
+  .ep-profesional :deep(.fa-foto--xl .fa-avatar) {
     width: 3.5rem;
     height: 3.5rem;
   }

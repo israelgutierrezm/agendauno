@@ -5,7 +5,7 @@ import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import IconoNav from "@/components/IconoNav.vue";
 
 /**
- * Foto de una persona (p. ej. el profesional al agendar) con una lupa para verla en
+ * Foto de una persona (p. ej. el profesional al agendar) pulsable para verla en
  * grande, por si no recuerdan su nombre. La lupa aparece al pasar el cursor o al
  * enfocarla; en pantallas táctiles se ve siempre. Sin foto, solo la inicial.
  */
@@ -25,6 +25,10 @@ let antes: HTMLElement | null = null;
 function alTeclear(e: KeyboardEvent): void {
   if (e.key === "Escape") {
     cerrar();
+  } else if (e.key === "Tab") {
+    // El diálogo solo tiene un control: el foco no debe salir al formulario.
+    e.preventDefault();
+    cerrarBtn.value?.focus();
   }
 }
 
@@ -50,17 +54,26 @@ onBeforeUnmount(() => window.removeEventListener("keydown", alTeclear));
 
 <template>
   <span class="fa-foto" :class="`fa-foto--${props.tam}`">
-    <AvatarIniciales :nombre="nombre" :foto="foto" :tam="tam" />
     <button
       v-if="foto"
       type="button"
-      class="fa-lupa"
+      class="fa-abrir"
       data-prueba="ampliar-foto"
       :aria-label="$t('fotoAmpliable.ver', { nombre })"
+      aria-haspopup="dialog"
       @click.stop.prevent="abrir"
     >
-      <IconoNav nombre="ampliar" :tam="14" />
+      <AvatarIniciales
+        class="fa-avatar"
+        :nombre="nombre"
+        :foto="foto"
+        :tam="tam"
+      />
+      <span class="fa-lupa" aria-hidden="true">
+        <IconoNav nombre="ampliar" :tam="14" />
+      </span>
     </button>
+    <AvatarIniciales v-else class="fa-avatar" :nombre="nombre" :tam="tam" />
   </span>
 
   <Teleport to="body">
@@ -96,6 +109,19 @@ onBeforeUnmount(() => window.removeEventListener("keydown", alTeclear));
   display: inline-flex;
   flex-shrink: 0;
 }
+.fa-abrir {
+  position: relative;
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: zoom-in;
+}
+.fa-abrir:focus-visible {
+  outline: 2px solid var(--primario);
+  outline-offset: 3px;
+}
 .fa-lupa {
   position: absolute;
   right: -0.25rem;
@@ -119,7 +145,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", alTeclear));
 }
 /* Con cursor: aparece al pasar sobre la foto (o sobre su tarjeta) y al enfocarla. */
 .fa-foto:hover .fa-lupa,
-.fa-lupa:focus-visible,
+.fa-abrir:focus-visible .fa-lupa,
 :global(.reserva-eleccion:hover) .fa-lupa {
   opacity: 1;
 }

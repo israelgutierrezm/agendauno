@@ -3,6 +3,8 @@ import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 
 import IconoNav from "@/components/IconoNav.vue";
+import BotonPantallaCompleta from "@/components/BotonPantallaCompleta.vue";
+import { agendaAmpliada } from "@/lib/pantallaCompleta";
 import PublicShell from "@/components/PublicShell.vue";
 import LayoutConfiguracion from "@/components/LayoutConfiguracion.vue";
 import NavLateral from "@/components/NavLateral.vue";
@@ -151,6 +153,7 @@ onMounted(() => {
 
     <!-- Barra lateral (oscura) -->
     <aside
+      v-show="!agendaAmpliada"
       class="fixed lg:sticky top-0 z-50 h-screen w-64 shrink-0 flex flex-col transition-all duration-200"
       :class="[
         compacto ? 'lg:w-16' : 'lg:w-64',
@@ -229,6 +232,7 @@ onMounted(() => {
     <div class="flex-1 flex flex-col min-w-0">
       <!-- Encabezado (claro, translúcido) -->
       <header
+        v-show="!agendaAmpliada"
         class="tu-barra-superior sticky top-0 z-30 h-16 flex items-center justify-between gap-3 px-4 sm:px-6 border-b backdrop-blur"
         :style="{
           background: 'color-mix(in srgb, var(--superficie) 85%, transparent)',
@@ -333,6 +337,8 @@ onMounted(() => {
             <IconoNav nombre="configuracion" :tam="18" />
           </button>
 
+          <BotonPantallaCompleta />
+
           <!-- Perfil -->
           <div class="relative">
             <button
@@ -431,8 +437,11 @@ onMounted(() => {
 
       <main class="flex-1" :style="{ background: 'var(--fondo)' }">
         <!-- Las vistas del área (Agenda: Calendario, Recepción…), bajo la barra -->
-        <PestanasArea />
-        <div class="tu-lienzo">
+        <PestanasArea v-show="!agendaAmpliada" />
+        <div
+          class="tu-lienzo"
+          :class="{ 'tu-lienzo-ampliado': agendaAmpliada }"
+        >
           <LayoutConfiguracion v-if="enConfiguracion">
             <RouterView />
           </LayoutConfiguracion>
@@ -482,6 +491,13 @@ onMounted(() => {
 </template>
 
 <style>
+.tu-lienzo.tu-lienzo-ampliado {
+  padding-inline: 0;
+}
+.tu-lienzo.tu-lienzo-ampliado > section {
+  max-width: none;
+  width: 100%;
+}
 /* Barra superior: el área donde se está, con su ícono en un cuadro neutro. */
 .tu-barra-titulo {
   display: flex;

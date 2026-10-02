@@ -557,10 +557,8 @@ describe("agenda pública por pasos", () => {
         .exists(),
     ).toBe(false);
 
-    // La lupa no elige a la persona: solo muestra la foto en grande.
-    await vista
-      .get('[data-prueba="filtro-ana"] [data-prueba="ampliar-foto"]')
-      .trigger("click");
+    // Pulsar directamente la foto no cambia al profesional seleccionado.
+    await vista.get('[data-prueba="filtro-ana"] img').trigger("click");
     const grande = document.querySelector('[data-prueba="foto-grande"]');
     expect(grande?.querySelector("img")?.getAttribute("src")).toBe(
       "/storage/ana.webp",

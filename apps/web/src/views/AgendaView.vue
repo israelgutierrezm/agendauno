@@ -3,7 +3,6 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import BuscarPersona from "@/components/BuscarPersona.vue";
-import BotonPantallaCompleta from "@/components/BotonPantallaCompleta.vue";
 import AgendaClasesSemana from "@/components/AgendaClasesSemana.vue";
 import AgendaKpis from "@/components/AgendaKpis.vue";
 import type {
@@ -1609,7 +1608,6 @@ onMounted(async () => {
         :subtitulo="$t('agenda.subtitulo')"
       />
       <div class="flex flex-wrap items-center gap-2">
-        <BotonPantallaCompleta agenda />
         <!-- De paso, a donde se configuran (cada una guarda sus datos). -->
         <RouterLink
           v-if="puedeEntrar('horarios', sesion)"

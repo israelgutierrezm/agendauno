@@ -3,6 +3,8 @@ defineProps<{ nombre: string; tam?: number }>();
 
 // Iconos de trazo (outline) 24x24, currentColor. Formas propias, estilo lineal.
 const RUTAS: Record<string, string[]> = {
+  "ampliar-pantalla": ["M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"],
+  "reducir-pantalla": ["M3 8h5V3M21 8h-5V3M16 21v-5h5M8 21v-5H3"],
   panel: ["M4 20V13h3.5v7z", "M10.25 20V8.5h3.5V20z", "M16.5 20V4h3.5v16z"],
   "mi-cuenta": [
     "M4 11 12 4l8 7",
