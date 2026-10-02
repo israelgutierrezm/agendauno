@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Tenancy\Application\AltaRapidaCatalogoTenant;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
@@ -53,33 +52,6 @@ class OnboardingController
             // Con qué suele empezar un negocio de su giro (el dueño lo ajusta).
             'sugerencias' => SugerenciasPerfil::para($estudio->perfil_negocio),
         ]]);
-    }
-
-    /**
-     * Servicios o clases en una línea (nombre, duración y precio o cupo): la estructura
-     * del catálogo se arma por dentro ({@see AltaRapidaCatalogoTenant}).
-     */
-    public function catalogo(Request $request, AltaRapidaCatalogoTenant $alta): JsonResponse
-    {
-        $estudio = $this->estudio($request);
-        $esCitas = $estudio->modalidad() === ModalidadServicio::Citas;
-        $validado = $request->validate([
-            'items' => ['required', 'array', 'min:1', 'max:30'],
-            'items.*.nombre' => ['required', 'string', 'max:120'],
-            'items.*.duracion_minutos' => ['required', 'integer', 'min:5', 'max:600'],
-            'items.*.precio_minor' => [$esCitas ? 'required' : 'prohibited', 'integer', 'min:0', 'max:100000000'],
-            'items.*.capacidad' => [$esCitas ? 'prohibited' : 'required', 'integer', 'min:1', 'max:500'],
-        ]);
-        $items = array_values($validado['items']);
-        $ofertas = $esCitas ? $alta->servicios($items) : $alta->clases($items);
-
-        return response()->json(['data' => array_map(static fn (OfertaTenant $o): array => [
-            'id' => $o->ulid,
-            'nombre' => $o->nombre,
-            'duracion_minutos' => $o->duracion_minutos,
-            'precio_minor' => $o->precio_clase_minor,
-            'capacidad' => $o->capacidad,
-        ], $ofertas)], 201);
     }
 
     /**

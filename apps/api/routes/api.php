@@ -412,7 +412,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/onboarding/quickstart', [OnboardingController::class, 'quickstart'])->middleware('puede:estudio.gestionar')->name('onboarding.quickstart');
             Route::put('/onboarding', [OnboardingController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('onboarding.guardar');
             // Servicios o clases en una línea (configuración inicial, ADR 0088).
-            Route::post('/onboarding/catalogo', [OnboardingController::class, 'catalogo'])->middleware('puede:estudio.gestionar')->name('onboarding.catalogo');
+            Route::post('/onboarding/catalogo', [CatalogoTenantController::class, 'altaRapida'])->middleware('puede:estudio.gestionar')->name('onboarding.catalogo');
             Route::put('/publicacion', [OnboardingController::class, 'publicacion'])->middleware('puede:estudio.gestionar')->name('publicacion');
             // Perfil de negocio / industria (R35): defaults/terminologia/feature-flags.
             Route::put('/perfil', [OnboardingController::class, 'perfil'])->middleware('puede:estudio.gestionar')->name('perfil');
@@ -460,6 +460,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/actividades/{actividad}/niveles', [CatalogoTenantController::class, 'crearNivel'])->middleware('puede:catalogo.gestionar')->name('niveles.store');
             Route::post('/actividades/{actividad}/ofertas', [CatalogoTenantController::class, 'crearOferta'])->middleware('puede:catalogo.gestionar')->name('ofertas.store');
             Route::get('/ofertas', [CatalogoTenantController::class, 'ofertas'])->middleware('puede:catalogo.ver')->name('ofertas.index');
+            // Servicios o clases en una línea (nombre, duración y precio o cupo).
+            Route::post('/ofertas/rapidas', [CatalogoTenantController::class, 'altaRapida'])->middleware('puede:catalogo.gestionar')->name('ofertas.rapidas');
             Route::put('/ofertas/{oferta}', [CatalogoTenantController::class, 'actualizarOferta'])->middleware('puede:catalogo.gestionar')->name('ofertas.update');
             // Foto del servicio (la que ve el cliente al elegirlo, ADR 0066).
             Route::post('/ofertas/{oferta}/foto', [CatalogoTenantController::class, 'subirFoto'])->middleware('puede:catalogo.gestionar')->name('ofertas.foto.store');

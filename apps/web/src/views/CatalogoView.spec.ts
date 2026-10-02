@@ -6,13 +6,13 @@ import { margenesServicio } from "@/i18n/locales/gestion.es-MX";
 import perfilPublico from "@/i18n/locales/perfilPublico.es-MX";
 import CatalogoView from "./CatalogoView.vue";
 
-const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn() }));
+const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: (e: unknown) => String(e),
 }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "a", puede: () => true }),
+  useSesionTenantStore: () => ({ slug: "a", puede: () => true, esCitas: true }),
 }));
 
 const oferta = (extra: Record<string, unknown>) => ({
@@ -47,7 +47,7 @@ async function montar(ofertas: unknown[]) {
           messages: { es: { margenesServicio, perfilPublico } },
         }),
       ],
-      stubs: { EncabezadoSeccion: true },
+      stubs: { teleport: true },
     },
   });
   await flushPromises();
@@ -81,7 +81,7 @@ describe("catálogo", () => {
       oferta({ id: "o2", nombre: "Flúor", incluye: [] }),
       oferta({ id: "o3", nombre: "Limpieza", incluye: [] }),
     ]);
-    await w.findAll("button")[0].trigger("click");
+    await w.findAll('[data-prueba="configurar"]')[0]!.trigger("click");
     const incluye = w.get('[data-prueba="incluye"]');
     // Los demás servicios, no él mismo.
     expect(incluye.findAll('input[type="checkbox"]')).toHaveLength(2);
@@ -104,7 +104,7 @@ describe("catálogo", () => {
       oferta({ id: "o2", nombre: "Flúor", incluye: [] }),
     ]);
     expect(w.text()).toContain("Incluye Flúor");
-    await w.findAll("button")[1].trigger("click");
+    await w.findAll('[data-prueba="configurar"]')[1]!.trigger("click");
     const incluye = w.get('[data-prueba="incluye"]');
     expect(incluye.text()).toContain("Está incluido en Limpieza completa");
     expect(incluye.find('input[type="checkbox"]').exists()).toBe(false);
@@ -114,10 +114,37 @@ describe("catálogo", () => {
     const w = await montar([
       oferta({ id: "o1", nombre: "Corte", foto_url: "/storage/corte.webp" }),
     ]);
-    expect(w.find('li img[src="/storage/corte.webp"]').exists()).toBe(true);
-    await w.findAll("button")[0].trigger("click");
+    expect(
+      w
+        .find('[data-prueba="servicio"] img[src="/storage/corte.webp"]')
+        .exists(),
+    ).toBe(true);
+    await w.findAll('[data-prueba="configurar"]')[0]!.trigger("click");
     const foto = w.get('[data-prueba="foto-servicio"]');
     expect(foto.find('img[src="/storage/corte.webp"]').exists()).toBe(true);
     expect(foto.text()).toContain("Quitar foto");
+  });
+
+  it("da de alta servicios en una línea: nombre, duración y precio", async () => {
+    api.post.mockResolvedValue({ data: { data: [] } });
+    const w = await montar([oferta({})]);
+    await w.get('[data-prueba="nuevo-servicio"]').trigger("click");
+    const fila = w.get(
+      '[data-prueba="filas-alta"] .ct-fila:not(.ct-fila-cabeza)',
+    );
+    await fila.get("input").setValue("Corte de cabello");
+    await fila.get(".ct-precio input").setValue("250");
+    await w.get('[data-prueba="guardar-alta"]').trigger("click");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith("/api/v1/app/a/ofertas/rapidas", {
+      items: [
+        {
+          nombre: "Corte de cabello",
+          duracion_minutos: 30,
+          precio_minor: 25000,
+        },
+      ],
+    });
   });
 });

@@ -118,3 +118,17 @@ it('configuración inicial de un negocio de citas: servicio, duración y precio 
         ->firstWhere('nombre', 'Corte y barba');
     expect($oferta)->toMatchArray(['modalidad' => 'individual', 'politica_reserva' => 'pago', 'precio_clase_minor' => 38000, 'duracion_minutos' => 60]);
 });
+
+it('en Catálogo también se da de alta un servicio en una línea; quien no gestiona el catálogo, no', function (): void {
+    $e = estudioConSesion('barberia-c', 'dueno@barberia-c.mx');
+    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+
+    $this->postJson("/api/v1/app/{$e['slug']}/ofertas/rapidas", ['items' => [
+        ['nombre' => 'Afeitado clásico', 'duracion_minutos' => 45, 'precio_minor' => 28000],
+    ]], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.0.precio_minor', 28000);
+
+    $barbero = personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia-c.mx', 'instructor');
+    $this->postJson("/api/v1/app/{$e['slug']}/ofertas/rapidas", ['items' => [
+        ['nombre' => 'Corte', 'duracion_minutos' => 30, 'precio_minor' => 20000],
+    ]], conBearer($barbero))->assertForbidden();
+});

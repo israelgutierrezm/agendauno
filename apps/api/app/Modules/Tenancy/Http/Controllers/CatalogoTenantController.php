@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AltaRapidaCatalogoTenant;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\ActividadTenant;
@@ -90,6 +91,35 @@ class CatalogoTenantController
         ]);
 
         return response()->json(['data' => ['id' => $nivel->ulid, 'nombre' => $nivel->nombre]], 201);
+    }
+
+    /**
+     * Servicios o clases en una línea (nombre, duración y precio o cupo), en Catálogo
+     * y en la configuración inicial (ADR 0088): la estructura del catálogo se arma por
+     * dentro ({@see AltaRapidaCatalogoTenant}). Citas o clases según el negocio.
+     */
+    public function altaRapida(Request $request, AltaRapidaCatalogoTenant $alta): JsonResponse
+    {
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+        $esCitas = $estudio->modalidad() === ModalidadServicio::Citas;
+        $validado = $request->validate([
+            'items' => ['required', 'array', 'min:1', 'max:30'],
+            'items.*.nombre' => ['required', 'string', 'max:120'],
+            'items.*.duracion_minutos' => ['required', 'integer', 'min:5', 'max:600'],
+            'items.*.precio_minor' => [$esCitas ? 'required' : 'prohibited', 'integer', 'min:0', 'max:100000000'],
+            'items.*.capacidad' => [$esCitas ? 'prohibited' : 'required', 'integer', 'min:1', 'max:500'],
+        ]);
+        $items = array_values($validado['items']);
+        $ofertas = $esCitas ? $alta->servicios($items) : $alta->clases($items);
+
+        return response()->json(['data' => array_map(static fn (OfertaTenant $o): array => [
+            'id' => $o->ulid,
+            'nombre' => $o->nombre,
+            'duracion_minutos' => $o->duracion_minutos,
+            'precio_minor' => $o->precio_clase_minor,
+            'capacidad' => $o->capacidad,
+        ], $ofertas)], 201);
     }
 
     public function crearOferta(Request $request): JsonResponse
