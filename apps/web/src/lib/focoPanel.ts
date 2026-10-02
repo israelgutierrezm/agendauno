@@ -1,15 +1,22 @@
-import { nextTick, onBeforeUnmount, watch, type Ref } from "vue";
+import { nextTick, onBeforeUnmount, ref, watch, type Ref } from "vue";
 
 // Los paneles pueden abrir otros paneles: solo el superior captura el teclado.
 const abiertos: symbol[] = [];
+// La capa base de los diálogos; cada uno que se abre queda sobre el anterior.
+const CAPA_BASE = 50;
 let overflowPrevio = "";
 
+/**
+ * Devuelve la capa (z-index) del panel: el último en abrirse va encima aunque se
+ * haya montado antes (p. ej. la confirmación, que vive en App.vue, sobre un modal).
+ */
 export function useFocoPanel(
   abierto: () => boolean,
   panel: Ref<HTMLElement | null>,
   cerrar: () => void,
-): void {
+): Ref<number> {
   const id = Symbol("panel");
+  const capa = ref(CAPA_BASE);
   let origen: HTMLElement | null = null;
 
   function enfocar(): void {
@@ -94,6 +101,7 @@ export function useFocoPanel(
         document.body.style.overflow = "hidden";
       }
       abiertos.push(id);
+      capa.value = CAPA_BASE + abiertos.length - 1;
       window.addEventListener("keydown", teclado);
       document.addEventListener("focusin", contenerFoco);
       await nextTick();
@@ -102,4 +110,5 @@ export function useFocoPanel(
     { immediate: true, flush: "post" },
   );
   onBeforeUnmount(liberar);
+  return capa;
 }

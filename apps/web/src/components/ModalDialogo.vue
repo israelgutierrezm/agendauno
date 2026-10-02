@@ -22,7 +22,7 @@ const props = withDefaults(
 const emit = defineEmits<{ cerrar: [] }>();
 
 const panel = ref<HTMLElement | null>(null);
-useFocoPanel(
+const capa = useFocoPanel(
   () => props.abierto,
   panel,
   () => emit("cerrar"),
@@ -38,7 +38,8 @@ const ancho = computed(
     <Transition name="tu-modal">
       <div
         v-if="abierto"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        class="fixed inset-0 flex items-center justify-center p-4"
+        :style="{ zIndex: capa }"
       >
         <div class="absolute inset-0 bg-black/50" @click="emit('cerrar')" />
         <section

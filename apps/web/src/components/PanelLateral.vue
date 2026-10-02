@@ -19,7 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{ cerrar: [] }>();
 
 const panel = ref<HTMLElement | null>(null);
-useFocoPanel(
+const capa = useFocoPanel(
   () => props.abierto,
   panel,
   () => emit("cerrar"),
@@ -31,7 +31,8 @@ useFocoPanel(
     <Transition :name="lateral ? 'tu-drawer' : 'tu-ventana'">
       <div
         v-if="abierto"
-        class="fixed inset-0 z-50 flex"
+        class="fixed inset-0 flex"
+        :style="{ zIndex: capa }"
         :class="lateral ? 'justify-end' : 'items-center justify-center p-4'"
       >
         <div class="absolute inset-0 bg-black/50" @click="emit('cerrar')" />
