@@ -106,8 +106,8 @@ it('en citas, el paso de equipo pide el horario de atención de los profesionale
 
     $tareas = collect($this->getJson("/api/v1/app/{$e['slug']}/onboarding/quickstart", conBearer($e['bearer']))->assertOk()->json('data.tareas'))
         ->keyBy('clave');
-    expect($tareas['horarios']['hecho'])->toBeTrue();
-    expect($tareas['horarios']['ruta'])->toBe('horarios');
-    // Los paquetes son opcionales en citas: cada servicio ya tiene su precio.
-    expect($tareas['productos']['requerido'])->toBeFalse();
+    expect($tareas['equipo']['hecho'])->toBeTrue();
+    expect($tareas['equipo']['ruta'])->toBe('onboarding');
+    // En citas no hay paso de planes: cada servicio ya tiene su precio.
+    expect($tareas->has('planes'))->toBeFalse();
 });

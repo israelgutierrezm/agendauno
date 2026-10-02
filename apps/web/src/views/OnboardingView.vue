@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink, useRouter } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import CargadorLogo from "@/components/CargadorLogo.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -12,11 +12,12 @@ import { useToastStore } from "@/stores/toast";
 
 /**
  * Configuración inicial por tipo de negocio (ADR 0088). Con citas: tu negocio →
- * servicios → quién atiende y cuándo → publicar. Con clases: tu negocio → clases →
- * horario → planes → publicar. Un servicio se da de alta en una línea («Corte de
- * cabello · 30 min · $250»): la estructura del catálogo se arma por dentro. Cobro en
- * línea, equipo administrativo, productos y reglas quedan «para cuando lo necesites».
- * Cada paso guarda lo suyo; el avance sale de los datos reales del negocio.
+ * servicios → quién atiende y cuándo → reglas → publicar. Con clases: tu negocio →
+ * clases → horario → planes → reglas → publicar. Un servicio se da de alta en una
+ * línea («Corte de cabello · 30 min · $250»): la estructura del catálogo se arma por
+ * dentro. Los pasos y el «listo para operar» son los mismos que «Pon tu negocio en
+ * marcha» del panel (ADR 0090): configurado, publicado y recibe reservas. Cobro en
+ * línea, equipo administrativo y productos quedan «para cuando lo necesites».
  */
 type Paso =
   | "negocio"
@@ -25,6 +26,7 @@ type Paso =
   | "clases"
   | "horario"
   | "planes"
+  | "reglas"
   | "publicacion";
 
 interface Sugerencias {
@@ -61,6 +63,7 @@ interface Profesional {
 }
 
 const { t } = useI18n();
+const route = useRoute();
 const router = useRouter();
 const sesion = useSesionTenantStore();
 const toast = useToastStore();
@@ -72,6 +75,7 @@ const ICONOS: Record<Paso, string> = {
   clases: "agenda",
   horario: "reloj",
   planes: "dinero",
+  reglas: "documentos",
   publicacion: "contenido",
 };
 const ZONAS = [
@@ -94,6 +98,22 @@ const indice = ref(0);
 const cargando = ref(true);
 const guardando = ref(false);
 const error = ref<string | null>(null);
+
+// Configurado, publicado y recibe reservas (no siempre coinciden).
+interface EstadoMarcha {
+  configurado: boolean;
+  publicado: boolean;
+  reservable: boolean;
+  listo: boolean;
+  primera_fecha: {
+    inicia_en: string;
+    zona_horaria: string | null;
+    sucursal: string | null;
+    que: string | null;
+  } | null;
+  motivo: string | null;
+}
+const estado = ref<EstadoMarcha | null>(null);
 
 const pasoActual = computed<Paso>(() => pasos.value[indice.value] ?? "negocio");
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
@@ -148,7 +168,10 @@ const planes = ref<
     clases: string;
   }[]
 >([]);
-const publicacion = ref({ publicado: true, privado: false });
+// Cómo se publica: en el directorio, solo con el enlace o cerrada.
+type Visibilidad = "publica" | "enlace" | "cerrada";
+const VISIBILIDADES: Visibilidad[] = ["publica", "enlace", "cerrada"];
+const visibilidad = ref<Visibilidad>("publica");
 
 function pesos(minor: number): string {
   return new Intl.NumberFormat("es-MX", {
@@ -169,17 +192,32 @@ async function cargar(): Promise<void> {
         pasos: Paso[];
         completados: string[];
         completo: boolean;
+        estado: EstadoMarcha;
+        publicacion: { publicado: boolean; privado: boolean };
         sugerencias: Sugerencias;
       };
     }>(`${base.value}/onboarding`);
     pasos.value = data.data.pasos;
     completados.value = new Set(data.data.completados);
     completo.value = data.data.completo;
+    estado.value = data.data.estado;
+    const pub = data.data.publicacion;
+    visibilidad.value = !pub.publicado
+      ? "cerrada"
+      : pub.privado
+        ? "enlace"
+        : "publica";
     await cargarReferencias();
     prellenar(data.data.sugerencias);
-    // Empieza en el primer paso pendiente.
+    // Empieza en el paso pedido (desde el panel) o en el primero pendiente.
+    const pedido = pasos.value.indexOf(String(route.query.paso ?? "") as Paso);
     const pendiente = pasos.value.findIndex((p) => !completados.value.has(p));
-    indice.value = pendiente === -1 ? pasos.value.length - 1 : pendiente;
+    indice.value =
+      pedido !== -1
+        ? pedido
+        : pendiente === -1
+          ? pasos.value.length - 1
+          : pendiente;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -205,7 +243,51 @@ async function cargarReferencias(): Promise<void> {
       ? Promise.resolve()
       : pedir("/plantillas-horario", plantillas),
     esCitas.value ? Promise.resolve() : pedir("/productos", productos),
+    cargarReglas(),
   ]);
+}
+
+// ---- Reglas: hasta cuándo se cancela y qué pasa si no llega ----
+interface Reglas {
+  horas_limite: number;
+  penaliza_tarde: boolean;
+  penaliza_no_show: boolean;
+  tolerancia_no_show: number;
+  ventana_no_show_dias: number | null;
+}
+const reglas = ref<Reglas>({
+  horas_limite: 6,
+  penaliza_tarde: true,
+  penaliza_no_show: true,
+  tolerancia_no_show: 0,
+  ventana_no_show_dias: null,
+});
+async function cargarReglas(): Promise<void> {
+  try {
+    const { data } = await api.get<{
+      data: (Reglas & { actividad_id: string | null })[];
+      por_defecto?: Reglas;
+    }>(`${base.value}/politicas-cancelacion`);
+    const g =
+      data.data.find((p) => p.actividad_id === null) ?? data.por_defecto;
+    if (g !== undefined) {
+      reglas.value = {
+        horas_limite: g.horas_limite,
+        penaliza_tarde: g.penaliza_tarde,
+        penaliza_no_show: g.penaliza_no_show,
+        tolerancia_no_show: g.tolerancia_no_show ?? 0,
+        ventana_no_show_dias: g.ventana_no_show_dias ?? null,
+      };
+    }
+  } catch {
+    // Sin permiso: el paso parte de lo razonable.
+  }
+}
+async function guardarReglas(): Promise<void> {
+  await api.put(`${base.value}/politicas-cancelacion`, {
+    actividad_id: null,
+    ...reglas.value,
+  });
 }
 
 function prellenar(s: Sugerencias): void {
@@ -258,10 +340,11 @@ const clasesGrupales = computed(() =>
 // ---- Pasos ----
 async function marcar(paso: Paso): Promise<void> {
   const { data } = await api.put<{
-    data: { completados: string[]; completo: boolean };
+    data: { completados: string[]; completo: boolean; estado: EstadoMarcha };
   }>(`${base.value}/onboarding`, { paso });
   completados.value = new Set(data.data.completados);
   completo.value = data.data.completo;
+  estado.value = data.data.estado;
   trackEvent("onboarding_step_completed", {
     step: paso,
     onboarding_complete: data.data.completo,
@@ -503,12 +586,59 @@ async function guardarPlanes(): Promise<void> {
 }
 
 async function guardarPublicacion(): Promise<void> {
-  await api.put(`${base.value}/publicacion`, publicacion.value);
+  const datos = {
+    publicado: visibilidad.value !== "cerrada",
+    privado: visibilidad.value === "enlace",
+  };
+  await api.put(`${base.value}/publicacion`, datos);
   trackEvent("studio_publication_updated", {
-    published: publicacion.value.publicado,
-    private: publicacion.value.privado,
+    published: datos.publicado,
+    private: datos.privado,
   });
 }
+
+// Qué falta para recibir reservas y en qué paso se resuelve.
+const PASO_DEL_MOTIVO: Record<string, Paso> = {
+  sin_servicios: "servicios",
+  sin_horario: "equipo",
+  sin_huecos: "equipo",
+  sin_clases: "horario",
+  sin_planes: "planes",
+  sin_publicar: "publicacion",
+};
+const pasoDelMotivo = computed<Paso | null>(() => {
+  const p = PASO_DEL_MOTIVO[estado.value?.motivo ?? ""];
+  return p !== undefined && p !== pasoActual.value && pasos.value.includes(p)
+    ? p
+    : null;
+});
+function irAPaso(paso: Paso): void {
+  const i = pasos.value.indexOf(paso);
+  if (i !== -1) {
+    indice.value = i;
+  }
+}
+const pasosConfiguracion = computed(() =>
+  pasos.value.filter((p) => p !== "publicacion"),
+);
+const faltanConfigurar = computed(
+  () =>
+    pasosConfiguracion.value.filter((p) => !completados.value.has(p)).length,
+);
+const primeraFecha = computed(() => {
+  const f = estado.value?.primera_fecha;
+  if (!f) {
+    return "";
+  }
+  return new Intl.DateTimeFormat("es-MX", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: f.zona_horaria ?? undefined,
+  }).format(new Date(f.inicia_en));
+});
 const enlace = computed(() =>
   esCitas.value
     ? `${window.location.origin}/agendar/${sesion.slug}`
@@ -573,9 +703,22 @@ const accion = computed<{
             !planes.value.some((p) => p.incluir && p.precio.trim() !== "")),
         ejecutar: () => void ejecutar(guardarPlanes),
       };
+    case "reglas":
+      return {
+        texto: t("configuracionInicial.reglas.aceptar"),
+        deshabilitado:
+          g ||
+          !Number.isInteger(reglas.value.horas_limite) ||
+          reglas.value.horas_limite < 0 ||
+          reglas.value.horas_limite > 720,
+        ejecutar: () => void ejecutar(guardarReglas),
+      };
     default:
       return {
-        texto: t("configuracionInicial.terminar"),
+        texto:
+          visibilidad.value === "cerrada"
+            ? t("configuracionInicial.guardarTerminar")
+            : t("configuracionInicial.terminar"),
         deshabilitado: g,
         ejecutar: () => void ejecutar(guardarPublicacion),
       };
@@ -684,15 +827,9 @@ onMounted(cargar);
         </li>
       </ol>
 
-      <div
-        v-if="completo"
-        class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl p-4 text-sm"
-        :style="{
-          background: 'color-mix(in srgb, var(--exito) 10%, transparent)',
-          color: 'var(--exito)',
-        }"
-      >
-        <span>{{ $t("configuracionInicial.completo") }}</span>
+      <div v-if="estado?.listo" class="ci-listo mt-6" data-prueba="listo">
+        <span class="ci-punto ci-punto-si" aria-hidden="true" />
+        <span class="flex-1">{{ $t("configuracionInicial.completo") }}</span>
         <button
           class="tu-btn tu-btn-primario"
           @click="router.push({ name: 'panel' })"
@@ -1180,8 +1317,138 @@ onMounted(cargar);
             </p>
           </template>
 
-          <!-- Publicar -->
+          <!-- Reglas de cancelación e inasistencia -->
+          <template v-else-if="pasoActual === 'reglas'">
+            <div class="ci-regla">
+              <label class="font-medium" for="ci-horas">{{
+                $t("configuracionInicial.reglas.horas")
+              }}</label>
+              <div class="flex items-center gap-2">
+                <input
+                  id="ci-horas"
+                  v-model.number="reglas.horas_limite"
+                  class="tu-input w-24"
+                  type="number"
+                  min="0"
+                  max="720"
+                  data-prueba="horas-limite"
+                />
+                <span class="ci-suave text-sm">{{
+                  $t("configuracionInicial.reglas.horasAntes")
+                }}</span>
+              </div>
+            </div>
+            <label
+              class="ci-opcion"
+              :class="{ 'ci-opcion-activa': reglas.penaliza_tarde }"
+            >
+              <input v-model="reglas.penaliza_tarde" type="checkbox" />
+              <span>
+                <span class="block font-medium">{{
+                  $t("configuracionInicial.reglas.tarde")
+                }}</span>
+                <span class="ci-suave block text-sm">{{
+                  $t("configuracionInicial.reglas.tardeAyuda", {
+                    n: reglas.horas_limite,
+                  })
+                }}</span>
+              </span>
+            </label>
+            <label
+              class="ci-opcion"
+              :class="{ 'ci-opcion-activa': reglas.penaliza_no_show }"
+            >
+              <input v-model="reglas.penaliza_no_show" type="checkbox" />
+              <span>
+                <span class="block font-medium">{{
+                  $t("configuracionInicial.reglas.noLlega")
+                }}</span>
+                <span class="ci-suave block text-sm">{{
+                  $t("configuracionInicial.reglas.noLlegaAyuda")
+                }}</span>
+              </span>
+            </label>
+            <p class="ci-suave text-sm">
+              {{ $t("configuracionInicial.reglas.despues") }}
+              <RouterLink :to="{ name: 'reglas-agenda' }" class="tu-enlace">{{
+                $t("configuracionInicial.reglas.irReglas")
+              }}</RouterLink>
+            </p>
+          </template>
+
+          <!-- Publicar: cómo va, vista previa y cómo se publica -->
           <template v-else>
+            <ul v-if="estado" class="ci-estados" data-prueba="estados">
+              <li>
+                <span
+                  class="ci-punto"
+                  :class="{ 'ci-punto-si': estado.configurado }"
+                  aria-hidden="true"
+                />
+                <span class="font-medium">{{
+                  $t("configuracionInicial.estados.configurado")
+                }}</span>
+                <span class="ci-suave text-sm">{{
+                  estado.configurado
+                    ? $t("configuracionInicial.estados.configuradoSi")
+                    : $t("configuracionInicial.estados.faltan", {
+                        n: faltanConfigurar,
+                      })
+                }}</span>
+              </li>
+              <li>
+                <span
+                  class="ci-punto"
+                  :class="{ 'ci-punto-si': estado.publicado }"
+                  aria-hidden="true"
+                />
+                <span class="font-medium">{{
+                  $t("configuracionInicial.estados.publicado")
+                }}</span>
+                <span class="ci-suave text-sm">{{
+                  estado.publicado
+                    ? $t("configuracionInicial.estados.publicadoSi")
+                    : $t("configuracionInicial.estados.publicadoNo")
+                }}</span>
+              </li>
+              <li data-prueba="estado-reservable">
+                <span
+                  class="ci-punto"
+                  :class="{ 'ci-punto-si': estado.reservable }"
+                  aria-hidden="true"
+                />
+                <span class="font-medium">{{
+                  $t("configuracionInicial.estados.reservable")
+                }}</span>
+                <span v-if="estado.primera_fecha" class="ci-suave text-sm">{{
+                  $t("configuracionInicial.estados.primera", {
+                    fecha: primeraFecha,
+                    que: estado.primera_fecha.que ?? "",
+                    sucursal: estado.primera_fecha.sucursal ?? "",
+                  })
+                }}</span>
+                <span
+                  v-if="!estado.reservable && estado.motivo"
+                  class="ci-suave text-sm"
+                  >{{
+                    $t(`configuracionInicial.estados.motivo.${estado.motivo}`)
+                  }}
+                  <button
+                    v-if="pasoDelMotivo"
+                    type="button"
+                    class="tu-enlace"
+                    @click="irAPaso(pasoDelMotivo)"
+                  >
+                    {{
+                      $t("configuracionInicial.estados.resolver", {
+                        paso: $t(`configuracionInicial.pasos.${pasoDelMotivo}`),
+                      })
+                    }}
+                  </button></span
+                >
+              </li>
+            </ul>
+
             <div class="ci-existentes">
               <p class="text-sm font-medium">
                 {{ $t("configuracionInicial.publicacion.tuPagina") }}
@@ -1195,36 +1462,45 @@ onMounted(cargar);
                 >
                   {{ $t("configuracionInicial.publicacion.copiar") }}
                 </button>
+                <a
+                  :href="enlace"
+                  target="_blank"
+                  rel="noopener"
+                  class="tu-btn tu-btn-fantasma"
+                  data-prueba="vista-previa"
+                  >{{ $t("configuracionInicial.publicacion.vistaPrevia") }}</a
+                >
               </div>
             </div>
-            <label
-              class="ci-opcion"
-              :class="{ 'ci-opcion-activa': publicacion.publicado }"
-            >
-              <input v-model="publicacion.publicado" type="checkbox" />
-              <span>
-                <span class="block font-medium">{{
-                  $t("configuracionInicial.publicacion.directorio")
-                }}</span>
-                <span class="ci-suave block text-sm">{{
-                  $t("configuracionInicial.publicacion.directorioAyuda")
-                }}</span>
-              </span>
-            </label>
-            <label
-              class="ci-opcion"
-              :class="{ 'ci-opcion-activa': publicacion.privado }"
-            >
-              <input v-model="publicacion.privado" type="checkbox" />
-              <span>
-                <span class="block font-medium">{{
-                  $t("configuracionInicial.publicacion.privado")
-                }}</span>
-                <span class="ci-suave block text-sm">{{
-                  $t("configuracionInicial.publicacion.privadoAyuda")
-                }}</span>
-              </span>
-            </label>
+
+            <fieldset class="space-y-2">
+              <legend class="mb-2 text-sm font-medium">
+                {{ $t("configuracionInicial.publicacion.como") }}
+              </legend>
+              <label
+                v-for="v in VISIBILIDADES"
+                :key="v"
+                class="ci-opcion"
+                :class="{ 'ci-opcion-activa': visibilidad === v }"
+              >
+                <input
+                  v-model="visibilidad"
+                  type="radio"
+                  name="ci-visibilidad"
+                  :value="v"
+                  :data-prueba="`visibilidad-${v}`"
+                />
+                <span>
+                  <span class="block font-medium">{{
+                    $t(`configuracionInicial.publicacion.vis.${v}`)
+                  }}</span>
+                  <span class="ci-suave block text-sm">{{
+                    $t(`configuracionInicial.publicacion.vis.${v}Ayuda`)
+                  }}</span>
+                </span>
+              </label>
+            </fieldset>
+
             <div>
               <p class="text-sm font-medium">
                 {{ $t("configuracionInicial.publicacion.despues") }}
@@ -1250,14 +1526,6 @@ onMounted(cargar);
                   <RouterLink :to="{ name: 'pos' }" class="tu-enlace"
                     >{{
                       $t("configuracionInicial.publicacion.tareas.pos")
-                    }}
-                    →</RouterLink
-                  >
-                </li>
-                <li>
-                  <RouterLink :to="{ name: 'reglas-agenda' }" class="tu-enlace"
-                    >{{
-                      $t("configuracionInicial.publicacion.tareas.reglas")
                     }}
                     →</RouterLink
                   >
@@ -1462,7 +1730,60 @@ onMounted(cargar);
 }
 .ci-opcion-activa {
   border-color: var(--primario);
-  background: color-mix(in srgb, var(--primario) 5%, var(--superficie));
+}
+.ci-regla {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.8rem;
+}
+/* Configurado · publicado · recibe reservas: punto y texto. */
+.ci-estados {
+  display: grid;
+  border: 1px solid var(--borde);
+  border-radius: 0.8rem;
+}
+.ci-estados > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.6rem;
+  padding: 0.75rem 1rem;
+}
+.ci-estados > li + li {
+  border-top: 1px solid var(--borde);
+}
+.ci-estados > li > .font-medium {
+  min-width: 9rem;
+}
+.ci-punto {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  flex-shrink: 0;
+  align-self: center;
+  border-radius: 999px;
+  background: var(--texto-suave);
+  opacity: 0.45;
+}
+.ci-punto-si {
+  background: var(--exito);
+  opacity: 1;
+}
+.ci-listo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.8rem;
+  background: var(--superficie);
+  font-size: 0.9rem;
 }
 .ci-dias {
   display: flex;

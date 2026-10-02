@@ -28,9 +28,9 @@ use Illuminate\Http\Request;
  * prospecto antes de registrarse — identidad (descripción, portada, redes), sus
  * sucursales (dirección, mapa, WhatsApp, redes y horario), profesionales con foto,
  * servicios o clases con su descripción, el horario semanal de clases, próximas clases
- * (con cupo), precios y reseñas. Sin auth, pero SOLO para estudios listados en el
- * directorio ({@see Estudio::enDirectorio()}); un estudio privado o no publicado no
- * tiene escaparate. Expone únicamente datos públicos (nunca IDs internos, correos ni
+ * (con cupo), precios y reseñas. Sin auth, pero SOLO con la página pública abierta
+ * ({@see Estudio::paginaPublica()}): publicado, esté o no en el directorio («solo con
+ * enlace»); uno no publicado no tiene escaparate. Expone únicamente datos públicos (nunca IDs internos, correos ni
  * datos sensibles). Opera sobre la BD del estudio ya resuelto por `estudio.resolver`.
  */
 class EscaparateController
@@ -42,8 +42,8 @@ class EscaparateController
     {
         $estudio = $request->attributes->get('estudio');
         abort_unless($estudio instanceof Estudio, 404);
-        // El escaparate es la cara pública: solo estudios listados en el directorio.
-        abort_unless($estudio->enDirectorio(), 404);
+        // El escaparate es la cara pública: solo con la página abierta.
+        abort_unless($estudio->paginaPublica(), 404);
 
         return response()->json(['data' => [
             'estudio' => [

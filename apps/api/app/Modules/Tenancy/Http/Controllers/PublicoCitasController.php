@@ -36,8 +36,9 @@ use Illuminate\Validation\ValidationException;
  * Citas PÚBLICAS (guest, sin cuenta): un cliente reserva y paga una cita desde el
  * escaparate del estudio, sin registrarse. Crea (o reutiliza por correo) una persona
  * guest, agenda la cita (reserva pendiente + orden por la sesión) y la cobra en línea.
- * Solo para estudios en el directorio; el `orden_id` (ULID aleatorio) es la capacidad
- * para pagar sin sesión. El webhook de la pasarela confirma la reserva (fulfillment).
+ * Solo con la página pública abierta (aunque no esté en el directorio); el `orden_id`
+ * (ULID aleatorio) es la capacidad para pagar sin sesión. El webhook de la pasarela
+ * confirma la reserva (fulfillment).
  */
 class PublicoCitasController
 {
@@ -58,13 +59,13 @@ class PublicoCitasController
     /**
      * Opciones para agendar una cita (guest): servicios cobrables como cita
      * (política = pago), sucursales y proveedores (barberos), todos por ULID —
-     * el identificador público. Solo estudios en el directorio.
+     * el identificador público. Solo con la página pública abierta.
      */
     public function opciones(Request $request): JsonResponse
     {
         $estudio = $request->attributes->get('estudio');
         abort_unless($estudio instanceof Estudio, 404);
-        abort_unless($estudio->enDirectorio(), 404);
+        abort_unless($estudio->paginaPublica(), 404);
 
         return response()->json(['data' => [
             'estudio' => [
@@ -81,13 +82,13 @@ class PublicoCitasController
     /**
      * Huecos libres de un proveedor en una fecha (guest), para elegir hora antes de
      * agendar. Reusa el mismo motor que la vista de staff. Sin proveedor («cualquier
-     * profesional disponible»), los de todo el equipo de la sede. Solo directorio.
+     * profesional disponible»), los de todo el equipo de la sede. Solo página abierta.
      */
     public function disponibilidad(Request $request): JsonResponse
     {
         $estudio = $request->attributes->get('estudio');
         abort_unless($estudio instanceof Estudio, 404);
-        abort_unless($estudio->enDirectorio(), 404);
+        abort_unless($estudio->paginaPublica(), 404);
 
         $validado = $request->validate([
             'instructor_id' => ['nullable', 'string'],
@@ -116,13 +117,13 @@ class PublicoCitasController
     /**
      * Días en que se puede agendar en la sede (desde hoy), para el calendario: los
      * que ya pasaron, en que nadie atiende o que el negocio cerró van como no
-     * disponibles. Con `instructor_id`, los de esa persona. Solo directorio.
+     * disponibles. Con `instructor_id`, los de esa persona. Solo página abierta.
      */
     public function dias(Request $request): JsonResponse
     {
         $estudio = $request->attributes->get('estudio');
         abort_unless($estudio instanceof Estudio, 404);
-        abort_unless($estudio->enDirectorio(), 404);
+        abort_unless($estudio->paginaPublica(), 404);
 
         $validado = $request->validate([
             'sucursal_id' => ['required', 'string'],
@@ -145,7 +146,7 @@ class PublicoCitasController
     {
         $estudio = $request->attributes->get('estudio');
         abort_unless($estudio instanceof Estudio, 404);
-        abort_unless($estudio->enDirectorio(), 404);
+        abort_unless($estudio->paginaPublica(), 404);
 
         $validado = $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
@@ -204,13 +205,13 @@ class PublicoCitasController
     /**
      * La cita de una orden por la sesión (el enlace del correo de apartado): qué es,
      * dónde, cuánto y hasta cuándo se puede pagar. El ULID de la orden es la
-     * capacidad, igual que al pagar; no expone datos de la persona. Solo directorio.
+     * capacidad, igual que al pagar; no expone datos de la persona. Solo página abierta.
      */
     public function orden(Request $request): JsonResponse
     {
         $estudio = $request->attributes->get('estudio');
         abort_unless($estudio instanceof Estudio, 404);
-        abort_unless($estudio->enDirectorio(), 404);
+        abort_unless($estudio->paginaPublica(), 404);
 
         $orden = OrdenTenant::query()
             ->where('ulid', (string) $request->route('orden'))
@@ -251,7 +252,7 @@ class PublicoCitasController
     {
         $estudio = $request->attributes->get('estudio');
         abort_unless($estudio instanceof Estudio, 404);
-        abort_unless($estudio->enDirectorio(), 404);
+        abort_unless($estudio->paginaPublica(), 404);
 
         $validado = $request->validate([
             'orden_id' => ['required', 'string'],

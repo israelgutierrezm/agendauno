@@ -12,6 +12,7 @@ use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoOutboxTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\PoliticaCancelacionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\OrigenCliente;
 use App\Modules\Tenancy\PerfilNegocio;
@@ -132,6 +133,8 @@ abstract class DemoBase
             'aprovisionado_en' => $this->inicio->subDays(30),
             'paso_aprovisionamiento' => null,
             'onboarding_completo' => true,
+            // Sus reglas ya están revisadas y la página publicada (ADR 0090).
+            'onboarding_pasos' => ['reglas' => true, 'publicacion' => true],
             'publicado' => true,
             'privado' => false,
             'pais' => 'MX',
@@ -148,6 +151,10 @@ abstract class DemoBase
                     DB::connection('tenant')->statement('PRAGMA synchronous = OFF');
                     DB::connection('tenant')->statement('PRAGMA journal_mode = MEMORY');
                 }
+                // Sus reglas de cancelación: avisar con tiempo; la inasistencia cuenta.
+                PoliticaCancelacionTenant::query()->updateOrCreate(['actividad_id' => null], [
+                    'horas_limite' => 6, 'penaliza_tarde' => true, 'penaliza_no_show' => true, 'tolerancia_no_show' => 0,
+                ]);
                 $this->sembrar();
                 $this->cerrarHistoria();
             });

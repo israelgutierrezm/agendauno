@@ -1533,14 +1533,10 @@ export default {
     opcionales: "Opcionales:",
     hecho: "(hecho)",
     pendiente: "(pendiente)",
+    // Lo opcional; los pasos llevan los nombres de la configuración guiada.
     tareas: {
-      sucursal: "Crea tu primera sucursal",
-      catalogo: "Define una clase (oferta)",
-      horarios: "Programa un horario o clase",
-      politica: "Configura tu política de cancelación",
-      productos: "Crea un producto para vender",
-      miembros: "Agrega a tu primer alumno",
-      publicado: "Aparece en el directorio",
+      cobro: "Cobrar en línea",
+      miembros: "Registra a tu primer cliente",
     },
   },
   lealtad: {

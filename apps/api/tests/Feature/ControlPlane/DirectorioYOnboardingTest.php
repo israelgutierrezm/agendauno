@@ -21,11 +21,11 @@ it('el directorio lista por defecto; el estudio puede optar por salirse o marcar
     $privado = estudioConSesion('estudio-privado', 'b@correo.mx');
     $oculto = estudioConSesion('estudio-oculto', 'c@correo.mx');
 
-    // El propietario opta por NO aparecer (solo por URL directa).
+    // El propietario cierra su página: ni directorio ni reserva en línea.
     $this->putJson("/api/v1/app/{$oculto['slug']}/publicacion", ['publicado' => false, 'privado' => false], conBearer($oculto['bearer']))
         ->assertOk()->assertJsonPath('data.en_directorio', false);
 
-    // Marcarse privado tambien lo saca del directorio.
+    // «Solo con enlace» lo saca del directorio, pero su página sigue abierta (ADR 0090).
     $this->putJson("/api/v1/app/{$privado['slug']}/publicacion", ['publicado' => true, 'privado' => true], conBearer($privado['bearer']))
         ->assertOk()->assertJsonPath('data.en_directorio', false);
 
@@ -36,6 +36,10 @@ it('el directorio lista por defecto; el estudio puede optar por salirse o marcar
     expect($slugs)->not->toContain('estudio-privado');
     expect($slugs)->not->toContain('estudio-oculto');
     expect($data[0] ?? [])->not->toHaveKey('id'); // sin IDs internos
+
+    $this->getJson("/api/v1/app/{$privado['slug']}/escaparate")->assertOk();
+    $this->getJson("/api/v1/app/{$privado['slug']}/citas/opciones")->assertOk();
+    $this->getJson("/api/v1/app/{$oculto['slug']}/escaparate")->assertNotFound();
 });
 
 it('el directorio permite buscar por ubicación y filtrar por perfil sin exponer datos privados', function (): void {
@@ -75,7 +79,7 @@ it('configuración inicial de un negocio de clases: sus pasos se dan por hechos 
     $this->getJson($url, conBearer($e['bearer']))
         ->assertOk()
         ->assertJsonPath('data.modalidad', 'clases')
-        ->assertJsonPath('data.pasos', ['negocio', 'clases', 'horario', 'planes', 'publicacion'])
+        ->assertJsonPath('data.pasos', ['negocio', 'clases', 'horario', 'planes', 'reglas', 'publicacion'])
         ->assertJsonPath('data.completo', false);
 
     // Un paso con datos no se da por hecho con solo «siguiente».
@@ -89,11 +93,16 @@ it('configuración inicial de un negocio de clases: sus pasos se dan por hechos 
     $this->getJson("/api/v1/app/{$e['slug']}/politicas-cancelacion", conBearer($e['bearer']))->assertOk()->assertJsonPath('data.0.horas_limite', 6);
     $this->getJson($url, conBearer($e['bearer']))->assertJsonFragment(['completados' => ['clases']]);
 
-    // Con sucursal, una clase programada y un plan, y al publicar: completo.
+    // Con sucursal, una clase programada, un plan y las reglas aceptadas; publicado: completo.
     $semilla = agendaSemilla($e);
     crearSesionTenant($e, $semilla);
     crearPackTenant($e);
-    $this->putJson($url, ['paso' => 'publicacion'], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.completo', true);
+    $this->putJson($url, ['paso' => 'publicacion'], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.completo', false);
+    $this->putJson($url, ['paso' => 'reglas'], conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.completo', true)
+        ->assertJsonPath('data.estado.configurado', true)
+        ->assertJsonPath('data.estado.reservable', true);
 });
 
 it('configuración inicial de un negocio de citas: servicio, duración y precio en una línea', function (): void {
@@ -103,7 +112,7 @@ it('configuración inicial de un negocio de citas: servicio, duración y precio 
 
     $this->getJson($url, conBearer($e['bearer']))
         ->assertOk()
-        ->assertJsonPath('data.pasos', ['negocio', 'servicios', 'equipo', 'publicacion'])
+        ->assertJsonPath('data.pasos', ['negocio', 'servicios', 'equipo', 'reglas', 'publicacion'])
         ->assertJsonPath('data.sugerencias.servicios.0', ['nombre' => 'Corte de cabello', 'duracion_minutos' => 30, 'precio_minor' => 25000]);
 
     // En citas no hay cupo: cada servicio lleva su precio.

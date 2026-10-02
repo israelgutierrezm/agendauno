@@ -19,7 +19,7 @@ use Illuminate\Http\Request;
  * crea su cuenta desde el escaparate y queda dentro (auto-login), con un token igual
  * que el login. Si su correo ya es de alguien en el negocio (una ficha o una cuenta
  * dada de baja), primero lo confirma desde ese correo ({@see RegistrarAlumnoTenant}).
- * Solo para estudios listados en el directorio; email único por estudio. Sin auth;
+ * Solo con la página pública abierta (aunque no esté en el directorio); email único por estudio. Sin auth;
  * con throttle.
  */
 class RegistroAlumnoController
@@ -76,8 +76,8 @@ class RegistroAlumnoController
     {
         $estudio = $request->attributes->get('estudio');
         abort_unless($estudio instanceof Estudio, 404);
-        // El registro público solo existe para estudios listados en el directorio.
-        abort_unless($estudio->enDirectorio(), 404);
+        // El registro público solo existe con la página pública abierta.
+        abort_unless($estudio->paginaPublica(), 404);
 
         return $estudio;
     }

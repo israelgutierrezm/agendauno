@@ -10,6 +10,7 @@ export default {
   siguiente: "Guardar y continuar",
   continuar: "Continuar",
   terminar: "Publicar y terminar",
+  guardarTerminar: "Guardar y terminar",
   completo: "Tu negocio ya está listo para recibir reservas.",
   irPanel: "Ir a mi panel",
   pasos: {
@@ -19,6 +20,7 @@ export default {
     clases: "Clases",
     horario: "Horario",
     planes: "Planes y precios",
+    reglas: "Reglas",
     publicacion: "Publicar",
   },
   desc: {
@@ -30,7 +32,10 @@ export default {
     clases: "Las clases que das, cuánto duran y cuántas personas caben.",
     horario: "Qué días y a qué hora se da cada clase.",
     planes: "Cómo te pagan tus alumnos: por clase, por paquete o por mes.",
-    publicacion: "Tu página para reservar y si apareces en el directorio.",
+    reglas:
+      "Hasta cuándo se puede cancelar y qué pasa si alguien no llega. Puedes aceptarlas como están.",
+    publicacion:
+      "Revisa cómo va tu negocio, mira tu página como la verán tus clientes y publícala.",
   },
   negocio: {
     logo: "Logo",
@@ -94,21 +99,60 @@ export default {
     ayuda:
       "Agrega paquetes, promociones o planes por clase en Ventas → Planes.",
   },
+  reglas: {
+    horas: "Se puede cancelar sin costo hasta",
+    horasAntes: "horas antes",
+    tarde: "Cobrar si cancela después",
+    tardeAyuda:
+      "Si cancela con menos de {n} horas de anticipación, se cobra (o se descuenta de su plan).",
+    noLlega: "Cobrar si no llega",
+    noLlegaAyuda: "Si no se presenta, se cobra (o se descuenta de su plan).",
+    aceptar: "Aceptar reglas",
+    despues: "Los detalles (tolerancias y reglas por clase) están en",
+    irReglas: "Reglas de la agenda",
+  },
+  estados: {
+    configurado: "Configurado",
+    configuradoSi: "Todos los pasos están completos.",
+    faltan: "Falta un paso. | Faltan {n} pasos.",
+    publicado: "Página publicada",
+    publicadoSi: "Tus clientes pueden abrir tu página y reservar.",
+    publicadoNo: "Tu página está cerrada.",
+    reservable: "Recibe reservas",
+    primera: "Primera fecha disponible: {fecha} · {que} · {sucursal}.",
+    resolver: "Ir a {paso}",
+    motivo: {
+      sin_servicios: "Aún no hay un servicio con precio para agendar.",
+      sin_horario: "Aún no hay un horario de atención.",
+      sin_huecos:
+        "No hay horas libres en los próximos 14 días: revisa los horarios de atención.",
+      sin_clases:
+        "No hay clases con lugar en los próximos 14 días: programa tu horario.",
+      sin_planes: "Hay clases, pero ningún plan con que reservarlas.",
+      sin_publicar: "Hay fechas, pero tu página está cerrada.",
+    },
+  },
   publicacion: {
     tuPagina: "Tu página para reservar",
+    vistaPrevia: "Ver como cliente",
+    como: "¿Cómo la publicas?",
+    vis: {
+      publica: "En el directorio y con tu enlace",
+      publicaAyuda:
+        "Te encuentran quienes buscan un negocio como el tuyo cerca.",
+      enlace: "Solo con tu enlace",
+      enlaceAyuda:
+        "Tu página funciona y reciben reservas, pero no apareces en búsquedas.",
+      cerrada: "Cerrada por ahora",
+      cerradaAyuda: "Nadie puede abrir tu página ni reservar en línea.",
+    },
     copiar: "Copiar enlace",
     copiado: "Enlace copiado.",
-    directorio: "Aparecer en el directorio de AgendaUno",
-    directorioAyuda:
-      "Te encuentran quienes buscan un negocio como el tuyo cerca.",
-    privado: "Solo con enlace",
-    privadoAyuda: "Tu página funciona, pero no aparece en búsquedas.",
     despues: "Cuando lo necesites",
     tareas: {
       pasarelas: "Cobrar en línea al reservar",
       usuarios: "Invitar a recepción o administración",
       pos: "Vender productos de mostrador",
-      reglas: "Ajustar las reglas de cancelación",
     },
   },
   diasCortos: {

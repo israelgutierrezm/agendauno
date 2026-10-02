@@ -120,6 +120,16 @@ class Estudio extends Model
     }
 
     /**
+     * ¿Su página pública (y la reserva en línea) está abierta? Publicado y operativo,
+     * aparezca o no en el directorio: «solo con enlace» (`privado`) no la cierra, solo
+     * la saca de las búsquedas (ADR 0090).
+     */
+    public function paginaPublica(): bool
+    {
+        return $this->publicado && $this->estado->operativo();
+    }
+
+    /**
      * Modalidad de servicio del estudio (clases con cupo vs citas 1 a 1), derivada de
      * su perfil de negocio.
      */

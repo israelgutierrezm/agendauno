@@ -4,16 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Tenancy\ModalidadServicio;
+use App\Modules\Tenancy\Application\PuestaEnMarchaTenant;
+use App\Modules\Tenancy\Models\ConfiguracionPasarelaTenant;
 use App\Modules\Tenancy\Models\Estudio;
-use App\Modules\Tenancy\Models\HorarioAtencionTenant;
-use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
-use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
 use App\Modules\Tenancy\Models\PoliticaCancelacionTenant;
-use App\Modules\Tenancy\Models\ProductoTenant;
-use App\Modules\Tenancy\Models\SesionTenant;
-use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\SugerenciasPerfil;
 use App\Modules\Tenancy\TipoPersonaTenant;
@@ -25,65 +20,62 @@ use Illuminate\Validation\ValidationException;
 /**
  * Configuración inicial del negocio (ADR 0088) y publicación en el directorio. Los
  * pasos dependen de cómo trabaja el negocio: con citas, «tu negocio → servicios →
- * quién atiende y cuándo → publicar»; con clases, «tu negocio → clases → horario →
- * planes → publicar». Cobro en línea, equipo administrativo, productos y políticas se
- * dejan para después (la lista de pendientes del panel). Un paso está hecho cuando
- * existen sus datos en la BD del negocio; solo «publicar» se anota aparte.
+ * quién atiende y cuándo → reglas → publicar»; con clases, «tu negocio → clases →
+ * horario → planes → reglas → publicar». El asistente y «Pon tu negocio en marcha»
+ * del panel usan el mismo criterio ({@see PuestaEnMarchaTenant}, ADR 0090): mismos
+ * pasos, mismo «hecho» y los mismos estados (configurado, publicado, recibe reservas).
  */
 class OnboardingController
 {
-    /** @var list<string> */
-    private const PASOS_CITAS = ['negocio', 'servicios', 'equipo', 'publicacion'];
-
-    /** @var list<string> */
-    private const PASOS_CLASES = ['negocio', 'clases', 'horario', 'planes', 'publicacion'];
+    public function __construct(
+        private readonly PuestaEnMarchaTenant $marcha,
+    ) {}
 
     public function show(Request $request): JsonResponse
     {
         $estudio = $this->estudio($request);
-        $pasos = $this->pasos($estudio);
-        $hechos = $this->hechos($estudio);
+        $pasos = $this->marcha->pasos($estudio);
+        $hechos = $this->marcha->hechos($estudio);
 
         return response()->json(['data' => [
             'modalidad' => $estudio->modalidad()->value,
             'pasos' => $pasos,
             'completados' => $hechos,
             'completo' => $estudio->onboarding_completo || count($hechos) === count($pasos),
+            'estado' => $this->marcha->estado($estudio),
+            'publicacion' => ['publicado' => (bool) $estudio->publicado, 'privado' => (bool) $estudio->privado],
             // Con qué suele empezar un negocio de su giro (el dueño lo ajusta).
             'sugerencias' => SugerenciasPerfil::para($estudio->perfil_negocio),
         ]]);
     }
 
     /**
-     * Quickstart (R36): checklist DERIVADO del estado real de configuración (no del
-     * JSON de pasos), para que el dueño active su estudio saltando a lo que falta. Cada
-     * tarea trae si está hecha, si es requerida para operar, y la ruta para completarla.
+     * «Pon tu negocio en marcha» (R36) en el Inicio: los MISMOS pasos del asistente,
+     * cada uno lleva a su paso, y lo opcional (cobro en línea, primer cliente) aparte.
      */
     public function quickstart(Request $request): JsonResponse
     {
         $estudio = $this->estudio($request);
 
-        // [clave, hecho, requerido, ruta] — el estado sale de datos reales del tenant.
-        // En citas, el horario es el de atención de los profesionales y los paquetes son
-        // opcionales (cada servicio ya tiene precio); en clases, la agenda y la membresía.
-        $esCitas = $estudio->modalidad() === ModalidadServicio::Citas;
-        $tareas = [
-            ['clave' => 'sucursal', 'hecho' => SucursalTenant::query()->exists(), 'requerido' => true, 'ruta' => 'onboarding'],
-            ['clave' => 'catalogo', 'hecho' => OfertaTenant::query()->exists(), 'requerido' => true, 'ruta' => 'onboarding'],
-            ['clave' => 'horarios', 'hecho' => $this->horariosListos($estudio), 'requerido' => true, 'ruta' => $esCitas ? 'horarios' : 'agenda'],
-            ['clave' => 'politica', 'hecho' => PoliticaCancelacionTenant::query()->exists(), 'requerido' => true, 'ruta' => 'onboarding'],
-            ['clave' => 'productos', 'hecho' => ProductoTenant::query()->exists(), 'requerido' => ! $esCitas, 'ruta' => 'ventas'],
-            ['clave' => 'miembros', 'hecho' => PersonaTenant::query()->where('tipo', TipoPersonaTenant::Miembro->value)->exists(), 'requerido' => false, 'ruta' => 'miembros'],
-            ['clave' => 'publicado', 'hecho' => (bool) $estudio->publicado, 'requerido' => false, 'ruta' => 'configuracion'],
-        ];
+        $hechos = $this->marcha->hechos($estudio);
+        $tareas = array_map(static fn (string $paso): array => [
+            'clave' => $paso,
+            'hecho' => in_array($paso, $hechos, true),
+            'requerido' => true,
+            'ruta' => 'onboarding',
+        ], $this->marcha->pasos($estudio));
+        $tareas[] = ['clave' => 'cobro', 'hecho' => ConfiguracionPasarelaTenant::query()->where('activa', true)->exists(), 'requerido' => false, 'ruta' => 'pasarelas'];
+        $tareas[] = ['clave' => 'miembros', 'hecho' => PersonaTenant::query()->where('tipo', TipoPersonaTenant::Miembro->value)->exists(), 'requerido' => false, 'ruta' => 'miembros'];
 
-        $requeridas = array_filter($tareas, fn (array $t): bool => $t['requerido']);
-        $hechasReq = array_filter($requeridas, fn (array $t): bool => $t['hecho']);
+        $requeridas = array_filter($tareas, static fn (array $t): bool => $t['requerido']);
+        $hechasReq = array_filter($requeridas, static fn (array $t): bool => $t['hecho']);
+        $estado = $this->marcha->estado($estudio);
 
         return response()->json(['data' => [
             'tareas' => $tareas,
             'progreso' => ['hechas' => count($hechasReq), 'total' => count($requeridas)],
-            'listo' => count($hechasReq) === count($requeridas),
+            'listo' => $estado['listo'],
+            'estado' => $estado,
         ]]);
     }
 
@@ -92,54 +84,35 @@ class OnboardingController
         $estudio = $this->estudio($request);
 
         $validado = $request->validate([
-            'paso' => ['required', Rule::in($this->pasos($estudio))],
+            'paso' => ['required', Rule::in($this->marcha->pasos($estudio))],
             'datos' => ['nullable', 'array'],
         ]);
         $paso = (string) $validado['paso'];
 
+        // Las reglas se aceptan como están (o como se ajustaron): deben existir.
+        if ($paso === 'reglas' && ! PoliticaCancelacionTenant::query()->whereNull('actividad_id')->exists()) {
+            throw ValidationException::withMessages(['paso' => [$this->falta($paso)]]);
+        }
         // Un paso con datos solo está hecho si los datos existen (no basta «siguiente»).
-        if ($paso !== 'publicacion' && ! in_array($paso, $this->hechos($estudio), true)) {
-            throw ValidationException::withMessages(['paso' => [$this->falta($paso, $estudio)]]);
+        if (! in_array($paso, ['reglas', 'publicacion'], true) && ! $this->marcha->hecho($estudio, $paso)) {
+            throw ValidationException::withMessages(['paso' => [$this->falta($paso)]]);
         }
 
         $anotados = $estudio->onboarding_pasos ?? [];
         $anotados[$paso] = $validado['datos'] ?? true;
         $estudio->onboarding_pasos = $anotados;
-        $hechos = $this->hechos($estudio);
-        $completo = $estudio->onboarding_completo || count($hechos) === count($this->pasos($estudio));
+        $hechos = $this->marcha->hechos($estudio);
+        $completo = $estudio->onboarding_completo || count($hechos) === count($this->marcha->pasos($estudio));
         $estudio->update(['onboarding_pasos' => $anotados, 'onboarding_completo' => $completo]);
 
         return response()->json(['data' => [
             'completados' => $hechos,
             'completo' => $completo,
+            'estado' => $this->marcha->estado($estudio),
         ]]);
     }
 
-    /**
-     * @return list<string>
-     */
-    private function pasos(Estudio $estudio): array
-    {
-        return $estudio->modalidad() === ModalidadServicio::Citas ? self::PASOS_CITAS : self::PASOS_CLASES;
-    }
-
-    /**
-     * Los pasos hechos, según los datos reales del negocio.
-     *
-     * @return list<string>
-     */
-    private function hechos(Estudio $estudio): array
-    {
-        return array_values(array_filter($this->pasos($estudio), fn (string $paso): bool => match ($paso) {
-            'negocio' => SucursalTenant::query()->exists(),
-            'servicios', 'clases' => OfertaTenant::query()->exists(),
-            'equipo', 'horario' => $this->horariosListos($estudio),
-            'planes' => ProductoTenant::query()->exists(),
-            default => array_key_exists($paso, $estudio->onboarding_pasos ?? []),
-        }));
-    }
-
-    private function falta(string $paso, Estudio $estudio): string
+    private function falta(string $paso): string
     {
         return match ($paso) {
             'negocio' => 'Indica el nombre de tu sucursal antes de continuar.',
@@ -147,6 +120,7 @@ class OnboardingController
             'clases' => 'Agrega al menos una clase antes de continuar.',
             'equipo' => 'Define quién atiende y su horario antes de continuar.',
             'horario' => 'Programa al menos una clase en tu horario antes de continuar.',
+            'reglas' => 'Guarda tus reglas de cancelación antes de continuar.',
             default => 'Agrega al menos un plan antes de continuar.',
         };
     }
@@ -169,6 +143,7 @@ class OnboardingController
             'publicado' => $estudio->publicado,
             'privado' => $estudio->privado,
             'en_directorio' => $estudio->enDirectorio(),
+            'estado' => $this->marcha->estado($estudio),
         ]]);
     }
 
@@ -190,17 +165,6 @@ class OnboardingController
             'perfil' => $estudio->perfil_negocio->value,
             'perfil_config' => $estudio->perfilConfig(),
         ]]);
-    }
-
-    /**
-     * ¿Ya hay horarios? En citas: el horario de atención de algún profesional. En
-     * clases: una plantilla recurrente o alguna clase programada.
-     */
-    private function horariosListos(Estudio $estudio): bool
-    {
-        return $estudio->modalidad() === ModalidadServicio::Citas
-            ? HorarioAtencionTenant::query()->exists()
-            : PlantillaHorarioTenant::query()->exists() || SesionTenant::query()->exists();
     }
 
     private function estudio(Request $request): Estudio
