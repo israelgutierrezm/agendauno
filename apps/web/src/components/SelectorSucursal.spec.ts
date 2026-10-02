@@ -58,12 +58,22 @@ describe("sucursal con la que se trabaja", () => {
 
     const selector = barra.get('[data-prueba="selector-sucursal"]');
     expect((selector.element as HTMLSelectElement).value).toBe("");
+    expect(barra.get('[data-prueba="sucursal-actual"]').text()).toBe(
+      "Todas las sucursales",
+    );
+    expect(barra.find(".ss-vivo").exists()).toBe(false);
     expect(pantalla.find('[data-prueba="propio"]').exists()).toBe(true);
 
     await selector.setValue("roma");
     await nextTick();
     expect(pantalla.get('[data-prueba="filtro"]').text()).toBe("roma");
     expect(pantalla.find('[data-prueba="propio"]').exists()).toBe(false);
+    // Operando en una sucursal: se dice y el punto late.
+    expect(barra.text()).toContain("Operando en");
+    expect(barra.get('[data-prueba="sucursal-actual"]').text()).toBe(
+      "Roma Norte",
+    );
+    expect(barra.find(".ss-vivo").exists()).toBe(true);
 
     await selector.setValue("");
     await nextTick();
@@ -73,12 +83,16 @@ describe("sucursal con la que se trabaja", () => {
   it("con una sola: no hay selector, solo su nombre, y se usa siempre", () => {
     sesion.usuario.sucursales = [ROMA];
     const barra = mount(SelectorSucursal, { global: { plugins: [i18n] } });
+    const nombre = mount(SelectorSucursal, {
+      props: { variante: "unica" },
+      global: { plugins: [i18n] },
+    });
     const pantalla = mount(Listado);
 
     expect(barra.find('[data-prueba="selector-sucursal"]').exists()).toBe(
       false,
     );
-    expect(barra.get('[data-prueba="sucursal-unica"]').text()).toBe(
+    expect(nombre.get('[data-prueba="sucursal-unica"]').text()).toBe(
       "Roma Norte",
     );
     expect(pantalla.get('[data-prueba="filtro"]').text()).toBe("roma");

@@ -19,7 +19,8 @@ import { puedeEntrar } from "@/lib/acceso";
 import { ubicacion } from "@/lib/menu";
 import { useUbicacionActual } from "@/lib/ubicacionActual";
 import { identidadDeSesion, reiniciarMiCuenta } from "@/lib/miCuenta";
-import { nombreDeRol } from "@/lib/roles";
+import { esMiembro, nombreDeRol } from "@/lib/roles";
+import { useSucursales } from "@/lib/sucursalOperativa";
 import { slugDeContexto } from "@/lib/tenant";
 import { pausarTerminologia } from "@/i18n";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -70,6 +71,12 @@ if (sesion.bearer !== null) {
 const hogar = computed(() => ({ name: sesion.rutaInicio }));
 // Barra superior: el área donde se está y la ruta de ubicación.
 const lugar = useUbicacionActual();
+// Con varias sucursales, la barra dice con cuál se trabaja en lugar del título (el
+// título sigue en la ruta de ubicación).
+const sucursalesSesion = useSucursales();
+const selectorEnBarra = computed(
+  () => sucursalesSesion.varias.value && !esMiembro(sesion.usuario),
+);
 
 // El panel es para las pantallas privadas. Las públicas (la página del negocio,
 // agendar, el directorio…) se ven como las ve cualquier visitante aunque haya
@@ -259,9 +266,11 @@ onMounted(() => {
               <path d="M4 7h16M4 12h16M4 17h16" />
             </svg>
           </button>
+          <!-- Con varias sucursales: con cuál se trabaja (en lugar del título). -->
+          <SelectorSucursal v-if="selectorEnBarra" />
           <!-- Dónde está: el área (su ícono y su nombre). -->
           <div
-            v-if="lugar.titulo.value"
+            v-else-if="lugar.titulo.value"
             class="tu-barra-titulo"
             data-prueba="titulo-barra"
           >
@@ -309,8 +318,8 @@ onMounted(() => {
             class="tu-barra-division"
             aria-hidden="true"
           />
-          <!-- Con qué sucursal se trabaja (con varias); con una, solo su nombre -->
-          <SelectorSucursal class="hidden sm:inline-flex" />
+          <!-- Con una sola sucursal, solo su nombre (informativo) -->
+          <SelectorSucursal variante="unica" class="hidden sm:inline-flex" />
           <!-- Cambiar de rol: solo si puede entrar con más de uno -->
           <button
             v-if="sesion.tieneVariosRoles"

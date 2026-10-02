@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -200,6 +201,7 @@ onMounted(cargar);
             </option>
           </select>
         </div>
+        <LeyendaSucursal v-else />
         <div>
           <label class="tu-label" for="rt">{{ $t("recursos.tipo") }}</label>
           <input

@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 
 import CorregirCobro from "@/components/CorregirCobro.vue";
+import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -332,6 +333,7 @@ onMounted(cargar);
               </option>
             </select>
           </template>
+          <LeyendaSucursal v-else />
 
           <p
             v-if="articulosVendibles.length === 0"

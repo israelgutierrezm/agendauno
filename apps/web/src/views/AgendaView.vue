@@ -17,6 +17,7 @@ import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PanelCita from "@/components/PanelCita.vue";
 import PanelNuevaCita from "@/components/PanelNuevaCita.vue";
@@ -3122,6 +3123,7 @@ onMounted(async () => {
             </option>
           </select>
         </div>
+        <LeyendaSucursal v-else />
         <div v-if="instructores.length > 0">
           <label class="tu-label" for="ai">{{
             $t("agenda.nueva.instructor")

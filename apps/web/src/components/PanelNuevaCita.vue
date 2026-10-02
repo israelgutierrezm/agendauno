@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import PanelLateral from "@/components/PanelLateral.vue";
+import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import {
   diaIso,
   fechaLocal,
@@ -409,6 +410,7 @@ async function agendar(): Promise<void> {
           </option>
         </select>
       </label>
+      <LeyendaSucursal v-else />
 
       <div class="grid grid-cols-3 gap-3">
         <label class="block col-span-3 sm:col-span-1">
