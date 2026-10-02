@@ -31,6 +31,8 @@ export default {
       lluvia: "{n} % de lluvia",
     },
     verDetalle: "Ver en mis reservas →",
+    comoLlegar: "Cómo llegar",
+    cambiarCancelar: "Cambiar o cancelar →",
     atencion: {
       firmar:
         "Tienes 1 documento por firmar | Tienes {n} documentos por firmar",
@@ -57,6 +59,16 @@ export default {
       expedienteValor: "Documentos y fichas de datos",
       configuracion: "Configuración",
       configuracionValor: "Privacidad y tu cuenta",
+      // Citas: sus citas, volver a agendar y su bono (ADR 0091).
+      misCitas: "Mis citas",
+      cambiarCancelar: "Cambiar o cancelar",
+      volverAgendar: "Volver a agendar",
+      bono: "Mi bono o membresía",
+      vence: "{valor} · vence el {fecha}",
+      // Clases: su asistencia reciente.
+      asistencia: "Mi asistencia",
+      asistenciaValor:
+        "Sin clases en 30 días | 1 clase en 30 días | {n} clases en 30 días",
     },
   },
   reservas: {

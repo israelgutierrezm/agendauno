@@ -13,12 +13,13 @@ vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: (e: unknown) => String(e),
 }));
+const sesion = vi.hoisted(() => ({
+  slug: "demo",
+  esCitas: false,
+  estudio: { nombre: "Estudio Demo" },
+}));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({
-    slug: "demo",
-    esCitas: false,
-    estudio: { nombre: "Estudio Demo" },
-  }),
+  useSesionTenantStore: () => sesion,
 }));
 vi.mock("@/lib/retornoPago", async () => {
   const { ref } = await import("vue");
@@ -135,6 +136,7 @@ describe("portal del alumno", () => {
     vi.setSystemTime(HOY);
     vi.clearAllMocks();
     localStorage.clear();
+    sesion.esCitas = false;
     api.get.mockImplementation((url: string) =>
       Promise.resolve({
         data: { data: datos[url.replace("/api/v1/app/demo", "")] ?? [] },
@@ -155,6 +157,80 @@ describe("portal del alumno", () => {
     expect(texto).toContain("1 clase disponible");
     expect(texto).toContain("6 créditos");
     expect(texto).toContain("1 por pagar");
+  });
+
+  it("en clases: reservar, su plan con vencimiento y su asistencia, en ese orden", async () => {
+    const perfil = datos["/mi/perfil"] as { derechos: object[] };
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      const cuerpo =
+        ruta === "/mi/perfil"
+          ? {
+              ...perfil,
+              derechos: [
+                { ...(perfil.derechos[0] as object), vence: "2030-01-31" },
+              ],
+              portal: { creditos: true, pase: false, expediente: true },
+              asistencias_30_dias: 3,
+            }
+          : (datos[ruta] ?? []);
+      return Promise.resolve({ data: { data: cuerpo } });
+    });
+    const w = montar(MiCuentaView);
+    await flushPromises();
+    const texto = w.text();
+
+    expect(texto).toContain("6 créditos · vence el 31 ene");
+    expect(texto).toContain("3 clases en 30 días");
+    expect(texto).not.toContain("Pase de entrada");
+    const orden = ["Reservar", "Mis reservas", "Mis créditos", "Mi asistencia"];
+    const posiciones = orden.map((x) => texto.indexOf(x));
+    expect(posiciones).toEqual([...posiciones].sort((a, b) => a - b));
+  });
+
+  it("en citas: cómo llegar, cambiar o cancelar, volver a agendar; sin «Sin paquete» ni pase", async () => {
+    sesion.esCitas = true;
+    const perfil = datos["/mi/perfil"] as { reservas: object[] };
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      const cuerpo =
+        ruta === "/mi/perfil"
+          ? {
+              ...perfil,
+              derechos: [],
+              reservas: [
+                {
+                  ...(perfil.reservas[0] as object),
+                  tipo: "cita",
+                  oferta: "Corte de cabello",
+                  mapa_url: "https://maps.example/roma",
+                },
+              ],
+              portal: { creditos: false, pase: false, expediente: false },
+            }
+          : ruta === "/mi/waivers"
+            ? []
+            : (datos[ruta] ?? []);
+      return Promise.resolve({ data: { data: cuerpo } });
+    });
+    const w = montar(MiCuentaView);
+    await flushPromises();
+    const texto = w.text();
+
+    expect(w.get('[data-prueba="como-llegar"]').attributes("href")).toBe(
+      "https://maps.example/roma",
+    );
+    expect(w.get('[data-prueba="ver-detalle"]').text()).toContain(
+      "Cambiar o cancelar",
+    );
+    expect(texto).not.toContain("Sin paquete activo");
+    expect(texto).not.toContain("Mis créditos");
+    expect(texto).not.toContain("Pase de entrada");
+    expect(texto).not.toContain("Expediente");
+    const orden = ["Mis citas", "Volver a agendar", "Pagos", "Configuración"];
+    const posiciones = orden.map((x) => texto.indexOf(x));
+    expect(posiciones.every((p) => p >= 0)).toBe(true);
+    expect(posiciones).toEqual([...posiciones].sort((a, b) => a - b));
   });
 
   it("sin reserva la tarjeta principal sigue ahí (invita a reservar) y lleva el clima", async () => {

@@ -16,6 +16,8 @@ export interface Derecho {
   ilimitado: boolean;
   saldo: number | null;
   disponible: number | null;
+  // Hasta cuándo se puede usar (null = no vence).
+  vence?: string | null;
 }
 export interface Reserva {
   id: string;
@@ -33,6 +35,14 @@ export interface Reserva {
   zona_horaria: string | null;
   oferta_expira_en: string | null;
   orden_id: string | null;
+  // Cómo llegar a la sucursal.
+  mapa_url?: string | null;
+}
+// Qué partes de su cuenta le sirven (ADR 0091).
+export interface PortalCuenta {
+  creditos: boolean;
+  pase: boolean;
+  expediente: boolean;
 }
 export interface Producto {
   id: string;
@@ -103,6 +113,8 @@ const ordenes = ref<Orden[]>([]);
 const politica = ref<Politica | null>(null);
 const formularios = ref<FormularioPersona[]>([]);
 const personaId = ref<string | null>(null);
+const portal = ref<PortalCuenta | null>(null);
+const asistencias = ref(0);
 const pagoEnLinea = ref(false);
 const pagoAutomatico = ref(false);
 const cargando = ref(false);
@@ -127,6 +139,8 @@ export function reiniciarMiCuenta(): void {
   politica.value = null;
   formularios.value = [];
   personaId.value = null;
+  portal.value = null;
+  asistencias.value = 0;
   pagoEnLinea.value = false;
   pagoAutomatico.value = false;
   cargando.value = false;
@@ -191,6 +205,8 @@ export function useMiCuenta() {
             derechos: Derecho[];
             reservas: Reserva[];
             politica_cancelacion: Politica | null;
+            portal?: PortalCuenta;
+            asistencias_30_dias?: number;
             pago_en_linea?: boolean;
             pago_automatico?: boolean;
           };
@@ -210,6 +226,8 @@ export function useMiCuenta() {
       derechos.value = p.data.data.derechos;
       reservas.value = p.data.data.reservas;
       politica.value = p.data.data.politica_cancelacion;
+      portal.value = p.data.data.portal ?? null;
+      asistencias.value = p.data.data.asistencias_30_dias ?? 0;
       pagoEnLinea.value = p.data.data.pago_en_linea === true;
       pagoAutomatico.value = p.data.data.pago_automatico === true;
       clases.value = a.data.data;
@@ -287,6 +305,8 @@ export function useMiCuenta() {
     politica,
     formularios,
     personaId,
+    portal,
+    asistencias,
     pagoEnLinea,
     pagoAutomatico,
     cargando,

@@ -87,6 +87,32 @@ Las sesiones se canjean así:
 - En el editor de planes, un bono solo se puede aplicar a los servicios que se toman
   con bono. Si no hay ninguno, el editor lo dice y lleva a Catálogo.
 
+### La cuenta del cliente
+
+`GET /mi/perfil` (`PortalDelClienteTenant`) dice qué partes de la cuenta le sirven
+a cada cliente:
+
+- **Créditos:** aparecen si tiene o tuvo un bono, paquete o membresía, o si el
+  negocio trabaja con clases y vende planes.
+- **Pase:** aparece si el negocio controla accesos, ya sea por acceso abierto o
+  porque registra entradas.
+- **Expediente:** aparece si el negocio pide consentimientos o fichas, o si la
+  persona tiene documentos.
+
+También devuelve la asistencia de los últimos 30 días, el vencimiento de cada
+derecho y cómo llegar a la sucursal de cada reserva.
+
+El Inicio ordena los accesos según el tipo de negocio:
+
+- **Citas:** próxima cita (con «Cómo llegar» y «Cambiar o cancelar») → mis citas →
+  volver a agendar → pagos. El bono, el expediente y el pase solo aparecen si
+  aplican.
+- **Clases:** próxima clase → reservar → mis reservas → clases de su plan (con su
+  vencimiento) → asistencia → pagos.
+
+Una tarjeta vacía de «Sin paquete» no le sirve a quien solo quiere cortarse el
+cabello, así que no se muestra.
+
 ## Consecuencias
 
 - Los textos del Inicio salen de llaves separadas por modalidad

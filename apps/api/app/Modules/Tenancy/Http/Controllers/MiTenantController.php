@@ -16,12 +16,14 @@ use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
 use App\Modules\Tenancy\Application\PaseAccesoTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
+use App\Modules\Tenancy\Application\PortalDelClienteTenant;
 use App\Modules\Tenancy\Application\PresentarMovimientosCreditoTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Models\DerechoTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -74,6 +76,7 @@ class MiTenantController
         private readonly RegistroDePasarelasTenant $pasarelas,
         private readonly FormulariosDePersonaTenant $formularios,
         private readonly DomiciliacionesTenant $domiciliaciones,
+        private readonly PortalDelClienteTenant $portal,
     ) {}
 
     /**
@@ -146,6 +149,8 @@ class MiTenantController
                 'ilimitado' => $d->ilimitado,
                 'saldo' => $d->ilimitado ? null : $this->libro->saldo($d),
                 'disponible' => $d->ilimitado ? null : $this->libro->disponible($d),
+                // Hasta cuándo se puede usar (null = no vence).
+                'vence' => $d->valido_hasta?->toDateString(),
             ])->all();
 
         $reservas = ReservaTenant::query()
@@ -172,6 +177,9 @@ class MiTenantController
             'pago_automatico' => $this->domiciliaciones->proveedor() !== null,
             'derechos' => $derechos,
             'reservas' => $reservas,
+            // Qué partes de su cuenta le sirven y su asistencia reciente (ADR 0091).
+            'portal' => $this->portal->capacidades($this->estudioDe($request), $persona),
+            'asistencias_30_dias' => $this->portal->asistencias($persona),
             'politica_cancelacion' => $politica instanceof PoliticaCancelacionTenant ? [
                 'horas_limite' => $politica->horas_limite,
                 'penaliza_tarde' => (bool) $politica->penaliza_tarde,
@@ -557,6 +565,8 @@ class MiTenantController
             'estado' => $reserva->estado->value,
             'oferta' => $reserva->sesion?->oferta?->nombre,
             'sucursal' => $reserva->sesion?->sucursal?->nombre,
+            // Cómo llegar a la sucursal (ADR 0091).
+            'mapa_url' => $reserva->sesion?->sucursal?->enlaceMapa(),
             'inicia_en' => $reserva->sesion?->inicia_en->toIso8601String(),
             // Fin y profesional: para verla en su calendario y agregarla al del teléfono.
             'termina_en' => $reserva->sesion?->termina_en->toIso8601String(),
@@ -747,5 +757,13 @@ class MiTenantController
         return $orden->lineas->contains(
             static fn (LineaOrdenTenant $l): bool => ($l->producto->politica_reset ?? PoliticaReset::Ninguno) !== PoliticaReset::Ninguno,
         );
+    }
+
+    private function estudioDe(Request $request): Estudio
+    {
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+
+        return $estudio;
     }
 }

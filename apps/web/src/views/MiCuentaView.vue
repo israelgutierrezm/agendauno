@@ -21,6 +21,11 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * clase o cita (siempre visible: sin reserva, invita a reservar) y el clima, lo que
  * pide su atención (firmar, aceptar un lugar) y accesos directos a cada parte de su
  * cuenta. El detalle vive en cada sección, con la barra lateral siempre.
+ *
+ * El orden sigue lo que necesita cada quien (ADR 0091). En citas: próxima cita →
+ * cómo llegar → cambiar o cancelar → volver a agendar → pagos. En clases: próxima
+ * clase → reservar → clases de su plan → vencimiento → asistencia. Créditos,
+ * expediente y pase aparecen solo si el negocio los usa (`portal` de /mi/perfil).
  */
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -80,6 +85,21 @@ const creditos = computed<{ ilimitado: boolean; n: number } | null>(() => {
   };
 });
 
+// Vence lo que antes se acaba de su plan (si vence).
+const vencimiento = computed(() => {
+  const fechas = cuenta.derechos.value
+    .map((d) => d.vence)
+    .filter((f): f is string => typeof f === "string")
+    .sort();
+  return fechas[0] ?? null;
+});
+function fechaCorta(iso: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "short",
+  }).format(new Date(`${iso}T12:00:00`));
+}
+
 // Un color y una ilustración por acceso.
 const TONO = {
   reservar: "azul",
@@ -89,6 +109,7 @@ const TONO = {
   pase: "cielo",
   expediente: "rosa",
   configuracion: "azul",
+  asistencia: "morado",
 };
 // Su imagen, si se agregó.
 const IMAGEN: Record<string, string> = {
@@ -108,6 +129,7 @@ const ILUSTRACION: Record<string, Ilustracion> = {
   pase: "pase",
   expediente: "expediente",
   configuracion: "configuracion",
+  asistencia: "reservas",
 };
 
 interface Acceso {
@@ -124,90 +146,140 @@ const accesos = computed<Acceso[]>(() => {
   const c = creditos.value;
   const pendientes = cuenta.porPagar.value.length;
   const proximas = cuenta.proximas.value.length;
-  return [
-    {
-      clave: "reservar",
-      titulo: t("portal.inicio.tarjetas.reservar"),
-      valor: sesion.esCitas
-        ? t("portal.inicio.tarjetas.agendar")
-        : t("portal.inicio.tarjetas.disponibles", disponibles.value),
-      icono: "agenda",
-      tono: TONO.reservar,
-      ruta: "mis-reservas",
-    },
-    {
-      clave: "reservas",
-      titulo: t("portal.inicio.tarjetas.reservas"),
-      valor:
-        proximas > 0
-          ? t("portal.inicio.tarjetas.proximas", proximas)
-          : t("portal.inicio.tarjetas.sinReservas"),
-      icono: "lista",
-      tono: TONO.reservas,
-      ruta: "mis-reservas",
-    },
-    {
-      clave: "creditos",
-      titulo: t("portal.inicio.tarjetas.creditos"),
-      valor:
-        c === null
-          ? t("portal.inicio.tarjetas.sinPaquete")
-          : c.ilimitado
-            ? t("portal.inicio.tarjetas.ilimitado")
-            : t(
-                "portal.inicio.tarjetas.creditosValor",
-                { n: new Intl.NumberFormat("es-MX").format(c.n) },
-                c.n === 1 ? 1 : 2,
-              ),
-      icono: "etiqueta",
-      tono: TONO.creditos,
-      ruta: "mis-pagos",
-    },
-    {
-      clave: "pagos",
-      titulo: t("portal.inicio.tarjetas.pagos"),
-      valor:
-        pendientes > 0
-          ? t("portal.inicio.tarjetas.porPagar", pendientes)
-          : t("portal.inicio.tarjetas.alCorriente"),
-      icono: "ventas",
-      tono: TONO.pagos,
-      ruta: "mis-pagos",
-      atencion: pendientes > 0,
-    },
-    ...(cuenta.personaId.value !== null
-      ? [
-          {
-            clave: "pase",
-            titulo: t("portal.inicio.tarjetas.pase"),
-            valor: t("portal.inicio.tarjetas.paseValor"),
-            icono: "cuadricula",
-            tono: TONO.pase,
-            alTocar: () => (verPase.value = true),
-          },
-        ]
-      : []),
-    {
-      clave: "expediente",
-      titulo: t("portal.inicio.tarjetas.expediente"),
-      valor:
-        cuenta.waivers.value.length > 0
-          ? t("portal.inicio.atencion.firmar", cuenta.waivers.value.length)
-          : t("portal.inicio.tarjetas.expedienteValor"),
-      icono: "expediente",
-      tono: TONO.expediente,
-      ruta: "mi-expediente",
-      atencion: cuenta.waivers.value.length > 0,
-    },
-    {
-      clave: "configuracion",
-      titulo: t("portal.inicio.tarjetas.configuracion"),
-      valor: t("portal.inicio.tarjetas.configuracionValor"),
-      icono: "configuracion",
-      tono: TONO.configuracion,
-      ruta: "mi-configuracion",
-    },
-  ];
+  const usa = cuenta.portal.value;
+  const citas = sesion.esCitas === true;
+
+  const valorCreditos =
+    c === null
+      ? t("portal.inicio.tarjetas.sinPaquete")
+      : c.ilimitado
+        ? t("portal.inicio.tarjetas.ilimitado")
+        : t(
+            "portal.inicio.tarjetas.creditosValor",
+            { n: new Intl.NumberFormat("es-MX").format(c.n) },
+            c.n === 1 ? 1 : 2,
+          );
+  const reservar: Acceso = {
+    clave: "reservar",
+    titulo: citas
+      ? t("portal.inicio.tarjetas.volverAgendar")
+      : t("portal.inicio.tarjetas.reservar"),
+    valor: citas
+      ? t("portal.inicio.tarjetas.agendar")
+      : t("portal.inicio.tarjetas.disponibles", disponibles.value),
+    icono: "agenda",
+    tono: TONO.reservar,
+    ruta: "mis-reservas",
+  };
+  const reservas: Acceso = {
+    clave: "reservas",
+    titulo: citas
+      ? t("portal.inicio.tarjetas.misCitas")
+      : t("portal.inicio.tarjetas.reservas"),
+    valor:
+      proximas > 0
+        ? citas
+          ? t("portal.inicio.tarjetas.cambiarCancelar")
+          : t("portal.inicio.tarjetas.proximas", proximas)
+        : t("portal.inicio.tarjetas.sinReservas"),
+    icono: "lista",
+    tono: TONO.reservas,
+    ruta: "mis-reservas",
+  };
+  // Su bono o su plan: solo si lo tiene, o si el negocio vende planes (clases).
+  const plan: Acceso | null =
+    (usa?.creditos ?? c !== null) && (c !== null || !citas)
+      ? {
+          clave: "creditos",
+          titulo: citas
+            ? t("portal.inicio.tarjetas.bono")
+            : t("portal.inicio.tarjetas.creditos"),
+          valor:
+            vencimiento.value && c !== null
+              ? t("portal.inicio.tarjetas.vence", {
+                  valor: valorCreditos,
+                  fecha: fechaCorta(vencimiento.value),
+                })
+              : valorCreditos,
+          icono: "etiqueta",
+          tono: TONO.creditos,
+          ruta: "mis-pagos",
+        }
+      : null;
+  const pagos: Acceso = {
+    clave: "pagos",
+    titulo: t("portal.inicio.tarjetas.pagos"),
+    valor:
+      pendientes > 0
+        ? t("portal.inicio.tarjetas.porPagar", pendientes)
+        : t("portal.inicio.tarjetas.alCorriente"),
+    icono: "ventas",
+    tono: TONO.pagos,
+    ruta: "mis-pagos",
+    atencion: pendientes > 0,
+  };
+  const asistencia: Acceso | null = citas
+    ? null
+    : {
+        clave: "asistencia",
+        titulo: t("portal.inicio.tarjetas.asistencia"),
+        valor: t(
+          "portal.inicio.tarjetas.asistenciaValor",
+          cuenta.asistencias.value,
+        ),
+        icono: "hecho",
+        tono: TONO.asistencia,
+        ruta: "mis-reservas",
+      };
+  // El pase y el expediente, solo si el negocio los usa (o hay algo por firmar).
+  const pase: Acceso | null =
+    cuenta.personaId.value !== null && (usa?.pase ?? true)
+      ? {
+          clave: "pase",
+          titulo: t("portal.inicio.tarjetas.pase"),
+          valor: t("portal.inicio.tarjetas.paseValor"),
+          icono: "cuadricula",
+          tono: TONO.pase,
+          alTocar: () => (verPase.value = true),
+        }
+      : null;
+  const expediente: Acceso | null =
+    (usa?.expediente ?? true) || cuenta.waivers.value.length > 0
+      ? {
+          clave: "expediente",
+          titulo: t("portal.inicio.tarjetas.expediente"),
+          valor:
+            cuenta.waivers.value.length > 0
+              ? t("portal.inicio.atencion.firmar", cuenta.waivers.value.length)
+              : t("portal.inicio.tarjetas.expedienteValor"),
+          icono: "expediente",
+          tono: TONO.expediente,
+          ruta: "mi-expediente",
+          atencion: cuenta.waivers.value.length > 0,
+        }
+      : null;
+  const configuracion: Acceso = {
+    clave: "configuracion",
+    titulo: t("portal.inicio.tarjetas.configuracion"),
+    valor: t("portal.inicio.tarjetas.configuracionValor"),
+    icono: "configuracion",
+    tono: TONO.configuracion,
+    ruta: "mi-configuracion",
+  };
+
+  const orden = citas
+    ? [reservas, reservar, pagos, plan, expediente, pase, configuracion]
+    : [
+        reservar,
+        reservas,
+        plan,
+        asistencia,
+        pagos,
+        pase,
+        expediente,
+        configuracion,
+      ];
+  return orden.filter((a): a is Acceso => a !== null);
 });
 
 onMounted(() => {
@@ -298,8 +370,25 @@ onMounted(() => {
                 .join(' · '),
             }"
           />
-          <RouterLink :to="{ name: 'mis-reservas' }" class="tu-enlace text-sm">
-            {{ $t("portal.inicio.verDetalle") }}
+          <a
+            v-if="proxima.tipo === 'cita' && proxima.mapa_url"
+            :href="proxima.mapa_url"
+            target="_blank"
+            rel="noopener"
+            class="tu-enlace text-sm"
+            data-prueba="como-llegar"
+            >{{ $t("portal.inicio.comoLlegar") }}</a
+          >
+          <RouterLink
+            :to="{ name: 'mis-reservas' }"
+            class="tu-enlace text-sm"
+            data-prueba="ver-detalle"
+          >
+            {{
+              proxima.tipo === "cita"
+                ? $t("portal.inicio.cambiarCancelar")
+                : $t("portal.inicio.verDetalle")
+            }}
           </RouterLink>
         </div>
       </template>
