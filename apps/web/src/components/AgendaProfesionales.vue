@@ -298,10 +298,32 @@ const lineaAhora = computed<number | null>(() => {
   const min = minutosLocal(iso, props.zona);
   return min >= rango.value.ini && min <= rango.value.fin ? y(min) : null;
 });
-// Dónde va el aviso de columna vacía: bajo la línea de ahora o arriba del día.
+// Dónde va el aviso de columna vacía: bajo la línea de ahora o arriba del día…
 const topVacio = computed(() =>
   Math.max(24, Math.min((lineaAhora.value ?? 0) + 40, alto.value - 220)),
 );
+// …pero nunca encima de «Fuera de horario» ni de un bloqueo: en el primer hueco
+// donde quepa (desde ahí y, si no, desde arriba). Sin hueco (no atiende ese día), no
+// va: invitaría a agendar donde no se puede, y la franja ya lo dice.
+const ALTO_VACIO = 190;
+function posicionVacio(fuera: { top: number; alto: number }[]): number | null {
+  const franjas = [...fuera].sort((a, b) => a.top - b.top);
+  const desde = (inicio: number): number | null => {
+    let pos = inicio;
+    for (const f of franjas) {
+      const finFranja = f.top + f.alto;
+      if (finFranja <= pos) {
+        continue;
+      }
+      if (f.top >= pos + ALTO_VACIO) {
+        break;
+      }
+      pos = finFranja + 12;
+    }
+    return pos + ALTO_VACIO <= alto.value ? pos : null;
+  };
+  return desde(topVacio.value) ?? desde(24);
+}
 const horaAhora = computed(() =>
   aHora(minutosLocal(ahora.value.toISOString(), props.zona)),
 );
@@ -492,9 +514,9 @@ watch(() => props.fecha, enfocar);
 
           <!-- Nada en el día: qué hacer, sin tapar los huecos (los clics pasan). -->
           <EstadoVacio
-            v-if="c.tarjetas.length === 0"
+            v-if="c.tarjetas.length === 0 && posicionVacio(c.fuera) !== null"
             class="ag-vacio"
-            :style="{ top: `${topVacio}px` }"
+            :style="{ top: `${posicionVacio(c.fuera)}px` }"
             icono="agenda"
             compacto
             :mas="puedeCrear"

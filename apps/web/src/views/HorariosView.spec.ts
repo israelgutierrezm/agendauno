@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
 import esMX from "@/i18n/locales/es-MX";
+import horariosVisual from "@/i18n/locales/horariosVisual.es-MX";
 import operacion from "@/i18n/locales/operacion.es-MX";
 import HorariosView from "./HorariosView.vue";
 
@@ -12,7 +13,11 @@ vi.mock("@/lib/api", () => ({
   mensajeDeError: (e: unknown) => String(e),
 }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
+  useSesionTenantStore: () => ({
+    slug: "demo",
+    puede: () => true,
+    terminologia: { sesion: "Cita", miembro: "Cliente", instructor: "Barbero" },
+  }),
 }));
 
 // Respuestas del horario que el test resuelve cuando quiere (para desordenarlas).
@@ -36,12 +41,20 @@ function montar() {
           locale: "es",
           missingWarn: false,
           fallbackWarn: false,
-          messages: { es: { ...esMX, operacion } },
+          messages: { es: { ...esMX, operacion, horariosVisual } },
         }),
       ],
       stubs: { EncabezadoSeccion: true, BloqueosAgenda: true },
     },
   });
+}
+
+// La vista de lista: los campos de hora de cada día (la semana se ve en bloques).
+async function aLista(w: ReturnType<typeof montar>): Promise<void> {
+  await w
+    .findAll("button")
+    .find((b) => b.text().includes(horariosVisual.vistaLista))!
+    .trigger("click");
 }
 
 describe("horarios de atención", () => {
@@ -90,7 +103,9 @@ describe("horarios de atención", () => {
     await flushPromises();
     // Mientras carga, no hay guardar disponible.
     const guardar = () =>
-      w.findAll("button").find((b) => b.text() === esMX.horarios.guardar);
+      w
+        .findAll("button")
+        .find((b) => b.text() === horariosVisual.guardarCambios);
     expect(
       guardar() === undefined ||
         guardar()!.attributes("disabled") !== undefined,
@@ -102,10 +117,13 @@ describe("horarios de atención", () => {
     await flushPromises();
     pendientes.get("ana")!(horario("07:00:00")); // llega tarde
     await flushPromises();
+    await aLista(w);
 
     expect((w.find("#d1-i0-ini").element as HTMLInputElement).value).toBe(
       "10:00",
     );
+    // Con un cambio, se puede guardar (el de Beto, no el de Ana).
+    await w.find("#d1-i0-fin").setValue("19:00");
     expect(guardar()!.attributes("disabled")).toBeUndefined();
   });
 
@@ -116,6 +134,7 @@ describe("horarios de atención", () => {
     await flushPromises();
     pendientes.get("ana")!(horario("07:00:00"));
     await flushPromises();
+    await aLista(w);
     expect(w.find("#d1-i0-ini").exists()).toBe(true);
 
     // La de Beto falla.
@@ -125,7 +144,7 @@ describe("horarios de atención", () => {
 
     const guardar = w
       .findAll("button")
-      .find((b) => b.text() === esMX.horarios.guardar);
+      .find((b) => b.text() === horariosVisual.guardarCambios);
     expect(w.find("#d1-i0-ini").exists()).toBe(false);
     expect(guardar).toBeUndefined();
     expect(w.text()).toContain(operacion.horarios.noSeCargo);
@@ -153,6 +172,7 @@ describe("horarios de atención", () => {
     await flushPromises();
     pendientes.get("ana")!(horario("09:00:00"));
     await flushPromises();
+    await aLista(w);
 
     await w.find("#d1-i0-ini").setValue("08:00");
     await w.find("#h-prov").setValue("beto");

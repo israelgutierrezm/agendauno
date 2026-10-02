@@ -9,7 +9,7 @@ import { api, mensajeDeError } from "@/lib/api";
  * horas o días completos, con su motivo. Antes de guardar avisa qué citas o clases ya agendadas caen ahí (no se
  * cancelan solas).
  */
-interface Bloqueo {
+export interface Bloqueo {
   id: string;
   ambito: "profesional" | "sede" | "sala";
   instructor_id: string | null;
@@ -47,6 +47,8 @@ const props = defineProps<{
   // Quitar un bloqueo es borrarlo (ADR 0077).
   puedeEliminar?: boolean;
 }>();
+
+const emit = defineEmits<{ cargados: [bloqueos: Bloqueo[]] }>();
 
 const bloqueos = ref<Bloqueo[]>([]);
 // Salas (y cabinas o equipos) de la sede elegida.
@@ -128,6 +130,7 @@ async function cargar(): Promise<void> {
     bloqueos.value = b.data.data.filter(
       (x) => new Date(x.hasta).getTime() > Date.now(),
     );
+    emit("cargados", bloqueos.value);
     salas.value = r.data.data.filter(
       (s) => s.activo && s.sucursal_id === props.sucursalId,
     );
