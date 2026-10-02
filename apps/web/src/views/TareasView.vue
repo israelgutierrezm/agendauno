@@ -315,18 +315,13 @@ onMounted(cargarTareas);
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion :titulo="$t('tareas.titulo')" />
 
-    <!-- Tabs -->
-    <div
-      class="mt-6 flex gap-1 border-b"
-      :style="{ borderColor: 'var(--borde)' }"
-    >
+    <!-- Pestañas (las del sistema) -->
+    <div class="tu-pestanas mt-6" role="tablist">
       <button
-        class="px-4 py-2 text-sm font-medium -mb-px border-b-2 transition"
-        :style="{
-          borderColor: tab === 'pendientes' ? 'var(--primario)' : 'transparent',
-          color:
-            tab === 'pendientes' ? 'var(--primario)' : 'var(--texto-suave)',
-        }"
+        type="button"
+        role="tab"
+        :aria-selected="tab === 'pendientes'"
+        :aria-pressed="tab === 'pendientes'"
         @click="cambiarTab('pendientes')"
       >
         {{ $t("tareas.tabPendientes")
@@ -336,11 +331,10 @@ onMounted(cargarTareas);
       </button>
       <button
         v-if="puedeReglas"
-        class="px-4 py-2 text-sm font-medium -mb-px border-b-2 transition"
-        :style="{
-          borderColor: tab === 'reglas' ? 'var(--primario)' : 'transparent',
-          color: tab === 'reglas' ? 'var(--primario)' : 'var(--texto-suave)',
-        }"
+        type="button"
+        role="tab"
+        :aria-selected="tab === 'reglas'"
+        :aria-pressed="tab === 'reglas'"
         @click="cambiarTab('reglas')"
       >
         {{ $t("tareas.tabReglas") }}

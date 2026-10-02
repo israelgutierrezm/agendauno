@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 
 import CorregirCobro from "@/components/CorregirCobro.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -57,24 +57,15 @@ async function alCorregirVenta(): Promise<void> {
 }
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
-const puedeGestionar = computed(() => sesion.puede("inventario.gestionar"));
-const puedeVender = computed(() => sesion.puede("pos.vender"));
 
-// La pestaña sigue a la entrada del menú: Mostrador (/pos) o Inventario (/inventario).
+// La vista sigue a la pestaña del área: Mostrador (/pos) o Inventario (/inventario).
 const route = useRoute();
-const router = useRouter();
 const tabDeRuta = () => (route.name === "inventario" ? "inventario" : "vender");
 const tab = ref<"vender" | "inventario">(tabDeRuta());
 watch(
   () => route.name,
   () => (tab.value = tabDeRuta()),
 );
-function irA(destino: "vender" | "inventario"): void {
-  tab.value = destino;
-  void router.replace({
-    name: destino === "inventario" ? "inventario" : "pos",
-  });
-}
 const articulos = ref<Articulo[]>([]);
 const sucursales = ref<Sucursal[]>([]);
 const ventas = ref<Venta[]>([]);
@@ -295,35 +286,6 @@ onMounted(cargar);
 <template>
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion :titulo="$t('pos.titulo')" />
-
-    <div
-      class="mt-6 flex gap-1 border-b"
-      :style="{ borderColor: 'var(--borde)' }"
-    >
-      <button
-        v-if="puedeVender"
-        class="px-4 py-2 text-sm font-medium -mb-px border-b-2 transition"
-        :style="{
-          borderColor: tab === 'vender' ? 'var(--primario)' : 'transparent',
-          color: tab === 'vender' ? 'var(--primario)' : 'var(--texto-suave)',
-        }"
-        @click="irA('vender')"
-      >
-        {{ $t("pos.tabVender") }}
-      </button>
-      <button
-        v-if="puedeGestionar"
-        class="px-4 py-2 text-sm font-medium -mb-px border-b-2 transition"
-        :style="{
-          borderColor: tab === 'inventario' ? 'var(--primario)' : 'transparent',
-          color:
-            tab === 'inventario' ? 'var(--primario)' : 'var(--texto-suave)',
-        }"
-        @click="irA('inventario')"
-      >
-        {{ $t("pos.tabInventario") }}
-      </button>
-    </div>
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
