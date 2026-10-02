@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
+import CorregirCobro from "@/components/CorregirCobro.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -35,9 +36,25 @@ interface Venta {
   moneda: string;
   metodo_pago: string;
   creado_en: string | null;
+  lineas?: { articulo: string | null; cantidad: number }[];
+  // Venta registrada por error: corregir su forma de pago o anularla (ADR 0089).
+  anulada_en?: string | null;
+  motivo_anulacion?: string | null;
+  corregible?: boolean;
+  anulable?: boolean;
 }
 
-const { t } = useI18n();
+const { t, te } = useI18n();
+
+// Forma de pago a la vista (no el valor interno) y la venta que se corrige.
+function nombreMetodo(m: string): string {
+  return te(`pos.metodos.${m}`) ? t(`pos.metodos.${m}`) : m;
+}
+const corrigiendo = ref<string | null>(null);
+async function alCorregirVenta(): Promise<void> {
+  corrigiendo.value = null;
+  await cargar();
+}
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("inventario.gestionar"));
@@ -722,26 +739,85 @@ onMounted(cargar);
                 <th class="px-4 py-2 font-medium hidden sm:table-cell">
                   {{ $t("pos.ventas.colMetodo") }}
                 </th>
+                <th class="px-4 py-2"></th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="v in ventas"
-                :key="v.id"
-                class="border-t"
-                :style="{ borderColor: 'var(--borde)' }"
-              >
-                <td class="px-4 py-2">{{ v.sucursal ?? "—" }}</td>
-                <td class="px-4 py-2 text-right font-semibold">
-                  {{ dinero(v.total_minor, v.moneda) }}
-                </td>
-                <td
-                  class="px-4 py-2 hidden sm:table-cell"
-                  :style="{ color: 'var(--texto-suave)' }"
-                >
-                  {{ v.metodo_pago }}
-                </td>
-              </tr>
+              <template v-for="v in ventas" :key="v.id">
+                <tr class="border-t" :style="{ borderColor: 'var(--borde)' }">
+                  <td class="px-4 py-2">
+                    <span class="block">{{ v.sucursal ?? "—" }}</span>
+                    <span
+                      v-if="v.lineas?.length"
+                      class="block text-xs"
+                      :style="{ color: 'var(--texto-suave)' }"
+                      >{{
+                        v.lineas
+                          .map((l) => `${l.cantidad} × ${l.articulo ?? ""}`)
+                          .join(", ")
+                      }}</span
+                    >
+                  </td>
+                  <td
+                    class="px-4 py-2 text-right font-semibold"
+                    :class="{ 'line-through': v.anulada_en }"
+                  >
+                    {{ dinero(v.total_minor, v.moneda) }}
+                  </td>
+                  <td
+                    class="px-4 py-2 hidden sm:table-cell"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    <span
+                      v-if="v.anulada_en"
+                      class="inline-flex items-center gap-1.5"
+                      :style="{ color: 'var(--error)' }"
+                      :title="v.motivo_anulacion ?? undefined"
+                      data-prueba="venta-anulada"
+                      ><span
+                        class="h-2 w-2 rounded-full"
+                        :style="{ background: 'currentColor' }"
+                        aria-hidden="true"
+                      ></span
+                      >{{ $t("corregirCobro.anulada") }}</span
+                    >
+                    <template v-else>{{
+                      nombreMetodo(v.metodo_pago)
+                    }}</template>
+                  </td>
+                  <td class="px-4 py-2 text-right">
+                    <button
+                      v-if="!v.anulada_en && (v.corregible || v.anulable)"
+                      class="tu-enlace text-sm"
+                      type="button"
+                      data-prueba="corregir-venta"
+                      :aria-expanded="corrigiendo === v.id"
+                      @click="corrigiendo = corrigiendo === v.id ? null : v.id"
+                    >
+                      {{ $t("corregirCobro.corregir") }}
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="corrigiendo === v.id">
+                  <td colspan="4" class="px-4 pb-3">
+                    <CorregirCobro
+                      :base="base"
+                      :pago="{
+                        id: v.id,
+                        metodo: v.metodo_pago,
+                        corregible: v.corregible === true,
+                        anulable: v.anulable === true,
+                      }"
+                      :url-metodo="`${base}/pos/ventas/${v.id}/metodo`"
+                      :url-anular="`${base}/pos/ventas/${v.id}/anular`"
+                      :metodos="['efectivo', 'tarjeta', 'transferencia']"
+                      permiso-metodo="pos.vender"
+                      contexto="venta"
+                      @cambiado="alCorregirVenta"
+                    />
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>

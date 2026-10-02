@@ -14,32 +14,56 @@ import { useToastStore } from "@/stores/toast";
  *   que dio), para quien hace devoluciones, con motivo.
  * Cada una se confirma antes y queda en la bitácora. El servidor decide si procede
  * (`corregible` / `anulable`) y lo vuelve a validar al guardar.
+ *
+ * También corrige una venta de mostrador (ADR 0089): con sus rutas, sus formas de pago
+ * y el permiso de quien vende.
  */
-const props = defineProps<{
-  base: string;
-  pago: {
-    id: string;
-    metodo: string | null;
-    corregible: boolean;
-    anulable: boolean;
-  };
-}>();
+const props = withDefaults(
+  defineProps<{
+    base: string;
+    pago: {
+      id: string;
+      metodo: string | null;
+      corregible: boolean;
+      anulable: boolean;
+    };
+    // Rutas de corregir y anular (por omisión, las de un cobro en caja).
+    urlMetodo?: string;
+    urlAnular?: string;
+    metodos?: readonly string[];
+    permisoMetodo?: string;
+    // Qué se anula: un cobro (vuelve a quedar por cobrar) o una venta de mostrador.
+    contexto?: "cobro" | "venta";
+  }>(),
+  {
+    urlMetodo: undefined,
+    urlAnular: undefined,
+    metodos: () => ["efectivo", "transferencia", "manual"],
+    permisoMetodo: "ordenes.gestionar",
+    contexto: "cobro",
+  },
+);
+type TextoAnular = "anular" | "anularAyuda" | "confirmarAnular" | "okAnulado";
+const k = (clave: TextoAnular): string =>
+  props.contexto === "venta"
+    ? `corregirCobro.venta.${clave}`
+    : `corregirCobro.${clave}`;
 const emit = defineEmits<{ cambiado: [tipo: "metodo" | "anulado"] }>();
 
 const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
 const toast = useToastStore();
 
-const METODOS = ["efectivo", "transferencia", "manual"] as const;
+const METODOS = computed(() => props.metodos);
 const puedeCorregir = computed(
-  () => props.pago.corregible && sesion.puede("ordenes.gestionar"),
+  () => props.pago.corregible && sesion.puede(props.permisoMetodo),
 );
 const puedeAnular = computed(
   () => props.pago.anulable && sesion.puede("pagos.reembolsar"),
 );
 
 const abierta = ref<"metodo" | "anular" | null>(null);
-const metodo = ref<(typeof METODOS)[number]>("efectivo");
+const metodo = ref("efectivo");
 const motivo = ref("");
 const guardando = ref(false);
 
@@ -49,7 +73,10 @@ function nombreMetodo(m: string | null): string {
 }
 function abrir(cual: "metodo" | "anular"): void {
   abierta.value = cual;
-  metodo.value = METODOS.find((m) => m !== props.pago.metodo) ?? METODOS[0];
+  metodo.value =
+    METODOS.value.find((m) => m !== props.pago.metodo) ??
+    METODOS.value[0] ??
+    "efectivo";
   motivo.value = "";
 }
 
@@ -71,9 +98,12 @@ async function corregirMetodo(): Promise<void> {
   }
   guardando.value = true;
   try {
-    await api.put(`${props.base}/pagos/${props.pago.id}/metodo`, {
-      metodo: metodo.value,
-    });
+    await api.put(
+      props.urlMetodo ?? `${props.base}/pagos/${props.pago.id}/metodo`,
+      {
+        metodo: metodo.value,
+      },
+    );
     toast.exito(t("corregirCobro.okMetodo"));
     abierta.value = null;
     emit("cambiado", "metodo");
@@ -89,8 +119,8 @@ async function anular(): Promise<void> {
     return;
   }
   if (
-    !(await confirmar(t("corregirCobro.confirmarAnular"), {
-      aceptar: t("corregirCobro.anular"),
+    !(await confirmar(t(k("confirmarAnular")), {
+      aceptar: t(k("anular")),
       peligro: true,
     }))
   ) {
@@ -98,10 +128,13 @@ async function anular(): Promise<void> {
   }
   guardando.value = true;
   try {
-    await api.post(`${props.base}/pagos/${props.pago.id}/anular`, {
-      motivo: motivo.value.trim(),
-    });
-    toast.exito(t("corregirCobro.okAnulado"));
+    await api.post(
+      props.urlAnular ?? `${props.base}/pagos/${props.pago.id}/anular`,
+      {
+        motivo: motivo.value.trim(),
+      },
+    );
+    toast.exito(t(k("okAnulado")));
     abierta.value = null;
     emit("cambiado", "anulado");
   } catch (e) {
@@ -132,7 +165,7 @@ async function anular(): Promise<void> {
         data-prueba="anular-cobro"
         @click="abrir('anular')"
       >
-        {{ $t("corregirCobro.anular") }}
+        {{ $t(k("anular")) }}
       </button>
     </p>
 
@@ -171,7 +204,7 @@ async function anular(): Promise<void> {
 
     <form v-else class="space-y-2" @submit.prevent="anular">
       <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("corregirCobro.anularAyuda") }}
+        {{ $t(k("anularAyuda")) }}
       </p>
       <label class="block">
         <span class="tu-label">{{ $t("corregirCobro.motivo") }}</span>
@@ -191,7 +224,7 @@ async function anular(): Promise<void> {
           style="color: var(--error)"
           :disabled="guardando || motivo.trim() === ''"
         >
-          {{ $t("corregirCobro.anular") }}
+          {{ $t(k("anular")) }}
         </button>
         <button
           type="button"

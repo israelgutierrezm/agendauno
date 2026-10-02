@@ -654,6 +654,9 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/articulos/{articulo}/movimientos', [InventarioTenantController::class, 'movimiento'])->middleware('puede:inventario.gestionar')->name('articulos.movimientos.store');
             Route::get('/pos/ventas', [PuntoDeVentaTenantController::class, 'index'])->middleware('puede:inventario.ver')->name('pos.ventas.index');
             Route::post('/pos/ventas', [PuntoDeVentaTenantController::class, 'vender'])->middleware('puede:pos.vender')->name('pos.ventas.store');
+            // Una venta registrada por error: corregir su forma de pago o anularla (ADR 0089).
+            Route::put('/pos/ventas/{venta}/metodo', [PuntoDeVentaTenantController::class, 'corregirMetodo'])->middleware('puede:pos.vender')->name('pos.ventas.metodo');
+            Route::post('/pos/ventas/{venta}/anular', [PuntoDeVentaTenantController::class, 'anular'])->middleware('puede:pagos.reembolsar')->name('pos.ventas.anular');
 
             // Lealtad (R24): programa de puntos, recompensas, canjes y saldo por miembro.
             Route::get('/lealtad/programa', [LealtadTenantController::class, 'programa'])->middleware('puede:lealtad.ver')->name('lealtad.programa');

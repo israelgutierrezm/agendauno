@@ -15,4 +15,15 @@ export default {
   confirmarAnular:
     "¿Anular este cobro? Se marca como anulado, la venta vuelve a quedar por cobrar y se retira lo que dio. No se puede deshacer.",
   okAnulado: "Cobro anulado; la venta quedó por cobrar.",
+  // Una venta de mostrador registrada por error (ADR 0089).
+  venta: {
+    anular: "Anular venta",
+    anularAyuda:
+      "Para una venta registrada por error: no cuenta en el corte y lo vendido regresa al inventario. Queda en la bitácora.",
+    confirmarAnular:
+      "¿Anular esta venta? No cuenta en el corte y lo vendido regresa al inventario. No se puede deshacer.",
+    okAnulado: "Venta anulada; lo vendido regresó al inventario.",
+  },
+  corregir: "Corregir",
+  anulada: "Anulada",
 };

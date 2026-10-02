@@ -173,6 +173,8 @@ class MovimientosDePagoTenant
     private function ventas(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId, ?int $limite): array
     {
         $ventas = VentaPosTenant::query()
+            // Una venta anulada nunca ocurrió (ADR 0089).
+            ->whereNull('anulada_en')
             ->whereBetween('created_at', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('usuario_id', $usuarioId))
             ->with('lineas.articulo')
@@ -310,6 +312,7 @@ class MovimientosDePagoTenant
         if ($incluye('venta')) {
             $filas = VentaPosTenant::query()
                 ->selectRaw('moneda, metodo_pago, usuario_id, SUM(total_minor) AS total')
+                ->whereNull('anulada_en')
                 ->whereBetween('created_at', [$inicio, $fin])
                 ->when($usuarioId !== null, fn ($q) => $q->where('usuario_id', $usuarioId))
                 ->groupBy('moneda', 'metodo_pago', 'usuario_id')
