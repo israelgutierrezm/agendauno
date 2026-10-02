@@ -74,6 +74,7 @@ import horariosVisual from "./locales/horariosVisual.es-MX";
 import detalleCita from "./locales/detalleCita.es-MX";
 import configuracionInicial from "./locales/configuracionInicial.es-MX";
 import detalleClase from "./locales/detalleClase.es-MX";
+import listadosVisual from "./locales/listadosVisual.es-MX";
 import planes from "./locales/planes.es-MX";
 import portal from "./locales/portal.es-MX";
 import recepcionVisual from "./locales/recepcionVisual.es-MX";
@@ -147,6 +148,7 @@ const mensajesBase = {
   detalleCita,
   configuracionInicial,
   detalleClase,
+  listadosVisual,
 };
 
 export const i18n = createI18n({
