@@ -21,6 +21,11 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * los indicadores del día, la foto del giro y el clima del negocio; debajo la
  * agenda del día y lo pendiente (cobros y renovaciones). Cada bloque llega solo si
  * quien entra tiene el permiso de su pantalla.
+ *
+ * Cada tipo de negocio ve lo suyo (ADR 0091). Con citas: quién viene después, quién
+ * llegó, qué falta por atender y por cobrar, y dónde hay espacios libres. Con clases:
+ * qué clases hay, cuántos lugares están ocupados, qué listas faltan por registrar,
+ * quién está en espera y qué planes están por vencer.
  */
 interface SesionHoy {
   id: string;
@@ -35,20 +40,36 @@ interface SesionHoy {
   esperados: number;
   llegaron: number;
   sin_marcar: number;
+  por_cobrar?: boolean;
+  en_espera?: number;
   cancelada: boolean;
   momento: "proxima" | "en_curso" | "termino" | "cancelada";
 }
+interface Libre {
+  profesional: string;
+  sucursal: string | null;
+  zona_horaria: string | null;
+  huecos: number;
+  siguiente: string | null;
+}
 interface Hoy {
   fecha: string;
+  modalidad?: "citas" | "clases";
   agenda: {
     totales: {
       sesiones: number;
       esperados: number;
       llegaron: number;
       sin_marcar: number;
+      capacidad?: number;
+      listas_pendientes?: number;
+      en_espera?: number;
+      por_atender?: number;
+      por_cobrar?: number;
     };
     sesiones: SesionHoy[];
   } | null;
+  libres?: Libre[] | null;
   cobros: {
     ordenes_pendientes: number;
     por_cobrar: { moneda: string; total_minor: number }[];
@@ -66,6 +87,7 @@ const error = ref<string | null>(null);
 const zonaNavegador = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const foto = computed(() => fotoNegocio(sesion.estudio?.perfil));
+const esCitas = computed(() => hoy.value?.modalidad === "citas");
 // El clima del negocio (su sede) o el de la próxima clase de quien entra.
 const { clima, cargar: cargarClima } = useClima(
   () => `/api/v1/app/${sesion.slug}/clima`,
@@ -87,18 +109,37 @@ const etiquetaDia = computed(() => {
   if (enCurso.value) {
     return t("operacion.hoy.enCurso");
   }
-  return siguiente.value
-    ? t("operacion.hoy.loQueSigue")
-    : t("operacion.hoy.titulo");
+  if (!siguiente.value) {
+    return t("operacion.hoy.titulo");
+  }
+  return esCitas.value
+    ? t("operacion.hoy.citas.vieneDespues")
+    : t("operacion.hoy.loQueSigue");
 });
 const tituloDia = computed(() => {
   const s = siguiente.value;
   if (s) {
-    return nombre(s);
+    // En citas importa quién viene; el servicio va debajo.
+    return esCitas.value && s.cliente ? s.cliente : nombre(s);
   }
-  return (hoy.value?.agenda?.totales.sesiones ?? 0) > 0
-    ? t("operacion.hoy.diaTerminado")
+  if ((hoy.value?.agenda?.totales.sesiones ?? 0) > 0) {
+    return esCitas.value
+      ? t("operacion.hoy.citas.diaTerminado")
+      : t("operacion.hoy.diaTerminado");
+  }
+  return esCitas.value
+    ? t("operacion.hoy.citas.sinCitas")
     : t("operacion.hoy.sinSesiones");
+});
+const detalleSiguiente = computed(() => {
+  const s = siguiente.value;
+  if (!s) {
+    return "";
+  }
+  const partes = esCitas.value
+    ? [s.oferta, s.instructor, s.sucursal]
+    : [s.sucursal, s.instructor];
+  return partes.filter(Boolean).join(" · ");
 });
 
 async function cargar(): Promise<void> {
@@ -145,44 +186,70 @@ const porCobrar = computed(() =>
     .join(" + "),
 );
 
-// Los indicadores del día en tarjetas, cada uno con su ícono y su color.
+// Los indicadores del día: cada tipo de negocio, sus preguntas (no el mismo
+// indicador con otro nombre).
 const indicadores = computed<Indicador[]>(() => {
   const tot = hoy.value?.agenda?.totales;
   if (!tot) {
     return [];
   }
+  if (esCitas.value) {
+    const porCobrar = tot.por_cobrar ?? 0;
+    return [
+      { clave: "citas", valor: String(tot.sesiones), icono: "agenda" },
+      { clave: "llegaron", valor: String(tot.llegaron), icono: "hecho" },
+      {
+        clave: "porAtender",
+        valor: String(tot.por_atender ?? 0),
+        icono: "reloj",
+      },
+      {
+        clave: "porCobrar",
+        valor: String(porCobrar),
+        icono: "dinero",
+        aviso: porCobrar > 0,
+      },
+    ].map((i) => ({ ...i, etiqueta: t(`operacion.hoy.citas.kpi.${i.clave}`) }));
+  }
+  const capacidad = tot.capacidad ?? 0;
+  const listas = tot.listas_pendientes ?? 0;
   const lista: Omit<Indicador, "etiqueta">[] = [
+    { clave: "clases", valor: String(tot.sesiones), icono: "agenda" },
     {
-      clave: "sesiones",
-      valor: String(tot.sesiones),
-      icono: "agenda",
-      tono: "azul",
-    },
-    {
-      clave: "esperados",
-      valor: String(tot.esperados),
+      clave: "ocupados",
+      valor:
+        capacidad > 0
+          ? t("operacion.hoy.cupo", { n: tot.esperados, total: capacidad })
+          : String(tot.esperados),
       icono: "personas",
-      tono: "morado",
     },
     {
-      clave: "llegaron",
-      valor: String(tot.llegaron),
-      icono: "hecho",
-      tono: "verde",
+      clave: "listas",
+      valor: String(listas),
+      icono: "lista",
+      aviso: listas > 0,
     },
-    {
-      clave: "sinMarcar",
-      valor: String(tot.sin_marcar),
-      icono: "reloj",
-      tono: "naranja",
-      aviso: tot.sin_marcar > 0,
-    },
+    { clave: "enEspera", valor: String(tot.en_espera ?? 0), icono: "reloj" },
   ];
+  const r = hoy.value?.renovaciones;
+  if (r) {
+    lista.push({
+      clave: "porVencer",
+      valor: String(r.por_vencer),
+      icono: "pulso",
+    });
+  }
   return lista.map((i) => ({
     ...i,
-    etiqueta: t(`operacion.hoy.indicadores.${i.clave}`),
+    etiqueta: t(`operacion.hoy.clases.kpi.${i.clave}`),
   }));
 });
+
+// Espacios libres de hoy (citas): quién tiene huecos y desde qué hora.
+function horaIso(iso: string, zona: string | null): string {
+  return aHora(minutosLocal(iso, zona ?? zonaNavegador));
+}
+const libres = computed(() => hoy.value?.libres ?? null);
 
 const hayPendientes = computed(() => {
   const c = hoy.value?.cobros;
@@ -224,15 +291,10 @@ onMounted(() => {
       :clima-lugar="climaLugar"
     >
       <p class="mt-2 text-2xl font-semibold sm:text-3xl">{{ tituloDia }}</p>
-      <p v-if="siguiente" class="mt-2">
+      <p v-if="siguiente" class="mt-2" data-prueba="detalle-siguiente">
         {{ hora(siguiente) }}
-        <span :style="{ color: 'var(--texto-suave)' }">
-          ·
-          {{
-            [siguiente.sucursal, siguiente.instructor]
-              .filter(Boolean)
-              .join(" · ")
-          }}</span
+        <span v-if="detalleSiguiente" :style="{ color: 'var(--texto-suave)' }">
+          · {{ detalleSiguiente }}</span
         >
       </p>
       <div class="mt-6 flex flex-wrap items-center gap-4">
@@ -305,10 +367,29 @@ onMounted(() => {
               >
               <RouterLink
                 v-if="s.sin_marcar > 0"
-                :to="{ name: 'recepcion' }"
+                :to="{ name: esCitas ? 'agenda' : 'recepcion' }"
                 class="mt-0.5 block text-sm"
                 :style="{ color: 'var(--aviso)' }"
-                >{{ $t("operacion.hoy.pasarLista", s.sin_marcar) }}</RouterLink
+                >{{
+                  s.tipo === "cita"
+                    ? $t("operacion.hoy.citas.marcarLlegada")
+                    : $t("operacion.hoy.pasarLista", s.sin_marcar)
+                }}</RouterLink
+              >
+              <span
+                v-if="s.tipo === 'cita' && !s.cancelada && s.por_cobrar"
+                class="mt-0.5 block text-sm"
+                :style="{ color: 'var(--aviso)' }"
+                data-prueba="cita-por-cobrar"
+                >{{ $t("operacion.hoy.citas.porCobrar") }}</span
+              >
+              <span
+                v-if="s.tipo !== 'cita' && (s.en_espera ?? 0) > 0"
+                class="mt-0.5 block text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{
+                  $t("operacion.hoy.clases.enEspera", s.en_espera ?? 0)
+                }}</span
               >
             </span>
             <span class="shrink-0 text-right text-sm">
@@ -325,6 +406,13 @@ onMounted(() => {
                 }}</span
               >
               <span
+                v-if="s.tipo === 'cita' && !s.cancelada && s.llegaron > 0"
+                class="block"
+                :style="{ color: 'var(--exito)' }"
+                >{{ $t("operacion.hoy.citas.llego") }}</span
+              >
+              <span
+                v-else
                 class="block"
                 :style="{
                   color:
@@ -339,74 +427,139 @@ onMounted(() => {
         </ul>
       </section>
 
-      <!-- Pendientes: cobros y renovaciones -->
-      <section
-        v-if="hoy.cobros || hoy.renovaciones"
-        class="tu-card p-5"
+      <div
+        v-if="libres || hoy.cobros || hoy.renovaciones"
+        class="grid content-start gap-6"
         :class="{ 'lg:col-span-3': !hoy.agenda }"
-        aria-labelledby="hoy-pendientes"
       >
-        <h2 id="hoy-pendientes" class="font-semibold">
-          {{ $t("operacion.hoy.pendientes") }}
-        </h2>
-        <EstadoVacio
-          v-if="!hayPendientes"
-          icono="hecho"
-          compacto
-          class="py-8"
-          :titulo="$t('operacion.hoy.alDia')"
-        />
-        <ul v-else class="mt-3 space-y-2 text-sm">
-          <li v-if="hoy.cobros && hoy.cobros.ordenes_pendientes > 0">
-            <RouterLink :to="{ name: 'cobranza' }" class="hoy-pendiente">
-              <span class="tu-icono-tono tu-tono-naranja" aria-hidden="true">
-                <IconoNav nombre="dinero" :tam="18" />
-              </span>
-              <span class="hoy-texto">{{
-                $t("operacion.hoy.porCobrar", hoy.cobros.ordenes_pendientes)
-              }}</span>
-              <span class="tabular-nums font-medium">{{ porCobrar }}</span>
+        <!-- Espacios libres de hoy (citas) -->
+        <section
+          v-if="libres"
+          class="tu-card p-5"
+          aria-labelledby="hoy-libres"
+          data-prueba="libres"
+        >
+          <div class="flex items-baseline justify-between gap-3">
+            <h2 id="hoy-libres" class="font-semibold">
+              {{ $t("operacion.hoy.citas.libres") }}
+            </h2>
+            <RouterLink :to="{ name: 'agenda' }" class="tu-enlace text-sm">
+              {{ $t("operacion.hoy.citas.agendar") }}
             </RouterLink>
-          </li>
-          <li v-if="hoy.cobros && hoy.cobros.en_mora > 0">
-            <RouterLink :to="{ name: 'cobranza' }" class="hoy-pendiente">
-              <span class="tu-icono-tono tu-tono-rosa" aria-hidden="true">
-                <IconoNav nombre="facturas" :tam="18" />
+          </div>
+          <p
+            v-if="libres.length === 0"
+            class="mt-3 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("operacion.hoy.citas.nadieAtiende") }}
+          </p>
+          <ul v-else class="mt-3 divide-y divide-[var(--borde)] text-sm">
+            <li
+              v-for="l in libres"
+              :key="`${l.profesional}-${l.sucursal}`"
+              class="flex items-center justify-between gap-3 py-2.5"
+            >
+              <span class="min-w-0">
+                <span class="block truncate font-medium">{{
+                  l.profesional
+                }}</span>
+                <span
+                  v-if="l.sucursal"
+                  class="block truncate"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ l.sucursal }}</span
+                >
               </span>
-              <span class="hoy-texto" :style="{ color: 'var(--aviso)' }">{{
-                $t("operacion.hoy.enMora", hoy.cobros.en_mora)
-              }}</span>
-            </RouterLink>
-          </li>
-          <li v-if="hoy.renovaciones && hoy.renovaciones.por_vencer > 0">
-            <RouterLink :to="{ name: 'retencion' }" class="hoy-pendiente">
-              <span class="tu-icono-tono tu-tono-morado" aria-hidden="true">
-                <IconoNav nombre="reloj" :tam="18" />
+              <span class="shrink-0 text-right">
+                <span class="block tabular-nums">{{
+                  l.huecos > 0
+                    ? $t("operacion.hoy.citas.huecos", l.huecos)
+                    : $t("operacion.hoy.citas.sinHuecos")
+                }}</span>
+                <span
+                  v-if="l.siguiente"
+                  class="block tabular-nums"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{
+                    $t("operacion.hoy.citas.desde", {
+                      hora: horaIso(l.siguiente, l.zona_horaria),
+                    })
+                  }}</span
+                >
               </span>
-              <span class="hoy-texto">{{
-                $t(
-                  "operacion.hoy.porVencer",
-                  {
-                    n: hoy.renovaciones.por_vencer,
-                    dias: hoy.renovaciones.dias,
-                  },
-                  hoy.renovaciones.por_vencer,
-                )
-              }}</span>
-            </RouterLink>
-          </li>
-          <li v-if="hoy.renovaciones && hoy.renovaciones.vencidas > 0">
-            <RouterLink :to="{ name: 'retencion' }" class="hoy-pendiente">
-              <span class="tu-icono-tono tu-tono-rosa" aria-hidden="true">
-                <IconoNav nombre="pulso" :tam="18" />
-              </span>
-              <span class="hoy-texto" :style="{ color: 'var(--aviso)' }">{{
-                $t("operacion.hoy.vencidas", hoy.renovaciones.vencidas)
-              }}</span>
-            </RouterLink>
-          </li>
-        </ul>
-      </section>
+            </li>
+          </ul>
+        </section>
+
+        <!-- Pendientes: cobros y renovaciones -->
+        <section
+          v-if="hoy.cobros || hoy.renovaciones"
+          class="tu-card p-5"
+          aria-labelledby="hoy-pendientes"
+        >
+          <h2 id="hoy-pendientes" class="font-semibold">
+            {{ $t("operacion.hoy.pendientes") }}
+          </h2>
+          <EstadoVacio
+            v-if="!hayPendientes"
+            icono="hecho"
+            compacto
+            class="py-8"
+            :titulo="$t('operacion.hoy.alDia')"
+          />
+          <ul v-else class="mt-3 space-y-2 text-sm">
+            <li v-if="hoy.cobros && hoy.cobros.ordenes_pendientes > 0">
+              <RouterLink :to="{ name: 'cobranza' }" class="hoy-pendiente">
+                <span class="tu-icono-tono tu-tono-naranja" aria-hidden="true">
+                  <IconoNav nombre="dinero" :tam="18" />
+                </span>
+                <span class="hoy-texto">{{
+                  $t("operacion.hoy.porCobrar", hoy.cobros.ordenes_pendientes)
+                }}</span>
+                <span class="tabular-nums font-medium">{{ porCobrar }}</span>
+              </RouterLink>
+            </li>
+            <li v-if="hoy.cobros && hoy.cobros.en_mora > 0">
+              <RouterLink :to="{ name: 'cobranza' }" class="hoy-pendiente">
+                <span class="tu-icono-tono tu-tono-rosa" aria-hidden="true">
+                  <IconoNav nombre="facturas" :tam="18" />
+                </span>
+                <span class="hoy-texto" :style="{ color: 'var(--aviso)' }">{{
+                  $t("operacion.hoy.enMora", hoy.cobros.en_mora)
+                }}</span>
+              </RouterLink>
+            </li>
+            <li v-if="hoy.renovaciones && hoy.renovaciones.por_vencer > 0">
+              <RouterLink :to="{ name: 'retencion' }" class="hoy-pendiente">
+                <span class="tu-icono-tono tu-tono-morado" aria-hidden="true">
+                  <IconoNav nombre="reloj" :tam="18" />
+                </span>
+                <span class="hoy-texto">{{
+                  $t(
+                    "operacion.hoy.porVencer",
+                    {
+                      n: hoy.renovaciones.por_vencer,
+                      dias: hoy.renovaciones.dias,
+                    },
+                    hoy.renovaciones.por_vencer,
+                  )
+                }}</span>
+              </RouterLink>
+            </li>
+            <li v-if="hoy.renovaciones && hoy.renovaciones.vencidas > 0">
+              <RouterLink :to="{ name: 'retencion' }" class="hoy-pendiente">
+                <span class="tu-icono-tono tu-tono-rosa" aria-hidden="true">
+                  <IconoNav nombre="pulso" :tam="18" />
+                </span>
+                <span class="hoy-texto" :style="{ color: 'var(--aviso)' }">{{
+                  $t("operacion.hoy.vencidas", hoy.renovaciones.vencidas)
+                }}</span>
+              </RouterLink>
+            </li>
+          </ul>
+        </section>
+      </div>
     </div>
   </template>
 </template>

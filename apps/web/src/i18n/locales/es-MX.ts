@@ -122,6 +122,7 @@ export default {
       caja: "Caja",
       disponibilidad: "Disponibilidad",
       membresias: "Membresías y paquetes",
+      paquetesCitas: "Bonos y membresías",
       suscripcion: "Suscripción y pagos",
       usoFacturable: "Uso facturable",
     },

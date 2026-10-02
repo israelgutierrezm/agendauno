@@ -7,18 +7,28 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\ModalidadServicio;
+use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
+use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use Carbon\CarbonImmutable;
 
 /**
  * El Inicio del negocio: el día de hoy de un vistazo, para quien atiende o dirige.
+ * Responde lo que pregunta cada tipo de negocio (ADR 0091):
+ *
+ * - citas: quién viene después, quién ya llegó, qué citas faltan por atender, cuáles
+ *   faltan por cobrar y dónde hay espacios libres (`libres`, por profesional);
+ * - clases: qué clases hay, cuántos lugares están ocupados, qué listas faltan por
+ *   registrar, quién está en espera y qué planes están por vencer.
  *
  * - `agenda`: las clases o citas del día (su fecha LOCAL, la de cada sede) con
  *   cuántos se esperan, cuántos llegaron y cuántos faltan por marcar en las que ya
@@ -40,18 +50,22 @@ class ResumenDelDiaTenant
         private readonly ResolverAccesoTenant $resolver,
         private readonly AccesoSesionTenant $acceso,
         private readonly RadarRenovacionesTenant $radar,
+        private readonly CalcularDisponibilidadTenant $disponibilidad,
     ) {}
 
     /**
-     * @return array{fecha: string, agenda: array<string, mixed>|null, cobros: array<string, mixed>|null, renovaciones: array<string, mixed>|null}
+     * @return array{fecha: string, modalidad: string, agenda: array<string, mixed>|null, libres: list<array<string, mixed>>|null, cobros: array<string, mixed>|null, renovaciones: array<string, mixed>|null}
      */
-    public function para(Usuario $usuario, CarbonImmutable $fecha): array
+    public function para(Usuario $usuario, CarbonImmutable $fecha, ModalidadServicio $modalidad = ModalidadServicio::Clases): array
     {
         $permitidas = $this->resolver->sucursalesPermitidas($usuario);
+        $veAgenda = $usuario->puede('agenda.ver');
 
         return [
             'fecha' => $fecha->toDateString(),
-            'agenda' => $usuario->puede('agenda.ver') ? $this->agenda($usuario, $fecha, $permitidas) : null,
+            'modalidad' => $modalidad->value,
+            'agenda' => $veAgenda ? $this->agenda($usuario, $fecha, $permitidas) : null,
+            'libres' => $veAgenda && $modalidad === ModalidadServicio::Citas ? $this->libres($usuario, $fecha, $permitidas) : null,
             'cobros' => $usuario->puede('facturacion.ver') ? $this->cobros() : null,
             'renovaciones' => $usuario->puede('miembros.gestionar') ? $this->renovaciones($permitidas) : null,
         ];
@@ -79,6 +93,7 @@ class ResumenDelDiaTenant
                     ->whereHas('asistencia', fn ($a) => $a->where('estado', EstadoAsistencia::Presente->value)),
                 'reservas as faltaron' => fn ($q) => $q->whereIn('estado', $esperan)
                     ->whereHas('asistencia', fn ($a) => $a->where('estado', EstadoAsistencia::Ausente->value)),
+                'reservas as en_espera' => fn ($q) => $q->where('estado', EstadoReserva::EnEspera->value),
             ])
             ->orderBy('inicia_en')
             ->limit(self::LIMITE_SESIONES)
@@ -86,30 +101,47 @@ class ResumenDelDiaTenant
             ->filter(fn (SesionTenant $s): bool => $s->inicia_en->copy()->setTimezone((string) $s->zona_horaria)->toDateString() === $fecha->toDateString())
             ->values();
 
-        // A quién se atiende en cada cita (una consulta para todas).
-        $clientes = ReservaTenant::query()
+        // A quién se atiende en cada cita y si falta cobrarla (una consulta para todas).
+        $titulares = ReservaTenant::query()
             ->whereIn('sesion_id', $sesiones->filter(fn (SesionTenant $s): bool => $s->esCita())->pluck('id'))
             ->whereIn('estado', $esperan)
-            ->with('persona')
+            ->with(['persona', 'orden'])
             ->get()
-            ->mapWithKeys(fn (ReservaTenant $r): array => [(int) $r->sesion_id => $r->persona?->nombreCompleto()]);
+            ->keyBy(fn (ReservaTenant $r): int => (int) $r->sesion_id);
 
         $ahora = CarbonImmutable::now();
-        $totales = ['sesiones' => 0, 'esperados' => 0, 'llegaron' => 0, 'sin_marcar' => 0];
+        $totales = [
+            'sesiones' => 0, 'esperados' => 0, 'llegaron' => 0, 'sin_marcar' => 0,
+            // Lugares de las clases con cupo, listas por registrar y lista de espera.
+            'capacidad' => 0, 'listas_pendientes' => 0, 'en_espera' => 0,
+            // Citas que faltan por atender y por cobrar.
+            'por_atender' => 0, 'por_cobrar' => 0,
+        ];
         $lista = [];
         foreach ($sesiones as $s) {
             $cancelada = $s->estado === EstadoSesionTenant::Cancelada;
             $esperados = (int) $s->getAttribute('esperados');
             $llegaron = (int) $s->getAttribute('llegaron');
+            $faltaron = (int) $s->getAttribute('faltaron');
+            $enEspera = (int) $s->getAttribute('en_espera');
             $empezo = $s->inicia_en->lessThanOrEqualTo($ahora);
+            $termino = $s->termina_en->lessThanOrEqualTo($ahora);
             // Por marcar: ya empezó y hay quien no tiene asistencia (ni presente ni falta).
-            $sinMarcar = ! $cancelada && $empezo ? max(0, $esperados - $llegaron - (int) $s->getAttribute('faltaron')) : 0;
+            $sinMarcar = ! $cancelada && $empezo ? max(0, $esperados - $llegaron - $faltaron) : 0;
+            $titular = $titulares->get((int) $s->getKey());
+            $porCobrar = $titular instanceof ReservaTenant && $titular->orden !== null && $titular->orden->estado === EstadoOrden::Pendiente;
 
             if (! $cancelada) {
                 $totales['sesiones']++;
                 $totales['esperados'] += $esperados;
                 $totales['llegaron'] += $llegaron;
                 $totales['sin_marcar'] += $sinMarcar;
+                $totales['capacidad'] += $s->esCita() ? 0 : (int) ($s->capacidad ?? 0);
+                $totales['listas_pendientes'] += $sinMarcar > 0 ? 1 : 0;
+                $totales['en_espera'] += $enEspera;
+                // Por atender: aún no termina y queda alguien sin llegar ni faltar.
+                $totales['por_atender'] += ! $termino && $esperados - $llegaron - $faltaron > 0 ? 1 : 0;
+                $totales['por_cobrar'] += $porCobrar ? 1 : 0;
             }
 
             $lista[] = [
@@ -118,7 +150,9 @@ class ResumenDelDiaTenant
                 'oferta' => $s->oferta?->nombre,
                 'instructor' => $s->instructor?->name,
                 'sucursal' => $s->sucursal?->nombre,
-                'cliente' => $clientes->get((int) $s->getKey()),
+                'cliente' => $titular?->persona?->nombreCompleto(),
+                'por_cobrar' => $porCobrar,
+                'en_espera' => $enEspera,
                 'inicia_en' => $s->inicia_en->toIso8601String(),
                 'termina_en' => $s->termina_en->toIso8601String(),
                 'zona_horaria' => $s->zona_horaria,
@@ -127,11 +161,55 @@ class ResumenDelDiaTenant
                 'llegaron' => $llegaron,
                 'sin_marcar' => $sinMarcar,
                 'cancelada' => $cancelada,
-                'momento' => $cancelada ? 'cancelada' : ($s->termina_en->lessThanOrEqualTo($ahora) ? 'termino' : ($empezo ? 'en_curso' : 'proxima')),
+                'momento' => $cancelada ? 'cancelada' : ($termino ? 'termino' : ($empezo ? 'en_curso' : 'proxima')),
             ];
         }
 
         return ['totales' => $totales, 'sesiones' => $lista];
+    }
+
+    /**
+     * Dónde hay espacios libres hoy: por profesional y sede, cuántos huecos quedan para
+     * el servicio más corto y cuál es el siguiente (el mismo cálculo que al agendar).
+     * Un profesional acotado ve solo los suyos.
+     *
+     * @param  list<int>|null  $permitidas
+     * @return list<array<string, mixed>>
+     */
+    private function libres(Usuario $usuario, CarbonImmutable $fecha, ?array $permitidas): array
+    {
+        $servicio = OfertaTenant::query()
+            ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
+            ->orderBy('duracion_minutos')
+            ->first();
+        if (! $servicio instanceof OfertaTenant) {
+            return [];
+        }
+        [$duracion, $margenes] = $this->disponibilidad->duracionYMargenes($servicio, null);
+        $soloYo = $this->acceso->esInstructorAcotado($usuario);
+
+        $libres = [];
+        $sedes = SucursalTenant::query()
+            ->when($permitidas !== null, fn ($q) => $q->whereIn('id', $permitidas))
+            ->orderBy('nombre')
+            ->get();
+        foreach ($sedes as $sucursal) {
+            foreach ($this->disponibilidad->profesionalesDeSede($sucursal, $fecha->toDateString()) as $profesional) {
+                if ($soloYo && (int) $profesional->getKey() !== (int) $usuario->getKey()) {
+                    continue;
+                }
+                $huecos = $this->disponibilidad->paraFecha((int) $profesional->getKey(), $sucursal, $fecha->toDateString(), $duracion, null, $margenes, $servicio);
+                $libres[] = [
+                    'profesional' => (string) $profesional->name,
+                    'sucursal' => $sucursal->nombre,
+                    'zona_horaria' => $sucursal->zona_horaria,
+                    'huecos' => count($huecos),
+                    'siguiente' => $huecos[0]['inicia'] ?? null,
+                ];
+            }
+        }
+
+        return $libres;
     }
 
     /**

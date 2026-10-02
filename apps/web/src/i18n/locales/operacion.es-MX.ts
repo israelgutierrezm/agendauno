@@ -177,12 +177,6 @@ export default {
     diaTerminado: "Terminaron las clases de hoy",
     abrirAgenda: "Abrir agenda",
     irRecepcion: "Ir a recepción →",
-    indicadores: {
-      sesiones: "Clases",
-      esperados: "Se esperan",
-      llegaron: "Llegaron",
-      sinMarcar: "Por pasar lista",
-    },
     agenda: "Agenda de hoy",
     verAgenda: "Ver agenda →",
     sinSesiones: "No hay clases hoy.",
@@ -203,6 +197,38 @@ export default {
       "1 membresía vence en {dias} días o menos | {n} membresías vencen en {dias} días o menos",
     vencidas:
       "1 membresía vencida por recuperar | {n} membresías vencidas por recuperar",
+    // Negocio de citas: quién viene, quién llegó, qué falta y dónde hay espacio.
+    citas: {
+      vieneDespues: "Quién viene después",
+      diaTerminado: "Terminaron las citas de hoy",
+      sinCitas: "No hay citas hoy",
+      marcarLlegada: "Falta marcar si llegó",
+      porCobrar: "Por cobrar",
+      llego: "Llegó",
+      libres: "Espacios libres hoy",
+      agendar: "Agendar →",
+      nadieAtiende: "Hoy nadie tiene horario de atención.",
+      huecos: "1 espacio | {n} espacios",
+      sinHuecos: "Sin espacios",
+      desde: "desde las {hora}",
+      kpi: {
+        citas: "Citas hoy",
+        llegaron: "Ya llegaron",
+        porAtender: "Por atender",
+        porCobrar: "Por cobrar",
+      },
+    },
+    // Negocio de clases: ocupación, listas, espera y planes por vencer.
+    clases: {
+      enEspera: "1 en lista de espera | {n} en lista de espera",
+      kpi: {
+        clases: "Clases hoy",
+        ocupados: "Lugares ocupados",
+        listas: "Listas por registrar",
+        enEspera: "En lista de espera",
+        porVencer: "Planes por vencer",
+      },
+    },
   },
   // Columnas de la lista de alumnos o clientes: un dato por columna.
   clientes: {

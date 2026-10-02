@@ -116,6 +116,25 @@ describe("pestañas del área", () => {
     );
   });
 
+  it("Ventas: con clases abre en los planes; con citas, en el mostrador", async () => {
+    entrar(["*"]);
+    const clases = await montar(PestanasArea, { name: "pos" });
+    const rutas = (w: typeof clases.w) =>
+      w.findAll(".pa-pestanas a").map((p) => p.attributes("href"));
+    expect(rutas(clases.w)).toEqual(["/ventas", "/pos", "/inventario"]);
+
+    entrar(["*"], "citas");
+    const citas = await montar(PestanasArea, { name: "pos" });
+    expect(rutas(citas.w)).toEqual(["/pos", "/inventario", "/ventas"]);
+    expect(citas.w.findAll(".pa-pestanas a").at(-1)!.text()).toBe(
+      "Bonos y membresías",
+    );
+    const lateral = await montar(NavLateral, { name: "pos" });
+    expect(
+      lateral.w.find('[data-prueba="area-ventas"]').attributes("href"),
+    ).toBe("/pos");
+  });
+
   it("con una sola vista no hay pestañas", async () => {
     entrar(["reservas.gestionar"]);
     const { w } = await montar(PestanasArea, { name: "recepcion" });
@@ -215,10 +234,7 @@ describe("barra superior", () => {
     });
 
     expect(w.get(".titulo").text()).toBe("Cobros");
-    expect(w.findAll(".miga").map((m) => m.text())).toEqual([
-      "Cobros",
-      "Caja",
-    ]);
+    expect(w.findAll(".miga").map((m) => m.text())).toEqual(["Cobros", "Caja"]);
   });
 
   it("en una ficha: el área, la vista de la que es y «Ficha»", async () => {

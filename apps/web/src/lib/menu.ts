@@ -359,10 +359,18 @@ export const MENU_NEGOCIO: GrupoMenu[] = [
         clave: "ventas",
         etiqueta: "nav.grupos.ventas",
         icono: "ventas",
+        // Con clases, lo que se vende primero son los planes; con citas, el
+        // mostrador (cada servicio ya tiene precio) y los bonos o membresías al
+        // final, como algo opcional (ADR 0091).
         vistas: [
-          v("membresias", "ventas", "nav.vistas.membresias"),
+          v("membresias", "ventas", "nav.vistas.membresias", {
+            modalidad: "clases",
+          }),
           v("mostrador", "pos", "planes.nav.mostrador"),
           v("inventario", "inventario", "planes.nav.inventario"),
+          v("paquetes", "ventas", "nav.vistas.paquetesCitas", {
+            modalidad: "citas",
+          }),
         ],
       },
       {

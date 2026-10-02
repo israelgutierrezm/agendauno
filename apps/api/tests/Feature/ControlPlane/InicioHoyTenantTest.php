@@ -56,7 +56,14 @@ it('el día local: esperados, llegaron y por marcar en las que ya empezaron', fu
     $r = $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy?fecha=2026-10-01", conBearer($e['bearer']))->assertOk();
 
     $r->assertJsonPath('data.fecha', '2026-10-01')
-        ->assertJsonPath('data.agenda.totales', ['sesiones' => 3, 'esperados' => 3, 'llegaron' => 1, 'sin_marcar' => 1])
+        ->assertJsonPath('data.modalidad', 'clases')
+        ->assertJsonPath('data.libres', null)
+        ->assertJsonPath('data.agenda.totales', [
+            'sesiones' => 3, 'esperados' => 3, 'llegaron' => 1, 'sin_marcar' => 1,
+            // 30 lugares; una lista por registrar (la que ya terminó).
+            'capacidad' => 30, 'listas_pendientes' => 1, 'en_espera' => 0,
+            'por_atender' => 0, 'por_cobrar' => 0,
+        ])
         ->assertJsonCount(3, 'data.agenda.sesiones')
         ->assertJsonPath('data.agenda.sesiones.0.momento', 'termino')
         ->assertJsonPath('data.agenda.sesiones.0.sin_marcar', 1)
@@ -111,6 +118,39 @@ it('las citas dicen a quién se atiende y lo pendiente de cobro sale en cobros',
     expect($r->json('data.agenda.sesiones.0'))->toMatchArray(['tipo' => 'cita', 'cliente' => 'Ana', 'esperados' => 1])
         ->and($r->json('data.cobros.ordenes_pendientes'))->toBe(1)
         ->and($r->json('data.cobros.por_cobrar'))->toBe([['moneda' => 'MXN', 'total_minor' => 25000]]);
+});
+
+it('en citas responde quién sigue, qué falta por atender y cobrar, y dónde hay espacios libres', function (): void {
+    // 9:00 en la Ciudad de México.
+    $this->travelTo('2026-10-05 15:00:00');
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
+    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $sede = agendaSemilla($e);
+    $corte = (string) $this->postJson("/api/v1/app/{$e['slug']}/ofertas/rapidas", ['items' => [
+        ['nombre' => 'Corte de cabello', 'duracion_minutos' => 30, 'precio_minor' => 25000],
+    ]], conBearer($e['bearer']))->assertCreated()->json('data.0.id');
+    personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia.mx', 'instructor');
+    $barbero = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    abrirHorarioDeCitas($e, $barbero, $sede['sucursal']);
+    $ana = alumnoConSesion($e, 'Ana', 'ana@correo.mx');
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/citas", [
+        'oferta_id' => $corte, 'sucursal_id' => $sede['sucursal'], 'instructor_id' => $barbero,
+        'inicia_en_local' => '2026-10-05 10:00:00', 'duracion_minutos' => 30,
+    ], conBearer($ana['bearer']))->assertCreated();
+
+    $r = $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy?fecha=2026-10-05", conBearer($e['bearer']))->assertOk();
+
+    $r->assertJsonPath('data.modalidad', 'citas')
+        ->assertJsonPath('data.agenda.totales.por_atender', 1)
+        ->assertJsonPath('data.agenda.totales.por_cobrar', 1)
+        ->assertJsonPath('data.agenda.sesiones.0.cliente', 'Ana')
+        ->assertJsonPath('data.agenda.sesiones.0.por_cobrar', true);
+    $libres = $r->json('data.libres');
+    expect($libres)->toHaveCount(1)
+        ->and($libres[0])->toMatchArray(['profesional' => 'Personal', 'sucursal' => 'Roma Norte'])
+        // Ya pasaron las 8:00 y las 8:30, y las 10:00 está ocupada.
+        ->and($libres[0]['siguiente'])->toBe('2026-10-05T15:30:00+00:00')
+        ->and($libres[0]['huecos'])->toBe(20);
 });
 
 it('la fecha va en formato de día', function (): void {

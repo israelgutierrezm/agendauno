@@ -53,7 +53,15 @@ describe("el día de hoy en el Inicio", () => {
         data: {
           fecha: "2026-10-01",
           agenda: {
-            totales: { sesiones: 2, esperados: 5, llegaron: 1, sin_marcar: 2 },
+            totales: {
+              sesiones: 2,
+              esperados: 5,
+              llegaron: 1,
+              sin_marcar: 2,
+              capacidad: 20,
+              listas_pendientes: 1,
+              en_espera: 2,
+            },
             sesiones: [
               sesion({ id: "s1", momento: "termino", sin_marcar: 2 }),
               sesion({
@@ -89,7 +97,13 @@ describe("el día de hoy en el Inicio", () => {
     expect(texto).toContain("En curso");
     expect(texto).toContain("Corte · Dana");
     expect(texto).toContain("Abrir agenda");
-    expect(texto).toContain("Por pasar lista");
+    // Clases: ocupación, listas por registrar, espera y planes por vencer.
+    expect(texto).toContain("Lugares ocupados");
+    expect(texto).toContain("5 de 20");
+    expect(texto).toContain("Listas por registrar");
+    expect(texto).toContain("En lista de espera");
+    expect(texto).toContain("Planes por vencer");
+    expect(texto).not.toContain("Por cobrar");
     expect(texto).toContain("08:00");
     expect(texto).toContain("Falta pasar lista a 2 personas");
     expect(texto).toContain("3 de 10");
@@ -121,5 +135,78 @@ describe("el día de hoy en el Inicio", () => {
     await flushPromises();
     expect(conError.text()).toContain("No se pudo cargar.");
     expect(conError.text()).not.toContain("No hay clases hoy.");
+  });
+
+  it("en citas: quién viene después, qué falta por atender y cobrar, y los espacios libres", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: {
+          fecha: "2026-10-01",
+          modalidad: "citas",
+          agenda: {
+            totales: {
+              sesiones: 2,
+              esperados: 2,
+              llegaron: 1,
+              sin_marcar: 0,
+              por_atender: 1,
+              por_cobrar: 1,
+            },
+            sesiones: [
+              sesion({
+                id: "c1",
+                tipo: "cita",
+                oferta: "Corte",
+                cliente: "Dana",
+                capacidad: 1,
+                esperados: 1,
+                llegaron: 1,
+                momento: "termino",
+              }),
+              sesion({
+                id: "c2",
+                tipo: "cita",
+                oferta: "Barba",
+                cliente: "Eli",
+                capacidad: 1,
+                esperados: 1,
+                llegaron: 0,
+                por_cobrar: true,
+                inicia_en: "2026-10-01T18:00:00Z",
+                momento: "proxima",
+              }),
+            ],
+          },
+          libres: [
+            {
+              profesional: "Caro",
+              sucursal: "Roma Norte",
+              zona_horaria: "America/Mexico_City",
+              huecos: 6,
+              siguiente: "2026-10-01T19:30:00Z",
+            },
+          ],
+          cobros: null,
+          renovaciones: null,
+        },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+    const texto = w.text();
+
+    expect(texto).toContain("Quién viene después");
+    expect(texto).toContain("Eli");
+    expect(w.get('[data-prueba="detalle-siguiente"]').text()).toContain(
+      "Barba · Caro",
+    );
+    expect(texto).toContain("Por atender");
+    expect(texto).toContain("Llegó");
+    expect(w.get('[data-prueba="cita-por-cobrar"]').text()).toBe("Por cobrar");
+    expect(texto).not.toContain("Listas por registrar");
+    const libres = w.get('[data-prueba="libres"]').text();
+    expect(libres).toContain("Caro");
+    expect(libres).toContain("6 espacios");
+    expect(libres).toContain("desde las 13:30");
   });
 });
