@@ -279,10 +279,10 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
-      // Mismo punto de venta, en la pestaña de inventario (entrada propia del menú).
+      // Inventario: los productos del mostrador y su stock por sucursal.
       path: "/inventario",
       name: "inventario",
-      component: () => import("@/views/PosView.vue"),
+      component: () => import("@/views/InventarioView.vue"),
       meta: { requiereSesion: true },
     },
     {

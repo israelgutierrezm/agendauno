@@ -95,6 +95,10 @@ final class CatalogoParametros
             new DefinicionParametro('resenas.dias_para_calificar', 'Reseñas', 'Días para calificar una clase o cita',
                 'Después ya no se pide la reseña.', $e, 30, 1, 365, 'días'),
 
+            // Inventario del mostrador.
+            new DefinicionParametro('inventario.stock_bajo', 'Inventario', 'Stock bajo',
+                'Con esta cantidad o menos en una sucursal, el producto se marca con stock bajo.', $e, 3, 0, 1000, 'piezas'),
+
             // Cancelaciones: el negocio las ajusta en Reglas de la agenda; esto es lo que
             // aplica a los negocios que aún no definen su política.
             new DefinicionParametro('cancelacion.horas_limite', 'Cancelaciones (negocios sin política propia)', 'Cancelar sin costo hasta',

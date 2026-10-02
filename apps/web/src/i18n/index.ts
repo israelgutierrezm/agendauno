@@ -76,6 +76,10 @@ import configuracionInicial from "./locales/configuracionInicial.es-MX";
 import detalleClase from "./locales/detalleClase.es-MX";
 import listadosVisual from "./locales/listadosVisual.es-MX";
 import sucursalOperativa from "./locales/sucursalOperativa.es-MX";
+import {
+  inventarioVisual,
+  mostradorVisual,
+} from "./locales/mostradorInventario.es-MX";
 import planes from "./locales/planes.es-MX";
 import portal from "./locales/portal.es-MX";
 import recepcionVisual from "./locales/recepcionVisual.es-MX";
@@ -151,6 +155,8 @@ const mensajesBase = {
   detalleClase,
   listadosVisual,
   sucursalOperativa,
+  inventarioVisual,
+  mostradorVisual,
 };
 
 export const i18n = createI18n({

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\InventarioTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Inventario\Exceptions\StockInsuficiente;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
@@ -16,14 +17,16 @@ use Illuminate\Http\Request;
 
 /**
  * Inventario minorista del estudio, tenant-local (R21): catálogo de artículos y su stock
- * por sucursal (derivado del ledger), con entradas y ajustes. Opera SIEMPRE sobre la BD
- * del estudio resuelto.
+ * por sucursal (derivado del ledger), con entradas y ajustes. Cada existencia lleva su
+ * estado (con stock, stock bajo, sin stock) según el umbral del negocio
+ * (`inventario.stock_bajo`, ADR 0042). Opera SIEMPRE sobre la BD del estudio resuelto.
  */
 class InventarioTenantController
 {
     public function __construct(
         private readonly InventarioTenant $inventario,
         private readonly ResolverAccesoTenant $acceso,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -34,6 +37,8 @@ class InventarioTenantController
 
         return response()->json([
             'data' => $articulos->map(fn (ArticuloTenant $a): array => $this->presentar($a, $sucursales, $permitidas))->all(),
+            // Desde cuántas piezas (o menos) se considera stock bajo.
+            'meta' => ['stock_bajo' => $this->parametros->entero('inventario.stock_bajo')],
         ]);
     }
 
@@ -166,6 +171,7 @@ class InventarioTenantController
     private function presentar(ArticuloTenant $articulo, array $sucursales, ?array $permitidas = null): array
     {
         $porSucursal = $this->inventario->stockPorSucursal($articulo->getKey());
+        $umbral = $this->parametros->entero('inventario.stock_bajo');
         $existencias = [];
         $total = 0;
         foreach ($porSucursal as $sucursalId => $stock) {
@@ -177,6 +183,7 @@ class InventarioTenantController
                 'sucursal_id' => $sucursales[$sucursalId]['ulid'] ?? null,
                 'sucursal' => $sucursales[$sucursalId]['nombre'] ?? '—',
                 'stock' => $stock,
+                'estado' => self::estadoStock($stock, $umbral),
             ];
             $total += $stock;
         }
@@ -189,7 +196,18 @@ class InventarioTenantController
             'moneda' => $articulo->moneda,
             'activo' => $articulo->activo,
             'stock_total' => $total,
+            'estado_stock' => self::estadoStock($total, $umbral),
             'existencias' => $existencias,
         ];
+    }
+
+    /** Sin stock, stock bajo (el umbral del negocio o menos) o con stock. */
+    private static function estadoStock(int $stock, int $umbral): string
+    {
+        return match (true) {
+            $stock <= 0 => 'sin_stock',
+            $stock <= $umbral => 'bajo',
+            default => 'con_stock',
+        };
     }
 }

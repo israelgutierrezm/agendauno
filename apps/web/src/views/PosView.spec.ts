@@ -5,8 +5,9 @@ import { i18n } from "@/i18n";
 import PosView from "./PosView.vue";
 
 /*
-| Ventas recientes del mostrador: la forma de pago a la vista (no el valor interno),
-| las anuladas marcadas, y una venta con error se corrige por su propia ruta (ADR 0089).
+| Mostrador: se vende lo que hay en la sucursal y las ventas recientes muestran la
+| forma de pago a la vista (no el valor interno), las anuladas marcadas, y una venta
+| con error se corrige por su propia ruta (ADR 0089).
 */
 
 const mocks = vi.hoisted(() => ({
@@ -25,10 +26,6 @@ vi.mock("@/stores/sesionTenant", () => ({
 }));
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
-}));
-vi.mock("vue-router", () => ({
-  useRoute: () => ({ name: "inventario", query: {} }),
-  useRouter: () => ({ replace: vi.fn() }),
 }));
 
 const VENTAS = [
@@ -58,6 +55,19 @@ const VENTAS = [
   },
 ];
 
+const ARTICULOS = [
+  {
+    id: "a1",
+    nombre: "Pomada mate",
+    sku: "PM-1",
+    precio_minor: 28000,
+    moneda: "MXN",
+    activo: true,
+    stock_total: 2,
+    existencias: [{ sucursal_id: "s1", sucursal: "Roma Norte", stock: 2 }],
+  },
+];
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.confirmar.mockResolvedValue(true);
@@ -69,7 +79,9 @@ beforeEach(() => {
           ? VENTAS
           : url.endsWith("/sucursales")
             ? [{ id: "s1", nombre: "Roma Norte" }]
-            : [],
+            : url.endsWith("/articulos")
+              ? ARTICULOS
+              : [],
       },
     }),
   );
@@ -93,7 +105,11 @@ describe("ventas recientes del mostrador", () => {
 
     await w.get('[data-prueba="corregir-venta"]').trigger("click");
     await w.get('[data-prueba="corregir-pago"]').trigger("click");
-    await w.get("select").setValue("tarjeta");
+    await w.get('[data-prueba="venta-actual"]'); // la venta y su corrección conviven
+    const metodo = w
+      .findAll("select")
+      .find((s) => s.text().includes("Transferencia"))!;
+    await metodo.setValue("tarjeta");
     await w
       .findAll("button")
       .find((b) => b.text() === "Guardar forma de pago")!
@@ -104,5 +120,29 @@ describe("ventas recientes del mostrador", () => {
       "/api/v1/app/demo/pos/ventas/v1/metodo",
       { metodo: "tarjeta" },
     );
+  });
+
+  it("no deja vender más de lo que hay en la sucursal y cobra con la forma elegida", async () => {
+    mocks.post.mockResolvedValue({ data: {} });
+    const w = mount(PosView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    const producto = w.get('[data-prueba="producto"]');
+    await producto.trigger("click");
+    await producto.trigger("click");
+    // Solo hay 2: el tercero ya no se puede agregar.
+    expect(producto.attributes("disabled")).toBeDefined();
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Tarjeta")!
+      .trigger("click");
+    await w.get('[data-prueba="cobrar"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.post).toHaveBeenCalledWith("/api/v1/app/demo/pos/ventas", {
+      sucursal_id: "s1",
+      metodo_pago: "tarjeta",
+      items: [{ articulo_id: "a1", cantidad: 2 }],
+    });
   });
 });

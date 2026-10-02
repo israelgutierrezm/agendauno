@@ -1,17 +1,27 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
 
 import CorregirCobro from "@/components/CorregirCobro.vue";
-import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import IconoNav from "@/components/IconoNav.vue";
+import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
+import TarjetasIndicadores, {
+  type Indicador,
+} from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
+/**
+ * Mostrador: vender productos del inventario y cobrar en caja. A la izquierda los
+ * productos de la sucursal (con su existencia), a la derecha la venta actual, y
+ * debajo las ventas recientes (con su corrección, ADR 0089). Los productos y su stock
+ * se administran en Inventario.
+ */
 interface Existencia {
   sucursal_id: string | null;
   sucursal: string;
@@ -46,7 +56,13 @@ interface Venta {
   anulable?: boolean;
 }
 
+const METODOS = ["efectivo", "tarjeta", "transferencia"] as const;
+
 const { t, te } = useI18n();
+const sesion = useSesionTenantStore();
+const toast = useToastStore();
+const base = computed(() => `/api/v1/app/${sesion.slug}`);
+const puedeVender = computed(() => sesion.puede("pos.vender"));
 
 // Forma de pago a la vista (no el valor interno) y la venta que se corrige.
 function nombreMetodo(m: string): string {
@@ -57,73 +73,22 @@ async function alCorregirVenta(): Promise<void> {
   corrigiendo.value = null;
   await cargar();
 }
-const sesion = useSesionTenantStore();
-const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
-// La vista sigue a la pestaña del área: Mostrador (/pos) o Inventario (/inventario).
-const route = useRoute();
-const tabDeRuta = () => (route.name === "inventario" ? "inventario" : "vender");
-const tab = ref<"vender" | "inventario">(tabDeRuta());
-watch(
-  () => route.name,
-  () => (tab.value = tabDeRuta()),
-);
 const articulos = ref<Articulo[]>([]);
 const sucursales = ref<Sucursal[]>([]);
 const ventas = ref<Venta[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
-const accionando = ref(false);
-const exito = ref<string | null>(null);
+const cobrando = ref(false);
 
-// POS
 const sucursalSel = ref("");
 // Con una sucursal fija (la de la barra o la única), se vende ahí sin preguntar.
-const {
-  mostrarSelect: elegirSucursal,
-  actual: sucursalActual,
-  fija: sucursalFija,
-} = useSucursalOperativa({ campo: sucursalSel });
+const { mostrarSelect: elegirSucursal, actual: sucursalActual } =
+  useSucursalOperativa({ campo: sucursalSel });
 const ventasVisibles = computed(() =>
   sucursalActual.value
     ? ventas.value.filter((v) => v.sucursal === sucursalActual.value!.nombre)
     : ventas.value,
-);
-const metodo = ref("efectivo");
-const carrito = ref<
-  Array<{ id: string; nombre: string; precio: number; cantidad: number }>
->([]);
-
-// Inventario
-const mostrarNuevo = ref(false);
-const nuevo = ref({ nombre: "", sku: "", precio: "" });
-const restockDe = ref<string | null>(null);
-const restock = ref<{
-  sucursal_id: string;
-  cantidad: string;
-  tipo: "entrada" | "ajuste";
-}>({ sucursal_id: "", cantidad: "", tipo: "entrada" });
-const editandoDe = ref<string | null>(null);
-const edicion = ref({ nombre: "", sku: "", precio: "", activo: true });
-
-function dinero(minor: number, moneda = "MXN"): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
-}
-
-function stockEn(articulo: Articulo, sucursalId: string): number {
-  return (
-    articulo.existencias.find((e) => e.sucursal_id === sucursalId)?.stock ?? 0
-  );
-}
-
-const articulosVendibles = computed(() =>
-  articulos.value.filter((a) => a.activo),
-);
-const totalCarrito = computed(() =>
-  carrito.value.reduce((s, l) => s + l.precio * l.cantidad, 0),
 );
 
 async function cargar(): Promise<void> {
@@ -139,7 +104,7 @@ async function cargar(): Promise<void> {
     sucursales.value = s.data.data;
     ventas.value = v.data.data;
     if (sucursalSel.value === "" && sucursales.value.length > 0) {
-      sucursalSel.value = sucursales.value[0].id;
+      sucursalSel.value = sucursales.value[0]!.id;
     }
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -148,13 +113,72 @@ async function cargar(): Promise<void> {
   }
 }
 
+function dinero(minor: number, moneda = "MXN"): string {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: moneda,
+  }).format(minor / 100);
+}
+function stockEn(articulo: Articulo): number {
+  return (
+    articulo.existencias.find((e) => e.sucursal_id === sucursalSel.value)
+      ?.stock ?? 0
+  );
+}
+function iniciales(nombre: string): string {
+  return nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]!.toUpperCase())
+    .join("");
+}
+function hora(iso: string | null): string {
+  if (!iso) {
+    return "—";
+  }
+  const d = new Date(iso);
+  const hoy = new Date().toDateString() === d.toDateString();
+  return new Intl.DateTimeFormat(
+    "es-MX",
+    hoy
+      ? { hour: "numeric", minute: "2-digit" }
+      : { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" },
+  ).format(d);
+}
+
+// ---- Productos a la venta ----
+const busqueda = ref("");
+const vendibles = computed(() => {
+  const q = busqueda.value.trim().toLowerCase();
+  return articulos.value.filter(
+    (a) =>
+      a.activo &&
+      (q === "" ||
+        a.nombre.toLowerCase().includes(q) ||
+        (a.sku ?? "").toLowerCase().includes(q)),
+  );
+});
+
+// ---- Venta actual ----
+const metodo = ref<(typeof METODOS)[number]>("efectivo");
+const carrito = ref<
+  Array<{ id: string; nombre: string; precio: number; cantidad: number }>
+>([]);
+const totalCarrito = computed(() =>
+  carrito.value.reduce((s, l) => s + l.precio * l.cantidad, 0),
+);
+const piezas = computed(() =>
+  carrito.value.reduce((s, l) => s + l.cantidad, 0),
+);
+function enCarrito(id: string): number {
+  return carrito.value.find((l) => l.id === id)?.cantidad ?? 0;
+}
 function agregar(a: Articulo): void {
-  const disp = stockEn(a, sucursalSel.value);
-  const linea = carrito.value.find((l) => l.id === a.id);
-  const enCarrito = linea?.cantidad ?? 0;
-  if (enCarrito >= disp) {
+  if (enCarrito(a.id) >= stockEn(a)) {
     return;
   }
+  const linea = carrito.value.find((l) => l.id === a.id);
   if (linea) {
     linea.cantidad++;
   } else {
@@ -166,9 +190,28 @@ function agregar(a: Articulo): void {
     });
   }
 }
-
+function restar(id: string): void {
+  const linea = carrito.value.find((l) => l.id === id);
+  if (!linea) {
+    return;
+  }
+  linea.cantidad--;
+  if (linea.cantidad <= 0) {
+    quitar(id);
+  }
+}
+function sumar(id: string): void {
+  const a = articulos.value.find((x) => x.id === id);
+  if (a) {
+    agregar(a);
+  }
+}
 function quitar(id: string): void {
   carrito.value = carrito.value.filter((l) => l.id !== id);
+}
+// Al cambiar de sucursal, la venta empieza de nuevo (otro stock).
+function cambiarSucursal(): void {
+  carrito.value = [];
 }
 
 async function cobrar(): Promise<void> {
@@ -186,9 +229,8 @@ async function cobrar(): Promise<void> {
   ) {
     return;
   }
-  accionando.value = true;
+  cobrando.value = true;
   error.value = null;
-  exito.value = null;
   try {
     await api.post(`${base.value}/pos/ventas`, {
       sucursal_id: sucursalSel.value,
@@ -198,116 +240,76 @@ async function cobrar(): Promise<void> {
         cantidad: l.cantidad,
       })),
     });
-    exito.value = t("pos.vendido");
+    toast.exito(t("pos.vendido"));
     carrito.value = [];
     await cargar();
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
-    accionando.value = false;
+    cobrando.value = false;
   }
 }
 
-async function crearArticulo(): Promise<void> {
-  if (nuevo.value.nombre.trim() === "" || nuevo.value.precio === "") {
-    return;
-  }
-  accionando.value = true;
-  error.value = null;
-  try {
-    await api.post(`${base.value}/articulos`, {
-      nombre: nuevo.value.nombre,
-      sku: nuevo.value.sku !== "" ? nuevo.value.sku : null,
-      precio_minor: Math.round(Number(nuevo.value.precio) * 100),
-    });
-    nuevo.value = { nombre: "", sku: "", precio: "" };
-    mostrarNuevo.value = false;
-    await cargar();
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    accionando.value = false;
-  }
-}
-
-function abrirRestock(articuloId: string): void {
-  restockDe.value = articuloId;
-  editandoDe.value = null;
-  restock.value = {
-    sucursal_id: sucursalFija.value ?? sucursales.value[0]?.id ?? "",
-    cantidad: "",
-    tipo: "entrada",
-  };
-}
-
-async function guardarRestock(articuloId: string): Promise<void> {
-  if (restock.value.sucursal_id === "" || restock.value.cantidad === "") {
-    return;
-  }
-  accionando.value = true;
-  error.value = null;
-  try {
-    await api.post(`${base.value}/articulos/${articuloId}/movimientos`, {
-      sucursal_id: restock.value.sucursal_id,
-      tipo: restock.value.tipo,
-      cantidad: Number(restock.value.cantidad),
-    });
-    restockDe.value = null;
-    await cargar();
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    accionando.value = false;
-  }
-}
-
-function abrirEdicion(a: Articulo): void {
-  restockDe.value = null;
-  editandoDe.value = a.id;
-  edicion.value = {
-    nombre: a.nombre,
-    sku: a.sku ?? "",
-    precio: String(a.precio_minor / 100),
-    activo: a.activo,
-  };
-}
-
-async function guardarEdicion(a: Articulo): Promise<void> {
-  accionando.value = true;
-  error.value = null;
-  try {
-    await api.put(`${base.value}/articulos/${a.id}`, {
-      nombre: edicion.value.nombre,
-      sku: edicion.value.sku !== "" ? edicion.value.sku : null,
-      precio_minor: Math.round(Number(edicion.value.precio) * 100),
-      moneda: a.moneda,
-      activo: edicion.value.activo,
-    });
-    editandoDe.value = null;
-    exito.value = t("inventarioExtra.guardado");
-    await cargar();
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    accionando.value = false;
-  }
-}
+// ---- Indicadores del día ----
+const deHoy = computed(() => {
+  const hoy = new Date().toDateString();
+  return ventasVisibles.value.filter(
+    (v) =>
+      !v.anulada_en &&
+      v.creado_en !== null &&
+      new Date(v.creado_en).toDateString() === hoy,
+  );
+});
+const indicadores = computed<Indicador[]>(() => {
+  const total = deHoy.value.reduce((s, v) => s + v.total_minor, 0);
+  const sinStock = articulos.value.filter(
+    (a) => a.activo && stockEn(a) <= 0,
+  ).length;
+  return [
+    {
+      clave: "ventas",
+      etiqueta: t("mostradorVisual.kpi.ventasHoy"),
+      valor: String(deHoy.value.length),
+      icono: "ventas",
+    },
+    {
+      clave: "total",
+      etiqueta: t("mostradorVisual.kpi.vendidoHoy"),
+      valor: dinero(total),
+      icono: "dinero",
+    },
+    {
+      clave: "ticket",
+      etiqueta: t("mostradorVisual.kpi.ticket"),
+      valor:
+        deHoy.value.length > 0
+          ? dinero(Math.round(total / deHoy.value.length))
+          : "—",
+      icono: "etiqueta",
+    },
+    {
+      clave: "sin_stock",
+      etiqueta: t("mostradorVisual.kpi.sinStock"),
+      valor: String(sinStock),
+      icono: "cerrar",
+    },
+  ];
+});
 
 onMounted(cargar);
 </script>
 
 <template>
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion :titulo="$t('pos.titulo')" />
+    <EncabezadoSeccion
+      :titulo="$t('mostradorVisual.titulo')"
+      :subtitulo="$t('mostradorVisual.subtitulo')"
+    />
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
     </p>
-    <p
-      v-if="cargando"
-      class="mt-6 text-sm"
-      :style="{ color: 'var(--texto-suave)' }"
-    >
+    <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
 
@@ -320,385 +322,183 @@ onMounted(cargar);
         {{ $t("pos.sinSucursales") }}
       </p>
 
-      <!-- ===== Vender ===== -->
-      <div v-else-if="tab === 'vender'" class="mt-6 grid gap-6 lg:grid-cols-3">
-        <div class="lg:col-span-2">
-          <template v-if="elegirSucursal">
-            <label class="tu-label" for="pos-suc">{{
-              $t("pos.sucursal")
-            }}</label>
-            <select id="pos-suc" v-model="sucursalSel" class="tu-input w-auto">
-              <option v-for="s in sucursales" :key="s.id" :value="s.id">
-                {{ s.nombre }}
-              </option>
-            </select>
-          </template>
-          <LeyendaSucursal v-else />
+      <template v-else>
+        <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
 
-          <p
-            v-if="articulosVendibles.length === 0"
-            class="mt-4 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("pos.sinArticulos") }}
-          </p>
-          <div v-else class="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <button
-              v-for="a in articulosVendibles"
-              :key="a.id"
-              type="button"
-              class="tu-card p-3 text-left transition hover:shadow-md disabled:opacity-50"
-              :disabled="stockEn(a, sucursalSel) === 0"
-              @click="agregar(a)"
-            >
-              <div class="font-semibold truncate">{{ a.nombre }}</div>
-              <div class="text-sm mt-1">
-                {{ dinero(a.precio_minor, a.moneda) }}
-              </div>
-              <div
-                class="text-xs mt-1"
-                :style="{
-                  color:
-                    stockEn(a, sucursalSel) === 0
-                      ? 'var(--error)'
-                      : 'var(--texto-suave)',
-                }"
-              >
-                {{
-                  stockEn(a, sucursalSel) === 0
-                    ? $t("pos.agotado")
-                    : `${$t("pos.stock")}: ${stockEn(a, sucursalSel)}`
-                }}
-              </div>
-            </button>
-          </div>
-        </div>
-
-        <!-- Carrito -->
-        <div class="tu-card p-4 h-fit">
-          <h2 class="font-medium">{{ $t("pos.carrito") }}</h2>
-          <p
-            v-if="carrito.length === 0"
-            class="mt-2 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("pos.carritoVacio") }}
-          </p>
-          <ul v-else class="mt-2 space-y-2">
-            <li
-              v-for="l in carrito"
-              :key="l.id"
-              class="flex items-center justify-between gap-2 text-sm"
-            >
-              <span class="min-w-0"
-                ><span class="font-semibold">{{ l.cantidad }}×</span>
-                {{ l.nombre }}</span
-              >
-              <span class="flex items-center gap-2 shrink-0">
-                {{ dinero(l.precio * l.cantidad) }}
-                <button
-                  class="tu-enlace"
-                  style="color: var(--error)"
-                  type="button"
-                  @click="quitar(l.id)"
-                >
-                  ✕
-                </button>
-              </span>
-            </li>
-          </ul>
-          <div class="mt-3">
-            <label class="tu-label" for="pos-met">{{ $t("pos.metodo") }}</label>
-            <select id="pos-met" v-model="metodo" class="tu-input">
-              <option value="efectivo">{{ $t("pos.metodos.efectivo") }}</option>
-              <option value="tarjeta">{{ $t("pos.metodos.tarjeta") }}</option>
-              <option value="transferencia">
-                {{ $t("pos.metodos.transferencia") }}
-              </option>
-            </select>
-          </div>
-          <div class="mt-3 flex items-center justify-between font-bold">
-            <span>{{ $t("pos.total") }}</span
-            ><span>{{ dinero(totalCarrito) }}</span>
-          </div>
-          <p
-            v-if="exito"
-            class="mt-2 text-sm"
-            :style="{ color: 'var(--exito)' }"
-          >
-            {{ exito }}
-          </p>
-          <button
-            class="tu-btn tu-btn-primario w-full mt-3"
-            type="button"
-            :disabled="accionando || carrito.length === 0"
-            @click="cobrar"
-          >
-            {{ accionando ? $t("pos.cobrando") : $t("pos.cobrar") }}
-          </button>
-        </div>
-      </div>
-
-      <!-- ===== Inventario ===== -->
-      <div v-else-if="tab === 'inventario'" class="mt-6">
-        <div class="flex justify-end">
-          <button
-            class="tu-btn tu-btn-primario tu-btn-crear"
-            type="button"
-            @click="mostrarNuevo = !mostrarNuevo"
-          >
-            {{ $t("pos.inventario.nuevo") }}
-          </button>
-        </div>
-
-        <form
-          v-if="mostrarNuevo"
-          class="mt-4 tu-card p-4 grid gap-3 sm:grid-cols-3"
-          @submit.prevent="crearArticulo"
-        >
-          <div>
-            <label class="tu-label" for="a-nombre">{{
-              $t("pos.inventario.nombre")
-            }}</label>
-            <input
-              id="a-nombre"
-              v-model="nuevo.nombre"
-              class="tu-input"
-              required
-            />
-          </div>
-          <div>
-            <label class="tu-label" for="a-sku">{{
-              $t("pos.inventario.sku")
-            }}</label>
-            <input id="a-sku" v-model="nuevo.sku" class="tu-input" />
-          </div>
-          <div>
-            <label class="tu-label" for="a-precio">{{
-              $t("pos.inventario.precio")
-            }}</label>
-            <input
-              id="a-precio"
-              v-model="nuevo.precio"
-              type="number"
-              min="0"
-              step="0.01"
-              class="tu-input"
-              required
-            />
-          </div>
-          <div class="sm:col-span-3 flex gap-2">
-            <button
-              class="tu-btn tu-btn-primario"
-              type="submit"
-              :disabled="accionando"
-            >
-              {{ $t("pos.inventario.guardar") }}
-            </button>
-            <button
-              class="tu-btn tu-btn-fantasma"
-              type="button"
-              @click="mostrarNuevo = false"
-            >
-              {{ $t("pos.inventario.cancelar") }}
-            </button>
-          </div>
-        </form>
-
-        <EstadoVacio
-          v-if="articulos.length === 0"
-          class="tu-card mt-6"
-          icono="pos"
-          :titulo="$t('pos.inventario.sinArticulos')"
-        />
-        <ul v-else class="mt-4 space-y-2">
-          <li v-for="a in articulos" :key="a.id" class="tu-card p-3">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span
-                    class="font-semibold"
-                    :style="a.activo ? {} : { color: 'var(--texto-suave)' }"
-                    >{{ a.nombre }}</span
-                  >
-                  <span v-if="!a.activo" class="tu-badge">{{
-                    $t("inventarioExtra.inactivo")
-                  }}</span>
-                  <span class="tu-badge">{{
-                    dinero(a.precio_minor, a.moneda)
-                  }}</span>
-                  <span
-                    class="tu-badge"
-                    :class="
-                      a.stock_total > 0 ? 'tu-badge-exito' : 'tu-badge-aviso'
-                    "
-                  >
-                    {{ $t("pos.inventario.stockTotal") }}: {{ a.stock_total }}
-                  </span>
-                </div>
-                <div
-                  v-if="a.existencias.length > 0"
-                  class="text-xs mt-1"
-                  :style="{ color: 'var(--texto-suave)' }"
-                >
-                  {{
-                    a.existencias
-                      .map((e) => `${e.sucursal}: ${e.stock}`)
-                      .join(" · ")
-                  }}
-                </div>
-              </div>
-              <span class="flex items-center gap-3 shrink-0">
-                <button
-                  class="tu-enlace"
-                  type="button"
-                  @click="abrirEdicion(a)"
-                >
-                  {{ $t("inventarioExtra.editar") }}
-                </button>
-                <button
-                  class="tu-enlace"
-                  type="button"
-                  @click="abrirRestock(a.id)"
-                >
-                  {{ $t("pos.inventario.reabastecer") }}
-                </button>
-              </span>
-            </div>
-            <form
-              v-if="editandoDe === a.id"
-              class="mt-2 flex flex-wrap items-end gap-2 rounded-md p-2"
-              :style="{ background: 'var(--fondo-suave)' }"
-              @submit.prevent="guardarEdicion(a)"
-            >
-              <div class="min-w-[10rem] flex-1">
-                <label class="tu-label" :for="`en-${a.id}`">{{
-                  $t("pos.inventario.nombre")
-                }}</label>
+        <div class="mt-5 grid gap-5 lg:grid-cols-3">
+          <!-- Productos -->
+          <div class="tu-card lg:col-span-2">
+            <div class="mo-barra">
+              <label class="mo-buscar">
+                <IconoNav nombre="buscar" :tam="16" />
                 <input
-                  :id="`en-${a.id}`"
-                  v-model="edicion.nombre"
+                  v-model="busqueda"
+                  type="search"
                   class="tu-input"
-                  required
+                  :placeholder="$t('mostradorVisual.buscar')"
+                  :aria-label="$t('mostradorVisual.buscar')"
                 />
-              </div>
-              <div class="w-32">
-                <label class="tu-label" :for="`es-${a.id}`">{{
-                  $t("pos.inventario.sku")
-                }}</label>
-                <input
-                  :id="`es-${a.id}`"
-                  v-model="edicion.sku"
-                  class="tu-input"
-                />
-              </div>
-              <div class="w-28">
-                <label class="tu-label" :for="`ep-${a.id}`">{{
-                  $t("pos.inventario.precio")
-                }}</label>
-                <input
-                  :id="`ep-${a.id}`"
-                  v-model="edicion.precio"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  class="tu-input"
-                  required
-                />
-              </div>
-              <label class="flex items-center gap-2 pb-2 text-sm">
-                <input v-model="edicion.activo" type="checkbox" />
-                {{ $t("inventarioExtra.activo") }}
               </label>
-              <button
-                class="tu-btn tu-btn-primario"
-                type="submit"
-                :disabled="accionando"
-              >
-                {{ $t("pos.inventario.guardar") }}
-              </button>
-              <button
-                class="tu-btn tu-btn-fantasma"
-                type="button"
-                @click="editandoDe = null"
-              >
-                {{ $t("pos.inventario.cancelar") }}
-              </button>
-            </form>
-            <form
-              v-if="restockDe === a.id"
-              class="mt-2 flex flex-wrap items-end gap-2 rounded-md p-2"
-              :style="{ background: 'var(--fondo-suave)' }"
-              @submit.prevent="guardarRestock(a.id)"
-            >
-              <div v-if="elegirSucursal">
-                <label class="tu-label" :for="`rs-${a.id}`">{{
-                  $t("pos.sucursal")
-                }}</label>
+              <label v-if="elegirSucursal" class="tu-select-icono">
+                <IconoNav nombre="ubicacion" :tam="16" />
                 <select
-                  :id="`rs-${a.id}`"
-                  v-model="restock.sucursal_id"
-                  class="tu-input w-auto"
+                  id="pos-suc"
+                  v-model="sucursalSel"
+                  class="tu-input"
+                  :aria-label="$t('pos.sucursal')"
+                  @change="cambiarSucursal"
                 >
                   <option v-for="s in sucursales" :key="s.id" :value="s.id">
                     {{ s.nombre }}
                   </option>
                 </select>
-              </div>
-              <div>
-                <label class="tu-label" :for="`rt-${a.id}`">{{
-                  $t("inventarioExtra.movimiento")
-                }}</label>
-                <select
-                  :id="`rt-${a.id}`"
-                  v-model="restock.tipo"
-                  class="tu-input w-auto"
-                >
-                  <option value="entrada">
-                    {{ $t("inventarioExtra.entrada") }}
-                  </option>
-                  <option value="ajuste">
-                    {{ $t("inventarioExtra.ajuste") }}
-                  </option>
-                </select>
-              </div>
-              <div class="w-24">
-                <label class="tu-label" :for="`rc-${a.id}`">{{
-                  $t("pos.inventario.cantidad")
-                }}</label>
-                <input
-                  :id="`rc-${a.id}`"
-                  v-model="restock.cantidad"
-                  type="number"
-                  :min="restock.tipo === 'entrada' ? 1 : undefined"
-                  :title="
-                    restock.tipo === 'ajuste'
-                      ? $t('inventarioExtra.ajusteAyuda')
-                      : undefined
-                  "
-                  class="tu-input"
-                />
-              </div>
+              </label>
+              <LeyendaSucursal v-else />
+            </div>
+
+            <p
+              v-if="vendibles.length === 0"
+              class="px-4 py-10 text-center text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{
+                busqueda
+                  ? $t("mostradorVisual.sinResultados")
+                  : $t("pos.sinArticulos")
+              }}
+            </p>
+            <div v-else class="mo-productos">
               <button
-                class="tu-btn tu-btn-primario"
-                type="submit"
-                :disabled="accionando"
-              >
-                {{ $t("pos.inventario.agregarStock") }}
-              </button>
-              <button
-                class="tu-btn tu-btn-fantasma"
+                v-for="a in vendibles"
+                :key="a.id"
                 type="button"
-                @click="restockDe = null"
+                class="mo-producto"
+                :disabled="!puedeVender || stockEn(a) - enCarrito(a.id) <= 0"
+                data-prueba="producto"
+                @click="agregar(a)"
               >
-                {{ $t("pos.inventario.cancelar") }}
+                <span class="mo-tile" aria-hidden="true">{{
+                  iniciales(a.nombre)
+                }}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate font-medium">{{ a.nombre }}</span>
+                  <span class="block tabular-nums">{{
+                    dinero(a.precio_minor, a.moneda)
+                  }}</span>
+                  <span
+                    class="mo-stock"
+                    :style="{
+                      '--tono':
+                        stockEn(a) > 0 ? 'var(--exito)' : 'var(--error)',
+                    }"
+                    >{{
+                      stockEn(a) > 0
+                        ? $t("mostradorVisual.enExistencia", { n: stockEn(a) })
+                        : $t("pos.agotado")
+                    }}</span
+                  >
+                </span>
+                <span
+                  v-if="enCarrito(a.id) > 0"
+                  class="mo-cuenta tabular-nums"
+                  >{{ enCarrito(a.id) }}</span
+                >
               </button>
-            </form>
-          </li>
-        </ul>
+            </div>
+          </div>
+
+          <!-- Venta actual -->
+          <aside class="tu-card mo-venta h-fit" data-prueba="venta-actual">
+            <header class="flex items-center justify-between gap-2">
+              <h2 class="font-medium">
+                {{ $t("mostradorVisual.ventaActual") }}
+              </h2>
+              <span
+                v-if="piezas > 0"
+                class="text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+                >{{ $t("mostradorVisual.piezas", { n: piezas }) }}</span
+              >
+            </header>
+            <p
+              v-if="carrito.length === 0"
+              class="mt-3 text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("mostradorVisual.vacia") }}
+            </p>
+            <ul v-else class="mo-lineas">
+              <li v-for="l in carrito" :key="l.id">
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm font-medium">{{ l.nombre }}</p>
+                  <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+                    {{ dinero(l.precio) }}
+                  </p>
+                </div>
+                <div class="mo-cantidad">
+                  <button
+                    type="button"
+                    :aria-label="$t('mostradorVisual.menos')"
+                    @click="restar(l.id)"
+                  >
+                    −
+                  </button>
+                  <span class="tabular-nums">{{ l.cantidad }}</span>
+                  <button
+                    type="button"
+                    :aria-label="$t('mostradorVisual.mas')"
+                    @click="sumar(l.id)"
+                  >
+                    +
+                  </button>
+                </div>
+                <span class="w-20 text-right text-sm tabular-nums">{{
+                  dinero(l.precio * l.cantidad)
+                }}</span>
+                <button
+                  type="button"
+                  class="tu-icono-btn"
+                  :aria-label="$t('mostradorVisual.quitar')"
+                  @click="quitar(l.id)"
+                >
+                  <IconoNav nombre="cerrar" :tam="14" />
+                </button>
+              </li>
+            </ul>
+
+            <div class="mt-4">
+              <p class="tu-label">{{ $t("pos.metodo") }}</p>
+              <div class="tu-segmentado w-full" role="group">
+                <button
+                  v-for="m in METODOS"
+                  :key="m"
+                  type="button"
+                  class="flex-1"
+                  :aria-pressed="metodo === m"
+                  @click="metodo = m"
+                >
+                  {{ $t(`pos.metodos.${m}`) }}
+                </button>
+              </div>
+            </div>
+            <div class="mo-total">
+              <span>{{ $t("pos.total") }}</span>
+              <span class="tabular-nums">{{ dinero(totalCarrito) }}</span>
+            </div>
+            <button
+              class="tu-btn tu-btn-primario mt-3 w-full"
+              type="button"
+              data-prueba="cobrar"
+              :disabled="!puedeVender || cobrando || carrito.length === 0"
+              @click="cobrar"
+            >
+              {{ cobrando ? $t("pos.cobrando") : $t("pos.cobrar") }}
+            </button>
+          </aside>
+        </div>
 
         <!-- Ventas recientes -->
-        <h2 class="mt-8 font-medium text-lg">{{ $t("pos.ventas.titulo") }}</h2>
+        <h2 class="mt-8 font-medium">{{ $t("pos.ventas.titulo") }}</h2>
         <EstadoVacio
           v-if="ventasVisibles.length === 0"
           class="mt-3 py-6"
@@ -706,66 +506,62 @@ onMounted(cargar);
           compacto
           :titulo="$t('pos.ventas.vacio')"
         />
-        <div v-else class="mt-3 tu-card overflow-hidden">
-          <table class="w-full text-sm">
+        <div v-else class="tu-card mt-3 overflow-x-auto">
+          <table class="mo-tabla">
             <thead>
-              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                <th class="px-4 py-2 font-medium">
+              <tr>
+                <th>{{ $t("mostradorVisual.col.cuando") }}</th>
+                <th>{{ $t("mostradorVisual.col.productos") }}</th>
+                <th v-if="!sucursalActual" class="hidden md:table-cell">
                   {{ $t("pos.ventas.colSucursal") }}
                 </th>
-                <th class="px-4 py-2 font-medium text-right">
-                  {{ $t("pos.ventas.colTotal") }}
-                </th>
-                <th class="px-4 py-2 font-medium hidden sm:table-cell">
+                <th class="hidden sm:table-cell">
                   {{ $t("pos.ventas.colMetodo") }}
                 </th>
-                <th class="px-4 py-2"></th>
+                <th class="text-right">{{ $t("pos.ventas.colTotal") }}</th>
+                <th>
+                  <span class="sr-only">{{
+                    $t("mostradorVisual.col.acciones")
+                  }}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               <template v-for="v in ventasVisibles" :key="v.id">
-                <tr class="border-t" :style="{ borderColor: 'var(--borde)' }">
-                  <td class="px-4 py-2">
-                    <span class="block">{{ v.sucursal ?? "—" }}</span>
-                    <span
-                      v-if="v.lineas?.length"
-                      class="block text-xs"
-                      :style="{ color: 'var(--texto-suave)' }"
-                      >{{
-                        v.lineas
-                          .map((l) => `${l.cantidad} × ${l.articulo ?? ""}`)
-                          .join(", ")
-                      }}</span
-                    >
+                <tr>
+                  <td class="whitespace-nowrap mo-suave">
+                    {{ hora(v.creado_en) }}
                   </td>
-                  <td
-                    class="px-4 py-2 text-right font-semibold"
-                    :class="{ 'line-through': v.anulada_en }"
-                  >
-                    {{ dinero(v.total_minor, v.moneda) }}
+                  <td>
+                    {{
+                      (v.lineas ?? [])
+                        .map((l) => `${l.cantidad} × ${l.articulo ?? ""}`)
+                        .join(", ") || "—"
+                    }}
                   </td>
-                  <td
-                    class="px-4 py-2 hidden sm:table-cell"
-                    :style="{ color: 'var(--texto-suave)' }"
-                  >
+                  <td v-if="!sucursalActual" class="hidden md:table-cell">
+                    {{ v.sucursal ?? "—" }}
+                  </td>
+                  <td class="hidden sm:table-cell">
                     <span
                       v-if="v.anulada_en"
-                      class="inline-flex items-center gap-1.5"
-                      :style="{ color: 'var(--error)' }"
+                      class="tu-pildora"
+                      :style="{ '--tono': 'var(--error)' }"
                       :title="v.motivo_anulacion ?? undefined"
                       data-prueba="venta-anulada"
-                      ><span
-                        class="h-2 w-2 rounded-full"
-                        :style="{ background: 'currentColor' }"
-                        aria-hidden="true"
-                      ></span
                       >{{ $t("corregirCobro.anulada") }}</span
                     >
                     <template v-else>{{
                       nombreMetodo(v.metodo_pago)
                     }}</template>
                   </td>
-                  <td class="px-4 py-2 text-right">
+                  <td
+                    class="text-right font-medium tabular-nums"
+                    :class="{ 'line-through mo-suave': v.anulada_en }"
+                  >
+                    {{ dinero(v.total_minor, v.moneda) }}
+                  </td>
+                  <td class="text-right">
                     <button
                       v-if="!v.anulada_en && (v.corregible || v.anulable)"
                       class="tu-enlace text-sm"
@@ -778,8 +574,8 @@ onMounted(cargar);
                     </button>
                   </td>
                 </tr>
-                <tr v-if="corrigiendo === v.id">
-                  <td colspan="4" class="px-4 pb-3">
+                <tr v-if="corrigiendo === v.id" class="mo-correccion">
+                  <td colspan="6">
                     <CorregirCobro
                       :base="base"
                       :pago="{
@@ -790,7 +586,7 @@ onMounted(cargar);
                       }"
                       :url-metodo="`${base}/pos/ventas/${v.id}/metodo`"
                       :url-anular="`${base}/pos/ventas/${v.id}/anular`"
-                      :metodos="['efectivo', 'tarjeta', 'transferencia']"
+                      :metodos="[...METODOS]"
                       permiso-metodo="pos.vender"
                       contexto="venta"
                       @cambiado="alCorregirVenta"
@@ -801,7 +597,168 @@ onMounted(cargar);
             </tbody>
           </table>
         </div>
-      </div>
+      </template>
     </template>
   </section>
 </template>
+
+<style scoped>
+.mo-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--borde);
+}
+.mo-buscar {
+  position: relative;
+  flex: 1 1 14rem;
+  color: var(--texto-suave);
+}
+.mo-buscar > :first-child {
+  position: absolute;
+  top: 50%;
+  left: 0.75rem;
+  transform: translateY(-50%);
+}
+.mo-buscar > input {
+  padding-left: 2.25rem;
+}
+.mo-productos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.6rem;
+  padding: 1rem;
+}
+.mo-producto {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.75rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--superficie);
+  font-size: 0.875rem;
+  text-align: left;
+  transition: border-color 0.15s ease;
+}
+.mo-producto:hover:not(:disabled) {
+  border-color: var(--primario);
+}
+.mo-producto:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.mo-tile {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  border: 1px solid var(--borde);
+  border-radius: 0.5rem;
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.mo-stock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+}
+.mo-stock::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--tono);
+}
+.mo-cuenta {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  min-width: 1.4rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--primario);
+  color: var(--primario-contraste, #fff);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4rem;
+  text-align: center;
+}
+.mo-venta {
+  padding: 1rem 1.1rem 1.1rem;
+}
+.mo-lineas {
+  display: grid;
+  margin-top: 0.75rem;
+}
+.mo-lineas > li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--borde);
+}
+.mo-cantidad {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-boton);
+  font-size: 0.85rem;
+}
+.mo-cantidad > button {
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--texto-suave);
+}
+.mo-cantidad > button:hover {
+  color: var(--texto);
+}
+.mo-cantidad > span {
+  min-width: 1.5rem;
+  text-align: center;
+}
+.mo-total {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--borde);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.mo-tabla {
+  width: 100%;
+  font-size: 0.9rem;
+  border-collapse: collapse;
+}
+.mo-tabla th {
+  padding: 0.7rem 1rem;
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-align: left;
+}
+.mo-tabla th.text-right {
+  text-align: right;
+}
+.mo-tabla td {
+  padding: 0.7rem 1rem;
+  border-top: 1px solid var(--borde);
+  vertical-align: middle;
+}
+.mo-correccion td {
+  border-top: 0;
+  padding-top: 0;
+}
+.mo-suave {
+  color: var(--texto-suave);
+}
+</style>

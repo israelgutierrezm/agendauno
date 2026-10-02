@@ -52,6 +52,27 @@ it('crea articulo, reabastece y el stock es la suma del ledger', function (): vo
     expect($art['existencias'][0]['stock'])->toBe(20);
 });
 
+it('cada existencia dice si hay stock, si es bajo o si no hay, con el umbral del negocio', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $articulo = crearArticulo($e);
+
+    $lista = $this->getJson("/api/v1/app/{$e['slug']}/articulos", conBearer($e['bearer']))->assertOk();
+    expect($lista->json('meta.stock_bajo'))->toBe(3);
+    expect($lista->json('data.0.estado_stock'))->toBe('sin_stock');
+
+    reabastecer($e, $articulo, $semilla['sucursal'], 3);
+    $art = $this->getJson("/api/v1/app/{$e['slug']}/articulos", conBearer($e['bearer']))->assertOk()->json('data.0');
+    expect($art['estado_stock'])->toBe('bajo');
+    expect($art['existencias'][0]['estado'])->toBe('bajo');
+
+    // El negocio decide qué es «bajo».
+    $this->putJson("/api/v1/app/{$e['slug']}/parametros", ['valores' => ['inventario.stock_bajo' => 2]], conBearer($e['bearer']))->assertOk();
+    $art = $this->getJson("/api/v1/app/{$e['slug']}/articulos", conBearer($e['bearer']))->assertOk();
+    expect($art->json('meta.stock_bajo'))->toBe(2);
+    expect($art->json('data.0.estado_stock'))->toBe('con_stock');
+});
+
 it('una venta POS registra el ticket y descuenta stock', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $semilla = agendaSemilla($e);
