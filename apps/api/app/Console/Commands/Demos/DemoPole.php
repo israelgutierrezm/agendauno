@@ -327,7 +327,7 @@ final class DemoPole extends DemoBase
         };
         $porSemana = self::PLANES[$plan][4];
         $posibles = $franja === 'sabado' ? [6, 2, 4] : [1, 2, 3, 4, 5];
-        shuffle($posibles);
+        $posibles = $this->mezclar($posibles);
 
         return [
             'persona' => $persona,
@@ -361,7 +361,7 @@ final class DemoPole extends DemoBase
         $ahora = $this->ahora;
 
         $orden = array_keys($this->alumnas);
-        shuffle($orden);
+        $orden = $this->mezclar($orden);
         foreach ($orden as $i) {
             $a = $this->alumnas[$i];
             if ($a['desde']->greaterThan($dia) || ($a['deja'] instanceof CarbonImmutable && $dia->greaterThanOrEqualTo($a['deja']))) {

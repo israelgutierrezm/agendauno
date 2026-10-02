@@ -349,7 +349,7 @@ final class DemoBarberia extends DemoBase
         /** @var list<array{0: ReservaTenant, 1: int|null}> $citas reserva y cliente (índice) */
         $citas = [];
         $orden = array_keys($this->clientes);
-        shuffle($orden);
+        $orden = $this->mezclar($orden);
         foreach ($orden as $i) {
             $c = $this->clientes[$i];
             if ($c['proxima']->greaterThan($dia) || $c['persona']->created_at?->greaterThan($dia->endOfDay())
@@ -412,7 +412,7 @@ final class DemoBarberia extends DemoBase
         $servicio = $this->servicios[$c['servicio']];
         $barberos = [$c['barbero'], ...array_values(array_diff(array_keys($this->turnos), [$c['barbero']]))];
         if ($this->prob(15)) {
-            shuffle($barberos);
+            $barberos = $this->mezclar($barberos);
         }
         foreach ($barberos as $barbero) {
             foreach ($this->huecos($barbero, $dia, (int) $servicio->duracion_minutos, $c['franja']) as [$sede, $minuto]) {
@@ -442,7 +442,7 @@ final class DemoBarberia extends DemoBase
     private function llegaSinCita(CarbonImmutable $dia, bool $esHoy): ?ReservaTenant
     {
         $barberos = array_keys($this->turnos);
-        shuffle($barberos);
+        $barberos = $this->mezclar($barberos);
         $servicio = $this->servicios[(string) $this->elegir(['corte' => 60, 'barba' => 25, 'corte_barba' => 15])];
         foreach ($barberos as $barbero) {
             foreach ($this->huecos($barbero, $dia, (int) $servicio->duracion_minutos, (string) $this->elegir(['manana' => 25, 'tarde' => 40, 'noche' => 35])) as [$sede, $minuto]) {
@@ -503,8 +503,8 @@ final class DemoBarberia extends DemoBase
                 }
             }
         }
-        shuffle($preferidos);
-        shuffle($otros);
+        $preferidos = $this->mezclar($preferidos);
+        $otros = $this->mezclar($otros);
 
         return array_slice([...$preferidos, ...$otros], 0, 3);
     }

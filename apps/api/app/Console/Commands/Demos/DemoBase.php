@@ -22,6 +22,8 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Random\Engine\Mt19937;
+use Random\Randomizer;
 use RuntimeException;
 use Throwable;
 
@@ -31,7 +33,8 @@ use Throwable;
  * para sembrar la historia día por día con los servicios del dominio (así órdenes,
  * pagos, créditos, asistencia y nómina quedan como si hubiera ocurrido).
  *
- * El azar tiene semilla fija: dos corridas dan los mismos datos. Solo para desarrollo.
+ * El azar tiene semilla fija (`Randomizer` con `Mt19937`): dos corridas dan los mismos
+ * datos. Solo para desarrollo.
  */
 abstract class DemoBase
 {
@@ -45,6 +48,9 @@ abstract class DemoBase
     protected CarbonImmutable $inicio;
 
     protected string $password = '';
+
+    /** Azar con semilla fija (el nombre del negocio). */
+    private Randomizer $aleatorio;
 
     /** @var array<string, int> lo que se sembró, para el resumen */
     protected array $cuenta = [];
@@ -90,7 +96,7 @@ abstract class DemoBase
         $this->hoy = $this->ahora->startOfDay();
         $this->inicio = $this->hoy->subDays($dias);
         $d = $this->datos();
-        mt_srand(crc32($d['slug']));
+        $this->aleatorio = new Randomizer(new Mt19937(crc32($d['slug'])));
 
         $estudio = Estudio::query()->where('slug', $d['slug'])->first();
         if ($estudio instanceof Estudio) {
@@ -183,9 +189,9 @@ abstract class DemoBase
      */
     protected function hace(int $minimo, int $maximo, ?\DateTimeInterface $alta): CarbonImmutable
     {
-        $momento = $this->ahora->subMinutes(mt_rand($minimo, $maximo));
+        $momento = $this->ahora->subMinutes($this->aleatorio->getInt($minimo, $maximo));
         if ($alta !== null && $momento->lessThan($alta)) {
-            $momento = CarbonImmutable::instance($alta)->addMinutes(mt_rand(5, 30));
+            $momento = CarbonImmutable::instance($alta)->addMinutes($this->aleatorio->getInt(5, 30));
         }
 
         return $this->en($momento);
@@ -194,7 +200,7 @@ abstract class DemoBase
     protected function en(CarbonImmutable $instante): CarbonImmutable
     {
         if ($instante->greaterThan($this->ahora)) {
-            $instante = $this->ahora->subMinutes(mt_rand(3, 60));
+            $instante = $this->ahora->subMinutes($this->aleatorio->getInt(3, 60));
         }
         Carbon::setTestNow($instante->utc());
 
@@ -203,13 +209,26 @@ abstract class DemoBase
 
     protected function azar(int $min, int $max): int
     {
-        return mt_rand($min, $max);
+        return $this->aleatorio->getInt($min, $max);
+    }
+
+    /**
+     * La lista en otro orden (con la misma semilla).
+     *
+     * @template T
+     *
+     * @param  list<T>  $lista
+     * @return list<T>
+     */
+    protected function mezclar(array $lista): array
+    {
+        return $this->aleatorio->shuffleArray($lista);
     }
 
     /** Verdadero con probabilidad `$porciento`. */
     protected function prob(int $porciento): bool
     {
-        return mt_rand(1, 100) <= $porciento;
+        return $this->aleatorio->getInt(1, 100) <= $porciento;
     }
 
     /**
@@ -222,7 +241,7 @@ abstract class DemoBase
      */
     protected function elegir(array $pesos): int|string
     {
-        $tiro = mt_rand(1, max(1, array_sum($pesos)));
+        $tiro = $this->aleatorio->getInt(1, max(1, array_sum($pesos)));
         foreach ($pesos as $valor => $peso) {
             $tiro -= $peso;
             if ($tiro <= 0) {
@@ -241,7 +260,7 @@ abstract class DemoBase
      */
     protected function uno(array $lista): mixed
     {
-        return $lista[mt_rand(0, count($lista) - 1)];
+        return $lista[$this->aleatorio->getInt(0, count($lista) - 1)];
     }
 
     protected function sumar(string $que, int $n = 1): void
@@ -325,7 +344,7 @@ abstract class DemoBase
         ]);
         // Nadie se da de alta en el futuro (un alta de hoy, más tarde que ahora).
         if ($alta->greaterThan($this->ahora)) {
-            $alta = $this->ahora->subMinutes(mt_rand(30, 240));
+            $alta = $this->ahora->subMinutes($this->aleatorio->getInt(30, 240));
         }
         $persona->forceFill(['created_at' => $alta->utc(), 'updated_at' => $alta->utc()])->saveQuietly();
         $this->sumar('personas');
