@@ -46,7 +46,7 @@ const ancho = computed(
         <div class="absolute inset-0 bg-black/50" @click="emit('cerrar')" />
         <section
           ref="panel"
-          class="tu-modal-panel relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-2xl shadow-xl"
+          class="tu-modal-panel relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-xl shadow-xl"
           :class="ancho"
           :style="{ background: 'var(--superficie)' }"
           role="dialog"

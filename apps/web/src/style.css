@@ -30,10 +30,10 @@
   --aviso: #b64400; /* Ember */
   --aviso-suave: #fbe9dd;
   --sombra: none; /* Sin sombras: separación por color + hairline. */
-  --radio-tarjeta: 0.85rem; /* ~14px: redondeado suave, no exagerado */
-  --radio-boton: 0.6rem; /* ~10px: un poco redondeado, ya no píldora */
-  --sombra-tarjeta:
-    0 1px 2px rgb(16 24 40 / 4%), 0 14px 32px -22px rgb(0 70 160 / 22%);
+  /* Sobrio, como un producto SaaS moderno: poco redondeo y sombra apenas visible. */
+  --radio-tarjeta: 0.65rem; /* ~10px */
+  --radio-boton: 0.5rem; /* ~8px */
+  --sombra-tarjeta: 0 1px 2px rgb(16 24 40 / 5%);
   color-scheme: light;
 }
 
@@ -504,9 +504,10 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
-    padding: 1rem 1.1rem;
-    border-radius: 0.85rem;
-    background: var(--superficie-2);
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--borde);
+    border-radius: var(--radio-tarjeta);
+    background: color-mix(in srgb, var(--superficie-2) 45%, var(--superficie));
   }
   @media (min-width: 768px) {
     .tu-detalle-franja {
@@ -535,34 +536,32 @@
     display: inline-grid;
     place-items: center;
     flex-shrink: 0;
-    width: 2.6rem;
-    height: 2.6rem;
-    border-radius: 0.65rem;
-    background: var(--primario-suave);
-    color: var(--primario-fuerte, var(--primario));
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px solid var(--borde);
+    border-radius: 0.5rem;
+    background: var(--superficie);
+    color: var(--texto-suave);
   }
   .tu-pildora {
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
-    padding: 0.35rem 0.8rem;
-    border-radius: 999px;
-    background: color-mix(
-      in srgb,
-      var(--tono, var(--texto-suave)) 12%,
-      transparent
-    );
-    color: var(--tono, var(--texto-suave));
-    font-size: 0.88rem;
+    gap: 0.4rem;
+    padding: 0.2rem 0.6rem;
+    border: 1px solid var(--borde);
+    border-radius: 0.4rem;
+    background: var(--superficie);
+    color: var(--texto);
+    font-size: 0.82rem;
     font-weight: 500;
     white-space: nowrap;
   }
   .tu-pildora::before {
     content: "";
-    width: 0.5rem;
-    height: 0.5rem;
+    width: 0.45rem;
+    height: 0.45rem;
     border-radius: 999px;
-    background: currentColor;
+    background: var(--tono, var(--texto-suave));
   }
   .tu-detalle-seccion {
     display: grid;

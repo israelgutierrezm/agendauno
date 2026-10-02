@@ -505,18 +505,20 @@ watch(
       <!-- Qué, con quién, cuánto y dónde -->
       <dl class="tu-detalle-franja">
         <div>
-          <span
-            class="tu-cuadro-icono"
-            :style="
-              tono ? { background: tono.fondo, color: tono.tinta } : undefined
-            "
-            aria-hidden="true"
-          >
+          <span class="tu-cuadro-icono" aria-hidden="true">
             <IconoNav nombre="etiqueta" :tam="20" />
           </span>
           <div class="min-w-0">
             <dt>{{ $t("detalleCita.servicio") }}</dt>
-            <dd>{{ sesion.oferta ?? "—" }}</dd>
+            <dd class="flex items-center gap-1.5">
+              <span
+                v-if="tono"
+                class="h-2 w-2 shrink-0 rounded-full"
+                :style="{ background: tono.tinta }"
+                aria-hidden="true"
+              ></span
+              >{{ sesion.oferta ?? "—" }}
+            </dd>
           </div>
         </div>
         <div>
@@ -988,12 +990,11 @@ watch(
 .pc-opcion-bien,
 .pc-opcion-mal {
   border-color: var(--tono);
-  background: color-mix(in srgb, var(--tono) 7%, var(--superficie));
 }
 .pc-opcion-bien .pc-opcion-icono,
 .pc-opcion-mal .pc-opcion-icono {
-  background: var(--tono);
-  color: #fff;
+  background: color-mix(in srgb, var(--tono) 10%, var(--superficie));
+  color: var(--tono);
 }
 .pc-opcion-bien .pc-opcion-titulo,
 .pc-opcion-bien .pc-opcion-sub,

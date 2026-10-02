@@ -1393,9 +1393,9 @@ onMounted(cargar);
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 0.9rem;
-  background: var(--primario-suave);
-  color: var(--primario-fuerte);
+  border: 1px solid var(--borde);
+  border-radius: 0.6rem;
+  color: var(--texto-suave);
 }
 .ci-existentes {
   display: grid;

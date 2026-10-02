@@ -4,10 +4,10 @@ import { computed } from "vue";
 import IconoNav from "@/components/IconoNav.vue";
 
 /**
- * Indicadores en tarjetas (Agenda, Recepción, Inicio): el ícono en un cuadro de su
- * color, la etiqueta y el valor, y el mismo ícono grande y tenue de fondo. Un valor
- * que pide atención (`aviso`) va en el color de aviso. Los colores son los de
- * `.tu-tono-*` (style.css).
+ * Indicadores (Agenda, Recepción, listados): una franja con la etiqueta, un ícono
+ * pequeño y neutro, y el valor. Sin color de adorno: solo lo que pide atención
+ * (`aviso`) va en el color de aviso y la tendencia, en verde o rojo. `tono` y
+ * `decoracion` se conservan por compatibilidad, pero ya no pintan nada.
  */
 export type Tono = "azul" | "verde" | "naranja" | "morado" | "rosa" | "cielo";
 
@@ -65,158 +65,126 @@ const columnasMedio = computed(() =>
       <div
         v-for="k in tarjetas"
         :key="k.clave"
-        class="ti-tarjeta tu-card"
-        :class="[
-          `tu-tono-${k.tono ?? 'azul'}`,
-          { 'ti-con-barras': decoracion === 'barras' },
-        ]"
+        class="ti-celda"
         :data-prueba="`indicador-${k.clave}`"
       >
-        <span class="tu-icono-tono ti-icono" aria-hidden="true">
-          <IconoNav :nombre="k.icono ?? 'punto'" :tam="22" />
-        </span>
-        <div class="min-w-0">
-          <dt class="ti-etiqueta">{{ k.etiqueta }}</dt>
-          <dd class="ti-valor">
-            <span :style="k.aviso ? { color: 'var(--aviso)' } : undefined">{{
-              k.valor
-            }}</span>
-            <span
-              v-if="k.tendencia"
-              class="ti-tendencia"
-              :class="
-                k.tendencia.buena === true
-                  ? 'ti-buena'
-                  : k.tendencia.buena === false
-                    ? 'ti-mala'
-                    : 'ti-neutra'
-              "
-              :title="k.tendencia.titulo"
-              data-prueba="tendencia"
-            >
-              <IconoNav
-                v-if="k.tendencia.direccion !== 'igual'"
-                :nombre="k.tendencia.direccion === 'sube' ? 'arriba' : 'abajo'"
-                :tam="12"
-              />
-              {{ k.tendencia.texto }}
-            </span>
-          </dd>
-        </div>
-        <span v-if="decoracion === 'icono'" class="ti-fondo" aria-hidden="true">
-          <IconoNav :nombre="k.icono ?? 'punto'" :tam="72" />
-        </span>
-        <span v-else class="ti-barras" aria-hidden="true">
+        <dt class="ti-etiqueta">
+          <IconoNav
+            v-if="k.icono"
+            class="ti-icono"
+            :nombre="k.icono"
+            :tam="15"
+          />
+          {{ k.etiqueta }}
+        </dt>
+        <dd class="ti-valor">
+          <span :style="k.aviso ? { color: 'var(--aviso)' } : undefined">{{
+            k.valor
+          }}</span>
           <span
-            v-for="(h, i) in [38, 62, 48, 86]"
-            :key="i"
-            :style="{ height: `${h}%` }"
-          ></span>
-        </span>
+            v-if="k.tendencia"
+            class="ti-tendencia"
+            :class="
+              k.tendencia.buena === true
+                ? 'ti-buena'
+                : k.tendencia.buena === false
+                  ? 'ti-mala'
+                  : 'ti-neutra'
+            "
+            :title="k.tendencia.titulo"
+            data-prueba="tendencia"
+          >
+            <IconoNav
+              v-if="k.tendencia.direccion !== 'igual'"
+              :nombre="k.tendencia.direccion === 'sube' ? 'arriba' : 'abajo'"
+              :tam="12"
+            />
+            {{ k.tendencia.texto }}
+          </span>
+        </dd>
       </div>
     </dl>
   </div>
 </template>
 
 <style scoped>
-/* Según el ancho que tiene (no el de la ventana, que incluye el menú): uno por fila
-   si es angosto, de dos en dos (o los 3) en mediano y en una fila si cabe. */
+/* Una sola franja, al estilo de los tableros de producto: celdas separadas por una
+   línea fina, sin cuadros de color ni íconos de adorno. Se acomoda al ancho que
+   tiene (no al de la ventana): una por fila si es angosto, de dos en dos (o las 3)
+   en mediano y en una fila si cabe. */
 .ti-envoltura {
   container-type: inline-size;
 }
 .ti {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 0.85rem;
+  gap: 1px;
   margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--borde);
 }
 @container (min-width: 34rem) {
   .ti {
     grid-template-columns: repeat(var(--ti-n-medio), minmax(0, 1fr));
+  }
+  /* De dos en dos con un número impar: la última ocupa la fila completa. */
+  .ti-celda:last-child:nth-child(odd) {
+    grid-column: span var(--ti-n-medio);
   }
 }
 @container (min-width: 60rem) {
   .ti {
     grid-template-columns: repeat(var(--ti-n), minmax(0, 1fr));
   }
+  .ti-celda:last-child:nth-child(odd) {
+    grid-column: auto;
+  }
 }
-.ti-tarjeta {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  padding: 1rem 1.1rem;
-}
-.ti-icono {
-  width: 2.85rem;
-  height: 2.85rem;
+.ti-celda {
+  min-width: 0;
+  padding: 0.95rem 1.15rem 1rem;
+  background: var(--superficie);
 }
 .ti-etiqueta {
-  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   color: var(--texto-suave);
+  font-size: 0.8rem;
+}
+.ti-icono {
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 .ti-valor {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   gap: 0.25rem 0.6rem;
-  margin: 0.1rem 0 0;
-  font-size: 1.35rem;
-  font-weight: 700;
+  margin: 0.35rem 0 0;
+  font-size: 1.45rem;
+  font-weight: 600;
   line-height: 1.2;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
 .ti-tendencia {
   display: inline-flex;
   align-items: center;
   gap: 0.15rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 0.4rem;
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 .ti-buena {
-  background: color-mix(in srgb, var(--exito) 12%, var(--superficie));
   color: var(--exito-texto, var(--exito));
 }
 .ti-mala {
-  background: color-mix(in srgb, var(--error) 10%, var(--superficie));
   color: var(--error);
 }
 .ti-neutra {
-  background: var(--superficie-2);
   color: var(--texto-suave);
-}
-/* Las barras van a la derecha: el texto no les pasa por encima. */
-.ti-con-barras {
-  padding-right: 2.9rem;
-}
-.ti-barras {
-  position: absolute;
-  right: 1rem;
-  bottom: 1rem;
-  display: flex;
-  align-items: flex-end;
-  gap: 0.2rem;
-  height: 1.7rem;
-  pointer-events: none;
-}
-.ti-barras > span {
-  width: 0.35rem;
-  border-radius: 0.15rem;
-  background: var(--tono);
-  opacity: 0.25;
-}
-.ti-barras > span:last-child {
-  opacity: 0.55;
-}
-.ti-fondo {
-  position: absolute;
-  right: -0.5rem;
-  bottom: -1rem;
-  color: var(--tono);
-  opacity: 0.1;
-  pointer-events: none;
 }
 </style>

@@ -14,13 +14,14 @@ function indicadores(n: number): Indicador[] {
 }
 
 describe("Tarjetas de indicadores", () => {
-  it("cada indicador con su ícono, su color, la etiqueta y el valor", () => {
+  it("cada indicador con su etiqueta, un ícono neutro y el valor (sin color de adorno)", () => {
     const w = mount(TarjetasIndicadores, {
       props: { tarjetas: indicadores(2) },
     });
 
     const tarjeta = w.get('[data-prueba="indicador-k1"]');
-    expect(tarjeta.classes()).toContain("tu-tono-verde");
+    expect(tarjeta.classes()).not.toContain("tu-tono-verde");
+    expect(tarjeta.find("dt svg").exists()).toBe(true);
     expect(tarjeta.text()).toContain("Indicador 1");
     expect(tarjeta.get("dd").text()).toBe("1");
   });
@@ -74,6 +75,5 @@ describe("Tarjetas de indicadores", () => {
     expect(clases.text()).toBe("12%");
     expect(clases.classes()).toContain("ti-buena");
     expect(espera.classes()).toContain("ti-mala");
-    expect(w.findAll(".ti-barras")).toHaveLength(2);
   });
 });

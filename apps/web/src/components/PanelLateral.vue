@@ -40,7 +40,7 @@ const capa = useFocoPanel(
           ref="panel"
           class="tu-drawer-panel relative flex w-full flex-col overflow-y-auto shadow-xl"
           :class="
-            lateral ? 'h-full max-w-md' : 'max-h-[92vh] max-w-3xl rounded-2xl'
+            lateral ? 'h-full max-w-md' : 'max-h-[92vh] max-w-3xl rounded-xl'
           "
           :style="{ background: 'var(--superficie)' }"
           role="dialog"
