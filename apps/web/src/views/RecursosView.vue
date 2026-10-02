@@ -6,6 +6,7 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -43,10 +44,13 @@ const form = ref({
 });
 const creando = ref(false);
 const abierto = ref(false);
+// Con una sucursal fija (la de la barra o la única), la sala nueva es de esa.
+const { mostrarSelect: elegirSucursal, fija: sucursalFija } =
+  useSucursalOperativa();
 
 function abrir(): void {
   form.value = {
-    sucursalId: "",
+    sucursalId: sucursalFija.value ?? "",
     nombre: "",
     tipo: "",
     modo: "unidad",
@@ -187,7 +191,7 @@ onMounted(cargar);
           <label class="tu-label" for="rn">{{ $t("recursos.nombre") }}</label>
           <input id="rn" v-model="form.nombre" class="tu-input" required />
         </div>
-        <div>
+        <div v-if="elegirSucursal">
           <label class="tu-label" for="rs">{{ $t("recursos.sucursal") }}</label>
           <select id="rs" v-model="form.sucursalId" class="tu-input" required>
             <option value="" disabled>{{ $t("recursos.sucursal") }}</option>

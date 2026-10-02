@@ -78,8 +78,11 @@ const exito = ref<string | null>(null);
 // POS
 const sucursalSel = ref("");
 // Con una sucursal fija (la de la barra o la única), se vende ahí sin preguntar.
-const { mostrarSelect: elegirSucursal, actual: sucursalActual } =
-  useSucursalOperativa({ campo: sucursalSel });
+const {
+  mostrarSelect: elegirSucursal,
+  actual: sucursalActual,
+  fija: sucursalFija,
+} = useSucursalOperativa({ campo: sucursalSel });
 const ventasVisibles = computed(() =>
   sucursalActual.value
     ? ventas.value.filter((v) => v.sucursal === sucursalActual.value!.nombre)
@@ -230,7 +233,7 @@ function abrirRestock(articuloId: string): void {
   restockDe.value = articuloId;
   editandoDe.value = null;
   restock.value = {
-    sucursal_id: sucursales.value[0]?.id ?? "",
+    sucursal_id: sucursalFija.value ?? sucursales.value[0]?.id ?? "",
     cantidad: "",
     tipo: "entrada",
   };
@@ -626,7 +629,7 @@ onMounted(cargar);
               :style="{ background: 'var(--fondo-suave)' }"
               @submit.prevent="guardarRestock(a.id)"
             >
-              <div>
+              <div v-if="elegirSucursal">
                 <label class="tu-label" :for="`rs-${a.id}`">{{
                   $t("pos.sucursal")
                 }}</label>
