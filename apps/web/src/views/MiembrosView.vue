@@ -52,6 +52,8 @@ interface Miembro {
   primera_vez: boolean | null;
   alta?: string | null;
   acceso_app?: boolean;
+  // Ya se le invitó y no ha activado su cuenta: se reenvía a esta cuenta.
+  invitacion_pendiente?: string | null;
   celular?: string | null;
   sucursal?: { id: string; nombre: string } | null;
   // Para las tarjetas (`resumen=1`): membresía, visitas y adeudo.
@@ -379,6 +381,22 @@ async function invitar(m: Miembro): Promise<void> {
       rol: "miembro",
     });
     invitados.value = new Set(invitados.value).add(m.id);
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    invitandoId.value = null;
+  }
+}
+// Invitación sin activar: se reenvía el correo (no se crea otra cuenta).
+async function reenviarInvitacion(m: Miembro): Promise<void> {
+  if (!m.invitacion_pendiente) {
+    return;
+  }
+  invitandoId.value = m.id;
+  error.value = null;
+  try {
+    await api.post(`${base.value}/usuarios/${m.invitacion_pendiente}/reenviar`);
+    toast.exito(t("operacion.clientes.reenviada", { email: m.email ?? "" }));
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -751,8 +769,8 @@ onMounted(() => {
                         {{
                           m.acceso_app
                             ? $t("operacion.clientes.conApp")
-                            : invitados.has(m.id)
-                              ? $t("miembros.invitado")
+                            : invitados.has(m.id) || m.invitacion_pendiente
+                              ? $t("operacion.clientes.invitacionPendiente")
                               : $t("operacion.clientes.sinApp")
                         }}
                       </td>
@@ -866,17 +884,39 @@ onMounted(() => {
                           tipo === 'miembro' &&
                           m.email &&
                           !m.acceso_app &&
+                          m.invitacion_pendiente &&
                           !invitados.has(m.id)
                         "
                         class="tu-enlace text-sm mr-3"
                         type="button"
+                        data-prueba="reenviar-invitacion"
+                        :disabled="invitandoId === m.id"
+                        @click="reenviarInvitacion(m)"
+                      >
+                        {{
+                          invitandoId === m.id
+                            ? $t("operacion.clientes.reenviando")
+                            : $t("operacion.clientes.reenviar")
+                        }}
+                      </button>
+                      <button
+                        v-else-if="
+                          puedeInvitar &&
+                          tipo === 'miembro' &&
+                          m.email &&
+                          !m.acceso_app &&
+                          !invitados.has(m.id)
+                        "
+                        class="tu-enlace text-sm mr-3"
+                        type="button"
+                        :title="$t('operacion.clientes.invitarAyuda')"
                         :disabled="invitandoId === m.id"
                         @click="invitar(m)"
                       >
                         {{
                           invitandoId === m.id
                             ? $t("miembros.invitando")
-                            : $t("miembros.invitar")
+                            : $t("operacion.clientes.invitar")
                         }}
                       </button>
                       <span

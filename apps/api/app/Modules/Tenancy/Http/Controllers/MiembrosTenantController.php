@@ -27,6 +27,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -121,6 +122,7 @@ class MiembrosTenantController
             $items = $pagina->getCollection();
             $asistencias = $this->conteoAsistencias($items->pluck('id')->all());
             $quienes = $this->nombresDe($items->pluck('eliminado_por')->filter()->all());
+            $cuentas = $this->cuentasPorCorreo($items);
             // `?resumen=1` (tarjetas del listado): membresía, visitas y adeudo en lote.
             $resumenes = $request->boolean('resumen') && $tipo === TipoPersonaTenant::Miembro->value
                 ? $this->resumenes($items)
@@ -128,7 +130,7 @@ class MiembrosTenantController
 
             return response()->json([
                 'data' => $items->map(fn (PersonaTenant $persona): array => [
-                    ...$this->presentar($persona, (int) ($asistencias[$persona->getKey()] ?? 0), $quienes),
+                    ...$this->presentar($persona, (int) ($asistencias[$persona->getKey()] ?? 0), $quienes, $cuentas),
                     ...(isset($resumenes[$persona->getKey()]) ? ['resumen' => $resumenes[$persona->getKey()]] : []),
                 ])->all(),
                 'meta' => [
@@ -143,14 +145,43 @@ class MiembrosTenantController
         $personas = $consulta->limit(self::LIMITE)->get();
         $asistencias = $this->conteoAsistencias($personas->pluck('id')->all());
         $quienes = $this->nombresDe($personas->pluck('eliminado_por')->filter()->all());
+        $cuentas = $this->cuentasPorCorreo($personas);
 
         return response()->json([
             'data' => $personas->map(fn (PersonaTenant $persona): array => $this->presentar(
                 $persona,
                 (int) ($asistencias[$persona->getKey()] ?? 0),
                 $quienes,
+                $cuentas,
             ))->all(),
         ]);
+    }
+
+    /**
+     * Cuentas con el correo de personas aún sin cuenta ligada, en un solo query. La
+     * cuenta se liga a su ficha la primera vez que entra; antes, una invitación sin
+     * activar queda pendiente (se reenvía, no se vuelve a invitar).
+     *
+     * @param  Collection<int, PersonaTenant>  $personas
+     * @return array<string, Usuario> por correo en minúsculas
+     */
+    private function cuentasPorCorreo(Collection $personas): array
+    {
+        $correos = $personas
+            ->filter(fn (PersonaTenant $p): bool => $p->usuario_id === null && filled($p->email))
+            ->map(fn (PersonaTenant $p): string => mb_strtolower((string) $p->email))
+            ->unique()
+            ->values()
+            ->all();
+        if ($correos === []) {
+            return [];
+        }
+
+        return Usuario::query()
+            ->whereIn(DB::raw('LOWER(email)'), $correos)
+            ->get(['id', 'ulid', 'email', 'activo'])
+            ->keyBy(fn (Usuario $u): string => mb_strtolower((string) $u->email))
+            ->all();
     }
 
     /**
@@ -544,10 +575,15 @@ class MiembrosTenantController
 
     /**
      * @param  array<int, string>  $quienes  nombres de quienes dieron de baja
+     * @param  array<string, Usuario>  $cuentas  cuentas por correo ({@see cuentasPorCorreo})
      * @return array<string, mixed>
      */
-    private function presentar(PersonaTenant $persona, ?int $asistencias = null, array $quienes = []): array
+    private function presentar(PersonaTenant $persona, ?int $asistencias = null, array $quienes = [], array $cuentas = []): array
     {
+        $cuenta = $persona->usuario_id === null && filled($persona->email)
+            ? ($cuentas[mb_strtolower((string) $persona->email)] ?? null)
+            : null;
+
         return [
             'id' => $persona->ulid,
             'nombre' => $persona->nombre,
@@ -567,7 +603,9 @@ class MiembrosTenantController
             'archivado' => $persona->archivado,
             'alta' => $persona->created_at?->toDateString(),
             // Tiene cuenta para entrar a la app o al portal (activó su invitación).
-            'acceso_app' => $persona->usuario_id !== null,
+            'acceso_app' => $persona->usuario_id !== null || $cuenta?->activo === true,
+            // Ya se le invitó y no ha activado: se reenvía a esta cuenta.
+            'invitacion_pendiente' => $cuenta !== null && ! $cuenta->activo ? (string) $cuenta->ulid : null,
             'asistencias' => $asistencias,
             'primera_vez' => $asistencias !== null ? $asistencias === 0 : null,
             'sucursal' => $persona->sucursal !== null

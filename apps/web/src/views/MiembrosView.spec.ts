@@ -5,9 +5,9 @@ import { createI18n } from "vue-i18n";
 import esMX from "@/i18n/locales/es-MX";
 import MiembrosView from "./MiembrosView.vue";
 
-const mocks = vi.hoisted(() => ({ get: vi.fn() }));
+const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({
-  api: { get: mocks.get, post: vi.fn(), put: vi.fn() },
+  api: { get: mocks.get, post: mocks.post, put: vi.fn() },
   mensajeDeError: () => "Error",
 }));
 vi.mock("@/stores/sesionTenant", () => ({
@@ -58,31 +58,35 @@ function montar() {
   });
 }
 
+// Lo que la lista recibe de cada miembro (con cambios por prueba).
+const miembroBase = {
+  id: "m1",
+  nombre: "Vale",
+  segundo_nombre: null,
+  primer_apellido: "Ruiz",
+  segundo_apellido: null,
+  nombre_completo: "Vale Ruiz",
+  email: "vale@correo.mx",
+  tipo: "miembro",
+  activo: true,
+  es_facturable: true,
+  archivado: false,
+  primera_vez: true,
+};
+let miembro: Record<string, unknown> = miembroBase;
+
 describe("directorio de clientes", () => {
   beforeEach(() => {
     localStorage.clear();
+    miembro = miembroBase;
+    mocks.post.mockResolvedValue({ data: {} });
     mocks.get.mockImplementation((url: string) =>
       Promise.resolve({
         data: url.endsWith("/miembros/resumen")
           ? { data: resumen }
           : url.endsWith("/miembros")
             ? {
-                data: [
-                  {
-                    id: "m1",
-                    nombre: "Vale",
-                    segundo_nombre: null,
-                    primer_apellido: "Ruiz",
-                    segundo_apellido: null,
-                    nombre_completo: "Vale Ruiz",
-                    email: "vale@correo.mx",
-                    tipo: "miembro",
-                    activo: true,
-                    es_facturable: true,
-                    archivado: false,
-                    primera_vez: true,
-                  },
-                ],
+                data: [miembro],
                 meta: { total: 1, page: 1, per_page: 25, ultima_pagina: 1 },
               }
             : { data: [] },
@@ -115,5 +119,17 @@ describe("directorio de clientes", () => {
     expect(fila.text()).toContain("vale@correo.mx");
     expect(fila.find(".mb-etiqueta-nuevo").exists()).toBe(true);
     expect(fila.find(".mb-punto").exists()).toBe(true);
+  });
+
+  it("con la invitación sin activar, se reenvía (no se vuelve a invitar)", async () => {
+    miembro = { ...miembroBase, invitacion_pendiente: "u9" };
+    const w = montar();
+    await flushPromises();
+
+    await w.get('[data-prueba="reenviar-invitacion"]').trigger("click");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/estudio-a/usuarios/u9/reenviar",
+    );
   });
 });

@@ -210,6 +210,14 @@ export default {
     app: "App",
     conApp: "Con acceso",
     sinApp: "Sin cuenta",
+    // Invitar a su cuenta: el correo para activarla y ver sus citas y pagos.
+    invitar: "Invitar a su cuenta",
+    invitarAyuda:
+      "Le enviamos un correo para que active su cuenta y vea sus citas, pagos y membresía.",
+    invitacionPendiente: "Invitación enviada",
+    reenviar: "Reenviar invitación",
+    reenviando: "Reenviando…",
+    reenviada: "Invitación reenviada a {email}.",
     plan: "Plan vigente",
     saldo: "Saldo",
     proxima: "Próxima reserva",
