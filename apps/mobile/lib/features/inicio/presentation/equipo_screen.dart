@@ -80,6 +80,8 @@ class _EquipoScreenState extends ConsumerState<EquipoScreen> {
 
 /// El día de hoy: saludo, la tarjeta grande con lo que sigue (o lo que está en
 /// curso) y los indicadores, lo pendiente de cobro y de renovación, y accesos.
+/// Cada tipo de negocio con sus preguntas (ADR 0091): en citas, quién viene, quién
+/// llegó, qué falta por atender y cobrar, y dónde hay espacios libres.
 class _InicioNegocio extends ConsumerWidget {
   const _InicioNegocio({required this.onIr});
 
@@ -117,6 +119,10 @@ class _InicioNegocio extends ConsumerWidget {
         final agenda = hoy?.agenda;
         final siguiente = agenda?.siguiente;
         final enCurso = agenda?.enCurso != null;
+        final esCitas = hoy?.modalidad == null
+            ? (sesion?.esCitas ?? false)
+            : hoy!.esCitas;
+        final libres = hoy?.libres;
 
         return RefreshIndicator(
           onRefresh: () {
@@ -145,17 +151,28 @@ class _InicioNegocio extends ConsumerWidget {
                 TarjetaPrincipal(
                   etiqueta: enCurso
                       ? 'En curso'
-                      : (siguiente != null ? 'Lo que sigue hoy' : 'Hoy'),
+                      : siguiente == null
+                      ? 'Hoy'
+                      : (esCitas ? 'Quién viene después' : 'Lo que sigue hoy'),
                   foto: fotoNegocio(sesion?.perfil),
                   clima: clima,
-                  dondeClima: clima?.dondeTexto('clase') ?? '',
+                  dondeClima:
+                      clima?.dondeTexto(esCitas ? 'cita' : 'clase') ?? '',
                   contenido: [
                     const SizedBox(height: 6),
                     Text(
-                      siguiente?.nombre ??
-                          (agenda.sesiones > 0
-                              ? 'Terminaron las $clases de hoy'
-                              : 'Sin $clases hoy'),
+                      siguiente != null
+                          // En citas importa quién viene; el servicio va debajo.
+                          ? (esCitas && siguiente.cliente != null
+                                ? siguiente.cliente!
+                                : siguiente.nombre)
+                          : esCitas
+                          ? (agenda.sesiones > 0
+                                ? 'Terminaron las citas de hoy'
+                                : 'No hay citas hoy')
+                          : (agenda.sesiones > 0
+                                ? 'Terminaron las $clases de hoy'
+                                : 'Sin $clases hoy'),
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
@@ -166,19 +183,32 @@ class _InicioNegocio extends ConsumerWidget {
                       Text(
                         [
                           Formato.hora(siguiente.iniciaEn),
+                          if (esCitas) ?siguiente.oferta,
+                          if (esCitas) ?siguiente.instructor,
                           ?siguiente.sucursal,
-                          ?siguiente.instructor,
+                          if (!esCitas) ?siguiente.instructor,
                         ].join(' · '),
                       ),
                     ],
                     const SizedBox(height: 14),
-                    _Indicadores(agenda: agenda, clases: terminos.sesiones),
+                    _Indicadores(
+                      agenda: agenda,
+                      clases: terminos.sesiones,
+                      esCitas: esCitas,
+                    ),
                     const SizedBox(height: 14),
                     FilledButton(
                       onPressed: () => onIr(PestanaEquipo.agenda),
                       child: const Text('Abrir agenda'),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+              ],
+              if (libres != null) ...[
+                _Libres(
+                  libres: libres,
+                  onAgenda: verAgenda ? () => onIr(PestanaEquipo.agenda) : null,
                 ),
                 const SizedBox(height: 12),
               ],
@@ -244,49 +274,160 @@ class _InicioNegocio extends ConsumerWidget {
   }
 }
 
-/// Los cuatro números del día, dentro de la tarjeta principal.
+/// Los cuatro números del día, dentro de la tarjeta principal: los de cada tipo
+/// de negocio, no el mismo indicador con otro nombre.
 class _Indicadores extends StatelessWidget {
-  const _Indicadores({required this.agenda, required this.clases});
+  const _Indicadores({
+    required this.agenda,
+    required this.clases,
+    required this.esCitas,
+  });
 
   final AgendaHoy agenda;
   final String clases;
+  final bool esCitas;
 
   @override
   Widget build(BuildContext context) {
-    Widget dato(String etiqueta, int valor, {bool aviso = false}) => SizedBox(
-      width: 120,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            etiqueta,
-            style: const TextStyle(
-              fontSize: 12,
-              color: TemaAgendaUno.textoSuave,
-            ),
+    Widget dato(String etiqueta, Object valor, {bool aviso = false}) =>
+        SizedBox(
+          width: 120,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                etiqueta,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: TemaAgendaUno.textoSuave,
+                ),
+              ),
+              Text(
+                '$valor',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: aviso ? TemaAgendaUno.aviso : null,
+                ),
+              ),
+            ],
           ),
-          Text(
-            '$valor',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: aviso ? TemaAgendaUno.aviso : null,
-            ),
-          ),
-        ],
-      ),
-    );
+        );
     return Wrap(
       spacing: 12,
       runSpacing: 10,
-      children: [
-        dato(clases, agenda.sesiones),
-        dato('Se esperan', agenda.esperados),
-        dato('Llegaron', agenda.llegaron),
-        dato('Por pasar lista', agenda.sinMarcar, aviso: agenda.sinMarcar > 0),
-      ],
+      children: esCitas
+          ? [
+              dato('Citas hoy', agenda.sesiones),
+              dato('Ya llegaron', agenda.llegaron),
+              dato('Por atender', agenda.porAtender),
+              dato('Por cobrar', agenda.porCobrar, aviso: agenda.porCobrar > 0),
+            ]
+          : [
+              dato('$clases hoy', agenda.sesiones),
+              dato(
+                'Lugares ocupados',
+                agenda.capacidad > 0
+                    ? '${agenda.esperados} de ${agenda.capacidad}'
+                    : agenda.esperados,
+              ),
+              dato(
+                'Listas por registrar',
+                agenda.listasPendientes,
+                aviso: agenda.listasPendientes > 0,
+              ),
+              dato('En lista de espera', agenda.enEspera),
+            ],
     );
   }
+}
+
+/// Citas: quién tiene espacios libres hoy y desde qué hora (el mismo cálculo que
+/// al agendar).
+class _Libres extends StatelessWidget {
+  const _Libres({required this.libres, this.onAgenda});
+
+  final List<LibreHoy> libres;
+  final VoidCallback? onAgenda;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    key: const Key('libres'),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Espacios libres hoy',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              if (onAgenda != null)
+                TextButton(onPressed: onAgenda, child: const Text('Agendar')),
+            ],
+          ),
+          if (libres.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                'Hoy nadie tiene horario de atención.',
+                style: TextStyle(color: TemaAgendaUno.textoSuave),
+              ),
+            ),
+          for (final l in libres)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l.profesional,
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        if (l.sucursal != null)
+                          Text(
+                            l.sucursal!,
+                            style: const TextStyle(
+                              color: TemaAgendaUno.textoSuave,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        l.huecos == 0
+                            ? 'Sin espacios'
+                            : (l.huecos == 1
+                                  ? '1 espacio'
+                                  : '${l.huecos} espacios'),
+                      ),
+                      if (l.huecos > 0 && l.siguiente != null)
+                        Text(
+                          'desde las ${Formato.hora(l.siguiente!)}',
+                          style: const TextStyle(
+                            color: TemaAgendaUno.textoSuave,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Lo pendiente de cobro y de renovación (se atiende desde la web).

@@ -113,6 +113,13 @@ El Inicio ordena los accesos según el tipo de negocio:
 Una tarjeta vacía de «Sin paquete» no le sirve a quien solo quiere cortarse el
 cabello, así que no se muestra.
 
+### En la app
+
+La app sigue lo mismo (2026-10-03): la cuenta del cliente ordena y muestra los
+accesos con `portal`, la asistencia de 30 días, el vencimiento y «Cómo llegar»; al
+agendar, los servicios de su bono aparecen «Con tu bono» y no se pagan; y el Inicio
+del equipo usa los indicadores de cada tipo y, en citas, los espacios libres.
+
 ## Consecuencias
 
 - Los textos del Inicio salen de llaves separadas por modalidad

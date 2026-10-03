@@ -1,21 +1,32 @@
 /// El día de hoy para el Inicio del negocio (GET /inicio/hoy): la agenda del día
 /// con quién se espera, quién llegó y a quién falta pasar lista; y, si quien entra
 /// tiene permiso, lo pendiente de cobro y las renovaciones por atender. Cada bloque
-/// es null cuando no le toca verlo.
+/// es null cuando no le toca verlo. En un negocio de citas trae además dónde hay
+/// espacios libres hoy (ADR 0091).
 class ResumenHoy {
   const ResumenHoy({
     required this.fecha,
+    this.modalidad,
     this.agenda,
     this.cobros,
     this.renovaciones,
+    this.libres,
   });
 
   factory ResumenHoy.desdeJson(Map<String, dynamic> j) {
     final agenda = j['agenda'];
     final cobros = j['cobros'];
     final renovaciones = j['renovaciones'];
+    final libres = j['libres'];
     return ResumenHoy(
       fecha: (j['fecha'] ?? '') as String,
+      modalidad: j['modalidad'] as String?,
+      libres: libres is List
+          ? libres
+                .whereType<Map<String, dynamic>>()
+                .map(LibreHoy.desdeJson)
+                .toList()
+          : null,
       agenda: agenda is Map<String, dynamic>
           ? AgendaHoy.desdeJson(agenda)
           : null,
@@ -29,9 +40,17 @@ class ResumenHoy {
   }
 
   final String fecha;
+
+  /// 'citas' o 'clases' (null si el API no lo dice).
+  final String? modalidad;
   final AgendaHoy? agenda;
   final CobrosHoy? cobros;
   final RenovacionesHoy? renovaciones;
+
+  /// Citas: quién tiene espacios libres hoy y desde qué hora (null en clases).
+  final List<LibreHoy>? libres;
+
+  bool get esCitas => modalidad == 'citas';
 
   /// ¿Hay algo que cobrar o renovar?
   bool get hayPendientes =>
@@ -48,6 +67,11 @@ class AgendaHoy {
     required this.llegaron,
     required this.sinMarcar,
     required this.lista,
+    this.capacidad = 0,
+    this.listasPendientes = 0,
+    this.enEspera = 0,
+    this.porAtender = 0,
+    this.porCobrar = 0,
   });
 
   factory AgendaHoy.desdeJson(Map<String, dynamic> j) {
@@ -58,6 +82,11 @@ class AgendaHoy {
       esperados: n('esperados'),
       llegaron: n('llegaron'),
       sinMarcar: n('sin_marcar'),
+      capacidad: n('capacidad'),
+      listasPendientes: n('listas_pendientes'),
+      enEspera: n('en_espera'),
+      porAtender: n('por_atender'),
+      porCobrar: n('por_cobrar'),
       lista: ((j['sesiones'] ?? const []) as List)
           .whereType<Map<String, dynamic>>()
           .map(SesionHoy.desdeJson)
@@ -71,6 +100,15 @@ class AgendaHoy {
   final int llegaron;
   final int sinMarcar;
   final List<SesionHoy> lista;
+
+  /// Clases: lugares en total, listas por registrar y quién espera lugar.
+  final int capacidad;
+  final int listasPendientes;
+  final int enEspera;
+
+  /// Citas: las que aún no terminan con alguien por llegar, y las por cobrar.
+  final int porAtender;
+  final int porCobrar;
 
   /// Lo que está en curso, si hay.
   SesionHoy? get enCurso =>
@@ -125,6 +163,30 @@ class SesionHoy {
   String get nombre => tipo == 'cita' && cliente != null
       ? '${oferta ?? ''} · $cliente'
       : (oferta ?? '—');
+}
+
+/// Espacios libres de un profesional en una sede hoy (citas).
+class LibreHoy {
+  const LibreHoy({
+    required this.profesional,
+    required this.huecos,
+    this.sucursal,
+    this.siguiente,
+  });
+
+  factory LibreHoy.desdeJson(Map<String, dynamic> j) => LibreHoy(
+    profesional: (j['profesional'] ?? '') as String,
+    sucursal: j['sucursal'] as String?,
+    huecos: (j['huecos'] as num? ?? 0).toInt(),
+    siguiente: DateTime.tryParse((j['siguiente'] ?? '') as String)?.toLocal(),
+  );
+
+  final String profesional;
+  final String? sucursal;
+  final int huecos;
+
+  /// Desde qué hora (local) hay espacio.
+  final DateTime? siguiente;
 }
 
 class CobrosHoy {

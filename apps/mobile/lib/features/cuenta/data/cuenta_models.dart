@@ -11,6 +11,7 @@ class DerechoMiembro {
     this.disponible,
     this.producto,
     this.pausaHasta,
+    this.vence,
   });
 
   final bool ilimitado;
@@ -22,6 +23,9 @@ class DerechoMiembro {
   /// Último día en pausa (AAAA-MM-DD) si la membresía está congelada.
   final String? pausaHasta;
 
+  /// Hasta cuándo se puede usar (AAAA-MM-DD); null si no vence.
+  final String? vence;
+
   /// Créditos disponibles (1 crédito = 1000 unidades).
   int get creditosDisponibles => ((disponible ?? 0) / 1000).round();
 
@@ -32,6 +36,7 @@ class DerechoMiembro {
     disponible: j['disponible'] as int?,
     producto: j['producto'] as String?,
     pausaHasta: j['pausa_hasta'] as String?,
+    vence: j['vence'] as String?,
   );
 }
 
@@ -152,11 +157,15 @@ class ReservaMiembro {
     this.ordenId,
     this.tipo,
     this.asiste,
+    this.mapaUrl,
   });
 
   final String id;
   final String estado;
   final String? sesionId;
+
+  /// Cómo llegar a la sucursal (enlace del mapa), si el negocio lo tiene.
+  final String? mapaUrl;
 
   /// Si la agendó para otra persona: quién asiste (la cita es suya).
   final String? asiste;
@@ -201,6 +210,7 @@ class ReservaMiembro {
     ordenId: j['orden_id'] as String?,
     tipo: j['tipo'] as String?,
     asiste: j['asiste'] as String?,
+    mapaUrl: j['mapa_url'] as String?,
   );
 }
 
@@ -275,6 +285,7 @@ class OpcionCita {
     this.zonaHoraria,
     this.incluye = const [],
     this.fotoUrl,
+    this.conPlan = false,
   });
 
   final String id;
@@ -288,6 +299,9 @@ class OpcionCita {
   /// Paquete: los servicios que incluye, en orden (vacío en un servicio simple).
   final List<String> incluye;
 
+  /// Se toma con su bono o membresía: no se paga al agendar (ADR 0091).
+  final bool conPlan;
+
   factory OpcionCita.desdeJson(Map<String, dynamic> j) => OpcionCita(
     id: (j['id'] ?? '') as String,
     nombre: (j['nombre'] ?? '') as String,
@@ -295,6 +309,7 @@ class OpcionCita {
     zonaHoraria: j['zona_horaria'] as String?,
     incluye: ((j['incluye'] ?? const []) as List).whereType<String>().toList(),
     fotoUrl: j['foto_url'] as String?,
+    conPlan: j['con_plan'] == true,
   );
 }
 
@@ -363,7 +378,15 @@ class MiCuenta {
     this.pagoAutomatico = false,
     this.resenasPendientes = const [],
     this.porPagar = const [],
+    this.portal,
+    this.asistencias30Dias = 0,
   });
+
+  /// Qué partes de su cuenta le sirven; null si el API no lo dice (ADR 0091).
+  final PortalCliente? portal;
+
+  /// A cuántas clases o citas llegó en los últimos 30 días.
+  final int asistencias30Dias;
 
   /// Lo que tiene pendiente de pago (p. ej. su renovación).
   final List<OrdenPorPagar> porPagar;
@@ -384,6 +407,28 @@ class MiCuenta {
   /// Las clases que ya reservó (o en las que espera), para no ofrecerlas de nuevo.
   Set<String> get sesionesReservadas =>
       reservas.map((r) => r.sesionId).whereType<String>().toSet();
+}
+
+/// Qué partes de su cuenta le sirven al cliente (ADR 0091): sus créditos, el pase
+/// y el expediente aparecen solo cuando el negocio de verdad los usa.
+class PortalCliente {
+  const PortalCliente({
+    required this.creditos,
+    required this.pase,
+    required this.expediente,
+  });
+
+  final bool creditos;
+  final bool pase;
+  final bool expediente;
+
+  static PortalCliente? desdeJson(Object? j) => j is Map<String, dynamic>
+      ? PortalCliente(
+          creditos: j['creditos'] == true,
+          pase: j['pase'] == true,
+          expediente: j['expediente'] == true,
+        )
+      : null;
 }
 
 /// Documento que pide el negocio y cómo va el del alumno.

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/calendario/agregar_calendario.dart';
 import '../../../core/formato.dart';
@@ -19,6 +20,8 @@ enum PestanaCuenta { inicio, reservas, pagos, expediente, cuenta }
 /// Inicio del portal del alumno o cliente (como en la web): un saludo, la tarjeta
 /// grande con su próxima clase o cita (siempre; sin reserva invita a reservar) con la
 /// foto del giro y el clima, lo que pide su atención y accesos directos con su color.
+/// Los accesos siguen el tipo de negocio y solo aparecen los que le sirven
+/// (ADR 0091): el bono, el pase y el expediente, si el negocio los usa.
 class InicioTab extends ConsumerWidget {
   const InicioTab({super.key, required this.cuenta, required this.onIr});
 
@@ -40,8 +43,12 @@ class InicioTab extends ConsumerWidget {
     final firmar = cuenta.consentimientos.length;
     final pagar = cuenta.porPagar.length;
     final creditos = _creditos(cuenta.derechos);
+    final vence = _vencimiento(cuenta.derechos);
     final clima = ref.watch(climaProvider).value;
     final esCitas = sesion?.esCitas ?? false;
+    final usa = cuenta.portal;
+    final tienePlan = cuenta.derechos.isNotEmpty;
+    final mapa = proxima?.esCita == true ? proxima?.mapaUrl : null;
     final nombre = _primerNombre(sesion);
     final estudio = sesion?.estudioNombre;
 
@@ -110,9 +117,21 @@ class InicioTab extends ConsumerWidget {
                             : DateTime.tryParse(proxima.terminaEn!)?.toLocal(),
                         lugar: proxima.sucursal,
                       ),
+                      if (mapa != null)
+                        TextButton(
+                          onPressed: () => launchUrl(
+                            Uri.parse(mapa),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                          child: const Text('Cómo llegar'),
+                        ),
                       TextButton(
                         onPressed: () => onIr(PestanaCuenta.reservas),
-                        child: const Text('Ver en mis reservas'),
+                        child: Text(
+                          proxima.esCita
+                              ? 'Cambiar o cancelar'
+                              : 'Ver en mis reservas',
+                        ),
                       ),
                     ],
                   ),
@@ -158,73 +177,128 @@ class InicioTab extends ConsumerWidget {
             onTap: () => onIr(PestanaCuenta.pagos),
           ),
 
-        // Accesos directos.
-        RejillaAccesos([
-          TarjetaAcceso(
-            icono: Icons.event_available_outlined,
-            titulo: 'Reservar',
-            tono: TonosAcceso.reservar,
-            valor: sesion?.esCitas ?? false
-                ? 'Agenda tu próxima $clase'
-                : (disponibles == 1
-                      ? '1 $clase disponible'
-                      : '$disponibles $clases disponibles'),
-            onTap: () => onIr(PestanaCuenta.reservas),
-          ),
-          TarjetaAcceso(
-            icono: Icons.view_list_outlined,
-            titulo: 'Mis reservas',
-            tono: TonosAcceso.reservas,
-            valor: proximas.isEmpty
-                ? 'Sin reservas próximas'
-                : (proximas.length == 1
-                      ? '1 próxima'
-                      : '${proximas.length} próximas'),
-            onTap: () => onIr(PestanaCuenta.reservas),
-          ),
-          TarjetaAcceso(
-            icono: Icons.local_offer_outlined,
-            titulo: 'Mis créditos',
-            tono: TonosAcceso.creditos,
-            valor: creditos,
-            onTap: () => onIr(PestanaCuenta.pagos),
-          ),
-          TarjetaAcceso(
-            icono: Icons.payments_outlined,
-            titulo: 'Pagos',
-            tono: TonosAcceso.pagos,
-            valor: pagar > 0
-                ? (pagar == 1 ? '1 por pagar' : '$pagar por pagar')
-                : 'Al corriente',
-            atencion: pagar > 0,
-            onTap: () => onIr(PestanaCuenta.pagos),
-          ),
-          TarjetaAcceso(
-            icono: Icons.qr_code_2,
-            titulo: 'Pase de entrada',
-            tono: TonosAcceso.pase,
-            valor: 'Muéstralo al llegar',
-            onTap: () => showModalBottomSheet<void>(
-              context: context,
-              showDragHandle: true,
-              builder: (_) => const PaseSheet(),
+        // Accesos directos, en el orden de cada tipo de negocio.
+        RejillaAccesos(
+          _accesos(
+            esCitas: esCitas,
+            reservar: TarjetaAcceso(
+              icono: Icons.event_available_outlined,
+              titulo: esCitas ? 'Volver a agendar' : 'Reservar',
+              tono: TonosAcceso.reservar,
+              valor: esCitas
+                  ? 'Agenda tu próxima $clase'
+                  : (disponibles == 1
+                        ? '1 $clase disponible'
+                        : '$disponibles $clases disponibles'),
+              onTap: () => onIr(PestanaCuenta.reservas),
             ),
+            reservas: TarjetaAcceso(
+              icono: Icons.view_list_outlined,
+              titulo: esCitas ? 'Mis citas' : 'Mis reservas',
+              tono: TonosAcceso.reservas,
+              valor: proximas.isEmpty
+                  ? 'Sin reservas próximas'
+                  : esCitas
+                  ? 'Cambiar o cancelar'
+                  : (proximas.length == 1
+                        ? '1 próxima'
+                        : '${proximas.length} próximas'),
+              onTap: () => onIr(PestanaCuenta.reservas),
+            ),
+            // Su bono o su plan: si lo tiene, o si el negocio vende planes (clases).
+            plan: (usa?.creditos ?? tienePlan) && (tienePlan || !esCitas)
+                ? TarjetaAcceso(
+                    icono: Icons.local_offer_outlined,
+                    titulo: esCitas ? 'Mi bono o membresía' : 'Mis créditos',
+                    tono: TonosAcceso.creditos,
+                    valor: vence != null && tienePlan
+                        ? '$creditos · vence el ${Formato.diaMes(vence)}'
+                        : creditos,
+                    onTap: () => onIr(PestanaCuenta.pagos),
+                  )
+                : null,
+            // Clases: su asistencia reciente.
+            asistencia: esCitas
+                ? null
+                : TarjetaAcceso(
+                    icono: Icons.task_alt,
+                    titulo: 'Mi asistencia',
+                    tono: TonosAcceso.reservas,
+                    valor: switch (cuenta.asistencias30Dias) {
+                      0 => 'Sin $clases en 30 días',
+                      1 => '1 $clase en 30 días',
+                      final n => '$n $clases en 30 días',
+                    },
+                    onTap: () => onIr(PestanaCuenta.reservas),
+                  ),
+            pagos: TarjetaAcceso(
+              icono: Icons.payments_outlined,
+              titulo: 'Pagos',
+              tono: TonosAcceso.pagos,
+              valor: pagar > 0
+                  ? (pagar == 1 ? '1 por pagar' : '$pagar por pagar')
+                  : 'Al corriente',
+              atencion: pagar > 0,
+              onTap: () => onIr(PestanaCuenta.pagos),
+            ),
+            // El pase y el expediente, solo si el negocio los usa (o hay algo por
+            // firmar).
+            pase: usa?.pase ?? true
+                ? TarjetaAcceso(
+                    icono: Icons.qr_code_2,
+                    titulo: 'Pase de entrada',
+                    tono: TonosAcceso.pase,
+                    valor: 'Muéstralo al llegar',
+                    onTap: () => showModalBottomSheet<void>(
+                      context: context,
+                      showDragHandle: true,
+                      builder: (_) => const PaseSheet(),
+                    ),
+                  )
+                : null,
+            expediente: (usa?.expediente ?? true) || firmar > 0
+                ? TarjetaAcceso(
+                    icono: Icons.folder_outlined,
+                    titulo: 'Expediente',
+                    tono: TonosAcceso.expediente,
+                    valor: firmar > 0
+                        ? (firmar == 1
+                              ? '1 documento por firmar'
+                              : '$firmar documentos por firmar')
+                        : 'Documentos del negocio',
+                    atencion: firmar > 0,
+                    onTap: () => onIr(PestanaCuenta.expediente),
+                  )
+                : null,
           ),
-          TarjetaAcceso(
-            icono: Icons.folder_outlined,
-            titulo: 'Expediente',
-            tono: TonosAcceso.expediente,
-            valor: firmar > 0
-                ? (firmar == 1
-                      ? '1 documento por firmar'
-                      : '$firmar documentos por firmar')
-                : 'Documentos del negocio',
-            atencion: firmar > 0,
-            onTap: () => onIr(PestanaCuenta.expediente),
-          ),
-        ]),
+        ),
       ],
     );
+  }
+
+  /// Citas: sus citas, volver a agendar, pagos y, si aplican, su bono, el
+  /// expediente y el pase. Clases: reservar, sus reservas, su plan, su
+  /// asistencia, pagos, el pase y el expediente.
+  static List<TarjetaAcceso> _accesos({
+    required bool esCitas,
+    required TarjetaAcceso reservar,
+    required TarjetaAcceso reservas,
+    required TarjetaAcceso pagos,
+    TarjetaAcceso? plan,
+    TarjetaAcceso? asistencia,
+    TarjetaAcceso? pase,
+    TarjetaAcceso? expediente,
+  }) => [
+    ...esCitas
+        ? [reservas, reservar, pagos, plan, expediente, pase]
+        : [reservar, reservas, plan, asistencia, pagos, pase, expediente],
+  ].whereType<TarjetaAcceso>().toList();
+
+  /// Lo que antes vence de su plan (AAAA-MM-DD), si vence.
+  static String? _vencimiento(List<DerechoMiembro> derechos) {
+    final fechas = derechos.map((d) => d.vence).whereType<String>().toList()
+      ..sort();
+    return fechas.firstOrNull;
   }
 
   /// Su primer nombre para el saludo.

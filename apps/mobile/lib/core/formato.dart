@@ -32,6 +32,15 @@ abstract final class Formato {
   static String dia(DateTime f) =>
       '${_dias[f.weekday - 1]} ${f.day} ${_meses[f.month - 1]}';
 
+  /// "14 nov" a partir de "2026-11-14" (o "—").
+  static String diaMes(String? fecha) {
+    final f = fecha == null ? null : DateTime.tryParse(fecha);
+    if (f == null) {
+      return '—';
+    }
+    return '${f.day} ${_meses[f.month - 1]}';
+  }
+
   /// "2026-09-25".
   static String iso(DateTime f) => '${f.year}-${_dos(f.month)}-${_dos(f.day)}';
 

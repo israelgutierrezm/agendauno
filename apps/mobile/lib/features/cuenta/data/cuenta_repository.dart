@@ -61,6 +61,8 @@ class CuentaRepository {
       pagoAutomatico: (data['pago_automatico'] ?? false) as bool,
       resenasPendientes: await _resenasPendientes(),
       porPagar: await _porPagar(),
+      portal: PortalCliente.desdeJson(data['portal']),
+      asistencias30Dias: (data['asistencias_30_dias'] as num? ?? 0).toInt(),
     );
   }
 

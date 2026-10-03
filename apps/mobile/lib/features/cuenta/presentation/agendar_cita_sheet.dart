@@ -12,7 +12,8 @@ import 'elegir_profesional.dart';
 
 /// Agendar una cita desde la cuenta: servicio, sede, de quién ver horarios (todo el
 /// equipo o alguien, por su foto, como en la web), día y hora libre. Si el servicio
-/// se paga para reservar, la cita queda apartada hasta pagarla.
+/// se paga para reservar, la cita queda apartada hasta pagarla. Los servicios de
+/// su bono o membresía aparecen «Con tu bono» y no se pagan (ADR 0091).
 class AgendarCitaSheet extends ConsumerStatefulWidget {
   const AgendarCitaSheet({super.key});
 
@@ -149,6 +150,8 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
           : '';
       final aviso = cita.estado == 'pendiente_pago'
           ? 'Tu cita quedó apartada. Págala para confirmarla.'
+          : _servicio!.conPlan
+          ? '¡Listo! Agendamos tu cita con tu bono.'
           : '¡Listo! Agendamos tu cita.';
       mensajero.showSnackBar(SnackBar(content: Text('$aviso$conQuien')));
     });
@@ -256,6 +259,15 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                       child: Text(
                         'Incluye: ${_servicio!.incluye.join(' · ')}',
                         style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                      ),
+                    ),
+                  if (_servicio?.conPlan ?? false)
+                    const Padding(
+                      key: Key('pago-con-bono'),
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'Se descuenta una sesión de tu bono o membresía; no pagas al agendar.',
+                        style: TextStyle(color: TemaAgendaUno.textoSuave),
                       ),
                     ),
                   if (opciones.sucursales.length > 1)
@@ -377,7 +389,12 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
       initialValue: valor,
       decoration: InputDecoration(labelText: etiqueta),
       items: lista
-          .map((o) => DropdownMenuItem(value: o, child: Text(o.nombre)))
+          .map(
+            (o) => DropdownMenuItem(
+              value: o,
+              child: Text(o.conPlan ? '${o.nombre} · Con tu bono' : o.nombre),
+            ),
+          )
           .toList(),
       onChanged: alCambiar,
     ),
