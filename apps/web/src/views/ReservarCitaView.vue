@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
@@ -116,9 +123,33 @@ const serviciosConFoto = computed(() =>
   (opciones.value?.servicios ?? []).some((s) => s.foto_url),
 );
 
+const busquedaServicio = ref("");
+const categoriaServicio = ref("");
+const normalizar = (texto: string): string =>
+  texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+const categoriasServicios = computed(() => [
+  ...new Set(
+    (opciones.value?.servicios ?? [])
+      .map((s) => s.categoria)
+      .filter((s): s is string => Boolean(s)),
+  ),
+]);
+const serviciosVisibles = computed(() =>
+  (opciones.value?.servicios ?? []).filter(
+    (s) =>
+      (!categoriaServicio.value || s.categoria === categoriaServicio.value) &&
+      normalizar(
+        `${s.nombre} ${s.descripcion ?? ""} ${s.categoria ?? ""}`,
+      ).includes(normalizar(busquedaServicio.value)),
+  ),
+);
 const gruposServicios = computed(() => {
   const grupos = new Map<string, Servicio[]>();
-  for (const s of opciones.value?.servicios ?? []) {
+  for (const s of serviciosVisibles.value) {
     const clave = s.categoria ?? "";
     grupos.set(clave, [...(grupos.get(clave) ?? []), s]);
   }
@@ -169,6 +200,22 @@ const ORIGENES = [
 const slots = ref<Slot[]>([]);
 const buscandoSlots = ref(false);
 const slotsCargados = ref(false);
+const buscandoSiguiente = ref(false);
+const mensajeSiguiente = ref("");
+const gruposHorarios = computed(() => {
+  const grupos = {
+    manana: [] as Slot[],
+    tarde: [] as Slot[],
+    noche: [] as Slot[],
+  };
+  for (const slot of slots.value) {
+    const hora = Number(horaLocal(slot.inicia).split(":")[0]);
+    grupos[hora < 12 ? "manana" : hora < 19 ? "tarde" : "noche"].push(slot);
+  }
+  return Object.entries(grupos)
+    .filter(([, lista]) => lista.length)
+    .map(([nombre, lista]) => ({ nombre, lista }));
+});
 
 const agendando = ref(false);
 const pagando = ref(false);
@@ -443,6 +490,7 @@ async function buscarSlots(): Promise<void> {
   }
   buscandoSlots.value = true;
   error.value = null;
+  mensajeSiguiente.value = "";
   try {
     const { data } = await api.get<{ data: { slots: Slot[] } }>(
       `/api/v1/app/${slug.value}/citas/disponibilidad`,
@@ -467,6 +515,61 @@ async function buscarSlots(): Promise<void> {
     if (consulta === busquedaActual) buscandoSlots.value = false;
   }
 }
+
+// Los días con atención no garantizan huecos: se comprueba el servicio y el equipo.
+// Búsqueda acotada a 14 días, descartada si cambia la selección o se sale de la vista.
+async function buscarSiguienteHorario(): Promise<void> {
+  if (buscandoSiguiente.value || buscandoSlots.value || !fecha.value) return;
+  const consulta = busquedaActual;
+  const vigente = (): boolean =>
+    consulta === busquedaActual && paso.value === "horario";
+  buscandoSiguiente.value = true;
+  mensajeSiguiente.value = "";
+  try {
+    const desde = new Date(`${fecha.value}T12:00:00Z`);
+    desde.setUTCDate(desde.getUTCDate() + 1);
+    const { data } = await api.get<{
+      data: { fecha: string; abierto: boolean }[];
+    }>(`/api/v1/app/${slug.value}/citas/dias`, {
+      params: {
+        sucursal_id: sucursalId.value,
+        desde: desde.toISOString().slice(0, 10),
+        dias: 14,
+        ...(filtro.value ? { instructor_id: filtro.value } : {}),
+      },
+    });
+    if (!vigente()) return;
+    for (const dia of data.data
+      .filter((d) => d.abierto && d.fecha > fecha.value)
+      .slice(0, 14)) {
+      const respuesta = await api.get<{ data: { slots: Slot[] } }>(
+        `/api/v1/app/${slug.value}/citas/disponibilidad`,
+        {
+          params: {
+            sucursal_id: sucursalId.value,
+            fecha: dia.fecha,
+            duracion_minutos: duracion.value,
+            oferta_id: servicioId.value,
+            ...(filtro.value ? { instructor_id: filtro.value } : {}),
+          },
+        },
+      );
+      if (!vigente()) return;
+      if (respuesta.data.data.slots.length) {
+        fecha.value = dia.fecha;
+        return;
+      }
+    }
+    mensajeSiguiente.value = t("perfilPublico.agendar.sinSiguiente");
+  } catch (e) {
+    if (vigente()) mensajeSiguiente.value = mensajeDeError(e);
+  } finally {
+    buscandoSiguiente.value = false;
+  }
+}
+onBeforeUnmount(() => {
+  busquedaActual++;
+});
 
 // Con quién de partida: el del filtro, el único profesional o «cualquiera».
 function profesionalDePartida(): string {
@@ -1020,14 +1123,20 @@ onMounted(cargar);
           </li>
         </ol>
 
-        <div ref="pasoTitulo" class="mt-5 space-y-4 scroll-mt-4">
+        <div
+          ref="pasoTitulo"
+          class="rc-paso-contenido mt-5 space-y-4 scroll-mt-4"
+        >
+          <div class="rc-guia" data-prueba="guia-paso">
+            <h2>{{ $t(`perfilPublico.agendar.guia.${paso}.titulo`) }}</h2>
+            <p>{{ $t(`perfilPublico.agendar.guia.${paso}.ayuda`) }}</p>
+          </div>
           <!-- Paso: sucursal (con foto si la tiene) -->
           <fieldset
             v-if="paso === 'sucursal'"
-            class="tu-card p-5 reserva-opciones"
+            class="tu-card p-5 reserva-opciones rc-sucursales"
           >
-            <legend class="tu-label">{{ $t("sucursalesPub.titulo") }}</legend>
-            <p class="reserva-ayuda">{{ $t("sucursalesPub.subtitulo") }}</p>
+            <legend class="sr-only">{{ $t("sucursalesPub.titulo") }}</legend>
             <div class="reserva-tarjetas">
               <label
                 v-for="s in opciones.sucursales"
@@ -1069,6 +1178,10 @@ onMounted(cargar);
                   <strong>{{ s.nombre }}</strong>
                   <small v-if="s.direccion">{{ s.direccion }}</small>
                   <small v-else-if="s.region">{{ s.region }}</small>
+                  <span class="rc-sede-elegir"
+                    >{{ $t("perfilPublico.agendar.elegirSucursal") }}
+                    <span aria-hidden="true">→</span></span
+                  >
                   <!-- Sus redes: abren aparte, sin elegir la sede. -->
                   <span
                     v-if="(s.redes ?? []).length > 0"
@@ -1113,86 +1226,148 @@ onMounted(cargar);
                 {{ $t("perfilPublico.agendar.cambiar") }}
               </button>
             </p>
-            <label class="tu-label">{{ $t("reservar.servicio") }}</label>
             <div
-              v-for="g in gruposServicios"
-              :key="g.nombre"
-              class="mt-1 space-y-2"
+              v-if="opciones.servicios.length > 5"
+              class="rc-busqueda-servicio"
             >
-              <p
-                v-if="g.nombre && gruposServicios.length > 1"
-                class="pt-2 text-xs font-semibold"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{ g.nombre }}
-              </p>
-              <label
-                v-for="s in g.lista"
-                :key="s.id"
-                class="flex items-center justify-between gap-3 rounded-lg p-3 cursor-pointer border"
-                :style="{
-                  borderColor:
-                    servicioId === s.id ? 'var(--primario)' : 'var(--borde)',
-                  background:
-                    servicioId === s.id
-                      ? 'var(--primario-suave)'
-                      : 'transparent',
-                }"
-              >
-                <span class="flex items-center gap-2 min-w-0">
-                  <input
-                    :checked="servicioId === s.id"
-                    type="radio"
-                    name="servicio"
-                    :value="s.id"
-                    class="shrink-0"
-                    @change="elegirServicio(s.id)"
-                    @click="servicioId === s.id && elegirServicio(s.id)"
-                  />
-                  <!-- Miniatura pequeña: aprovecha el ancho sin hacer más alta la fila. -->
-                  <span
-                    v-if="serviciosConFoto"
-                    class="rc-servicio-foto"
-                    aria-hidden="true"
-                  >
-                    <img
-                      v-if="s.foto_url"
-                      :src="s.foto_url"
-                      alt=""
-                      data-prueba="foto-servicio"
-                    />
-                    <template v-else>{{
-                      s.nombre.trim().charAt(0).toUpperCase()
-                    }}</template>
-                  </span>
-                  <span class="min-w-0">
-                    <span class="font-medium block truncate">{{
-                      s.nombre
-                    }}</span>
-                    <span v-if="s.duracion_minutos" class="rc-duracion"
-                      ><IconoNav nombre="reloj" :tam="13" />{{
-                        $t("reservar.duracionMin", { n: s.duracion_minutos })
-                      }}</span
-                    >
-                    <span
-                      v-if="s.descripcion"
-                      class="block text-sm"
-                      :style="{ color: 'var(--texto-suave)' }"
-                      >{{ s.descripcion }}</span
-                    >
-                    <ServicioIncluye
-                      :incluye="s.incluye"
-                      :precio-minor="s.precio_minor"
-                      :por-separado-minor="s.precio_por_separado_minor"
-                      :moneda="s.moneda"
-                    />
-                  </span>
-                </span>
-                <span class="font-semibold shrink-0">{{
-                  dinero(s.precio_minor, s.moneda)
-                }}</span>
-              </label>
+              <label for="rc-buscar-servicio" class="sr-only">{{
+                $t("perfilPublico.agendar.buscarServicio")
+              }}</label>
+              <input
+                id="rc-buscar-servicio"
+                v-model="busquedaServicio"
+                type="search"
+                class="tu-input"
+                :placeholder="$t('perfilPublico.agendar.buscarServicio')"
+              />
             </div>
+            <div
+              v-if="categoriasServicios.length > 1"
+              class="rc-categorias"
+              :aria-label="$t('perfilPublico.agendar.categorias')"
+              role="group"
+            >
+              <button
+                type="button"
+                :aria-pressed="categoriaServicio === ''"
+                @click="categoriaServicio = ''"
+              >
+                {{ $t("perfilPublico.agendar.todosServicios") }}
+              </button>
+              <button
+                v-for="categoria in categoriasServicios"
+                :key="categoria"
+                type="button"
+                :aria-pressed="categoriaServicio === categoria"
+                @click="categoriaServicio = categoria"
+              >
+                {{ categoria }}
+              </button>
+            </div>
+            <p v-if="!serviciosVisibles.length" class="rc-vacio" role="status">
+              {{ $t("perfilPublico.agendar.sinResultadosServicio") }}
+              <button
+                v-if="busquedaServicio || categoriaServicio"
+                type="button"
+                class="tu-enlace"
+                @click="
+                  busquedaServicio = '';
+                  categoriaServicio = '';
+                "
+              >
+                {{ $t("perfilPublico.agendar.limpiarBusqueda") }}
+              </button>
+            </p>
+            <fieldset class="rc-catalogo">
+              <legend class="sr-only">{{ $t("reservar.servicio") }}</legend>
+              <div
+                v-for="g in gruposServicios"
+                :key="g.nombre"
+                class="rc-grupo-servicios"
+              >
+                <p
+                  v-if="g.nombre"
+                  class="rc-categoria-titulo"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ g.nombre }}
+                </p>
+                <label
+                  v-for="s in g.lista"
+                  :key="s.id"
+                  class="rc-servicio"
+                  :style="{
+                    borderColor:
+                      servicioId === s.id ? 'var(--primario)' : 'var(--borde)',
+                    background:
+                      servicioId === s.id
+                        ? 'var(--primario-suave)'
+                        : 'transparent',
+                  }"
+                >
+                  <span class="flex items-center gap-2 min-w-0">
+                    <input
+                      :checked="servicioId === s.id"
+                      type="radio"
+                      name="servicio"
+                      :value="s.id"
+                      class="shrink-0"
+                      @change="elegirServicio(s.id)"
+                      @click="servicioId === s.id && elegirServicio(s.id)"
+                    />
+                    <!-- Miniatura pequeña: aprovecha el ancho sin hacer más alta la fila. -->
+                    <span
+                      v-if="serviciosConFoto"
+                      class="rc-servicio-foto"
+                      aria-hidden="true"
+                    >
+                      <img
+                        v-if="s.foto_url"
+                        :src="s.foto_url"
+                        alt=""
+                        data-prueba="foto-servicio"
+                      />
+                      <template v-else>{{
+                        s.nombre.trim().charAt(0).toUpperCase()
+                      }}</template>
+                    </span>
+                    <span class="min-w-0">
+                      <span class="font-medium block rc-nombre-servicio">{{
+                        s.nombre
+                      }}</span>
+                      <span v-if="s.duracion_minutos" class="rc-duracion"
+                        ><IconoNav nombre="reloj" :tam="13" />{{
+                          $t("reservar.duracionMin", { n: s.duracion_minutos })
+                        }}</span
+                      >
+                      <span
+                        v-if="s.descripcion"
+                        class="block text-sm"
+                        :style="{ color: 'var(--texto-suave)' }"
+                        >{{ s.descripcion }}</span
+                      >
+                      <ServicioIncluye
+                        :incluye="s.incluye"
+                        :precio-minor="s.precio_minor"
+                        :por-separado-minor="s.precio_por_separado_minor"
+                        :moneda="s.moneda"
+                      />
+                    </span>
+                  </span>
+                  <span class="rc-servicio-precio">{{
+                    dinero(s.precio_minor, s.moneda)
+                  }}</span>
+                </label>
+              </div>
+            </fieldset>
+            <button
+              v-if="variasSedes"
+              type="button"
+              class="tu-enlace rc-atras-servicios"
+              @click="volverA('sucursal')"
+            >
+              {{ $t("perfilPublico.agendar.atras") }}
+            </button>
           </div>
 
           <!-- Paso: fecha y hora (de todo el equipo o de quien se prefiera) -->
@@ -1204,12 +1379,34 @@ onMounted(cargar);
               {{ $t("reservar.sinProfesionales") }}
             </p>
             <div v-else class="tu-card rc-panel-horario">
-              <p class="rc-contexto" data-prueba="contexto">
-                {{ servicioSel?.nombre
-                }}<template v-if="variasSedes && sucursalSel">
-                  · {{ sucursalSel.nombre }}</template
-                >
-                ·
+              <div
+                class="rc-contexto rc-eleccion-resumen"
+                data-prueba="contexto"
+              >
+                <span class="rc-ticket-icono" aria-hidden="true"
+                  ><IconoNav nombre="agenda" :tam="22"
+                /></span>
+                <span class="rc-eleccion-texto"
+                  ><strong>{{ servicioSel?.nombre }}</strong>
+                  <span
+                    >{{ sucursalSel?.nombre
+                    }}<template v-if="servicioSel?.duracion_minutos">
+                      ·
+                      {{
+                        $t("reservar.duracionMin", {
+                          n: servicioSel.duracion_minutos,
+                        })
+                      }}</template
+                    >
+                    ·
+                    {{
+                      dinero(
+                        servicioSel?.precio_minor ?? null,
+                        servicioSel?.moneda ?? null,
+                      )
+                    }}</span
+                  >
+                </span>
                 <button
                   type="button"
                   class="tu-enlace"
@@ -1217,14 +1414,29 @@ onMounted(cargar);
                 >
                   {{ $t("perfilPublico.agendar.cambiar") }}
                 </button>
-              </p>
+              </div>
               <!-- Ver horarios de: todo el equipo o alguien, por su foto. -->
               <ElegirProfesional
                 v-if="variosProfesionales"
                 v-model="filtro"
-                class="mb-4"
+                class="mb-4 rc-selector-profesional"
                 :profesionales="opciones.instructores"
               />
+              <div
+                v-else-if="opciones.instructores.length === 1"
+                class="rc-profesional-unico"
+              >
+                <FotoAmpliable
+                  :nombre="opciones.instructores[0].nombre"
+                  :foto="opciones.instructores[0].foto_url"
+                />
+                <span
+                  ><small>{{
+                    $t("perfilPublico.agendar.quienTeAtiende")
+                  }}</small
+                  ><strong>{{ opciones.instructores[0].nombre }}</strong></span
+                >
+              </div>
               <span class="tu-label">{{ $t("reservar.cuando") }}</span>
               <!-- Días desde hoy; los que no tienen atención no se eligen. -->
               <CalendarioDias
@@ -1247,41 +1459,72 @@ onMounted(cargar);
               <p
                 v-if="fecha !== '' && buscandoSlots"
                 class="mt-3 text-sm"
+                role="status"
                 :style="{ color: 'var(--texto-suave)' }"
               >
                 {{ $t("reservar.calculando") }}
               </p>
               <template v-else-if="fecha !== '' && slotsCargados">
-                <p
+                <div
                   v-if="slots.length === 0"
-                  class="mt-3 text-sm"
-                  :style="{ color: 'var(--texto-suave)' }"
+                  class="rc-vacio"
+                  data-prueba="sin-horarios"
                 >
-                  {{ $t("reservar.sinHuecos") }}
-                </p>
+                  <IconoNav nombre="agenda" :tam="26" />
+                  <p>{{ $t("reservar.sinHuecos") }}</p>
+                  <button
+                    type="button"
+                    class="tu-btn"
+                    :disabled="buscandoSiguiente"
+                    data-prueba="siguiente-horario"
+                    @click="buscarSiguienteHorario"
+                  >
+                    {{
+                      $t(
+                        buscandoSiguiente
+                          ? "perfilPublico.agendar.buscandoSiguiente"
+                          : "perfilPublico.agendar.buscarSiguiente",
+                      )
+                    }}
+                  </button>
+                  <p role="status" class="text-sm">{{ mensajeSiguiente }}</p>
+                </div>
                 <div v-else class="mt-3">
-                  <label class="tu-label">{{ $t("reservar.hora") }}</label>
-                  <div class="rc-horas">
-                    <button
-                      v-for="s in slots"
-                      :key="s.inicia"
-                      type="button"
-                      class="rc-hora border"
-                      :aria-pressed="slotSel === s.inicia"
-                      :style="
-                        slotSel === s.inicia
-                          ? {
-                              background: 'var(--primario)',
-                              color: 'var(--primario-contraste)',
-                              borderColor: 'var(--primario)',
-                            }
-                          : { borderColor: 'var(--borde)' }
-                      "
-                      @click="slotSel = s.inicia"
-                    >
-                      {{ horaLocal(s.inicia) }}
-                    </button>
-                  </div>
+                  <p class="tu-label">{{ $t("reservar.hora") }}</p>
+                  <p class="rc-zona-horaria">
+                    {{ $t("perfilPublico.agendar.horaSucursal") }}
+                  </p>
+                  <fieldset
+                    v-for="grupo in gruposHorarios"
+                    :key="grupo.nombre"
+                    class="rc-franja"
+                  >
+                    <legend>
+                      {{ $t(`perfilPublico.agendar.franjas.${grupo.nombre}`) }}
+                      <span>{{ grupo.lista.length }}</span>
+                    </legend>
+                    <div class="rc-horas">
+                      <button
+                        v-for="s in grupo.lista"
+                        :key="s.inicia"
+                        type="button"
+                        class="rc-hora border"
+                        :aria-pressed="slotSel === s.inicia"
+                        :style="
+                          slotSel === s.inicia
+                            ? {
+                                background: 'var(--primario)',
+                                color: 'var(--primario-contraste)',
+                                borderColor: 'var(--primario)',
+                              }
+                            : { borderColor: 'var(--borde)' }
+                        "
+                        @click="slotSel = s.inicia"
+                      >
+                        {{ horaLocal(s.inicia) }}
+                      </button>
+                    </div>
+                  </fieldset>
                 </div>
               </template>
             </div>
@@ -1289,7 +1532,7 @@ onMounted(cargar);
             <!-- Con quién: tras la hora, solo quienes están libres entonces. -->
             <fieldset
               v-if="slotSel !== '' && eligeConQuien"
-              class="tu-card p-5 reserva-opciones"
+              class="tu-card p-5 reserva-opciones rc-libres"
             >
               <legend class="tu-label">
                 {{ $t("perfilPublico.agendar.quienTeAtiende") }}
@@ -1347,7 +1590,7 @@ onMounted(cargar);
               </div>
             </fieldset>
 
-            <div class="flex items-center justify-between gap-3">
+            <div class="rc-acciones">
               <button
                 type="button"
                 class="tu-enlace text-sm"
@@ -1355,6 +1598,14 @@ onMounted(cargar);
               >
                 {{ $t("perfilPublico.agendar.atras") }}
               </button>
+              <p class="rc-seleccion-hora" role="status">
+                <template v-if="slotSel"
+                  ><strong>{{ horaLocal(slotSel) }}</strong
+                  ><span>{{ diaLocal(slotSel) }}</span></template
+                ><template v-else>{{
+                  $t("perfilPublico.agendar.eligeHorarioContinuar")
+                }}</template>
+              </p>
               <button
                 type="button"
                 class="tu-btn tu-btn-primario"
@@ -1369,317 +1620,435 @@ onMounted(cargar);
 
           <!-- Paso: confirmación (lo elegido, dónde es y tus datos) -->
           <template v-else-if="paso === 'confirmar'">
-            <div class="tu-card p-5" data-prueba="resumen">
-              <h2 class="font-semibold">
-                {{ $t("perfilPublico.agendar.revisa") }}
-              </h2>
-              <dl class="rc-resumen mt-3">
-                <div>
-                  <dt>{{ $t("perfilPublico.agendar.servicio") }}</dt>
-                  <dd>
-                    <span class="font-medium">{{ servicioSel?.nombre }}</span>
-                    ·
-                    {{
-                      dinero(
-                        servicioSel?.precio_minor ?? null,
-                        servicioSel?.moneda ?? null,
-                      )
-                    }}
-                    <ServicioIncluye
-                      :incluye="servicioSel?.incluye"
-                      :precio-minor="servicioSel?.precio_minor"
-                      :por-separado-minor="
-                        servicioSel?.precio_por_separado_minor
-                      "
-                      :moneda="servicioSel?.moneda"
-                    />
-                  </dd>
-                  <button
-                    type="button"
-                    class="tu-enlace text-sm"
-                    @click="volverA('servicio')"
-                  >
-                    {{ $t("perfilPublico.agendar.cambiar") }}
-                  </button>
+            <div class="rc-confirmacion">
+              <aside
+                class="tu-card rc-ticket"
+                data-prueba="resumen"
+                :aria-label="$t('perfilPublico.agendar.revisa')"
+              >
+                <div class="rc-ticket-cabecera">
+                  <img
+                    v-if="servicioSel?.foto_url"
+                    :src="servicioSel.foto_url"
+                    alt=""
+                    class="rc-ticket-imagen"
+                  />
+                  <span v-else class="rc-ticket-icono" aria-hidden="true"
+                    ><IconoNav nombre="agenda" :tam="25"
+                  /></span>
+                  <div>
+                    <p class="rc-antetitulo">{{ opciones.estudio.nombre }}</p>
+                    <h3 class="font-semibold">
+                      {{ $t("perfilPublico.agendar.revisa") }}
+                    </h3>
+                  </div>
                 </div>
-                <div>
-                  <dt>{{ $t("perfilPublico.agendar.cuando") }}</dt>
-                  <dd>
-                    <span class="font-medium">{{ diaLocal(slotSel) }}</span>
-                    · {{ horaLocal(slotSel) }}
-                    <span
-                      class="block text-sm"
-                      :style="{ color: 'var(--texto-suave)' }"
-                      >{{
+                <dl class="rc-resumen mt-3">
+                  <div>
+                    <dt>
+                      <IconoNav nombre="etiqueta" :tam="16" />{{
+                        $t("perfilPublico.agendar.servicio")
+                      }}
+                    </dt>
+                    <dd>
+                      <span class="font-medium">{{ servicioSel?.nombre }}</span>
+                      <span
+                        v-if="servicioSel?.duracion_minutos"
+                        class="rc-detalle-secundario"
+                        >{{
+                          $t("reservar.duracionMin", {
+                            n: servicioSel.duracion_minutos,
+                          })
+                        }}</span
+                      >
+                      <ServicioIncluye
+                        :incluye="servicioSel?.incluye"
+                        :precio-minor="servicioSel?.precio_minor"
+                        :por-separado-minor="
+                          servicioSel?.precio_por_separado_minor
+                        "
+                        :moneda="servicioSel?.moneda"
+                      />
+                    </dd>
+                    <button
+                      type="button"
+                      class="tu-enlace text-sm"
+                      :aria-label="$t('perfilPublico.agendar.cambiarServicio')"
+                      @click="volverA('servicio')"
+                    >
+                      {{ $t("perfilPublico.agendar.cambiar") }}
+                    </button>
+                  </div>
+                  <div>
+                    <dt>
+                      <IconoNav nombre="agenda" :tam="16" />{{
+                        $t("perfilPublico.agendar.cuando")
+                      }}
+                    </dt>
+                    <dd>
+                      <span class="font-medium">{{ diaLocal(slotSel) }}</span>
+                      <span class="rc-hora-resumen">{{
+                        horaLocal(slotSel)
+                      }}</span>
+                      <span class="rc-detalle-secundario" :title="zona">{{
+                        $t("perfilPublico.agendar.horaSucursal")
+                      }}</span>
+                    </dd>
+                    <button
+                      type="button"
+                      class="tu-enlace text-sm"
+                      :aria-label="$t('perfilPublico.agendar.cambiarHorario')"
+                      @click="volverA('horario')"
+                    >
+                      {{ $t("perfilPublico.agendar.cambiar") }}
+                    </button>
+                  </div>
+                  <div>
+                    <dt>
+                      <IconoNav nombre="miembros" :tam="16" />{{
+                        $t("perfilPublico.agendar.quienTeAtiende")
+                      }}
+                    </dt>
+                    <dd class="rc-profesional-resumen">
+                      <img
+                        v-if="barberoSel?.foto_url"
+                        :src="barberoSel.foto_url"
+                        alt=""
+                        class="rc-avatar-resumen"
+                      />
+                      <span>{{
                         barberoId === CUALQUIERA
                           ? $t("perfilPublico.agendar.cualquiera")
                           : barberoSel?.nombre
-                      }}</span
+                      }}</span>
+                    </dd>
+                    <button
+                      type="button"
+                      class="tu-enlace text-sm"
+                      :aria-label="
+                        $t('perfilPublico.agendar.cambiarProfesional')
+                      "
+                      @click="volverA('horario')"
                     >
-                  </dd>
-                  <button
-                    type="button"
-                    class="tu-enlace text-sm"
-                    @click="volverA('horario')"
-                  >
-                    {{ $t("perfilPublico.agendar.cambiar") }}
-                  </button>
-                </div>
-                <div v-if="sucursalSel" data-prueba="donde">
-                  <dt>{{ $t("perfilPublico.agendar.donde") }}</dt>
-                  <dd>
-                    <span class="flex items-start gap-3">
-                      <img
-                        v-if="sucursalSel.foto_url"
-                        :src="sucursalSel.foto_url"
-                        alt=""
-                        class="h-14 w-20 shrink-0 rounded-lg object-cover"
-                      />
-                      <span class="min-w-0">
-                        <span class="font-medium block">{{
-                          sucursalSel.nombre
-                        }}</span>
-                        <span
-                          v-if="sucursalSel.direccion"
-                          class="block text-sm"
-                          :style="{ color: 'var(--texto-suave)' }"
-                          >{{ sucursalSel.direccion }}</span
-                        >
-                        <a
-                          v-if="sucursalSel.mapa_url"
-                          :href="sucursalSel.mapa_url"
-                          target="_blank"
-                          rel="noopener"
-                          class="tu-enlace text-sm"
-                          data-prueba="como-llegar"
-                          >{{ $t("perfilPublico.agendar.comoLlegar") }}</a
-                        >
-                      </span>
-                    </span>
-                  </dd>
-                  <button
-                    v-if="variasSedes"
-                    type="button"
-                    class="tu-enlace text-sm"
-                    @click="volverA('sucursal')"
-                  >
-                    {{ $t("perfilPublico.agendar.cambiar") }}
-                  </button>
-                </div>
-              </dl>
-            </div>
-
-            <div class="tu-card p-5">
-              <!-- Con su cuenta: no se piden datos, solo confirmar que es él. -->
-              <div v-if="clienteConCuenta" data-prueba="con-cuenta">
-                <label class="tu-label">{{
-                  $t("perfilPublico.agendar.agendarasComo")
-                }}</label>
-                <p class="font-medium">{{ sesion.usuario?.nombre }}</p>
-                <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-                  {{ sesion.usuario?.email }}
-                </p>
-                <button
-                  type="button"
-                  class="tu-enlace mt-1 text-sm"
-                  @click="comoInvitado = true"
-                >
-                  {{ $t("perfilPublico.agendar.usarOtrosDatos") }}
-                </button>
-              </div>
-              <template v-else>
-                <label class="tu-label">{{ $t("reservar.datos") }}</label>
-                <p
-                  v-if="sesionDelEquipo"
-                  class="-mt-1 mb-3 text-sm"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  data-prueba="sesion-equipo"
-                >
-                  {{
-                    $t("perfilPublico.agendar.sesionEquipo", {
-                      rol: rolDeSesion,
-                      negocio: sesion.estudio?.nombre ?? "",
-                    })
-                  }}
-                  <RouterLink
-                    v-if="puedeEntrar('agenda', sesion)"
-                    :to="{ name: 'agenda' }"
-                    class="tu-enlace"
-                    >{{ $t("perfilPublico.agendar.desdeAgenda") }}</RouterLink
-                  >
-                </p>
-                <p
-                  v-else
-                  class="-mt-1 mb-3 text-sm"
-                  :style="{ color: 'var(--texto-suave)' }"
-                >
-                  {{ $t("perfilPublico.agendar.tienesCuenta") }}
-                  <button
-                    type="button"
-                    class="tu-enlace"
-                    data-prueba="entrar"
-                    @click="entrarParaAgendar"
-                  >
-                    {{ $t("perfilPublico.agendar.entrar") }}
-                  </button>
-                </p>
-                <div class="space-y-3">
-                  <div class="grid sm:grid-cols-2 gap-3">
-                    <div>
-                      <label class="tu-label" for="rc-nom">{{
-                        $t("reservar.nombre")
-                      }}</label>
-                      <input
-                        id="rc-nom"
-                        v-model="datos.nombre"
-                        class="tu-input"
-                        autocomplete="given-name"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label class="tu-label" for="rc-ape">{{
-                        $t("perfilPublico.agendar.apellidos")
-                      }}</label>
-                      <input
-                        id="rc-ape"
-                        v-model="datos.apellidos"
-                        class="tu-input"
-                        autocomplete="family-name"
-                      />
-                    </div>
+                      {{ $t("perfilPublico.agendar.cambiar") }}
+                    </button>
                   </div>
-                  <div class="grid sm:grid-cols-2 gap-3">
-                    <div>
-                      <label class="tu-label" for="rc-cel">{{
-                        $t("reservar.celular")
-                      }}</label>
-                      <div class="flex gap-2">
-                        <select
-                          id="rc-lada"
-                          v-model="datos.lada"
-                          class="tu-input w-auto"
-                          :aria-label="$t('perfilPublico.agendar.lada')"
-                        >
-                          <option v-for="l in LADAS" :key="l" :value="l">
-                            {{ l }}
-                          </option>
-                        </select>
+                  <div v-if="sucursalSel" data-prueba="donde">
+                    <dt>
+                      <IconoNav nombre="ubicacion" :tam="16" />{{
+                        $t("perfilPublico.agendar.donde")
+                      }}
+                    </dt>
+                    <dd>
+                      <span class="flex items-start gap-3">
+                        <img
+                          v-if="sucursalSel.foto_url"
+                          :src="sucursalSel.foto_url"
+                          alt=""
+                          class="h-14 w-20 shrink-0 rounded-lg object-cover"
+                        />
+                        <span class="min-w-0">
+                          <span class="font-medium block">{{
+                            sucursalSel.nombre
+                          }}</span>
+                          <span
+                            v-if="sucursalSel.direccion"
+                            class="block text-sm"
+                            :style="{ color: 'var(--texto-suave)' }"
+                            >{{ sucursalSel.direccion }}</span
+                          >
+                          <a
+                            v-if="sucursalSel.mapa_url"
+                            :href="sucursalSel.mapa_url"
+                            target="_blank"
+                            rel="noopener"
+                            class="tu-enlace text-sm"
+                            data-prueba="como-llegar"
+                            >{{ $t("perfilPublico.agendar.comoLlegar") }}</a
+                          >
+                        </span>
+                      </span>
+                    </dd>
+                    <button
+                      v-if="variasSedes"
+                      type="button"
+                      class="tu-enlace text-sm"
+                      :aria-label="$t('perfilPublico.agendar.cambiarSucursal')"
+                      @click="volverA('sucursal')"
+                    >
+                      {{ $t("perfilPublico.agendar.cambiar") }}
+                    </button>
+                  </div>
+                </dl>
+                <div class="rc-precio-resumen" data-prueba="precio-resumen">
+                  <span>{{ $t("perfilPublico.agendar.precioServicio") }}</span>
+                  <strong>{{
+                    dinero(
+                      servicioSel?.precio_minor ?? null,
+                      servicioSel?.moneda ?? null,
+                    )
+                  }}</strong>
+                </div>
+                <p class="rc-pago-ayuda" data-prueba="pago-ayuda">
+                  <IconoNav nombre="pasarelas" :tam="18" />{{
+                    $t(
+                      pagoObligatorio
+                        ? "perfilPublico.agendar.pagoPrevio"
+                        : pagoEnLinea
+                          ? "perfilPublico.agendar.pagoFlexible"
+                          : "perfilPublico.agendar.pagoEnLugar",
+                    )
+                  }}
+                </p>
+              </aside>
+
+              <div class="tu-card rc-datos">
+                <div class="rc-datos-cabecera">
+                  <span class="rc-ticket-icono" aria-hidden="true"
+                    ><IconoNav nombre="miembros" :tam="23"
+                  /></span>
+                  <div>
+                    <h3>
+                      {{
+                        $t(
+                          sesionDelEquipo
+                            ? "perfilPublico.agendar.datosCliente"
+                            : "reservar.datos",
+                        )
+                      }}
+                    </h3>
+                    <p>
+                      {{
+                        $t(
+                          clienteConCuenta
+                            ? "perfilPublico.agendar.datosCuentaAyuda"
+                            : "perfilPublico.agendar.datosAyuda",
+                        )
+                      }}
+                    </p>
+                  </div>
+                </div>
+                <!-- Con su cuenta: no se piden datos, solo confirmar que es él. -->
+                <div v-if="clienteConCuenta" data-prueba="con-cuenta">
+                  <label class="tu-label">{{
+                    $t("perfilPublico.agendar.agendarasComo")
+                  }}</label>
+                  <p class="font-medium">{{ sesion.usuario?.nombre }}</p>
+                  <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+                    {{ sesion.usuario?.email }}
+                  </p>
+                  <button
+                    type="button"
+                    class="tu-enlace mt-1 text-sm"
+                    @click="comoInvitado = true"
+                  >
+                    {{ $t("perfilPublico.agendar.usarOtrosDatos") }}
+                  </button>
+                </div>
+                <template v-else>
+                  <p
+                    v-if="sesionDelEquipo"
+                    class="rc-aviso-equipo"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    data-prueba="sesion-equipo"
+                  >
+                    {{
+                      $t("perfilPublico.agendar.sesionEquipo", {
+                        rol: rolDeSesion,
+                        negocio: sesion.estudio?.nombre ?? "",
+                      })
+                    }}
+                    <RouterLink
+                      v-if="puedeEntrar('agenda', sesion)"
+                      :to="{ name: 'agenda' }"
+                      class="tu-enlace rc-enlace-equipo"
+                      >{{ $t("perfilPublico.agendar.desdeAgenda") }}</RouterLink
+                    >
+                  </p>
+                  <p
+                    v-else
+                    class="rc-acceso-datos"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    {{ $t("perfilPublico.agendar.tienesCuenta") }}
+                    <button
+                      type="button"
+                      class="tu-enlace"
+                      data-prueba="entrar"
+                      @click="entrarParaAgendar"
+                    >
+                      {{ $t("perfilPublico.agendar.entrar") }}
+                    </button>
+                  </p>
+                  <div class="space-y-3">
+                    <div class="grid sm:grid-cols-2 gap-3">
+                      <div>
+                        <label class="tu-label" for="rc-nom">{{
+                          $t("reservar.nombre")
+                        }}</label>
                         <input
-                          id="rc-cel"
-                          v-model="datos.celular"
+                          id="rc-nom"
+                          v-model="datos.nombre"
                           class="tu-input"
-                          inputmode="tel"
-                          autocomplete="tel-national"
+                          autocomplete="given-name"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label class="tu-label" for="rc-ape">{{
+                          $t("perfilPublico.agendar.apellidos")
+                        }}</label>
+                        <input
+                          id="rc-ape"
+                          v-model="datos.apellidos"
+                          class="tu-input"
+                          autocomplete="family-name"
+                          :placeholder="$t('perfilPublico.agendar.opcional')"
                         />
                       </div>
                     </div>
-                    <div>
-                      <label class="tu-label" for="rc-email">{{
-                        $t("perfilPublico.agendar.correo")
-                      }}</label>
-                      <input
-                        id="rc-email"
-                        v-model="datos.email"
-                        type="email"
-                        class="tu-input"
-                        autocomplete="email"
-                        required
-                      />
-                      <span class="tu-hint">{{
-                        $t("perfilPublico.agendar.correoAyuda")
-                      }}</span>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                      <div>
+                        <label class="tu-label" for="rc-cel">{{
+                          $t("reservar.celular")
+                        }}</label>
+                        <div class="flex gap-2">
+                          <select
+                            id="rc-lada"
+                            v-model="datos.lada"
+                            class="tu-input w-auto"
+                            :aria-label="$t('perfilPublico.agendar.lada')"
+                          >
+                            <option v-for="l in LADAS" :key="l" :value="l">
+                              {{ l }}
+                            </option>
+                          </select>
+                          <input
+                            id="rc-cel"
+                            v-model="datos.celular"
+                            class="tu-input"
+                            inputmode="tel"
+                            autocomplete="tel-national"
+                            :placeholder="$t('perfilPublico.agendar.opcional')"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label class="tu-label" for="rc-email">{{
+                          $t("perfilPublico.agendar.correo")
+                        }}</label>
+                        <input
+                          id="rc-email"
+                          v-model="datos.email"
+                          type="email"
+                          class="tu-input"
+                          autocomplete="email"
+                          aria-describedby="rc-email-ayuda"
+                          required
+                        />
+                        <span id="rc-email-ayuda" class="tu-hint">{{
+                          $t("perfilPublico.agendar.correoAyuda")
+                        }}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <label class="tu-label" for="rc-origen">{{
-                      $t("perfilPublico.agendar.comoNosConociste")
-                    }}</label>
-                    <select
-                      id="rc-origen"
-                      v-model="datos.origen"
-                      class="tu-input"
+                    <details class="rc-opcional">
+                      <summary>
+                        {{ $t("perfilPublico.agendar.comoNosConociste") }}
+                      </summary>
+                      <label class="sr-only" for="rc-origen">{{
+                        $t("perfilPublico.agendar.comoNosConociste")
+                      }}</label>
+                      <select
+                        id="rc-origen"
+                        v-model="datos.origen"
+                        class="tu-input"
+                      >
+                        <option value="">
+                          {{ $t("perfilPublico.agendar.prefieroNoDecir") }}
+                        </option>
+                        <option v-for="o in ORIGENES" :key="o" :value="o">
+                          {{ $t(`perfilPublico.origenes.${o}`) }}
+                        </option>
+                      </select>
+                    </details>
+                    <label
+                      v-if="ofrecerWhatsApp"
+                      class="flex items-center gap-2 text-sm"
                     >
-                      <option value="">
-                        {{ $t("perfilPublico.agendar.prefieroNoDecir") }}
-                      </option>
-                      <option v-for="o in ORIGENES" :key="o" :value="o">
-                        {{ $t(`perfilPublico.origenes.${o}`) }}
-                      </option>
-                    </select>
+                      <input
+                        v-model="datos.whatsapp"
+                        type="checkbox"
+                        data-prueba="acepta-whatsapp"
+                      />
+                      {{ $t("perfilPublico.agendar.aceptaWhatsApp") }}
+                    </label>
                   </div>
-                  <label
-                    v-if="ofrecerWhatsApp"
-                    class="flex items-center gap-2 text-sm"
-                  >
+                </template>
+
+                <!-- Para otra persona: la cita es de quien agenda (ADR 0068). -->
+                <div class="mt-3">
+                  <label class="flex items-center gap-2 text-sm">
                     <input
-                      v-model="datos.whatsapp"
+                      v-model="paraOtra"
                       type="checkbox"
-                      data-prueba="acepta-whatsapp"
+                      data-prueba="para-otra"
                     />
-                    {{ $t("perfilPublico.agendar.aceptaWhatsApp") }}
+                    {{ $t("perfilPublico.agendar.paraOtra") }}
                   </label>
+                  <div v-if="paraOtra" class="mt-2">
+                    <label class="tu-label" for="rc-asiste">{{
+                      $t("perfilPublico.agendar.quienAsiste")
+                    }}</label>
+                    <input
+                      id="rc-asiste"
+                      v-model="asiste"
+                      class="tu-input"
+                      maxlength="120"
+                    />
+                    <span class="tu-hint">{{
+                      $t("perfilPublico.agendar.paraOtraAyuda")
+                    }}</span>
+                  </div>
                 </div>
-              </template>
 
-              <!-- Para otra persona: la cita es de quien agenda (ADR 0068). -->
-              <div class="mt-3">
-                <label class="flex items-center gap-2 text-sm">
-                  <input
-                    v-model="paraOtra"
-                    type="checkbox"
-                    data-prueba="para-otra"
-                  />
-                  {{ $t("perfilPublico.agendar.paraOtra") }}
-                </label>
-                <div v-if="paraOtra" class="mt-2">
-                  <label class="tu-label" for="rc-asiste">{{
-                    $t("perfilPublico.agendar.quienAsiste")
+                <!-- Nota para el negocio (opcional), con o sin cuenta. -->
+                <details class="rc-opcional mt-3">
+                  <summary>{{ $t("perfilPublico.agendar.nota") }}</summary>
+                  <label class="sr-only" for="rc-nota">{{
+                    $t("perfilPublico.agendar.nota")
                   }}</label>
-                  <input
-                    id="rc-asiste"
-                    v-model="asiste"
+                  <textarea
+                    id="rc-nota"
+                    v-model="nota"
                     class="tu-input"
-                    maxlength="120"
+                    rows="2"
+                    maxlength="500"
+                    :placeholder="$t('perfilPublico.agendar.notaPh')"
                   />
-                  <span class="tu-hint">{{
-                    $t("perfilPublico.agendar.paraOtraAyuda")
-                  }}</span>
-                </div>
-              </div>
+                </details>
 
-              <!-- Nota para el negocio (opcional), con o sin cuenta. -->
-              <div class="mt-3">
-                <label class="tu-label" for="rc-nota">{{
-                  $t("perfilPublico.agendar.nota")
-                }}</label>
-                <textarea
-                  id="rc-nota"
-                  v-model="nota"
-                  class="tu-input"
-                  rows="2"
-                  maxlength="500"
-                  :placeholder="$t('perfilPublico.agendar.notaPh')"
-                />
+                <button
+                  class="tu-btn tu-btn-primario mt-4 w-full"
+                  type="button"
+                  :disabled="agendando || !listoParaAgendar"
+                  @click="agendar"
+                >
+                  {{
+                    agendando
+                      ? $t("reservar.agendando")
+                      : pagoObligatorio
+                        ? $t("reservar.agendarYPagar")
+                        : $t("perfilPublico.agendar.agendar")
+                  }}
+                </button>
+                <p
+                  v-if="error"
+                  class="mt-3 text-sm"
+                  style="color: var(--error)"
+                >
+                  {{ error }}
+                </p>
               </div>
-
-              <button
-                class="tu-btn tu-btn-primario mt-4 w-full"
-                type="button"
-                :disabled="agendando || !listoParaAgendar"
-                @click="agendar"
-              >
-                {{
-                  agendando
-                    ? $t("reservar.agendando")
-                    : pagoObligatorio
-                      ? $t("reservar.agendarYPagar")
-                      : $t("perfilPublico.agendar.agendar")
-                }}
-              </button>
-              <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
-                {{ error }}
-              </p>
             </div>
 
             <button
@@ -1700,6 +2069,261 @@ onMounted(cargar);
 .rc-contenedor {
   max-width: 66rem;
 }
+.rc-busqueda-servicio {
+  margin-bottom: 1rem;
+  max-width: 32rem;
+}
+.rc-categorias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.rc-categorias button {
+  padding: 0.55rem 0.85rem;
+  min-height: 44px;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.rc-categorias button[aria-pressed="true"] {
+  background: var(--primario-suave);
+  border-color: var(--primario);
+  color: var(--enlace);
+}
+.rc-catalogo {
+  min-width: 0;
+}
+.rc-grupo-servicios {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+.rc-categoria-titulo {
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+.rc-servicio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.1rem;
+  border: 1px solid var(--borde);
+  border-radius: 14px;
+  cursor: pointer;
+}
+.rc-servicio input {
+  accent-color: var(--primario);
+}
+.rc-servicio-precio {
+  font-size: 1.05rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: var(--fondo);
+}
+.rc-atras-servicios {
+  display: inline-block;
+  margin-top: 1.25rem;
+}
+.rc-sede-elegir {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  color: var(--enlace);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.rc-sede--compacta {
+  position: relative;
+}
+.rc-sede--compacta .rc-sede-texto {
+  width: 100%;
+}
+.rc-sede--compacta .rc-sede-elegir {
+  border-top: 1px solid var(--borde);
+  padding-top: 0.7rem;
+}
+.rc-eleccion-resumen {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--borde);
+}
+.rc-eleccion-texto {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.2rem;
+  overflow-wrap: anywhere;
+}
+.rc-eleccion-texto strong {
+  color: var(--texto);
+  font-weight: 600;
+}
+.rc-eleccion-texto > span {
+  font-size: 0.8rem;
+}
+.rc-profesional-unico {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 1.25rem;
+}
+.rc-profesional-unico strong,
+.rc-profesional-unico small {
+  display: block;
+}
+.rc-profesional-unico small {
+  color: var(--texto-suave);
+}
+.rc-profesional-unico strong {
+  font-weight: 500;
+}
+.rc-selector-profesional :deep(.ep-opcion) {
+  gap: 0.7rem;
+  padding: 0.75rem;
+}
+.rc-selector-profesional :deep(.ep-icono) {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+.rc-selector-profesional :deep(.ep-texto strong) {
+  font-size: 0.9rem;
+}
+.rc-selector-profesional :deep(.ep-texto small) {
+  font-size: 0.75rem;
+}
+.rc-selector-profesional :deep(.ep-profesional) {
+  flex: 0 0 auto;
+  width: 7rem;
+  min-width: 7rem;
+  border-color: transparent;
+  background: transparent;
+}
+.rc-selector-profesional :deep(.ep-profesional--activo) {
+  border-color: var(--primario);
+  background: var(--primario-suave);
+}
+.rc-zona-horaria {
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+  margin-top: -0.35rem;
+}
+.rc-franja {
+  margin-top: 1rem;
+  min-width: 0;
+}
+.rc-franja legend {
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 0.6rem;
+}
+.rc-franja legend span {
+  margin-left: 0.3rem;
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+.rc-vacio {
+  display: grid;
+  justify-items: center;
+  gap: 0.8rem;
+  padding: 1.5rem 1rem;
+  margin-top: 1rem;
+  border-radius: 12px;
+  background: var(--fondo);
+  color: var(--texto-suave);
+  text-align: center;
+}
+.rc-libres .reserva-eleccion {
+  min-height: 64px;
+  padding: 0.75rem;
+}
+.rc-libres .rc-equipo {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+.rc-acciones {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 14px;
+  background: var(--superficie);
+}
+.rc-seleccion-hora {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--texto-suave);
+}
+.rc-seleccion-hora strong {
+  color: var(--texto);
+  font-size: 1.1rem;
+}
+.rc-categorias button:focus-visible,
+.rc-servicio:has(:focus-visible) {
+  outline: 2px solid var(--primario);
+  outline-offset: 3px;
+}
+@media (max-width: 520px) {
+  .rc-servicio {
+    gap: 0.7rem;
+    padding: 0.85rem;
+  }
+  .rc-servicio-precio {
+    grid-column: 1 / -1;
+    justify-self: end;
+    font-size: 0.95rem;
+  }
+  .rc-acciones {
+    flex-wrap: wrap;
+  }
+  .rc-seleccion-hora {
+    order: -1;
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+  .rc-eleccion-resumen > .rc-ticket-icono {
+    display: none;
+  }
+}
+.rc-guia {
+  margin-bottom: 1.25rem;
+}
+.rc-guia h2 {
+  font-size: clamp(1.15rem, 2.5vw, 1.4rem);
+  font-weight: 600;
+  line-height: 1.35;
+}
+.rc-guia p {
+  margin-top: 0.35rem;
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+}
+.rc-servicio:hover,
+.rc-servicio:has(:focus-visible) {
+  border-color: var(--primario);
+}
+.rc-nombre-servicio {
+  display: block;
+  overflow-wrap: anywhere;
+}
 .rc-panel-horario {
   padding: clamp(1rem, 3vw, 1.75rem);
 }
@@ -1711,11 +2335,11 @@ onMounted(cargar);
   margin-bottom: 1.35rem;
   font-size: 0.95rem;
 }
-.reserva-opciones legend {
+.reserva-opciones legend:not(.sr-only) {
   float: left;
   width: 100%;
 }
-.reserva-opciones legend + * {
+.reserva-opciones legend:not(.sr-only) + * {
   clear: both;
 }
 .reserva-ayuda {
@@ -1728,6 +2352,13 @@ onMounted(cargar);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+}
+.rc-sucursales .rc-sede-foto {
+  height: 10rem;
+  aspect-ratio: auto;
+}
+.rc-sucursales .rc-sede--compacta .rc-sede-foto {
+  height: 36px;
 }
 .reserva-eleccion {
   display: flex;
@@ -1947,6 +2578,7 @@ onMounted(cargar);
   gap: 0.4rem;
   width: 100%;
   min-width: 0;
+  min-height: 44px;
   font-size: 0.8rem;
   color: var(--texto-suave);
   text-align: center;
@@ -1992,21 +2624,177 @@ button.rc-paso-marca:hover .rc-paso-texto {
 }
 
 /* Resumen de la confirmación */
+.rc-confirmacion {
+  display: grid;
+  gap: 1.25rem;
+  align-items: start;
+  margin-bottom: 1.25rem;
+}
+.rc-ticket,
+.rc-datos {
+  min-width: 0;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  border-radius: 18px;
+}
+.rc-ticket-cabecera,
+.rc-datos-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.rc-ticket-cabecera h3,
+.rc-datos-cabecera h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.rc-ticket-imagen,
+.rc-ticket-icono {
+  width: 3rem;
+  height: 3rem;
+  flex-shrink: 0;
+  border-radius: 12px;
+  object-fit: cover;
+}
+.rc-ticket-icono {
+  display: grid;
+  place-items: center;
+  color: var(--enlace);
+  background: var(--primario-suave);
+}
+.rc-antetitulo,
+.rc-detalle-secundario,
+.rc-datos-cabecera p {
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.rc-detalle-secundario {
+  display: block;
+  margin-top: 0.2rem;
+}
 .rc-resumen > div {
   display: grid;
-  grid-template-columns: 6.5rem minmax(0, 1fr) auto;
-  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 0.75rem;
   align-items: start;
   padding: 0.75rem 0;
   border-top: 1px solid var(--borde);
 }
 .rc-resumen dt {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  grid-column: 1;
+  grid-row: 1;
   font-size: 0.85rem;
   color: var(--texto-suave);
 }
 .rc-resumen dd {
+  grid-column: 1 / -1;
+  grid-row: 2;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.rc-resumen > div > button {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 32px;
+}
+.rc-hora-resumen {
+  display: inline-block;
+  margin-left: 0.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.rc-profesional-resumen {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.rc-avatar-resumen {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 50%;
+}
+.rc-precio-resumen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  background: var(--primario-suave);
+  font-size: 0.85rem;
+}
+.rc-precio-resumen strong {
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+.rc-pago-ayuda {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.rc-pago-ayuda svg,
+.rc-resumen dt svg {
+  flex-shrink: 0;
+}
+.rc-datos-cabecera {
+  margin-bottom: 1rem;
+}
+.rc-datos-cabecera p {
+  margin-top: 0.25rem;
+}
+.rc-aviso-equipo {
+  padding: 0.8rem;
+  margin-bottom: 1rem;
+  border-left: 3px solid var(--borde);
+  border-radius: 0 8px 8px 0;
+  background: var(--fondo);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.rc-enlace-equipo {
+  display: block;
+  margin-top: 0.3rem;
+}
+.rc-acceso-datos {
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+.rc-opcional {
+  border-top: 1px solid var(--borde);
+  font-size: 0.85rem;
+}
+.rc-opcional summary {
+  padding: 0.8rem 0;
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--texto-suave);
+}
+.rc-opcional[open] summary {
+  color: var(--texto);
+}
+.rc-datos input::placeholder {
+  color: var(--texto-suave);
+  opacity: 0.65;
+}
+.rc-datos #rc-cel {
+  min-width: 0;
+}
+@media (min-width: 960px) {
+  .rc-confirmacion {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  }
 }
 
 @media (max-width: 520px) {

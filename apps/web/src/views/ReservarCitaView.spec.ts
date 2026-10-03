@@ -219,6 +219,166 @@ beforeEach(() => {
 });
 
 describe("agenda pública por pasos", () => {
+  it("busca sin distinguir acentos y filtra catálogos grandes por categoría", async () => {
+    const op = opciones(1);
+    op.data.data.servicios = Array.from({ length: 6 }, (_, i) => ({
+      ...op.data.data.servicios[0],
+      id: `servicio-${i}`,
+      nombre: `Consulta clínica ${i}`,
+      categoria: i < 3 ? "Consultas" : "Terapias",
+    }));
+    api(op);
+    const vista = montar();
+    await flushPromises();
+    await vista.get("#rc-buscar-servicio").setValue("clinica");
+    expect(vista.findAll('input[name="servicio"]')).toHaveLength(6);
+    await vista
+      .findAll(".rc-categorias button")
+      .find((b) => b.text() === "Terapias")!
+      .trigger("click");
+    expect(vista.findAll('input[name="servicio"]')).toHaveLength(3);
+    await vista.get("#rc-buscar-servicio").setValue("inexistente");
+    expect(vista.get('[role="status"]').text()).toContain(
+      perfilPublico.agendar.sinResultadosServicio,
+    );
+    await vista.get(".rc-vacio button").trigger("click");
+    expect(vista.findAll('input[name="servicio"]')).toHaveLength(6);
+    vista.unmount();
+  });
+
+  it("agrupa horarios según la hora local de la sucursal, no según UTC", async () => {
+    api(opciones(1), () =>
+      Promise.resolve({
+        data: {
+          data: {
+            slots: [
+              "2030-01-07T15:00:00Z",
+              "2030-01-07T21:00:00Z",
+              "2030-01-08T02:00:00Z",
+            ].map((inicia) => ({
+              inicia,
+              termina: inicia,
+              profesionales: ["ana"],
+            })),
+          },
+        },
+      }),
+    );
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    const franjas = vista.findAll(".rc-franja");
+    expect(franjas).toHaveLength(3);
+    expect(franjas[0].text()).toContain("09:00");
+    expect(franjas[1].text()).toContain("15:00");
+    expect(franjas[2].text()).toContain("20:00");
+    await elegirHora(vista, "15:00");
+    expect(vista.get(".rc-seleccion-hora").text()).toContain("15:00");
+    vista.unmount();
+  });
+
+  it("un profesional único se muestra sin pedir una elección de equipo", async () => {
+    const op = opciones(1);
+    op.data.data.instructores = [op.data.data.instructores[0]];
+    api(op);
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    expect(vista.find('[data-prueba="ver-horarios-de"]').exists()).toBe(false);
+    expect(vista.get(".rc-profesional-unico").text()).toContain("Ana Pérez");
+    await elegirHora(vista, "09:00");
+    expect(vista.find('input[name="profesional"]').exists()).toBe(false);
+    expect(
+      vista.get('[data-prueba="continuar"]').attributes("disabled"),
+    ).toBeUndefined();
+    vista.unmount();
+  });
+
+  it("busca un siguiente día con huecos reales para el servicio sin crear la cita", async () => {
+    const siguientes = {
+      data: {
+        data: {
+          slots: horarios.data.data.slots.map((s) => ({
+            ...s,
+            inicia: s.inicia.replace("01-07", "01-08"),
+            termina: s.termina.replace("01-07", "01-08"),
+          })),
+        },
+      },
+    };
+    mocks.get.mockImplementation(
+      (url: string, config?: { params?: { fecha?: string } }) =>
+        Promise.resolve(
+          url.endsWith("/opciones")
+            ? opciones(1)
+            : url.endsWith("/dias")
+              ? dias
+              : config?.params?.fecha === "2030-01-08"
+                ? siguientes
+                : { data: { data: { slots: [] } } },
+        ),
+    );
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await vista.get('[data-prueba="siguiente-horario"]').trigger("click");
+    await flushPromises();
+    expect(
+      vista.get('[data-fecha="2030-01-08"]').attributes("aria-pressed"),
+    ).toBe("true");
+    expect(vista.find('[data-prueba="sin-horarios"]').exists()).toBe(false);
+    expect(mocks.get).toHaveBeenCalledWith(
+      "/api/v1/app/demo/citas/disponibilidad",
+      {
+        params: expect.objectContaining({
+          fecha: "2030-01-08",
+          oferta_id: "servicio",
+          duracion_minutos: 30,
+        }),
+      },
+    );
+    expect(mocks.post).not.toHaveBeenCalled();
+    vista.unmount();
+  });
+
+  it("descarta una búsqueda de siguiente horario si el usuario vuelve al servicio", async () => {
+    api(opciones(1), () => Promise.resolve({ data: { data: { slots: [] } } }));
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    let responder!: (value: typeof dias) => void;
+    mocks.get.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          responder = resolve;
+        }),
+    );
+    await vista.get('[data-prueba="siguiente-horario"]').trigger("click");
+    await vista.get('button[data-paso="servicio"]').trigger("click");
+    const llamadas = mocks.get.mock.calls.length;
+    responder(dias);
+    await flushPromises();
+    expect(mocks.get).toHaveBeenCalledTimes(llamadas);
+    expect(vista.find('input[name="servicio"]').exists()).toBe(true);
+    vista.unmount();
+  });
+
+  it("no promete disponibilidad cuando los próximos días también están llenos", async () => {
+    api(opciones(1), () => Promise.resolve({ data: { data: { slots: [] } } }));
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await vista.get('[data-prueba="siguiente-horario"]').trigger("click");
+    await flushPromises();
+    expect(vista.get('[data-prueba="sin-horarios"]').text()).toContain(
+      perfilPublico.agendar.sinSiguiente,
+    );
+    expect(
+      vista.get('[data-prueba="continuar"]').attributes("disabled"),
+    ).toBeDefined();
+    vista.unmount();
+  });
+
   it("con varias sedes empieza por la sede (foto, dirección y redes) y luego el servicio", async () => {
     const vista = montar();
     await flushPromises();
@@ -342,6 +502,61 @@ describe("agenda pública por pasos", () => {
     await vista.get('button[data-paso="servicio"]').trigger("click");
     expect(vista.find('input[value="servicio"]').exists()).toBe(true);
     expect(vista.find('[data-prueba="dias"]').exists()).toBe(false);
+    vista.unmount();
+  });
+
+  it.each([
+    [true, true, perfilPublico.agendar.pagoPrevio],
+    [false, true, perfilPublico.agendar.pagoFlexible],
+    [false, false, perfilPublico.agendar.pagoEnLugar],
+  ])(
+    "explica el pago según la configuración (%s, %s)",
+    async (obligatorio, enLinea, mensaje) => {
+      api(
+        opciones(1, { pago_obligatorio: obligatorio, pago_en_linea: enLinea }),
+      );
+      const vista = montar();
+      await flushPromises();
+      await hastaHorario(vista);
+      await elegirHora(vista, "09:00");
+      await continuar(vista);
+      expect(vista.get('[data-prueba="pago-ayuda"]').text()).toBe(mensaje);
+      expect(vista.get('[data-prueba="precio-resumen"]').text()).toContain(
+        "$200.00",
+      );
+      expect(vista.get('[data-prueba="guia-paso"]').text()).toContain(
+        perfilPublico.agendar.guia.confirmar.titulo,
+      );
+      expect(mocks.post).not.toHaveBeenCalled();
+      vista.unmount();
+    },
+  );
+
+  it("presenta la foto, duración y profesional sin perder los campos opcionales", async () => {
+    api(opciones(1));
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await elegirHora(vista, "09:00");
+    await vista.get('input[name="profesional"][value="ana"]').setValue();
+    await continuar(vista);
+    const resumen = vista.get('[data-prueba="resumen"]');
+    expect(resumen.text()).toContain("30 min");
+    expect(resumen.text()).toContain("Ana Pérez");
+    expect(resumen.get(".rc-avatar-resumen").attributes("src")).toBe(
+      "/storage/ana.webp",
+    );
+    expect(resumen.get(".rc-ticket-imagen").attributes("src")).toBe(
+      "/storage/corte.webp",
+    );
+    expect(vista.findAll("details.rc-opcional")).toHaveLength(2);
+    expect(vista.get("#rc-ape").attributes("placeholder")).toBe("Opcional");
+    expect(vista.get("#rc-email").attributes("aria-describedby")).toBe(
+      "rc-email-ayuda",
+    );
+    await vista.get('button[aria-label="Cambiar servicio"]').trigger("click");
+    expect(vista.find('input[value="servicio"]').exists()).toBe(true);
+    expect(mocks.post).not.toHaveBeenCalled();
     vista.unmount();
   });
 

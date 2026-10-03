@@ -132,6 +132,18 @@ export default {
     redes: "Síguenos",
   },
   agendar: {
+    elegirSucursal: "Reservar aquí",
+    buscarServicio: "Buscar servicio…",
+    categorias: "Categorías de servicios",
+    todosServicios: "Todos",
+    sinResultadosServicio: "No encontramos servicios con esa búsqueda.",
+    limpiarBusqueda: "Ver todos los servicios",
+    franjas: { manana: "Mañana", tarde: "Tarde", noche: "Noche" },
+    buscarSiguiente: "Buscar próximo horario",
+    buscandoSiguiente: "Buscando en los próximos 14 días…",
+    sinSiguiente:
+      "No encontramos horarios en los próximos 14 días. Prueba otra fecha o profesional.",
+    eligeHorarioContinuar: "Elige una hora para continuar",
     cualquiera: "Cualquier profesional disponible",
     cualquieraDesc: "Te atiende quien esté libre a esa hora.",
     teAtiende: "Te atenderá {nombre}.",
@@ -153,6 +165,40 @@ export default {
     atras: "← Atrás",
     continuar: "Continuar",
     revisa: "Revisa tu cita",
+    guia: {
+      sucursal: {
+        titulo: "Elige dónde te atendemos",
+        ayuda: "Consulta la ubicación y selecciona la sucursal que prefieras.",
+      },
+      servicio: {
+        titulo: "¿Qué te gustaría reservar?",
+        ayuda: "Revisa los servicios, su duración y precio antes de elegir.",
+      },
+      horario: {
+        titulo: "Encuentra tu mejor horario",
+        ayuda:
+          "Consulta la disponibilidad del equipo o elige a alguien en particular.",
+      },
+      confirmar: {
+        titulo: "Todo listo para revisar tu cita",
+        ayuda: "Comprueba los detalles y completa tus datos para continuar.",
+      },
+    },
+    cambiarServicio: "Cambiar servicio",
+    cambiarHorario: "Cambiar fecha y hora",
+    cambiarProfesional: "Cambiar quién te atiende",
+    cambiarSucursal: "Cambiar sucursal",
+    precioServicio: "Precio del servicio",
+    horaSucursal: "Horario local de la sucursal",
+    pagoPrevio:
+      "Para confirmar tu cita, completa el pago en el siguiente paso.",
+    pagoFlexible: "Puedes pagar en línea o directamente en la sucursal.",
+    pagoEnLugar: "El pago se realiza directamente en la sucursal.",
+    datosCliente: "Datos del cliente",
+    datosAyuda:
+      "Nombre y correo son obligatorios. Los demás datos son opcionales.",
+    datosCuentaAyuda: "Usaremos los datos de tu cuenta para esta reserva.",
+    opcional: "Opcional",
     servicio: "Servicio",
     cuando: "Cuándo",
     donde: "Dónde",

@@ -78,11 +78,12 @@ function diaSiguiente(f: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function cargar(mas = false): Promise<void> {
+async function cargar(mas = false, inicio?: string): Promise<void> {
   if (props.sucursalId === "") return;
   const esta = ++consulta;
   const ultimo = dias.value[dias.value.length - 1];
-  const desde = mas && ultimo ? diaSiguiente(ultimo.fecha) : hoySede();
+  const desde =
+    inicio ?? (mas && ultimo ? diaSiguiente(ultimo.fecha) : hoySede());
   cargando.value = true;
   error.value = null;
   try {
@@ -134,6 +135,20 @@ function etiqueta(f: string): { semana: string; numero: string; mes: string } {
 }
 
 // Otra sede u otra persona: otros días.
+// Una búsqueda externa puede encontrar una fecha fuera de la tira actual.
+watch(
+  () => props.modelValue,
+  (fecha) => {
+    if (
+      fecha &&
+      dias.value.length &&
+      !dias.value.some((d) => d.fecha === fecha) &&
+      fecha >= hoySede()
+    ) {
+      void cargar(false, fecha);
+    }
+  },
+);
 watch(
   () => [props.sucursalId, props.instructorId ?? ""],
   () => {

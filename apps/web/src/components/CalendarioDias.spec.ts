@@ -49,6 +49,21 @@ beforeEach(() => {
 afterEach(() => w?.unmount());
 
 describe("calendario de días", () => {
+  it("muestra una fecha encontrada fuera de la tira actual", async () => {
+    w = montar();
+    await flushPromises();
+    api.get.mockResolvedValueOnce({
+      data: { data: [{ fecha: "2030-02-01", abierto: true }] },
+    });
+    await w.setProps({ modelValue: "2030-02-01" });
+    await flushPromises();
+    expect(api.get).toHaveBeenLastCalledWith("/api/v1/app/demo/mi/citas/dias", {
+      params: expect.objectContaining({ desde: "2030-02-01" }),
+    });
+    expect(w.get('[data-fecha="2030-02-01"]').attributes("aria-pressed")).toBe(
+      "true",
+    );
+  });
   it("las flechas desplazan las fechas sin cambiar el día seleccionado", async () => {
     w = montar();
     const tira = w.get('[data-prueba="dias"]').element;
