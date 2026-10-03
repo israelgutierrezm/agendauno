@@ -226,3 +226,42 @@ export const gruposVisual = {
     estado: "Estado",
   },
 };
+
+// Lealtad (views/LealtadView.vue) con el patrón de los listados.
+export const lealtadVisual = {
+  subtitulo:
+    "Puntos por asistir y por comprar, y las recompensas que se canjean.",
+  inactivo: "Apagado",
+  kpi: {
+    programa: "Programa",
+    recompensas: "Recompensas activas",
+    pendientes: "Canjes por entregar",
+    canjeados: "Puntos canjeados",
+  },
+};
+
+// Documentos (views/DocumentosView.vue) con el patrón de los listados.
+export const documentosVisual = {
+  col: {
+    persona: "Persona",
+    documento: "Documento",
+    subido: "Subido",
+    estado: "Estado",
+    acciones: "Acciones",
+  },
+};
+
+// Sucursales y Comunicaciones con el patrón de los listados.
+export const sucursalesVisual = {
+  col: {
+    sucursal: "Sucursal",
+    zona: "Zona horaria",
+    moneda: "Moneda",
+    iva: "IVA",
+    acciones: "Acciones",
+  },
+};
+export const comunicacionesVisual = {
+  subtitulo:
+    "Avisos a tus clientes por correo, WhatsApp o en su cuenta, y lo que ya se envió.",
+};

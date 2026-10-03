@@ -214,7 +214,7 @@ onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 py-10">
+  <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion
       :titulo="
         soloRespuestas ? $t('nav.vistas.respuestas') : $t('formularios.titulo')

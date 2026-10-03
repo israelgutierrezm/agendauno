@@ -63,7 +63,9 @@ describe("sedes: foto y enlace de Google Maps", () => {
     api.put.mockResolvedValue({ data: { data: roma } });
     const w = await montar();
     // La lista muestra la miniatura de la sede.
-    expect(w.find('li img[src="/storage/roma.webp"]').exists()).toBe(true);
+    expect(
+      w.find('[data-prueba="sucursal"] img[src="/storage/roma.webp"]').exists(),
+    ).toBe(true);
 
     await w
       .findAll("button")

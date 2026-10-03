@@ -482,7 +482,10 @@ onMounted(cargar);
 
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion :titulo="$t('comunicaciones.titulo')" />
+    <EncabezadoSeccion
+      :titulo="$t('comunicaciones.titulo')"
+      :subtitulo="$t('comunicacionesVisual.subtitulo')"
+    />
 
     <div
       v-if="puedeAutomaticos || puedeSalida"

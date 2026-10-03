@@ -361,7 +361,7 @@ onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-5xl px-4 py-10">
+  <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion :titulo="$t(TITULOS[pestana])">
       <template
         v-if="pestana === 'consentimientos' && puedeGestionar"
@@ -389,79 +389,105 @@ onMounted(cargar);
       v-if="!cargando && pestana === 'documentos'"
       class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]"
     >
-      <div class="tu-card p-5 min-w-0">
-        <div class="flex items-center justify-between gap-2 flex-wrap">
-          <h2 class="font-semibold">{{ $t("documentos.docs.titulo") }}</h2>
-          <select
-            v-model="filtroEstado"
-            class="tu-input max-w-[180px]"
-            :aria-label="$t('documentos.docs.filtro')"
-            @change="cargar"
-          >
-            <option value="">{{ $t("documentos.docs.todos") }}</option>
-            <option value="pendiente">
-              {{ $t("documentos.docs.pendiente") }}
-            </option>
-            <option value="aprobado">
-              {{ $t("documentos.docs.aprobado") }}
-            </option>
-            <option value="rechazado">
-              {{ $t("documentos.docs.rechazado") }}
-            </option>
-          </select>
+      <div class="tu-card min-w-0 overflow-x-auto">
+        <div class="tu-filtros">
+          <h2 class="font-medium mr-auto">
+            {{ $t("documentos.docs.titulo") }}
+          </h2>
+          <div class="tu-segmentado" role="group">
+            <button
+              v-for="f in ['', 'pendiente', 'aprobado', 'rechazado']"
+              :key="f"
+              type="button"
+              :aria-pressed="filtroEstado === f"
+              :data-prueba="`filtro-doc-${f || 'todos'}`"
+              @click="
+                filtroEstado = f;
+                cargar();
+              "
+            >
+              {{ $t(`documentos.docs.${f || "todos"}`) }}
+            </button>
+          </div>
         </div>
 
         <EstadoVacio
           v-if="docs.length === 0"
-          class="mt-4 py-6"
+          class="py-8"
           icono="documentos"
           compacto
           :titulo="$t('documentos.docs.vacio')"
         />
-        <ul v-else class="mt-2">
-          <li v-for="d in docs" :key="d.id" class="doc-fila text-sm">
-            <div class="min-w-0">
-              <p class="font-medium truncate">{{ d.persona ?? "—" }}</p>
-              <p
-                class="mt-0.5 text-xs flex items-center gap-1.5 flex-wrap"
+        <table v-else class="tu-tabla">
+          <thead>
+            <tr>
+              <th>{{ $t("documentosVisual.col.persona") }}</th>
+              <th class="hidden sm:table-cell">
+                {{ $t("documentosVisual.col.documento") }}
+              </th>
+              <th class="hidden md:table-cell">
+                {{ $t("documentosVisual.col.subido") }}
+              </th>
+              <th>{{ $t("documentosVisual.col.estado") }}</th>
+              <th>
+                <span class="sr-only">{{
+                  $t("documentosVisual.col.acciones")
+                }}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="d in docs" :key="d.id" data-prueba="documento">
+              <td>
+                <span class="font-medium">{{ d.persona ?? "—" }}</span>
+                <span class="tu-sub sm:hidden">{{ d.tipo ?? d.nombre }}</span>
+              </td>
+              <td class="hidden sm:table-cell">{{ d.tipo ?? d.nombre }}</td>
+              <td
+                class="hidden md:table-cell whitespace-nowrap"
                 :style="{ color: 'var(--texto-suave)' }"
               >
+                {{ fecha(d.subido_en) }}
+              </td>
+              <td>
                 <span
-                  class="tu-badge"
-                  :class="{
-                    'tu-badge-exito': d.estado === 'aprobado',
-                    'tu-badge-aviso': d.estado === 'pendiente',
+                  class="tu-pildora"
+                  :style="{
+                    '--tono':
+                      d.estado === 'aprobado'
+                        ? 'var(--exito)'
+                        : d.estado === 'pendiente'
+                          ? 'var(--aviso)'
+                          : 'var(--error)',
                   }"
                   >{{ $t(`documentos.docs.${d.estado}`) }}</span
                 >
-                <span>{{ d.tipo ?? d.nombre }}</span>
-                <span>· {{ fecha(d.subido_en) }}</span>
-              </p>
-            </div>
-            <span class="flex items-center gap-3 shrink-0">
-              <template v-if="puedeGestionar && d.estado === 'pendiente'">
-                <button
-                  class="tu-enlace"
-                  :disabled="accionando"
-                  @click="validar(d, 'aprobado')"
-                >
-                  {{ $t("documentos.docs.aprobar") }}
+              </td>
+              <td class="text-right whitespace-nowrap">
+                <template v-if="puedeGestionar && d.estado === 'pendiente'">
+                  <button
+                    class="tu-enlace text-sm"
+                    :disabled="accionando"
+                    @click="validar(d, 'aprobado')"
+                  >
+                    {{ $t("documentos.docs.aprobar") }}
+                  </button>
+                  <button
+                    class="tu-enlace text-sm ml-3"
+                    style="color: var(--error)"
+                    :disabled="accionando"
+                    @click="validar(d, 'rechazado')"
+                  >
+                    {{ $t("documentos.docs.rechazar") }}
+                  </button>
+                </template>
+                <button class="tu-enlace text-sm ml-3" @click="ver(d)">
+                  {{ $t("documentos.docs.ver") }}
                 </button>
-                <button
-                  class="tu-enlace"
-                  style="color: var(--error)"
-                  :disabled="accionando"
-                  @click="validar(d, 'rechazado')"
-                >
-                  {{ $t("documentos.docs.rechazar") }}
-                </button>
-              </template>
-              <button class="tu-enlace" @click="ver(d)">
-                {{ $t("documentos.docs.ver") }}
-              </button>
-            </span>
-          </li>
-        </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <div v-if="puedeSubir" class="tu-card p-5 h-max">

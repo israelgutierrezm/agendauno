@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import CargadorImagen from "@/components/CargadorImagen.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -357,39 +358,74 @@ onMounted(cargar);
           :titulo="$t('sedes.vacio')"
         />
 
-        <ul v-else class="space-y-2">
-          <li
-            v-for="s in org.sucursales"
-            :key="s.id"
-            class="tu-card p-4 flex items-center justify-between gap-3"
-          >
-            <img
-              v-if="s.foto_url"
-              :src="s.foto_url"
-              alt=""
-              class="h-12 w-16 shrink-0 rounded-lg object-cover"
-            />
-            <div class="min-w-0 flex-1">
-              <div class="font-semibold truncate">{{ s.nombre }}</div>
-              <div
-                class="text-sm truncate"
-                :style="{ color: 'var(--texto-suave)' }"
+        <div v-else class="tu-card overflow-x-auto">
+          <table class="tu-tabla">
+            <thead>
+              <tr>
+                <th>{{ $t("sucursalesVisual.col.sucursal") }}</th>
+                <th class="hidden md:table-cell">
+                  {{ $t("sucursalesVisual.col.zona") }}
+                </th>
+                <th class="hidden sm:table-cell">
+                  {{ $t("sucursalesVisual.col.moneda") }}
+                </th>
+                <th class="hidden sm:table-cell text-right">
+                  {{ $t("sucursalesVisual.col.iva") }}
+                </th>
+                <th>
+                  <span class="sr-only">{{
+                    $t("sucursalesVisual.col.acciones")
+                  }}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="s in org.sucursales"
+                :key="s.id"
+                data-prueba="sucursal"
               >
-                <span v-if="s.region">{{ s.region }} · </span>
-                {{ s.zona_horaria }} · {{ dinero(s.moneda) }} ·
-                {{ $t("sedes.iva", { n: s.impuesto_tasa_bps / 100 }) }}
-              </div>
-            </div>
-            <button
-              v-if="puedeGestionar"
-              class="tu-btn tu-btn-fantasma text-sm shrink-0"
-              type="button"
-              @click="abrirEdicion(s)"
-            >
-              {{ $t("sedes.editar") }}
-            </button>
-          </li>
-        </ul>
+                <td>
+                  <div class="flex items-center gap-3">
+                    <img
+                      v-if="s.foto_url"
+                      :src="s.foto_url"
+                      alt=""
+                      class="su-foto"
+                    />
+                    <span v-else class="su-foto su-sin-foto" aria-hidden="true">
+                      <IconoNav nombre="ubicacion" :tam="16" />
+                    </span>
+                    <div class="min-w-0">
+                      <span class="font-medium">{{ s.nombre }}</span>
+                      <span v-if="s.region" class="tu-sub">{{ s.region }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td
+                  class="hidden md:table-cell"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ s.zona_horaria }}
+                </td>
+                <td class="hidden sm:table-cell">{{ dinero(s.moneda) }}</td>
+                <td class="hidden sm:table-cell text-right tabular-nums">
+                  {{ s.impuesto_tasa_bps / 100 }}%
+                </td>
+                <td class="text-right">
+                  <button
+                    v-if="puedeGestionar"
+                    class="tu-enlace text-sm"
+                    type="button"
+                    @click="abrirEdicion(s)"
+                  >
+                    {{ $t("sedes.editar") }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </template>
 
@@ -725,3 +761,19 @@ onMounted(cargar);
     </PanelLateral>
   </section>
 </template>
+
+<style scoped>
+.su-foto {
+  width: 2.75rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: 0.4rem;
+  object-fit: cover;
+}
+.su-sin-foto {
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--borde);
+  color: var(--texto-suave);
+}
+</style>

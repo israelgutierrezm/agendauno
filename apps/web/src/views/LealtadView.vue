@@ -4,6 +4,9 @@ import { useI18n } from "vue-i18n";
 
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import TarjetasIndicadores, {
+  type Indicador,
+} from "@/components/TarjetasIndicadores.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -243,11 +246,54 @@ async function accionCanje(
 }
 
 onMounted(cargar);
+
+// Indicadores del programa (patrón de los listados).
+const indicadores = computed<Indicador[]>(() => {
+  const pendientes = canjes.value.filter(
+    (c) => c.estado === "pendiente",
+  ).length;
+  return [
+    {
+      clave: "programa",
+      etiqueta: t("lealtadVisual.kpi.programa"),
+      valor: programa.value.activa
+        ? t("lealtad.programa.activa")
+        : t("lealtadVisual.inactivo"),
+      icono: "lealtad",
+    },
+    {
+      clave: "recompensas",
+      etiqueta: t("lealtadVisual.kpi.recompensas"),
+      valor: String(recompensas.value.filter((r) => r.activa).length),
+      icono: "estrella",
+    },
+    {
+      clave: "pendientes",
+      etiqueta: t("lealtadVisual.kpi.pendientes"),
+      valor: String(pendientes),
+      icono: "reloj",
+      aviso: pendientes > 0,
+    },
+    {
+      clave: "canjeados",
+      etiqueta: t("lealtadVisual.kpi.canjeados"),
+      valor: String(
+        canjes.value
+          .filter((c) => c.estado === "entregado")
+          .reduce((suma, c) => suma + c.puntos, 0),
+      ),
+      icono: "hecho",
+    },
+  ];
+});
 </script>
 
 <template>
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion :titulo="$t('lealtad.titulo')" />
+    <EncabezadoSeccion
+      :titulo="$t('lealtad.titulo')"
+      :subtitulo="$t('lealtadVisual.subtitulo')"
+    />
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
@@ -264,8 +310,9 @@ onMounted(cargar);
     </p>
 
     <template v-else>
+      <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
       <!-- Programa -->
-      <div class="mt-6 tu-card p-5">
+      <div class="mt-5 tu-card p-5">
         <div class="flex items-center justify-between gap-3">
           <h2 class="font-medium">{{ $t("lealtad.programa.titulo") }}</h2>
           <label class="flex items-center gap-2 text-sm font-medium">
@@ -488,7 +535,7 @@ onMounted(cargar);
       </div>
 
       <!-- Canjes recientes -->
-      <h2 class="mt-8 font-medium text-lg">
+      <h2 class="mt-8 font-medium">
         {{ $t("lealtad.canjes.titulo") }}
       </h2>
       <EstadoVacio
