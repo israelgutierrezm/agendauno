@@ -49,7 +49,6 @@ import {
   bloqueosAgenda,
   cambiarSerie,
   cancelacion,
-  confirmarRegistro,
   corteCaja,
   pausaMembresia,
   plataformaAdmin,
@@ -86,6 +85,8 @@ import {
   equipoVisual,
   promocionesVisual,
   recursosVisual,
+  oportunidadesVisual,
+  gruposVisual,
 } from "./locales/mostradorInventario.es-MX";
 import planes from "./locales/planes.es-MX";
 import portal from "./locales/portal.es-MX";
@@ -134,7 +135,6 @@ const mensajesBase = {
   pagoTienda,
   bajas,
   porConciliar,
-  confirmarRegistro,
   corteCaja,
   cancelacion,
   margenesServicio,
@@ -171,6 +171,8 @@ const mensajesBase = {
   equipoVisual,
   promocionesVisual,
   recursosVisual,
+  oportunidadesVisual,
+  gruposVisual,
 };
 
 export const i18n = createI18n({

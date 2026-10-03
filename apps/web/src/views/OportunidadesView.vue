@@ -3,7 +3,9 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
-import EstadoVacio from "@/components/EstadoVacio.vue";
+import TarjetasIndicadores, {
+  type Indicador,
+} from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -94,27 +96,52 @@ async function promover(o: Oportunidad): Promise<void> {
   }
 }
 
+// Indicadores del horizonte elegido (patrón de los listados).
+const indicadores = computed<Indicador[]>(() => {
+  const lista = oportunidades.value;
+  const conPct = lista.filter((o) => o.ocupacion_pct !== null);
+  return [
+    {
+      clave: "clases",
+      etiqueta: t("oportunidadesVisual.kpi.clases"),
+      valor: String(lista.length),
+      icono: "agenda",
+    },
+    {
+      clave: "libres",
+      etiqueta: t("oportunidadesVisual.kpi.libres"),
+      valor: String(lista.reduce((s, o) => s + o.libres, 0)),
+      icono: "personas",
+    },
+    {
+      clave: "espera",
+      etiqueta: t("oportunidadesVisual.kpi.espera"),
+      valor: String(lista.reduce((s, o) => s + o.en_espera, 0)),
+      icono: "reloj",
+      aviso: lista.some((o) => o.en_espera > 0),
+    },
+    {
+      clave: "ocupacion",
+      etiqueta: t("oportunidadesVisual.kpi.ocupacion"),
+      valor:
+        conPct.length > 0
+          ? `${Math.round(conPct.reduce((s, o) => s + (o.ocupacion_pct ?? 0), 0) / conPct.length)}%`
+          : "—",
+      icono: "reportes",
+    },
+  ];
+});
+
 watch(dias, cargar);
 onMounted(cargar);
 </script>
 
 <template>
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
-    <EncabezadoSeccion :titulo="$t('oportunidades.titulo')" />
-
-    <!-- Horizonte -->
-    <div class="mt-6 flex flex-wrap items-end gap-3">
-      <div>
-        <label class="tu-label" for="dias">{{
-          $t("oportunidades.horizonte")
-        }}</label>
-        <select id="dias" v-model.number="dias" class="tu-input w-auto">
-          <option :value="7">{{ $t("oportunidades.dias", { n: 7 }) }}</option>
-          <option :value="14">{{ $t("oportunidades.dias", { n: 14 }) }}</option>
-          <option :value="30">{{ $t("oportunidades.dias", { n: 30 }) }}</option>
-        </select>
-      </div>
-    </div>
+    <EncabezadoSeccion
+      :titulo="$t('oportunidades.titulo')"
+      :subtitulo="$t('oportunidadesVisual.subtitulo')"
+    />
 
     <p v-if="aviso" class="mt-4 text-sm" style="color: var(--exito)">
       {{ aviso }}
@@ -131,64 +158,128 @@ onMounted(cargar);
     </p>
 
     <template v-else>
-      <EstadoVacio
-        v-if="oportunidades.length === 0"
-        class="tu-card mt-6"
-        icono="oportunidades"
-        :titulo="$t('oportunidades.vacio')"
-      />
+      <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
 
-      <div v-else class="mt-6 grid gap-3 sm:grid-cols-2">
-        <div v-for="o in oportunidades" :key="o.id" class="tu-card p-4">
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <p class="font-semibold truncate">
-                {{ o.oferta ?? o.actividad ?? "—" }}
-              </p>
-              <p
-                class="text-xs mt-0.5"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{ fechaHora(o.inicia_en, o.zona_horaria) }}
-                <template v-if="o.sucursal"> · {{ o.sucursal }}</template>
-                <template v-if="o.instructor"> · {{ o.instructor }}</template>
-              </p>
-            </div>
-            <span class="tu-badge tu-badge-exito shrink-0">{{
-              $t("oportunidades.libres", { n: o.libres })
-            }}</span>
-          </div>
-
-          <div class="mt-3 flex items-center justify-between gap-3">
-            <div class="text-xs" :style="{ color: 'var(--texto-suave)' }">
-              <span>{{ o.ocupados }}/{{ o.capacidad }}</span>
-              <span v-if="o.ocupacion_pct !== null">
-                · {{ o.ocupacion_pct }}%</span
-              >
-              <span
-                v-if="o.en_espera > 0"
-                class="ml-2 font-semibold"
-                :style="{ color: 'var(--aviso)' }"
-              >
-                {{ $t("oportunidades.enEspera", { n: o.en_espera }) }}
-              </span>
-            </div>
+      <div class="tu-card mt-5 overflow-x-auto">
+        <div class="tu-filtros">
+          <span class="text-sm" :style="{ color: 'var(--texto-suave)' }">{{
+            $t("oportunidades.horizonte")
+          }}</span>
+          <div class="tu-segmentado" role="group">
             <button
-              v-if="puedePromover && o.en_espera > 0"
+              v-for="n in [7, 14, 30]"
+              :key="n"
               type="button"
-              class="tu-btn tu-btn-primario text-xs px-3 py-1.5"
-              :disabled="promoviendo === o.id"
-              @click="promover(o)"
+              :aria-pressed="dias === n"
+              :data-prueba="`dias-${n}`"
+              @click="dias = n"
             >
-              {{
-                promoviendo === o.id
-                  ? $t("oportunidades.promoviendo")
-                  : $t("oportunidades.promover")
-              }}
+              {{ $t("oportunidades.dias", { n }) }}
             </button>
           </div>
         </div>
+        <p v-if="oportunidades.length === 0" class="tu-sin-resultados">
+          {{ $t("oportunidades.vacio") }}
+        </p>
+        <table v-else class="tu-tabla">
+          <thead>
+            <tr>
+              <th>{{ $t("oportunidadesVisual.col.clase") }}</th>
+              <th class="hidden sm:table-cell">
+                {{ $t("oportunidadesVisual.col.ocupacion") }}
+              </th>
+              <th class="text-right">
+                {{ $t("oportunidadesVisual.col.libres") }}
+              </th>
+              <th class="text-right hidden md:table-cell">
+                {{ $t("oportunidadesVisual.col.espera") }}
+              </th>
+              <th>
+                <span class="sr-only">{{
+                  $t("oportunidadesVisual.col.acciones")
+                }}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="o in oportunidades"
+              :key="o.id"
+              data-prueba="oportunidad"
+            >
+              <td>
+                <span class="font-medium">{{
+                  o.oferta ?? o.actividad ?? "—"
+                }}</span>
+                <span class="tu-sub"
+                  >{{ fechaHora(o.inicia_en, o.zona_horaria)
+                  }}<template v-if="o.sucursal"> · {{ o.sucursal }}</template
+                  ><template v-if="o.instructor">
+                    · {{ o.instructor }}</template
+                  ></span
+                >
+              </td>
+              <td class="hidden sm:table-cell">
+                <div class="op-ocupacion">
+                  <span class="op-barra" aria-hidden="true"
+                    ><span
+                      :style="{ width: `${o.ocupacion_pct ?? 0}%` }" /></span
+                  ><span class="tabular-nums"
+                    >{{ o.ocupados }}/{{ o.capacidad }}</span
+                  >
+                </div>
+              </td>
+              <td class="text-right tabular-nums font-medium">
+                {{ o.libres }}
+              </td>
+              <td class="text-right hidden md:table-cell tabular-nums">
+                <span
+                  v-if="o.en_espera > 0"
+                  class="tu-pildora"
+                  :style="{ '--tono': 'var(--aviso)' }"
+                  >{{ o.en_espera }}</span
+                >
+                <template v-else>—</template>
+              </td>
+              <td class="text-right whitespace-nowrap">
+                <button
+                  v-if="puedePromover && o.en_espera > 0"
+                  type="button"
+                  class="tu-enlace text-sm"
+                  :disabled="promoviendo === o.id"
+                  @click="promover(o)"
+                >
+                  {{
+                    promoviendo === o.id
+                      ? $t("oportunidades.promoviendo")
+                      : $t("oportunidades.promover")
+                  }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </template>
   </section>
 </template>
+
+<style scoped>
+.op-ocupacion {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.op-barra {
+  width: 5rem;
+  height: 0.35rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--superficie-2);
+}
+.op-barra > span {
+  display: block;
+  height: 100%;
+  background: var(--texto-suave);
+}
+</style>

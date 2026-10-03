@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -215,188 +216,182 @@ onMounted(cargar);
       {{ error }}
     </p>
 
-    <!-- Filtros de los cambios -->
-    <div
-      v-if="pestana === 'cambios'"
-      class="mt-5 flex flex-wrap items-end gap-3 text-sm"
-    >
-      <label class="grid gap-1">
-        <span class="tu-label">{{ $t("bitacora.desde") }}</span>
-        <input v-model="desde" type="date" class="tu-input" />
-      </label>
-      <label class="grid gap-1">
-        <span class="tu-label">{{ $t("bitacora.hasta") }}</span>
-        <input v-model="hasta" type="date" class="tu-input" />
-      </label>
-      <label class="grid gap-1">
-        <span class="tu-label">{{ $t("bitacora.quien") }}</span>
-        <select v-model="usuario" class="tu-input">
-          <option value="">{{ $t("bitacora.todos") }}</option>
-          <option v-for="a in actores" :key="a.id" :value="a.id">
-            {{ a.nombre }}
-          </option>
-        </select>
-      </label>
-      <label class="grid gap-1">
-        <span class="tu-label">{{ $t("bitacora.categoria") }}</span>
-        <select v-model="categoria" class="tu-input">
-          <option value="">{{ $t("bitacora.todos") }}</option>
-          <option v-for="c in categorias" :key="c" :value="c">
-            {{ $t(`bitacora.categorias.${c}`) }}
-          </option>
-        </select>
-      </label>
-      <label class="grid flex-1 gap-1 min-w-[10rem]">
-        <span class="tu-label">{{ $t("bitacora.buscar") }}</span>
-        <input v-model="texto" class="tu-input" />
-      </label>
-      <button
-        type="button"
-        class="tu-btn tu-btn-fantasma text-sm"
-        :disabled="descargando"
-        @click="descargar"
-      >
-        {{ $t("bitacora.descargar") }}
-      </button>
-    </div>
+    <div class="mt-5 tu-card">
+      <!-- Filtros de los cambios -->
+      <div v-if="pestana === 'cambios'" class="tu-filtros bi-filtros text-sm">
+        <label class="grid gap-1">
+          <span class="tu-label">{{ $t("bitacora.desde") }}</span>
+          <input v-model="desde" type="date" class="tu-input" />
+        </label>
+        <label class="grid gap-1">
+          <span class="tu-label">{{ $t("bitacora.hasta") }}</span>
+          <input v-model="hasta" type="date" class="tu-input" />
+        </label>
+        <label class="grid gap-1">
+          <span class="tu-label">{{ $t("bitacora.quien") }}</span>
+          <select v-model="usuario" class="tu-input">
+            <option value="">{{ $t("bitacora.todos") }}</option>
+            <option v-for="a in actores" :key="a.id" :value="a.id">
+              {{ a.nombre }}
+            </option>
+          </select>
+        </label>
+        <label class="grid gap-1">
+          <span class="tu-label">{{ $t("bitacora.categoria") }}</span>
+          <select v-model="categoria" class="tu-input">
+            <option value="">{{ $t("bitacora.todos") }}</option>
+            <option v-for="c in categorias" :key="c" :value="c">
+              {{ $t(`bitacora.categorias.${c}`) }}
+            </option>
+          </select>
+        </label>
+        <label class="tu-buscar self-end">
+          <IconoNav nombre="buscar" :tam="16" />
+          <input
+            v-model="texto"
+            type="search"
+            class="tu-input"
+            :placeholder="$t('bitacora.buscar')"
+            :aria-label="$t('bitacora.buscar')"
+          />
+        </label>
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma text-sm"
+          :disabled="descargando"
+          @click="descargar"
+        >
+          {{ $t("bitacora.descargar") }}
+        </button>
+      </div>
 
-    <div class="mt-5 tu-card p-5">
-      <p
-        v-if="cargando"
-        class="text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("comun.cargando") }}
-      </p>
+      <div class="px-5 pb-3 pt-2">
+        <p
+          v-if="cargando"
+          class="text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{ $t("comun.cargando") }}
+        </p>
 
-      <!-- Cambios -->
-      <template v-else-if="pestana === 'cambios'">
-        <EstadoVacio
-          v-if="cambios.length === 0"
-          class="py-6"
-          icono="lista"
-          compacto
-          :titulo="$t('bitacora.sinCambios')"
-        />
-        <ul v-else>
-          <li v-for="c in cambios" :key="c.id" class="bi-fila text-sm">
-            <div class="flex w-full items-start justify-between gap-3">
+        <!-- Cambios -->
+        <template v-else-if="pestana === 'cambios'">
+          <EstadoVacio
+            v-if="cambios.length === 0"
+            class="py-6"
+            icono="lista"
+            compacto
+            :titulo="$t('bitacora.sinCambios')"
+          />
+          <ul v-else>
+            <li v-for="c in cambios" :key="c.id" class="bi-fila text-sm">
+              <div class="flex w-full items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="font-medium">{{ accion(c) }}</p>
+                  <p
+                    class="mt-0.5 text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    {{ fecha(c.fecha) }} ·
+                    {{
+                      $t("bitacora.por", {
+                        actor: c.actor ?? $t("bitacora.sistema"),
+                      })
+                    }}
+                    <template v-if="c.motivo"> · {{ c.motivo }}</template>
+                  </p>
+                </div>
+                <button
+                  v-if="diferencias(c).length > 0"
+                  type="button"
+                  class="tu-enlace shrink-0"
+                  :aria-expanded="abierto === c.id"
+                  @click="abierto = abierto === c.id ? null : c.id"
+                >
+                  {{ $t("bitacora.detalle") }}
+                </button>
+              </div>
+              <table v-if="abierto === c.id" class="tu-tabla bi-detalle">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>{{ $t("bitacora.antes") }}</th>
+                    <th>{{ $t("bitacora.despues") }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="d in diferencias(c)" :key="d.campo">
+                    <td class="font-medium">{{ d.campo }}</td>
+                    <td>{{ d.antes }}</td>
+                    <td>{{ d.despues }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </li>
+          </ul>
+          <div
+            v-if="ultimaPagina > 1"
+            class="mt-3 flex items-center justify-between gap-3 text-sm"
+          >
+            <button
+              type="button"
+              class="tu-enlace"
+              :disabled="pagina <= 1"
+              @click="irPagina(pagina - 1)"
+            >
+              ← {{ $t("bitacora.anterior") }}
+            </button>
+            <span :style="{ color: 'var(--texto-suave)' }">{{
+              $t("bitacora.pagina", { page: pagina, total: ultimaPagina })
+            }}</span>
+            <button
+              type="button"
+              class="tu-enlace"
+              :disabled="pagina >= ultimaPagina"
+              @click="irPagina(pagina + 1)"
+            >
+              {{ $t("bitacora.siguiente") }} →
+            </button>
+          </div>
+        </template>
+
+        <!-- Accesos -->
+        <template v-else>
+          <EstadoVacio
+            v-if="accesos.length === 0"
+            class="py-6"
+            icono="lista"
+            compacto
+            :titulo="$t('bitacora.sinAccesos')"
+          />
+          <ul v-else>
+            <li v-for="a in accesos" :key="a.id" class="bi-fila text-sm">
               <div class="min-w-0">
-                <p class="font-medium">{{ accion(c) }}</p>
+                <p class="font-medium truncate">{{ a.persona ?? "—" }}</p>
                 <p
                   class="mt-0.5 text-xs"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
-                  {{ fecha(c.fecha) }} ·
-                  {{
-                    $t("bitacora.por", {
-                      actor: c.actor ?? $t("bitacora.sistema"),
-                    })
-                  }}
-                  <template v-if="c.motivo"> · {{ c.motivo }}</template>
+                  {{ fecha(a.registrado_en) }} ·
+                  {{ $t(`bitacora.metodos.${a.metodo}`) }} ·
+                  {{ $t(`accesoRecepcion.codigos.${a.codigo}`) }}
                 </p>
               </div>
-              <button
-                v-if="diferencias(c).length > 0"
-                type="button"
-                class="tu-enlace shrink-0"
-                :aria-expanded="abierto === c.id"
-                @click="abierto = abierto === c.id ? null : c.id"
+              <span
+                class="tu-pildora shrink-0"
+                :style="{
+                  '--tono': a.permitido ? 'var(--exito)' : 'var(--error)',
+                }"
+                >{{
+                  a.permitido
+                    ? $t("accesoRecepcion.permitido")
+                    : $t("accesoRecepcion.denegado")
+                }}</span
               >
-                {{ $t("bitacora.detalle") }}
-              </button>
-            </div>
-            <table
-              v-if="abierto === c.id"
-              class="mt-3 w-full rounded-xl text-xs"
-              :style="{ background: 'var(--fondo)' }"
-            >
-              <thead>
-                <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                  <th class="px-3 py-2 font-medium"></th>
-                  <th class="px-3 py-2 font-medium">
-                    {{ $t("bitacora.antes") }}
-                  </th>
-                  <th class="px-3 py-2 font-medium">
-                    {{ $t("bitacora.despues") }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="d in diferencias(c)"
-                  :key="d.campo"
-                  class="border-t"
-                  :style="{ borderColor: 'var(--borde)' }"
-                >
-                  <td class="px-3 py-2 font-medium">{{ d.campo }}</td>
-                  <td class="px-3 py-2">{{ d.antes }}</td>
-                  <td class="px-3 py-2">{{ d.despues }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </li>
-        </ul>
-        <div
-          v-if="ultimaPagina > 1"
-          class="mt-3 flex items-center justify-between gap-3 text-sm"
-        >
-          <button
-            type="button"
-            class="tu-enlace"
-            :disabled="pagina <= 1"
-            @click="irPagina(pagina - 1)"
-          >
-            ← {{ $t("bitacora.anterior") }}
-          </button>
-          <span :style="{ color: 'var(--texto-suave)' }">{{
-            $t("bitacora.pagina", { page: pagina, total: ultimaPagina })
-          }}</span>
-          <button
-            type="button"
-            class="tu-enlace"
-            :disabled="pagina >= ultimaPagina"
-            @click="irPagina(pagina + 1)"
-          >
-            {{ $t("bitacora.siguiente") }} →
-          </button>
-        </div>
-      </template>
-
-      <!-- Accesos -->
-      <template v-else>
-        <EstadoVacio
-          v-if="accesos.length === 0"
-          class="py-6"
-          icono="lista"
-          compacto
-          :titulo="$t('bitacora.sinAccesos')"
-        />
-        <ul v-else>
-          <li v-for="a in accesos" :key="a.id" class="bi-fila text-sm">
-            <div class="min-w-0">
-              <p class="font-medium truncate">{{ a.persona ?? "—" }}</p>
-              <p
-                class="mt-0.5 text-xs"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{ fecha(a.registrado_en) }} ·
-                {{ $t(`bitacora.metodos.${a.metodo}`) }} ·
-                {{ $t(`accesoRecepcion.codigos.${a.codigo}`) }}
-              </p>
-            </div>
-            <span
-              class="tu-badge shrink-0"
-              :class="a.permitido ? 'tu-badge-exito' : 'tu-badge-aviso'"
-              >{{
-                a.permitido
-                  ? $t("accesoRecepcion.permitido")
-                  : $t("accesoRecepcion.denegado")
-              }}</span
-            >
-          </li>
-        </ul>
-      </template>
+            </li>
+          </ul>
+        </template>
+      </div>
     </div>
   </section>
 </template>
@@ -413,5 +408,14 @@ onMounted(cargar);
 }
 .bi-fila:first-child {
   border-top: 0;
+}
+.bi-filtros {
+  align-items: flex-end;
+}
+.bi-detalle {
+  margin-top: 0.75rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-boton);
+  font-size: 0.8rem;
 }
 </style>

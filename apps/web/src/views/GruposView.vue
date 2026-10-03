@@ -7,6 +7,9 @@ import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import TarjetasIndicadores, {
+  type Indicador,
+} from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -163,21 +166,50 @@ async function inscribir(): Promise<void> {
 }
 
 onMounted(cargar);
+
+// Indicadores de los grupos (patrón de los listados).
+const indicadores = computed<Indicador[]>(() => {
+  const activos = grupos.value.filter((g) => g.activo);
+  const inscritos = activos.reduce((suma, g) => suma + g.inscritos, 0);
+  return [
+    {
+      clave: "grupos",
+      etiqueta: t("gruposVisual.kpi.grupos"),
+      valor: String(activos.length),
+      icono: "grupos",
+    },
+    {
+      clave: "inscritos",
+      etiqueta: t("gruposVisual.kpi.inscritos"),
+      valor: String(inscritos),
+      icono: "personas",
+    },
+    {
+      clave: "promedio",
+      etiqueta: t("gruposVisual.kpi.promedio"),
+      valor: activos.length > 0 ? (inscritos / activos.length).toFixed(1) : "—",
+      icono: "reportes",
+    },
+  ];
+});
 </script>
 
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
-    <div class="flex items-start justify-between gap-3 flex-wrap">
-      <EncabezadoSeccion :titulo="$t('cursos.titulo')" :total="grupos.length" />
-      <button
-        v-if="puedeGestionar && plantillas.length > 0"
-        class="tu-btn tu-btn-primario tu-btn-crear"
-        type="button"
-        @click="abrir"
-      >
-        {{ $t("cursos.crear") }}
-      </button>
-    </div>
+    <EncabezadoSeccion
+      :titulo="$t('cursos.titulo')"
+      :subtitulo="$t('gruposVisual.subtitulo')"
+    >
+      <template v-if="puedeGestionar && plantillas.length > 0" #acciones>
+        <button
+          class="tu-btn tu-btn-primario tu-btn-crear"
+          type="button"
+          @click="abrir"
+        >
+          {{ $t("cursos.crear") }}
+        </button>
+      </template>
+    </EncabezadoSeccion>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -187,88 +219,139 @@ onMounted(cargar);
     </p>
 
     <template v-if="!cargando">
-      <!-- Lista de grupos -->
       <EstadoVacio
         v-if="grupos.length === 0"
-        class="mt-8"
+        class="tu-card mt-6"
         icono="grupos"
         :titulo="$t('cursos.vacio')"
       />
-      <div v-else class="mt-6 grid sm:grid-cols-2 gap-3">
-        <button
-          v-for="g in grupos"
-          :key="g.id"
-          class="tu-card p-4 text-left"
-          :style="
-            seleccionado?.id === g.id
-              ? { outline: '2px solid var(--primario)' }
-              : {}
-          "
-          @click="seleccionar(g)"
-        >
-          <div class="font-semibold">{{ g.nombre }}</div>
-          <div class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-            {{ g.oferta ?? "—" }}
-          </div>
-          <div class="mt-2 tu-badge">
-            {{ $t("cursos.inscritos", { n: g.inscritos }) }}
-          </div>
-        </button>
-      </div>
+      <template v-else>
+        <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
 
-      <!-- Grupo seleccionado: inscritos + inscribir -->
-      <div v-if="seleccionado" class="mt-6 tu-card p-5">
-        <h2 class="font-medium">
-          {{ seleccionado.nombre }} · {{ $t("cursos.inscritosTitulo") }}
-        </h2>
-
-        <form
-          v-if="puedeGestionar"
-          class="mt-3 flex flex-wrap items-end gap-2"
-          @submit.prevent="inscribir"
-        >
-          <div class="flex-1 min-w-[180px]">
-            <label class="tu-label" for="im">{{
-              $t("cursos.inscribir")
-            }}</label>
-            <BuscarPersona
-              v-model="miembroId"
-              campo-id="im"
-              :personas="personasBuscables"
-            />
+        <div class="mt-5 grid gap-5 lg:grid-cols-5">
+          <!-- Grupos -->
+          <div class="tu-card overflow-x-auto lg:col-span-3">
+            <table class="tu-tabla">
+              <thead>
+                <tr>
+                  <th>{{ $t("gruposVisual.col.grupo") }}</th>
+                  <th class="text-right">
+                    {{ $t("gruposVisual.col.inscritos") }}
+                  </th>
+                  <th>{{ $t("gruposVisual.col.estado") }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="g in grupos"
+                  :key="g.id"
+                  class="gr-fila"
+                  :class="{ 'gr-elegida': seleccionado?.id === g.id }"
+                  :aria-selected="seleccionado?.id === g.id"
+                  data-prueba="grupo"
+                  @click="seleccionar(g)"
+                >
+                  <td>
+                    <button
+                      type="button"
+                      class="gr-nombre"
+                      @click.stop="seleccionar(g)"
+                    >
+                      {{ g.nombre }}
+                    </button>
+                    <span class="tu-sub">{{ g.oferta ?? "—" }}</span>
+                  </td>
+                  <td class="text-right tabular-nums">{{ g.inscritos }}</td>
+                  <td>
+                    <span
+                      class="tu-pildora"
+                      :style="{
+                        '--tono': g.activo
+                          ? 'var(--exito)'
+                          : 'var(--texto-suave)',
+                      }"
+                      >{{
+                        g.activo
+                          ? $t("gruposVisual.activo")
+                          : $t("gruposVisual.inactivo")
+                      }}</span
+                    >
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <button
-            class="tu-btn tu-btn-primario"
-            type="submit"
-            :disabled="inscribiendo || miembroId === ''"
+
+          <!-- Grupo elegido: inscritos e inscribir -->
+          <aside
+            class="tu-card p-5 lg:col-span-2 h-fit"
+            data-prueba="detalle-grupo"
           >
-            {{
-              inscribiendo ? $t("cursos.inscribiendo") : $t("cursos.inscribir")
-            }}
-          </button>
-        </form>
-        <p
-          v-if="mensaje"
-          class="mt-2 text-sm"
-          :style="{ color: 'var(--exito)' }"
-        >
-          {{ mensaje }}
-        </p>
+            <p
+              v-if="!seleccionado"
+              class="text-sm"
+              :style="{ color: 'var(--texto-suave)' }"
+            >
+              {{ $t("gruposVisual.elige") }}
+            </p>
+            <template v-else>
+              <h2 class="font-medium">{{ seleccionado.nombre }}</h2>
+              <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("cursos.inscritosTitulo") }}
+              </p>
 
-        <ul v-if="inscripciones.length > 0" class="mt-4 space-y-2">
-          <li
-            v-for="i in inscripciones"
-            :key="i.id"
-            class="flex items-center gap-2 text-sm"
-          >
-            <AvatarIniciales :nombre="i.persona" tam="sm" />
-            <span>{{ i.persona ?? "—" }}</span>
-          </li>
-        </ul>
-        <p v-else class="mt-4 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("cursos.sinInscritos") }}
-        </p>
-      </div>
+              <form
+                v-if="puedeGestionar"
+                class="mt-4 flex flex-wrap items-end gap-2"
+                @submit.prevent="inscribir"
+              >
+                <div class="flex-1 min-w-[180px]">
+                  <label class="tu-label" for="im">{{
+                    $t("cursos.inscribir")
+                  }}</label>
+                  <BuscarPersona
+                    v-model="miembroId"
+                    campo-id="im"
+                    :personas="personasBuscables"
+                  />
+                </div>
+                <button
+                  class="tu-btn tu-btn-primario"
+                  type="submit"
+                  :disabled="inscribiendo || miembroId === ''"
+                >
+                  {{
+                    inscribiendo
+                      ? $t("cursos.inscribiendo")
+                      : $t("cursos.inscribir")
+                  }}
+                </button>
+              </form>
+              <p
+                v-if="mensaje"
+                class="mt-2 text-sm"
+                :style="{ color: 'var(--exito)' }"
+              >
+                {{ mensaje }}
+              </p>
+
+              <ul v-if="inscripciones.length > 0" class="gr-inscritos mt-4">
+                <li v-for="i in inscripciones" :key="i.id">
+                  <AvatarIniciales :nombre="i.persona" tam="sm" />
+                  <span>{{ i.persona ?? "—" }}</span>
+                </li>
+              </ul>
+              <p
+                v-else
+                class="mt-4 text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{ $t("cursos.sinInscritos") }}
+              </p>
+            </template>
+          </aside>
+        </div>
+      </template>
     </template>
 
     <!-- Nuevo grupo (drawer lateral) -->
@@ -313,3 +396,31 @@ onMounted(cargar);
     </PanelLateral>
   </section>
 </template>
+
+<style scoped>
+.gr-fila {
+  cursor: pointer;
+}
+.gr-fila:hover td,
+.gr-elegida td {
+  background: color-mix(in srgb, var(--texto-suave) 5%, transparent);
+}
+.gr-elegida td:first-child {
+  box-shadow: inset 2px 0 0 var(--primario);
+}
+.gr-nombre {
+  font-weight: 500;
+  text-align: left;
+}
+.gr-inscritos {
+  display: grid;
+}
+.gr-inscritos > li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--borde);
+  font-size: 0.875rem;
+}
+</style>

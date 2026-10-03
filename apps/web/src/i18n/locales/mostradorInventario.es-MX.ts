@@ -189,3 +189,40 @@ export const recursosVisual = {
     sedes: "Sucursales con recursos",
   },
 };
+
+// Lugares disponibles (views/OportunidadesView.vue) con el patrón de los listados.
+export const oportunidadesVisual = {
+  subtitulo:
+    "Clases próximas con lugares libres y su lista de espera, para llenarlas.",
+  kpi: {
+    clases: "Clases con lugar",
+    libres: "Lugares libres",
+    espera: "En lista de espera",
+    ocupacion: "Ocupación promedio",
+  },
+  col: {
+    clase: "Clase",
+    ocupacion: "Ocupación",
+    libres: "Libres",
+    espera: "En espera",
+    acciones: "Acciones",
+  },
+};
+
+// Grupos (views/GruposView.vue) con el patrón de los listados.
+export const gruposVisual = {
+  subtitulo: "Grupos fijos de una clase y quiénes están inscritos.",
+  elige: "Elige un grupo para ver e inscribir a sus integrantes.",
+  activo: "Activo",
+  inactivo: "Inactivo",
+  kpi: {
+    grupos: "Grupos activos",
+    inscritos: "Inscritos",
+    promedio: "Inscritos por grupo",
+  },
+  col: {
+    grupo: "Grupo",
+    inscritos: "Inscritos",
+    estado: "Estado",
+  },
+};
