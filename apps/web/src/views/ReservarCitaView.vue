@@ -37,6 +37,8 @@ interface Servicio {
   precio_minor: number | null;
   moneda: string;
   duracion_minutos: number | null;
+  // Se toma con su bono o membresía (solo con su cuenta, ADR 0091): no se paga.
+  con_plan?: boolean;
 }
 interface Sucursal {
   id: string;
@@ -70,6 +72,8 @@ interface Opciones {
   cobro?: { pago_obligatorio: boolean; pago_en_linea: boolean };
   // Si el negocio manda los avisos de la cita por WhatsApp (ADR 0069).
   whatsapp?: boolean;
+  // Hay servicios que se toman con bono o membresía (se usan desde la cuenta).
+  hay_con_plan?: boolean;
 }
 // La cita por pagar del enlace del correo de apartado (?pagar=<orden>).
 interface PorPagar {
@@ -402,13 +406,54 @@ async function cargar(): Promise<void> {
       sucursalId.value = data.data.sucursales[0].id;
     }
     paso.value = sucursalId.value !== "" ? "servicio" : "sucursal";
-    await Promise.all([retomar(), cargarPorPagar()]);
+    await Promise.all([retomar(), cargarPorPagar(), sumarServiciosConBono()]);
   } catch {
     noDisponible.value = true;
   } finally {
     cargando.value = false;
   }
 }
+
+// Con su cuenta, además de los servicios con precio, los que puede tomar con su
+// bono o membresía vigente (ADR 0091): se agendan sin pagar.
+async function sumarServiciosConBono(): Promise<void> {
+  if (!clienteConCuenta.value || opciones.value === null) {
+    return;
+  }
+  try {
+    const { data } = await api.get<{ data: { servicios: Servicio[] } }>(
+      `/api/v1/app/${slug.value}/mi/citas/opciones`,
+    );
+    const actuales = new Set(opciones.value.servicios.map((x) => x.id));
+    const conBono = data.data.servicios.filter(
+      (x) => x.con_plan === true && !actuales.has(x.id),
+    );
+    if (conBono.length > 0) {
+      opciones.value.servicios = [...opciones.value.servicios, ...conBono].sort(
+        (a, b) => a.nombre.localeCompare(b.nombre),
+      );
+    }
+  } catch {
+    // Sin sus opciones, agenda lo de la página pública.
+  }
+}
+// Precio a la vista: los de su bono no se pagan.
+function precioDe(x: Servicio | null | undefined): string {
+  return x?.con_plan
+    ? t("perfilPublico.agendar.conTuBono")
+    : dinero(x?.precio_minor ?? null, x?.moneda ?? null);
+}
+// Se paga en línea para confirmar, salvo lo que se toma con su bono.
+const requierePago = computed(
+  () => pagoObligatorio.value && servicioSel.value?.con_plan !== true,
+);
+// Visitante sin cuenta en un negocio con bonos: se le invita a entrar para usarlo.
+const avisoBono = computed(
+  () =>
+    opciones.value?.hay_con_plan === true &&
+    !clienteConCuenta.value &&
+    !sesionDelEquipo.value,
+);
 
 // Lo elegido se guarda mientras el cliente entra a su cuenta y se retoma al volver.
 const claveAsistente = computed(() => `agendar:${slug.value}`);
@@ -646,7 +691,9 @@ async function agendar(): Promise<void> {
       resultado.value = {
         estado: data.data.estado,
         orden_id: data.data.orden_id,
-        total_minor: servicioSel.value?.precio_minor ?? null,
+        total_minor: servicioSel.value?.con_plan
+          ? null
+          : (servicioSel.value?.precio_minor ?? null),
         moneda: servicioSel.value?.moneda ?? null,
         profesional: data.data.profesional ?? null,
       };
@@ -990,7 +1037,11 @@ onMounted(cargar);
         </p>
         <p class="mt-1 font-medium">
           {{ diaLocal(slotSel) }} · {{ horaLocal(slotSel) }} ·
-          {{ dinero(resultado.total_minor, resultado.moneda) }}
+          {{
+            servicioSel?.con_plan
+              ? $t("perfilPublico.agendar.conTuBono")
+              : dinero(resultado.total_minor, resultado.moneda)
+          }}
         </p>
         <!-- Dónde: para no llegar a otra sede. -->
         <p
@@ -1212,6 +1263,22 @@ onMounted(cargar);
 
           <!-- Paso: servicio -->
           <div v-else-if="paso === 'servicio'" class="tu-card p-5">
+            <!-- ¿Tiene un bono? Lo usa desde su cuenta (ADR 0091/0093). -->
+            <div
+              v-if="avisoBono"
+              class="rc-aviso-bono"
+              data-prueba="aviso-bono"
+            >
+              <span>{{ $t("perfilPublico.agendar.avisoBono") }}</span>
+              <button
+                type="button"
+                class="tu-btn tu-btn-fantasma shrink-0"
+                data-prueba="entrar-bono"
+                @click="entrarParaAgendar"
+              >
+                {{ $t("perfilPublico.agendar.entrarBono") }}
+              </button>
+            </div>
             <p
               v-if="variasSedes && sucursalSel"
               class="rc-contexto"
@@ -1354,9 +1421,7 @@ onMounted(cargar);
                       />
                     </span>
                   </span>
-                  <span class="rc-servicio-precio">{{
-                    dinero(s.precio_minor, s.moneda)
-                  }}</span>
+                  <span class="rc-servicio-precio">{{ precioDe(s) }}</span>
                 </label>
               </div>
             </fieldset>
@@ -1399,12 +1464,7 @@ onMounted(cargar);
                       }}</template
                     >
                     ·
-                    {{
-                      dinero(
-                        servicioSel?.precio_minor ?? null,
-                        servicioSel?.moneda ?? null,
-                      )
-                    }}</span
+                    {{ precioDe(servicioSel) }}</span
                   >
                 </span>
                 <button
@@ -1782,21 +1842,18 @@ onMounted(cargar);
                 </dl>
                 <div class="rc-precio-resumen" data-prueba="precio-resumen">
                   <span>{{ $t("perfilPublico.agendar.precioServicio") }}</span>
-                  <strong>{{
-                    dinero(
-                      servicioSel?.precio_minor ?? null,
-                      servicioSel?.moneda ?? null,
-                    )
-                  }}</strong>
+                  <strong>{{ precioDe(servicioSel) }}</strong>
                 </div>
                 <p class="rc-pago-ayuda" data-prueba="pago-ayuda">
                   <IconoNav nombre="pasarelas" :tam="18" />{{
                     $t(
-                      pagoObligatorio
-                        ? "perfilPublico.agendar.pagoPrevio"
-                        : pagoEnLinea
-                          ? "perfilPublico.agendar.pagoFlexible"
-                          : "perfilPublico.agendar.pagoEnLugar",
+                      servicioSel?.con_plan
+                        ? "perfilPublico.agendar.pagoConBono"
+                        : pagoObligatorio
+                          ? "perfilPublico.agendar.pagoPrevio"
+                          : pagoEnLinea
+                            ? "perfilPublico.agendar.pagoFlexible"
+                            : "perfilPublico.agendar.pagoEnLugar",
                     )
                   }}
                 </p>
@@ -2036,7 +2093,7 @@ onMounted(cargar);
                   {{
                     agendando
                       ? $t("reservar.agendando")
-                      : pagoObligatorio
+                      : requierePago
                         ? $t("reservar.agendarYPagar")
                         : $t("perfilPublico.agendar.agendar")
                   }}
@@ -2330,6 +2387,18 @@ onMounted(cargar);
 .rc-panel-horario .tu-label {
   margin-bottom: 0.65rem;
   font-size: 0.95rem;
+}
+.rc-aviso-bono {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-boton);
+  font-size: 0.9rem;
 }
 .rc-panel-horario .rc-contexto {
   margin-bottom: 1.35rem;

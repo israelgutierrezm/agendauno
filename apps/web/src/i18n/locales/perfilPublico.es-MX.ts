@@ -189,6 +189,13 @@ export default {
     cambiarProfesional: "Cambiar quién te atiende",
     cambiarSucursal: "Cambiar sucursal",
     precioServicio: "Precio del servicio",
+    // Servicios que se toman con bono o membresía (ADR 0091/0093).
+    avisoBono:
+      "¿Tienes un bono o membresía? Entra a tu cuenta para usarlo: ahí aparecen los servicios que incluye.",
+    entrarBono: "Entrar a mi cuenta",
+    conTuBono: "Con tu bono",
+    pagoConBono:
+      "Se descuenta una sesión de tu bono o membresía; no pagas al agendar.",
     horaSucursal: "Horario local de la sucursal",
     pagoPrevio:
       "Para confirmar tu cita, completa el pago en el siguiente paso.",

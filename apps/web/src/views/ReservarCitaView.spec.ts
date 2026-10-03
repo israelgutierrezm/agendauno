@@ -122,15 +122,19 @@ function api(
   op = opciones(),
   huecos: () => Promise<unknown> = () => Promise.resolve(horarios),
   porPagar: () => Promise<unknown> = () => Promise.reject(new Error("404")),
+  // Las opciones de la cuenta del cliente (con los servicios de su bono).
+  mias: () => Promise<unknown> = () => Promise.reject(new Error("401")),
 ) {
   mocks.get.mockImplementation((url: string) =>
-    url.endsWith("/citas/opciones")
-      ? Promise.resolve(op)
-      : url.endsWith("/citas/dias")
-        ? Promise.resolve(dias)
-        : url.includes("/citas/orden/")
-          ? porPagar()
-          : huecos(),
+    url.endsWith("/mi/citas/opciones")
+      ? mias()
+      : url.endsWith("/citas/opciones")
+        ? Promise.resolve(op)
+        : url.endsWith("/citas/dias")
+          ? Promise.resolve(dias)
+          : url.includes("/citas/orden/")
+            ? porPagar()
+            : huecos(),
   );
 }
 // La cita del enlace del correo de apartado.
@@ -1041,6 +1045,123 @@ describe("cliente con cuenta", () => {
     expect(vista.get('[data-prueba="sesion-equipo"]').text()).toContain(
       "Tienes la sesión abierta como",
     );
+    vista.unmount();
+  });
+});
+
+describe("bono o membresía", () => {
+  // Un negocio con servicios que se toman con bono (ADR 0091/0093).
+  function conBono() {
+    const op = opciones(1);
+    (op.data.data as Record<string, unknown>).hay_con_plan = true;
+    return op;
+  }
+  // Las opciones de su cuenta: además, la barba que cubre su bono.
+  function mias() {
+    return Promise.resolve({
+      data: {
+        data: {
+          servicios: [
+            {
+              id: "servicio",
+              nombre: "Corte",
+              precio_minor: 20000,
+              moneda: "MXN",
+              duracion_minutos: 30,
+            },
+            {
+              id: "barba",
+              nombre: "Barba",
+              precio_minor: 15000,
+              moneda: "MXN",
+              duracion_minutos: 30,
+              con_plan: true,
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  it("al visitante le avisa que use su bono desde su cuenta", async () => {
+    api(conBono());
+    const vista = montar();
+    await flushPromises();
+
+    const aviso = vista.get('[data-prueba="aviso-bono"]');
+    expect(aviso.text()).toContain("¿Tienes un bono o membresía?");
+    await vista.get('[data-prueba="entrar-bono"]').trigger("click");
+    expect(mocks.push).toHaveBeenCalledWith({
+      name: "entrar",
+      query: { estudio: "demo", volver: "/agendar/demo" },
+    });
+    // No pide sus opciones de cliente: no tiene sesión.
+    expect(mocks.get).not.toHaveBeenCalledWith(
+      expect.stringContaining("/mi/citas/opciones"),
+    );
+    vista.unmount();
+  });
+
+  it("sin servicios con bono no hay aviso", async () => {
+    api(opciones(1));
+    const vista = montar();
+    await flushPromises();
+    expect(vista.find('[data-prueba="aviso-bono"]').exists()).toBe(false);
+    vista.unmount();
+  });
+
+  it("con su cuenta ve los servicios de su bono y los agenda sin pagar", async () => {
+    mocks.sesion.autenticado = true;
+    mocks.sesion.slug = "demo";
+    mocks.sesion.usuario = {
+      nombre: "Vale Ruiz",
+      email: "vale@correo.mx",
+      rol: "miembro",
+    };
+    api(
+      conBono(),
+      () => Promise.resolve(horarios),
+      () => Promise.reject(new Error("404")),
+      mias,
+    );
+    mocks.post.mockResolvedValue({
+      data: {
+        data: {
+          estado: "confirmada",
+          orden_id: null,
+          profesional: { id: "ana", nombre: "Ana Pérez" },
+        },
+      },
+    });
+    const vista = montar();
+    await flushPromises();
+
+    expect(vista.find('[data-prueba="aviso-bono"]').exists()).toBe(false);
+    // Sin repetir el corte, que ya está en la página pública.
+    expect(vista.findAll('input[value="servicio"]')).toHaveLength(1);
+    const barba = vista.get('input[value="barba"]').element.closest("label")!;
+    expect(barba.textContent).toContain("Con tu bono");
+    expect(barba.textContent).not.toContain("$150.00");
+
+    await vista.get('input[value="barba"]').setValue();
+    await flushPromises();
+    await elegirHora(vista, "09:00");
+    await continuar(vista);
+    expect(vista.text()).toContain(
+      "Se descuenta una sesión de tu bono o membresía",
+    );
+    // No se paga al agendar: el botón solo agenda.
+    expect(
+      vista
+        .findAll("button")
+        .some((b) => b.text() === es.reservar.agendarYPagar),
+    ).toBe(false);
+    await agendarComo(vista, perfilPublico.agendar.agendar);
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/mi/citas",
+      expect.objectContaining({ oferta_id: "barba" }),
+    );
+    expect(vista.text()).not.toContain("$150.00");
     vista.unmount();
   });
 });
