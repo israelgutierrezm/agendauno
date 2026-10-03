@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use Carbon\CarbonImmutable;
@@ -81,7 +82,15 @@ it('siembra Grecon en «demo» con su agenda de octubre, sus planes y 80 miembro
 
         // Una operación con historia: miembros, ventas cobradas, por cobrar, asistencia
         // y clases apartadas para las próximas semanas.
-        expect(PersonaTenant::query()->where('tipo', 'miembro')->count())->toBe(80)
+        // El dueño (Constantino Escobar) da clases y también es alumno: tres roles,
+        // una cuenta y su ficha de alumno.
+        $dueno = Usuario::query()->where('email', 'constantino@grecon.test')->sole();
+        expect($dueno->roles)->toBe(['propietario', 'instructor', 'miembro'])
+            ->and(PersonaTenant::query()->where('usuario_id', $dueno->getKey())->exists())->toBeTrue()
+            ->and(SesionTenant::query()->where('instructor_id', $dueno->getKey())->exists())->toBeTrue();
+
+        // 80 miembros inventados más el dueño como alumno.
+        expect(PersonaTenant::query()->where('tipo', 'miembro')->count())->toBe(81)
             ->and(DB::connection('tenant')->table('pagos')->count())->toBeGreaterThan(20)
             ->and(OrdenTenant::query()->where('estado', EstadoOrden::Pendiente->value)->count())->toBeGreaterThan(0)
             ->and(DB::connection('tenant')->table('asistencias')->count())->toBeGreaterThan(50)

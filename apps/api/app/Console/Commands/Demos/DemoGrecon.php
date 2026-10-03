@@ -48,6 +48,10 @@ use RuntimeException;
  * publicado, semanas sin cierta clase y la sesión suspendida. Los meses anteriores
  * repiten el horario semanal.
  *
+ * Constantino Escobar es el dueño, da clases y también toma clases con otros
+ * profesores: una sola cuenta con los tres roles (entra con el que elija, ADR 0055)
+ * y su ficha de alumno con su plan.
+ *
  * Los 80 miembros son inventados: cada uno con su estilo (pole por nivel, exotic o
  * mixto), su horario y su plan. Reservan, cancelan (y entra quien esperaba), se
  * marca su asistencia, compran su plan al empezar el mes o cuando se les acaba, y
@@ -75,6 +79,12 @@ final class DemoGrecon extends DemoBase
 
     private const CUPO_OPEN = 12;
 
+    /** El dueño: también da clases y toma clases como alumno. */
+    private const DUENO = 'CONSTANTINO ESCOBAR';
+
+    /** Las clases que toma el dueño con otros profesores (no chocan con las suyas). */
+    private const CLASES_DEL_DUENO = ['ACRO MOVING', 'FLEXY LAB', 'JAZZ FUNK'];
+
     /** Cuántos miembros ya venían al empezar la historia y cuántos llegan durante ella. */
     private const ANTIGUOS = 62;
 
@@ -88,7 +98,7 @@ final class DemoGrecon extends DemoBase
 
     private SucursalTenant $sede;
 
-    private Usuario $admin;
+    private Usuario $dueno;
 
     private Usuario $recepcion;
 
@@ -118,8 +128,8 @@ final class DemoGrecon extends DemoBase
             'nombre' => 'Grecon Art House (demo)',
             'slug' => 'demo',
             'perfil' => PerfilNegocio::Pole,
-            'contacto' => ['Administración', 'Grecon', ''],
-            'email' => 'admin@grecon.test',
+            'contacto' => ['Constantino', 'Escobar', ''],
+            'email' => 'constantino@grecon.test',
             'telefono' => '5500000000',
             'descripcion' => 'Demo con el horario y las clases publicadas por Grecon Art House en octubre de 2026: pole por niveles, exotic, flexibilidad, danza y Open Training. Precios, cuentas y miembros de prueba.',
             'instagram' => '@greconarthouse',
@@ -132,9 +142,10 @@ final class DemoGrecon extends DemoBase
     public function cuentas(): array
     {
         return [
-            'admin@grecon.test' => 'Dueño: catálogo, agenda, miembros, ventas y configuración',
+            'constantino@grecon.test' => 'Constantino Escobar: dueño, instructor y alumno (elige con qué rol entrar)',
+            'admin@grecon.test' => 'Administración: catálogo, agenda, miembros, ventas y configuración',
             'recepcion@grecon.test' => 'Recepción',
-            'constantino@grecon.test' => 'Instructor (Constantino Escobar)',
+            'abril@grecon.test' => 'Instructora (Abril Von)',
             'valeria.rios@correo.test' => 'Miembro con Paquete 8 clases («Mi cuenta»)',
             'renata.soto@correo.test' => 'Miembro con Ilimitada, incluye Open Training («Mi cuenta»)',
         ];
@@ -186,14 +197,17 @@ final class DemoGrecon extends DemoBase
             ],
         ]);
 
-        $this->admin = $this->usuario('admin@grecon.test', 'Administración', 'Grecon', ['propietario']);
-        $this->recepcion = $this->usuario('recepcion@grecon.test', 'Fernanda', 'Ruiz', ['recepcionista']);
         // Los profesores con el nombre que publica el estudio; sus cuentas son de prueba.
+        // El dueño es uno de ellos y además toma clases (ADR 0055: entra con un rol).
         foreach ($agenda['instructores'] as $profe) {
             $partes = explode(' ', mb_convert_case(mb_strtolower($profe['nombre']), MB_CASE_TITLE), 2);
             $correo = NombresDemo::ascii($partes[0]).'@grecon.test';
-            $this->profes[$profe['nombre']] = $this->usuario($correo, $partes[0], $partes[1] ?? '', ['instructor']);
+            $roles = $profe['nombre'] === self::DUENO ? ['propietario', 'instructor', 'miembro'] : ['instructor'];
+            $this->profes[$profe['nombre']] = $this->usuario($correo, $partes[0], $partes[1] ?? '', $roles);
         }
+        $this->dueno = $this->profes[self::DUENO];
+        $this->usuario('admin@grecon.test', 'Administración', 'Grecon', ['admin']);
+        $this->recepcion = $this->usuario('recepcion@grecon.test', 'Fernanda', 'Ruiz', ['recepcionista']);
     }
 
     /**
@@ -315,7 +329,7 @@ final class DemoGrecon extends DemoBase
                     $this->sumar($profe === null ? 'clases sin profesor publicado' : 'suplencias');
                 }
                 if ($publicada['estado_publicado'] !== 'programada') {
-                    app(ReservasTenant::class)->cancelarSesion($sesion, $this->admin);
+                    app(ReservasTenant::class)->cancelarSesion($sesion, $this->dueno);
                     $this->sumar('clases suspendidas');
                 }
             }
@@ -346,7 +360,8 @@ final class DemoGrecon extends DemoBase
 
     /**
      * Los que ya venían y los que llegan durante la historia, más dos con cuenta
-     * para revisar «Mi cuenta» (una con paquete y una con Ilimitada).
+     * para revisar «Mi cuenta» (una con paquete y una con Ilimitada) y el dueño
+     * como alumno.
      */
     private function darDeAltaMiembros(): void
     {
@@ -367,6 +382,15 @@ final class DemoGrecon extends DemoBase
 
         $this->conCuenta(0, 'Valeria', 'Ríos', 'Peña', 'valeria.rios@correo.test', 'p8');
         $this->conCuenta(1, 'Renata', 'Soto', 'Lara', 'renata.soto@correo.test', 'ilimitada');
+
+        // El dueño también es alumno: su ficha ligada a su cuenta, con Ilimitada.
+        $dueno = $this->persona('Constantino', 'Escobar', '', $this->inicio->subDays(900), (int) $this->sede->getKey(), false, [
+            'email' => 'constantino@grecon.test', 'usuario_id' => $this->dueno->getKey(),
+        ]);
+        $this->alumnas[] = [
+            ...$this->costumbre($dueno, 'ilimitada', $this->inicio, false),
+            'clases' => self::CLASES_DEL_DUENO, 'dias' => [1, 4, 5], 'franja' => 'tarde', 'sube' => null, 'deja' => null,
+        ];
     }
 
     private function conCuenta(int $i, string $nombre, string $apellido1, string $apellido2, string $correo, string $plan): void

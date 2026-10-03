@@ -103,9 +103,10 @@ fuera del directorio público, y su nombre dice «(demo)».
 
 | Cuenta ficticia | Escenario |
 | --- | --- |
-| admin@grecon.test | Dueño: catálogo, agenda, miembros, ventas y configuración |
+| constantino@grecon.test | Constantino Escobar: dueño, instructor y alumno con Ilimitada. Al entrar elige con qué rol |
+| admin@grecon.test | Administración: catálogo, agenda, miembros, ventas y configuración |
 | recepcion@grecon.test | Recepción: cobrar planes, pasar lista y lo por cobrar |
-| constantino@grecon.test | Vista de instructor: Constantino Escobar |
+| abril@grecon.test | Vista de instructora: Abril Von |
 | valeria.rios@correo.test | Miembro con Paquete 8 clases del mes; no puede reservar Open Training |
 | renata.soto@correo.test | Miembro con Ilimitada del mes; puede reservar Open Training sujeto a cupo |
 

@@ -32,10 +32,12 @@ su nombre dice «(demo)».
 
 - **Sede:** una, sin dirección (la real no está confirmada).
 - **Equipo:**
-  - administración (dueño);
-  - recepción;
-  - los 11 profesores con el nombre que publica el estudio. Sus cuentas son de prueba:
-    `nombre@grecon.test`.
+  - Constantino Escobar, el dueño, que también da clases y toma clases con otros
+    profesores: una cuenta con los roles dueño, instructor y alumno (elige con cuál
+    entrar) y su ficha de alumno con Ilimitada;
+  - administración y recepción;
+  - los otros 10 profesores con el nombre que publica el estudio. Sus cuentas son de
+    prueba: `nombre@grecon.test`.
 - **Clases:** las 26 publicadas, en cinco categorías: Pole, Exotic, Flexibilidad, Danza y
   Open Training. Cupo de 8; Open Training, 12.
 - **Horario:** el semanal de 44 clases. Octubre de 2026 es exactamente la agenda
@@ -47,7 +49,8 @@ su nombre dice «(demo)».
   - Ilimitada $2,200 (incluye Open Training).
 - **Cancelación:** con 6 horas; tarde o sin asistir consume la clase.
 - **Miembros:** 80 inventados (62 que ya venían y 18 que llegan durante la historia),
-  cada uno con su estilo (pole por nivel, exotic o mixto), su horario y su plan.
+  cada uno con su estilo (pole por nivel, exotic o mixto), su horario y su plan; más el
+  dueño como alumno.
 - **Historia:**
   - compran su plan al empezar el mes o cuando se les acaba (efectivo, tarjeta o
     transferencia) y algunos cambian de plan o se van;
@@ -62,9 +65,10 @@ su nombre dice «(demo)».
 
 | Cuenta | Para revisar |
 | --- | --- |
-| `admin@grecon.test` | Dueño: catálogo, agenda, miembros, ventas y configuración |
+| `constantino@grecon.test` | Constantino Escobar: dueño, instructor y alumno (elige con qué rol entrar) |
+| `admin@grecon.test` | Administración: catálogo, agenda, miembros, ventas y configuración |
 | `recepcion@grecon.test` | Recepción |
-| `constantino@grecon.test` | Instructor (Constantino Escobar) |
+| `abril@grecon.test` | Instructora (Abril Von) |
 | `valeria.rios@correo.test` | Miembro con Paquete 8 clases («Mi cuenta») |
 | `renata.soto@correo.test` | Miembro con Ilimitada, incluye Open Training («Mi cuenta») |
 
