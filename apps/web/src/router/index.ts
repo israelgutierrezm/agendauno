@@ -164,6 +164,12 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      path: "/agenda/importar",
+      name: "importar-clases",
+      component: () => import("@/views/ImportarClasesView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/instructores",
       name: "instructores",
       component: () => import("@/views/InstructoresView.vue"),

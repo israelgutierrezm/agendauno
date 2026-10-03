@@ -109,6 +109,7 @@ export const POLITICAS: Record<string, Politica> = {
   "ficha-instructor": { permiso: "usuarios.gestionar" },
   importar: { permiso: "miembros.gestionar" },
   "importar-instructores": { permiso: "usuarios.invitar" },
+  "importar-clases": { permiso: "agenda.gestionar", modalidad: "clases" },
   // Cada paso crea algo distinto: sede, catálogo, planes, equipo.
   onboarding: {
     permiso: [

@@ -37,6 +37,7 @@ use App\Modules\Tenancy\Http\Controllers\FormulariosController;
 use App\Modules\Tenancy\Http\Controllers\FrontDeskTenantController;
 use App\Modules\Tenancy\Http\Controllers\GruposTenantController;
 use App\Modules\Tenancy\Http\Controllers\ImportacionesTenantController;
+use App\Modules\Tenancy\Http\Controllers\ImportarClasesTenantController;
 use App\Modules\Tenancy\Http\Controllers\IncidenciasCobroTenantController;
 use App\Modules\Tenancy\Http\Controllers\InicioHoyTenantController;
 use App\Modules\Tenancy\Http\Controllers\IntegracionApiTenantController;
@@ -362,6 +363,12 @@ Route::prefix('v1')->group(function (): void {
             // Importacion CSV de instructores (R37): crea cuentas de usuario rol instructor + activacion.
             Route::post('/importaciones/instructores/preview', [ImportacionesTenantController::class, 'previewInstructores'])->middleware('puede:usuarios.invitar')->name('importaciones.instructores.preview');
             Route::post('/importaciones/instructores', [ImportacionesTenantController::class, 'importarInstructores'])->middleware('puede:usuarios.invitar')->name('importaciones.instructores.store');
+
+            // Importación de clases por fecha o programación semanal (ADR 0092).
+            Route::get('/importaciones/clases/catalogos', [ImportarClasesTenantController::class, 'catalogos'])->middleware('puede:agenda.gestionar')->name('importaciones.clases.catalogos');
+            Route::get('/importaciones/clases/plantilla', [ImportarClasesTenantController::class, 'plantilla'])->middleware('puede:agenda.gestionar')->name('importaciones.clases.plantilla');
+            Route::post('/importaciones/clases/preview', [ImportarClasesTenantController::class, 'preview'])->middleware('puede:agenda.gestionar')->name('importaciones.clases.preview');
+            Route::post('/importaciones/clases', [ImportarClasesTenantController::class, 'importar'])->middleware('puede:agenda.gestionar')->name('importaciones.clases.store');
 
             // Tareas de seguimiento (R16): bandeja de pendientes del staff (manuales o automaticas).
             Route::get('/tareas', [TareasTenantController::class, 'index'])->middleware('puede:tareas.ver')->name('tareas.index');

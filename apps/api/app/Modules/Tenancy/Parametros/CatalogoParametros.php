@@ -118,6 +118,8 @@ final class CatalogoParametros
                 'Segundos. Una captura de pantalla deja de servir después.', $e, 180, 90, 900, 's', porNegocio: false),
             new DefinicionParametro('importaciones.max_filas', 'Importaciones', 'Filas por archivo al importar miembros o personal',
                 '', $e, 1000, 100, 10000, 'filas', porNegocio: false),
+            new DefinicionParametro('importaciones.max_sesiones_agenda', 'Importaciones', 'Sesiones por carga de agenda',
+                'Incluye las fechas que se expanden desde las filas semanales. Divide archivos mayores en varios lotes.', $e, 500, 10, 2000, 'sesiones', porNegocio: false),
 
             // Cuentas: vigencia de enlaces de seguridad (solo la plataforma).
             new DefinicionParametro('cuentas.horas_confirmar_registro', 'Cuentas', 'Vigencia del enlace para confirmar un registro',

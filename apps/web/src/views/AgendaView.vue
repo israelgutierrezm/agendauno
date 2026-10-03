@@ -3,6 +3,7 @@ import { computed, onMounted, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import BuscarPersona from "@/components/BuscarPersona.vue";
+import BotonImportar from "@/components/BotonImportar.vue";
 import AgendaClasesSemana from "@/components/AgendaClasesSemana.vue";
 import AgendaKpis from "@/components/AgendaKpis.vue";
 import type {
@@ -1673,6 +1674,11 @@ onMounted(async () => {
         :subtitulo="$t('agenda.subtitulo')"
       />
       <div class="flex flex-wrap items-center gap-2">
+        <BotonImportar
+          v-if="puedeEntrar('importar-clases', sesion)"
+          ruta="importar-clases"
+          :texto="$t('importarClases.titulo')"
+        />
         <!-- De paso, a donde se configuran (cada una guarda sus datos). -->
         <RouterLink
           v-if="puedeEntrar('horarios', sesion)"
