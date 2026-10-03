@@ -130,3 +130,20 @@ export const cobranzaVisual = {
     automatico: "Con pago automático",
   },
 };
+
+// Equipo (views/InstructoresView.vue) con el patrón de los listados.
+export const equipoVisual = {
+  subtitulo: "Quién atiende, dónde y cómo viene su semana.",
+  deTotal: "{n} de {total}",
+  kpi: {
+    conAgenda: "Con agenda esta semana",
+    clasesSemana: "Clases esta semana",
+    citasSemana: "Citas esta semana",
+    calificacion: "Calificación promedio",
+  },
+  col: {
+    persona: "Persona",
+    sedes: "Sedes",
+    acciones: "Acciones",
+  },
+};

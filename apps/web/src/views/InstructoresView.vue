@@ -9,6 +9,9 @@ import BotonImportar from "@/components/BotonImportar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import TarjetasIndicadores, {
+  type Indicador,
+} from "@/components/TarjetasIndicadores.vue";
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
 import { plural } from "@/lib/terminologia";
@@ -153,19 +156,66 @@ async function invitar(): Promise<void> {
   }
 }
 
+// Indicadores del equipo: cuántos son, cuántos tienen agenda esta semana, cuánto
+// trabajo hay y cómo los califican.
+const indicadores = computed<Indicador[]>(() => {
+  const lista = instructores.value;
+  const conAgenda = lista.filter(
+    (i) => (i.resumen?.semana.clases ?? 0) + (i.resumen?.semana.citas ?? 0) > 0,
+  ).length;
+  const sesiones = lista.reduce(
+    (s, i) =>
+      s + (i.resumen?.semana.clases ?? 0) + (i.resumen?.semana.citas ?? 0),
+    0,
+  );
+  const calificados = lista.filter((i) => i.resumen?.resenas);
+  const promedio =
+    calificados.length > 0
+      ? calificados.reduce((s, i) => s + i.resumen!.resenas!.promedio, 0) /
+        calificados.length
+      : null;
+  return [
+    {
+      clave: "equipo",
+      etiqueta: plural(sesion.terminologia.instructor),
+      valor: String(lista.length),
+      icono: "instructores",
+    },
+    {
+      clave: "conAgenda",
+      etiqueta: t("equipoVisual.kpi.conAgenda"),
+      valor: t("equipoVisual.deTotal", { n: conAgenda, total: lista.length }),
+      icono: "agenda",
+    },
+    {
+      clave: "semana",
+      etiqueta: sesion.esCitas
+        ? t("equipoVisual.kpi.citasSemana")
+        : t("equipoVisual.kpi.clasesSemana"),
+      valor: String(sesiones),
+      icono: "reloj",
+    },
+    {
+      clave: "resenas",
+      etiqueta: t("equipoVisual.kpi.calificacion"),
+      valor: promedio !== null ? promedio.toFixed(1) : "—",
+      icono: "estrella",
+    },
+  ];
+});
+
 onMounted(cargar);
 </script>
 
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
-    <div class="flex items-start justify-between gap-3 flex-wrap">
-      <EncabezadoSeccion
-        :titulo="plural(sesion.terminologia.instructor)"
-        :total="instructores.length"
-      />
-      <div
+    <EncabezadoSeccion
+      :titulo="plural(sesion.terminologia.instructor)"
+      :subtitulo="$t('equipoVisual.subtitulo')"
+    >
+      <template
         v-if="puedeInvitar || puedeEntrar('usuarios', sesion)"
-        class="flex items-center gap-2 flex-wrap"
+        #acciones
       >
         <!-- Quién entra al panel y con qué permisos vive en Configuración. -->
         <RouterLink
@@ -187,8 +237,8 @@ onMounted(cargar);
             {{ $t("instructores.invitar.enviar") }}
           </button>
         </template>
-      </div>
-    </div>
+      </template>
+    </EncabezadoSeccion>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -206,10 +256,11 @@ onMounted(cargar);
         :titulo="$t('instructores.vacio')"
       />
       <template v-else>
+        <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
         <BarraListado
           v-model:busqueda="busqueda"
           v-model:vista="vista"
-          class="mt-6"
+          class="mt-5"
           :placeholder="$t('tabla.buscar')"
         />
 
@@ -281,24 +332,80 @@ onMounted(cargar);
           </li>
         </ul>
 
-        <!-- Lista -->
-        <ul v-else class="mt-4 tu-card overflow-hidden">
-          <li
-            v-for="i in visibles"
-            :key="i.id"
-            class="flex items-center gap-3 border-t px-4 py-3 first:border-t-0"
-            :style="{ borderColor: 'var(--borde)' }"
-          >
-            <AvatarIniciales :nombre="i.nombre" :foto="i.foto_url" tam="md" />
-            <span class="flex-1 font-medium">{{ i.nombre_corto }}</span>
-            <RouterLink
-              v-if="puedeVerPerfil"
-              :to="{ name: 'ficha-instructor', params: { id: i.id } }"
-              class="tu-enlace text-sm"
-              >{{ $t("profesional.verPerfil") }} →</RouterLink
-            >
-          </li>
-        </ul>
+        <!-- Lista: una fila por persona -->
+        <div v-else class="mt-4 tu-card overflow-x-auto">
+          <table class="tu-tabla">
+            <thead>
+              <tr>
+                <th>{{ $t("equipoVisual.col.persona") }}</th>
+                <th class="hidden md:table-cell">
+                  {{ $t("equipoVisual.col.sedes") }}
+                </th>
+                <th>{{ $t("tarjetas.estaSemana") }}</th>
+                <th class="hidden lg:table-cell">
+                  {{ $t("tarjetas.proxima") }}
+                </th>
+                <th class="hidden sm:table-cell">
+                  {{ $t("tarjetas.resenas") }}
+                </th>
+                <th>
+                  <span class="sr-only">{{
+                    $t("equipoVisual.col.acciones")
+                  }}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="i in visibles" :key="i.id" data-prueba="profesional">
+                <td>
+                  <div class="flex items-center gap-3">
+                    <AvatarIniciales
+                      :nombre="i.nombre"
+                      :foto="i.foto_url"
+                      tam="md"
+                    />
+                    <span class="font-medium">{{ i.nombre_corto }}</span>
+                  </div>
+                </td>
+                <td class="hidden md:table-cell in-suave">
+                  {{ i.resumen?.sedes.join(" · ") || "—" }}
+                </td>
+                <td>{{ carga(i) }}</td>
+                <td class="hidden lg:table-cell in-suave">
+                  <template v-if="i.resumen?.proxima">
+                    {{
+                      cuando(
+                        i.resumen.proxima.inicia_en,
+                        i.resumen.proxima.zona_horaria,
+                      )
+                    }}<template v-if="i.resumen.proxima.clase">
+                      · {{ i.resumen.proxima.clase }}</template
+                    >
+                  </template>
+                  <template v-else>—</template>
+                </td>
+                <td class="hidden sm:table-cell tabular-nums">
+                  {{
+                    i.resumen?.resenas
+                      ? $t("tarjetas.promedio", {
+                          promedio: i.resumen.resenas.promedio.toFixed(1),
+                          n: i.resumen.resenas.total,
+                        })
+                      : "—"
+                  }}
+                </td>
+                <td class="text-right whitespace-nowrap">
+                  <RouterLink
+                    v-if="puedeVerPerfil"
+                    :to="{ name: 'ficha-instructor', params: { id: i.id } }"
+                    class="tu-enlace text-sm"
+                    >{{ $t("profesional.verPerfil") }}</RouterLink
+                  >
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </template>
     </template>
 
@@ -341,14 +448,7 @@ onMounted(cargar);
           </select>
         </div>
       </form>
-      <div
-        v-if="activacion"
-        class="mt-4 text-sm rounded-lg p-3"
-        :style="{
-          background: 'var(--primario-suave)',
-          color: 'var(--primario-fuerte)',
-        }"
-      >
+      <div v-if="activacion" class="in-activacion mt-4 text-sm">
         {{ $t("instructores.invitar.creada", { email: activacion.email }) }}
         <code class="block mt-1 break-all">{{ activacion.token }}</code>
       </div>
@@ -409,6 +509,14 @@ onMounted(cargar);
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: right;
+}
+.in-suave {
+  color: var(--texto-suave);
+}
+.in-activacion {
+  padding: 0.75rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-boton);
 }
 .in-enlace {
   transition:
