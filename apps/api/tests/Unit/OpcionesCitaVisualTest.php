@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Application\CobroDeCitasTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
+use App\Modules\Tenancy\Application\ResolverDerechoTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,7 @@ it('expone solo la foto pública del profesional y la región de la sede dentro 
             $t->string('ulid');
             $t->string('nombre');
             $t->string('politica_reserva');
+            $t->string('modalidad')->nullable();
             $t->integer('precio_clase_minor')->nullable();
             $t->integer('duracion_minutos')->nullable();
         });
@@ -48,7 +50,11 @@ it('expone solo la foto pública del profesional y la región de la sede dentro 
         $cobro->shouldReceive('paraPantalla')->andReturn(['pago_obligatorio' => true, 'pago_en_linea' => true]);
         $whatsapp = Mockery::mock(WhatsAppTenant::class);
         $whatsapp->shouldReceive('enUso')->andReturn(false);
-        $opciones = (new OpcionesCitaTenant($cobro, $whatsapp))->listar();
+        // Sin cuenta (página pública) no se consultan bonos.
+        $derechos = Mockery::mock(ResolverDerechoTenant::class);
+        $derechos->shouldNotReceive('ofertasCubiertas');
+        $opciones = (new OpcionesCitaTenant($cobro, $whatsapp, $derechos))->listar();
+        expect($opciones['hay_con_plan'])->toBeFalse();
         expect($opciones['instructores'])->toBe([
             ['id' => 'Ana', 'nombre' => 'Ana', 'foto_url' => Storage::disk('public')->url('tenants/demo/perfiles/ana.webp')],
             ['id' => 'Luis', 'nombre' => 'Luis', 'foto_url' => null],
