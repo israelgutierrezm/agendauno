@@ -173,3 +173,19 @@ export const promocionesVisual = {
     acciones: "Acciones",
   },
 };
+
+// Salas y equipos (views/RecursosView.vue) con el patrón de los listados.
+export const recursosVisual = {
+  subtitulo:
+    "Las salas, cabinas o equipos que usa cada servicio, por sucursal.",
+  buscar: "Buscar por nombre o tipo",
+  sinResultados: "Ningún recurso coincide con la búsqueda.",
+  acciones: "Acciones",
+  pool: "Varios iguales · {n}",
+  unidad: "Uno a la vez",
+  kpi: {
+    unidades: "Únicos",
+    pools: "En grupos (piezas)",
+    sedes: "Sucursales con recursos",
+  },
+};

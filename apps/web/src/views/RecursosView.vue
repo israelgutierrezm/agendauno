@@ -5,7 +5,11 @@ import { useI18n } from "vue-i18n";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import TarjetasIndicadores, {
+  type Indicador,
+} from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { confirmar } from "@/lib/confirmar";
@@ -46,8 +50,59 @@ const form = ref({
 const creando = ref(false);
 const abierto = ref(false);
 // Con una sucursal fija (la de la barra o la única), la sala nueva es de esa.
-const { mostrarSelect: elegirSucursal, fija: sucursalFija } =
-  useSucursalOperativa();
+const {
+  mostrarSelect: elegirSucursal,
+  fija: sucursalFija,
+  actual: sucursalActual,
+} = useSucursalOperativa();
+
+// ---- Indicadores y búsqueda (patrón de los listados) ----
+const busqueda = ref("");
+// Con una sucursal elegida en la barra, solo los de esa sucursal.
+const deLaSucursal = computed(() =>
+  sucursalActual.value
+    ? recursos.value.filter((r) => r.sucursal === sucursalActual.value!.nombre)
+    : recursos.value,
+);
+const visibles = computed(() => {
+  const q = busqueda.value.trim().toLowerCase();
+  return deLaSucursal.value.filter(
+    (r) =>
+      q === "" ||
+      r.nombre.toLowerCase().includes(q) ||
+      (r.tipo ?? "").toLowerCase().includes(q),
+  );
+});
+const indicadores = computed<Indicador[]>(() => {
+  const lista = deLaSucursal.value;
+  const pools = lista.filter((r) => r.modo === "pool");
+  return [
+    {
+      clave: "recursos",
+      etiqueta: t("recursos.titulo"),
+      valor: String(lista.length),
+      icono: "recursos",
+    },
+    {
+      clave: "unidades",
+      etiqueta: t("recursosVisual.kpi.unidades"),
+      valor: String(lista.length - pools.length),
+      icono: "ubicacion",
+    },
+    {
+      clave: "pools",
+      etiqueta: t("recursosVisual.kpi.pools"),
+      valor: String(pools.reduce((s, r) => s + r.capacidad, 0)),
+      icono: "cuadricula",
+    },
+    {
+      clave: "sedes",
+      etiqueta: t("recursosVisual.kpi.sedes"),
+      valor: String(new Set(lista.map((r) => r.sucursal)).size),
+      icono: "ubicacion",
+    },
+  ];
+});
 
 function abrir(): void {
   form.value = {
@@ -117,21 +172,22 @@ onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-5xl px-4 sm:px-6 py-8">
-    <div class="flex items-start justify-between gap-3 flex-wrap">
-      <EncabezadoSeccion
-        :titulo="$t('recursos.titulo')"
-        :total="recursos.length"
-      />
-      <button
-        v-if="puedeGestionar && sucursales.length > 0"
-        class="tu-btn tu-btn-primario tu-btn-crear"
-        type="button"
-        @click="abrir"
-      >
-        {{ $t("recursos.crear") }}
-      </button>
-    </div>
+  <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
+    <EncabezadoSeccion
+      :titulo="$t('recursos.titulo')"
+      :subtitulo="$t('recursosVisual.subtitulo')"
+    >
+      <template v-if="puedeGestionar && sucursales.length > 0" #acciones>
+        <button
+          class="tu-btn tu-btn-primario tu-btn-crear"
+          type="button"
+          data-prueba="nuevo-recurso"
+          @click="abrir"
+        >
+          {{ $t("recursos.crear") }}
+        </button>
+      </template>
+    </EncabezadoSeccion>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -148,37 +204,80 @@ onMounted(cargar);
         icono="recursos"
         :titulo="$t('recursos.vacio')"
       />
-      <ul v-else class="mt-6 space-y-2">
-        <li
-          v-for="r in recursos"
-          :key="r.id"
-          class="tu-card p-4 flex items-center justify-between gap-3"
-        >
-          <div class="min-w-0">
-            <div class="font-semibold">{{ r.nombre }}</div>
-            <div class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-              {{ r.sucursal ?? "—" }}<span v-if="r.tipo"> · {{ r.tipo }}</span>
-            </div>
+      <template v-else>
+        <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
+        <div class="tu-card mt-5 overflow-x-auto">
+          <div class="tu-filtros">
+            <label class="tu-buscar">
+              <IconoNav nombre="buscar" :tam="16" />
+              <input
+                v-model="busqueda"
+                type="search"
+                class="tu-input"
+                :placeholder="$t('recursosVisual.buscar')"
+                :aria-label="$t('recursosVisual.buscar')"
+                data-prueba="buscar-recurso"
+              />
+            </label>
           </div>
-          <div class="flex items-center gap-3 shrink-0">
-            <span class="tu-badge">
-              {{
-                r.modo === "pool"
-                  ? `${$t("recursos.modoPool")} · ${r.capacidad}`
-                  : $t("recursos.modoUnidad")
-              }}
-            </span>
-            <button
-              v-if="puedeEliminar"
-              class="tu-enlace text-sm"
-              style="color: var(--error)"
-              @click="eliminar(r)"
-            >
-              {{ $t("recursos.eliminar") }}
-            </button>
-          </div>
-        </li>
-      </ul>
+          <table class="tu-tabla">
+            <thead>
+              <tr>
+                <th>{{ $t("recursos.nombre") }}</th>
+                <th v-if="!sucursalActual" class="hidden sm:table-cell">
+                  {{ $t("recursos.sucursal") }}
+                </th>
+                <th class="hidden md:table-cell">{{ $t("recursos.tipo") }}</th>
+                <th>{{ $t("recursos.modo") }}</th>
+                <th>
+                  <span class="sr-only">{{
+                    $t("recursosVisual.acciones")
+                  }}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="r in visibles" :key="r.id" data-prueba="recurso">
+                <td class="font-medium">{{ r.nombre }}</td>
+                <td
+                  v-if="!sucursalActual"
+                  class="hidden sm:table-cell"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ r.sucursal ?? "—" }}
+                </td>
+                <td
+                  class="hidden md:table-cell"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ r.tipo ?? "—" }}
+                </td>
+                <td>
+                  {{
+                    r.modo === "pool"
+                      ? $t("recursosVisual.pool", { n: r.capacidad })
+                      : $t("recursosVisual.unidad")
+                  }}
+                </td>
+                <td class="text-right">
+                  <button
+                    v-if="puedeEliminar"
+                    class="tu-enlace text-sm"
+                    style="color: var(--error)"
+                    type="button"
+                    @click="eliminar(r)"
+                  >
+                    {{ $t("recursos.eliminar") }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p v-if="visibles.length === 0" class="tu-sin-resultados">
+            {{ $t("recursosVisual.sinResultados") }}
+          </p>
+        </div>
+      </template>
     </template>
 
     <!-- Nuevo recurso (drawer lateral) -->

@@ -85,6 +85,7 @@ import {
   cobranzaVisual,
   equipoVisual,
   promocionesVisual,
+  recursosVisual,
 } from "./locales/mostradorInventario.es-MX";
 import planes from "./locales/planes.es-MX";
 import portal from "./locales/portal.es-MX";
@@ -169,6 +170,7 @@ const mensajesBase = {
   cobranzaVisual,
   equipoVisual,
   promocionesVisual,
+  recursosVisual,
 };
 
 export const i18n = createI18n({
