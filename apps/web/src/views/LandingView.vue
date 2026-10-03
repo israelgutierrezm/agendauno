@@ -77,27 +77,26 @@ function medirCta(ubicacion: string, destino: string): void {
   });
 }
 
+// Orden editorial del carrusel: alterna los protagonistas de las fotografías,
+// también al volver del último elemento al primero. Revisarlo al cambiar imágenes.
 const NEGOCIOS = [
   { clave: "pilates", imagen: "pilates-v1.jpg", destacada: true },
   { clave: "pole", imagen: "pole-v1.jpg", destacada: true },
+  { clave: "hyrox", imagen: "crossfit-hyrox-v1.webp", destacada: false },
   { clave: "academias", imagen: "academias-v1.jpg", destacada: false },
   { clave: "acuaticas", imagen: "natacion-v1.jpg", destacada: false },
-  {
-    clave: "crossfitHyrox",
-    imagen: "crossfit-hyrox-v1.webp",
-    destacada: false,
-  },
-  { clave: "barberia", imagen: "barberia-v1.jpg", destacada: false },
+  { clave: "crossfit", imagen: "crossfit-v1.webp", destacada: false },
   { clave: "estetica", imagen: "estetica-v1.jpg", destacada: false },
   { clave: "dentistas", imagen: "consultorios-v1.webp", destacada: false },
+  { clave: "barberia", imagen: "barberia-v1.jpg", destacada: false },
   { clave: "psicologos", imagen: "psicologia-v1.webp", destacada: false },
-  { clave: "nutriologos", imagen: "nutriologos-v1.webp", destacada: false },
   { clave: "wellness", imagen: "wellness-v1.webp", destacada: false },
+  { clave: "nutriologos", imagen: "nutriologos-v3.webp", destacada: false },
   { clave: "spa", imagen: "spa-v1.webp", destacada: false },
-  { clave: "terapeutas", imagen: "terapeutas-v1.webp", destacada: false },
   { clave: "gimnasio", imagen: "gimnasio-v1.jpg", destacada: false },
+  { clave: "terapeutas", imagen: "terapeutas-v1.webp", destacada: false },
   { clave: "danza", imagen: "danza-v1.jpg", destacada: false },
-  { clave: "yoga", imagen: "yoga-v1.jpg", destacada: false },
+  { clave: "yoga", imagen: "yoga-v2.webp", destacada: false },
 ] as const;
 
 const negocios = computed(() =>
@@ -113,7 +112,7 @@ const negocios = computed(() =>
 const heroNegocios = [
   { clave: "barberia", imagen: "barberia-v1.jpg" },
   { clave: "pole", imagen: "pole-v1.jpg" },
-  { clave: "crossfitHyrox", imagen: "crossfit-hyrox-v1.webp" },
+  { clave: "hyrox", imagen: "crossfit-hyrox-v1.webp" },
 ] as const;
 const flujoReserva = [
   "servicio",

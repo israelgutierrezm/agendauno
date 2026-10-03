@@ -211,8 +211,8 @@ export default {
       poleAlt: "Atleta practicando Pole dance en un estudio profesional",
       barberia: "Barberías",
       barberiaAlt: "Barbero atendiendo a un cliente en una barbería moderna",
-      crossfitHyrox: "CrossFit / HYROX",
-      crossfitHyroxAlt:
+      hyrox: "HYROX",
+      hyroxAlt:
         "Atleta empujando un trineo en un centro de entrenamiento funcional",
       pilates: "Clases",
       pilatesAlt: "Alumna practicando Pilates Reformer",
@@ -290,9 +290,9 @@ export default {
     },
     precio: {
       etiqueta: "Tu suscripción a AgendaUno",
-      titulo: "Un precio que acompaña el tamaño de tu negocio.",
+      titulo: "Dos modelos de suscripción. Uno para tu forma de trabajar.",
       subtitulo:
-        "La suscripción es el pago por usar AgendaUno. Los precios de tus clases, paquetes y servicios los defines tú; son cobros distintos.",
+        "Por alumnos activos si organizas clases; por profesionales si atiendes por cita. Encuentra tu modalidad y prueba AgendaUno 30 días gratis.",
       badge: "{dias} días gratis",
       pruebaDetalle:
         "Configura tu agenda y comprueba cómo encaja en tu operación antes de contratar.",
@@ -333,17 +333,23 @@ export default {
       saludAlcance:
         "organiza citas, disponibilidad y cobros de dentistas, psicólogos, nutriólogos y otros profesionales. No sustituye un expediente clínico ni un sistema médico especializado.",
       negocios: {
-        crossfitHyrox: {
-          nombre: "CrossFit / HYROX",
+        crossfit: {
+          nombre: "CrossFit",
           descripcion:
-            "Clases, cupos, coaches y membresías para tu centro de entrenamiento.",
+            "Clases, cupos y membresías para la comunidad de tu box.",
+          alt: "Atleta realizando una sentadilla frontal con barra en un box de entrenamiento",
+        },
+        hyrox: {
+          nombre: "HYROX",
+          descripcion:
+            "Sesiones de entrenamiento, grupos y reservas para tu centro.",
           alt: "Atleta empujando un trineo durante una sesión de entrenamiento funcional",
         },
         nutriologos: {
           nombre: "Nutriólogos",
           descripcion:
             "Consultas de primera vez y seguimiento, horarios y cobros por profesional.",
-          alt: "Nutrióloga conversando con un paciente sobre sus hábitos de alimentación",
+          alt: "Nutriólogo conversando con una paciente durante una consulta de nutrición",
         },
         barberia: {
           nombre: "Barberías",
@@ -375,7 +381,7 @@ export default {
         yoga: {
           nombre: "Yoga",
           descripcion: "Pases, talleres y reservas sin fricción.",
-          alt: "Alumna practicando una postura de equilibrio de yoga",
+          alt: "Hombre practicando la postura del árbol en un estudio de yoga",
         },
         danza: {
           nombre: "Danza",
@@ -434,9 +440,9 @@ export default {
       q5: "¿Sirve para consultorios o profesionales de la salud?",
       a5: "Sí, cuando necesitan organizar citas, disponibilidad, recordatorios y cobros. AgendaUno no sustituye un expediente clínico ni un sistema médico especializado.",
       q6: "¿Cómo se calcula el precio de AgendaUno?",
-      a6: "En estudios y academias, la renta se calcula por rangos de alumnos activos del mes, no por todas las personas registradas. En citas, se suman los tramos de profesionales activos equivalentes, considerando el medio tiempo. Consulta los rangos, el IVA y las reglas de ambas modalidades en Precios; el panel muestra el uso y el cargo estimado de tu negocio.",
-      q7: "¿La suscripción es lo mismo que mis membresías o servicios?",
-      a7: "No. La suscripción es lo que pagas por utilizar AgendaUno. Tú defines lo que cobras a tus clientes por servicios, clases, paquetes y membresías. Los pagos en línea requieren conectar una pasarela compatible y pueden tener comisiones de ese proveedor.",
+      a6: "Hay dos modelos de suscripción: por rangos de alumnos activos del mes para estudios y academias, o por profesionales activos para negocios con citas. En Precios puedes elegir tu modalidad, consultar las tarifas mensuales y conocer qué actividad se toma en cuenta. Todos los importes se muestran más IVA.",
+      q7: "¿Puedo definir mis propios precios y paquetes?",
+      a7: "Sí. Tú eliges los precios de tus servicios, clases, paquetes y membresías. AgendaUno te ayuda a ofrecerlos, recibir reservas y gestionar los cobros. Para cobrar en línea, conecta una pasarela compatible; sus comisiones dependen del proveedor.",
       q8: "¿Tengo que aparecer en el directorio público?",
       a8: "No. Puedes controlar la publicación desde Configuración. Cuando está visible, las personas pueden consultar servicios o clases, precios y reservar directamente.",
       q9: "¿Debo configurar todo de una vez?",
@@ -659,6 +665,8 @@ export default {
     panelCitaDetalle: "10:30 · Andrea · Confirmada",
     panelClase: "Pole dance básico",
     panelClaseDetalle: "18:00 · 7 de 8 lugares",
+    panelBarberia: "Corte y barba",
+    panelBarberiaDetalle: "12:30 · Marco · Confirmada",
     buscarReserva: "¿Buscas reservar? Encuentra tu negocio",
     sinCuentaCliente:
       "¿Aún no tienes cuenta? Pídela a {negocio}: te enviará una invitación a tu correo.",

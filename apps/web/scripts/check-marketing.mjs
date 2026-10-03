@@ -93,5 +93,5 @@ for (const file of [
 }
 assert.ok(!sitemap.includes("/registro"));
 console.log(
-  "SEO validado: 7 páginas, HTML sin JS, imágenes, CSS, canonical y fallback privado.",
+  `SEO validado: ${routes.length} páginas, HTML sin JS, imágenes, CSS, canonical y fallback privado.`,
 );

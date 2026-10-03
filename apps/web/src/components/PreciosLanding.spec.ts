@@ -13,8 +13,8 @@ describe("precios públicos", () => {
   it("muestra el precio sin IVA y la leyenda debajo, con prueba sin tarjeta", () => {
     const vista = montar();
     expect(vista.findAll("article")).toHaveLength(3);
-    expect(vista.get('button[aria-pressed="true"]').text()).toBe(
-      "Estudios y academias",
+    expect(vista.get('button[aria-pressed="true"] strong').text()).toBe(
+      "Por alumnos activos",
     );
     expect(vista.get(".precio-importe strong").text()).toBe("$339");
     expect(vista.get(".precio-impuestos").text()).toBe("+ IVA");
@@ -35,14 +35,38 @@ describe("precios públicos", () => {
     );
     vista.unmount();
   });
-  it("cambia a citas y explica medio tiempo y cargos por actividad grupal", async () => {
+  it("presenta ambos modelos y sus negocios antes de elegir", () => {
+    const vista = montar();
+    const modelos = vista.findAll(".precios-selector button");
+    expect(modelos).toHaveLength(2);
+    expect(modelos[0]!.text()).toContain("Por alumnos activos");
+    for (const negocio of ["Pilates", "Pole dance", "acuáticas", "baile"]) {
+      expect(modelos[0]!.text()).toContain(negocio);
+    }
+    expect(modelos[1]!.text()).toContain("Por profesionales");
+    for (const negocio of [
+      "Barberías",
+      "estéticas",
+      "psicólogos",
+      "dentistas",
+      "nutriólogos",
+    ]) {
+      expect(modelos[1]!.text()).toContain(negocio);
+    }
+    expect(modelos[0]!.attributes("aria-pressed")).toBe("true");
+    expect(modelos[1]!.attributes("aria-pressed")).toBe("false");
+    vista.unmount();
+  });
+  it("cambia a citas sin distinguir jornadas y conserva los cargos por actividad grupal", async () => {
     const vista = montar();
     await vista.findAll("button")[1]!.trigger("click");
-    expect(vista.get('button[aria-pressed="true"]').text()).toBe(
-      "Citas por profesional",
+    expect(vista.get('button[aria-pressed="true"] strong').text()).toBe(
+      "Por profesionales",
     );
-    expect(vista.get(".precios-intro").text()).toContain("$134.50");
-    expect(vista.get(".precios-intro").text()).toContain("medio tiempo");
+    expect(vista.get(".precios-intro").text()).toContain("$269");
+    expect(vista.text()).not.toMatch(
+      /medio tiempo|tiempo completo|equivalente|\$134\.50/i,
+    );
     expect(vista.get(".precio-importe strong").text()).toBe("$269");
     expect(vista.findAll(".precio-importe strong")[1]!.text()).toBe("$495");
     expect(vista.findAll(".precio-importe strong")[2]!.text()).toBe("$630");

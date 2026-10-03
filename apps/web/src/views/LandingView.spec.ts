@@ -142,7 +142,7 @@ describe("landing comercial", () => {
     expect(vista.findAll(".tu-hero-foto").map((foto) => foto.text())).toEqual([
       "Barberías",
       "Pole dance",
-      "CrossFit / HYROX",
+      "HYROX",
     ]);
     expect(
       vista.findAll(".tu-hero-foto img")[1]!.attributes("fetchpriority"),
@@ -157,22 +157,67 @@ describe("landing comercial", () => {
         "Spas",
         "Terapeutas",
         "Nutriólogos",
-        "CrossFit / HYROX",
+        "CrossFit",
+        "HYROX",
       ]),
     );
     expect(new Set(negocios.map((n) => n.clave)).size).toBe(negocios.length);
+    expect(negocios).toHaveLength(17);
+    expect(negocios.map((n) => n.nombre)).not.toContain("CrossFit / HYROX");
+    expect(negocios.find((n) => n.clave === "crossfit").src).toBe(
+      "/assets/landing/disciplinas/crossfit-v1.webp",
+    );
+    expect(negocios.find((n) => n.clave === "hyrox").src).toBe(
+      "/assets/landing/disciplinas/crossfit-hyrox-v1.webp",
+    );
     vista.unmount();
   });
-  it("distingue la suscripción de los cobros propios y presenta las dos modalidades", () => {
+  it("conserva el orden editorial de imágenes revisado para el ciclo completo", () => {
+    const vista = montar();
+    const negocios = vista.findComponent(CarruselNegocios).props("negocios");
+    expect(negocios.map((n) => n.clave)).toEqual([
+      "pilates",
+      "pole",
+      "hyrox",
+      "academias",
+      "acuaticas",
+      "crossfit",
+      "estetica",
+      "dentistas",
+      "barberia",
+      "psicologos",
+      "wellness",
+      "nutriologos",
+      "spa",
+      "gimnasio",
+      "terapeutas",
+      "danza",
+      "yoga",
+    ]);
+    expect(negocios.find((n) => n.clave === "yoga").src).toBe(
+      "/assets/landing/disciplinas/yoga-v2.webp",
+    );
+    vista.unmount();
+  });
+  it("presenta los dos modelos con enfoque comercial y sin distinciones de jornada", () => {
     const vista = montar();
     expect(vista.get("#precios").text()).toContain("Por alumnos activos");
-    expect(vista.get("#precios").text()).toContain("Citas por profesional");
+    expect(vista.get("#precios").text()).toContain("Por profesionales");
+    expect(vista.get("#precios h2").text()).toContain(
+      "Dos modelos de suscripción",
+    );
     expect(vista.get("#precios .precio-importe strong").text()).toBe("$339");
     expect(vista.get("#precios .precio-impuestos").text()).toBe("+ IVA");
     expect(vista.text()).not.toContain(
       "Aún no se puede contratar con este esquema",
     );
-    expect(vista.get("#precios").text()).toContain("son cobros distintos");
+    expect(vista.text()).not.toMatch(
+      /son cobros distintos|los pagos de tus clientes son distintos|medio tiempo|tiempo completo/i,
+    );
+    expect(vista.get("#precios").text()).toContain("Tú pones el valor");
+    expect(es.landing.faq.q7).toBe(
+      "¿Puedo definir mis propios precios y paquetes?",
+    );
     expect(vista.text()).not.toContain("Tu equipo y administradores no inflan");
     expect(vista.get(".tu-hero-actions a[href]").attributes("href")).toBe(
       "#producto",

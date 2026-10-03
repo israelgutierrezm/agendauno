@@ -45,33 +45,40 @@ function elegirModo(valor: "clases" | "citas") {
         :aria-pressed="modo === 'clases'"
         @click="elegirModo('clases')"
       >
-        Estudios y academias
+        <span class="precios-modelo-titulo">Clases y academias</span>
+        <strong>Por alumnos activos</strong>
+        <span class="precios-modelo-negocios">
+          Pilates, Pole dance, yoga, acuáticas, baile y CrossFit / HYROX.
+        </span>
       </button>
       <button
         type="button"
         :aria-pressed="modo === 'citas'"
         @click="elegirModo('citas')"
       >
-        Citas por profesional
+        <span class="precios-modelo-titulo">Servicios con cita</span>
+        <strong>Por profesionales</strong>
+        <span class="precios-modelo-negocios">
+          Barberías, estéticas, spas, psicólogos, dentistas y nutriólogos.
+        </span>
       </button>
     </div>
 
     <div class="precios-intro" aria-live="polite" aria-atomic="true">
       <template v-if="modo === 'clases'">
-        <h3>Por alumnos activos, no por el tamaño de tu directorio.</h3>
+        <h3>Tu comunidad crece. Tu plan la acompaña.</h3>
         <p>
-          Pilates, Pole dance, yoga, acuáticas, academias y CrossFit / HYROX.
-          Desde
+          Organiza tus clases, cupos y membresías desde
           <strong>{{ pesos(33900) }} MXN/mes + IVA</strong> para 1–49 alumnos
           activos.
         </p>
       </template>
       <template v-else>
-        <h3>Una agenda para cada profesional. Una operación conectada.</h3>
+        <h3>Tu agenda, a solas o con todo tu equipo.</h3>
         <p>
-          Barberías, estéticas, spas, nutriólogos y consultorios. Desde
-          <strong>{{ pesos(13450) }} MXN/mes + IVA</strong> para un profesional
-          de medio tiempo; tiempo completo desde {{ pesos(26900) }} + IVA.
+          Organiza servicios, disponibilidad y reservas desde
+          <strong>{{ pesos(ejemplosCitas[0].subtotal) }} MXN/mes + IVA</strong>
+          para un profesional. Consulta el precio según el tamaño de tu equipo.
         </p>
       </template>
     </div>
@@ -84,9 +91,7 @@ function elegirModo(valor: "clases" | "citas") {
       >
         <p class="precio-contexto">
           {{
-            modo === "clases"
-              ? "Estudios y academias"
-              : "Citas · tiempo completo"
+            modo === "clases" ? "Estudios y academias" : "Servicios con cita"
           }}
         </p>
         <h4>{{ tarjeta.capacidad }}</h4>
@@ -119,9 +124,8 @@ function elegirModo(valor: "clases" | "citas") {
     </div>
 
     <p class="precios-aclaracion">
-      Las mismas herramientas dentro de cada modalidad. Cambia el uso de tu
-      negocio, no las funciones incluidas. Importes por un mes completo; el
-      cargo depende de la actividad del periodo.
+      Todas las herramientas de tu modalidad, desde el primer plan. Tarifas
+      mensuales según los alumnos o profesionales activos de tu negocio.
     </p>
 
     <details :key="modo" class="precios-detalle">
@@ -129,7 +133,7 @@ function elegirModo(valor: "clases" | "citas") {
         {{
           modo === "clases"
             ? "Ver todos los rangos y qué cuenta como alumno activo"
-            : "Ver cómo crece el precio y las reglas de medio tiempo"
+            : "Ver las tarifas para equipos más grandes"
         }}
       </summary>
       <div v-if="modo === 'clases'" class="precios-reglas">
@@ -164,12 +168,12 @@ function elegirModo(valor: "clases" | "citas") {
       <div v-else class="precios-reglas">
         <table>
           <caption>
-            Precio marginal por profesional equivalente · MXN / mes + IVA
+            Tarifa por cada profesional de tu equipo · MXN / mes + IVA
           </caption>
           <thead>
             <tr>
-              <th scope="col">Tramo</th>
-              <th scope="col">Base por equivalente</th>
+              <th scope="col">Profesional</th>
+              <th scope="col">Precio por profesional</th>
             </tr>
           </thead>
           <tbody>
@@ -194,16 +198,13 @@ function elegirModo(valor: "clases" | "citas") {
         <p>
           Los tramos se suman: 2 profesionales cuestan $269 + $226 = $495 antes
           de IVA. El componente por profesionales tiene un tope de
-          {{ pesos(246500) }} + IVA al mes, a partir de 20 equivalentes.
+          {{ pesos(246500) }} + IVA al mes, a partir de 20 profesionales.
         </p>
         <p>
           Cuenta el profesional con al menos una sesión no cancelada en el mes.
-          Con un horario configurado mayor a 0 y menor a 20 horas semanales
-          cuenta como medio equivalente; con 20 horas o más, o sin horario
-          configurado, como uno completo.
         </p>
         <p>
-          ¿También das clases o talleres? Cada equivalente incluye 10 personas
+          ¿También das clases o talleres? Cada profesional incluye 10 personas
           con reservas grupales en el mes (hasta 100 en total). Cada persona
           adicional suma {{ pesos(900) }} + IVA al mes. Este cargo es adicional
           al componente por profesionales y no se aplica a los clientes
@@ -227,9 +228,9 @@ function elegirModo(valor: "clases" | "citas") {
       >
     </aside>
     <p class="precios-aclaracion">
-      La suscripción a AgendaUno y los pagos de tus clientes son distintos. Las
-      comisiones de una pasarela de pagos, cuando aplique, no están incluidas en
-      estos importes.
+      Tú pones el valor a tus servicios, clases y paquetes. AgendaUno te ayuda a
+      ofrecerlos y gestionar sus cobros. Las comisiones del proveedor de pagos
+      en línea no están incluidas en la suscripción.
     </p>
   </div>
 </template>
@@ -262,26 +263,40 @@ function elegirModo(valor: "clases" | "citas") {
   padding: 0.75rem 1.25rem;
 }
 .precios-selector {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0.4rem;
-  width: fit-content;
-  background: var(--superficie);
-  border: 1px solid var(--borde);
-  border-radius: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
 }
 .precios-selector button {
-  padding: 0.8rem 1.25rem;
-  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 1.25rem 1.5rem;
+  border: 2px solid var(--borde);
+  border-radius: 16px;
+  background: var(--superficie);
+  text-align: left;
   font: inherit;
-  font-weight: 500;
-  color: var(--texto-suave);
+  color: var(--texto);
   cursor: pointer;
 }
 .precios-selector button[aria-pressed="true"] {
-  background: var(--primario);
-  color: var(--primario-contraste);
+  border-color: var(--primario);
+  background: color-mix(in srgb, var(--primario) 8%, var(--superficie));
+}
+.precios-modelo-titulo {
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+}
+.precios-selector strong {
+  font-size: clamp(1.05rem, 2vw, 1.25rem);
+  font-weight: 600;
+}
+.precios-modelo-negocios {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--texto-suave);
 }
 .precios-selector button:focus-visible,
 summary:focus-visible {
@@ -438,9 +453,7 @@ td {
     width: 100%;
   }
   .precios-selector button {
-    flex: 1;
-    padding: 0.75rem 0.5rem;
-    font-size: 0.85rem;
+    padding: 1rem;
   }
   .precio-tarjeta {
     padding: 1.5rem;
@@ -452,6 +465,11 @@ td {
   td {
     padding: 0.6rem 0.2rem;
     font-size: 0.75rem;
+  }
+}
+@media (max-width: 540px) {
+  .precios-selector {
+    grid-template-columns: 1fr;
   }
 }
 </style>

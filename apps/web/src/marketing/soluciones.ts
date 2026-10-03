@@ -67,8 +67,8 @@ export const soluciones: readonly Solucion[] = [
     encabezado: "Más tiempo para tus pacientes. Menos mensajes para agendar.",
     resumen:
       "Ya atiendas de forma independiente o en un consultorio con varios nutriólogos, organiza tus consultas y horarios desde una misma agenda. Comparte tu enlace para facilitar la próxima reserva.",
-    imagen: "nutriologos-v1.webp",
-    alt: "Nutrióloga conversando con un paciente sobre sus hábitos de alimentación",
+    imagen: "nutriologos-v3.webp",
+    alt: "Nutriólogo conversando con una paciente durante una consulta de nutrición",
     modo: "citas",
     ejemplo: "Consulta de nutrición",
     beneficios: [
