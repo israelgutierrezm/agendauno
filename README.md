@@ -65,13 +65,11 @@ composer test       # Pest
 
 - Salud: `GET http://localhost:8000/api/v1/health`
 - OpenAPI (Scramble): `http://localhost:8000/docs/api`
-- Estudios demo: `php artisan agendauno:sembrar-demo` (negocio `demo`, clases y citas) y
-  `php artisan agendauno:sembrar-demo --slug=barberia --perfil=barberia --nombre="Barbería Demo"`
-  (solo citas). Crean una cuenta por rol (dueño, administradora, recepción, profesionales,
-  alumna); la contraseña es la opción `--password` del comando y lo imprime al terminar.
-  También siembran el último mes de historia (citas y clases con asistencia, cobros,
-  compras de paquetes, bloqueos y esquemas de pago) para ver los reportes con datos. No
-  borran nada: se pueden volver a correr y no repiten la historia.
+- Demos: `php artisan agendauno:sembrar-demos --rehacer` siembra los dos negocios de muestra,
+  uno por modalidad de cobro: Grecon Art House en `demo` (clases, por alumnos activos) y
+  Barbería La Navaja en `barberia` (citas, por profesionales activos), con meses de historia.
+  `--rehacer` borra la base de cada uno antes de sembrarlo. Cuentas y detalles en
+  `docs/DEMOS.md`.
 
 ### 3. Web
 

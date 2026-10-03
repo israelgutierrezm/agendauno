@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 
 /**
  * Sin datos globales que sembrar: cada estudio vive en su propia base y se crea al
- * registrarse. Los estudios demo se siembran con `php artisan agendauno:sembrar-demo`.
+ * registrarse. Los demos se siembran con `php artisan agendauno:sembrar-demos`.
  */
 class DatabaseSeeder extends Seeder
 {

@@ -68,9 +68,10 @@ abstract class DemoBase
     ) {}
 
     /**
-     * Nombre, slug, giro, contacto (dueño), descripción, redes y color del logo.
+     * Nombre, slug, giro, contacto (dueño), descripción, redes, color del logo y, si
+     * va fuera del directorio, `privado` (solo con enlace).
      *
-     * @return array{nombre: string, slug: string, perfil: PerfilNegocio, contacto: array{0: string, 1: string, 2: string}, email: string, telefono: string, descripcion: string, instagram: string, color: array{0: int, 1: int, 2: int}}
+     * @return array{nombre: string, slug: string, perfil: PerfilNegocio, contacto: array{0: string, 1: string, 2: string}, email: string, telefono: string, descripcion: string, instagram: string, color: array{0: int, 1: int, 2: int}, privado?: bool}
      */
     abstract protected function datos(): array;
 
@@ -89,11 +90,12 @@ abstract class DemoBase
     /**
      * @return array{estudio: Estudio, cuenta: array<string, int>}
      */
-    public function ejecutar(string $password, int $dias, bool $rehacer): array
+    public function ejecutar(string $password, int $dias, bool $rehacer, ?CarbonImmutable $ahora = null): array
     {
         $this->password = $password;
         Carbon::setTestNow();
-        $this->ahora = CarbonImmutable::now($this->zona);
+        // La hora real; las pruebas fijan otra para no depender del día en que corren.
+        $this->ahora = ($ahora ?? CarbonImmutable::now())->setTimezone($this->zona);
         $this->hoy = $this->ahora->startOfDay();
         $this->inicio = $this->hoy->subDays($dias);
         $d = $this->datos();
@@ -124,7 +126,14 @@ abstract class DemoBase
         $this->gestor->aprovisionarBaseDeDatos($estudio);
 
         // Un negocio que ya opera: activo, al corriente, publicado y sin el asistente.
+        // Si el negocio ya existía (se rehace), toma el nombre y el contacto del demo.
         $estudio->update([
+            'nombre' => $d['nombre'],
+            'contacto_nombre' => $nombre,
+            'contacto_primer_apellido' => $apellido1,
+            'contacto_segundo_apellido' => $apellido2,
+            'contacto_email' => $d['email'],
+            'contacto_telefono' => $d['telefono'],
             'perfil_negocio' => $d['perfil']->value,
             'estado' => EstadoEstudio::Active->value,
             'estado_facturacion' => EstadoFacturacion::Active->value,
@@ -136,7 +145,7 @@ abstract class DemoBase
             // Sus reglas ya están revisadas y la página publicada (ADR 0090).
             'onboarding_pasos' => ['reglas' => true, 'publicacion' => true],
             'publicado' => true,
-            'privado' => false,
+            'privado' => $d['privado'] ?? false,
             'pais' => 'MX',
             'ciudad' => 'Ciudad de México',
             'descripcion' => $d['descripcion'],
@@ -381,8 +390,8 @@ abstract class DemoBase
         Carbon::setTestNow();
         EventoOutboxTenant::query()
             ->whereNull('publicado_en')
-            ->where('ocurrido_en', '<', now())
-            ->update(['publicado_en' => now()]);
+            ->where('ocurrido_en', '<=', $this->ahora->utc())
+            ->update(['publicado_en' => $this->ahora->utc()]);
     }
 
     /**

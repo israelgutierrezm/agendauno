@@ -113,7 +113,7 @@ final class DemoBarberia extends DemoBase
     {
         return [
             'nombre' => 'Barbería La Navaja',
-            'slug' => 'la-navaja',
+            'slug' => 'barberia',
             'perfil' => PerfilNegocio::Barberia,
             'contacto' => ['Ramón', 'Salgado', 'Ibarra'],
             'email' => 'ramon@lanavaja.test',
