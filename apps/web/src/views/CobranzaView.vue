@@ -8,7 +8,11 @@ import CorteDeCaja from "@/components/CorteDeCaja.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PorConciliar from "@/components/PorConciliar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
+import TarjetasIndicadores, {
+  type Indicador,
+} from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -318,6 +322,103 @@ async function reembolsar(): Promise<void> {
   }
 }
 
+// ---- Indicadores y filtros (patrón de los listados) ----
+const busqueda = ref("");
+const filtroEstado = ref<"" | "aprobado" | "otros">("");
+const pagosVisibles = computed(() => {
+  const q = busqueda.value.trim().toLowerCase();
+  return pagos.value.filter(
+    (p) =>
+      (q === "" || (p.persona ?? "").toLowerCase().includes(q)) &&
+      (filtroEstado.value === "" ||
+        (filtroEstado.value === "aprobado") === (p.estado === "aprobado")),
+  );
+});
+function suma(lista: number[]): string {
+  return dinero(
+    lista.reduce((a, b) => a + b, 0),
+    pagos.value[0]?.moneda ?? "MXN",
+  );
+}
+const indicadores = computed<Indicador[]>(() => {
+  if (vista.value === "movimientos") {
+    const aprobados = pagos.value.filter((p) => p.estado === "aprobado");
+    const otros = pagos.value.length - aprobados.length;
+    return [
+      {
+        clave: "cobros",
+        etiqueta: t("cobranzaVisual.kpi.cobros"),
+        valor: String(aprobados.length),
+        icono: "ventas",
+      },
+      {
+        clave: "cobrado",
+        etiqueta: t("cobranzaVisual.kpi.cobrado"),
+        valor: suma(aprobados.map((p) => p.monto_minor)),
+        icono: "dinero",
+      },
+      {
+        clave: "reembolsado",
+        etiqueta: t("cobranzaVisual.kpi.reembolsado"),
+        valor: suma(pagos.value.map((p) => p.reembolsado_minor)),
+        icono: "intercambio",
+      },
+      {
+        clave: "revisar",
+        etiqueta: t("cobranzaVisual.kpi.sinAprobar"),
+        valor: String(otros),
+        icono: "reloj",
+        aviso: otros > 0,
+      },
+    ];
+  }
+  if (vista.value === "por-cobrar") {
+    const suspendidos = morosos.value.filter(
+      (m) => m.estado === "suspendido",
+    ).length;
+    const automaticos = suscripciones.value.filter(
+      (x) => x.pago_automatico !== null,
+    ).length;
+    return [
+      {
+        clave: "mora",
+        etiqueta: t("cobranzaVisual.kpi.enMora"),
+        valor: String(morosos.value.length),
+        icono: "facturas",
+        aviso: morosos.value.length > 0,
+      },
+      {
+        clave: "suspendidos",
+        etiqueta: t("cobranzaVisual.kpi.suspendidos"),
+        valor: String(suspendidos),
+        icono: "cerrar",
+      },
+      {
+        clave: "renovaciones",
+        etiqueta: t("cobranzaVisual.kpi.renovaciones"),
+        valor: String(suscripciones.value.length),
+        icono: "reloj",
+      },
+      {
+        clave: "automatico",
+        etiqueta: t("cobranzaVisual.kpi.automatico"),
+        valor: t("cobranzaVisual.deTotal", {
+          n: automaticos,
+          total: suscripciones.value.length,
+        }),
+        icono: "hecho",
+      },
+    ];
+  }
+  return [];
+});
+const TONO_PAGO: Record<string, string> = {
+  aprobado: "var(--exito)",
+  reembolsado: "var(--texto-suave)",
+  anulado: "var(--texto-suave)",
+  fallido: "var(--error)",
+};
+
 watch(vista, cargar, { immediate: true });
 </script>
 
@@ -345,51 +446,42 @@ watch(vista, cargar, { immediate: true });
     </p>
 
     <template v-else>
+      <TarjetasIndicadores
+        v-if="indicadores.length > 0"
+        class="mt-6"
+        :tarjetas="indicadores"
+      />
       <template v-if="vista === 'por-cobrar'">
         <!-- Morosos (dunning) -->
-        <div class="mt-6 flex items-center gap-3">
-          <h2 class="font-medium text-lg">{{ $t("cobranza.morosos") }}</h2>
-          <span
-            class="tu-badge"
-            :class="morosos.length > 0 ? 'tu-badge-aviso' : 'tu-badge-exito'"
-            >{{ morosos.length }}</span
-          >
-        </div>
+        <h2 class="mt-8 font-medium">{{ $t("cobranza.morosos") }}</h2>
         <EstadoVacio
           v-if="morosos.length === 0"
           class="tu-card mt-3"
           icono="hecho"
           :titulo="$t('cobranza.sinMorosos')"
         />
-        <div v-else class="mt-3 tu-card overflow-hidden">
-          <table class="w-full text-sm">
+        <div v-else class="mt-3 tu-card overflow-x-auto">
+          <table class="tu-tabla">
             <thead>
-              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                <th class="px-4 py-2 font-medium">
+              <tr>
+                <th>
                   {{ $t("cobranza.colAlumno") }}
                 </th>
-                <th class="px-4 py-2 font-medium">
+                <th>
                   {{ $t("cobranza.colEstado") }}
                 </th>
-                <th
-                  class="px-4 py-2 font-medium text-right hidden sm:table-cell"
-                >
+                <th class="text-right hidden sm:table-cell">
                   {{ $t("cobranza.colIntentos") }}
                 </th>
-                <th class="px-4 py-2 font-medium hidden md:table-cell">
+                <th class="hidden md:table-cell">
                   {{ $t("cobranza.colGracia") }}
                 </th>
-                <th class="px-4 py-2 font-medium text-right"></th>
+                <th class="text-right"></th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="m in morosos"
-                :key="m.id"
-                class="border-t"
-                :style="{ borderColor: 'var(--borde)' }"
-              >
-                <td class="px-4 py-2">
+              <tr v-for="m in morosos" :key="m.id">
+                <td>
                   <span class="font-semibold">{{
                     m.persona?.nombre ?? "—"
                   }}</span>
@@ -400,34 +492,29 @@ watch(vista, cargar, { immediate: true });
                     >{{ m.ultimo_motivo }}</span
                   >
                 </td>
-                <td class="px-4 py-2">
+                <td>
                   <span
-                    class="tu-badge"
-                    :style="
-                      m.estado === 'suspendido'
-                        ? {
-                            background: 'var(--error-suave)',
-                            color: 'var(--error)',
-                          }
-                        : {
-                            background: 'var(--aviso-suave)',
-                            color: 'var(--aviso)',
-                          }
-                    "
+                    class="tu-pildora"
+                    :style="{
+                      '--tono':
+                        m.estado === 'suspendido'
+                          ? 'var(--error)'
+                          : 'var(--aviso)',
+                    }"
                   >
                     {{ $t(`cobranza.estados.${m.estado}`) }}
                   </span>
                 </td>
-                <td class="px-4 py-2 text-right hidden sm:table-cell">
+                <td class="text-right hidden sm:table-cell">
                   {{ m.intentos }}
                 </td>
                 <td
-                  class="px-4 py-2 hidden md:table-cell"
+                  class="hidden md:table-cell"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
                   {{ fecha(m.gracia_hasta) }}
                 </td>
-                <td class="px-4 py-2 text-right">
+                <td class="text-right">
                   <button
                     v-if="puedeRegularizar && m.acuerdo"
                     class="tu-enlace text-sm"
@@ -464,42 +551,65 @@ watch(vista, cargar, { immediate: true });
 
       <!-- Pagos / reembolsos -->
       <template v-if="vista === 'movimientos'">
-        <h2 class="mt-6 font-medium text-lg">{{ $t("cobranza.pagos") }}</h2>
         <EstadoVacio
           v-if="pagos.length === 0"
-          class="tu-card mt-3"
+          class="tu-card mt-5"
           icono="dinero"
           :titulo="$t('cobranza.sinPagos')"
         />
-        <div v-else class="mt-3 tu-card overflow-hidden">
-          <table class="w-full text-sm">
+        <div v-else class="mt-5 tu-card overflow-x-auto">
+          <div class="tu-filtros">
+            <label class="tu-buscar">
+              <IconoNav nombre="buscar" :tam="16" />
+              <input
+                v-model="busqueda"
+                type="search"
+                class="tu-input"
+                :placeholder="$t('cobranzaVisual.buscar')"
+                :aria-label="$t('cobranzaVisual.buscar')"
+                data-prueba="buscar-pago"
+              />
+            </label>
+            <div class="tu-segmentado" role="group">
+              <button
+                v-for="f in ['', 'aprobado', 'otros'] as const"
+                :key="f"
+                type="button"
+                :aria-pressed="filtroEstado === f"
+                @click="filtroEstado = f"
+              >
+                {{ $t(`cobranzaVisual.filtro.${f || "todos"}`) }}
+              </button>
+            </div>
+          </div>
+          <table class="tu-tabla">
             <thead>
-              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                <th class="px-4 py-2 font-medium">
+              <tr>
+                <th>
                   {{ $t("cobranza.colFecha") }}
                 </th>
-                <th class="px-4 py-2 font-medium">
+                <th>
                   {{ $t("cobranza.colAlumno") }}
                 </th>
-                <th class="px-4 py-2 font-medium text-right">
+                <th class="text-right">
                   {{ $t("cobranza.colMonto") }}
                 </th>
-                <th class="px-4 py-2 font-medium">
+                <th>
                   {{ $t("cobranza.colEstado") }}
                 </th>
-                <th class="px-4 py-2 font-medium text-right"></th>
+                <th class="text-right"></th>
               </tr>
             </thead>
             <tbody>
-              <template v-for="p in pagos" :key="p.id">
-                <tr class="border-t" :style="{ borderColor: 'var(--borde)' }">
+              <template v-for="p in pagosVisibles" :key="p.id">
+                <tr>
                   <td
-                    class="px-4 py-2 whitespace-nowrap"
+                    class="whitespace-nowrap"
                     :style="{ color: 'var(--texto-suave)' }"
                   >
                     {{ fechaHora(p.fecha) }}
                   </td>
-                  <td class="px-4 py-2">
+                  <td>
                     <span class="font-semibold">{{ p.persona ?? "—" }}</span>
                     <span
                       v-if="p.registrado_por"
@@ -510,7 +620,7 @@ watch(vista, cargar, { immediate: true });
                       }}</span
                     >
                   </td>
-                  <td class="px-4 py-2 text-right">
+                  <td class="text-right">
                     {{ dinero(p.monto_minor, p.moneda) }}
                     <span
                       v-if="p.con_reembolsos && !puedeReembolsar"
@@ -535,18 +645,16 @@ watch(vista, cargar, { immediate: true });
                       −{{ dinero(p.reembolsado_minor, p.moneda) }}
                     </button>
                   </td>
-                  <td class="px-4 py-2">
+                  <td>
                     <span
-                      class="tu-badge"
-                      :class="
-                        p.estado === 'aprobado'
-                          ? 'tu-badge-exito'
-                          : 'tu-badge-aviso'
-                      "
+                      class="tu-pildora"
+                      :style="{
+                        '--tono': TONO_PAGO[p.estado] ?? 'var(--aviso)',
+                      }"
                       >{{ $t(`cobranza.pagoEstados.${p.estado}`) }}</span
                     >
                   </td>
-                  <td class="px-4 py-2 text-right">
+                  <td class="text-right">
                     <span class="inline-flex flex-wrap justify-end gap-x-3">
                       <button
                         v-if="p.corregible || p.anulable"
@@ -572,7 +680,7 @@ watch(vista, cargar, { immediate: true });
                 </tr>
                 <!-- Cobro en caja con error: corregir la forma o anularlo -->
                 <tr v-if="corrigiendo === p.id">
-                  <td colspan="5" class="px-4 pb-3">
+                  <td colspan="5" class="tu-celda-detalle">
                     <CorregirCobro
                       :base="base"
                       :pago="{
@@ -586,7 +694,7 @@ watch(vista, cargar, { immediate: true });
                   </td>
                 </tr>
                 <tr v-if="reembolsosDe === p.id">
-                  <td colspan="5" class="px-4 pb-3">
+                  <td colspan="5" class="tu-celda-detalle">
                     <div
                       class="rounded-xl border px-4 text-xs"
                       :style="{
@@ -637,12 +745,13 @@ watch(vista, cargar, { immediate: true });
                             dinero(r.monto_minor, r.moneda)
                           }}</span>
                           <span
-                            class="tu-badge"
-                            :class="
-                              r.estado === 'aprobado'
-                                ? 'tu-badge-exito'
-                                : 'tu-badge-aviso'
-                            "
+                            class="tu-pildora"
+                            :style="{
+                              '--tono':
+                                r.estado === 'aprobado'
+                                  ? 'var(--exito)'
+                                  : 'var(--aviso)',
+                            }"
                             >{{
                               $t(`reembolsosPago.estados.${r.estado}`)
                             }}</span
@@ -655,12 +764,15 @@ watch(vista, cargar, { immediate: true });
               </template>
             </tbody>
           </table>
+          <p v-if="pagosVisibles.length === 0" class="tu-sin-resultados">
+            {{ $t("cobranzaVisual.sinResultados") }}
+          </p>
         </div>
       </template>
 
       <!-- Próximas renovaciones (cobro recurrente) -->
       <template v-if="vista === 'por-cobrar'">
-        <h2 class="mt-8 font-medium text-lg">
+        <h2 class="mt-8 font-medium">
           {{ $t("cobranza.renovaciones") }}
         </h2>
         <p
@@ -677,68 +789,64 @@ watch(vista, cargar, { immediate: true });
           icono="reloj"
           :titulo="$t('cobranza.sinRenovaciones')"
         />
-        <div v-else class="mt-3 tu-card overflow-hidden">
-          <table class="w-full text-sm">
+        <div v-else class="mt-3 tu-card overflow-x-auto">
+          <table class="tu-tabla">
             <thead>
-              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                <th class="px-4 py-2 font-medium">
+              <tr>
+                <th>
                   {{ $t("cobranza.colAlumno") }}
                 </th>
-                <th class="px-4 py-2 font-medium hidden sm:table-cell">
+                <th class="hidden sm:table-cell">
                   {{ $t("cobranza.colMembresia") }}
                 </th>
-                <th class="px-4 py-2 font-medium text-right">
+                <th class="text-right">
                   {{ $t("cobranza.colMonto") }}
                 </th>
-                <th class="px-4 py-2 font-medium">
+                <th>
                   {{ $t("cobranza.colProxima") }}
                 </th>
-                <th class="px-4 py-2 font-medium">
+                <th>
                   {{ $t("pagoAutomatico.colCobro") }}
                 </th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="s in suscripciones"
-                :key="s.id"
-                class="border-t"
-                :style="{ borderColor: 'var(--borde)' }"
-              >
-                <td class="px-4 py-2 font-semibold">{{ s.persona ?? "—" }}</td>
+              <tr v-for="s in suscripciones" :key="s.id">
+                <td class="font-semibold">{{ s.persona ?? "—" }}</td>
                 <td
-                  class="px-4 py-2 hidden sm:table-cell"
+                  class="hidden sm:table-cell"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
                   {{ s.producto ?? "—" }}
                 </td>
-                <td class="px-4 py-2 text-right">
+                <td class="text-right">
                   {{
                     s.precio_minor !== null
                       ? dinero(s.precio_minor, s.moneda ?? "MXN")
                       : "—"
                   }}
                 </td>
-                <td class="px-4 py-2">
+                <td>
                   {{ fecha(s.proxima_cobro_en) }}
                   <span
                     v-if="s.estado !== 'activo'"
-                    class="tu-badge ml-1"
-                    :style="{
-                      background: 'var(--error-suave)',
-                      color: 'var(--error)',
-                    }"
+                    class="tu-pildora ml-1"
+                    :style="{ '--tono': 'var(--error)' }"
                     >{{ $t(`cobranza.estados.${s.estado}`, s.estado) }}</span
                   >
                 </td>
-                <td class="px-4 py-2">
+                <td>
                   <template v-if="s.pago_automatico">
-                    <span class="tu-badge tu-badge-exito">{{
-                      $t("pagoAutomatico.tarjeta", {
-                        marca: marca(s.pago_automatico.marca),
-                        ultimos4: s.pago_automatico.ultimos4 ?? "····",
-                      })
-                    }}</span>
+                    <span
+                      class="tu-pildora"
+                      :style="{ '--tono': 'var(--exito)' }"
+                      >{{
+                        $t("pagoAutomatico.tarjeta", {
+                          marca: marca(s.pago_automatico.marca),
+                          ultimos4: s.pago_automatico.ultimos4 ?? "····",
+                        })
+                      }}</span
+                    >
                     <button
                       v-if="puedeRegularizar"
                       type="button"

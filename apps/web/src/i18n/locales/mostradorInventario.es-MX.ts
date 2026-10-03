@@ -108,3 +108,25 @@ export const planesVisual = {
     acciones: "Acciones",
   },
 };
+
+// Cobros (views/CobranzaView.vue) con el patrón de los listados.
+export const cobranzaVisual = {
+  buscar: "Buscar por cliente",
+  sinResultados: "Ningún movimiento coincide con los filtros.",
+  deTotal: "{n} de {total}",
+  filtro: {
+    todos: "Todos",
+    aprobado: "Aprobados",
+    otros: "Con algún cambio",
+  },
+  kpi: {
+    cobros: "Cobros aprobados",
+    cobrado: "Cobrado",
+    reembolsado: "Reembolsado",
+    sinAprobar: "Con algún cambio",
+    enMora: "En mora",
+    suspendidos: "Suspendidos",
+    renovaciones: "Renovaciones próximas",
+    automatico: "Con pago automático",
+  },
+};

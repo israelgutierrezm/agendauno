@@ -7,6 +7,7 @@ import {
 } from "@/lib/terminologia";
 
 import agendaVisual from "./locales/agendaVisual.es-MX";
+import importarClases from "./locales/importarClases.es-MX";
 import apariencia from "./locales/apariencia.es-MX";
 import cobro from "./locales/cobro.es-MX";
 import {
@@ -81,6 +82,7 @@ import {
   mostradorVisual,
   ventasVisual,
   planesVisual,
+  cobranzaVisual,
 } from "./locales/mostradorInventario.es-MX";
 import planes from "./locales/planes.es-MX";
 import portal from "./locales/portal.es-MX";
@@ -89,6 +91,7 @@ import recepcionVisual from "./locales/recepcionVisual.es-MX";
 // Textos base (sin adaptar a ningún negocio).
 const mensajesBase = {
   ...esMX,
+  importarClases,
   agendaVisual,
   apariencia,
   cobro,
@@ -161,6 +164,7 @@ const mensajesBase = {
   mostradorVisual,
   ventasVisual,
   planesVisual,
+  cobranzaVisual,
 };
 
 export const i18n = createI18n({

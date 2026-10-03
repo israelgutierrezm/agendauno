@@ -563,6 +563,68 @@
     border-radius: 999px;
     background: var(--tono, var(--texto-suave));
   }
+  /* Listados (patrón de Inventario, Planes, Cobros…): tabla sobria con encabezados
+     suaves y filas separadas por una línea; barra de filtros arriba, dentro de la
+     misma tarjeta; buscador con su lupa. */
+  .tu-tabla {
+    width: 100%;
+    font-size: 0.9rem;
+    border-collapse: collapse;
+  }
+  .tu-tabla th {
+    padding: 0.7rem 1rem;
+    color: var(--texto-suave);
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-align: left;
+  }
+  .tu-tabla th.text-right {
+    text-align: right;
+  }
+  .tu-tabla td {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--borde);
+    vertical-align: middle;
+  }
+  .tu-tabla td.tu-celda-detalle {
+    padding-top: 0;
+    border-top: 0;
+  }
+  .tu-tabla .tu-sub {
+    display: block;
+    color: var(--texto-suave);
+    font-size: 0.78rem;
+  }
+  .tu-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid var(--borde);
+  }
+  .tu-buscar {
+    position: relative;
+    flex: 1 1 14rem;
+    color: var(--texto-suave);
+  }
+  .tu-buscar > :first-child {
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+  .tu-buscar > input {
+    padding-left: 2.25rem;
+  }
+  .tu-sin-resultados {
+    padding: 2rem 1rem;
+    border-top: 1px solid var(--borde);
+    color: var(--texto-suave);
+    font-size: 0.9rem;
+    text-align: center;
+  }
   .tu-detalle-seccion {
     display: grid;
     gap: 0.9rem;
