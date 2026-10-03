@@ -60,7 +60,8 @@ function elegirModo(valor: "clases" | "citas") {
       <template v-if="modo === 'clases'">
         <h3>Por alumnos activos, no por el tamaño de tu directorio.</h3>
         <p>
-          Pilates, Pole dance, yoga, acuáticas y academias. Desde
+          Pilates, Pole dance, yoga, acuáticas, academias y CrossFit / HYROX.
+          Desde
           <strong>{{ pesos(33900) }} MXN/mes + IVA</strong> para 1–49 alumnos
           activos.
         </p>
@@ -68,7 +69,7 @@ function elegirModo(valor: "clases" | "citas") {
       <template v-else>
         <h3>Una agenda para cada profesional. Una operación conectada.</h3>
         <p>
-          Barberías, estéticas, spas y consultorios. Desde
+          Barberías, estéticas, spas, nutriólogos y consultorios. Desde
           <strong>{{ pesos(13450) }} MXN/mes + IVA</strong> para un profesional
           de medio tiempo; tiempo completo desde {{ pesos(26900) }} + IVA.
         </p>

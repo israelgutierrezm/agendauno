@@ -14,6 +14,8 @@ const routes = [
     "barberias",
     "spas",
     "terapeutas",
+    "crossfit-hyrox",
+    "nutriologos",
   ].map((s) => `/software-para-${s}`),
 ];
 const sitemap = await readFile(resolve(root, "dist/sitemap.xml"), "utf8");
@@ -76,7 +78,7 @@ for (const route of routes) {
     await access(resolve(root, "dist", style.getAttribute("href").slice(1)));
   }
 }
-assert.equal(titles.size, 7);
+assert.equal(titles.size, routes.length);
 for (const file of [
   "app.html",
   "registro/index.html",

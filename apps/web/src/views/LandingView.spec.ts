@@ -136,10 +136,17 @@ describe("landing comercial", () => {
   });
   it("muestra Pole dance en el hero y categorías específicas de acuáticas y salud", () => {
     const vista = montar();
-    expect(vista.findAll(".tu-hero-foto img")[0]!.attributes("src")).toBe(
+    expect(vista.findAll(".tu-hero-foto img")[1]!.attributes("src")).toBe(
       "/assets/landing/disciplinas/pole-v1.jpg",
     );
-    expect(vista.findAll(".tu-hero-foto")[0]!.text()).toBe("Pole dance");
+    expect(vista.findAll(".tu-hero-foto").map((foto) => foto.text())).toEqual([
+      "Barberías",
+      "Pole dance",
+      "CrossFit / HYROX",
+    ]);
+    expect(
+      vista.findAll(".tu-hero-foto img")[1]!.attributes("fetchpriority"),
+    ).toBe("high");
     const negocios = vista.findComponent(CarruselNegocios).props("negocios");
     expect(negocios.map((n) => n.nombre)).toEqual(
       expect.arrayContaining([
@@ -149,6 +156,8 @@ describe("landing comercial", () => {
         "Wellness",
         "Spas",
         "Terapeutas",
+        "Nutriólogos",
+        "CrossFit / HYROX",
       ]),
     );
     expect(new Set(negocios.map((n) => n.clave)).size).toBe(negocios.length);

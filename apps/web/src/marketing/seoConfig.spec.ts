@@ -13,11 +13,11 @@ describe("SEO comercial", () => {
       expect(renderSeoHead(seoParaRuta(path))).not.toContain("14 días");
     }
   });
-  it("tiene siete páginas con título, descripción y canonical propios", () => {
-    expect(rutasMarketing).toHaveLength(7);
+  it("tiene nueve páginas con título, descripción y canonical propios", () => {
+    expect(rutasMarketing).toHaveLength(9);
     expect(
       new Set(rutasMarketing.map((path) => seoParaRuta(path).title)).size,
-    ).toBe(7);
+    ).toBe(9);
     for (const path of rutasMarketing) {
       const seo = seoParaRuta(path);
       expect(seo.index).toBe(true);

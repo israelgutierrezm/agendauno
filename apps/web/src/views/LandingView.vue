@@ -22,6 +22,8 @@ const negociosAnimados = computed(() =>
     "academias",
     "acuaticas",
     "yoga",
+    "crossfit",
+    "hyrox",
     "barberias",
     "esteticas",
     "spas",
@@ -29,6 +31,7 @@ const negociosAnimados = computed(() =>
     "terapeutas",
     "dentistas",
     "psicologos",
+    "nutriologos",
   ].map((clave) => t(`landing.heroEscritura.negocios.${clave}`)),
 );
 
@@ -79,10 +82,16 @@ const NEGOCIOS = [
   { clave: "pole", imagen: "pole-v1.jpg", destacada: true },
   { clave: "academias", imagen: "academias-v1.jpg", destacada: false },
   { clave: "acuaticas", imagen: "natacion-v1.jpg", destacada: false },
+  {
+    clave: "crossfitHyrox",
+    imagen: "crossfit-hyrox-v1.webp",
+    destacada: false,
+  },
   { clave: "barberia", imagen: "barberia-v1.jpg", destacada: false },
   { clave: "estetica", imagen: "estetica-v1.jpg", destacada: false },
   { clave: "dentistas", imagen: "consultorios-v1.webp", destacada: false },
   { clave: "psicologos", imagen: "psicologia-v1.webp", destacada: false },
+  { clave: "nutriologos", imagen: "nutriologos-v1.webp", destacada: false },
   { clave: "wellness", imagen: "wellness-v1.webp", destacada: false },
   { clave: "spa", imagen: "spa-v1.webp", destacada: false },
   { clave: "terapeutas", imagen: "terapeutas-v1.webp", destacada: false },
@@ -102,9 +111,9 @@ const negocios = computed(() =>
 );
 
 const heroNegocios = [
-  { clave: "pole", imagen: "pole-v1.jpg" },
-  { clave: "pilates", imagen: "pilates-v1.jpg" },
   { clave: "barberia", imagen: "barberia-v1.jpg" },
+  { clave: "pole", imagen: "pole-v1.jpg" },
+  { clave: "crossfitHyrox", imagen: "crossfit-hyrox-v1.webp" },
 ] as const;
 const flujoReserva = [
   "servicio",
@@ -211,7 +220,7 @@ onBeforeUnmount(() => observador?.disconnect());
                 :alt="$t(`landing.heroVisual.${negocio.clave}Alt`)"
                 width="1122"
                 height="1402"
-                :fetchpriority="i === 0 ? 'high' : undefined"
+                :fetchpriority="i === 1 ? 'high' : undefined"
                 decoding="async"
               />
               <span>{{ $t(`landing.heroVisual.${negocio.clave}`) }}</span>
@@ -761,8 +770,8 @@ onBeforeUnmount(() => observador?.disconnect());
 .tu-hero-foto--2 {
   height: 96%;
 }
-.tu-hero-foto--1 img {
-  object-position: 65% center;
+.tu-hero-foto.tu-hero-foto--2 img {
+  object-position: 73% center;
 }
 .tu-hero-foto--3 {
   height: 76%;

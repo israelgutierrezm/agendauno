@@ -4,7 +4,7 @@ const opciones = [
   {
     id: "clases" as const,
     titulo: "Organizo clases",
-    para: "Pilates · Pole dance · Academias · Yoga",
+    para: "Pilates · Pole dance · Academias · Yoga · CrossFit / HYROX",
     descripcion:
       "Cuida a tu comunidad, no una hoja de cálculo. Organiza grupos, cupos y membresías desde una misma agenda.",
     imagen: "pilates-v1.jpg",
@@ -22,7 +22,7 @@ const opciones = [
   {
     id: "citas" as const,
     titulo: "Atiendo por cita",
-    para: "Barberías · Estéticas · Consultorios",
+    para: "Barberías · Estéticas · Nutriólogos · Consultorios",
     descripcion:
       "Dale a cada profesional una agenda clara. Tus clientes eligen servicio, quién los atiende y un horario disponible.",
     imagen: "barberia-v1.jpg",

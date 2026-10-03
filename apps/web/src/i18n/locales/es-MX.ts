@@ -189,6 +189,8 @@ export default {
         academias: "academias",
         acuaticas: "escuelas de natación",
         yoga: "estudios de yoga",
+        crossfit: "boxes de CrossFit",
+        hyrox: "centros de HYROX",
         barberias: "barberías",
         esteticas: "estéticas",
         spas: "spas",
@@ -196,6 +198,7 @@ export default {
         terapeutas: "terapeutas",
         dentistas: "consultorios dentales",
         psicologos: "psicólogos",
+        nutriologos: "nutriólogos",
       },
     },
     titulo: "Menos pendientes. Más tiempo para tus clientes.",
@@ -208,10 +211,13 @@ export default {
       poleAlt: "Atleta practicando Pole dance en un estudio profesional",
       barberia: "Barberías",
       barberiaAlt: "Barbero atendiendo a un cliente en una barbería moderna",
+      crossfitHyrox: "CrossFit / HYROX",
+      crossfitHyroxAlt:
+        "Atleta empujando un trineo en un centro de entrenamiento funcional",
       pilates: "Clases",
       pilatesAlt: "Alumna practicando Pilates Reformer",
       confirmada: "Reserva confirmada",
-      confirmadaDetalle: "Pilates Reformer · Hoy 18:00",
+      confirmadaDetalle: "Pole dance · Hoy 18:00",
       flujoTitulo: "Tu operación conectada",
       flujo: {
         servicio: "Agenda",
@@ -325,8 +331,20 @@ export default {
       titulo: "Clases, academias y servicios con cita.",
       saludTitulo: "Para profesionales de la salud:",
       saludAlcance:
-        "organiza citas, disponibilidad y cobros de dentistas, psicólogos y otros profesionales. No sustituye un expediente clínico ni un sistema médico especializado.",
+        "organiza citas, disponibilidad y cobros de dentistas, psicólogos, nutriólogos y otros profesionales. No sustituye un expediente clínico ni un sistema médico especializado.",
       negocios: {
+        crossfitHyrox: {
+          nombre: "CrossFit / HYROX",
+          descripcion:
+            "Clases, cupos, coaches y membresías para tu centro de entrenamiento.",
+          alt: "Atleta empujando un trineo durante una sesión de entrenamiento funcional",
+        },
+        nutriologos: {
+          nombre: "Nutriólogos",
+          descripcion:
+            "Consultas de primera vez y seguimiento, horarios y cobros por profesional.",
+          alt: "Nutrióloga conversando con un paciente sobre sus hábitos de alimentación",
+        },
         barberia: {
           nombre: "Barberías",
           descripcion:
@@ -439,12 +457,12 @@ export default {
       estetica: "Estética o centro de belleza",
       salon: "Salón de belleza o peluquería",
       spa: "Spa o centro de bienestar",
-      salud: "Consultorio o profesional de la salud",
+      salud: "Consultorio, nutrición o profesional de la salud",
       pilates: "Estudio de Pilates",
       pole: "Estudio de Pole dance",
       yoga: "Estudio de Yoga",
       danza: "Escuela de danza",
-      gimnasio: "Gimnasio o entrenamiento",
+      gimnasio: "Gimnasio, CrossFit o HYROX",
       natacion: "Escuela de natación",
       academia: "Academia o escuela",
       general: "Otro negocio con agenda",
