@@ -147,3 +147,29 @@ export const equipoVisual = {
     acciones: "Acciones",
   },
 };
+
+// Promociones (views/PromocionesView.vue) con el patrón de los listados.
+export const promocionesVisual = {
+  subtitulo:
+    "Códigos de descuento: cuánto descuentan, cuántas veces y hasta cuándo.",
+  buscar: "Buscar código",
+  sinResultados: "Ninguna promoción coincide con los filtros.",
+  desde: "En compras desde {monto}",
+  filtro: {
+    todas: "Todas",
+    vigentes: "Vigentes",
+    no_vigentes: "No vigentes",
+  },
+  kpi: {
+    vigentes: "Vigentes",
+    usos: "Veces usadas",
+    porVencer: "Vencen en 7 días",
+    noVigentes: "No vigentes",
+  },
+  col: {
+    codigo: "Código",
+    descuento: "Descuento",
+    estado: "Estado",
+    acciones: "Acciones",
+  },
+};
