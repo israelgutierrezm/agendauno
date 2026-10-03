@@ -134,6 +134,31 @@ class AuthTenantController
         ]]);
     }
 
+    /**
+     * Conecta Google a la cuenta con la que se inició sesión (ADR 0093): desde ese
+     * momento puede entrar con Google. Sin registro: solo cuentas que ya existen.
+     */
+    public function conectarGoogle(Request $request): JsonResponse
+    {
+        $usuario = $this->usuarioTenant($request);
+        abort_unless($usuario instanceof Usuario, 401);
+        $validado = $request->validate(['credential' => ['required', 'string']]);
+
+        $this->google->conectar($usuario, (string) $validado['credential']);
+
+        return response()->json(['data' => ['usuario' => UsuarioTenantPresenter::datos($usuario->refresh())]]);
+    }
+
+    public function desconectarGoogle(Request $request): JsonResponse
+    {
+        $usuario = $this->usuarioTenant($request);
+        abort_unless($usuario instanceof Usuario, 401);
+
+        $this->google->desconectar($usuario);
+
+        return response()->json(['data' => ['usuario' => UsuarioTenantPresenter::datos($usuario->refresh())]]);
+    }
+
     public function activar(ActivarTenantRequest $request): JsonResponse
     {
         $estudio = $this->estudioDe($request);

@@ -15,7 +15,7 @@ afterEach(function (): void {
     File::deleteDirectory(storage_path('tenants'));
 });
 
-// Saca al estudio del directorio público (deja de tener escaparate/registro).
+// Saca al estudio del directorio público (deja de tener escaparate).
 function despublicarEstudio(string $slug): void
 {
     Estudio::query()->where('slug', $slug)->update(['publicado' => false]);
@@ -59,51 +59,4 @@ it('el escaparate no expone estudios fuera del directorio (404)', function (): v
     despublicarEstudio($e['slug']);
 
     $this->getJson("/api/v1/app/{$e['slug']}/escaparate")->assertNotFound();
-});
-
-it('el registro público crea al alumno y lo deja dentro (auto-login)', function (): void {
-    $e = estudioConSesion('estudio-a', 'a@correo.mx');
-
-    $data = $this->postJson("/api/v1/app/{$e['slug']}/registro-alumno", [
-        'nombre' => 'Valentina',
-        'primer_apellido' => 'Ríos',
-        'email' => 'valentina@correo.mx',
-        'password' => 'secreto123',
-        'password_confirmation' => 'secreto123',
-    ])->assertCreated()->json('data');
-
-    expect($data['usuario']['rol'])->toBe('miembro');
-    expect($data['token'])->not->toBeEmpty();
-
-    // El token recién emitido autentica (auto-login).
-    $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($data['token']))
-        ->assertOk()->assertJsonPath('data.usuario.email', 'valentina@correo.mx');
-
-    // El alumno queda en el padrón del estudio (persona creada, facturable).
-    $miembros = collect($this->getJson("/api/v1/app/{$e['slug']}/miembros?q=Valentina", conBearer($e['bearer']))
-        ->assertOk()->json('data'));
-    expect($miembros->pluck('nombre_completo'))->toContain('Valentina Ríos');
-});
-
-it('el registro público rechaza un correo ya usado en el estudio', function (): void {
-    $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    $carga = [
-        'nombre' => 'Ana', 'email' => 'ana@correo.mx',
-        'password' => 'secreto123', 'password_confirmation' => 'secreto123',
-    ];
-    $this->postJson("/api/v1/app/{$e['slug']}/registro-alumno", $carga)->assertCreated();
-
-    $this->postJson("/api/v1/app/{$e['slug']}/registro-alumno", $carga)
-        ->assertStatus(422)->assertJsonPath('code', 'VALIDATION_FAILED')
-        ->assertJsonPath('meta.errors.email.0', 'Ya existe una cuenta con ese correo en este estudio. Inicia sesión.');
-});
-
-it('el registro público no acepta altas en estudios fuera del directorio (404)', function (): void {
-    $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    despublicarEstudio($e['slug']);
-
-    $this->postJson("/api/v1/app/{$e['slug']}/registro-alumno", [
-        'nombre' => 'Ana', 'email' => 'ana@correo.mx',
-        'password' => 'secreto123', 'password_confirmation' => 'secreto123',
-    ])->assertNotFound();
 });

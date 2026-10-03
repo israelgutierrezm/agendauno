@@ -122,8 +122,6 @@ final class CatalogoParametros
                 'Incluye las fechas que se expanden desde las filas semanales. Divide archivos mayores en varios lotes.', $e, 500, 10, 2000, 'sesiones', porNegocio: false),
 
             // Cuentas: vigencia de enlaces de seguridad (solo la plataforma).
-            new DefinicionParametro('cuentas.horas_confirmar_registro', 'Cuentas', 'Vigencia del enlace para confirmar un registro',
-                'Horas.', $e, 24, 1, 168, 'h', porNegocio: false),
             new DefinicionParametro('cuentas.horas_confirmar_correo', 'Cuentas', 'Vigencia del enlace para confirmar un cambio de correo',
                 'Horas.', $e, 24, 1, 168, 'h', porNegocio: false),
             new DefinicionParametro('cuentas.minutos_restablecer_contrasena', 'Cuentas', 'Vigencia del enlace para restablecer la contraseña',

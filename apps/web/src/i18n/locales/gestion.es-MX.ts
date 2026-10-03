@@ -925,17 +925,6 @@ export const bajas = {
   verEquipo: "Ver equipo",
 };
 
-// Registro con un correo que ya es de alguien en el negocio: se confirma por correo.
-export const confirmarRegistro = {
-  enviado:
-    "Te enviamos un correo a {email}. Ábrelo y confirma que es tuyo para entrar con tu historial.",
-  titulo: "Confirma tu registro",
-  confirmando: "Confirmando tu correo…",
-  sinEnlace:
-    "Falta información del enlace. Ábrelo directamente desde tu correo.",
-  volverARegistrarte: "Volver a la página del negocio",
-};
-
 export const corteCaja = {
   titulo: "Corte de caja",
   descargar: "Descargar CSV",

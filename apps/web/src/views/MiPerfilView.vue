@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
@@ -7,6 +7,7 @@ import CampoContrasena from "@/components/CampoContrasena.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { clientIdGoogle, renderizarBotonGoogle } from "@/lib/google";
 import {
   useSesionTenantStore,
   type UsuarioTenant,
@@ -23,6 +24,50 @@ const sesion = useSesionTenantStore();
 const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const usuario = computed(() => sesion.usuario);
+
+// ---- Google: se conecta aquí para entrar con él (ADR 0093: no registra cuentas) ----
+const hayGoogle = clientIdGoogle() !== undefined;
+const botonGoogle = ref<HTMLElement | null>(null);
+const conectandoGoogle = ref(false);
+async function mostrarBotonGoogle(): Promise<void> {
+  await nextTick();
+  if (!hayGoogle || botonGoogle.value === null) {
+    return;
+  }
+  botonGoogle.value.replaceChildren();
+  await renderizarBotonGoogle(
+    botonGoogle.value,
+    (credential) => void conectarGoogle(credential),
+  );
+}
+async function conectarGoogle(credential: string): Promise<void> {
+  conectandoGoogle.value = true;
+  try {
+    await sesion.conectarGoogle(credential);
+    toast.exito(t("miPerfil.google.conectado"));
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    conectandoGoogle.value = false;
+  }
+}
+async function desconectarGoogle(): Promise<void> {
+  conectandoGoogle.value = true;
+  try {
+    await sesion.desconectarGoogle();
+    toast.exito(t("miPerfil.google.desconectado"));
+    await mostrarBotonGoogle();
+  } catch (e) {
+    toast.error(mensajeDeError(e));
+  } finally {
+    conectandoGoogle.value = false;
+  }
+}
+onMounted(() => {
+  if (sesion.usuario?.google_conectado !== true) {
+    void mostrarBotonGoogle();
+  }
+});
 
 type Respuesta = { data: { usuario: UsuarioTenant } };
 
@@ -435,6 +480,37 @@ const aparienciaAbierta = ref(false);
         </div>
       </form>
 
+      <!-- Entrar con Google -->
+      <div class="mp-fila" data-prueba="google">
+        <div>
+          <h2 class="mp-titulo">{{ $t("miPerfil.google.titulo") }}</h2>
+          <p class="mp-ayuda">{{ $t("miPerfil.google.ayuda") }}</p>
+        </div>
+        <div class="space-y-3">
+          <template v-if="usuario.google_conectado">
+            <p class="mp-estado">
+              <span class="mp-punto" aria-hidden="true" />
+              {{ $t("miPerfil.google.conectadoEstado") }}
+            </p>
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma"
+              data-prueba="desconectar-google"
+              :disabled="conectandoGoogle"
+              @click="desconectarGoogle"
+            >
+              {{ $t("miPerfil.google.desconectar") }}
+            </button>
+          </template>
+          <template v-else-if="hayGoogle">
+            <div ref="botonGoogle" data-prueba="boton-google" />
+          </template>
+          <p v-else class="mp-ayuda">
+            {{ $t("miPerfil.google.noDisponible") }}
+          </p>
+        </div>
+      </div>
+
       <!-- Calendario -->
       <div class="mp-fila">
         <div>
@@ -530,6 +606,18 @@ const aparienciaAbierta = ref(false);
     grid-template-columns: 15rem minmax(0, 1fr);
     gap: 2rem;
   }
+}
+.mp-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+.mp-punto {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--exito);
 }
 .mp-titulo {
   font-weight: 600;

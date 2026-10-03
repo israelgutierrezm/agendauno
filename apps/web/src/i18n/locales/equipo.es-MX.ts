@@ -4,6 +4,17 @@
  * `expediente`, `profesional` y `listados`.
  */
 export const miPerfil = {
+  // Entrar con Google: se conecta desde aquí (ADR 0093).
+  google: {
+    titulo: "Entrar con Google",
+    ayuda:
+      "Conecta tu cuenta de Google para entrar sin contraseña. Puedes usar un Gmail distinto a tu correo de acceso.",
+    conectado: "Listo: ya puedes entrar con Google.",
+    conectadoEstado: "Google conectado",
+    desconectar: "Quitar Google",
+    desconectado: "Quitaste Google: entra con tu correo y contraseña.",
+    noDisponible: "Entrar con Google aún no está disponible en este sitio.",
+  },
   titulo: "Mi perfil",
   foto: "Foto",
   fotoAyuda:

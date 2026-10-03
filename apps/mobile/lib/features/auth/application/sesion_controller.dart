@@ -63,46 +63,6 @@ class SesionController extends Notifier<Sesion?> {
     await ref.read(almacenSesionProvider).guardar(state!.aJson());
   }
 
-  /// Crea la cuenta de un alumno nuevo en el negocio (registro público) y deja la
-  /// sesión iniciada, igual que el login. Si el correo ya es de alguien en el
-  /// negocio, no entra todavía: el servidor manda un enlace a ese correo para
-  /// confirmar que es suyo, y devuelve ese correo.
-  Future<String?> registrarAlumno({
-    required String slug,
-    required String nombre,
-    required String primerApellido,
-    required String email,
-    required String password,
-  }) async {
-    final res = await ref
-        .read(dioProvider)
-        .post<Map<String, dynamic>>(
-          '/api/v1/app/$slug/registro-alumno',
-          data: {
-            'nombre': nombre,
-            'primer_apellido': primerApellido.isEmpty ? null : primerApellido,
-            'email': email,
-            'password': password,
-            'password_confirmation': password,
-          },
-        );
-
-    final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
-    if (res.statusCode == 202) {
-      return (data['email'] ?? email) as String;
-    }
-    final bearer = (data['token'] ?? '') as String;
-    ref.read(authTokenProvider.notifier).establecer(bearer);
-    state = Sesion.desdeJson(
-      slug,
-      bearer,
-      (data['usuario'] ?? {}) as Map<String, dynamic>,
-      data['estudio'] as Map<String, dynamic>?,
-    );
-    await ref.read(almacenSesionProvider).guardar(state!.aJson());
-    return null;
-  }
-
   /// Pide el enlace para elegir una contraseña nueva (llega por correo y se abre en
   /// la web). El servidor responde igual exista o no la cuenta.
   Future<void> pedirRecuperacion(String slug, String email) async {

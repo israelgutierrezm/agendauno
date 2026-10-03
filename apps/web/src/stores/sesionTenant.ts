@@ -36,6 +36,8 @@ export interface UsuarioTenant {
   nombre_corto?: string;
   foto_url?: string | null;
   tiene_contrasena?: boolean;
+  // Conectó Google para entrar con él (ADR 0093).
+  google_conectado?: boolean;
   // Correo nuevo que espera confirmación por enlace.
   email_pendiente?: string | null;
 }
@@ -251,6 +253,24 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     }
   }
 
+  /**
+   * Conecta (o quita) Google a la cuenta con la que se entró: desde entonces puede
+   * entrar con Google. Google no crea cuentas (ADR 0093).
+   */
+  async function conectarGoogle(credential: string): Promise<void> {
+    const { data } = await api.put<{ data: { usuario: UsuarioTenant } }>(
+      `/api/v1/app/${slug.value}/yo/google`,
+      { credential },
+    );
+    usuario.value = data.data.usuario;
+  }
+  async function desconectarGoogle(): Promise<void> {
+    const { data } = await api.delete<{ data: { usuario: UsuarioTenant } }>(
+      `/api/v1/app/${slug.value}/yo/google`,
+    );
+    usuario.value = data.data.usuario;
+  }
+
   async function activar(
     slugEstudio: string,
     email: string,
@@ -302,66 +322,6 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     } finally {
       cargando.value = false;
     }
-  }
-
-  /**
-   * Crea la cuenta del alumno. Si el correo ya es de alguien en el negocio, el
-   * servidor no la liga todavía: manda un enlace a ese correo y devuelve a qué
-   * correo (`confirmar`); si no, entra de una vez (`confirmar` = null).
-   */
-  async function registrarAlumno(
-    slugEstudio: string,
-    datos: {
-      nombre: string;
-      primer_apellido?: string;
-      email: string;
-      password: string;
-      passwordConfirmation: string;
-    },
-  ): Promise<{ confirmar: string | null }> {
-    cargando.value = true;
-    error.value = null;
-    try {
-      const respuesta = await api.post<{
-        data: RespuestaAuth | { confirmacion: string; email: string };
-      }>(`/api/v1/app/${slugEstudio}/registro-alumno`, {
-        nombre: datos.nombre,
-        primer_apellido: datos.primer_apellido || null,
-        email: datos.email,
-        password: datos.password,
-        password_confirmation: datos.passwordConfirmation,
-      });
-      const cuerpo = respuesta.data.data;
-      if (respuesta.status === 202 && "confirmacion" in cuerpo) {
-        return { confirmar: cuerpo.email };
-      }
-      establecer(cuerpo as RespuestaAuth);
-      return { confirmar: null };
-    } catch (e) {
-      error.value = mensajeDeError(
-        e,
-        i18n.global.t("validacion.sesion.registrar"),
-      );
-      throw e;
-    } finally {
-      cargando.value = false;
-    }
-  }
-
-  /**
-   * Abre el enlace del correo de confirmación de registro: liga la cuenta a su
-   * historial y entra.
-   */
-  async function confirmarRegistro(
-    slugEstudio: string,
-    email: string,
-    token: string,
-  ): Promise<void> {
-    const { data } = await api.post<{ data: RespuestaAuth }>(
-      `/api/v1/app/${slugEstudio}/registro-alumno/confirmar`,
-      { email, token },
-    );
-    establecer(data.data);
   }
 
   async function cargarYo(): Promise<void> {
@@ -452,9 +412,9 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     iniciarSesionConGoogle,
     activar,
     restablecerContrasena,
-    registrarAlumno,
-    confirmarRegistro,
     cargarYo,
+    conectarGoogle,
+    desconectarGoogle,
     cambiarRol,
     actualizarUsuario,
     verificarSesion,

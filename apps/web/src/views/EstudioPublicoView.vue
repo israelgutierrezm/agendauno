@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 
-import CampoContrasena from "@/components/CampoContrasena.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import IconoRed from "@/components/IconoRed.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
-import { api, mensajeDeError } from "@/lib/api";
+import { api } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import { recordarNegocio } from "@/lib/negociosRecientes";
 import { updateSeo } from "@/lib/seo";
-import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Sesion {
   clase: string | null;
@@ -110,25 +109,15 @@ interface Escaparate {
 }
 
 const route = useRoute();
-const router = useRouter();
-const sesion = useSesionTenantStore();
 
 const slug = computed(() => String(route.params.slug));
 const escaparate = ref<Escaparate | null>(null);
 const cargando = ref(true);
 const noDisponible = ref(false);
 
-const registrando = ref(false);
-const form = ref({
-  nombre: "",
-  apellido: "",
-  email: "",
-  password: "",
-  passwordConfirmation: "",
-});
-const errorRegistro = ref<string | null>(null);
-// Su correo ya era de alguien en el negocio: se confirma por correo antes de entrar.
-const confirmacionEnviada = ref<string | null>(null);
+// Registro cerrado (ADR 0093): nadie crea su cuenta aquí. Quien quiere reservar
+// pide su acceso al negocio (que lo da de alta y lo invita) o entra si ya lo tiene.
+const pidiendoAcceso = ref(false);
 
 const ubicacion = computed(() => {
   const e = escaparate.value?.estudio;
@@ -226,9 +215,9 @@ function iniciales(nombre: string): string {
     .toUpperCase();
 }
 
-function abrirRegistro(origen: string): void {
-  registrando.value = true;
-  trackEvent("student_registration_opened", {
+function abrirAcceso(origen: string): void {
+  pidiendoAcceso.value = true;
+  trackEvent("student_access_opened", {
     source: origen,
     business_profile: escaparate.value?.estudio.perfil ?? "unknown",
   });
@@ -277,30 +266,6 @@ async function cargar(): Promise<void> {
     noDisponible.value = true;
   } finally {
     cargando.value = false;
-  }
-}
-
-async function registrar(): Promise<void> {
-  errorRegistro.value = null;
-  try {
-    const registro = await sesion.registrarAlumno(slug.value, {
-      nombre: form.value.nombre,
-      primer_apellido: form.value.apellido,
-      email: form.value.email,
-      password: form.value.password,
-      passwordConfirmation: form.value.passwordConfirmation,
-    });
-    trackEvent("student_account_created", {
-      business_profile: escaparate.value?.estudio.perfil ?? "unknown",
-    });
-    // Auto-login: al portal del alumno (su cuenta) para reservar/comprar.
-    if (registro.confirmar !== null) {
-      confirmacionEnviada.value = registro.confirmar;
-      return;
-    }
-    void router.push({ name: sesion.destinoAlEntrar });
-  } catch (e) {
-    errorRegistro.value = mensajeDeError(e);
   }
 }
 
@@ -453,7 +418,7 @@ onMounted(cargar);
               v-if="!usaCitas"
               type="button"
               class="tu-btn tu-btn-primario px-6"
-              @click="abrirRegistro('hero')"
+              @click="abrirAcceso('hero')"
             >
               {{ $t("escaparate.reservar") }}
             </button>
@@ -774,9 +739,9 @@ onMounted(cargar);
               <button
                 type="button"
                 class="tu-btn tu-btn-primario mt-4 w-full"
-                @click="abrirRegistro('price_card')"
+                @click="abrirAcceso('price_card')"
               >
-                {{ $t("escaparate.crearCuenta") }}
+                {{ $t("escaparate.pedirAcceso") }}
               </button>
             </li>
           </ul>
@@ -990,124 +955,69 @@ onMounted(cargar);
           v-else
           type="button"
           class="tu-btn tu-btn-primario mt-5 px-8"
-          @click="abrirRegistro('final')"
+          @click="abrirAcceso('final')"
         >
           {{ $t("escaparate.reservar") }}
         </button>
       </section>
 
-      <!-- Modal de registro -->
+      <!-- Pedir acceso: el negocio da de alta a sus clientes (ADR 0093) -->
       <div
-        v-if="registrando"
+        v-if="pidiendoAcceso"
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        data-prueba="pedir-acceso"
       >
         <div
           class="absolute inset-0 bg-black/50"
-          @click="registrando = false"
+          @click="pidiendoAcceso = false"
         />
         <div
           class="relative w-full max-w-md tu-card p-6"
           :style="{ background: 'var(--superficie)' }"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="$t('escaparate.acceso.titulo')"
         >
           <div class="flex items-start justify-between gap-3">
-            <div>
-              <h3 class="text-xl font-light">
-                {{ $t("escaparate.registro.titulo") }}
-              </h3>
-              <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-                {{
-                  $t("escaparate.registro.subtitulo", {
-                    estudio: escaparate.estudio.nombre,
-                  })
-                }}
-              </p>
-            </div>
+            <h3 class="text-xl font-medium">
+              {{ $t("escaparate.acceso.titulo") }}
+            </h3>
             <button
               type="button"
               class="tu-icono-btn shrink-0"
               :aria-label="$t('comun.cerrar')"
-              @click="registrando = false"
+              @click="pidiendoAcceso = false"
             >
-              <span aria-hidden="true">✕</span>
+              <IconoNav nombre="cerrar" :tam="16" />
             </button>
           </div>
-
-          <form class="mt-5 space-y-3" @submit.prevent="registrar">
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="tu-label" for="rn">{{
-                  $t("escaparate.registro.nombre")
-                }}</label>
-                <input
-                  id="rn"
-                  v-model="form.nombre"
-                  class="tu-input"
-                  required
-                />
-              </div>
-              <div>
-                <label class="tu-label" for="ra">{{
-                  $t("escaparate.registro.apellido")
-                }}</label>
-                <input id="ra" v-model="form.apellido" class="tu-input" />
-              </div>
-            </div>
-            <div>
-              <label class="tu-label" for="re">{{
-                $t("escaparate.registro.email")
-              }}</label>
-              <input
-                id="re"
-                v-model="form.email"
-                class="tu-input"
-                type="email"
-                required
-              />
-            </div>
-            <div>
-              <label class="tu-label" for="rp">{{
-                $t("escaparate.registro.password")
-              }}</label>
-              <CampoContrasena
-                id="rp"
-                v-model="form.password"
-                autocomplete="new-password"
-                :required="true"
-              />
-            </div>
-            <div>
-              <label class="tu-label" for="rpc">{{
-                $t("escaparate.registro.passwordConfirm")
-              }}</label>
-              <CampoContrasena
-                id="rpc"
-                v-model="form.passwordConfirmation"
-                autocomplete="new-password"
-                :required="true"
-              />
-            </div>
-
-            <p v-if="confirmacionEnviada" class="text-sm" role="status">
-              {{
-                $t("confirmarRegistro.enviado", { email: confirmacionEnviada })
-              }}
-            </p>
-            <p v-if="errorRegistro" class="text-sm" style="color: var(--error)">
-              {{ errorRegistro }}
-            </p>
-
-            <button
+          <p class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
+            {{
+              $t("escaparate.acceso.explicacion", {
+                estudio: escaparate.estudio.nombre,
+              })
+            }}
+          </p>
+          <div class="mt-5 grid gap-2">
+            <a
+              v-if="escaparate.estudio.whatsapp_url"
+              :href="escaparate.estudio.whatsapp_url"
+              target="_blank"
+              rel="noopener"
               class="tu-btn tu-btn-primario w-full"
-              type="submit"
-              :disabled="sesion.cargando"
+              @click="
+                trackEvent('student_access_requested', { channel: 'whatsapp' })
+              "
             >
-              {{
-                sesion.cargando
-                  ? $t("escaparate.registro.creando")
-                  : $t("escaparate.registro.crear")
-              }}
-            </button>
-          </form>
+              {{ $t("escaparate.acceso.whatsapp") }}
+            </a>
+            <RouterLink
+              :to="{ name: 'entrar', query: { estudio: slug } }"
+              class="tu-btn tu-btn-fantasma w-full"
+            >
+              {{ $t("escaparate.acceso.yaTengo") }}
+            </RouterLink>
+          </div>
         </div>
       </div>
     </template>

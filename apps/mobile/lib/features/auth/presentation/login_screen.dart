@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/sesion_controller.dart';
-import 'registro_screen.dart';
 
 /// Acceso tenant-local: el usuario escribe la direccion de su estudio (slug) y sus
 /// credenciales. No hay login global ni selector de tenant tras el login.
@@ -182,17 +181,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           )
                         : const Text('Entrar'),
                   ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: _cargando
-                        ? null
-                        : () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) =>
-                                  RegistroScreen(slugInicial: _slug.text.trim()),
-                            ),
-                          ),
-                    child: const Text('¿Primera vez aquí? Crea tu cuenta'),
+                  const SizedBox(height: 16),
+                  // Registro cerrado (ADR 0093): las cuentas las crea el negocio.
+                  Text(
+                    '¿Aún no tienes cuenta? Pídela a tu negocio: te enviará una '
+                    'invitación a tu correo.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),

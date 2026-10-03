@@ -576,7 +576,15 @@ export default {
     agendaPaso1: "Elige servicio",
     agendaPaso2: "Elige profesional",
     agendaPaso3: "Elige horario",
-    crearCuenta: "Crear cuenta y empezar",
+    pedirAcceso: "Pedir acceso",
+    // Registro cerrado (ADR 0093): el negocio da de alta a sus clientes.
+    acceso: {
+      titulo: "Pide tu acceso",
+      explicacion:
+        "Las cuentas de {estudio} las crea el negocio. Pídele tu acceso: te llegará una invitación a tu correo para activar tu cuenta.",
+      whatsapp: "Pedirlo por WhatsApp",
+      yaTengo: "Ya tengo cuenta · Entrar",
+    },
     yaSoyAlumno: "Ya soy alumno · Entrar",
     yaSoyCliente: "Ya soy cliente · Entrar",
     proximasClases: "Próximas clases",
@@ -598,17 +606,6 @@ export default {
     creditos: "1 crédito | {n} créditos",
     ilimitado: "Ilimitado",
     registro: {
-      titulo: "Crea tu cuenta",
-      subtitulo:
-        "Regístrate en {estudio} para reservar y administrar tus compras.",
-      nombre: "Nombre",
-      apellido: "Apellido",
-      email: "Correo",
-      password: "Contraseña",
-      passwordConfirm: "Repite la contraseña",
-      crear: "Crear cuenta",
-      creando: "Creando…",
-      exito: "¡Listo! Ya tienes cuenta en {estudio}.",
       tipos: {
         membresia: "Membresía",
         paquete: "Paquete",
@@ -663,6 +660,8 @@ export default {
     panelClase: "Pole dance básico",
     panelClaseDetalle: "18:00 · 7 de 8 lugares",
     buscarReserva: "¿Buscas reservar? Encuentra tu negocio",
+    sinCuentaCliente:
+      "¿Aún no tienes cuenta? Pídela a {negocio}: te enviará una invitación a tu correo.",
     sinCuenta: "¿Administras un negocio?",
     registrar: "Prueba AgendaUno gratis",
   },

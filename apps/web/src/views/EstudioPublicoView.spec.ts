@@ -13,9 +13,6 @@ vi.mock("@/lib/api", () => ({
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
 vi.mock("@/lib/seo", () => ({ updateSeo: vi.fn() }));
-vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ registrarAlumno: vi.fn(), rutaInicio: "" }),
-}));
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: { slug: "estudio-a" }, query: {} }),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -64,6 +61,28 @@ function montar() {
 describe("página pública del estudio", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("no deja crear una cuenta: se pide acceso al negocio (ADR 0093)", async () => {
+    const respuesta = escaparate({ promedio: null, total: 0, recientes: [] });
+    respuesta.data.data.estudio = {
+      ...respuesta.data.data.estudio,
+      whatsapp_url: "https://wa.me/525512345678",
+    } as typeof respuesta.data.data.estudio;
+    mocks.get.mockResolvedValue(respuesta);
+    const w = montar();
+    await flushPromises();
+
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Reservar primera clase")!
+      .trigger("click");
+    const acceso = w.get('[data-prueba="pedir-acceso"]');
+    expect(acceso.text()).toContain("Pide tu acceso");
+    expect(acceso.find('input[type="password"]').exists()).toBe(false);
+    expect(acceso.get("a[href^='https://wa.me']").text()).toBe(
+      "Pedirlo por WhatsApp",
+    );
   });
 
   it("muestra el promedio y los comentarios que el negocio deja visibles", async () => {

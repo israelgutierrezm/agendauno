@@ -3,17 +3,15 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
-use App\Modules\Tenancy\Mail\CorreoConfirmarRegistro;
-use App\Modules\Tenancy\Models\Estudio;
-use App\Modules\Tenancy\Models\PersonaTenant;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Testing\TestResponse;
 
 /*
-| 1.5 de la fase 1: conocer el correo de alguien no da acceso a su ficha. Registrarse
-| con un correo que ya es de alguien en el negocio pide confirmarlo desde ese correo
-| antes de ligar su historial; la cita pública no reactiva ni usa membresías.
+| Registro cerrado (ADR 0093): nadie crea su cuenta en un negocio. El cliente existe
+| porque el negocio lo da de alta (o porque agendó sin cuenta) y tiene cuenta solo si
+| el negocio lo invita y él activa el enlace. Conocer el correo de alguien no da
+| acceso a su ficha; la cita pública no reactiva ni usa membresías.
 */
 
 beforeEach(function (): void {
@@ -25,16 +23,6 @@ afterEach(function (): void {
     app(GestorDeConexionTenant::class)->desconectar();
     File::deleteDirectory(storage_path('tenants'));
 });
-
-/**
- * @param  array{slug: string}  $e
- */
-function registrarseCon(array $e, string $email, string $password = 'clave-nueva-123'): TestResponse
-{
-    return test()->postJson("/api/v1/app/{$e['slug']}/registro-alumno", [
-        'nombre' => 'Quien sea', 'email' => $email, 'password' => $password, 'password_confirmation' => $password,
-    ]);
-}
 
 /**
  * Ficha que dio de alta recepción (con paquete de créditos), sin cuenta.
@@ -52,69 +40,28 @@ function fichaConCreditos(array $e, string $email): string
     return $persona;
 }
 
-it('saber el correo de alguien no da acceso a su ficha: se confirma desde ese correo', function (): void {
+it('nadie se registra solo en un negocio: no hay alta pública de cuentas', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+
+    $this->postJson("/api/v1/app/{$e['slug']}/registro-alumno", [
+        'nombre' => 'Quien sea', 'email' => 'nueva@correo.mx',
+        'password' => 'clave-nueva-123', 'password_confirmation' => 'clave-nueva-123',
+    ])->assertNotFound();
+    $this->postJson("/api/v1/app/{$e['slug']}/login", ['email' => 'nueva@correo.mx', 'password' => 'clave-nueva-123'])
+        ->assertStatus(422);
+});
+
+it('el cliente tiene cuenta cuando el negocio lo invita: entra ligado a su ficha y sus créditos', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $ana = fichaConCreditos($e, 'ana@correo.mx');
 
-    // Se registra con el correo de Ana (en mayúsculas): no entra ni se liga todavía.
-    $r = registrarseCon($e, 'ANA@correo.mx')->assertStatus(202);
-    expect($r->json('data'))->toBe(['confirmacion' => 'enviada', 'email' => 'ana@correo.mx'])
-        ->and(app(GestorDeConexionTenant::class)->ejecutarEn(
-            Estudio::query()->where('slug', 'estudio-a')->firstOrFail(),
-            fn () => PersonaTenant::query()->where('ulid', $ana)->value('usuario_id'),
-        ))->toBeNull();
+    // Saber su correo no basta: sin invitación no hay cuenta.
+    $this->postJson("/api/v1/app/{$e['slug']}/login", ['email' => 'ana@correo.mx', 'password' => 'secreto123'])->assertStatus(422);
 
-    // Un enlace inventado no sirve.
-    $this->postJson("/api/v1/app/{$e['slug']}/registro-alumno/confirmar", ['email' => 'ana@correo.mx', 'token' => 'inventado'])
-        ->assertStatus(422)->assertJsonPath('code', 'SIGNUP_CONFIRMATION_INVALID');
-
-    // Quien abre el correo de Ana entra con su historial.
-    $cuenta = $this->postJson("/api/v1/app/{$e['slug']}/registro-alumno/confirmar", [
-        'email' => 'ana@correo.mx', 'token' => tokenDeRegistro('ana@correo.mx'),
-    ])->assertCreated()->assertJsonPath('data.persona_id', $ana)->json('data');
-    $this->getJson("/api/v1/app/{$e['slug']}/mi/perfil", conBearer($cuenta['token']))
-        ->assertOk()->assertJsonPath('data.derechos.0.saldo', 8000);
-});
-
-it('el enlace vence en 24 horas y sirve una sola vez', function (): void {
-    $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    fichaConCreditos($e, 'ana@correo.mx');
-
-    registrarseCon($e, 'ana@correo.mx')->assertStatus(202);
-    $vencido = tokenDeRegistro('ana@correo.mx');
-    $this->travel(25)->hours();
-    $this->postJson("/api/v1/app/{$e['slug']}/registro-alumno/confirmar", ['email' => 'ana@correo.mx', 'token' => $vencido])
-        ->assertStatus(422);
-
-    Mail::fake();
-    registrarseCon($e, 'ana@correo.mx')->assertStatus(202);
-    $token = tokenDeRegistro('ana@correo.mx');
-    $this->postJson("/api/v1/app/{$e['slug']}/registro-alumno/confirmar", ['email' => 'ana@correo.mx', 'token' => $token])->assertCreated();
-    $this->postJson("/api/v1/app/{$e['slug']}/registro-alumno/confirmar", ['email' => 'ana@correo.mx', 'token' => $token])->assertStatus(422);
-});
-
-it('una cuenta dada de baja no cambia de contraseña hasta que se confirma el correo', function (): void {
-    $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    alumnoConSesion($e, 'Vale', 'vale@correo.mx');
-    $persona = (string) $this->getJson("/api/v1/app/{$e['slug']}/miembros?q=Vale", conBearer($e['bearer']))->json('data.0.id');
-    $this->deleteJson("/api/v1/app/{$e['slug']}/miembros/{$persona}", [], conBearer($e['bearer']))->assertOk();
-
-    registrarseCon($e, 'vale@correo.mx', 'clave-del-atacante')->assertStatus(202);
-    // Sin confirmar, la cuenta sigue dada de baja y nadie entra con la clave nueva.
-    $this->postJson("/api/v1/app/{$e['slug']}/login", ['email' => 'vale@correo.mx', 'password' => 'clave-del-atacante'])
-        ->assertStatus(422);
-
-    $this->postJson("/api/v1/app/{$e['slug']}/registro-alumno/confirmar", [
-        'email' => 'vale@correo.mx', 'token' => tokenDeRegistro('vale@correo.mx'),
-    ])->assertCreated()->assertJsonPath('data.persona_id', $persona);
-    $this->postJson("/api/v1/app/{$e['slug']}/login", ['email' => 'vale@correo.mx', 'password' => 'clave-del-atacante'])->assertOk();
-});
-
-it('con un correo nuevo entra de una vez', function (): void {
-    $e = estudioConSesion('estudio-a', 'a@correo.mx');
-
-    registrarseCon($e, 'nueva@correo.mx')->assertCreated()->assertJsonStructure(['data' => ['token', 'persona_id']]);
-    Mail::assertNotQueued(CorreoConfirmarRegistro::class);
+    $cuenta = alumnoConSesion($e, 'Ana', 'ana@correo.mx');
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/formularios", conBearer($cuenta['bearer']))
+        ->assertOk()->assertJsonPath('data.persona_id', $ana);
+    expect(collect($this->getJson("/api/v1/app/{$e['slug']}/mi/perfil", conBearer($cuenta['bearer']))->json('data.derechos')))->toHaveCount(1);
 });
 
 it('la cita pública no reactiva a nadie, no cambia la ficha ni usa membresías', function (): void {

@@ -41,6 +41,8 @@ class UsuarioTenantPresenter
             'foto_url' => $usuario->fotoUrl(),
             // ¿Ya tiene contraseña? (quien entra solo con Google aún no).
             'tiene_contrasena' => $usuario->password !== null && $usuario->password !== '',
+            // ¿Conectó Google para entrar con él? (ADR 0093: se conecta desde el perfil).
+            'google_conectado' => $usuario->google_id !== null,
             // El rol con el que trabaja en esta sesión, sus permisos y los roles con
             // los que puede entrar (quien tiene varios elige y cambia).
             'rol' => $usuario->rolActivo() ?? $catalogo->principal($roles),

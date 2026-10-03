@@ -17,7 +17,11 @@ use Illuminate\Support\Str;
  */
 class ActivacionPropietario
 {
-    public function __construct(private readonly GestorDeConexionTenant $gestor) {}
+    public function __construct(
+        private readonly GestorDeConexionTenant $gestor,
+        private readonly PersonaDeUsuarioTenant $personas,
+        private readonly RegistrarEventoTenant $eventos,
+    ) {}
 
     /**
      * Genera (o refresca) el token de activación y devuelve el valor en claro
@@ -41,7 +45,7 @@ class ActivacionPropietario
      */
     public function activar(Estudio $estudio, string $email, string $token, string $password): Usuario
     {
-        return $this->gestor->ejecutarEn($estudio, function () use ($email, $token, $password): Usuario {
+        return $this->gestor->ejecutarEn($estudio, function () use ($estudio, $email, $token, $password): Usuario {
             $usuario = Usuario::query()->where('email', $email)->first();
 
             if ($usuario === null
@@ -56,6 +60,20 @@ class ActivacionPropietario
                 'activation_token' => null,
                 'email_verified_at' => now(),
             ])->save();
+
+            // Con el registro cerrado (ADR 0093), el negocio da de alta la ficha y
+            // después invita: al activar, la cuenta queda ligada a su ficha (así la
+            // baja del cliente también le cierra la sesión).
+            $persona = $this->personas->buscar($usuario);
+
+            // Un cliente que activa su cuenta recibe la bienvenida (plantilla
+            // `cuenta.creada`) con el enlace para entrar.
+            if ($persona !== null && array_diff($usuario->rolesEfectivos(), ['miembro']) === []) {
+                $this->eventos->registrar('cuenta.creada', 'persona', (string) $persona->ulid, [
+                    'persona_id' => (string) $persona->ulid,
+                    'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $estudio->slug),
+                ]);
+            }
 
             return $usuario;
         });

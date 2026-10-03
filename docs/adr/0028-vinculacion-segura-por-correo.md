@@ -1,6 +1,8 @@
 # ADR 0028 — Vinculación segura por correo (fase 1, punto 1.5)
 
 Estado: Aceptado (2026-09-25). Corrige parte del ADR 0022 ("el correo reactiva").
+El registro público de alumnos que describe se quitó en el ADR 0093 (registro cerrado);
+la regla de la cita pública sigue vigente.
 
 ## Contexto
 

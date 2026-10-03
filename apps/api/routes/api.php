@@ -81,7 +81,6 @@ use App\Modules\Tenancy\Http\Controllers\PublicoCitasController;
 use App\Modules\Tenancy\Http\Controllers\PuntoDeVentaTenantController;
 use App\Modules\Tenancy\Http\Controllers\RecursosTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReembolsosTenantController;
-use App\Modules\Tenancy\Http\Controllers\RegistroAlumnoController;
 use App\Modules\Tenancy\Http\Controllers\RegistroEstudioController;
 use App\Modules\Tenancy\Http\Controllers\RegistroWhatsAppController;
 use App\Modules\Tenancy\Http\Controllers\ReporteCohortesTenantController;
@@ -218,13 +217,11 @@ Route::prefix('v1')->group(function (): void {
         // acceso (sin auth). Con throttle para mitigar sondeo de slugs.
         Route::get('/marca', [MarcaEstudioController::class, 'mostrar'])->middleware('throttle:60,1')->name('marca');
 
-        // Embudo público (P0 #3): escaparate del estudio (identidad, próximas clases,
-        // precios, instructores, ubicación) y registro público de alumno (self-signup
-        // → auto-login). Sin auth; solo estudios listados en el directorio. Con throttle.
+        // Escaparate público (P0 #3): identidad, próximas clases, precios, instructores
+        // y ubicación. Sin auth; solo con la página pública abierta. Con throttle.
+        // Registro cerrado (ADR 0093): los clientes no crean su cuenta; el negocio los
+        // da de alta y los invita. Agendar sin cuenta sigue en /citas.
         Route::get('/escaparate', EscaparateController::class)->middleware('throttle:60,1')->name('escaparate');
-        Route::post('/registro-alumno', RegistroAlumnoController::class)->middleware('throttle:login')->name('registro-alumno');
-        // Confirmar el registro cuyo correo ya era de alguien en el negocio (enlace del correo).
-        Route::post('/registro-alumno/confirmar', [RegistroAlumnoController::class, 'confirmar'])->middleware('throttle:login')->name('registro-alumno.confirmar');
 
         // Citas públicas (guest, sin cuenta): opciones (servicios/sucursales/barberos)
         // y disponibilidad para elegir hueco; luego agendar y pagar en línea (el
@@ -246,6 +243,9 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware(['estudio.auth', 'throttle:tenant'])->group(function (): void {
             Route::get('/yo', [AuthTenantController::class, 'yo'])->name('yo');
             Route::put('/yo/rol-activo', [AuthTenantController::class, 'rolActivo'])->name('yo.rol-activo');
+            // Conectar o quitar Google para entrar con él (ADR 0093: Google no registra).
+            Route::put('/yo/google', [AuthTenantController::class, 'conectarGoogle'])->middleware('throttle:login')->name('yo.google.conectar');
+            Route::delete('/yo/google', [AuthTenantController::class, 'desconectarGoogle'])->name('yo.google.desconectar');
             Route::get('/yo/calendario', [CalendarioTenantController::class, 'enlace'])->name('yo.calendario');
             Route::post('/yo/calendario/regenerar', [CalendarioTenantController::class, 'regenerar'])->name('yo.calendario.regenerar');
             // Apariencia personal (tema y colores propios), guardada en la cuenta.

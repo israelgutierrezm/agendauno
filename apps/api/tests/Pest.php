@@ -3,13 +3,11 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Integraciones\ResolvedorDns;
-use App\Modules\Tenancy\Mail\CorreoConfirmarRegistro;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 /*
@@ -66,16 +64,24 @@ function conBearer(string $bearer): array
 }
 
 /**
- * Registra un alumno por el embudo público (self-signup) y devuelve su bearer
- * tenant-local. El estudio recién registrado ya está en el directorio.
+ * Un cliente con cuenta, como entra con el registro cerrado (ADR 0093): el negocio
+ * lo da de alta (si aún no tiene ficha con ese correo), lo invita y él activa su
+ * cuenta con el enlace. Devuelve su bearer tenant-local.
  *
  * @param  array{slug: string, bearer: string}  $e
  * @return array{slug: string, bearer: string}
  */
 function alumnoConSesion(array $e, string $nombre = 'Vale', string $email = 'vale@correo.mx'): array
 {
-    $token = (string) test()->postJson("/api/v1/app/{$e['slug']}/registro-alumno", [
-        'nombre' => $nombre, 'email' => $email,
+    // La ficha puede existir ya (alta en recepción): si el correo está ocupado, se usa esa.
+    test()->postJson("/api/v1/app/{$e['slug']}/miembros", [
+        'nombre' => $nombre, 'email' => $email, 'tipo' => 'miembro',
+    ], conBearer($e['bearer']));
+    $invitacion = test()->postJson("/api/v1/app/{$e['slug']}/usuarios/invitar", [
+        'nombre' => $nombre, 'email' => $email, 'rol' => 'miembro',
+    ], conBearer($e['bearer']))->assertCreated()->json('data.activacion');
+    $token = (string) test()->postJson("/api/v1/app/{$e['slug']}/activar", [
+        'email' => $invitacion['email'], 'token' => $invitacion['token'],
         'password' => 'secreto123', 'password_confirmation' => 'secreto123',
     ])->assertCreated()->json('data.token');
 
@@ -423,23 +429,6 @@ function cuentaDeServicioFcmDePrueba(): string
     config(['services.fcm.credenciales' => $dir.'/cuenta.json']);
 
     return (string) openssl_pkey_get_details($llave)['key'];
-}
-
-/**
- * El token del último correo de confirmación de registro enviado a ese correo.
- */
-function tokenDeRegistro(string $email): string
-{
-    $token = '';
-    Mail::assertQueued(CorreoConfirmarRegistro::class, function (CorreoConfirmarRegistro $correo) use ($email, &$token): bool {
-        if ($correo->email === $email) {
-            $token = $correo->token;
-        }
-
-        return $correo->email === $email;
-    });
-
-    return $token;
 }
 
 /**

@@ -6,7 +6,6 @@ use App\Modules\Tenancy\Application\MedirUsoSaas;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Testing\TestResponse;
 
 /*
@@ -55,16 +54,6 @@ function ultimoAsiento(array $e, string $accion): array
         ->assertOk()->json('data.0');
 }
 
-/**
- * @param  array{slug: string}  $e
- */
-function registrarAlumno(array $e, string $email, string $nombre = 'Vale', string $password = 'secreto123'): TestResponse
-{
-    return test()->postJson("/api/v1/app/{$e['slug']}/registro-alumno", [
-        'nombre' => $nombre, 'email' => $email, 'password' => $password, 'password_confirmation' => $password,
-    ]);
-}
-
 it('dar de baja a un alumno cierra lo vigente, conserva su historial y queda en la bitácora con quién lo hizo', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $a = alumnoConSesion($e, 'Vale', 'vale@correo.mx');
@@ -103,8 +92,7 @@ it('dar de baja a un alumno cierra lo vigente, conserva su historial y queda en 
         ->and($asiento['antes']['email'])->toBe('vale@correo.mx');
 });
 
-it('si vuelve a registrarse con su correo y lo confirma, se reactiva con su historial en lugar de duplicarse', function (): void {
-    Mail::fake();
+it('si el negocio lo reactiva, vuelve a entrar con su cuenta y su historial en lugar de duplicarse', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $a = alumnoConSesion($e, 'Vale', 'vale@correo.mx');
     $persona = (string) collect($this->getJson("/api/v1/app/{$e['slug']}/miembros", conBearer($e['bearer']))->json('data'))->value('id');
@@ -113,31 +101,26 @@ it('si vuelve a registrarse con su correo y lo confirma, se reactiva con su hist
     ], conBearer($a['bearer']))->assertCreated()->json('data.id');
     $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
     $this->deleteJson("/api/v1/app/{$e['slug']}/miembros/{$persona}", [], conBearer($e['bearer']))->assertOk();
+    // Dado de baja, no entra (y no puede volver a registrarse solo: ADR 0093).
+    $this->postJson("/api/v1/app/{$e['slug']}/login", ['email' => 'vale@correo.mx', 'password' => 'secreto123'])->assertStatus(422);
 
-    // Su correo ya tenía historial: primero confirma que es suyo.
-    registrarAlumno($e, 'vale@correo.mx', 'Valeria', 'otra-clave-123')->assertStatus(202);
-    $nueva = $this->postJson("/api/v1/app/{$e['slug']}/registro-alumno/confirmar", [
-        'email' => 'vale@correo.mx', 'token' => tokenDeRegistro('vale@correo.mx'),
-    ])->assertCreated()->json('data');
+    $this->postJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/reactivar", [], conBearer($e['bearer']))->assertOk();
 
-    expect($nueva['persona_id'])->toBe($persona)
-        ->and(idsDeMiembros($e))->toBe([$persona]);
-    // Entra con su nueva contraseña y ve su historial.
-    $this->getJson("/api/v1/app/{$e['slug']}/mi/ordenes", conBearer($nueva['token']))
+    expect(idsDeMiembros($e))->toBe([$persona]);
+    $token = (string) $this->postJson("/api/v1/app/{$e['slug']}/login", ['email' => 'vale@correo.mx', 'password' => 'secreto123'])
+        ->assertOk()->json('data.token');
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/ordenes", conBearer($token))
         ->assertOk()->assertJsonPath('data.0.id', $orden)->assertJsonPath('data.0.estado', 'pagada');
-    $this->postJson("/api/v1/app/{$e['slug']}/login", ['email' => 'vale@correo.mx', 'password' => 'otra-clave-123'])->assertOk();
     expect(ultimoAsiento($e, 'miembro.reactivado')['entidad_id'])->toBe($persona);
 });
 
-it('un alumno que dio de alta recepción y después se registra (confirmando su correo) queda ligado a su ficha', function (): void {
-    Mail::fake();
+it('un alumno que dio de alta recepción y después invita a su cuenta queda ligado a su ficha', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $persona = (string) altaMiembro($e, ['nombre' => 'Ana', 'email' => 'ana@correo.mx'])->assertCreated()->json('data.id');
 
-    registrarAlumno($e, 'ana@correo.mx', 'Ana')->assertStatus(202);
-    $this->postJson("/api/v1/app/{$e['slug']}/registro-alumno/confirmar", [
-        'email' => 'ana@correo.mx', 'token' => tokenDeRegistro('ana@correo.mx'),
-    ])->assertCreated()->assertJsonPath('data.persona_id', $persona);
+    $cuenta = alumnoConSesion($e, 'Ana', 'ana@correo.mx');
+    $this->getJson("/api/v1/app/{$e['slug']}/mi/formularios", conBearer($cuenta['bearer']))
+        ->assertOk()->assertJsonPath('data.persona_id', $persona);
 
     expect(idsDeMiembros($e))->toBe([$persona]);
 });
@@ -206,7 +189,7 @@ it('nadie puede darse de baja a sí mismo ni dejar al negocio sin dueño', funct
         ->assertJsonPath('code', 'DEACTIVATION_NOT_ALLOWED');
 });
 
-it('quien canceló sus datos (ARCO) no se reactiva: si vuelve, es un registro nuevo', function (): void {
+it('quien canceló sus datos (ARCO) no se reactiva: si vuelve, el negocio lo da de alta como nuevo', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $a = alumnoConSesion($e, 'Vale', 'vale@correo.mx');
     $persona = (string) collect($this->getJson("/api/v1/app/{$e['slug']}/miembros", conBearer($e['bearer']))->json('data'))->value('id');
@@ -217,8 +200,8 @@ it('quien canceló sus datos (ARCO) no se reactiva: si vuelve, es un registro nu
     $this->postJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/reactivar", [], conBearer($e['bearer']))
         ->assertStatus(422)->assertJsonPath('code', 'DEACTIVATION_NOT_ALLOWED');
 
-    $nueva = registrarAlumno($e, 'vale@correo.mx')->assertCreated()->json('data');
-    expect($nueva['persona_id'])->not->toBe($persona);
+    $nueva = (string) altaMiembro($e, ['nombre' => 'Vale', 'email' => 'vale@correo.mx'])->assertCreated()->json('data.id');
+    expect($nueva)->not->toBe($persona);
 });
 
 it('un alumno dado de baja a mitad de mes sigue contando en el cobro de ese mes', function (): void {

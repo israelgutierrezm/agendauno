@@ -556,6 +556,14 @@ onMounted(async () => {
           </form>
         </template>
 
+        <!-- Registro cerrado (ADR 0093): las cuentas de un negocio las crea el negocio. -->
+        <p
+          v-if="marca"
+          class="tu-login-registro"
+          data-prueba="sin-cuenta-cliente"
+        >
+          {{ $t("entrar.sinCuentaCliente", { negocio: marca.nombre }) }}
+        </p>
         <p class="tu-login-registro">
           {{ $t("entrar.sinCuenta") }}
           <RouterLink class="tu-enlace" :to="{ name: 'registro' }">{{

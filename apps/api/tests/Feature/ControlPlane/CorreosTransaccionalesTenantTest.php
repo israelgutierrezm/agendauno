@@ -119,7 +119,7 @@ it('el recibo lleva el detalle, el total y el método de pago', function (): voi
         && str_contains($mail->cuerpoMensaje, 'Pagado con: Efectivo'));
 });
 
-it('da la bienvenida a quien crea su cuenta, con el enlace para entrar', function (): void {
+it('da la bienvenida al cliente que activa la cuenta a la que lo invitaron, con el enlace para entrar', function (): void {
     Mail::fake();
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     alumnoConSesion($e, 'Vale', 'vale@correo.mx');
