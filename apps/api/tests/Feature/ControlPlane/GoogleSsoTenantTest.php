@@ -112,6 +112,16 @@ it('rechaza un ID token cuyo aud no es esta app', function (): void {
         ->assertStatus(422)->assertJsonPath('code', 'GOOGLE_AUTH_FAILED');
 });
 
+it('acepta los ID tokens de la app móvil (su cliente de Android o iOS)', function (): void {
+    config()->set('services.google.client_ids_app', 'android-1.apps.googleusercontent.com, ios-1.apps.googleusercontent.com');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    googleTokeninfo('a@correo.mx', aud: 'ios-1.apps.googleusercontent.com');
+
+    $this->putJson("/api/v1/app/{$e['slug']}/yo/google", ['credential' => 't'], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.usuario.google_conectado', true);
+    $this->postJson("/api/v1/app/{$e['slug']}/auth/google", ['credential' => 't'])->assertOk();
+});
+
 it('rechaza Google si el correo no esta verificado', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     googleTokeninfo('a@correo.mx', verificado: false);

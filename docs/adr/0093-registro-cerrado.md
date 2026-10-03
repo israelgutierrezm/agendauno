@@ -54,6 +54,14 @@ negocio. En la app desaparece la pantalla de registro.
   el perfil.
 - El usuario trae `google_conectado`. Mi perfil tiene la sección «Entrar con Google».
 
+### En la app
+
+La app usa `google_sign_in`: «Conectar Google» y «Quitar Google» en Mi perfil, y
+«Entrar con Google» al entrar. Se activa al compilar con
+`GOOGLE_SERVER_CLIENT_ID` (y `GOOGLE_IOS_CLIENT_ID` en iOS). El API acepta también
+los clientes de Android e iOS (`GOOGLE_CLIENT_IDS_APP`). Los pasos están en
+`docs/GOOGLE_APP.md`.
+
 ## Consecuencias
 
 - Nadie puede crear una cuenta en un negocio sin que el negocio lo autorice. Conocer

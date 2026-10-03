@@ -8,8 +8,9 @@ use Illuminate\Support\Facades\Http;
 
 /**
  * Verificador de ID token de Google via el endpoint oficial `tokeninfo`: Google
- * valida firma y expiracion del token; aqui se confirma ademas que `aud` sea el
- * client_id de la app, que `iss` sea de Google y que el correo este verificado.
+ * valida firma y expiracion del token; aqui se confirma ademas que `aud` sea uno de
+ * los clientes de AgendaUno (la web o la app móvil, Android/iOS), que `iss` sea de
+ * Google y que el correo este verificado.
  * (Testeable con Http::fake, mismo patron que las pasarelas.)
  */
 class VerificadorGoogleTokeninfo implements VerificadorGoogle
@@ -18,9 +19,9 @@ class VerificadorGoogleTokeninfo implements VerificadorGoogle
 
     public function verificar(string $credential): ?IdentidadGoogle
     {
-        $clientId = (string) config('services.google.client_id');
+        $clientes = $this->clientes();
 
-        if ($credential === '' || $clientId === '') {
+        if ($credential === '' || $clientes === []) {
             return null;
         }
 
@@ -42,7 +43,8 @@ class VerificadorGoogleTokeninfo implements VerificadorGoogle
         $emailVerificado = isset($datos['email_verified'])
             && in_array($datos['email_verified'], [true, 'true', '1', 1], true);
 
-        if (! hash_equals($clientId, $aud) || ! in_array($iss, self::ISS_VALIDOS, true)) {
+        $audValido = array_filter($clientes, static fn (string $c): bool => hash_equals($c, $aud)) !== [];
+        if (! $audValido || ! in_array($iss, self::ISS_VALIDOS, true)) {
             return null;
         }
 
@@ -53,5 +55,20 @@ class VerificadorGoogleTokeninfo implements VerificadorGoogle
         $nombre = isset($datos['name']) && $datos['name'] !== '' ? (string) $datos['name'] : null;
 
         return new IdentidadGoogle($sub, $email, $emailVerificado, $nombre);
+    }
+
+    /**
+     * El cliente web y los de la app móvil configurados.
+     *
+     * @return list<string>
+     */
+    private function clientes(): array
+    {
+        $app = explode(',', (string) config('services.google.client_ids_app'));
+
+        return array_values(array_filter(
+            array_map('trim', [(string) config('services.google.client_id'), ...$app]),
+            static fn (string $c): bool => $c !== '',
+        ));
     }
 }

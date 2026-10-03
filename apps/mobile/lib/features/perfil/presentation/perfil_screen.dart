@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/google/google_auth.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
@@ -140,6 +141,43 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
             segundoApellido: _opcional(_segundoApellido),
           ),
       exito: 'Perfil actualizado.',
+    );
+    if (mounted) {
+      setState(() => _guardando = false);
+    }
+  }
+
+  /// Conecta Google (ADR 0093): desde entonces puede entrar con él.
+  Future<void> _conectarGoogle() async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _guardando = true);
+    try {
+      final token = await ref.read(googleAuthProvider).idToken();
+      if (token == null || !mounted) {
+        return;
+      }
+      await hacerConAviso(
+        context,
+        () => ref.read(sesionProvider.notifier).conectarGoogle(token),
+        exito: 'Listo: ya puedes entrar con Google.',
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('No se pudo conectar con Google.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _guardando = false);
+      }
+    }
+  }
+
+  Future<void> _quitarGoogle() async {
+    setState(() => _guardando = true);
+    await hacerConAviso(
+      context,
+      () => ref.read(sesionProvider.notifier).desconectarGoogle(),
+      exito: 'Quitaste Google: entra con tu correo y contraseña.',
     );
     if (mounted) {
       setState(() => _guardando = false);
@@ -514,6 +552,45 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
               ),
             ),
           ),
+          // Entrar con Google: se conecta aquí (Google no crea cuentas).
+          if (sesion.googleConectado ||
+              ref.watch(googleAuthProvider).disponible)
+            Card(
+              key: const Key('google'),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Entrar con Google',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      sesion.googleConectado
+                          ? 'Google conectado: puedes entrar con él en la app y en la web.'
+                          : 'Conecta tu cuenta de Google para entrar sin contraseña. '
+                                'Puede ser un Gmail distinto a tu correo de acceso.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 12),
+                    if (sesion.googleConectado)
+                      OutlinedButton(
+                        key: const Key('quitar-google'),
+                        onPressed: _guardando ? null : _quitarGoogle,
+                        child: const Text('Quitar Google'),
+                      )
+                    else
+                      FilledButton.tonal(
+                        key: const Key('conectar-google'),
+                        onPressed: _guardando ? null : _conectarGoogle,
+                        child: const Text('Conectar Google'),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           Card(
             child: ListTile(
               leading: const Icon(Icons.calendar_month_outlined),

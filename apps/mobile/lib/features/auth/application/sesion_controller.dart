@@ -24,8 +24,50 @@ class SesionController extends Notifier<Sesion?> {
       '/api/v1/app/$slug/login',
       data: {'email': email, 'password': password},
     );
+    await _entrar(slug, res.data);
+  }
 
-    final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
+  /// Entra con Google: solo a una cuenta que ya conectó Google desde su perfil
+  /// (Google no crea ni activa cuentas, ADR 0093).
+  Future<void> iniciarConGoogle(String slug, String idToken) async {
+    final res = await ref
+        .read(dioProvider)
+        .post<Map<String, dynamic>>(
+          '/api/v1/app/$slug/auth/google',
+          data: {'credential': idToken},
+        );
+    await _entrar(slug, res.data);
+  }
+
+  /// Conecta Google a la cuenta con la que se entró (puede ser otro Gmail).
+  Future<void> conectarGoogle(String idToken) async {
+    final actual = state;
+    if (actual == null) {
+      return;
+    }
+    final res = await ref
+        .read(dioProvider)
+        .put<Map<String, dynamic>>(
+          '/api/v1/app/${actual.slug}/yo/google',
+          data: {'credential': idToken},
+        );
+    await _reflejarUsuario(actual, res.data);
+  }
+
+  /// Quita Google: vuelve a entrar con su correo y contraseña.
+  Future<void> desconectarGoogle() async {
+    final actual = state;
+    if (actual == null) {
+      return;
+    }
+    final res = await ref
+        .read(dioProvider)
+        .delete<Map<String, dynamic>>('/api/v1/app/${actual.slug}/yo/google');
+    await _reflejarUsuario(actual, res.data);
+  }
+
+  Future<void> _entrar(String slug, Map<String, dynamic>? cuerpo) async {
+    final data = (cuerpo?['data'] ?? {}) as Map<String, dynamic>;
     final bearer = (data['token'] ?? '') as String;
     final usuario = (data['usuario'] ?? {}) as Map<String, dynamic>;
     final estudio = data['estudio'] as Map<String, dynamic>?;

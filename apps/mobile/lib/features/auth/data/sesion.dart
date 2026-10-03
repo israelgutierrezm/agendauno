@@ -136,6 +136,7 @@ class Sesion {
     this.emailPendiente,
     this.fotoUrl,
     this.tieneContrasena = true,
+    this.googleConectado = false,
     this.modalidad = Modalidad.clases,
     this.terminologia = const Terminologia(),
     this.estudioNombre,
@@ -163,6 +164,9 @@ class Sesion {
   final String? emailPendiente;
   final String? fotoUrl;
   final bool tieneContrasena;
+
+  /// Conectó Google para entrar con él (se conecta desde su perfil, ADR 0093).
+  final bool googleConectado;
   final Modalidad modalidad;
   final Terminologia terminologia;
 
@@ -212,6 +216,7 @@ class Sesion {
     'email_pendiente': emailPendiente,
     'foto_url': fotoUrl,
     'tiene_contrasena': tieneContrasena,
+    'google_conectado': googleConectado,
     'modalidad': modalidad.name,
     'terminologia': terminologia.aJson(),
     'estudio_nombre': estudioNombre,
@@ -243,6 +248,7 @@ class Sesion {
       emailPendiente: datos['email_pendiente'] as String?,
       fotoUrl: datos['foto_url'] as String?,
       tieneContrasena: (datos['tiene_contrasena'] ?? true) as bool,
+      googleConectado: (datos['google_conectado'] ?? false) as bool,
       modalidad: Modalidad.desde(datos['modalidad']),
       terminologia: Terminologia.desdeJson(
         datos['terminologia'] as Map<String, dynamic>?,
@@ -274,6 +280,7 @@ class Sesion {
       emailPendiente: usuario['email_pendiente'] as String?,
       fotoUrl: usuario['foto_url'] as String?,
       tieneContrasena: (usuario['tiene_contrasena'] ?? true) as bool,
+      googleConectado: (usuario['google_conectado'] ?? false) as bool,
       modalidad: Modalidad.desde(config?['modalidad']),
       terminologia: Terminologia.desdeJson(
         config?['terminologia'] as Map<String, dynamic>?,
@@ -286,41 +293,43 @@ class Sesion {
   /// La misma sesión con los datos de usuario que devuelve el servidor (p. ej. tras
   /// editar el perfil o cambiar de rol), conservando el estudio y la configuración
   /// del negocio.
-  Sesion conUsuario(Map<String, dynamic> usuario, {bool? eligiendoRol}) =>
-      Sesion(
-        slug: slug,
-        bearer: bearer,
-        nombre: (usuario['nombre'] ?? nombre) as String,
-        rol: (usuario['rol'] ?? rol) as String,
-        roles: usuario.containsKey('roles') ? _textos(usuario['roles']) : roles,
-        rolesDisponibles: usuario.containsKey('roles_disponibles')
-            ? RolDisponible.lista(usuario['roles_disponibles'])
-            : rolesDisponibles,
-        eligiendoRol: eligiendoRol ?? this.eligiendoRol,
-        permisos: usuario.containsKey('permisos')
-            ? _textos(usuario['permisos'])
-            : permisos,
-        nombrePila: usuario['nombre_pila'] as String? ?? nombrePila,
-        primerApellido: usuario.containsKey('primer_apellido')
-            ? usuario['primer_apellido'] as String?
-            : primerApellido,
-        segundoApellido: usuario.containsKey('segundo_apellido')
-            ? usuario['segundo_apellido'] as String?
-            : segundoApellido,
-        email: usuario['email'] as String? ?? email,
-        emailPendiente: usuario.containsKey('email_pendiente')
-            ? usuario['email_pendiente'] as String?
-            : emailPendiente,
-        fotoUrl: usuario.containsKey('foto_url')
-            ? usuario['foto_url'] as String?
-            : fotoUrl,
-        tieneContrasena:
-            (usuario['tiene_contrasena'] ?? tieneContrasena) as bool,
-        modalidad: modalidad,
-        terminologia: terminologia,
-        estudioNombre: estudioNombre,
-        perfil: perfil,
-      );
+  Sesion conUsuario(
+    Map<String, dynamic> usuario, {
+    bool? eligiendoRol,
+  }) => Sesion(
+    slug: slug,
+    bearer: bearer,
+    nombre: (usuario['nombre'] ?? nombre) as String,
+    rol: (usuario['rol'] ?? rol) as String,
+    roles: usuario.containsKey('roles') ? _textos(usuario['roles']) : roles,
+    rolesDisponibles: usuario.containsKey('roles_disponibles')
+        ? RolDisponible.lista(usuario['roles_disponibles'])
+        : rolesDisponibles,
+    eligiendoRol: eligiendoRol ?? this.eligiendoRol,
+    permisos: usuario.containsKey('permisos')
+        ? _textos(usuario['permisos'])
+        : permisos,
+    nombrePila: usuario['nombre_pila'] as String? ?? nombrePila,
+    primerApellido: usuario.containsKey('primer_apellido')
+        ? usuario['primer_apellido'] as String?
+        : primerApellido,
+    segundoApellido: usuario.containsKey('segundo_apellido')
+        ? usuario['segundo_apellido'] as String?
+        : segundoApellido,
+    email: usuario['email'] as String? ?? email,
+    emailPendiente: usuario.containsKey('email_pendiente')
+        ? usuario['email_pendiente'] as String?
+        : emailPendiente,
+    fotoUrl: usuario.containsKey('foto_url')
+        ? usuario['foto_url'] as String?
+        : fotoUrl,
+    tieneContrasena: (usuario['tiene_contrasena'] ?? tieneContrasena) as bool,
+    googleConectado: (usuario['google_conectado'] ?? googleConectado) as bool,
+    modalidad: modalidad,
+    terminologia: terminologia,
+    estudioNombre: estudioNombre,
+    perfil: perfil,
+  );
 
   static List<String> _textos(Object? valor) => valor is List
       ? valor.whereType<String>().toList(growable: false)

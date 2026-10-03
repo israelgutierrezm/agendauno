@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/google/google_auth.dart';
 import '../application/sesion_controller.dart';
 
 /// Acceso tenant-local: el usuario escribe la direccion de su estudio (slug) y sus
@@ -53,6 +54,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  /// Entra con Google: solo a una cuenta de este negocio que ya lo conectó desde su
+  /// perfil (ADR 0093).
+  Future<void> _entrarConGoogle() async {
+    final slug = _slug.text.trim();
+    if (slug.isEmpty) {
+      setState(() => _error = 'Escribe primero la dirección del negocio.');
+      return;
+    }
+    setState(() {
+      _cargando = true;
+      _error = null;
+    });
+    try {
+      final token = await ref.read(googleAuthProvider).idToken();
+      if (token == null) {
+        return;
+      }
+      await ref.read(sesionProvider.notifier).iniciarConGoogle(slug, token);
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      setState(() {
+        _error = (data is Map && data['message'] is String)
+            ? data['message'] as String
+            : 'No se pudo entrar con Google.';
+      });
+    } catch (_) {
+      setState(() => _error = 'No se pudo entrar con Google.');
+    } finally {
+      if (mounted) {
+        setState(() => _cargando = false);
+      }
+    }
+  }
+
   /// Pide el enlace de recuperación con el negocio y el correo escritos (o los que
   /// se capturen en el diálogo). El enlace llega por correo y se abre en la web.
   Future<void> _recuperar() async {
@@ -65,11 +100,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Te enviaremos un enlace para elegir una contraseña nueva.'),
+            const Text(
+              'Te enviaremos un enlace para elegir una contraseña nueva.',
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: slug,
-              decoration: const InputDecoration(labelText: 'Dirección del negocio'),
+              decoration: const InputDecoration(
+                labelText: 'Dirección del negocio',
+              ),
               autocorrect: false,
             ),
             const SizedBox(height: 12),
@@ -82,8 +121,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Enviar enlace')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Enviar enlace'),
+          ),
         ],
       ),
     );
@@ -96,10 +141,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(sesionProvider.notifier).pedirRecuperacion(datos.$1, datos.$2);
+      await ref
+          .read(sesionProvider.notifier)
+          .pedirRecuperacion(datos.$1, datos.$2);
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Si ese correo tiene cuenta, te llegará un enlace en unos minutos.'),
+          content: Text(
+            'Si ese correo tiene cuenta, te llegará un enlace en unos minutos.',
+          ),
         ),
       );
     } on DioException catch (e) {
@@ -129,13 +178,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('AgendaUno',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                      textAlign: TextAlign.center),
+                  Text(
+                    'AgendaUno',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 4),
-                  Text('Entra a tu negocio',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                      textAlign: TextAlign.center),
+                  Text(
+                    'Entra a tu negocio',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 24),
                   TextField(
                     controller: _slug,
@@ -167,8 +220,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                   if (_error != null) ...[
-                    Text(_error!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                    Text(
+                      _error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                   ],
                   FilledButton(
@@ -181,6 +238,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           )
                         : const Text('Entrar'),
                   ),
+                  if (ref.watch(googleAuthProvider).disponible) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      key: const Key('entrar-google'),
+                      onPressed: _cargando ? null : _entrarConGoogle,
+                      child: const Text('Entrar con Google'),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   // Registro cerrado (ADR 0093): las cuentas las crea el negocio.
                   Text(

@@ -36,6 +36,9 @@ return [
     */
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
+        // Clientes OAuth de la app móvil (Android, iOS), separados por coma: sus ID
+        // tokens traen su propio `aud` (ADR 0093).
+        'client_ids_app' => env('GOOGLE_CLIENT_IDS_APP', ''),
     ],
 
     /*
