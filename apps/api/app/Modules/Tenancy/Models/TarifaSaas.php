@@ -17,8 +17,9 @@ use Illuminate\Support\Carbon;
  * `definicion` (dinero en minor, sin IVA):
  * - clases: `bandas` [{hasta|null, monto_minor}] por alumnos activos (la última = techo).
  * - citas: `tramos` [{hasta|null, unitario_minor}] marginales por profesional activo,
- *   más `personas_incluidas_por_profesional`, `tope_personas_incluidas`,
- *   `extra_por_persona_minor` y `horas_medio_tiempo`.
+ *   más `personas_incluidas_por_profesional`, `tope_personas_incluidas` y
+ *   `extra_por_persona_minor`. Cada profesional cuenta completo (ADR 0094); las
+ *   versiones anteriores pueden traer `horas_medio_tiempo`, que ya no se usa.
  * - ambas: `dias_prueba`, `iva_porcentaje`.
  *
  * @property ModalidadServicio $modalidad

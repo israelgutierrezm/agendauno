@@ -11,7 +11,7 @@ export default {
     ayudaClases:
       "Cuenta a quien reservó una clase o compró algo en el mes. Quien no vino ni pagó, no cuenta.",
     ayudaCitas:
-      "Cuenta a cada profesional que atendió en el mes (medio tiempo cuenta 0.5). Incluye 10 personas en clases o talleres por profesional.",
+      "Cuenta a cada profesional que atendió al menos una cita o clase en el mes. Incluye 10 personas en clases o talleres por profesional.",
     ayudaFijo: "Monto acordado con AgendaUno: {monto} al mes, IVA incluido.",
     pruebaHasta: "Prueba gratis hasta el {fecha}: esos días no se cobran.",
     mesVencido: "Se cobra al cerrar el mes, con lo que realmente usaste.",
@@ -21,7 +21,6 @@ export default {
     estimado: "Estimado con IVA",
     alumnos_activos: "alumnos activos",
     profesionales_activos: "profesionales activos",
-    equivalentes: "{n} equivalentes de tiempo completo",
     fueraDeCita: "{n} personas en clases o talleres",
     sinCargo: "Sin cargo este mes por ahora.",
   },
@@ -38,7 +37,6 @@ export default {
     ocultar: "Ocultar",
     titulo: "Quién cuenta este mes",
     nadie: "Nadie cuenta todavía este mes.",
-    medioTiempo: "Medio tiempo",
     sesiones: "{n} citas o clases",
   },
   historial: {
@@ -67,7 +65,6 @@ export default {
     incluidas: "Personas incluidas por profesional",
     tope: "Tope de personas incluidas",
     extra: "Precio por persona adicional",
-    medioTiempo: "Medio tiempo: menos de (horas/semana)",
     publicar: "Publicar versión nueva",
     publicando: "Publicando…",
     publicada: "Se publicó la versión {n}.",

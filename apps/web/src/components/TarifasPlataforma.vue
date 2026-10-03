@@ -20,7 +20,6 @@ interface Definicion {
   personas_incluidas_por_profesional?: number;
   tope_personas_incluidas?: number;
   extra_por_persona_minor?: number;
-  horas_medio_tiempo?: number;
 }
 interface Tarifa {
   id: string;
@@ -36,7 +35,6 @@ interface Borrador {
   incluidas: number;
   tope: number;
   extra: string;
-  horas: number;
 }
 
 const MODALIDADES = ["clases", "citas"] as const;
@@ -84,7 +82,6 @@ function borradorDe(tarifa: Tarifa | null, modalidad: Modalidad): Borrador {
     incluidas: d?.personas_incluidas_por_profesional ?? 10,
     tope: d?.tope_personas_incluidas ?? 100,
     extra: pesos(d?.extra_por_persona_minor ?? 900),
-    horas: d?.horas_medio_tiempo ?? 20,
   };
 }
 
@@ -147,7 +144,6 @@ async function publicar(m: Modalidad): Promise<void> {
           personas_incluidas_por_profesional: b.incluidas,
           tope_personas_incluidas: b.tope,
           extra_por_persona_minor: aMinor(b.extra),
-          horas_medio_tiempo: b.horas,
         };
   try {
     const { data } = await cliente().post<{ data: Tarifa }>(
@@ -320,17 +316,6 @@ onMounted(cargar);
                   type="number"
                   min="0"
                   step="0.01"
-                />
-              </label>
-              <label class="block">
-                <span class="tu-label">{{
-                  $t("cobro.tarifas.medioTiempo")
-                }}</span>
-                <input
-                  v-model.number="borradores[m]!.horas"
-                  class="tu-input"
-                  type="number"
-                  min="1"
                 />
               </label>
             </template>

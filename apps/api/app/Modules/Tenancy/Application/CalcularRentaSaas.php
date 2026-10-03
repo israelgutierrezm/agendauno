@@ -6,9 +6,9 @@ namespace App\Modules\Tenancy\Application;
 
 /**
  * Calcula el cargo mensual del SaaS a partir del uso medido y de la tarifa vigente
- * (ADR 0019). Puro y determinista; dinero en minor (enteros) y cantidades
- * fraccionarias en milésimas — nunca float. Devuelve un DESGLOSE legible (líneas
- * + subtotal + IVA + total) que se guarda con el cargo y se muestra al dueño.
+ * (ADR 0019). Puro y determinista; dinero en minor (enteros), nunca float.
+ * Devuelve un DESGLOSE legible (líneas + subtotal + IVA + total) que se guarda con
+ * el cargo y se muestra al dueño.
  *
  * @phpstan-type Linea array{concepto: string, detalle: string, importe_minor: int}
  * @phpstan-type Desglose array{lineas: list<Linea>, subtotal_minor: int, iva_porcentaje: int, iva_minor: int, total_minor: int, prorrateo?: array{dias_cobrables: int, dias_periodo: int}}
@@ -45,32 +45,32 @@ class CalcularRentaSaas
     }
 
     /**
-     * Citas: precio MARGINAL por profesional activo (el 1º cuesta más que el 2º, etc.),
-     * con equivalentes de tiempo completo en milésimas (medio tiempo = 500). Más la
-     * regla híbrida: cada profesional incluye N personas atendidas fuera de cita (hasta
-     * un tope); las personas adicionales se cobran por unidad.
+     * Citas: precio MARGINAL por profesional activo (el 1º cuesta más que el 2º, etc.).
+     * Cada profesional cuenta completo, sin importar sus horas (ADR 0094). Más la regla
+     * híbrida: cada profesional incluye N personas atendidas fuera de cita (hasta un
+     * tope); las personas adicionales se cobran por unidad.
      *
      * @param  array<string, mixed>  $definicion
      * @return Desglose
      */
-    public function citas(array $definicion, int $fteMilesimas, int $personasFueraDeCita): array
+    public function citas(array $definicion, int $profesionales, int $personasFueraDeCita): array
     {
         $lineas = [];
-        $restante = max(0, $fteMilesimas);
+        $restante = max(0, $profesionales);
         $previo = 0;
         foreach ($this->lista($definicion['tramos'] ?? []) as $tramo) {
             if ($restante <= 0) {
                 break;
             }
             $hasta = isset($tramo['hasta']) ? (int) $tramo['hasta'] : null;
-            $capacidad = $hasta === null ? $restante : max(0, ($hasta - $previo) * 1000);
+            $capacidad = $hasta === null ? $restante : max(0, $hasta - $previo);
             $tomado = min($restante, $capacidad);
             $unitario = (int) ($tramo['unitario_minor'] ?? 0);
             if ($tomado > 0 && $unitario > 0) {
                 $lineas[] = [
-                    'concepto' => 'Profesionales '.$this->rango($previo + 1, $hasta).': '.$this->equivalentes($tomado),
+                    'concepto' => 'Profesionales '.$this->rango($previo + 1, $hasta).': '.$tomado,
                     'detalle' => 'Precio por profesional en este tramo',
-                    'importe_minor' => intdiv($tomado * $unitario, 1000),
+                    'importe_minor' => $tomado * $unitario,
                 ];
             }
             $restante -= $tomado;
@@ -79,7 +79,7 @@ class CalcularRentaSaas
 
         $porProfesional = (int) ($definicion['personas_incluidas_por_profesional'] ?? 0);
         $tope = (int) ($definicion['tope_personas_incluidas'] ?? 0);
-        $incluidas = min(intdiv(max(0, $fteMilesimas) * $porProfesional, 1000), $tope);
+        $incluidas = min(max(0, $profesionales) * $porProfesional, $tope);
         $extra = max(0, $personasFueraDeCita - $incluidas);
         if ($extra > 0) {
             $lineas[] = [
@@ -173,16 +173,5 @@ class CalcularRentaSaas
         }
 
         return $desde === $hasta ? $desde.'º' : $desde.'º a '.$hasta.'º';
-    }
-
-    /**
-     * Milésimas → texto ("2", "2.5").
-     */
-    private function equivalentes(int $milesimas): string
-    {
-        $entero = intdiv($milesimas, 1000);
-        $resto = $milesimas % 1000;
-
-        return $resto === 0 ? (string) $entero : $entero.'.'.rtrim(str_pad((string) $resto, 3, '0', STR_PAD_LEFT), '0');
     }
 }

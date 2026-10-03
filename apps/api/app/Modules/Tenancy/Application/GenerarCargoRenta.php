@@ -98,7 +98,7 @@ class GenerarCargoRenta
             $tarifa = TarifaSaas::vigenteEn($modalidad, $tarifaAl ?? CarbonImmutable::now());
             $definicion = $tarifa->definicion ?? [];
             $desglose = $modalidad === ModalidadServicio::Citas
-                ? $this->calcular->citas($definicion, (int) ($detalle['fte_milesimas'] ?? $cantidad * 1000), (int) ($detalle['personas_fuera_de_cita'] ?? 0))
+                ? $this->calcular->citas($definicion, $cantidad, (int) ($detalle['personas_fuera_de_cita'] ?? 0))
                 : $this->calcular->clases($definicion, $cantidad);
             $version = $tarifa?->version;
         }

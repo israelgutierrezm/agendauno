@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\File;
 /*
 | Cobro del SaaS por modalidad (ADR 0019): estudios de clases pagan por ALUMNOS
 | ACTIVOS (con actividad en el mes); negocios de citas por PROFESIONALES ACTIVOS
-| (medio tiempo = 0.5) más personas atendidas fuera de cita. Tarifas versionadas,
+| (cada uno completo, ADR 0094) más personas atendidas fuera de cita. Tarifas versionadas,
 | cobro mes vencido con la medición congelada y sin cobrar la prueba gratis.
 */
 
@@ -73,7 +73,7 @@ it('clases: cobra la banda de alumnos activos del mes con IVA', function (): voi
         ->and($cargo['estado'])->toBe('pendiente');
 });
 
-it('citas: cobra por profesional activo, con medio tiempo a 0.5', function (): void {
+it('citas: cobra por profesional activo, completo sin importar sus horas', function (): void {
     $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
     $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
     terminarPrueba($e);
@@ -87,7 +87,7 @@ it('citas: cobra por profesional activo, con medio tiempo a 0.5', function (): v
     // Dos atienden este mes; el tercero no tiene sesiones y no cuenta.
     sesionDeHoyCon($e, $sede, $pros[0], '10:00');
     sesionDeHoyCon($e, $sede, $pros[1], '11:00');
-    // El segundo atiende 10 h a la semana: medio tiempo.
+    // El segundo atiende solo 10 h a la semana: aun así cuenta completo.
     $this->putJson("/api/v1/app/{$e['slug']}/horarios-atencion", [
         'instructor_id' => $pros[1], 'sucursal_id' => $sede['sucursal'],
         'horarios' => [
@@ -99,17 +99,17 @@ it('citas: cobra por profesional activo, con medio tiempo a 0.5', function (): v
     $periodo = emitirCargoDelMesEnCurso();
     $cargo = rentaDe($e)['cargos'][0];
 
-    // 1º completo ($269) + 2º a medio tiempo (0.5 × $226).
+    // 1º ($269) + 2º ($226).
     expect($cargo['metrica'])->toBe('profesionales_activos')
         ->and($cargo['cantidad'])->toBe(2)
-        ->and($cargo['desglose']['subtotal_minor'])->toBe(26900 + 11300);
+        ->and($cargo['desglose']['subtotal_minor'])->toBe(26900 + 22600);
 
-    // Transparencia: el dueño ve quién cuenta y quién es medio tiempo.
+    // Transparencia: el dueño ve quién cuenta.
     $quien = $this->getJson("/api/v1/app/{$e['slug']}/renta/quien-cuenta?periodo={$periodo}", conBearer($e['bearer']))->assertOk()->json('data');
     expect($quien['metrica'])->toBe('profesionales_activos')
         ->and($quien['quienes'])->toHaveCount(2)
-        ->and(collect($quien['quienes'])->where('medio_tiempo', true))->toHaveCount(1)
-        ->and($quien['detalle']['fte_milesimas'])->toBe(1500);
+        ->and($quien['quienes'][0])->not->toHaveKey('medio_tiempo')
+        ->and($quien['detalle'])->not->toHaveKey('fte_milesimas');
 });
 
 it('citas: las personas atendidas fuera de cita por encima de lo incluido se cobran', function (): void {
@@ -242,7 +242,7 @@ it('una tarifa sin techo o con topes desordenados se rechaza', function (): void
         'dias_prueba' => 14, 'iva_porcentaje' => 16,
         'tramos' => [['hasta' => 5, 'unitario_minor' => 100], ['hasta' => 3, 'unitario_minor' => 50], ['hasta' => null, 'unitario_minor' => 0]],
         'personas_incluidas_por_profesional' => 10, 'tope_personas_incluidas' => 100,
-        'extra_por_persona_minor' => 900, 'horas_medio_tiempo' => 20,
+        'extra_por_persona_minor' => 900,
     ], conPlataforma())->assertStatus(422)->assertJsonPath('meta.errors.tramos.0', 'Los topes deben ir de menor a mayor.');
 
     $this->getJson('/api/v1/plataforma/tarifas', ['Accept' => 'application/json'])->assertUnauthorized();

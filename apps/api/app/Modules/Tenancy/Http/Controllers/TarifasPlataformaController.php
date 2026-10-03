@@ -65,7 +65,6 @@ class TarifasPlataformaController
                 'personas_incluidas_por_profesional' => ['required', 'integer', 'min:0', 'max:10000'],
                 'tope_personas_incluidas' => ['required', 'integer', 'min:0', 'max:1000000'],
                 'extra_por_persona_minor' => ['required', 'integer', 'min:0', 'max:100000000'],
-                'horas_medio_tiempo' => ['required', 'integer', 'min:1', 'max:80'],
             ];
         $validado = $request->validate($reglas);
 
@@ -85,7 +84,6 @@ class TarifasPlataformaController
                 'personas_incluidas_por_profesional' => (int) $validado['personas_incluidas_por_profesional'],
                 'tope_personas_incluidas' => (int) $validado['tope_personas_incluidas'],
                 'extra_por_persona_minor' => (int) $validado['extra_por_persona_minor'],
-                'horas_medio_tiempo' => (int) $validado['horas_medio_tiempo'],
             ];
 
         // Versión siguiente bajo lock: dos publicaciones simultáneas no chocan.

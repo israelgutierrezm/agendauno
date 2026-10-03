@@ -46,7 +46,7 @@ interface Uso {
   periodo: string;
   metrica: string;
   cantidad: number;
-  detalle: { fte_milesimas?: number; personas_fuera_de_cita?: number };
+  detalle: { personas_fuera_de_cita?: number };
   desglose: Desglose;
   cargo_estimado_minor: number;
 }
@@ -67,7 +67,6 @@ interface QuienCuenta {
     id: string;
     nombre: string;
     sesiones?: number;
-    medio_tiempo?: boolean;
   }[];
 }
 interface RespuestaPago {
@@ -103,11 +102,6 @@ function fecha(iso: string): string {
   return new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(
     new Date(a, m - 1, d),
   );
-}
-function equivalentes(milesimas: number): string {
-  return (milesimas / 1000).toLocaleString("es-MX", {
-    maximumFractionDigits: 1,
-  });
 }
 
 const enPrueba = computed(() => {
@@ -357,17 +351,6 @@ onMounted(() => {
                 {{ $t(`cobro.actual.${renta.actual.metrica}`) }}
               </div>
               <div
-                v-if="renta.actual.detalle.fte_milesimas !== undefined"
-                class="text-xs"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{
-                  $t("cobro.actual.equivalentes", {
-                    n: equivalentes(renta.actual.detalle.fte_milesimas),
-                  })
-                }}
-              </div>
-              <div
                 v-if="(renta.actual.detalle.personas_fuera_de_cita ?? 0) > 0"
                 class="text-xs"
                 :style="{ color: 'var(--texto-suave)' }"
@@ -470,9 +453,6 @@ onMounted(() => {
                 }"
               >
                 {{ p.nombre }}
-                <span v-if="p.medio_tiempo" class="rt-suave">
-                  · {{ $t("cobro.quien.medioTiempo") }}</span
-                >
                 <span v-if="p.sesiones !== undefined" class="rt-suave">
                   · {{ $t("cobro.quien.sesiones", { n: p.sesiones }) }}</span
                 >

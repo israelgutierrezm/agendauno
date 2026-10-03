@@ -69,37 +69,41 @@ it('clases: arriba de la última banda se cobra el techo, y sin alumnos no hay c
 it('citas: precio marginal por profesional activo', function (): void {
     $calc = new CalcularRentaSaas;
 
-    expect($calc->citas(tarifaCitas(), 1000, 0)['subtotal_minor'])->toBe(26900);
-    expect($calc->citas(tarifaCitas(), 2000, 0)['subtotal_minor'])->toBe(49500);
-    expect($calc->citas(tarifaCitas(), 3000, 0)['subtotal_minor'])->toBe(63000);
+    expect($calc->citas(tarifaCitas(), 1, 0)['subtotal_minor'])->toBe(26900);
+    expect($calc->citas(tarifaCitas(), 2, 0)['subtotal_minor'])->toBe(49500);
+    expect($calc->citas(tarifaCitas(), 3, 0)['subtotal_minor'])->toBe(63000);
     // 12 = 269 + 226 + 8×135 + 2×89
-    expect($calc->citas(tarifaCitas(), 12000, 0)['subtotal_minor'])->toBe(175300);
+    expect($calc->citas(tarifaCitas(), 12, 0)['subtotal_minor'])->toBe(175300);
     // Del 21 en adelante no cuestan: 25 = 269 + 226 + 8×135 + 10×89
-    expect($calc->citas(tarifaCitas(), 25000, 0)['subtotal_minor'])->toBe(246500);
+    expect($calc->citas(tarifaCitas(), 25, 0)['subtotal_minor'])->toBe(246500);
     expect($calc->citas(tarifaCitas(), 0, 0)['total_minor'])->toBe(0);
 });
 
-it('citas: un profesional de medio tiempo cuenta como 0.5', function (): void {
-    $d = (new CalcularRentaSaas)->citas(tarifaCitas(), 2500, 0);
+it('citas: cada profesional cuenta completo, con una línea por tramo (ADR 0094)', function (): void {
+    $d = (new CalcularRentaSaas)->citas(tarifaCitas(), 4, 0);
 
-    // 269 + 226 + 0.5×135
-    expect($d['subtotal_minor'])->toBe(56250);
-    expect($d['lineas'][2]['concepto'])->toBe('Profesionales 3º a 10º: 0.5');
+    // 269 + 226 + 2×135
+    expect($d['subtotal_minor'])->toBe(76500);
+    expect(array_column($d['lineas'], 'concepto'))->toBe([
+        'Profesionales 1º: 1',
+        'Profesionales 2º: 1',
+        'Profesionales 3º a 10º: 2',
+    ]);
 });
 
 it('citas: regla híbrida — personas fuera de cita incluidas por profesional, con tope', function (): void {
     $calc = new CalcularRentaSaas;
 
     // 2 profesionales incluyen 20 personas; 26 atendidas → 6 adicionales × $9.
-    $d = $calc->citas(tarifaCitas(), 2000, 26);
+    $d = $calc->citas(tarifaCitas(), 2, 26);
     expect($d['subtotal_minor'])->toBe(49500 + 5400);
     expect(end($d['lineas'])['detalle'])->toBe('20 incluidas con tus profesionales; 6 adicionales');
 
     // Dentro de lo incluido no hay cargo extra.
-    expect($calc->citas(tarifaCitas(), 2000, 20)['subtotal_minor'])->toBe(49500);
+    expect($calc->citas(tarifaCitas(), 2, 20)['subtotal_minor'])->toBe(49500);
 
     // Tope de 100 incluidas aunque haya 15 profesionales (150 teóricas).
-    $tope = $calc->citas(tarifaCitas(), 15000, 130);
+    $tope = $calc->citas(tarifaCitas(), 15, 130);
     expect(end($tope['lineas'])['importe_minor'])->toBe(30 * 900);
 });
 

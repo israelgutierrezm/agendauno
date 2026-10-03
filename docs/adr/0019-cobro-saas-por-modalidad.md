@@ -21,7 +21,8 @@ negocios mixtos y precios 10% por debajo de la competencia.
   - Citas → **profesionales activos** (`profesionales-v1`): quienes atendieron al
     menos una sesión no cancelada en el mes. Con menos de `horas_medio_tiempo`
     (20 h) de atención semanal cuentan como medio tiempo (0.5). Cantidades en
-    milésimas, nunca float.
+    milésimas, nunca float. *Reemplazado por el ADR 0094: cada profesional cuenta
+    completo, sin medio tiempo (`profesionales-v2`).*
   - Regla híbrida (citas): cada profesional incluye 10 personas atendidas fuera de
     cita (clases/talleres), tope 100; cada persona adicional cuesta $9.
   - El conteo corre en la BD del tenant; al control plane solo sube el agregado.

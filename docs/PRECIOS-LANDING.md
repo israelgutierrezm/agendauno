@@ -8,7 +8,8 @@ Mantener dos modalidades, con las mismas herramientas dentro de cada modalidad,
 en lugar de inventar niveles Básico / Pro con restricciones que el sistema no aplica.
 
 - Estudios y academias: una banda mensual según alumnos activos.
-- Citas: suma marginal de profesionales equivalentes activos, considerando medio tiempo.
+- Citas: suma marginal de profesionales activos; cada profesional cuenta completo,
+  sin medio tiempo (ADR 0094).
 - Prueba de 30 días sin tarjeta.
 - Mostrar el precio base como importe principal y la leyenda «+ IVA» debajo.
   Los importes introductorios y las tablas también indican que se agrega IVA.
@@ -39,16 +40,15 @@ El umbral de 2,000 es comercial: no bloquea las reservas ni cambia automáticame
 el contrato de un negocio. Una propuesta aceptada debe configurarse con el modo de
 cuota fija existente; hasta entonces el cálculo por uso conserva su techo técnico.
 
-| Citas: profesionales equivalentes | Base | Total con IVA |
+| Citas: profesionales activos | Base | Total con IVA |
 | --- | ---: | ---: |
-| 0.5 (uno de medio tiempo) | $134.50 | $156.02 |
 | 1 | $269 | $312.04 |
 | 2 | $495 | $574.20 |
 | 3 | $630 | $730.80 |
 
 La landing explica los tramos adicionales, el tope del componente por profesionales
-y los cargos por personas en clases/talleres de un negocio de citas. El precio mínimo
-de medio tiempo nunca se anuncia sin indicar esa condición.
+y los cargos por personas en clases/talleres de un negocio de citas. El precio de
+entrada es el de un profesional: no hay precio de medio tiempo.
 
 ## Referencias de presentación
 
