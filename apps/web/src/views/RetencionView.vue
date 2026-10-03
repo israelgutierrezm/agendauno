@@ -193,29 +193,24 @@ onMounted(cargar);
         :titulo="$t('operacion.renovaciones.vacio')"
       />
       <div v-else class="mt-4 tu-card overflow-hidden">
-        <table class="w-full text-sm">
+        <table class="tu-tabla">
           <thead>
-            <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-              <th class="px-4 py-2 font-medium">
+            <tr>
+              <th>
                 {{ $t("retencion.colAlumno") }}
               </th>
-              <th class="px-4 py-2 font-medium">
+              <th>
                 {{ $t("retencion.colVence") }}
               </th>
-              <th class="px-4 py-2 font-medium hidden sm:table-cell">
+              <th class="hidden sm:table-cell">
                 {{ $t("retencion.colActividad") }}
               </th>
-              <th class="px-4 py-2 font-medium text-right"></th>
+              <th class="text-right"></th>
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="m in miembros"
-              :key="m.id"
-              class="border-t"
-              :style="{ borderColor: 'var(--borde)' }"
-            >
-              <td class="px-4 py-2">
+            <tr v-for="m in miembros" :key="m.id">
+              <td>
                 <RouterLink
                   :to="{ name: 'ficha-miembro', params: { id: m.id } }"
                   class="font-semibold tu-enlace"
@@ -228,7 +223,7 @@ onMounted(cargar);
                   >{{ m.email }}</span
                 >
               </td>
-              <td class="px-4 py-2">
+              <td>
                 <span
                   class="tu-badge"
                   :style="
@@ -251,12 +246,12 @@ onMounted(cargar);
                 >
               </td>
               <td
-                class="px-4 py-2 hidden sm:table-cell"
+                class="hidden sm:table-cell"
                 :style="{ color: 'var(--texto-suave)' }"
               >
                 {{ asistTexto(m) }}
               </td>
-              <td class="px-4 py-2 text-right whitespace-nowrap">
+              <td class="text-right whitespace-nowrap">
                 <a
                   v-if="m.email"
                   :href="`mailto:${m.email}`"

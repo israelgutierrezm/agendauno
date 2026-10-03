@@ -231,32 +231,27 @@ function descargarPlantilla(): void {
         </p>
 
         <div class="mt-4 tu-card overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="tu-tabla">
             <thead>
-              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                <th class="px-3 py-2 font-medium">#</th>
-                <th class="px-3 py-2 font-medium">
+              <tr>
+                <th>#</th>
+                <th>
                   {{ $t("importar.colNombre") }}
                 </th>
-                <th class="px-3 py-2 font-medium hidden sm:table-cell">
+                <th class="hidden sm:table-cell">
                   {{ $t("importar.colCorreo") }}
                 </th>
-                <th class="px-3 py-2 font-medium">
+                <th>
                   {{ $t("importar.colEstado") }}
                 </th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="f in preview.filas"
-                :key="f.fila"
-                class="border-t"
-                :style="{ borderColor: 'var(--borde)' }"
-              >
-                <td class="px-3 py-2" :style="{ color: 'var(--texto-suave)' }">
+              <tr v-for="f in preview.filas" :key="f.fila">
+                <td :style="{ color: 'var(--texto-suave)' }">
                   {{ f.fila }}
                 </td>
-                <td class="px-3 py-2 font-medium">
+                <td class="font-medium">
                   {{ texto(f.datos.nombre) }}
                   {{
                     texto(f.datos.primer_apellido) !== "—"
@@ -265,12 +260,12 @@ function descargarPlantilla(): void {
                   }}
                 </td>
                 <td
-                  class="px-3 py-2 hidden sm:table-cell"
+                  class="hidden sm:table-cell"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
                   {{ texto(f.datos.email) }}
                 </td>
-                <td class="px-3 py-2">
+                <td>
                   <span
                     v-if="f.errores.length === 0"
                     class="tu-badge tu-badge-exito"

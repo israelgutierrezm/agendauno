@@ -488,7 +488,9 @@ onMounted(cargar);
       </div>
 
       <!-- Canjes recientes -->
-      <h2 class="mt-8 font-medium text-lg">{{ $t("lealtad.canjes.titulo") }}</h2>
+      <h2 class="mt-8 font-medium text-lg">
+        {{ $t("lealtad.canjes.titulo") }}
+      </h2>
       <EstadoVacio
         v-if="canjes.length === 0"
         class="mt-3 py-6"
@@ -497,37 +499,32 @@ onMounted(cargar);
         :titulo="$t('lealtad.canjes.vacio')"
       />
       <div v-else class="mt-3 tu-card overflow-hidden">
-        <table class="w-full text-sm">
+        <table class="tu-tabla">
           <thead>
-            <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-              <th class="px-4 py-2 font-medium">
+            <tr>
+              <th>
                 {{ $t("lealtad.canjes.colMiembro") }}
               </th>
-              <th class="px-4 py-2 font-medium">
+              <th>
                 {{ $t("lealtad.canjes.colRecompensa") }}
               </th>
-              <th class="px-4 py-2 font-medium text-right">
+              <th class="text-right">
                 {{ $t("lealtad.puntos") }}
               </th>
-              <th class="px-4 py-2 font-medium">
+              <th>
                 {{ $t("lealtad.canjes.colEstado") }}
               </th>
-              <th class="px-4 py-2 font-medium text-right">
+              <th class="text-right">
                 {{ $t("lealtad.canjes.colAccion") }}
               </th>
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="c in canjes"
-              :key="c.id"
-              class="border-t"
-              :style="{ borderColor: 'var(--borde)' }"
-            >
-              <td class="px-4 py-2 font-semibold">{{ c.persona }}</td>
-              <td class="px-4 py-2">{{ c.recompensa }}</td>
-              <td class="px-4 py-2 text-right">{{ c.puntos }}</td>
-              <td class="px-4 py-2">
+            <tr v-for="c in canjes" :key="c.id">
+              <td class="font-semibold">{{ c.persona }}</td>
+              <td>{{ c.recompensa }}</td>
+              <td class="text-right">{{ c.puntos }}</td>
+              <td>
                 <span
                   class="tu-badge"
                   :class="
@@ -541,7 +538,7 @@ onMounted(cargar);
                   {{ $t(`lealtad.estados.${c.estado}`) }}
                 </span>
               </td>
-              <td class="px-4 py-2 text-right">
+              <td class="text-right">
                 <span
                   v-if="puedeGestionar && c.estado === 'pendiente'"
                   class="inline-flex gap-2 justify-end"

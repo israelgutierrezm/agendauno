@@ -203,20 +203,14 @@ const enCuadricula = computed(() => vista?.value === "cuadricula");
 
     <div v-else class="tu-card overflow-hidden" :class="conBarra ? 'mt-4' : ''">
       <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+        <table class="tu-tabla">
           <thead>
-            <tr
-              :style="{
-                background:
-                  'color-mix(in srgb, var(--texto-suave) 6%, var(--superficie))',
-              }"
-            >
+            <tr>
               <th
                 v-for="c in columnas"
                 :key="c.clave"
-                class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider whitespace-nowrap"
+                class="whitespace-nowrap"
                 :class="c.alinear === 'derecha' ? 'text-right' : 'text-left'"
-                :style="{ color: 'var(--texto-suave)' }"
                 scope="col"
               >
                 {{ c.etiqueta }}
@@ -237,15 +231,10 @@ const enCuadricula = computed(() => vista?.value === "cuadricula");
                 />
               </td>
             </tr>
-            <tr
-              v-for="(fila, i) in paginadas"
-              :key="i"
-              :style="{ borderTop: '1px solid var(--borde)' }"
-            >
+            <tr v-for="(fila, i) in paginadas" :key="i">
               <td
                 v-for="c in columnas"
                 :key="c.clave"
-                class="px-4 py-2.5 align-middle"
                 :class="c.alinear === 'derecha' ? 'text-right' : 'text-left'"
               >
                 <slot

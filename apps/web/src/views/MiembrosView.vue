@@ -654,17 +654,10 @@ onMounted(() => {
                   </div>
                 </li>
               </ul>
-              <table v-else class="w-full text-sm">
+              <table v-else class="tu-tabla">
                 <thead>
-                  <tr
-                    class="text-left text-xs font-semibold uppercase tracking-wider"
-                    :style="{
-                      color: 'var(--texto-suave)',
-                      background:
-                        'color-mix(in srgb, var(--texto-suave) 6%, var(--superficie))',
-                    }"
-                  >
-                    <th class="px-4 py-3 whitespace-nowrap">
+                  <tr>
+                    <th class="whitespace-nowrap">
                       {{ $t("miembros.colNombre") }}
                     </th>
                     <th
@@ -675,41 +668,35 @@ onMounted(() => {
                     </th>
                     <template v-else>
                       <th
-                        class="px-4 py-3 whitespace-nowrap hidden"
+                        class="whitespace-nowrap hidden"
                         :class="{ 'md:table-cell': !resumenAlLado }"
                       >
                         {{ $t("operacion.clientes.registro") }}
                       </th>
-                      <th
-                        class="px-4 py-3 whitespace-nowrap hidden lg:table-cell"
-                      >
+                      <th class="whitespace-nowrap hidden lg:table-cell">
                         {{ $t("operacion.clientes.app") }}
                       </th>
-                      <th
-                        class="px-4 py-3 whitespace-nowrap hidden sm:table-cell"
-                      >
+                      <th class="whitespace-nowrap hidden sm:table-cell">
                         {{ $t("operacion.clientes.plan") }}
                       </th>
-                      <th
-                        class="px-4 py-3 whitespace-nowrap hidden md:table-cell"
-                      >
+                      <th class="whitespace-nowrap hidden md:table-cell">
                         {{ $t("operacion.clientes.saldo") }}
                       </th>
                       <th
-                        class="px-4 py-3 whitespace-nowrap hidden"
+                        class="whitespace-nowrap hidden"
                         :class="{ 'xl:table-cell': !resumenAlLado }"
                       >
                         {{ $t("operacion.clientes.proxima") }}
                       </th>
                     </template>
-                    <th class="px-4 py-3 whitespace-nowrap">
+                    <th class="whitespace-nowrap">
                       {{
                         tipo === "miembro"
                           ? $t("operacion.clientes.estado")
                           : $t("miembros.colEstado")
                       }}
                     </th>
-                    <th class="px-4 py-3 text-right"></th>
+                    <th class="text-right"></th>
                   </tr>
                 </thead>
                 <tbody class="tu-tabla-cuerpo">
@@ -721,7 +708,7 @@ onMounted(() => {
                     :style="{ borderColor: 'var(--borde)' }"
                     @click="elegir(m, $event)"
                   >
-                    <td class="px-4 py-2">
+                    <td>
                       <div class="flex items-center gap-3 whitespace-nowrap">
                         <AvatarIniciales :nombre="m.nombre" tam="md" />
                         <span class="min-w-0">
@@ -763,15 +750,13 @@ onMounted(() => {
                     </td>
                     <template v-else>
                       <td
-                        class="px-4 py-2 whitespace-nowrap hidden"
+                        class="whitespace-nowrap hidden"
                         :class="{ 'md:table-cell': !resumenAlLado }"
                         :style="{ color: 'var(--texto-suave)' }"
                       >
                         {{ m.alta ? diaCorto(m.alta) : "—" }}
                       </td>
-                      <td
-                        class="px-4 py-2 whitespace-nowrap hidden lg:table-cell"
-                      >
+                      <td class="whitespace-nowrap hidden lg:table-cell">
                         <span
                           class="block"
                           :style="{ color: 'var(--texto-suave)' }"
@@ -824,7 +809,7 @@ onMounted(() => {
                           }}
                         </button>
                       </td>
-                      <td class="px-4 py-2 hidden sm:table-cell">
+                      <td class="hidden sm:table-cell">
                         <span class="flex max-w-[16rem] items-center gap-1.5">
                           <span class="truncate">{{
                             m.resumen?.membresia.plan ??
@@ -867,12 +852,12 @@ onMounted(() => {
                         >
                       </td>
                       <td
-                        class="px-4 py-2 whitespace-nowrap hidden md:table-cell tabular-nums"
+                        class="whitespace-nowrap hidden md:table-cell tabular-nums"
                       >
                         {{ creditosDe(m.resumen?.membresia, t) ?? "—" }}
                       </td>
                       <td
-                        class="px-4 py-2 whitespace-nowrap hidden"
+                        class="whitespace-nowrap hidden"
                         :class="{ 'xl:table-cell': !resumenAlLado }"
                         :title="m.resumen?.proxima?.clase ?? undefined"
                       >

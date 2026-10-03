@@ -708,37 +708,32 @@ onMounted(cargar);
         v-else-if="difusiones.length > 0"
         class="mt-3 tu-card overflow-hidden"
       >
-        <table class="w-full text-sm">
+        <table class="tu-tabla">
           <thead>
-            <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-              <th class="px-4 py-2 font-medium">
+            <tr>
+              <th>
                 {{ $t("comunicaciones.colFecha") }}
               </th>
-              <th class="px-4 py-2 font-medium">
+              <th>
                 {{ $t("comunicaciones.colSegmento") }}
               </th>
-              <th class="px-4 py-2 font-medium">
+              <th>
                 {{ $t("comunicaciones.colAsunto") }}
               </th>
-              <th class="px-4 py-2 font-medium text-right">
+              <th class="text-right">
                 {{ $t("comunicaciones.colTotal") }}
               </th>
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="d in difusiones"
-              :key="d.id"
-              class="border-t"
-              :style="{ borderColor: 'var(--borde)' }"
-            >
+            <tr v-for="d in difusiones" :key="d.id">
               <td
-                class="px-4 py-2 whitespace-nowrap"
+                class="whitespace-nowrap"
                 :style="{ color: 'var(--texto-suave)' }"
               >
                 {{ fecha(d.enviada_en) }}
               </td>
-              <td class="px-4 py-2">
+              <td>
                 <span class="tu-badge">{{ d.segmento_etiqueta }}</span>
                 <span
                   class="block text-xs mt-1"
@@ -746,8 +741,8 @@ onMounted(cargar);
                   >{{ canalTexto(d.canal) }}</span
                 >
               </td>
-              <td class="px-4 py-2">{{ d.asunto }}</td>
-              <td class="px-4 py-2 text-right font-semibold">{{ d.total }}</td>
+              <td>{{ d.asunto }}</td>
+              <td class="text-right font-semibold">{{ d.total }}</td>
             </tr>
           </tbody>
         </table>

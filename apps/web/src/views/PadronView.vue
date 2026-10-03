@@ -116,29 +116,24 @@ onMounted(cargar);
         :titulo="$t('padron.vacio')"
       />
       <div v-else class="mt-4 tu-card overflow-hidden">
-        <table class="w-full text-sm">
+        <table class="tu-tabla">
           <thead>
-            <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-              <th class="px-4 py-2 font-medium">
+            <tr>
+              <th>
                 {{ $t("padron.colAlumno") }}
               </th>
-              <th class="px-4 py-2 font-medium hidden sm:table-cell">
+              <th class="hidden sm:table-cell">
                 {{ $t("padron.colSucursal") }}
               </th>
-              <th class="px-4 py-2 font-medium">{{ $t("padron.colAlta") }}</th>
-              <th class="px-4 py-2 font-medium hidden sm:table-cell">
+              <th>{{ $t("padron.colAlta") }}</th>
+              <th class="hidden sm:table-cell">
                 {{ $t("padron.colRazon") }}
               </th>
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="f in filas"
-              :key="f.id"
-              class="border-t"
-              :style="{ borderColor: 'var(--borde)' }"
-            >
-              <td class="px-4 py-2">
+            <tr v-for="f in filas" :key="f.id">
+              <td>
                 <span class="font-semibold">{{ f.nombre_completo }}</span>
                 <span
                   v-if="f.email"
@@ -148,14 +143,14 @@ onMounted(cargar);
                 >
               </td>
               <td
-                class="px-4 py-2 hidden sm:table-cell"
+                class="hidden sm:table-cell"
                 :style="{ color: 'var(--texto-suave)' }"
               >
                 {{ f.sucursal ?? "—" }}
               </td>
-              <td class="px-4 py-2">{{ f.alta ?? "—" }}</td>
+              <td>{{ f.alta ?? "—" }}</td>
               <td
-                class="px-4 py-2 hidden sm:table-cell"
+                class="hidden sm:table-cell"
                 :style="{ color: 'var(--texto-suave)' }"
               >
                 {{ f.razon }}

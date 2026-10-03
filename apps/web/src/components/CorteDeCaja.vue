@@ -299,35 +299,30 @@ onMounted(cargar);
       >
         {{ $t("corteCaja.vacio") }}
       </p>
-      <table v-else class="w-full text-sm">
+      <table v-else class="tu-tabla">
         <thead>
-          <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-            <th class="px-4 py-2 font-medium">{{ $t("corteCaja.fecha") }}</th>
-            <th class="px-4 py-2 font-medium">
+          <tr>
+            <th>{{ $t("corteCaja.fecha") }}</th>
+            <th>
               {{ $t("corteCaja.movimiento") }}
             </th>
-            <th class="px-4 py-2 font-medium hidden sm:table-cell">
+            <th class="hidden sm:table-cell">
               {{ $t("corteCaja.quien") }}
             </th>
-            <th class="px-4 py-2 font-medium text-right">
+            <th class="text-right">
               {{ $t("corteCaja.monto") }}
             </th>
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="m in movimientos"
-            :key="`${m.tipo}-${m.referencia}`"
-            class="border-t"
-            :style="{ borderColor: 'var(--borde)' }"
-          >
+          <tr v-for="m in movimientos" :key="`${m.tipo}-${m.referencia}`">
             <td
-              class="px-4 py-2 whitespace-nowrap"
+              class="whitespace-nowrap"
               :style="{ color: 'var(--texto-suave)' }"
             >
               {{ fechaHora(m.fecha) }}
             </td>
-            <td class="px-4 py-2">
+            <td>
               <span class="font-medium">{{
                 t(`corteCaja.tipos.${m.tipo}`)
               }}</span>
@@ -346,9 +341,9 @@ onMounted(cargar);
                 >{{ m.quien }}</span
               >
             </td>
-            <td class="px-4 py-2 hidden sm:table-cell">{{ m.quien }}</td>
+            <td class="hidden sm:table-cell">{{ m.quien }}</td>
             <td
-              class="px-4 py-2 text-right tabular-nums whitespace-nowrap"
+              class="text-right tabular-nums whitespace-nowrap"
               :style="{
                 color:
                   m.monto_minor < 0

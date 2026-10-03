@@ -492,31 +492,31 @@ onMounted(() => {
         {{ $t("renta.sinCargos") }}
       </p>
       <div v-else class="mt-3 tu-card overflow-hidden">
-        <table class="w-full text-sm">
+        <table class="tu-tabla">
           <thead>
-            <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-              <th class="px-4 py-2 font-medium">
+            <tr>
+              <th>
                 {{ $t("renta.colPeriodo") }}
               </th>
-              <th class="px-4 py-2 font-medium text-right hidden sm:table-cell">
+              <th class="text-right hidden sm:table-cell">
                 {{ $t("cobro.historial.uso") }}
               </th>
-              <th class="px-4 py-2 font-medium text-right">
+              <th class="text-right">
                 {{ $t("renta.colMonto") }}
               </th>
-              <th class="px-4 py-2 font-medium">{{ $t("renta.colEstado") }}</th>
-              <th class="px-4 py-2 font-medium hidden sm:table-cell">
+              <th>{{ $t("renta.colEstado") }}</th>
+              <th class="hidden sm:table-cell">
                 {{ $t("renta.colVence") }}
               </th>
-              <th class="px-4 py-2 font-medium text-right">
+              <th class="text-right">
                 {{ $t("renta.colAccion") }}
               </th>
             </tr>
           </thead>
           <tbody>
             <template v-for="c in renta.cargos" :key="c.id">
-              <tr class="border-t" :style="{ borderColor: 'var(--borde)' }">
-                <td class="px-4 py-2 font-semibold">
+              <tr>
+                <td class="font-semibold">
                   {{ c.periodo }}
                   <button
                     v-if="c.desglose && c.desglose.lineas.length > 0"
@@ -531,17 +531,17 @@ onMounted(() => {
                     }}
                   </button>
                 </td>
-                <td class="px-4 py-2 text-right hidden sm:table-cell">
+                <td class="text-right hidden sm:table-cell">
                   {{
                     c.modo_cobro === "fijo"
                       ? "—"
                       : `${c.cantidad} ${$t(`cobro.actual.${c.metrica}`)}`
                   }}
                 </td>
-                <td class="px-4 py-2 text-right font-semibold">
+                <td class="text-right font-semibold">
                   {{ dinero(c.monto_minor, c.moneda) }}
                 </td>
-                <td class="px-4 py-2">
+                <td>
                   <span
                     class="tu-badge"
                     :class="{
@@ -553,12 +553,12 @@ onMounted(() => {
                   </span>
                 </td>
                 <td
-                  class="px-4 py-2 hidden sm:table-cell"
+                  class="hidden sm:table-cell"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
                   {{ c.estado === "sin_cargo" ? "—" : (c.vence_en ?? "—") }}
                 </td>
-                <td class="px-4 py-2 text-right">
+                <td class="text-right">
                   <!-- Pendiente: pagar la renta -->
                   <button
                     v-if="c.estado === 'pendiente'"

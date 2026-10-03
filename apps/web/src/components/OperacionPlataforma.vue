@@ -392,45 +392,40 @@ onMounted(cargar);
           {{ $t("plataformaAdmin.operacion.sinAlertas") }}
         </p>
         <div v-else class="mt-3 overflow-x-auto">
-          <table class="w-full text-sm" data-prueba="alertas">
+          <table class="tu-tabla" data-prueba="alertas">
             <thead>
-              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                <th class="py-2 pr-3 font-medium">
+              <tr>
+                <th class="pr-3">
                   {{ $t("plataformaAdmin.operacion.colAlerta") }}
                 </th>
-                <th class="py-2 pr-3 font-medium">
+                <th class="pr-3">
                   {{ $t("plataformaAdmin.operacion.colNegocio") }}
                 </th>
-                <th class="py-2 pr-3 font-medium text-right">
+                <th class="pr-3 text-right">
                   {{ $t("plataformaAdmin.operacion.colVeces") }}
                 </th>
-                <th class="py-2 pr-3 font-medium">
+                <th class="pr-3">
                   {{ $t("plataformaAdmin.operacion.colUltima") }}
                 </th>
-                <th class="py-2 font-medium">
+                <th>
                   {{ $t("plataformaAdmin.operacion.colAviso") }}
                 </th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="a in datos.alertas"
-                :key="`${a.tipo}-${a.clave}`"
-                class="border-t align-top"
-                :style="{ borderColor: 'var(--borde)' }"
-              >
-                <td class="py-2 pr-3">
+              <tr v-for="a in datos.alertas" :key="`${a.tipo}-${a.clave}`">
+                <td class="pr-3">
                   <p class="font-medium">{{ tipoAlerta(a.tipo) }}</p>
                   <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
                     {{ a.mensaje }}
                   </p>
                 </td>
-                <td class="py-2 pr-3">{{ a.estudio ?? "—" }}</td>
-                <td class="py-2 pr-3 text-right tabular-nums">{{ a.veces }}</td>
-                <td class="py-2 pr-3 whitespace-nowrap">
+                <td class="pr-3">{{ a.estudio ?? "—" }}</td>
+                <td class="pr-3 text-right tabular-nums">{{ a.veces }}</td>
+                <td class="pr-3 whitespace-nowrap">
                   {{ fechaHora(a.ultima_en) }}
                 </td>
-                <td class="py-2 whitespace-nowrap">
+                <td class="whitespace-nowrap">
                   <span v-if="!a.avisada" class="op-estado">
                     <span class="op-punto op-aviso"></span>
                     {{ $t("plataformaAdmin.operacion.porAvisar") }}

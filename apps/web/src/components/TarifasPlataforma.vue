@@ -207,13 +207,13 @@ onMounted(cargar);
         </div>
 
         <template v-if="borradores[m]">
-          <table class="w-full text-sm">
+          <table class="tu-tabla">
             <thead>
-              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                <th class="py-1 font-medium">
+              <tr>
+                <th>
                   {{ $t("cobro.tarifas.hasta") }}
                 </th>
-                <th class="py-1 font-medium">
+                <th>
                   {{
                     m === "clases"
                       ? $t("cobro.tarifas.monto")
@@ -225,7 +225,7 @@ onMounted(cargar);
             </thead>
             <tbody>
               <tr v-for="(e, i) in borradores[m]!.escalones" :key="i">
-                <td class="py-1 pr-2">
+                <td class="pr-2">
                   <span
                     v-if="i === borradores[m]!.escalones.length - 1"
                     class="text-xs"
@@ -241,7 +241,7 @@ onMounted(cargar);
                     :aria-label="$t('cobro.tarifas.hasta')"
                   />
                 </td>
-                <td class="py-1 pr-2">
+                <td class="pr-2">
                   <input
                     v-model="e.precio"
                     class="tu-input"
@@ -255,7 +255,7 @@ onMounted(cargar);
                     "
                   />
                 </td>
-                <td class="py-1 text-right">
+                <td class="text-right">
                   <button
                     v-if="borradores[m]!.escalones.length > 1"
                     type="button"

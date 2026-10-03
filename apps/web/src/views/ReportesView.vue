@@ -718,30 +718,25 @@ onMounted(cargar);
             {{ $t("reportes.tendencias.sinProducto") }}
           </p>
           <div v-else class="mt-3 tu-card overflow-hidden">
-            <table class="w-full text-sm">
+            <table class="tu-tabla">
               <thead>
-                <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                  <th class="px-4 py-2 font-medium">
+                <tr>
+                  <th>
                     {{ $t("reportes.tendencias.colProducto") }}
                   </th>
-                  <th class="px-4 py-2 font-medium text-right">
+                  <th class="text-right">
                     {{ $t("reportes.tendencias.colUnidades") }}
                   </th>
-                  <th class="px-4 py-2 font-medium text-right">
+                  <th class="text-right">
                     {{ $t("reportes.tendencias.colIngresos") }}
                   </th>
                 </tr>
               </thead>
               <tbody>
-                <tr
-                  v-for="p in tendencias.por_producto"
-                  :key="p.producto"
-                  class="border-t"
-                  :style="{ borderColor: 'var(--borde)' }"
-                >
-                  <td class="px-4 py-2 font-semibold">{{ p.producto }}</td>
-                  <td class="px-4 py-2 text-right">{{ p.unidades }}</td>
-                  <td class="px-4 py-2 text-right">
+                <tr v-for="p in tendencias.por_producto" :key="p.producto">
+                  <td class="font-semibold">{{ p.producto }}</td>
+                  <td class="text-right">{{ p.unidades }}</td>
+                  <td class="text-right">
                     {{ dinero(p.ingresos_minor, tendencias.moneda) }}
                   </td>
                 </tr>
@@ -833,13 +828,13 @@ onMounted(cargar);
           {{ $t("reportes.cohortes.subtitulo") }}
         </p>
         <div class="mt-3 tu-card overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="tu-tabla">
             <thead>
               <tr class="text-center" :style="{ color: 'var(--texto-suave)' }">
-                <th class="px-3 py-2 font-medium text-left">
+                <th class="text-left">
                   {{ $t("reportes.cohortes.colCohorte") }}
                 </th>
-                <th class="px-2 py-2 font-medium text-right">
+                <th class="text-right">
                   {{ $t("reportes.cohortes.colAltas") }}
                 </th>
                 <th
@@ -852,16 +847,11 @@ onMounted(cargar);
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="c in cohortes.cohortes"
-                :key="c.mes"
-                class="border-t"
-                :style="{ borderColor: 'var(--borde)' }"
-              >
-                <td class="px-3 py-1.5 font-semibold whitespace-nowrap">
+              <tr v-for="c in cohortes.cohortes" :key="c.mes">
+                <td class="font-semibold whitespace-nowrap">
                   {{ mesCorto(c.mes) }}
                 </td>
-                <td class="px-2 py-1.5 text-right">{{ c.tamano }}</td>
+                <td class="text-right">{{ c.tamano }}</td>
                 <td
                   v-for="(r, i) in c.retencion"
                   :key="i"
@@ -903,34 +893,28 @@ onMounted(cargar);
         </p>
         <template v-else>
           <div class="mt-3 tu-card overflow-x-auto">
-            <table class="w-full text-sm" data-prueba="equipo">
+            <table class="tu-tabla" data-prueba="equipo">
               <thead>
-                <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                  <th class="px-4 py-2 font-medium">
+                <tr>
+                  <th>
                     {{ $t("reportes.equipo.colProfesional") }}
                   </th>
-                  <th class="px-4 py-2 font-medium">
+                  <th>
                     {{ $t("reportes.equipo.colOcupacion") }}
                   </th>
-                  <th
-                    class="px-4 py-2 font-medium text-right hidden sm:table-cell"
-                  >
+                  <th class="text-right hidden sm:table-cell">
                     {{ $t("reportes.equipo.colSesiones") }}
                   </th>
-                  <th
-                    class="px-4 py-2 font-medium text-right hidden md:table-cell"
-                  >
+                  <th class="text-right hidden md:table-cell">
                     {{ $t("reportes.equipo.colInasistencia") }}
                   </th>
-                  <th class="px-4 py-2 font-medium text-right">
+                  <th class="text-right">
                     {{ $t("reportes.equipo.colValor") }}
                   </th>
-                  <th
-                    class="px-4 py-2 font-medium text-right hidden sm:table-cell"
-                  >
+                  <th class="text-right hidden sm:table-cell">
                     {{ $t("reportes.equipo.colPago") }}
                   </th>
-                  <th class="px-4 py-2 font-medium text-right">
+                  <th class="text-right">
                     {{ $t("reportes.equipo.colMargen") }}
                   </th>
                 </tr>
@@ -939,11 +923,9 @@ onMounted(cargar);
                 <tr
                   v-for="p in equipo.profesionales"
                   :key="p.id ?? 'sin'"
-                  class="border-t"
-                  :style="{ borderColor: 'var(--borde)' }"
                   data-prueba="profesional"
                 >
-                  <td class="px-4 py-2">
+                  <td>
                     <span class="flex items-center gap-2 font-semibold">
                       <img
                         v-if="p.foto_url"
@@ -954,7 +936,7 @@ onMounted(cargar);
                       {{ p.nombre ?? $t("reportes.equipo.sinProfesional") }}
                     </span>
                   </td>
-                  <td class="px-4 py-2 re-ocupacion">
+                  <td class="re-ocupacion">
                     <template v-if="p.ocupacion_pct !== null">
                       <span class="font-semibold tabular-nums">{{
                         pct(p.ocupacion_pct)
@@ -977,23 +959,23 @@ onMounted(cargar);
                       {{ horas(p.agendado_min) }}</span
                     >
                   </td>
-                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                  <td class="text-right hidden sm:table-cell">
                     {{ sesionesTexto(p) }}
                   </td>
                   <td
-                    class="px-4 py-2 text-right hidden md:table-cell"
+                    class="text-right hidden md:table-cell"
                     :title="`${p.presentes} / ${p.ausentes}`"
                   >
                     {{ pct(p.inasistencia_pct) }}
                   </td>
-                  <td class="px-4 py-2 text-right">
+                  <td class="text-right">
                     {{ dinero(p.ingreso_minor, equipo.moneda) }}
                   </td>
-                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                  <td class="text-right hidden sm:table-cell">
                     {{ dinero(p.costo_minor, equipo.moneda) }}
                   </td>
                   <td
-                    class="px-4 py-2 text-right font-semibold"
+                    class="text-right font-semibold"
                     :style="{
                       color:
                         p.margen_minor >= 0 ? 'var(--exito)' : 'var(--error)',
@@ -1004,28 +986,25 @@ onMounted(cargar);
                 </tr>
               </tbody>
               <tfoot>
-                <tr
-                  class="border-t font-bold"
-                  :style="{ borderColor: 'var(--borde)' }"
-                >
-                  <td class="px-4 py-2">{{ $t("reportes.equipo.total") }}</td>
-                  <td class="px-4 py-2">
+                <tr>
+                  <td>{{ $t("reportes.equipo.total") }}</td>
+                  <td>
                     {{ pct(equipo.totales.ocupacion_pct) }}
                   </td>
-                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                  <td class="text-right hidden sm:table-cell">
                     {{ sesionesTexto(equipo.totales) }}
                   </td>
-                  <td class="px-4 py-2 text-right hidden md:table-cell">
+                  <td class="text-right hidden md:table-cell">
                     {{ pct(equipo.totales.inasistencia_pct) }}
                   </td>
-                  <td class="px-4 py-2 text-right">
+                  <td class="text-right">
                     {{ dinero(equipo.totales.ingreso_minor, equipo.moneda) }}
                   </td>
-                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                  <td class="text-right hidden sm:table-cell">
                     {{ dinero(equipo.totales.costo_minor, equipo.moneda) }}
                   </td>
                   <td
-                    class="px-4 py-2 text-right"
+                    class="text-right"
                     :style="{
                       color:
                         equipo.totales.margen_minor >= 0
@@ -1060,72 +1039,60 @@ onMounted(cargar);
           {{ $t("reportes.sinSucursales") }}
         </p>
         <div v-else class="mt-3 tu-card overflow-hidden">
-          <table class="w-full text-sm">
+          <table class="tu-tabla">
             <thead>
-              <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                <th class="px-4 py-2 font-medium">
+              <tr>
+                <th>
                   {{ $t("reportes.colSucursal") }}
                 </th>
-                <th class="px-4 py-2 font-medium hidden sm:table-cell">
+                <th class="hidden sm:table-cell">
                   {{ $t("reportes.colRegion") }}
                 </th>
-                <th class="px-4 py-2 font-medium hidden sm:table-cell">
+                <th class="hidden sm:table-cell">
                   {{ $t("reportes.colMoneda") }}
                 </th>
-                <th class="px-4 py-2 font-medium text-right">
+                <th class="text-right">
                   {{ $t("reportes.colMiembros") }}
                 </th>
-                <th class="px-4 py-2 font-medium text-right">
+                <th class="text-right">
                   {{ $t("reportes.colClases") }}
                 </th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="s in sucursales"
-                :key="s.id"
-                class="border-t"
-                :style="{ borderColor: 'var(--borde)' }"
-              >
-                <td class="px-4 py-2 font-semibold">{{ s.nombre }}</td>
+              <tr v-for="s in sucursales" :key="s.id">
+                <td class="font-semibold">{{ s.nombre }}</td>
                 <td
-                  class="px-4 py-2 hidden sm:table-cell"
+                  class="hidden sm:table-cell"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
                   {{ s.region ?? "—" }}
                 </td>
-                <td class="px-4 py-2 hidden sm:table-cell">
+                <td class="hidden sm:table-cell">
                   {{ s.moneda ?? "—" }}
                 </td>
-                <td class="px-4 py-2 text-right">{{ s.miembros_activos }}</td>
-                <td class="px-4 py-2 text-right">{{ s.sesiones_proximas }}</td>
+                <td class="text-right">{{ s.miembros_activos }}</td>
+                <td class="text-right">{{ s.sesiones_proximas }}</td>
               </tr>
-              <tr
-                v-if="sinSucursal > 0"
-                class="border-t"
-                :style="{ borderColor: 'var(--borde)' }"
-              >
-                <td class="px-4 py-2" :style="{ color: 'var(--texto-suave)' }">
+              <tr v-if="sinSucursal > 0">
+                <td :style="{ color: 'var(--texto-suave)' }">
                   {{ $t("operacion.reportes.sinSucursal") }}
                 </td>
-                <td class="px-4 py-2 hidden sm:table-cell" />
-                <td class="px-4 py-2 hidden sm:table-cell" />
-                <td class="px-4 py-2 text-right">{{ sinSucursal }}</td>
-                <td class="px-4 py-2 text-right">—</td>
+                <td class="hidden sm:table-cell" />
+                <td class="hidden sm:table-cell" />
+                <td class="text-right">{{ sinSucursal }}</td>
+                <td class="text-right">—</td>
               </tr>
             </tbody>
             <tfoot v-if="totalesSucursales">
-              <tr
-                class="border-t font-semibold"
-                :style="{ borderColor: 'var(--borde)' }"
-              >
-                <td class="px-4 py-2">{{ $t("operacion.reportes.total") }}</td>
-                <td class="px-4 py-2 hidden sm:table-cell" />
-                <td class="px-4 py-2 hidden sm:table-cell" />
-                <td class="px-4 py-2 text-right">
+              <tr>
+                <td>{{ $t("operacion.reportes.total") }}</td>
+                <td class="hidden sm:table-cell" />
+                <td class="hidden sm:table-cell" />
+                <td class="text-right">
                   {{ totalesSucursales.miembros_activos }}
                 </td>
-                <td class="px-4 py-2 text-right">
+                <td class="text-right">
                   {{ totalesSucursales.sesiones_proximas }}
                 </td>
               </tr>
@@ -1148,51 +1115,44 @@ onMounted(cargar);
         </p>
         <template v-else>
           <div class="mt-3 tu-card overflow-hidden">
-            <table class="w-full text-sm">
+            <table class="tu-tabla">
               <thead>
-                <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                  <th class="px-4 py-2 font-medium">
+                <tr>
+                  <th>
                     {{ $t("reportes.rentabilidad.colClase") }}
                   </th>
-                  <th
-                    class="px-4 py-2 font-medium text-right hidden sm:table-cell"
-                  >
+                  <th class="text-right hidden sm:table-cell">
                     {{ $t("reportes.rentabilidad.colSesiones") }}
                   </th>
-                  <th class="px-4 py-2 font-medium text-right">
+                  <th class="text-right">
                     {{ $t("reportes.rentabilidad.colAsistentes") }}
                   </th>
-                  <th class="px-4 py-2 font-medium text-right">
+                  <th class="text-right">
                     {{ $t("reportes.rentabilidad.colIngreso") }}
                   </th>
-                  <th class="px-4 py-2 font-medium text-right">
+                  <th class="text-right">
                     {{ $t("reportes.rentabilidad.colCosto") }}
                   </th>
-                  <th class="px-4 py-2 font-medium text-right">
+                  <th class="text-right">
                     {{ $t("reportes.rentabilidad.colMargen") }}
                   </th>
                 </tr>
               </thead>
               <tbody>
-                <tr
-                  v-for="o in rentabilidad.ofertas"
-                  :key="o.id ?? o.oferta"
-                  class="border-t"
-                  :style="{ borderColor: 'var(--borde)' }"
-                >
-                  <td class="px-4 py-2 font-semibold">{{ o.oferta }}</td>
-                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                <tr v-for="o in rentabilidad.ofertas" :key="o.id ?? o.oferta">
+                  <td class="font-semibold">{{ o.oferta }}</td>
+                  <td class="text-right hidden sm:table-cell">
                     {{ o.sesiones }}
                   </td>
-                  <td class="px-4 py-2 text-right">{{ o.asistentes }}</td>
-                  <td class="px-4 py-2 text-right">
+                  <td class="text-right">{{ o.asistentes }}</td>
+                  <td class="text-right">
                     {{ dinero(o.ingreso_minor, rentabilidad.moneda) }}
                   </td>
-                  <td class="px-4 py-2 text-right">
+                  <td class="text-right">
                     {{ dinero(o.costo_minor, rentabilidad.moneda) }}
                   </td>
                   <td
-                    class="px-4 py-2 text-right font-semibold"
+                    class="text-right font-semibold"
                     :style="{
                       color:
                         o.margen_minor >= 0 ? 'var(--exito)' : 'var(--error)',
@@ -1203,18 +1163,15 @@ onMounted(cargar);
                 </tr>
               </tbody>
               <tfoot>
-                <tr
-                  class="border-t font-bold"
-                  :style="{ borderColor: 'var(--borde)' }"
-                >
-                  <td class="px-4 py-2">
+                <tr>
+                  <td>
                     {{ $t("reportes.rentabilidad.total") }}
                   </td>
-                  <td class="px-4 py-2 hidden sm:table-cell"></td>
-                  <td class="px-4 py-2 text-right">
+                  <td class="hidden sm:table-cell"></td>
+                  <td class="text-right">
                     {{ rentabilidad.totales.asistentes }}
                   </td>
-                  <td class="px-4 py-2 text-right">
+                  <td class="text-right">
                     {{
                       dinero(
                         rentabilidad.totales.ingreso_minor,
@@ -1222,7 +1179,7 @@ onMounted(cargar);
                       )
                     }}
                   </td>
-                  <td class="px-4 py-2 text-right">
+                  <td class="text-right">
                     {{
                       dinero(
                         rentabilidad.totales.costo_minor,
@@ -1231,7 +1188,7 @@ onMounted(cargar);
                     }}
                   </td>
                   <td
-                    class="px-4 py-2 text-right"
+                    class="text-right"
                     :style="{
                       color:
                         rentabilidad.totales.margen_minor >= 0
@@ -1307,69 +1264,59 @@ onMounted(cargar);
             {{ $t("reportes.demanda.porActividad") }}
           </h3>
           <div class="mt-3 tu-card overflow-hidden">
-            <table class="w-full text-sm">
+            <table class="tu-tabla">
               <thead>
-                <tr class="text-left" :style="{ color: 'var(--texto-suave)' }">
-                  <th class="px-4 py-2 font-medium">
+                <tr>
+                  <th>
                     {{ $t("reportes.demanda.colActividad") }}
                   </th>
-                  <th
-                    class="px-4 py-2 font-medium text-right hidden sm:table-cell"
-                  >
+                  <th class="text-right hidden sm:table-cell">
                     {{ $t("reportes.demanda.colSesiones") }}
                   </th>
-                  <th class="px-4 py-2 font-medium text-right">
+                  <th class="text-right">
                     {{ $t("reportes.demanda.colConfirmadas") }}
                   </th>
-                  <th class="px-4 py-2 font-medium text-right">
+                  <th class="text-right">
                     {{ $t("reportes.demanda.colEspera") }}
                   </th>
-                  <th class="px-4 py-2 font-medium text-right">
+                  <th class="text-right">
                     {{ $t("reportes.demanda.colOcupacion") }}
                   </th>
                 </tr>
               </thead>
               <tbody>
-                <tr
-                  v-for="a in demanda.actividades"
-                  :key="a.id ?? a.actividad"
-                  class="border-t"
-                  :style="{ borderColor: 'var(--borde)' }"
-                >
-                  <td class="px-4 py-2 font-semibold">{{ a.actividad }}</td>
-                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                <tr v-for="a in demanda.actividades" :key="a.id ?? a.actividad">
+                  <td class="font-semibold">{{ a.actividad }}</td>
+                  <td class="text-right hidden sm:table-cell">
                     {{ a.sesiones }}
                   </td>
-                  <td class="px-4 py-2 text-right">{{ a.confirmadas }}</td>
+                  <td class="text-right">{{ a.confirmadas }}</td>
                   <td
-                    class="px-4 py-2 text-right font-semibold"
+                    class="text-right font-semibold"
                     :style="{
                       color: a.espera > 0 ? 'var(--aviso)' : 'inherit',
                     }"
                   >
                     {{ a.espera }}
                   </td>
-                  <td class="px-4 py-2 text-right font-semibold">
+                  <td class="text-right font-semibold">
                     {{ pct(a.ocupacion_pct) }}
                   </td>
                 </tr>
               </tbody>
               <tfoot>
-                <tr
-                  class="border-t font-bold"
-                  :style="{ borderColor: 'var(--borde)' }"
-                >
-                  <td class="px-4 py-2">{{ $t("reportes.demanda.total") }}</td>
-                  <td class="px-4 py-2 text-right hidden sm:table-cell">
+                <tr>
+                  <td>{{ $t("reportes.demanda.total") }}</td>
+                  <td class="text-right hidden sm:table-cell">
                     {{ demanda.totales.sesiones }}
                   </td>
-                  <td class="px-4 py-2 text-right">
+                  <td class="text-right">
                     {{ demanda.totales.confirmadas }}
                   </td>
-                  <td class="px-4 py-2 text-right">
+                  <td class="text-right">
                     {{ demanda.totales.espera }}
                   </td>
-                  <td class="px-4 py-2 text-right">
+                  <td class="text-right">
                     {{ pct(demanda.totales.ocupacion_pct) }}
                   </td>
                 </tr>
