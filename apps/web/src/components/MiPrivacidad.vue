@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import CampoContrasena from "@/components/CampoContrasena.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -10,7 +12,8 @@ import { useToastStore } from "@/stores/toast";
  * Privacidad del alumno (derechos ARCO frente al negocio): recibir o no promociones
  * (oposición), aceptar los avisos por WhatsApp (solo si el negocio los usa, ADR
  * 0069), descargar sus datos (acceso) y pedir la baja de sus datos (cancelación). La
- * rectificación está en "Mi perfil".
+ * rectificación está en "Mi perfil". Descargar y pedir la baja se confirman con su
+ * contraseña en una ventana: así se sabe que es la persona de la sesión.
  */
 interface Privacidad {
   recibe_promociones: boolean;
@@ -61,37 +64,61 @@ async function cambiar(
   }
 }
 
-async function descargar(): Promise<void> {
-  ocupado.value = true;
-  try {
-    const { data } = await api.get<Blob>(`${base.value}/mi/datos`, {
-      responseType: "blob",
-    });
-    const url = URL.createObjectURL(data);
-    const enlace = document.createElement("a");
-    enlace.href = url;
-    enlace.download = `mis-datos-${sesion.slug}.json`;
-    enlace.click();
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  } catch (e) {
-    toast.error(mensajeDeError(e));
-  } finally {
-    ocupado.value = false;
-  }
+// Descargar los datos y pedir la baja: primero su contraseña (en una ventana).
+type Accion = "descargar" | "baja";
+const confirmando = ref<Accion | null>(null);
+const contrasena = ref("");
+const errorContrasena = ref<string | null>(null);
+
+function pedirContrasena(accion: Accion): void {
+  contrasena.value = "";
+  errorContrasena.value = null;
+  confirmando.value = accion;
+}
+function cerrarConfirmacion(): void {
+  if (ocupado.value) return;
+  confirmando.value = null;
+  contrasena.value = "";
 }
 
-async function solicitarBaja(): Promise<void> {
+function guardarArchivo(contenido: unknown): void {
+  const archivo = new Blob([JSON.stringify(contenido, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(archivo);
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = `mis-datos-${sesion.slug}.json`;
+  enlace.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+async function confirmar(): Promise<void> {
+  if (confirmando.value === null || contrasena.value === "" || ocupado.value) {
+    return;
+  }
   ocupado.value = true;
+  errorContrasena.value = null;
   try {
-    const { data } = await api.post<{ data: Privacidad }>(
-      `${base.value}/mi/privacidad/baja`,
-      { motivo: motivo.value.trim() || null },
-    );
-    datos.value = data.data;
-    pidiendoBaja.value = false;
-    toast.exito(t("miPrivacidad.bajaEnviada"));
+    if (confirmando.value === "descargar") {
+      const { data } = await api.post<unknown>(`${base.value}/mi/datos`, {
+        password: contrasena.value,
+      });
+      guardarArchivo(data);
+    } else {
+      const { data } = await api.post<{ data: Privacidad }>(
+        `${base.value}/mi/privacidad/baja`,
+        { motivo: motivo.value.trim() || null, password: contrasena.value },
+      );
+      datos.value = data.data;
+      pidiendoBaja.value = false;
+      toast.exito(t("miPrivacidad.bajaEnviada"));
+    }
+    confirmando.value = null;
+    contrasena.value = "";
   } catch (e) {
-    toast.error(mensajeDeError(e));
+    // Contraseña incorrecta, sin contraseña o demasiados intentos: se dice aquí.
+    errorContrasena.value = mensajeDeError(e);
   } finally {
     ocupado.value = false;
   }
@@ -153,7 +180,7 @@ onMounted(cargar);
         type="button"
         class="tu-btn tu-btn-fantasma text-sm"
         :disabled="ocupado"
-        @click="descargar"
+        @click="pedirContrasena('descargar')"
       >
         {{ $t("miPrivacidad.descargar") }}
       </button>
@@ -190,7 +217,7 @@ onMounted(cargar);
       v-if="pidiendoBaja"
       class="mt-3 space-y-3 rounded-xl border p-4"
       :style="{ borderColor: 'var(--borde)' }"
-      @submit.prevent="solicitarBaja"
+      @submit.prevent="pedirContrasena('baja')"
     >
       <p class="text-sm">{{ $t("miPrivacidad.bajaExplica") }}</p>
       <div>
@@ -212,5 +239,66 @@ onMounted(cargar);
         {{ $t("miPrivacidad.confirmarBaja") }}
       </button>
     </form>
+    <!-- Confirma con su contraseña que es la persona de la sesión. -->
+    <ModalDialogo
+      :abierto="confirmando !== null"
+      :titulo="$t('miPrivacidad.confirmarTitulo')"
+      @cerrar="cerrarConfirmacion"
+    >
+      <form
+        id="mp-confirmar"
+        class="space-y-3"
+        data-prueba="confirmar-contrasena"
+        @submit.prevent="confirmar"
+      >
+        <p class="text-sm">
+          {{
+            confirmando === "baja"
+              ? $t("miPrivacidad.confirmarBajaTexto")
+              : $t("miPrivacidad.confirmarDescargaTexto")
+          }}
+        </p>
+        <div>
+          <label class="tu-label" for="mp-contrasena">{{
+            $t("miPrivacidad.contrasena")
+          }}</label>
+          <CampoContrasena
+            id="mp-contrasena"
+            v-model="contrasena"
+            autocomplete="current-password"
+          />
+          <p
+            v-if="errorContrasena"
+            class="mt-1 text-sm"
+            data-prueba="error-contrasena"
+            style="color: var(--error)"
+          >
+            {{ errorContrasena }}
+          </p>
+        </div>
+      </form>
+      <template #pie>
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          :disabled="ocupado"
+          @click="cerrarConfirmacion"
+        >
+          {{ $t("miPrivacidad.cancelar") }}
+        </button>
+        <button
+          type="submit"
+          form="mp-confirmar"
+          class="tu-btn tu-btn-primario"
+          :disabled="ocupado || contrasena === ''"
+        >
+          {{
+            confirmando === "baja"
+              ? $t("miPrivacidad.confirmarBaja")
+              : $t("miPrivacidad.descargar")
+          }}
+        </button>
+      </template>
+    </ModalDialogo>
   </div>
 </template>

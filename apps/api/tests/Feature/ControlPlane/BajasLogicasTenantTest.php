@@ -193,7 +193,7 @@ it('quien canceló sus datos (ARCO) no se reactiva: si vuelve, el negocio lo da 
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $a = alumnoConSesion($e, 'Vale', 'vale@correo.mx');
     $persona = (string) collect($this->getJson("/api/v1/app/{$e['slug']}/miembros", conBearer($e['bearer']))->json('data'))->value('id');
-    $this->postJson("/api/v1/app/{$e['slug']}/mi/privacidad/baja", ['motivo' => 'Ya no quiero'], conBearer($a['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/privacidad/baja", ['motivo' => 'Ya no quiero', 'password' => 'secreto123'], conBearer($a['bearer']))->assertCreated();
     $solicitud = (string) $this->getJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad", conBearer($e['bearer']))->json('data.0.id');
     $this->postJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad/{$solicitud}/atender", [], conBearer($e['bearer']))->assertOk();
 

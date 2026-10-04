@@ -829,6 +829,14 @@ export const miPrivacidad = {
     "El negocio borrará tus datos personales y cerrará tu cuenta. Tus compras y pagos se conservan sin tu nombre, como pide la ley.",
   motivo: "Motivo (opcional)",
   confirmarBaja: "Enviar solicitud",
+  // Confirmar con la contraseña antes de descargar o pedir la baja.
+  confirmarTitulo: "Confirma que eres tú",
+  confirmarDescargaTexto:
+    "Para descargar tus datos, escribe la contraseña con la que entras.",
+  confirmarBajaTexto:
+    "Para enviar la solicitud de baja de tus datos, escribe la contraseña con la que entras.",
+  contrasena: "Contraseña",
+  cancelar: "Cancelar",
   bajaEnviada: "Solicitud enviada. El negocio te responderá.",
   bajaPendiente: "Tu solicitud de baja está en revisión.",
   bajaRechazada: "El negocio no pudo darte de baja: {respuesta}",

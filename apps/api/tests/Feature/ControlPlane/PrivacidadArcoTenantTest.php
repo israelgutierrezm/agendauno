@@ -39,11 +39,18 @@ function alumnaConDatos(array $e): array
     return ['bearer' => $alumna['bearer'], 'persona' => $persona];
 }
 
-it('el alumno descarga todos sus datos (acceso y portabilidad)', function (): void {
+it('el alumno descarga todos sus datos (acceso y portabilidad), confirmando con su contraseña', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $vale = alumnaConDatos($e);
+    $url = "/api/v1/app/{$e['slug']}/mi/datos";
 
-    $r = $this->get("/api/v1/app/{$e['slug']}/mi/datos", conBearer($vale['bearer']))->assertOk();
+    // Sin contraseña, o con otra, no hay descarga; tampoco por GET (iría en la URL).
+    $this->postJson($url, [], conBearer($vale['bearer']))->assertUnprocessable()->assertJsonStructure(['meta' => ['errors' => ['password']]]);
+    $this->postJson($url, ['password' => 'otra-cosa'], conBearer($vale['bearer']))
+        ->assertUnprocessable()->assertJsonPath('meta.errors.password.0', 'La contraseña no es correcta.');
+    $this->getJson($url, conBearer($vale['bearer']))->assertStatus(405);
+
+    $r = $this->postJson($url, ['password' => 'secreto123'], conBearer($vale['bearer']))->assertOk();
     expect((string) $r->headers->get('Content-Disposition'))->toContain('attachment');
     $r->assertJsonPath('data.persona.email', 'vale@correo.mx')
         ->assertJsonPath('data.membresias_y_paquetes.0.producto', 'Pack 8 clases')
@@ -75,7 +82,7 @@ it('la baja: el alumno la pide y el negocio la atiende anonimizando sus datos', 
 
     // La pide (una sola abierta aunque insista).
     foreach ([1, 2] as $_) {
-        $this->postJson("/api/v1/app/{$e['slug']}/mi/privacidad/baja", ['motivo' => 'Me mudo'], conBearer($vale['bearer']))
+        $this->postJson("/api/v1/app/{$e['slug']}/mi/privacidad/baja", ['motivo' => 'Me mudo', 'password' => 'secreto123'], conBearer($vale['bearer']))
             ->assertCreated()->assertJsonPath('data.baja.estado', 'pendiente');
     }
     $solicitudes = $this->getJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad", conBearer($e['bearer']))
@@ -105,7 +112,10 @@ it('la baja: el alumno la pide y el negocio la atiende anonimizando sus datos', 
 it('el negocio puede rechazar la baja con motivo; la persona queda intacta', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $vale = alumnaConDatos($e);
-    $this->postJson("/api/v1/app/{$e['slug']}/mi/privacidad/baja", [], conBearer($vale['bearer']))->assertCreated();
+    // Sin su contraseña no se pide la baja.
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/privacidad/baja", ['password' => 'no-es'], conBearer($vale['bearer']))->assertUnprocessable();
+    $this->getJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad", conBearer($e['bearer']))->assertOk()->assertJsonCount(0, 'data');
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/privacidad/baja", ['password' => 'secreto123'], conBearer($vale['bearer']))->assertCreated();
     $id = (string) $this->getJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad", conBearer($e['bearer']))->json('data.0.id');
 
     $this->postJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad/{$id}/rechazar", [], conBearer($e['bearer']))->assertStatus(422);
@@ -117,4 +127,15 @@ it('el negocio puede rechazar la baja con motivo; la persona queda intacta', fun
 
     $instructor = personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
     $this->getJson("/api/v1/app/{$e['slug']}/solicitudes-privacidad", conBearer($instructor))->assertStatus(403);
+});
+
+it('confirmar con la contraseña tiene pocos intentos por minuto', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $vale = alumnaConDatos($e);
+    $url = "/api/v1/app/{$e['slug']}/mi/datos";
+
+    for ($i = 0; $i < 5; $i++) {
+        $this->postJson($url, ['password' => 'adivinando'], conBearer($vale['bearer']))->assertUnprocessable();
+    }
+    $this->postJson($url, ['password' => 'secreto123'], conBearer($vale['bearer']))->assertStatus(429);
 });

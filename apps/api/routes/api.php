@@ -289,10 +289,13 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/mi/dispositivos', [MiDispositivosTenantController::class, 'registrar'])->name('mi.dispositivos.store');
             Route::delete('/mi/dispositivos', [MiDispositivosTenantController::class, 'quitar'])->name('mi.dispositivos.destroy');
             // Privacidad (ARCO): descargar mis datos, oponerme a promociones, pedir la baja.
+            // Descargar y pedir la baja se confirman con la contraseña (en el cuerpo).
             Route::get('/mi/privacidad', [MiPrivacidadTenantController::class, 'mostrar'])->name('mi.privacidad');
             Route::put('/mi/privacidad', [MiPrivacidadTenantController::class, 'actualizar'])->name('mi.privacidad.actualizar');
-            Route::get('/mi/datos', [MiPrivacidadTenantController::class, 'datos'])->name('mi.datos');
-            Route::post('/mi/privacidad/baja', [MiPrivacidadTenantController::class, 'solicitarBaja'])->name('mi.privacidad.baja');
+            Route::post('/mi/datos', [MiPrivacidadTenantController::class, 'datos'])
+                ->middleware('throttle:confirmar-contrasena')->name('mi.datos');
+            Route::post('/mi/privacidad/baja', [MiPrivacidadTenantController::class, 'solicitarBaja'])
+                ->middleware('throttle:confirmar-contrasena')->name('mi.privacidad.baja');
             // Reseñas: lo que el alumno puede calificar y su calificación.
             Route::get('/mi/resenas/pendientes', [ResenasTenantController::class, 'pendientes'])->name('mi.resenas.pendientes');
             Route::post('/mi/reservas/{reserva}/resena', [ResenasTenantController::class, 'calificar'])->name('mi.reservas.resena');

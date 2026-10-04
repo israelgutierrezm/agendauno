@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\BajaDePersonaTenant;
 use App\Modules\Tenancy\Application\ExportarDatosPersonaTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
+use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -14,13 +15,18 @@ use App\Modules\Tenancy\Models\SolicitudPrivacidadTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Privacidad del alumno (derechos ARCO frente al negocio): descargar sus datos
  * (acceso/portabilidad), oponerse a promociones, aceptar o retirar los avisos por
  * WhatsApp (si el negocio los usa, ADR 0069) y pedir la baja de sus datos
  * (cancelación). La rectificación está en "Mi perfil".
+ *
+ * Descargar los datos y pedir la baja se confirman con la contraseña: así se sabe
+ * que quien tiene la sesión abierta es de verdad la persona.
  */
 class MiPrivacidadTenantController
 {
@@ -29,6 +35,7 @@ class MiPrivacidadTenantController
         private readonly ExportarDatosPersonaTenant $exportar,
         private readonly BajaDePersonaTenant $baja,
         private readonly WhatsAppTenant $whatsapp,
+        private readonly RegistrarAuditoria $auditoria,
     ) {}
 
     public function mostrar(Request $request): JsonResponse
@@ -57,6 +64,8 @@ class MiPrivacidadTenantController
     public function datos(Request $request): JsonResponse
     {
         $persona = $this->persona($request);
+        $usuario = $this->confirmarContrasena($request);
+        $this->auditoria->registrar($usuario, 'privacidad.datos_descargados', 'persona', (string) $persona->ulid);
         $nombre = 'mis-datos-'.Str::slug((string) $request->route('estudio')).'.json';
 
         return response()->json(['data' => $this->exportar->para($persona)], 200, [
@@ -67,6 +76,7 @@ class MiPrivacidadTenantController
     public function solicitarBaja(Request $request): JsonResponse
     {
         $persona = $this->persona($request);
+        $this->confirmarContrasena($request);
         $validado = $request->validate(['motivo' => ['nullable', 'string', 'max:500']]);
         $motivo = $validado['motivo'] ?? null;
         $this->baja->solicitar($persona, is_string($motivo) && trim($motivo) !== '' ? trim($motivo) : null);
@@ -94,6 +104,25 @@ class MiPrivacidadTenantController
                 'respuesta' => $solicitud->respuesta,
             ] : null,
         ];
+    }
+
+    /**
+     * Confirma con la contraseña que es la persona de la sesión. Sin contraseña (p. ej.
+     * solo entra con Google) primero debe crear una en Mi perfil.
+     */
+    private function confirmarContrasena(Request $request): Usuario
+    {
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($usuario instanceof Usuario, 401);
+        $validado = $request->validate(['password' => ['required', 'string']]);
+        if ($usuario->password === null || $usuario->password === '') {
+            throw ValidationException::withMessages(['password' => ['Crea una contraseña en Mi perfil para confirmar que eres tú.']]);
+        }
+        if (! Hash::check((string) $validado['password'], (string) $usuario->password)) {
+            throw ValidationException::withMessages(['password' => ['La contraseña no es correcta.']]);
+        }
+
+        return $usuario;
     }
 
     private function persona(Request $request): PersonaTenant

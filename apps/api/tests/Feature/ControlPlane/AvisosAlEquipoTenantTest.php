@@ -79,7 +79,7 @@ function avisosAlEquipo(array $e): array
 it('una solicitud de baja de datos le llega a quien puede atenderla', function (): void {
     $e = negocioConEquipo();
 
-    $this->postJson("/api/v1/app/{$e['slug']}/mi/privacidad/baja", ['motivo' => 'Me mudo'], conBearer($e['vale']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/mi/privacidad/baja", ['motivo' => 'Me mudo', 'password' => 'secreto123'], conBearer($e['vale']))->assertCreated();
 
     $avisos = avisosAlEquipo($e);
     // Correo a la dueña y a recepción (gestionan alumnos); push solo a la dueña, que

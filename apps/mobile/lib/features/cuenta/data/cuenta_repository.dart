@@ -181,17 +181,22 @@ class CuentaRepository {
     );
   }
 
-  /// Todo lo que el negocio tiene de él (derecho de acceso).
-  Future<Map<String, dynamic>> misDatos() async {
-    final res = await _dio.get<Map<String, dynamic>>('$_base/mi/datos');
+  /// Todo lo que el negocio tiene de él (derecho de acceso). Se confirma con su
+  /// contraseña (va en el cuerpo, nunca en la URL).
+  Future<Map<String, dynamic>> misDatos(String password) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/mi/datos',
+      data: {'password': password},
+    );
     return (res.data?['data'] ?? {}) as Map<String, dynamic>;
   }
 
-  /// Pide la baja de sus datos (cancelación); el negocio la atiende.
-  Future<Privacidad> solicitarBaja(String? motivo) async {
+  /// Pide la baja de sus datos (cancelación), confirmando con su contraseña; el
+  /// negocio la atiende.
+  Future<Privacidad> solicitarBaja(String? motivo, String password) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '$_base/mi/privacidad/baja',
-      data: {'motivo': motivo},
+      data: {'motivo': motivo, 'password': password},
     );
     return Privacidad.desdeJson(
       (res.data?['data'] ?? {}) as Map<String, dynamic>,

@@ -78,6 +78,18 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        // Confirmar con la contraseña una acción delicada (descargar mis datos, pedir
+        // la baja): pocos intentos por usuario de cada negocio, para que no sirva para
+        // adivinarla con una sesión robada.
+        RateLimiter::for('confirmar-contrasena', function (Request $request): Limit {
+            $usuario = $request->attributes->get('usuario_tenant');
+            $estudio = (string) ($request->route('estudio') ?? '');
+
+            return Limit::perMinute(5)->by($usuario instanceof Usuario
+                ? 'confirmar:'.$estudio.':'.$usuario->getKey()
+                : 'confirmar-ip:'.$request->ip());
+        });
+
         // Rate limit de las rutas tenant AUTENTICADAS: por usuario tenant (o IP si no
         // se resolvio), para frenar abuso/enumeracion sin castigar a todo el estudio.
         RateLimiter::for('tenant', function (Request $request): Limit {

@@ -81,8 +81,57 @@ class _MiPrivacidadScreenState extends ConsumerState<MiPrivacidadScreen> {
     }
   });
 
-  Future<void> _verDatos() => _conRepo((repo) async {
-    final datos = await repo.misDatos();
+  /// Pide su contraseña para confirmar que es la persona de la sesión; null si
+  /// cancela.
+  Future<String?> _contrasena(String explicacion) async {
+    final campo = TextEditingController();
+    final valor = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirma que eres tú'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(explicacion),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('confirmar-contrasena'),
+              controller: campo,
+              obscureText: true,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Contraseña'),
+              onSubmitted: (v) => Navigator.of(context).pop(v),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(campo.text),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+    campo.dispose();
+    return valor == null || valor.isEmpty ? null : valor;
+  }
+
+  Future<void> _verDatos() async {
+    final password = await _contrasena(
+      'Para ver tus datos, escribe la contraseña con la que entras.',
+    );
+    if (password == null || !mounted) {
+      return;
+    }
+    await _mostrarDatos(password);
+  }
+
+  Future<void> _mostrarDatos(String password) => _conRepo((repo) async {
+    final datos = await repo.misDatos(password);
     if (!mounted) {
       return;
     }
@@ -168,8 +217,17 @@ class _MiPrivacidadScreenState extends ConsumerState<MiPrivacidadScreen> {
     if (confirmado != true || !mounted) {
       return;
     }
+    final password = await _contrasena(
+      'Para enviar la solicitud de baja de tus datos, escribe la contraseña con la que entras.',
+    );
+    if (password == null || !mounted) {
+      return;
+    }
     await _conRepo((repo) async {
-      final datos = await repo.solicitarBaja(texto.isEmpty ? null : texto);
+      final datos = await repo.solicitarBaja(
+        texto.isEmpty ? null : texto,
+        password,
+      );
       if (mounted) {
         setState(() => _datos = datos);
       }
