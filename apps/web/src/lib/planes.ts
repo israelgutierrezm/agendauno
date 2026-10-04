@@ -28,6 +28,8 @@ export interface Plan {
   politica_rollover: string;
   rollover_max: number | null;
   sucursal_id: string | null;
+  sucursales?: { id: string; nombre: string }[];
+  todas_sucursales?: boolean;
   archivado: boolean;
   ofertas: { id: string; nombre: string }[];
 }

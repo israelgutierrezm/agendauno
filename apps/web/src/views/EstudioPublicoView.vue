@@ -20,6 +20,8 @@ interface Sesion {
   lugares_libres: number | null;
 }
 interface Producto {
+  todas_sucursales?: boolean;
+  sucursales?: { id: string; nombre: string }[];
   nombre: string;
   tipo: string;
   precio_minor: number;
@@ -721,6 +723,17 @@ onMounted(cargar);
                 $t(`escaparate.registro.tipos.${p.tipo}`)
               }}</span>
               <p class="mt-2 font-light">{{ p.nombre }}</p>
+              <p
+                v-if="variasSedes && p.todas_sucursales !== undefined"
+                class="mt-1 text-sm"
+                style="color: var(--texto-suave)"
+              >
+                {{
+                  p.todas_sucursales
+                    ? $t("sucursalOperativa.todas")
+                    : p.sucursales?.map((s) => s.nombre).join(" · ")
+                }}
+              </p>
               <p class="mt-1 text-2xl font-extrabold">
                 {{ dinero(p.precio_minor, p.moneda) }}
               </p>

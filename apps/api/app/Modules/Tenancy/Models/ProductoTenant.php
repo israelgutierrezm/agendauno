@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\PoliticaRollover;
 use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\Membresias\TipoVigencia;
+use App\Modules\Tenancy\Support\TieneCoberturaSucursales;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,10 +18,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * Producto comercial vendible, tenant-local. Otorga derechos (entitlements) al
  * venderse, con su plantilla de ciclo/rollover/restricciones. Dinero:
  * `precio_minor` (BIGINT) + `moneda`. Creditos: enteros escalados.
+ *
+ * @property list<int>|null $sucursales_ids sedes donde vale (null = todas, ADR 0017)
  */
 class ProductoTenant extends Model
 {
     use HasPublicId;
+    use TieneCoberturaSucursales;
 
     protected $connection = 'tenant';
 
@@ -28,7 +32,7 @@ class ProductoTenant extends Model
 
     protected $fillable = [
         'nombre', 'tipo', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos',
-        'vigencia_tipo', 'vigencia_cantidad', 'archivado', 'actividad_id', 'sucursal_id', 'politica_reset',
+        'vigencia_tipo', 'vigencia_cantidad', 'archivado', 'actividad_id', 'sucursal_id', 'sucursales_ids', 'politica_reset',
         'unidades_por_ciclo', 'politica_rollover', 'rollover_max',
     ];
 
@@ -36,6 +40,7 @@ class ProductoTenant extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'sucursales_ids' => 'array',
         'tipo' => TipoProducto::class,
         'precio_minor' => 'integer',
         'ilimitado' => 'boolean',

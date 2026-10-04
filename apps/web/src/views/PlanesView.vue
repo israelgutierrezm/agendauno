@@ -279,6 +279,13 @@ onMounted(cargar);
               >
                 <td>
                   <p class="font-medium">{{ p.nombre }}</p>
+                  <p v-if="p.todas_sucursales !== undefined" class="pv-sub">
+                    {{
+                      p.todas_sucursales
+                        ? $t("sucursalOperativa.todas")
+                        : p.sucursales?.map((s) => s.nombre).join(" · ")
+                    }}
+                  </p>
                   <p class="pv-sub">{{ nombreSeccion(seccionDe(p.tipo)) }}</p>
                 </td>
                 <td class="hidden sm:table-cell">{{ clases(p) }}</td>

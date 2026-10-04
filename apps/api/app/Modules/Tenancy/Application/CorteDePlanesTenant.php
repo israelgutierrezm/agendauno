@@ -82,6 +82,7 @@ class CorteDePlanesTenant
             'id' => $acuerdo?->ulid,
             'derecho_id' => $plan->ulid,
             'producto' => $acuerdo?->producto?->nombre,
+            ...$plan->coberturaSucursales(),
             'tipo' => $acuerdo?->producto?->tipo->value,
             'comprado' => $acuerdo?->fecha_inicio?->toDateString(),
             'desde' => $plan->valido_desde?->toDateString(),

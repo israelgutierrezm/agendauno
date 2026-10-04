@@ -75,7 +75,9 @@ class MembresiasTenantController
             'politica_rollover' => ['nullable', Rule::enum(PoliticaRollover::class)],
             'rollover_max' => ['nullable', 'integer', 'min:0'],
             'actividad_id' => ['nullable', 'string'],
-            'sucursal_id' => ['nullable', 'string'],
+            'sucursal_id' => ['nullable', 'string', 'prohibited_with:sucursal_ids'],
+            'sucursal_ids' => ['sometimes', 'nullable', 'array', 'min:1', 'max:200'],
+            'sucursal_ids.*' => ['string', 'distinct'],
             'ofertas' => ['sometimes', 'array', 'max:200'],
             'ofertas.*' => ['string', 'distinct'],
         ]);
@@ -97,6 +99,7 @@ class MembresiasTenantController
                 ? new VigenciaProducto(TipoVigencia::from($validado['vigencia_tipo']), (int) $validado['vigencia_cantidad'])
                 : null,
             $this->ofertasDe($validado['ofertas'] ?? []),
+            isset($validado['sucursal_ids']) ? $this->sucursalesDe($validado['sucursal_ids']) : null,
         );
 
         return response()->json(['data' => $this->presentarProducto($producto)], 201);
@@ -127,7 +130,9 @@ class MembresiasTenantController
             'rollover_max' => ['nullable', 'integer', 'min:0'],
             'archivado' => ['sometimes', 'boolean'],
             'actividad_id' => ['sometimes', 'nullable', 'string'],
-            'sucursal_id' => ['sometimes', 'nullable', 'string'],
+            'sucursal_id' => ['sometimes', 'nullable', 'string', 'prohibited_with:sucursal_ids'],
+            'sucursal_ids' => ['sometimes', 'nullable', 'array', 'min:1', 'max:200'],
+            'sucursal_ids.*' => ['string', 'distinct'],
             'ofertas' => ['sometimes', 'array', 'max:200'],
             'ofertas.*' => ['string', 'distinct'],
         ]);
@@ -159,9 +164,14 @@ class MembresiasTenantController
         }
         if ($request->has('sucursal_id')) {
             $atributos['sucursal_id'] = $this->resolverId(SucursalTenant::class, $validado['sucursal_id'] ?? null);
+            $atributos['sucursales_ids'] = null;
+        }
+        if (array_key_exists('sucursal_ids', $validado)) {
+            $atributos['sucursal_id'] = null;
+            $atributos['sucursales_ids'] = isset($validado['sucursal_ids']) ? $this->sucursalesDe($validado['sucursal_ids']) : null;
         }
 
-        $antes = $producto->only(['nombre', 'precio_minor', 'ilimitado', 'creditos_incluidos', 'vigencia_tipo', 'vigencia_cantidad', 'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max', 'archivado']);
+        $antes = $producto->only(['nombre', 'precio_minor', 'ilimitado', 'creditos_incluidos', 'vigencia_tipo', 'vigencia_cantidad', 'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max', 'archivado', 'actividad_id', 'sucursal_id', 'sucursales_ids']);
         $this->membresias->actualizarProducto(
             $producto,
             $atributos,
@@ -174,7 +184,7 @@ class MembresiasTenantController
             'producto',
             $producto->ulid,
             $antes,
-            $producto->only(['nombre', 'precio_minor', 'ilimitado', 'creditos_incluidos', 'vigencia_tipo', 'vigencia_cantidad', 'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max', 'archivado']),
+            $producto->only(['nombre', 'precio_minor', 'ilimitado', 'creditos_incluidos', 'vigencia_tipo', 'vigencia_cantidad', 'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max', 'archivado', 'actividad_id', 'sucursal_id', 'sucursales_ids']),
         );
 
         return response()->json(['data' => $this->presentarProducto($producto)]);
@@ -310,11 +320,29 @@ class MembresiasTenantController
             'actividad' => $producto->actividad?->nombre,
             'sucursal_id' => $producto->sucursal?->ulid,
             'sucursal' => $producto->sucursal?->nombre,
+            ...$producto->coberturaSucursales(),
             // Clases o servicios a los que aplica; vacío = a todos.
             'ofertas' => $producto->ofertas
                 ->map(fn (OfertaTenant $o): array => ['id' => $o->ulid, 'nombre' => $o->nombre])
                 ->values()->all(),
         ];
+    }
+
+    /**
+     * Ids internos de las sucursales elegidas (por su ulid). Una que no exista es un
+     * error de captura, no se ignora en silencio.
+     *
+     * @param  list<string>  $ulids
+     * @return list<int>
+     */
+    private function sucursalesDe(array $ulids): array
+    {
+        $ids = SucursalTenant::query()->whereIn('ulid', $ulids)->pluck('id');
+        if ($ids->count() !== count($ulids)) {
+            throw ValidationException::withMessages(['sucursal_ids' => 'Alguna de las sucursales elegidas ya no existe.']);
+        }
+
+        return $ids->map(fn ($id): int => (int) $id)->values()->all();
     }
 
     /**
@@ -342,6 +370,7 @@ class MembresiasTenantController
         return [
             'id' => $derecho->ulid,
             'ambito' => $derecho->ambito,
+            ...$derecho->coberturaSucursales(),
             'ilimitado' => $derecho->ilimitado,
             'saldo' => $derecho->ilimitado ? null : $this->libro->saldo($derecho),
             'disponible' => $derecho->ilimitado ? null : $this->libro->disponible($derecho),

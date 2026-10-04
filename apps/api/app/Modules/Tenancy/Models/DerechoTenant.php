@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\PoliticaRollover;
+use App\Modules\Tenancy\Support\TieneCoberturaSucursales;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,17 +16,20 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * Derecho (entitlement) tenant-local otorgado por un acuerdo. El saldo NO se guarda
  * aqui: se deriva del ledger (`movimientos`). Puede ser ilimitado.
+ *
+ * @property list<int>|null $sucursales_ids sedes donde vale (null = todas, ADR 0017)
  */
 class DerechoTenant extends Model
 {
     use HasPublicId;
+    use TieneCoberturaSucursales;
 
     protected $connection = 'tenant';
 
     protected $table = 'derechos';
 
     protected $fillable = [
-        'acuerdo_id', 'extra_de_id', 'ambito', 'actividad_id', 'sucursal_id', 'ilimitado',
+        'acuerdo_id', 'extra_de_id', 'ambito', 'actividad_id', 'sucursal_id', 'sucursales_ids', 'ilimitado',
         'politica_reset', 'unidades_por_ciclo', 'politica_rollover', 'rollover_max',
         'ciclo_inicio', 'ciclo_fin', 'valido_desde', 'valido_hasta',
     ];
@@ -34,6 +38,7 @@ class DerechoTenant extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'sucursales_ids' => 'array',
         'ilimitado' => 'boolean',
         'politica_reset' => PoliticaReset::class,
         'politica_rollover' => PoliticaRollover::class,

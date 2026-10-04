@@ -121,8 +121,14 @@ export default {
     eligeClases: "Elige al menos una clase.",
     sinClases: "Aún no hay clases en el catálogo.",
     avanzado: "Más opciones",
-    sede: "Solo en una sede",
-    todasSedes: "Todas las sedes",
+    // Dónde se puede usar (ADR 0017): todas las sucursales o las marcadas.
+    cobertura: "Dónde se puede usar",
+    coberturaAlgunas: "Una o varias sucursales",
+    coberturaTodasAyuda:
+      "Incluye las sucursales actuales y las que abras después.",
+    coberturaAlgunasAyuda:
+      "Solo las sucursales marcadas; las que abras después no se agregan solas.",
+    coberturaCompras: "Los cambios aplican a las compras nuevas.",
     acumula: "Las clases que no use en el mes",
     acumulaNinguno: "Se pierden",
     acumulaTodo: "Pasan al mes siguiente",

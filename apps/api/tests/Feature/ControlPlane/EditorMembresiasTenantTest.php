@@ -29,6 +29,43 @@ function crearProductoTenant(array $e, array $datos): string
     ], $datos), conBearer($e['bearer']))->assertCreated()->json('data.id');
 }
 
+it('conserva las sucursales compradas y comparte el saldo entre ellas sin incluir sedes futuras', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $org = $this->postJson("/api/v1/app/{$e['slug']}/organizaciones", ['nombre' => 'Sedes'], conBearer($e['bearer']))->json('data.id');
+    $polanco = $this->postJson("/api/v1/app/{$e['slug']}/organizaciones/{$org}/sucursales", ['nombre' => 'Polanco'], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $producto = crearProductoTenant($e, ['sucursal_ids' => [$semilla['sucursal'], $polanco]]);
+    $persona = crearMiembroTenant($e, 'Ana');
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $persona, 'producto_id' => $producto], conBearer($e['bearer']))->assertCreated();
+    $futura = $this->postJson("/api/v1/app/{$e['slug']}/organizaciones/{$org}/sucursales", ['nombre' => 'Nueva'], conBearer($e['bearer']))->assertCreated()->json('data.id');
+
+    $this->putJson("/api/v1/app/{$e['slug']}/productos/{$producto}", ['sucursal_ids' => null], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.todas_sucursales', true);
+
+    $derechos = $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/derechos", conBearer($e['bearer']))->assertOk();
+    $derechos->assertJsonPath('data.0.todas_sucursales', false)->assertJsonCount(2, 'data.0.sucursales');
+    foreach ([$semilla['sucursal'], $polanco] as $sucursal) {
+        $sesion = crearSesionTenant($e, ['oferta' => $semilla['oferta'], 'sucursal' => $sucursal], 10);
+        $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))->assertCreated();
+    }
+    $noCubierta = crearSesionTenant($e, ['oferta' => $semilla['oferta'], 'sucursal' => $futura], 10);
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$noCubierta}/reservas", ['persona_id' => $persona], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonPath('code', 'ENTITLEMENT_REQUIRED')->assertJsonPath('message', 'Tu plan cubre esta actividad, pero no esta sucursal. Elige una sucursal incluida o un plan multisucursal.');
+    $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$persona}/derechos", conBearer($e['bearer']))
+        ->assertJsonPath('data.0.disponible', 6000);
+    $nuevaPersona = crearMiembroTenant($e, 'Beto');
+    $this->postJson("/api/v1/app/{$e['slug']}/acuerdos", ['persona_id' => $nuevaPersona, 'producto_id' => $producto], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$noCubierta}/reservas", ['persona_id' => $nuevaPersona], conBearer($e['bearer']))->assertCreated();
+});
+
+it('rechaza sucursales inexistentes y una selección vacía con 422', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $producto = crearProductoTenant($e, []);
+    foreach ([[], ['inexistente']] as $ids) {
+        $this->putJson("/api/v1/app/{$e['slug']}/productos/{$producto}", ['sucursal_ids' => $ids], conBearer($e['bearer']))
+            ->assertUnprocessable()->assertJsonValidationErrors(['sucursal_ids'], 'meta.errors');
+    }
+});
+
 it('edita la plantilla de un producto (precio, vigencia) sin tocar lo vendido', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $producto = crearProductoTenant($e, []);

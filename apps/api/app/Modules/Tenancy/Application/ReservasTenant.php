@@ -68,6 +68,7 @@ class ReservasTenant
         private readonly CerrarIntentosPagoTenant $intentos,
         // Ventanas de pago y de oferta, y horas de cancelación (configurables, ADR 0042).
         private readonly ParametrosTenant $parametros,
+        private readonly RegistrarAuditoria $auditoria,
     ) {}
 
     /**
@@ -215,7 +216,7 @@ class ReservasTenant
                 $derecho = $this->resolver->paraSesion($persona, $bloqueada, $costo);
 
                 if ($derecho === null) {
-                    throw new SinDerechoDisponible('No hay un derecho con saldo para esta sesion.');
+                    throw new SinDerechoDisponible($this->resolver->motivoSinDerecho($persona, $bloqueada, $costo));
                 }
 
                 // Congela (snapshot) la politica de cancelacion/no-show vigente: cancelar
@@ -338,7 +339,7 @@ class ReservasTenant
         $derecho = $this->resolver->paraSesion($persona, $sesion, $costo);
         $reglas['derecho_disponible'] = $derecho !== null;
         if ($derecho === null) {
-            return DecisionReserva::rechazar('ENTITLEMENT_REQUIRED', 'No hay un derecho con saldo para esta sesion.', $reglas);
+            return DecisionReserva::rechazar('ENTITLEMENT_REQUIRED', $this->resolver->motivoSinDerecho($persona, $sesion, $costo), $reglas);
         }
 
         // Mapa de lugares (R4): si se eligió lugar, debe estar en rango y libre.
@@ -392,9 +393,9 @@ class ReservasTenant
      * cambia el participante. No permite transferir tras registrar asistencia ni si el
      * destino ya tiene lugar en la clase.
      */
-    public function transferir(ReservaTenant $reserva, PersonaTenant $destino): ReservaTenant
+    public function transferir(ReservaTenant $reserva, PersonaTenant $destino, ?Usuario $actor = null): ReservaTenant
     {
-        return DB::connection('tenant')->transaction(function () use ($reserva, $destino): ReservaTenant {
+        return DB::connection('tenant')->transaction(function () use ($reserva, $destino, $actor): ReservaTenant {
             $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
 
             if (! in_array($bloqueada->estado, [EstadoReserva::Confirmada, EstadoReserva::Ofrecida], true)) {
@@ -416,7 +417,13 @@ class ReservasTenant
                 throw new TransferenciaInvalida('Esa persona ya tiene lugar en esta clase.');
             }
 
+            $antes = ['persona_id' => $bloqueada->persona?->ulid, 'persona' => $bloqueada->persona?->nombreCompleto()];
             $bloqueada->update(['persona_id' => $destino->getKey()]);
+            $this->auditoria->registrar($actor, 'reserva.transferida', 'reserva', (string) $bloqueada->ulid, $antes, [
+                'persona_id' => $destino->ulid,
+                'persona' => $destino->nombreCompleto(),
+                'sesion_id' => $bloqueada->sesion?->ulid,
+            ]);
             $bloqueada->refresh();
             if ($bloqueada->estado === EstadoReserva::Confirmada) {
                 $this->confirmada->emitir($bloqueada);

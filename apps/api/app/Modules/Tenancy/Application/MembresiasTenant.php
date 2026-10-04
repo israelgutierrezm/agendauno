@@ -39,6 +39,7 @@ class MembresiasTenant
 
     /**
      * @param  list<int>  $ofertaIds  clases a las que aplica (vacío = a todas)
+     * @param  list<int>|null  $sucursalesIds  sedes donde vale (null = todas, ADR 0017)
      */
     public function crearProducto(
         string $nombre,
@@ -55,6 +56,7 @@ class MembresiasTenant
         ?int $sucursalId = null,
         ?VigenciaProducto $vigencia = null,
         array $ofertaIds = [],
+        ?array $sucursalesIds = null,
     ): ProductoTenant {
         $producto = ProductoTenant::query()->create($this->normalizar([
             'nombre' => $nombre,
@@ -72,6 +74,7 @@ class MembresiasTenant
             'rollover_max' => $rolloverMax,
             'actividad_id' => $actividadId,
             'sucursal_id' => $sucursalId,
+            'sucursales_ids' => $sucursalesIds,
         ]));
         $producto->ofertas()->sync($ofertaIds);
 
@@ -195,6 +198,7 @@ class MembresiasTenant
                 'ambito' => 'general',
                 'actividad_id' => $producto->actividad_id,
                 'sucursal_id' => $producto->sucursal_id,
+                'sucursales_ids' => $producto->sucursales_ids,
                 'ilimitado' => $producto->ilimitado,
                 'politica_reset' => $politicaReset->value,
                 'unidades_por_ciclo' => $producto->unidades_por_ciclo,
@@ -288,6 +292,7 @@ class MembresiasTenant
             'ambito' => 'general',
             'actividad_id' => $base->actividad_id,
             'sucursal_id' => $base->sucursal_id,
+            'sucursales_ids' => $base->sucursales_ids,
             'ilimitado' => false,
             'politica_reset' => PoliticaReset::Ninguno->value,
             'politica_rollover' => PoliticaRollover::Ninguno->value,

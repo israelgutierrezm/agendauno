@@ -84,10 +84,28 @@ class ResolverDerechoTenant
     }
 
     /**
-     * ¿El derecho cubre esta sesion segun sus restricciones de actividad, sucursal y
-     * clases (p. ej. "Nivel 1 a 3")? Sin restriccion (nulo o sin clases) cubre cualquiera.
+     * Por qué no se puede reservar con lo que tiene: si un plan vigente y con saldo
+     * cubre la actividad pero no esa sucursal, se lo dice (para elegir otra sede o un
+     * plan multisucursal); si no, que no tiene un derecho con saldo.
      */
-    private function cubre(DerechoTenant $derecho, SesionTenant $sesion): bool
+    public function motivoSinDerecho(PersonaTenant $persona, SesionTenant $sesion, int $unidades): string
+    {
+        $otraSucursal = DerechoTenant::query()->whereHas('acuerdo', fn ($q) => $q
+            ->where('persona_id', $persona->getKey())->where('estado', EstadoAcuerdo::Activo->value))
+            ->with('ofertas:id')->get()->contains(fn (DerechoTenant $d): bool => $this->vigente($d, $sesion->inicia_en) && $this->cubre($d, $sesion, false)
+                && ! $this->cubre($d, $sesion)
+                && ($d->ilimitado || $this->libro->disponible($d) >= $unidades));
+
+        return $otraSucursal ? 'Tu plan cubre esta actividad, pero no esta sucursal. Elige una sucursal incluida o un plan multisucursal.'
+            : 'No hay un derecho con saldo para esta sesion.';
+    }
+
+    /**
+     * ¿El derecho cubre esta sesion segun sus restricciones de actividad, sucursal (una
+     * o varias, ADR 0017) y clases (p. ej. "Nivel 1 a 3")? Sin restriccion (nulo o sin
+     * clases) cubre cualquiera. Sin `$revisarSucursal`, ignora la sucursal.
+     */
+    private function cubre(DerechoTenant $derecho, SesionTenant $sesion, bool $revisarSucursal = true): bool
     {
         $sesion->loadMissing('oferta');
 
@@ -95,7 +113,10 @@ class ResolverDerechoTenant
             return false;
         }
 
-        if ($derecho->sucursal_id !== null && (int) $derecho->sucursal_id !== (int) $sesion->sucursal_id) {
+        if ($revisarSucursal && $derecho->sucursal_id !== null && (int) $derecho->sucursal_id !== (int) $sesion->sucursal_id) {
+            return false;
+        }
+        if ($revisarSucursal && $derecho->sucursales_ids !== null && ! in_array((int) $sesion->sucursal_id, $derecho->sucursales_ids, true)) {
             return false;
         }
 

@@ -57,6 +57,43 @@ function montar() {
 }
 
 describe("planes de un negocio de citas", () => {
+  it("exige elegir sedes y guarda la selección sin convertirla en cobertura total", async () => {
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/sucursales")
+            ? [
+                { id: "roma", nombre: "Roma" },
+                { id: "polanco", nombre: "Polanco" },
+              ]
+            : [],
+        },
+      }),
+    );
+    api.post.mockResolvedValue({});
+    const w = montar();
+    await flushPromises();
+    await w.get("#ep-nombre").setValue("Bono Roma");
+    await w.get("#ep-precio").setValue("500");
+    await w.get('[data-prueba="cobertura-sucursal"]').setValue("seleccionadas");
+    expect(
+      (w.get('button[type="submit"]').element as HTMLButtonElement).disabled,
+    ).toBe(true);
+    await w.get('input[type="checkbox"][value="roma"]').setValue(true);
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/productos",
+      expect.objectContaining({ sucursal_ids: ["roma"] }),
+    );
+    await w.get('[data-prueba="cobertura-sucursal"]').setValue("todas");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/productos",
+      expect.objectContaining({ sucursal_ids: null }),
+    );
+  });
   it("son bono de sesiones o membresía; el servicio suelto o el combo, en Catálogo", async () => {
     const w = montar();
     await flushPromises();

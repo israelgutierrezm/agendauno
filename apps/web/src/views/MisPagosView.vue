@@ -292,7 +292,7 @@ onMounted(() => void cuenta.asegurar());
             >
               {{
                 p.todas_sucursales
-                  ? "Todas las sucursales"
+                  ? $t("sucursalOperativa.todas")
                   : p.sucursales?.map((s) => s.nombre).join(" · ")
               }}
             </p>

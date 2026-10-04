@@ -37,3 +37,14 @@ restricciones por actividad/sucursal. El saldo sigue derivándose del ledger
 - El `MAX_CICLOS` acota el catch-up de derechos muy atrasados en una corrida.
 - La UI para configurar ciclo/rollover/restricciones en el producto y para top-ups
   queda como trabajo de frontend (hoy la API los acepta).
+
+## Ampliación: selección de sucursales (octubre de 2026)
+
+`sucursales_ids` permite limitar un producto a una lista explícita de sedes. Se
+copia al derecho al venderlo y a sus clases extra; editar el catálogo no altera
+compras anteriores. El saldo sigue siendo único y compartido entre las sedes
+incluidas. Una selección explícita no incorpora nuevas sucursales; ambas
+restricciones nulas representan todas las sucursales, incluidas las futuras.
+`sucursal_id` conserva compatibilidad con planes anteriores de una sola sede.
+La API no acepta ambos formatos simultáneamente. La migración nullable conserva
+las condiciones existentes y debe aplicarse a los tenants antes de desplegar.

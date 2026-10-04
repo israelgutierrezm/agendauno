@@ -61,7 +61,10 @@ const form = reactive({
   cantidad: String(p?.vigencia_cantidad ?? 1),
   todas: (p?.ofertas.length ?? 0) === 0,
   ofertas: new Set(p?.ofertas.map((o) => o.id) ?? []),
-  sucursal: p?.sucursal_id ?? "",
+  cobertura:
+    p?.todas_sucursales === false || p?.sucursal_id ? "seleccionadas" : "todas",
+  sucursalIds:
+    p?.sucursales?.map((s) => s.id) ?? (p?.sucursal_id ? [p.sucursal_id] : []),
   rollover: p?.politica_rollover ?? "ninguno",
   rolloverMax:
     p?.rollover_max != null ? String(p.rollover_max / UNIDADES_POR_CLASE) : "",
@@ -150,6 +153,7 @@ function alternar(id: string): void {
 const valido = computed(
   () =>
     form.nombre.trim() !== "" &&
+    (form.cobertura === "todas" || form.sucursalIds.length > 0) &&
     numero(form.precio) !== null &&
     (esExtra.value || form.todas || form.ofertas.size > 0),
 );
@@ -183,7 +187,7 @@ async function guardar(): Promise<void> {
     vigencia_cantidad: sinVigencia.value ? null : numero(form.cantidad),
     // Las extras sirven para lo mismo que el paquete al que se suman.
     ofertas: esExtra.value || form.todas ? [] : [...form.ofertas],
-    sucursal_id: form.sucursal || null,
+    sucursal_ids: form.cobertura === "todas" ? null : form.sucursalIds,
   };
   try {
     if (p) {
@@ -472,23 +476,50 @@ onMounted(async () => {
       </div>
     </fieldset>
 
+    <fieldset v-if="sucursales.length > 1 && !esExtra" class="space-y-3">
+      <legend class="font-medium">
+        {{ $t("planes.editor.cobertura") }}
+      </legend>
+      <select
+        v-model="form.cobertura"
+        class="tu-input"
+        data-prueba="cobertura-sucursal"
+        :aria-label="$t('planes.editor.cobertura')"
+      >
+        <option value="todas">{{ $t("sucursalOperativa.todas") }}</option>
+        <option value="seleccionadas">
+          {{ $t("planes.editor.coberturaAlgunas") }}
+        </option>
+      </select>
+      <div
+        v-if="form.cobertura === 'seleccionadas'"
+        class="grid gap-2 sm:grid-cols-2"
+      >
+        <label
+          v-for="s in sucursales"
+          :key="s.id"
+          class="flex items-center gap-2"
+        >
+          <input v-model="form.sucursalIds" type="checkbox" :value="s.id" />{{
+            s.nombre
+          }}
+        </label>
+      </div>
+      <p class="text-sm" style="color: var(--texto-suave)">
+        {{
+          form.cobertura === "todas"
+            ? $t("planes.editor.coberturaTodasAyuda")
+            : $t("planes.editor.coberturaAlgunasAyuda")
+        }}
+        {{ $t("planes.editor.coberturaCompras") }}
+      </p>
+    </fieldset>
     <!-- Más opciones -->
     <details class="text-sm">
       <summary class="cursor-pointer" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("planes.editor.avanzado") }}
       </summary>
       <div class="mt-3 grid gap-3 sm:grid-cols-2">
-        <div v-if="sucursales.length > 1">
-          <label class="tu-label" for="ep-sede">{{
-            $t("planes.editor.sede")
-          }}</label>
-          <select id="ep-sede" v-model="form.sucursal" class="tu-input">
-            <option value="">{{ $t("planes.editor.todasSedes") }}</option>
-            <option v-for="s in sucursales" :key="s.id" :value="s.id">
-              {{ s.nombre }}
-            </option>
-          </select>
-        </div>
         <template v-if="esMembresia && !form.ilimitado">
           <div>
             <label class="tu-label" for="ep-acumula">{{

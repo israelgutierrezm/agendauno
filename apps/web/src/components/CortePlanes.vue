@@ -20,6 +20,8 @@ interface Uso {
   extra: boolean;
 }
 interface PlanCorte {
+  todas_sucursales?: boolean;
+  sucursales?: { id: string; nombre: string }[];
   id: string;
   derecho_id: string;
   producto: string | null;
@@ -173,6 +175,16 @@ defineExpose({ cargar });
         >
           <div class="flex flex-wrap items-baseline justify-between gap-2">
             <h3 class="font-medium">{{ p.producto ?? "—" }}</h3>
+            <span
+              v-if="p.todas_sucursales !== undefined"
+              class="text-xs"
+              style="color: var(--texto-suave)"
+              >{{
+                p.todas_sucursales
+                  ? $t("sucursalOperativa.todas")
+                  : p.sucursales?.map((s) => s.nombre).join(" · ")
+              }}</span
+            >
             <span class="inline-flex items-center gap-1.5 text-sm">
               <span
                 class="h-2 w-2 rounded-full"
