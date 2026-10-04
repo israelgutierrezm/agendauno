@@ -188,7 +188,8 @@ export default {
     calendario: {
       titulo: "Mi calendario",
       proximas: "Próximas clases",
-      sinClases: "No tienes clases asignadas en los próximos 30 días.",
+      proximos7: "Próximos 7 días",
+      sinClases: "No tienes clases asignadas en estos días.",
       sincronizar: "Ver mis clases en el calendario del teléfono →",
     },
   },

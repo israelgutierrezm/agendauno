@@ -141,7 +141,8 @@ const accesos = computed<Acceso[]>(() => {
       titulo: t("portal.instructor.inicio.tarjetas.semana"),
       valor: n("semanaValor", clases.value.length),
       icono: "lista",
-      to: { name: "mis-clases", query: { vista: "lista" } },
+      // Los próximos 7 días, no la lista de un mes.
+      to: { name: "mis-clases", query: { vista: "lista", dias: "7" } },
     },
     {
       clave: "calendario",

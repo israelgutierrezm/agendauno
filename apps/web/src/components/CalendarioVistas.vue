@@ -41,6 +41,8 @@ const props = defineProps<{
   error?: string | null;
   /** Vista con la que abre (p. ej. desde un acceso directo); si no, la recordada. */
   vistaInicial?: Vista | null;
+  /** Cuántos días ve la lista desde hoy (30 si no se dice). */
+  diasLista?: number;
 }>();
 const emit = defineEmits<{
   abrir: [id: string];
@@ -206,8 +208,8 @@ const siguienteConAlgo = computed<string | null>(() => {
   return fechas[0] ?? null;
 });
 
-// Rango visible (fechas locales, fin incluido): la lista ve los próximos 30 días;
-// el mes, sus semanas completas.
+// Rango visible (fechas locales, fin incluido): la lista ve los próximos días
+// (`diasLista`, 30 si no se dice); el mes, sus semanas completas.
 const rango = computed(() => {
   if (vista.value === "dia") {
     return { desde: isoDe(fecha.value), hasta: isoDe(fecha.value) };
@@ -227,7 +229,10 @@ const rango = computed(() => {
       hasta: isoDe(mas(lunesDe(ultimo), 6)),
     };
   }
-  return { desde: isoDe(hoy()), hasta: isoDe(mas(hoy(), 30)) };
+  return {
+    desde: isoDe(hoy()),
+    hasta: isoDe(mas(hoy(), (props.diasLista ?? 30) - 1)),
+  };
 });
 watch(
   rango,

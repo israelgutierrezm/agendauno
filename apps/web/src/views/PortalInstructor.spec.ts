@@ -23,9 +23,10 @@ vi.mock("@/stores/sesionTenant", () => ({
     puede: (p: string) => p === "agenda.ver" || p === "asistencia.marcar",
   }),
 }));
+const ruta = vi.hoisted(() => ({ query: {} as Record<string, string> }));
 vi.mock("vue-router", () => ({
   RouterLink: { props: ["to"], template: "<a><slot /></a>" },
-  useRoute: () => ({ query: {} }),
+  useRoute: () => ruta,
 }));
 
 // Miércoles 9 de enero de 2030, 12:00 en CDMX.
@@ -102,7 +103,33 @@ describe("portal del instructor", () => {
     vi.setSystemTime(HOY);
     vi.clearAllMocks();
     localStorage.clear();
+    ruta.query = {};
     api.get.mockResolvedValue({ data: { data: SESIONES } });
+  });
+
+  it("«Próximos 7 días» abre 7 días, y lo que ya terminó hoy no es «próximo»", async () => {
+    ruta.query = { vista: "lista", dias: "7" };
+    api.get.mockResolvedValue({
+      data: {
+        data: [
+          // Hoy a las 8:00 en CDMX: ya terminó.
+          sesion("s0", "Mañanera", "2030-01-09T14:00:00Z"),
+          ...SESIONES,
+        ],
+      },
+    });
+    const w = montar(MisClasesView);
+    await flushPromises();
+
+    const params = api.get.mock.calls.at(-1)?.[1]?.params as Record<
+      string,
+      string
+    >;
+    expect(params.desde).toBe("2030-01-09");
+    expect(params.hasta).toBe("2030-01-15");
+    expect(w.text()).toContain("Próximos 7 días");
+    expect(w.text()).not.toContain("Mañanera");
+    expect(w.text()).toContain("Exotic");
   });
   afterEach(() => {
     vi.useRealTimers();

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { esInstructor } from "@/lib/roles";
 import { computed, onMounted, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -181,6 +182,9 @@ const mesInicio = ref(
 const diaSel = ref(isoDe(new Date()));
 const sucursalFiltro = ref("");
 const instructorFiltro = ref("");
+// Quien imparte (sin un rol del equipo) solo ve sus clases o citas: elegir a otro
+// profesional dejaría la agenda vacía, así que no se ofrece.
+const soloLoSuyo = computed(() => esInstructor(sesion.usuario));
 // Por servicio o clase (2.6).
 const ofertaFiltro = ref("");
 
@@ -1724,7 +1728,10 @@ onMounted(async () => {
             </option>
           </select>
         </span>
-        <span v-if="instructores.length > 0" class="tu-select-icono">
+        <span
+          v-if="instructores.length > 0 && !soloLoSuyo"
+          class="tu-select-icono"
+        >
           <IconoNav nombre="instructores" :tam="18" />
           <select
             v-model="instructorFiltro"

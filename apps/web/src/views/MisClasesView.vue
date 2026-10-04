@@ -30,6 +30,16 @@ const rango = ref<{ desde: string; hasta: string } | null>(null);
 const vistaInicial = computed(() =>
   typeof route.query.vista === "string" ? (route.query.vista as Vista) : null,
 );
+// «Próximos 7 días» abre la lista de 7 días (`?dias=7`); si no, 30.
+const diasLista = computed(() => {
+  const n = Number(route.query.dias);
+  return Number.isInteger(n) && n > 0 && n <= 62 ? n : 30;
+});
+// En la lista, lo que sigue: lo que ya terminó hoy no es «próximo».
+const ahora = ref(Date.now());
+const proximas = computed(() =>
+  clases.value.filter((c) => new Date(c.termina_en).getTime() > ahora.value),
+);
 
 function detalle(c: ClaseMia): string {
   const lugar = [c.sucursal, c.sala].filter(Boolean).join(" · ");
@@ -70,6 +80,7 @@ const eventos = computed<EventoPeriodo[]>(() =>
 
 async function alCambiarRango(r: { desde: string; hasta: string }) {
   rango.value = r;
+  ahora.value = Date.now();
   await cargar(r.desde, r.hasta);
 }
 async function recargar(): Promise<void> {
@@ -111,6 +122,7 @@ const eventoCalendario = computed(() =>
       class="mt-4"
       clave="tu.instructor.vista"
       :vista-inicial="vistaInicial"
+      :dias-lista="diasLista"
       :eventos="eventos"
       :cargando="cargando"
       @abrir="abrir"
@@ -126,13 +138,17 @@ const eventoCalendario = computed(() =>
       <template #lista>
         <div class="tu-card p-5">
           <h2 class="font-semibold">
-            {{ $t("portal.instructor.calendario.proximas") }}
+            {{
+              diasLista === 7
+                ? $t("portal.instructor.calendario.proximos7")
+                : $t("portal.instructor.calendario.proximas")
+            }}
           </h2>
           <ul
-            v-if="clases.length > 0"
+            v-if="proximas.length > 0"
             class="mt-3 divide-y divide-[var(--borde)]"
           >
-            <li v-for="c in clases" :key="c.id">
+            <li v-for="c in proximas" :key="c.id">
               <button type="button" class="mc-fila" @click="abrir(c.id)">
                 <span class="min-w-0 flex-1">
                   <span class="block truncate font-medium">{{
