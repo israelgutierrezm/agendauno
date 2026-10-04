@@ -71,19 +71,6 @@ final class CatalogoTemas
                 'borde' => '#DCE6EC', 'texto' => '#0F2233', 'texto_suave' => '#5A7382',
             ],
         ],
-        'medianoche' => [
-            'nombre' => 'Medianoche',
-            'oscuro' => true,
-            'permite_personalizar' => true,
-            'tokens' => [
-                'barra' => '#0B1120', 'barra_suave' => '#111827', 'barra_texto' => '#94A3B8',
-                'barra_activo' => '#38BDF8', 'barra_activo_texto' => '#0B1120',
-                'barra_borde' => 'rgb(255 255 255 / 10%)', 'barra_titulo' => '#FFFFFF',
-                'acento' => '#38BDF8', 'acento_texto' => '#0B1120',
-                'fondo' => '#0F172A', 'superficie' => '#1E293B', 'superficie_2' => '#273449',
-                'borde' => '#334155', 'texto' => '#F1F5F9', 'texto_suave' => '#94A3B8',
-            ],
-        ],
         'esmeralda' => [
             'nombre' => 'Esmeralda',
             'oscuro' => false,
@@ -110,19 +97,18 @@ final class CatalogoTemas
                 'borde' => '#E8D8D2', 'texto' => '#3F3438', 'texto_suave' => '#7D6C70',
             ],
         ],
-        'alto_contraste' => [
-            'nombre' => 'Alto contraste',
-            'oscuro' => false,
-            // Sin ajustes personales: personalizar rompería el contraste, que es la
-            // razón de ser de este tema.
-            'permite_personalizar' => false,
+        // El oscuro va al final de la lista.
+        'medianoche' => [
+            'nombre' => 'Medianoche',
+            'oscuro' => true,
+            'permite_personalizar' => true,
             'tokens' => [
-                'barra' => '#000000', 'barra_suave' => '#1A1A1A', 'barra_texto' => '#FFFFFF',
-                'barra_activo' => '#FFD400', 'barra_activo_texto' => '#000000',
+                'barra' => '#0B1120', 'barra_suave' => '#111827', 'barra_texto' => '#94A3B8',
+                'barra_activo' => '#38BDF8', 'barra_activo_texto' => '#0B1120',
                 'barra_borde' => 'rgb(255 255 255 / 10%)', 'barra_titulo' => '#FFFFFF',
-                'acento' => '#0000CC', 'acento_texto' => '#FFFFFF',
-                'fondo' => '#FFFFFF', 'superficie' => '#FFFFFF', 'superficie_2' => '#F0F0F0',
-                'borde' => '#000000', 'texto' => '#000000', 'texto_suave' => '#333333',
+                'acento' => '#38BDF8', 'acento_texto' => '#0B1120',
+                'fondo' => '#0F172A', 'superficie' => '#1E293B', 'superficie_2' => '#273449',
+                'borde' => '#334155', 'texto' => '#F1F5F9', 'texto_suave' => '#94A3B8',
             ],
         ],
     ];
@@ -135,7 +121,8 @@ final class CatalogoTemas
     /**
      * Lo que ve un usuario: su tema (o el predeterminado) con sus ajustes personales
      * encima, solo si el tema los admite. Un tema que ya no existe (se retiraron
-     * "AgendaUno marino", "AgendaUno noche" e "Índigo") cae en el predeterminado.
+     * "AgendaUno marino", "AgendaUno noche", "Índigo" y "Alto contraste") cae en el
+     * predeterminado.
      *
      * @param  array<string, string>|null  $personalizacion
      * @return array{clave: string, nombre: string, oscuro: bool, permite_personalizar: bool, tokens: array<string, string>, personalizacion: array<string, string>}

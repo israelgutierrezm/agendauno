@@ -31,9 +31,12 @@ it('un usuario nuevo ve el tema predeterminado y el catálogo de temas', functio
         ->assertJsonPath('data.usuario.apariencia.tokens.barra', '#FFFFFF');
 
     $data = $this->getJson("/api/v1/app/{$e['slug']}/apariencia", conBearer($e['bearer']))->assertOk()->json('data');
-    expect(collect($data['disponibles'])->pluck('clave')->all())
-        ->toContain('agendauno', 'agendauno_alternativo', 'oceano', 'medianoche', 'alto_contraste')
-        ->not->toContain('agendauno_marino', 'agendauno_noche', 'indigo');
+    $claves = collect($data['disponibles'])->pluck('clave')->all();
+    expect($claves)
+        ->toContain('agendauno', 'agendauno_alternativo', 'oceano', 'medianoche')
+        ->not->toContain('agendauno_marino', 'agendauno_noche', 'indigo', 'alto_contraste');
+    // El oscuro va al final.
+    expect(end($claves))->toBe('medianoche');
     // Con los colores de la página comercial: azul marino, rosa y azul petróleo.
     expect(collect($data['disponibles'])->firstWhere('clave', 'agendauno_alternativo'))->toMatchArray([
         'nombre' => 'Agenda Uno Alternativo',
@@ -81,7 +84,7 @@ it('los ajustes propios sobrescriben el tema y se pueden restablecer', function 
         ->assertOk()->assertJsonPath('data.tokens.acento', '#006A89');
 });
 
-it('alto contraste no admite ajustes y solo se personalizan colores válidos', function (): void {
+it('solo se personalizan colores válidos y ya no hay tema de alto contraste', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
 
     $this->putJson("/api/v1/app/{$e['slug']}/apariencia/color", ['token' => 'fondo', 'valor' => '#000000'], conBearer($e['bearer']))
@@ -92,8 +95,6 @@ it('alto contraste no admite ajustes y solo se personalizan colores válidos', f
         ->assertStatus(422);
 
     $this->putJson("/api/v1/app/{$e['slug']}/apariencia", ['tema' => 'alto_contraste'], conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.permite_personalizar', false);
-    $this->putJson("/api/v1/app/{$e['slug']}/apariencia/color", ['token' => 'acento', 'valor' => '#FF0066'], conBearer($e['bearer']))
         ->assertStatus(422);
 });
 

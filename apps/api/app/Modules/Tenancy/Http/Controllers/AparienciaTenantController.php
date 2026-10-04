@@ -66,7 +66,7 @@ class AparienciaTenantController
         $actual = CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion);
         if (! $actual['permite_personalizar']) {
             throw ValidationException::withMessages([
-                'token' => ['Este tema no admite ajustes personales: sus colores están fijados para garantizar el contraste.'],
+                'token' => ['Este tema no admite ajustes personales.'],
             ]);
         }
 

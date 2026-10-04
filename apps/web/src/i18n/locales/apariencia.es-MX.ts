@@ -26,6 +26,6 @@ export default {
   },
   restablecer: "Restablecer colores del tema",
   sinPropios:
-    "Este tema no admite ajustes personales: sus colores están fijados para garantizar el contraste.",
+    "Este tema no admite ajustes personales.",
   error: "No se pudo guardar la apariencia.",
 };
