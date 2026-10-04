@@ -13,7 +13,6 @@ export const miPerfil = {
     conectadoEstado: "Google conectado",
     desconectar: "Quitar Google",
     desconectado: "Quitaste Google: entra con tu correo y contraseña.",
-    noDisponible: "Entrar con Google aún no está disponible en este sitio.",
   },
   titulo: "Mi perfil",
   foto: "Foto",

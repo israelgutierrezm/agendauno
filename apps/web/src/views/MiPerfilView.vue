@@ -480,8 +480,13 @@ const aparienciaAbierta = ref(false);
         </div>
       </form>
 
-      <!-- Entrar con Google -->
-      <div class="mp-fila" data-prueba="google">
+      <!-- Entrar con Google: solo si el sitio lo tiene configurado (o ya lo conectó,
+           para poder quitarlo). Sin configurar no se ofrece. -->
+      <div
+        v-if="hayGoogle || usuario.google_conectado"
+        class="mp-fila"
+        data-prueba="google"
+      >
         <div>
           <h2 class="mp-titulo">{{ $t("miPerfil.google.titulo") }}</h2>
           <p class="mp-ayuda">{{ $t("miPerfil.google.ayuda") }}</p>
@@ -502,12 +507,7 @@ const aparienciaAbierta = ref(false);
               {{ $t("miPerfil.google.desconectar") }}
             </button>
           </template>
-          <template v-else-if="hayGoogle">
-            <div ref="botonGoogle" data-prueba="boton-google" />
-          </template>
-          <p v-else class="mp-ayuda">
-            {{ $t("miPerfil.google.noDisponible") }}
-          </p>
+          <div v-else ref="botonGoogle" data-prueba="boton-google" />
         </div>
       </div>
 
