@@ -95,7 +95,10 @@ describe("vender un plan", () => {
     expect(w.get('[data-prueba="venta-plan"]').text()).toContain(
       "Paquete 8 clases",
     );
-    w.findComponent(BuscarPersona).vm.$emit("update:modelValue", "m1");
+    // La persona se elige en el buscador (busca en el servidor).
+    const buscador = w.findComponent(BuscarPersona);
+    buscador.vm.$emit("elegir", { id: "m1", nombre: "Ana López" });
+    buscador.vm.$emit("update:modelValue", "m1");
     await w
       .findAll("button")
       .find((b) => b.text() === "Transferencia")!

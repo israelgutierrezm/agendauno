@@ -2,6 +2,9 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import BuscarPersona, {
+  type PersonaBuscable,
+} from "@/components/BuscarPersona.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import {
@@ -17,8 +20,8 @@ import { useToastStore } from "@/stores/toast";
 
 /**
  * Alta de una CITA por el negocio (recepción, teléfono, mostrador): cliente (se busca
- * o se da de alta al vuelo), servicio, profesional y hora. La cita queda confirmada;
- * si el servicio es de pago, se cobra en caja.
+ * entre todos en el servidor o se da de alta al vuelo), servicio, profesional y hora.
+ * La cita queda confirmada; si el servicio es de pago, se cobra en caja.
  *
  * Avisa antes de guardar si la hora cae fuera de la atención del profesional (el
  * negocio puede agendarla igual) o choca con un bloqueo de la agenda que ya se cargó
@@ -38,7 +41,6 @@ const props = defineProps<{
   ofertas: OfertaCita[];
   sucursales: { id: string; nombre: string }[];
   profesionales: { id: string; nombre: string }[];
-  clientes: { id: string; nombre: string; nombre_completo: string }[];
   inicial: {
     fecha: string;
     hora: string;
@@ -65,7 +67,8 @@ const form = ref({
   hora: "",
   duracion: 30,
 });
-const busqueda = ref("");
+// El cliente elegido (su nombre, para el aviso al agendar).
+const clienteSel = ref<PersonaBuscable | null>(null);
 const nuevo = ref(false);
 const puedeCrearCliente = computed(() =>
   useSesionTenantStore().puede("miembros.gestionar"),
@@ -98,7 +101,7 @@ watch(
       hora: props.inicial.hora,
       duracion: primera?.duracion_minutos ?? 30,
     };
-    busqueda.value = "";
+    clienteSel.value = null;
     nuevo.value = false;
     nuevoCliente.value = { nombre: "", celular: "", whatsapp: false };
     error.value = null;
@@ -115,26 +118,6 @@ watch(
     form.value.duracion = oferta.value?.duracion_minutos ?? form.value.duracion;
   },
 );
-
-function nombreCliente(c: { nombre: string; nombre_completo: string }): string {
-  return c.nombre_completo || c.nombre;
-}
-const coincidencias = computed(() => {
-  const q = busqueda.value.trim().toLowerCase();
-  if (q === "") {
-    return [];
-  }
-  return props.clientes
-    .filter((c) => nombreCliente(c).toLowerCase().includes(q))
-    .slice(0, 6);
-});
-const clienteSel = computed(() =>
-  props.clientes.find((c) => c.id === form.value.clienteId),
-);
-function elegir(id: string): void {
-  form.value.clienteId = id;
-  busqueda.value = "";
-}
 
 function dinero(minor: number): string {
   return new Intl.NumberFormat("es-MX", {
@@ -231,7 +214,7 @@ async function agendar(): Promise<void> {
   error.value = null;
   try {
     let personaId = form.value.clienteId;
-    let nombre = clienteSel.value ? nombreCliente(clienteSel.value) : "";
+    let nombre = clienteSel.value?.nombre ?? "";
     if (nuevo.value) {
       const { data } = await api.post<{ data: { id: string } }>(
         `${props.base}/miembros`,
@@ -282,45 +265,17 @@ async function agendar(): Promise<void> {
       <!-- Cliente: buscar o dar de alta al vuelo -->
       <div>
         <span class="tu-label">{{ $t("agendaVisual.nuevaCita.cliente") }}</span>
-        <div
-          v-if="clienteSel && !nuevo"
-          class="flex items-center justify-between gap-2 tu-card px-3 py-2"
-        >
-          <span class="font-semibold truncate">{{
-            nombreCliente(clienteSel)
-          }}</span>
-          <button
-            type="button"
-            class="tu-enlace text-sm"
-            @click="form.clienteId = ''"
-          >
-            {{ $t("agendaVisual.nuevaCita.cambiar") }}
-          </button>
-        </div>
-        <template v-else-if="!nuevo">
-          <input
-            v-model="busqueda"
-            class="tu-input"
-            type="search"
+        <template v-if="!nuevo">
+          <BuscarPersona
+            v-model="form.clienteId"
+            :buscar-en="`${base}/miembros`"
+            :parametros="{ tipo: 'miembro' }"
             :placeholder="$t('agendaVisual.nuevaCita.buscarCliente')"
-            :aria-label="$t('agendaVisual.nuevaCita.buscarCliente')"
+            data-prueba="buscar-cliente"
+            @elegir="clienteSel = $event"
           />
-          <ul
-            v-if="coincidencias.length > 0"
-            class="mt-1 tu-card divide-y divide-[var(--borde)]"
-          >
-            <li v-for="c in coincidencias" :key="c.id">
-              <button
-                type="button"
-                class="w-full text-left px-3 py-2 text-sm hover:opacity-80"
-                @click="elegir(c.id)"
-              >
-                {{ nombreCliente(c) }}
-              </button>
-            </li>
-          </ul>
           <button
-            v-if="puedeCrearCliente"
+            v-if="puedeCrearCliente && form.clienteId === ''"
             type="button"
             class="tu-enlace text-sm mt-2"
             @click="nuevo = true"

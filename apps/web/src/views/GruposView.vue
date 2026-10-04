@@ -26,12 +26,6 @@ interface Plantilla {
   dias_semana: number[];
   hora_local: string;
 }
-interface Miembro {
-  id: string;
-  nombre: string;
-  nombre_completo: string;
-  email?: string | null;
-}
 interface Inscripcion {
   id: string;
   persona: string | null;
@@ -45,16 +39,7 @@ const puedeGestionar = computed(() => sesion.puede("agenda.gestionar"));
 
 const grupos = ref<Grupo[]>([]);
 const plantillas = ref<Plantilla[]>([]);
-const miembros = ref<Miembro[]>([]);
 
-// Para elegir a alguien escribiendo su nombre o correo (BuscarPersona).
-const personasBuscables = computed(() =>
-  miembros.value.map((m) => ({
-    id: m.id,
-    nombre: nombreMiembro(m),
-    detalle: m.email ?? null,
-  })),
-);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
@@ -85,24 +70,17 @@ function etiquetaPlantilla(p: Plantilla): string {
     .join(" ");
   return `${p.oferta ?? "—"} · ${dias} ${p.hora_local}`;
 }
-function nombreMiembro(m: Miembro): string {
-  return m.nombre_completo || m.nombre;
-}
 
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const [g, p, m] = await Promise.all([
+    const [g, p] = await Promise.all([
       api.get<{ data: Grupo[] }>(`${base.value}/grupos`),
       api.get<{ data: Plantilla[] }>(`${base.value}/plantillas-horario`),
-      api.get<{ data: Miembro[] }>(`${base.value}/miembros`, {
-        params: { tipo: "miembro" },
-      }),
     ]);
     grupos.value = g.data.data;
     plantillas.value = p.data.data;
-    miembros.value = m.data.data;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -312,7 +290,8 @@ const indicadores = computed<Indicador[]>(() => {
                   <BuscarPersona
                     v-model="miembroId"
                     campo-id="im"
-                    :personas="personasBuscables"
+                    :buscar-en="`${base}/miembros`"
+                    :parametros="{ tipo: 'miembro' }"
                   />
                 </div>
                 <button

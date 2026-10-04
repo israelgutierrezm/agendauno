@@ -159,6 +159,20 @@ function limpiarFiltros(): void {
   archivado.value = "no";
   sucursalFiltro.value = "";
 }
+// Hay una búsqueda o un filtro: una lista vacía es «nadie coincide», no «aún no
+// hay nadie».
+const filtrando = computed(
+  () =>
+    q.value.trim() !== "" ||
+    estado.value !== "" ||
+    facturable.value !== "" ||
+    archivado.value !== "no" ||
+    sucursalFiltro.value !== "",
+);
+function quitarBusquedaYFiltros(): void {
+  q.value = "";
+  limpiarFiltros();
+}
 
 const miembros = ref<Miembro[]>([]);
 // Resumen de la persona elegida: a un lado de la tabla en pantallas anchas (como la
@@ -599,7 +613,22 @@ onMounted(() => {
 
         <template v-else>
           <EstadoVacio
-            v-if="miembros.length === 0"
+            v-if="miembros.length === 0 && filtrando"
+            class="tu-card mt-4"
+            icono="buscar"
+            :titulo="$t('miembros.sinResultados')"
+            data-prueba="sin-resultados"
+          >
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma text-sm"
+              @click="quitarBusquedaYFiltros"
+            >
+              {{ $t("miembros.quitarBusqueda") }}
+            </button>
+          </EstadoVacio>
+          <EstadoVacio
+            v-else-if="miembros.length === 0"
             class="tu-card mt-4"
             icono="miembros"
             :titulo="$t('miembros.vacio')"

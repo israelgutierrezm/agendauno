@@ -87,12 +87,6 @@ interface Recurso {
   sucursal_id: string | null;
   activo: boolean;
 }
-interface Miembro {
-  id: string;
-  nombre: string;
-  nombre_completo: string;
-  email?: string | null;
-}
 interface Reserva {
   transferencias?: {
     id: string;
@@ -155,16 +149,6 @@ const CANALES = [
 const ofertas = ref<Oferta[]>([]);
 const sucursales = ref<Sucursal[]>([]);
 const sesiones = ref<Sesion[]>([]);
-const miembros = ref<Miembro[]>([]);
-
-// Para elegir a alguien escribiendo su nombre o correo (BuscarPersona).
-const personasBuscables = computed(() =>
-  miembros.value.map((m) => ({
-    id: m.id,
-    nombre: nombreMiembro(m),
-    detalle: m.email ?? null,
-  })),
-);
 const instructores = ref<{ id: string; nombre: string }[]>([]);
 const recursos = ref<Recurso[]>([]);
 // Horario de atención de cada profesional (sombrea lo que queda fuera en citas).
@@ -262,9 +246,6 @@ function horaCorta(iso: string, zona: string): string {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(iso));
-}
-function nombreMiembro(m: Miembro): string {
-  return m.nombre_completo || m.nombre;
 }
 
 // Lo que se ve: el servidor ensancha el rango un día antes y dos después (zonas
@@ -519,14 +500,6 @@ async function cargarReferencias(): Promise<void> {
     tareas.push(
       pedir<Sucursal[]>("/sucursales").then((d) => {
         sucursales.value = d;
-      }),
-    );
-  }
-  // Los alumnos solo hacen falta para inscribir o transferir.
-  if (puedeReservar.value && puedeVerMiembros.value) {
-    tareas.push(
-      pedir<Miembro[]>("/miembros", { tipo: "miembro" }).then((d) => {
-        miembros.value = d;
       }),
     );
   }
@@ -2419,7 +2392,7 @@ onMounted(async () => {
               v-if="
                 detalle.estado === 'programada' &&
                 puedeReservar &&
-                miembros.length > 0
+                puedeVerMiembros
               "
               class="tu-detalle-seccion"
             >
@@ -2438,7 +2411,8 @@ onMounted(async () => {
                   <BuscarPersona
                     v-model="reservarModel.miembroId"
                     campo-id="rm"
-                    :personas="personasBuscables"
+                    :buscar-en="`${base}/miembros`"
+                    :parametros="{ tipo: 'miembro' }"
                   />
                 </div>
                 <div class="min-w-[120px]">
@@ -2616,7 +2590,7 @@ onMounted(async () => {
                           !r.asistencia &&
                           (r.estado === 'confirmada' ||
                             r.estado === 'ofrecida') &&
-                          miembros.length > 0
+                          puedeVerMiembros
                         "
                         class="tu-enlace"
                         :disabled="accionando"
@@ -2657,7 +2631,8 @@ onMounted(async () => {
                       <BuscarPersona
                         v-model="transferirModel.personaId"
                         :campo-id="`tr-${r.id}`"
-                        :personas="personasBuscables"
+                        :buscar-en="`${base}/miembros`"
+                        :parametros="{ tipo: 'miembro' }"
                       />
                     </div>
                     <button
@@ -3382,7 +3357,6 @@ onMounted(async () => {
       :ofertas="ofertas"
       :sucursales="sucursalActual ? [sucursalActual] : sucursales"
       :profesionales="instructores"
-      :clientes="miembros"
       :inicial="inicialCita"
       :ventanas="ventanas"
       :bloqueos="bloqueos"

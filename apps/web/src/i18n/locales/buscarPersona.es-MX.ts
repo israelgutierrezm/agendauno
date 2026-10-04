@@ -1,6 +1,7 @@
 // Elegir a una persona escribiendo su nombre (components/BuscarPersona.vue).
 export default {
-  placeholder: "Escribe su nombre o correo",
+  placeholder: "Escribe su nombre, correo o celular",
+  buscando: "Buscando…",
   cambiar: "Cambiar",
   sinCoincidencias: "Nadie coincide con esa búsqueda.",
 };

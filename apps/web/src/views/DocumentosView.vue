@@ -37,12 +37,6 @@ interface Doc {
   tipo: string | null;
   subido_en: string | null;
 }
-interface Miembro {
-  id: string;
-  nombre: string;
-  nombre_completo: string;
-  email?: string | null;
-}
 interface Consentimiento {
   id: string;
   clave: string;
@@ -89,16 +83,7 @@ const TITULOS: Record<Pestana, string> = {
 };
 const tipos = ref<TipoDoc[]>([]);
 const docs = ref<Doc[]>([]);
-const miembros = ref<Miembro[]>([]);
 
-// Para elegir a alguien escribiendo su nombre o correo (BuscarPersona).
-const personasBuscables = computed(() =>
-  miembros.value.map((m) => ({
-    id: m.id,
-    nombre: m.nombre_completo || m.nombre,
-    detalle: m.email ?? null,
-  })),
-);
 const consentimientosVigentes = ref<Consentimiento[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
@@ -119,13 +104,10 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const [t, d, m, c] = await Promise.all([
+    const [t, d, c] = await Promise.all([
       api.get<{ data: TipoDoc[] }>(`${base.value}/tipos-documento`),
       api.get<{ data: Doc[] }>(`${base.value}/documentos`, {
         params: filtroEstado.value !== "" ? { estado: filtroEstado.value } : {},
-      }),
-      api.get<{ data: Miembro[] }>(`${base.value}/miembros`, {
-        params: { tipo: "miembro" },
       }),
       puedeGestionar.value
         ? api.get<{ data: Consentimiento[] }>(`${base.value}/waivers`)
@@ -133,7 +115,6 @@ async function cargar(): Promise<void> {
     ]);
     tipos.value = t.data.data;
     docs.value = d.data.data;
-    miembros.value = m.data.data;
     consentimientosVigentes.value = c.data.data;
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -500,7 +481,8 @@ onMounted(cargar);
             <BuscarPersona
               v-model="subida.persona"
               campo-id="dp"
-              :personas="personasBuscables"
+              :buscar-en="`${base}/miembros`"
+              :parametros="{ tipo: 'miembro' }"
             />
           </div>
           <div>

@@ -821,6 +821,9 @@ export default {
     crear: "Agregar",
     creando: "Agregando…",
     vacio: "Aún no hay miembros. Agrega el primero.",
+    // Con búsqueda o filtros: nadie coincide (sí hay personas).
+    sinResultados: "Nadie coincide con la búsqueda o los filtros.",
+    quitarBusqueda: "Quitar búsqueda y filtros",
     creado: "Miembro agregado.",
     colNombre: "Nombre",
     colCorreo: "Correo",
@@ -1072,7 +1075,6 @@ export default {
       exitoPack: "Vendido. {persona} tiene {saldo} créditos.",
       exitoVenta: "Venta registrada para {persona}.",
       exitoMembresia: "Vendido. {persona} tiene una membresía activa.",
-      sinMiembros: "Primero agrega un alumno en Miembros.",
       sinProductos: "Primero crea un producto.",
       promo: "Código de promoción",
       promoPlaceholder: "CUPÓN",

@@ -40,11 +40,6 @@ interface Movimiento {
   saldo_posterior: number;
   descripcion: string | null;
 }
-interface Miembro {
-  id: string;
-  nombre_completo: string;
-  email?: string | null;
-}
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -62,16 +57,6 @@ const programa = ref<Programa>({
 });
 const recompensas = ref<Recompensa[]>([]);
 const canjes = ref<Canje[]>([]);
-const miembros = ref<Miembro[]>([]);
-
-// Para elegir a alguien escribiendo su nombre o correo (BuscarPersona).
-const personasBuscables = computed(() =>
-  miembros.value.map((m) => ({
-    id: m.id,
-    nombre: m.nombre_completo,
-    detalle: m.email ?? null,
-  })),
-);
 
 const nueva = ref({ nombre: "", descripcion: "", costo_puntos: 100 });
 
@@ -85,16 +70,14 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const [prog, recs, canj, miem] = await Promise.all([
+    const [prog, recs, canj] = await Promise.all([
       api.get<{ data: Programa }>(`${base.value}/lealtad/programa`),
       api.get<{ data: Recompensa[] }>(`${base.value}/lealtad/recompensas`),
       api.get<{ data: Canje[] }>(`${base.value}/lealtad/canjes`),
-      api.get<{ data: Miembro[] }>(`${base.value}/miembros?tipo=miembro`),
     ]);
     programa.value = prog.data.data;
     recompensas.value = recs.data.data;
     canjes.value = canj.data.data;
-    miembros.value = miem.data.data;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -450,7 +433,8 @@ const indicadores = computed<Indicador[]>(() => {
           <BuscarPersona
             v-model="miembroSel"
             class="mt-3"
-            :personas="personasBuscables"
+            :buscar-en="`${base}/miembros`"
+            :parametros="{ tipo: 'miembro' }"
             :placeholder="$t('lealtad.miembro.elige')"
             @update:model-value="verMiembro"
           />

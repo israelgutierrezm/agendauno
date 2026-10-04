@@ -3,7 +3,9 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
-import BuscarPersona from "@/components/BuscarPersona.vue";
+import BuscarPersona, {
+  type PersonaBuscable,
+} from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -29,12 +31,6 @@ import { useToastStore } from "@/stores/toast";
  * actual a la derecha (cliente, forma de pago, cupón y total) y debajo las ventas
  * recientes. Qué se vende se define en Planes y paquetes.
  */
-interface Miembro {
-  id: string;
-  nombre: string;
-  nombre_completo: string;
-  email?: string | null;
-}
 type Producto = Plan;
 interface Orden {
   id: string;
@@ -56,20 +52,12 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeVender = computed(() => sesion.puede("ordenes.gestionar"));
 const puedePromos = computed(() => sesion.puede("ordenes.gestionar"));
 
-const miembros = ref<Miembro[]>([]);
+// A quién se vende (se busca entre todos en el servidor).
+const comprador = ref<PersonaBuscable | null>(null);
 const productos = ref<Producto[]>([]);
 const ordenes = ref<Orden[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
-
-// Para elegir a alguien escribiendo su nombre o correo (BuscarPersona).
-const personasBuscables = computed(() =>
-  miembros.value.map((m) => ({
-    id: m.id,
-    nombre: nombreMiembro(m),
-    detalle: m.email ?? null,
-  })),
-);
 
 const venta = ref<{
   compradorId: string;
@@ -100,9 +88,6 @@ function dinero(minor: number, moneda = "MXN"): string {
     style: "currency",
     currency: moneda,
   }).format(minor / 100);
-}
-function nombreMiembro(m: Miembro): string {
-  return m.nombre_completo || m.nombre;
 }
 function queIncluye(p: Plan): string {
   if (p.tipo === "membresia") {
@@ -144,16 +129,12 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const [m, p, o] = await Promise.all([
-      api.get<{ data: Miembro[] }>(`${base.value}/miembros`, {
-        params: { tipo: "miembro" },
-      }),
+    const [p, o] = await Promise.all([
       api.get<{ data: Producto[] }>(`${base.value}/productos`, {
         params: { incluir: "todos" },
       }),
       api.get<{ data: Orden[] }>(`${base.value}/ordenes`),
     ]);
-    miembros.value = m.data.data;
     productos.value = p.data.data;
     ordenes.value = o.data.data;
   } catch (e) {
@@ -200,10 +181,12 @@ const total = computed(
 
 async function vender(): Promise<void> {
   const producto = productoSel.value;
-  const comprador = miembros.value.find(
-    (m) => m.id === venta.value.compradorId,
-  );
-  if (producto === null || comprador === undefined) {
+  const persona = comprador.value;
+  if (
+    producto === null ||
+    persona === null ||
+    persona.id !== venta.value.compradorId
+  ) {
     return;
   }
   // Vender cobra en el momento: se confirma qué, cuánto, cómo y a quién.
@@ -213,7 +196,7 @@ async function vender(): Promise<void> {
         producto: producto.nombre,
         monto: dinero(total.value, producto.moneda),
         metodo: t(`ventas.metodos.${venta.value.metodo}`),
-        persona: nombreMiembro(comprador),
+        persona: persona.nombre,
       }),
       { aceptar: t("confirmaciones.cobrar") },
     ))
@@ -244,7 +227,7 @@ async function vender(): Promise<void> {
   }
 
   // Ya se cobró: el formulario no queda listo para cobrar otra vez lo mismo.
-  const nombre = nombreMiembro(comprador);
+  const nombre = persona.nombre;
   venta.value.productoId = "";
   venta.value.codigoPromo = "";
   promoPreview.value = null;
@@ -253,7 +236,7 @@ async function vender(): Promise<void> {
     // Lo que le quedó: su membresía o sus créditos.
     const der = await api.get<{
       data: Array<{ ilimitado: boolean; saldo: number | null }>;
-    }>(`${base.value}/miembros/${comprador.id}/derechos`);
+    }>(`${base.value}/miembros/${persona.id}/derechos`);
     const ultimo = der.data.data[0];
     if (ultimo) {
       mensaje = ultimo.ilimitado
@@ -382,14 +365,7 @@ onMounted(cargar);
         <!-- Venta actual -->
         <aside class="tu-card vv-venta h-fit" data-prueba="venta-plan">
           <h2 class="font-medium">{{ $t("ventasVisual.ventaActual") }}</h2>
-          <p
-            v-if="miembros.length === 0"
-            class="mt-3 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("ventas.vender.sinMiembros") }}
-          </p>
-          <form v-else class="mt-3 space-y-4" @submit.prevent="vender">
+          <form class="mt-3 space-y-4" @submit.prevent="vender">
             <div>
               <label class="tu-label" for="vm">{{
                 $t("ventas.vender.miembro")
@@ -397,7 +373,9 @@ onMounted(cargar);
               <BuscarPersona
                 v-model="venta.compradorId"
                 campo-id="vm"
-                :personas="personasBuscables"
+                :buscar-en="`${base}/miembros`"
+                :parametros="{ tipo: 'miembro' }"
+                @elegir="comprador = $event"
               />
             </div>
 

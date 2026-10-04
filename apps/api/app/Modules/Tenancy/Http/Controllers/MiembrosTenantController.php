@@ -70,13 +70,9 @@ class MiembrosTenantController
             ->with('sucursal')
             ->where('tipo', $tipo)
             ->when($this->sucursalIdDe((string) $request->query('sucursal_id', '')), fn ($q, int $id) => $q->where('sucursal_id', $id))
-            // Búsqueda server-side (nombre/apellidos/email): no perder al alumno 101.
-            ->when($busqueda !== '', fn ($q) => $q->where(fn ($sub) => $sub
-                ->where('nombre', 'like', "%{$busqueda}%")
-                ->orWhere('segundo_nombre', 'like', "%{$busqueda}%")
-                ->orWhere('primer_apellido', 'like', "%{$busqueda}%")
-                ->orWhere('segundo_apellido', 'like', "%{$busqueda}%")
-                ->orWhere('email', 'like', "%{$busqueda}%")));
+            // Búsqueda en el servidor (nombre completo, correo o celular): no se pierde
+            // a la persona 101 ni a quien se busca por nombre y apellido.
+            ->when($busqueda !== '', fn ($q) => $q->buscar($busqueda));
 
         // Alcance por sucursal (R19): el staff acotado a sedes solo ve a los alumnos de
         // SUS sucursales (el propietario/admin y el staff sin asignación ven todos).
