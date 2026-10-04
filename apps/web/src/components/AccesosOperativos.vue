@@ -15,6 +15,7 @@ const TONOS: Record<string, string> = {
   recepcion: "verde",
   horarios: "cielo",
   ventas: "naranja",
+  cobranza: "naranja",
 };
 // Su imagen, si se agregó (la Agenda puede tener una por modalidad).
 const IMAGENES = computed<Record<string, string[]>>(() => ({
@@ -23,6 +24,7 @@ const IMAGENES = computed<Record<string, string[]>>(() => ({
   recepcion: ["acceso-recepcion"],
   horarios: ["acceso-horarios"],
   ventas: ["acceso-vender"],
+  cobranza: ["acceso-vender"],
 }));
 const ILUSTRACIONES: Record<string, Ilustracion> = {
   agenda: "agenda",
@@ -30,6 +32,7 @@ const ILUSTRACIONES: Record<string, Ilustracion> = {
   recepcion: "recepcion",
   horarios: "horarios",
   ventas: "ventas",
+  cobranza: "ventas",
 };
 // Los accesos: la ruta (también su regla de acceso), su ícono y su nombre.
 const DEFINICION: Record<
@@ -41,13 +44,16 @@ const DEFINICION: Record<
   recepcion: { icono: "recepcion", etiqueta: "nav.recepcion" },
   horarios: { icono: "reloj", etiqueta: "nav.horarios" },
   ventas: { icono: "ventas", etiqueta: "planes.nav.vender" },
+  cobranza: { icono: "ventas", etiqueta: "accesos.cobrarTitulo" },
 };
+// En citas cada servicio se cobra: el acceso es «Cobrar» (lo pendiente de pago),
+// no vender planes que el negocio quizá no tiene.
 const accesos = computed(() =>
   [
     "agenda",
     "miembros",
     sesion.modalidad === "citas" ? "horarios" : "recepcion",
-    "ventas",
+    sesion.modalidad === "citas" ? "cobranza" : "ventas",
   ]
     .filter((ruta) => puedeEntrar(ruta, sesion))
     .map((ruta) => {

@@ -18,6 +18,8 @@ export default {
     recepcion: "Revisa llegadas y asistencias del día.",
     horarios: "Consulta la disponibilidad de cada profesional.",
     ventas: "Consulta ventas, pagos y saldos pendientes.",
+    cobrarTitulo: "Cobrar",
+    cobranza: "Lo pendiente de pago: registra el cobro de cada cita.",
   },
   comun: {
     cambiosSinGuardar:
@@ -1044,7 +1046,22 @@ export default {
     },
     reservas: {
       titulo: "Historial de reservas",
+      tituloCitas: "Historial de citas",
       vacio: "Aún no tiene reservas.",
+    },
+    // Lo que debe, para cobrarlo desde la ficha.
+    pendientes: {
+      titulo: "Pendiente de pago",
+    },
+    // Negocio de citas: sus visitas.
+    visitas: {
+      titulo: "Visitas",
+      proxima: "Próxima cita",
+      sinProxima: "Sin próxima cita",
+      ultima: "Última visita",
+      sinUltima: "Aún no ha venido",
+      servicio: "Servicio habitual",
+      profesional: "Profesional habitual",
     },
     ordenes: {
       titulo: "Historial de compras",

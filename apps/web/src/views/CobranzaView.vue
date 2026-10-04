@@ -11,6 +11,9 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
+import RegistrarPagoOrden, {
+  type OrdenPorCobrar,
+} from "@/components/RegistrarPagoOrden.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
@@ -246,42 +249,23 @@ function detallePendiente(p: Pendiente): string {
   return t("cobranza.pendientes.comprada", { fecha: fecha(p.creada_en) });
 }
 
-// Registrar el pago de lo que se debe (en caja: efectivo, transferencia…).
-const METODOS_CAJA = ["efectivo", "transferencia", "ventanilla"] as const;
-const cobrando = ref<Pendiente | null>(null);
-const cMetodo = ref<(typeof METODOS_CAJA)[number]>("efectivo");
-const cReferencia = ref("");
-const cProcesando = ref(false);
+// Registrar el pago de lo que se debe (RegistrarPagoOrden): la orden elegida.
+const cobrando = ref<OrdenPorCobrar | null>(null);
 const avisoCobro = ref<string | null>(null);
 function abrirCobro(p: Pendiente): void {
-  cobrando.value = p;
-  cMetodo.value = "efectivo";
-  cReferencia.value = "";
   avisoCobro.value = null;
+  cobrando.value = {
+    id: p.id,
+    persona: p.persona?.nombre ?? null,
+    concepto: p.concepto,
+    total_minor: p.total_minor,
+    moneda: p.moneda,
+  };
 }
-async function registrarPago(): Promise<void> {
-  const p = cobrando.value;
-  if (!p) {
-    return;
-  }
-  cProcesando.value = true;
-  error.value = null;
-  try {
-    await api.post(`${base.value}/ordenes/${p.id}/liquidar`, {
-      metodo: cMetodo.value,
-      referencia: cReferencia.value.trim() || null,
-    });
-    avisoCobro.value = t("cobranza.pendientes.registrado", {
-      nombre: p.persona?.nombre ?? "—",
-      monto: dinero(p.total_minor, p.moneda),
-    });
-    cobrando.value = null;
-    await irPendientes(paginaPendientes.value);
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    cProcesando.value = false;
-  }
+async function alRegistrar(aviso: string): Promise<void> {
+  avisoCobro.value = aviso;
+  cobrando.value = null;
+  await irPendientes(paginaPendientes.value);
 }
 
 function marca(m: string | null): string {
@@ -1198,64 +1182,11 @@ watch(vista, cargar, { immediate: true });
       </template>
     </ModalDialogo>
     <!-- Registrar el pago de lo que se debe -->
-    <ModalDialogo
-      :abierto="cobrando !== null"
-      :titulo="$t('cobranza.pendientes.registrarTitulo')"
-      tam="md"
+    <RegistrarPagoOrden
+      :base="base"
+      :orden="cobrando"
       @cerrar="cobrando = null"
-    >
-      <form v-if="cobrando" class="space-y-4" @submit.prevent="registrarPago">
-        <p class="text-sm">
-          <span class="font-medium">{{ cobrando.persona?.nombre ?? "—" }}</span>
-          · {{ cobrando.concepto ?? "—" }}
-        </p>
-        <p class="text-2xl font-semibold tabular-nums">
-          {{ dinero(cobrando.total_minor, cobrando.moneda) }}
-        </p>
-        <div>
-          <p class="tu-label">{{ $t("ventas.vender.metodo") }}</p>
-          <div class="tu-segmentado w-full" role="group">
-            <button
-              v-for="m in METODOS_CAJA"
-              :key="m"
-              type="button"
-              class="flex-1"
-              :aria-pressed="cMetodo === m"
-              @click="cMetodo = m"
-            >
-              {{ $t(`ventas.metodos.${m}`) }}
-            </button>
-          </div>
-        </div>
-        <div>
-          <label class="tu-label" for="cobro-ref">{{
-            $t("cobranza.pendientes.referencia")
-          }}</label>
-          <input
-            id="cobro-ref"
-            v-model="cReferencia"
-            class="tu-input"
-            maxlength="255"
-          />
-        </div>
-        <div class="flex justify-end gap-2">
-          <button
-            type="button"
-            class="tu-btn tu-btn-fantasma"
-            @click="cobrando = null"
-          >
-            {{ $t("comun.cancelar") }}
-          </button>
-          <button
-            type="submit"
-            class="tu-btn tu-btn-primario"
-            :disabled="cProcesando"
-            data-prueba="confirmar-pago"
-          >
-            {{ $t("cobranza.pendientes.registrar") }}
-          </button>
-        </div>
-      </form>
-    </ModalDialogo>
+      @registrado="alRegistrar"
+    />
   </section>
 </template>

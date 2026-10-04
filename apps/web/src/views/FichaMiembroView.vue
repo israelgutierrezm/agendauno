@@ -10,6 +10,9 @@ import PanelEditarMiembro, {
   type MiembroEditable,
 } from "@/components/PanelEditarMiembro.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
+import RegistrarPagoOrden, {
+  type OrdenPorCobrar,
+} from "@/components/RegistrarPagoOrden.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useRegreso } from "@/lib/regreso";
@@ -35,6 +38,13 @@ interface Resumen {
   proxima_reserva: {
     clase: string | null;
     inicia_en: string;
+    zona_horaria: string | null;
+  } | null;
+  // La más reciente a la que llegó (en citas, qué y con quién).
+  ultima_visita?: {
+    clase: string | null;
+    profesional: string | null;
+    inicia_en: string | null;
     zona_horaria: string | null;
   } | null;
   alertas: string[];
@@ -72,6 +82,8 @@ interface Reserva {
   estado: string;
   asistencia: string | null;
   cancelada_por?: "cliente" | "negocio" | "sistema" | null;
+  tipo?: "clase" | "cita" | null;
+  instructor?: string | null;
 }
 interface Orden {
   id: string;
@@ -81,6 +93,13 @@ interface Orden {
   moneda: string;
   metodo_pago: string | null;
   pagada_en: string | null;
+  // Qué se pagó y, si es una cita, con quién y cuándo.
+  concepto?: string | null;
+  sesion?: {
+    profesional: string | null;
+    inicia_en: string;
+    zona_horaria: string | null;
+  } | null;
 }
 interface Ficha {
   persona: {
@@ -96,7 +115,9 @@ interface Ficha {
   };
   derechos: Derecho[];
   reservas: Reserva[];
-  ordenes: Orden[];
+  // Sin permiso para ver órdenes, el servidor no las manda (null).
+  ordenes: Orden[] | null;
+  pendientes?: Orden[] | null;
 }
 
 const { t } = useI18n();
@@ -125,6 +146,66 @@ const puedeGestionar = computed(() => sesion.puede("miembros.gestionar"));
 const puedeVerDerechos = computed(() => sesion.puede("derechos.ver"));
 const puedeVender = computed(() => sesion.puede("ordenes.gestionar"));
 const puedeRecargar = computed(() => sesion.puede("membresias.gestionar"));
+
+// Negocio de citas: el cliente paga cada servicio; sin bono ni membresía no le
+// falta nada. Lo que importa es su próxima cita, su última visita, lo que suele
+// pedir y con quién, y lo que debe. Los planes aparecen solo si tiene alguno.
+const esCitas = computed(() => sesion.esCitas === true);
+const conPlanes = computed(() => (ficha.value?.derechos.length ?? 0) > 0);
+const mostrarPlanes = computed(() => !esCitas.value || conPlanes.value);
+const pendientes = computed(() => ficha.value?.pendientes ?? []);
+function masFrecuente(valores: (string | null | undefined)[]): string | null {
+  const cuenta = new Map<string, number>();
+  for (const v of valores) {
+    if (v) {
+      cuenta.set(v, (cuenta.get(v) ?? 0) + 1);
+    }
+  }
+  return [...cuenta].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+}
+// Lo que más pide y con quién, de las visitas a las que llegó.
+const habituales = computed(() => {
+  const visitas = (ficha.value?.reservas ?? []).filter(
+    (r) => r.asistencia === "presente",
+  );
+  return {
+    servicio: masFrecuente(visitas.map((r) => r.clase)),
+    profesional: masFrecuente(visitas.map((r) => r.instructor)),
+  };
+});
+
+// Cobrar lo que debe desde la ficha (el mismo recorrido que «Por cobrar»).
+const cobrando = ref<OrdenPorCobrar | null>(null);
+const avisoCobro = ref<string | null>(null);
+function abrirCobro(o: Orden): void {
+  avisoCobro.value = null;
+  cobrando.value = {
+    id: o.id,
+    persona: ficha.value?.persona.nombre_completo ?? null,
+    concepto: o.concepto ?? null,
+    total_minor: o.total_minor,
+    moneda: o.moneda,
+  };
+}
+async function alRegistrar(aviso: string): Promise<void> {
+  cobrando.value = null;
+  await cargar();
+  avisoCobro.value = aviso;
+}
+// Si es una cita: con quién y cuándo; si no, la fecha de la compra.
+function detalleOrden(o: Orden): string {
+  if (o.sesion) {
+    return [
+      o.sesion.profesional
+        ? t("cobranza.pendientes.con", { nombre: o.sesion.profesional })
+        : null,
+      fechaHora(o.sesion.inicia_en, o.sesion.zona_horaria),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  return t("cobranza.pendientes.comprada", { fecha: fecha(o.fecha) });
+}
 const toast = useToastStore();
 
 // Movimientos del ledger de un derecho (1000 unidades = 1 crédito) y recarga manual.
@@ -504,7 +585,7 @@ const regreso = useRegreso({
                   {{ $t("expediente.actividad") }}
                 </button>
                 <button
-                  v-if="puedeVerDerechos"
+                  v-if="puedeVerDerechos && mostrarPlanes"
                   type="button"
                   :aria-pressed="seccion === 'planes'"
                   @click="irSeccion('planes')"
@@ -533,8 +614,124 @@ const regreso = useRegreso({
               tipo-persona="miembro"
             />
             <template v-else>
-              <!-- Membresías y paquetes (derechos) -->
-              <section class="px-5 py-5">
+              <p
+                v-if="avisoCobro"
+                class="px-5 pt-5 text-sm"
+                role="status"
+                :style="{ color: 'var(--exito)' }"
+              >
+                {{ avisoCobro }}
+              </p>
+              <!-- Lo que debe: primero, con «Registrar pago» -->
+              <section
+                v-if="pendientes.length > 0"
+                class="px-5 py-5"
+                data-prueba="pendientes-ficha"
+              >
+                <h2 class="text-sm font-semibold">
+                  {{ $t("ficha.pendientes.titulo") }}
+                </h2>
+                <ul class="mt-1">
+                  <li
+                    v-for="o in pendientes"
+                    :key="o.id"
+                    class="fi-fila"
+                    :style="{ borderColor: 'var(--borde)' }"
+                  >
+                    <div class="min-w-0">
+                      <p class="font-medium truncate">
+                        {{ o.concepto ?? "—" }}
+                      </p>
+                      <p
+                        class="mt-0.5 text-xs first-letter:uppercase"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        {{ detalleOrden(o) }}
+                      </p>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-3">
+                      <span class="font-semibold tabular-nums">{{
+                        dinero(o.total_minor, o.moneda)
+                      }}</span>
+                      <button
+                        v-if="puedeVender"
+                        type="button"
+                        class="tu-btn tu-btn-primario text-sm"
+                        data-prueba="cobrar-pendiente"
+                        @click="abrirCobro(o)"
+                      >
+                        {{ $t("cobranza.pendientes.registrar") }}
+                      </button>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+
+              <!-- Citas: sus visitas (próxima, última, lo habitual) -->
+              <section
+                v-if="esCitas"
+                class="px-5 py-5"
+                :class="{ 'border-t': pendientes.length > 0 }"
+                :style="{ borderColor: 'var(--borde)' }"
+                data-prueba="visitas-cliente"
+              >
+                <h2 class="text-sm font-semibold">
+                  {{ $t("ficha.visitas.titulo") }}
+                </h2>
+                <dl class="fi-visitas">
+                  <div>
+                    <dt>{{ $t("ficha.visitas.proxima") }}</dt>
+                    <dd v-if="resumen.proxima_reserva">
+                      {{ resumen.proxima_reserva.clase ?? "—" }}
+                      <span class="fi-visitas-detalle first-letter:uppercase">{{
+                        fechaHora(
+                          resumen.proxima_reserva.inicia_en,
+                          resumen.proxima_reserva.zona_horaria,
+                        )
+                      }}</span>
+                    </dd>
+                    <dd v-else class="fi-visitas-vacio">
+                      {{ $t("ficha.visitas.sinProxima") }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t("ficha.visitas.ultima") }}</dt>
+                    <dd v-if="resumen.ultima_visita">
+                      {{ resumen.ultima_visita.clase ?? "—" }}
+                      <span class="fi-visitas-detalle first-letter:uppercase">{{
+                        [
+                          fechaHora(
+                            resumen.ultima_visita.inicia_en,
+                            resumen.ultima_visita.zona_horaria,
+                          ),
+                          resumen.ultima_visita.profesional,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
+                      }}</span>
+                    </dd>
+                    <dd v-else class="fi-visitas-vacio">
+                      {{ $t("ficha.visitas.sinUltima") }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t("ficha.visitas.servicio") }}</dt>
+                    <dd>{{ habituales.servicio ?? "—" }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t("ficha.visitas.profesional") }}</dt>
+                    <dd>{{ habituales.profesional ?? "—" }}</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <!-- Membresías y paquetes (derechos); en citas, solo si tiene -->
+              <section
+                v-if="mostrarPlanes"
+                class="px-5 py-5"
+                :class="{ 'border-t': pendientes.length > 0 || esCitas }"
+                :style="{ borderColor: 'var(--borde)' }"
+              >
                 <h2 class="text-sm font-semibold">
                   {{ $t("ficha.derechos.titulo") }}
                 </h2>
@@ -884,7 +1081,11 @@ const regreso = useRegreso({
                 :style="{ borderColor: 'var(--borde)' }"
               >
                 <h2 class="text-sm font-semibold">
-                  {{ $t("ficha.reservas.titulo") }}
+                  {{
+                    esCitas
+                      ? $t("ficha.reservas.tituloCitas")
+                      : $t("ficha.reservas.titulo")
+                  }}
                 </h2>
                 <p
                   v-if="ficha.reservas.length === 0"
@@ -930,8 +1131,9 @@ const regreso = useRegreso({
                 </ul>
               </section>
 
-              <!-- Historial de compras -->
+              <!-- Historial de compras (solo a quien puede ver órdenes) -->
               <section
+                v-if="ficha.ordenes !== null"
                 class="px-5 py-5 border-t"
                 :style="{ borderColor: 'var(--borde)' }"
               >
@@ -939,7 +1141,7 @@ const regreso = useRegreso({
                   {{ $t("ficha.ordenes.titulo") }}
                 </h2>
                 <p
-                  v-if="ficha.ordenes.length === 0"
+                  v-if="(ficha.ordenes ?? []).length === 0"
                   class="mt-2 text-sm"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
@@ -947,14 +1149,14 @@ const regreso = useRegreso({
                 </p>
                 <ul v-else class="mt-1">
                   <li
-                    v-for="o in ficha.ordenes"
+                    v-for="o in ficha.ordenes ?? []"
                     :key="o.id"
                     class="fi-fila"
                     :style="{ borderColor: 'var(--borde)' }"
                   >
                     <div class="min-w-0">
-                      <p class="font-medium tabular-nums">
-                        {{ dinero(o.total_minor, o.moneda) }}
+                      <p class="font-medium truncate">
+                        {{ o.concepto ?? "—" }}
                       </p>
                       <p
                         class="mt-0.5 text-xs"
@@ -966,15 +1168,20 @@ const regreso = useRegreso({
                         >
                       </p>
                     </div>
-                    <span
-                      class="tu-badge shrink-0"
-                      :class="
-                        o.estado === 'pagada'
-                          ? 'tu-badge-exito'
-                          : 'tu-badge-aviso'
-                      "
-                      >{{ $t(`ficha.ordenes.estados.${o.estado}`) }}</span
-                    >
+                    <div class="flex shrink-0 items-center gap-3">
+                      <span class="font-medium tabular-nums">{{
+                        dinero(o.total_minor, o.moneda)
+                      }}</span>
+                      <span
+                        class="tu-badge"
+                        :class="
+                          o.estado === 'pagada'
+                            ? 'tu-badge-exito'
+                            : 'tu-badge-aviso'
+                        "
+                        >{{ $t(`ficha.ordenes.estados.${o.estado}`) }}</span
+                      >
+                    </div>
                   </li>
                 </ul>
               </section>
@@ -986,32 +1193,56 @@ const regreso = useRegreso({
             class="border-t lg:border-t-0 lg:border-l px-5 py-6"
             :style="{ borderColor: 'var(--borde)', background: 'var(--fondo)' }"
           >
-            <p class="fi-etiqueta">{{ $t("ficha.membresia") }}</p>
-            <p class="mt-1 text-lg font-semibold tracking-tight">
-              {{ $t(`recepcion.membresia.${resumen.membresia.estado}`) }}
-            </p>
-            <p
-              v-if="resumen.membresia.pausada_hasta"
-              class="text-sm"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{
-                $t("pausaMembresia.enPausa", {
-                  fecha: fecha(resumen.membresia.pausada_hasta),
-                })
-              }}
-            </p>
-            <p
-              v-else-if="resumen.membresia.valido_hasta"
-              class="text-sm"
-              :style="{ color: 'var(--texto-suave)' }"
-            >
-              {{
-                $t("ficha.derechos.vence", {
-                  fecha: fecha(resumen.membresia.valido_hasta),
-                })
-              }}
-            </p>
+            <template v-if="!mostrarPlanes">
+              <p class="fi-etiqueta">{{ $t("ficha.visitas.ultima") }}</p>
+              <p class="mt-1 text-lg font-semibold tracking-tight">
+                {{
+                  resumen.ultima_visita
+                    ? (resumen.ultima_visita.clase ?? "—")
+                    : $t("ficha.visitas.sinUltima")
+                }}
+              </p>
+              <p
+                v-if="resumen.ultima_visita"
+                class="text-sm first-letter:uppercase"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{
+                  fechaHora(
+                    resumen.ultima_visita.inicia_en,
+                    resumen.ultima_visita.zona_horaria,
+                  )
+                }}
+              </p>
+            </template>
+            <template v-else>
+              <p class="fi-etiqueta">{{ $t("ficha.membresia") }}</p>
+              <p class="mt-1 text-lg font-semibold tracking-tight">
+                {{ $t(`recepcion.membresia.${resumen.membresia.estado}`) }}
+              </p>
+              <p
+                v-if="resumen.membresia.pausada_hasta"
+                class="text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{
+                  $t("pausaMembresia.enPausa", {
+                    fecha: fecha(resumen.membresia.pausada_hasta),
+                  })
+                }}
+              </p>
+              <p
+                v-else-if="resumen.membresia.valido_hasta"
+                class="text-sm"
+                :style="{ color: 'var(--texto-suave)' }"
+              >
+                {{
+                  $t("ficha.derechos.vence", {
+                    fecha: fecha(resumen.membresia.valido_hasta),
+                  })
+                }}
+              </p>
+            </template>
 
             <p
               v-if="resumen.alertas.length > 0"
@@ -1038,7 +1269,7 @@ const regreso = useRegreso({
                 borderColor: 'var(--borde)',
               }"
             >
-              <div class="fi-dato">
+              <div v-if="mostrarPlanes" class="fi-dato">
                 <dt>{{ $t("ficha.saldo") }}</dt>
                 <dd data-prueba="saldo-resumen">{{ textoSaldoVigente }}</dd>
               </div>
@@ -1103,6 +1334,12 @@ const regreso = useRegreso({
       @cerrar="editando = null"
       @guardado="onGuardado"
     />
+    <RegistrarPagoOrden
+      :base="base"
+      :orden="cobrando"
+      @cerrar="cobrando = null"
+      @registrado="alRegistrar"
+    />
     <PanelMiembro
       v-if="vendiendo && ficha"
       :persona-id="personaId"
@@ -1133,6 +1370,36 @@ const regreso = useRegreso({
 }
 .fi-fila:first-child {
   border-top: 0;
+}
+/* Visitas del cliente (citas): cuatro datos en dos columnas. */
+.fi-visitas {
+  display: grid;
+  gap: 0.9rem 1.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+}
+@media (min-width: 640px) {
+  .fi-visitas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.fi-visitas dt {
+  font-size: 0.75rem;
+  color: var(--texto-suave);
+}
+.fi-visitas dd {
+  margin-top: 0.15rem;
+  font-weight: 500;
+}
+.fi-visitas-detalle {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--texto-suave);
+}
+.fi-visitas-vacio {
+  font-weight: 400 !important;
+  color: var(--texto-suave);
 }
 .fi-dato {
   display: flex;

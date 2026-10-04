@@ -7,10 +7,13 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
+use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
+use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,6 +23,10 @@ use Illuminate\Http\Request;
  * de reservas (con asistencia) y de compras (órdenes). El resumen operativo
  * (membresía/saldo/adeudo/alertas/próxima) lo entrega {@see ResumenMiembroTenantController};
  * aquí va lo que ese resumen no cubre, sin duplicar lógica.
+ *
+ * Lo económico (compras, importes, formas de pago y lo pendiente de pago) solo va a
+ * quien puede ver órdenes (`ordenes.ver`): ocultar el botón no basta, el servidor
+ * no lo entrega (`null`).
  */
 class FichaMiembroTenantController
 {
@@ -62,8 +69,15 @@ class FichaMiembroTenantController
             ],
             'derechos' => $this->derechos($persona),
             'reservas' => $this->reservas($persona),
-            'ordenes' => $this->ordenes($persona),
+            'ordenes' => $this->veDinero($actor) ? $this->ordenes($persona) : null,
+            // Todo lo que debe (sin tope), para cobrarlo desde la ficha.
+            'pendientes' => $this->veDinero($actor) ? $this->pendientes($persona) : null,
         ]]);
+    }
+
+    private function veDinero(mixed $actor): bool
+    {
+        return ! $actor instanceof Usuario || $actor->puede('ordenes.ver');
     }
 
     /**
@@ -113,13 +127,16 @@ class FichaMiembroTenantController
             ->where('reservas.persona_id', $persona->getKey())
             ->orderByDesc('sesiones.inicia_en')
             ->select('reservas.*')
-            ->with(['sesion.oferta', 'asistencia'])
+            ->with(['sesion.oferta', 'sesion.instructor', 'asistencia'])
             ->limit(self::HISTORIAL)
             ->get();
 
         return $reservas->map(fn (ReservaTenant $reserva): array => [
             'id' => $reserva->ulid,
             'clase' => $reserva->sesion?->oferta?->nombre,
+            // Clase o cita, y con quién: en citas, el servicio y el profesional habituales.
+            'tipo' => $reserva->sesion?->tipo->value,
+            'instructor' => $reserva->sesion?->instructor?->name,
             'inicia_en' => $reserva->sesion?->inicia_en?->toIso8601String(),
             'zona_horaria' => $reserva->sesion?->zona_horaria,
             'estado' => $reserva->estado->value,
@@ -138,11 +155,40 @@ class FichaMiembroTenantController
     {
         $ordenes = OrdenTenant::query()
             ->where('persona_id', $persona->getKey())
+            ->with(['lineas.producto', 'sesion.oferta', 'sesion.instructor'])
             ->orderByDesc('id')
             ->limit(self::HISTORIAL)
             ->get();
 
-        return $ordenes->map(fn (OrdenTenant $orden): array => [
+        return $ordenes->map(fn (OrdenTenant $orden): array => $this->presentarOrden($orden))->all();
+    }
+
+    /**
+     * Lo que debe, completo (de lo más antiguo a lo más reciente).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function pendientes(PersonaTenant $persona): array
+    {
+        return OrdenTenant::query()
+            ->where('persona_id', $persona->getKey())
+            ->where('estado', EstadoOrden::Pendiente->value)
+            ->with(['lineas.producto', 'sesion.oferta', 'sesion.instructor'])
+            ->orderBy('id')
+            ->get()
+            ->map(fn (OrdenTenant $orden): array => $this->presentarOrden($orden))
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function presentarOrden(OrdenTenant $orden): array
+    {
+        $sesion = $orden->sesion;
+        $productos = $orden->lineas->map(static fn (LineaOrdenTenant $l): ?string => $l->producto?->nombre)->filter()->values();
+
+        return [
             'id' => $orden->ulid,
             'fecha' => $orden->created_at?->toIso8601String(),
             'estado' => $orden->estado->value,
@@ -150,6 +196,13 @@ class FichaMiembroTenantController
             'moneda' => $orden->moneda,
             'metodo_pago' => $orden->metodo_pago,
             'pagada_en' => $orden->pagada_en?->toIso8601String(),
-        ])->all();
+            // Qué se pagó: sus productos o, si es una cita, el servicio, con quién y cuándo.
+            'concepto' => $productos->isNotEmpty() ? $productos->implode(', ') : $sesion?->oferta?->nombre,
+            'sesion' => $sesion instanceof SesionTenant ? [
+                'profesional' => $sesion->instructor?->name,
+                'inicia_en' => $sesion->inicia_en->toIso8601String(),
+                'zona_horaria' => $sesion->zona_horaria,
+            ] : null,
+        ];
     }
 }

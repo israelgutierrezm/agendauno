@@ -38,6 +38,9 @@ describe("accesos del panel", () => {
     expect(vista.text()).toContain("Horarios de atención");
     expect(vista.text()).toContain("Clientes");
     expect(vista.text()).not.toContain("Recepción");
+    // Se cobra cada cita: «Cobrar», no vender planes.
+    expect(vista.text()).toContain("Cobrar");
+    expect(vista.text()).not.toContain("Vender a un");
     vista.unmount();
   });
   it("no muestra enlaces sin permisos", () => {

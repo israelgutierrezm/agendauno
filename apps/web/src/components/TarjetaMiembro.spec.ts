@@ -58,12 +58,12 @@ describe("tarjeta de miembro", () => {
     vi.useRealTimers();
   });
 
-  it("muestra contacto, plan, créditos, vencimiento y visitas", () => {
+  it("muestra contacto, plan, lo disponible, vencimiento y visitas", () => {
     const w = montar(base);
     const texto = w.text();
     expect(texto).toContain("ana@demo.mx · 5512345678");
     expect(texto).toContain("Pack 8 clases");
-    expect(texto).toContain("6.5 créditos");
+    expect(texto).toContain("6.5 disponibles");
     expect(texto).toContain("vence el 20 feb");
     expect(texto).toContain("ayer");
     expect(texto).toMatch(/mar.*8.*ene.*09:00/);
@@ -86,7 +86,7 @@ describe("tarjeta de miembro", () => {
     expect(w.text()).toContain("Tiene un pago pendiente");
     expect(w.text()).toContain("Aún no asiste");
     expect(w.text()).toContain("Sin reservas");
-    expect(w.text()).not.toContain("créditos");
+    expect(w.text()).not.toContain("disponibles");
   });
 
   it("sin membresía lo dice, y un suspendido se marca junto al nombre", () => {

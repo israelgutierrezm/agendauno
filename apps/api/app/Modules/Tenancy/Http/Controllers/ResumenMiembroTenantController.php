@@ -12,6 +12,8 @@ use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\ModalidadServicio;
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -71,6 +73,17 @@ class ResumenMiembroTenantController
             ->with('sesion.oferta')
             ->first();
 
+        // Su última visita (la más reciente a la que llegó).
+        $ultima = ReservaTenant::query()
+            ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
+            ->join('asistencias', 'asistencias.reserva_id', '=', 'reservas.id')
+            ->where('asistencias.estado', EstadoAsistencia::Presente->value)
+            ->where('reservas.persona_id', $persona->getKey())
+            ->orderByDesc('sesiones.inicia_en')
+            ->select('reservas.*')
+            ->with(['sesion.oferta', 'sesion.instructor'])
+            ->first();
+
         $asistencias = ReservaTenant::query()
             ->join('asistencias', 'asistencias.reserva_id', '=', 'reservas.id')
             ->where('asistencias.estado', EstadoAsistencia::Presente->value)
@@ -114,8 +127,22 @@ class ResumenMiembroTenantController
                 'inicia_en' => $proxima->sesion?->inicia_en->toIso8601String(),
                 'zona_horaria' => $proxima->sesion?->zona_horaria,
             ] : null,
-            'alertas' => $this->alertas($adeudo, $estado, $documentosPendientes),
+            'ultima_visita' => $ultima instanceof ReservaTenant ? [
+                'clase' => $ultima->sesion?->oferta?->nombre,
+                'profesional' => $ultima->sesion?->instructor?->name,
+                'inicia_en' => $ultima->sesion?->inicia_en->toIso8601String(),
+                'zona_horaria' => $ultima->sesion?->zona_horaria,
+            ] : null,
+            // En citas, quien paga cada servicio no está «sin acceso»: esa alerta no aplica.
+            'alertas' => $this->alertas($adeudo, $estado, $documentosPendientes, $this->esCitas($request)),
         ]]);
+    }
+
+    private function esCitas(Request $request): bool
+    {
+        $estudio = $request->attributes->get('estudio');
+
+        return $estudio instanceof Estudio && $estudio->modalidad() === ModalidadServicio::Citas;
     }
 
     /**
@@ -123,7 +150,7 @@ class ResumenMiembroTenantController
      *
      * @return list<string>
      */
-    private function alertas(bool $adeudo, string $estadoMembresia, int $documentosPendientes): array
+    private function alertas(bool $adeudo, string $estadoMembresia, int $documentosPendientes, bool $citas): array
     {
         $alertas = [];
         if ($adeudo) {
@@ -135,7 +162,7 @@ class ResumenMiembroTenantController
             $alertas[] = 'membresia_por_vencer';
         } elseif ($estadoMembresia === 'pausada') {
             $alertas[] = 'membresia_pausada';
-        } elseif ($estadoMembresia === 'sin') {
+        } elseif ($estadoMembresia === 'sin' && ! $citas) {
             $alertas[] = 'sin_acceso';
         }
         if ($documentosPendientes > 0) {
