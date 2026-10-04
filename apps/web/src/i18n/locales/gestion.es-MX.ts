@@ -858,6 +858,12 @@ export const privacidadNegocio = {
 export const resenas = {
   titulo: "Reseñas",
   califica: "Califica tus clases",
+  // Filtro de fechas de lo que hay por calificar.
+  ventana: "Puedes calificar las de los últimos {n} días.",
+  desde: "Desde",
+  hasta: "Hasta",
+  quitarFiltro: "Quitar fechas",
+  sinEnFechas: "No hay clases por calificar en esas fechas.",
   calificacion: "Calificación",
   estrellas: "{n} de 5",
   comentarioPh: "¿Cómo te fue? (opcional)",

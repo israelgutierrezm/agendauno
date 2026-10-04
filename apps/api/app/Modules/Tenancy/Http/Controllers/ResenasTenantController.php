@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ResenaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
+use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,23 +39,52 @@ class ResenasTenantController
     public function pendientes(Request $request): JsonResponse
     {
         $persona = $this->persona($request);
+        $filtros = $request->validate([
+            'desde' => ['nullable', 'date_format:Y-m-d'],
+            'hasta' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:desde'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'between:1,50'],
+        ]);
+        $dias = $this->parametros->entero('resenas.dias_para_calificar');
+        // Las fechas del filtro son del calendario del negocio (su zona).
+        $zona = (string) (SucursalTenant::query()->value('zona_horaria') ?? config('app.timezone', 'UTC'));
 
-        $reservas = ReservaTenant::query()
+        $consulta = ReservaTenant::query()
             ->where('persona_id', $persona->getKey())
             ->whereHas('asistencia', fn ($q) => $q->where('estado', EstadoAsistencia::Presente->value))
-            ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>=', Carbon::now()->subDays($this->parametros->entero('resenas.dias_para_calificar'))))
+            ->whereHas('sesion', function ($q) use ($dias, $filtros, $zona): void {
+                $q->where('inicia_en', '>=', Carbon::now()->subDays($dias));
+                if (isset($filtros['desde'])) {
+                    $q->where('inicia_en', '>=', Carbon::parse($filtros['desde'], $zona)->startOfDay()->utc());
+                }
+                if (isset($filtros['hasta'])) {
+                    $q->where('inicia_en', '<', Carbon::parse($filtros['hasta'], $zona)->addDay()->startOfDay()->utc());
+                }
+            })
             ->whereNotExists(fn ($q) => $q->select(DB::raw(1))->from('resenas')->whereColumn('resenas.reserva_id', 'reservas.id'))
             ->with(['sesion.oferta', 'sesion.instructor'])
-            ->orderByDesc('id')
-            ->limit(20)
-            ->get();
+            ->orderByDesc('id');
 
-        return response()->json(['data' => $reservas->map(fn (ReservaTenant $r): array => [
-            'reserva_id' => $r->ulid,
-            'actividad' => $r->sesion?->oferta?->nombre,
-            'con' => $r->sesion?->instructor?->nombreCorto(),
-            'fecha' => $r->sesion?->inicia_en->toIso8601String(),
-        ])->all()]);
+        // Paginadas: si se juntan varias, no es una lista interminable.
+        $porPagina = (int) ($filtros['per_page'] ?? 20);
+        $total = (clone $consulta)->count();
+        $ultima = max(1, (int) ceil($total / $porPagina));
+        $pagina = min((int) ($filtros['page'] ?? 1), $ultima);
+        $reservas = $consulta->forPage($pagina, $porPagina)->get();
+
+        return response()->json([
+            'data' => $reservas->map(fn (ReservaTenant $r): array => [
+                'reserva_id' => $r->ulid,
+                'actividad' => $r->sesion?->oferta?->nombre,
+                'con' => $r->sesion?->instructor?->nombreCorto(),
+                'fecha' => $r->sesion?->inicia_en->toIso8601String(),
+            ])->all(),
+            'meta' => [
+                'page' => $pagina, 'ultima_pagina' => $ultima, 'total' => $total, 'per_page' => $porPagina,
+                // Hasta cuántos días atrás se puede calificar (el límite del filtro).
+                'dias_para_calificar' => $dias,
+            ],
+        ]);
     }
 
     public function calificar(Request $request): JsonResponse
