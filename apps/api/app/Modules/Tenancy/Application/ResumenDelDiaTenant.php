@@ -9,7 +9,6 @@ use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\OfertaTenant;
-use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
@@ -51,6 +50,7 @@ class ResumenDelDiaTenant
         private readonly AccesoSesionTenant $acceso,
         private readonly RadarRenovacionesTenant $radar,
         private readonly CalcularDisponibilidadTenant $disponibilidad,
+        private readonly PorCobrarTenant $porCobrar,
     ) {}
 
     /**
@@ -66,7 +66,7 @@ class ResumenDelDiaTenant
             'modalidad' => $modalidad->value,
             'agenda' => $veAgenda ? $this->agenda($usuario, $fecha, $permitidas) : null,
             'libres' => $veAgenda && $modalidad === ModalidadServicio::Citas ? $this->libres($usuario, $fecha, $permitidas) : null,
-            'cobros' => $usuario->puede('facturacion.ver') ? $this->cobros() : null,
+            'cobros' => $usuario->puede('facturacion.ver') ? $this->cobros($permitidas) : null,
             'renovaciones' => $usuario->puede('miembros.gestionar') ? $this->renovaciones($permitidas) : null,
         ];
     }
@@ -213,22 +213,16 @@ class ResumenDelDiaTenant
     }
 
     /**
-     * @return array{ordenes_pendientes: int, por_cobrar: list<array{moneda: string, total_minor: int}>, en_mora: int}
+     * Lo que ya se debe, con el mismo criterio que «Por cobrar» (las citas próximas
+     * que se pagan al atenderlas no cuentan todavía), y quién está en mora.
+     *
+     * @param  list<int>|null  $permitidas
+     * @return array{ordenes_pendientes: int, por_cobrar: list<array{moneda: string, total_minor: int}>, proximas: int, en_mora: int}
      */
-    private function cobros(): array
+    private function cobros(?array $permitidas): array
     {
-        $pendientes = OrdenTenant::query()
-            ->where('estado', EstadoOrden::Pendiente->value)
-            ->groupBy('moneda')
-            ->selectRaw('moneda, COUNT(*) as n, SUM(total_minor) as total')
-            ->get();
-
         return [
-            'ordenes_pendientes' => (int) $pendientes->sum(fn ($f): int => (int) $f->getAttribute('n')),
-            'por_cobrar' => $pendientes->map(fn ($f): array => [
-                'moneda' => mb_strtoupper((string) $f->getAttribute('moneda')),
-                'total_minor' => (int) $f->getAttribute('total'),
-            ])->values()->all(),
+            ...$this->porCobrar->resumen($permitidas),
             'en_mora' => ProcesoDunningTenant::query()
                 ->whereIn('estado', [EstadoDunning::EnMora->value, EstadoDunning::Suspendido->value])
                 ->count(),

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 
 import CorregirCobro from "@/components/CorregirCobro.vue";
 import CorteDeCaja from "@/components/CorteDeCaja.vue";
@@ -10,6 +10,7 @@ import PorConciliar from "@/components/PorConciliar.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
@@ -17,6 +18,31 @@ import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
+// Lo que ya se debe (GET /cobranza/pendientes): compras sin pagar y citas o clases
+// de pago que ya pasaron. Es el mismo criterio que el Inicio.
+interface Pendiente {
+  id: string;
+  persona: { id: string; nombre: string } | null;
+  concepto: string | null;
+  total_minor: number;
+  moneda: string;
+  creada_en: string | null;
+  sesion: {
+    tipo: "clase" | "cita";
+    profesional: string | null;
+    inicia_en: string;
+    zona_horaria: string | null;
+    sucursal: string | null;
+  } | null;
+}
+interface MetaPendientes {
+  page: number;
+  ultima_pagina: number;
+  total: number;
+  per_page: number;
+  por_cobrar: { moneda: string; total_minor: number }[];
+  proximas: number;
+}
 interface Moroso {
   id: string;
   acuerdo: string | null;
@@ -69,6 +95,9 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeRegularizar = computed(() => sesion.puede("ordenes.gestionar"));
 const puedeReembolsar = computed(() => sesion.puede("pagos.reembolsar"));
 
+const pendientes = ref<Pendiente[]>([]);
+const metaPendientes = ref<MetaPendientes | null>(null);
+const paginaPendientes = ref(1);
 const morosos = ref<Moroso[]>([]);
 const pagos = ref<Pago[]>([]);
 const suscripciones = ref<Suscripcion[]>([]);
@@ -152,13 +181,20 @@ async function cargar(): Promise<void> {
       const p = await api.get<{ data: Pago[] }>(`${base.value}/pagos`);
       pagos.value = p.data.data;
     } else {
-      const [d, s] = await Promise.all([
+      const [pe, d, s] = await Promise.all([
+        api.get<{ data: Pendiente[]; meta: MetaPendientes }>(
+          `${base.value}/cobranza/pendientes`,
+          { params: { page: paginaPendientes.value } },
+        ),
         api.get<{ data: Moroso[] }>(`${base.value}/dunning`),
         api.get<{
           data: Suscripcion[];
           pago_automatico_disponible?: boolean;
         }>(`${base.value}/suscripciones`),
       ]);
+      pendientes.value = pe.data.data;
+      metaPendientes.value = pe.data.meta;
+      paginaPendientes.value = pe.data.meta.page;
       morosos.value = d.data.data;
       suscripciones.value = s.data.data;
       pagoAutomaticoDisponible.value =
@@ -168,6 +204,83 @@ async function cargar(): Promise<void> {
     error.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
+  }
+}
+
+// Otra página de lo que se debe (sin recargar mora ni renovaciones).
+async function irPendientes(n: number): Promise<void> {
+  paginaPendientes.value = n;
+  try {
+    const { data } = await api.get<{
+      data: Pendiente[];
+      meta: MetaPendientes;
+    }>(`${base.value}/cobranza/pendientes`, { params: { page: n } });
+    pendientes.value = data.data;
+    metaPendientes.value = data.meta;
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  }
+}
+
+// Qué se debe, en una línea: la cita (con quién, cuándo) o la fecha de la compra.
+function detallePendiente(p: Pendiente): string {
+  if (p.sesion) {
+    return [
+      p.sesion.profesional
+        ? t("cobranza.pendientes.con", { nombre: p.sesion.profesional })
+        : null,
+      new Intl.DateTimeFormat("es-MX", {
+        timeZone: p.sesion.zona_horaria ?? undefined,
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(new Date(p.sesion.inicia_en)),
+      p.sesion.sucursal,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  return t("cobranza.pendientes.comprada", { fecha: fecha(p.creada_en) });
+}
+
+// Registrar el pago de lo que se debe (en caja: efectivo, transferencia…).
+const METODOS_CAJA = ["efectivo", "transferencia", "ventanilla"] as const;
+const cobrando = ref<Pendiente | null>(null);
+const cMetodo = ref<(typeof METODOS_CAJA)[number]>("efectivo");
+const cReferencia = ref("");
+const cProcesando = ref(false);
+const avisoCobro = ref<string | null>(null);
+function abrirCobro(p: Pendiente): void {
+  cobrando.value = p;
+  cMetodo.value = "efectivo";
+  cReferencia.value = "";
+  avisoCobro.value = null;
+}
+async function registrarPago(): Promise<void> {
+  const p = cobrando.value;
+  if (!p) {
+    return;
+  }
+  cProcesando.value = true;
+  error.value = null;
+  try {
+    await api.post(`${base.value}/ordenes/${p.id}/liquidar`, {
+      metodo: cMetodo.value,
+      referencia: cReferencia.value.trim() || null,
+    });
+    avisoCobro.value = t("cobranza.pendientes.registrado", {
+      nombre: p.persona?.nombre ?? "—",
+      monto: dinero(p.total_minor, p.moneda),
+    });
+    cobrando.value = null;
+    await irPendientes(paginaPendientes.value);
+  } catch (e) {
+    error.value = mensajeDeError(e);
+  } finally {
+    cProcesando.value = false;
   }
 }
 
@@ -373,25 +486,29 @@ const indicadores = computed<Indicador[]>(() => {
     ];
   }
   if (vista.value === "por-cobrar") {
-    const suspendidos = morosos.value.filter(
-      (m) => m.estado === "suspendido",
-    ).length;
     const automaticos = suscripciones.value.filter(
       (x) => x.pago_automatico !== null,
     ).length;
+    const debe = metaPendientes.value;
     return [
+      {
+        clave: "porCobrar",
+        etiqueta: t("cobranzaVisual.kpi.porCobrar"),
+        valor:
+          debe && debe.por_cobrar.length > 0
+            ? debe.por_cobrar
+                .map((m) => dinero(m.total_minor, m.moneda))
+                .join(" + ")
+            : dinero(0, "MXN"),
+        icono: "dinero",
+        aviso: (debe?.total ?? 0) > 0,
+      },
       {
         clave: "mora",
         etiqueta: t("cobranzaVisual.kpi.enMora"),
         valor: String(morosos.value.length),
         icono: "facturas",
         aviso: morosos.value.length > 0,
-      },
-      {
-        clave: "suspendidos",
-        etiqueta: t("cobranzaVisual.kpi.suspendidos"),
-        valor: String(suspendidos),
-        icono: "cerrar",
       },
       {
         clave: "renovaciones",
@@ -452,6 +569,100 @@ watch(vista, cargar, { immediate: true });
         :tarjetas="indicadores"
       />
       <template v-if="vista === 'por-cobrar'">
+        <p
+          v-if="avisoCobro"
+          class="mt-4 text-sm"
+          role="status"
+          :style="{ color: 'var(--exito)' }"
+        >
+          {{ avisoCobro }}
+        </p>
+        <!-- Lo que ya se debe: compras sin pagar y citas o clases ya pasadas -->
+        <h2 class="mt-8 font-medium">
+          {{ $t("cobranza.pendientes.titulo") }}
+        </h2>
+        <p
+          v-if="metaPendientes && metaPendientes.proximas > 0"
+          class="mt-1 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+        >
+          {{
+            $t(
+              "cobranza.pendientes.proximas",
+              { n: metaPendientes.proximas },
+              metaPendientes.proximas,
+            )
+          }}
+        </p>
+        <EstadoVacio
+          v-if="pendientes.length === 0"
+          class="tu-card mt-3"
+          icono="hecho"
+          :titulo="$t('cobranza.pendientes.vacio')"
+        />
+        <div
+          v-else
+          class="mt-3 tu-card overflow-x-auto"
+          data-prueba="pendientes"
+        >
+          <table class="tu-tabla">
+            <thead>
+              <tr>
+                <th>{{ $t("cobranza.pendientes.colCliente") }}</th>
+                <th>{{ $t("cobranza.pendientes.colConcepto") }}</th>
+                <th class="text-right">{{ $t("cobranza.colMonto") }}</th>
+                <th class="text-right"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in pendientes" :key="p.id">
+                <td>
+                  <RouterLink
+                    v-if="p.persona"
+                    :to="{
+                      name: 'ficha-miembro',
+                      params: { id: p.persona.id },
+                    }"
+                    class="font-medium hover:underline"
+                    >{{ p.persona.nombre }}</RouterLink
+                  >
+                  <span v-else>—</span>
+                </td>
+                <td>
+                  <span class="block">{{ p.concepto ?? "—" }}</span>
+                  <span
+                    class="block text-xs first-letter:uppercase"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ detallePendiente(p) }}</span
+                  >
+                </td>
+                <td class="text-right tabular-nums font-medium">
+                  {{ dinero(p.total_minor, p.moneda) }}
+                </td>
+                <td class="text-right">
+                  <button
+                    v-if="puedeRegularizar"
+                    type="button"
+                    class="tu-btn tu-btn-fantasma text-sm"
+                    data-prueba="registrar-pago"
+                    @click="abrirCobro(p)"
+                  >
+                    {{ $t("cobranza.pendientes.registrar") }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <PaginacionListado
+            v-if="metaPendientes && metaPendientes.ultima_pagina > 1"
+            :page="metaPendientes.page"
+            :ultima-pagina="metaPendientes.ultima_pagina"
+            :total="metaPendientes.total"
+            :per-page="metaPendientes.per_page"
+            @ir="irPendientes"
+          />
+        </div>
+
         <!-- Morosos (dunning) -->
         <h2 class="mt-8 font-medium">{{ $t("cobranza.morosos") }}</h2>
         <EstadoVacio
@@ -985,6 +1196,66 @@ watch(vista, cargar, { immediate: true });
           }}
         </button>
       </template>
+    </ModalDialogo>
+    <!-- Registrar el pago de lo que se debe -->
+    <ModalDialogo
+      :abierto="cobrando !== null"
+      :titulo="$t('cobranza.pendientes.registrarTitulo')"
+      tam="md"
+      @cerrar="cobrando = null"
+    >
+      <form v-if="cobrando" class="space-y-4" @submit.prevent="registrarPago">
+        <p class="text-sm">
+          <span class="font-medium">{{ cobrando.persona?.nombre ?? "—" }}</span>
+          · {{ cobrando.concepto ?? "—" }}
+        </p>
+        <p class="text-2xl font-semibold tabular-nums">
+          {{ dinero(cobrando.total_minor, cobrando.moneda) }}
+        </p>
+        <div>
+          <p class="tu-label">{{ $t("ventas.vender.metodo") }}</p>
+          <div class="tu-segmentado w-full" role="group">
+            <button
+              v-for="m in METODOS_CAJA"
+              :key="m"
+              type="button"
+              class="flex-1"
+              :aria-pressed="cMetodo === m"
+              @click="cMetodo = m"
+            >
+              {{ $t(`ventas.metodos.${m}`) }}
+            </button>
+          </div>
+        </div>
+        <div>
+          <label class="tu-label" for="cobro-ref">{{
+            $t("cobranza.pendientes.referencia")
+          }}</label>
+          <input
+            id="cobro-ref"
+            v-model="cReferencia"
+            class="tu-input"
+            maxlength="255"
+          />
+        </div>
+        <div class="flex justify-end gap-2">
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma"
+            @click="cobrando = null"
+          >
+            {{ $t("comun.cancelar") }}
+          </button>
+          <button
+            type="submit"
+            class="tu-btn tu-btn-primario"
+            :disabled="cProcesando"
+            data-prueba="confirmar-pago"
+          >
+            {{ $t("cobranza.pendientes.registrar") }}
+          </button>
+        </div>
+      </form>
     </ModalDialogo>
   </section>
 </template>

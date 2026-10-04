@@ -952,7 +952,22 @@ export default {
   cobranza: {
     titulo: "Cobranza",
     morosos: "En mora",
-    sinMorosos: "Nadie en mora. Todo al corriente.",
+    sinMorosos: "Nadie en mora.",
+    // Lo que ya se debe: compras sin pagar y citas o clases que ya pasaron.
+    pendientes: {
+      titulo: "Pendientes de pago",
+      vacio: "Nada pendiente de pago.",
+      proximas:
+        "1 cita próxima se cobra al atenderla. | {n} citas próximas se cobran al atenderlas.",
+      colCliente: "Cliente",
+      colConcepto: "Concepto",
+      con: "Con {nombre}",
+      comprada: "Comprada el {fecha}",
+      registrar: "Registrar pago",
+      registrarTitulo: "Registrar pago",
+      referencia: "Referencia (opcional)",
+      registrado: "Pago de {nombre} registrado: {monto}.",
+    },
     pagos: "Pagos",
     sinPagos: "Aún no hay pagos con pasarela.",
     renovaciones: "Próximas renovaciones",

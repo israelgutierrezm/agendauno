@@ -11,16 +11,20 @@ import CobranzaView from "./CobranzaView.vue";
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
+  post: vi.fn(),
   ruta: { query: { vista: "movimientos" } as Record<string, string> },
 }));
 vi.mock("@/lib/api", () => ({
-  api: { get: mocks.get, post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  api: { get: mocks.get, post: mocks.post, put: vi.fn(), delete: vi.fn() },
   mensajeDeError: () => "Error",
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
 }));
-vi.mock("vue-router", () => ({ useRoute: () => mocks.ruta }));
+vi.mock("vue-router", () => ({
+  useRoute: () => mocks.ruta,
+  RouterLink: { props: ["to"], template: "<a><slot /></a>" },
+}));
 
 const pago = (id: string, persona: string, estado: string) => ({
   id,
@@ -37,6 +41,7 @@ const pago = (id: string, persona: string, estado: string) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.ruta.query = { vista: "movimientos" };
   mocks.get.mockImplementation((url: string) =>
     Promise.resolve({
       data: {
@@ -74,5 +79,72 @@ describe("cobros: movimientos", () => {
       .trigger("click");
     expect(filas()).toHaveLength(1);
     expect(filas()[0]).toContain("Ana López");
+  });
+});
+
+describe("cobros: por cobrar", () => {
+  it("muestra lo que ya se debe (como el Inicio) y registra su pago", async () => {
+    mocks.ruta.query = { vista: "por-cobrar" };
+    const pendiente = {
+      id: "o1",
+      persona: { id: "p1", nombre: "Ana López" },
+      concepto: "Corte",
+      total_minor: 25000,
+      moneda: "MXN",
+      creada_en: "2026-10-01T18:00:00Z",
+      sesion: {
+        tipo: "cita",
+        profesional: "Luis",
+        inicia_en: "2026-10-01T18:00:00Z",
+        zona_horaria: "America/Mexico_City",
+        sucursal: "Centro",
+      },
+    };
+    let pagada = false;
+    mocks.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/cobranza/pendientes")
+          ? {
+              data: pagada ? [] : [pendiente],
+              meta: {
+                page: 1,
+                ultima_pagina: 1,
+                total: pagada ? 0 : 1,
+                per_page: 20,
+                por_cobrar: pagada
+                  ? []
+                  : [{ moneda: "MXN", total_minor: 25000 }],
+                proximas: 3,
+              },
+            }
+          : { data: [] },
+      }),
+    );
+    mocks.post.mockImplementation(() => {
+      pagada = true;
+      return Promise.resolve({ data: { data: {} } });
+    });
+    const w = mount(CobranzaView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+
+    const tabla = w.get('[data-prueba="pendientes"]');
+    expect(tabla.text()).toContain("Ana López");
+    expect(tabla.text()).toContain("Corte");
+    expect(tabla.text()).toContain("Con Luis");
+    expect(w.text()).toContain("$250.00");
+    expect(w.text()).toContain("3 citas próximas se cobran al atenderlas.");
+
+    await w.get('[data-prueba="registrar-pago"]').trigger("click");
+    await w.get('[data-prueba="confirmar-pago"]').trigger("submit");
+    await flushPromises();
+
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/ordenes/o1/liquidar",
+      { metodo: "efectivo", referencia: null },
+    );
+    expect(w.text()).toContain("Pago de Ana López registrado: $250.00.");
+    expect(w.text()).toContain("Nada pendiente de pago.");
   });
 });

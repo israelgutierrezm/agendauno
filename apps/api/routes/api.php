@@ -77,6 +77,7 @@ use App\Modules\Tenancy\Http\Controllers\PlataformaEstudiosController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaOperacionController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaWhatsAppController;
 use App\Modules\Tenancy\Http\Controllers\PoliticasCancelacionTenantController;
+use App\Modules\Tenancy\Http\Controllers\PorCobrarTenantController;
 use App\Modules\Tenancy\Http\Controllers\PromocionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\PublicoCitasController;
 use App\Modules\Tenancy\Http\Controllers\PuntoDeVentaTenantController;
@@ -590,6 +591,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/acuerdos', [MembresiasTenantController::class, 'vender'])->middleware('puede:membresias.gestionar')->name('acuerdos.store');
             // Dunning (R10): morosidad de la membresia ante fallo de cobro.
             Route::get('/dunning', [DunningTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('dunning.index');
+            // Lo que ya se debe (compras sin pagar y citas pasadas sin pagar), como en el Inicio.
+            Route::get('/cobranza/pendientes', PorCobrarTenantController::class)->middleware('puede:facturacion.ver')->name('cobranza.pendientes');
             Route::post('/acuerdos/{acuerdo}/cobro-fallido', [DunningTenantController::class, 'registrarFallo'])->middleware('puede:ordenes.gestionar')->name('acuerdos.cobro-fallido');
             Route::post('/acuerdos/{acuerdo}/regularizar', [DunningTenantController::class, 'regularizar'])->middleware('puede:ordenes.gestionar')->name('acuerdos.regularizar');
             // Pausar (congelar) y reanudar una membresía o paquete.

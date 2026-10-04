@@ -115,9 +115,17 @@ it('las citas dicen a quién se atiende y lo pendiente de cobro sale en cobros',
 
     $r = $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy?fecha=2026-10-05", conBearer($e['bearer']))->assertOk();
 
+    // Aún no llega su hora: se cobra al atenderla, todavía no se debe.
     expect($r->json('data.agenda.sesiones.0'))->toMatchArray(['tipo' => 'cita', 'cliente' => 'Ana', 'esperados' => 1])
-        ->and($r->json('data.cobros.ordenes_pendientes'))->toBe(1)
-        ->and($r->json('data.cobros.por_cobrar'))->toBe([['moneda' => 'MXN', 'total_minor' => 25000]]);
+        ->and($r->json('data.cobros.ordenes_pendientes'))->toBe(0)
+        ->and($r->json('data.cobros.proximas'))->toBe(1);
+
+    // Pasó sin pagarse: ya es por cobrar (lo mismo que dice «Por cobrar»).
+    $this->travelTo('2026-10-05 18:00:00');
+    $r = $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy?fecha=2026-10-05", conBearer($e['bearer']))->assertOk();
+    expect($r->json('data.cobros.ordenes_pendientes'))->toBe(1)
+        ->and($r->json('data.cobros.por_cobrar'))->toBe([['moneda' => 'MXN', 'total_minor' => 25000]])
+        ->and($r->json('data.cobros.proximas'))->toBe(0);
 });
 
 it('en citas responde quién sigue, qué falta por atender y cobrar, y dónde hay espacios libres', function (): void {

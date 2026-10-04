@@ -124,6 +124,7 @@ export const cobranzaVisual = {
     cobrado: "Cobrado",
     reembolsado: "Reembolsado",
     sinAprobar: "Con algún cambio",
+    porCobrar: "Por cobrar",
     enMora: "En mora",
     suspendidos: "Suspendidos",
     renovaciones: "Renovaciones próximas",
