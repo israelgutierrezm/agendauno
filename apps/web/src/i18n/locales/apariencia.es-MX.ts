@@ -25,7 +25,6 @@ export default {
     barra_activo: "Resaltado activo",
   },
   restablecer: "Restablecer colores del tema",
-  sinPropios:
-    "Este tema no admite ajustes personales.",
+  sinPropios: "Este tema no admite ajustes personales.",
   error: "No se pudo guardar la apariencia.",
 };
