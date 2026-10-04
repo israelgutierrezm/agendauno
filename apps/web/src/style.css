@@ -3,6 +3,18 @@
 /* Modo oscuro por clase en <html> (lo controla el store de tema). */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Un mismo contenedor en toda la cuenta, aprovechando el ancho del panel. */
+.tu-pagina-cuenta {
+  width: 100%;
+  min-width: 0;
+  padding: 2rem 1rem;
+}
+@media (min-width: 640px) {
+  .tu-pagina-cuenta {
+    padding-inline: 1.5rem;
+  }
+}
+
 /* Sistema institucional Agenda Uno: claridad, propósito y bienestar. */
 :root {
   --fondo: #f6f8fc;

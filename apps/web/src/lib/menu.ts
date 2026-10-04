@@ -1,4 +1,5 @@
 import { puedeEntrar } from "@/lib/acceso";
+import { facetaActiva, type Faceta } from "@/lib/roles";
 import type {
   ModalidadServicio,
   useSesionTenantStore,
@@ -46,6 +47,7 @@ export interface GrupoMenu {
   areas: Area[];
   // Portal del alumno o de quien imparte: su contexto, no el del dueño.
   portal?: boolean;
+  faceta?: Faceta;
 }
 
 export interface OpcionConfiguracion extends Vista {
@@ -425,12 +427,13 @@ export const MENU_PORTALES: GrupoMenu[] = [
     clave: "mi-cuenta",
     etiqueta: "nav.miCuenta",
     portal: true,
+    faceta: "miembro",
     areas: [
       ["mi-cuenta", "portal.nav.inicio", "panel"],
       ["mis-reservas", "portal.nav.reservas", "agenda"],
       ["mis-pagos", "portal.nav.pagos", "ventas"],
       ["mi-expediente", "portal.nav.expediente", "expediente"],
-      ["mi-configuracion", "portal.nav.configuracion", "configuracion"],
+      ["mi-perfil", "miPerfil.titulo", "miembros"],
     ].map(([ruta, etiqueta, icono]) => ({
       clave: ruta,
       etiqueta,
@@ -476,13 +479,17 @@ export function vistasVisibles(area: Area, sesion: Sesion): Vista[] {
 export function menuVisible(sesion: Sesion): (GrupoMenu & {
   areas: (Area & { destino: Vista })[];
 })[] {
-  return MENU.map((g) => ({
-    ...g,
-    areas: g.areas.flatMap((a) => {
-      const vistas = vistasVisibles(a, sesion);
-      return vistas.length > 0 ? [{ ...a, destino: vistas[0] }] : [];
-    }),
-  })).filter((g) => g.areas.length > 0);
+  return MENU.filter(
+    (g) => g.faceta === undefined || g.faceta === facetaActiva(sesion.usuario),
+  )
+    .map((g) => ({
+      ...g,
+      areas: g.areas.flatMap((a) => {
+        const vistas = vistasVisibles(a, sesion);
+        return vistas.length > 0 ? [{ ...a, destino: vistas[0] }] : [];
+      }),
+    }))
+    .filter((g) => g.areas.length > 0);
 }
 
 /** Todas las rutas del menú (cada pantalla con su destino principal). */

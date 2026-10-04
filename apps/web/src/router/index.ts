@@ -413,7 +413,7 @@ const router = createRouter({
     {
       path: "/mi-cuenta/configuracion",
       name: "mi-configuracion",
-      component: () => import("@/views/MiConfiguracionView.vue"),
+      redirect: { name: "mi-perfil" },
       meta: { requiereSesion: true },
     },
     {

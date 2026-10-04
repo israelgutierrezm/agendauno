@@ -249,12 +249,30 @@ describe("menú del negocio", () => {
       "mis-reservas",
       "mis-pagos",
       "mi-expediente",
-      "mi-configuracion",
+      "mi-perfil",
     ]);
   });
 });
 
 describe("ubicación de la pantalla actual", () => {
+  it("Mi perfil sustituye el puente de configuración y el enlace anterior redirige", () => {
+    expect(destino(sesion([], { rol: "miembro" }), "mi-perfil")).toBe(
+      "mi-perfil",
+    );
+    expect(areas(sesion([], { rol: "miembro" }))).not.toContain(
+      "mi-configuracion",
+    );
+    expect(areas(sesion(["*"], { rol: "propietario" }))).not.toContain(
+      "mi-perfil",
+    );
+    expect(areas(sesion(["agenda.ver"], { rol: "instructor" }))).not.toContain(
+      "mi-perfil",
+    );
+    expect(ubicacion({ name: "mi-perfil" })?.area.clave).toBe("mi-perfil");
+    expect(
+      router.getRoutes().find((r) => r.name === "mi-configuracion")?.redirect,
+    ).toEqual({ name: "mi-perfil" });
+  });
   it("una ficha deja activa su área; una vista por `vista` o por ancla, la suya", () => {
     const u = (name: string, query = {}, hash = "") =>
       ubicacion({ name, query, hash });

@@ -121,7 +121,7 @@ const TONO = {
   pagos: "naranja",
   pase: "cielo",
   expediente: "rosa",
-  configuracion: "azul",
+  perfil: "azul",
   asistencia: "morado",
 };
 // Su imagen, si se agregó.
@@ -132,7 +132,7 @@ const IMAGEN: Record<string, string> = {
   pagos: "acceso-pagos",
   pase: "acceso-pase",
   expediente: "acceso-expediente",
-  configuracion: "acceso-configuracion",
+  perfil: "acceso-perfil",
 };
 const ILUSTRACION: Record<string, Ilustracion> = {
   reservar: "agenda",
@@ -141,7 +141,7 @@ const ILUSTRACION: Record<string, Ilustracion> = {
   pagos: "pagos",
   pase: "pase",
   expediente: "expediente",
-  configuracion: "configuracion",
+  perfil: "perfil",
   asistencia: "reservas",
 };
 
@@ -271,27 +271,18 @@ const accesos = computed<Acceso[]>(() => {
           atencion: cuenta.waivers.value.length > 0,
         }
       : null;
-  const configuracion: Acceso = {
-    clave: "configuracion",
-    titulo: t("portal.inicio.tarjetas.configuracion"),
-    valor: t("portal.inicio.tarjetas.configuracionValor"),
-    icono: "configuracion",
-    tono: TONO.configuracion,
-    ruta: "mi-configuracion",
+  const perfil: Acceso = {
+    clave: "perfil",
+    titulo: t("miPerfil.titulo"),
+    valor: t("portal.inicio.tarjetas.perfilValor"),
+    icono: "miembros",
+    tono: TONO.perfil,
+    ruta: "mi-perfil",
   };
 
   const orden = citas
-    ? [reservas, reservar, pagos, plan, expediente, pase, configuracion]
-    : [
-        reservar,
-        reservas,
-        plan,
-        asistencia,
-        pagos,
-        pase,
-        expediente,
-        configuracion,
-      ];
+    ? [reservas, reservar, pagos, plan, expediente, pase, perfil]
+    : [reservar, reservas, plan, asistencia, pagos, pase, expediente, perfil];
   return orden.filter((a): a is Acceso => a !== null);
 });
 
@@ -302,7 +293,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="mx-auto max-w-5xl px-4 py-8">
+  <section class="tu-pagina-cuenta">
     <h1 class="text-2xl font-semibold">
       {{
         nombre

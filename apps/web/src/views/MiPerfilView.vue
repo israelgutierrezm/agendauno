@@ -5,9 +5,11 @@ import { useI18n } from "vue-i18n";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import MiPrivacidad from "@/components/MiPrivacidad.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { clientIdGoogle, renderizarBotonGoogle } from "@/lib/google";
+import { esMiembro } from "@/lib/roles";
 import {
   useSesionTenantStore,
   type UsuarioTenant,
@@ -24,6 +26,7 @@ const sesion = useSesionTenantStore();
 const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const usuario = computed(() => sesion.usuario);
+const mostrarPrivacidad = computed(() => esMiembro(usuario.value));
 
 // ---- Google: se conecta aquí para entrar con él (ADR 0093: no registra cuentas) ----
 const hayGoogle = clientIdGoogle() !== undefined;
@@ -258,7 +261,7 @@ const aparienciaAbierta = ref(false);
 </script>
 
 <template>
-  <section class="mx-auto max-w-4xl px-4 sm:px-6 py-8">
+  <section class="tu-pagina-cuenta">
     <EncabezadoSeccion :titulo="$t('miPerfil.titulo')" />
 
     <div v-if="usuario" class="mt-6 tu-card overflow-hidden">
@@ -268,7 +271,7 @@ const aparienciaAbierta = ref(false);
           <h2 class="mp-titulo">{{ $t("miPerfil.foto") }}</h2>
           <p class="mp-ayuda">{{ $t("miPerfil.fotoAyuda") }}</p>
         </div>
-        <div class="flex items-center gap-4">
+        <div class="flex flex-wrap items-center gap-4 min-w-0">
           <!-- Zona de la foto: se suelta aquí una imagen o se hace clic para elegirla. -->
           <div
             class="mp-foto-zona"
@@ -639,6 +642,14 @@ const aparienciaAbierta = ref(false);
       </div>
     </div>
 
+    <div v-if="mostrarPrivacidad" class="mt-6 tu-card mp-fila">
+      <div>
+        <h2 class="mp-titulo">{{ $t("miPrivacidad.titulo") }}</h2>
+        <p class="mp-ayuda">{{ $t("miPrivacidad.ayuda") }}</p>
+      </div>
+      <MiPrivacidad :key="sesion.slug ?? undefined" integrado />
+    </div>
+
     <PanelApariencia
       :abierto="aparienciaAbierta"
       @cerrar="aparienciaAbierta = false"
@@ -654,6 +665,9 @@ const aparienciaAbierta = ref(false);
   gap: 1rem;
   padding: 1.5rem;
   border-top: 1px solid var(--borde);
+}
+.mp-fila > * {
+  min-width: 0;
 }
 .mp-fila:first-child {
   border-top: 0;

@@ -49,6 +49,28 @@ beforeEach(() => {
 });
 
 describe("avisos por WhatsApp en Mi privacidad", () => {
+  it("un fallo de carga se muestra y permite recuperar las preferencias", async () => {
+    api.get.mockRejectedValueOnce(new Error("Sin conexión"));
+    api.get.mockResolvedValueOnce(privacidad());
+    const w = montar();
+    await flushPromises();
+    expect(w.get('[role="alert"]').text()).toContain(miPrivacidad.errorCarga);
+    await w.get('[role="alert"] button').trigger("click");
+    await flushPromises();
+    expect(w.find('[role="alert"]').exists()).toBe(false);
+    expect(w.text()).toContain(miPrivacidad.promociones);
+    expect(api.get).toHaveBeenCalledTimes(2);
+  });
+
+  it("integrada en perfil no repite el título ni agrega otra tarjeta", async () => {
+    api.get.mockResolvedValue(privacidad());
+    const w = montar();
+    await w.setProps({ integrado: true });
+    await flushPromises();
+    expect(w.find("h2").exists()).toBe(false);
+    expect(w.classes()).not.toContain("tu-card");
+    expect(w.text()).toContain(miPrivacidad.descargar);
+  });
   it("si el negocio no los usa, no aparecen", async () => {
     api.get.mockResolvedValue(privacidad());
     const w = montar();

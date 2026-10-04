@@ -10,6 +10,8 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * lo suyo. Las acciones (reservar, cancelar, pagar…) recargan en silencio.
  */
 export interface Derecho {
+  todas_sucursales?: boolean;
+  sucursales?: { id: string; nombre: string }[];
   id: string;
   producto?: string | null;
   pausa_hasta?: string | null;
@@ -45,6 +47,8 @@ export interface PortalCuenta {
   expediente: boolean;
 }
 export interface Producto {
+  todas_sucursales?: boolean;
+  sucursales?: { id: string; nombre: string }[];
   id: string;
   nombre: string;
   tipo: string;

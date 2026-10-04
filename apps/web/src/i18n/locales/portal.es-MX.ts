@@ -1,6 +1,6 @@
 /**
  * Portal del alumno o cliente: Inicio con accesos directos, Reservas (lista y
- * calendario), Pagos, Expediente y Configuración. Las palabras "clase" y "alumno" se
+ * calendario), Pagos, Expediente y Mi perfil. Las palabras "clase" y "alumno" se
  * adaptan solas a la terminología del negocio (ADR 0049).
  */
 export default {
@@ -9,7 +9,6 @@ export default {
     reservas: "Reservas",
     pagos: "Pagos",
     expediente: "Expediente",
-    configuracion: "Configuración",
   },
   inicio: {
     saludo: "¡Hola, {nombre}!",
@@ -57,8 +56,7 @@ export default {
       paseValor: "Muéstralo al llegar",
       expediente: "Expediente",
       expedienteValor: "Documentos y fichas de datos",
-      configuracion: "Configuración",
-      configuracionValor: "Privacidad y tu cuenta",
+      perfilValor: "Tus datos, acceso y privacidad",
       // Citas: sus citas, volver a agendar y su bono (ADR 0091).
       misCitas: "Mis citas",
       cambiarCancelar: "Cambiar o cancelar",
@@ -150,12 +148,5 @@ export default {
     titulo: "Expediente",
     firmar: "Por firmar",
     formularios: "Ficha de datos",
-  },
-  configuracion: {
-    titulo: "Configuración",
-    perfil: "Mi perfil",
-    perfilAyuda:
-      "Tu nombre, foto, correo y contraseña, y la liga para ver tus reservas en el calendario del teléfono.",
-    perfilIr: "Ir a mi perfil →",
   },
 };

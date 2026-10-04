@@ -127,7 +127,7 @@ onMounted(() => void cuenta.asegurar());
 </script>
 
 <template>
-  <section class="mx-auto max-w-5xl px-4 py-8">
+  <section class="tu-pagina-cuenta">
     <EncabezadoSeccion :titulo="$t('portal.pagos.titulo')" />
 
     <p
@@ -285,6 +285,17 @@ onMounted(() => void cuenta.asegurar());
               $t(`miCuenta.comprar.tipos.${p.tipo}`)
             }}</span>
             <p class="mt-1 font-semibold">{{ p.nombre }}</p>
+            <p
+              v-if="p.todas_sucursales !== undefined"
+              class="mt-1 text-xs"
+              style="color: var(--texto-suave)"
+            >
+              {{
+                p.todas_sucursales
+                  ? "Todas las sucursales"
+                  : p.sucursales?.map((s) => s.nombre).join(" · ")
+              }}
+            </p>
             <p class="mt-1 text-xl font-semibold">
               {{ dinero(p.precio_minor, p.moneda) }}
             </p>

@@ -817,6 +817,10 @@ export const misDocumentos = {
 
 export const miPrivacidad = {
   titulo: "Privacidad",
+  ayuda: "Elige qué avisos recibes y administra tus datos en este negocio.",
+  errorCarga: "No pudimos cargar tus opciones de privacidad.",
+  reintentar: "Volver a intentar",
+  cargando: "Cargando tus opciones de privacidad…",
   promociones: "Recibir promociones",
   promocionesAyuda:
     "Ofertas y novedades del negocio. Los avisos de tus reservas y pagos te siguen llegando.",

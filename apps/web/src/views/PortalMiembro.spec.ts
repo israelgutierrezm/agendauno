@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
 import esMX from "@/i18n/locales/es-MX";
+import { miPerfil } from "@/i18n/locales/equipo.es-MX";
 import { miCuentaExtra, miReprogramar } from "@/i18n/locales/gestion.es-MX";
 import portal from "@/i18n/locales/portal.es-MX";
 import MiCuentaView from "./MiCuentaView.vue";
@@ -110,7 +111,7 @@ function montar(componente: typeof MiCuentaView | typeof MisReservasView) {
           missingWarn: false,
           fallbackWarn: false,
           messages: {
-            es: { ...esMX, portal, miCuentaExtra, miReprogramar },
+            es: { ...esMX, portal, miCuentaExtra, miReprogramar, miPerfil },
           },
         }),
       ],
@@ -257,10 +258,17 @@ describe("portal del alumno", () => {
     expect(texto).not.toContain("Mis créditos");
     expect(texto).not.toContain("Pase de entrada");
     expect(texto).not.toContain("Expediente");
-    const orden = ["Mis citas", "Volver a agendar", "Pagos", "Configuración"];
+    const orden = ["Mis citas", "Volver a agendar", "Pagos", "Mi perfil"];
     const posiciones = orden.map((x) => texto.indexOf(x));
     expect(posiciones.every((p) => p >= 0)).toBe(true);
     expect(posiciones).toEqual([...posiciones].sort((a, b) => a - b));
+    expect(texto).not.toContain("Configuración");
+    expect(
+      w
+        .findAllComponents({ name: "TarjetaOperacion" })
+        .find((tarjeta) => tarjeta.props("titulo") === "Mi perfil")
+        ?.props("to"),
+    ).toEqual({ name: "mi-perfil" });
   });
 
   it("sin reserva la tarjeta principal sigue ahí (invita a reservar) y lleva el clima", async () => {
