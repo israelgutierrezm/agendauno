@@ -22,6 +22,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
   final _nombre = TextEditingController();
   final _primerApellido = TextEditingController();
   final _segundoApellido = TextEditingController();
+  final _celular = TextEditingController();
   final _actual = TextEditingController();
   final _nueva = TextEditingController();
   final _confirmacion = TextEditingController();
@@ -34,6 +35,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     _nombre.text = sesion?.nombrePila ?? sesion?.nombre ?? '';
     _primerApellido.text = sesion?.primerApellido ?? '';
     _segundoApellido.text = sesion?.segundoApellido ?? '';
+    _celular.text = sesion?.celular ?? '';
   }
 
   @override
@@ -42,6 +44,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
       _nombre,
       _primerApellido,
       _segundoApellido,
+      _celular,
       _actual,
       _nueva,
       _confirmacion,
@@ -139,6 +142,9 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
             nombre: _nombre.text.trim(),
             primerApellido: _opcional(_primerApellido),
             segundoApellido: _opcional(_segundoApellido),
+            // El celular es de su ficha de cliente o alumno.
+            celular: _opcional(_celular),
+            conCelular: ref.read(sesionProvider)?.tieneFicha ?? false,
           ),
       exito: 'Perfil actualizado.',
     );
@@ -476,7 +482,7 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Nombre',
+                    'Datos personales',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),
@@ -498,6 +504,19 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                       labelText: 'Segundo apellido (opcional)',
                     ),
                   ),
+                  if (ref.watch(sesionProvider)?.tieneFicha ?? false) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _celular,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'Celular',
+                        helperText:
+                            'Para avisarte de tus clases y citas (también por WhatsApp, si lo activas).',
+                        helperMaxLines: 2,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   FilledButton(
                     onPressed: _guardando ? null : _guardarNombre,

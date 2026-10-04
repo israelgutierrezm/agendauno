@@ -118,10 +118,13 @@ class CuentaRepository {
     }
   }
 
-  /// Lo que tiene pendiente de pago; si falla, simplemente no se muestra.
+  /// Todo lo que debe (completo, aparte del historial: un adeudo antiguo no se
+  /// pierde); si falla, simplemente no se muestra.
   Future<List<OrdenPorPagar>> _porPagar() async {
     try {
-      final res = await _dio.get<Map<String, dynamic>>('$_base/mi/ordenes');
+      final res = await _dio.get<Map<String, dynamic>>(
+        '$_base/mi/ordenes/pendientes',
+      );
       return OrdenPorPagar.pendientes((res.data?['data'] ?? []) as List);
     } on DioException {
       return const [];
@@ -140,6 +143,15 @@ class CuentaRepository {
     } on DioException {
       return const [];
     }
+  }
+
+  /// Una página de su historial de clases y citas (lo más reciente primero).
+  Future<PaginaHistorial> historial(int pagina) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/historial',
+      queryParameters: {'page': pagina, 'per_page': 15},
+    );
+    return PaginaHistorial.desdeJson(res.data ?? const {});
   }
 
   /// Califica una clase o cita a la que asistió (1 a 5 y comentario opcional).

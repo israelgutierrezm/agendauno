@@ -221,9 +221,12 @@ class PorPagarTile extends ConsumerWidget {
     child: ListTile(
       title: Text(o.concepto),
       subtitle: Text(
-        pagoEnLinea
-            ? Formato.dinero(o.totalMinor)
-            : '${Formato.dinero(o.totalMinor)} · Págalo en recepción',
+        [
+          if (o.detalle != null && o.detalle!.isNotEmpty) o.detalle!,
+          pagoEnLinea
+              ? Formato.dinero(o.totalMinor)
+              : '${Formato.dinero(o.totalMinor)} · Págalo en recepción',
+        ].join('\n'),
       ),
       trailing: pagoEnLinea
           ? FilledButton(
@@ -427,6 +430,22 @@ class _DetalleClase extends ConsumerWidget {
               ].whereType<String>().join(' · '),
               style: const TextStyle(color: TemaAgendaUno.textoSuave),
             ),
+            if (c.cobertura != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: EstadoPunto(
+                  c.cobertura!.texto,
+                  color: colorCobertura(c.cobertura!),
+                ),
+              ),
+            if (c.cobertura?.motivoTexto != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '${c.cobertura!.motivoTexto!} Consulta los planes en Pagos.',
+                  style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                ),
+              ),
             if (lugaresTexto(c).isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -439,18 +458,19 @@ class _DetalleClase extends ConsumerWidget {
                 ),
               ),
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: c.llena
-                  ? OutlinedButton(
-                      onPressed: () => reservar(esperar: true),
-                      child: const Text('Anotarme en la lista de espera'),
-                    )
-                  : FilledButton(
-                      onPressed: reservar,
-                      child: const Text('Reservar'),
-                    ),
-            ),
+            if (c.reservable)
+              SizedBox(
+                width: double.infinity,
+                child: c.llena
+                    ? OutlinedButton(
+                        onPressed: () => reservar(esperar: true),
+                        child: const Text('Anotarme en la lista de espera'),
+                      )
+                    : FilledButton(
+                        onPressed: reservar,
+                        child: const Text('Reservar'),
+                      ),
+              ),
           ],
         ),
       ),
@@ -569,4 +589,37 @@ abstract final class TonosAcceso {
   static const pagos = Color(0xFFE07A2E);
   static const pase = Color(0xFF1C9BC7);
   static const expediente = Color(0xFFD6457F);
+}
+
+/// Color del punto de la cobertura: incluida en verde, solo con membresía en
+/// ámbar, de pago en el primario y no incluida en gris.
+Color colorCobertura(CoberturaClase c) => switch (c.estado) {
+  'incluida' => TemaAgendaUno.exito,
+  'solo_membresia' => TemaAgendaUno.aviso,
+  'de_pago' => TemaAgendaUno.acento,
+  _ => TemaAgendaUno.textoSuave,
+};
+
+/// Un estado como punto de color + texto (sin íconos tintados).
+class EstadoPunto extends StatelessWidget {
+  const EstadoPunto(this.texto, {super.key, required this.color});
+
+  final String texto;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 6),
+      Flexible(
+        child: Text(texto, style: const TextStyle(fontWeight: FontWeight.w500)),
+      ),
+    ],
+  );
 }

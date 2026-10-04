@@ -42,9 +42,12 @@ class InicioTab extends ConsumerWidget {
     final disponibles = clasesDisponibles(cuenta).length;
     final firmar = cuenta.consentimientos.length;
     final pagar = cuenta.porPagar.length;
-    // Lo vigente (no vencido) suma; lo vencido es historial (Pagos › Mis planes).
-    final vigentes = _vigentes(cuenta.derechos);
-    final creditos = _creditos(vigentes);
+    // Lo vigente (según el estado que da el servidor) suma; lo vencido es
+    // historial (Pagos › Mis planes). Sin vigente, por qué: pausa, suspensión…
+    final vigentes = cuenta.derechos.where((d) => d.vigente).toList();
+    final creditos = vigentes.isEmpty
+        ? _otroEstado(cuenta.derechos)
+        : _creditos(vigentes);
     final vence = _vencimiento(vigentes);
     final clima = ref.watch(climaProvider).value;
     final esCitas = sesion?.esCitas ?? false;
@@ -296,12 +299,24 @@ class InicioTab extends ConsumerWidget {
         : [reservar, reservas, plan, asistencia, pagos, pase, expediente],
   ].whereType<TarjetaAcceso>().toList();
 
-  /// Sus planes que no han vencido (los vencidos no suman a su saldo).
-  static List<DerechoMiembro> _vigentes(List<DerechoMiembro> derechos) {
-    final hoy = Formato.iso(DateTime.now());
-    return derechos
-        .where((d) => d.vence == null || d.vence!.compareTo(hoy) >= 0)
-        .toList();
+  /// Sin plan vigente: en pausa, suspendido o por empezar (en ese orden).
+  static String _otroEstado(List<DerechoMiembro> derechos) {
+    DerechoMiembro? con(String estado) =>
+        derechos.where((d) => d.estado == estado).firstOrNull;
+    final pausado = con('pausado');
+    if (pausado != null) {
+      return pausado.pausaHasta == null
+          ? 'En pausa'
+          : 'En pausa hasta el ${Formato.diaMes(pausado.pausaHasta)}';
+    }
+    if (con('suspendido') != null) {
+      return 'Suspendido: paga para reactivarlo';
+    }
+    final porEmpezar = con('por_empezar');
+    if (porEmpezar?.desde != null) {
+      return 'Empieza el ${Formato.diaMes(porEmpezar!.desde)}';
+    }
+    return 'Sin paquete activo';
   }
 
   /// Lo que antes vence de su plan (AAAA-MM-DD), si vence.
@@ -322,7 +337,7 @@ class InicioTab extends ConsumerWidget {
     if (derechos.isEmpty) {
       return 'Sin paquete activo';
     }
-    if (derechos.any((d) => d.ilimitado && d.pausaHasta == null)) {
+    if (derechos.any((d) => d.ilimitado)) {
       return 'Ilimitado';
     }
     final n = derechos.fold<int>(0, (a, d) => a + d.creditosDisponibles);

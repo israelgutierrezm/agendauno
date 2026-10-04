@@ -17,8 +17,14 @@ List<ReservaMiembro> proximasReservas(MiCuenta c) =>
       ..sort((a, b) => a.iniciaEn!.compareTo(b.iniciaEn!));
 
 /// Las clases a las que aún puede entrar (no reservadas por él).
+/// Las que puede reservar: sin reservar aún y que su plan incluye (o de pago).
 List<ClaseMiembro> clasesDisponibles(MiCuenta c) => c.clases
-    .where((x) => x.iniciaEn != null && !c.sesionesReservadas.contains(x.id))
+    .where(
+      (x) =>
+          x.iniciaEn != null &&
+          !c.sesionesReservadas.contains(x.id) &&
+          x.reservable,
+    )
     .toList();
 
 String lugaresTexto(ClaseMiembro c) {
@@ -62,8 +68,13 @@ List<EventoCal> eventosDeCuenta(MiCuenta c, {List<ClaseMiembro>? clases}) {
         inicio: fecha(x.iniciaEn)!,
         fin: fecha(x.terminaEn),
         detalle: detalle(x.sucursal, x.instructor),
-        estado: lugaresTexto(x),
-        tono: x.llena ? TonoEvento.aviso : TonoEvento.suave,
+        // Si su plan no la incluye, eso es lo primero que se dice.
+        estado: x.reservable ? lugaresTexto(x) : x.cobertura!.texto,
+        tono: !x.reservable
+            ? TonoEvento.suave
+            : x.llena
+            ? TonoEvento.aviso
+            : TonoEvento.suave,
       ),
   ]..sort((a, b) => a.inicio.compareTo(b.inicio));
 }

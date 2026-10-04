@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
 
 /// Modelos del autoservicio del miembro (Mi cuenta).
@@ -12,6 +13,8 @@ class DerechoMiembro {
     this.producto,
     this.pausaHasta,
     this.vence,
+    this.desde,
+    this.estado = 'vigente',
   });
 
   final bool ilimitado;
@@ -26,6 +29,16 @@ class DerechoMiembro {
   /// Hasta cuándo se puede usar (AAAA-MM-DD); null si no vence.
   final String? vence;
 
+  /// Desde cuándo se puede usar (AAAA-MM-DD); null si ya se puede.
+  final String? desde;
+
+  /// Estado efectivo que da el servidor: vigente, agotado, por_empezar,
+  /// pausado, suspendido, vencido o cancelado (no se deduce por fechas).
+  final String estado;
+
+  /// Se puede usar hoy (aunque se le hayan acabado las clases).
+  bool get vigente => estado == 'vigente' || estado == 'agotado';
+
   /// Créditos disponibles (1 crédito = 1000 unidades).
   int get creditosDisponibles => ((disponible ?? 0) / 1000).round();
 
@@ -37,6 +50,8 @@ class DerechoMiembro {
     producto: j['producto'] as String?,
     pausaHasta: j['pausa_hasta'] as String?,
     vence: j['vence'] as String?,
+    desde: j['desde'] as String?,
+    estado: (j['estado'] ?? 'vigente') as String,
   );
 }
 
@@ -214,6 +229,48 @@ class ReservaMiembro {
   );
 }
 
+/// Si su plan cubre una clase, dicho por el servidor con la misma regla que al
+/// reservar: incluida, solo con membresía, no incluida (y por qué) o de pago.
+class CoberturaClase {
+  const CoberturaClase({required this.estado, this.motivo, this.precioMinor});
+
+  final String estado;
+  final String? motivo;
+  final int? precioMinor;
+
+  /// Se puede reservar con lo que tiene (o pagando la clase).
+  bool get reservable => estado == 'incluida' || estado == 'de_pago';
+
+  String get texto => switch (estado) {
+    'incluida' => 'Incluida en tu plan',
+    'solo_membresia' => 'Solo con membresía',
+    'de_pago' => 'Pago por clase',
+    _ => 'No incluida',
+  };
+
+  /// Por qué no la puede reservar con lo que tiene.
+  String? get motivoTexto => estado == 'solo_membresia'
+      ? 'Esta clase solo la incluye una membresía.'
+      : switch (motivo) {
+          'sin_plan' => 'Necesitas un plan para reservarla.',
+          'clase' => 'Tu plan no incluye esta clase.',
+          'pausa' => 'Tu plan está en pausa.',
+          'suspendido' => 'Tu plan está suspendido por falta de pago.',
+          'vigencia' => 'Tu plan no está vigente ese día.',
+          'sucursal' => 'Tu plan no vale en esta sucursal.',
+          'saldo' => 'Ya no te quedan clases en tu plan.',
+          _ => null,
+        };
+
+  static CoberturaClase? desdeJson(Object? j) => j is Map<String, dynamic>
+      ? CoberturaClase(
+          estado: (j['estado'] ?? 'incluida') as String,
+          motivo: j['motivo'] as String?,
+          precioMinor: (j['precio_minor'] as num?)?.toInt(),
+        )
+      : null;
+}
+
 class ClaseMiembro {
   const ClaseMiembro({
     required this.id,
@@ -225,6 +282,7 @@ class ClaseMiembro {
     this.zonaHoraria,
     this.capacidad,
     this.ocupados = 0,
+    this.cobertura,
   });
 
   final String id;
@@ -237,8 +295,14 @@ class ClaseMiembro {
   final int? capacidad;
   final int ocupados;
 
+  /// Si su plan la cubre (null si el servidor no lo dice).
+  final CoberturaClase? cobertura;
+
   /// Sin lugares: se ofrece anotarse en la lista de espera.
   bool get llena => capacidad != null && ocupados >= capacidad!;
+
+  /// Se puede reservar (sin dato de cobertura, se intenta).
+  bool get reservable => cobertura?.reservable ?? true;
 
   factory ClaseMiembro.desdeJson(Map<String, dynamic> j) => ClaseMiembro(
     id: (j['id'] ?? '') as String,
@@ -250,6 +314,7 @@ class ClaseMiembro {
     zonaHoraria: j['zona_horaria'] as String?,
     capacidad: j['capacidad'] as int?,
     ocupados: (j['ocupados'] ?? 0) as int,
+    cobertura: CoberturaClase.desdeJson(j['cobertura']),
   );
 }
 
@@ -333,20 +398,20 @@ class OrdenPorPagar {
     required this.id,
     required this.concepto,
     required this.totalMinor,
+    this.detalle,
   });
 
   final String id;
   final String concepto;
   final int totalMinor;
 
-  /// Las órdenes pendientes con productos (las de una cita no traen productos).
+  /// Si es una cita: con quién, cuándo y dónde.
+  final String? detalle;
+
+  /// Todo lo que debe (GET /mi/ordenes/pendientes, completo): también las citas.
   static List<OrdenPorPagar> pendientes(List<dynamic> ordenes) => ordenes
       .whereType<Map<String, dynamic>>()
-      .where(
-        (o) =>
-            o['estado'] == 'pendiente' &&
-            ((o['lineas'] ?? []) as List).isNotEmpty,
-      )
+      .where((o) => o['estado'] == 'pendiente')
       .map(OrdenPorPagar.desdeJson)
       .toList();
 
@@ -359,10 +424,20 @@ class OrdenPorPagar {
           return cantidad > 1 ? '$nombre × $cantidad' : nombre;
         })
         .toList();
+    final sesion = j['sesion'];
+    final concepto = (j['concepto'] as String?) ?? lineas.join(', ');
     return OrdenPorPagar(
       id: j['id'] as String,
-      concepto: lineas.join(', '),
+      concepto: concepto.isEmpty ? '—' : concepto,
       totalMinor: (j['total_minor'] as int?) ?? 0,
+      detalle: sesion is Map<String, dynamic>
+          ? [
+              if (sesion['profesional'] != null) 'Con ${sesion['profesional']}',
+              if (sesion['inicia_en'] != null)
+                Formato.fechaHora(sesion['inicia_en'] as String),
+              if (sesion['sucursal'] != null) sesion['sucursal'] as String,
+            ].join(' · ')
+          : null,
     );
   }
 }
@@ -828,4 +903,94 @@ class AgendaPeriodo {
   final List<ClaseMiembro> clases;
   final List<SedeAgenda> sucursales;
   final bool truncado;
+}
+
+/// Una clase o cita de su historial (GET /mi/historial): qué pasó, si cambió de
+/// horario y su reseña (o si aún puede calificarla).
+class ItemHistorial {
+  const ItemHistorial({
+    required this.id,
+    required this.estado,
+    this.tipo,
+    this.oferta,
+    this.sucursal,
+    this.instructor,
+    this.iniciaEn,
+    this.canceladaPor,
+    this.reprogramada = false,
+    this.calificacion,
+    this.comentario,
+    this.calificable = false,
+  });
+
+  final String id;
+  final String estado;
+  final String? tipo;
+  final String? oferta;
+  final String? sucursal;
+  final String? instructor;
+  final String? iniciaEn;
+  final String? canceladaPor;
+  final bool reprogramada;
+  final int? calificacion;
+  final String? comentario;
+  final bool calificable;
+
+  String get estadoTexto => switch (estado) {
+    'asistio' => 'Asististe',
+    'no_asistio' => 'No asististe',
+    'cancelada' =>
+      canceladaPor == 'cliente' ? 'Cancelaste' : 'Cancelada por el negocio',
+    'expirada' => 'Lugar sin aceptar',
+    'sin_lugar' => 'Te quedaste en lista de espera',
+    'sin_pagar' => 'Sin pagar',
+    _ => 'Reservada',
+  };
+
+  factory ItemHistorial.desdeJson(Map<String, dynamic> j) {
+    final resena = j['resena'];
+    return ItemHistorial(
+      id: (j['id'] ?? '') as String,
+      estado: (j['estado'] ?? '') as String,
+      tipo: j['tipo'] as String?,
+      oferta: j['oferta'] as String?,
+      sucursal: j['sucursal'] as String?,
+      instructor: j['instructor'] as String?,
+      iniciaEn: j['inicia_en'] as String?,
+      canceladaPor: j['cancelada_por'] as String?,
+      reprogramada: (j['reprogramada'] ?? false) as bool,
+      calificacion: resena is Map<String, dynamic>
+          ? (resena['calificacion'] as num?)?.toInt()
+          : null,
+      comentario: resena is Map<String, dynamic>
+          ? resena['comentario'] as String?
+          : null,
+      calificable: (j['calificable'] ?? false) as bool,
+    );
+  }
+}
+
+/// Una página del historial.
+class PaginaHistorial {
+  const PaginaHistorial({
+    required this.items,
+    required this.pagina,
+    required this.ultimaPagina,
+  });
+
+  final List<ItemHistorial> items;
+  final int pagina;
+  final int ultimaPagina;
+
+  factory PaginaHistorial.desdeJson(Map<String, dynamic> j) {
+    final meta = (j['meta'] ?? const {}) as Map<String, dynamic>;
+    return PaginaHistorial(
+      items: ((j['data'] ?? const []) as List)
+          .whereType<Map<String, dynamic>>()
+          .map(ItemHistorial.desdeJson)
+          .toList(),
+      pagina: (meta['page'] as num? ?? 1).toInt(),
+      ultimaPagina: (meta['ultima_pagina'] as num? ?? 1).toInt(),
+    );
+  }
 }

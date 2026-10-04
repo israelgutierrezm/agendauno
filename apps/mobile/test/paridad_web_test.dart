@@ -249,6 +249,7 @@ void main() {
                   id: 'vencido',
                   disponible: 4000,
                   vence: '2020-01-31',
+                  estado: 'vencido',
                 ),
               ],
               reservas: [],

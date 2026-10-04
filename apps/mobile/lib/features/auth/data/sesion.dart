@@ -137,6 +137,8 @@ class Sesion {
     this.fotoUrl,
     this.tieneContrasena = true,
     this.googleConectado = false,
+    this.tieneFicha = false,
+    this.celular,
     this.modalidad = Modalidad.clases,
     this.terminologia = const Terminologia(),
     this.estudioNombre,
@@ -167,6 +169,11 @@ class Sesion {
 
   /// Conectó Google para entrar con él (se conecta desde su perfil, ADR 0093).
   final bool googleConectado;
+
+  /// Tiene ficha de cliente o alumno: de ahí sale su celular (lo edita en su
+  /// perfil, para avisos y WhatsApp).
+  final bool tieneFicha;
+  final String? celular;
   final Modalidad modalidad;
   final Terminologia terminologia;
 
@@ -217,6 +224,8 @@ class Sesion {
     'foto_url': fotoUrl,
     'tiene_contrasena': tieneContrasena,
     'google_conectado': googleConectado,
+    'tiene_ficha': tieneFicha,
+    'celular': celular,
     'modalidad': modalidad.name,
     'terminologia': terminologia.aJson(),
     'estudio_nombre': estudioNombre,
@@ -249,6 +258,8 @@ class Sesion {
       fotoUrl: datos['foto_url'] as String?,
       tieneContrasena: (datos['tiene_contrasena'] ?? true) as bool,
       googleConectado: (datos['google_conectado'] ?? false) as bool,
+      tieneFicha: (datos['tiene_ficha'] ?? false) as bool,
+      celular: datos['celular'] as String?,
       modalidad: Modalidad.desde(datos['modalidad']),
       terminologia: Terminologia.desdeJson(
         datos['terminologia'] as Map<String, dynamic>?,
@@ -281,6 +292,8 @@ class Sesion {
       fotoUrl: usuario['foto_url'] as String?,
       tieneContrasena: (usuario['tiene_contrasena'] ?? true) as bool,
       googleConectado: (usuario['google_conectado'] ?? false) as bool,
+      tieneFicha: (usuario['tiene_ficha'] ?? false) as bool,
+      celular: usuario['celular'] as String?,
       modalidad: Modalidad.desde(config?['modalidad']),
       terminologia: Terminologia.desdeJson(
         config?['terminologia'] as Map<String, dynamic>?,
@@ -325,6 +338,10 @@ class Sesion {
         : fotoUrl,
     tieneContrasena: (usuario['tiene_contrasena'] ?? tieneContrasena) as bool,
     googleConectado: (usuario['google_conectado'] ?? googleConectado) as bool,
+    tieneFicha: (usuario['tiene_ficha'] ?? tieneFicha) as bool,
+    celular: usuario.containsKey('celular')
+        ? usuario['celular'] as String?
+        : celular,
     modalidad: modalidad,
     terminologia: terminologia,
     estudioNombre: estudioNombre,

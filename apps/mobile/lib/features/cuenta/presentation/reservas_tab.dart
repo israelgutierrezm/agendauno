@@ -11,6 +11,7 @@ import '../data/cuenta_models.dart';
 import '../data/eventos_cuenta.dart';
 import 'agendar_cita_sheet.dart';
 import 'cuenta_widgets.dart';
+import 'historial_screen.dart';
 
 /// Reservas del portal: las suyas y (en negocios de clases) las clases a las que
 /// puede entrar, en lista o calendario (día, semana, mes). Tocar una abre su
@@ -151,6 +152,22 @@ class ReservasTab extends ConsumerWidget {
                 ),
               ),
           ],
+          // Lo que ya pasó: asistencias, cancelaciones y cambios, con su reseña.
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Card(
+              child: ListTile(
+                title: const Text('Historial'),
+                subtitle: Text('Tus $clases y citas anteriores'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const HistorialScreen(),
+                  ),
+                ),
+              ),
+            ),
+          ),
           if (cuenta.resenasPendientes.isNotEmpty) ...[
             TituloSeccion('Califica tus $clases'),
             for (final r in cuenta.resenasPendientes)
