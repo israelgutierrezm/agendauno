@@ -62,6 +62,36 @@ const nombres = (w: ReturnType<typeof montar>) =>
     .map((li) => li.find(".font-medium").text());
 
 describe("reseñas", () => {
+  it("solicita la siguiente página y reinicia al buscar", async () => {
+    mocks.get.mockResolvedValue({
+      data: {
+        data: [resena("pagina", 5)],
+        meta: { page: 1, ultima_pagina: 3, total: 45, per_page: 20 },
+        resumen: {
+          general: { promedio: 5, total: 45 },
+          por_profesional: [],
+          conteos: { todas: 45, "5": 45, "4": 0, "3": 0 },
+          con_comentario: 0,
+        },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+    await w.get('button[aria-label="Página 2"]').trigger("click");
+    await flushPromises();
+    expect(mocks.get).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/resenas",
+      expect.objectContaining({ params: expect.objectContaining({ page: 2 }) }),
+    );
+    await w.get('input[type="search"]').setValue("antiguo");
+    await flushPromises();
+    expect(mocks.get).toHaveBeenLastCalledWith(
+      "/api/v1/app/demo/resenas",
+      expect.objectContaining({
+        params: expect.objectContaining({ page: 1, q: "antiguo" }),
+      }),
+    );
+  });
   it("arriba, el promedio, el total, las de 5 estrellas y las comentadas", async () => {
     const w = montar();
     await flushPromises();

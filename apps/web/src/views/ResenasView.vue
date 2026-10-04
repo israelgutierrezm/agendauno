@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
@@ -7,6 +7,7 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import CalificacionEstrellas from "@/components/CalificacionEstrellas.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
@@ -52,6 +53,16 @@ type Filtro = "todas" | "5" | "4" | "3";
 const filtro = ref<Filtro>("todas");
 const profesional = ref("");
 const busqueda = ref("");
+const pagina = ref(1);
+const meta = ref<{
+  page: number;
+  ultima_pagina: number;
+  total: number;
+  per_page: number;
+} | null>(null);
+const conteos = ref<Record<Filtro, number> | null>(null);
+const comentarios = ref<number | null>(null);
+let solicitud = 0;
 
 function fecha(iso: string | null): string {
   return iso
@@ -64,22 +75,41 @@ function fecha(iso: string | null): string {
 }
 
 async function cargar(): Promise<void> {
+  const actual = ++solicitud;
   cargando.value = true;
   error.value = null;
   try {
     const { data } = await api.get<{
       data: Resena[];
-      resumen: { general: Promedio; por_profesional: Promedio[] };
-    }>(`${base.value}/resenas`);
+      meta?: NonNullable<typeof meta.value>;
+      resumen: {
+        general: Promedio;
+        por_profesional: Promedio[];
+        conteos?: Record<Filtro, number>;
+        con_comentario?: number;
+      };
+    }>(`${base.value}/resenas`, {
+      params: {
+        page: pagina.value,
+        per_page: 20,
+        q: busqueda.value.trim(),
+        calificacion: filtro.value,
+        profesional: profesional.value,
+      },
+    });
+    if (actual !== solicitud) return;
+    meta.value = data.meta ?? null;
+    conteos.value = data.resumen.conteos ?? null;
+    comentarios.value = data.resumen.con_comentario ?? null;
     resenas.value = data.data;
     general.value = data.resumen.general;
     porProfesional.value = [...data.resumen.por_profesional].sort(
       (a, b) => b.promedio - a.promedio,
     );
   } catch (e) {
-    error.value = mensajeDeError(e);
+    if (actual === solicitud) error.value = mensajeDeError(e);
   } finally {
-    cargando.value = false;
+    if (actual === solicitud) cargando.value = false;
   }
 }
 
@@ -96,12 +126,15 @@ async function alternar(r: Resena): Promise<void> {
 }
 
 const cuenta = (f: Filtro): number =>
-  f === "todas"
-    ? resenas.value.length
-    : resenas.value.filter((r) =>
-        f === "3" ? r.calificacion <= 3 : r.calificacion === Number(f),
-      ).length;
+  conteos.value
+    ? conteos.value[f]
+    : f === "todas"
+      ? resenas.value.length
+      : resenas.value.filter((r) =>
+          f === "3" ? r.calificacion <= 3 : r.calificacion === Number(f),
+        ).length;
 const visibles = computed(() => {
+  if (meta.value) return resenas.value;
   const q = busqueda.value.trim().toLowerCase();
   return resenas.value.filter(
     (r) =>
@@ -117,13 +150,24 @@ const visibles = computed(() => {
   );
 });
 const nombresProfesionales = computed(() =>
-  [...new Set(resenas.value.map((r) => r.con).filter((x) => x))].sort(),
+  [
+    ...new Set(
+      [
+        ...porProfesional.value.map((p) => p.nombre),
+        ...resenas.value.map((r) => r.con),
+      ].filter((x) => x),
+    ),
+  ].sort(),
 );
 
 const indicadores = computed<Indicador[]>(() => {
   const g = general.value;
-  const conComentario = resenas.value.filter((r) => r.comentario).length;
-  const cinco = resenas.value.filter((r) => r.calificacion === 5).length;
+  const conComentario =
+    comentarios.value ?? resenas.value.filter((r) => r.comentario).length;
+  const cinco =
+    conteos.value?.["5"] ??
+    resenas.value.filter((r) => r.calificacion === 5).length;
+  const total = conteos.value?.todas ?? resenas.value.length;
   return [
     {
       clave: "promedio",
@@ -142,10 +186,7 @@ const indicadores = computed<Indicador[]>(() => {
     {
       clave: "cinco",
       etiqueta: t("listadosVisual.resenas.cinco"),
-      valor:
-        resenas.value.length > 0
-          ? `${Math.round((cinco / resenas.value.length) * 100)} %`
-          : "—",
+      valor: total > 0 ? `${Math.round((cinco / total) * 100)} %` : "—",
       icono: "hecho",
       tono: "verde",
     },
@@ -159,6 +200,15 @@ const indicadores = computed<Indicador[]>(() => {
   ];
 });
 
+watch([filtro, profesional, busqueda], () => {
+  if (!meta.value) return;
+  pagina.value = 1;
+  void cargar();
+});
+function irPagina(n: number): void {
+  pagina.value = n;
+  void cargar();
+}
 onMounted(cargar);
 </script>
 
@@ -274,6 +324,14 @@ onMounted(cargar);
             </button>
           </li>
         </ul>
+        <PaginacionListado
+          v-if="meta && !cargando"
+          :page="meta.page"
+          :ultima-pagina="meta.ultima_pagina"
+          :total="meta.total"
+          :per-page="meta.per_page"
+          @ir="irPagina"
+        />
       </div>
 
       <!-- Promedio de cada profesional -->

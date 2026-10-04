@@ -17,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -140,10 +141,42 @@ class ResenasTenantController
     /**
      * Reseñas del negocio con su promedio general, por profesional y por servicio.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $resenas = ResenaTenant::query()->with(['oferta', 'instructor', 'persona'])->orderByDesc('id')->limit(200)->get();
-        $todas = ResenaTenant::query()->get(['calificacion', 'instructor_id', 'oferta_id']);
+        $filtros = $request->validate([
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'between:1,100'],
+            'q' => ['nullable', 'string', 'max:200'],
+            'calificacion' => ['nullable', Rule::in(['todas', '5', '4', '3'])],
+            'profesional' => ['nullable', 'string', 'max:200'],
+        ]);
+        $consulta = ResenaTenant::query()->with(['oferta', 'instructor', 'persona'])->orderByDesc('id');
+        $todas = ResenaTenant::query()->with('instructor')->get(['calificacion', 'instructor_id', 'oferta_id', 'comentario']);
+        $nota = $filtros['calificacion'] ?? 'todas';
+        if ($nota !== 'todas') {
+            $consulta->where('calificacion', $nota === '3' ? '<=' : '=', (int) $nota);
+        }
+        $profesional = $filtros['profesional'] ?? '';
+        if ($profesional !== '') {
+            $ids = $todas->pluck('instructor')->filter()->unique('id')
+                ->filter(fn (Usuario $u): bool => $u->nombreCorto() === $profesional)->pluck('id');
+            $consulta->whereIn('instructor_id', $ids);
+        }
+        foreach (preg_split('/\s+/u', trim($filtros['q'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) as $termino) {
+            $patron = '%'.$termino.'%';
+            $consulta->where(function ($q) use ($patron): void {
+                $q->where('comentario', 'like', $patron)
+                    ->orWhereHas('oferta', fn ($o) => $o->where('nombre', 'like', $patron))
+                    ->orWhereHas('persona', fn ($p) => $p->where('nombre', 'like', $patron)
+                        ->orWhere('segundo_nombre', 'like', $patron)->orWhere('primer_apellido', 'like', $patron)
+                        ->orWhere('segundo_apellido', 'like', $patron));
+            });
+        }
+        $perPage = (int) ($filtros['per_page'] ?? 20);
+        $total = (clone $consulta)->count();
+        $ultima = max(1, (int) ceil($total / $perPage));
+        $page = min((int) ($filtros['page'] ?? 1), $ultima);
+        $resenas = $consulta->forPage($page, $perPage)->get();
 
         $promedio = static fn ($grupo): array => [
             'promedio' => round((float) $grupo->avg('calificacion'), 1),
@@ -152,10 +185,13 @@ class ResenasTenantController
 
         return response()->json([
             'data' => $resenas->map(fn (ResenaTenant $r): array => $this->presentar($r))->all(),
+            'meta' => ['page' => $page, 'ultima_pagina' => $ultima, 'total' => $total, 'per_page' => $perPage],
             'resumen' => [
+                'conteos' => ['todas' => $todas->count(), '5' => $todas->where('calificacion', 5)->count(), '4' => $todas->where('calificacion', 4)->count(), '3' => $todas->where('calificacion', '<=', 3)->count()],
+                'con_comentario' => $todas->filter(fn ($r): bool => filled($r->comentario))->count(),
                 'general' => $promedio($todas),
                 'por_profesional' => $todas->whereNotNull('instructor_id')->groupBy('instructor_id')
-                    ->map(fn ($grupo, $id): array => ['nombre' => Usuario::query()->find($id)?->nombreCorto(), ...$promedio($grupo)])
+                    ->map(fn ($grupo): array => ['nombre' => $grupo->first()->instructor?->nombreCorto(), ...$promedio($grupo)])
                     ->sortByDesc('total')->values()->all(),
             ],
         ]);
