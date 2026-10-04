@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 
 import IconoNav from "@/components/IconoNav.vue";
+import MenuPerfil from "@/components/MenuPerfil.vue";
 import BotonPantallaCompleta from "@/components/BotonPantallaCompleta.vue";
 import SelectorSucursal from "@/components/SelectorSucursal.vue";
 import { agendaAmpliada } from "@/lib/pantallaCompleta";
@@ -15,11 +16,10 @@ import DialogoConfirmar from "@/components/DialogoConfirmar.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import PanelRoles from "@/components/PanelRoles.vue";
 import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
-import { puedeEntrar } from "@/lib/acceso";
 import { ubicacion } from "@/lib/menu";
 import { useUbicacionActual } from "@/lib/ubicacionActual";
 import { identidadDeSesion, reiniciarMiCuenta } from "@/lib/miCuenta";
-import { esMiembro, nombreDeRol } from "@/lib/roles";
+import { esMiembro } from "@/lib/roles";
 import { useSucursales } from "@/lib/sucursalOperativa";
 import { slugDeContexto } from "@/lib/tenant";
 import { pausarTerminologia } from "@/i18n";
@@ -93,26 +93,11 @@ watch(
   { immediate: true },
 );
 
-// Configuración del negocio en el menú del usuario: si alguna opción se puede abrir.
-const puedeConfigurar = computed(() => puedeEntrar("ajustes", sesion));
-
 // Una opción de Configuración (no su portada) va con la navegación secundaria.
 const enConfiguracion = computed(() => {
   const u = ubicacion(route);
   return u?.area.clave === "configuracion" && u.vista.clave !== "portada";
 });
-
-function siglas(nombre: string | undefined): string {
-  return (
-    (nombre ?? "")
-      .split(" ")
-      .slice(0, 2)
-      .map((p) => p.charAt(0))
-      .join("")
-      .toUpperCase() || "·"
-  );
-}
-const inicialesUsuario = computed(() => siglas(sesion.usuario?.nombre));
 
 // Estado de la interfaz.
 const menuLateral = ref(false); // cajón en móvil
@@ -357,99 +342,16 @@ onMounted(() => {
 
           <BotonPantallaCompleta />
 
-          <!-- Perfil -->
-          <div class="relative">
-            <button
-              type="button"
-              class="flex items-center gap-2 rounded-xl p-1 pr-2 hover:bg-black/5"
-              :aria-expanded="menuPerfil"
-              @click="
-                menuPerfil = !menuPerfil;
-                menuApariencia = false;
-              "
-            >
-              <img
-                v-if="sesion.usuario?.foto_url"
-                :src="sesion.usuario.foto_url"
-                alt=""
-                class="h-8 w-8 rounded-full object-cover shrink-0"
-              />
-              <span
-                v-else
-                class="h-8 w-8 rounded-full inline-flex items-center justify-center text-xs font-semibold shrink-0"
-                :style="{
-                  background: 'var(--superficie-2)',
-                  color: 'var(--texto)',
-                }"
-                aria-hidden="true"
-                >{{ inicialesUsuario }}</span
-              >
-              <span class="hidden sm:block text-left leading-tight">
-                <span
-                  class="block text-[13px] font-semibold truncate max-w-[8rem]"
-                  >{{
-                    sesion.usuario?.nombre_corto ?? sesion.usuario?.nombre
-                  }}</span
-                >
-                <span
-                  class="block text-[11px] truncate"
-                  :style="{ color: 'var(--texto-suave)' }"
-                  >{{
-                    nombreDeRol(
-                      sesion.usuario?.rol ?? "",
-                      sesion.usuario?.roles_disponibles,
-                      (llave) => ($te(llave) ? $t(llave) : null),
-                    )
-                  }}</span
-                >
-              </span>
-            </button>
-            <div
-              v-if="menuPerfil"
-              class="absolute right-0 top-full mt-2 w-60 tu-card p-1.5 z-50"
-            >
-              <div
-                class="px-2.5 py-2 border-b"
-                :style="{ borderColor: 'var(--borde)' }"
-              >
-                <p class="text-sm font-semibold truncate">
-                  {{ sesion.usuario?.nombre }}
-                </p>
-                <p
-                  class="text-xs truncate"
-                  :style="{ color: 'var(--texto-suave)' }"
-                >
-                  {{ sesion.usuario?.email }}
-                </p>
-              </div>
-              <RouterLink
-                class="tu-menu-item mt-1"
-                :to="{ name: 'mi-perfil' }"
-                @click="menuPerfil = false"
-              >
-                <IconoNav nombre="miembros" :tam="16" />
-                {{ $t("miPerfil.titulo") }}
-              </RouterLink>
-              <RouterLink
-                v-if="puedeConfigurar"
-                class="tu-menu-item"
-                :to="{ name: 'ajustes' }"
-                @click="menuPerfil = false"
-              >
-                <IconoNav nombre="configuracion" :tam="16" />
-                {{ $t("nav.configuracion") }}
-              </RouterLink>
-              <button
-                type="button"
-                class="tu-menu-item"
-                style="color: var(--error)"
-                @click="salir"
-              >
-                <IconoNav nombre="salir" :tam="16" />
-                {{ $t("panel.salir") }}
-              </button>
-            </div>
-          </div>
+          <!-- Perfil: quién entró y con qué rol; su perfil y salir. -->
+          <MenuPerfil
+            :abierto="menuPerfil"
+            @alternar="
+              menuPerfil = !menuPerfil;
+              menuApariencia = false;
+            "
+            @cerrar="menuPerfil = false"
+            @salir="salir"
+          />
         </div>
       </header>
 
@@ -670,24 +572,5 @@ a.tu-miga:hover {
   .tu-barra-menu {
     display: none;
   }
-}
-
-/* Elementos de menús flotantes (perfil, apariencia) sobre fondo claro. */
-.tu-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  width: 100%;
-  padding: 0.5rem 0.6rem;
-  border-radius: 0.6rem;
-  font-weight: 600;
-  font-size: 0.88rem;
-  color: var(--texto);
-  text-decoration: none;
-  cursor: pointer;
-  text-align: left;
-}
-.tu-menu-item:hover {
-  background: var(--superficie-2);
 }
 </style>
