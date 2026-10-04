@@ -15,4 +15,15 @@ export default {
   lugaresDisponibles:
     "Sin lugares disponibles | 1 lugar disponible | {n} lugares disponibles",
   llena: "Clase llena",
+  // Negocio de citas: la jornada como lista de clientes (no hay «lugares»).
+  citas: {
+    sinCitas: "No hay citas este día.",
+    sinCliente: "Sin cliente",
+    kpi: {
+      citas: "Citas",
+      llegaron: "Ya llegaron",
+      porAtender: "Por atender",
+      porCobrar: "Por cobrar",
+    },
+  },
 };

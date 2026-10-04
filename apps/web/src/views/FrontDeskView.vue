@@ -8,6 +8,9 @@ import EscanerPase from "@/components/EscanerPase.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PanelClase from "@/components/PanelClase.vue";
+import RecepcionCitas, {
+  type ResumenCitas,
+} from "@/components/RecepcionCitas.vue";
 import PanelMiembro from "@/components/PanelMiembro.vue";
 import TarjetasIndicadores, {
   type Indicador,
@@ -47,6 +50,8 @@ interface SesionDia {
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
+// En citas, la jornada es una lista de clientes (RecepcionCitas); sus números.
+const resumenCitas = ref<ResumenCitas | null>(null);
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 // En escritorio el detalle de la clase va junto a la lista; en móvil, como panel.
 const esEscritorio = useAnchoMinimo(1024);
@@ -243,6 +248,11 @@ function claseInicial(): SesionDia | null {
 }
 
 async function cargar(): Promise<void> {
+  // En citas, la lista y sus números los carga RecepcionCitas.
+  if (sesion.esCitas) {
+    cargando.value = false;
+    return;
+  }
   cargando.value = true;
   error.value = null;
   try {
@@ -270,6 +280,40 @@ async function cargar(): Promise<void> {
 
 // Las métricas del día en tarjetas, cada una con su ícono y su color.
 const tarjetas = computed<Indicador[]>(() => {
+  // Citas: cuántas, quiénes llegaron, cuántas faltan por atender y por cobrar (la
+  // ocupación de «lugares» no dice si la jornada está llena).
+  if (sesion.esCitas) {
+    const r = resumenCitas.value;
+    if (r === null) {
+      return [];
+    }
+    const citas: Omit<Indicador, "etiqueta">[] = [
+      { clave: "citas", valor: String(r.citas), icono: "agenda", tono: "azul" },
+      {
+        clave: "llegaron",
+        valor: String(r.llegaron),
+        icono: "hecho",
+        tono: "verde",
+      },
+      {
+        clave: "porAtender",
+        valor: String(r.porAtender),
+        icono: "reloj",
+        tono: "cielo",
+      },
+      {
+        clave: "porCobrar",
+        valor: String(r.porCobrar),
+        icono: "dinero",
+        tono: "naranja",
+        aviso: r.porCobrar > 0,
+      },
+    ];
+    return citas.map((k) => ({
+      ...k,
+      etiqueta: t(`recepcionVisual.citas.kpi.${k.clave}`),
+    }));
+  }
   const m = metricas.value;
   if (m === null) {
     return [];
@@ -494,7 +538,15 @@ onMounted(async () => {
         </span>
       </div>
 
+      <!-- Citas: la jornada como lista de clientes, con su cita al tocarla -->
+      <RecepcionCitas
+        v-if="sesion.esCitas"
+        :fecha="fecha"
+        :sucursal-id="sucursalFiltro"
+        @resumen="resumenCitas = $event"
+      />
       <div
+        v-else
         class="lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_24rem]"
       >
         <!-- Clases del día -->

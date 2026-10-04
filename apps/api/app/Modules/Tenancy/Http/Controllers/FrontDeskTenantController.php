@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
@@ -121,16 +122,22 @@ class FrontDeskTenantController
     }
 
     /**
+     * Los totales del día cuentan solo lo que se va a dar: una clase cancelada sigue
+     * en la lista (con su estado), pero no suma sesiones, cupo ni ocupación.
+     *
      * @param  Collection<int, array<string, mixed>>  $filas
      * @return array<string, mixed>
      */
     private function totales(Collection $filas): array
     {
+        $canceladas = $filas->filter(fn (array $f): bool => $f['estado'] === EstadoSesionTenant::Cancelada->value)->count();
+        $filas = $filas->reject(fn (array $f): bool => $f['estado'] === EstadoSesionTenant::Cancelada->value);
         $capacidad = (int) $filas->sum(fn (array $f): int => (int) ($f['capacidad'] ?? 0));
         $confirmadas = (int) $filas->sum('confirmadas');
 
         return [
             'sesiones' => $filas->count(),
+            'canceladas' => $canceladas,
             'capacidad_total' => $capacidad,
             'confirmadas' => $confirmadas,
             'en_espera' => (int) $filas->sum('en_espera'),

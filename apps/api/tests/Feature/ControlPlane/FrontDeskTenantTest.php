@@ -59,6 +59,28 @@ it('resume el dia con las sesiones y sus metricas (cupo, reservas, asistencia)',
     expect($r['sesiones'][0]['en_espera'])->toBe(1);
 });
 
+it('una clase cancelada sigue en la lista pero no suma sesiones, cupo ni ocupación', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $en30 = Carbon::now('America/Mexico_City')->addMinutes(30)->format('Y-m-d H:i:s');
+    $en90 = Carbon::now('America/Mexico_City')->addMinutes(90)->format('Y-m-d H:i:s');
+    $sesion = crearSesionTenant($e, $semilla, capacidad: 4, cuando: $en30);
+    $cancelada = crearSesionTenant($e, $semilla, capacidad: 10, cuando: $en90);
+    $a = venderPackAMiembroTenant($e, 8000, 'Ana');
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $a['persona']], conBearer($e['bearer']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$cancelada}/cancelar", [], conBearer($e['bearer']))->assertOk();
+
+    $fecha = Carbon::now('America/Mexico_City')->toDateString();
+    $r = $this->getJson("/api/v1/app/{$e['slug']}/front-desk?fecha={$fecha}&sucursal_id={$semilla['sucursal']}", conBearer($e['bearer']))
+        ->assertOk()->json();
+
+    expect($r['sesiones'])->toHaveCount(2);
+    expect($r['metricas']['sesiones'])->toBe(1);
+    expect($r['metricas']['canceladas'])->toBe(1);
+    expect($r['metricas']['capacidad_total'])->toBe(4);
+    expect($r['metricas']['ocupacion_pct'])->toBe(25);
+});
+
 it('filtra por sucursal: no muestra las sesiones de otra sede', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $cuando = Carbon::now('America/Mexico_City')->addMinutes(30)->format('Y-m-d H:i:s');
