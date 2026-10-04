@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 
+import MenuFlotante from "@/components/MenuFlotante.vue";
 import {
   descargarIcs,
   enlaceGoogle,
@@ -9,30 +10,29 @@ import {
 
 /**
  * "Agregar a mi calendario" de una reserva: Google Calendar (en una pestaña nueva) o
- * el archivo .ics para Apple Calendar, Outlook y los demás.
+ * el archivo .ics para Apple Calendar, Outlook y los demás. Las opciones flotan sobre
+ * la página: la tarjeta donde va el botón no las recorta.
  */
 const props = defineProps<{ evento: EventoCalendario; primario?: boolean }>();
 
 const abierto = ref(false);
+const boton = ref<HTMLElement | null>(null);
 </script>
 
 <template>
-  <div class="relative inline-block">
+  <div class="inline-block">
     <button
+      ref="boton"
       type="button"
       class="tu-btn text-sm"
       :class="props.primario ? 'tu-btn-primario' : 'tu-btn-fantasma'"
       :aria-expanded="abierto"
+      aria-haspopup="menu"
       @click="abierto = !abierto"
     >
       {{ $t("portal.calendario.agregar") }}
     </button>
-    <div
-      v-if="abierto"
-      class="absolute left-0 z-20 mt-1 w-56 overflow-hidden rounded-lg border shadow-lg"
-      :style="{ background: 'var(--superficie)', borderColor: 'var(--borde)' }"
-      role="menu"
-    >
+    <MenuFlotante :abierto="abierto" :ancla="boton" @cerrar="abierto = false">
       <a
         :href="enlaceGoogle(props.evento)"
         target="_blank"
@@ -53,6 +53,6 @@ const abierto = ref(false);
       >
         {{ $t("portal.calendario.ics") }}
       </button>
-    </div>
+    </MenuFlotante>
   </div>
 </template>

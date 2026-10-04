@@ -7,7 +7,7 @@ import esMX from "@/i18n/locales/es-MX";
 import operacion from "@/i18n/locales/operacion.es-MX";
 import { menuVisible } from "@/lib/menu";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
-import ElegirRolView from "./ElegirRolView.vue";
+import PanelRoles from "@/components/PanelRoles.vue";
 
 const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({
@@ -45,16 +45,34 @@ function i18n() {
 }
 
 describe("rol activo", () => {
+  it("exige elegir al autenticar y conserva la elección pendiente hasta confirmarla", async () => {
+    api.post.mockResolvedValue({
+      data: {
+        data: {
+          token: "prueba",
+          usuario: usuario("admin", ["*"]),
+          estudio: { slug: "demo", nombre: "Demo", estado: "active" },
+        },
+      },
+    });
+    const sesion = useSesionTenantStore();
+    await sesion.iniciarSesion("demo", "ana@correo.mx", "password");
+    expect(sesion.requiereElegirRol).toBe(true);
+    expect(localStorage.getItem("tu.tenant.rol-pendiente")).toBe("1");
+    sesion.confirmarRolInicial();
+    expect(sesion.requiereElegirRol).toBe(false);
+    expect(localStorage.getItem("tu.tenant.rol-pendiente")).toBeNull();
+  });
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
   });
 
-  it("con varios roles, tras entrar pregunta con cuál; con uno, va a su inicio", () => {
+  it("tras entrar va al inicio de su rol; con varios, el panel lateral pregunta antes", () => {
     const sesion = useSesionTenantStore();
     sesion.usuario = usuario("instructor", ["agenda.ver"]);
     expect(sesion.tieneVariosRoles).toBe(true);
-    expect(sesion.destinoAlEntrar).toBe("elegir-rol");
+    expect(sesion.destinoAlEntrar).toBe("inicio-instructor");
 
     sesion.usuario = {
       ...usuario("miembro", []),
@@ -89,7 +107,15 @@ describe("rol activo", () => {
     expect(visibles()).not.toContain("mis-reservas");
   });
 
-  it("«¿Cómo quieres entrar?» marca el de la última vez y cambia al elegido", async () => {
+  // El panel lateral derecho al entrar (como en Acadion).
+  function panelAlEntrar(destino: string | null = null) {
+    return mount(PanelRoles, {
+      props: { abierto: true, alEntrar: true, destino },
+      global: { plugins: [i18n()], stubs: { teleport: true } },
+    });
+  }
+
+  it("«¿Cómo quieres entrar?» en el panel lateral: marca el de la última vez y cambia al elegido", async () => {
     const sesion = useSesionTenantStore();
     sesion.slug = "demo";
     sesion.usuario = usuario("instructor", ["agenda.ver"]);
@@ -102,7 +128,8 @@ describe("rol activo", () => {
       },
     });
 
-    const w = mount(ElegirRolView, { global: { plugins: [i18n()] } });
+    const w = panelAlEntrar();
+    expect(w.get('[role="dialog"]').text()).toContain("¿Cómo quieres entrar?");
     const tarjetas = w.findAll(".lr-rol");
     expect(tarjetas.map((t) => t.find(".lr-nombre").text())).toEqual([
       "Administrador",
@@ -126,11 +153,27 @@ describe("rol activo", () => {
     sesion.slug = "demo";
     sesion.usuario = usuario("instructor", ["agenda.ver"]);
 
-    const w = mount(ElegirRolView, { global: { plugins: [i18n()] } });
+    const w = panelAlEntrar();
     await w.findAll(".lr-rol")[1].trigger("click");
     await flushPromises();
 
     expect(api.put).not.toHaveBeenCalled();
     expect(router.replace).toHaveBeenCalledWith({ name: "inicio-instructor" });
+  });
+
+  it("cerrar el panel al entrar entra con el rol de la última vez y vuelve a donde venía", async () => {
+    const sesion = useSesionTenantStore();
+    sesion.slug = "demo";
+    sesion.usuario = usuario("instructor", ["agenda.ver"]);
+    sesion.requiereElegirRol = true;
+
+    const w = panelAlEntrar("/agendar/demo");
+    await w.get('[role="dialog"] button[aria-label="Cerrar"]').trigger("click");
+    await flushPromises();
+
+    expect(api.put).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith("/agendar/demo");
+    expect(sesion.requiereElegirRol).toBe(false);
+    expect(w.emitted("cerrar")).toBeTruthy();
   });
 });

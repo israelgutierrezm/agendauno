@@ -42,7 +42,13 @@ const emit = defineEmits<{ elegir: [clave: string] }>();
             {{ $t(`operacion.rolActivo.faceta.${rol.faceta}`) }}
           </span>
         </span>
-        <span v-if="aplicando === rol.clave" class="lr-marca">…</span>
+        <span
+          v-if="aplicando === rol.clave"
+          class="lr-marca"
+          role="status"
+          :aria-label="$t('comun.cargando')"
+          ><span class="lr-spinner" aria-hidden="true"
+        /></span>
         <span v-else-if="rol.clave === marcado" class="lr-marca">
           <span class="lr-punto" aria-hidden="true"></span>
           {{ etiquetaMarca }}
@@ -56,6 +62,24 @@ const emit = defineEmits<{ elegir: [clave: string] }>();
 .lr-lista {
   display: grid;
   gap: 0.6rem;
+}
+.lr-spinner {
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 2px solid var(--borde);
+  border-top-color: var(--acento);
+  border-radius: 50%;
+  animation: lr-girar 0.7s linear infinite;
+}
+@keyframes lr-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lr-spinner {
+    animation: none;
+  }
 }
 .lr-rol {
   display: flex;

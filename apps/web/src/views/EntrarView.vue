@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PanelRoles from "@/components/PanelRoles.vue";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -66,15 +67,25 @@ const hayGoogle = clientIdGoogle() !== undefined;
 const contenedorGoogle = ref<HTMLElement | null>(null);
 const googleRenderizadoPara = ref("");
 
-// Con más de un rol, primero «¿Cómo quieres entrar?».
 // Tras entrar: de vuelta a donde venía (p. ej. agendar una cita) o a su inicio. Solo
 // rutas internas: un enlace no puede mandar a otro sitio.
-function destino(): RouteLocationRaw {
+function volverA(): string | null {
   const volver = String(route.query.volver ?? "");
-  if (/^\/(?![/\\])/.test(volver)) {
-    return volver;
+  return /^\/(?![/\\])/.test(volver) ? volver : null;
+}
+function destino(): RouteLocationRaw {
+  return volverA() ?? { name: sesion.destinoAlEntrar };
+}
+
+// Con más de un rol en el negocio, el panel lateral pregunta con cuál entra (como en
+// Acadion); con uno, entra directo.
+const eligiendoRol = ref(false);
+function continuar(): void {
+  if (sesion.requiereElegirRol) {
+    eligiendoRol.value = true;
+    return;
   }
-  return { name: sesion.destinoAlEntrar };
+  void router.push(destino());
 }
 
 function ubicacion(negocio: {
@@ -216,7 +227,7 @@ async function enviar(): Promise<void> {
         pais: null,
       });
     }
-    void router.push(destino());
+    continuar();
   } catch {
     // El error queda en sesion.error.
   }
@@ -225,7 +236,7 @@ async function enviar(): Promise<void> {
 async function entrarConGoogle(credential: string): Promise<void> {
   try {
     await sesion.iniciarSesionConGoogle(slug.value.trim(), credential);
-    void router.push(destino());
+    continuar();
   } catch {
     // El error queda en sesion.error.
   }
@@ -573,6 +584,12 @@ onMounted(async () => {
       </div>
     </section>
   </div>
+  <PanelRoles
+    :abierto="eligiendoRol && sesion.requiereElegirRol"
+    al-entrar
+    :destino="volverA()"
+    @cerrar="eligiendoRol = false"
+  />
 </template>
 
 <style scoped>

@@ -121,6 +121,12 @@ const menuPerfil = ref(false);
 const menuApariencia = ref(false);
 // Panel «Cambiar de rol» (quien tiene más de un rol en el negocio).
 const menuRoles = ref(false);
+// Entró (o recargó) sin elegir con qué rol: el panel lateral se lo pregunta. En la
+// pantalla de entrar lo pregunta la propia pantalla.
+const rolPorElegir = computed(
+  () =>
+    sesion.autenticado && sesion.requiereElegirRol && route.name !== "entrar",
+);
 
 // La contracción solo aplica en escritorio; con el cajón abierto se ve completo.
 const compactoEfectivo = computed(() => compacto.value && !menuLateral.value);
@@ -499,7 +505,11 @@ onMounted(() => {
   <!-- Confirmaciones dentro de la app (lib/confirmar.ts). -->
   <DialogoConfirmar />
   <PanelApariencia :abierto="menuApariencia" @cerrar="menuApariencia = false" />
-  <PanelRoles :abierto="menuRoles" @cerrar="menuRoles = false" />
+  <PanelRoles
+    :abierto="menuRoles || rolPorElegir"
+    :al-entrar="rolPorElegir && !menuRoles"
+    @cerrar="menuRoles = false"
+  />
 </template>
 
 <style>

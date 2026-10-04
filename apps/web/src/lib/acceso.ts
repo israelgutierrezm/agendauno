@@ -133,7 +133,6 @@ export const POLITICAS: Record<string, Politica> = {
 
   // ---- Personales ----
   "mi-perfil": { personal: true },
-  "elegir-rol": { personal: true },
 };
 
 /** ¿Entró como alumno o cliente? Cuenta solo el rol activo. */

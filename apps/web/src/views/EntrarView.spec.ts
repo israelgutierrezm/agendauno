@@ -2,13 +2,22 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 import es from "@/i18n/locales/es-MX";
+import PanelRoles from "@/components/PanelRoles.vue";
 import { recordarNegocio } from "@/lib/negociosRecientes";
 import EntrarView from "./EntrarView.vue";
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   replace: vi.fn(),
+  push: vi.fn(),
   route: { query: {} as Record<string, string> },
+  sesion: {
+    error: null,
+    cargando: false,
+    requiereElegirRol: false,
+    destinoAlEntrar: "panel",
+    iniciarSesion: vi.fn(),
+  },
 }));
 vi.mock("@/lib/api", () => ({
   api: { get: mocks.get },
@@ -23,14 +32,14 @@ vi.mock("@/lib/google", () => ({
   renderizarBotonGoogle: vi.fn(),
 }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ error: null, cargando: false }),
+  useSesionTenantStore: () => mocks.sesion,
 }));
 vi.mock("@/stores/tema", () => ({
   useTemaStore: () => ({ esOscuro: false, alternarModo: vi.fn() }),
 }));
 vi.mock("vue-router", () => ({
   useRoute: () => mocks.route,
-  useRouter: () => ({ replace: mocks.replace, push: vi.fn() }),
+  useRouter: () => ({ replace: mocks.replace, push: mocks.push }),
   RouterLink: { template: "<a><slot /></a>" },
 }));
 
@@ -39,6 +48,8 @@ function montar() {
   const wrapper = mount(EntrarView, {
     global: {
       plugins: [createI18n({ legacy: false, locale: "es", messages: { es } })],
+      // El panel de roles al entrar tiene su propia prueba (ElegirRol.spec).
+      stubs: { PanelRoles: true },
     },
   });
   montajes.push(wrapper);
@@ -61,6 +72,7 @@ describe("acceso por negocio", () => {
     localStorage.clear();
     vi.clearAllMocks();
     mocks.route.query = {};
+    mocks.sesion.requiereElegirRol = false;
     mocks.get.mockResolvedValue({ data: { data: [] } });
   });
   afterEach(() => {
@@ -120,6 +132,45 @@ describe("acceso por negocio", () => {
     expect(wrapper.get(".tu-login-identidad img").attributes("src")).toContain(
       "isotipo.png",
     );
+  });
+
+  it("con varios roles, al entrar abre el panel lateral para elegir con cuál (sin navegar)", async () => {
+    mocks.route.query = { estudio: "pilates" };
+    mocks.get.mockResolvedValue({
+      data: { data: { nombre: "Pilates Centro", logo_url: null } },
+    });
+    mocks.sesion.iniciarSesion.mockImplementation(async () => {
+      mocks.sesion.requiereElegirRol = true;
+    });
+    const wrapper = montar();
+    await flushPromises();
+    await wrapper.get("#email").setValue("ana@correo.test");
+    await wrapper.get("#password").setValue("prueba");
+    await wrapper.get("form.tu-login-form").trigger("submit");
+    await flushPromises();
+
+    expect(mocks.sesion.iniciarSesion).toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+    const panel = wrapper.findComponent(PanelRoles);
+    expect(panel.props("abierto")).toBe(true);
+    expect(panel.props("alEntrar")).toBe(true);
+  });
+
+  it("con un solo rol, al entrar va directo a su inicio", async () => {
+    mocks.route.query = { estudio: "pilates" };
+    mocks.get.mockResolvedValue({
+      data: { data: { nombre: "Pilates Centro", logo_url: null } },
+    });
+    mocks.sesion.iniciarSesion.mockResolvedValue(undefined);
+    const wrapper = montar();
+    await flushPromises();
+    await wrapper.get("#email").setValue("ana@correo.test");
+    await wrapper.get("#password").setValue("prueba");
+    await wrapper.get("form.tu-login-form").trigger("submit");
+    await flushPromises();
+
+    expect(mocks.push).toHaveBeenCalledWith({ name: "panel" });
+    expect(wrapper.findComponent(PanelRoles).props("abierto")).toBe(false);
   });
 
   it("un enlace directo abre el formulario con la identidad del negocio", async () => {

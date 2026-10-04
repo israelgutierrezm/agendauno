@@ -91,6 +91,7 @@ interface RespuestaAuth {
 
 const CLAVE_BEARER = "tu.tenant.bearer";
 const CLAVE_SLUG = "tu.tenant.slug";
+const CLAVE_ROL_PENDIENTE = "tu.tenant.rol-pendiente";
 
 /**
  * Sesion TENANT-LOCAL: no hay login global. Se resuelve el estudio por slug y se
@@ -105,6 +106,11 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
   const cargando = ref(false);
   const error = ref<string | null>(null);
   const verificado = ref(false);
+  const requiereElegirRol = ref(leer(CLAVE_ROL_PENDIENTE) === "1");
+  function confirmarRolInicial(): void {
+    requiereElegirRol.value = false;
+    borrar(CLAVE_ROL_PENDIENTE);
+  }
 
   const autenticado = computed(
     () => usuario.value !== null && bearer.value !== null,
@@ -161,10 +167,11 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     () => (usuario.value?.roles_disponibles?.length ?? 0) > 1,
   );
 
-  /** A dónde va tras iniciar sesión: a elegir rol si tiene varios; si no, a su inicio. */
-  const destinoAlEntrar = computed<string>(() =>
-    tieneVariosRoles.value ? "elegir-rol" : rutaInicio.value,
-  );
+  /**
+   * A dónde va tras iniciar sesión: su inicio. Con varios roles, antes el panel
+   * lateral pregunta con cuál entra (`requiereElegirRol`).
+   */
+  const destinoAlEntrar = computed<string>(() => rutaInicio.value);
 
   /**
    * Modalidad de servicio del negocio (derivada de su perfil). La agenda, el menú, la
@@ -198,6 +205,10 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     bearer.value = datos.token;
     slug.value = datos.estudio.slug;
     usuario.value = datos.usuario;
+    requiereElegirRol.value =
+      (datos.usuario.roles_disponibles?.length ?? 0) > 1;
+    if (requiereElegirRol.value) guardar(CLAVE_ROL_PENDIENTE, "1");
+    else borrar(CLAVE_ROL_PENDIENTE);
     estudio.value = datos.estudio;
     useAparienciaStore().activar(datos.usuario.apariencia);
     verificado.value = true;
@@ -383,6 +394,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
   }
 
   function limpiar(): void {
+    confirmarRolInicial();
     bearer.value = null;
     usuario.value = null;
     estudio.value = null;
@@ -405,6 +417,8 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     suspendido,
     tieneVariosRoles,
     destinoAlEntrar,
+    requiereElegirRol,
+    confirmarRolInicial,
     modalidad,
     esCitas,
     terminologia,

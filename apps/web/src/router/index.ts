@@ -430,13 +430,6 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
-      // «¿Cómo quieres entrar?»: quien tiene más de un rol elige con cuál trabaja.
-      path: "/elegir-rol",
-      name: "elegir-rol",
-      component: () => import("@/views/ElegirRolView.vue"),
-      meta: { requiereSesion: true },
-    },
-    {
       // Mi perfil: foto, nombre y contraseña de quien tiene la sesión (todo rol).
       path: "/mi-perfil",
       name: "mi-perfil",
@@ -466,7 +459,6 @@ router.beforeEach(async (to) => {
   if (to.meta.requiereSesion === true && !sesion.autenticado) {
     return { name: "entrar" };
   }
-
   // Cada pantalla privada tiene su regla en lib/acceso (sin regla, no se entra).
   // Cubre la URL escrita a mano: el menú solo ofrece lo permitido. Sin permiso se
   // va al inicio de quien entra, que también se valida; si ni ese se puede, a su

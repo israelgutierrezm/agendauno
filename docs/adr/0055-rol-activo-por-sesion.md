@@ -43,9 +43,11 @@ activo que el servidor valida.
   La faceta dice qué parte de la app corresponde al rol: `equipo` (el negocio),
   `instructor` (su portal) o `miembro` (su cuenta).
 - **Web**:
-  - Con más de un rol, tras entrar va a «¿Cómo quieres entrar?», con el último rol
-    marcado.
-  - En la barra superior hay un botón «Cambiar de rol» (panel lateral).
+  - Con más de un rol, al entrar se abre el panel lateral derecho «¿Cómo quieres
+    entrar?» (como en Acadion, 2026-10-04; antes era una página aparte), con el último
+    rol marcado. Cerrarlo entra con ese rol. La elección pendiente sobrevive a una
+    recarga: el mismo panel se abre sobre la app hasta que elige.
+  - En la barra superior hay un botón «Cambiar de rol»: el mismo panel lateral.
   - El menú y la pantalla de inicio siguen solo la faceta del rol activo.
 - **App**:
   - La misma pantalla al entrar.
