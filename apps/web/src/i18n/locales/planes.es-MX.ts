@@ -169,6 +169,9 @@ export default {
       usadas: "Usadas",
       apartadas: "Reservadas",
       disponibles: "Disponibles",
+      // Lo que quedó sin usar en un plan que ya no está vigente.
+      sinUsarVencido: "Sin usar al vencer",
+      sinUsarCancelado: "Sin usar al cancelar",
       vencidas: "Vencidas",
       devueltas: "Devueltas",
     },
@@ -187,5 +190,13 @@ export default {
     deExtra: "extra",
     verDetalle: "Ver detalle",
     anteriores: "Planes anteriores",
+    // Los anteriores, plegados: una línea por plan.
+    verAnteriores: "Ver planes anteriores ({n})",
+    ocultarAnteriores: "Ocultar planes anteriores",
+    plegar: "Plegar",
+    sinVigentes: "Sin plan vigente.",
+    resumenUso: "Usaste {usadas} de {total}",
+    resumenIlimitado: "{usadas} usadas",
+    aplicaAMas: "Sirve para: {clases} y {n} más",
   },
 };

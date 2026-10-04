@@ -40,6 +40,10 @@ export interface UsuarioTenant {
   google_conectado?: boolean;
   // Correo nuevo que espera confirmación por enlace.
   email_pendiente?: string | null;
+  // Su ficha de cliente o alumno (si la tiene): de ahí sale su celular, que
+  // edita en «Mi perfil».
+  tiene_ficha?: boolean;
+  celular?: string | null;
 }
 
 /** Cómo atiende el negocio: clases con cupo o citas 1 a 1 con un profesional. */

@@ -17,9 +17,12 @@ import {
 import { useToastStore } from "@/stores/toast";
 
 /**
- * "Mi perfil": lo que cada persona ajusta de sí misma: su foto, su nombre (con
- * apellidos por separado), su correo de acceso (se confirma por enlace), su
- * contraseña y su apariencia.
+ * "Mi perfil": lo que cada persona ajusta de sí misma, en tres partes:
+ * - Datos personales: su foto, su nombre (con apellidos por separado) y, si es
+ *   cliente o alumno, su celular (para avisos y WhatsApp).
+ * - Acceso: su correo (se confirma por enlace), su contraseña y Google.
+ * - Preferencias y privacidad: su calendario, su apariencia y, si es cliente o
+ *   alumno, su privacidad (promociones, WhatsApp, sus datos).
  */
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
@@ -134,7 +137,12 @@ async function quitarFoto(): Promise<void> {
 }
 
 // ---- Datos ----
-const datos = ref({ nombre: "", primer_apellido: "", segundo_apellido: "" });
+const datos = ref({
+  nombre: "",
+  primer_apellido: "",
+  segundo_apellido: "",
+  celular: "",
+});
 watch(
   usuario,
   (u) => {
@@ -146,6 +154,7 @@ watch(
       nombre: u.nombre_pila ?? u.nombre,
       primer_apellido: u.primer_apellido ?? "",
       segundo_apellido: u.segundo_apellido ?? "",
+      celular: u.celular ?? "",
     };
   },
   { immediate: true },
@@ -158,6 +167,10 @@ async function guardarDatos(): Promise<void> {
       nombre: datos.value.nombre,
       primer_apellido: datos.value.primer_apellido || null,
       segundo_apellido: datos.value.segundo_apellido || null,
+      // El celular es de su ficha de cliente o alumno: sin ficha no se manda.
+      ...(usuario.value?.tiene_ficha
+        ? { celular: datos.value.celular.trim() || null }
+        : {}),
     });
     sesion.actualizarUsuario(data.data.usuario);
     toast.exito(t("miPerfil.guardado"));
@@ -264,391 +277,425 @@ const aparienciaAbierta = ref(false);
   <section class="tu-pagina-cuenta">
     <EncabezadoSeccion :titulo="$t('miPerfil.titulo')" />
 
-    <div v-if="usuario" class="mt-6 tu-card overflow-hidden">
-      <!-- Foto -->
-      <div class="mp-fila">
-        <div>
-          <h2 class="mp-titulo">{{ $t("miPerfil.foto") }}</h2>
-          <p class="mp-ayuda">{{ $t("miPerfil.fotoAyuda") }}</p>
-        </div>
-        <div class="flex flex-wrap items-center gap-4 min-w-0">
-          <!-- Zona de la foto: se suelta aquí una imagen o se hace clic para elegirla. -->
-          <div
-            class="mp-foto-zona"
-            :class="{
-              'mp-foto-zona-activa': arrastrandoFoto,
-              'mp-foto-zona-ocupada': subiendoFoto,
-            }"
-            role="button"
-            tabindex="0"
-            :aria-label="$t('miPerfil.fotoArrastra')"
-            :aria-busy="subiendoFoto"
-            data-prueba="zona-foto"
-            @click="elegirFoto"
-            @keydown.enter.prevent="elegirFoto"
-            @keydown.space.prevent="elegirFoto"
-            @dragenter.prevent="arrastrandoFoto = true"
-            @dragover.prevent="arrastrandoFoto = true"
-            @dragleave.prevent="arrastrandoFoto = false"
-            @drop.prevent="alSoltarFoto"
-          >
-            <AvatarIniciales
-              :nombre="usuario.nombre"
-              :foto="usuario.foto_url"
-              tam="xl"
-            />
-            <span class="mp-foto-texto">
-              <span class="block text-sm font-medium">{{
-                subiendoFoto
-                  ? $t("miPerfil.fotoSubiendo")
-                  : arrastrandoFoto
-                    ? $t("miPerfil.fotoSuelta")
-                    : $t("miPerfil.fotoArrastra")
-              }}</span>
-              <span class="mp-ayuda block">{{
-                $t("miPerfil.fotoFormatos")
-              }}</span>
-            </span>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button
-              type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
-              :disabled="subiendoFoto"
-              @click="elegirFoto"
-            >
-              {{
-                usuario.foto_url
-                  ? $t("miPerfil.cambiarFoto")
-                  : $t("miPerfil.subirFoto")
-              }}
-            </button>
-            <button
-              v-if="usuario.foto_url"
-              type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
-              :disabled="subiendoFoto"
-              @click="quitarFoto"
-            >
-              {{ $t("miPerfil.quitarFoto") }}
-            </button>
-          </div>
-          <input
-            ref="selectorFoto"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            class="sr-only"
-            tabindex="-1"
-            @change="alElegirFoto"
-          />
-        </div>
-      </div>
-
-      <!-- Datos -->
-      <form class="mp-fila" @submit.prevent="guardarDatos">
-        <div>
-          <h2 class="mp-titulo">{{ $t("miPerfil.datos") }}</h2>
-          <p class="mp-ayuda">{{ $t("miPerfil.datosAyuda") }}</p>
-        </div>
-        <div class="space-y-4">
+    <template v-if="usuario">
+      <!-- DATOS PERSONALES -->
+      <h2 class="mp-seccion">{{ $t("miPerfil.seccionDatos") }}</h2>
+      <div class="tu-card overflow-hidden">
+        <!-- Foto -->
+        <div class="mp-fila">
           <div>
-            <label class="tu-label" for="mp-nombre">{{
-              $t("miPerfil.nombre")
-            }}</label>
+            <h3 class="mp-titulo">{{ $t("miPerfil.foto") }}</h3>
+            <p class="mp-ayuda">{{ $t("miPerfil.fotoAyuda") }}</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-4 min-w-0">
+            <!-- Zona de la foto: se suelta aquí una imagen o se hace clic para elegirla. -->
+            <div
+              class="mp-foto-zona"
+              :class="{
+                'mp-foto-zona-activa': arrastrandoFoto,
+                'mp-foto-zona-ocupada': subiendoFoto,
+              }"
+              role="button"
+              tabindex="0"
+              :aria-label="$t('miPerfil.fotoArrastra')"
+              :aria-busy="subiendoFoto"
+              data-prueba="zona-foto"
+              @click="elegirFoto"
+              @keydown.enter.prevent="elegirFoto"
+              @keydown.space.prevent="elegirFoto"
+              @dragenter.prevent="arrastrandoFoto = true"
+              @dragover.prevent="arrastrandoFoto = true"
+              @dragleave.prevent="arrastrandoFoto = false"
+              @drop.prevent="alSoltarFoto"
+            >
+              <AvatarIniciales
+                :nombre="usuario.nombre"
+                :foto="usuario.foto_url"
+                tam="xl"
+              />
+              <span class="mp-foto-texto">
+                <span class="block text-sm font-medium">{{
+                  subiendoFoto
+                    ? $t("miPerfil.fotoSubiendo")
+                    : arrastrandoFoto
+                      ? $t("miPerfil.fotoSuelta")
+                      : $t("miPerfil.fotoArrastra")
+                }}</span>
+                <span class="mp-ayuda block">{{
+                  $t("miPerfil.fotoFormatos")
+                }}</span>
+              </span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="tu-btn tu-btn-fantasma text-sm"
+                :disabled="subiendoFoto"
+                @click="elegirFoto"
+              >
+                {{
+                  usuario.foto_url
+                    ? $t("miPerfil.cambiarFoto")
+                    : $t("miPerfil.subirFoto")
+                }}
+              </button>
+              <button
+                v-if="usuario.foto_url"
+                type="button"
+                class="tu-btn tu-btn-fantasma text-sm"
+                :disabled="subiendoFoto"
+                @click="quitarFoto"
+              >
+                {{ $t("miPerfil.quitarFoto") }}
+              </button>
+            </div>
             <input
-              id="mp-nombre"
-              v-model="datos.nombre"
-              class="tu-input"
-              required
-              maxlength="80"
-              autocomplete="given-name"
+              ref="selectorFoto"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              class="sr-only"
+              tabindex="-1"
+              @change="alElegirFoto"
             />
           </div>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label class="tu-label" for="mp-ap1">{{
-                $t("miPerfil.primerApellido")
-              }}</label>
-              <input
-                id="mp-ap1"
-                v-model="datos.primer_apellido"
-                class="tu-input"
-                maxlength="80"
-                autocomplete="family-name"
-              />
-            </div>
-            <div>
-              <label class="tu-label" for="mp-ap2">{{
-                $t("miPerfil.segundoApellido")
-              }}</label>
-              <input
-                id="mp-ap2"
-                v-model="datos.segundo_apellido"
-                class="tu-input"
-                maxlength="80"
-              />
-            </div>
-          </div>
-          <button
-            type="submit"
-            class="tu-btn tu-btn-primario"
-            :disabled="guardandoDatos || datos.nombre.trim() === ''"
-          >
-            {{ $t("miPerfil.guardar") }}
-          </button>
         </div>
-      </form>
 
-      <!-- Correo de acceso -->
-      <div class="mp-fila">
-        <div>
-          <h2 class="mp-titulo">{{ $t("miPerfil.correo") }}</h2>
-          <p class="mp-ayuda">{{ $t("miPerfil.correoAyuda") }}</p>
-        </div>
-        <div class="space-y-4">
-          <p class="text-sm">{{ usuario.email }}</p>
-          <template v-if="usuario.email_pendiente">
-            <p class="text-sm" role="status" style="color: var(--aviso)">
-              {{
-                $t("miPerfil.correoPendiente", {
-                  email: usuario.email_pendiente,
-                })
-              }}
-            </p>
-            <button
-              type="button"
-              class="tu-btn tu-btn-fantasma text-sm"
-              :disabled="enviandoCorreo"
-              @click="cancelarCambioCorreo"
-            >
-              {{ $t("miPerfil.cancelarCambio") }}
-            </button>
-          </template>
-          <form
-            v-else-if="editandoCorreo"
-            class="space-y-4"
-            @submit.prevent="pedirCambioCorreo"
-          >
+        <!-- Datos -->
+        <form class="mp-fila" @submit.prevent="guardarDatos">
+          <div>
+            <h3 class="mp-titulo">{{ $t("miPerfil.datos") }}</h3>
+            <p class="mp-ayuda">{{ $t("miPerfil.datosAyuda") }}</p>
+          </div>
+          <div class="space-y-4">
             <div>
-              <label class="tu-label" for="mp-correo">{{
-                $t("miPerfil.correoNuevo")
+              <label class="tu-label" for="mp-nombre">{{
+                $t("miPerfil.nombre")
               }}</label>
               <input
-                id="mp-correo"
-                v-model="correo.email"
-                type="email"
+                id="mp-nombre"
+                v-model="datos.nombre"
                 class="tu-input"
                 required
-                maxlength="255"
-                autocomplete="email"
+                maxlength="80"
+                autocomplete="given-name"
               />
             </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="tu-label" for="mp-ap1">{{
+                  $t("miPerfil.primerApellido")
+                }}</label>
+                <input
+                  id="mp-ap1"
+                  v-model="datos.primer_apellido"
+                  class="tu-input"
+                  maxlength="80"
+                  autocomplete="family-name"
+                />
+              </div>
+              <div>
+                <label class="tu-label" for="mp-ap2">{{
+                  $t("miPerfil.segundoApellido")
+                }}</label>
+                <input
+                  id="mp-ap2"
+                  v-model="datos.segundo_apellido"
+                  class="tu-input"
+                  maxlength="80"
+                />
+              </div>
+            </div>
+            <!-- Celular: el de su ficha de cliente o alumno -->
+            <div v-if="usuario.tiene_ficha">
+              <label class="tu-label" for="mp-celular">{{
+                $t("miPerfil.celular")
+              }}</label>
+              <input
+                id="mp-celular"
+                v-model="datos.celular"
+                class="tu-input"
+                type="tel"
+                inputmode="tel"
+                maxlength="30"
+                autocomplete="tel"
+                data-prueba="celular"
+              />
+              <p class="tu-hint mt-1">{{ $t("miPerfil.celularAyuda") }}</p>
+            </div>
+            <button
+              type="submit"
+              class="tu-btn tu-btn-primario"
+              :disabled="guardandoDatos || datos.nombre.trim() === ''"
+            >
+              {{ $t("miPerfil.guardar") }}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ACCESO -->
+      <h2 class="mp-seccion">{{ $t("miPerfil.seccionAcceso") }}</h2>
+      <div class="tu-card overflow-hidden">
+        <!-- Correo de acceso -->
+        <div class="mp-fila">
+          <div>
+            <h3 class="mp-titulo">{{ $t("miPerfil.correo") }}</h3>
+            <p class="mp-ayuda">{{ $t("miPerfil.correoAyuda") }}</p>
+          </div>
+          <div class="space-y-4">
+            <p class="text-sm">{{ usuario.email }}</p>
+            <template v-if="usuario.email_pendiente">
+              <p class="text-sm" role="status" style="color: var(--aviso)">
+                {{
+                  $t("miPerfil.correoPendiente", {
+                    email: usuario.email_pendiente,
+                  })
+                }}
+              </p>
+              <button
+                type="button"
+                class="tu-btn tu-btn-fantasma text-sm"
+                :disabled="enviandoCorreo"
+                @click="cancelarCambioCorreo"
+              >
+                {{ $t("miPerfil.cancelarCambio") }}
+              </button>
+            </template>
+            <form
+              v-else-if="editandoCorreo"
+              class="space-y-4"
+              @submit.prevent="pedirCambioCorreo"
+            >
+              <div>
+                <label class="tu-label" for="mp-correo">{{
+                  $t("miPerfil.correoNuevo")
+                }}</label>
+                <input
+                  id="mp-correo"
+                  v-model="correo.email"
+                  type="email"
+                  class="tu-input"
+                  required
+                  maxlength="255"
+                  autocomplete="email"
+                />
+              </div>
+              <div v-if="usuario.tiene_contrasena !== false">
+                <label class="tu-label" for="mp-correo-clave">{{
+                  $t("miPerfil.tuContrasena")
+                }}</label>
+                <CampoContrasena
+                  id="mp-correo-clave"
+                  v-model="correo.password"
+                  autocomplete="current-password"
+                  required
+                />
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  class="tu-btn tu-btn-primario"
+                  :disabled="enviandoCorreo || correo.email.trim() === ''"
+                >
+                  {{ $t("miPerfil.enviarEnlace") }}
+                </button>
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-fantasma"
+                  @click="editandoCorreo = false"
+                >
+                  {{ $t("miPerfil.cancelar") }}
+                </button>
+              </div>
+            </form>
+            <button
+              v-else
+              type="button"
+              class="tu-btn tu-btn-fantasma text-sm"
+              @click="editandoCorreo = true"
+            >
+              {{ $t("miPerfil.cambiarCorreo") }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Contraseña -->
+        <form class="mp-fila" @submit.prevent="cambiarClave">
+          <div>
+            <h3 class="mp-titulo">{{ $t("miPerfil.contrasena") }}</h3>
+            <p class="mp-ayuda">{{ $t("miPerfil.contrasenaAyuda") }}</p>
+          </div>
+          <div class="space-y-4">
             <div v-if="usuario.tiene_contrasena !== false">
-              <label class="tu-label" for="mp-correo-clave">{{
-                $t("miPerfil.tuContrasena")
+              <label class="tu-label" for="mp-actual">{{
+                $t("miPerfil.actual")
               }}</label>
               <CampoContrasena
-                id="mp-correo-clave"
-                v-model="correo.password"
+                id="mp-actual"
+                v-model="clave.actual"
                 autocomplete="current-password"
                 required
               />
             </div>
-            <div class="flex flex-wrap gap-2">
-              <button
-                type="submit"
-                class="tu-btn tu-btn-primario"
-                :disabled="enviandoCorreo || correo.email.trim() === ''"
-              >
-                {{ $t("miPerfil.enviarEnlace") }}
-              </button>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="tu-label" for="mp-nueva">{{
+                  $t("miPerfil.nueva")
+                }}</label>
+                <CampoContrasena
+                  id="mp-nueva"
+                  v-model="clave.nueva"
+                  autocomplete="new-password"
+                  :minlength="8"
+                  required
+                />
+              </div>
+              <div>
+                <label class="tu-label" for="mp-conf">{{
+                  $t("miPerfil.confirmar")
+                }}</label>
+                <CampoContrasena
+                  id="mp-conf"
+                  v-model="clave.confirmacion"
+                  autocomplete="new-password"
+                  :minlength="8"
+                  required
+                />
+              </div>
+            </div>
+            <button
+              type="submit"
+              class="tu-btn tu-btn-primario"
+              :disabled="
+                cambiandoClave ||
+                clave.nueva.length < 8 ||
+                clave.nueva !== clave.confirmacion
+              "
+            >
+              {{ $t("miPerfil.cambiar") }}
+            </button>
+          </div>
+        </form>
+
+        <!-- Entrar con Google: solo si el sitio lo tiene configurado (o ya lo conectó,
+           para poder quitarlo). Sin configurar no se ofrece. -->
+        <div
+          v-if="hayGoogle || usuario.google_conectado"
+          class="mp-fila"
+          data-prueba="google"
+        >
+          <div>
+            <h3 class="mp-titulo">{{ $t("miPerfil.google.titulo") }}</h3>
+            <p class="mp-ayuda">{{ $t("miPerfil.google.ayuda") }}</p>
+          </div>
+          <div class="space-y-3">
+            <template v-if="usuario.google_conectado">
+              <p class="mp-estado">
+                <span class="mp-punto" aria-hidden="true" />
+                {{ $t("miPerfil.google.conectadoEstado") }}
+              </p>
               <button
                 type="button"
                 class="tu-btn tu-btn-fantasma"
-                @click="editandoCorreo = false"
+                data-prueba="desconectar-google"
+                :disabled="conectandoGoogle"
+                @click="desconectarGoogle"
               >
-                {{ $t("miPerfil.cancelar") }}
+                {{ $t("miPerfil.google.desconectar") }}
               </button>
-            </div>
-          </form>
-          <button
-            v-else
-            type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
-            @click="editandoCorreo = true"
-          >
-            {{ $t("miPerfil.cambiarCorreo") }}
-          </button>
+            </template>
+            <div v-else ref="botonGoogle" data-prueba="boton-google" />
+          </div>
         </div>
       </div>
 
-      <!-- Contraseña -->
-      <form class="mp-fila" @submit.prevent="cambiarClave">
-        <div>
-          <h2 class="mp-titulo">{{ $t("miPerfil.contrasena") }}</h2>
-          <p class="mp-ayuda">{{ $t("miPerfil.contrasenaAyuda") }}</p>
-        </div>
-        <div class="space-y-4">
-          <div v-if="usuario.tiene_contrasena !== false">
-            <label class="tu-label" for="mp-actual">{{
-              $t("miPerfil.actual")
-            }}</label>
-            <CampoContrasena
-              id="mp-actual"
-              v-model="clave.actual"
-              autocomplete="current-password"
-              required
-            />
+      <!-- PREFERENCIAS Y PRIVACIDAD -->
+      <h2 class="mp-seccion">{{ $t("miPerfil.seccionPreferencias") }}</h2>
+      <div class="tu-card overflow-hidden">
+        <!-- Calendario -->
+        <div class="mp-fila">
+          <div>
+            <h3 class="mp-titulo">{{ $t("miPerfil.calendario") }}</h3>
+            <p class="mp-ayuda">{{ $t("miPerfil.calendarioAyuda") }}</p>
           </div>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label class="tu-label" for="mp-nueva">{{
-                $t("miPerfil.nueva")
-              }}</label>
-              <CampoContrasena
-                id="mp-nueva"
-                v-model="clave.nueva"
-                autocomplete="new-password"
-                :minlength="8"
-                required
+          <div class="space-y-3">
+            <button
+              v-if="calendario === null"
+              type="button"
+              class="tu-btn tu-btn-fantasma text-sm"
+              :disabled="cargandoCalendario"
+              @click="obtenerCalendario()"
+            >
+              {{ $t("miPerfil.calendarioObtener") }}
+            </button>
+            <template v-else>
+              <input
+                class="tu-input text-xs"
+                :value="calendario.url"
+                readonly
+                aria-label="URL"
+                @focus="($event.target as HTMLInputElement).select()"
               />
-            </div>
-            <div>
-              <label class="tu-label" for="mp-conf">{{
-                $t("miPerfil.confirmar")
-              }}</label>
-              <CampoContrasena
-                id="mp-conf"
-                v-model="clave.confirmacion"
-                autocomplete="new-password"
-                :minlength="8"
-                required
-              />
-            </div>
+              <div class="flex flex-wrap gap-2">
+                <a
+                  class="tu-btn tu-btn-primario text-sm"
+                  :href="calendario.webcal"
+                >
+                  {{ $t("miPerfil.calendarioAbrir") }}
+                </a>
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-fantasma text-sm"
+                  @click="copiarCalendario"
+                >
+                  {{ $t("miPerfil.calendarioCopiar") }}
+                </button>
+                <button
+                  type="button"
+                  class="tu-btn tu-btn-fantasma text-sm"
+                  :disabled="cargandoCalendario"
+                  @click="obtenerCalendario(true)"
+                >
+                  {{ $t("miPerfil.calendarioNuevo") }}
+                </button>
+              </div>
+              <p class="tu-hint">{{ $t("miPerfil.calendarioGoogle") }}</p>
+              <p class="tu-hint">{{ $t("miPerfil.calendarioNuevoAyuda") }}</p>
+            </template>
           </div>
-          <button
-            type="submit"
-            class="tu-btn tu-btn-primario"
-            :disabled="
-              cambiandoClave ||
-              clave.nueva.length < 8 ||
-              clave.nueva !== clave.confirmacion
-            "
-          >
-            {{ $t("miPerfil.cambiar") }}
-          </button>
         </div>
-      </form>
 
-      <!-- Entrar con Google: solo si el sitio lo tiene configurado (o ya lo conectó,
-           para poder quitarlo). Sin configurar no se ofrece. -->
-      <div
-        v-if="hayGoogle || usuario.google_conectado"
-        class="mp-fila"
-        data-prueba="google"
-      >
-        <div>
-          <h2 class="mp-titulo">{{ $t("miPerfil.google.titulo") }}</h2>
-          <p class="mp-ayuda">{{ $t("miPerfil.google.ayuda") }}</p>
-        </div>
-        <div class="space-y-3">
-          <template v-if="usuario.google_conectado">
-            <p class="mp-estado">
-              <span class="mp-punto" aria-hidden="true" />
-              {{ $t("miPerfil.google.conectadoEstado") }}
-            </p>
+        <!-- Apariencia -->
+        <div class="mp-fila">
+          <div>
+            <h3 class="mp-titulo">{{ $t("miPerfil.apariencia") }}</h3>
+            <p class="mp-ayuda">{{ $t("miPerfil.aparienciaAyuda") }}</p>
+          </div>
+          <div>
             <button
               type="button"
-              class="tu-btn tu-btn-fantasma"
-              data-prueba="desconectar-google"
-              :disabled="conectandoGoogle"
-              @click="desconectarGoogle"
+              class="tu-btn tu-btn-fantasma text-sm"
+              @click="aparienciaAbierta = true"
             >
-              {{ $t("miPerfil.google.desconectar") }}
+              {{ $t("miPerfil.abrirApariencia") }}
             </button>
-          </template>
-          <div v-else ref="botonGoogle" data-prueba="boton-google" />
+          </div>
         </div>
-      </div>
 
-      <!-- Calendario -->
-      <div class="mp-fila">
-        <div>
-          <h2 class="mp-titulo">{{ $t("miPerfil.calendario") }}</h2>
-          <p class="mp-ayuda">{{ $t("miPerfil.calendarioAyuda") }}</p>
-        </div>
-        <div class="space-y-3">
-          <button
-            v-if="calendario === null"
-            type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
-            :disabled="cargandoCalendario"
-            @click="obtenerCalendario()"
-          >
-            {{ $t("miPerfil.calendarioObtener") }}
-          </button>
-          <template v-else>
-            <input
-              class="tu-input text-xs"
-              :value="calendario.url"
-              readonly
-              aria-label="URL"
-              @focus="($event.target as HTMLInputElement).select()"
-            />
-            <div class="flex flex-wrap gap-2">
-              <a
-                class="tu-btn tu-btn-primario text-sm"
-                :href="calendario.webcal"
-              >
-                {{ $t("miPerfil.calendarioAbrir") }}
-              </a>
-              <button
-                type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
-                @click="copiarCalendario"
-              >
-                {{ $t("miPerfil.calendarioCopiar") }}
-              </button>
-              <button
-                type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
-                :disabled="cargandoCalendario"
-                @click="obtenerCalendario(true)"
-              >
-                {{ $t("miPerfil.calendarioNuevo") }}
-              </button>
-            </div>
-            <p class="tu-hint">{{ $t("miPerfil.calendarioGoogle") }}</p>
-            <p class="tu-hint">{{ $t("miPerfil.calendarioNuevoAyuda") }}</p>
-          </template>
+        <!-- Privacidad (clientes y alumnos). Se recarga si cambia su celular: de él
+           depende recibir avisos por WhatsApp. -->
+        <div v-if="mostrarPrivacidad" class="mp-fila">
+          <div>
+            <h3 class="mp-titulo">{{ $t("miPrivacidad.titulo") }}</h3>
+            <p class="mp-ayuda">{{ $t("miPrivacidad.ayuda") }}</p>
+          </div>
+          <MiPrivacidad
+            :key="`${sesion.slug ?? ''}|${usuario.celular ?? ''}`"
+            integrado
+          />
         </div>
       </div>
-
-      <!-- Apariencia -->
-      <div class="mp-fila">
-        <div>
-          <h2 class="mp-titulo">{{ $t("miPerfil.apariencia") }}</h2>
-          <p class="mp-ayuda">{{ $t("miPerfil.aparienciaAyuda") }}</p>
-        </div>
-        <div>
-          <button
-            type="button"
-            class="tu-btn tu-btn-fantasma text-sm"
-            @click="aparienciaAbierta = true"
-          >
-            {{ $t("miPerfil.abrirApariencia") }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="mostrarPrivacidad" class="mt-6 tu-card mp-fila">
-      <div>
-        <h2 class="mp-titulo">{{ $t("miPrivacidad.titulo") }}</h2>
-        <p class="mp-ayuda">{{ $t("miPrivacidad.ayuda") }}</p>
-      </div>
-      <MiPrivacidad :key="sesion.slug ?? undefined" integrado />
-    </div>
+    </template>
 
     <PanelApariencia
       :abierto="aparienciaAbierta"
@@ -690,8 +737,20 @@ const aparienciaAbierta = ref(false);
   border-radius: 999px;
   background: var(--exito);
 }
+/* Título de cada parte (Datos personales, Acceso, Preferencias y privacidad). */
+.mp-seccion {
+  margin: 2rem 0 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+.mp-seccion:first-of-type {
+  margin-top: 1.5rem;
+}
 .mp-titulo {
-  font-weight: 600;
+  font-weight: 500;
 }
 .mp-ayuda {
   margin-top: 0.25rem;

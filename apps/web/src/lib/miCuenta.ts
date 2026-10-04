@@ -9,6 +9,15 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * Reservas, Pagos, Expediente, Configuración): se carga una vez y cada pantalla toma
  * lo suyo. Las acciones (reservar, cancelar, pagar…) recargan en silencio.
  */
+/** Estado efectivo de un plan, como lo dice el servidor (no solo por fechas). */
+export type EstadoPlan =
+  | "vigente"
+  | "agotado"
+  | "por_empezar"
+  | "pausado"
+  | "suspendido"
+  | "vencido"
+  | "cancelado";
 export interface Derecho {
   todas_sucursales?: boolean;
   sucursales?: { id: string; nombre: string }[];
@@ -18,7 +27,9 @@ export interface Derecho {
   ilimitado: boolean;
   saldo: number | null;
   disponible: number | null;
-  // Hasta cuándo se puede usar (null = no vence).
+  estado: EstadoPlan;
+  // Desde y hasta cuándo se puede usar (null = desde siempre / no vence).
+  desde?: string | null;
   vence?: string | null;
 }
 export interface Reserva {
@@ -66,23 +77,59 @@ export interface Orden {
   total_minor: number;
   moneda: string;
   fecha: string | null;
+  pagada_en?: string | null;
   recurrente?: boolean;
+  // Qué se pagó en una línea: sus productos o, si es una cita, el servicio.
+  concepto?: string | null;
+  // Si es el pago de una cita o clase: cuál, con quién, cuándo y dónde.
+  sesion?: {
+    tipo: "clase" | "cita";
+    servicio: string | null;
+    profesional: string | null;
+    inicia_en: string;
+    zona_horaria: string | null;
+    sucursal: string | null;
+  } | null;
   lineas: {
     producto: string | null;
     cantidad: number;
     subtotal_minor: number;
   }[];
 }
+/**
+ * Si su plan cubre una clase, dicho por el servidor con la misma regla que al
+ * reservar: incluida, solo con membresía, no incluida (y por qué) o de pago.
+ */
+export interface Cobertura {
+  estado: "incluida" | "solo_membresia" | "no_incluida" | "de_pago";
+  motivo:
+    | "sin_plan"
+    | "clase"
+    | "pausa"
+    | "suspendido"
+    | "vigencia"
+    | "sucursal"
+    | "saldo"
+    | null;
+  precio_minor?: number;
+  moneda?: string;
+}
 export interface Clase {
   id: string;
   oferta: string | null;
+  oferta_id?: string | null;
+  actividad?: string | null;
+  actividad_id?: string | null;
   sucursal: string | null;
+  sucursal_id?: string | null;
   inicia_en: string;
   termina_en?: string | null;
   instructor?: string | null;
+  instructor_id?: string | null;
   zona_horaria: string;
   capacidad: number | null;
   ocupados: number;
+  cobertura?: Cobertura | null;
 }
 export interface Waiver {
   id: string;
@@ -113,7 +160,10 @@ const reservas = ref<Reserva[]>([]);
 const clases = ref<Clase[]>([]);
 const waivers = ref<Waiver[]>([]);
 const productos = ref<Producto[]>([]);
-const ordenes = ref<Orden[]>([]);
+// Todo lo que debe (GET /mi/ordenes/pendientes, completo): no sale de la primera
+// página del historial, así un adeudo antiguo no deja de verse. El historial de
+// compras se pide aparte, paginado, en Pagos.
+const pendientes = ref<Orden[]>([]);
 const politica = ref<Politica | null>(null);
 const formularios = ref<FormularioPersona[]>([]);
 const personaId = ref<string | null>(null);
@@ -139,7 +189,7 @@ export function reiniciarMiCuenta(): void {
   clases.value = [];
   waivers.value = [];
   productos.value = [];
-  ordenes.value = [];
+  pendientes.value = [];
   politica.value = null;
   formularios.value = [];
   personaId.value = null;
@@ -222,7 +272,7 @@ export function useMiCuenta() {
           .catch(() => ({ data: { data: [] as Clase[] } })),
         api.get<{ data: Waiver[] }>(`${base.value}/mi/waivers`),
         api.get<{ data: Producto[] }>(`${base.value}/mi/productos`),
-        api.get<{ data: Orden[] }>(`${base.value}/mi/ordenes`),
+        api.get<{ data: Orden[] }>(`${base.value}/mi/ordenes/pendientes`),
       ]);
       if (mia !== generacion) {
         return; // Llegó tarde, de una sesión anterior: se descarta.
@@ -237,7 +287,7 @@ export function useMiCuenta() {
       clases.value = a.data.data;
       waivers.value = w.data.data;
       productos.value = pr.data.data;
-      ordenes.value = o.data.data;
+      pendientes.value = o.data.data;
       cargado.value = true;
       identidadCargada = id;
     } catch (e) {
@@ -283,9 +333,7 @@ export function useMiCuenta() {
       ),
   );
   // Lo que pide atención: firmar, aceptar un lugar ofrecido, pagar.
-  const porPagar = computed(() =>
-    ordenes.value.filter((o) => o.estado === "pendiente"),
-  );
+  const porPagar = computed(() => pendientes.value);
   const proximas = computed(() =>
     reservas.value
       .filter(
@@ -305,7 +353,6 @@ export function useMiCuenta() {
     clases,
     waivers,
     productos,
-    ordenes,
     politica,
     formularios,
     personaId,
@@ -362,4 +409,55 @@ export function dinero(minor: number, moneda: string): string {
     style: "currency",
     currency: moneda,
   }).format(minor / 100);
+}
+
+/** Cómo se presenta la cobertura de una clase: su píldora y, si no entra, por qué. */
+export interface CoberturaVista {
+  texto: string;
+  tono: string;
+  motivo: string | null;
+  // Se puede reservar con lo que tiene (o pagando la clase).
+  reservable: boolean;
+}
+export function presentarCobertura(
+  c: Cobertura | null | undefined,
+  t: (clave: string, valores?: Record<string, unknown>) => string,
+): CoberturaVista | null {
+  if (!c) {
+    return null;
+  }
+  switch (c.estado) {
+    case "incluida":
+      return {
+        texto: t("portal.cobertura.incluida"),
+        tono: "var(--exito)",
+        motivo: null,
+        reservable: true,
+      };
+    case "de_pago":
+      return {
+        texto: c.precio_minor
+          ? t("portal.cobertura.dePagoPrecio", {
+              precio: dinero(c.precio_minor, c.moneda ?? "MXN"),
+            })
+          : t("portal.cobertura.dePago"),
+        tono: "var(--primario)",
+        motivo: null,
+        reservable: true,
+      };
+    case "solo_membresia":
+      return {
+        texto: t("portal.cobertura.soloMembresia"),
+        tono: "var(--aviso)",
+        motivo: t("portal.cobertura.motivos.soloMembresia"),
+        reservable: false,
+      };
+    default:
+      return {
+        texto: t("portal.cobertura.noIncluida"),
+        tono: "var(--texto-suave)",
+        motivo: c.motivo ? t(`portal.cobertura.motivos.${c.motivo}`) : null,
+        reservable: false,
+      };
+  }
 }

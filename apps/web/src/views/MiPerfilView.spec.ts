@@ -19,9 +19,23 @@ const estado = vi.hoisted(() => ({
     roles_disponibles: [{ clave: "miembro", faceta: "miembro" }],
   },
 }));
-const sesion = reactive({ slug: "demo", usuario: estado.usuario });
+const sesion = reactive({
+  slug: "demo",
+  usuario: estado.usuario,
+  actualizarUsuario: vi.fn(),
+});
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => sesion,
+}));
+const api = vi.hoisted(() => ({
+  get: vi.fn(),
+  put: vi.fn(),
+  post: vi.fn(),
+  delete: vi.fn(),
+}));
+vi.mock("@/lib/api", () => ({
+  api,
+  mensajeDeError: (e: unknown) => String(e),
 }));
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
@@ -55,8 +69,10 @@ function montar() {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   sesion.usuario.rol = "miembro";
   sesion.usuario.roles_disponibles = [{ clave: "miembro", faceta: "miembro" }];
+  Object.assign(sesion.usuario, { tiene_ficha: false, celular: null });
 });
 
 describe("perfil unificado", () => {
@@ -81,6 +97,45 @@ describe("perfil unificado", () => {
       w.unmount();
     },
   );
+
+  it("se ordena en Datos personales, Acceso y Preferencias y privacidad", () => {
+    const w = montar();
+    expect(w.findAll("h2.mp-seccion").map((h) => h.text())).toEqual([
+      "Datos personales",
+      "Acceso",
+      "Preferencias y privacidad",
+    ]);
+    w.unmount();
+  });
+
+  it("con ficha de cliente edita su celular junto a su nombre", async () => {
+    Object.assign(sesion.usuario, { tiene_ficha: true, celular: "5511112222" });
+    api.put.mockResolvedValue({ data: { data: { usuario: sesion.usuario } } });
+    const w = montar();
+    const celular = w.get('[data-prueba="celular"]');
+    expect(celular.element).toHaveProperty("value", "5511112222");
+
+    await celular.setValue("55 3333 4444");
+    await w.findAll("form")[0].trigger("submit");
+    await flushPromises();
+    expect(api.put).toHaveBeenCalledWith(
+      "/api/v1/app/demo/yo/perfil",
+      expect.objectContaining({ nombre: "Ana", celular: "55 3333 4444" }),
+    );
+    w.unmount();
+  });
+
+  it("sin ficha (personal) no hay celular que editar ni se manda", async () => {
+    sesion.usuario.rol = "propietario";
+    api.put.mockResolvedValue({ data: { data: { usuario: sesion.usuario } } });
+    const w = montar();
+    expect(w.find('[data-prueba="celular"]').exists()).toBe(false);
+
+    await w.findAll("form")[0].trigger("submit");
+    await flushPromises();
+    expect(api.put.mock.calls[0][1]).not.toHaveProperty("celular");
+    w.unmount();
+  });
 
   it("reacciona al rol activo, incluyendo roles personalizados", async () => {
     const w = montar();

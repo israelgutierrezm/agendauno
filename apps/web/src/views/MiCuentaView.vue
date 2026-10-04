@@ -12,7 +12,12 @@ import TarjetaOperacion, {
 import TarjetaPrincipal from "@/components/TarjetaPrincipal.vue";
 import { lugarDelClima, useClima } from "@/lib/clima";
 import { fotoNegocio } from "@/lib/fotoNegocio";
-import { cuandoCorto, useMiCuenta } from "@/lib/miCuenta";
+import {
+  cuandoCorto,
+  presentarCobertura,
+  useMiCuenta,
+  type Derecho,
+} from "@/lib/miCuenta";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -56,10 +61,14 @@ const etiquetaProxima = computed(() => {
 const ofrecida = computed(() =>
   cuenta.reservas.value.find((r) => r.estado === "ofrecida"),
 );
+// Las que puede reservar: sin reservar aún y que su plan incluye (o de pago).
 const disponibles = computed(
   () =>
-    cuenta.clases.value.filter((c) => !cuenta.reservadas.value.has(c.id))
-      .length,
+    cuenta.clases.value.filter(
+      (c) =>
+        !cuenta.reservadas.value.has(c.id) &&
+        presentarCobertura(c.cobertura, t)?.reservable !== false,
+    ).length,
 );
 
 // El clima de la tarjeta (GET /mi/clima): el de su próxima reserva o el de ahora.
@@ -70,18 +79,43 @@ const climaLugar = computed(() =>
   lugarDelClima(clima.value, t, proxima.value?.tipo),
 );
 
-// Lo vigente: lo que no ha vencido. Lo vencido es historial (está en Pagos › Mis
-// planes) y no suma al saldo.
-function hoyLocal(): string {
-  const d = new Date();
-  const dos = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
-}
+// Lo vigente, según el estado efectivo que manda el servidor: un plan en pausa,
+// suspendido o que aún no empieza no suma créditos, aunque no haya vencido. Lo
+// vencido es historial (está en Pagos › Mis planes).
 const vigentes = computed(() =>
   cuenta.derechos.value.filter(
-    (d) => !d.vence || d.vence.slice(0, 10) >= hoyLocal(),
+    (d) => d.estado === "vigente" || d.estado === "agotado",
   ),
 );
+
+// Sin plan vigente, por qué: en pausa, suspendido o por empezar (en ese orden).
+const otroEstado = computed(() => {
+  if (vigentes.value.length > 0) {
+    return null;
+  }
+  for (const estado of ["pausado", "suspendido", "por_empezar"] as const) {
+    const d = cuenta.derechos.value.find((x) => x.estado === estado);
+    if (d) {
+      return d;
+    }
+  }
+  return null;
+});
+function textoOtroEstado(d: Derecho): string {
+  if (d.estado === "pausado") {
+    return d.pausa_hasta
+      ? t("portal.inicio.tarjetas.enPausaHasta", {
+          fecha: fechaCorta(d.pausa_hasta),
+        })
+      : t("portal.inicio.tarjetas.enPausa");
+  }
+  if (d.estado === "suspendido") {
+    return t("portal.inicio.tarjetas.suspendido");
+  }
+  return d.desde
+    ? t("portal.inicio.tarjetas.empieza", { fecha: fechaCorta(d.desde) })
+    : t("portal.inicio.tarjetas.sinPaquete");
+}
 
 // Créditos de lo vigente: ilimitado o la suma disponible (1000 unidades = 1).
 const creditos = computed<{ ilimitado: boolean; n: number } | null>(() => {
@@ -89,7 +123,7 @@ const creditos = computed<{ ilimitado: boolean; n: number } | null>(() => {
   if (d.length === 0) {
     return null;
   }
-  if (d.some((x) => x.ilimitado && !x.pausa_hasta)) {
+  if (d.some((x) => x.ilimitado)) {
     return { ilimitado: true, n: 0 };
   }
   return {
@@ -152,6 +186,8 @@ interface Acceso {
   icono: string;
   tono: string;
   ruta?: string;
+  // La pestaña de Reservas a la que lleva (reservar, próximas o historial).
+  vista?: string;
   alTocar?: () => void;
   atencion?: boolean;
 }
@@ -162,9 +198,12 @@ const accesos = computed<Acceso[]>(() => {
   const usa = cuenta.portal.value;
   const citas = sesion.esCitas === true;
 
+  const otro = otroEstado.value;
   const valorCreditos =
     c === null
-      ? t("portal.inicio.tarjetas.sinPaquete")
+      ? otro
+        ? textoOtroEstado(otro)
+        : t("portal.inicio.tarjetas.sinPaquete")
       : c.ilimitado
         ? t("portal.inicio.tarjetas.ilimitado")
         : t(
@@ -183,6 +222,7 @@ const accesos = computed<Acceso[]>(() => {
     icono: "agenda",
     tono: TONO.reservar,
     ruta: "mis-reservas",
+    vista: "reservar",
   };
   const reservas: Acceso = {
     clave: "reservas",
@@ -198,10 +238,12 @@ const accesos = computed<Acceso[]>(() => {
     icono: "lista",
     tono: TONO.reservas,
     ruta: "mis-reservas",
+    vista: "proximas",
   };
   // Su bono o su plan: solo si lo tiene, o si el negocio vende planes (clases).
+  const tienePlan = c !== null || otro !== null;
   const plan: Acceso | null =
-    (usa?.creditos ?? c !== null) && (c !== null || !citas)
+    (usa?.creditos ?? tienePlan) && (tienePlan || !citas)
       ? {
           clave: "creditos",
           titulo: citas
@@ -217,6 +259,8 @@ const accesos = computed<Acceso[]>(() => {
           icono: "etiqueta",
           tono: TONO.creditos,
           ruta: "mis-pagos",
+          // Suspendido por falta de pago: pide atención.
+          atencion: c === null && otro?.estado === "suspendido",
         }
       : null;
   const pagos: Acceso = {
@@ -243,6 +287,7 @@ const accesos = computed<Acceso[]>(() => {
         icono: "hecho",
         tono: TONO.asistencia,
         ruta: "mis-reservas",
+        vista: "historial",
       };
   // El pase y el expediente, solo si el negocio los usa (o hay algo por firmar).
   const pase: Acceso | null =
@@ -384,7 +429,7 @@ onMounted(() => {
             >{{ $t("portal.inicio.comoLlegar") }}</a
           >
           <RouterLink
-            :to="{ name: 'mis-reservas' }"
+            :to="{ name: 'mis-reservas', query: { vista: 'proximas' } }"
             class="tu-enlace text-sm"
             data-prueba="ver-detalle"
           >
@@ -426,7 +471,7 @@ onMounted(() => {
       >
         <RouterLink
           v-if="ofrecida"
-          :to="{ name: 'mis-reservas' }"
+          :to="{ name: 'mis-reservas', query: { vista: 'proximas' } }"
           class="pi-aviso"
           >{{
             $t("portal.inicio.atencion.lugar", { clase: ofrecida.oferta ?? "" })
@@ -446,7 +491,13 @@ onMounted(() => {
       <ul class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <li v-for="a in accesos" :key="a.clave">
           <TarjetaOperacion
-            :to="a.ruta ? { name: a.ruta } : undefined"
+            :to="
+              a.ruta
+                ? a.vista
+                  ? { name: a.ruta, query: { vista: a.vista } }
+                  : { name: a.ruta }
+                : undefined
+            "
             :icono="a.icono"
             :titulo="a.titulo"
             :texto="a.valor"

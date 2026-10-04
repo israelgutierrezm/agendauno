@@ -86,8 +86,9 @@ beforeEach(() => {
   respuestas();
 });
 
-function montar() {
+function montar(props: Record<string, unknown> = {}) {
   return mount(AgendarCitaCuenta, {
+    props,
     global: {
       plugins: [
         createI18n({
@@ -158,6 +159,23 @@ describe("agendar desde la cuenta", () => {
     ).toBe(true);
   });
 
+  it("«Agendar de nuevo» parte del mismo servicio, sede y profesional", async () => {
+    equipo.lista = [
+      { id: "ana", nombre: "Ana Pérez" },
+      { id: "luis", nombre: "Luis López" },
+    ];
+    const w = montar({
+      inicial: { servicio: "corte", sucursal: "centro", profesional: "luis" },
+    });
+    await flushPromises();
+
+    expect(w.get("#cc-servicio").element).toHaveProperty("value", "corte");
+    expect(api.get).toHaveBeenCalledWith(
+      "/api/v1/app/demo/mi/citas/disponibilidad",
+      { params: expect.objectContaining({ instructor_id: "luis" }) },
+    );
+  });
+
   it("sin celular no se le ofrecen", async () => {
     privacidad.datos = {
       whatsapp_disponible: true,
@@ -215,5 +233,72 @@ describe("agendar desde la cuenta", () => {
     expect(w.get('[data-prueba="con-bono"]').text()).toContain(
       "conTuBonoAyuda",
     );
+  });
+  it("al agendar, la confirmación se queda a la vista hasta «Listo»", async () => {
+    api.post.mockResolvedValue({
+      data: {
+        data: { estado: "pendiente_pago", profesional: { nombre: "Ana" } },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+    await w.get("#cc-servicio").setValue("corte");
+    await flushPromises();
+    await w
+      .findAll("button")
+      .find((b) => b.text().includes("10:00") || b.text().includes("16:00"))
+      ?.trigger("click");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    const confirmada = w.get('[data-prueba="cita-confirmada"]');
+    expect(confirmada.text()).toContain("Corte");
+    expect(confirmada.text()).toContain("Centro");
+    expect(confirmada.text()).toContain("Ana");
+    expect(confirmada.text()).toContain("citaCuenta.pendientePago");
+    // Avisa para recargar, pero no cierra: cierra quien la lee, con «Listo».
+    expect(w.emitted("agendada")).toHaveLength(1);
+    expect(w.emitted("cerrar")).toBeUndefined();
+    await w.get('[data-prueba="cita-listo"]').trigger("click");
+    expect(w.emitted("cerrar")).toHaveLength(1);
+  });
+
+  it("una respuesta tardía de horarios no reemplaza la de la selección actual", async () => {
+    extraServicios.lista = [
+      {
+        id: "barba",
+        nombre: "Barba",
+        precio_minor: 15000,
+        moneda: "MXN",
+        duracion_minutos: 30,
+      },
+    ];
+    // Las dos búsquedas quedan pendientes y se resuelven al revés.
+    const pendientes: ((valor: unknown) => void)[] = [];
+    const base = api.get.getMockImplementation()!;
+    api.get.mockImplementation((url: string, opciones?: unknown) =>
+      url.endsWith("/mi/citas/disponibilidad")
+        ? new Promise((resolver) => pendientes.push(resolver))
+        : base(url, opciones),
+    );
+    const w = montar();
+    await flushPromises();
+    await w.get("#cc-servicio").setValue("corte");
+    await flushPromises();
+    await w.get("#cc-servicio").setValue("barba");
+    await flushPromises();
+    expect(pendientes.length).toBeGreaterThanOrEqual(2);
+
+    const slot = (inicia: string) => ({
+      data: { data: { slots: [{ inicia, termina: inicia }] } },
+    });
+    pendientes[pendientes.length - 1](slot("2030-01-07T17:00:00Z"));
+    await flushPromises();
+    pendientes[0](slot("2030-01-07T16:00:00Z"));
+    await flushPromises();
+
+    const horas = w.findAll(".cc-hora").map((b) => b.text());
+    expect(horas).toHaveLength(1);
+    expect(horas[0]).toContain("11:00");
   });
 });

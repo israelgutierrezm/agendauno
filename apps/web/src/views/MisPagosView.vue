@@ -4,26 +4,61 @@ import { useI18n } from "vue-i18n";
 
 import CortePlanes from "@/components/CortePlanes.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import HistorialCompras from "@/components/HistorialCompras.vue";
 import PagoAutomatico from "@/components/PagoAutomatico.vue";
 import { api, mensajeDeError } from "@/lib/api";
-import { dinero, useMiCuenta, type Voucher } from "@/lib/miCuenta";
+import {
+  cuandoCorto,
+  dinero,
+  useMiCuenta,
+  type Orden,
+  type Voucher,
+} from "@/lib/miCuenta";
 import { useRetornoPago } from "@/lib/retornoPago";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
- * Pagos del portal: el corte de sus planes (qué incluía cada uno, cómo lo usó, sus
- * clases extra y lo que le queda), lo que tiene por pagar (en línea o en tienda),
- * comprar un plan, el pago automático y el historial de compras.
+ * Pagos del portal, según cómo trabaja el negocio (ADR 0091):
+ * - Clases: su plan vigente (compacto; los anteriores plegados), lo que tiene por
+ *   pagar, comprar o renovar, el pago automático y el historial.
+ * - Citas: lo que tiene por pagar (servicio, con quién, cuándo) y el historial de
+ *   cobros; sus bonos y comprarlos, solo si los tiene o el negocio los vende.
+ * Lo que debe llega completo aparte (no de la primera página del historial).
  */
 const { t } = useI18n();
+const sesion = useSesionTenantStore();
 const cuenta = useMiCuenta();
 const retornoPago = useRetornoPago();
 const corte = ref<InstanceType<typeof CortePlanes> | null>(null);
+const historial = ref<InstanceType<typeof HistorialCompras> | null>(null);
 if (retornoPago.value === "exito") {
   // El webhook de la pasarela confirma el pago en segundos.
   window.setTimeout(() => {
     void cuenta.cargar(true);
     void corte.value?.cargar();
+    void historial.value?.cargar();
   }, 4000);
+}
+
+const citas = computed(() => sesion.esCitas === true);
+// En citas, «Mis planes» solo si tiene alguno (bono o membresía).
+const mostrarPlanes = computed(
+  () => !citas.value || cuenta.derechos.value.length > 0,
+);
+// Segunda línea de lo que debe: la cita (con quién, cuándo y dónde).
+function detalleCita(o: Orden): string | null {
+  if (!o.sesion) {
+    return null;
+  }
+  return [
+    o.sesion.profesional
+      ? t("portal.pagos.con", { nombre: o.sesion.profesional })
+      : null,
+    cuandoCorto(o.sesion.inicia_en, o.sesion.zona_horaria),
+    o.sesion.sucursal,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 const pagando = ref<string | null>(null);
@@ -32,10 +67,6 @@ const voucher = ref<Voucher | null>(null);
 const mensaje = ref<string | null>(null);
 const error = ref<string | null>(null);
 const domiciliar = ref<Record<string, boolean>>({});
-
-const historial = computed(() =>
-  cuenta.ordenes.value.filter((o) => o.estado !== "pendiente"),
-);
 
 // Las clases extra se suman a un paquete: solo se ofrecen a quien tiene uno.
 const tienePaquete = computed(() =>
@@ -66,16 +97,6 @@ function vigencia(p: {
       return null;
   }
 }
-function fecha(iso: string | null): string {
-  return iso
-    ? new Intl.DateTimeFormat("es-MX", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      }).format(new Date(iso))
-    : "";
-}
-
 // Con pasarela de redirección se va al checkout; con pago en tienda se muestra la
 // referencia; si no, el pago queda en proceso.
 async function pagar(
@@ -189,17 +210,18 @@ onMounted(() => void cuenta.asegurar());
       {{ $t("comun.cargando") }}
     </p>
 
-    <template v-else>
-      <!-- Corte de sus planes: qué incluía cada uno y cómo lo usó -->
+    <div v-else class="mp-pagos">
+      <!-- Clases: su plan vigente primero. En citas, sus bonos van después. -->
       <CortePlanes
+        v-if="mostrarPlanes"
         ref="corte"
-        class="mt-5"
+        :class="citas ? 'order-3' : 'order-1'"
         :url="`${cuenta.base.value}/mi/planes`"
       />
 
-      <div class="mt-4">
+      <div class="order-2">
         <!-- Por pagar -->
-        <div class="tu-card p-5">
+        <div class="tu-card p-5" data-prueba="por-pagar">
           <h2 class="font-semibold">{{ $t("portal.pagos.porPagar") }}</h2>
           <ul
             v-if="cuenta.porPagar.value.length > 0"
@@ -207,13 +229,16 @@ onMounted(() => void cuenta.asegurar());
           >
             <li v-for="o in cuenta.porPagar.value" :key="o.id" class="py-3">
               <div class="flex items-baseline justify-between gap-3">
-                <span class="font-medium">{{
-                  o.lineas
-                    .map((l) => l.producto)
-                    .filter(Boolean)
-                    .join(", ") || "—"
-                }}</span>
-                <span class="font-semibold">{{
+                <span class="min-w-0">
+                  <span class="block font-medium">{{ o.concepto || "—" }}</span>
+                  <span
+                    v-if="detalleCita(o)"
+                    class="block text-sm first-letter:uppercase"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ detalleCita(o) }}</span
+                  >
+                </span>
+                <span class="shrink-0 font-semibold tabular-nums">{{
                   dinero(o.total_minor, o.moneda)
                 }}</span>
               </div>
@@ -264,8 +289,8 @@ onMounted(() => void cuenta.asegurar());
         </div>
       </div>
 
-      <!-- Comprar -->
-      <div v-if="comprables.length > 0" class="mt-4 tu-card p-5">
+      <!-- Comprar o renovar -->
+      <div v-if="comprables.length > 0" class="order-4 tu-card p-5">
         <h2 class="font-semibold">{{ $t("miCuenta.comprar.titulo") }}</h2>
         <p
           v-if="mensaje === 'comprado'"
@@ -335,41 +360,23 @@ onMounted(() => void cuenta.asegurar());
       </div>
 
       <!-- Pago automático -->
-      <PagoAutomatico v-if="cuenta.personaId.value !== null" class="mt-4" />
+      <PagoAutomatico v-if="cuenta.personaId.value !== null" class="order-5" />
 
-      <!-- Historial -->
-      <div class="mt-4 tu-card p-5">
-        <h2 class="font-semibold">{{ $t("portal.pagos.historial") }}</h2>
-        <ul
-          v-if="historial.length > 0"
-          class="mt-3 divide-y divide-[var(--borde)] text-sm"
-        >
-          <li
-            v-for="o in historial"
-            :key="o.id"
-            class="flex items-center justify-between gap-3 py-2.5"
-          >
-            <span class="min-w-0">
-              <span class="block truncate font-medium">{{
-                o.lineas
-                  .map((l) => l.producto)
-                  .filter(Boolean)
-                  .join(", ") || "—"
-              }}</span>
-              <span class="text-xs" :style="{ color: 'var(--texto-suave)' }"
-                >{{ fecha(o.fecha) }} ·
-                {{ $t(`miCuenta.compras.estados.${o.estado}`) }}</span
-              >
-            </span>
-            <span class="shrink-0 font-semibold">{{
-              dinero(o.total_minor, o.moneda)
-            }}</span>
-          </li>
-        </ul>
-        <p v-else class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("portal.pagos.sinHistorial") }}
-        </p>
-      </div>
-    </template>
+      <!-- Historial: en citas, justo después de lo que debe -->
+      <HistorialCompras
+        ref="historial"
+        :class="citas ? 'order-2' : 'order-6'"
+      />
+    </div>
   </section>
 </template>
+
+<style scoped>
+/* Las tarjetas de Pagos en columna; su orden cambia con la modalidad. */
+.mp-pagos {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+</style>

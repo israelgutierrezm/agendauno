@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
 
 import CalendarioDias from "@/components/CalendarioDias.vue";
 import ElegirProfesional from "@/components/ElegirProfesional.vue";
@@ -13,8 +12,20 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * hora libre. Si el servicio se paga para reservar, la cita queda apartada hasta
  * pagarla (aparece en "Mis reservas"). Si el negocio manda avisos por WhatsApp y el
  * cliente aún no los aceptó (y tiene celular), se le ofrecen al agendar (ADR 0069).
+ *
+ * Al agendar, la confirmación se queda a la vista (servicio, cuándo, sede, quién lo
+ * atiende y si queda pendiente de pago) hasta que la persona pulsa «Listo» o agenda
+ * otra; `agendada` avisa al contenedor para que recargue, `cerrar` para que cierre.
  */
-const emit = defineEmits<{ agendada: [] }>();
+const props = defineProps<{
+  /** «Agendar de nuevo» desde el historial: el mismo servicio, sede y profesional. */
+  inicial?: {
+    servicio?: string | null;
+    sucursal?: string | null;
+    profesional?: string | null;
+  } | null;
+}>();
+const emit = defineEmits<{ agendada: []; cerrar: [] }>();
 
 interface Servicio {
   id: string;
@@ -38,10 +49,17 @@ interface Slot {
   inicia: string;
   termina: string;
 }
+// Lo que se agendó, para la confirmación.
+interface Confirmacion {
+  servicio: string;
+  inicia: string;
+  sucursal: string | null;
+  profesional: string | null;
+  pendientePago: boolean;
+}
 // Sin preferencia: el negocio asigna a quien esté libre a esa hora.
 const CUALQUIERA = "cualquiera";
 
-const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
@@ -50,7 +68,7 @@ const profesionales = ref<Opcion[]>([]);
 const sucursales = ref<Opcion[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
-const aviso = ref<string | null>(null);
+const confirmacion = ref<Confirmacion | null>(null);
 
 const servicioId = ref("");
 const profesionalId = ref("");
@@ -100,6 +118,18 @@ function hora(iso: string): string {
   }).format(new Date(iso));
 }
 
+/** «lun 5 de oct, 10:00» en la hora de la sede. */
+function cuando(iso: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: sucursal.value?.zona_horaria ?? undefined,
+  }).format(new Date(iso));
+}
+
 /** "2026-10-05T10:00" en la hora local de la sede, como lo espera el API. */
 function horaLocal(iso: string): string {
   const partes = new Intl.DateTimeFormat("sv-SE", {
@@ -114,10 +144,15 @@ function horaLocal(iso: string): string {
   return partes.replace(" ", "T");
 }
 
+// Cada búsqueda lleva su número: una respuesta tardía de una selección anterior no
+// reemplaza los horarios de la selección actual.
+let busqueda = 0;
 async function buscarHorarios(): Promise<void> {
+  const actual = ++busqueda;
   slots.value = [];
   slotSel.value = "";
   if (!listo.value || servicio.value === null) {
+    buscando.value = false;
     return;
   }
   buscando.value = true;
@@ -138,11 +173,17 @@ async function buscarHorarios(): Promise<void> {
         },
       },
     );
-    slots.value = data.data.slots;
+    if (actual === busqueda) {
+      slots.value = data.data.slots;
+    }
   } catch (e) {
-    error.value = mensajeDeError(e);
+    if (actual === busqueda) {
+      error.value = mensajeDeError(e);
+    }
   } finally {
-    buscando.value = false;
+    if (actual === busqueda) {
+      buscando.value = false;
+    }
   }
 }
 watch([servicioId, profesionalId, sucursalId, fecha], buscarHorarios);
@@ -172,22 +213,29 @@ async function agendar(): Promise<void> {
     if (ofrecerWhatsApp.value && aceptaWhatsApp.value) {
       ofrecerWhatsApp.value = false;
     }
-    aviso.value =
-      data.data.estado === "pendiente_pago"
-        ? t("citaCuenta.apartada")
-        : t("citaCuenta.agendada");
-    // Con «cualquiera», se dice quién la atenderá.
-    if (profesionalId.value === CUALQUIERA && data.data.profesional) {
-      aviso.value += ` ${t("perfilPublico.agendar.teAtiende", { nombre: data.data.profesional.nombre })}`;
-    }
-    slotSel.value = "";
-    await buscarHorarios();
+    // Con «cualquiera», el negocio dice quién la atenderá.
+    confirmacion.value = {
+      servicio: servicio.value.nombre,
+      inicia: slotSel.value,
+      sucursal: sucursal.value?.nombre ?? null,
+      profesional:
+        data.data.profesional?.nombre ??
+        profesionales.value.find((p) => p.id === profesionalId.value)?.nombre ??
+        null,
+      pendientePago: data.data.estado === "pendiente_pago",
+    };
     emit("agendada");
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
     agendando.value = false;
   }
+}
+
+/** Vuelve al formulario para agendar otra cita (la anterior ya quedó). */
+function otraCita(): void {
+  confirmacion.value = null;
+  void buscarHorarios();
 }
 
 onMounted(async () => {
@@ -209,6 +257,26 @@ onMounted(async () => {
         : (profesionales.value[0]?.id ?? "");
     if (sucursales.value.length === 1) {
       sucursalId.value = sucursales.value[0].id;
+    }
+    // Lo mismo que la vez anterior, si sigue disponible.
+    const antes = props.inicial;
+    if (
+      antes?.servicio &&
+      servicios.value.some((s) => s.id === antes.servicio)
+    ) {
+      servicioId.value = antes.servicio;
+    }
+    if (
+      antes?.sucursal &&
+      sucursales.value.some((s) => s.id === antes.sucursal)
+    ) {
+      sucursalId.value = antes.sucursal;
+    }
+    if (
+      antes?.profesional &&
+      profesionales.value.some((p) => p.id === antes.profesional)
+    ) {
+      profesionalId.value = antes.profesional;
     }
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -245,6 +313,79 @@ onMounted(async () => {
     >
       {{ $t("citaCuenta.sinServicios") }}
     </p>
+    <!-- Confirmación: se queda a la vista hasta «Listo» o «Agendar otra». -->
+    <div
+      v-else-if="confirmacion"
+      class="space-y-4"
+      role="status"
+      data-prueba="cita-confirmada"
+    >
+      <p class="font-medium">
+        {{
+          confirmacion.pendientePago
+            ? $t("citaCuenta.apartada")
+            : $t("citaCuenta.agendada")
+        }}
+      </p>
+      <dl class="cc-resumen">
+        <div>
+          <dt>{{ $t("citaCuenta.servicio") }}</dt>
+          <dd>{{ confirmacion.servicio }}</dd>
+        </div>
+        <div>
+          <dt>{{ $t("citaCuenta.cuando") }}</dt>
+          <dd class="first-letter:uppercase">
+            {{ cuando(confirmacion.inicia) }}
+          </dd>
+        </div>
+        <div v-if="confirmacion.sucursal">
+          <dt>{{ $t("citaCuenta.sede") }}</dt>
+          <dd>{{ confirmacion.sucursal }}</dd>
+        </div>
+        <div v-if="confirmacion.profesional">
+          <dt>{{ $t("citaCuenta.profesional") }}</dt>
+          <dd>{{ confirmacion.profesional }}</dd>
+        </div>
+        <div>
+          <dt>{{ $t("citaCuenta.estado") }}</dt>
+          <dd>
+            <span
+              class="tu-pildora"
+              :style="{
+                '--tono': confirmacion.pendientePago
+                  ? 'var(--aviso)'
+                  : 'var(--exito)',
+              }"
+              >{{
+                confirmacion.pendientePago
+                  ? $t("citaCuenta.pendientePago")
+                  : $t("citaCuenta.confirmada")
+              }}</span
+            >
+          </dd>
+        </div>
+      </dl>
+      <p
+        v-if="confirmacion.pendientePago"
+        class="text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("citaCuenta.pendientePagoAyuda") }}
+      </p>
+      <div class="flex flex-wrap justify-end gap-2">
+        <button type="button" class="tu-btn tu-btn-fantasma" @click="otraCita">
+          {{ $t("citaCuenta.otra") }}
+        </button>
+        <button
+          type="button"
+          class="tu-btn tu-btn-primario"
+          data-prueba="cita-listo"
+          @click="emit('cerrar')"
+        >
+          {{ $t("citaCuenta.listo") }}
+        </button>
+      </div>
+    </div>
     <form v-else class="space-y-4" @submit.prevent="agendar">
       <div class="grid gap-3 sm:grid-cols-2">
         <div>
@@ -355,14 +496,6 @@ onMounted(async () => {
       <p v-if="error" class="text-sm" style="color: var(--error)">
         {{ error }}
       </p>
-      <p
-        v-if="aviso"
-        class="text-sm"
-        role="status"
-        :style="{ color: 'var(--exito)' }"
-      >
-        {{ aviso }}
-      </p>
       <label v-if="ofrecerWhatsApp" class="flex items-center gap-2 text-sm">
         <input
           v-model="aceptaWhatsApp"
@@ -416,5 +549,26 @@ onMounted(async () => {
   border-color: var(--primario);
   background: var(--primario);
   color: var(--primario-contraste);
+}
+/* Resumen de la cita agendada. */
+.cc-resumen {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.75rem;
+}
+.cc-resumen > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+.cc-resumen dt {
+  color: var(--texto-suave);
+}
+.cc-resumen dd {
+  text-align: right;
+  font-weight: 500;
 }
 </style>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import { api, mensajeDeError } from "@/lib/api";
 import { fechaCorta } from "@/lib/planes";
@@ -7,8 +8,10 @@ import { fechaCorta } from "@/lib/planes";
 /**
  * Corte de planes (ADR 0050): por cada paquete o membresía, qué incluía, sus clases
  * extra, en qué clases se usó (asistió, no asistió, cancelación tardía, próximas),
- * y lo que queda, se reservó o venció. Los vigentes arriba; los anteriores,
- * plegados. Lo ve el alumno en su cuenta y el equipo en su ficha (`equipo`).
+ * y lo que queda, se reservó o venció. Los vigentes arriba, completos; los
+ * anteriores, plegados en una línea cada uno (qué fue, cuándo y cuánto se usó) y
+ * se abren uno por uno. Lo ve el alumno en su cuenta y el equipo en su ficha
+ * (`equipo`).
  */
 interface Uso {
   clase: string | null;
@@ -53,11 +56,15 @@ interface PlanCorte {
 }
 
 const props = defineProps<{ url: string; equipo?: boolean }>();
+const { t } = useI18n();
 
 const planes = ref<PlanCorte[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const abiertos = ref(new Set<string>());
+// Planes anteriores: la lista plegada y, dentro, los que se abrieron.
+const verAnteriores = ref(false);
+const expandidos = ref(new Set<string>());
 
 const ACTIVOS = ["vigente", "por_empezar", "pausado", "suspendido"];
 const actuales = computed(() =>
@@ -66,6 +73,41 @@ const actuales = computed(() =>
 const anteriores = computed(() =>
   planes.value.filter((p) => !ACTIVOS.includes(p.estado)),
 );
+const visibles = computed(() =>
+  verAnteriores.value
+    ? [...actuales.value, ...anteriores.value]
+    : actuales.value,
+);
+function esAnterior(p: PlanCorte): boolean {
+  return !ACTIVOS.includes(p.estado);
+}
+// Un plan anterior se ve en una línea hasta que se abre.
+function plegado(p: PlanCorte): boolean {
+  return esAnterior(p) && !expandidos.value.has(p.id);
+}
+// Las clases a las que sirve: las primeras y cuántas más (la lista completa
+// puede ser larga).
+const MAX_CLASES = 3;
+function aplicaA(p: PlanCorte): string {
+  const lista = p.aplica_a;
+  return lista.length > MAX_CLASES
+    ? t("planes.corte.aplicaAMas", {
+        clases: lista.slice(0, MAX_CLASES).join(", "),
+        n: lista.length - MAX_CLASES,
+      })
+    : t("planes.corte.aplicaA", { clases: lista.join(", ") });
+}
+// Resumen de un plan anterior: cuánto se usó.
+function resumen(p: PlanCorte): string {
+  const u = p.unidades;
+  if (p.ilimitado) {
+    return t("planes.corte.resumenIlimitado", { usadas: clases(u.usadas) });
+  }
+  return t("planes.corte.resumenUso", {
+    usadas: clases(u.usadas),
+    total: clases(u.incluidas + u.extras),
+  });
+}
 
 function clases(unidades: number): string {
   return new Intl.NumberFormat("es-MX", { maximumFractionDigits: 1 }).format(
@@ -102,11 +144,32 @@ function numeros(p: PlanCorte): { clave: string; valor: string }[] {
     { clave: "apartadas", valor: u.apartadas },
     { clave: "devueltas", valor: u.devueltas },
     { clave: "vencidas", valor: u.vencidas },
-    { clave: "disponibles", valor: u.disponibles, siempre: !p.ilimitado },
+    // Lo que quedó en un plan vencido o cancelado ya no se puede usar: no se
+    // presenta como «disponible».
+    {
+      clave:
+        p.estado === "vencido"
+          ? "sinUsarVencido"
+          : p.estado === "cancelado"
+            ? "sinUsarCancelado"
+            : "disponibles",
+      valor: u.disponibles,
+      siempre:
+        !p.ilimitado && p.estado !== "vencido" && p.estado !== "cancelado",
+    },
   ];
   return lista
     .filter((n) => n.siempre || n.valor > 0)
     .map((n) => ({ clave: n.clave, valor: clases(n.valor) }));
+}
+function alternarPlan(id: string): void {
+  const s = new Set(expandidos.value);
+  if (s.has(id)) {
+    s.delete(id);
+  } else {
+    s.add(id);
+  }
+  expandidos.value = s;
 }
 function alternar(id: string): void {
   const s = new Set(abiertos.value);
@@ -159,19 +222,51 @@ defineExpose({ cargar });
     </p>
 
     <template v-else>
-      <template v-for="(grupo, g) in [actuales, anteriores]" :key="g">
-        <p
-          v-if="g === 1 && grupo.length > 0"
-          class="mt-6 text-sm font-medium"
-          :style="{ color: 'var(--texto-suave)' }"
+      <p
+        v-if="actuales.length === 0"
+        class="mt-3 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("planes.corte.sinVigentes") }}
+      </p>
+      <template v-for="p in visibles" :key="p.id">
+        <!-- Anterior y plegado: una línea -->
+        <button
+          v-if="plegado(p)"
+          type="button"
+          class="cp-plan cp-linea"
+          :aria-expanded="false"
+          data-prueba="plan-anterior"
+          @click="alternarPlan(p.id)"
         >
-          {{ $t("planes.corte.anteriores") }}
-        </p>
+          <span class="min-w-0">
+            <span class="block truncate font-medium">{{
+              p.producto ?? "—"
+            }}</span>
+            <span class="block text-sm" :style="{ color: 'var(--texto-suave)' }"
+              >{{
+                p.hasta
+                  ? $t("planes.corte.vigencia", {
+                      desde: fechaCorta(p.desde),
+                      hasta: fechaCorta(p.hasta),
+                    })
+                  : $t("planes.corte.sinVencimiento", {
+                      desde: fechaCorta(p.desde),
+                    })
+              }}
+              · {{ resumen(p) }}</span
+            >
+          </span>
+          <span
+            class="tu-pildora shrink-0"
+            :style="{ '--tono': colorEstado(p.estado) }"
+            >{{ $t(`planes.corte.estados.${p.estado}`) }}</span
+          >
+        </button>
         <article
-          v-for="p in grupo"
-          :key="p.id"
+          v-else
           class="cp-plan"
-          :class="{ 'cp-anterior': g === 1 }"
+          :class="{ 'cp-anterior': esAnterior(p) }"
         >
           <div class="flex flex-wrap items-baseline justify-between gap-2">
             <h3 class="font-medium">{{ p.producto ?? "—" }}</h3>
@@ -204,12 +299,18 @@ defineExpose({ cargar });
               $t("planes.corte.sinVencimiento", { desde: fechaCorta(p.desde) })
             }}</template>
             <template v-if="p.aplica_a.length > 0">
-              ·
-              {{
-                $t("planes.corte.aplicaA", { clases: p.aplica_a.join(", ") })
-              }}</template
+              · {{ aplicaA(p) }}</template
             >
           </p>
+          <button
+            v-if="esAnterior(p)"
+            type="button"
+            class="tu-enlace mt-1 text-sm"
+            :aria-expanded="true"
+            @click="alternarPlan(p.id)"
+          >
+            {{ $t("planes.corte.plegar") }}
+          </button>
 
           <!-- Los números del plan -->
           <dl class="cp-numeros">
@@ -303,6 +404,20 @@ defineExpose({ cargar });
           </ul>
         </article>
       </template>
+      <button
+        v-if="anteriores.length > 0"
+        type="button"
+        class="tu-enlace mt-5 block text-sm"
+        :aria-expanded="verAnteriores"
+        data-prueba="ver-anteriores"
+        @click="verAnteriores = !verAnteriores"
+      >
+        {{
+          verAnteriores
+            ? $t("planes.corte.ocultarAnteriores")
+            : $t("planes.corte.verAnteriores", { n: anteriores.length })
+        }}
+      </button>
     </template>
   </section>
 </template>
@@ -318,7 +433,19 @@ defineExpose({ cargar });
   padding-top: 0;
 }
 .cp-anterior {
-  opacity: 0.75;
+  opacity: 0.85;
+}
+/* Un plan anterior plegado: una línea que se abre al tocarla. */
+.cp-linea {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  text-align: left;
+}
+.cp-linea:hover .font-medium {
+  color: var(--primario);
 }
 .cp-numeros {
   display: flex;

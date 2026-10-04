@@ -346,6 +346,15 @@ export const citaCuenta = {
   agendar: "Agendar",
   agendada: "¡Listo! Tu cita quedó agendada.",
   apartada: "Tu cita quedó apartada. Págala para confirmarla.",
+  // Confirmación que se queda a la vista.
+  cuando: "Cuándo",
+  estado: "Estado",
+  confirmada: "Confirmada",
+  pendientePago: "Pendiente de pago",
+  pendientePagoAyuda:
+    "La encuentras en Mis reservas para pagarla. Si no se paga a tiempo, el horario se libera.",
+  otra: "Agendar otra",
+  listo: "Listo",
 };
 
 export const miCuentaExtra = {

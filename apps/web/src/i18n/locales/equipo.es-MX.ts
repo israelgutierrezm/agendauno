@@ -15,6 +15,13 @@ export const miPerfil = {
     desconectado: "Quitaste Google: entra con tu correo y contraseña.",
   },
   titulo: "Mi perfil",
+  // Las tres partes de Mi perfil.
+  seccionDatos: "Datos personales",
+  seccionAcceso: "Acceso",
+  seccionPreferencias: "Preferencias y privacidad",
+  celular: "Celular",
+  celularAyuda:
+    "Para avisarte de tus clases y citas (también por WhatsApp, si lo activas).",
   foto: "Foto",
   fotoAyuda:
     "Así te ubican en la agenda y en el equipo. JPG, PNG o WebP de hasta 4 MB.",

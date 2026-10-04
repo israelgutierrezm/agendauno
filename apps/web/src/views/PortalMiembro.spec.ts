@@ -22,12 +22,19 @@ const sesion = vi.hoisted(() => ({
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => sesion,
 }));
+vi.mock("@/stores/toast", () => ({
+  useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
+}));
 vi.mock("@/lib/retornoPago", async () => {
   const { ref } = await import("vue");
   return { useRetornoPago: () => ref(null) };
 });
+const ruta = vi.hoisted(() => ({ query: {} as Record<string, string> }));
+const router = vi.hoisted(() => ({ replace: vi.fn() }));
 vi.mock("vue-router", () => ({
   RouterLink: { props: ["to"], template: "<a><slot /></a>" },
+  useRoute: () => ruta,
+  useRouter: () => router,
 }));
 
 // Miércoles 9 de enero de 2030: el jueves 10 cae en la misma semana.
@@ -46,6 +53,7 @@ const datos: Record<string, unknown> = {
         ilimitado: false,
         saldo: 6000,
         disponible: 6000,
+        estado: "vigente",
       },
     ],
     reservas: [
@@ -73,6 +81,7 @@ const datos: Record<string, unknown> = {
       zona_horaria: "America/Mexico_City",
       capacidad: 10,
       ocupados: 3,
+      cobertura: { estado: "incluida", motivo: null },
     },
     {
       id: "s2",
@@ -82,13 +91,27 @@ const datos: Record<string, unknown> = {
       zona_horaria: "America/Mexico_City",
       capacidad: 8,
       ocupados: 8,
+      cobertura: { estado: "incluida", motivo: null },
+    },
+    {
+      id: "s3",
+      oferta: "Open Training",
+      oferta_id: "o3",
+      actividad: "Entrenamiento",
+      actividad_id: "a2",
+      sucursal: "Roma Norte",
+      inicia_en: futuro(4),
+      zona_horaria: "America/Mexico_City",
+      capacidad: 10,
+      ocupados: 1,
+      cobertura: { estado: "solo_membresia", motivo: "clase" },
     },
   ],
   "/mi/waivers": [
     { id: "w1", titulo: "Reglamento", contenido: "…", version: 1 },
   ],
   "/mi/productos": [],
-  "/mi/ordenes": [
+  "/mi/ordenes/pendientes": [
     {
       id: "o1",
       estado: "pendiente",
@@ -138,6 +161,7 @@ describe("portal del alumno", () => {
     vi.clearAllMocks();
     localStorage.clear();
     sesion.esCitas = false;
+    ruta.query = {};
     api.get.mockImplementation((url: string) =>
       Promise.resolve({
         data: { data: datos[url.replace("/api/v1/app/demo", "")] ?? [] },
@@ -204,6 +228,7 @@ describe("portal del alumno", () => {
                   id: "vencido",
                   disponible: 4000,
                   vence: "2020-01-31",
+                  estado: "vencido",
                 },
               ],
               portal: { creditos: true, pase: false, expediente: true },
@@ -217,6 +242,35 @@ describe("portal del alumno", () => {
     // 6 del vigente; los 4 del vencido no cuentan ni su fecha.
     expect(w.text()).toContain("6 créditos · vence el 31 ene");
     expect(w.text()).not.toContain("10 créditos");
+  });
+
+  it("Mis créditos sigue el estado que da el servidor: un plan en pausa no suma", async () => {
+    const perfil = datos["/mi/perfil"] as { derechos: object[] };
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      const cuerpo =
+        ruta === "/mi/perfil"
+          ? {
+              ...perfil,
+              // No ha vencido, pero está en pausa: no hay créditos que usar.
+              derechos: [
+                {
+                  ...(perfil.derechos[0] as object),
+                  vence: "2030-01-31",
+                  estado: "pausado",
+                  pausa_hasta: "2030-01-20",
+                },
+              ],
+              portal: { creditos: true, pase: false, expediente: true },
+            }
+          : (datos[ruta] ?? []);
+      return Promise.resolve({ data: { data: cuerpo } });
+    });
+    const w = montar(MiCuentaView);
+    await flushPromises();
+
+    expect(w.text()).toContain("En pausa hasta el 20 ene");
+    expect(w.text()).not.toContain("6 créditos");
   });
 
   it("en citas: cómo llegar, cambiar o cancelar, volver a agendar; sin «Sin paquete» ni pase", async () => {
@@ -396,12 +450,17 @@ describe("portal del alumno", () => {
     expect(w.text()).toContain("Flexibilidad");
   });
 
-  it("reservas: lista con las suyas y las disponibles; en semana y detalle", async () => {
+  it("reservas: en Reservar, las disponibles; en semana, también las suyas con su detalle", async () => {
     const w = montar(MisReservasView);
     await flushPromises();
-    expect(w.text()).toContain("Mis reservas");
     expect(w.text()).toContain("Flexibilidad");
     expect(w.text()).toContain(esMX.miCuenta.listaEspera); // la llena
+    // La suya no se repite entre las disponibles.
+    expect(
+      w
+        .findAll('[data-prueba="clase-disponible"]')
+        .some((f) => f.text().includes("Pole Nivel 1")),
+    ).toBe(false);
 
     await w
       .findAll(".tu-segmentado button")
@@ -412,5 +471,92 @@ describe("portal del alumno", () => {
     await w.find(".cv-chip-propio").trigger("click");
     expect(w.text()).toContain("Agregar a mi calendario");
     expect(w.text()).toContain(miReprogramar.boton);
+  });
+
+  it("reservas: antes de reservar dice si su plan incluye la clase; la que no, sin «Reservar»", async () => {
+    const w = montar(MisReservasView);
+    await flushPromises();
+    const filas = w.findAll('[data-prueba="clase-disponible"]');
+    const open = filas.find((f) => f.text().includes("Open Training"))!;
+    const flexi = filas.find((f) => f.text().includes("Flexibilidad"))!;
+
+    expect(flexi.text()).toContain("Incluida en tu plan");
+    expect(open.text()).toContain("Solo con membresía");
+    expect(open.text()).not.toContain(esMX.miCuenta.reservar);
+
+    // Su detalle dice por qué y lleva a los planes.
+    await open.find("button").trigger("click");
+    expect(w.text()).toContain("Esta clase solo la incluye una membresía.");
+    expect(w.find('[data-prueba="ver-planes"]').exists()).toBe(true);
+
+    // «Solo las incluidas en mi plan» la quita de la lista.
+    await w.get('[data-prueba="filtro-incluidas"] input').setValue(true);
+    expect(
+      w
+        .findAll('[data-prueba="clase-disponible"]')
+        .map((f) => f.text())
+        .join(" "),
+    ).not.toContain("Open Training");
+  });
+
+  it("reservas: Próximas muestra las suyas e Historial vuelve a reservar la misma clase", async () => {
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      if (ruta === "/mi/historial") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                id: "h1",
+                tipo: "clase",
+                oferta: "Open Training",
+                oferta_id: "o3",
+                sucursal: "Roma Norte",
+                sucursal_id: "su1",
+                instructor: "Abril",
+                instructor_id: "i1",
+                inicia_en: futuro(-2),
+                zona_horaria: "America/Mexico_City",
+                estado: "asistio",
+                cancelada_por: null,
+                reprogramada: true,
+                resena: null,
+                calificable: true,
+              },
+            ],
+            meta: { page: 1, ultima_pagina: 1, total: 1, per_page: 10 },
+          },
+        });
+      }
+      return Promise.resolve({ data: { data: datos[ruta] ?? [] } });
+    });
+    const w = montar(MisReservasView);
+    await flushPromises();
+
+    await w.get('[data-prueba="pestana-proximas"]').trigger("click");
+    expect(w.get('[data-prueba="reserva-proxima"]').text()).toContain(
+      "Pole Nivel 1",
+    );
+    expect(router.replace).toHaveBeenLastCalledWith({
+      query: { vista: "proximas" },
+    });
+
+    await w.get('[data-prueba="pestana-historial"]').trigger("click");
+    await flushPromises();
+    const fila = w.get('[data-prueba="historial-fila"]');
+    expect(fila.text()).toContain("Asististe");
+    expect(fila.text()).toContain("Cambió de horario");
+    expect(fila.find('[data-prueba="historial-calificar"]').exists()).toBe(
+      true,
+    );
+
+    await fila.get('[data-prueba="historial-de-nuevo"]').trigger("click");
+    await flushPromises();
+    expect(w.get('[data-prueba="filtro-clase"]').text()).toContain(
+      "Open Training",
+    );
+    const disponibles = w.findAll('[data-prueba="clase-disponible"]');
+    expect(disponibles).toHaveLength(1);
+    expect(disponibles[0].text()).toContain("Open Training");
   });
 });

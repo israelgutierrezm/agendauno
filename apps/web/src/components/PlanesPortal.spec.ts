@@ -202,4 +202,51 @@ describe("corte de planes", () => {
     expect(w.text()).toContain("Próxima");
     expect(w.text()).toContain("(extra)");
   });
+
+  it("lo que quedó en un plan vencido no se presenta como disponible", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: [
+          {
+            id: "a2",
+            derecho_id: "d2",
+            producto: "Paquete 8 clases",
+            tipo: "paquete",
+            comprado: "2026-08-01",
+            desde: "2026-08-01",
+            hasta: "2026-08-31",
+            estado: "vencido",
+            ilimitado: false,
+            aplica_a: [],
+            unidades: {
+              incluidas: 8000,
+              extras: 0,
+              usadas: 5000,
+              devueltas: 0,
+              vencidas: 0,
+              ajustes: 0,
+              apartadas: 0,
+              disponibles: 3000,
+            },
+            extras: [],
+            usos: [],
+          },
+        ],
+      },
+    });
+    const w = montar(CortePlanes, { url: "/api/v1/app/demo/mi/planes" });
+    await flushPromises();
+
+    // Los anteriores van plegados: una línea por plan, que se abre.
+    expect(w.text()).toContain("Sin plan vigente.");
+    expect(w.text()).not.toContain("Paquete 8 clases");
+    await w.get('[data-prueba="ver-anteriores"]').trigger("click");
+    expect(w.text()).toContain("Usaste 5 de 8");
+    expect(w.text()).not.toContain("Sin usar al vencer");
+    await w.get('[data-prueba="plan-anterior"]').trigger("click");
+
+    expect(w.text()).toContain("Sin usar al vencer");
+    expect(w.text()).not.toContain("Disponibles");
+    expect(w.find(".cp-destacado").exists()).toBe(false);
+  });
 });
