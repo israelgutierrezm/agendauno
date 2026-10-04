@@ -240,6 +240,39 @@ async function reanudar(d: Derecho): Promise<void> {
 
 const resumen = ref<Resumen | null>(null);
 const ficha = ref<Ficha | null>(null);
+
+// Membresías y paquetes: lo vigente (no cancelado ni vencido) va primero con su
+// saldo; lo demás es historial y se abre aparte. El saldo no suma lo vencido.
+function hoyLocal(): string {
+  const d = new Date();
+  const dos = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+}
+function esVigente(d: Derecho): boolean {
+  return (
+    d.estado !== "cancelado" &&
+    (d.valido_hasta === null || d.valido_hasta.slice(0, 10) >= hoyLocal())
+  );
+}
+const derechosVigentes = computed(() =>
+  (ficha.value?.derechos ?? []).filter(esVigente),
+);
+const derechosHistorial = computed(() =>
+  (ficha.value?.derechos ?? []).filter((d) => !esVigente(d)),
+);
+const verHistorial = ref(false);
+const derechosVisibles = computed(() => [
+  ...derechosVigentes.value,
+  ...(verHistorial.value ? derechosHistorial.value : []),
+]);
+const saldoVigente = computed(() => ({
+  ilimitado: derechosVigentes.value.some((d) => d.ilimitado),
+  creditos:
+    derechosVigentes.value
+      .filter((d) => !d.ilimitado)
+      .reduce((total, d) => total + Math.max(0, d.saldo_unidades ?? 0), 0) /
+    1000,
+}));
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const editando = ref<MiembroEditable | null>(null);
@@ -476,285 +509,329 @@ const regreso = useRegreso({
                 >
                   {{ $t("ficha.derechos.vacio") }}
                 </p>
-                <ul v-else class="mt-1">
-                  <li
-                    v-for="d in ficha.derechos"
-                    :key="d.id"
-                    class="fi-fila"
-                    :style="{ borderColor: 'var(--borde)' }"
-                  >
-                    <div class="min-w-0">
-                      <p class="font-medium truncate">
-                        {{ d.producto ?? "—" }}
-                      </p>
-                      <p
-                        class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs"
-                        :style="{ color: 'var(--texto-suave)' }"
+                <template v-else>
+                  <p class="mt-1 text-sm" data-prueba="saldo-vigente">
+                    {{
+                      derechosVigentes.length === 0
+                        ? $t("ficha.derechos.sinVigente")
+                        : saldoVigente.ilimitado
+                          ? $t("ficha.derechos.saldoIlimitado")
+                          : $t("ficha.derechos.saldoVigente", {
+                              creditos: $t(
+                                "ficha.creditos",
+                                { n: saldoVigente.creditos },
+                                saldoVigente.creditos === 1 ? 1 : 2,
+                              ),
+                            })
+                    }}
+                  </p>
+                  <ul class="mt-1">
+                    <template v-for="(d, i) in derechosVisibles" :key="d.id">
+                      <li
+                        v-if="i === derechosVigentes.length"
+                        class="fi-subtitulo"
+                        data-prueba="historial-planes"
                       >
-                        <span
-                          v-if="d.estado"
-                          class="tu-badge"
-                          :class="
-                            d.estado === 'activo'
-                              ? 'tu-badge-exito'
-                              : 'tu-badge-aviso'
-                          "
-                          >{{ $t(`ficha.acuerdo.${d.estado}`) }}</span
-                        >
-                        <span v-if="d.pausa_hasta">{{
-                          $t("pausaMembresia.enPausa", {
-                            fecha: fecha(d.pausa_hasta),
-                          })
-                        }}</span>
-                        <span v-else>{{
-                          d.valido_hasta
-                            ? $t("ficha.derechos.vence", {
-                                fecha: fecha(d.valido_hasta),
-                              })
-                            : $t("ficha.derechos.sinVence")
-                        }}</span>
-                      </p>
-                    </div>
-                    <div class="text-right shrink-0">
-                      <p v-if="d.ilimitado" class="text-sm font-medium">
-                        {{ $t("ficha.derechos.ilimitado") }}
-                      </p>
-                      <template v-else>
-                        <p class="font-semibold tabular-nums">
-                          {{
-                            $t(
-                              "ficha.creditos",
-                              { n: d.saldo_creditos ?? 0 },
-                              d.saldo_creditos === 1 ? 1 : 2,
-                            )
-                          }}
-                        </p>
-                        <p
-                          class="text-xs"
-                          :style="{ color: 'var(--texto-suave)' }"
-                        >
-                          {{
-                            $t(
-                              "ficha.derechos.disponible",
-                              { n: (d.disponible_unidades ?? 0) / 1000 },
-                              d.disponible_unidades === 1000 ? 1 : 2,
-                            )
-                          }}
-                        </p>
-                      </template>
-                    </div>
-                    <div
-                      v-if="
-                        !d.ilimitado ||
-                        (puedeRecargar &&
-                          d.acuerdo_id &&
-                          (d.estado === 'activo' || d.estado === 'pausado'))
-                      "
-                      class="flex w-full items-center gap-4 text-sm"
-                    >
-                      <template v-if="!d.ilimitado">
-                        <button
-                          v-if="puedeVerDerechos"
-                          type="button"
-                          class="tu-enlace"
-                          :aria-expanded="movimientosDe === d.id"
-                          @click="verMovimientos(d)"
-                        >
-                          {{
-                            movimientosDe === d.id
-                              ? $t("creditosFicha.ocultar")
-                              : $t("creditosFicha.movimientos")
-                          }}
-                        </button>
-                        <button
-                          v-if="puedeRecargar"
-                          type="button"
-                          class="tu-enlace"
-                          @click="abrirRecarga(d)"
-                        >
-                          {{ $t("creditosFicha.agregar") }}
-                        </button>
-                      </template>
-                      <template v-if="puedeRecargar && d.acuerdo_id">
-                        <button
-                          v-if="d.estado === 'activo'"
-                          type="button"
-                          class="tu-enlace"
-                          :aria-expanded="pausando === d.id"
-                          @click="abrirPausa(d)"
-                        >
-                          {{ $t("pausaMembresia.pausar") }}
-                        </button>
-                        <button
-                          v-else-if="d.estado === 'pausado'"
-                          type="button"
-                          class="tu-enlace"
-                          :disabled="guardandoPausa"
-                          @click="reanudar(d)"
-                        >
-                          {{ $t("pausaMembresia.reanudar") }}
-                        </button>
-                      </template>
-                    </div>
-                    <form
-                      v-if="pausando === d.id"
-                      class="w-full space-y-3 rounded-xl border p-4"
-                      :style="{
-                        borderColor: 'var(--borde)',
-                        background: 'var(--fondo)',
-                      }"
-                      @submit.prevent="pausar(d)"
-                    >
-                      <p
-                        class="text-xs"
-                        :style="{ color: 'var(--texto-suave)' }"
-                      >
-                        {{ $t("pausaMembresia.ayuda") }}
-                      </p>
-                      <div class="flex flex-wrap items-end gap-3">
-                        <div>
-                          <label class="tu-label" :for="`ph-${d.id}`">{{
-                            $t("pausaMembresia.hasta")
-                          }}</label>
-                          <input
-                            :id="`ph-${d.id}`"
-                            v-model="pausa.hasta"
-                            class="tu-input"
-                            type="date"
-                            :min="hoy"
-                            required
-                          />
-                        </div>
-                        <div class="min-w-[12rem] flex-1">
-                          <label class="tu-label" :for="`pm-${d.id}`">{{
-                            $t("pausaMembresia.motivo")
-                          }}</label>
-                          <input
-                            :id="`pm-${d.id}`"
-                            v-model="pausa.motivo"
-                            class="tu-input"
-                            maxlength="255"
-                            :placeholder="$t('pausaMembresia.motivoPh')"
-                          />
-                        </div>
-                        <button
-                          type="submit"
-                          class="tu-btn tu-btn-primario text-sm"
-                          :disabled="guardandoPausa || pausa.hasta === ''"
-                        >
-                          {{ $t("pausaMembresia.confirmar") }}
-                        </button>
-                      </div>
-                    </form>
-                    <form
-                      v-if="recargando === d.id"
-                      class="flex w-full flex-wrap items-end gap-3 rounded-xl border p-4"
-                      :style="{
-                        borderColor: 'var(--borde)',
-                        background: 'var(--fondo)',
-                      }"
-                      @submit.prevent="recargar(d)"
-                    >
-                      <div>
-                        <label class="tu-label" :for="`rc-${d.id}`">{{
-                          $t("creditosFicha.creditos")
-                        }}</label>
-                        <input
-                          :id="`rc-${d.id}`"
-                          v-model.number="recarga.creditos"
-                          class="tu-input w-24"
-                          type="number"
-                          min="0.5"
-                          step="0.5"
-                          required
-                        />
-                      </div>
-                      <div class="min-w-[12rem] flex-1">
-                        <label class="tu-label" :for="`rm-${d.id}`">{{
-                          $t("creditosFicha.motivo")
-                        }}</label>
-                        <input
-                          :id="`rm-${d.id}`"
-                          v-model="recarga.motivo"
-                          class="tu-input"
-                          maxlength="255"
-                          :placeholder="$t('creditosFicha.motivoPh')"
-                          required
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        class="tu-btn tu-btn-primario text-sm"
-                        :disabled="guardandoRecarga || recarga.creditos <= 0"
-                      >
-                        {{ $t("creditosFicha.confirmar") }}
-                      </button>
-                    </form>
-                    <div
-                      v-if="movimientosDe === d.id"
-                      class="w-full rounded-xl border px-4 text-xs"
-                      :style="{
-                        borderColor: 'var(--borde)',
-                        background: 'var(--fondo)',
-                      }"
-                    >
-                      <p
-                        v-if="movimientos.length === 0"
-                        class="py-3"
-                        :style="{ color: 'var(--texto-suave)' }"
-                      >
-                        {{ $t("creditosFicha.sinMovimientos") }}
-                      </p>
-                      <div
-                        v-for="m in movimientos"
-                        :key="m.id"
-                        class="flex items-center justify-between gap-3 border-t py-2 first:border-t-0"
+                        {{ $t("ficha.derechos.historial") }}
+                      </li>
+                      <li
+                        class="fi-fila"
+                        :class="{ 'fi-pasado': i >= derechosVigentes.length }"
                         :style="{ borderColor: 'var(--borde)' }"
                       >
-                        <span class="min-w-0">
-                          <span class="block font-medium">{{
-                            m.concepto ?? $t(`creditosFicha.tipos.${m.tipo}`)
-                          }}</span>
-                          <span
-                            class="block truncate"
+                        <div class="min-w-0">
+                          <p class="font-medium truncate">
+                            {{ d.producto ?? "—" }}
+                          </p>
+                          <p
+                            class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs"
                             :style="{ color: 'var(--texto-suave)' }"
-                            >{{ fecha(m.fecha) }}
-                            <!-- La nota solo en ajustes a mano (el resto ya lo dice el concepto). -->
-                            <template
-                              v-if="m.descripcion && m.origen === 'ajuste'"
+                          >
+                            <span
+                              v-if="d.estado"
+                              class="tu-badge"
+                              :class="
+                                d.estado === 'activo'
+                                  ? 'tu-badge-exito'
+                                  : 'tu-badge-aviso'
+                              "
+                              >{{ $t(`ficha.acuerdo.${d.estado}`) }}</span
                             >
-                              · {{ m.descripcion }}</template
-                            >
-                            <template v-if="m.actor">
-                              ·
+                            <span v-if="d.pausa_hasta">{{
+                              $t("pausaMembresia.enPausa", {
+                                fecha: fecha(d.pausa_hasta),
+                              })
+                            }}</span>
+                            <span v-else>{{
+                              d.valido_hasta
+                                ? $t("ficha.derechos.vence", {
+                                    fecha: fecha(d.valido_hasta),
+                                  })
+                                : $t("ficha.derechos.sinVence")
+                            }}</span>
+                          </p>
+                        </div>
+                        <div class="text-right shrink-0">
+                          <p v-if="d.ilimitado" class="text-sm font-medium">
+                            {{ $t("ficha.derechos.ilimitado") }}
+                          </p>
+                          <template v-else>
+                            <p class="font-semibold tabular-nums">
                               {{
-                                $t("creditosFicha.por", { actor: m.actor })
-                              }}</template
-                            ></span
+                                $t(
+                                  "ficha.creditos",
+                                  { n: d.saldo_creditos ?? 0 },
+                                  d.saldo_creditos === 1 ? 1 : 2,
+                                )
+                              }}
+                            </p>
+                            <p
+                              class="text-xs"
+                              :style="{ color: 'var(--texto-suave)' }"
+                            >
+                              {{
+                                $t(
+                                  "ficha.derechos.disponible",
+                                  { n: (d.disponible_unidades ?? 0) / 1000 },
+                                  d.disponible_unidades === 1000 ? 1 : 2,
+                                )
+                              }}
+                            </p>
+                          </template>
+                        </div>
+                        <div
+                          v-if="
+                            !d.ilimitado ||
+                            (puedeRecargar &&
+                              d.acuerdo_id &&
+                              (d.estado === 'activo' || d.estado === 'pausado'))
+                          "
+                          class="flex w-full items-center gap-4 text-sm"
+                        >
+                          <template v-if="!d.ilimitado">
+                            <button
+                              v-if="puedeVerDerechos"
+                              type="button"
+                              class="tu-enlace"
+                              :aria-expanded="movimientosDe === d.id"
+                              @click="verMovimientos(d)"
+                            >
+                              {{
+                                movimientosDe === d.id
+                                  ? $t("creditosFicha.ocultar")
+                                  : $t("creditosFicha.movimientos")
+                              }}
+                            </button>
+                            <button
+                              v-if="puedeRecargar"
+                              type="button"
+                              class="tu-enlace"
+                              @click="abrirRecarga(d)"
+                            >
+                              {{ $t("creditosFicha.agregar") }}
+                            </button>
+                          </template>
+                          <template v-if="puedeRecargar && d.acuerdo_id">
+                            <button
+                              v-if="d.estado === 'activo'"
+                              type="button"
+                              class="tu-enlace"
+                              :aria-expanded="pausando === d.id"
+                              @click="abrirPausa(d)"
+                            >
+                              {{ $t("pausaMembresia.pausar") }}
+                            </button>
+                            <button
+                              v-else-if="d.estado === 'pausado'"
+                              type="button"
+                              class="tu-enlace"
+                              :disabled="guardandoPausa"
+                              @click="reanudar(d)"
+                            >
+                              {{ $t("pausaMembresia.reanudar") }}
+                            </button>
+                          </template>
+                        </div>
+                        <form
+                          v-if="pausando === d.id"
+                          class="w-full space-y-3 rounded-xl border p-4"
+                          :style="{
+                            borderColor: 'var(--borde)',
+                            background: 'var(--fondo)',
+                          }"
+                          @submit.prevent="pausar(d)"
+                        >
+                          <p
+                            class="text-xs"
+                            :style="{ color: 'var(--texto-suave)' }"
                           >
-                        </span>
-                        <span class="shrink-0 text-right tabular-nums">
-                          <span
-                            class="block font-semibold"
-                            :style="{
-                              color:
-                                m.unidades < 0
-                                  ? 'var(--error)'
-                                  : 'var(--exito)',
-                            }"
-                            >{{ m.unidades > 0 ? "+" : ""
-                            }}{{ creditos(m.unidades) }}</span
+                            {{ $t("pausaMembresia.ayuda") }}
+                          </p>
+                          <div class="flex flex-wrap items-end gap-3">
+                            <div>
+                              <label class="tu-label" :for="`ph-${d.id}`">{{
+                                $t("pausaMembresia.hasta")
+                              }}</label>
+                              <input
+                                :id="`ph-${d.id}`"
+                                v-model="pausa.hasta"
+                                class="tu-input"
+                                type="date"
+                                :min="hoy"
+                                required
+                              />
+                            </div>
+                            <div class="min-w-[12rem] flex-1">
+                              <label class="tu-label" :for="`pm-${d.id}`">{{
+                                $t("pausaMembresia.motivo")
+                              }}</label>
+                              <input
+                                :id="`pm-${d.id}`"
+                                v-model="pausa.motivo"
+                                class="tu-input"
+                                maxlength="255"
+                                :placeholder="$t('pausaMembresia.motivoPh')"
+                              />
+                            </div>
+                            <button
+                              type="submit"
+                              class="tu-btn tu-btn-primario text-sm"
+                              :disabled="guardandoPausa || pausa.hasta === ''"
+                            >
+                              {{ $t("pausaMembresia.confirmar") }}
+                            </button>
+                          </div>
+                        </form>
+                        <form
+                          v-if="recargando === d.id"
+                          class="flex w-full flex-wrap items-end gap-3 rounded-xl border p-4"
+                          :style="{
+                            borderColor: 'var(--borde)',
+                            background: 'var(--fondo)',
+                          }"
+                          @submit.prevent="recargar(d)"
+                        >
+                          <div>
+                            <label class="tu-label" :for="`rc-${d.id}`">{{
+                              $t("creditosFicha.creditos")
+                            }}</label>
+                            <input
+                              :id="`rc-${d.id}`"
+                              v-model.number="recarga.creditos"
+                              class="tu-input w-24"
+                              type="number"
+                              min="0.5"
+                              step="0.5"
+                              required
+                            />
+                          </div>
+                          <div class="min-w-[12rem] flex-1">
+                            <label class="tu-label" :for="`rm-${d.id}`">{{
+                              $t("creditosFicha.motivo")
+                            }}</label>
+                            <input
+                              :id="`rm-${d.id}`"
+                              v-model="recarga.motivo"
+                              class="tu-input"
+                              maxlength="255"
+                              :placeholder="$t('creditosFicha.motivoPh')"
+                              required
+                            />
+                          </div>
+                          <button
+                            type="submit"
+                            class="tu-btn tu-btn-primario text-sm"
+                            :disabled="
+                              guardandoRecarga || recarga.creditos <= 0
+                            "
                           >
-                          <span :style="{ color: 'var(--texto-suave)' }">{{
-                            $t("creditosFicha.saldo", {
-                              n: creditos(m.saldo_posterior),
-                            })
-                          }}</span>
-                        </span>
-                      </div>
-                    </div>
-                  </li>
-                </ul>
+                            {{ $t("creditosFicha.confirmar") }}
+                          </button>
+                        </form>
+                        <div
+                          v-if="movimientosDe === d.id"
+                          class="w-full rounded-xl border px-4 text-xs"
+                          :style="{
+                            borderColor: 'var(--borde)',
+                            background: 'var(--fondo)',
+                          }"
+                        >
+                          <p
+                            v-if="movimientos.length === 0"
+                            class="py-3"
+                            :style="{ color: 'var(--texto-suave)' }"
+                          >
+                            {{ $t("creditosFicha.sinMovimientos") }}
+                          </p>
+                          <div
+                            v-for="m in movimientos"
+                            :key="m.id"
+                            class="flex items-center justify-between gap-3 border-t py-2 first:border-t-0"
+                            :style="{ borderColor: 'var(--borde)' }"
+                          >
+                            <span class="min-w-0">
+                              <span class="block font-medium">{{
+                                m.concepto ??
+                                $t(`creditosFicha.tipos.${m.tipo}`)
+                              }}</span>
+                              <span
+                                class="block truncate"
+                                :style="{ color: 'var(--texto-suave)' }"
+                                >{{ fecha(m.fecha) }}
+                                <!-- La nota solo en ajustes a mano (el resto ya lo dice el concepto). -->
+                                <template
+                                  v-if="m.descripcion && m.origen === 'ajuste'"
+                                >
+                                  · {{ m.descripcion }}</template
+                                >
+                                <template v-if="m.actor">
+                                  ·
+                                  {{
+                                    $t("creditosFicha.por", { actor: m.actor })
+                                  }}</template
+                                ></span
+                              >
+                            </span>
+                            <span class="shrink-0 text-right tabular-nums">
+                              <span
+                                class="block font-semibold"
+                                :style="{
+                                  color:
+                                    m.unidades < 0
+                                      ? 'var(--error)'
+                                      : 'var(--exito)',
+                                }"
+                                >{{ m.unidades > 0 ? "+" : ""
+                                }}{{ creditos(m.unidades) }}</span
+                              >
+                              <span :style="{ color: 'var(--texto-suave)' }">{{
+                                $t("creditosFicha.saldo", {
+                                  n: creditos(m.saldo_posterior),
+                                })
+                              }}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </li>
+                    </template>
+                  </ul>
+                  <button
+                    v-if="derechosHistorial.length > 0"
+                    type="button"
+                    class="tu-enlace mt-2 text-sm"
+                    :aria-expanded="verHistorial"
+                    data-prueba="ver-historial-planes"
+                    @click="verHistorial = !verHistorial"
+                  >
+                    {{
+                      verHistorial
+                        ? $t("ficha.derechos.ocultarHistorial")
+                        : $t("ficha.derechos.verHistorial", {
+                            n: derechosHistorial.length,
+                          })
+                    }}
+                  </button>
+                </template>
               </section>
 
               <!-- Historial de reservas -->
@@ -1034,5 +1111,17 @@ const regreso = useRegreso({
 .fi-dato dd {
   text-align: right;
   font-weight: 500;
+}
+/* Planes que ya no están vigentes (historial): atenuados, con su subtítulo. */
+.fi-subtitulo {
+  padding: 0.9rem 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+.fi-pasado {
+  opacity: 0.72;
 }
 </style>

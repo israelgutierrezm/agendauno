@@ -1010,6 +1010,13 @@ export default {
     derechos: {
       titulo: "Membresías y paquetes",
       vacio: "Sin membresías ni paquetes.",
+      // Saldo de lo vigente; lo vencido o cancelado es historial (aparte).
+      saldoVigente: "Saldo vigente: {creditos}",
+      saldoIlimitado: "Saldo vigente: ilimitado",
+      sinVigente: "Sin membresía ni paquete vigente.",
+      historial: "Historial",
+      verHistorial: "Ver historial ({n})",
+      ocultarHistorial: "Ocultar historial",
       ilimitado: "Ilimitado",
       disponible: "1 disponible | {n} disponibles",
       vence: "Vence {fecha}",

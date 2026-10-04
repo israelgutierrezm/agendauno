@@ -222,6 +222,49 @@ void main() {
     expect(find.text('Pase de entrada'), findsNothing);
   });
 
+  testWidgets(
+    'Mis créditos suma solo lo vigente: un paquete vencido no cuenta',
+    (tester) async {
+      await _montar(tester, const CuentaScreen(), [
+        sesionInicialProvider.overrideWithValue(
+          const Sesion(
+            slug: 'demo',
+            bearer: 't',
+            nombre: 'Vale',
+            rol: 'miembro',
+          ),
+        ),
+        cuentaProvider.overrideWith(
+          () => _CuentaFalsa(
+            const MiCuenta(
+              derechos: [
+                DerechoMiembro(
+                  ilimitado: false,
+                  id: 'd1',
+                  disponible: 6000,
+                  vence: '2099-11-14',
+                ),
+                DerechoMiembro(
+                  ilimitado: false,
+                  id: 'vencido',
+                  disponible: 4000,
+                  vence: '2020-01-31',
+                ),
+              ],
+              reservas: [],
+              clases: [],
+            ),
+          ),
+        ),
+        climaProvider.overrideWith((ref) async => null),
+        cortePlanesProvider.overrideWith((ref) async => const []),
+      ]);
+
+      expect(find.text('6 créditos · vence el 14 nov'), findsOneWidget);
+      expect(find.textContaining('10 créditos'), findsNothing);
+    },
+  );
+
   testWidgets('al agendar, el servicio de su bono dice que no se paga', (
     tester,
   ) async {

@@ -42,8 +42,10 @@ class InicioTab extends ConsumerWidget {
     final disponibles = clasesDisponibles(cuenta).length;
     final firmar = cuenta.consentimientos.length;
     final pagar = cuenta.porPagar.length;
-    final creditos = _creditos(cuenta.derechos);
-    final vence = _vencimiento(cuenta.derechos);
+    // Lo vigente (no vencido) suma; lo vencido es historial (Pagos › Mis planes).
+    final vigentes = _vigentes(cuenta.derechos);
+    final creditos = _creditos(vigentes);
+    final vence = _vencimiento(vigentes);
     final clima = ref.watch(climaProvider).value;
     final esCitas = sesion?.esCitas ?? false;
     final usa = cuenta.portal;
@@ -293,6 +295,14 @@ class InicioTab extends ConsumerWidget {
         ? [reservas, reservar, pagos, plan, expediente, pase]
         : [reservar, reservas, plan, asistencia, pagos, pase, expediente],
   ].whereType<TarjetaAcceso>().toList();
+
+  /// Sus planes que no han vencido (los vencidos no suman a su saldo).
+  static List<DerechoMiembro> _vigentes(List<DerechoMiembro> derechos) {
+    final hoy = Formato.iso(DateTime.now());
+    return derechos
+        .where((d) => d.vence == null || d.vence!.compareTo(hoy) >= 0)
+        .toList();
+  }
 
   /// Lo que antes vence de su plan (AAAA-MM-DD), si vence.
   static String? _vencimiento(List<DerechoMiembro> derechos) {

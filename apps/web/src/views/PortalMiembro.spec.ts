@@ -188,6 +188,36 @@ describe("portal del alumno", () => {
     expect(posiciones).toEqual([...posiciones].sort((a, b) => a - b));
   });
 
+  it("Mis créditos suma solo lo vigente: un paquete vencido no cuenta", async () => {
+    const perfil = datos["/mi/perfil"] as { derechos: object[] };
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      const cuerpo =
+        ruta === "/mi/perfil"
+          ? {
+              ...perfil,
+              derechos: [
+                { ...(perfil.derechos[0] as object), vence: "2030-01-31" },
+                {
+                  ...(perfil.derechos[0] as object),
+                  id: "vencido",
+                  disponible: 4000,
+                  vence: "2020-01-31",
+                },
+              ],
+              portal: { creditos: true, pase: false, expediente: true },
+            }
+          : (datos[ruta] ?? []);
+      return Promise.resolve({ data: { data: cuerpo } });
+    });
+    const w = montar(MiCuentaView);
+    await flushPromises();
+
+    // 6 del vigente; los 4 del vencido no cuentan ni su fecha.
+    expect(w.text()).toContain("6 créditos · vence el 31 ene");
+    expect(w.text()).not.toContain("10 créditos");
+  });
+
   it("en citas: cómo llegar, cambiar o cancelar, volver a agendar; sin «Sin paquete» ni pase", async () => {
     sesion.esCitas = true;
     const perfil = datos["/mi/perfil"] as { reservas: object[] };

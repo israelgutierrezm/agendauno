@@ -70,9 +70,22 @@ const climaLugar = computed(() =>
   lugarDelClima(clima.value, t, proxima.value?.tipo),
 );
 
+// Lo vigente: lo que no ha vencido. Lo vencido es historial (está en Pagos › Mis
+// planes) y no suma al saldo.
+function hoyLocal(): string {
+  const d = new Date();
+  const dos = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+}
+const vigentes = computed(() =>
+  cuenta.derechos.value.filter(
+    (d) => !d.vence || d.vence.slice(0, 10) >= hoyLocal(),
+  ),
+);
+
 // Créditos de lo vigente: ilimitado o la suma disponible (1000 unidades = 1).
 const creditos = computed<{ ilimitado: boolean; n: number } | null>(() => {
-  const d = cuenta.derechos.value;
+  const d = vigentes.value;
   if (d.length === 0) {
     return null;
   }
@@ -85,9 +98,9 @@ const creditos = computed<{ ilimitado: boolean; n: number } | null>(() => {
   };
 });
 
-// Vence lo que antes se acaba de su plan (si vence).
+// Vence lo que antes se acaba de su plan vigente (si vence).
 const vencimiento = computed(() => {
-  const fechas = cuenta.derechos.value
+  const fechas = vigentes.value
     .map((d) => d.vence)
     .filter((f): f is string => typeof f === "string")
     .sort();
