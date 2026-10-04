@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
@@ -37,6 +38,53 @@ const cargando = ref(true);
 const error = ref<string | null>(null);
 const aviso = ref<string | null>(null);
 const promoviendo = ref<string | null>(null);
+const busqueda = ref("");
+const sucursal = ref("");
+const instructor = ref("");
+const soloEspera = ref(false);
+const pagina = ref(1);
+const porPagina = 20;
+const sucursales = computed(() =>
+  [
+    ...new Set(
+      oportunidades.value
+        .map((o) => o.sucursal)
+        .filter((n): n is string => !!n),
+    ),
+  ].sort(),
+);
+const instructores = computed(() =>
+  [
+    ...new Set(
+      oportunidades.value
+        .map((o) => o.instructor)
+        .filter((n): n is string => !!n),
+    ),
+  ].sort(),
+);
+const filtradas = computed(() => {
+  const q = busqueda.value.trim().toLocaleLowerCase("es-MX");
+  return oportunidades.value.filter(
+    (o) =>
+      (!sucursal.value || o.sucursal === sucursal.value) &&
+      (!instructor.value || o.instructor === instructor.value) &&
+      (!soloEspera.value || o.en_espera > 0) &&
+      (!q ||
+        `${o.oferta ?? ""} ${o.actividad ?? ""} ${o.sucursal ?? ""} ${o.instructor ?? ""}`
+          .toLocaleLowerCase("es-MX")
+          .includes(q)),
+  );
+});
+const ultimaPagina = computed(() =>
+  Math.max(1, Math.ceil(filtradas.value.length / porPagina)),
+);
+const visibles = computed(() =>
+  filtradas.value.slice(
+    (pagina.value - 1) * porPagina,
+    pagina.value * porPagina,
+  ),
+);
+let solicitud = 0;
 
 function fechaHora(iso: string, zona: string | null): string {
   return new Intl.DateTimeFormat("es-MX", {
@@ -50,6 +98,7 @@ function fechaHora(iso: string, zona: string | null): string {
 }
 
 async function cargar(): Promise<void> {
+  const actual = ++solicitud;
   cargando.value = true;
   error.value = null;
   try {
@@ -59,11 +108,13 @@ async function cargar(): Promise<void> {
         params: { dias: dias.value },
       },
     );
+    if (actual !== solicitud) return;
     oportunidades.value = data.data;
+    pagina.value = Math.min(pagina.value, ultimaPagina.value);
   } catch (e) {
-    error.value = mensajeDeError(e);
+    if (actual === solicitud) error.value = mensajeDeError(e);
   } finally {
-    cargando.value = false;
+    if (actual === solicitud) cargando.value = false;
   }
 }
 
@@ -98,7 +149,7 @@ async function promover(o: Oportunidad): Promise<void> {
 
 // Indicadores del horizonte elegido (patrón de los listados).
 const indicadores = computed<Indicador[]>(() => {
-  const lista = oportunidades.value;
+  const lista = filtradas.value;
   const conPct = lista.filter((o) => o.ocupacion_pct !== null);
   return [
     {
@@ -133,6 +184,9 @@ const indicadores = computed<Indicador[]>(() => {
 });
 
 watch(dias, cargar);
+watch([busqueda, sucursal, instructor, soloEspera], () => {
+  pagina.value = 1;
+});
 onMounted(cargar);
 </script>
 
@@ -162,6 +216,37 @@ onMounted(cargar);
 
       <div class="tu-card mt-5 overflow-x-auto">
         <div class="tu-filtros">
+          <input
+            v-model="busqueda"
+            class="tu-input"
+            type="search"
+            placeholder="Buscar clase, sede o instructor"
+            aria-label="Buscar lugares disponibles"
+          />
+          <select
+            v-if="sucursales.length > 1"
+            v-model="sucursal"
+            class="tu-input"
+            aria-label="Filtrar por sucursal"
+          >
+            <option value="">{{ $t("sucursalOperativa.todas") }}</option>
+            <option v-for="s in sucursales" :key="s" :value="s">{{ s }}</option>
+          </select>
+          <select
+            v-if="instructores.length > 1"
+            v-model="instructor"
+            class="tu-input"
+            aria-label="Filtrar por instructor"
+          >
+            <option value="">Todos los instructores</option>
+            <option v-for="i in instructores" :key="i" :value="i">
+              {{ i }}
+            </option>
+          </select>
+          <label class="flex items-center gap-2 text-sm"
+            ><input v-model="soloEspera" type="checkbox" />Con lista de
+            espera</label
+          >
           <span class="text-sm" :style="{ color: 'var(--texto-suave)' }">{{
             $t("oportunidades.horizonte")
           }}</span>
@@ -178,7 +263,7 @@ onMounted(cargar);
             </button>
           </div>
         </div>
-        <p v-if="oportunidades.length === 0" class="tu-sin-resultados">
+        <p v-if="filtradas.length === 0" class="tu-sin-resultados">
           {{ $t("oportunidades.vacio") }}
         </p>
         <table v-else class="tu-tabla">
@@ -202,11 +287,7 @@ onMounted(cargar);
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="o in oportunidades"
-              :key="o.id"
-              data-prueba="oportunidad"
-            >
+            <tr v-for="o in visibles" :key="o.id" data-prueba="oportunidad">
               <td>
                 <span class="font-medium">{{
                   o.oferta ?? o.actividad ?? "—"
@@ -259,6 +340,13 @@ onMounted(cargar);
             </tr>
           </tbody>
         </table>
+        <PaginacionListado
+          :page="pagina"
+          :ultima-pagina="ultimaPagina"
+          :total="filtradas.length"
+          :per-page="porPagina"
+          @ir="pagina = $event"
+        />
       </div>
     </template>
   </section>

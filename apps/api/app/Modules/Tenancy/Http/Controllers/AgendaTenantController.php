@@ -359,7 +359,7 @@ class AgendaTenantController
         }
 
         // Solo las que de verdad tienen lugares libres (cupo - ocupados > 0).
-        $oportunidades = $consulta->limit(self::LIMITE)->get()
+        $oportunidades = $consulta->get()
             ->filter(fn (SesionTenant $s): bool => (int) $s->capacidad - (int) $s->getAttribute('ocupados') > 0)
             ->map(fn (SesionTenant $s): array => $this->presentarOportunidad($s))
             ->values()
