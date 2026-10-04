@@ -94,18 +94,23 @@ function fecha(iso: string | null): string {
   });
 }
 
+// «mias»: sin permiso para las del equipo, solo ve y atiende las suyas.
+const alcance = ref<"mias" | "equipo">("equipo");
+
 async function cargarTareas(): Promise<void> {
   cargandoTareas.value = true;
   error.value = null;
   try {
-    const { data } = await api.get<{ data: Tarea[]; pendientes: number }>(
-      `${base.value}/tareas`,
-      {
-        params: { estado: estadoFiltro.value },
-      },
-    );
+    const { data } = await api.get<{
+      data: Tarea[];
+      pendientes: number;
+      alcance?: "mias" | "equipo";
+    }>(`${base.value}/tareas`, {
+      params: { estado: estadoFiltro.value },
+    });
     tareas.value = data.data;
     pendientes.value = data.pendientes;
+    alcance.value = data.alcance ?? "equipo";
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -313,7 +318,11 @@ onMounted(cargarTareas);
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t('tareas.titulo')" />
+    <EncabezadoSeccion
+      :titulo="
+        alcance === 'mias' ? $t('tareas.tituloMias') : $t('tareas.titulo')
+      "
+    />
 
     <!-- Pestañas (las del sistema) -->
     <div class="tu-pestanas mt-6" role="tablist">

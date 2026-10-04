@@ -121,7 +121,11 @@ export default {
         eliminar: "Dar de baja al equipo",
       },
       roles: { gestionar: "Crear y editar roles" },
-      tareas: { ver: "Ver tareas", gestionar: "Crear y asignar tareas" },
+      tareas: {
+        ver: "Ver tareas",
+        gestionar: "Crear y asignar tareas",
+        equipo: "Ver y atender las tareas de todo el equipo",
+      },
       comunicaciones: {
         ver: "Ver comunicaciones",
         gestionar: "Enviar avisos y campañas",

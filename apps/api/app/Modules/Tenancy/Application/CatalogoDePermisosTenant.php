@@ -32,7 +32,7 @@ class CatalogoDePermisosTenant
                 'ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar',
                 'facturacion.ver', 'usuarios.invitar', 'usuarios.gestionar', 'usuarios.eliminar', 'auditoria.ver',
                 'comunicaciones.gestionar', 'comunicaciones.ver', 'comunicaciones.eliminar',
-                'automatizaciones.gestionar', 'automatizaciones.eliminar', 'tareas.ver', 'tareas.gestionar',
+                'automatizaciones.gestionar', 'automatizaciones.eliminar', 'tareas.ver', 'tareas.gestionar', 'tareas.equipo',
                 'promociones.gestionar', 'promociones.eliminar',
                 'lealtad.ver', 'lealtad.gestionar',
                 'inventario.ver', 'inventario.gestionar', 'pos.vender',
@@ -43,7 +43,9 @@ class CatalogoDePermisosTenant
                 'productos.ver', 'membresias.gestionar', 'creditos.gestionar', 'derechos.ver',
                 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar',
                 'ordenes.ver', 'ordenes.gestionar', 'comunicaciones.ver',
-                'tareas.ver', 'tareas.gestionar',
+                // Recepción atiende los seguimientos de todos (las tareas automáticas no
+                // tienen responsable).
+                'tareas.ver', 'tareas.gestionar', 'tareas.equipo',
                 'lealtad.ver', 'lealtad.gestionar',
                 'inventario.ver', 'inventario.gestionar', 'pos.vender',
             ],
@@ -74,7 +76,7 @@ class CatalogoDePermisosTenant
             'membresias' => ['catalogo.ver', 'catalogo.gestionar', 'productos.ver', 'productos.gestionar', 'productos.eliminar', 'membresias.gestionar', 'creditos.gestionar', 'promociones.gestionar', 'promociones.eliminar'],
             'cobros' => ['ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'facturacion.ver'],
             'punto_venta' => ['pos.vender', 'inventario.ver', 'inventario.gestionar'],
-            'equipo' => ['usuarios.invitar', 'usuarios.gestionar', 'usuarios.eliminar', 'roles.gestionar', 'tareas.ver', 'tareas.gestionar'],
+            'equipo' => ['usuarios.invitar', 'usuarios.gestionar', 'usuarios.eliminar', 'roles.gestionar', 'tareas.ver', 'tareas.gestionar', 'tareas.equipo'],
             'marketing' => ['comunicaciones.ver', 'comunicaciones.gestionar', 'comunicaciones.eliminar', 'automatizaciones.gestionar', 'automatizaciones.eliminar', 'lealtad.ver', 'lealtad.gestionar'],
             'negocio' => ['estudio.gestionar', 'sucursales.ver', 'sucursales.gestionar', 'organizaciones.ver', 'organizaciones.gestionar', 'integraciones.configurar', 'pagos.configurar', 'auditoria.ver'],
         ];
@@ -130,6 +132,7 @@ class CatalogoDePermisosTenant
             'usuarios.gestionar' => ['usuarios.invitar', 'sucursales.ver', 'miembros.ver'],
             'usuarios.eliminar' => ['usuarios.gestionar', 'usuarios.invitar', 'sucursales.ver', 'miembros.ver'],
             'tareas.gestionar' => ['tareas.ver'],
+            'tareas.equipo' => ['tareas.ver', 'tareas.gestionar'],
         ];
     }
 

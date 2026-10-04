@@ -1487,6 +1487,8 @@ export default {
   },
   tareas: {
     titulo: "Tareas",
+    // Sin permiso para las del equipo: solo las suyas.
+    tituloMias: "Mis tareas",
     tabPendientes: "Pendientes",
     tabReglas: "Automatización",
     nueva: "Nueva tarea",

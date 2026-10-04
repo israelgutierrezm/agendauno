@@ -17,6 +17,10 @@ use Illuminate\Support\Carbon;
  * Bandeja de tareas de seguimiento del estudio, tenant-local (R16): pendientes
  * accionables para el staff (manuales o generadas por automatización). Opera SIEMPRE
  * sobre la BD del estudio resuelto.
+ *
+ * Alcance: sin `tareas.equipo`, cada quien ve, completa y reabre solo SUS tareas
+ * (de las que es responsable); las del equipo y las automáticas sin responsable
+ * son de quien tiene ese permiso. Ocultarlas en la pantalla no bastaría.
  */
 class TareasTenantController
 {
@@ -26,7 +30,9 @@ class TareasTenantController
     {
         $estado = (string) $request->query('estado', EstadoTarea::Pendiente->value);
 
-        $consulta = TareaTenant::query()->with(['persona', 'responsable']);
+        $suyas = $this->soloDe($request);
+        $consulta = TareaTenant::query()->with(['persona', 'responsable'])
+            ->when($suyas !== null, fn ($q) => $q->where('responsable_id', $suyas));
         if (EstadoTarea::tryFrom($estado) !== null) {
             $consulta->where('estado', $estado);
         }
@@ -41,11 +47,15 @@ class TareasTenantController
             ->orderByDesc('id')
             ->get();
 
-        $pendientes = TareaTenant::query()->where('estado', EstadoTarea::Pendiente->value)->count();
+        $pendientes = TareaTenant::query()->where('estado', EstadoTarea::Pendiente->value)
+            ->when($suyas !== null, fn ($q) => $q->where('responsable_id', $suyas))
+            ->count();
 
         return response()->json([
             'data' => $tareas->map(fn (TareaTenant $t): array => $this->presentar($t))->all(),
             'pendientes' => $pendientes,
+            // «mias»: solo las suyas; «equipo»: las de todos.
+            'alcance' => $suyas !== null ? 'mias' : 'equipo',
         ]);
     }
 
@@ -92,7 +102,21 @@ class TareasTenantController
 
     private function resolver(Request $request): TareaTenant
     {
-        return TareaTenant::query()->where('ulid', (string) $request->route('tarea'))->firstOrFail();
+        $tarea = TareaTenant::query()->where('ulid', (string) $request->route('tarea'))->firstOrFail();
+        $suyas = $this->soloDe($request);
+        abort_if($suyas !== null && (int) $tarea->responsable_id !== $suyas, 403, 'Esta tarea es de otra persona del equipo.');
+
+        return $tarea;
+    }
+
+    /**
+     * Sin `tareas.equipo`, el id de quien pide (solo sus tareas); con él, null.
+     */
+    private function soloDe(Request $request): ?int
+    {
+        $actor = $this->actor($request);
+
+        return $actor !== null && ! $actor->puede('tareas.equipo') ? (int) $actor->getKey() : null;
     }
 
     private function actor(Request $request): ?Usuario
