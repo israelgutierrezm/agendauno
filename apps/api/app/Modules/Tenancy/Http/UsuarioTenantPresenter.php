@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\CatalogoTemas;
+use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 
@@ -23,6 +24,8 @@ class UsuarioTenantPresenter
     {
         $roles = $usuario->rolesEfectivos();
         $catalogo = app(RolesTenant::class);
+        // Su ficha de cliente o alumno (si la tiene): de ahí sale su celular.
+        $ficha = PersonaTenant::query()->where('usuario_id', $usuario->getKey())->first(['id', 'celular']);
 
         return [
             'ulid' => $usuario->ulid,
@@ -39,6 +42,10 @@ class UsuarioTenantPresenter
                 ? $usuario->email_nuevo
                 : null,
             'foto_url' => $usuario->fotoUrl(),
+            // Su celular, para avisos y WhatsApp (lo edita en «Mi perfil»). Sin ficha
+            // (personal que no es cliente) no hay celular que editar.
+            'tiene_ficha' => $ficha instanceof PersonaTenant,
+            'celular' => $ficha?->celular,
             // ¿Ya tiene contraseña? (quien entra solo con Google aún no).
             'tiene_contrasena' => $usuario->password !== null && $usuario->password !== '',
             // ¿Conectó Google para entrar con él? (ADR 0093: se conecta desde el perfil).

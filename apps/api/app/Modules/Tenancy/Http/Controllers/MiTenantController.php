@@ -19,6 +19,7 @@ use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\PortalDelClienteTenant;
 use App\Modules\Tenancy\Application\PresentarMovimientosCreditoTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
+use App\Modules\Tenancy\Application\ResolverDerechoTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
@@ -130,7 +131,12 @@ class MiTenantController
         ]], 201);
     }
 
-    public function perfil(Request $request): JsonResponse
+    /**
+     * Su cuenta: sus planes con su estado EFECTIVO (vigente, por empezar, en pausa,
+     * suspendido, vencido…: el Inicio no lo deduce solo por el vencimiento), sus
+     * próximas reservas, la política de cancelación y qué partes de su cuenta usa.
+     */
+    public function perfil(Request $request, CorteDePlanesTenant $corte): JsonResponse
     {
         $persona = $this->persona($request);
 
@@ -138,21 +144,29 @@ class MiTenantController
             return response()->json(['data' => ['persona' => null, 'derechos' => [], 'reservas' => []]]);
         }
 
+        $hoy = $corte->hoy();
         $derechos = DerechoTenant::query()
             ->whereHas('acuerdo', fn ($q) => $q->where('persona_id', $persona->getKey()))
             ->with(['acuerdo.producto', 'acuerdo.pausaAbierta'])
             ->get()
-            ->map(fn (DerechoTenant $d): array => [
-                'id' => $d->ulid,
-                'producto' => $d->acuerdo?->producto?->nombre,
-                ...$d->coberturaSucursales(),
-                'pausa_hasta' => $d->acuerdo?->pausaAbierta?->hasta->toDateString(),
-                'ilimitado' => $d->ilimitado,
-                'saldo' => $d->ilimitado ? null : $this->libro->saldo($d),
-                'disponible' => $d->ilimitado ? null : $this->libro->disponible($d),
-                // Hasta cuándo se puede usar (null = no vence).
-                'vence' => $d->valido_hasta?->toDateString(),
-            ])->all();
+            ->map(function (DerechoTenant $d) use ($corte, $hoy): array {
+                $saldo = $d->ilimitado ? null : $this->libro->saldo($d);
+                $disponible = $d->ilimitado ? null : $this->libro->disponible($d);
+
+                return [
+                    'id' => $d->ulid,
+                    'producto' => $d->acuerdo?->producto?->nombre,
+                    ...$d->coberturaSucursales(),
+                    'pausa_hasta' => $d->acuerdo?->pausaAbierta?->hasta->toDateString(),
+                    'ilimitado' => $d->ilimitado,
+                    'saldo' => $saldo,
+                    'disponible' => $disponible,
+                    'estado' => $corte->estadoEfectivo($d, $hoy, (int) $disponible, (int) $saldo - (int) $disponible),
+                    // Desde y hasta cuándo se puede usar (null = desde ya / no vence).
+                    'desde' => $d->valido_desde?->toDateString(),
+                    'vence' => $d->valido_hasta?->toDateString(),
+                ];
+            })->all();
 
         $reservas = ReservaTenant::query()
             ->where('persona_id', $persona->getKey())
@@ -213,8 +227,12 @@ class MiTenantController
      * N clases del negocio eran de otras fechas o sedes. La sucursal se filtra en la
      * consulta (antes del tope); si aun así se llena el tope, `meta.truncado` lo dice.
      * Sin fechas: desde hoy y 30 días (lo que ve la lista).
+     *
+     * Cada clase dice si su plan la cubre (`cobertura`: incluida, solo con membresía,
+     * no incluida y por qué, o de pago por clase), con la misma regla que al
+     * reservar: la persona lo ve antes de intentarlo.
      */
-    public function agenda(Request $request): JsonResponse
+    public function agenda(Request $request, ResolverDerechoTenant $resolver): JsonResponse
     {
         $validado = $request->validate([
             'desde' => ['nullable', 'date_format:Y-m-d'],
@@ -247,7 +265,7 @@ class MiTenantController
             ->where('inicia_en', '>=', $inicio->greaterThan($ahora) ? $inicio : $ahora)
             ->where('inicia_en', '<', $hasta->addDays(2)->startOfDay())
             ->when($sucursalId !== null, fn ($q) => $q->where('sucursal_id', $sucursalId))
-            ->with(['oferta', 'sucursal', 'instructor'])
+            ->with(['oferta.actividad', 'sucursal', 'instructor'])
             // Cupo ocupado = reservas que toman lugar (confirmadas, ofrecidas y
             // pendientes de pago, que retienen el cupo mientras se pagan).
             ->withCount(['reservas as ocupados' => fn ($q) => $q->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::PendientePago->value])])
@@ -262,18 +280,30 @@ class MiTenantController
             return $dia >= $desde->toDateString() && $dia <= $hasta->toDateString();
         });
 
+        // Qué le cubre su plan (sin perfil de miembro, no se dice).
+        $persona = $this->persona($request);
+        $cobertura = $persona instanceof PersonaTenant
+            ? $resolver->coberturaDeSesiones($persona, $enPeriodo, ReservasTenant::UNIDADES_POR_SESION)
+            : [];
+
         return response()->json([
             'data' => $enPeriodo->map(fn (SesionTenant $s): array => [
                 'id' => $s->ulid,
                 'oferta' => $s->oferta?->nombre,
+                // Para filtrar por clase, actividad e instructor.
+                'oferta_id' => $s->oferta?->ulid,
+                'actividad' => $s->oferta?->actividad?->nombre,
+                'actividad_id' => $s->oferta?->actividad?->ulid,
                 'sucursal' => $s->sucursal?->nombre,
                 'sucursal_id' => $s->sucursal?->ulid,
                 'inicia_en' => $s->inicia_en->toIso8601String(),
                 'termina_en' => $s->termina_en->toIso8601String(),
                 'instructor' => $s->instructor?->name,
+                'instructor_id' => $s->instructor?->ulid,
                 'zona_horaria' => $s->zona_horaria,
                 'capacidad' => $s->capacidad,
                 'ocupados' => (int) ($s->getAttribute('ocupados') ?? 0),
+                'cobertura' => $this->coberturaDe($s, $cobertura),
             ])->values()->all(),
             'meta' => [
                 'desde' => $desde->toDateString(),
@@ -284,6 +314,21 @@ class MiTenantController
                     ->map(fn (SucursalTenant $x): array => ['id' => $x->ulid, 'nombre' => $x->nombre])->all(),
             ],
         ]);
+    }
+
+    /**
+     * Cómo entra a esa clase: de pago por clase (con su precio) o con su plan.
+     *
+     * @param  array<int, array{estado: string, motivo: string|null}>  $cobertura
+     * @return array{estado: string, motivo: string|null, precio_minor?: int, moneda?: string}|null
+     */
+    private function coberturaDe(SesionTenant $sesion, array $cobertura): ?array
+    {
+        if ($sesion->oferta?->politica_reserva === PoliticaReservaTenant::Pago) {
+            return ['estado' => 'de_pago', 'motivo' => null, 'precio_minor' => (int) $sesion->oferta->precio_clase_minor, 'moneda' => 'MXN'];
+        }
+
+        return $cobertura[(int) $sesion->getKey()] ?? null;
     }
 
     public function reservar(Request $request): JsonResponse
@@ -607,9 +652,44 @@ class MiTenantController
     }
 
     /**
-     * Historial de compras del alumno (sus órdenes), para ver pagos/estado.
+     * Historial de compras del alumno (sus órdenes), paginado. Con
+     * `excluir_pendientes`, solo lo pagado, cancelado o devuelto: lo que debe se pide
+     * aparte (`ordenesPendientes`), completo.
      */
     public function ordenes(Request $request): JsonResponse
+    {
+        $persona = $this->persona($request);
+        if (! $persona instanceof PersonaTenant) {
+            return response()->json(['data' => [], 'meta' => ['page' => 1, 'ultima_pagina' => 1, 'total' => 0, 'per_page' => 50]]);
+        }
+        $filtros = $request->validate([
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'between:1,50'],
+            'excluir_pendientes' => ['sometimes', 'boolean'],
+        ]);
+
+        $consulta = OrdenTenant::query()
+            ->where('persona_id', $persona->getKey())
+            ->when($request->boolean('excluir_pendientes'), fn ($q) => $q->where('estado', '!=', EstadoOrden::Pendiente->value))
+            ->orderByDesc('id');
+        $porPagina = (int) ($filtros['per_page'] ?? 50);
+        $total = (clone $consulta)->count();
+        $ultima = max(1, (int) ceil($total / $porPagina));
+        $pagina = min((int) ($filtros['page'] ?? 1), $ultima);
+        $ordenes = $consulta->with(['lineas.producto', 'sesion.oferta', 'sesion.instructor', 'sesion.sucursal'])
+            ->forPage($pagina, $porPagina)->get();
+
+        return response()->json([
+            'data' => $ordenes->map(fn (OrdenTenant $o): array => $this->presentarOrden($o))->all(),
+            'meta' => ['page' => $pagina, 'ultima_pagina' => $ultima, 'total' => $total, 'per_page' => $porPagina],
+        ]);
+    }
+
+    /**
+     * Todo lo que tiene por pagar, sin tope: no sale de la primera página del
+     * historial, así un adeudo antiguo no deja de verse.
+     */
+    public function ordenesPendientes(Request $request): JsonResponse
     {
         $persona = $this->persona($request);
         if (! $persona instanceof PersonaTenant) {
@@ -618,9 +698,9 @@ class MiTenantController
 
         $ordenes = OrdenTenant::query()
             ->where('persona_id', $persona->getKey())
-            ->with('lineas.producto')
+            ->where('estado', EstadoOrden::Pendiente->value)
+            ->with(['lineas.producto', 'sesion.oferta', 'sesion.instructor', 'sesion.sucursal'])
             ->orderByDesc('id')
-            ->limit(50)
             ->get();
 
         return response()->json([
@@ -725,10 +805,23 @@ class MiTenantController
      */
     private function presentarOrden(OrdenTenant $orden): array
     {
-        $orden->loadMissing('lineas.producto');
+        $orden->loadMissing(['lineas.producto', 'sesion.oferta', 'sesion.instructor', 'sesion.sucursal']);
+        $sesion = $orden->sesion;
+        $productos = $orden->lineas->map(static fn (LineaOrdenTenant $l): ?string => $l->producto?->nombre)->filter()->values();
 
         return [
             'id' => $orden->ulid,
+            // Qué se pagó, en una línea: sus productos o, si es una cita, el servicio.
+            'concepto' => $productos->isNotEmpty() ? $productos->implode(', ') : $sesion?->oferta?->nombre,
+            // Si es el pago de una cita o clase: cuál, con quién, cuándo y dónde.
+            'sesion' => $sesion instanceof SesionTenant ? [
+                'tipo' => $sesion->tipo->value,
+                'servicio' => $sesion->oferta?->nombre,
+                'profesional' => $sesion->instructor?->name,
+                'inicia_en' => $sesion->inicia_en->toIso8601String(),
+                'zona_horaria' => $sesion->zona_horaria,
+                'sucursal' => $sesion->sucursal?->nombre,
+            ] : null,
             'estado' => $orden->estado->value,
             'total_minor' => $orden->total_minor,
             'descuento_minor' => (int) ($orden->descuento_minor ?? 0),

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CambiarCorreoTenant;
+use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Http\UsuarioTenantPresenter;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\TokenAccesoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
@@ -14,25 +16,42 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 /**
  * "Mi perfil": lo que cada usuario ajusta de sí mismo (cualquier rol, sin permiso
- * extra): nombre, foto, contraseña y correo (este último, confirmado por enlace).
+ * extra): nombre, celular (el de su ficha de cliente o alumno), foto, contraseña y
+ * correo (este último, confirmado por enlace).
  */
 class PerfilTenantController
 {
-    public function __construct(private readonly CambiarCorreoTenant $cambioCorreo) {}
+    public function __construct(
+        private readonly CambiarCorreoTenant $cambioCorreo,
+        private readonly PersonaDeUsuarioTenant $personas,
+    ) {}
 
     public function actualizar(Request $request): JsonResponse
     {
         $usuario = $this->usuario($request);
+        // El celular es de su ficha de cliente o alumno (para avisos y WhatsApp): sin
+        // ficha no hay celular que guardar.
+        $persona = $request->has('celular') ? $this->personas->buscar($usuario) : null;
         $validado = $request->validate([
             'nombre' => ['required', 'string', 'max:80'],
             'primer_apellido' => ['nullable', 'string', 'max:80'],
             'segundo_apellido' => ['nullable', 'string', 'max:80'],
+            'celular' => ['sometimes', 'nullable', 'string', 'max:30', 'regex:/^[0-9 +()-]*$/',
+                Rule::unique(PersonaTenant::class, 'celular')->whereNull('deleted_at')->ignore($persona?->getKey())],
+        ], [
+            'celular.regex' => 'Escribe el celular solo con números.',
+            'celular.unique' => 'Ese celular ya es de otra persona en este negocio.',
         ]);
+        if (array_key_exists('celular', $validado) && $persona instanceof PersonaTenant) {
+            $celular = trim((string) $validado['celular']);
+            $persona->update(['celular' => $celular !== '' ? $celular : null]);
+        }
 
         $partes = array_map(
             static fn (?string $parte): ?string => $parte !== null && trim($parte) !== '' ? trim($parte) : null,

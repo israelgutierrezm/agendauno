@@ -51,6 +51,7 @@ use App\Modules\Tenancy\Http\Controllers\MembresiasTenantController;
 use App\Modules\Tenancy\Http\Controllers\MensajesTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiDispositivosTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiembrosTenantController;
+use App\Modules\Tenancy\Http\Controllers\MiHistorialTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiPagoAutomaticoTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiPrivacidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiReprogramarTenantController;
@@ -278,6 +279,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/reservas/{reserva}/reprogramar', [MiReprogramarTenantController::class, 'opciones'])->name('mi.reservas.reprogramar.opciones');
             Route::post('/mi/reservas/{reserva}/reprogramar', [MiReprogramarTenantController::class, 'reprogramar'])->name('mi.reservas.reprogramar');
             Route::get('/mi/reservas/{reserva}/cancelacion', [MiTenantController::class, 'previsualizarCancelacion'])->name('mi.reservas.cancelacion');
+            // Historial de clases y citas (asistió, faltó, canceló, cambió) con su reseña.
+            Route::get('/mi/historial', MiHistorialTenantController::class)->name('mi.historial');
             Route::get('/mi/derechos/{derecho}/movimientos', [MiTenantController::class, 'movimientosDerecho'])->name('mi.derechos.movimientos');
             Route::get('/mi/planes', [MiTenantController::class, 'planes'])->name('mi.planes');
             Route::get('/mi/clima', [MiTenantController::class, 'clima'])->middleware('throttle:30,1')->name('mi.clima');
@@ -307,6 +310,8 @@ Route::prefix('v1')->group(function (): void {
             // línea desde su portal. El fulfillment (créditos) lo confirma el webhook.
             Route::get('/mi/productos', [MiTenantController::class, 'productos'])->name('mi.productos.index');
             Route::get('/mi/ordenes', [MiTenantController::class, 'ordenes'])->name('mi.ordenes.index');
+            // Todo lo que debe, aparte del historial paginado: un adeudo antiguo no se pierde.
+            Route::get('/mi/ordenes/pendientes', [MiTenantController::class, 'ordenesPendientes'])->name('mi.ordenes.pendientes');
             Route::post('/mi/ordenes', [MiTenantController::class, 'comprar'])->name('mi.ordenes.store');
             Route::post('/mi/ordenes/{orden}/cobrar', [MiTenantController::class, 'cobrar'])->name('mi.ordenes.cobrar');
             // Pago automático: qué membresías se cobran solas y con qué tarjeta; activar,

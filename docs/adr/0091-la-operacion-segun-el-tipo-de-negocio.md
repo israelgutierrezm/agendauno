@@ -129,3 +129,38 @@ del equipo usa los indicadores de cada tipo y, en citas, los espacios libres.
 - Un servicio no es «de pago» y «con bono» a la vez. Si un negocio vende el mismo
   corte suelto y en bono, hoy son dos servicios. Cobrar con el bono cuando el
   cliente lo tiene y, si no, con el precio, queda como mejora futura.
+
+## Ampliación: la cuenta dice lo que puede hacer antes de intentarlo (octubre de 2026)
+
+Una revisión del portal del miembro encontró que la cuenta dejaba descubrir las
+reglas al fallar (reservar una clase que su plan no incluye) o las deducía en la
+pantalla (el Inicio decidía si un plan estaba vigente solo por su vencimiento).
+Ahora el servidor lo dice y las pantallas solo lo muestran:
+
+- **Cobertura por clase.** `GET /mi/agenda` trae, por clase, `cobertura`:
+  `incluida`, `solo_membresia` (solo una membresía del catálogo la incluye),
+  `no_incluida` con su `motivo` (`sin_plan`, `clase`, `pausa`, `suspendido`,
+  `vigencia`, `sucursal`, `saldo`) o `de_pago` con su precio. La calcula
+  `ResolverDerechoTenant::coberturaDeSesiones` con la misma regla que al reservar
+  (plan activo, vigente el día de la clase, de esa actividad, clase y sucursal, con
+  saldo), leyendo los planes y su saldo una sola vez. Reservar sigue validando bajo
+  bloqueo: la cobertura informa, no autoriza.
+- **Estado efectivo del plan.** `GET /mi/perfil` trae el `estado` de cada derecho
+  (vigente, agotado, por empezar, en pausa, suspendido, vencido, cancelado) con la
+  misma regla del corte de planes (`CorteDePlanesTenant::estadoEfectivo`).
+- **Adeudos aparte.** `GET /mi/ordenes/pendientes` trae todo lo que debe, sin tope;
+  `GET /mi/ordenes` es el historial paginado (`excluir_pendientes` quita lo
+  pendiente). Antes los pendientes salían de las últimas 50 órdenes y uno antiguo
+  podía dejar de verse. Cada orden trae su `concepto` y, si es una cita, la
+  `sesion` (servicio, profesional, cuándo y dónde).
+- **Historial.** `GET /mi/historial` (paginado, con fechas del calendario del
+  negocio): lo que tomó, faltó o canceló (él o el negocio), si cambió de horario,
+  su reseña o si aún puede calificarla, y lo necesario para volver a reservar lo
+  mismo.
+- **Celular.** `PUT /yo/perfil` acepta `celular` cuando el usuario tiene ficha de
+  cliente o alumno (`tiene_ficha` en `/yo`); es único por negocio.
+
+En la web, Reservas se organiza por tarea (Reservar · Próximas · Historial, con
+filtros por actividad, instructor y sucursal) y Pagos por modalidad (en citas,
+primero lo que debe y el historial; los bonos solo si los tiene). La app sigue lo
+mismo.

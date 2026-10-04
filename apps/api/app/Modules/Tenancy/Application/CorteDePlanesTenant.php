@@ -45,9 +45,36 @@ class CorteDePlanesTenant
             ->limit(self::LIMITE)
             ->get();
 
-        $hoy = CarbonImmutable::now($this->membresias->zona())->toDateString();
+        $hoy = $this->hoy();
 
         return $planes->map(fn (DerechoTenant $plan): array => $this->corte($plan, $hoy))->values()->all();
+    }
+
+    /** La fecha de hoy en el calendario del negocio. */
+    public function hoy(): string
+    {
+        return CarbonImmutable::now($this->membresias->zona())->toDateString();
+    }
+
+    /**
+     * Estado efectivo de un plan (o de sus clases extra) en `$hoy`: cancelado, en
+     * pausa o suspendido (por su acuerdo), por empezar, vencido, agotado o vigente.
+     * Lo usan el corte y el resumen del Inicio, para que no lo deduzca cada pantalla
+     * solo por el vencimiento.
+     */
+    public function estadoEfectivo(DerechoTenant $plan, string $hoy, int $disponibles, int $apartadas): string
+    {
+        $estadoAcuerdo = $plan->acuerdo?->estado;
+
+        return match (true) {
+            $estadoAcuerdo === EstadoAcuerdo::Cancelado => 'cancelado',
+            $estadoAcuerdo === EstadoAcuerdo::Pausado => 'pausado',
+            $estadoAcuerdo === EstadoAcuerdo::Suspendido => 'suspendido',
+            $plan->valido_desde !== null && $plan->valido_desde->toDateString() > $hoy => 'por_empezar',
+            $plan->valido_hasta !== null && $plan->valido_hasta->toDateString() < $hoy => 'vencido',
+            ! $plan->ilimitado && $disponibles <= 0 && $apartadas <= 0 => 'agotado',
+            default => 'vigente',
+        };
     }
 
     /**
@@ -87,7 +114,7 @@ class CorteDePlanesTenant
             'comprado' => $acuerdo?->fecha_inicio?->toDateString(),
             'desde' => $plan->valido_desde?->toDateString(),
             'hasta' => $plan->valido_hasta?->toDateString(),
-            'estado' => $this->estado($plan, $hoy, $unidades),
+            'estado' => $this->estadoEfectivo($plan, $hoy, $unidades['disponibles'], $unidades['apartadas']),
             'ilimitado' => $plan->ilimitado,
             'aplica_a' => $plan->ofertas->map(fn (OfertaTenant $o): string => (string) $o->nombre)->values()->all(),
             'unidades' => $unidades,
@@ -99,24 +126,6 @@ class CorteDePlanesTenant
             ])->values()->all(),
             'usos' => $this->usos($todos, $movimientos),
         ];
-    }
-
-    /**
-     * @param  array<string, int>  $unidades
-     */
-    private function estado(DerechoTenant $plan, string $hoy, array $unidades): string
-    {
-        $estadoAcuerdo = $plan->acuerdo?->estado;
-
-        return match (true) {
-            $estadoAcuerdo === EstadoAcuerdo::Cancelado => 'cancelado',
-            $estadoAcuerdo === EstadoAcuerdo::Pausado => 'pausado',
-            $estadoAcuerdo === EstadoAcuerdo::Suspendido => 'suspendido',
-            $plan->valido_desde !== null && $plan->valido_desde->toDateString() > $hoy => 'por_empezar',
-            $plan->valido_hasta !== null && $plan->valido_hasta->toDateString() < $hoy => 'vencido',
-            ! $plan->ilimitado && $unidades['disponibles'] <= 0 && $unidades['apartadas'] <= 0 => 'agotado',
-            default => 'vigente',
-        };
     }
 
     /**

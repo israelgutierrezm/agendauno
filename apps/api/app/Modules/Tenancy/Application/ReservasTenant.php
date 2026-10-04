@@ -48,7 +48,7 @@ use Illuminate\Support\Facades\DB;
 class ReservasTenant
 {
     // Costo por defecto de una sesion: 1 credito = 1000 unidades escaladas.
-    private const UNIDADES_POR_SESION = 1000;
+    public const UNIDADES_POR_SESION = 1000;
 
     // Reservas que ocupan (o esperan) un lugar.
     private const ACTIVAS = [

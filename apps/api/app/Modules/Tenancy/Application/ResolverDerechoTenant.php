@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
+use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 /**
  * Resuelve que derecho (entitlement) tenant-local de una persona cubre una sesion:
@@ -81,6 +84,95 @@ class ResolverDerechoTenant
         }
 
         return $cubiertas;
+    }
+
+    /**
+     * Qué puede reservar con lo que tiene, clase por clase, ANTES de intentarlo: la
+     * misma regla que al reservar (plan activo, vigente el día de la clase, de esa
+     * actividad, clase y sucursal, con saldo). Si no la cubre, el motivo (no tiene
+     * plan, su plan no incluye esa clase, está en pausa o suspendido, no está
+     * vigente ese día, no vale en esa sucursal o ya no le quedan clases) y si solo
+     * una membresía del catálogo la incluye. Los planes y su saldo se leen una vez.
+     *
+     * @param  iterable<SesionTenant>  $sesiones  con `oferta` cargada
+     * @return array<int, array{estado: string, motivo: string|null}> por id interno de la sesión
+     */
+    public function coberturaDeSesiones(PersonaTenant $persona, iterable $sesiones, int $unidades): array
+    {
+        // Lo que aún sirve o servirá: ni cancelado ni vencido.
+        $derechos = DerechoTenant::query()
+            ->whereHas('acuerdo', fn (Builder $q) => $q->where('persona_id', $persona->getKey())
+                ->where('estado', '!=', EstadoAcuerdo::Cancelado->value))
+            ->where(fn ($q) => $q->whereNull('valido_hasta')->orWhere('valido_hasta', '>=', now()->toDateString()))
+            ->with(['acuerdo', 'ofertas:id'])
+            ->get();
+        $saldo = $derechos->mapWithKeys(fn (DerechoTenant $d): array => [
+            (int) $d->getKey() => $d->ilimitado ? PHP_INT_MAX : $this->libro->disponible($d),
+        ]);
+        /** @var Collection<int, ProductoTenant>|null $catalogo */
+        $catalogo = null;
+
+        $cobertura = [];
+        foreach ($sesiones as $sesion) {
+            $motivo = $this->motivoSinCobertura($derechos, $saldo, $sesion, $unidades);
+            if ($motivo === null) {
+                $cobertura[(int) $sesion->getKey()] = ['estado' => 'incluida', 'motivo' => null];
+
+                continue;
+            }
+
+            // Su plan no incluye esa clase (o no tiene): ¿solo una membresía la incluye?
+            $soloMembresia = false;
+            if (in_array($motivo, ['sin_plan', 'clase'], true)) {
+                $catalogo ??= ProductoTenant::query()->where('archivado', false)
+                    ->where('tipo', '!=', TipoProducto::AddOn->value)->with('ofertas:id')->get();
+                $laIncluyen = $catalogo->filter(fn (ProductoTenant $p): bool => $this->productoCubre($p, $sesion));
+                $soloMembresia = $laIncluyen->isNotEmpty()
+                    && $laIncluyen->every(fn (ProductoTenant $p): bool => $p->tipo === TipoProducto::Membresia);
+            }
+            $cobertura[(int) $sesion->getKey()] = ['estado' => $soloMembresia ? 'solo_membresia' : 'no_incluida', 'motivo' => $motivo];
+        }
+
+        return $cobertura;
+    }
+
+    /**
+     * Null si algún plan cubre la sesión; si no, el primer motivo que lo impide.
+     *
+     * @param  Collection<int, DerechoTenant>  $derechos
+     * @param  Collection<int, int>  $saldo  disponible por id de derecho
+     */
+    private function motivoSinCobertura(Collection $derechos, Collection $saldo, SesionTenant $sesion, int $unidades): ?string
+    {
+        if ($derechos->isEmpty()) {
+            return 'sin_plan';
+        }
+        $deLaClase = $derechos->filter(fn (DerechoTenant $d): bool => $this->cubre($d, $sesion, false));
+        if ($deLaClase->isEmpty()) {
+            return 'clase';
+        }
+        $activos = $deLaClase->filter(fn (DerechoTenant $d): bool => $d->acuerdo?->estado === EstadoAcuerdo::Activo);
+        if ($activos->isEmpty()) {
+            return $deLaClase->contains(fn (DerechoTenant $d): bool => $d->acuerdo?->estado === EstadoAcuerdo::Suspendido) ? 'suspendido' : 'pausa';
+        }
+        $eseDia = $activos->filter(fn (DerechoTenant $d): bool => $this->vigente($d, $sesion->inicia_en));
+        if ($eseDia->isEmpty()) {
+            return 'vigencia';
+        }
+        $enLaSede = $eseDia->filter(fn (DerechoTenant $d): bool => $this->cubre($d, $sesion));
+        if ($enLaSede->isEmpty()) {
+            return 'sucursal';
+        }
+
+        return $enLaSede->contains(fn (DerechoTenant $d): bool => (int) $saldo->get((int) $d->getKey(), 0) >= $unidades) ? null : 'saldo';
+    }
+
+    /** ¿Un plan del catálogo incluye esta sesión (actividad, sucursal y clases)? */
+    private function productoCubre(ProductoTenant $producto, SesionTenant $sesion): bool
+    {
+        return ($producto->actividad_id === null || (int) $producto->actividad_id === (int) $sesion->oferta?->actividad_id)
+            && $producto->valeEnSucursal((int) $sesion->sucursal_id)
+            && ($producto->ofertas->isEmpty() || $producto->ofertas->contains('id', (int) $sesion->oferta_id));
     }
 
     /**

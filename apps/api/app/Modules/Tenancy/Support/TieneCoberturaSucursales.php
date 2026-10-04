@@ -19,4 +19,12 @@ trait TieneCoberturaSucursales
                 ->map(fn (SucursalTenant $s): array => ['id' => (string) $s->ulid, 'nombre' => (string) $s->nombre])->all(),
         ];
     }
+
+    /** ¿Vale en esa sucursal? (sin sucursales elegidas, en todas). */
+    public function valeEnSucursal(int $sucursalId): bool
+    {
+        $ids = $this->sucursales_ids ?? ($this->sucursal_id !== null ? [(int) $this->sucursal_id] : null);
+
+        return $ids === null || in_array($sucursalId, array_map(intval(...), $ids), true);
+    }
 }
