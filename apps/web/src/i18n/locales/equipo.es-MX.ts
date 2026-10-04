@@ -19,6 +19,13 @@ export const miPerfil = {
   fotoAyuda:
     "Así te ubican en la agenda y en el equipo. JPG, PNG o WebP de hasta 4 MB.",
   cambiarFoto: "Cambiar foto",
+  // Zona de la foto: arrastrar y soltar o clic.
+  fotoArrastra: "Arrastra tu foto aquí o haz clic para elegirla",
+  fotoSuelta: "Suelta la imagen para subirla",
+  fotoSubiendo: "Subiendo tu foto…",
+  fotoFormatos: "JPG, PNG o WebP de hasta 4 MB",
+  fotoTipo: "Elige una imagen JPG, PNG o WebP.",
+  fotoPeso: "La imagen pesa más de 4 MB.",
   subirFoto: "Subir foto",
   quitarFoto: "Quitar",
   datos: "Tus datos",

@@ -71,12 +71,36 @@ onMounted(() => {
 
 type Respuesta = { data: { usuario: UsuarioTenant } };
 
-// ---- Foto ----
+// ---- Foto: se arrastra sobre la zona o se elige con un clic ----
 const selectorFoto = ref<HTMLInputElement | null>(null);
 const subiendoFoto = ref(false);
+const arrastrandoFoto = ref(false);
+// Lo mismo que valida el servidor: JPG, PNG o WebP de hasta 4 MB.
+const TIPOS_FOTO = ["image/jpeg", "image/png", "image/webp"];
+const MAX_FOTO = 4 * 1024 * 1024;
+
+function elegirFoto(): void {
+  if (!subiendoFoto.value) {
+    selectorFoto.value?.click();
+  }
+}
+function alSoltarFoto(e: DragEvent): void {
+  arrastrandoFoto.value = false;
+  void subirFoto(e.dataTransfer?.files?.[0]);
+}
 async function alElegirFoto(e: Event): Promise<void> {
-  const archivo = (e.target as HTMLInputElement).files?.[0];
-  if (!archivo) {
+  await subirFoto((e.target as HTMLInputElement).files?.[0]);
+}
+async function subirFoto(archivo: File | undefined): Promise<void> {
+  if (!archivo || subiendoFoto.value) {
+    return;
+  }
+  if (!TIPOS_FOTO.includes(archivo.type)) {
+    toast.error(t("miPerfil.fotoTipo"));
+    return;
+  }
+  if (archivo.size > MAX_FOTO) {
+    toast.error(t("miPerfil.fotoPeso"));
     return;
   }
   subiendoFoto.value = true;
@@ -245,17 +269,50 @@ const aparienciaAbierta = ref(false);
           <p class="mp-ayuda">{{ $t("miPerfil.fotoAyuda") }}</p>
         </div>
         <div class="flex items-center gap-4">
-          <AvatarIniciales
-            :nombre="usuario.nombre"
-            :foto="usuario.foto_url"
-            tam="xl"
-          />
+          <!-- Zona de la foto: se suelta aquí una imagen o se hace clic para elegirla. -->
+          <div
+            class="mp-foto-zona"
+            :class="{
+              'mp-foto-zona-activa': arrastrandoFoto,
+              'mp-foto-zona-ocupada': subiendoFoto,
+            }"
+            role="button"
+            tabindex="0"
+            :aria-label="$t('miPerfil.fotoArrastra')"
+            :aria-busy="subiendoFoto"
+            data-prueba="zona-foto"
+            @click="elegirFoto"
+            @keydown.enter.prevent="elegirFoto"
+            @keydown.space.prevent="elegirFoto"
+            @dragenter.prevent="arrastrandoFoto = true"
+            @dragover.prevent="arrastrandoFoto = true"
+            @dragleave.prevent="arrastrandoFoto = false"
+            @drop.prevent="alSoltarFoto"
+          >
+            <AvatarIniciales
+              :nombre="usuario.nombre"
+              :foto="usuario.foto_url"
+              tam="xl"
+            />
+            <span class="mp-foto-texto">
+              <span class="block text-sm font-medium">{{
+                subiendoFoto
+                  ? $t("miPerfil.fotoSubiendo")
+                  : arrastrandoFoto
+                    ? $t("miPerfil.fotoSuelta")
+                    : $t("miPerfil.fotoArrastra")
+              }}</span>
+              <span class="mp-ayuda block">{{
+                $t("miPerfil.fotoFormatos")
+              }}</span>
+            </span>
+          </div>
           <div class="flex flex-wrap gap-2">
             <button
               type="button"
               class="tu-btn tu-btn-fantasma text-sm"
               :disabled="subiendoFoto"
-              @click="selectorFoto?.click()"
+              @click="elegirFoto"
             >
               {{
                 usuario.foto_url
@@ -626,5 +683,35 @@ const aparienciaAbierta = ref(false);
   margin-top: 0.25rem;
   font-size: 0.85rem;
   color: var(--texto-suave);
+}
+/* Zona de la foto: se arrastra una imagen encima o se hace clic para elegirla. */
+.mp-foto-zona {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem 0.75rem 0.75rem;
+  border: 1.5px dashed var(--borde);
+  border-radius: 1rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+.mp-foto-zona:hover,
+.mp-foto-zona:focus-visible {
+  border-color: color-mix(in srgb, var(--acento) 45%, var(--borde));
+  outline: none;
+}
+.mp-foto-zona-activa {
+  border-color: var(--acento);
+  background: color-mix(in srgb, var(--acento) 6%, var(--superficie));
+}
+.mp-foto-zona-ocupada {
+  cursor: progress;
+  opacity: 0.7;
+}
+.mp-foto-texto {
+  min-width: 0;
+  max-width: 14rem;
 }
 </style>

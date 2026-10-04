@@ -1,0 +1,122 @@
+import { flushPromises, mount } from "@vue/test-utils";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createI18n } from "vue-i18n";
+import { reactive } from "vue";
+
+import esMX from "@/i18n/locales/es-MX";
+import { miPerfil } from "@/i18n/locales/equipo.es-MX";
+import MiPerfilView from "./MiPerfilView.vue";
+
+/**
+ * La foto de Mi perfil se sube arrastrándola sobre su zona o con un clic para
+ * elegirla; se revisa el tipo y el peso antes de subirla. Datos sintéticos.
+ */
+const mocks = vi.hoisted(() => ({
+  post: vi.fn(),
+  error: vi.fn(),
+  actualizarUsuario: vi.fn(),
+}));
+vi.mock("@/lib/api", () => ({
+  api: { get: vi.fn(), post: mocks.post, put: vi.fn(), delete: vi.fn() },
+  mensajeDeError: () => "Error",
+}));
+const sesion = reactive({
+  slug: "demo",
+  usuario: {
+    rol: "instructor",
+    nombre: "Ana Demo",
+    nombre_pila: "Ana",
+    primer_apellido: "Demo",
+    email: "ana@example.test",
+    foto_url: null,
+    roles_disponibles: [{ clave: "instructor", faceta: "instructor" }],
+  },
+  actualizarUsuario: mocks.actualizarUsuario,
+});
+vi.mock("@/stores/sesionTenant", () => ({
+  useSesionTenantStore: () => sesion,
+}));
+vi.mock("@/stores/toast", () => ({
+  useToastStore: () => ({ exito: vi.fn(), error: mocks.error }),
+}));
+vi.mock("@/lib/google", () => ({
+  clientIdGoogle: () => undefined,
+  renderizarBotonGoogle: vi.fn(),
+}));
+
+function montar() {
+  return mount(MiPerfilView, {
+    global: {
+      plugins: [
+        createI18n({
+          legacy: false,
+          locale: "es",
+          messages: { es: { ...esMX, miPerfil } },
+          missingWarn: false,
+          fallbackWarn: false,
+        }),
+      ],
+      stubs: { PanelApariencia: true, MiPrivacidad: true },
+    },
+  });
+}
+
+function soltar(archivo: File) {
+  return { dataTransfer: { files: [archivo] } };
+}
+
+beforeEach(() => vi.clearAllMocks());
+
+describe("foto de Mi perfil", () => {
+  it("soltar una imagen sobre la zona la sube", async () => {
+    mocks.post.mockResolvedValue({
+      data: { data: { usuario: { ...sesion.usuario, foto_url: "/f.webp" } } },
+    });
+    const w = montar();
+    const zona = w.get('[data-prueba="zona-foto"]');
+    expect(zona.text()).toContain(miPerfil.fotoArrastra);
+
+    await zona.trigger("dragenter");
+    expect(zona.classes()).toContain("mp-foto-zona-activa");
+    expect(zona.text()).toContain(miPerfil.fotoSuelta);
+
+    const foto = new File(["x"], "yo.png", { type: "image/png" });
+    await zona.trigger("drop", soltar(foto));
+    await flushPromises();
+
+    expect(zona.classes()).not.toContain("mp-foto-zona-activa");
+    const [url, cuerpo] = mocks.post.mock.calls[0];
+    expect(url).toBe("/api/v1/app/demo/yo/foto");
+    expect((cuerpo as FormData).get("foto")).toBe(foto);
+    expect(mocks.actualizarUsuario).toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("un clic en la zona abre el selector de archivo", async () => {
+    const w = montar();
+    const entrada = w.get('input[type="file"]').element as HTMLInputElement;
+    const clic = vi.spyOn(entrada, "click");
+    await w.get('[data-prueba="zona-foto"]').trigger("click");
+    expect(clic).toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("no sube otro tipo de archivo ni una imagen de más de 4 MB", async () => {
+    const w = montar();
+    const zona = w.get('[data-prueba="zona-foto"]');
+
+    await zona.trigger(
+      "drop",
+      soltar(new File(["x"], "cv.pdf", { type: "application/pdf" })),
+    );
+    expect(mocks.error).toHaveBeenLastCalledWith(miPerfil.fotoTipo);
+
+    const grande = new File([new Uint8Array(4 * 1024 * 1024 + 1)], "g.jpg", {
+      type: "image/jpeg",
+    });
+    await zona.trigger("drop", soltar(grande));
+    expect(mocks.error).toHaveBeenLastCalledWith(miPerfil.fotoPeso);
+    expect(mocks.post).not.toHaveBeenCalled();
+    w.unmount();
+  });
+});
