@@ -70,7 +70,7 @@ onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+  <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('padron.titulo')" />
 
     <div class="mt-6 flex flex-wrap items-center gap-3">

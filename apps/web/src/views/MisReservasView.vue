@@ -408,7 +408,7 @@ onMounted(() => void cuenta.asegurar());
 </script>
 
 <template>
-  <section class="tu-pagina-cuenta">
+  <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('portal.reservas.titulo')" />
 
     <div class="tu-pestanas mt-4" role="tablist">

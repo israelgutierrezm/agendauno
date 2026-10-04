@@ -100,7 +100,7 @@ const eventoCalendario = computed(() =>
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 py-8">
+  <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('portal.instructor.calendario.titulo')" />
 
     <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">

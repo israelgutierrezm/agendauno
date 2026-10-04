@@ -338,7 +338,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="tu-pagina-cuenta">
+  <section class="tu-pagina">
     <h1 class="text-2xl font-semibold">
       {{
         nombre

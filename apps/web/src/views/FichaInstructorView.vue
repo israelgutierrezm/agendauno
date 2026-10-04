@@ -73,7 +73,7 @@ function fecha(iso: string | null): string {
 </script>
 
 <template>
-  <section class="mx-auto max-w-4xl px-4 py-8">
+  <section class="tu-pagina">
     <RouterLink :to="regreso.destino.value" class="tu-enlace text-sm"
       >← {{ regreso.etiqueta.value }}</RouterLink
     >

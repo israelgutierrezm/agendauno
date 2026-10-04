@@ -3,13 +3,21 @@
 /* Modo oscuro por clase en <html> (lo controla el store de tema). */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Un mismo contenedor en toda la cuenta, aprovechando el ancho del panel. */
+/*
+ * Un mismo contenedor de página para todos los roles (panel, portal del alumno o
+ * cliente y de quien imparte): el mismo ancho y los mismos márgenes, sin importar
+ * con qué rol se entra. El lienzo del panel le pone el ancho máximo (App.vue);
+ * Configuración usa el suyo, junto a su navegación.
+ */
+.tu-pagina,
 .tu-pagina-cuenta {
   width: 100%;
   min-width: 0;
+  margin-inline: auto;
   padding: 2rem 1rem;
 }
 @media (min-width: 640px) {
+  .tu-pagina,
   .tu-pagina-cuenta {
     padding-inline: 1.5rem;
   }

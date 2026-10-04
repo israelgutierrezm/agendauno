@@ -114,7 +114,7 @@ onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 py-8">
+  <section class="tu-pagina">
     <h1 class="text-2xl font-semibold">
       {{
         nombre

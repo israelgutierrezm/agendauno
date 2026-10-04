@@ -1647,7 +1647,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="px-4 sm:px-6 py-8">
+  <section class="tu-pagina">
     <div class="flex items-start justify-between gap-3 flex-wrap">
       <EncabezadoSeccion
         :titulo="$t('agenda.titulo')"

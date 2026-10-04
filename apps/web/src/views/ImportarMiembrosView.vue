@@ -116,7 +116,7 @@ function descargarPlantilla(): void {
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
+  <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('importar.titulo')" />
 
     <!-- Éxito -->

@@ -186,7 +186,7 @@ async function descargar() {
 </script>
 
 <template>
-  <section class="mx-auto max-w-6xl px-4 py-8 sm:px-6" :aria-busy="ocupado">
+  <section class="tu-pagina" :aria-busy="ocupado">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <EncabezadoSeccion
         :titulo="t('importarClases.titulo')"

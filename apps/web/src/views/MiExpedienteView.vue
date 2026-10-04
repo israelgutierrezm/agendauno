@@ -16,7 +16,7 @@ onMounted(() => void cuenta.asegurar());
 </script>
 
 <template>
-  <section class="tu-pagina-cuenta">
+  <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('portal.expediente.titulo')" />
 
     <p

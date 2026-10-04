@@ -304,7 +304,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
+  <section class="tu-pagina">
     <EncabezadoSeccion
       :titulo="$t('nomina.titulo')"
       :subtitulo="$t('nominaVisual.subtitulo')"

@@ -563,7 +563,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="mx-auto max-w-7xl px-4 py-8">
+  <section class="tu-pagina">
     <div class="flex items-start justify-between gap-3 flex-wrap">
       <EncabezadoSeccion
         :titulo="plural(sesion.terminologia.miembro)"

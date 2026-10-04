@@ -335,7 +335,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
+  <section class="tu-pagina">
     <div class="flex items-center justify-between gap-3 flex-wrap">
       <EncabezadoSeccion :titulo="$t('recepcion.titulo')" />
       <RouterLink class="tu-btn tu-btn-fantasma" :to="{ name: 'agenda' }">{{
