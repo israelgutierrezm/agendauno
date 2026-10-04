@@ -155,7 +155,14 @@ export default {
   },
   // Portal de quien imparte: su Inicio y su calendario (solo lo suyo).
   instructor: {
-    nav: { grupo: "Mis clases", inicio: "Inicio", calendario: "Mi calendario" },
+    nav: {
+      grupo: "Mi trabajo",
+      inicio: "Inicio",
+      calendario: "Mi calendario",
+      // Lo del panel que le sirve, con el nombre de lo suyo.
+      mis: "Mis {grupo}",
+      resenas: "Mis reseñas",
+    },
     inicio: {
       proxima: "Tu próxima clase",
       proximaCita: "Tu próxima cita",

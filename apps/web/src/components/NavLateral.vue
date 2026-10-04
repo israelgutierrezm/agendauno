@@ -24,6 +24,11 @@ const grupos = computed(() => menuVisible(sesion));
 const activa = computed(() => ubicacion(route)?.area.clave ?? null);
 
 function etiqueta(a: Area): string {
+  if (a.termino !== undefined && a.mio) {
+    return t("portal.instructor.nav.mis", {
+      grupo: plural(sesion.terminologia[a.termino]).toLowerCase(),
+    });
+  }
   return a.termino !== undefined
     ? plural(sesion.terminologia[a.termino])
     : t(a.etiqueta);

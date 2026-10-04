@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
-import { destinoDe, ubicacion, vistasVisibles, type Vista } from "@/lib/menu";
+import { destinoDe, ubicacion, vistasDeArea, type Vista } from "@/lib/menu";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -21,7 +21,7 @@ const sesion = useSesionTenantStore();
 
 const actual = computed(() => ubicacion(route));
 const vistas = computed(() =>
-  actual.value ? vistasVisibles(actual.value.area, sesion) : [],
+  actual.value ? vistasDeArea(actual.value.area, sesion) : [],
 );
 const mostrar = computed(
   () =>

@@ -239,11 +239,8 @@ describe("menú del negocio", () => {
     const instructor = sesion(["agenda.ver"], { rol: "instructor" });
     const alumno = sesion(["formularios.responder"], { rol: "miembro" });
 
-    expect(areas(instructor)).toEqual([
-      "inicio-instructor",
-      "mis-clases",
-      "agenda",
-    ]);
+    // La agenda del negocio ya es su calendario: no se repite.
+    expect(areas(instructor)).toEqual(["inicio-instructor", "mis-clases"]);
     expect(areas(alumno)).toEqual([
       "mi-cuenta",
       "mis-reservas",
@@ -251,6 +248,45 @@ describe("menú del negocio", () => {
       "mi-expediente",
       "mi-perfil",
     ]);
+  });
+});
+
+describe("menú de quien imparte", () => {
+  it("un solo grupo con lo suyo: sin dos «Inicio», sin Agenda, Equipo, Marketing ni Configuración", () => {
+    // Los permisos del rol de instructor (CatalogoDePermisosTenant), en una barbería.
+    const barbero = sesion(
+      [
+        "miembros.ver",
+        "documentos.subir",
+        "formularios.responder",
+        "catalogo.ver",
+        "sucursales.ver",
+        "agenda.ver",
+        "derechos.ver",
+        "reservas.ver",
+        "asistencia.marcar",
+        "checkins.registrar",
+        "tareas.ver",
+        "tareas.gestionar",
+      ],
+      { rol: "instructor", modalidad: "citas" },
+    );
+    const grupos = menuVisible(barbero);
+
+    expect(grupos.map((g) => g.clave)).toEqual(["instructor"]);
+    expect(grupos[0].areas.map((a) => a.clave)).toEqual([
+      "inicio-instructor",
+      "mis-clases",
+      "inicio",
+      "clientes",
+      "marketing",
+    ]);
+    const area = (clave: string) =>
+      grupos[0].areas.find((a) => a.clave === clave)!;
+    // Con el nombre de lo suyo.
+    expect(area("inicio").etiqueta).toBe("tareas.tituloMias");
+    expect(area("clientes").mio).toBe(true);
+    expect(area("marketing").etiqueta).toBe("portal.instructor.nav.resenas");
   });
 });
 

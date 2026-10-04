@@ -3,9 +3,10 @@ import { useI18n } from "vue-i18n";
 import { useRoute, type RouteLocationRaw } from "vue-router";
 
 import {
+  areaParaSesion,
   destinoDe,
   ubicacion,
-  vistasVisibles,
+  vistasDeArea,
   type Area,
   type Vista,
 } from "@/lib/menu";
@@ -48,10 +49,17 @@ export function useUbicacionActual(): {
   const sesion = useSesionTenantStore();
 
   const actual = computed(() => ubicacion(route));
-  const nombre = (x: Area | Vista): string =>
-    x.termino !== undefined
-      ? plural(sesion.terminologia[x.termino])
-      : t(x.etiqueta);
+  const nombre = (x: Area | Vista): string => {
+    const y = "vistas" in x ? areaParaSesion(x, sesion) : x;
+    if (y.termino !== undefined && "mio" in y && y.mio) {
+      return t("portal.instructor.nav.mis", {
+        grupo: plural(sesion.terminologia[y.termino]).toLowerCase(),
+      });
+    }
+    return y.termino !== undefined
+      ? plural(sesion.terminologia[y.termino])
+      : t(y.etiqueta);
+  };
 
   const titulo = computed(() => {
     if (actual.value !== null) {
@@ -68,7 +76,7 @@ export function useUbicacionActual(): {
       return [];
     }
     const area = nombre(u.area);
-    const primera = vistasVisibles(u.area, sesion)[0];
+    const primera = vistasDeArea(u.area, sesion)[0];
     const lista: Miga[] = [
       { texto: area, destino: primera ? destinoDe(primera) : undefined },
     ];

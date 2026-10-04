@@ -38,6 +38,8 @@ export interface Area {
   icono: string;
   // La etiqueta es el plural del término del negocio (Alumnos, Clientes…).
   termino?: "miembro" | "instructor";
+  // Con `termino`: «Mis alumnos», «Mis clientes» (lo de quien imparte).
+  mio?: boolean;
   vistas: Vista[];
 }
 
@@ -473,23 +475,87 @@ export function vistasVisibles(area: Area, sesion: Sesion): Vista[] {
 }
 
 /**
+ * Quien imparte (faceta de instructor) no ve el panel del negocio con los nombres de
+ * la administración: lo que ya cubre su portal (la agenda es su calendario; los
+ * horarios, del equipo) o no le toca (Configuración) no se ofrece, y lo que queda se
+ * nombra como lo suyo («Mis tareas», «Mis alumnos», «Mis reseñas»). Una función
+ * adicional que su rol conceda con un permiso explícito sí aparece.
+ */
+const CUBIERTO_INSTRUCTOR = new Set([
+  "agenda",
+  "grupos",
+  "horarios",
+  "ajustes",
+  "documentos",
+]);
+const NOMBRE_INSTRUCTOR: Record<string, Partial<Area>> = {
+  tareas: { etiqueta: "tareas.tituloMias", termino: undefined },
+  miembros: { mio: true },
+  resenas: { etiqueta: "portal.instructor.nav.resenas", termino: undefined },
+};
+const AREAS_PORTAL = new Set(
+  MENU_PORTALES.flatMap((g) => g.areas.map((a) => a.clave)),
+);
+function esInstructorActivo(sesion: Sesion): boolean {
+  return facetaActiva(sesion.usuario) === "instructor";
+}
+
+/** Las vistas de un área que se le ofrecen a esta sesión (tras lo de su rol). */
+export function vistasDeArea(area: Area, sesion: Sesion): Vista[] {
+  const vistas = vistasVisibles(area, sesion);
+  return esInstructorActivo(sesion) && !AREAS_PORTAL.has(area.clave)
+    ? vistas.filter((x) => !CUBIERTO_INSTRUCTOR.has(x.ruta))
+    : vistas;
+}
+
+/** El área como la ve esta sesión: a quien imparte, con el nombre de lo suyo. */
+export function areaParaSesion(area: Area, sesion: Sesion): Area {
+  if (!esInstructorActivo(sesion) || AREAS_PORTAL.has(area.clave)) {
+    return area;
+  }
+  const vistas = vistasDeArea(area, sesion);
+  const nombre =
+    vistas.length === 1 ? NOMBRE_INSTRUCTOR[vistas[0].ruta] : undefined;
+  return nombre !== undefined ? { ...area, ...nombre } : area;
+}
+
+/**
  * El menú de esta sesión: solo áreas con al menos una vista permitida y solo grupos
- * con al menos un área. Nombres y orden son los mismos para todos los roles.
+ * con al menos un área. Quien imparte ve un solo grupo («Mi trabajo»): su portal y,
+ * del panel, lo que le sirve con el nombre de lo suyo.
  */
 export function menuVisible(sesion: Sesion): (GrupoMenu & {
   areas: (Area & { destino: Vista })[];
 })[] {
-  return MENU.filter(
+  const grupos = MENU.filter(
     (g) => g.faceta === undefined || g.faceta === facetaActiva(sesion.usuario),
   )
     .map((g) => ({
       ...g,
       areas: g.areas.flatMap((a) => {
-        const vistas = vistasVisibles(a, sesion);
-        return vistas.length > 0 ? [{ ...a, destino: vistas[0] }] : [];
+        const vistas = vistasDeArea(a, sesion);
+        return vistas.length > 0
+          ? [{ ...areaParaSesion(a, sesion), destino: vistas[0] }]
+          : [];
       }),
     }))
     .filter((g) => g.areas.length > 0);
+  if (!esInstructorActivo(sesion)) {
+    return grupos;
+  }
+  const portal = grupos.find((g) => g.clave === "instructor");
+  if (portal === undefined) {
+    return grupos;
+  }
+  return [
+    {
+      ...portal,
+      areas: [
+        ...portal.areas,
+        ...grupos.filter((g) => g !== portal).flatMap((g) => g.areas),
+      ],
+    },
+  ];
 }
 
 /** Todas las rutas del menú (cada pantalla con su destino principal). */
