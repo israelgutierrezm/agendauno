@@ -21,6 +21,8 @@ interface Resumen {
   asistencias: number;
   primera_vez: boolean;
   saldo_creditos: number;
+  // Con una membresía ilimitada vigente, el saldo de paquetes no es lo que manda.
+  ilimitado?: boolean;
   saldo_unidades: number;
   membresia: {
     estado: string;
@@ -330,13 +332,15 @@ function cancelarVenta(): void {
           <dt :style="{ color: 'var(--texto-suave)' }">
             {{ $t("recepcion.miembro.saldo") }}
           </dt>
-          <dd class="text-right font-medium">
+          <dd class="text-right font-medium" data-prueba="saldo-panel">
             {{
-              $t(
-                "recepcion.miembro.creditos",
-                { n: resumen.saldo_creditos },
-                resumen.saldo_creditos === 1 ? 1 : 2,
-              )
+              resumen.ilimitado
+                ? $t("recepcion.miembro.ilimitado")
+                : $t(
+                    "recepcion.miembro.creditos",
+                    { n: resumen.saldo_creditos },
+                    resumen.saldo_creditos === 1 ? 1 : 2,
+                  )
             }}
           </dd>
         </div>

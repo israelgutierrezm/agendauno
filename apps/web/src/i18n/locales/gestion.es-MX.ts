@@ -1144,7 +1144,8 @@ export const terminologiaNegocio = {
 // Tarjetas de los listados de Miembros e Instructores.
 export const tarjetas = {
   ilimitado: "Ilimitado",
-  creditos: "1 crédito | {n} créditos",
+  // Lo que puede usar (lo ya reservado no cuenta), como en la ficha.
+  creditos: "1 disponible | {n} disponibles",
   vence: "vence el {fecha}",
   vencio: "venció el {fecha}",
   enPausa: "en pausa hasta el {fecha}",

@@ -96,6 +96,9 @@ class ResumenMiembroTenantController
             'activo' => $persona->activo,
             'asistencias' => $asistencias,
             'primera_vez' => $asistencias === 0,
+            // Lo que puede usar de sus paquetes vigentes; con una membresía ilimitada
+            // vigente, `ilimitado` (y el saldo no es lo que manda).
+            'ilimitado' => (bool) $membresia['ilimitado'],
             'saldo_creditos' => intdiv($saldo, 1000),
             'saldo_unidades' => $saldo,
             'membresia' => [

@@ -1028,10 +1028,12 @@ export default {
     derechos: {
       titulo: "Membresías y paquetes",
       vacio: "Sin membresías ni paquetes.",
-      // Saldo de lo vigente; lo vencido o cancelado es historial (aparte).
-      saldoVigente: "Saldo vigente: {creditos}",
-      saldoIlimitado: "Saldo vigente: ilimitado",
+      // Saldo de lo vigente (lo que puede usar y lo ya reservado); lo vencido o
+      // cancelado es historial (aparte).
+      saldoVigente: "Saldo vigente: {saldo}",
       sinVigente: "Sin membresía ni paquete vigente.",
+      sinSaldo: "Sin saldo vigente",
+      apartadas: "1 apartada | {n} apartadas",
       historial: "Historial",
       verHistorial: "Ver historial ({n})",
       ocultarHistorial: "Ocultar historial",
@@ -1933,7 +1935,8 @@ export default {
       sinAlertas: "Todo en orden",
       membresia: "Membresía",
       saldo: "Saldo",
-      creditos: "1 crédito | {n} créditos",
+      creditos: "1 disponible | {n} disponibles",
+      ilimitado: "Ilimitado",
       proxima: "Próxima reserva",
       sinProxima: "Sin próxima reserva",
       asistencias: "Asistencias",

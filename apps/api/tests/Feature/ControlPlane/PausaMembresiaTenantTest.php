@@ -72,6 +72,9 @@ it('en pausa no reserva; al terminar se reanuda sola y corre sus fechas', functi
     $this->travelTo('2026-09-10 12:00:00');
     $m = membresiaParaPausar();
     $antes = derechoEnFicha($m);
+    // Con su membresía ilimitada vigente, el resumen lo dice (no solo un saldo).
+    $this->getJson("/api/v1/app/{$m['slug']}/miembros/{$m['persona']}/resumen", conBearer($m['bearer']))
+        ->assertOk()->assertJsonPath('data.ilimitado', true);
 
     $this->postJson("/api/v1/app/{$m['slug']}/acuerdos/{$m['acuerdo']}/pausar", [
         'hasta' => '2026-09-19', 'motivo' => 'Vacaciones',
@@ -85,6 +88,7 @@ it('en pausa no reserva; al terminar se reanuda sola y corre sus fechas', functi
     $this->getJson("/api/v1/app/{$m['slug']}/miembros/{$m['persona']}/resumen", conBearer($m['bearer']))
         ->assertOk()
         ->assertJsonPath('data.membresia.estado', 'pausada')
+        ->assertJsonPath('data.ilimitado', false)
         ->assertJsonPath('data.membresia.pausada_hasta', '2026-09-19')
         ->assertJsonPath('data.alertas', ['membresia_pausada']);
     expect(derechoEnFicha($m)['pausa_hasta'])->toBe('2026-09-19');

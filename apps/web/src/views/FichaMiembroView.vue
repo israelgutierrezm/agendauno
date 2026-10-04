@@ -265,14 +265,46 @@ const derechosVisibles = computed(() => [
   ...derechosVigentes.value,
   ...(verHistorial.value ? derechosHistorial.value : []),
 ]);
-const saldoVigente = computed(() => ({
-  ilimitado: derechosVigentes.value.some((d) => d.ilimitado),
-  creditos:
-    derechosVigentes.value
-      .filter((d) => !d.ilimitado)
-      .reduce((total, d) => total + Math.max(0, d.saldo_unidades ?? 0), 0) /
-    1000,
-}));
+// El saldo, con un solo criterio en toda la ficha (contenido y resumen): con una
+// membresía ilimitada vigente, «Ilimitado»; si no, lo que puede usar
+// («disponibles») y lo que ya tiene reservado («apartadas»), de lo vigente.
+const saldoVigente = computed(() => {
+  const limitados = derechosVigentes.value.filter((d) => !d.ilimitado);
+  const disponibles = limitados.reduce(
+    (t, d) => t + Math.max(0, d.disponible_unidades ?? 0),
+    0,
+  );
+  const saldo = limitados.reduce(
+    (t, d) => t + Math.max(0, d.saldo_unidades ?? 0),
+    0,
+  );
+  return {
+    ilimitado: derechosVigentes.value.some((d) => d.ilimitado),
+    disponibles: disponibles / 1000,
+    apartadas: Math.max(0, saldo - disponibles) / 1000,
+  };
+});
+/** «9 disponibles · 3 apartadas» (sin apartadas, solo lo disponible). */
+function textoSaldo(disponibles: number, apartadas: number): string {
+  const d = t(
+    "ficha.derechos.disponible",
+    { n: disponibles },
+    disponibles === 1 ? 1 : 2,
+  );
+  return apartadas > 0
+    ? `${d} · ${t("ficha.derechos.apartadas", { n: apartadas }, apartadas === 1 ? 1 : 2)}`
+    : d;
+}
+const textoSaldoVigente = computed(() =>
+  derechosVigentes.value.length === 0
+    ? t("ficha.derechos.sinSaldo")
+    : saldoVigente.value.ilimitado
+      ? t("ficha.derechos.ilimitado")
+      : textoSaldo(
+          saldoVigente.value.disponibles,
+          saldoVigente.value.apartadas,
+        ),
+);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const editando = ref<MiembroEditable | null>(null);
@@ -301,11 +333,15 @@ function fecha(iso: string | null): string {
   if (iso === null) {
     return "—";
   }
+  // Una fecha de calendario (AAAA-MM-DD) es ese día, no la medianoche UTC (que en
+  // México cae el día anterior): se arma en la fecha local.
+  const soloFecha = /^\d{4}-\d{2}-\d{2}$/.test(iso);
+  const [a, m, d] = iso.slice(0, 10).split("-").map(Number);
   return new Intl.DateTimeFormat("es-MX", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  }).format(new Date(iso));
+  }).format(soloFecha ? new Date(a, m - 1, d) : new Date(iso));
 }
 
 // Ámbar para "por vencer"; rojo para el resto de alertas.
@@ -514,15 +550,9 @@ const regreso = useRegreso({
                     {{
                       derechosVigentes.length === 0
                         ? $t("ficha.derechos.sinVigente")
-                        : saldoVigente.ilimitado
-                          ? $t("ficha.derechos.saldoIlimitado")
-                          : $t("ficha.derechos.saldoVigente", {
-                              creditos: $t(
-                                "ficha.creditos",
-                                { n: saldoVigente.creditos },
-                                saldoVigente.creditos === 1 ? 1 : 2,
-                              ),
-                            })
+                        : $t("ficha.derechos.saldoVigente", {
+                            saldo: textoSaldoVigente,
+                          })
                     }}
                   </p>
                   <ul class="mt-1">
@@ -576,24 +606,38 @@ const regreso = useRegreso({
                             {{ $t("ficha.derechos.ilimitado") }}
                           </p>
                           <template v-else>
+                            <!-- Lo que puede usar y, aparte, lo que ya reservó. -->
                             <p class="font-semibold tabular-nums">
-                              {{
-                                $t(
-                                  "ficha.creditos",
-                                  { n: d.saldo_creditos ?? 0 },
-                                  d.saldo_creditos === 1 ? 1 : 2,
-                                )
-                              }}
-                            </p>
-                            <p
-                              class="text-xs"
-                              :style="{ color: 'var(--texto-suave)' }"
-                            >
                               {{
                                 $t(
                                   "ficha.derechos.disponible",
                                   { n: (d.disponible_unidades ?? 0) / 1000 },
                                   d.disponible_unidades === 1000 ? 1 : 2,
+                                )
+                              }}
+                            </p>
+                            <p
+                              v-if="
+                                (d.saldo_unidades ?? 0) >
+                                (d.disponible_unidades ?? 0)
+                              "
+                              class="text-xs"
+                              :style="{ color: 'var(--texto-suave)' }"
+                            >
+                              {{
+                                $t(
+                                  "ficha.derechos.apartadas",
+                                  {
+                                    n:
+                                      ((d.saldo_unidades ?? 0) -
+                                        (d.disponible_unidades ?? 0)) /
+                                      1000,
+                                  },
+                                  (d.saldo_unidades ?? 0) -
+                                    (d.disponible_unidades ?? 0) ===
+                                    1000
+                                    ? 1
+                                    : 2,
                                 )
                               }}
                             </p>
@@ -996,15 +1040,7 @@ const regreso = useRegreso({
             >
               <div class="fi-dato">
                 <dt>{{ $t("ficha.saldo") }}</dt>
-                <dd>
-                  {{
-                    $t(
-                      "ficha.creditos",
-                      { n: resumen.saldo_creditos },
-                      resumen.saldo_creditos === 1 ? 1 : 2,
-                    )
-                  }}
-                </dd>
+                <dd data-prueba="saldo-resumen">{{ textoSaldoVigente }}</dd>
               </div>
               <div class="fi-dato">
                 <dt>{{ $t("ficha.proxima") }}</dt>

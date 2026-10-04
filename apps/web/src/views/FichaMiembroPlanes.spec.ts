@@ -114,9 +114,11 @@ describe("membresías y paquetes en la ficha", () => {
 
   it("el saldo suma solo lo vigente; lo vencido y lo cancelado van al historial", async () => {
     respuestas([
+      // 6 en el saldo: 4 puede usarlas y 2 ya las reservó.
       derecho("d1", "Paquete 8 clases", {
         saldo_creditos: 6,
         saldo_unidades: 6000,
+        disponible_unidades: 4000,
       }),
       derecho("d2", "Paquete 4 clases", {
         saldo_creditos: 3,
@@ -133,7 +135,11 @@ describe("membresías y paquetes en la ficha", () => {
     await flushPromises();
 
     expect(w.get('[data-prueba="saldo-vigente"]').text()).toBe(
-      "Saldo vigente: 6 créditos",
+      "Saldo vigente: 4 disponibles · 2 apartadas",
+    );
+    // El resumen de al lado dice lo mismo.
+    expect(w.get('[data-prueba="saldo-resumen"]').text()).toBe(
+      "4 disponibles · 2 apartadas",
     );
     expect(w.text()).toContain("Paquete 8 clases");
     expect(w.text()).not.toContain("Paquete 4 clases");
@@ -147,8 +153,33 @@ describe("membresías y paquetes en la ficha", () => {
     expect(w.text()).toContain("Paquete 12 clases");
     // El saldo no cambia al ver el historial.
     expect(w.get('[data-prueba="saldo-vigente"]').text()).toBe(
-      "Saldo vigente: 6 créditos",
+      "Saldo vigente: 4 disponibles · 2 apartadas",
     );
+  });
+
+  it("con una membresía ilimitada vigente, todo dice «Ilimitado»; la fecha es la del calendario", async () => {
+    respuestas([
+      derecho("d1", "Ilimitada", {
+        ilimitado: true,
+        saldo_creditos: null,
+        saldo_unidades: null,
+        disponible_unidades: null,
+        valido_hasta: "2099-10-31",
+      }),
+      derecho("d2", "Paquete 4 clases", {
+        saldo_unidades: 2000,
+        disponible_unidades: 2000,
+      }),
+    ]);
+    const w = montar();
+    await flushPromises();
+
+    expect(w.get('[data-prueba="saldo-vigente"]').text()).toBe(
+      "Saldo vigente: Ilimitado",
+    );
+    expect(w.get('[data-prueba="saldo-resumen"]').text()).toBe("Ilimitado");
+    // 31 de octubre, no el 30 (una fecha no es la medianoche UTC).
+    expect(w.text()).toContain("Vence 31 oct 2099");
   });
 
   it("sin nada vigente lo dice, y lo anterior sigue en el historial", async () => {
