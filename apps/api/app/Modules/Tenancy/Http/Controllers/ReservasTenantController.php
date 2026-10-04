@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\Models\AceptacionWaiverTenant;
+use App\Modules\Tenancy\Models\AuditoriaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -64,9 +65,20 @@ class ReservasTenantController
         $yaAsistieron = $this->personasQueAsistieron($personaIds);
         $conAdeudo = $this->personasConAdeudo($personaIds);
         $docsPendientes = $this->documentosPendientesPorPersona($personaIds);
+        $transferencias = AuditoriaTenant::query()
+            ->where('accion', 'reserva.transferida')->where('entidad_tipo', 'reserva')
+            ->whereIn('entidad_id', $reservas->pluck('ulid'))->orderBy('id')->get()
+            ->groupBy('entidad_id')->map(fn ($asientos): array => $asientos->map(fn (AuditoriaTenant $a): array => [
+                'id' => $a->ulid, 'de' => $a->antes['persona'] ?? null,
+                'a' => $a->despues['persona'] ?? null, 'por' => $a->actor_nombre,
+                'fecha' => $a->created_at->toIso8601String(),
+            ])->all());
 
         return response()->json([
-            'data' => $reservas->map(fn (ReservaTenant $reserva): array => $this->presentar($reserva, $yaAsistieron, $conAdeudo, $docsPendientes))->all(),
+            'data' => $reservas->map(fn (ReservaTenant $reserva): array => [
+                ...$this->presentar($reserva, $yaAsistieron, $conAdeudo, $docsPendientes),
+                'transferencias' => $transferencias->get($reserva->ulid, []),
+            ])->all(),
         ]);
     }
 
@@ -278,7 +290,8 @@ class ReservasTenantController
         $validado = $request->validate(['persona_id' => ['required', 'string']]);
         $destino = PersonaTenant::query()->where('ulid', $validado['persona_id'])->firstOrFail();
 
-        $this->reservas->transferir($reserva, $destino);
+        $actor = $request->attributes->get('usuario_tenant');
+        $this->reservas->transferir($reserva, $destino, $actor instanceof Usuario ? $actor : null);
 
         return response()->json(['data' => $this->presentar($reserva->refresh())]);
     }

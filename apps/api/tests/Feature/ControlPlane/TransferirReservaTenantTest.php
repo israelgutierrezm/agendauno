@@ -47,6 +47,17 @@ it('transfiere (regala) el lugar: el roster cambia de persona y la retencion sig
     // El roster ahora muestra a Beto (no a Ana), sobre la MISMA reserva.
     $roster = $this->getJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", conBearer($e['bearer']))->assertOk()->json('data');
     expect(collect($roster)->pluck('persona')->all())->toBe(['Beto']);
+    expect($roster[0]['transferencias'])->toHaveCount(1);
+    expect($roster[0]['transferencias'][0]['de'])->toBe('Ana');
+    expect($roster[0]['transferencias'][0]['a'])->toBe('Beto');
+    expect($roster[0]['transferencias'][0]['por'])->not->toBeNull();
+    $carlos = crearMiembroTenant($e, 'Carlos');
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/transferir", ['persona_id' => $carlos], conBearer($e['bearer']))->assertOk();
+    $this->getJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", conBearer($e['bearer']))
+        ->assertJsonCount(2, 'data.0.transferencias')
+        ->assertJsonPath('data.0.transferencias.0.de', 'Ana')
+        ->assertJsonPath('data.0.transferencias.1.de', 'Beto')
+        ->assertJsonPath('data.0.transferencias.1.a', 'Carlos');
 
     // El regalo no mueve credito: la retencion sigue en Ana (disponible 7000), Beto intacto.
     expect(derechoDeTransfer($e, $ana['persona'])['disponible'])->toBe(7000);

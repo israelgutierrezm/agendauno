@@ -94,6 +94,13 @@ interface Miembro {
   email?: string | null;
 }
 interface Reserva {
+  transferencias?: {
+    id: string;
+    de: string | null;
+    a: string | null;
+    por: string | null;
+    fecha: string;
+  }[];
   id: string;
   estado: string;
   canal: string;
@@ -2530,6 +2537,31 @@ onMounted(async () => {
                     <span class="flex min-w-0 items-center gap-3">
                       <AvatarIniciales :nombre="r.persona" tam="md" />
                       <span class="min-w-0">
+                        <details
+                          v-if="r.transferencias?.length"
+                          class="text-xs mb-1"
+                          @click.stop
+                        >
+                          <summary
+                            class="cursor-pointer"
+                            style="color: var(--acento)"
+                          >
+                            {{ $t("agenda.roster.transferido") }}
+                          </summary>
+                          <ul class="mt-2 space-y-2">
+                            <li
+                              v-for="cambio in r.transferencias"
+                              :key="cambio.id"
+                            >
+                              {{ cambio.de }} → {{ cambio.a }}<br />
+                              {{
+                                new Date(cambio.fecha).toLocaleString("es-MX")
+                              }}
+                              ·
+                              {{ cambio.por ?? $t("agenda.roster.sistema") }}
+                            </li>
+                          </ul>
+                        </details>
                         <span class="block truncate font-medium">{{
                           r.persona ?? "—"
                         }}</span>

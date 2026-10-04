@@ -2051,6 +2051,9 @@ export default {
       cancelarReserva: "Cancelar",
       transferir: "Transferir",
       transferirA: "Regalar el lugar a",
+      // Historial de un lugar que se transfirió (bitácora).
+      transferido: "Lugar transferido · Ver historial",
+      sistema: "Sistema",
       confirmarTransfer: "Transferir",
       primeraVez: "1ª vez",
       primeraVezAyuda: "Es su primera clase: dale la bienvenida.",
