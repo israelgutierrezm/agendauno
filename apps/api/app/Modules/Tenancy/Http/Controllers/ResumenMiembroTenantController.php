@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcanceClientesTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\ResumenMembresiasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
@@ -34,6 +35,7 @@ class ResumenMiembroTenantController
     public function __construct(
         private readonly WaiversTenant $waivers,
         private readonly ResolverAccesoTenant $acceso,
+        private readonly AlcanceClientesTenant $alcance,
         private readonly ResumenMembresiasTenant $membresias,
         private readonly WhatsAppTenant $whatsapp,
     ) {}
@@ -49,6 +51,8 @@ class ResumenMiembroTenantController
             ! $actor instanceof Usuario || $this->acceso->permiteSucursal($actor, $persona->sucursal_id !== null ? (int) $persona->sucursal_id : null),
             403,
         );
+        // Quien imparte solo abre a sus clientes (quienes reservaron sus sesiones).
+        abort_unless($this->alcance->puedeVer($persona, $actor instanceof Usuario ? $actor : null), 403);
 
         $ahora = CarbonImmutable::now();
         // Membresía o paquete: la misma regla que las tarjetas del listado.

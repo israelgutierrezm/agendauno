@@ -18,7 +18,7 @@ afterEach(function (): void {
 /**
  * Barbería con un corte de pago y Ana con una cita el 5 de octubre (sin pagar).
  *
- * @return array{e: array{slug: string, bearer: string}, ana: string, reserva: string}
+ * @return array{e: array{slug: string, bearer: string}, ana: string, reserva: string, barbero: string}
  */
 function barberiaConClienta(): array
 {
@@ -28,7 +28,7 @@ function barberiaConClienta(): array
     test()->putJson("/api/v1/app/{$e['slug']}/ofertas/{$sede['oferta']}", [
         'lugares' => 0, 'politica_reserva' => 'pago', 'precio_clase_minor' => 25000,
     ], conBearer($e['bearer']))->assertOk();
-    personalConSesion($e['slug'], $e['bearer'], 'barbero@correo.mx', 'instructor');
+    $bearerBarbero = personalConSesion($e['slug'], $e['bearer'], 'barbero@correo.mx', 'instructor');
     $barbero = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->assertOk()->json('data.0.id');
     abrirHorarioDeCitas($e, $barbero, $sede['sucursal']);
     $cuenta = alumnoConSesion($e, 'Ana', 'ana@correo.mx');
@@ -39,7 +39,7 @@ function barberiaConClienta(): array
     $ana = (string) collect(test()->getJson("/api/v1/app/{$e['slug']}/miembros?q=Ana&page=1", conBearer($e['bearer']))->json('data'))
         ->firstWhere('nombre', 'Ana')['id'];
 
-    return ['e' => $e, 'ana' => $ana, 'reserva' => $reserva];
+    return ['e' => $e, 'ana' => $ana, 'reserva' => $reserva, 'barbero' => $bearerBarbero];
 }
 
 it('la ficha de un cliente de citas trae lo que debe con su servicio, y su última visita', function (): void {
@@ -64,8 +64,8 @@ it('la ficha de un cliente de citas trae lo que debe con su servicio, y su últi
 });
 
 it('quien no puede ver órdenes no recibe compras, importes ni pendientes en la ficha', function (): void {
-    ['e' => $e, 'ana' => $ana] = barberiaConClienta();
-    $barbero = personalConSesion($e['slug'], $e['bearer'], 'otro.barbero@correo.mx', 'instructor');
+    // El barbero que la atiende abre su ficha, pero sin lo económico.
+    ['e' => $e, 'ana' => $ana, 'barbero' => $barbero] = barberiaConClienta();
 
     $this->getJson("/api/v1/app/{$e['slug']}/miembros/{$ana}/ficha", conBearer($barbero))
         ->assertOk()

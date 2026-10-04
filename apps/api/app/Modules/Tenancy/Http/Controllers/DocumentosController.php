@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AccesoExpedienteTenant;
+use App\Modules\Tenancy\Application\AlcanceClientesTenant;
 use App\Modules\Tenancy\EstadoDocumento;
 use App\Modules\Tenancy\Models\Documento;
 use App\Modules\Tenancy\Models\Estudio;
@@ -43,6 +44,8 @@ class DocumentosController
             ->when(! $this->usuario($request)->puede('usuarios.gestionar'), function ($consulta): void {
                 $consulta->whereHas('persona', fn ($p) => $p->where('tipo', TipoPersonaTenant::Miembro->value));
             })
+            // Quien imparte: solo los de sus clientes.
+            ->whereHas('persona', fn ($p) => app(AlcanceClientesTenant::class)->acotar($p, $this->usuario($request)))
             ->orderByDesc('id')
             ->limit(self::LIMITE)
             ->get();

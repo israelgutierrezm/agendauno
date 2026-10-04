@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcanceClientesTenant;
 use App\Modules\Tenancy\Application\BajasTenant;
 use App\Modules\Tenancy\Application\MedirUsoSaas;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
@@ -47,6 +48,7 @@ class MiembrosTenantController
         private readonly BajasTenant $bajas,
         private readonly ResumenMembresiasTenant $membresias,
         private readonly WhatsAppTenant $whatsapp,
+        private readonly AlcanceClientesTenant $alcance,
     ) {}
 
     /**
@@ -77,6 +79,10 @@ class MiembrosTenantController
         // Alcance por sucursal (R19): el staff acotado a sedes solo ve a los alumnos de
         // SUS sucursales (el propietario/admin y el staff sin asignación ven todos).
         $actor = $this->actor($request);
+        // Quien imparte (acotado) solo ve a quienes reservaron alguna de sus sesiones.
+        if ($tipo === TipoPersonaTenant::Miembro->value) {
+            $this->alcance->acotar($consulta, $actor);
+        }
         if ($actor !== null) {
             $permitidas = $this->acceso->sucursalesPermitidas($actor);
             if ($permitidas !== null) {

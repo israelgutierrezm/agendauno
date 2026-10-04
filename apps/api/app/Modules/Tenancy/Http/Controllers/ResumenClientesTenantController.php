@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcanceClientesTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\ResumenClientesTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -25,6 +26,8 @@ class ResumenClientesTenantController
     public function __invoke(Request $request): JsonResponse
     {
         $actor = $request->attributes->get('usuario_tenant');
+        // Números de todo el negocio: no para quien imparte (ve solo a sus clientes).
+        abort_if($actor instanceof Usuario && app(AlcanceClientesTenant::class)->esAcotado($actor), 403);
         $permitidas = $actor instanceof Usuario ? $this->acceso->sucursalesPermitidas($actor) : null;
 
         return response()->json(['data' => $this->resumen->calcular($permitidas)]);

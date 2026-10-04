@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcanceClientesTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
@@ -36,6 +37,7 @@ class FichaMiembroTenantController
     public function __construct(
         private readonly LibroMayorTenant $libro,
         private readonly ResolverAccesoTenant $acceso,
+        private readonly AlcanceClientesTenant $alcance,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -52,6 +54,8 @@ class FichaMiembroTenantController
             ! $actor instanceof Usuario || $this->acceso->permiteSucursal($actor, $persona->sucursal_id !== null ? (int) $persona->sucursal_id : null),
             403,
         );
+        // Quien imparte solo abre a sus clientes (quienes reservaron sus sesiones).
+        abort_unless($this->alcance->puedeVer($persona, $actor instanceof Usuario ? $actor : null), 403);
 
         return response()->json(['data' => [
             'persona' => [

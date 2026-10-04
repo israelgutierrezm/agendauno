@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcanceClientesTenant;
 use App\Modules\Tenancy\Application\RadarRenovacionesTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -29,6 +30,8 @@ class RetencionTenantController
 
         // Alcance por sucursal (R19): el staff acotado solo ve el radar de SUS sedes.
         $actor = $request->attributes->get('usuario_tenant');
+        // Números de todo el negocio: no para quien imparte (ve solo a sus clientes).
+        abort_if($actor instanceof Usuario && app(AlcanceClientesTenant::class)->esAcotado($actor), 403);
         $permitidas = $actor instanceof Usuario ? $this->acceso->sucursalesPermitidas($actor) : null;
 
         return $this->responder($this->radar->miembros($dias, $permitidas), $dias, $request);

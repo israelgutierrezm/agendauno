@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AlcanceClientesTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Models\AceptacionWaiverTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\WaiverTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -71,6 +73,8 @@ class WaiversTenantController
     public function pendientesDePersona(Request $request): JsonResponse
     {
         $persona = PersonaTenant::query()->where('ulid', (string) $request->route('persona'))->firstOrFail();
+        $actor = $request->attributes->get('usuario_tenant');
+        abort_unless(app(AlcanceClientesTenant::class)->puedeVer($persona, $actor instanceof Usuario ? $actor : null), 403);
 
         return response()->json([
             'data' => $this->waivers->pendientesDe($persona)->map(fn (WaiverTenant $w): array => $this->presentar($w))->all(),
