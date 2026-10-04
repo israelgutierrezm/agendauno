@@ -25,7 +25,7 @@ final class CatalogoTemas
     public const PERSONALIZABLES = ['acento', 'barra', 'barra_activo'];
 
     /**
-     * @var array<string, array{nombre: string, oscuro: bool, permite_personalizar: bool, tokens: array<string, string>}>
+     * @var array<string, array{nombre: string, oscuro: bool, tokens: array<string, string>}>
      */
     private const TEMAS = [
         // Claro: barra lateral blanca, fondo lavanda muy suave y texto pizarra; el
@@ -33,7 +33,6 @@ final class CatalogoTemas
         'agendauno' => [
             'nombre' => 'AgendaUno',
             'oscuro' => false,
-            'permite_personalizar' => true,
             'tokens' => [
                 'barra' => '#FFFFFF', 'barra_suave' => '#F2F4FA', 'barra_texto' => '#5B6478',
                 'barra_activo' => '#EAF1FF', 'barra_activo_texto' => '#0B5BD3',
@@ -48,7 +47,6 @@ final class CatalogoTemas
         'agendauno_alternativo' => [
             'nombre' => 'Agenda Uno Alternativo',
             'oscuro' => false,
-            'permite_personalizar' => true,
             'tokens' => [
                 'barra' => '#182B39', 'barra_suave' => '#20384A', 'barra_texto' => '#B9C7CC',
                 'barra_activo' => '#C43B80', 'barra_activo_texto' => '#FFFFFF',
@@ -61,7 +59,6 @@ final class CatalogoTemas
         'oceano' => [
             'nombre' => 'Océano',
             'oscuro' => false,
-            'permite_personalizar' => true,
             'tokens' => [
                 'barra' => '#00344D', 'barra_suave' => '#00527C', 'barra_texto' => '#B8DCEC',
                 'barra_activo' => '#0077B6', 'barra_activo_texto' => '#FFFFFF',
@@ -74,7 +71,6 @@ final class CatalogoTemas
         'esmeralda' => [
             'nombre' => 'Esmeralda',
             'oscuro' => false,
-            'permite_personalizar' => true,
             'tokens' => [
                 'barra' => '#064E3B', 'barra_suave' => '#065F46', 'barra_texto' => '#A7F3D0',
                 'barra_activo' => '#10B981', 'barra_activo_texto' => '#052E23',
@@ -87,7 +83,6 @@ final class CatalogoTemas
         'rosa_crema' => [
             'nombre' => 'Rosa crema',
             'oscuro' => false,
-            'permite_personalizar' => true,
             'tokens' => [
                 'barra' => '#6F4E63', 'barra_suave' => '#5B3F52', 'barra_texto' => '#E7D3DA',
                 'barra_activo' => '#B76E79', 'barra_activo_texto' => '#FFFFFF',
@@ -101,7 +96,6 @@ final class CatalogoTemas
         'medianoche' => [
             'nombre' => 'Medianoche',
             'oscuro' => true,
-            'permite_personalizar' => true,
             'tokens' => [
                 'barra' => '#0B1120', 'barra_suave' => '#111827', 'barra_texto' => '#94A3B8',
                 'barra_activo' => '#38BDF8', 'barra_activo_texto' => '#0B1120',
@@ -131,15 +125,15 @@ final class CatalogoTemas
     {
         $clave = $clave !== null && self::existe($clave) ? $clave : self::POR_DEFECTO;
         $tema = self::TEMAS[$clave];
-        $propios = $tema['permite_personalizar']
-            ? array_intersect_key($personalizacion ?? [], array_flip(self::PERSONALIZABLES))
-            : [];
+        $propios = array_intersect_key($personalizacion ?? [], array_flip(self::PERSONALIZABLES));
 
         return [
             'clave' => $clave,
             'nombre' => $tema['nombre'],
             'oscuro' => $tema['oscuro'],
-            'permite_personalizar' => $tema['permite_personalizar'],
+            // Todos los temas admiten ajustes personales (el único que no, «Alto
+            // contraste», se retiró); el campo se conserva para quien lo lee.
+            'permite_personalizar' => true,
             'tokens' => [...$tema['tokens'], ...$propios],
             'personalizacion' => $propios,
         ];

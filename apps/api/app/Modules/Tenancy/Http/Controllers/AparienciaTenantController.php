@@ -9,7 +9,6 @@ use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 
 /**
  * Apariencia del usuario (tema y ajustes de color), al estilo de Acadion. Es una
@@ -64,11 +63,6 @@ class AparienciaTenantController
         ]);
 
         $actual = CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion);
-        if (! $actual['permite_personalizar']) {
-            throw ValidationException::withMessages([
-                'token' => ['Este tema no admite ajustes personales.'],
-            ]);
-        }
 
         $propios = $actual['personalizacion'];
         if (($validado['valor'] ?? '') === '') {
