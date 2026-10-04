@@ -141,7 +141,6 @@ function montar(componente: typeof MiCuentaView | typeof MisReservasView) {
       stubs: {
         teleport: true,
         PaseEntrada: true,
-        CalificarClases: true,
         EncabezadoSeccion: {
           props: ["titulo"],
           template: "<h1>{{ titulo }}<slot name='acciones' /></h1>",
