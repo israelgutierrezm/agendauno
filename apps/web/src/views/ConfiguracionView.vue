@@ -118,7 +118,7 @@ onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-2xl px-4 py-10">
+  <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('configuracion.titulo')" />
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
@@ -131,7 +131,9 @@ onMounted(cargar);
     <template v-if="!cargando">
       <!-- Logo del estudio (Configuración › Negocio › Datos e imagen) -->
       <div id="datos" class="mt-6 tu-card p-6 scroll-mt-24">
-        <h2 class="font-medium text-lg">{{ $t("configuracion.logoTitulo") }}</h2>
+        <h2 class="font-medium text-lg">
+          {{ $t("configuracion.logoTitulo") }}
+        </h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("configuracion.logoDesc") }}
         </p>

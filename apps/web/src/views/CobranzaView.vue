@@ -108,6 +108,7 @@ const pagoAutomaticoDisponible = ref(false);
 const avisoRenovacion = ref<string | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+const vistaCargada = ref<VistaCobros | null>(null);
 const accionando = ref<string | null>(null);
 
 // Modal de reembolso.
@@ -203,6 +204,7 @@ async function cargar(): Promise<void> {
       pagoAutomaticoDisponible.value =
         s.data.pago_automatico_disponible === true;
     }
+    vistaCargada.value = vista.value;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -431,11 +433,19 @@ const pagosVisibles = computed(() => {
         (filtroEstado.value === "aprobado") === (p.estado === "aprobado")),
   );
 });
-function suma(lista: number[]): string {
-  return dinero(
-    lista.reduce((a, b) => a + b, 0),
-    pagos.value[0]?.moneda ?? "MXN",
-  );
+function suma(
+  lista: Pago[],
+  campo: "monto_minor" | "reembolsado_minor",
+): string {
+  const porMoneda = new Map<string, number>();
+  for (const p of lista) {
+    porMoneda.set(p.moneda, (porMoneda.get(p.moneda) ?? 0) + p[campo]);
+  }
+  return porMoneda.size > 0
+    ? [...porMoneda]
+        .map(([moneda, minor]) => `${dinero(minor, moneda)} ${moneda}`)
+        .join(" · ")
+    : dinero(0, pagos.value[0]?.moneda ?? "MXN");
 }
 const indicadores = computed<Indicador[]>(() => {
   if (vista.value === "movimientos") {
@@ -451,13 +461,13 @@ const indicadores = computed<Indicador[]>(() => {
       {
         clave: "cobrado",
         etiqueta: t("cobranzaVisual.kpi.cobrado"),
-        valor: suma(aprobados.map((p) => p.monto_minor)),
+        valor: suma(aprobados, "monto_minor"),
         icono: "dinero",
       },
       {
         clave: "reembolsado",
         etiqueta: t("cobranzaVisual.kpi.reembolsado"),
-        valor: suma(pagos.value.map((p) => p.reembolsado_minor)),
+        valor: suma(pagos.value, "reembolsado_minor"),
         icono: "intercambio",
       },
       {
@@ -474,7 +484,7 @@ const indicadores = computed<Indicador[]>(() => {
       (x) => x.pago_automatico !== null,
     ).length;
     const debe = metaPendientes.value;
-    return [
+    const lista: Indicador[] = [
       {
         clave: "porCobrar",
         etiqueta: t("cobranzaVisual.kpi.porCobrar"),
@@ -510,6 +520,11 @@ const indicadores = computed<Indicador[]>(() => {
         icono: "hecho",
       },
     ];
+    return sesion.esCitas && suscripciones.value.length === 0
+      ? lista.filter(
+          (k) => k.clave !== "renovaciones" && k.clave !== "automatico",
+        )
+      : lista;
   }
   return [];
 });
@@ -525,7 +540,10 @@ watch(vista, cargar, { immediate: true });
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t(TITULOS[vista])" />
+    <EncabezadoSeccion
+      :titulo="$t(TITULOS[vista])"
+      :subtitulo="$t(`operacion.admin.cobros.${vista}`)"
+    />
 
     <p
       v-if="avisoReembolso"
@@ -537,6 +555,9 @@ watch(vista, cargar, { immediate: true });
     </p>
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
+      <button type="button" class="tu-enlace ml-2" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
     </p>
     <p
       v-if="cargando"
@@ -546,7 +567,7 @@ watch(vista, cargar, { immediate: true });
       {{ $t("comun.cargando") }}
     </p>
 
-    <template v-else>
+    <template v-else-if="!error || vistaCargada === vista">
       <TarjetasIndicadores
         v-if="indicadores.length > 0"
         class="mt-6"
@@ -562,7 +583,8 @@ watch(vista, cargar, { immediate: true });
           {{ avisoCobro }}
         </p>
         <!-- Lo que ya se debe: compras sin pagar y citas o clases ya pasadas -->
-        <h2 class="mt-8 font-medium">
+        <h2 class="cb-seccion mt-6">
+          <IconoNav nombre="dinero" :tam="21" />
           {{ $t("cobranza.pendientes.titulo") }}
         </h2>
         <p
@@ -648,14 +670,22 @@ watch(vista, cargar, { immediate: true });
         </div>
 
         <!-- Morosos (dunning) -->
-        <h2 class="mt-8 font-medium">{{ $t("cobranza.morosos") }}</h2>
+        <h2
+          v-if="!sesion.esCitas || morosos.length > 0"
+          class="cb-seccion mt-8"
+        >
+          <IconoNav nombre="facturas" :tam="21" />{{ $t("cobranza.morosos") }}
+        </h2>
         <EstadoVacio
-          v-if="morosos.length === 0"
+          v-if="morosos.length === 0 && !sesion.esCitas"
           class="tu-card mt-3"
           icono="hecho"
           :titulo="$t('cobranza.sinMorosos')"
         />
-        <div v-else class="mt-3 tu-card overflow-x-auto">
+        <div
+          v-else-if="morosos.length > 0"
+          class="mt-3 tu-card overflow-x-auto"
+        >
           <table class="tu-tabla">
             <thead>
               <tr>
@@ -966,7 +996,12 @@ watch(vista, cargar, { immediate: true });
       </template>
 
       <!-- Próximas renovaciones (cobro recurrente) -->
-      <template v-if="vista === 'por-cobrar'">
+      <template
+        v-if="
+          vista === 'por-cobrar' &&
+          (!sesion.esCitas || suscripciones.length > 0)
+        "
+      >
         <h2 class="mt-8 font-medium">
           {{ $t("cobranza.renovaciones") }}
         </h2>
@@ -1190,3 +1225,16 @@ watch(vista, cargar, { immediate: true });
     />
   </section>
 </template>
+
+<style scoped>
+.cb-seccion {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+}
+.cb-seccion > svg {
+  color: var(--primario);
+  flex-shrink: 0;
+}
+</style>

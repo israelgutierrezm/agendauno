@@ -3,6 +3,37 @@
  * renovaciones, recepción y comunicación. Aparte de es-MX.ts (la landing en curso).
  */
 export default {
+  admin: {
+    jornadaCitas: "Citas y atención a clientes",
+    jornadaClases: "Clases y asistencia",
+    suscripcion: "Tu suscripción a AgendaUno",
+    buscarJornada: "Buscar en las citas de este día…",
+    buscarDirectorio: "Buscar otro cliente en el directorio",
+    filtrarAtencion: "Filtrar por atención",
+    atencion: {
+      todas: "Todas",
+      pendientes: "Por atender",
+      llegaron: "Llegaron",
+      canceladas: "Canceladas",
+    },
+    verDetalle: "Ver detalle",
+    sinResultados: "No hay citas que coincidan con estos filtros.",
+    limpiar: "Limpiar filtros",
+    progresoAsistencia: "Asistencia registrada",
+    ocupacion: "Ocupación",
+    clientesCitas:
+      "Encuentra a tus clientes, consulta sus visitas y revisa su próxima cita.",
+    clientesClases:
+      "Consulta planes, créditos y próximas clases de tus alumnos.",
+    cobros: {
+      "por-cobrar":
+        "Revisa los adeudos y registra los pagos que recibe tu negocio.",
+      movimientos: "Consulta los pagos recibidos, sus ajustes y reembolsos.",
+      conciliacion:
+        "Revisa los pagos en línea y resuelve lo que requiere validación.",
+      caja: "Consulta los ingresos de caja por fecha y por quien los registró.",
+    },
+  },
   // Roles propios del negocio (ADR 0057): nadie da permisos que no tiene.
   rolesPropios: {
     titulo: "Roles y permisos",
@@ -178,7 +209,16 @@ export default {
     saludo: "Esto es lo que pasa hoy en {estudio}, {fecha}.",
     enCurso: "En curso",
     loQueSigue: "Lo que sigue hoy",
-    diaTerminado: "Terminaron las clases de hoy",
+    diaTerminado: "No quedan clases por comenzar hoy",
+    buscar: "Buscar en la agenda de hoy…",
+    filtrar: "Filtrar la jornada",
+    filtros: {
+      todas: "Todas",
+      proximas: "Por comenzar",
+      canceladas: "Canceladas",
+    },
+    sinResultados: "No hay actividad que coincida con tu búsqueda.",
+    limpiar: "Limpiar búsqueda y filtros",
     abrirAgenda: "Abrir agenda",
     irRecepcion: "Ir a recepción →",
     agenda: "Agenda de hoy",
@@ -204,7 +244,9 @@ export default {
     // Negocio de citas: quién viene, quién llegó, qué falta y dónde hay espacio.
     citas: {
       vieneDespues: "Quién viene después",
-      diaTerminado: "Terminaron las citas de hoy",
+      diaTerminado: "No quedan citas por comenzar hoy",
+      revisarCierre:
+        "Revisa las llegadas y los cobros pendientes para cerrar la jornada.",
       sinCitas: "No hay citas hoy",
       marcarLlegada: "Falta marcar si llegó",
       porCobrar: "Por cobrar",
@@ -224,6 +266,8 @@ export default {
     },
     // Negocio de clases: ocupación, listas, espera y planes por vencer.
     clases: {
+      revisarCierre:
+        "Revisa la asistencia y los pendientes para cerrar la jornada.",
       enEspera: "1 en lista de espera | {n} en lista de espera",
       kpi: {
         clases: "Clases hoy",

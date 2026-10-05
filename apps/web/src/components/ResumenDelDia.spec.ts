@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "@/i18n";
 import ResumenDelDia from "./ResumenDelDia.vue";
 
-const api = vi.hoisted(() => ({ get: vi.fn() }));
+const api = vi.hoisted(() => ({
+  get: vi.fn(),
+  permisos: null as string[] | null,
+}));
 vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: () => "No se pudo cargar.",
@@ -13,7 +16,8 @@ vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
     estudio: { nombre: "Estudio Demo", perfil: "pole" },
-    puede: () => true,
+    puede: (permiso: string) =>
+      api.permisos === null || api.permisos.includes(permiso),
   }),
 }));
 
@@ -45,7 +49,10 @@ function montar() {
 }
 
 describe("el día de hoy en el Inicio", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.permisos = null;
+  });
 
   it("indicadores, agenda con lo que falta marcar y pendientes", async () => {
     api.get.mockResolvedValue({
@@ -208,5 +215,75 @@ describe("el día de hoy en el Inicio", () => {
     expect(libres).toContain("Caro");
     expect(libres).toContain("6 espacios");
     expect(libres).toContain("desde las 13:30");
+  });
+  it("busca por nombre sin acentos y filtra sin cambiar las cifras del día", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: {
+          fecha: "2026-10-01",
+          agenda: {
+            totales: { sesiones: 3, esperados: 6, llegaron: 0, sin_marcar: 0 },
+            sesiones: [
+              sesion({ id: "uno", instructor: "María", momento: "proxima" }),
+              sesion({ id: "dos", oferta: "Exotic", momento: "termino" }),
+              sesion({
+                id: "tres",
+                oferta: "Yoga",
+                cancelada: true,
+                momento: "cancelada",
+              }),
+            ],
+          },
+          cobros: null,
+          renovaciones: null,
+        },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+    await w.get('input[type="search"]').setValue("maria");
+    expect(w.findAll(".hoy-sesion")).toHaveLength(1);
+    expect(w.get(".hoy-sesion").text()).toContain("María");
+    await w.get('input[type="search"]').setValue("exotic");
+    expect(w.findAll(".hoy-sesion")).toHaveLength(1);
+    expect(w.get('[data-prueba="indicador-clases"]').text()).toContain("3");
+    await w.get('input[type="search"]').setValue("");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Por comenzar")!
+      .trigger("click");
+    expect(w.findAll(".hoy-sesion")).toHaveLength(1);
+    expect(w.get(".hoy-sesion").text()).toContain("María");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Canceladas")!
+      .trigger("click");
+    expect(w.get(".hoy-sesion").text()).toContain("Yoga");
+  });
+  it("no ofrece pasar lista a un rol sin permiso y distingue horarios pasados de cierre", async () => {
+    api.permisos = ["agenda.ver"];
+    api.get.mockResolvedValue({
+      data: {
+        data: {
+          fecha: "2026-10-01",
+          agenda: {
+            totales: { sesiones: 1, esperados: 3, llegaron: 0, sin_marcar: 3 },
+            sesiones: [sesion({ momento: "termino", sin_marcar: 3 })],
+          },
+          cobros: null,
+          renovaciones: null,
+        },
+      },
+    });
+    const w = montar();
+    await flushPromises();
+    expect(w.text()).toContain("No quedan clases por comenzar hoy");
+    expect(w.text()).toContain("Revisa la asistencia");
+    expect(
+      w.findAll("a").some((a) => a.text().includes("Falta pasar lista")),
+    ).toBe(false);
+    expect(
+      w.findAll("a").some((a) => a.text().includes("Ir a recepción")),
+    ).toBe(false);
   });
 });

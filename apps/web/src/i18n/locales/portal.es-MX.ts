@@ -167,6 +167,11 @@ export default {
   },
   // Portal de quien imparte: su Inicio y su calendario (solo lo suyo).
   instructor: {
+    lista: {
+      reservas: "Con lugar reservado",
+      presentes: "Presentes",
+      sinMarcar: "Por registrar",
+    },
     nav: {
       grupo: "Mi trabajo",
       inicio: "Inicio",
@@ -180,6 +185,14 @@ export default {
       proximaCita: "Tu próxima cita",
       proximaGeneral: "Lo próximo en tu agenda",
       resumen: "Aquí tienes tus clases y citas en {estudio}.",
+      resumenClases: "Tu día en {estudio}: clases, participantes y asistencia.",
+      resumenCitas: "Tu día en {estudio}: clientes, citas y atención.",
+      pendientesHoy: "Asistencia pendiente",
+      pendientesAyuda: "Sesiones iniciadas que aún requieren registro.",
+      alDia: "Todo al día",
+      pendientesValor: "1 pendiente | {n} pendientes",
+      verDetalle: "Ver detalle",
+      diaCompleto: "Ver día completo",
       enCurso: "En curso",
       sinProxima: "No tienes clases asignadas en los próximos días.",
       cupo: "{ocupados} de {capacidad} lugares ocupados",
@@ -205,12 +218,27 @@ export default {
         calendarioValor: "Lista, día, semana y mes",
         agenda: "Agenda",
         agendaValor: "Tu día con horarios y pase de lista",
+        agendaCitasValor: "Tu día con horarios y atención a clientes",
         perfil: "Mi perfil",
         perfilValor: "Foto, contraseña y calendario del teléfono",
       },
     },
     calendario: {
       titulo: "Mi calendario",
+      descripcionClases:
+        "Consulta tus clases, revisa el cupo y abre el pase de lista.",
+      descripcionCitas:
+        "Revisa a quién atiendes, el servicio y el horario de cada cita.",
+      buscar: "Buscar en mi calendario",
+      buscarClases: "Buscar actividad o lugar…",
+      buscarCitas: "Buscar cliente, servicio o lugar…",
+      sucursal: "Sucursal",
+      todasSucursales: "Todas mis sucursales",
+      limpiar: "Limpiar filtros",
+      sinCoincidencias:
+        "No hay resultados con estos filtros en el periodo seleccionado.",
+      sincronizarCorto: "Sincronizar calendario",
+      rangoLista: "Próximos {n} días",
       proximas: "Próximas clases",
       proximos7: "Próximos 7 días",
       sinClases: "No tienes clases asignadas en estos días.",

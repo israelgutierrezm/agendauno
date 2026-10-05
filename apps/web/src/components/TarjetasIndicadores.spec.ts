@@ -14,6 +14,19 @@ function indicadores(n: number): Indicador[] {
 }
 
 describe("Tarjetas de indicadores", () => {
+  it("permite compactar el tablero sin cambiar las cifras ni otras pantallas", () => {
+    const normal = mount(TarjetasIndicadores, {
+      props: { tarjetas: indicadores(6) },
+    });
+    const compacta = mount(TarjetasIndicadores, {
+      props: { tarjetas: indicadores(6), compacta: true },
+    });
+    expect(normal.get("dl").classes()).not.toContain("ti-compacta");
+    expect(compacta.get("dl").classes()).toContain("ti-compacta");
+    expect(compacta.get("dl").text()).toBe(normal.get("dl").text());
+    expect(compacta.get("dl").attributes("style")).toContain("--ti-n: 3");
+  });
+
   it("cada indicador con su etiqueta, un ícono neutro y el valor (sin color de adorno)", () => {
     const w = mount(TarjetasIndicadores, {
       props: { tarjetas: indicadores(2) },

@@ -8,11 +8,15 @@ import PanelMiembro from "./PanelMiembro.vue";
 
 const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
-const permisos = vi.hoisted(() => ({ lista: ["miembros.gestionar"] }));
+const permisos = vi.hoisted(() => ({
+  lista: ["miembros.gestionar"],
+  esCitas: false,
+}));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
     terminologia: { miembro: "Cliente" },
+    esCitas: permisos.esCitas,
     puede: (p: string) => permisos.lista.includes(p),
   }),
 }));
@@ -62,6 +66,40 @@ function montar() {
 beforeEach(() => {
   vi.clearAllMocks();
   permisos.lista = ["miembros.gestionar"];
+  permisos.esCitas = false;
+});
+
+describe("resumen adaptado a citas o clases", () => {
+  it("en citas no muestra la membresía inexistente ni un saldo vacío", async () => {
+    permisos.esCitas = true;
+    api.get.mockResolvedValue(resumen(undefined));
+    const w = montar();
+    await flushPromises();
+    expect(w.find(".md-pastilla").exists()).toBe(false);
+    expect(w.find('[data-prueba="saldo-panel"]').exists()).toBe(false);
+    expect(w.text()).toContain("Próxima reserva");
+  });
+
+  it("en citas conserva los créditos reales y un plan vigente", async () => {
+    permisos.esCitas = true;
+    const datos = resumen(undefined);
+    datos.data.data.saldo_creditos = 2;
+    datos.data.data.saldo_unidades = 2000;
+    datos.data.data.membresia.estado = "vigente";
+    api.get.mockResolvedValue(datos);
+    const w = montar();
+    await flushPromises();
+    expect(w.find(".md-pastilla").exists()).toBe(true);
+    expect(w.get('[data-prueba="saldo-panel"]').text()).toContain("2");
+  });
+
+  it("en clases sigue mostrando el saldo aunque no haya un plan", async () => {
+    api.get.mockResolvedValue(resumen(undefined));
+    const w = montar();
+    await flushPromises();
+    expect(w.find(".md-pastilla").exists()).toBe(true);
+    expect(w.find('[data-prueba="saldo-panel"]').exists()).toBe(true);
+  });
 });
 
 describe("avisos por WhatsApp en la ficha de recepción", () => {

@@ -15,16 +15,20 @@ import {
  * y de un vistazo su membresía o paquete (créditos, vencimiento, pausa), si debe, su
  * última visita y su próxima reserva. Solo lo que pide atención lleva color.
  */
-const props = defineProps<{
-  nombre: string;
-  nombreCompleto: string;
-  email: string | null;
-  celular?: string | null;
-  sede?: string | null;
-  activo: boolean;
-  nuevo?: boolean;
-  resumen?: ResumenTarjeta | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    nombre: string;
+    nombreCompleto: string;
+    email: string | null;
+    celular?: string | null;
+    sede?: string | null;
+    activo: boolean;
+    nuevo?: boolean;
+    resumen?: ResumenTarjeta | null;
+    mostrarPlan?: boolean;
+  }>(),
+  { mostrarPlan: true, celular: null, sede: null, resumen: null },
+);
 
 const { t } = useI18n();
 
@@ -80,7 +84,7 @@ const contacto = computed(() =>
     </div>
 
     <template v-if="resumen">
-      <div class="tm-plan">
+      <div v-if="mostrarPlan" class="tm-plan">
         <p class="truncate text-sm font-medium">
           {{ resumen.membresia.plan ?? $t("tarjetas.sinMembresia") }}
         </p>
@@ -103,6 +107,13 @@ const contacto = computed(() =>
           {{ $t("tarjetas.adeudo") }}
         </p>
       </div>
+      <p
+        v-else-if="resumen.adeudo"
+        class="mt-3 text-xs font-medium"
+        style="color: var(--error)"
+      >
+        {{ $t("tarjetas.adeudo") }}
+      </p>
 
       <dl class="tm-datos">
         <div>

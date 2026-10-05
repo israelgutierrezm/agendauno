@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, type RouteLocationRaw } from "vue-router";
 
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import PanelCita from "@/components/PanelCita.vue";
 import PanelClase from "@/components/PanelClase.vue";
 import TarjetaOperacion, {
@@ -70,6 +71,7 @@ const deHoy = computed(() =>
 const alumnosHoy = computed(() =>
   deHoy.value.reduce((n, c) => n + c.ocupados, 0),
 );
+const pendientesHoy = computed(() => deHoy.value.filter(faltaLista).length);
 const climaLugar = computed(() =>
   lugarDelClima(clima.value, t, proxima.value?.tipo),
 );
@@ -158,7 +160,11 @@ const accesos = computed<Acceso[]>(() => {
           {
             clave: "agenda",
             titulo: t("portal.instructor.inicio.tarjetas.agenda"),
-            valor: t("portal.instructor.inicio.tarjetas.agendaValor"),
+            valor: t(
+              sesion.esCitas
+                ? "portal.instructor.inicio.tarjetas.agendaCitasValor"
+                : "portal.instructor.inicio.tarjetas.agendaValor",
+            ),
             icono: "reloj",
             to: { name: "agenda" },
           },
@@ -276,9 +282,14 @@ onUnmounted(() => clearInterval(reloj));
     </h1>
     <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
       {{
-        $t("portal.instructor.inicio.resumen", {
-          estudio: sesion.estudio?.nombre ?? "",
-        })
+        $t(
+          sesion.esCitas
+            ? "portal.instructor.inicio.resumenCitas"
+            : "portal.instructor.inicio.resumenClases",
+          {
+            estudio: sesion.estudio?.nombre ?? "",
+          },
+        )
       }}
     </p>
 
@@ -292,10 +303,49 @@ onUnmounted(() => clearInterval(reloj));
       {{ $t("comun.cargando") }}
     </p>
 
-    <template v-else>
+    <template v-else-if="!error || clases.length > 0">
+      <div class="pi-resumen">
+        <RouterLink
+          v-for="a in accesos.slice(0, 3)"
+          :key="a.clave"
+          :to="a.to"
+          class="pi-metrica tu-card"
+        >
+          <span class="pi-metrica-icono"
+            ><IconoNav :nombre="a.icono" :tam="22"
+          /></span>
+          <span
+            ><small>{{ a.titulo }}</small
+            ><strong>{{ a.valor }}</strong></span
+          >
+        </RouterLink>
+        <a
+          href="#mi-dia"
+          class="pi-metrica tu-card"
+          :class="{ 'pi-metrica-pendiente': pendientesHoy > 0 }"
+          :title="$t('portal.instructor.inicio.pendientesAyuda')"
+        >
+          <span class="pi-metrica-icono"
+            ><IconoNav :nombre="pendientesHoy ? 'reloj' : 'hecho'" :tam="22"
+          /></span>
+          <span
+            ><small>{{ $t("portal.instructor.inicio.pendientesHoy") }}</small
+            ><strong>{{
+              pendientesHoy
+                ? $t(
+                    "portal.instructor.inicio.pendientesValor",
+                    { n: pendientesHoy },
+                    pendientesHoy,
+                  )
+                : $t("portal.instructor.inicio.alDia")
+            }}</strong></span
+          >
+        </a>
+      </div>
       <!-- La tarjeta principal: siempre, con o sin algo agendado -->
       <TarjetaPrincipal
-        class="mt-6"
+        class="mt-5"
+        compacta
         :etiqueta="etiqueta"
         :etiqueta-viva="enCurso"
         :foto="foto"
@@ -304,7 +354,11 @@ onUnmounted(() => clearInterval(reloj));
       >
         <template v-if="proxima">
           <p class="mt-2 text-2xl font-semibold sm:text-3xl">
-            {{ proxima.oferta ?? "—" }}
+            {{
+              proxima.tipo === "cita"
+                ? lineaHoy(proxima).titulo
+                : (proxima.oferta ?? "—")
+            }}
           </p>
           <p class="mt-2 first-letter:uppercase">
             {{ cuandoCorto(proxima.inicia_en, proxima.zona_horaria) }}
@@ -321,7 +375,7 @@ onUnmounted(() => clearInterval(reloj));
             class="mt-1 text-sm"
             :style="{ color: 'var(--texto-suave)' }"
           >
-            {{ detalle(proxima) }}
+            {{ proxima.tipo === "cita" ? proxima.oferta : detalle(proxima) }}
           </p>
           <div class="mt-6 flex flex-wrap items-center gap-3">
             <button
@@ -371,11 +425,13 @@ onUnmounted(() => clearInterval(reloj));
 
       <!-- Hoy: sus clases o citas, con los pases de lista que faltan -->
       <section
+        id="mi-dia"
         class="mt-5 tu-card overflow-hidden"
         data-prueba="hoy-instructor"
       >
         <header class="pi-hoy-cabecera">
           <h2 class="font-medium">
+            <IconoNav nombre="agenda" :tam="20" class="inline-block mr-2" />
             {{ $t("portal.instructor.inicio.tarjetas.hoy") }}
           </h2>
           <button
@@ -393,9 +449,7 @@ onUnmounted(() => clearInterval(reloj));
             <button type="button" class="pi-hoy-fila" @click="abierta = c">
               <span class="pi-hoy-hora tabular-nums">{{ horaDe(c) }}</span>
               <span class="min-w-0 flex-1">
-                <span class="block truncate font-medium">{{
-                  lineaHoy(c).titulo
-                }}</span>
+                <span class="block font-medium">{{ lineaHoy(c).titulo }}</span>
                 <span
                   class="block truncate text-sm"
                   :style="{ color: 'var(--texto-suave)' }"
@@ -412,6 +466,7 @@ onUnmounted(() => clearInterval(reloj));
                     : $t("portal.instructor.inicio.faltaLista")
                 }}</span
               >
+              <IconoNav nombre="chevron" :tam="18" class="pi-hoy-abrir" />
             </button>
           </li>
         </ul>
@@ -422,11 +477,18 @@ onUnmounted(() => clearInterval(reloj));
         >
           {{ $t("portal.instructor.inicio.sinHoy") }}
         </p>
+        <footer v-if="deHoy.length" class="pi-hoy-pie">
+          <RouterLink
+            :to="{ name: 'mis-clases', query: { vista: 'dia' } }"
+            class="tu-enlace text-sm"
+            >{{ $t("portal.instructor.inicio.diaCompleto") }} →</RouterLink
+          >
+        </footer>
       </section>
 
       <!-- Accesos directos -->
       <ul class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <li v-for="a in accesos" :key="a.clave">
+        <li v-for="a in accesos.slice(3)" :key="a.clave">
           <TarjetaOperacion
             :to="a.to"
             :icono="a.icono"
@@ -486,5 +548,89 @@ onUnmounted(() => clearInterval(reloj));
   width: 3.2rem;
   flex-shrink: 0;
   font-weight: 500;
+}
+.pi-resumen {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-top: 1.5rem;
+}
+.pi-metrica {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem;
+  min-width: 0;
+  text-decoration: none;
+}
+.pi-metrica:hover {
+  border-color: var(--primario);
+}
+.pi-metrica-icono {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--primario-suave);
+  color: var(--primario-fuerte);
+}
+.pi-metrica small {
+  display: block;
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+}
+.pi-metrica strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 1.1rem;
+}
+.pi-metrica-pendiente .pi-metrica-icono {
+  background: color-mix(in srgb, var(--aviso) 12%, var(--superficie));
+  color: var(--aviso);
+}
+.pi-hoy-fila:hover {
+  background: var(--superficie-2);
+}
+.pi-hoy-abrir {
+  flex-shrink: 0;
+  color: var(--texto-suave);
+}
+.pi-hoy-pie {
+  border-top: 1px solid var(--borde);
+  padding: 0.85rem 1.25rem;
+}
+#mi-dia {
+  scroll-margin-top: 6rem;
+}
+@media (max-width: 1100px) {
+  .pi-resumen {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .pi-metrica {
+    gap: 0.5rem;
+    padding: 0.8rem;
+  }
+  .pi-metrica-icono {
+    width: 30px;
+    height: 30px;
+  }
+  .pi-metrica strong {
+    font-size: 0.95rem;
+  }
+  .pi-hoy-fila {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+  .pi-hoy-fila .tu-pildora {
+    margin-left: 4.1rem;
+    white-space: normal;
+  }
+  .pi-hoy-abrir {
+    display: none;
+  }
 }
 </style>

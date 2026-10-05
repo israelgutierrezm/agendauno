@@ -194,7 +194,10 @@ async function vender(): Promise<void> {
 /** "Membresía vigente · hasta 12 oct" (o "Sin membresía"), para la píldora. */
 const pastilla = computed<{ texto: string; aviso: boolean } | null>(() => {
   const m = resumen.value?.membresia;
-  if (!m) {
+  if (
+    !m ||
+    (sesionStore.esCitas && ["sin", "sin_membresia"].includes(m.estado))
+  ) {
     return null;
   }
   const estado = t(`recepcion.membresia.${m.estado}`);
@@ -218,6 +221,15 @@ const pastilla = computed<{ texto: string; aviso: boolean } | null>(() => {
       m.estado === "pausada",
   };
 });
+
+// En citas no se muestra un saldo vacío; sí se conserva cualquier crédito real.
+const mostrarSaldo = computed(
+  () =>
+    !sesionStore.esCitas ||
+    Boolean(resumen.value?.ilimitado) ||
+    (resumen.value?.saldo_unidades ?? 0) > 0 ||
+    (resumen.value?.saldo_creditos ?? 0) > 0,
+);
 
 // Ámbar para "por vencer"; rojo para el resto de alertas.
 function colorAlerta(codigo: string): string {
@@ -328,7 +340,10 @@ function cancelarVenta(): void {
           borderColor: 'var(--borde)',
         }"
       >
-        <div class="flex items-center justify-between gap-3 py-2.5">
+        <div
+          v-if="mostrarSaldo"
+          class="flex items-center justify-between gap-3 py-2.5"
+        >
           <dt :style="{ color: 'var(--texto-suave)' }">
             {{ $t("recepcion.miembro.saldo") }}
           </dt>

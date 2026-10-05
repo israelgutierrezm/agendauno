@@ -288,12 +288,17 @@ onMounted(() => {
                 class="tu-migas-sep"
                 aria-hidden="true"
               />
-              <RouterLink v-if="m.destino" :to="m.destino" class="tu-miga">{{
-                m.texto
-              }}</RouterLink>
+              <RouterLink
+                v-if="m.destino"
+                :to="m.destino"
+                class="tu-miga"
+                :title="m.texto"
+                >{{ m.texto }}</RouterLink
+              >
               <span
                 v-else
                 class="tu-miga"
+                :title="m.texto"
                 :class="{
                   'tu-miga-actual': i === lugar.migas.value.length - 1,
                 }"
@@ -452,15 +457,22 @@ onMounted(() => {
   color: var(--texto-suave);
   font-size: 0.8rem;
   white-space: nowrap;
+  min-width: 0;
+  max-width: clamp(10rem, calc(100vw - 66rem), 32rem);
+  overflow: hidden;
 }
 .tu-migas-sep {
   opacity: 0.5;
+  flex-shrink: 0;
 }
 .tu-miga {
   padding: 0.2rem 0.35rem;
   border-radius: 0.4rem;
   color: var(--texto-suave);
   text-decoration: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 a.tu-miga:hover {
   background: var(--fondo);
@@ -483,6 +495,13 @@ a.tu-miga:hover {
   }
   .tu-barra-division {
     display: block;
+  }
+}
+/* Con menos espacio, el área ya está a la izquierda: solo muestra la sección. */
+@media (min-width: 1280px) and (max-width: 1535px) {
+  .tu-migas > .tu-miga:not(.tu-miga-actual),
+  .tu-migas > .tu-migas-sep {
+    display: none;
   }
 }
 

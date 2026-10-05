@@ -9,6 +9,7 @@ import TarjetaPrincipal from "@/components/TarjetaPrincipal.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
+import { puedeEntrar } from "@/lib/acceso";
 import { aHora, fechaLocal, minutosLocal } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import { lugarDelClima, useClima } from "@/lib/clima";
@@ -83,6 +84,39 @@ const sesion = useSesionTenantStore();
 const hoy = ref<Hoy | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+const busqueda = ref("");
+const filtro = ref<"todas" | "proximas" | "canceladas">("todas");
+const agendaVisible = computed(() => {
+  const q = busqueda.value
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  return (hoy.value?.agenda?.sesiones ?? []).filter((s) => {
+    const coincideEstado =
+      filtro.value === "todas" ||
+      (filtro.value === "canceladas"
+        ? s.cancelada
+        : !s.cancelada &&
+          (s.momento === "proxima" || s.momento === "en_curso"));
+    const texto = [s.oferta, s.cliente, s.instructor, s.sucursal]
+      .filter(Boolean)
+      .join(" ")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    return coincideEstado && (!q || texto.includes(q));
+  });
+});
+function limpiar(): void {
+  busqueda.value = "";
+  filtro.value = "todas";
+}
+function ocupacion(s: SesionHoy): number {
+  return s.capacidad && s.capacidad > 0
+    ? Math.max(0, Math.min(100, (s.esperados / s.capacidad) * 100))
+    : 0;
+}
 
 const zonaNavegador = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -289,6 +323,7 @@ onMounted(() => {
       :foto="foto"
       :clima="clima"
       :clima-lugar="climaLugar"
+      compacta
     >
       <p class="mt-2 text-2xl font-semibold sm:text-3xl">{{ tituloDia }}</p>
       <p v-if="siguiente" class="mt-2" data-prueba="detalle-siguiente">
@@ -297,15 +332,29 @@ onMounted(() => {
           · {{ detalleSiguiente }}</span
         >
       </p>
+      <p
+        v-else-if="hoy.agenda && hoy.agenda.totales.sesiones > 0"
+        class="mt-2 text-sm"
+        style="color: var(--texto-suave)"
+      >
+        {{
+          $t(
+            esCitas
+              ? "operacion.hoy.citas.revisarCierre"
+              : "operacion.hoy.clases.revisarCierre",
+          )
+        }}
+      </p>
       <div class="mt-6 flex flex-wrap items-center gap-4">
         <RouterLink
+          v-if="puedeEntrar('agenda', sesion)"
           :to="{ name: 'agenda' }"
           class="tu-btn tu-btn-primario inline-flex"
         >
           {{ $t("operacion.hoy.abrirAgenda") }}
         </RouterLink>
         <RouterLink
-          v-if="sesion.puede('reservas.gestionar')"
+          v-if="puedeEntrar('recepcion', sesion)"
           :to="{ name: 'recepcion' }"
           class="tu-enlace text-sm"
         >
@@ -318,6 +367,7 @@ onMounted(() => {
       v-if="indicadores.length > 0"
       class="mt-4"
       :tarjetas="indicadores"
+      compacta
     />
 
     <div class="mt-6 grid gap-6 lg:grid-cols-3">
@@ -327,46 +377,104 @@ onMounted(() => {
         class="tu-card p-5 lg:col-span-2"
         aria-labelledby="hoy-agenda"
       >
-        <div class="flex items-baseline justify-between gap-3">
-          <h2 id="hoy-agenda" class="font-semibold">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="hoy-agenda" class="hoy-seccion">
+            <IconoNav nombre="agenda" :tam="20" />
             {{ $t("operacion.hoy.agenda") }}
           </h2>
-          <RouterLink :to="{ name: 'agenda' }" class="tu-enlace text-sm">
+          <RouterLink
+            v-if="puedeEntrar('agenda', sesion)"
+            :to="{ name: 'agenda' }"
+            class="tu-enlace text-sm"
+          >
             {{ $t("operacion.hoy.verAgenda") }}
           </RouterLink>
+        </div>
+        <div v-if="hoy.agenda.sesiones.length > 0" class="hoy-filtros">
+          <label class="tu-campo-icono hoy-buscar">
+            <IconoNav nombre="buscar" :tam="17" />
+            <input
+              v-model="busqueda"
+              type="search"
+              class="tu-input"
+              :aria-label="$t('operacion.hoy.buscar')"
+              :placeholder="$t('operacion.hoy.buscar')"
+            />
+          </label>
+          <div
+            class="tu-segmentado"
+            role="group"
+            :aria-label="$t('operacion.hoy.filtrar')"
+          >
+            <button
+              v-for="op in ['todas', 'proximas', 'canceladas'] as const"
+              :key="op"
+              type="button"
+              :aria-pressed="filtro === op"
+              @click="filtro = op"
+            >
+              {{ $t(`operacion.hoy.filtros.${op}`) }}
+            </button>
+          </div>
         </div>
         <EstadoVacio
           v-if="hoy.agenda.sesiones.length === 0"
           icono="agenda"
           compacto
           class="py-8"
-          :titulo="$t('operacion.hoy.sinSesiones')"
+          :titulo="
+            $t(
+              esCitas
+                ? 'operacion.hoy.citas.sinCitas'
+                : 'operacion.hoy.sinSesiones',
+            )
+          "
         />
-        <ul v-else class="mt-3 divide-y divide-[var(--borde)]">
+        <EstadoVacio
+          v-else-if="agendaVisible.length === 0"
+          icono="buscar"
+          compacto
+          class="py-8"
+          :titulo="$t('operacion.hoy.sinResultados')"
+        >
+          <button type="button" class="tu-btn tu-btn-fantasma" @click="limpiar">
+            {{ $t("operacion.hoy.limpiar") }}
+          </button>
+        </EstadoVacio>
+        <ul v-else class="hoy-agenda-lista">
           <li
-            v-for="s in hoy.agenda.sesiones"
+            v-for="s in agendaVisible"
             :key="s.id"
-            class="flex items-start gap-4 py-3"
+            class="hoy-sesion"
+            :class="{
+              'hoy-en-curso': s.momento === 'en_curso',
+              'hoy-cancelada': s.cancelada,
+            }"
             :style="s.cancelada ? { color: 'var(--texto-suave)' } : undefined"
           >
-            <span class="w-12 shrink-0 font-medium tabular-nums">{{
-              hora(s)
-            }}</span>
+            <span class="hoy-hora">{{ hora(s) }}</span>
             <span class="min-w-0 flex-1">
               <span
-                class="block truncate font-medium"
+                class="block font-semibold hoy-nombre"
                 :class="{ 'line-through': s.cancelada }"
-                >{{ nombre(s) }}</span
+                >{{ esCitas && s.cliente ? s.cliente : nombre(s) }}</span
               >
               <span
-                class="block truncate text-sm"
+                class="block text-sm hoy-detalle"
                 :style="{ color: 'var(--texto-suave)' }"
                 >{{
-                  [s.instructor, s.sucursal].filter(Boolean).join(" · ")
+                  [esCitas ? s.oferta : null, s.instructor, s.sucursal]
+                    .filter(Boolean)
+                    .join(" · ")
                 }}</span
               >
               <RouterLink
-                v-if="s.sin_marcar > 0"
+                v-if="
+                  !s.cancelada &&
+                  s.sin_marcar > 0 &&
+                  sesion.puede('asistencia.marcar') &&
+                  puedeEntrar(esCitas ? 'agenda' : 'recepcion', sesion)
+                "
                 :to="{ name: esCitas ? 'agenda' : 'recepcion' }"
                 class="mt-0.5 block text-sm"
                 :style="{ color: 'var(--aviso)' }"
@@ -392,7 +500,7 @@ onMounted(() => {
                 }}</span
               >
             </span>
-            <span class="shrink-0 text-right text-sm">
+            <span class="hoy-estado text-sm">
               <span
                 v-if="s.tipo !== 'cita' && !s.cancelada"
                 class="block tabular-nums"
@@ -406,16 +514,22 @@ onMounted(() => {
                 }}</span
               >
               <span
+                v-if="s.tipo !== 'cita' && !s.cancelada && s.capacidad"
+                class="hoy-ocupacion"
+                aria-hidden="true"
+                ><span :style="{ width: `${ocupacion(s)}%` }"
+              /></span>
+              <span
                 v-if="s.tipo === 'cita' && !s.cancelada && s.llegaron > 0"
-                class="block"
-                :style="{ color: 'var(--exito)' }"
+                class="hoy-status"
+                :style="{ '--tono': 'var(--exito-texto, var(--exito))' }"
                 >{{ $t("operacion.hoy.citas.llego") }}</span
               >
               <span
                 v-else
-                class="block"
+                class="hoy-status"
                 :style="{
-                  color:
+                  '--tono':
                     s.momento === 'en_curso'
                       ? 'var(--primario)'
                       : 'var(--texto-suave)',
@@ -440,10 +554,15 @@ onMounted(() => {
           data-prueba="libres"
         >
           <div class="flex items-baseline justify-between gap-3">
-            <h2 id="hoy-libres" class="font-semibold">
+            <h2 id="hoy-libres" class="hoy-seccion">
+              <IconoNav nombre="reloj" :tam="20" />
               {{ $t("operacion.hoy.citas.libres") }}
             </h2>
-            <RouterLink :to="{ name: 'agenda' }" class="tu-enlace text-sm">
+            <RouterLink
+              v-if="puedeEntrar('agenda', sesion)"
+              :to="{ name: 'agenda' }"
+              class="tu-enlace text-sm"
+            >
               {{ $t("operacion.hoy.citas.agendar") }}
             </RouterLink>
           </div>
@@ -498,7 +617,8 @@ onMounted(() => {
           class="tu-card p-5"
           aria-labelledby="hoy-pendientes"
         >
-          <h2 id="hoy-pendientes" class="font-semibold">
+          <h2 id="hoy-pendientes" class="hoy-seccion">
+            <IconoNav nombre="pulso" :tam="20" />
             {{ $t("operacion.hoy.pendientes") }}
           </h2>
           <EstadoVacio
@@ -565,11 +685,126 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.hoy-seccion {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 600;
+}
+.hoy-seccion > svg {
+  color: var(--primario);
+  flex-shrink: 0;
+}
+.hoy-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.hoy-buscar {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+.hoy-agenda-lista {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+.hoy-sesion {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.9rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.85rem;
+  background: var(--superficie);
+}
+.hoy-en-curso {
+  border-left: 3px solid var(--primario);
+  background: color-mix(in srgb, var(--primario) 4%, var(--superficie));
+}
+.hoy-cancelada {
+  background: var(--superficie-2);
+}
+.hoy-hora {
+  flex-shrink: 0;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.55rem;
+  background: var(--primario-suave);
+  color: var(--primario);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.hoy-cancelada .hoy-hora {
+  background: var(--superficie-2);
+  color: var(--texto-suave);
+}
+.hoy-nombre,
+.hoy-detalle {
+  overflow-wrap: anywhere;
+}
+.hoy-detalle {
+  margin-top: 0.2rem;
+}
+.hoy-estado {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.hoy-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--tono);
+}
+.hoy-status::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+.hoy-ocupacion {
+  width: 3.5rem;
+  height: 0.25rem;
+  overflow: hidden;
+  background: var(--superficie-2);
+  border-radius: 1rem;
+}
+.hoy-ocupacion > span {
+  display: block;
+  height: 100%;
+  background: var(--primario);
+}
+@media (max-width: 600px) {
+  .hoy-sesion {
+    flex-wrap: wrap;
+  }
+  .hoy-estado {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-left: 4rem;
+  }
+  .hoy-filtros .tu-segmentado {
+    width: 100%;
+  }
+  .hoy-filtros .tu-segmentado button {
+    flex: 1;
+    min-height: 44px;
+  }
+}
 .hoy-pendiente {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.35rem;
+  padding: 0.65rem 0.35rem;
+  min-height: 44px;
   border-radius: 0.75rem;
   color: var(--texto);
 }

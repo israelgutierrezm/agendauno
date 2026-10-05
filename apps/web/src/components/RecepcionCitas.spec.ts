@@ -91,4 +91,41 @@ describe("recepción en un negocio de citas", () => {
       { citas: 2, llegaron: 1, porAtender: 1, porCobrar: 1 },
     ]);
   });
+  it("filtra la jornada sin alterar las métricas ni realizar acciones", async () => {
+    const w = mount(RecepcionCitas, {
+      props: { fecha: "2030-01-07", sucursalId: "" },
+      global: { plugins: [i18n], stubs: { PanelCita: true } },
+    });
+    await flushPromises();
+    await w.get('input[type="search"]').setValue("bea");
+    expect(w.findAll(".rc-fila")).toHaveLength(1);
+    expect(w.get(".rc-fila").text()).toContain("Bea");
+    expect(w.emitted("resumen")?.at(-1)).toEqual([
+      { citas: 2, llegaron: 1, porAtender: 1, porCobrar: 1 },
+    ]);
+    await w.get('input[type="search"]').setValue("");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Canceladas")!
+      .trigger("click");
+    expect(w.findAll(".rc-fila")).toHaveLength(1);
+    expect(w.get(".rc-fila").text()).toContain("Carlos");
+    await w.get(".rc-fila").trigger("click");
+    expect(w.getComponent({ name: "PanelCita" }).props("sesion").id).toBe("c3");
+    expect(api.get).toHaveBeenCalledTimes(1);
+  });
+  it("distingue una búsqueda sin coincidencias de una jornada vacía", async () => {
+    const w = mount(RecepcionCitas, {
+      props: { fecha: "2030-01-07", sucursalId: "" },
+      global: { plugins: [i18n], stubs: { PanelCita: true } },
+    });
+    await flushPromises();
+    await w.get('input[type="search"]').setValue("sin-coincidencias");
+    expect(w.text()).toContain("No hay citas que coincidan");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Limpiar filtros")!
+      .trigger("click");
+    expect(w.findAll(".rc-fila")).toHaveLength(3);
+  });
 });

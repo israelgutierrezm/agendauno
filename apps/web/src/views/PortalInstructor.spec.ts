@@ -4,11 +4,13 @@ import { createI18n } from "vue-i18n";
 
 import esMX from "@/i18n/locales/es-MX";
 import portal from "@/i18n/locales/portal.es-MX";
+import agendaVisual from "@/i18n/locales/agendaVisual.es-MX";
 import { esInstructor } from "@/lib/roles";
 import InicioInstructorView from "./InicioInstructorView.vue";
 import MisClasesView from "./MisClasesView.vue";
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
+const modo = vi.hoisted(() => ({ citas: false }));
 vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: (e: unknown) => String(e),
@@ -16,7 +18,7 @@ vi.mock("@/lib/api", () => ({
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
-    esCitas: false,
+    esCitas: modo.citas,
     estudio: { nombre: "Estudio Demo" },
     usuario: { ulid: "u-coach", rol: "instructor" },
     terminologia: { sesion: "Clase" },
@@ -77,7 +79,7 @@ function montar(
           locale: "es",
           missingWarn: false,
           fallbackWarn: false,
-          messages: { es: { ...esMX, portal } },
+          messages: { es: { ...esMX, portal, agendaVisual } },
         }),
       ],
       stubs: {
@@ -90,7 +92,8 @@ function montar(
         PanelCita: true,
         EncabezadoSeccion: {
           props: ["titulo"],
-          template: "<h1>{{ titulo }}</h1>",
+          template:
+            "<header><h1>{{ titulo }}</h1><slot name='acciones' /></header>",
         },
       },
     },
@@ -104,6 +107,7 @@ describe("portal del instructor", () => {
     vi.clearAllMocks();
     localStorage.clear();
     ruta.query = {};
+    modo.citas = false;
     api.get.mockResolvedValue({ data: { data: SESIONES } });
   });
 
@@ -179,6 +183,90 @@ describe("portal del instructor", () => {
     ).toBe(true);
   });
 
+  it("filtra actividad sin importar acentos y combina la sucursal en todas las vistas", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: [
+          sesion("s1", "Técnica de pole", "2030-01-10T01:00:00Z"),
+          sesion("s3", "Exotic", "2030-01-11T17:00:00Z", {
+            sucursal: "Polanco",
+          }),
+        ],
+      },
+    });
+    const w = montar(MisClasesView);
+    await flushPromises();
+    await w.get('input[type="search"]').setValue("tecnica");
+    expect(w.findAll(".mc-fila")).toHaveLength(1);
+    await w.get("select").setValue("Polanco");
+    expect(w.findAll(".mc-fila")).toHaveLength(0);
+    expect(w.text()).toContain("No hay resultados con estos filtros");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Limpiar filtros")!
+      .trigger("click");
+    expect(w.findAll(".mc-fila")).toHaveLength(2);
+    await w.get("select").setValue("Polanco");
+    await w
+      .findAll(".tu-segmentado button")
+      .find((b) => b.text() === "Semana")!
+      .trigger("click");
+    await flushPromises();
+    expect(w.findAll(".cv-chip")).toHaveLength(1);
+    expect(w.get(".cv-chip").text()).toContain("Exotic");
+    expect(w.findAll("button").some((b) => b.text() === "Actualizar")).toBe(
+      true,
+    );
+    w.unmount();
+  });
+
+  it("en citas muestra cliente, servicio y estado sin cupos de clase", async () => {
+    modo.citas = true;
+    api.get.mockResolvedValue({
+      data: {
+        data: [
+          sesion("c1", "Corte de cabello", "2030-01-10T01:00:00Z", {
+            tipo: "cita",
+            capacidad: null,
+            ocupados: 1,
+            cita: {
+              cliente: "José Pérez",
+              asistencia: null,
+              estado: "confirmada",
+            },
+          }),
+        ],
+      },
+    });
+    const w = montar(MisClasesView);
+    await flushPromises();
+    expect(w.get(".mc-fila").text()).toContain("José Pérez");
+    expect(w.get(".mc-fila").text()).toContain("Corte de cabello");
+    expect(w.get(".mc-fila").text()).toContain("Agendada");
+    expect(w.find(".mc-ocupacion").exists()).toBe(false);
+    await w.get('input[type="search"]').setValue("jose");
+    expect(w.findAll(".mc-fila")).toHaveLength(1);
+    await w
+      .findAll(".tu-segmentado button")
+      .find((b) => b.text() === "Semana")!
+      .trigger("click");
+    await flushPromises();
+    expect(w.get(".cv-chip").text()).toContain("José Pérez");
+    expect(w.get(".cv-chip").text()).toContain("Corte de cabello");
+    expect(w.get(".cv-chip").text()).not.toContain("agendaCitas.estados");
+    w.unmount();
+  });
+
+  it("un fallo inicial no aparenta una jornada vacía o todo al día", async () => {
+    api.get.mockRejectedValue(new Error("Sin conexión"));
+    const w = montar(InicioInstructorView);
+    await flushPromises();
+    expect(w.text()).toContain("Sin conexión");
+    expect(w.find(".pi-resumen").exists()).toBe(false);
+    expect(w.find('[data-prueba="hoy-instructor"]').exists()).toBe(false);
+    w.unmount();
+  });
+
   it("el inicio pide solo lo suyo y muestra su próxima clase y sus accesos", async () => {
     const w = montar(InicioInstructorView);
     await flushPromises();
@@ -192,7 +280,9 @@ describe("portal del instructor", () => {
     // El clima de su próxima clase (el del equipo, no el del alumno).
     expect(api.get).toHaveBeenCalledWith("/api/v1/app/demo/clima");
     const texto = w.text();
-    expect(texto).toContain("Aquí tienes tus clases y citas en Estudio Demo.");
+    expect(texto).toContain(
+      "Tu día en Estudio Demo: clases, participantes y asistencia.",
+    );
     expect(texto).toContain("Tu próxima clase");
     expect(texto).toContain("Pole Nivel 1");
     expect(texto).toContain("4 de 10 lugares ocupados · 2 en lista de espera");

@@ -4,6 +4,8 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
+import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import MoverReserva from "@/components/MoverReserva.vue";
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -63,7 +65,12 @@ const enEspera = computed(() =>
   roster.value.filter((r) => r.estado === "en_espera"),
 );
 const presentes = computed(
-  () => roster.value.filter((r) => r.asistencia === "presente").length,
+  () => enSala.value.filter((r) => r.asistencia === "presente").length,
+);
+const sinMarcar = computed(
+  () =>
+    enSala.value.filter((r) => r.estado === "confirmada" && !r.asistencia)
+      .length,
 );
 const libres = computed(() => {
   const cap = props.sesion.capacidad;
@@ -298,7 +305,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
   >
     <template #destacado>
       <span
-        v-if="libres !== null"
+        v-if="!cargando && !error && libres !== null"
         class="md-pastilla"
         :class="{ 'md-pastilla-aviso': libres === 0 }"
         >{{
@@ -307,15 +314,30 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             : $t("recepcionVisual.lugaresDisponibles", { n: libres }, libres)
         }}</span
       >
-      <p class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("recepcion.panel.enSala", { n: enSala.length }) }} ·
-        {{ $t("recepcion.panel.presentes", { n: presentes })
-        }}<template v-if="enEspera.length > 0">
-          ·
-          <span :style="{ color: 'var(--aviso)' }">{{
-            $t("recepcion.panel.espera", { n: enEspera.length })
-          }}</span></template
-        >
+      <div v-if="!cargando && !error" class="pc-lista-resumen">
+        <div>
+          <IconoNav nombre="miembros" :tam="18" /><strong>{{
+            enSala.length
+          }}</strong
+          ><span>{{ $t("portal.instructor.lista.reservas") }}</span>
+        </div>
+        <div class="pc-lista-presentes">
+          <IconoNav nombre="hecho" :tam="18" /><strong>{{ presentes }}</strong
+          ><span>{{ $t("portal.instructor.lista.presentes") }}</span>
+        </div>
+        <div>
+          <IconoNav nombre="reloj" :tam="18" /><strong>{{ sinMarcar }}</strong
+          ><span>{{ $t("portal.instructor.lista.sinMarcar") }}</span>
+        </div>
+      </div>
+      <p
+        v-if="!cargando && !error && enEspera.length > 0"
+        class="mt-3 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        <span :style="{ color: 'var(--aviso)' }">{{
+          $t("recepcion.panel.espera", { n: enEspera.length })
+        }}</span>
       </p>
       <!-- Acciones de quien lo abre (p. ej. agregar a mi calendario) -->
       <div v-if="$slots.acciones" class="mt-3"><slot name="acciones" /></div>
@@ -408,18 +430,19 @@ watch(() => props.sesion.id, cargar, { immediate: true });
           class="border-t py-3 first:border-t-0"
           :style="{ borderColor: 'var(--borde)' }"
         >
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
+          <div class="flex items-center gap-3">
+            <AvatarIniciales :nombre="r.persona" tam="md" />
+            <div class="min-w-0 flex-1">
               <RouterLink
-                v-if="r.persona_id"
+                v-if="r.persona_id && sesionStore.puede('miembros.ver')"
                 :to="{
                   name: 'ficha-miembro',
                   params: { id: r.persona_id },
                 }"
-                class="block font-medium truncate hover:underline"
+                class="block font-medium break-words hover:underline"
                 >{{ r.persona ?? "—" }}</RouterLink
               >
-              <span v-else class="block font-medium truncate">{{
+              <span v-else class="block font-medium break-words">{{
                 r.persona ?? "—"
               }}</span>
               <p v-if="avisos(r).length > 0" class="text-xs">
@@ -457,7 +480,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             <template v-if="r.estado === 'confirmada' && puedeMarcar">
               <button
                 type="button"
-                class="tu-btn text-xs px-3 py-1.5"
+                class="tu-btn pc-lista-accion text-sm"
                 :class="
                   r.asistencia === 'presente'
                     ? 'tu-btn-fantasma'
@@ -466,14 +489,16 @@ watch(() => props.sesion.id, cargar, { immediate: true });
                 :disabled="accionando"
                 @click="marcar(r, 'presente')"
               >
+                <IconoNav nombre="hecho" :tam="16" />
                 {{ $t("recepcion.panel.llego") }}
               </button>
               <button
                 type="button"
-                class="tu-enlace text-xs"
+                class="tu-btn tu-btn-fantasma pc-lista-accion text-sm"
                 :disabled="accionando"
                 @click="marcar(r, 'ausente')"
               >
+                <IconoNav nombre="ausente" :tam="16" />
                 {{ $t("recepcion.panel.noVino") }}
               </button>
             </template>
@@ -567,3 +592,45 @@ watch(() => props.sesion.id, cargar, { immediate: true });
     </template>
   </MarcoDetalle>
 </template>
+
+<style scoped>
+.pc-lista-resumen {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+.pc-lista-resumen > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.75rem;
+  border: 1px solid var(--borde);
+  background: var(--superficie);
+  border-radius: 10px;
+}
+.pc-lista-resumen strong {
+  font-size: 1.25rem;
+}
+.pc-lista-resumen span {
+  width: 100%;
+  font-size: 0.75rem;
+  color: var(--texto-suave);
+}
+.pc-lista-resumen svg {
+  color: var(--texto-suave);
+}
+.pc-lista-presentes strong,
+.pc-lista-presentes svg {
+  color: var(--exito-texto);
+}
+.pc-lista-accion {
+  min-height: 44px;
+}
+@media (max-width: 400px) {
+  .pc-lista-resumen > div {
+    padding: 0.55rem;
+  }
+}
+</style>

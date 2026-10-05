@@ -117,6 +117,7 @@ interface MiembroResultado {
   email: string | null;
 }
 const busqueda = ref("");
+const directorioAbierto = ref(false);
 const resultados = ref<MiembroResultado[]>([]);
 const buscando = ref(false);
 const miembroActivo = ref<{ id: string; nombre: string } | null>(null);
@@ -232,6 +233,14 @@ function lugares(s: SesionDia): string {
         capacidad: s.capacidad,
       })
     : t("recepcionVisual.reservados", { n: s.confirmadas });
+}
+function progreso(s: SesionDia): number {
+  return s.confirmadas > 0
+    ? Math.min(
+        100,
+        Math.max(0, ((s.presentes + s.ausentes) / s.confirmadas) * 100),
+      )
+    : 0;
 }
 
 /** La clase en curso o la siguiente; si ya pasaron todas, la primera del día. */
@@ -387,82 +396,104 @@ onMounted(async () => {
       }}</RouterLink>
     </div>
 
-    <!-- Buscador global de alumno -->
-    <div class="relative mt-5">
-      <IconoNav
-        nombre="buscar"
-        :tam="18"
-        class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2"
-        :style="{ color: 'var(--texto-suave)' }"
-      />
-      <div class="flex gap-2">
-        <input
-          v-model="busqueda"
-          type="search"
-          class="tu-input pl-10"
-          :placeholder="$t('recepcion.buscarMiembro')"
-          :disabled="registrandoPase"
-          @keydown.enter.prevent="alEnter"
-        />
-        <button
-          v-if="camaraDisponible"
-          type="button"
-          class="tu-btn tu-btn-fantasma shrink-0"
-          @click="escanerAbierto = true"
-        >
-          {{ $t("paseEntrada.escanear") }}
-        </button>
-      </div>
-      <div
-        v-if="busqueda.trim().length >= 2 && !esPase(busqueda)"
-        class="absolute z-20 mt-1 w-full tu-card overflow-hidden"
-      >
-        <p
-          v-if="buscando"
-          class="px-4 py-3 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("comun.cargando") }}
-        </p>
-        <p
-          v-else-if="resultados.length === 0"
-          class="px-4 py-3 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("recepcion.sinResultados") }}
-        </p>
-        <ul v-else class="max-h-72 overflow-y-auto">
-          <li v-for="m in resultados" :key="m.id">
-            <button
-              type="button"
-              class="w-full border-t px-4 py-2.5 text-left first:border-t-0 hover:brightness-95"
-              :style="{ borderColor: 'var(--borde)' }"
-              @click="abrirMiembro(m)"
-            >
-              <span class="block font-medium">{{ m.nombre_completo }}</span>
-              <span
-                v-if="m.email"
-                class="block text-xs"
-                :style="{ color: 'var(--texto-suave)' }"
-                >{{ m.email }}</span
-              >
-            </button>
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <p
-      v-if="avisoPase"
-      class="mt-3 text-sm font-medium"
-      role="status"
-      :style="{ color: avisoPase.permitido ? 'var(--exito)' : 'var(--error)' }"
+    <!-- En citas, la búsqueda principal es la jornada; el directorio queda aparte. -->
+    <button
+      v-if="sesion.esCitas && sesion.puede('miembros.ver')"
+      type="button"
+      class="tu-btn tu-btn-fantasma mt-4"
+      :aria-expanded="directorioAbierto"
+      aria-controls="fd-directorio"
+      @click="directorioAbierto = !directorioAbierto"
     >
-      {{ avisoPase.texto }}
-    </p>
-    <p v-else class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t("paseEntrada.pistaLector") }}
-    </p>
+      <IconoNav nombre="miembros" :tam="18" />{{
+        $t("operacion.admin.buscarDirectorio")
+      }}
+    </button>
+    <div v-show="!sesion.esCitas || directorioAbierto" id="fd-directorio">
+      <!-- Buscador global de alumno -->
+      <div class="relative mt-5">
+        <IconoNav
+          nombre="buscar"
+          :tam="18"
+          class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2"
+          :style="{ color: 'var(--texto-suave)' }"
+        />
+        <div class="flex gap-2">
+          <input
+            v-model="busqueda"
+            type="search"
+            class="tu-input pl-10"
+            :placeholder="$t('recepcion.buscarMiembro')"
+            :aria-label="$t('recepcion.buscarMiembro')"
+            :disabled="registrandoPase"
+            @keydown.enter.prevent="alEnter"
+          />
+          <button
+            v-if="camaraDisponible"
+            type="button"
+            class="tu-btn tu-btn-fantasma shrink-0"
+            @click="escanerAbierto = true"
+          >
+            {{ $t("paseEntrada.escanear") }}
+          </button>
+        </div>
+        <div
+          v-if="busqueda.trim().length >= 2 && !esPase(busqueda)"
+          class="absolute z-20 mt-1 w-full tu-card overflow-hidden"
+        >
+          <p
+            v-if="buscando"
+            class="px-4 py-3 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("comun.cargando") }}
+          </p>
+          <p
+            v-else-if="resultados.length === 0"
+            class="px-4 py-3 text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("recepcion.sinResultados") }}
+          </p>
+          <ul v-else class="max-h-72 overflow-y-auto">
+            <li v-for="m in resultados" :key="m.id">
+              <button
+                type="button"
+                class="w-full border-t px-4 py-2.5 text-left first:border-t-0 hover:brightness-95"
+                :style="{ borderColor: 'var(--borde)' }"
+                @click="abrirMiembro(m)"
+              >
+                <span class="block font-medium">{{ m.nombre_completo }}</span>
+                <span
+                  v-if="m.email"
+                  class="block text-xs"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ m.email }}</span
+                >
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <p
+        v-if="avisoPase"
+        class="mt-3 text-sm font-medium"
+        role="status"
+        :style="{
+          color: avisoPase.permitido ? 'var(--exito)' : 'var(--error)',
+        }"
+      >
+        {{ avisoPase.texto }}
+      </p>
+      <p
+        v-else-if="!sesion.esCitas"
+        class="mt-2 text-xs"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("paseEntrada.pistaLector") }}
+      </p>
+    </div>
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
@@ -473,6 +504,7 @@ onMounted(async () => {
       v-if="tarjetas.length > 0"
       class="mt-5"
       :tarjetas="tarjetas"
+      compacta
     />
 
     <!-- El día: navegación y clases con su detalle a un lado -->
@@ -580,7 +612,7 @@ onMounted(async () => {
               >{{ $t("operacion.recepcion.irAgenda") }}</RouterLink
             >
           </EstadoVacio>
-          <ul v-else>
+          <ul v-else class="fd-lista">
             <li v-for="s in sesiones" :key="s.id">
               <button
                 type="button"
@@ -596,7 +628,7 @@ onMounted(async () => {
                   horaCorta(s.inicia_en, s.zona_horaria)
                 }}</span>
                 <span class="min-w-0 flex-1">
-                  <span class="block font-semibold truncate"
+                  <span class="block font-semibold fd-nombre"
                     >{{ s.oferta ?? "—"
                     }}<span
                       v-if="s.estado !== 'programada'"
@@ -606,7 +638,7 @@ onMounted(async () => {
                     ></span
                   >
                   <span
-                    class="block text-xs truncate"
+                    class="block text-xs fd-detalle"
                     :style="{ color: 'var(--texto-suave)' }"
                     >{{
                       [s.instructor, lugares(s)].filter(Boolean).join(" · ")
@@ -614,6 +646,13 @@ onMounted(async () => {
                   >
                 </span>
                 <span class="shrink-0 text-right text-xs">
+                  <span
+                    v-if="s.estado === 'programada' && s.confirmadas > 0"
+                    class="fd-progreso"
+                    :title="$t('operacion.admin.progresoAsistencia')"
+                    aria-hidden="true"
+                    ><span :style="{ width: `${progreso(s)}%` }"
+                  /></span>
                   <span
                     v-if="s.en_espera > 0"
                     class="block font-medium"
@@ -688,9 +727,37 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.fd-lista {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+}
+.fd-nombre,
+.fd-detalle {
+  overflow-wrap: anywhere;
+}
+.fd-detalle {
+  margin-top: 0.2rem;
+}
+.fd-progreso {
+  display: block;
+  width: 4rem;
+  height: 0.25rem;
+  margin: 0.35rem 0 0.5rem auto;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: var(--superficie-2);
+}
+.fd-progreso > span {
+  display: block;
+  height: 100%;
+  background: var(--exito);
+}
 /* Navegación de días: botones de borde, como en la Agenda. */
 .fd-paso {
-  padding: 0.45rem;
+  padding: 0.6rem;
+  min-width: 44px;
+  min-height: 44px;
 }
 .fd-hoy {
   padding: 0.45rem 0.9rem;
@@ -710,21 +777,20 @@ onMounted(async () => {
   align-items: center;
   gap: 1rem;
   width: 100%;
-  padding: 0.85rem 1.25rem;
-  border-top: 1px solid var(--borde);
+  padding: 0.95rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.85rem;
   background: transparent;
   text-align: left;
   cursor: pointer;
   transition: background-color 0.15s ease;
-}
-li:first-child > .fd-clase {
-  border-top: 0;
 }
 .fd-clase:hover {
   background: color-mix(in srgb, var(--primario) 4%, var(--superficie));
 }
 .fd-activa,
 .fd-activa:hover {
+  border-color: var(--primario);
   background: color-mix(in srgb, var(--primario) 7%, var(--superficie));
   box-shadow: inset 3px 0 0 var(--primario);
 }
@@ -732,10 +798,35 @@ li:first-child > .fd-clase {
   opacity: 0.55;
 }
 .fd-hora {
-  width: 3rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.55rem;
+  color: var(--primario);
+  background: var(--primario-suave);
   flex-shrink: 0;
   font-size: 0.85rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+@media (max-width: 600px) {
+  .fd-clase {
+    flex-wrap: wrap;
+    gap: 0.65rem 0.75rem;
+    align-items: flex-start;
+  }
+  .fd-clase > span:last-child {
+    display: flex;
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: 4rem;
+    text-align: left;
+  }
+  .fd-clase > span:last-child:empty {
+    display: none;
+  }
+  .fd-progreso {
+    margin: 0;
+  }
 }
 </style>

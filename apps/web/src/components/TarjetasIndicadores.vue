@@ -35,8 +35,10 @@ const props = withDefaults(
     tarjetas: Indicador[];
     // De fondo: el ícono grande y tenue, o unas barras.
     decoracion?: "icono" | "barras";
+    // Tableros operativos: libera altura antes de la agenda si caben las cifras.
+    compacta?: boolean;
   }>(),
-  { decoracion: "icono" },
+  { decoracion: "icono", compacta: false },
 );
 
 // En pantalla grande, todos en una fila hasta 5; con 6, dos filas de 3. En mediano,
@@ -57,7 +59,10 @@ const columnasMedio = computed(() =>
   <div class="ti-envoltura">
     <dl
       class="ti"
-      :class="{ 'ti-medio-pares': columnasMedio === 2 }"
+      :class="{
+        'ti-medio-pares': columnasMedio === 2,
+        'ti-compacta': compacta,
+      }"
       :style="{
         '--ti-n': String(columnas),
         '--ti-n-medio': String(columnasMedio),
@@ -155,6 +160,14 @@ const columnasMedio = computed(() =>
   min-width: 0;
   padding: 0.6rem 0.8rem 0.65rem;
   background: var(--superficie);
+}
+@container (min-width: 48rem) {
+  .ti-compacta {
+    grid-template-columns: repeat(var(--ti-n), minmax(0, 1fr));
+  }
+  .ti-compacta.ti-medio-pares > .ti-celda:last-child:nth-child(odd) {
+    grid-column: auto;
+  }
 }
 @container (min-width: 34rem) {
   .ti-celda {

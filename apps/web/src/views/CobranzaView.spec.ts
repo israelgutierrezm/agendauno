@@ -12,6 +12,7 @@ import CobranzaView from "./CobranzaView.vue";
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
+  esCitas: false,
   ruta: { query: { vista: "movimientos" } as Record<string, string> },
 }));
 vi.mock("@/lib/api", () => ({
@@ -19,7 +20,11 @@ vi.mock("@/lib/api", () => ({
   mensajeDeError: () => "Error",
 }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
+  useSesionTenantStore: () => ({
+    slug: "demo",
+    esCitas: mocks.esCitas,
+    puede: () => true,
+  }),
 }));
 vi.mock("vue-router", () => ({
   useRoute: () => mocks.ruta,
@@ -42,6 +47,7 @@ const pago = (id: string, persona: string, estado: string) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.ruta.query = { vista: "movimientos" };
+  mocks.esCitas = false;
   mocks.get.mockImplementation((url: string) =>
     Promise.resolve({
       data: {
@@ -57,6 +63,46 @@ beforeEach(() => {
 });
 
 describe("cobros: movimientos", () => {
+  it("no suma importes de monedas diferentes en un mismo saldo", async () => {
+    mocks.get.mockResolvedValue({
+      data: {
+        data: [
+          pago("1", "Ana", "aprobado"),
+          { ...pago("2", "Bea", "aprobado"), moneda: "USD", monto_minor: 2000 },
+        ],
+      },
+    });
+    const w = mount(CobranzaView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+    const saldo = w.get('[data-prueba="indicador-cobrado"]').text();
+    expect(saldo).toContain("100.00");
+    expect(saldo).toContain("MXN");
+    expect(saldo).toContain("20.00");
+    expect(saldo).toContain("USD");
+    expect(saldo).not.toContain("120.00");
+  });
+  it("un error inicial permite reintentar sin mostrar ceros como si se hubieran cargado", async () => {
+    mocks.get.mockRejectedValue(new Error("red"));
+    const w = mount(CobranzaView, {
+      global: { plugins: [i18n], stubs: { teleport: true } },
+    });
+    await flushPromises();
+    expect(w.text()).toContain("Error");
+    expect(w.find('[data-prueba="indicador-cobrado"]').exists()).toBe(false);
+    expect(w.text()).not.toContain("No hay pagos");
+    mocks.get.mockResolvedValue({
+      data: { data: [pago("1", "Ana", "aprobado")] },
+    });
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Reintentar")!
+      .trigger("click");
+    await flushPromises();
+    expect(w.text()).toContain("Ana");
+    expect(mocks.post).not.toHaveBeenCalled();
+  });
   it("resume lo cobrado y filtra por cliente y por estado", async () => {
     const w = mount(CobranzaView, {
       global: { plugins: [i18n], stubs: { teleport: true } },
@@ -83,6 +129,34 @@ describe("cobros: movimientos", () => {
 });
 
 describe("cobros: por cobrar", () => {
+  it("en citas oculta renovaciones vacías pero conserva los cobros pendientes", async () => {
+    mocks.esCitas = true;
+    mocks.ruta.query = { vista: "por-cobrar" };
+    mocks.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url.endsWith("/cobranza/pendientes")
+          ? {
+              data: [],
+              meta: {
+                page: 1,
+                ultima_pagina: 1,
+                total: 0,
+                per_page: 20,
+                por_cobrar: [],
+                proximas: 3,
+              },
+            }
+          : { data: [] },
+      }),
+    );
+    const w = mount(CobranzaView, { global: { plugins: [i18n] } });
+    await flushPromises();
+    expect(w.text()).toContain("Pendientes de pago");
+    expect(w.text()).toContain("3 citas próximas");
+    expect(w.text()).not.toContain("Próximas renovaciones");
+    expect(w.text()).not.toContain("No hay membresías con cobro recurrente");
+  });
+
   it("muestra lo que ya se debe (como el Inicio) y registra su pago", async () => {
     mocks.ruta.query = { vista: "por-cobrar" };
     const pendiente = {

@@ -3,6 +3,8 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import PanelCita from "@/components/PanelCita.vue";
 import {
   estadoCita,
@@ -11,6 +13,7 @@ import {
   type SesionAgenda,
 } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
+import { normalizar } from "@/lib/menu";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -41,6 +44,34 @@ const citas = ref<SesionAgenda[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const abierta = ref<SesionAgenda | null>(null);
+const busqueda = ref("");
+const filtro = ref<"todas" | "pendientes" | "llegaron" | "canceladas">("todas");
+const visibles = computed(() => {
+  const q = normalizar(busqueda.value.trim());
+  return citas.value.filter((s) => {
+    const estado = estadoCita(s, new Date());
+    const coincide =
+      filtro.value === "todas" ||
+      (filtro.value === "pendientes" && estado === "confirmada") ||
+      (filtro.value === "llegaron" &&
+        s.estado === "programada" &&
+        s.cita?.asistencia === "presente") ||
+      (filtro.value === "canceladas" && estado === "cancelada");
+    return (
+      coincide &&
+      (!q ||
+        normalizar(
+          [s.cita?.asiste, s.cita?.cliente, s.oferta, s.instructor, s.sucursal]
+            .filter(Boolean)
+            .join(" "),
+        ).includes(q))
+    );
+  });
+});
+function limpiar(): void {
+  busqueda.value = "";
+  filtro.value = "todas";
+}
 
 let pedido = 0;
 async function cargar(): Promise<void> {
@@ -153,6 +184,38 @@ defineExpose({ cargar });
 
 <template>
   <div>
+    <div v-if="!error && citas.length > 0" class="rc-filtros">
+      <label class="tu-campo-icono rc-buscar">
+        <IconoNav nombre="buscar" :tam="18" />
+        <input
+          v-model="busqueda"
+          class="tu-input"
+          type="search"
+          :placeholder="$t('operacion.admin.buscarJornada')"
+          :aria-label="$t('operacion.admin.buscarJornada')"
+        />
+      </label>
+      <div
+        class="tu-segmentado rc-segmentado"
+        role="group"
+        :aria-label="$t('operacion.admin.filtrarAtencion')"
+      >
+        <button
+          v-for="op in [
+            'todas',
+            'pendientes',
+            'llegaron',
+            'canceladas',
+          ] as const"
+          :key="op"
+          type="button"
+          :aria-pressed="filtro === op"
+          @click="filtro = op"
+        >
+          {{ $t(`operacion.admin.atencion.${op}`) }}
+        </button>
+      </div>
+    </div>
     <p
       v-if="cargando && citas.length === 0"
       class="px-5 py-6 text-sm"
@@ -172,8 +235,18 @@ defineExpose({ cargar });
       icono="agenda"
       :titulo="$t('recepcionVisual.citas.sinCitas')"
     />
-    <ul v-else data-prueba="recepcion-citas">
-      <li v-for="s in citas" :key="s.id">
+    <EstadoVacio
+      v-else-if="visibles.length === 0"
+      class="py-12"
+      icono="buscar"
+      :titulo="$t('operacion.admin.sinResultados')"
+    >
+      <button type="button" class="tu-btn tu-btn-fantasma" @click="limpiar">
+        {{ $t("operacion.admin.limpiar") }}
+      </button>
+    </EstadoVacio>
+    <ul v-else class="rc-lista" data-prueba="recepcion-citas">
+      <li v-for="s in visibles" :key="s.id">
         <button
           type="button"
           class="rc-fila"
@@ -181,16 +254,23 @@ defineExpose({ cargar });
           @click="abierta = s"
         >
           <span class="rc-hora tabular-nums">{{ hora(s) }}</span>
+          <AvatarIniciales
+            :nombre="s.cita?.asiste || s.cita?.cliente || ''"
+            tam="md"
+            class="rc-avatar"
+          />
           <span class="min-w-0 flex-1">
-            <span class="block truncate font-medium">{{
+            <span class="block font-semibold rc-nombre">{{
               s.cita?.asiste ||
               s.cita?.cliente ||
               $t("recepcionVisual.citas.sinCliente")
             }}</span>
             <span
-              class="block truncate text-sm"
+              class="block text-sm rc-detalle"
               :style="{ color: 'var(--texto-suave)' }"
-              >{{ [s.oferta, s.instructor].filter(Boolean).join(" · ") }}</span
+              >{{
+                [s.oferta, s.instructor, s.sucursal].filter(Boolean).join(" · ")
+              }}</span
             >
           </span>
           <span class="rc-estado">
@@ -204,6 +284,7 @@ defineExpose({ cargar });
               >{{ pago(s) }}</span
             >
           </span>
+          <IconoNav nombre="chevron" :tam="16" class="rc-chevron" />
         </button>
       </li>
     </ul>
@@ -223,6 +304,33 @@ defineExpose({ cargar });
 </template>
 
 <style scoped>
+.rc-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--borde);
+}
+.rc-buscar {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+.rc-lista {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+}
+.rc-nombre,
+.rc-detalle {
+  overflow-wrap: anywhere;
+}
+.rc-detalle {
+  margin-top: 0.2rem;
+}
+.rc-chevron {
+  flex-shrink: 0;
+  color: var(--texto-suave);
+}
 /* Una cita por fila: la hora, quién y qué; su atención y su pago a la derecha. */
 .rc-fila {
   display: flex;
@@ -230,18 +338,25 @@ defineExpose({ cargar });
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem 1rem;
-  padding: 0.8rem 1.25rem;
-  border-top: 1px solid var(--borde);
+  padding: 0.95rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.85rem;
+  background: var(--superficie);
   text-align: left;
 }
-li:first-child > .rc-fila {
-  border-top: 0;
+.rc-fila:hover {
+  background: var(--superficie-2);
+  border-color: var(--primario);
 }
 .rc-fila:hover .font-medium {
   color: var(--primario);
 }
 .rc-hora {
-  width: 3.2rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.55rem;
+  background: var(--primario-suave);
+  color: var(--primario);
+  font-size: 0.85rem;
   flex-shrink: 0;
   font-weight: 500;
 }
@@ -254,5 +369,32 @@ li:first-child > .rc-fila {
 }
 .rc-cancelada {
   opacity: 0.6;
+}
+@media (max-width: 600px) {
+  .rc-lista {
+    padding: 0.75rem;
+  }
+  .rc-fila {
+    gap: 0.65rem;
+  }
+  .rc-avatar {
+    display: none;
+  }
+  .rc-estado {
+    width: 100%;
+    margin-left: 4rem;
+  }
+  .rc-chevron {
+    display: none;
+  }
+  .rc-segmentado {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .rc-segmentado button {
+    flex: 1;
+    min-height: 44px;
+  }
 }
 </style>

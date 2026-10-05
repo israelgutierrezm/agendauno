@@ -5,6 +5,7 @@ import { RouterLink } from "vue-router";
 
 import AccesosOperativos from "@/components/AccesosOperativos.vue";
 import EnlaceEstudio from "@/components/EnlaceEstudio.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import PonEnMarcha, { type Quickstart } from "@/components/PonEnMarcha.vue";
 import ResumenDelDia from "@/components/ResumenDelDia.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -115,21 +116,34 @@ onMounted(cargar);
 
 <template>
   <section class="tu-pagina">
-    <h1 class="text-2xl font-semibold">
-      {{
-        nombre
-          ? $t("portal.inicio.saludo", { nombre })
-          : $t("portal.inicio.saludoSinNombre")
-      }}
-    </h1>
-    <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
-      {{
-        $t("operacion.hoy.saludo", {
-          estudio: sesion.estudio?.nombre ?? "",
-          fecha: hoyTexto,
-        })
-      }}
-    </p>
+    <div class="pa-cabecera">
+      <div>
+        <h1 class="text-2xl font-semibold">
+          {{
+            nombre
+              ? $t("portal.inicio.saludo", { nombre })
+              : $t("portal.inicio.saludoSinNombre")
+          }}
+        </h1>
+        <p class="mt-1" :style="{ color: 'var(--texto-suave)' }">
+          {{
+            $t("operacion.hoy.saludo", {
+              estudio: sesion.estudio?.nombre ?? "",
+              fecha: hoyTexto,
+            })
+          }}
+        </p>
+      </div>
+      <span class="pa-modalidad"
+        ><IconoNav nombre="agenda" :tam="18" />{{
+          $t(
+            sesion.esCitas
+              ? "operacion.admin.jornadaCitas"
+              : "operacion.admin.jornadaClases",
+          )
+        }}</span
+      >
+    </div>
 
     <!-- Quickstart (R36): guía de activación mientras falte configuración esencial -->
     <PonEnMarcha
@@ -155,7 +169,11 @@ onMounted(cargar);
     <!-- Suscripción a AgendaUno: estado y lo que va del mes -->
     <div v-else-if="facturacion" class="mt-6 tu-card p-5">
       <div class="flex items-baseline justify-between gap-3">
-        <h2 class="font-semibold">{{ $t("panel.suscripcion") }}</h2>
+        <h2 class="pa-seccion">
+          <IconoNav nombre="facturas" :tam="20" />{{
+            $t("operacion.admin.suscripcion")
+          }}
+        </h2>
         <RouterLink :to="{ name: 'renta' }" class="tu-enlace text-sm">
           {{ $t("panel.verDetalle") }}
         </RouterLink>
@@ -176,7 +194,7 @@ onMounted(cargar);
           }}</template
         >
       </p>
-      <dl class="mt-4 grid grid-cols-2 gap-4 max-w-md">
+      <dl class="pa-suscripcion mt-4">
         <div>
           <dt class="text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{ mesDelPeriodo }}
@@ -207,3 +225,49 @@ onMounted(cargar);
     <EnlaceEstudio class="mt-6" />
   </section>
 </template>
+
+<style scoped>
+.pa-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.pa-modalidad {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.65rem;
+  color: var(--texto-suave);
+  background: var(--superficie);
+  font-size: 0.8rem;
+}
+.pa-modalidad > svg,
+.pa-seccion > svg {
+  color: var(--primario);
+}
+.pa-seccion {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 600;
+}
+.pa-suscripcion {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--borde);
+}
+.pa-suscripcion > div {
+  min-width: 0;
+}
+@media (max-width: 480px) {
+  .pa-suscripcion {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
