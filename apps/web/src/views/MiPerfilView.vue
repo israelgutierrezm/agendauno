@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import FondoDecorado from "@/components/FondoDecorado.vue";
@@ -155,6 +156,8 @@ const datos = ref({
   primer_apellido: "",
   segundo_apellido: "",
   celular: "",
+  fecha_nacimiento: "",
+  genero: "",
 });
 watch(
   usuario,
@@ -168,6 +171,8 @@ watch(
       primer_apellido: u.primer_apellido ?? "",
       segundo_apellido: u.segundo_apellido ?? "",
       celular: u.celular ?? "",
+      fecha_nacimiento: u.fecha_nacimiento ?? "",
+      genero: u.genero ?? "",
     };
   },
   { immediate: true },
@@ -182,7 +187,11 @@ async function guardarDatos(): Promise<void> {
       segundo_apellido: datos.value.segundo_apellido || null,
       // El celular es de su ficha de cliente o alumno: sin ficha no se manda.
       ...(usuario.value?.tiene_ficha
-        ? { celular: datos.value.celular.trim() || null }
+        ? {
+            celular: datos.value.celular.trim() || null,
+            fecha_nacimiento: datos.value.fecha_nacimiento || null,
+            genero: datos.value.genero || null,
+          }
         : {}),
     });
     sesion.actualizarUsuario(data.data.usuario);
@@ -492,6 +501,14 @@ const aparienciaAbierta = ref(false);
               />
               <p class="tu-hint mt-1">{{ $t("miPerfil.celularAyuda") }}</p>
             </div>
+            <!-- Fecha de nacimiento y género (opcionales), también de su ficha -->
+            <CamposDatosPersonales
+              v-if="usuario.tiene_ficha"
+              id="mp"
+              v-model:fecha="datos.fecha_nacimiento"
+              v-model:genero="datos.genero"
+              ayuda
+            />
             <div class="mp-pie-formulario">
               <button
                 type="submit"

@@ -44,6 +44,9 @@ export interface UsuarioTenant {
   // edita en «Mi perfil».
   tiene_ficha?: boolean;
   celular?: string | null;
+  // También de su ficha (opcionales): fecha de nacimiento y género.
+  fecha_nacimiento?: string | null;
+  genero?: string | null;
 }
 
 /** Cómo atiende el negocio: clases con cupo o citas 1 a 1 con un profesional. */

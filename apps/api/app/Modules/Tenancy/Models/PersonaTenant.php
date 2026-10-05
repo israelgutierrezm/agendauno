@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\Application\BajasTenant;
+use App\Modules\Tenancy\GeneroPersona;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Builder;
@@ -33,6 +34,7 @@ class PersonaTenant extends Model
         'sucursal_id', 'nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido',
         'email', 'celular', 'tipo', 'activo', 'es_facturable', 'archivado', 'usuario_id',
         'recibe_promociones', 'como_nos_conocio', 'whatsapp_aceptado_en',
+        'fecha_nacimiento', 'genero',
     ];
 
     /**
@@ -94,6 +96,8 @@ class PersonaTenant extends Model
         'es_facturable' => 'boolean',
         'archivado' => 'boolean',
         'whatsapp_aceptado_en' => 'datetime',
+        'fecha_nacimiento' => 'date',
+        'genero' => GeneroPersona::class,
     ];
 
     /**

@@ -13,6 +13,7 @@ import RegistrarPagoOrden, {
 } from "@/components/RegistrarPagoOrden.vue";
 import { puedeEntrar } from "@/lib/acceso";
 import { fechaLocal } from "@/lib/agenda";
+import { edadDe, fechaNacimientoTexto } from "@/lib/datosPersonales";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { plural } from "@/lib/terminologia";
@@ -34,6 +35,8 @@ export interface PersonaListado {
   nombre_completo: string;
   email: string | null;
   celular?: string | null;
+  fecha_nacimiento?: string | null;
+  genero?: string | null;
   activo: boolean;
   archivado: boolean;
   alta?: string | null;
@@ -714,6 +717,31 @@ function colorAlerta(codigo: string): string {
             <div>
               <dt>{{ $t("detalleMiembro.info.celular") }}</dt>
               <dd>{{ persona.celular ?? "—" }}</dd>
+            </div>
+            <div data-prueba="info-nacimiento">
+              <dt>{{ $t("datosPersonales.fechaNacimiento") }}</dt>
+              <dd v-if="persona.fecha_nacimiento">
+                {{ fechaNacimientoTexto(persona.fecha_nacimiento) }}
+                <span :style="{ color: 'var(--texto-suave)' }"
+                  >·
+                  {{
+                    $t("datosPersonales.edad", {
+                      n: edadDe(persona.fecha_nacimiento),
+                    })
+                  }}</span
+                >
+              </dd>
+              <dd v-else>—</dd>
+            </div>
+            <div>
+              <dt>{{ $t("datosPersonales.genero") }}</dt>
+              <dd>
+                {{
+                  persona.genero
+                    ? $t(`datosPersonales.generos.${persona.genero}`)
+                    : "—"
+                }}
+              </dd>
             </div>
             <div v-if="persona.sucursal">
               <dt>{{ $t("detalleMiembro.info.sucursal") }}</dt>

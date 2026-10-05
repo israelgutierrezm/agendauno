@@ -8,6 +8,7 @@ import { useI18n } from "vue-i18n";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import BarraListado from "@/components/BarraListado.vue";
 import BotonImportar from "@/components/BotonImportar.vue";
+import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
@@ -60,6 +61,8 @@ interface Miembro {
   // Ya se le invitó y no ha activado su cuenta: se reenvía a esta cuenta.
   invitacion_pendiente?: string | null;
   celular?: string | null;
+  fecha_nacimiento?: string | null;
+  genero?: string | null;
   sucursal?: { id: string; nombre: string } | null;
   // Para las tarjetas (`resumen=1`): membresía, visitas y adeudo.
   resumen?: ResumenTarjeta;
@@ -469,6 +472,8 @@ function abrirEditar(m: Miembro): void {
     activo: m.activo,
     es_facturable: m.es_facturable,
     archivado: m.archivado,
+    fecha_nacimiento: m.fecha_nacimiento ?? null,
+    genero: m.genero ?? null,
   };
 }
 function onGuardado(): void {
@@ -575,6 +580,8 @@ const form = ref({
   segundo_apellido: "",
   email: "",
   celular: "",
+  fecha_nacimiento: "",
+  genero: "",
   whatsapp: false,
   tipo: "miembro",
 });
@@ -601,6 +608,8 @@ function abrirAlta(): void {
     segundo_apellido: "",
     email: "",
     celular: "",
+    fecha_nacimiento: "",
+    genero: "",
     whatsapp: false,
     tipo: tipo.value,
   };
@@ -628,6 +637,8 @@ async function crear(liberarCelular = false): Promise<void> {
       segundo_apellido: form.value.segundo_apellido || null,
       email: form.value.email || null,
       celular: form.value.celular || null,
+      fecha_nacimiento: form.value.fecha_nacimiento || null,
+      genero: form.value.genero || null,
       ...(ofrecerWhatsApp.value && form.value.whatsapp
         ? { acepta_whatsapp: true }
         : {}),
@@ -648,6 +659,8 @@ async function crear(liberarCelular = false): Promise<void> {
       segundo_apellido: "",
       email: "",
       celular: "",
+      fecha_nacimiento: "",
+      genero: "",
       whatsapp: false,
       tipo: tipo.value,
     };
@@ -1307,6 +1320,11 @@ onMounted(() => {
           <label class="tu-label" for="mc">{{ $t("miembros.celular") }}</label>
           <input id="mc" v-model="form.celular" class="tu-input" type="tel" />
         </div>
+        <CamposDatosPersonales
+          id="ma"
+          v-model:fecha="form.fecha_nacimiento"
+          v-model:genero="form.genero"
+        />
         <label v-if="ofrecerWhatsApp" class="flex items-start gap-2 text-sm">
           <input
             v-model="form.whatsapp"

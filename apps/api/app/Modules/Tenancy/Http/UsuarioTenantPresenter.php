@@ -25,7 +25,7 @@ class UsuarioTenantPresenter
         $roles = $usuario->rolesEfectivos();
         $catalogo = app(RolesTenant::class);
         // Su ficha de cliente o alumno (si la tiene): de ahí sale su celular.
-        $ficha = PersonaTenant::query()->where('usuario_id', $usuario->getKey())->first(['id', 'celular']);
+        $ficha = PersonaTenant::query()->where('usuario_id', $usuario->getKey())->first(['id', 'celular', 'fecha_nacimiento', 'genero']);
 
         return [
             'ulid' => $usuario->ulid,
@@ -46,6 +46,9 @@ class UsuarioTenantPresenter
             // (personal que no es cliente) no hay celular que editar.
             'tiene_ficha' => $ficha instanceof PersonaTenant,
             'celular' => $ficha?->celular,
+            // Opcionales, también de su ficha: fecha de nacimiento y género.
+            'fecha_nacimiento' => $ficha?->fecha_nacimiento?->toDateString(),
+            'genero' => $ficha?->genero?->value,
             // ¿Ya tiene contraseña? (quien entra solo con Google aún no).
             'tiene_contrasena' => $usuario->password !== null && $usuario->password !== '',
             // ¿Conectó Google para entrar con él? (ADR 0093: se conecta desde el perfil).

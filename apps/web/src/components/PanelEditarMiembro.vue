@@ -2,6 +2,7 @@
 import { reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -17,6 +18,8 @@ export interface MiembroEditable {
   activo: boolean;
   es_facturable: boolean;
   archivado: boolean;
+  fecha_nacimiento?: string | null;
+  genero?: string | null;
 }
 
 const props = defineProps<{ miembro: MiembroEditable }>();
@@ -35,6 +38,8 @@ const form = reactive({
   primer_apellido: props.miembro.primer_apellido ?? "",
   segundo_apellido: props.miembro.segundo_apellido ?? "",
   email: props.miembro.email ?? "",
+  fecha_nacimiento: props.miembro.fecha_nacimiento ?? "",
+  genero: props.miembro.genero ?? "",
   activo: props.miembro.activo,
   es_facturable: props.miembro.es_facturable,
   archivado: props.miembro.archivado,
@@ -79,6 +84,8 @@ async function guardar(): Promise<void> {
         primer_apellido: form.primer_apellido || null,
         segundo_apellido: form.segundo_apellido || null,
         email: form.email || null,
+        fecha_nacimiento: form.fecha_nacimiento || null,
+        genero: form.genero || null,
         activo: form.activo,
         es_facturable: form.es_facturable,
         archivado: form.archivado,
@@ -115,6 +122,11 @@ async function guardar(): Promise<void> {
         <label class="tu-label" for="ee">{{ $t("miembros.email") }}</label>
         <input id="ee" v-model="form.email" class="tu-input" type="email" />
       </div>
+      <CamposDatosPersonales
+        id="em"
+        v-model:fecha="form.fecha_nacimiento"
+        v-model:genero="form.genero"
+      />
 
       <div
         class="border-t pt-4 space-y-3"

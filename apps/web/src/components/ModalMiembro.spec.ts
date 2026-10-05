@@ -46,6 +46,8 @@ const persona: PersonaListado = {
   nombre_completo: "Ana García López",
   email: "ana@correo.mx",
   celular: "5512345678",
+  fecha_nacimiento: "1994-03-14",
+  genero: "no_binario",
   activo: true,
   archivado: false,
   alta: "2026-03-14",
@@ -171,6 +173,9 @@ describe("detalle de un cliente en un modal", () => {
     expect(info).toContain("García López");
     expect(info).toContain("5512345678");
     expect(info).toContain("Instagram");
+    expect(info).toContain("14 mar 1994");
+    expect(info).toMatch(/\d+ años/);
+    expect(info).toContain("No binario");
   });
 
   it("las estadísticas cambian de periodo", async () => {

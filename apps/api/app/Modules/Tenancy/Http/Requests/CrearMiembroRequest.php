@@ -48,6 +48,8 @@ class CrearMiembroRequest extends FormRequest
             'tipo' => ['nullable', 'in:miembro,instructor,staff'],
             'es_facturable' => ['nullable', 'boolean'],
             'sucursal_id' => ['nullable', 'string'],
+            // Opcionales: fecha de nacimiento y género (lista breve).
+            ...DatosPersonales::reglas(),
         ];
     }
 
@@ -59,6 +61,7 @@ class CrearMiembroRequest extends FormRequest
         return [
             'email.unique' => 'Ya existe una persona con ese correo en este estudio.',
             'celular.unique' => 'Ya existe una persona con ese teléfono en este estudio.',
+            ...DatosPersonales::mensajes(),
         ];
     }
 }

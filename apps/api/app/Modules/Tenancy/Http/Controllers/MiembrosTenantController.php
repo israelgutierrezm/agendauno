@@ -16,6 +16,7 @@ use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Exceptions\PersonaDadaDeBaja;
 use App\Modules\Tenancy\Http\Requests\CrearMiembroRequest;
+use App\Modules\Tenancy\Http\Requests\DatosPersonales;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
@@ -388,6 +389,8 @@ class MiembrosTenantController
                 'primer_apellido' => $request->validated('primer_apellido'),
                 'segundo_apellido' => $request->validated('segundo_apellido'),
                 'celular' => $request->validated('celular'),
+                'fecha_nacimiento' => $request->validated('fecha_nacimiento'),
+                'genero' => $request->validated('genero'),
             ], static fn (mixed $v): bool => $v !== null && $v !== '') + ['activo' => true, 'archivado' => false]);
             if ($request->boolean('acepta_whatsapp')) {
                 $this->whatsapp->registrarPorEquipo($conCorreo, true, $actor);
@@ -417,6 +420,8 @@ class MiembrosTenantController
             'segundo_apellido' => $request->validated('segundo_apellido'),
             'email' => $request->validated('email'),
             'celular' => $request->validated('celular'),
+            'fecha_nacimiento' => $request->validated('fecha_nacimiento'),
+            'genero' => $request->validated('genero'),
             'tipo' => (string) $request->validated('tipo', TipoPersonaTenant::Miembro->value),
             'activo' => true,
             'es_facturable' => (bool) $request->validated('es_facturable', true),
@@ -539,16 +544,18 @@ class MiembrosTenantController
             'archivado' => ['sometimes', 'boolean'],
             // El cliente pidió (o ya no quiere) los avisos por WhatsApp (ADR 0069).
             'acepta_whatsapp' => ['sometimes', 'boolean'],
+            ...DatosPersonales::reglas(),
         ], [
             'email.unique' => 'Ya existe una persona con ese correo en este estudio.',
             'celular.unique' => 'Ya existe una persona con ese teléfono en este estudio.',
+            ...DatosPersonales::mensajes(),
         ]);
 
-        $campos = ['nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email', 'celular', 'activo', 'es_facturable', 'archivado', 'sucursal_id'];
+        $campos = ['nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email', 'celular', 'fecha_nacimiento', 'genero', 'activo', 'es_facturable', 'archivado', 'sucursal_id'];
         $antes = $persona->only($campos);
 
         $cambios = [];
-        foreach (['nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email', 'celular', 'activo', 'es_facturable', 'archivado'] as $campo) {
+        foreach (['nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido', 'email', 'celular', 'fecha_nacimiento', 'genero', 'activo', 'es_facturable', 'archivado'] as $campo) {
             if ($request->has($campo)) {
                 $cambios[$campo] = $validado[$campo] ?? null;
             }
@@ -692,6 +699,9 @@ class MiembrosTenantController
             'nombre_completo' => $persona->nombreCompleto(),
             'email' => $persona->email,
             'celular' => $persona->celular,
+            // Opcionales: fecha de nacimiento (AAAA-MM-DD) y género (GeneroPersona).
+            'fecha_nacimiento' => $persona->fecha_nacimiento?->toDateString(),
+            'genero' => $persona->genero?->value,
             // Cómo conoció al negocio (lo dijo al agendar en línea, ADR 0067).
             'como_nos_conocio' => $persona->como_nos_conocio,
             // Aceptó los avisos por WhatsApp (ADR 0069).

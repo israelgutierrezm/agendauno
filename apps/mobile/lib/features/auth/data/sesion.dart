@@ -139,6 +139,8 @@ class Sesion {
     this.googleConectado = false,
     this.tieneFicha = false,
     this.celular,
+    this.fechaNacimiento,
+    this.genero,
     this.modalidad = Modalidad.clases,
     this.terminologia = const Terminologia(),
     this.estudioNombre,
@@ -174,6 +176,11 @@ class Sesion {
   /// perfil, para avisos y WhatsApp).
   final bool tieneFicha;
   final String? celular;
+
+  /// También de su ficha (opcionales): fecha de nacimiento (AAAA-MM-DD) y género
+  /// (`mujer`, `hombre`, `no_binario`, `otro`, `prefiero_no_decir`).
+  final String? fechaNacimiento;
+  final String? genero;
   final Modalidad modalidad;
   final Terminologia terminologia;
 
@@ -226,6 +233,8 @@ class Sesion {
     'google_conectado': googleConectado,
     'tiene_ficha': tieneFicha,
     'celular': celular,
+    'fecha_nacimiento': fechaNacimiento,
+    'genero': genero,
     'modalidad': modalidad.name,
     'terminologia': terminologia.aJson(),
     'estudio_nombre': estudioNombre,
@@ -260,6 +269,8 @@ class Sesion {
       googleConectado: (datos['google_conectado'] ?? false) as bool,
       tieneFicha: (datos['tiene_ficha'] ?? false) as bool,
       celular: datos['celular'] as String?,
+      fechaNacimiento: datos['fecha_nacimiento'] as String?,
+      genero: datos['genero'] as String?,
       modalidad: Modalidad.desde(datos['modalidad']),
       terminologia: Terminologia.desdeJson(
         datos['terminologia'] as Map<String, dynamic>?,
@@ -294,6 +305,8 @@ class Sesion {
       googleConectado: (usuario['google_conectado'] ?? false) as bool,
       tieneFicha: (usuario['tiene_ficha'] ?? false) as bool,
       celular: usuario['celular'] as String?,
+      fechaNacimiento: usuario['fecha_nacimiento'] as String?,
+      genero: usuario['genero'] as String?,
       modalidad: Modalidad.desde(config?['modalidad']),
       terminologia: Terminologia.desdeJson(
         config?['terminologia'] as Map<String, dynamic>?,
@@ -342,6 +355,12 @@ class Sesion {
     celular: usuario.containsKey('celular')
         ? usuario['celular'] as String?
         : celular,
+    fechaNacimiento: usuario.containsKey('fecha_nacimiento')
+        ? usuario['fecha_nacimiento'] as String?
+        : fechaNacimiento,
+    genero: usuario.containsKey('genero')
+        ? usuario['genero'] as String?
+        : genero,
     modalidad: modalidad,
     terminologia: terminologia,
     estudioNombre: estudioNombre,

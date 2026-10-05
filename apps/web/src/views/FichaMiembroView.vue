@@ -15,6 +15,7 @@ import RegistrarPagoOrden, {
 } from "@/components/RegistrarPagoOrden.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { edadDe, fechaNacimientoTexto } from "@/lib/datosPersonales";
 import { useRegreso } from "@/lib/regreso";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -105,7 +106,13 @@ interface Ficha {
   persona: {
     id: string;
     nombre_completo: string;
+    nombre?: string;
+    segundo_nombre?: string | null;
+    primer_apellido?: string | null;
+    segundo_apellido?: string | null;
     email: string | null;
+    fecha_nacimiento?: string | null;
+    genero?: string | null;
     tipo: string;
     activo: boolean;
     es_facturable: boolean;
@@ -460,14 +467,17 @@ function abrirEditar(): void {
   const p = ficha.value.persona;
   editando.value = {
     id: p.id,
-    nombre: p.nombre_completo,
-    segundo_nombre: null,
-    primer_apellido: null,
-    segundo_apellido: null,
+    // Con las partes del nombre (si no, se guardaría el nombre completo como nombre).
+    nombre: p.nombre ?? p.nombre_completo,
+    segundo_nombre: p.segundo_nombre ?? null,
+    primer_apellido: p.primer_apellido ?? null,
+    segundo_apellido: p.segundo_apellido ?? null,
     email: p.email,
     activo: p.activo,
     es_facturable: p.es_facturable,
     archivado: p.archivado,
+    fecha_nacimiento: p.fecha_nacimiento ?? null,
+    genero: p.genero ?? null,
   };
 }
 function onGuardado(): void {
@@ -1305,6 +1315,30 @@ const regreso = useRegreso({
               <div v-if="ficha.persona.sucursal" class="fi-dato">
                 <dt>{{ $t("ficha.sucursal") }}</dt>
                 <dd>{{ ficha.persona.sucursal }}</dd>
+              </div>
+              <div
+                v-if="ficha.persona.fecha_nacimiento"
+                class="fi-dato"
+                data-prueba="ficha-nacimiento"
+              >
+                <dt>{{ $t("datosPersonales.fechaNacimiento") }}</dt>
+                <dd>
+                  {{ fechaNacimientoTexto(ficha.persona.fecha_nacimiento) }}
+                  <span :style="{ color: 'var(--texto-suave)' }"
+                    >·
+                    {{
+                      $t("datosPersonales.edad", {
+                        n: edadDe(ficha.persona.fecha_nacimiento),
+                      })
+                    }}</span
+                  >
+                </dd>
+              </div>
+              <div v-if="ficha.persona.genero" class="fi-dato">
+                <dt>{{ $t("datosPersonales.genero") }}</dt>
+                <dd>
+                  {{ $t(`datosPersonales.generos.${ficha.persona.genero}`) }}
+                </dd>
               </div>
               <div class="fi-dato">
                 <dt>{{ $t("ficha.asistencias") }}</dt>

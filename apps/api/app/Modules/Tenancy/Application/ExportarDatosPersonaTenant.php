@@ -39,6 +39,8 @@ class ExportarDatosPersonaTenant
                 'segundo_apellido' => $persona->segundo_apellido,
                 'email' => $persona->email,
                 'celular' => $persona->celular,
+                'fecha_nacimiento' => $persona->fecha_nacimiento?->toDateString(),
+                'genero' => $persona->genero?->value,
                 'recibe_promociones' => (bool) $persona->recibe_promociones,
                 'acepta_whatsapp_desde' => $fecha($persona->whatsapp_aceptado_en),
                 'alta' => $fecha($persona->created_at),

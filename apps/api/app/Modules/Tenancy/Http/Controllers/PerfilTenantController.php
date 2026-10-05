@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CambiarCorreoTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
+use App\Modules\Tenancy\Http\Requests\DatosPersonales;
 use App\Modules\Tenancy\Http\UsuarioTenantPresenter;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -35,22 +36,36 @@ class PerfilTenantController
     public function actualizar(Request $request): JsonResponse
     {
         $usuario = $this->usuario($request);
-        // El celular es de su ficha de cliente o alumno (para avisos y WhatsApp): sin
-        // ficha no hay celular que guardar.
-        $persona = $request->has('celular') ? $this->personas->buscar($usuario) : null;
+        // El celular (para avisos y WhatsApp), la fecha de nacimiento y el género son de
+        // su ficha de cliente o alumno: sin ficha no hay dónde guardarlos.
+        $deFicha = $request->hasAny(['celular', 'fecha_nacimiento', 'genero']);
+        $persona = $deFicha ? $this->personas->buscar($usuario) : null;
         $validado = $request->validate([
             'nombre' => ['required', 'string', 'max:80'],
             'primer_apellido' => ['nullable', 'string', 'max:80'],
             'segundo_apellido' => ['nullable', 'string', 'max:80'],
             'celular' => ['sometimes', 'nullable', 'string', 'max:30', 'regex:/^[0-9 +()-]*$/',
                 Rule::unique(PersonaTenant::class, 'celular')->whereNull('deleted_at')->ignore($persona?->getKey())],
+            ...DatosPersonales::reglas(),
         ], [
             'celular.regex' => 'Escribe el celular solo con números.',
             'celular.unique' => 'Ese celular ya es de otra persona en este negocio.',
+            ...DatosPersonales::mensajes(),
         ]);
-        if (array_key_exists('celular', $validado) && $persona instanceof PersonaTenant) {
-            $celular = trim((string) $validado['celular']);
-            $persona->update(['celular' => $celular !== '' ? $celular : null]);
+        if ($persona instanceof PersonaTenant) {
+            $deLaFicha = [];
+            if (array_key_exists('celular', $validado)) {
+                $celular = trim((string) $validado['celular']);
+                $deLaFicha['celular'] = $celular !== '' ? $celular : null;
+            }
+            foreach (['fecha_nacimiento', 'genero'] as $campo) {
+                if (array_key_exists($campo, $validado)) {
+                    $deLaFicha[$campo] = $validado[$campo] !== '' ? $validado[$campo] : null;
+                }
+            }
+            if ($deLaFicha !== []) {
+                $persona->update($deLaFicha);
+            }
         }
 
         $partes = array_map(

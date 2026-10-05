@@ -6,6 +6,7 @@ import { reactive } from "vue";
 import esMX from "@/i18n/locales/es-MX";
 import { miPerfil } from "@/i18n/locales/equipo.es-MX";
 import { miPrivacidad } from "@/i18n/locales/gestion.es-MX";
+import datosPersonales from "@/i18n/locales/datosPersonales.es-MX";
 import zonaArchivo from "@/i18n/locales/zonaArchivo.es-MX";
 import MiPerfilView from "./MiPerfilView.vue";
 
@@ -53,7 +54,15 @@ function montar() {
         createI18n({
           legacy: false,
           locale: "es",
-          messages: { es: { ...esMX, miPerfil, miPrivacidad, zonaArchivo } },
+          messages: {
+            es: {
+              ...esMX,
+              miPerfil,
+              miPrivacidad,
+              zonaArchivo,
+              datosPersonales,
+            },
+          },
           missingWarn: false,
           fallbackWarn: false,
         }),
@@ -232,6 +241,45 @@ describe("perfil unificado", () => {
     w.unmount();
   });
 
+  it("con ficha anota su fecha de nacimiento y su género (opcionales)", async () => {
+    Object.assign(sesion.usuario, {
+      tiene_ficha: true,
+      celular: null,
+      fecha_nacimiento: "1994-03-14",
+      genero: null,
+    });
+    api.put.mockResolvedValue({ data: { data: { usuario: sesion.usuario } } });
+    const w = montar();
+    expect(w.get('[data-prueba="fecha-nacimiento"]').element).toHaveProperty(
+      "value",
+      "1994-03-14",
+    );
+    const opciones = w
+      .get('[data-prueba="genero"]')
+      .findAll("option")
+      .map((o) => o.text());
+    expect(opciones).toEqual([
+      "Sin especificar",
+      "Mujer",
+      "Hombre",
+      "No binario",
+      "Otro",
+      "Prefiero no decirlo",
+    ]);
+
+    await w.get('[data-prueba="genero"]').setValue("no_binario");
+    await w.findAll("form")[0].trigger("submit");
+    await flushPromises();
+    expect(api.put).toHaveBeenCalledWith(
+      "/api/v1/app/demo/yo/perfil",
+      expect.objectContaining({
+        fecha_nacimiento: "1994-03-14",
+        genero: "no_binario",
+      }),
+    );
+    w.unmount();
+  });
+
   it("sin ficha (personal) no hay celular que editar ni se manda", async () => {
     sesion.usuario.rol = "propietario";
     api.put.mockResolvedValue({ data: { data: { usuario: sesion.usuario } } });
@@ -241,6 +289,8 @@ describe("perfil unificado", () => {
     await w.findAll("form")[0].trigger("submit");
     await flushPromises();
     expect(api.put.mock.calls[0][1]).not.toHaveProperty("celular");
+    expect(w.find('[data-prueba="genero"]').exists()).toBe(false);
+    expect(api.put.mock.calls[0][1]).not.toHaveProperty("genero");
     w.unmount();
   });
 

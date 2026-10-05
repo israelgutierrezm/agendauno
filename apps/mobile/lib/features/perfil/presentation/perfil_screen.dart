@@ -11,6 +11,15 @@ import '../../auth/data/sesion.dart';
 import '../../auth/presentation/elegir_rol_screen.dart';
 import '../../cuenta/presentation/cuenta_screen.dart' show hacerConAviso;
 
+/// Géneros (opcionales), lista breve e incluyente: la misma que en la web y el API.
+const generos = <String, String>{
+  'mujer': 'Mujer',
+  'hombre': 'Hombre',
+  'no_binario': 'No binario',
+  'otro': 'Otro',
+  'prefiero_no_decir': 'Prefiero no decirlo',
+};
+
 /// Mi perfil: foto, nombre y contraseña de quien tiene la sesión, y cerrar sesión.
 class PerfilScreen extends ConsumerStatefulWidget {
   const PerfilScreen({super.key});
@@ -28,6 +37,9 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
   final _nueva = TextEditingController();
   final _confirmacion = TextEditingController();
   bool _guardando = false;
+  // De su ficha (opcionales): fecha de nacimiento (AAAA-MM-DD) y género.
+  String? _fechaNacimiento;
+  String? _genero;
 
   @override
   void initState() {
@@ -37,6 +49,27 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
     _primerApellido.text = sesion?.primerApellido ?? '';
     _segundoApellido.text = sesion?.segundoApellido ?? '';
     _celular.text = sesion?.celular ?? '';
+    _fechaNacimiento = sesion?.fechaNacimiento;
+    _genero = generos.containsKey(sesion?.genero) ? sesion?.genero : null;
+  }
+
+  /// Elige la fecha de nacimiento en el calendario del sistema.
+  Future<void> _elegirNacimiento() async {
+    final hoy = DateTime.now();
+    final actual = _fechaNacimiento != null
+        ? DateTime.tryParse(_fechaNacimiento!)
+        : null;
+    final elegida = await showDatePicker(
+      context: context,
+      initialDate: actual ?? DateTime(hoy.year - 25, hoy.month, hoy.day),
+      firstDate: DateTime(1900, 1, 2),
+      lastDate: hoy,
+      initialEntryMode: DatePickerEntryMode.input,
+      helpText: 'Fecha de nacimiento',
+    );
+    if (elegida != null && mounted) {
+      setState(() => _fechaNacimiento = fechaIso(elegida));
+    }
   }
 
   @override
@@ -143,8 +176,11 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
             nombre: _nombre.text.trim(),
             primerApellido: _opcional(_primerApellido),
             segundoApellido: _opcional(_segundoApellido),
-            // El celular es de su ficha de cliente o alumno.
+            // El celular, la fecha de nacimiento y el género son de su ficha de
+            // cliente o alumno.
             celular: _opcional(_celular),
+            fechaNacimiento: _fechaNacimiento,
+            genero: _genero,
             conCelular: ref.read(sesionProvider)?.tieneFicha ?? false,
           ),
       exito: 'Perfil actualizado.',
@@ -517,6 +553,51 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                         helperMaxLines: 2,
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      key: const Key('fecha-nacimiento'),
+                      onTap: _guardando ? null : _elegirNacimiento,
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Fecha de nacimiento (opcional)',
+                          suffixIcon: _fechaNacimiento == null
+                              ? const Icon(Icons.calendar_today_outlined)
+                              : IconButton(
+                                  tooltip: 'Quitar',
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () =>
+                                      setState(() => _fechaNacimiento = null),
+                                ),
+                        ),
+                        child: Text(
+                          _fechaNacimiento == null
+                              ? 'Sin especificar'
+                              : fechaLarga(_fechaNacimiento!),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String?>(
+                      key: const Key('genero'),
+                      initialValue: _genero,
+                      decoration: const InputDecoration(
+                        labelText: 'Género (opcional)',
+                        helperText: 'Solo tú y el equipo del negocio lo ven.',
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          child: Text('Sin especificar'),
+                        ),
+                        for (final g in generos.entries)
+                          DropdownMenuItem<String?>(
+                            value: g.key,
+                            child: Text(g.value),
+                          ),
+                      ],
+                      onChanged: _guardando
+                          ? null
+                          : (valor) => setState(() => _genero = valor),
+                    ),
                   ],
                   const SizedBox(height: 16),
                   FilledButton(
@@ -667,4 +748,32 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
       ),
     );
   }
+}
+
+/// Una fecha como AAAA-MM-DD (la del API).
+String fechaIso(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+const _meses = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+/// «14 de marzo de 1994» a partir de AAAA-MM-DD.
+String fechaLarga(String iso) {
+  final d = DateTime.tryParse(iso);
+  if (d == null) {
+    return iso;
+  }
+  return '${d.day} de ${_meses[d.month - 1]} de ${d.year}';
 }

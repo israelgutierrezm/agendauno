@@ -61,8 +61,15 @@ class FichaMiembroTenantController
             'persona' => [
                 'id' => $persona->ulid,
                 'nombre_completo' => $persona->nombreCompleto(),
+                // Las partes del nombre, para editarlo sin perder los apellidos.
+                'nombre' => $persona->nombre,
+                'segundo_nombre' => $persona->segundo_nombre,
+                'primer_apellido' => $persona->primer_apellido,
+                'segundo_apellido' => $persona->segundo_apellido,
                 'email' => $persona->email,
                 'celular' => $persona->celular,
+                'fecha_nacimiento' => $persona->fecha_nacimiento?->toDateString(),
+                'genero' => $persona->genero?->value,
                 'tipo' => $persona->tipo->value,
                 'activo' => $persona->activo,
                 'dado_de_baja_en' => $persona->deleted_at?->toIso8601String(),

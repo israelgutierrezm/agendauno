@@ -69,6 +69,7 @@ import perfilPublico from "./locales/perfilPublico.es-MX";
 import buscarPersona from "./locales/buscarPersona.es-MX";
 import zonaArchivo from "./locales/zonaArchivo.es-MX";
 import detalleMiembro from "./locales/detalleMiembro.es-MX";
+import datosPersonales from "./locales/datosPersonales.es-MX";
 import confirmaciones from "./locales/confirmaciones.es-MX";
 import corregirCobro from "./locales/corregirCobro.es-MX";
 import nominaVisual from "./locales/nominaVisual.es-MX";
@@ -162,6 +163,7 @@ const mensajesBase = {
   buscarPersona,
   zonaArchivo,
   detalleMiembro,
+  datosPersonales,
   confirmaciones,
   corregirCobro,
   nominaVisual,

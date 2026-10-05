@@ -144,13 +144,15 @@ class SesionController extends Notifier<Sesion?> {
     }
   }
 
-  /// Guarda el nombre y, si tiene ficha de cliente o alumno, su celular (Mi
-  /// perfil); refleja lo que devuelve el servidor.
+  /// Guarda el nombre y, si tiene ficha de cliente o alumno, su celular, su fecha
+  /// de nacimiento y su género (Mi perfil); refleja lo que devuelve el servidor.
   Future<void> guardarPerfil({
     required String nombre,
     String? primerApellido,
     String? segundoApellido,
     String? celular,
+    String? fechaNacimiento,
+    String? genero,
     bool conCelular = false,
   }) async {
     final actual = state;
@@ -165,7 +167,11 @@ class SesionController extends Notifier<Sesion?> {
             'nombre': nombre,
             'primer_apellido': primerApellido,
             'segundo_apellido': segundoApellido,
-            if (conCelular) 'celular': celular,
+            if (conCelular) ...{
+              'celular': celular,
+              'fecha_nacimiento': fechaNacimiento,
+              'genero': genero,
+            },
           },
         );
     final usuario =
