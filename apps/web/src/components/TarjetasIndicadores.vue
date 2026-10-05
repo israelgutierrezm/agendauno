@@ -57,6 +57,7 @@ const columnasMedio = computed(() =>
   <div class="ti-envoltura">
     <dl
       class="ti"
+      :class="{ 'ti-medio-pares': columnasMedio === 2 }"
       :style="{
         '--ti-n': String(columnas),
         '--ti-n-medio': String(columnasMedio),
@@ -110,14 +111,14 @@ const columnasMedio = computed(() =>
 <style scoped>
 /* Una sola franja, al estilo de los tableros de producto: celdas separadas por una
    línea fina, sin cuadros de color ni íconos de adorno. Se acomoda al ancho que
-   tiene (no al de la ventana): una por fila si es angosto, de dos en dos (o las 3)
-   en mediano y en una fila si cabe. */
+   tiene (no al de la ventana): de dos en dos y compactas si es angosto (el teléfono),
+   de dos en dos (o las 3) en mediano y en una fila si cabe. */
 .ti-envoltura {
   container-type: inline-size;
 }
 .ti {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
   margin: 0;
   overflow: hidden;
@@ -125,27 +126,40 @@ const columnasMedio = computed(() =>
   border-radius: var(--radio-tarjeta);
   background: var(--borde);
 }
+/* Angosto: con un número impar, la última ocupa la fila completa. */
+.ti-celda:last-child:nth-child(odd) {
+  grid-column: span 2;
+}
 @container (min-width: 34rem) {
   .ti {
     grid-template-columns: repeat(var(--ti-n-medio), minmax(0, 1fr));
   }
-  /* De dos en dos con un número impar: la última ocupa la fila completa. */
+  /* De dos en dos con un número impar: la última ocupa la fila completa. Con
+     tres columnas (3 o menos indicadores) caben todas en una fila. */
   .ti-celda:last-child:nth-child(odd) {
-    grid-column: span var(--ti-n-medio);
+    grid-column: auto;
+  }
+  .ti-medio-pares > .ti-celda:last-child:nth-child(odd) {
+    grid-column: span 2;
   }
 }
 @container (min-width: 60rem) {
   .ti {
     grid-template-columns: repeat(var(--ti-n), minmax(0, 1fr));
   }
-  .ti-celda:last-child:nth-child(odd) {
+  .ti-medio-pares > .ti-celda:last-child:nth-child(odd) {
     grid-column: auto;
   }
 }
 .ti-celda {
   min-width: 0;
-  padding: 0.95rem 1.15rem 1rem;
+  padding: 0.6rem 0.8rem 0.65rem;
   background: var(--superficie);
+}
+@container (min-width: 34rem) {
+  .ti-celda {
+    padding: 0.95rem 1.15rem 1rem;
+  }
 }
 .ti-etiqueta {
   display: flex;
@@ -163,12 +177,18 @@ const columnasMedio = computed(() =>
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.25rem 0.6rem;
-  margin: 0.35rem 0 0;
-  font-size: 1.45rem;
+  margin: 0.2rem 0 0;
+  font-size: 1.15rem;
   font-weight: 600;
   line-height: 1.2;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
+}
+@container (min-width: 34rem) {
+  .ti-valor {
+    margin-top: 0.35rem;
+    font-size: 1.45rem;
+  }
 }
 .ti-tendencia {
   display: inline-flex;

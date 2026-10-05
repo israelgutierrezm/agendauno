@@ -573,8 +573,10 @@ const regreso = useRegreso({
           </div>
         </header>
 
-        <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <div class="min-w-0">
+        <!-- En el teléfono: lo que debe y sus planes, luego el resumen y al final
+             los historiales (la columna se «abre» para ordenar sus secciones). -->
+        <div class="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div class="min-w-0 max-lg:contents">
             <div class="px-5 pt-5">
               <div class="tu-segmentado" role="group">
                 <button
@@ -1077,7 +1079,7 @@ const regreso = useRegreso({
 
               <!-- Historial de reservas -->
               <section
-                class="px-5 py-5 border-t"
+                class="px-5 py-5 border-t max-lg:order-2"
                 :style="{ borderColor: 'var(--borde)' }"
               >
                 <h2 class="text-sm font-semibold">
@@ -1134,7 +1136,7 @@ const regreso = useRegreso({
               <!-- Historial de compras (solo a quien puede ver órdenes) -->
               <section
                 v-if="ficha.ordenes !== null"
-                class="px-5 py-5 border-t"
+                class="px-5 py-5 border-t max-lg:order-2"
                 :style="{ borderColor: 'var(--borde)' }"
               >
                 <h2 class="text-sm font-semibold">
@@ -1190,7 +1192,7 @@ const regreso = useRegreso({
 
           <!-- Resumen a un lado, sobre fondo gris -->
           <aside
-            class="border-t lg:border-t-0 lg:border-l px-5 py-6"
+            class="border-t lg:border-t-0 lg:border-l px-5 py-6 max-lg:order-1"
             :style="{ borderColor: 'var(--borde)', background: 'var(--fondo)' }"
           >
             <template v-if="!mostrarPlanes">

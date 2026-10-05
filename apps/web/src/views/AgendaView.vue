@@ -187,6 +187,14 @@ const instructorFiltro = ref("");
 const soloLoSuyo = computed(() => esInstructor(sesion.usuario));
 // Por servicio o clase (2.6).
 const ofertaFiltro = ref("");
+// En el teléfono los filtros van plegados tras un botón: primero la fecha y las citas.
+const filtrosAbiertos = ref(false);
+const filtrosActivos = computed(
+  () =>
+    [sucursalFiltro.value, instructorFiltro.value, ofertaFiltro.value].filter(
+      (v) => v !== "",
+    ).length,
+);
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
@@ -292,6 +300,23 @@ function sesionesDe(iso: string): Sesion[] {
 }
 const diaSelInfo = computed(
   () => dias.value.find((d) => d.iso === diaSel.value) ?? dias.value[0],
+);
+
+// La tira de días del teléfono deja a la vista el día elegido (hoy puede ser domingo).
+const tiraDias = ref<HTMLElement | null>(null);
+watch(
+  [diaSel, () => dias.value[0]?.iso, tiraDias],
+  () => {
+    const tira = tiraDias.value;
+    const boton = tira?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (tira && boton) {
+      tira.scrollLeft =
+        boton.offsetLeft -
+        tira.offsetLeft -
+        (tira.clientWidth - boton.offsetWidth) / 2;
+    }
+  },
+  { flush: "post" },
 );
 
 /**
@@ -1658,8 +1683,10 @@ onMounted(async () => {
         :subtitulo="$t('agenda.subtitulo')"
       />
       <div class="flex flex-wrap items-center gap-2">
+        <!-- En el teléfono, solo la acción principal: lo demás está en el menú. -->
         <BotonImportar
           v-if="puedeEntrar('importar-clases', sesion)"
+          class="max-sm:hidden"
           ruta="importar-clases"
           :texto="$t('importarClases.titulo')"
         />
@@ -1667,13 +1694,13 @@ onMounted(async () => {
         <RouterLink
           v-if="puedeEntrar('horarios', sesion)"
           :to="{ name: 'horarios' }"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-fantasma max-sm:hidden"
           >{{ $t("agenda.disponibilidadEquipo") }}</RouterLink
         >
         <RouterLink
           v-if="puedeEntrar('reglas-agenda', sesion)"
           :to="{ name: 'reglas-agenda', hash: '#politicas' }"
-          class="tu-btn tu-btn-fantasma"
+          class="tu-btn tu-btn-fantasma max-sm:hidden"
           >{{ $t("agenda.reglasReserva") }}</RouterLink
         >
         <!-- Citas: el negocio agenda al cliente. Clases: se programa una clase. -->
@@ -1712,14 +1739,51 @@ onMounted(async () => {
       {{ avisoSerie }}
     </p>
 
-    <template v-if="!cargando">
+    <!-- En el teléfono, los indicadores y la leyenda van después de las citas. -->
+    <div v-if="!cargando" class="flex flex-col">
       <!-- Barra de herramientas: filtros + navegacion + vista -->
       <div class="mt-6 flex flex-wrap items-center gap-2 sm:gap-3">
-        <span v-if="elegirSucursal" class="tu-select-icono">
+        <button
+          v-if="
+            elegirSucursal ||
+            (instructores.length > 0 && !soloLoSuyo) ||
+            ofertasAgenda.length > 1
+          "
+          type="button"
+          class="tu-btn tu-btn-fantasma sm:hidden"
+          data-prueba="mostrar-filtros"
+          :aria-expanded="filtrosAbiertos"
+          :style="
+            filtrosAbiertos || filtrosActivos
+              ? {
+                  borderColor: 'var(--primario)',
+                  color: 'var(--primario-fuerte)',
+                }
+              : {}
+          "
+          @click="filtrosAbiertos = !filtrosAbiertos"
+        >
+          <IconoNav nombre="ajustes" :tam="16" />
+          {{ $t("tabla.filtros") }}
+          <span
+            v-if="filtrosActivos"
+            class="rounded-full px-1.5 text-xs"
+            :style="{
+              background: 'var(--primario)',
+              color: 'var(--primario-contraste)',
+            }"
+            >{{ filtrosActivos }}</span
+          >
+        </button>
+        <span
+          v-if="elegirSucursal"
+          class="tu-select-icono"
+          :class="filtrosAbiertos ? 'max-sm:w-full' : 'max-sm:hidden'"
+        >
           <IconoNav nombre="ubicacion" :tam="18" />
           <select
             v-model="sucursalFiltro"
-            class="tu-input w-auto"
+            class="tu-input w-auto max-sm:w-full"
             :aria-label="$t('agenda.nueva.sucursal')"
           >
             <option value="">{{ $t("agenda.todasSucursales") }}</option>
@@ -1731,11 +1795,12 @@ onMounted(async () => {
         <span
           v-if="instructores.length > 0 && !soloLoSuyo"
           class="tu-select-icono"
+          :class="filtrosAbiertos ? 'max-sm:w-full' : 'max-sm:hidden'"
         >
           <IconoNav nombre="instructores" :tam="18" />
           <select
             v-model="instructorFiltro"
-            class="tu-input w-auto"
+            class="tu-input w-auto max-sm:w-full"
             :aria-label="$t('agenda.nueva.instructor')"
           >
             <option value="">
@@ -1751,11 +1816,15 @@ onMounted(async () => {
           </select>
         </span>
 
-        <span v-if="ofertasAgenda.length > 1" class="tu-select-icono">
+        <span
+          v-if="ofertasAgenda.length > 1"
+          class="tu-select-icono"
+          :class="filtrosAbiertos ? 'max-sm:w-full' : 'max-sm:hidden'"
+        >
           <IconoNav nombre="etiqueta" :tam="18" />
           <select
             v-model="ofertaFiltro"
-            class="tu-input w-auto"
+            class="tu-input w-auto max-sm:w-full"
             :aria-label="$t('agendaOperacion.servicio')"
           >
             <option value="">{{ $t("agendaOperacion.todosServicios") }}</option>
@@ -1765,7 +1834,9 @@ onMounted(async () => {
           </select>
         </span>
 
-        <div class="flex items-center gap-1 ml-auto">
+        <div
+          class="flex items-center gap-1 sm:ml-auto max-sm:order-first max-sm:mr-auto"
+        >
           <button
             class="tu-btn tu-btn-fantasma ag-paso"
             :aria-label="
@@ -1811,25 +1882,38 @@ onMounted(async () => {
           :class="{ 'hidden lg:inline-flex': !sesion.esCitas }"
           role="group"
         >
+          <!-- En el teléfono las citas se ven por día (por profesional y por
+               semana se ven igual), así que solo se ofrece «Día» y «Mes». -->
           <button
             v-for="op in opcionesVista"
             :key="op"
             type="button"
+            :class="{ 'max-lg:hidden': sesion.esCitas && op === 'semana' }"
             :aria-pressed="vista === op"
             @click="vista = op"
           >
-            {{ $t(`agendaVisual.vistas.${op}`) }}
+            <template v-if="sesion.esCitas && op === 'profesionales'">
+              <span class="lg:hidden">{{ $t("agendaVisual.vistas.dia") }}</span>
+              <span class="max-lg:hidden">{{
+                $t("agendaVisual.vistas.profesionales")
+              }}</span>
+            </template>
+            <template v-else>{{ $t(`agendaVisual.vistas.${op}`) }}</template>
           </button>
         </div>
       </div>
 
       <!-- Indicadores del día (citas) o de la semana (clases). -->
-      <AgendaKpis v-if="vista !== 'mes'" class="mt-4" :tarjetas="tarjetasKpi" />
+      <AgendaKpis
+        v-if="vista !== 'mes'"
+        class="mt-4 max-lg:order-last"
+        :tarjetas="tarjetasKpi"
+      />
 
       <!-- Leyenda: el color identifica el servicio o la clase. -->
       <div
         v-if="leyenda.length > 0"
-        class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"
+        class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs max-lg:order-last"
         :style="{ color: 'var(--texto-suave)' }"
       >
         <span class="font-medium" :style="{ color: 'var(--texto)' }">{{
@@ -2082,12 +2166,19 @@ onMounted(async () => {
               : 'mt-4 lg:hidden'
         "
       >
-        <!-- Tira de dias -->
-        <div class="flex gap-1.5 overflow-x-auto pb-2">
+        <!-- El día elegido, completo; luego la tira de días -->
+        <p
+          class="mb-2 text-sm font-medium first-letter:uppercase"
+          data-prueba="dia-completo"
+        >
+          {{ diaTexto }}
+        </p>
+        <div ref="tiraDias" class="flex gap-1.5 overflow-x-auto pb-2">
           <button
             v-for="d in dias"
             :key="d.iso"
             class="flex-1 min-w-[3rem] rounded-xl border py-2 text-center"
+            :aria-pressed="diaSel === d.iso"
             :style="
               diaSel === d.iso
                 ? {
@@ -2207,7 +2298,7 @@ onMounted(async () => {
           {{ $t("agenda.sinClasesDia") }}
         </p>
       </div>
-    </template>
+    </div>
 
     <!-- ===== Detalle de una clase (mismo patrón que el de una cita) ===== -->
     <ModalDialogo
