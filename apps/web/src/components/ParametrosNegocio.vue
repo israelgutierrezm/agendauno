@@ -54,7 +54,7 @@ onMounted(cargar);
 
 <template>
   <div class="mt-5 tu-card p-5">
-    <h2 class="font-semibold">{{ $t("parametrosConfig.tituloNegocio") }}</h2>
+    <h2 class="font-medium">{{ $t("parametrosConfig.tituloNegocio") }}</h2>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("parametrosConfig.ayudaNegocio") }}
     </p>

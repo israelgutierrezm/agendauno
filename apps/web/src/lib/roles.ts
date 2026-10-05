@@ -30,8 +30,11 @@ const FACETA_DE_SISTEMA: Record<string, Faceta> = {
  * y cambia desde la barra superior: el menú, su inicio y lo que la API le concede
  * son solo de ese rol.
  */
-export function facetaActiva(usuario: UsuarioConRol | null): Faceta | null {
-  if (usuario === null) {
+export function facetaActiva(
+  usuario: UsuarioConRol | null | undefined,
+): Faceta | null {
+  // Sin usuario (aún no se carga la sesión): ninguna faceta.
+  if (!usuario) {
     return null;
   }
   const disponible = usuario.roles_disponibles?.find(
@@ -55,7 +58,9 @@ export function nombreDeRol(
 }
 
 /** ¿Entró como quien imparte clases o atiende citas? */
-export function esInstructor(usuario: UsuarioConRol | null): boolean {
+export function esInstructor(
+  usuario: UsuarioConRol | null | undefined,
+): boolean {
   return facetaActiva(usuario) === "instructor";
 }
 

@@ -27,7 +27,7 @@ class PlantillasHorarioTenantController
 
     public function index(): JsonResponse
     {
-        $plantillas = PlantillaHorarioTenant::query()->with(['oferta', 'sucursal', 'instructor'])->orderByDesc('id')->get();
+        $plantillas = PlantillaHorarioTenant::query()->with(['oferta.actividad', 'sucursal', 'instructor'])->orderByDesc('id')->get();
 
         return response()->json([
             'data' => $plantillas->map(fn (PlantillaHorarioTenant $p): array => $this->presentar($p))->all(),
@@ -68,7 +68,7 @@ class PlantillasHorarioTenantController
             'activo' => (bool) ($validado['activo'] ?? true),
         ]);
 
-        return response()->json(['data' => $this->presentar($plantilla->load(['oferta', 'sucursal', 'instructor']))], 201);
+        return response()->json(['data' => $this->presentar($plantilla->load(['oferta.actividad', 'sucursal', 'instructor']))], 201);
     }
 
     public function eliminar(Request $request, EliminacionesTenant $eliminaciones): JsonResponse
@@ -181,8 +181,12 @@ class PlantillasHorarioTenantController
         return [
             'id' => $plantilla->ulid,
             'oferta' => $plantilla->oferta?->nombre,
+            // Para ver la programación de la semana por actividad e instructor.
+            'actividad' => $plantilla->oferta?->actividad?->nombre,
+            'actividad_id' => $plantilla->oferta?->actividad?->ulid,
             'sucursal' => $plantilla->sucursal?->nombre,
             'instructor' => $plantilla->instructor?->name,
+            'instructor_id' => $plantilla->instructor?->ulid,
             'dias_semana' => $plantilla->dias_semana,
             'hora_local' => $plantilla->hora_local,
             'duracion_minutos' => $plantilla->duracion_minutos,

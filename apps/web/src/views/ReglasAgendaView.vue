@@ -1,19 +1,24 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ParametrosNegocio from "@/components/ParametrosNegocio.vue";
+import ProgramacionSemanal from "@/components/ProgramacionSemanal.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { instantanea, useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { confirmar } from "@/lib/confirmar";
+import { isoLocal } from "@/lib/misClases";
+import type { SerieProgramada } from "@/lib/programacion";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
 /**
- * Reglas que gobiernan la agenda: la política de cancelación (general y por
- * actividad), los días cerrados (sin clases ni citas) y las clases que se repiten
- * (plantillas que generan fechas).
+ * Reglas que gobiernan la agenda, cada una en su pestaña: la política de cancelación
+ * (general y por actividad), los días de cierre (sin clases ni citas), las clases que
+ * se repiten (la semana tipo, filtrable) y los límites y tiempos del negocio. El menú
+ * de Configuración entra directo a cada una por su ancla (#politicas, #cierres…).
  */
 const { t } = useI18n();
 
@@ -33,16 +38,7 @@ interface DiaCerrado {
   fecha: string;
   motivo: string | null;
 }
-interface Serie {
-  id: string;
-  oferta: string | null;
-  sucursal: string | null;
-  instructor: string | null;
-  dias_semana: number[];
-  hora_local: string;
-  vigente_desde: string;
-  vigente_hasta: string | null;
-}
+type Pestana = "politicas" | "cierres" | "programacion" | "parametros";
 interface Oferta {
   actividad: string | null;
   actividad_id: string | null;
@@ -59,6 +55,7 @@ interface FormPolitica {
 
 const sesion = useSesionTenantStore();
 const toast = useToastStore();
+const route = useRoute();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedePoliticas = computed(() => sesion.puede("estudio.gestionar"));
 // Quitar un día o dejar de repetir un horario es borrarlo (ADR 0077).
@@ -68,7 +65,7 @@ const cargando = ref(true);
 const error = ref<string | null>(null);
 const politicas = ref<Politica[]>([]);
 const cerrados = ref<DiaCerrado[]>([]);
-const series = ref<Serie[]>([]);
+const series = ref<SerieProgramada[]>([]);
 const actividades = ref<{ id: string; nombre: string }[]>([]);
 
 const general = ref<FormPolitica>({
@@ -95,9 +92,37 @@ const nuevoDia = ref({ fecha: "", motivo: "" });
 // Días de la ventana cuando la política no fija los suyos (los de la plataforma).
 const ventanaPlataforma = ref(30);
 
-const LETRAS = ["", "L", "M", "M", "J", "V", "S", "D"];
+// La programación recurrente es de clases; en citas solo aparece si ya hay series.
+const pestanas = computed<Pestana[]>(() =>
+  (["politicas", "cierres", "programacion", "parametros"] as const).filter(
+    (p) =>
+      (p !== "programacion" || !sesion.esCitas || series.value.length > 0) &&
+      (p !== "parametros" || puedePoliticas.value),
+  ),
+);
+const elegida = ref<Pestana>(desdeAncla(route.hash) ?? "politicas");
+const pestana = computed<Pestana>(() =>
+  pestanas.value.includes(elegida.value) ? elegida.value : "politicas",
+);
+// Desde el menú se llega a otra sección sin salir de la página.
+watch(
+  () => route.hash,
+  (h) => {
+    const p = desdeAncla(h);
+    if (p !== null) {
+      elegida.value = p;
+    }
+  },
+);
 
-const hoy = new Date().toISOString().slice(0, 10);
+function desdeAncla(hash: string): Pestana | null {
+  const p = hash.replace("#", "");
+  return ["politicas", "cierres", "programacion", "parametros"].includes(p)
+    ? (p as Pestana)
+    : null;
+}
+
+const hoy = isoLocal(new Date());
 const cerradosProximos = computed(() =>
   cerrados.value.filter((d) => d.fecha >= hoy),
 );
@@ -117,13 +142,6 @@ function fecha(iso: string): string {
     month: "short",
     year: "numeric",
   }).format(new Date(`${iso}T12:00:00`));
-}
-
-function dias(s: Serie): string {
-  return [...s.dias_semana]
-    .sort((a, b) => a - b)
-    .map((d) => LETRAS[d])
-    .join(" ");
 }
 
 function resumen(p: Politica): string {
@@ -152,7 +170,7 @@ async function cargar(): Promise<void> {
         por_defecto?: Omit<FormPolitica, "actividad_id">;
       }>(`${base.value}/politicas-cancelacion`),
       api.get<{ data: DiaCerrado[] }>(`${base.value}/excepciones-horario`),
-      api.get<{ data: Serie[] }>(`${base.value}/plantillas-horario`),
+      api.get<{ data: SerieProgramada[] }>(`${base.value}/plantillas-horario`),
       api.get<{ data: Oferta[] }>(`${base.value}/ofertas`),
     ]);
     politicas.value = p.data.data;
@@ -252,7 +270,7 @@ async function quitarDia(d: DiaCerrado): Promise<void> {
   }
 }
 
-async function dejarDeRepetir(s: Serie): Promise<void> {
+async function dejarDeRepetir(s: SerieProgramada): Promise<void> {
   if (!(await confirmar(t("reglasAgenda.confirmarDejar"), { peligro: true }))) {
     return;
   }
@@ -268,8 +286,20 @@ onMounted(cargar);
 </script>
 
 <template>
-  <section class="mx-auto max-w-4xl px-4 py-10">
+  <section class="mx-auto max-w-6xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion :titulo="$t('reglasAgenda.titulo')" />
+
+    <div class="tu-pestanas mt-6" role="group" data-prueba="pestanas">
+      <button
+        v-for="p in pestanas"
+        :key="p"
+        type="button"
+        :aria-pressed="pestana === p"
+        @click="elegida = p"
+      >
+        {{ $t(`reglasAgenda.pestanas.${p}`) }}
+      </button>
+    </div>
 
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
@@ -280,8 +310,8 @@ onMounted(cargar);
 
     <template v-if="!cargando">
       <!-- Cancelaciones (Configuración › Agenda y reservas › Políticas) -->
-      <div id="politicas" class="mt-6 tu-card p-5 scroll-mt-24">
-        <h2 class="font-semibold">{{ $t("reglasAgenda.cancelaciones") }}</h2>
+      <div v-if="pestana === 'politicas'" class="mt-5 tu-card p-5">
+        <h2 class="font-medium">{{ $t("reglasAgenda.cancelaciones") }}</h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("reglasAgenda.cancelacionesAyuda") }}
         </p>
@@ -369,7 +399,7 @@ onMounted(cargar);
         </form>
 
         <template v-if="actividades.length > 0">
-          <h3 class="mt-6 text-sm font-semibold">
+          <h3 class="mt-6 text-sm font-medium">
             {{ $t("reglasAgenda.porActividad") }}
           </h3>
           <ul class="mt-1">
@@ -499,9 +529,9 @@ onMounted(cargar);
         </template>
       </div>
 
-      <!-- Días cerrados -->
-      <div id="cierres" class="mt-5 tu-card p-5 scroll-mt-24">
-        <h2 class="font-semibold">{{ $t("reglasAgenda.cerrados") }}</h2>
+      <!-- Días de cierre -->
+      <div v-if="pestana === 'cierres'" class="mt-5 tu-card p-5">
+        <h2 class="font-medium">{{ $t("reglasAgenda.cerrados") }}</h2>
         <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
           {{ $t("reglasAgenda.cerradosAyuda") }}
         </p>
@@ -576,70 +606,16 @@ onMounted(cargar);
         </ul>
       </div>
 
-      <!-- Clases que se repiten -->
-      <div
-        v-if="!sesion.esCitas || series.length > 0"
-        id="programacion"
-        class="mt-5 tu-card p-5 scroll-mt-24"
-      >
-        <h2 class="font-semibold">{{ $t("reglasAgenda.series") }}</h2>
-        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("reglasAgenda.seriesAyuda") }}
-        </p>
-        <p
-          v-if="series.length === 0"
-          class="mt-4 text-sm"
-          :style="{ color: 'var(--texto-suave)' }"
-        >
-          {{ $t("reglasAgenda.sinSeries") }}
-        </p>
-        <ul v-else class="mt-3">
-          <li v-for="s in series" :key="s.id" class="ra-fila text-sm">
-            <div class="min-w-0">
-              <p class="font-medium truncate">
-                {{ s.oferta ?? "—" }} · {{ dias(s) }} {{ s.hora_local }}
-              </p>
-              <p
-                class="mt-0.5 text-xs truncate"
-                :style="{ color: 'var(--texto-suave)' }"
-              >
-                {{
-                  [
-                    s.sucursal,
-                    s.instructor,
-                    $t("reglasAgenda.desde", {
-                      fecha: fecha(s.vigente_desde),
-                    }),
-                    s.vigente_hasta
-                      ? $t("reglasAgenda.hasta", {
-                          fecha: fecha(s.vigente_hasta),
-                        })
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")
-                }}
-              </p>
-            </div>
-            <button
-              v-if="puedeEliminar"
-              type="button"
-              class="tu-enlace shrink-0"
-              style="color: var(--error)"
-              @click="dejarDeRepetir(s)"
-            >
-              {{ $t("reglasAgenda.dejarDeRepetir") }}
-            </button>
-          </li>
-        </ul>
-      </div>
+      <!-- Clases que se repiten: la semana tipo -->
+      <ProgramacionSemanal
+        v-if="pestana === 'programacion'"
+        :series="series"
+        :puede-eliminar="puedeEliminar"
+        @dejar="dejarDeRepetir"
+      />
 
       <!-- Límites y tiempos del negocio (ADR 0042) -->
-      <ParametrosNegocio
-        v-if="puedePoliticas"
-        id="parametros"
-        class="scroll-mt-24"
-      />
+      <ParametrosNegocio v-if="pestana === 'parametros'" />
     </template>
   </section>
 </template>

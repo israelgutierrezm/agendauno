@@ -101,6 +101,25 @@ it('no resucita una sesion cancelada al reejecutar (override por instancia)', fu
     expect($creadas)->toBe(0);
 });
 
+it('cada serie dice su actividad e instructor para filtrar la semana', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    personalConSesion($e['slug'], $e['bearer'], 'beto@correo.mx', 'instructor');
+    $coach = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+
+    $this->postJson("/api/v1/app/{$e['slug']}/plantillas-horario", [
+        'oferta_id' => $semilla['oferta'], 'sucursal_id' => $semilla['sucursal'], 'instructor_id' => $coach,
+        'dias_semana' => [1, 3], 'hora_local' => '09:00', 'duracion_minutos' => 60,
+        'vigente_desde' => Carbon::now()->toDateString(),
+    ], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.actividad', 'Pole Sport');
+
+    $this->getJson("/api/v1/app/{$e['slug']}/plantillas-horario", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.0.actividad', 'Pole Sport')
+        ->assertJsonPath('data.0.instructor_id', $coach)
+        ->assertJsonPath('data.0.instructor', 'Personal');
+});
+
 it('gestionar plantillas/excepciones exige agenda.gestionar', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $semilla = agendaSemilla($e);

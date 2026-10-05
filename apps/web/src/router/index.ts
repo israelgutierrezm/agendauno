@@ -19,7 +19,9 @@ const router = createRouter({
   history: createWebHistory(),
   scrollBehavior(to, _from, savedPosition) {
     if (savedPosition) return savedPosition;
-    if (to.hash) {
+    // Un ancla que no es un elemento (p. ej. la pestaña de Reglas de la agenda)
+    // no desplaza: la página la interpreta.
+    if (to.hash && document.getElementById(to.hash.slice(1)) !== null) {
       // La barra fija de arriba: la de la página pública o la del panel.
       const headerHeight =
         document

@@ -204,6 +204,13 @@ export const avisosWhatsApp = {
 
 export const reglasAgenda = {
   titulo: "Reglas de la agenda",
+  // Mismos nombres que en el menú de Configuración.
+  pestanas: {
+    politicas: "Políticas",
+    cierres: "Días de cierre",
+    programacion: "Programación recurrente",
+    parametros: "Límites y tiempos",
+  },
   cancelaciones: "Cancelaciones",
   cancelacionesAyuda:
     "Cancelar con esta antelación devuelve el crédito. Después, se cobra según lo que marques.",
@@ -221,7 +228,7 @@ export const reglasAgenda = {
   cobraTarde: "cobra tardías",
   cobraNoShow: "cobra inasistencias",
   soloLectura: "Solo el dueño o un administrador cambian esta política.",
-  cerrados: "Días cerrados",
+  cerrados: "Días de cierre",
   cerradosAyuda:
     "Feriados y cierres: esos días no se generan clases ni se ofrecen citas.",
   fecha: "Fecha",
@@ -239,6 +246,30 @@ export const reglasAgenda = {
     "¿Dejar de repetir esta clase? Las fechas ya agendadas se conservan.",
   desde: "desde {fecha}",
   hasta: "hasta {fecha}",
+  filtroActividad: "Actividad",
+  filtroInstructor: "Instructor",
+  filtroSucursal: "Sucursal",
+  todasActividades: "Todas las actividades",
+  todosInstructores: "Todos los instructores",
+  todasSucursales: "Todas las sucursales",
+  sinInstructor: "Sin instructor",
+  quitarFiltros: "Quitar filtros",
+  clasesPorSemana:
+    "Sin clases a la semana | 1 clase a la semana | {n} clases a la semana",
+  sinSeriesFiltro: "Ninguna clase que se repite coincide con los filtros.",
+  yaNoSeRepiten: "Ya no se repiten ({n})",
+  detalle: {
+    actividad: "Actividad",
+    dias: "Días",
+    horario: "Horario",
+    minutos: "{n} min",
+    instructor: "Instructor",
+    sucursal: "Sucursal",
+    lugares: "Lugares",
+    vigencia: "Vigencia",
+    cambiar:
+      "Para cambiar días, hora o instructor, abre una de sus clases en la agenda y elige «Mover esta y las siguientes».",
+  },
 };
 
 export const creditosFicha = {
