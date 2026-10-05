@@ -79,6 +79,9 @@ final class DemoGrecon extends DemoBase
 
     private const CUPO_OPEN = 12;
 
+    /** Los planes valen hasta fin de mes: en sus últimos días nadie compra uno. */
+    private const SIN_COMPRA_ULTIMOS_DIAS = 7;
+
     /** El dueño: también da clases y toma clases como alumno. */
     private const DUENO = 'CONSTANTINO ESCOBAR';
 
@@ -557,7 +560,8 @@ final class DemoGrecon extends DemoBase
     /**
      * Sin plan vigente: casi todos compran otro (a veces cambian de plan). Quien
      * gastó su paquete a mitad de mes compra otro igual o uno más grande. Algunos
-     * se van cuando termina su mes.
+     * se van cuando termina su mes. Nadie compra un plan en la última semana del mes:
+     * vale hasta fin de mes, así que espera al siguiente.
      */
     private function renovar(int $i, CarbonImmutable $momento): bool
     {
@@ -567,6 +571,9 @@ final class DemoGrecon extends DemoBase
             $this->alumnas[$i]['deja'] = $momento->startOfDay();
             $this->sumar('miembros que se fueron');
 
+            return false;
+        }
+        if ($momento->daysInMonth - $momento->day < self::SIN_COMPRA_ULTIMOS_DIAS) {
             return false;
         }
         if ($mismoMes) {

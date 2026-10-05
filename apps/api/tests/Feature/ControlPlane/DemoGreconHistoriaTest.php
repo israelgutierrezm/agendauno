@@ -99,6 +99,12 @@ it('siembra Grecon en «demo» con su agenda de octubre, sus planes y 80 miembro
                 ->count())->toBeGreaterThan(10)
             // Nada de la historia queda por avisar.
             ->and(DB::connection('tenant')->table('eventos_outbox')->whereNull('publicado_en')->count())->toBe(0);
+
+        // Los planes valen hasta fin de mes: nadie compra uno que le dure pocos días
+        // (p. ej. un paquete de 12 el día 31).
+        $cortos = DB::connection('tenant')->table('derechos')->whereNotNull('acuerdo_id')->get(['valido_desde', 'valido_hasta'])
+            ->filter(fn (object $d): bool => CarbonImmutable::parse($d->valido_desde)->diffInDays(CarbonImmutable::parse($d->valido_hasta)) < 7);
+        expect($cortos)->toHaveCount(0);
     });
 
     $this->postJson('/api/v1/app/demo/login', ['email' => 'admin@grecon.test', 'password' => 'password'])
