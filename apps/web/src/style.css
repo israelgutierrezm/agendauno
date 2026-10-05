@@ -35,8 +35,10 @@
   --primario: var(--acento);
   --primario-fuerte: color-mix(in srgb, var(--acento), black 12%);
   --primario-contraste: #ffffff;
-  --primario-suave: color-mix(in srgb, var(--acento) 10%, #ffffff);
-  --enlace: #0065e8;
+  /* Los derivados salen del acento y la superficie del tema: un tema verde o rosa
+     no deja enlaces ni fondos suaves en azul. */
+  --primario-suave: color-mix(in srgb, var(--acento) 10%, var(--superficie));
+  --enlace: color-mix(in srgb, var(--acento), black 15%);
   --barra: #031b4e;
   --barra-suave: #0b2b62;
   --barra-activo: #0070ff;
@@ -68,8 +70,8 @@
   --primario: var(--acento);
   --primario-fuerte: color-mix(in srgb, var(--acento), white 15%);
   --primario-contraste: #ffffff;
-  --primario-suave: color-mix(in srgb, var(--acento) 24%, #071a3a);
-  --enlace: #56a3ff;
+  --primario-suave: color-mix(in srgb, var(--acento) 24%, var(--superficie));
+  --enlace: color-mix(in srgb, var(--acento), white 22%);
   --barra: #020d24;
   --barra-suave: #0b2854;
   --barra-activo: #2d88ff;
@@ -656,5 +658,88 @@
   .tu-detalle-seccion > header p {
     color: var(--texto-suave);
     font-size: 0.9rem;
+  }
+
+  /* Zona para subir un archivo (ZonaArchivo, CargadorImagen, CargadorLogo): borde
+     punteado, ícono y «Arrastra… o elígelo». Todo sale de los colores del tema. */
+  .tu-zona-archivo {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    width: 100%;
+    min-width: 0;
+    padding: 1.5rem 1rem;
+    border: 1.5px dashed
+      color-mix(in srgb, var(--texto-suave) 35%, var(--borde));
+    border-radius: var(--radio-tarjeta);
+    background: color-mix(in srgb, var(--fondo) 55%, var(--superficie));
+    color: var(--texto);
+    text-align: center;
+    cursor: pointer;
+    transition:
+      border-color 0.15s ease,
+      background-color 0.15s ease;
+  }
+  .tu-zona-archivo:hover,
+  .tu-zona-archivo:focus-visible {
+    border-color: color-mix(in srgb, var(--acento) 60%, var(--borde));
+    outline: none;
+  }
+  .tu-zona-archivo:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 22%, transparent);
+  }
+  .tu-zona-archivo-activa {
+    border-color: var(--acento);
+    background: color-mix(in srgb, var(--acento) 7%, var(--superficie));
+  }
+  .tu-zona-archivo[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  .tu-zona-archivo-ocupada {
+    cursor: progress;
+  }
+  .tu-zona-archivo-icono {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--primario);
+  }
+  .tu-zona-archivo-textos {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+  .tu-zona-archivo-texto {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: color-mix(in srgb, var(--texto) 86%, var(--superficie));
+    overflow-wrap: anywhere;
+  }
+  .tu-zona-archivo-elige {
+    color: var(--enlace);
+  }
+  .tu-zona-archivo-ayuda {
+    font-size: 0.75rem;
+    color: var(--texto-suave);
+  }
+  .tu-zona-archivo-ayuda:empty {
+    display: none;
+  }
+  /* En una fila: el ícono a la izquierda (formularios y tarjetas). */
+  .tu-zona-archivo-compacta {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0.85rem;
+    padding: 0.85rem 1rem;
+    text-align: left;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tu-zona-archivo {
+      transition: none;
+    }
   }
 }

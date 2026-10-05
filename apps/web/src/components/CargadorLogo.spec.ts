@@ -32,7 +32,7 @@ describe("cargador del logo", () => {
   it("sin logo invita a subirlo", () => {
     const w = montar(null);
     expect(w.find("img").exists()).toBe(false);
-    expect(w.text()).toContain("Arrastra tu logo aquí o selecciona un archivo");
+    expect(w.text()).toContain("Arrastra tu logo aquí o elígelo");
     expect(w.text()).toContain("Máx. 2 MB");
   });
 

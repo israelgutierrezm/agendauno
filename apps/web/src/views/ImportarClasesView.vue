@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { useI18n } from "vue-i18n";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -46,7 +47,6 @@ const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}/importaciones/clases`);
 const modo = ref<Modo>("fechas");
 const archivo = ref<File | null>(null);
-const input = ref<HTMLInputElement | null>(null);
 const catalogos = ref<Catalogos | null>(null);
 const preview = ref<Resultado | null>(null);
 const exito = ref<Resultado | null>(null);
@@ -100,7 +100,6 @@ function limpiar() {
   preview.value = null;
   exito.value = null;
   error.value = "";
-  if (input.value) input.value.value = "";
 }
 function cambiarModo(valor: Modo) {
   if (!ocupado.value && valor !== modo.value) {
@@ -108,8 +107,8 @@ function cambiarModo(valor: Modo) {
     limpiar();
   }
 }
-async function seleccionar(evento: Event) {
-  archivo.value = (evento.target as HTMLInputElement).files?.[0] ?? null;
+async function seleccionar(elegido: File) {
+  archivo.value = elegido;
   preview.value = null;
   exito.value = null;
   error.value = "";
@@ -341,26 +340,24 @@ async function descargar() {
         >
           {{ t("importarClases.sinCatalogo") }}
         </p>
-        <div class="mt-4 flex flex-wrap items-center gap-3">
-          <label for="archivo-clases" class="font-medium">{{
-            t("importarClases.elegir")
-          }}</label>
-          <input
-            id="archivo-clases"
-            ref="input"
-            type="file"
-            accept=".csv,text/csv"
-            class="max-w-full text-sm"
-            :disabled="
-              ocupado ||
-              cargando ||
-              !catalogos?.clases.length ||
-              !catalogos?.sucursales.length
-            "
-            @change="seleccionar"
-          />
+        <ZonaArchivo
+          id="archivo-clases"
+          class="mt-4"
+          accept=".csv,text/csv"
+          :texto="$t('zonaArchivo.csv.arrastra')"
+          :ayuda="$t('zonaArchivo.formatos.csv')"
+          :cargado="archivo?.name ?? null"
+          :ocupado="ocupado"
+          :ocupado-texto="t('importarClases.analizando')"
+          :deshabilitado="
+            cargando ||
+            !catalogos?.clases.length ||
+            !catalogos?.sucursales.length
+          "
+          @archivo="seleccionar"
+        />
+        <div v-if="archivo" class="mt-3 flex flex-wrap items-center gap-3">
           <button
-            v-if="archivo"
             type="button"
             class="tu-btn tu-btn-fantasma"
             :disabled="ocupado"

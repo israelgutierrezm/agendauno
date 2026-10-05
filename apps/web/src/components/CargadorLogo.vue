@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -9,7 +10,8 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 /**
  * Cargador del logo del negocio por ARCHIVO: arrastrar y soltar o hacer clic para
  * elegir (nunca por URL). Sube a `POST /marca/logo` (imagen PNG/JPG/WebP ≤ 2 MB) y
- * permite quitarlo (`DELETE /marca/logo`). Emite el nuevo `logo_url` al padre.
+ * permite quitarlo (`DELETE /marca/logo`). Emite el nuevo `logo_url` al padre. Se
+ * ve como toda zona de carga de la app (`.tu-zona-archivo`).
  */
 const props = withDefaults(
   defineProps<{ logoUrl: string | null; puedeGestionar?: boolean }>(),
@@ -25,7 +27,9 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const MAX_BYTES = 2 * 1024 * 1024;
 const TIPOS = ["image/png", "image/jpeg", "image/webp"];
 
-const arrastrando = ref(false);
+// Contador: entrar al logo o al texto dispara «dragleave» en la zona.
+const dentro = ref(0);
+const arrastrando = computed(() => dentro.value > 0 && habilitado.value);
 const subiendo = ref(false);
 const error = ref<string | null>(null);
 const entrada = ref<HTMLInputElement | null>(null);
@@ -71,14 +75,9 @@ async function procesar(archivo: File | undefined | null): Promise<void> {
 }
 
 function alSoltar(evento: DragEvent): void {
-  arrastrando.value = false;
+  dentro.value = 0;
   if (habilitado.value) {
     void procesar(evento.dataTransfer?.files?.[0]);
-  }
-}
-function alArrastrar(dentro: boolean): void {
-  if (habilitado.value) {
-    arrastrando.value = dentro;
   }
 }
 function alSeleccionar(evento: Event): void {
@@ -113,23 +112,22 @@ async function quitar(): Promise<void> {
 <template>
   <div>
     <div
-      class="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-8 text-center transition"
-      :class="{ 'cursor-pointer': habilitado }"
-      :style="{
-        borderColor: arrastrando ? 'var(--primario)' : 'var(--borde)',
-        background: arrastrando ? 'var(--primario-suave)' : 'var(--fondo)',
-        opacity: puedeGestionar ? 1 : 0.6,
+      class="tu-zona-archivo py-7"
+      :class="{
+        'tu-zona-archivo-activa': arrastrando,
+        'tu-zona-archivo-ocupada': subiendo,
       }"
       role="button"
       :tabindex="habilitado ? 0 : -1"
+      :aria-disabled="!puedeGestionar"
       :aria-label="$t('configuracion.logoArrastra')"
       @click="elegir"
       @keydown.enter.prevent="elegir"
       @keydown.space.prevent="elegir"
-      @dragover.prevent="alArrastrar(true)"
-      @dragenter.prevent="alArrastrar(true)"
-      @dragleave.prevent="alArrastrar(false)"
-      @drop.prevent="alSoltar"
+      @dragenter.prevent="dentro += 1"
+      @dragover.prevent
+      @dragleave.prevent="dentro = Math.max(0, dentro - 1)"
+      @drop.prevent.stop="alSoltar"
     >
       <img
         v-if="logoUrl"
@@ -138,37 +136,29 @@ async function quitar(): Promise<void> {
         class="h-20 w-20 rounded-2xl object-cover"
         :style="{ boxShadow: 'var(--sombra)' }"
       />
-      <span v-else class="cl-icono" aria-hidden="true">
-        <svg
-          width="30"
-          height="30"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.6"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <rect x="3.5" y="3.5" width="17" height="17" rx="2.5" />
-          <circle cx="9" cy="9" r="1.75" />
-          <path d="M20.5 15.5 15.5 10.5 5 20.5" />
-        </svg>
-      </span>
+      <span v-else class="tu-zona-archivo-icono"
+        ><IconoNav nombre="imagen" :tam="24"
+      /></span>
 
-      <p class="text-sm font-medium">
+      <span class="tu-zona-archivo-texto">
         <template v-if="subiendo">{{
           $t("configuracion.logoSubiendo")
         }}</template>
+        <template v-else-if="arrastrando">{{
+          logoUrl
+            ? $t("zonaArchivo.imagen.suelta")
+            : $t("zonaArchivo.imagen.sueltaNueva")
+        }}</template>
         <template v-else>
           {{ $t("asistente.logo.arrastra") }}
-          <span :style="{ color: 'var(--primario)' }">{{
+          <span class="tu-zona-archivo-elige">{{
             $t("asistente.logo.selecciona")
           }}</span>
         </template>
-      </p>
-      <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+      </span>
+      <span class="tu-zona-archivo-ayuda">
         {{ $t("asistente.logo.ayuda") }}
-      </p>
+      </span>
 
       <input
         ref="entrada"
@@ -205,16 +195,3 @@ async function quitar(): Promise<void> {
     </p>
   </div>
 </template>
-
-<style scoped>
-.cl-icono {
-  display: inline-flex;
-  height: 4rem;
-  width: 4rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: var(--primario-suave);
-  color: var(--primario-fuerte);
-}
-</style>

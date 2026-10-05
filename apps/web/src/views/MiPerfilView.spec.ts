@@ -6,6 +6,7 @@ import { reactive } from "vue";
 import esMX from "@/i18n/locales/es-MX";
 import { miPerfil } from "@/i18n/locales/equipo.es-MX";
 import { miPrivacidad } from "@/i18n/locales/gestion.es-MX";
+import zonaArchivo from "@/i18n/locales/zonaArchivo.es-MX";
 import MiPerfilView from "./MiPerfilView.vue";
 
 const estado = vi.hoisted(() => ({
@@ -52,7 +53,7 @@ function montar() {
         createI18n({
           legacy: false,
           locale: "es",
-          messages: { es: { ...esMX, miPerfil, miPrivacidad } },
+          messages: { es: { ...esMX, miPerfil, miPrivacidad, zonaArchivo } },
           missingWarn: false,
           fallbackWarn: false,
         }),
@@ -72,7 +73,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   sesion.usuario.rol = "miembro";
   sesion.usuario.roles_disponibles = [{ clave: "miembro", faceta: "miembro" }];
-  Object.assign(sesion.usuario, { tiene_ficha: false, celular: null });
+  Object.assign(sesion.usuario, {
+    tiene_ficha: false,
+    celular: null,
+    email_pendiente: null,
+    tiene_contrasena: true,
+    google_conectado: false,
+  });
 });
 
 describe("perfil unificado", () => {
@@ -105,6 +112,91 @@ describe("perfil unificado", () => {
       "Acceso",
       "Preferencias y privacidad",
     ]);
+    w.unmount();
+  });
+
+  it("muestra la identidad y enlaces a secciones reales sin esconder formularios", () => {
+    const w = montar();
+    const identidad = w.get('[data-prueba="identidad-perfil"]');
+    expect(identidad.text()).toContain("Ana Demo");
+    expect(identidad.text()).toContain("ana@example.test");
+    const enlaces = w.findAll("nav.mp-atajos a");
+    expect(enlaces).toHaveLength(3);
+    for (const enlace of enlaces) {
+      const destino = w.get(enlace.attributes("href")!);
+      expect(destino.attributes("aria-labelledby")).toBeTruthy();
+    }
+    expect(w.findAll("h1")).toHaveLength(1);
+    expect(
+      w.get('#mp-acceso input[autocomplete="current-password"]').exists(),
+    ).toBe(true);
+    w.unmount();
+  });
+
+  it("no promete privacidad de alumno en los atajos del personal", () => {
+    sesion.usuario.rol = "instructor";
+    const w = montar();
+    expect(w.get("#mp-preferencias-titulo").text()).toBe("Preferencias");
+    expect(w.get('nav a[href="#mp-preferencias"]').text()).toBe("Preferencias");
+    expect(w.find('[data-prueba="privacidad"]').exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("respeta el nombre del rol personalizado en la cabecera", () => {
+    sesion.usuario.roles_disponibles = [
+      {
+        clave: "cliente-vip",
+        faceta: "miembro",
+        nombre: "Cliente VIP",
+      } as (typeof sesion.usuario.roles_disponibles)[number],
+    ];
+    sesion.usuario.rol = "cliente-vip";
+    const w = montar();
+    expect(w.get(".mp-rol").text()).toBe("Cliente VIP");
+    expect(w.get("#mp-preferencias-titulo").text()).toBe(
+      "Preferencias y privacidad",
+    );
+    w.unmount();
+  });
+
+  it("permite abrir y cancelar el formulario de correo sin enviar cambios", async () => {
+    const w = montar();
+    const cambiar = w
+      .findAll("button")
+      .find((b) => b.text() === "Cambiar correo")!;
+    await cambiar.trigger("click");
+    expect(w.find("#mp-correo").exists()).toBe(true);
+    const cancelar = w.findAll("button").find((b) => b.text() === "Cancelar")!;
+    await cancelar.trigger("click");
+    expect(w.find("#mp-correo").exists()).toBe(false);
+    expect(api.post).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("mantiene visible un cambio de correo pendiente de confirmación", () => {
+    Object.assign(sesion.usuario, { email_pendiente: "nuevo@example.test" });
+    const w = montar();
+    expect(w.get("#mp-acceso").text()).toContain("nuevo@example.test");
+    expect(w.get("#mp-acceso").text()).toContain("Cancelar cambio");
+    expect(w.find("#mp-correo").exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("muestra el estado de guardado sin perder las etiquetas traducidas", async () => {
+    let terminar!: (value: unknown) => void;
+    api.put.mockReturnValue(
+      new Promise((resolve) => {
+        terminar = resolve;
+      }),
+    );
+    const w = montar();
+    await w.get("#mp-datos form").trigger("submit");
+    const guardar = w.get('#mp-datos button[type="submit"]');
+    expect(guardar.text()).toBe("Guardando…");
+    expect(guardar.attributes("disabled")).toBeDefined();
+    terminar({ data: { data: { usuario: sesion.usuario } } });
+    await flushPromises();
+    expect(guardar.text()).toBe("Guardar");
     w.unmount();
   });
 

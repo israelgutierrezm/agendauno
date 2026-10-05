@@ -7,6 +7,7 @@ import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -131,11 +132,6 @@ const subida = ref<{ persona: string; tipo: string; archivo: File | null }>({
 });
 const subiendo = ref(false);
 const accionando = ref(false);
-
-function archivoElegido(e: Event): void {
-  const input = e.target as HTMLInputElement;
-  subida.value.archivo = input.files?.[0] ?? null;
-}
 
 async function subir(): Promise<void> {
   if (subida.value.archivo === null || subida.value.persona === "") {
@@ -500,12 +496,17 @@ onMounted(cargar);
             <label class="tu-label" for="df">{{
               $t("documentos.docs.archivo")
             }}</label>
-            <input
+            <ZonaArchivo
               id="df"
-              class="tu-input"
-              type="file"
+              compacta
+              icono="archivo"
               accept=".jpg,.jpeg,.png,.pdf"
-              @change="archivoElegido"
+              :max-bytes="8 * 1024 * 1024"
+              :texto="$t('zonaArchivo.documento.arrastra')"
+              :ayuda="$t('zonaArchivo.formatos.documento')"
+              :cargado="subida.archivo?.name ?? null"
+              :ocupado="subiendo"
+              @archivo="subida.archivo = $event"
             />
           </div>
           <button

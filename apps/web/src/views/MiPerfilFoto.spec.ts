@@ -5,11 +5,13 @@ import { reactive } from "vue";
 
 import esMX from "@/i18n/locales/es-MX";
 import { miPerfil } from "@/i18n/locales/equipo.es-MX";
+import zonaArchivo from "@/i18n/locales/zonaArchivo.es-MX";
 import MiPerfilView from "./MiPerfilView.vue";
 
 /**
- * La foto de Mi perfil se sube arrastrándola sobre su zona o con un clic para
- * elegirla; se revisa el tipo y el peso antes de subirla. Datos sintéticos.
+ * La foto de Mi perfil se suelta en cualquier parte de la tarjeta del nombre (o en
+ * su zona de carga) o se elige con un clic; tipo y peso se revisan antes de subirla
+ * y lo que no se acepta se dice debajo de la zona. Datos sintéticos.
  */
 const mocks = vi.hoisted(() => ({
   post: vi.fn(),
@@ -51,7 +53,7 @@ function montar() {
         createI18n({
           legacy: false,
           locale: "es",
-          messages: { es: { ...esMX, miPerfil } },
+          messages: { es: { ...esMX, miPerfil, zonaArchivo } },
           missingWarn: false,
           fallbackWarn: false,
         }),
@@ -68,23 +70,31 @@ function soltar(archivo: File) {
 beforeEach(() => vi.clearAllMocks());
 
 describe("foto de Mi perfil", () => {
-  it("soltar una imagen sobre la zona la sube", async () => {
+  it("soltar una imagen en cualquier parte de la tarjeta la sube", async () => {
     mocks.post.mockResolvedValue({
       data: { data: { usuario: { ...sesion.usuario, foto_url: "/f.webp" } } },
     });
     const w = montar();
-    const zona = w.get('[data-prueba="zona-foto"]');
-    expect(zona.text()).toContain(miPerfil.fotoArrastra);
+    const tarjeta = w.get('[data-prueba="identidad-perfil"]');
+    const zona = w.get('[data-prueba="zona-archivo"]');
+    expect(zona.text()).toContain("Arrastra tu foto aquí o elígela");
+    expect(zona.text()).toContain(miPerfil.fotoFormatos);
 
-    await zona.trigger("dragenter");
-    expect(zona.classes()).toContain("mp-foto-zona-activa");
+    // Sobre el nombre: toda la tarjeta la recibe y la zona lo dice.
+    const nombre = w.get(".mp-nombre");
+    await nombre.trigger("dragenter");
+    expect(tarjeta.classes()).toContain("mp-identidad-activa");
+    expect(w.get('[data-prueba="zona-foto"]').classes()).toContain(
+      "mp-foto-zona-activa",
+    );
     expect(zona.text()).toContain(miPerfil.fotoSuelta);
 
     const foto = new File(["x"], "yo.png", { type: "image/png" });
-    await zona.trigger("drop", soltar(foto));
+    await nombre.trigger("drop", soltar(foto));
     await flushPromises();
 
-    expect(zona.classes()).not.toContain("mp-foto-zona-activa");
+    expect(tarjeta.classes()).not.toContain("mp-identidad-activa");
+    expect(mocks.post).toHaveBeenCalledTimes(1);
     const [url, cuerpo] = mocks.post.mock.calls[0];
     expect(url).toBe("/api/v1/app/demo/yo/foto");
     expect((cuerpo as FormData).get("foto")).toBe(foto);
@@ -92,7 +102,19 @@ describe("foto de Mi perfil", () => {
     w.unmount();
   });
 
-  it("un clic en la zona abre el selector de archivo", async () => {
+  it("soltarla en la zona de carga la sube una sola vez", async () => {
+    mocks.post.mockResolvedValue({
+      data: { data: { usuario: sesion.usuario } },
+    });
+    const w = montar();
+    const foto = new File(["x"], "yo.webp", { type: "image/webp" });
+    await w.get('[data-prueba="zona-archivo"]').trigger("drop", soltar(foto));
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
+  it("un clic en la foto abre el selector de archivo", async () => {
     const w = montar();
     const entrada = w.get('input[type="file"]').element as HTMLInputElement;
     const clic = vi.spyOn(entrada, "click");
@@ -101,21 +123,21 @@ describe("foto de Mi perfil", () => {
     w.unmount();
   });
 
-  it("no sube otro tipo de archivo ni una imagen de más de 4 MB", async () => {
+  it("no sube otro tipo de archivo ni una imagen de más de 4 MB, y lo dice", async () => {
     const w = montar();
-    const zona = w.get('[data-prueba="zona-foto"]');
+    const tarjeta = w.get('[data-prueba="identidad-perfil"]');
 
-    await zona.trigger(
+    await tarjeta.trigger(
       "drop",
       soltar(new File(["x"], "cv.pdf", { type: "application/pdf" })),
     );
-    expect(mocks.error).toHaveBeenLastCalledWith(miPerfil.fotoTipo);
+    expect(w.get("[role=alert]").text()).toBe(miPerfil.fotoTipo);
 
     const grande = new File([new Uint8Array(4 * 1024 * 1024 + 1)], "g.jpg", {
       type: "image/jpeg",
     });
-    await zona.trigger("drop", soltar(grande));
-    expect(mocks.error).toHaveBeenLastCalledWith(miPerfil.fotoPeso);
+    await tarjeta.trigger("drop", soltar(grande));
+    expect(w.get("[role=alert]").text()).toBe(miPerfil.fotoPeso);
     expect(mocks.post).not.toHaveBeenCalled();
     w.unmount();
   });

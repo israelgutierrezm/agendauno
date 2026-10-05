@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import ListaFormularios from "@/components/ListaFormularios.vue";
+import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import type { FormularioPersona } from "@/lib/formularios";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -123,7 +124,6 @@ const subiendo = ref(false);
 const abiertoSubir = ref(false);
 const tipoSel = ref("");
 const archivo = ref<File | null>(null);
-const selector = ref<HTMLInputElement | null>(null);
 
 const tiposQueAplican = computed(() =>
   tipos.value.filter(
@@ -148,9 +148,6 @@ async function abrirSubir(): Promise<void> {
     }
   }
 }
-function alElegir(e: Event): void {
-  archivo.value = (e.target as HTMLInputElement).files?.[0] ?? null;
-}
 async function subir(): Promise<void> {
   if (archivo.value === null) {
     return;
@@ -168,9 +165,6 @@ async function subir(): Promise<void> {
     abiertoSubir.value = false;
     tipoSel.value = "";
     archivo.value = null;
-    if (selector.value) {
-      selector.value.value = "";
-    }
     await cargar();
   } catch (e) {
     toast.error(mensajeDeError(e, t("expediente.error")));
@@ -244,16 +238,18 @@ async function subir(): Promise<void> {
               <label class="tu-label" for="ex-archivo">{{
                 $t("expediente.archivo")
               }}</label>
-              <input
+              <ZonaArchivo
                 id="ex-archivo"
-                ref="selector"
-                type="file"
+                compacta
+                icono="archivo"
                 accept="application/pdf,image/jpeg,image/png"
-                class="tu-input py-1.5 text-sm"
-                required
-                @change="alElegir"
+                :max-bytes="8 * 1024 * 1024"
+                :texto="$t('zonaArchivo.documento.arrastra')"
+                :ayuda="$t('expediente.archivoAyuda')"
+                :cargado="archivo?.name ?? null"
+                :ocupado="subiendo"
+                @archivo="archivo = $event"
               />
-              <p class="tu-hint">{{ $t("expediente.archivoAyuda") }}</p>
             </div>
           </div>
           <div class="flex gap-2">

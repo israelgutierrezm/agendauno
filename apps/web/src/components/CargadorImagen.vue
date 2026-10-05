@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -10,7 +11,8 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * Una imagen por ARCHIVO (arrastrar o elegir, nunca por URL): la portada de la página
  * pública (`marca/portada`) o la foto de una sede (`sucursales/{id}/foto`). Sube por
  * `POST {ruta}` (PNG/JPG/WebP ≤ 4 MB) en el campo `campo`, la quita con `DELETE` y
- * emite la nueva URL (`clave` de la respuesta) al padre.
+ * emite la nueva URL (`clave` de la respuesta) al padre. Se ve como toda zona de
+ * carga de la app (`.tu-zona-archivo`); con imagen, la zona es la imagen misma.
  */
 const props = withDefaults(
   defineProps<{
@@ -46,7 +48,9 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const MAX_BYTES = 4 * 1024 * 1024;
 const TIPOS = ["image/png", "image/jpeg", "image/webp"];
 
-const arrastrando = ref(false);
+// Contador: entrar a la imagen o al texto dispara «dragleave» en la zona.
+const dentro = ref(0);
+const arrastrando = computed(() => dentro.value > 0 && habilitado.value);
 const subiendo = ref(false);
 const error = ref<string | null>(null);
 const entrada = ref<HTMLInputElement | null>(null);
@@ -119,30 +123,53 @@ async function quitar(): Promise<void> {
 <template>
   <div>
     <div
-      class="cp-zona"
-      :class="{ 'cursor-pointer': habilitado, 'cp-arrastrando': arrastrando }"
+      class="tu-zona-archivo cp-zona"
+      :class="{
+        'tu-zona-archivo-activa': arrastrando,
+        'tu-zona-archivo-ocupada': subiendo,
+        'cp-con-imagen': url,
+      }"
       role="button"
       :tabindex="habilitado ? 0 : -1"
-      :aria-label="arrastra ?? $t('perfilPublico.config.portadaArrastra')"
+      :aria-disabled="!habilitado"
+      :aria-label="`${arrastra ?? $t('perfilPublico.config.portadaArrastra')} ${$t('zonaArchivo.imagen.elige')}`"
       @click="elegir"
       @keydown.enter.prevent="elegir"
       @keydown.space.prevent="elegir"
-      @dragover.prevent="arrastrando = habilitado"
-      @dragenter.prevent="arrastrando = habilitado"
-      @dragleave.prevent="arrastrando = false"
-      @drop.prevent="
-        arrastrando = false;
+      @dragenter.prevent="dentro += 1"
+      @dragover.prevent
+      @dragleave.prevent="dentro = Math.max(0, dentro - 1)"
+      @drop.prevent.stop="
+        dentro = 0;
         habilitado && procesar($event.dataTransfer?.files?.[0]);
       "
     >
       <img v-if="url" :src="url" alt="" class="cp-imagen" />
-      <p v-else class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-        {{
-          subiendo
-            ? $t("perfilPublico.config.portadaSubiendo")
-            : (arrastra ?? $t("perfilPublico.config.portadaArrastra"))
-        }}
-      </p>
+      <template v-else>
+        <span class="tu-zona-archivo-icono"
+          ><IconoNav nombre="imagen" :tam="24"
+        /></span>
+        <span class="tu-zona-archivo-texto">
+          <template v-if="subiendo">{{
+            $t("perfilPublico.config.portadaSubiendo")
+          }}</template>
+          <template v-else>
+            {{ arrastra ?? $t("perfilPublico.config.portadaArrastra") }}
+            <span class="tu-zona-archivo-elige">{{
+              $t("zonaArchivo.imagen.elige")
+            }}</span>
+          </template>
+        </span>
+        <span class="tu-zona-archivo-ayuda">{{
+          ayuda ?? $t("perfilPublico.config.portadaAyuda")
+        }}</span>
+      </template>
+      <!-- Con imagen: al arrastrar otra encima se dice que la reemplaza. -->
+      <span v-if="url && (arrastrando || subiendo)" class="cp-aviso">{{
+        subiendo
+          ? $t("perfilPublico.config.portadaSubiendo")
+          : $t("zonaArchivo.imagen.suelta")
+      }}</span>
     </div>
     <input
       ref="entrada"
@@ -151,12 +178,15 @@ async function quitar(): Promise<void> {
       class="hidden"
       @change="procesar(($event.target as HTMLInputElement).files?.[0])"
     />
-    <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+    <div
+      v-if="url"
+      class="mt-2 flex flex-wrap items-center justify-between gap-2"
+    >
       <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
         {{ ayuda ?? $t("perfilPublico.config.portadaAyuda") }}
       </p>
       <button
-        v-if="url && puedeGestionar"
+        v-if="puedeGestionar"
         type="button"
         class="tu-enlace text-sm"
         :disabled="subiendo"
@@ -173,24 +203,32 @@ async function quitar(): Promise<void> {
 
 <style scoped>
 .cp-zona {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   aspect-ratio: v-bind(proporcion);
   overflow: hidden;
-  border-radius: 1rem;
-  border: 1px dashed var(--borde);
-  background: var(--fondo);
-  text-align: center;
-  padding: 0;
 }
-.cp-arrastrando {
-  border-color: var(--primario);
-  background: var(--primario-suave);
+/* Con imagen, la zona es la imagen: sin relleno, el borde punteado solo al arrastrar. */
+.cp-con-imagen {
+  padding: 0;
+  border-style: solid;
+}
+.cp-con-imagen.tu-zona-archivo-activa {
+  border-style: dashed;
 }
 .cp-imagen {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.cp-aviso {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--superficie) 82%, transparent);
+  color: var(--texto);
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 </style>

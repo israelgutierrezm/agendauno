@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -53,12 +54,7 @@ async function cargar(): Promise<void> {
   }
 }
 
-async function subir(r: Requisito, e: Event): Promise<void> {
-  const entrada = e.target as HTMLInputElement;
-  const archivo = entrada.files?.[0];
-  if (!archivo) {
-    return;
-  }
+async function subir(r: Requisito, archivo: File): Promise<void> {
   subiendo.value = r.tipo.id;
   try {
     const datos = new FormData();
@@ -71,7 +67,6 @@ async function subir(r: Requisito, e: Event): Promise<void> {
     toast.error(mensajeDeError(err, t("misDocumentos.error")));
   } finally {
     subiendo.value = null;
-    entrada.value = "";
   }
 }
 
@@ -135,36 +130,33 @@ onMounted(cargar);
             </template>
           </p>
         </div>
-        <div class="flex shrink-0 items-center gap-3 text-sm">
-          <button
-            v-if="r.documento"
-            type="button"
-            class="tu-enlace"
-            @click="ver(r.documento)"
-          >
-            {{ $t("misDocumentos.ver") }}
-          </button>
-          <label
-            v-if="r.documento?.estado !== 'aprobado'"
-            class="tu-btn tu-btn-fantasma cursor-pointer text-sm"
-            :aria-disabled="subiendo === r.tipo.id"
-          >
-            {{
-              subiendo === r.tipo.id
-                ? $t("misDocumentos.subiendo")
-                : r.documento
-                  ? $t("misDocumentos.reemplazar")
-                  : $t("misDocumentos.subir")
-            }}
-            <input
-              type="file"
-              accept="image/jpeg,image/png,application/pdf"
-              class="sr-only"
-              :disabled="subiendo !== null"
-              @change="subir(r, $event)"
-            />
-          </label>
-        </div>
+        <button
+          v-if="r.documento"
+          type="button"
+          class="tu-enlace shrink-0 text-sm"
+          @click="ver(r.documento)"
+        >
+          {{ $t("misDocumentos.ver") }}
+        </button>
+        <!-- Lo que falta o hay que corregir se sube aquí: arrastrar o elegir. -->
+        <ZonaArchivo
+          v-if="r.documento?.estado !== 'aprobado'"
+          class="w-full"
+          compacta
+          icono="archivo"
+          accept="image/jpeg,image/png,application/pdf"
+          :max-bytes="8 * 1024 * 1024"
+          :texto="
+            r.documento
+              ? $t('zonaArchivo.documento.otro')
+              : $t('zonaArchivo.documento.arrastra')
+          "
+          :ayuda="$t('zonaArchivo.formatos.documento')"
+          :ocupado="subiendo === r.tipo.id"
+          :ocupado-texto="$t('misDocumentos.subiendo')"
+          :deshabilitado="subiendo !== null && subiendo !== r.tipo.id"
+          @archivo="subir(r, $event)"
+        />
       </li>
     </ul>
   </div>

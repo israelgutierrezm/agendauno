@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, useTemplateRef } from "vue";
+import { computed, onMounted, ref } from "vue";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { instantanea, useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -33,8 +34,8 @@ const guardando = ref(false);
 const error = ref<string | null>(null);
 const mensaje = ref<string | null>(null);
 
-const cerInput = useTemplateRef<HTMLInputElement>("cerInput");
-const keyInput = useTemplateRef<HTMLInputElement>("keyInput");
+const cer = ref<File | null>(null);
+const key = ref<File | null>(null);
 const selloPassword = ref("");
 const subiendoSello = ref(false);
 const mensajeSello = ref<string | null>(null);
@@ -88,9 +89,7 @@ async function guardar(): Promise<void> {
 }
 
 async function subirSello(): Promise<void> {
-  const cer = cerInput.value?.files?.[0];
-  const key = keyInput.value?.files?.[0];
-  if (!cer || !key || selloPassword.value === "") {
+  if (cer.value === null || key.value === null || selloPassword.value === "") {
     return;
   }
   subiendoSello.value = true;
@@ -98,8 +97,8 @@ async function subirSello(): Promise<void> {
   mensajeSello.value = null;
   try {
     const fd = new FormData();
-    fd.append("certificado", cer);
-    fd.append("llave", key);
+    fd.append("certificado", cer.value);
+    fd.append("llave", key.value);
     fd.append("password", selloPassword.value);
     const { data } = await api.post<{ data: DatosFiscales }>(
       `${base.value}/datos-fiscales/sello`,
@@ -107,12 +106,8 @@ async function subirSello(): Promise<void> {
     );
     sellosCargados.value = data.data.sellos_cargados;
     selloPassword.value = "";
-    if (cerInput.value) {
-      cerInput.value.value = "";
-    }
-    if (keyInput.value) {
-      keyInput.value.value = "";
-    }
+    cer.value = null;
+    key.value = null;
     mensajeSello.value = "ok";
   } catch (e) {
     errorSello.value = mensajeDeError(e);
@@ -244,26 +239,30 @@ onMounted(cargar);
               <label class="tu-label" for="cer">{{
                 $t("datosFiscales.sellos.certificado")
               }}</label>
-              <input
+              <ZonaArchivo
                 id="cer"
-                ref="cerInput"
-                class="tu-input"
-                type="file"
+                compacta
+                icono="archivo"
                 accept=".cer"
-                required
+                :ayuda="$t('zonaArchivo.formatos.cer')"
+                :cargado="cer?.name ?? null"
+                :ocupado="subiendoSello"
+                @archivo="cer = $event"
               />
             </div>
             <div>
               <label class="tu-label" for="key">{{
                 $t("datosFiscales.sellos.llave")
               }}</label>
-              <input
+              <ZonaArchivo
                 id="key"
-                ref="keyInput"
-                class="tu-input"
-                type="file"
+                compacta
+                icono="archivo"
                 accept=".key"
-                required
+                :ayuda="$t('zonaArchivo.formatos.key')"
+                :cargado="key?.name ?? null"
+                :ocupado="subiendoSello"
+                @archivo="key = $event"
               />
             </div>
           </div>

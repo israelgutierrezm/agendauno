@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -40,17 +41,13 @@ function texto(v: unknown): string {
   return v === null || v === undefined || v === "" ? "—" : String(v);
 }
 
-async function onArchivo(e: Event): Promise<void> {
-  const input = e.target as HTMLInputElement;
-  const f = input.files?.[0] ?? null;
+async function onArchivo(f: File): Promise<void> {
   archivo.value = f;
-  nombreArchivo.value = f?.name ?? "";
+  nombreArchivo.value = f.name;
   preview.value = null;
   creados.value = null;
   error.value = null;
-  if (f !== null) {
-    await previsualizar();
-  }
+  await previsualizar();
 }
 
 async function previsualizar(): Promise<void> {
@@ -145,16 +142,17 @@ function descargarPlantilla(): void {
             >nombre, primer_apellido, email, tipo, es_facturable</code
           >
         </p>
-        <div class="mt-4 flex flex-wrap items-center gap-3">
-          <label class="tu-btn tu-btn-primario cursor-pointer">
-            {{ $t("importar.elegir") }}
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              class="hidden"
-              @change="onArchivo"
-            />
-          </label>
+        <ZonaArchivo
+          class="mt-4"
+          accept=".csv,text/csv"
+          :texto="$t('zonaArchivo.csv.arrastra')"
+          :ayuda="$t('zonaArchivo.formatos.csv')"
+          :cargado="nombreArchivo || null"
+          :ocupado="analizando"
+          :ocupado-texto="$t('importar.analizando')"
+          @archivo="onArchivo"
+        />
+        <div class="mt-3 flex flex-wrap items-center gap-3">
           <button
             type="button"
             class="tu-btn tu-btn-fantasma"
@@ -162,12 +160,6 @@ function descargarPlantilla(): void {
           >
             {{ $t("importar.plantilla") }}
           </button>
-          <span
-            v-if="nombreArchivo"
-            class="text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-            >{{ nombreArchivo }}</span
-          >
         </div>
       </div>
 

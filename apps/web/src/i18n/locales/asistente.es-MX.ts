@@ -11,7 +11,7 @@ export default {
     etiqueta: "Logo del estudio",
     opcional: "(opcional)",
     arrastra: "Arrastra tu logo aquí o",
-    selecciona: "selecciona un archivo",
+    selecciona: "elígelo",
     ayuda: "PNG, JPG o WEBP · Máx. 2 MB · Idealmente cuadrado",
   },
 };

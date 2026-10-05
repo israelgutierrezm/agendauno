@@ -5,11 +5,14 @@ import { useI18n } from "vue-i18n";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import FondoDecorado from "@/components/FondoDecorado.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import MiPrivacidad from "@/components/MiPrivacidad.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
+import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { clientIdGoogle, renderizarBotonGoogle } from "@/lib/google";
-import { esMiembro } from "@/lib/roles";
+import { esMiembro, nombreDeRol } from "@/lib/roles";
 import {
   useSesionTenantStore,
   type UsuarioTenant,
@@ -24,12 +27,26 @@ import { useToastStore } from "@/stores/toast";
  * - Preferencias y privacidad: su calendario, su apariencia y, si es cliente o
  *   alumno, su privacidad (promociones, WhatsApp, sus datos).
  */
-const { t } = useI18n();
+const { t, te } = useI18n();
 const sesion = useSesionTenantStore();
 const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const usuario = computed(() => sesion.usuario);
 const mostrarPrivacidad = computed(() => esMiembro(usuario.value));
+const rolVisible = computed(() =>
+  nombreDeRol(
+    usuario.value?.rol ?? "",
+    usuario.value?.roles_disponibles,
+    (llave) => (te(llave) ? t(llave) : null),
+  ),
+);
+const tituloPreferencias = computed(() =>
+  t(
+    mostrarPrivacidad.value
+      ? "miPerfil.seccionPreferencias"
+      : "miPerfil.preferencias",
+  ),
+);
 
 // ---- Google: se conecta aquí para entrar con él (ADR 0093: no registra cuentas) ----
 const hayGoogle = clientIdGoogle() !== undefined;
@@ -77,36 +94,30 @@ onMounted(() => {
 
 type Respuesta = { data: { usuario: UsuarioTenant } };
 
-// ---- Foto: se arrastra sobre la zona o se elige con un clic ----
-const selectorFoto = ref<HTMLInputElement | null>(null);
+// ---- Foto: se suelta sobre la tarjeta (o su zona) o se elige con un clic ----
+const zonaFoto = ref<InstanceType<typeof ZonaArchivo> | null>(null);
 const subiendoFoto = ref(false);
-const arrastrandoFoto = ref(false);
-// Lo mismo que valida el servidor: JPG, PNG o WebP de hasta 4 MB.
-const TIPOS_FOTO = ["image/jpeg", "image/png", "image/webp"];
+// Contador: al pasar sobre los hijos de la tarjeta llegan «dragleave» intermedios.
+const sobreTarjeta = ref(0);
+const arrastrandoFoto = computed(() => sobreTarjeta.value > 0);
+// Lo mismo que valida el servidor: JPG, PNG o WebP de hasta 4 MB. La zona revisa
+// tipo y peso y lo dice debajo de ella.
+const TIPOS_FOTO = "image/jpeg,image/png,image/webp";
 const MAX_FOTO = 4 * 1024 * 1024;
 
 function elegirFoto(): void {
-  if (!subiendoFoto.value) {
-    selectorFoto.value?.click();
-  }
+  zonaFoto.value?.abrir();
 }
-function alSoltarFoto(e: DragEvent): void {
-  arrastrandoFoto.value = false;
-  void subirFoto(e.dataTransfer?.files?.[0]);
+function alSalirDeTarjeta(): void {
+  sobreTarjeta.value = Math.max(0, sobreTarjeta.value - 1);
 }
-async function alElegirFoto(e: Event): Promise<void> {
-  await subirFoto((e.target as HTMLInputElement).files?.[0]);
+function alSoltarEnTarjeta(e: DragEvent): void {
+  sobreTarjeta.value = 0;
+  zonaFoto.value?.recibir(e.dataTransfer?.files?.[0]);
 }
-async function subirFoto(archivo: File | undefined): Promise<void> {
-  if (!archivo || subiendoFoto.value) {
-    return;
-  }
-  if (!TIPOS_FOTO.includes(archivo.type)) {
-    toast.error(t("miPerfil.fotoTipo"));
-    return;
-  }
-  if (archivo.size > MAX_FOTO) {
-    toast.error(t("miPerfil.fotoPeso"));
+async function subirFoto(archivo: File): Promise<void> {
+  sobreTarjeta.value = 0;
+  if (subiendoFoto.value) {
     return;
   }
   subiendoFoto.value = true;
@@ -119,9 +130,6 @@ async function subirFoto(archivo: File | undefined): Promise<void> {
     toast.error(mensajeDeError(err, t("miPerfil.error")));
   } finally {
     subiendoFoto.value = false;
-    if (selectorFoto.value) {
-      selectorFoto.value.value = "";
-    }
   }
 }
 async function quitarFoto(): Promise<void> {
@@ -275,91 +283,142 @@ const aparienciaAbierta = ref(false);
 
 <template>
   <section class="tu-pagina-cuenta">
-    <EncabezadoSeccion :titulo="$t('miPerfil.titulo')" />
+    <EncabezadoSeccion
+      :titulo="$t('miPerfil.titulo')"
+      :subtitulo="$t('miPerfil.subtitulo')"
+    />
 
     <template v-if="usuario">
-      <!-- DATOS PERSONALES -->
-      <h2 class="mp-seccion">{{ $t("miPerfil.seccionDatos") }}</h2>
-      <div class="tu-card overflow-hidden">
-        <!-- Foto -->
-        <div class="mp-fila">
-          <div>
-            <h3 class="mp-titulo">{{ $t("miPerfil.foto") }}</h3>
-            <p class="mp-ayuda">{{ $t("miPerfil.fotoAyuda") }}</p>
+      <!-- Identidad y foto, sin separar la imagen de la persona a la que pertenece. -->
+      <!-- La foto se suelta en cualquier parte de la tarjeta (o en su zona). -->
+      <div
+        class="tu-card mp-identidad"
+        :class="{ 'mp-identidad-activa': arrastrandoFoto }"
+        data-prueba="identidad-perfil"
+        @dragenter.prevent="sobreTarjeta += 1"
+        @dragover.prevent
+        @dragleave.prevent="alSalirDeTarjeta"
+        @drop.prevent="alSoltarEnTarjeta"
+      >
+        <FondoDecorado />
+        <div class="mp-persona">
+          <!-- La foto: un clic (o Enter) la cambia. -->
+          <div
+            class="mp-foto-zona"
+            :class="{
+              'mp-foto-zona-activa': arrastrandoFoto,
+              'mp-foto-zona-ocupada': subiendoFoto,
+            }"
+            role="button"
+            tabindex="0"
+            :aria-label="$t('miPerfil.fotoArrastra')"
+            :aria-busy="subiendoFoto"
+            data-prueba="zona-foto"
+            @click="elegirFoto"
+            @keydown.enter.prevent="elegirFoto"
+            @keydown.space.prevent="elegirFoto"
+          >
+            <AvatarIniciales
+              :nombre="usuario.nombre"
+              :foto="usuario.foto_url"
+              tam="xl"
+            />
+            <span class="mp-foto-insignia" aria-hidden="true">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M8 6 9.5 3.5h5L16 6h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"
+                />
+                <circle cx="12" cy="12.5" r="3.5" />
+              </svg>
+            </span>
           </div>
-          <div class="flex flex-wrap items-center gap-4 min-w-0">
-            <!-- Zona de la foto: se suelta aquí una imagen o se hace clic para elegirla. -->
-            <div
-              class="mp-foto-zona"
-              :class="{
-                'mp-foto-zona-activa': arrastrandoFoto,
-                'mp-foto-zona-ocupada': subiendoFoto,
-              }"
-              role="button"
-              tabindex="0"
-              :aria-label="$t('miPerfil.fotoArrastra')"
-              :aria-busy="subiendoFoto"
-              data-prueba="zona-foto"
-              @click="elegirFoto"
-              @keydown.enter.prevent="elegirFoto"
-              @keydown.space.prevent="elegirFoto"
-              @dragenter.prevent="arrastrandoFoto = true"
-              @dragover.prevent="arrastrandoFoto = true"
-              @dragleave.prevent="arrastrandoFoto = false"
-              @drop.prevent="alSoltarFoto"
-            >
-              <AvatarIniciales
-                :nombre="usuario.nombre"
-                :foto="usuario.foto_url"
-                tam="xl"
-              />
-              <span class="mp-foto-texto">
-                <span class="block text-sm font-medium">{{
-                  subiendoFoto
-                    ? $t("miPerfil.fotoSubiendo")
-                    : arrastrandoFoto
-                      ? $t("miPerfil.fotoSuelta")
-                      : $t("miPerfil.fotoArrastra")
-                }}</span>
-                <span class="mp-ayuda block">{{
-                  $t("miPerfil.fotoFormatos")
-                }}</span>
+          <div class="mp-persona-datos">
+            <p class="mp-nombre">{{ usuario.nombre }}</p>
+            <p class="mp-email">{{ usuario.email }}</p>
+            <div class="mp-contexto">
+              <span v-if="rolVisible" class="mp-rol">{{ rolVisible }}</span>
+              <span v-if="sesion.estudio?.nombre" class="mp-negocio">
+                <IconoNav nombre="ubicacion" :tam="15" />
+                {{ sesion.estudio.nombre }}
               </span>
             </div>
-            <div class="flex flex-wrap gap-2">
-              <button
-                type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
-                :disabled="subiendoFoto"
-                @click="elegirFoto"
-              >
-                {{
-                  usuario.foto_url
-                    ? $t("miPerfil.cambiarFoto")
-                    : $t("miPerfil.subirFoto")
-                }}
-              </button>
-              <button
-                v-if="usuario.foto_url"
-                type="button"
-                class="tu-btn tu-btn-fantasma text-sm"
-                :disabled="subiendoFoto"
-                @click="quitarFoto"
-              >
-                {{ $t("miPerfil.quitarFoto") }}
-              </button>
-            </div>
-            <input
-              ref="selectorFoto"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              class="sr-only"
-              tabindex="-1"
-              @change="alElegirFoto"
-            />
           </div>
         </div>
+        <!-- Subir: la misma zona de arrastrar y soltar que en toda la app. -->
+        <div class="mp-foto-acciones">
+          <ZonaArchivo
+            ref="zonaFoto"
+            compacta
+            icono="imagen"
+            :accept="TIPOS_FOTO"
+            :max-bytes="MAX_FOTO"
+            :error-tipo="$t('miPerfil.fotoTipo')"
+            :error-peso="$t('miPerfil.fotoPeso')"
+            :texto="$t('miPerfil.fotoZonaTexto')"
+            :elige="$t('miPerfil.fotoZonaElige')"
+            :suelta="$t('miPerfil.fotoSuelta')"
+            :ayuda="$t('miPerfil.fotoFormatos')"
+            :ocupado="subiendoFoto"
+            :ocupado-texto="$t('miPerfil.fotoSubiendo')"
+            :resaltada="arrastrandoFoto"
+            @archivo="subirFoto"
+          />
+          <button
+            v-if="usuario.foto_url"
+            type="button"
+            class="tu-btn tu-btn-fantasma text-sm mp-quitar-foto"
+            :disabled="subiendoFoto"
+            @click="quitarFoto"
+          >
+            {{ $t("miPerfil.quitarFoto") }}
+          </button>
+        </div>
+      </div>
 
+      <nav class="mp-atajos" :aria-label="$t('miPerfil.navegacion')">
+        <a href="#mp-datos" class="mp-atajo">
+          <IconoNav nombre="miembros" :tam="20" />
+          <span>{{ $t("miPerfil.seccionDatos") }}</span>
+          <IconoNav nombre="abajo" :tam="15" class="mp-atajo-flecha" />
+        </a>
+        <a href="#mp-acceso" class="mp-atajo">
+          <IconoNav nombre="usuarios" :tam="20" />
+          <span>{{ $t("miPerfil.seccionAcceso") }}</span>
+          <IconoNav nombre="abajo" :tam="15" class="mp-atajo-flecha" />
+        </a>
+        <a href="#mp-preferencias" class="mp-atajo">
+          <IconoNav nombre="ajustes" :tam="20" />
+          <span>{{ tituloPreferencias }}</span>
+          <IconoNav nombre="abajo" :tam="15" class="mp-atajo-flecha" />
+        </a>
+      </nav>
+
+      <!-- DATOS PERSONALES -->
+      <section
+        id="mp-datos"
+        class="tu-card mp-bloque"
+        aria-labelledby="mp-datos-titulo"
+      >
+        <header class="mp-cabecera">
+          <span class="mp-icono" aria-hidden="true"
+            ><IconoNav nombre="miembros" :tam="22"
+          /></span>
+          <div>
+            <h2 id="mp-datos-titulo" class="mp-seccion">
+              {{ $t("miPerfil.seccionDatos") }}
+            </h2>
+            <p class="mp-ayuda">{{ $t("miPerfil.datosDescripcion") }}</p>
+          </div>
+        </header>
         <!-- Datos -->
         <form class="mp-fila" @submit.prevent="guardarDatos">
           <div>
@@ -422,20 +481,40 @@ const aparienciaAbierta = ref(false);
               />
               <p class="tu-hint mt-1">{{ $t("miPerfil.celularAyuda") }}</p>
             </div>
-            <button
-              type="submit"
-              class="tu-btn tu-btn-primario"
-              :disabled="guardandoDatos || datos.nombre.trim() === ''"
-            >
-              {{ $t("miPerfil.guardar") }}
-            </button>
+            <div class="mp-pie-formulario">
+              <button
+                type="submit"
+                class="tu-btn tu-btn-primario"
+                :disabled="guardandoDatos || datos.nombre.trim() === ''"
+              >
+                {{
+                  guardandoDatos
+                    ? $t("miPerfil.guardando")
+                    : $t("miPerfil.guardar")
+                }}
+              </button>
+            </div>
           </div>
         </form>
-      </div>
+      </section>
 
       <!-- ACCESO -->
-      <h2 class="mp-seccion">{{ $t("miPerfil.seccionAcceso") }}</h2>
-      <div class="tu-card overflow-hidden">
+      <section
+        id="mp-acceso"
+        class="tu-card mp-bloque"
+        aria-labelledby="mp-acceso-titulo"
+      >
+        <header class="mp-cabecera">
+          <span class="mp-icono" aria-hidden="true"
+            ><IconoNav nombre="usuarios" :tam="22"
+          /></span>
+          <div>
+            <h2 id="mp-acceso-titulo" class="mp-seccion">
+              {{ $t("miPerfil.seccionAcceso") }}
+            </h2>
+            <p class="mp-ayuda">{{ $t("miPerfil.accesoDescripcion") }}</p>
+          </div>
+        </header>
         <!-- Correo de acceso -->
         <div class="mp-fila">
           <div>
@@ -443,7 +522,9 @@ const aparienciaAbierta = ref(false);
             <p class="mp-ayuda">{{ $t("miPerfil.correoAyuda") }}</p>
           </div>
           <div class="space-y-4">
-            <p class="text-sm">{{ usuario.email }}</p>
+            <p class="mp-correo-actual">
+              <IconoNav nombre="mensaje" :tam="18" />{{ usuario.email }}
+            </p>
             <template v-if="usuario.email_pendiente">
               <p class="text-sm" role="status" style="color: var(--aviso)">
                 {{
@@ -563,17 +644,23 @@ const aparienciaAbierta = ref(false);
                 />
               </div>
             </div>
-            <button
-              type="submit"
-              class="tu-btn tu-btn-primario"
-              :disabled="
-                cambiandoClave ||
-                clave.nueva.length < 8 ||
-                clave.nueva !== clave.confirmacion
-              "
-            >
-              {{ $t("miPerfil.cambiar") }}
-            </button>
+            <div class="mp-pie-formulario">
+              <button
+                type="submit"
+                class="tu-btn tu-btn-primario"
+                :disabled="
+                  cambiandoClave ||
+                  clave.nueva.length < 8 ||
+                  clave.nueva !== clave.confirmacion
+                "
+              >
+                {{
+                  cambiandoClave
+                    ? $t("miPerfil.guardando")
+                    : $t("miPerfil.cambiar")
+                }}
+              </button>
+            </div>
           </div>
         </form>
 
@@ -607,18 +694,36 @@ const aparienciaAbierta = ref(false);
             <div v-else ref="botonGoogle" data-prueba="boton-google" />
           </div>
         </div>
-      </div>
+      </section>
 
       <!-- PREFERENCIAS Y PRIVACIDAD -->
-      <h2 class="mp-seccion">{{ $t("miPerfil.seccionPreferencias") }}</h2>
-      <div class="tu-card overflow-hidden">
+      <section
+        id="mp-preferencias"
+        class="tu-card mp-bloque"
+        aria-labelledby="mp-preferencias-titulo"
+      >
+        <header class="mp-cabecera">
+          <span class="mp-icono" aria-hidden="true"
+            ><IconoNav nombre="ajustes" :tam="22"
+          /></span>
+          <div>
+            <h2 id="mp-preferencias-titulo" class="mp-seccion">
+              {{ tituloPreferencias }}
+            </h2>
+            <p class="mp-ayuda">{{ $t("miPerfil.preferenciasDescripcion") }}</p>
+          </div>
+        </header>
         <!-- Calendario -->
         <div class="mp-fila">
           <div>
             <h3 class="mp-titulo">{{ $t("miPerfil.calendario") }}</h3>
             <p class="mp-ayuda">{{ $t("miPerfil.calendarioAyuda") }}</p>
           </div>
-          <div class="space-y-3">
+          <div class="mp-calendario space-y-3">
+            <span class="mp-icono mp-icono-calendario" aria-hidden="true"
+              ><IconoNav nombre="agenda" :tam="28"
+            /></span>
+            <p class="mp-titulo">{{ $t("miPerfil.calendarioDispositivos") }}</p>
             <button
               v-if="calendario === null"
               type="button"
@@ -684,7 +789,7 @@ const aparienciaAbierta = ref(false);
 
         <!-- Privacidad (clientes y alumnos). Se recarga si cambia su celular: de él
            depende recibir avisos por WhatsApp. -->
-        <div v-if="mostrarPrivacidad" class="mp-fila">
+        <div v-if="mostrarPrivacidad" class="mp-fila mp-privacidad">
           <div>
             <h3 class="mp-titulo">{{ $t("miPrivacidad.titulo") }}</h3>
             <p class="mp-ayuda">{{ $t("miPrivacidad.ayuda") }}</p>
@@ -694,7 +799,7 @@ const aparienciaAbierta = ref(false);
             integrado
           />
         </div>
-      </div>
+      </section>
     </template>
 
     <PanelApariencia
@@ -705,8 +810,156 @@ const aparienciaAbierta = ref(false);
 </template>
 
 <style scoped>
-/* Como la demo: secciones separadas por una línea fina; a la izquierda qué es y a
-   la derecha el formulario. */
+/* Identidad visible, navegación corta y formularios con la misma jerarquía. */
+.mp-identidad {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  overflow: hidden;
+  border-left: 3px solid var(--acento);
+  background: color-mix(in srgb, var(--acento) 3%, var(--superficie));
+  transition: box-shadow 0.15s ease;
+}
+/* Arrastrando una imagen sobre la tarjeta: toda ella la recibe. */
+.mp-identidad-activa {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--acento) 45%, transparent);
+}
+/* El contenido va sobre el adorno de fondo. */
+.mp-persona,
+.mp-foto-acciones {
+  position: relative;
+  z-index: 1;
+}
+.mp-persona {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  min-width: 0;
+  flex: 1 1 20rem;
+}
+.mp-persona-datos {
+  min-width: 0;
+}
+.mp-nombre {
+  font-size: clamp(1.15rem, 1rem + 0.5vw, 1.5rem);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+.mp-email {
+  margin-top: 0.3rem;
+  font-size: 0.875rem;
+  color: var(--texto-suave);
+  overflow-wrap: anywhere;
+}
+.mp-contexto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.8rem;
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+}
+.mp-rol {
+  border: 1px solid color-mix(in srgb, var(--acento) 22%, var(--borde));
+  padding: 0.2rem 0.55rem;
+  border-radius: 0.35rem;
+  /* El acento hacia el color del texto: se lee en temas claros y oscuros (un acento
+     verde o rosa solo, sobre su tinte, queda corto de contraste). */
+  color: color-mix(in srgb, var(--acento), var(--texto) 35%);
+  background: var(--primario-suave);
+  font-weight: 500;
+}
+.mp-negocio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  color: var(--texto-suave);
+  overflow-wrap: anywhere;
+}
+.mp-foto-acciones {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex: 0 1 21rem;
+  min-width: 0;
+}
+.mp-foto-acciones > :first-child {
+  width: 100%;
+}
+/* Sobre el adorno, la zona va en la superficie para que se lea igual en cada tema. */
+.mp-foto-acciones :deep(.tu-zona-archivo:not(.tu-zona-archivo-activa)) {
+  background: var(--superficie);
+}
+.mp-atajos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 1rem 0 1.5rem;
+}
+.mp-atajo {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+.mp-atajo > svg {
+  color: var(--primario-fuerte);
+  flex-shrink: 0;
+}
+.mp-atajo-flecha {
+  margin-left: auto;
+}
+.mp-atajo:hover {
+  border-color: var(--acento);
+  background: var(--primario-suave);
+}
+.mp-atajo:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 3px;
+}
+.mp-bloque {
+  margin-top: 1.25rem;
+  scroll-margin-top: 6rem;
+}
+.mp-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.2rem 1.5rem;
+  background: color-mix(in srgb, var(--fondo) 60%, var(--superficie));
+  border-radius: var(--radio-tarjeta) var(--radio-tarjeta) 0 0;
+}
+.mp-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.65rem;
+  color: var(--primario-fuerte);
+  background: var(--primario-suave);
+}
 .mp-fila {
   display: grid;
   gap: 1rem;
@@ -721,7 +974,7 @@ const aparienciaAbierta = ref(false);
 }
 @media (min-width: 768px) {
   .mp-fila {
-    grid-template-columns: 15rem minmax(0, 1fr);
+    grid-template-columns: minmax(10rem, 0.65fr) minmax(0, 2fr);
     gap: 2rem;
   }
 }
@@ -737,17 +990,11 @@ const aparienciaAbierta = ref(false);
   border-radius: 999px;
   background: var(--exito);
 }
-/* Título de cada parte (Datos personales, Acceso, Preferencias y privacidad). */
 .mp-seccion {
-  margin: 2rem 0 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--texto-suave);
-}
-.mp-seccion:first-of-type {
-  margin-top: 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--texto);
 }
 .mp-titulo {
   font-weight: 500;
@@ -759,11 +1006,14 @@ const aparienciaAbierta = ref(false);
 }
 /* Zona de la foto: se arrastra una imagen encima o se hace clic para elegirla. */
 .mp-foto-zona {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1rem 0.75rem 0.75rem;
-  border: 1.5px dashed var(--borde);
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0.45rem;
+  /* El punteado solo al arrastrar: la zona de carga de al lado ya lo dice. */
+  border: 1.5px dashed transparent;
   border-radius: 1rem;
   cursor: pointer;
   transition:
@@ -773,7 +1023,10 @@ const aparienciaAbierta = ref(false);
 .mp-foto-zona:hover,
 .mp-foto-zona:focus-visible {
   border-color: color-mix(in srgb, var(--acento) 45%, var(--borde));
-  outline: none;
+}
+.mp-foto-zona:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 4px;
 }
 .mp-foto-zona-activa {
   border-color: var(--acento);
@@ -783,8 +1036,88 @@ const aparienciaAbierta = ref(false);
   cursor: progress;
   opacity: 0.7;
 }
-.mp-foto-texto {
-  min-width: 0;
-  max-width: 14rem;
+.mp-foto-insignia {
+  position: absolute;
+  right: -0.35rem;
+  bottom: -0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 2px solid var(--superficie);
+  border-radius: 0.5rem;
+  background: var(--primario);
+  color: var(--primario-contraste);
+}
+.mp-pie-formulario {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.5rem;
+}
+.mp-correo-actual {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+.mp-correo-actual svg {
+  flex-shrink: 0;
+  color: var(--texto-suave);
+}
+.mp-calendario {
+  padding: 1.1rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-tarjeta);
+  background: color-mix(in srgb, var(--acento) 3%, var(--superficie));
+}
+.mp-icono-calendario {
+  width: 3rem;
+  height: 3rem;
+}
+@media (max-width: 639px) {
+  .mp-identidad {
+    padding: 1.1rem;
+    gap: 1rem;
+  }
+  .mp-persona {
+    gap: 0.9rem;
+    flex-basis: 100%;
+  }
+  .mp-foto-acciones {
+    flex-basis: 100%;
+  }
+  .mp-atajos {
+    grid-template-columns: 1fr;
+    gap: 0;
+    border: 1px solid var(--borde);
+    border-radius: var(--radio-tarjeta);
+    overflow: hidden;
+  }
+  .mp-atajo {
+    border: 0;
+    border-radius: 0;
+  }
+  .mp-atajo + .mp-atajo {
+    border-top: 1px solid var(--borde);
+  }
+  .mp-cabecera,
+  .mp-fila {
+    padding: 1.1rem;
+  }
+  .mp-cabecera {
+    align-items: flex-start;
+  }
+  .mp-pie-formulario .tu-btn {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mp-identidad,
+  .mp-atajo,
+  .mp-foto-zona {
+    transition: none;
+  }
 }
 </style>

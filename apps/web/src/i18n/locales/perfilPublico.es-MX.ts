@@ -14,7 +14,7 @@ export default {
     portada: "Portada",
     portadaAyuda:
       "Imagen horizontal (por ejemplo 1600 × 600). PNG, JPG o WebP, hasta 4 MB.",
-    portadaArrastra: "Arrastra la portada aquí o haz clic para elegir",
+    portadaArrastra: "Arrastra la portada aquí o",
     portadaTipo: "Usa una imagen PNG, JPG o WebP.",
     portadaPeso: "La imagen no debe pesar más de 4 MB.",
     portadaSubiendo: "Subiendo…",
@@ -51,7 +51,7 @@ export default {
     direccion: "Dirección",
     direccionPh: "Calle, número, colonia y ciudad",
     foto: "Foto de la sede",
-    fotoArrastra: "Arrastra la foto aquí o haz clic para elegir",
+    fotoArrastra: "Arrastra la foto aquí o",
     fotoAyuda:
       "La fachada o la entrada: así tus clientes eligen la sede correcta. PNG, JPG o WebP de hasta 4 MB.",
     fotoQuitar: "Quitar foto",
@@ -84,7 +84,7 @@ export default {
     incluidoEn: "Está incluido en {lista}, así que no puede incluir otros.",
     incluyeResumen: "Incluye {lista}",
     foto: "Foto del servicio",
-    fotoArrastra: "Arrastra la foto aquí o haz clic para elegir",
+    fotoArrastra: "Arrastra la foto aquí o",
     fotoAyuda: "La ven tus clientes al elegir. PNG, JPG o WebP de hasta 4 MB.",
     fotoQuitar: "Quitar foto",
   },
