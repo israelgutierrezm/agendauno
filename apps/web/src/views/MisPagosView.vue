@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import CortePlanes from "@/components/CortePlanes.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import HistorialCompras from "@/components/HistorialCompras.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import PagoAutomatico from "@/components/PagoAutomatico.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import {
@@ -149,7 +150,64 @@ onMounted(() => void cuenta.asegurar());
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t('portal.pagos.titulo')" />
+    <EncabezadoSeccion
+      :titulo="$t('portal.pagos.titulo')"
+      :subtitulo="
+        $t(
+          citas
+            ? 'portal.pagos.descripcionCitas'
+            : 'portal.pagos.descripcionClases',
+        )
+      "
+    />
+
+    <nav
+      v-if="
+        !cuenta.cargando.value && (!cuenta.error.value || cuenta.cargado.value)
+      "
+      class="mp-accesos"
+      :aria-label="$t('portal.pagos.secciones')"
+    >
+      <a
+        href="#mp-pendientes"
+        class="tu-card mp-acceso"
+        :class="{ 'mp-atencion': cuenta.porPagar.value.length > 0 }"
+      >
+        <span class="mp-icono"><IconoNav nombre="ventas" :tam="26" /></span>
+        <span
+          ><small>{{ $t("portal.pagos.porPagar") }}</small
+          ><strong>{{
+            cuenta.porPagar.value.length
+              ? $t(
+                  "portal.inicio.tarjetas.porPagar",
+                  cuenta.porPagar.value.length,
+                )
+              : $t("portal.inicio.tarjetas.alCorriente")
+          }}</strong></span
+        >
+      </a>
+      <a v-if="mostrarPlanes" href="#mp-planes" class="tu-card mp-acceso"
+        ><span class="mp-icono"><IconoNav nombre="etiqueta" :tam="26" /></span
+        ><span
+          ><strong>{{ $t("portal.pagos.planes") }}</strong
+          ><small>{{ $t("portal.pagos.saldoVigencia") }}</small></span
+        ></a
+      >
+      <a href="#mp-historial" class="tu-card mp-acceso"
+        ><span class="mp-icono"><IconoNav nombre="lista" :tam="26" /></span
+        ><span
+          ><strong>{{ $t("portal.pagos.historial") }}</strong
+          ><small>{{ $t("portal.pagos.verMovimientos") }}</small></span
+        ></a
+      >
+      <a v-if="comprables.length" href="#mp-comprar" class="tu-card mp-acceso"
+        ><span class="mp-icono"><IconoNav nombre="dinero" :tam="26" /></span
+        ><span
+          ><strong>{{ $t("portal.pagos.renovar") }}</strong
+          ><small>{{ $t("portal.pagos.verOpciones") }}</small></span
+        ></a
+      >
+    </nav>
 
     <p
       v-if="error || cuenta.error.value"
@@ -157,6 +215,14 @@ onMounted(() => void cuenta.asegurar());
       style="color: var(--error)"
     >
       {{ error ?? cuenta.error.value }}
+      <button
+        v-if="cuenta.error.value"
+        type="button"
+        class="tu-enlace ml-2"
+        @click="cuenta.cargar(true)"
+      >
+        {{ $t("comun.reintentar") }}
+      </button>
     </p>
     <p
       v-if="retornoPago"
@@ -210,19 +276,29 @@ onMounted(() => void cuenta.asegurar());
       {{ $t("comun.cargando") }}
     </p>
 
-    <div v-else class="mp-pagos">
+    <div
+      v-else-if="!cuenta.error.value || cuenta.cargado.value"
+      class="mp-pagos"
+    >
       <!-- Clases: su plan vigente primero. En citas, sus bonos van después. -->
-      <CortePlanes
+      <div
         v-if="mostrarPlanes"
-        ref="corte"
+        id="mp-planes"
         :class="citas ? 'order-3' : 'order-1'"
-        :url="`${cuenta.base.value}/mi/planes`"
-      />
+      >
+        <CortePlanes ref="corte" :url="`${cuenta.base.value}/mi/planes`" />
+      </div>
 
-      <div class="order-2">
+      <div id="mp-pendientes" class="order-2">
         <!-- Por pagar -->
         <div class="tu-card p-5" data-prueba="por-pagar">
-          <h2 class="font-semibold">{{ $t("portal.pagos.porPagar") }}</h2>
+          <h2 class="mp-seccion">
+            <IconoNav nombre="ventas" :tam="22" />{{
+              $t("portal.pagos.porPagar")
+            }}<span v-if="cuenta.porPagar.value.length" class="tu-badge">{{
+              cuenta.porPagar.value.length
+            }}</span>
+          </h2>
           <ul
             v-if="cuenta.porPagar.value.length > 0"
             class="mt-3 divide-y divide-[var(--borde)] text-sm"
@@ -276,11 +352,8 @@ onMounted(() => void cuenta.asegurar());
               </div>
             </li>
           </ul>
-          <p
-            v-else
-            class="mt-3 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
+          <p v-else class="mp-al-corriente">
+            <IconoNav nombre="hecho" :tam="22" />
             {{ $t("portal.inicio.tarjetas.alCorriente") }}
           </p>
           <p class="mt-3 text-xs" :style="{ color: 'var(--texto-suave)' }">
@@ -290,8 +363,16 @@ onMounted(() => void cuenta.asegurar());
       </div>
 
       <!-- Comprar o renovar -->
-      <div v-if="comprables.length > 0" class="order-4 tu-card p-5">
-        <h2 class="font-semibold">{{ $t("miCuenta.comprar.titulo") }}</h2>
+      <div
+        v-if="comprables.length > 0"
+        id="mp-comprar"
+        class="order-4 tu-card p-5"
+      >
+        <h2 class="mp-seccion">
+          <IconoNav nombre="etiqueta" :tam="22" />{{
+            $t("miCuenta.comprar.titulo")
+          }}
+        </h2>
         <p
           v-if="mensaje === 'comprado'"
           class="mt-2 text-sm"
@@ -303,7 +384,7 @@ onMounted(() => void cuenta.asegurar());
           <li
             v-for="p in comprables"
             :key="p.id"
-            class="flex flex-col rounded-xl border p-4"
+            class="mp-producto flex flex-col rounded-xl border p-4"
             :style="{ borderColor: 'var(--borde)' }"
           >
             <span class="text-xs" :style="{ color: 'var(--texto-suave)' }">{{
@@ -363,10 +444,9 @@ onMounted(() => void cuenta.asegurar());
       <PagoAutomatico v-if="cuenta.personaId.value !== null" class="order-5" />
 
       <!-- Historial: en citas, justo después de lo que debe -->
-      <HistorialCompras
-        ref="historial"
-        :class="citas ? 'order-2' : 'order-6'"
-      />
+      <div id="mp-historial" :class="citas ? 'order-2' : 'order-6'">
+        <HistorialCompras ref="historial" />
+      </div>
     </div>
   </section>
 </template>
@@ -378,5 +458,87 @@ onMounted(() => void cuenta.asegurar());
   flex-direction: column;
   gap: 1rem;
   margin-top: 1.25rem;
+}
+.mp-accesos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.8rem;
+  margin-top: 1.25rem;
+}
+.mp-acceso {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 1rem;
+  text-decoration: none;
+}
+.mp-acceso:hover {
+  border-color: var(--primario);
+}
+.mp-acceso strong {
+  display: block;
+  font-size: 0.95rem;
+}
+.mp-acceso small {
+  display: block;
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+}
+.mp-icono {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--primario);
+}
+.mp-atencion .mp-icono {
+  color: var(--aviso);
+}
+.mp-seccion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+}
+.mp-seccion > svg {
+  color: var(--primario);
+}
+.mp-al-corriente {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 1rem;
+  border-radius: 10px;
+  background: var(--exito-suave);
+  color: var(--exito-texto);
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+.mp-producto {
+  background: var(--superficie-2);
+  gap: 0.2rem;
+}
+/* En el teléfono, los accesos en dos columnas y sin descripción: lo primero que se
+   ve sigue siendo lo que debe y su plan. */
+@media (max-width: 639px) {
+  .mp-accesos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .mp-acceso {
+    gap: 0.6rem;
+    padding: 0.75rem;
+  }
+  .mp-acceso strong {
+    font-size: 0.875rem;
+  }
+  .mp-acceso strong + small {
+    display: none;
+  }
+}
+#mp-planes,
+#mp-pendientes,
+#mp-historial,
+#mp-comprar {
+  scroll-margin-top: 6rem;
 }
 </style>

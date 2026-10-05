@@ -7,10 +7,12 @@ import CampoContrasena from "@/components/CampoContrasena.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import FondoDecorado from "@/components/FondoDecorado.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import LogoCalendario from "@/components/LogoCalendario.vue";
 import MiPrivacidad from "@/components/MiPrivacidad.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { APPS_CALENDARIO } from "@/lib/calendario";
 import { clientIdGoogle, renderizarBotonGoogle } from "@/lib/google";
 import { esMiembro, nombreDeRol } from "@/lib/roles";
 import {
@@ -96,6 +98,8 @@ type Respuesta = { data: { usuario: UsuarioTenant } };
 
 // ---- Foto: se suelta sobre la tarjeta (o su zona) o se elige con un clic ----
 const zonaFoto = ref<InstanceType<typeof ZonaArchivo> | null>(null);
+// La zona de carga solo se ve al pulsar «Cambiar foto» (o al arrastrar una imagen).
+const zonaFotoAbierta = ref(false);
 const subiendoFoto = ref(false);
 // Contador: al pasar sobre los hijos de la tarjeta llegan «dragleave» intermedios.
 const sobreTarjeta = ref(0);
@@ -126,6 +130,7 @@ async function subirFoto(archivo: File): Promise<void> {
     datos.append("foto", archivo);
     const { data } = await api.post<Respuesta>(`${base.value}/yo/foto`, datos);
     sesion.actualizarUsuario(data.data.usuario);
+    zonaFotoAbierta.value = false;
   } catch (err) {
     toast.error(mensajeDeError(err, t("miPerfil.error")));
   } finally {
@@ -357,7 +362,13 @@ const aparienciaAbierta = ref(false);
         <div class="mp-foto-acciones">
           <ZonaArchivo
             ref="zonaFoto"
+            v-model:abierta="zonaFotoAbierta"
             compacta
+            :boton="
+              usuario.foto_url
+                ? $t('miPerfil.cambiarFoto')
+                : $t('miPerfil.subirFoto')
+            "
             icono="imagen"
             :accept="TIPOS_FOTO"
             :max-bytes="MAX_FOTO"
@@ -373,7 +384,7 @@ const aparienciaAbierta = ref(false);
             @archivo="subirFoto"
           />
           <button
-            v-if="usuario.foto_url"
+            v-if="usuario.foto_url && !zonaFotoAbierta && !arrastrandoFoto"
             type="button"
             class="tu-btn tu-btn-fantasma text-sm mp-quitar-foto"
             :disabled="subiendoFoto"
@@ -723,7 +734,16 @@ const aparienciaAbierta = ref(false);
             <span class="mp-icono mp-icono-calendario" aria-hidden="true"
               ><IconoNav nombre="agenda" :tam="28"
             /></span>
-            <p class="mp-titulo">{{ $t("miPerfil.calendarioDispositivos") }}</p>
+            <!-- Con qué calendarios funciona: cada uno con su miniatura. -->
+            <ul
+              class="mp-apps-calendario"
+              :aria-label="$t('miPerfil.calendarioDispositivos')"
+              data-prueba="apps-calendario"
+            >
+              <li v-for="app in APPS_CALENDARIO" :key="app.marca">
+                <LogoCalendario :marca="app.marca" :tam="22" />{{ app.nombre }}
+              </li>
+            </ul>
             <button
               v-if="calendario === null"
               type="button"
@@ -764,7 +784,11 @@ const aparienciaAbierta = ref(false);
                   {{ $t("miPerfil.calendarioNuevo") }}
                 </button>
               </div>
-              <p class="tu-hint">{{ $t("miPerfil.calendarioGoogle") }}</p>
+              <p class="tu-hint mp-hint-app">
+                <LogoCalendario marca="google" :tam="16" />{{
+                  $t("miPerfil.calendarioGoogle")
+                }}
+              </p>
               <p class="tu-hint">{{ $t("miPerfil.calendarioNuevoAyuda") }}</p>
             </template>
           </div>
@@ -883,15 +907,17 @@ const aparienciaAbierta = ref(false);
   color: var(--texto-suave);
   overflow-wrap: anywhere;
 }
+/* «Cambiar foto» y «Quitar foto» en una fila; desplegada, la zona ocupa el ancho. */
 .mp-foto-acciones {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.35rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.5rem;
   flex: 0 1 21rem;
   min-width: 0;
 }
-.mp-foto-acciones > :first-child {
+.mp-foto-acciones > :deep(:has(> .tu-zona-archivo)) {
   width: 100%;
 }
 /* Sobre el adorno, la zona va en la superficie para que se lea igual en cada tema. */
@@ -1071,6 +1097,27 @@ const aparienciaAbierta = ref(false);
   border: 1px solid var(--borde);
   border-radius: var(--radio-tarjeta);
   background: color-mix(in srgb, var(--acento) 3%, var(--superficie));
+}
+/* Las apps de calendario: miniatura y nombre, en una fila que se acomoda. */
+.mp-apps-calendario {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.1rem;
+}
+.mp-apps-calendario li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.mp-hint-app {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+.mp-hint-app svg {
+  margin-top: 0.1rem;
 }
 .mp-icono-calendario {
   width: 3rem;

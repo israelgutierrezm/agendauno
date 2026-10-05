@@ -360,6 +360,7 @@ export function useMiCuenta() {
     asistencias,
     pagoEnLinea,
     pagoAutomatico,
+    cargado,
     cargando,
     error,
     accionando,

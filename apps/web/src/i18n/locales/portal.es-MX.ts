@@ -14,6 +14,9 @@ export default {
     saludo: "¡Hola, {nombre}!",
     saludoSinNombre: "¡Hola!",
     resumen: "Aquí tienes un resumen de tu actividad en {estudio}.",
+    noDisponible:
+      "No pudimos consultar tu actividad. Reintenta para ver tus reservas y planes.",
+    para: "Asiste {nombre}",
     // La etiqueta de la tarjeta principal va por lo que se reservó: clase o cita; sin
     // reserva, el término general.
     proxima: "Tu próxima clase",
@@ -29,9 +32,10 @@ export default {
       ahoraCerca: "Ahora cerca de {lugar}",
       lluvia: "{n} % de lluvia",
     },
-    verDetalle: "Ver en mis reservas →",
+    // Botón principal de la tarjeta (sin flecha: no es un enlace de texto).
+    verDetalle: "Ver en mis reservas",
     comoLlegar: "Cómo llegar",
-    cambiarCancelar: "Cambiar o cancelar →",
+    cambiarCancelar: "Cambiar o cancelar",
     atencion: {
       firmar:
         "Tienes 1 documento por firmar | Tienes {n} documentos por firmar",
@@ -76,6 +80,14 @@ export default {
   },
   reservas: {
     titulo: "Reservas",
+    descripcionClases:
+      "Encuentra tu próxima clase, revisa qué incluye tu plan y administra tus reservas.",
+    descripcionCitas:
+      "Agenda una cita, consulta lo próximo o revisa tus visitas anteriores.",
+    buscar: "Buscar clases",
+    buscarPlaceholder: "Buscar clase, instructor o sucursal…",
+    limpiar: "Limpiar filtros",
+    verDetalle: "Ver detalle",
     mias: "Mis reservas",
     disponibles: "Clases disponibles",
     reservada: "Reservada",
@@ -221,6 +233,16 @@ export default {
   },
   pagos: {
     titulo: "Pagos",
+    descripcionClases:
+      "Consulta tu plan, revisa pagos pendientes y encuentra opciones para renovar.",
+    descripcionCitas:
+      "Revisa los pagos de tus citas y consulta tus compras anteriores.",
+    secciones: "Secciones de pagos",
+    planes: "Mis planes",
+    saldoVigencia: "Disponibilidad y vigencia",
+    verMovimientos: "Consulta tus compras y pagos",
+    renovar: "Comprar o renovar",
+    verOpciones: "Explora las opciones del negocio",
     porPagar: "Por pagar",
     historial: "Historial de pagos",
     sinHistorial: "Aún no hay pagos.",
@@ -228,6 +250,16 @@ export default {
   },
   expediente: {
     titulo: "Expediente",
+    descripcion:
+      "Revisa documentos por firmar, archivos y fichas de datos del negocio.",
+    secciones: "Secciones del expediente",
+    documentos: "Mis documentos",
+    documentosAyuda: "Archivos y estado de revisión",
+    sinDocumentos: "El negocio no te ha solicitado archivos por el momento.",
+    errorDocumentos: "No pudimos consultar los documentos. Vuelve a intentar.",
+    fichasAyuda: "Consulta o completa tus respuestas",
+    vacio:
+      "Cuando el negocio te solicite documentos o datos, podrás consultarlos aquí.",
     firmar: "Por firmar",
     formularios: "Ficha de datos",
   },

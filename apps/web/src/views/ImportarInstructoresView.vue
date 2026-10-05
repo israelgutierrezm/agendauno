@@ -143,6 +143,7 @@ function descargarPlantilla(): void {
         <ZonaArchivo
           class="mt-4"
           accept=".csv,text/csv"
+          :boton="$t('importar.elegir')"
           :texto="$t('zonaArchivo.csv.arrastra')"
           :ayuda="$t('zonaArchivo.formatos.csv')"
           :cargado="nombreArchivo || null"

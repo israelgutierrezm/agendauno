@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -36,6 +37,8 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 const requisitos = ref<Requisito[]>([]);
 const subiendo = ref<string | null>(null);
+const cargando = ref(true);
+const cargaError = ref<string | null>(null);
 
 const COLOR: Record<string, string> = {
   pendiente: "var(--aviso)",
@@ -44,6 +47,8 @@ const COLOR: Record<string, string> = {
 };
 
 async function cargar(): Promise<void> {
+  cargando.value = true;
+  cargaError.value = null;
   try {
     const { data } = await api.get<{ data: { requisitos: Requisito[] } }>(
       `${base.value}/mi/documentos`,
@@ -51,6 +56,9 @@ async function cargar(): Promise<void> {
     requisitos.value = data.data.requisitos;
   } catch {
     requisitos.value = [];
+    cargaError.value = t("portal.expediente.errorDocumentos");
+  } finally {
+    cargando.value = false;
   }
 }
 
@@ -88,12 +96,34 @@ onMounted(cargar);
 </script>
 
 <template>
-  <div v-if="requisitos.length > 0" class="tu-card p-6">
-    <h2 class="font-medium text-lg">{{ $t("misDocumentos.titulo") }}</h2>
+  <div class="tu-card p-6">
+    <h2 class="flex items-center gap-2 font-semibold">
+      <IconoNav
+        nombre="expediente"
+        :tam="22"
+        class="text-[var(--primario)]"
+      />{{ $t("misDocumentos.titulo") }}
+    </h2>
     <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("misDocumentos.ayuda") }}
     </p>
-    <ul class="mt-3">
+    <p v-if="cargando" class="mt-4 text-sm" style="color: var(--texto-suave)">
+      {{ $t("comun.cargando") }}
+    </p>
+    <div v-else-if="cargaError" class="mt-4 text-sm" role="alert">
+      <p style="color: var(--error)">{{ cargaError }}</p>
+      <button type="button" class="tu-btn tu-btn-fantasma mt-3" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
+    <p
+      v-else-if="requisitos.length === 0"
+      class="mt-4 text-sm"
+      style="color: var(--texto-suave)"
+    >
+      {{ $t("portal.expediente.sinDocumentos") }}
+    </p>
+    <ul v-else class="mt-3">
       <li
         v-for="r in requisitos"
         :key="r.tipo.id"
@@ -141,11 +171,16 @@ onMounted(cargar);
         <!-- Lo que falta o hay que corregir se sube aquí: arrastrar o elegir. -->
         <ZonaArchivo
           v-if="r.documento?.estado !== 'aprobado'"
-          class="w-full"
+          class="md-zona"
           compacta
           icono="archivo"
           accept="image/jpeg,image/png,application/pdf"
           :max-bytes="8 * 1024 * 1024"
+          :boton="
+            r.documento
+              ? $t('misDocumentos.reemplazar')
+              : $t('misDocumentos.subir')
+          "
           :texto="
             r.documento
               ? $t('zonaArchivo.documento.otro')
@@ -161,3 +196,14 @@ onMounted(cargar);
     </ul>
   </div>
 </template>
+
+<style scoped>
+/* Plegada, el botón va a la derecha de su fila; desplegada, ocupa toda la fila. */
+.md-zona {
+  margin-left: auto;
+}
+:deep(.md-zona:has(> .tu-zona-archivo)) {
+  width: 100%;
+  margin-left: 0;
+}
+</style>

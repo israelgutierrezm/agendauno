@@ -1,3 +1,10 @@
+/** Las apps de calendario que se nombran (con su miniatura, LogoCalendario.vue). */
+export const APPS_CALENDARIO = [
+  { marca: "google", nombre: "Google Calendar" },
+  { marca: "apple", nombre: "Apple Calendar" },
+  { marca: "outlook", nombre: "Outlook" },
+] as const;
+
 /**
  * "Agregar a mi calendario" de una reserva: enlace para Google Calendar y archivo
  * .ics (Apple Calendar, Outlook y los demás). Todo en el navegador, sin servidor.

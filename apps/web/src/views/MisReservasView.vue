@@ -10,6 +10,7 @@ import CalendarioVistas, {
 } from "@/components/CalendarioVistas.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import HistorialReservas, {
   type ItemHistorial,
 } from "@/components/HistorialReservas.vue";
@@ -85,6 +86,12 @@ const periodo = ref<{ desde: string; hasta: string } | null>(null);
 const sucursalId = ref("");
 const actividadId = ref("");
 const instructorId = ref("");
+const busqueda = ref("");
+const normalizar = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase();
 const soloIncluidas = ref(false);
 // «Reservar de nuevo» desde el historial: esa clase.
 const ofertaElegida = ref<{ id: string; nombre: string } | null>(null);
@@ -138,7 +145,14 @@ function alCambiarPeriodo(r: { desde: string; hasta: string }): void {
 }
 watch(sucursalId, () => void cargarClases());
 watch(
-  [sucursalId, actividadId, instructorId, soloIncluidas, ofertaElegida],
+  [
+    sucursalId,
+    actividadId,
+    instructorId,
+    soloIncluidas,
+    ofertaElegida,
+    busqueda,
+  ],
   () => {
     limite.value = POR_TANDA;
   },
@@ -184,7 +198,9 @@ const hayCobertura = computed(() =>
 );
 const filtrando = computed(
   () =>
+    sucursalId.value !== "" ||
     actividadId.value !== "" ||
+    busqueda.value.trim() !== "" ||
     instructorId.value !== "" ||
     soloIncluidas.value ||
     ofertaElegida.value !== null,
@@ -192,6 +208,9 @@ const filtrando = computed(
 
 function pasaFiltros(c: Clase): boolean {
   return (
+    normalizar(
+      [c.oferta, c.sucursal, c.instructor].filter(Boolean).join(" "),
+    ).includes(normalizar(busqueda.value.trim())) &&
     (actividadId.value === "" || c.actividad_id === actividadId.value) &&
     (instructorId.value === "" || c.instructor_id === instructorId.value) &&
     (ofertaElegida.value === null || c.oferta_id === ofertaElegida.value.id) &&
@@ -200,6 +219,8 @@ function pasaFiltros(c: Clase): boolean {
   );
 }
 function quitarFiltros(): void {
+  sucursalId.value = "";
+  busqueda.value = "";
   actividadId.value = "";
   instructorId.value = "";
   soloIncluidas.value = false;
@@ -321,6 +342,18 @@ function hora(e: Evento): string {
     hour12: false,
   }).format(new Date(e.inicia));
 }
+function fecha(e: Evento, parte: "day" | "month"): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: e.zona,
+    ...(parte === "day" ? { day: "numeric" } : { month: "short" }),
+  }).format(new Date(e.inicia));
+}
+function ocupacion(e: Evento): number {
+  const c = e.clase;
+  return c?.capacidad && c.capacidad > 0
+    ? Math.min(100, (c.ocupados / c.capacidad) * 100)
+    : 0;
+}
 function lugares(e: Evento): string {
   const c = e.clase;
   if (!c || c.capacidad === null) {
@@ -409,7 +442,16 @@ onMounted(() => void cuenta.asegurar());
 
 <template>
   <section class="tu-pagina">
-    <EncabezadoSeccion :titulo="$t('portal.reservas.titulo')" />
+    <EncabezadoSeccion
+      :titulo="$t('portal.reservas.titulo')"
+      :subtitulo="
+        $t(
+          sesion.esCitas
+            ? 'portal.reservas.descripcionCitas'
+            : 'portal.reservas.descripcionClases',
+        )
+      "
+    />
 
     <div class="tu-pestanas mt-4" role="tablist">
       <button
@@ -450,8 +492,33 @@ onMounted(() => void cuenta.asegurar());
     </p>
 
     <!-- RESERVAR: citas -->
+    <p
+      v-if="pestana === 'proximas' && cuenta.cargando.value"
+      class="mt-5 text-sm"
+      style="color: var(--texto-suave)"
+    >
+      {{ $t("comun.cargando") }}
+    </p>
     <div
-      v-if="pestana === 'reservar' && sesion.esCitas"
+      v-else-if="
+        pestana === 'proximas' && cuenta.error.value && !cuenta.cargado.value
+      "
+      class="mt-5 tu-card p-5"
+      role="alert"
+    >
+      <p class="text-sm" style="color: var(--error)">
+        {{ cuenta.error.value }}
+      </p>
+      <button
+        type="button"
+        class="tu-btn tu-btn-fantasma mt-3"
+        @click="cuenta.cargar(true)"
+      >
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
+    <div
+      v-else-if="pestana === 'reservar' && sesion.esCitas"
       class="mt-4 tu-card p-5 mr-cita"
     >
       <AgendarCitaCuenta
@@ -478,12 +545,22 @@ onMounted(() => void cuenta.asegurar());
         :eventos="enCalendario"
         :cargando="cuenta.cargando.value || cargandoClases"
         :error="errorClases"
+        detallado
         @abrir="abrirPorId"
         @rango="alCambiarPeriodo"
         @reintentar="cargarClases"
       >
-        <template #barra>
-          <div class="mr-filtros">
+        <template #filtros>
+          <div class="mr-filtros tu-card">
+            <label class="mr-busqueda">
+              <span class="sr-only">{{ $t("portal.reservas.buscar") }}</span>
+              <input
+                v-model="busqueda"
+                type="search"
+                class="tu-input"
+                :placeholder="$t('portal.reservas.buscarPlaceholder')"
+              />
+            </label>
             <select
               v-if="actividades.length > 1 || actividadId"
               v-model="actividadId"
@@ -513,7 +590,7 @@ onMounted(() => void cuenta.asegurar());
               </option>
             </select>
             <select
-              v-if="sedes.length > 1"
+              v-if="sedes.length > 1 || sucursalId"
               id="mr-sede"
               v-model="sucursalId"
               class="tu-input"
@@ -552,65 +629,96 @@ onMounted(() => void cuenta.asegurar());
                 {{ $t("portal.reservas.quitarFiltro") }}
               </button>
             </span>
+            <button
+              v-if="filtrando"
+              type="button"
+              class="tu-enlace text-sm"
+              @click="quitarFiltros"
+            >
+              {{ $t("portal.reservas.limpiar") }}
+            </button>
           </div>
         </template>
 
         <!-- LISTA: las disponibles, por día -->
         <template #lista>
-          <div class="tu-card overflow-hidden">
+          <div class="mr-disponibles">
             <template v-if="porDia.length > 0">
-              <section v-for="g in porDia" :key="g.dia">
-                <h2 class="mr-dia first-letter:uppercase">{{ g.dia }}</h2>
-                <ul>
-                  <li
-                    v-for="e in g.eventos"
-                    :key="e.id"
-                    class="mr-clase"
-                    data-prueba="clase-disponible"
-                  >
-                    <button type="button" class="mr-info" @click="abrir(e)">
-                      <span class="block truncate font-medium">{{
-                        e.titulo
-                      }}</span>
-                      <span class="mr-detalle"
-                        >{{ hora(e) }}{{ e.sucursal ? ` · ${e.sucursal}` : ""
-                        }}{{ e.instructor ? ` · ${e.instructor}` : "" }}</span
-                      >
-                      <span class="mr-estado">
-                        <span
-                          v-if="cobertura(e)"
-                          class="tu-pildora"
-                          :style="{ '--tono': cobertura(e)!.tono }"
-                          data-prueba="cobertura"
-                          >{{ cobertura(e)!.texto }}</span
-                        >
-                        <span
-                          v-if="lugares(e)"
-                          :style="{
-                            color: llena(e)
-                              ? 'var(--aviso)'
-                              : 'var(--texto-suave)',
-                          }"
-                          >{{ lugares(e) }}</span
-                        >
-                      </span>
-                    </button>
-                    <button
-                      v-if="reservable(e)"
-                      type="button"
-                      class="tu-btn shrink-0 text-sm"
-                      :class="llena(e) ? 'tu-btn-fantasma' : 'tu-btn-primario'"
-                      :disabled="cuenta.accionando.value"
-                      @click="reservar(e, llena(e))"
+              <section v-for="g in porDia" :key="g.dia" class="mr-jornada">
+                <div class="mr-fecha" aria-hidden="true">
+                  <strong>{{ fecha(g.eventos[0]!, "day") }}</strong
+                  ><span>{{ fecha(g.eventos[0]!, "month") }}</span>
+                </div>
+                <div class="min-w-0">
+                  <h2 class="mr-dia first-letter:uppercase">{{ g.dia }}</h2>
+                  <ul>
+                    <li
+                      v-for="e in g.eventos"
+                      :key="e.id"
+                      class="mr-clase tu-card"
+                      data-prueba="clase-disponible"
                     >
-                      {{
-                        llena(e)
-                          ? $t("miCuenta.listaEspera")
-                          : $t("miCuenta.reservar")
-                      }}
-                    </button>
-                  </li>
-                </ul>
+                      <button type="button" class="mr-info" @click="abrir(e)">
+                        <span class="mr-hora"
+                          >{{ hora(e)
+                          }}<small v-if="e.termina"
+                            >– {{ hora({ ...e, inicia: e.termina }) }}</small
+                          ></span
+                        >
+                        <span class="block font-semibold">{{ e.titulo }}</span>
+                        <span class="mr-detalle">{{
+                          [e.instructor, e.sucursal].filter(Boolean).join(" · ")
+                        }}</span>
+                        <span class="mr-estado">
+                          <span
+                            v-if="cobertura(e)"
+                            class="tu-pildora"
+                            :style="{ '--tono': cobertura(e)!.tono }"
+                            data-prueba="cobertura"
+                            >{{ cobertura(e)!.texto }}</span
+                          >
+                          <span
+                            v-if="lugares(e)"
+                            :style="{
+                              color: llena(e)
+                                ? 'var(--aviso)'
+                                : 'var(--texto-suave)',
+                            }"
+                            >{{ lugares(e) }}</span
+                          >
+                        </span>
+                        <span
+                          v-if="e.clase?.capacidad"
+                          class="mr-ocupacion"
+                          aria-hidden="true"
+                          ><i
+                            :style="{
+                              width: `${ocupacion(e)}%`,
+                              background: llena(e)
+                                ? 'var(--aviso)'
+                                : 'var(--primario)',
+                            }"
+                        /></span>
+                      </button>
+                      <button
+                        v-if="reservable(e)"
+                        type="button"
+                        class="tu-btn shrink-0 text-sm"
+                        :class="
+                          llena(e) ? 'tu-btn-fantasma' : 'tu-btn-primario'
+                        "
+                        :disabled="cuenta.accionando.value"
+                        @click="reservar(e, llena(e))"
+                      >
+                        {{
+                          llena(e)
+                            ? $t("miCuenta.listaEspera")
+                            : $t("miCuenta.reservar")
+                        }}
+                      </button>
+                    </li>
+                  </ul>
+                </div>
               </section>
               <div v-if="libres.length > enLista.length" class="p-4">
                 <button
@@ -622,7 +730,8 @@ onMounted(() => void cuenta.asegurar());
                 </button>
               </div>
             </template>
-            <div v-else class="p-5 text-sm">
+            <div v-else class="mr-vacio tu-card">
+              <IconoNav nombre="agenda" :tam="36" />
               <p :style="{ color: 'var(--texto-suave)' }">
                 {{
                   filtrando
@@ -645,19 +754,20 @@ onMounted(() => void cuenta.asegurar());
     </template>
 
     <!-- PRÓXIMAS -->
-    <div
-      v-else-if="pestana === 'proximas'"
-      class="mt-4 tu-card overflow-hidden"
-    >
-      <ul v-if="mias.length > 0">
+    <div v-else-if="pestana === 'proximas'" class="mt-4 mr-proximas">
+      <ul v-if="mias.length > 0" class="mr-proximas-lista">
         <li
           v-for="e in mias"
           :key="e.id"
-          class="mr-clase"
+          class="mr-clase tu-card"
           data-prueba="reserva-proxima"
         >
           <button type="button" class="mr-info" @click="abrir(e)">
-            <span class="block truncate font-medium">{{ e.titulo }}</span>
+            <span class="mr-proxima-fecha" aria-hidden="true"
+              ><strong>{{ fecha(e, "day") }}</strong
+              ><span>{{ fecha(e, "month") }}</span></span
+            >
+            <span class="block font-semibold">{{ e.titulo }}</span>
             <span class="mr-detalle first-letter:uppercase"
               >{{ cuandoCorto(e.inicia, e.zona)
               }}{{ e.sucursal ? ` · ${e.sucursal}` : ""
@@ -670,10 +780,16 @@ onMounted(() => void cuenta.asegurar());
                 >{{ estadoMia(e).texto }}</span
               >
             </span>
+            <span class="mr-ver-detalle"
+              ><IconoNav nombre="chevron" :tam="16" />{{
+                $t("portal.reservas.verDetalle")
+              }}</span
+            >
           </button>
         </li>
       </ul>
-      <div v-else class="p-5 text-sm">
+      <div v-else class="mr-vacio tu-card">
+        <IconoNav nombre="agenda" :tam="36" />
         <p :style="{ color: 'var(--texto-suave)' }">
           {{ $t("portal.reservas.sinProximas") }}
         </p>
@@ -862,6 +978,10 @@ onMounted(() => void cuenta.asegurar());
   align-items: center;
   gap: 0.5rem 0.75rem;
   min-width: 0;
+  padding: 0.85rem;
+}
+.mr-busqueda {
+  flex: 1 1 230px;
 }
 .mr-filtros > select {
   width: auto;
@@ -869,15 +989,10 @@ onMounted(() => void cuenta.asegurar());
 }
 /* Encabezado de cada día de la lista. */
 .mr-dia {
-  padding: 0.6rem 1.25rem;
-  font-size: 0.8rem;
+  margin-bottom: 0.65rem;
+  font-size: 0.9rem;
   font-weight: 500;
   color: var(--texto-suave);
-  background: color-mix(in srgb, var(--texto) 3%, var(--superficie));
-  border-top: 1px solid var(--borde);
-}
-section:first-child > .mr-dia {
-  border-top: 0;
 }
 /* Una clase: lo que es a la izquierda y la acción a la derecha; en el teléfono,
    la acción baja sin desbordar el ancho. */
@@ -886,11 +1001,8 @@ section:first-child > .mr-dia {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 1rem;
-  padding: 0.75rem 1.25rem;
-  border-top: 1px solid var(--borde);
-}
-ul > .mr-clase:first-child {
-  border-top: 0;
+  padding: 1rem 1.25rem;
+  margin-top: 0.6rem;
 }
 .mr-info {
   display: block;
@@ -898,16 +1010,13 @@ ul > .mr-clase:first-child {
   min-width: 0;
   text-align: left;
 }
-.mr-info:hover .font-medium {
-  color: var(--primario);
+.mr-info:hover .font-semibold {
+  color: var(--enlace);
 }
 .mr-detalle {
   display: block;
   font-size: 0.875rem;
   color: var(--texto-suave);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .mr-estado {
   display: flex;
@@ -918,6 +1027,108 @@ ul > .mr-clase:first-child {
   font-size: 0.8rem;
 }
 .mr-cita {
-  max-width: 44rem;
+  width: 100%;
+}
+.mr-jornada {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.mr-fecha {
+  align-self: start;
+  padding: 0.6rem 0.2rem;
+  border-radius: 12px;
+  text-align: center;
+  background: var(--primario-suave);
+  color: color-mix(in srgb, var(--acento), var(--texto) 35%);
+}
+.mr-fecha strong,
+.mr-proxima-fecha strong {
+  display: block;
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+.mr-fecha span,
+.mr-proxima-fecha > span {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+.mr-hora {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: color-mix(in srgb, var(--acento), var(--texto) 35%);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.mr-hora small {
+  font-size: inherit;
+  font-weight: 400;
+  margin-left: 0.3rem;
+}
+.mr-ocupacion {
+  display: block;
+  width: 100px;
+  height: 4px;
+  border-radius: 3px;
+  background: var(--borde);
+  margin-top: 0.6rem;
+  overflow: hidden;
+}
+.mr-ocupacion i {
+  display: block;
+  height: 100%;
+}
+.mr-proximas-lista {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.mr-proximas .mr-clase {
+  margin: 0;
+}
+.mr-proxima-fecha {
+  display: block;
+  float: left;
+  text-align: center;
+  padding: 0.5rem;
+  width: 3.4rem;
+  margin-right: 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 10px;
+  background: var(--primario-suave);
+  color: color-mix(in srgb, var(--acento), var(--texto) 35%);
+}
+.mr-ver-detalle {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  margin-top: 0.65rem;
+  font-size: 0.8rem;
+  color: var(--enlace);
+}
+.mr-vacio {
+  padding: 2rem;
+  text-align: center;
+}
+.mr-vacio > svg {
+  margin: 0 auto 1rem;
+  color: var(--texto-suave);
+}
+@media (max-width: 700px) {
+  .mr-jornada {
+    grid-template-columns: 2.7rem minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+  .mr-clase {
+    padding: 0.85rem;
+  }
+  .mr-proximas-lista {
+    grid-template-columns: 1fr;
+  }
+  .mr-filtros > select {
+    flex: 1 1 150px;
+  }
 }
 </style>

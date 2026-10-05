@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../features/auth/application/sesion_controller.dart';
 import 'calendario.dart';
+import 'logo_calendario.dart';
 
 /// "Agregar a mi calendario" de una reserva o una clase: Google Calendar (enlace
 /// directo) o el .ics que sirve el servidor (Apple Calendar, Outlook y los demás).
@@ -32,7 +33,13 @@ Future<void> mostrarAgregarCalendario(
           ),
         ),
         ListTile(
-          leading: const Icon(Icons.event_outlined),
+          leading: const SizedBox(
+            width: 48,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: LogoCalendario(MarcaCalendario.google),
+            ),
+          ),
           title: const Text('Google Calendar'),
           onTap: () {
             Navigator.pop(ctx);
@@ -48,7 +55,17 @@ Future<void> mostrarAgregarCalendario(
           },
         ),
         ListTile(
-          leading: const Icon(Icons.calendar_month_outlined),
+          // El .ics lo abren Apple Calendar, Outlook y los demás.
+          leading: const SizedBox(
+            width: 48,
+            child: Row(
+              children: [
+                LogoCalendario(MarcaCalendario.apple),
+                SizedBox(width: 3),
+                LogoCalendario(MarcaCalendario.outlook),
+              ],
+            ),
+          ),
           title: const Text('Apple, Outlook y otros'),
           subtitle: const Text('Se descarga el evento (.ics)'),
           onTap: () async {

@@ -2,16 +2,16 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
-import IconoNav from "@/components/IconoNav.vue";
+import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
- * Cargador del logo del negocio por ARCHIVO: arrastrar y soltar o hacer clic para
- * elegir (nunca por URL). Sube a `POST /marca/logo` (imagen PNG/JPG/WebP ≤ 2 MB) y
- * permite quitarlo (`DELETE /marca/logo`). Emite el nuevo `logo_url` al padre. Se
- * ve como toda zona de carga de la app (`.tu-zona-archivo`).
+ * Cargador del logo del negocio por ARCHIVO: arrastrar y soltar o elegirlo (nunca por
+ * URL). Sube a `POST /marca/logo` (imagen PNG/JPG/WebP ≤ 2 MB) y permite quitarlo
+ * (`DELETE /marca/logo`). Emite el nuevo `logo_url` al padre. Muestra el logo y, con
+ * «Subir/Cambiar logo», la zona de carga de toda la app (ZonaArchivo).
  */
 const props = withDefaults(
   defineProps<{ logoUrl: string | null; puedeGestionar?: boolean }>(),
@@ -25,36 +25,14 @@ const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 // Coincide con la validación del backend (image | mimes:jpg,jpeg,png,webp | max:2048).
 const MAX_BYTES = 2 * 1024 * 1024;
-const TIPOS = ["image/png", "image/jpeg", "image/webp"];
+const TIPOS = "image/png,image/jpeg,image/webp";
 
-// Contador: entrar al logo o al texto dispara «dragleave» en la zona.
-const dentro = ref(0);
-const arrastrando = computed(() => dentro.value > 0 && habilitado.value);
+const abierta = ref(false);
 const subiendo = ref(false);
 const error = ref<string | null>(null);
-const entrada = ref<HTMLInputElement | null>(null);
 
-const habilitado = computed(() => props.puedeGestionar && !subiendo.value);
-
-function elegir(): void {
-  if (habilitado.value) {
-    entrada.value?.click();
-  }
-}
-
-async function procesar(archivo: File | undefined | null): Promise<void> {
+async function procesar(archivo: File): Promise<void> {
   error.value = null;
-  if (archivo === undefined || archivo === null) {
-    return;
-  }
-  if (!TIPOS.includes(archivo.type)) {
-    error.value = t("configuracion.logoTipo");
-    return;
-  }
-  if (archivo.size > MAX_BYTES) {
-    error.value = t("configuracion.logoPeso");
-    return;
-  }
   subiendo.value = true;
   try {
     const cuerpo = new FormData();
@@ -64,28 +42,16 @@ async function procesar(archivo: File | undefined | null): Promise<void> {
       cuerpo,
     );
     emit("update:logoUrl", data.data.logo_url);
+    abierta.value = false;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
     subiendo.value = false;
-    if (entrada.value) {
-      entrada.value.value = "";
-    }
   }
-}
-
-function alSoltar(evento: DragEvent): void {
-  dentro.value = 0;
-  if (habilitado.value) {
-    void procesar(evento.dataTransfer?.files?.[0]);
-  }
-}
-function alSeleccionar(evento: Event): void {
-  void procesar((evento.target as HTMLInputElement).files?.[0]);
 }
 
 async function quitar(): Promise<void> {
-  if (!habilitado.value) {
+  if (!props.puedeGestionar || subiendo.value) {
     return;
   }
   if (
@@ -111,77 +77,42 @@ async function quitar(): Promise<void> {
 
 <template>
   <div>
-    <div
-      class="tu-zona-archivo py-7"
-      :class="{
-        'tu-zona-archivo-activa': arrastrando,
-        'tu-zona-archivo-ocupada': subiendo,
-      }"
-      role="button"
-      :tabindex="habilitado ? 0 : -1"
-      :aria-disabled="!puedeGestionar"
-      :aria-label="$t('configuracion.logoArrastra')"
-      @click="elegir"
-      @keydown.enter.prevent="elegir"
-      @keydown.space.prevent="elegir"
-      @dragenter.prevent="dentro += 1"
-      @dragover.prevent
-      @dragleave.prevent="dentro = Math.max(0, dentro - 1)"
-      @drop.prevent.stop="alSoltar"
-    >
-      <img
-        v-if="logoUrl"
-        :src="logoUrl"
-        alt=""
-        class="h-20 w-20 rounded-2xl object-cover"
-        :style="{ boxShadow: 'var(--sombra)' }"
-      />
-      <span v-else class="tu-zona-archivo-icono"
-        ><IconoNav nombre="imagen" :tam="24"
-      /></span>
-
-      <span class="tu-zona-archivo-texto">
-        <template v-if="subiendo">{{
-          $t("configuracion.logoSubiendo")
-        }}</template>
-        <template v-else-if="arrastrando">{{
+    <img
+      v-if="logoUrl"
+      :src="logoUrl"
+      alt=""
+      class="cl-logo"
+      data-prueba="logo-actual"
+    />
+    <div v-if="puedeGestionar" class="cl-acciones" :class="{ 'mt-3': logoUrl }">
+      <ZonaArchivo
+        v-model:abierta="abierta"
+        icono="imagen"
+        :accept="TIPOS"
+        :max-bytes="MAX_BYTES"
+        :error-tipo="$t('configuracion.logoTipo')"
+        :error-peso="$t('configuracion.logoPeso')"
+        :boton="
           logoUrl
-            ? $t("zonaArchivo.imagen.suelta")
-            : $t("zonaArchivo.imagen.sueltaNueva")
-        }}</template>
-        <template v-else>
-          {{ $t("asistente.logo.arrastra") }}
-          <span class="tu-zona-archivo-elige">{{
-            $t("asistente.logo.selecciona")
-          }}</span>
-        </template>
-      </span>
-      <span class="tu-zona-archivo-ayuda">
-        {{ $t("asistente.logo.ayuda") }}
-      </span>
-
-      <input
-        ref="entrada"
-        type="file"
-        accept="image/png,image/jpeg,image/webp"
-        class="hidden"
-        :disabled="!habilitado"
-        @change="alSeleccionar"
+            ? $t('zonaArchivo.logo.cambiar')
+            : $t('configuracion.logoSubir')
+        "
+        :texto="$t('asistente.logo.arrastra')"
+        :elige="$t('asistente.logo.selecciona')"
+        :suelta="
+          logoUrl
+            ? $t('zonaArchivo.imagen.suelta')
+            : $t('zonaArchivo.imagen.sueltaNueva')
+        "
+        :ayuda="$t('asistente.logo.ayuda')"
+        :ocupado="subiendo"
+        :ocupado-texto="$t('configuracion.logoSubiendo')"
+        @archivo="procesar"
       />
-    </div>
-
-    <div v-if="logoUrl && puedeGestionar" class="mt-2 flex flex-wrap gap-2">
       <button
+        v-if="logoUrl && !abierta"
         type="button"
-        class="tu-btn tu-btn-fantasma"
-        :disabled="subiendo"
-        @click="elegir"
-      >
-        {{ $t("configuracion.logoSubir") }}
-      </button>
-      <button
-        type="button"
-        class="tu-btn tu-btn-fantasma"
+        class="tu-btn tu-btn-fantasma text-sm"
         style="color: var(--error)"
         :disabled="subiendo"
         @click="quitar"
@@ -195,3 +126,23 @@ async function quitar(): Promise<void> {
     </p>
   </div>
 </template>
+
+<style scoped>
+.cl-logo {
+  width: 5rem;
+  height: 5rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-tarjeta);
+  object-fit: cover;
+}
+/* «Cambiar logo» y «Quitar» en una fila; desplegada, la zona ocupa el ancho. */
+.cl-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.cl-acciones > :deep(:has(> .tu-zona-archivo)) {
+  width: 100%;
+}
+</style>

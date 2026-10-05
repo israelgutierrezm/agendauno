@@ -76,13 +76,14 @@ describe("foto de Mi perfil", () => {
     });
     const w = montar();
     const tarjeta = w.get('[data-prueba="identidad-perfil"]');
-    const zona = w.get('[data-prueba="zona-archivo"]');
-    expect(zona.text()).toContain("Arrastra tu foto aquí o elígela");
-    expect(zona.text()).toContain(miPerfil.fotoFormatos);
+    // Plegada: solo el botón; la zona aparece al arrastrar sobre la tarjeta.
+    expect(w.find('[data-prueba="zona-archivo"]').exists()).toBe(false);
+    expect(w.get('[data-prueba="abrir-zona"]').text()).toBe(miPerfil.subirFoto);
 
     // Sobre el nombre: toda la tarjeta la recibe y la zona lo dice.
     const nombre = w.get(".mp-nombre");
     await nombre.trigger("dragenter");
+    const zona = w.get('[data-prueba="zona-archivo"]');
     expect(tarjeta.classes()).toContain("mp-identidad-activa");
     expect(w.get('[data-prueba="zona-foto"]').classes()).toContain(
       "mp-foto-zona-activa",
@@ -102,15 +103,32 @@ describe("foto de Mi perfil", () => {
     w.unmount();
   });
 
-  it("soltarla en la zona de carga la sube una sola vez", async () => {
+  it("«Subir foto» despliega la zona; soltarla ahí la sube una vez y se pliega", async () => {
     mocks.post.mockResolvedValue({
       data: { data: { usuario: sesion.usuario } },
     });
     const w = montar();
+    await w.get('[data-prueba="abrir-zona"]').trigger("click");
+    const zona = w.get('[data-prueba="zona-archivo"]');
+    expect(zona.text()).toContain("Arrastra tu foto aquí o elígela");
+    expect(zona.text()).toContain(miPerfil.fotoFormatos);
+
     const foto = new File(["x"], "yo.webp", { type: "image/webp" });
-    await w.get('[data-prueba="zona-archivo"]').trigger("drop", soltar(foto));
+    await zona.trigger("drop", soltar(foto));
     await flushPromises();
     expect(mocks.post).toHaveBeenCalledTimes(1);
+    expect(w.find('[data-prueba="zona-archivo"]').exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("con foto ofrece cambiarla o quitarla", () => {
+    sesion.usuario.foto_url = "/f.webp" as never;
+    const w = montar();
+    expect(w.get('[data-prueba="abrir-zona"]').text()).toBe(
+      miPerfil.cambiarFoto,
+    );
+    expect(w.get(".mp-quitar-foto").text()).toBe(miPerfil.quitarFoto);
+    sesion.usuario.foto_url = null;
     w.unmount();
   });
 

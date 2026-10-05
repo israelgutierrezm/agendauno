@@ -1,21 +1,24 @@
 <script setup lang="ts">
-import { computed, ref, useId } from "vue";
+import { computed, nextTick, ref, useId } from "vue";
 import { useI18n } from "vue-i18n";
 
 import IconoNav from "@/components/IconoNav.vue";
-import { aceptaArchivo } from "@/lib/archivos";
+import { aceptaArchivo, useArrastreDeArchivos } from "@/lib/archivos";
 
 /**
- * Zona para subir un archivo, la misma en toda la app (como en Acadion): se arrastra
- * encima o se elige con un clic o con el teclado. Al soltar, el navegador no filtra
- * por tipo, así que aquí se revisa contra `accept`; el archivo válido se emite y
- * quien la usa decide qué hacer (subirlo, revisarlo…). Con `cargado` muestra el
- * nombre del archivo elegido; `compacta` la pone en una fila (para formularios).
- * Los errores de tipo y de peso se dicen debajo de la zona, siempre igual.
+ * Subir un archivo, igual en toda la app (como en Acadion). Plegada, es un botón
+ * («Cambiar foto», «Elegir archivo»…); al pulsarlo aparece la zona para arrastrar o
+ * elegir. También aparece sola mientras se arrastra un archivo sobre la página, para
+ * soltarlo sin buscarla. Al soltar, el navegador no filtra por tipo: aquí se revisa
+ * contra `accept` (y el peso con `maxBytes`) y lo que no se acepta se dice debajo;
+ * el archivo válido se emite y quien la usa decide qué hacer. Con `cargado` muestra
+ * el nombre del archivo elegido; `compacta` la pone en una fila (formularios).
  */
 const props = withDefaults(
   defineProps<{
     accept: string;
+    // El botón que la despliega.
+    boton?: string;
     // «Arrastra … aquí o» + «elígelo» (en color de enlace).
     texto?: string;
     elige?: string;
@@ -39,6 +42,7 @@ const props = withDefaults(
     errorPeso?: string;
   }>(),
   {
+    boton: undefined,
     texto: undefined,
     elige: undefined,
     suelta: undefined,
@@ -57,16 +61,30 @@ const props = withDefaults(
   },
 );
 const emit = defineEmits<{ archivo: [archivo: File] }>();
+// Desplegada a pedido (con el botón); quien la usa puede plegarla (tras subir).
+const abierta = defineModel<boolean>("abierta", { default: false });
 const { t } = useI18n();
 
 const entrada = ref<HTMLInputElement | null>(null);
+const zona = ref<HTMLElement | null>(null);
 // Contador: entrar a un hijo (ícono, texto) dispara «dragleave» en la zona.
 const dentro = ref(0);
 const error = ref<string | null>(null);
 const idAyuda = useId();
+const hayArrastre = useArrastreDeArchivos();
 const habilitada = computed(() => !props.deshabilitado && !props.ocupado);
 const arrastrando = computed(
   () => (dentro.value > 0 || props.resaltada) && habilitada.value,
+);
+// Se ve la zona si se pidió, si hay un archivo en camino (arrastrándolo por la
+// página o sobre quien la contiene), si ya hay uno elegido o mientras sube.
+const visible = computed(
+  () =>
+    abierta.value ||
+    props.cargado !== null ||
+    props.ocupado ||
+    props.resaltada ||
+    (hayArrastre.value && !props.deshabilitado),
 );
 
 function abrir(): void {
@@ -75,16 +93,31 @@ function abrir(): void {
   }
 }
 
+async function desplegar(): Promise<void> {
+  abierta.value = true;
+  error.value = null;
+  // El foco pasa a la zona: Enter o Espacio abren el selector.
+  await nextTick();
+  zona.value?.focus();
+}
+
+function plegar(): void {
+  abierta.value = false;
+  error.value = null;
+}
+
 function recibir(archivo: File | undefined): void {
   error.value = null;
   if (archivo === undefined || !habilitada.value) {
     return;
   }
   if (!aceptaArchivo(archivo, props.accept)) {
+    abierta.value = true;
     error.value = props.errorTipo ?? t("zonaArchivo.tipo");
     return;
   }
   if (props.maxBytes !== undefined && archivo.size > props.maxBytes) {
+    abierta.value = true;
     error.value = props.errorPeso ?? t("zonaArchivo.peso");
     return;
   }
@@ -92,8 +125,8 @@ function recibir(archivo: File | undefined): void {
 }
 
 // Quien la contiene puede pasarle lo que se soltó fuera de ella (toda una tarjeta
-// que acepta la foto) o abrir el selector desde otro control.
-defineExpose({ abrir, recibir });
+// que acepta la foto), abrir el selector desde otro control o plegarla.
+defineExpose({ abrir, recibir, plegar });
 
 function alElegir(e: Event): void {
   const input = e.target as HTMLInputElement;
@@ -116,62 +149,86 @@ function alSoltar(e: DragEvent): void {
 
 <template>
   <div>
-    <div
-      class="tu-zona-archivo"
-      :class="{
-        'tu-zona-archivo-compacta': compacta,
-        'tu-zona-archivo-activa': arrastrando,
-        'tu-zona-archivo-ocupada': ocupado,
-      }"
-      role="button"
-      :tabindex="habilitada ? 0 : -1"
-      :aria-disabled="!habilitada"
-      :aria-busy="ocupado"
-      :aria-describedby="idAyuda"
-      data-prueba="zona-archivo"
-      @click="abrir"
-      @keydown.enter.prevent="abrir"
-      @keydown.space.prevent="abrir"
-      @dragenter.prevent="alEntrar"
-      @dragover.prevent
-      @dragleave.prevent="alSalir"
-      @drop.prevent.stop="alSoltar"
+    <button
+      v-if="!visible"
+      type="button"
+      class="tu-btn tu-btn-fantasma text-sm"
+      data-prueba="abrir-zona"
+      :disabled="deshabilitado"
+      @click="desplegar"
     >
-      <span class="tu-zona-archivo-icono">
-        <IconoNav :nombre="cargado && !ocupado ? 'hecho' : icono" :tam="22" />
-      </span>
-      <span class="tu-zona-archivo-textos">
-        <span class="tu-zona-archivo-texto" aria-live="polite">
-          <template v-if="ocupado">{{
-            ocupadoTexto ?? $t("zonaArchivo.subiendo")
-          }}</template>
-          <template v-else-if="arrastrando">{{
-            suelta ?? $t("zonaArchivo.suelta")
-          }}</template>
-          <template v-else-if="cargado">{{ cargado }}</template>
-          <template v-else>
-            {{ texto ?? $t("zonaArchivo.arrastra") }}
-            <span class="tu-zona-archivo-elige">{{
-              elige ?? $t("zonaArchivo.elige")
-            }}</span>
-          </template>
+      <IconoNav :nombre="icono === 'imagen' ? 'imagen' : 'subir'" :tam="16" />
+      {{ boton ?? $t("zonaArchivo.boton") }}
+    </button>
+    <template v-else>
+      <div
+        ref="zona"
+        class="tu-zona-archivo"
+        :class="{
+          'tu-zona-archivo-compacta': compacta,
+          'tu-zona-archivo-activa': arrastrando,
+          'tu-zona-archivo-ocupada': ocupado,
+        }"
+        role="button"
+        :tabindex="habilitada ? 0 : -1"
+        :aria-disabled="!habilitada"
+        :aria-busy="ocupado"
+        :aria-describedby="idAyuda"
+        data-prueba="zona-archivo"
+        @click="abrir"
+        @keydown.enter.prevent="abrir"
+        @keydown.space.prevent="abrir"
+        @keydown.esc="plegar"
+        @dragenter.prevent="alEntrar"
+        @dragover.prevent
+        @dragleave.prevent="alSalir"
+        @drop.prevent.stop="alSoltar"
+      >
+        <span class="tu-zona-archivo-icono">
+          <IconoNav :nombre="cargado && !ocupado ? 'hecho' : icono" :tam="22" />
         </span>
-        <span :id="idAyuda" class="tu-zona-archivo-ayuda">{{
-          cargado && !ocupado ? $t("zonaArchivo.cambiar") : ayuda
-        }}</span>
-      </span>
-      <input
-        :id="id"
-        ref="entrada"
-        type="file"
-        :accept="accept"
-        class="sr-only"
-        tabindex="-1"
-        :disabled="!habilitada"
-        @click.stop
-        @change="alElegir"
-      />
-    </div>
+        <span class="tu-zona-archivo-textos">
+          <span class="tu-zona-archivo-texto" aria-live="polite">
+            <template v-if="ocupado">{{
+              ocupadoTexto ?? $t("zonaArchivo.subiendo")
+            }}</template>
+            <template v-else-if="arrastrando">{{
+              suelta ?? $t("zonaArchivo.suelta")
+            }}</template>
+            <template v-else-if="cargado">{{ cargado }}</template>
+            <template v-else>
+              {{ texto ?? $t("zonaArchivo.arrastra") }}
+              <span class="tu-zona-archivo-elige">{{
+                elige ?? $t("zonaArchivo.elige")
+              }}</span>
+            </template>
+          </span>
+          <span :id="idAyuda" class="tu-zona-archivo-ayuda">{{
+            cargado && !ocupado ? $t("zonaArchivo.cambiar") : ayuda
+          }}</span>
+        </span>
+      </div>
+      <!-- Desplegada a pedido y sin archivo aún: se puede volver al botón. -->
+      <button
+        v-if="abierta && cargado === null && !ocupado"
+        type="button"
+        class="tu-zona-archivo-cancelar tu-enlace text-xs"
+        data-prueba="plegar-zona"
+        @click="plegar"
+      >
+        {{ $t("zonaArchivo.cancelar") }}
+      </button>
+    </template>
+    <input
+      :id="id"
+      ref="entrada"
+      type="file"
+      :accept="accept"
+      class="sr-only"
+      tabindex="-1"
+      :disabled="!habilitada"
+      @change="alElegir"
+    />
     <p
       v-if="error"
       class="mt-1.5 text-sm"

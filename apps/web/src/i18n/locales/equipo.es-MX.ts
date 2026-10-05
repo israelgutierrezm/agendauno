@@ -38,6 +38,9 @@ export const miPerfil = {
   fotoFormatos: "JPG, PNG o WebP de hasta 4 MB",
   fotoTipo: "Elige una imagen JPG, PNG o WebP.",
   fotoPeso: "La imagen pesa más de 4 MB.",
+  // El botón que despliega la zona para arrastrar o elegir la foto.
+  subirFoto: "Subir foto",
+  cambiarFoto: "Cambiar foto",
   quitarFoto: "Quitar foto",
   datos: "Tus datos",
   datosAyuda: "Tu nombre como lo verá el equipo.",

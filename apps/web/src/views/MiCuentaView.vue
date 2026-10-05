@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaseEntrada from "@/components/PaseEntrada.vue";
 import TarjetaOperacion, {
@@ -358,6 +359,9 @@ onMounted(() => {
       style="color: var(--error)"
     >
       {{ cuenta.error.value }}
+      <button type="button" class="tu-enlace ml-2" @click="cuenta.cargar(true)">
+        {{ $t("comun.reintentar") }}
+      </button>
     </p>
     <p
       v-if="retornoPago"
@@ -373,6 +377,7 @@ onMounted(() => {
     <!-- La tarjeta principal: siempre, con o sin reserva. -->
     <TarjetaPrincipal
       class="mt-6"
+      compacta
       :etiqueta="etiquetaProxima"
       :foto="foto"
       :clima="clima"
@@ -384,6 +389,13 @@ onMounted(() => {
         :style="{ color: 'var(--texto-suave)' }"
       >
         {{ $t("comun.cargando") }}
+      </p>
+      <p
+        v-else-if="cuenta.error.value && !cuenta.cargado.value"
+        class="mt-2 text-sm"
+        style="color: var(--texto-suave)"
+      >
+        {{ $t("portal.inicio.noDisponible") }}
       </p>
       <template v-else-if="proxima">
         <p class="mt-2 text-2xl font-semibold sm:text-3xl">
@@ -405,10 +417,24 @@ onMounted(() => {
         >
           {{ $t("miCuenta.pendiente_pago") }}
         </p>
+        <p
+          v-if="proxima.instructor || proxima.asiste"
+          class="mt-2 text-sm mi-contexto"
+        >
+          <span v-if="proxima.instructor"
+            ><IconoNav nombre="instructores" :tam="16" />{{
+              proxima.instructor
+            }}</span
+          >
+          <span v-if="proxima.asiste"
+            ><IconoNav nombre="miembros" :tam="16" />{{
+              $t("portal.inicio.para", { nombre: proxima.asiste })
+            }}</span
+          >
+        </p>
         <div class="mt-6 flex flex-wrap items-center gap-4">
           <AgregarCalendario
             v-if="proxima.inicia_en"
-            primario
             :evento="{
               uid: `reserva-${proxima.id}`,
               titulo: proxima.oferta ?? sesion.estudio?.nombre ?? '',
@@ -430,7 +456,7 @@ onMounted(() => {
           >
           <RouterLink
             :to="{ name: 'mis-reservas', query: { vista: 'proximas' } }"
-            class="tu-enlace text-sm"
+            class="tu-btn tu-btn-primario text-sm order-first"
             data-prueba="ver-detalle"
           >
             {{
@@ -463,7 +489,11 @@ onMounted(() => {
       </template>
     </TarjetaPrincipal>
 
-    <template v-if="!cuenta.cargando.value">
+    <template
+      v-if="
+        !cuenta.cargando.value && (!cuenta.error.value || cuenta.cargado.value)
+      "
+    >
       <!-- Lo que pide atención -->
       <div
         v-if="ofrecida || cuenta.waivers.value.length > 0"
@@ -534,5 +564,16 @@ onMounted(() => {
 }
 .pi-aviso:hover {
   border-color: var(--aviso);
+}
+.mi-contexto {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  color: var(--texto-suave);
+}
+.mi-contexto span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 </style>

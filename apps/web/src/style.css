@@ -729,6 +729,11 @@
   .tu-zona-archivo-ayuda:empty {
     display: none;
   }
+  /* «Cancelar» de una zona desplegada con su botón: debajo, a la derecha. */
+  .tu-zona-archivo-cancelar {
+    display: block;
+    margin: 0.35rem 0 0 auto;
+  }
   /* En una fila: el ícono a la izquierda (formularios y tarjetas). */
   .tu-zona-archivo-compacta {
     flex-direction: row;

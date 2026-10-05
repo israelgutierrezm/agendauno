@@ -43,6 +43,8 @@ const props = defineProps<{
   vistaInicial?: Vista | null;
   /** Cuántos días ve la lista desde hoy (30 si no se dice). */
   diasLista?: number;
+  /** Tarjetas de trabajo con hora, nombre y contexto en la vista semanal. */
+  detallado?: boolean;
 }>();
 const emit = defineEmits<{
   abrir: [id: string];
@@ -301,6 +303,8 @@ defineExpose({ irDia });
       </div>
     </div>
 
+    <div v-if="$slots.filtros" class="mt-4"><slot name="filtros" /></div>
+
     <p v-if="cargando" class="mt-6" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
@@ -379,7 +383,10 @@ defineExpose({ irDia });
             {{ $t("portal.periodo.irSiguiente") }}
           </button>
         </p>
-        <div class="mt-4 grid gap-3 md:grid-cols-7">
+        <div
+          class="mt-4 grid gap-3 md:grid-cols-7"
+          :class="{ 'cv-semana-detallada': detallado }"
+        >
           <div
             v-for="d in semana"
             :key="d.iso"
@@ -398,12 +405,23 @@ defineExpose({ irDia });
                 <button
                   type="button"
                   class="cv-chip"
-                  :class="{ 'cv-chip-propio': e.destacado }"
+                  :class="{
+                    'cv-chip-propio': e.destacado,
+                    'cv-chip-detallado': detallado,
+                  }"
                   :title="[e.titulo, e.detalle].filter(Boolean).join(' · ')"
                   @click="emit('abrir', e.id)"
                 >
                   <span class="cv-hora">{{ hora(e.inicia, e.zona) }}</span>
                   <span class="truncate">{{ e.titulo }}</span>
+                  <span v-if="detallado && e.detalle" class="cv-contexto">{{
+                    e.detalle
+                  }}</span>
+                  <span
+                    v-if="detallado && e.estado"
+                    :style="{ color: color(e) }"
+                    >{{ e.estado }}</span
+                  >
                 </button>
               </li>
             </ul>
@@ -462,5 +480,25 @@ defineExpose({ irDia });
   background: color-mix(in srgb, var(--primario) 14%, var(--superficie));
   box-shadow: inset 3px 0 0 var(--primario);
   font-weight: 600;
+}
+.cv-chip-detallado {
+  flex-direction: column;
+  padding: 0.7rem 0.6rem;
+  gap: 0.3rem;
+  min-height: 90px;
+}
+.cv-chip-detallado .truncate {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.cv-contexto {
+  font-weight: 400;
+  color: var(--texto-suave);
+  font-size: 0.7rem;
+}
+@media (min-width: 768px) and (max-width: 1199px) {
+  .cv-semana-detallada {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 </style>

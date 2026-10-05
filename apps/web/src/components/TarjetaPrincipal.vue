@@ -16,11 +16,12 @@ defineProps<{
   climaLugar: string;
   // "En curso" y similares resaltan la etiqueta con el color de marca.
   etiquetaViva?: boolean;
+  compacta?: boolean;
 }>();
 </script>
 
 <template>
-  <article class="tp tu-card">
+  <article class="tp tu-card" :class="{ 'tp-compacta': compacta }">
     <div class="tp-texto">
       <p class="tp-etiqueta" :class="{ 'tp-viva': etiquetaViva }">
         {{ etiqueta }}
@@ -122,5 +123,19 @@ defineProps<{
   color: #fff;
   background: rgb(15 23 42 / 0.58);
   backdrop-filter: blur(6px);
+}
+.tp-compacta .tp-texto {
+  padding: 1.5rem;
+}
+.tp-compacta .tp-foto {
+  min-height: 6rem;
+}
+@media (min-width: 768px) {
+  .tp-compacta {
+    grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
+  }
+  .tp-compacta .tp-foto {
+    min-height: 13rem;
+  }
 }
 </style>

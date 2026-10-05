@@ -20,8 +20,39 @@ function montar(props: Record<string, unknown> = {}) {
 }
 
 describe("ZonaArchivo", () => {
+  it("plegada es un botón; al pulsarlo aparece la zona y se puede cancelar", async () => {
+    const w = montar({ boton: "Elegir archivo CSV" });
+    expect(w.find('[data-prueba="zona-archivo"]').exists()).toBe(false);
+    const boton = w.get('[data-prueba="abrir-zona"]');
+    expect(boton.text()).toBe("Elegir archivo CSV");
+
+    await boton.trigger("click");
+    expect(w.get('[data-prueba="zona-archivo"]').text()).toContain(
+      "Arrastra el archivo aquí o elígelo",
+    );
+    await w.get('[data-prueba="plegar-zona"]').trigger("click");
+    expect(w.find('[data-prueba="zona-archivo"]').exists()).toBe(false);
+  });
+
+  it("aparece sola mientras se arrastra un archivo sobre la página", async () => {
+    const w = montar();
+    const arrastre = (tipo: string) => {
+      const e = new Event(tipo, { bubbles: true });
+      Object.defineProperty(e, "dataTransfer", { value: { types: ["Files"] } });
+      return e;
+    };
+    window.dispatchEvent(arrastre("dragenter"));
+    await w.vm.$nextTick();
+    expect(w.find('[data-prueba="zona-archivo"]').exists()).toBe(true);
+
+    window.dispatchEvent(arrastre("drop"));
+    await w.vm.$nextTick();
+    expect(w.find('[data-prueba="zona-archivo"]').exists()).toBe(false);
+  });
+
   it("al soltar un archivo válido lo entrega; lo demás lo dice debajo", async () => {
     const w = montar({ maxBytes: 10 });
+    await w.get('[data-prueba="abrir-zona"]').trigger("click");
     const zona = w.get('[data-prueba="zona-archivo"]');
 
     await zona.trigger("dragenter");
@@ -52,8 +83,6 @@ describe("ZonaArchivo", () => {
 
   it("elegido con el selector, muestra su nombre y cómo cambiarlo", async () => {
     const w = montar({ texto: "Arrastra tu archivo CSV aquí o" });
-    expect(w.text()).toContain("Arrastra tu archivo CSV aquí o elígelo");
-
     const entrada = w.get('input[type="file"]');
     const csv = new File(["a"], "agenda.csv", { type: "text/csv" });
     Object.defineProperty(entrada.element, "files", { value: [csv] });
@@ -65,12 +94,13 @@ describe("ZonaArchivo", () => {
     expect(w.text()).toContain("Arrastra otro o haz clic para cambiarlo");
   });
 
-  it("deshabilitada u ocupada no recibe nada", async () => {
+  it("deshabilitada no se abre; ocupada dice que sube", async () => {
     const w = montar({ deshabilitado: true });
-    const zona = w.get('[data-prueba="zona-archivo"]');
-    expect(zona.attributes("aria-disabled")).toBe("true");
-    await zona.trigger("drop", soltar(new File(["a"], "a.csv")));
+    expect(
+      w.get('[data-prueba="abrir-zona"]').attributes("disabled"),
+    ).toBeDefined();
     await w.setProps({ deshabilitado: false, ocupado: true });
+    const zona = w.get('[data-prueba="zona-archivo"]');
     await zona.trigger("drop", soltar(new File(["a"], "a.csv")));
     expect(w.emitted("archivo")).toBeUndefined();
     expect(zona.text()).toContain("Subiendo…");

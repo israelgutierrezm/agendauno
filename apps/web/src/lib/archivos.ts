@@ -1,3 +1,5 @@
+import { readonly, ref, type Ref } from "vue";
+
 /**
  * ¿El archivo es de alguno de los tipos de `accept` (como en `<input type="file">`)?
  * Acepta extensiones (".csv"), tipos exactos ("image/png") y familias ("image/*").
@@ -49,4 +51,47 @@ export function instalarGuardaDeArrastre(ventana: Window = window): void {
   };
   ventana.addEventListener("dragover", cancelar);
   ventana.addEventListener("drop", cancelar);
+}
+
+const conArchivos = (e: DragEvent): boolean =>
+  e.dataTransfer?.types.includes("Files") ?? false;
+
+const hayArrastre = ref(false);
+let instalado = false;
+
+/**
+ * ¿Hay un archivo arrastrándose sobre la página? Las zonas de carga plegadas se
+ * despliegan solas mientras tanto, para soltarlo sin buscar el botón. Se cuentan
+ * las entradas y salidas (cada elemento que se cruza dispara ambas) y se apaga al
+ * soltar o al salir de la ventana.
+ */
+export function useArrastreDeArchivos(
+  ventana: Window = window,
+): Readonly<Ref<boolean>> {
+  if (!instalado) {
+    instalado = true;
+    let cuenta = 0;
+    const apagar = () => {
+      cuenta = 0;
+      hayArrastre.value = false;
+    };
+    ventana.addEventListener("dragenter", (e) => {
+      if (conArchivos(e)) {
+        cuenta += 1;
+        hayArrastre.value = true;
+      }
+    });
+    ventana.addEventListener("dragleave", (e) => {
+      if (!conArchivos(e)) {
+        return;
+      }
+      cuenta = Math.max(0, cuenta - 1);
+      if (cuenta === 0 || e.relatedTarget === null) {
+        apagar();
+      }
+    });
+    ventana.addEventListener("drop", apagar);
+    ventana.addEventListener("dragend", apagar);
+  }
+  return readonly(hayArrastre);
 }

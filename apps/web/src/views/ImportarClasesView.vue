@@ -344,6 +344,7 @@ async function descargar() {
           id="archivo-clases"
           class="mt-4"
           accept=".csv,text/csv"
+          :boton="t('importarClases.elegir')"
           :texto="$t('zonaArchivo.csv.arrastra')"
           :ayuda="$t('zonaArchivo.formatos.csv')"
           :cargado="archivo?.name ?? null"

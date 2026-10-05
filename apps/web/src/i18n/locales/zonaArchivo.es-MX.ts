@@ -1,5 +1,7 @@
 // Zona para subir un archivo (components/ZonaArchivo.vue): arrastrar o elegir.
 export default {
+  boton: "Elegir archivo",
+  cancelar: "Cancelar",
   arrastra: "Arrastra el archivo aquí o",
   elige: "elígelo",
   suelta: "Suéltalo para subirlo",
@@ -21,7 +23,13 @@ export default {
     arrastra: "Arrastra el documento aquí o",
     otro: "Arrastra el nuevo documento aquí o",
   },
+  logo: {
+    cambiar: "Cambiar logo",
+  },
   imagen: {
+    subir: "Subir imagen",
+    cambiar: "Cambiar imagen",
+    sinImagen: "Sin imagen",
     elige: "elígela",
     suelta: "Suéltala para reemplazar la imagen",
     sueltaNueva: "Suéltala para subirla",

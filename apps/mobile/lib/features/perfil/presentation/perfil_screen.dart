@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/calendario/logo_calendario.dart';
 import '../../../core/google/google_auth.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
@@ -614,8 +615,24 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
             child: ListTile(
               leading: const Icon(Icons.calendar_month_outlined),
               title: const Text('Agregar a mi calendario'),
-              subtitle: const Text(
-                'Tus clases y citas en el calendario del teléfono; se actualiza solo.',
+              // Funciona con Google Calendar, Apple Calendar y Outlook (como en la web).
+              subtitle: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tus clases y citas en el calendario del teléfono; se actualiza solo.',
+                  ),
+                  SizedBox(height: 6),
+                  Row(
+                    children: [
+                      LogoCalendario(MarcaCalendario.google, tam: 18),
+                      SizedBox(width: 6),
+                      LogoCalendario(MarcaCalendario.apple, tam: 18),
+                      SizedBox(width: 6),
+                      LogoCalendario(MarcaCalendario.outlook, tam: 18),
+                    ],
+                  ),
+                ],
               ),
               onTap: _guardando ? null : _agregarCalendario,
             ),

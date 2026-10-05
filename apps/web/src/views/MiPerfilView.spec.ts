@@ -105,6 +105,21 @@ describe("perfil unificado", () => {
     },
   );
 
+  it("el calendario nombra Google Calendar, Apple Calendar y Outlook con su miniatura", () => {
+    const w = montar();
+    const apps = w.get('[data-prueba="apps-calendario"]');
+    // El nombre va en el texto; la miniatura es decorativa (aria-hidden).
+    const nombres = apps.findAll("li").map((li) => li.text());
+    expect(nombres).toHaveLength(3);
+    ["Google Calendar", "Apple Calendar", "Outlook"].forEach((n, i) =>
+      expect(nombres[i]).toContain(n),
+    );
+    expect(
+      apps.findAll("svg[data-marca]").map((s) => s.attributes("data-marca")),
+    ).toEqual(["google", "apple", "outlook"]);
+    w.unmount();
+  });
+
   it("se ordena en Datos personales, Acceso y Preferencias y privacidad", () => {
     const w = montar();
     expect(w.findAll("h2.mp-seccion").map((h) => h.text())).toEqual([

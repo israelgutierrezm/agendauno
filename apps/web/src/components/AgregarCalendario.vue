@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 
+import LogoCalendario from "@/components/LogoCalendario.vue";
 import MenuFlotante from "@/components/MenuFlotante.vue";
 import {
   descargarIcs,
@@ -37,22 +38,48 @@ const boton = ref<HTMLElement | null>(null);
         :href="enlaceGoogle(props.evento)"
         target="_blank"
         rel="noopener"
-        class="block px-3 py-2 text-sm hover:bg-[var(--superficie-2)]"
+        class="ac-opcion"
         role="menuitem"
         @click="abierto = false"
+        ><span class="ac-logos"><LogoCalendario marca="google" /></span
         >{{ $t("portal.calendario.google") }}</a
       >
       <button
         type="button"
-        class="block w-full px-3 py-2 text-left text-sm hover:bg-[var(--superficie-2)]"
+        class="ac-opcion"
         role="menuitem"
         @click="
           descargarIcs(props.evento);
           abierto = false;
         "
       >
+        <span class="ac-logos"
+          ><LogoCalendario marca="apple" /><LogoCalendario marca="outlook"
+        /></span>
         {{ $t("portal.calendario.ics") }}
       </button>
     </MenuFlotante>
   </div>
 </template>
+
+<style scoped>
+/* Cada opción con la miniatura de su app (la del .ics: Apple y Outlook). */
+.ac-opcion {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  text-align: left;
+}
+.ac-opcion:hover {
+  background: var(--superficie-2);
+}
+.ac-logos {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 0.2rem;
+  min-width: 2.65rem;
+}
+</style>

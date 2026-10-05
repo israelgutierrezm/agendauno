@@ -1,4 +1,4 @@
-import { flushPromises, mount } from "@vue/test-utils";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
@@ -6,8 +6,13 @@ import esMX from "@/i18n/locales/es-MX";
 import { miPerfil } from "@/i18n/locales/equipo.es-MX";
 import { miCuentaExtra, miReprogramar } from "@/i18n/locales/gestion.es-MX";
 import portal from "@/i18n/locales/portal.es-MX";
+import { reiniciarMiCuenta } from "@/lib/miCuenta";
 import MiCuentaView from "./MiCuentaView.vue";
 import MisReservasView from "./MisReservasView.vue";
+import MisPagosView from "./MisPagosView.vue";
+import MiExpedienteView from "./MiExpedienteView.vue";
+
+enableAutoUnmount(afterEach);
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({
@@ -124,7 +129,13 @@ const datos: Record<string, unknown> = {
   "/mi/formularios": { persona_id: "p1", formularios: [] },
 };
 
-function montar(componente: typeof MiCuentaView | typeof MisReservasView) {
+function montar(
+  componente:
+    | typeof MiCuentaView
+    | typeof MisReservasView
+    | typeof MisPagosView
+    | typeof MiExpedienteView,
+) {
   return mount(componente, {
     global: {
       plugins: [
@@ -141,6 +152,11 @@ function montar(componente: typeof MiCuentaView | typeof MisReservasView) {
       stubs: {
         teleport: true,
         PaseEntrada: true,
+        CortePlanes: true,
+        HistorialCompras: true,
+        PagoAutomatico: true,
+        MisDocumentos: true,
+        ListaFormularios: true,
         EncabezadoSeccion: {
           props: ["titulo"],
           template: "<h1>{{ titulo }}<slot name='acciones' /></h1>",
@@ -158,6 +174,7 @@ describe("portal del alumno", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(HOY);
     vi.clearAllMocks();
+    reiniciarMiCuenta();
     localStorage.clear();
     sesion.esCitas = false;
     ruta.query = {};
@@ -557,5 +574,107 @@ describe("portal del alumno", () => {
     const disponibles = w.findAll('[data-prueba="clase-disponible"]');
     expect(disponibles).toHaveLength(1);
     expect(disponibles[0].text()).toContain("Open Training");
+  });
+
+  it("mantiene búsqueda y cobertura al cambiar de lista a semana", async () => {
+    const w = montar(MisReservasView);
+    await flushPromises();
+    await w.get('input[type="search"]').setValue("training");
+    expect(w.findAll('[data-prueba="clase-disponible"]')).toHaveLength(1);
+    expect(w.get('[data-prueba="clase-disponible"]').text()).not.toContain(
+      esMX.miCuenta.reservar,
+    );
+    await w
+      .findAll(".tu-segmentado button")
+      .find((b) => b.text() === "Semana")!
+      .trigger("click");
+    await flushPromises();
+    expect(w.get('input[type="search"]').element.value).toBe("training");
+    expect(w.find('[data-prueba="filtro-incluidas"]').exists()).toBe(true);
+    expect(
+      w.findAll(".cv-chip").some((c) => c.text().includes("Flexibilidad")),
+    ).toBe(false);
+    expect(api.post).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("en próximas muestra fecha visual y abre el detalle sin reservar de nuevo", async () => {
+    ruta.query = { vista: "proximas" };
+    const w = montar(MisReservasView);
+    await flushPromises();
+    expect(w.find(".mr-proxima-fecha").exists()).toBe(true);
+    await w.get('[data-prueba="reserva-proxima"] button').trigger("click");
+    expect(w.text()).toContain("Agregar a mi calendario");
+    expect(api.post).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("pagos tiene accesos a pendientes, planes e historial sin iniciar cobros", async () => {
+    const w = montar(MisPagosView);
+    await flushPromises();
+    expect(w.get('a[href="#mp-pendientes"]').text()).toContain("1 por pagar");
+    expect(w.find("#mp-pendientes").exists()).toBe(true);
+    expect(w.find("#mp-planes").exists()).toBe(true);
+    expect(w.find("#mp-historial").exists()).toBe(true);
+    expect(api.post).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("una cuenta de citas sin plan no muestra un acceso de planes vacío", async () => {
+    sesion.esCitas = true;
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/mi/perfil")
+            ? { ...(datos["/mi/perfil"] as object), derechos: [] }
+            : (datos[url.replace("/api/v1/app/demo", "")] ?? []),
+        },
+      }),
+    );
+    const w = montar(MisPagosView);
+    await flushPromises();
+    expect(w.find('a[href="#mp-planes"]').exists()).toBe(false);
+    expect(w.find("#mp-planes").exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("expediente conserva completo el documento y requiere aceptación explícita", async () => {
+    const w = montar(MiExpedienteView);
+    await flushPromises();
+    expect(w.get("#me-firmar").text()).toContain("Reglamento");
+    expect(w.get("#me-firmar").text()).toContain("…");
+    expect(w.find('a[href="#me-documentos"]').exists()).toBe(true);
+    expect(api.post).not.toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("expediente no duplica accesos cuando solo hay documentos", async () => {
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      return Promise.resolve({
+        data: { data: ruta === "/mi/waivers" ? [] : (datos[ruta] ?? []) },
+      });
+    });
+    const w = montar(MiExpedienteView);
+    await flushPromises();
+    expect(w.find(".me-accesos").exists()).toBe(false);
+    expect(w.find("#me-documentos").exists()).toBe(true);
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it("un error inicial no aparenta saldo al corriente o cuenta sin reservas", async () => {
+    api.get.mockRejectedValue(new Error("Sin conexión"));
+    const inicio = montar(MiCuentaView);
+    await flushPromises();
+    expect(inicio.text()).not.toContain("Nada agendado por ahora");
+    expect(inicio.text()).not.toContain("Al corriente");
+    inicio.unmount();
+    reiniciarMiCuenta();
+    const pagos = montar(MisPagosView);
+    await flushPromises();
+    expect(pagos.find(".mp-accesos").exists()).toBe(false);
+    expect(pagos.text()).not.toContain("Al corriente");
+    expect(pagos.text()).toContain("Sin conexión");
+    pagos.unmount();
   });
 });
