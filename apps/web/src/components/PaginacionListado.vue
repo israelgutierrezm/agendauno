@@ -5,16 +5,18 @@ import { computed } from "vue";
  * Paginación de un listado (estilo Acadion): «desde–hasta de total» + botones de
  * página. Trabaja sobre el `meta` del backend (page/ultima_pagina/total) y emite
  * `ir(n)` para que el padre recargue esa página. Extraída a componente para no
- * repetir el bloque en cada listado.
+ * repetir el bloque en cada listado. Con `opcionesPorPagina`, también deja elegir
+ * cuántas filas ver (emite `porPagina(n)`).
  */
 const props = defineProps<{
   page: number;
   ultimaPagina: number;
   total: number;
   perPage: number;
+  opcionesPorPagina?: number[];
 }>();
 
-const emit = defineEmits<{ ir: [n: number] }>();
+const emit = defineEmits<{ ir: [n: number]; porPagina: [n: number] }>();
 
 const desde = computed(() =>
   props.total === 0 ? 0 : (props.page - 1) * props.perPage + 1,
@@ -56,9 +58,25 @@ function ir(n: number): void {
     class="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3 sm:px-6"
     :style="{ borderColor: 'var(--borde)' }"
   >
-    <span class="text-sm" :style="{ color: 'var(--texto-suave)' }">
-      {{ $t("tabla.mostrando", { desde, hasta, total }) }}
-    </span>
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <span class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+        {{ $t("tabla.mostrando", { desde, hasta, total }) }}
+      </span>
+      <select
+        v-if="opcionesPorPagina?.length"
+        class="tu-input w-auto py-1.5 text-sm"
+        :value="perPage"
+        :aria-label="$t('tabla.filasPorPagina')"
+        data-prueba="por-pagina"
+        @change="
+          emit('porPagina', Number(($event.target as HTMLSelectElement).value))
+        "
+      >
+        <option v-for="n in opcionesPorPagina" :key="n" :value="n">
+          {{ $t("tabla.porPagina", { n }) }}
+        </option>
+      </select>
+    </div>
 
     <div v-if="ultimaPagina > 1" class="flex flex-wrap items-center gap-1">
       <button

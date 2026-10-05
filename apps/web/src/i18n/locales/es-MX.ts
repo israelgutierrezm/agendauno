@@ -51,6 +51,13 @@ export default {
       "Prueba con otro nombre o elimina los filtros para ver todos los registros.",
     restablecer: "Limpiar búsqueda y filtros",
     sinRegistros: "Todavía no hay registros.",
+    porPagina: "{n} por página",
+    filasPorPagina: "Filas por página",
+    columnas: "Columnas",
+    columnasAyuda: "Qué columnas ver",
+    exportar: "Exportar",
+    exportando: "Exportando…",
+    ordenarPor: "Ordenar por {columna}",
   },
   nav: {
     menu: "Menu",

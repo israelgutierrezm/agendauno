@@ -9,7 +9,8 @@ import { useFocoPanel } from "@/lib/focoPanel";
  * modal centrado y amplio (~768 px); solo la apariencia la usa anclada a la derecha
  * (`lateral`), para ver el cambio de tema sobre la pantalla. Se cierra con Escape o
  * tocando el fondo, atrapa el foco y bloquea el scroll de atrás. El contenido va en
- * el slot por defecto y las acciones en el slot `pie`.
+ * el slot por defecto, las acciones en el slot `pie` y, si hace falta, un encabezado
+ * propio en `cabecera` (en lugar del título).
  */
 const props = defineProps<{
   abierto: boolean;
@@ -56,7 +57,10 @@ const capa = useFocoPanel(
               background: 'var(--superficie)',
             }"
           >
-            <h2 class="text-lg font-semibold">{{ titulo }}</h2>
+            <!-- Un encabezado propio (p. ej. foto, nombre y estado) o el título. -->
+            <slot name="cabecera">
+              <h2 class="text-lg font-semibold">{{ titulo }}</h2>
+            </slot>
             <button
               class="tu-icono-btn"
               type="button"

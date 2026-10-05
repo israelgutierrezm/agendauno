@@ -217,6 +217,22 @@ const RUTAS: Record<string, string[]> = {
     "M13.5 3.5v5h5",
   ],
   mas: ["M12 5v14", "M5 12h14"],
+  // Más acciones: tres puntos en fila.
+  puntos: ["M6 12h.01", "M12 12h.01", "M18 12h.01"],
+  // Descargar (exportar): la bandeja con la flecha hacia abajo.
+  descargar: [
+    "M4 15.5v2.75A1.75 1.75 0 0 0 5.75 20h12.5A1.75 1.75 0 0 0 20 18.25V15.5",
+    "M12 4v11.5",
+    "M7.5 11 12 15.5l4.5-4.5",
+  ],
+  // Columnas de una tabla.
+  columnas: [
+    "M5.75 4h12.5A1.75 1.75 0 0 1 20 5.75v12.5A1.75 1.75 0 0 1 18.25 20H5.75A1.75 1.75 0 0 1 4 18.25V5.75A1.75 1.75 0 0 1 5.75 4Z",
+    "M9.5 4v16",
+    "M14.5 4v16",
+  ],
+  // Ordenar (sin orden aplicado): arriba y abajo.
+  orden: ["M8 9.5l4-4 4 4", "M8 14.5l4 4 4-4"],
   flecha: ["M5 12h14", "M13 6l6 6-6 6"],
   arriba: ["M12 19V5", "M6 11l6-6 6 6"],
   abajo: ["M12 5v14", "M6 13l6 6 6-6"],

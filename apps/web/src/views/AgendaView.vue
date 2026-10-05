@@ -2,6 +2,7 @@
 import { esInstructor } from "@/lib/roles";
 import { computed, onMounted, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import BotonImportar from "@/components/BotonImportar.vue";
@@ -174,12 +175,19 @@ const opcionesVista = computed<Vista[]>(() =>
     : ["semana", "dia", "mes"],
 );
 const vista = ref<Vista>(sesion.esCitas ? "profesionales" : "semana");
-const semanaInicio = ref(lunesDe(new Date()));
+// `?fecha=AAAA-MM-DD` abre la agenda en ese día (p. ej. «Ver en agenda» desde el
+// detalle de un cliente); sin ella, hoy.
+const fechaPedida = useRoute()?.query.fecha;
+const fechaInicial =
+  typeof fechaPedida === "string" && /^\d{4}-\d{2}-\d{2}$/.test(fechaPedida)
+    ? new Date(`${fechaPedida}T12:00:00`)
+    : new Date();
+const semanaInicio = ref(lunesDe(fechaInicial));
 // Vista mensual: primer día del mes que se muestra.
 const mesInicio = ref(
-  new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  new Date(fechaInicial.getFullYear(), fechaInicial.getMonth(), 1),
 );
-const diaSel = ref(isoDe(new Date()));
+const diaSel = ref(isoDe(fechaInicial));
 const sucursalFiltro = ref("");
 const instructorFiltro = ref("");
 // Quien imparte (sin un rol del equipo) solo ve sus clases o citas: elegir a otro

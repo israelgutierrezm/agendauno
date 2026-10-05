@@ -22,6 +22,12 @@ export interface ResumenTarjeta {
     planes?: string[];
   };
   ultima_visita: string | null;
+  // Su última clase o cita (ya pasó y no la canceló): cuándo y cuál.
+  ultima?: {
+    inicia_en: string;
+    zona_horaria: string | null;
+    clase: string | null;
+  } | null;
   proxima: {
     inicia_en: string;
     zona_horaria: string | null;
