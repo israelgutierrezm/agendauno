@@ -22,7 +22,7 @@ class AcuerdoTenant extends Model
 
     protected $table = 'acuerdos';
 
-    protected $fillable = ['persona_id', 'producto_comercial_id', 'linea_orden_id', 'fecha_inicio', 'proxima_cobro_en', 'estado'];
+    protected $fillable = ['persona_id', 'producto_comercial_id', 'linea_orden_id', 'fecha_inicio', 'proxima_cobro_en', 'dia_ancla', 'estado'];
 
     /**
      * @var array<string, string>
@@ -30,6 +30,8 @@ class AcuerdoTenant extends Model
     protected $casts = [
         'fecha_inicio' => 'date',
         'proxima_cobro_en' => 'date',
+        // Día del mes de sus aniversarios (ciclos y cobro), ver Aniversario.
+        'dia_ancla' => 'integer',
         'estado' => EstadoAcuerdo::class,
     ];
 

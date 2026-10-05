@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\SesionTenant;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 /*
 | Inicio del negocio: el día de hoy (su fecha LOCAL) con quién se espera, quién llegó
@@ -63,6 +66,9 @@ it('el día local: esperados, llegaron y por marcar en las que ya empezaron', fu
             // 30 lugares; una lista por registrar (la que ya terminó).
             'capacidad' => 30, 'listas_pendientes' => 1, 'en_espera' => 0,
             'por_atender' => 0, 'por_cobrar' => 0,
+            // Estados de las citas (aquí no hay citas).
+            'por_llegar' => 0, 'en_atencion' => 0, 'pendientes_registrar' => 0,
+            'finalizadas' => 0, 'no_asistio' => 0,
         ])
         ->assertJsonCount(3, 'data.agenda.sesiones')
         ->assertJsonPath('data.agenda.sesiones.0.momento', 'termino')
@@ -168,4 +174,65 @@ it('la fecha va en formato de día', function (): void {
         ->assertUnprocessable()->assertJsonValidationErrors(['fecha'], 'meta.errors');
     $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy", conBearer($e['bearer']))
         ->assertOk()->assertJsonPath('data.agenda.totales.sesiones', 0);
+});
+
+it('muchas sesiones del día anterior no esconden las de hoy (se acota la jornada antes de listar)', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $semilla = agendaSemilla($e);
+    $this->travelTo('2026-09-30 15:00:00');
+    $ayer = crearSesionTenant($e, $semilla, 10, '2026-09-30 21:00:00');
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->sole(), function () use ($ayer): void {
+        $original = SesionTenant::query()->where('ulid', $ayer)->sole();
+        for ($i = 0; $i < 210; $i++) {
+            $copia = $original->replicate();
+            $copia->ulid = (string) Str::ulid();
+            $copia->save();
+        }
+    });
+    $this->travelTo('2026-10-01 12:00:00');
+    $hoy = crearSesionTenant($e, $semilla, 10, '2026-10-01 19:00:00');
+
+    $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy?fecha=2026-10-01", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.agenda.totales.sesiones', 1)
+        ->assertJsonCount(1, 'data.agenda.sesiones')
+        ->assertJsonPath('data.agenda.sesiones.0.id', $hoy)
+        ->assertJsonPath('data.agenda.truncado', false);
+});
+
+it('cada cita del día está en un solo estado y «por atender» es lo que sigue sin registro', function (): void {
+    // 8:00 en la Ciudad de México.
+    $this->travelTo('2026-10-05 14:00:00');
+    $e = estudioConSesion('barberia-b', 'dueno@barberia-b.mx');
+    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $sede = agendaSemilla($e);
+    $this->putJson("/api/v1/app/{$e['slug']}/ofertas/{$sede['oferta']}", [
+        'lugares' => 0, 'politica_reserva' => 'pago', 'precio_clase_minor' => 15000, 'duracion_minutos' => 30,
+    ], conBearer($e['bearer']))->assertOk();
+    personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia-b.mx', 'instructor');
+    $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    $citar = fn (string $hora, string $nombre): string => (string) $this->postJson("/api/v1/app/{$e['slug']}/agenda/citas", [
+        'persona_id' => crearMiembroTenant($e, $nombre), 'oferta_id' => $sede['oferta'],
+        'sucursal_id' => $sede['sucursal'], 'instructor_id' => $pro, 'inicia_en_local' => "2026-10-05 {$hora}:00",
+    ], conBearer($e['bearer']))->assertCreated()->json('data.cita.reserva_id');
+    $termino = $citar('08:30', 'Ana');
+    $falto = $citar('09:00', 'Beto');
+    $citar('09:30', 'Cris');
+    $atendiendo = $citar('11:00', 'Dani');
+    $citar('12:00', 'Eva');
+
+    // 11:15: Ana ya se atendió, Beto no vino, Cris pasó sin registrar, Dani está en
+    // el sillón y Eva aún no llega.
+    $this->travelTo('2026-10-05 17:15:00');
+    foreach ([$termino => 'presente', $falto => 'ausente', $atendiendo => 'presente'] as $reserva => $estado) {
+        $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/asistencia", ['estado' => $estado], conBearer($e['bearer']))->assertCreated();
+    }
+
+    $totales = $this->getJson("/api/v1/app/{$e['slug']}/inicio/hoy?fecha=2026-10-05", conBearer($e['bearer']))
+        ->assertOk()->json('data.agenda.totales');
+    expect($totales)->toMatchArray([
+        'por_llegar' => 1, 'en_atencion' => 1, 'pendientes_registrar' => 1, 'finalizadas' => 1, 'no_asistio' => 1,
+        // Sin registro: Eva (por llegar) y Cris (pasó sin registrar), como en Recepción.
+        'por_atender' => 2,
+    ]);
 });

@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AnularCobroTenant;
 use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Pagos\EstadoPago;
@@ -18,15 +19,21 @@ use Illuminate\Validation\Rule;
  * Pagos capturados del estudio (data plane del tenant): base de la pantalla de
  * cobranza para consultar cobros y emitir reembolsos. Solo pagos con dinero recibido
  * (aprobados / total o parcialmente reembolsados); los pendientes/rechazados no
- * aplican. Incluye el monto ya reembolsado y el reembolsable restante.
+ * aplican. Incluye el monto ya reembolsado y el reembolsable restante. Quien está
+ * acotado a sedes (R19) solo ve, corrige o anula cobros de compras de las suyas.
  */
 class PagosTenantController
 {
     private const LIMITE = 200;
 
-    public function index(AnularCobroTenant $anular, CorregirMetodoPagoTenant $corregir): JsonResponse
+    public function __construct(private readonly ResolverAccesoTenant $acceso) {}
+
+    public function index(Request $request, AnularCobroTenant $anular, CorregirMetodoPagoTenant $corregir): JsonResponse
     {
+        $actor = $request->attributes->get('usuario_tenant');
+        $sedes = $actor instanceof Usuario ? $this->acceso->sucursalesPermitidas($actor) : null;
         $pagos = PagoTenant::query()
+            ->when($sedes !== null, fn ($q) => $q->whereHas('orden', fn ($o) => $o->whereIn('sucursal_id', $sedes)))
             ->whereIn('estado', [
                 EstadoPago::Aprobado->value,
                 EstadoPago::ParcialmenteReembolsado->value,
@@ -76,7 +83,7 @@ class PagosTenantController
      */
     public function anular(Request $request, AnularCobroTenant $anular): JsonResponse
     {
-        $pago = PagoTenant::query()->where('ulid', (string) $request->route('pago'))->firstOrFail();
+        $pago = $this->pagoDeMiSede($request, $this->acceso);
         $validado = $request->validate([
             'motivo' => ['required', 'string', 'max:255'],
         ]);
@@ -96,7 +103,7 @@ class PagosTenantController
      */
     public function corregirMetodo(Request $request, CorregirMetodoPagoTenant $corregir): JsonResponse
     {
-        $pago = PagoTenant::query()->where('ulid', (string) $request->route('pago'))->firstOrFail();
+        $pago = $this->pagoDeMiSede($request, $this->acceso);
         $validado = $request->validate([
             'metodo' => ['required', Rule::in(CorregirMetodoPagoTenant::METODOS)],
             'motivo' => ['nullable', 'string', 'max:255'],
@@ -114,5 +121,22 @@ class PagosTenantController
             'id' => $pago->ulid,
             'metodo' => $pago->orden->metodo_pago ?? $pago->metodo->value,
         ]]);
+    }
+
+    /**
+     * El pago de la ruta, si su compra es de una sede que le corresponde a quien lo
+     * toca (R19); un cobro sin sede no es de ninguna.
+     */
+    public static function pagoDeMiSede(Request $request, ResolverAccesoTenant $acceso): PagoTenant
+    {
+        $pago = PagoTenant::query()->where('ulid', (string) $request->route('pago'))->with('orden')->firstOrFail();
+        $actor = $request->attributes->get('usuario_tenant');
+        $sucursal = $pago->orden?->sucursal_id;
+        abort_unless(
+            ! $actor instanceof Usuario || $acceso->permiteSucursal($actor, $sucursal !== null ? (int) $sucursal : null),
+            403,
+        );
+
+        return $pago;
     }
 }

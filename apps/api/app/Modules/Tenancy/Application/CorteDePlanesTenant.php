@@ -29,7 +29,7 @@ class CorteDePlanesTenant
 
     public function __construct(
         private readonly LibroMayorTenant $libro,
-        private readonly MembresiasTenant $membresias,
+        private readonly FechasNegocioTenant $fechas,
     ) {}
 
     /**
@@ -53,7 +53,7 @@ class CorteDePlanesTenant
     /** La fecha de hoy en el calendario del negocio. */
     public function hoy(): string
     {
-        return CarbonImmutable::now($this->membresias->zona())->toDateString();
+        return $this->fechas->hoy();
     }
 
     /**

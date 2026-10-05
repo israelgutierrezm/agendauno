@@ -6,7 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Creditos\TipoMovimiento;
-use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Membresias\Aniversario;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\PoliticaRollover;
@@ -34,7 +34,7 @@ class MembresiasTenant
 
     public function __construct(
         private readonly LibroMayorTenant $libro,
-        private readonly GestorDeConexionTenant $gestor,
+        private readonly FechasNegocioTenant $fechas,
     ) {}
 
     /**
@@ -187,6 +187,11 @@ class MembresiasTenant
                 // Recurrente: el próximo cobro vence al cerrar el primer ciclo (el
                 // scheduler lo cobrará). No recurrente (pack/pase): no se renueva.
                 'proxima_cobro_en' => $recurrente && $cicloFin !== null ? Carbon::parse($cicloFin)->addDay()->toDateString() : null,
+                // El día del mes al que vuelve su cobro (y, por aniversario, sus
+                // ciclos): el de su inicio; de calendario, el 1.
+                'dia_ancla' => $recurrente
+                    ? ($politicaReset === PoliticaReset::Calendario ? 1 : Aniversario::diaDe($inicio))
+                    : null,
                 'estado' => 'activo',
             ]);
 
@@ -320,7 +325,7 @@ class MembresiasTenant
      */
     public function zona(): string
     {
-        return (string) ($this->gestor->actual()?->zona_horaria ?: 'America/Mexico_City');
+        return $this->fechas->zona();
     }
 
     /**
@@ -339,10 +344,7 @@ class MembresiasTenant
             ];
         }
 
-        // Aniversario: desde la fecha, un mes menos un dia.
-        return [
-            $dia->toDateString(),
-            $dia->copy()->addMonth()->subDay()->toDateString(),
-        ];
+        // Aniversario: hasta un día antes del siguiente (sin desbordar febrero).
+        return Aniversario::ventana($dia, Aniversario::diaDe($dia));
     }
 }

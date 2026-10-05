@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\GenerarCicloEntitlementTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
@@ -41,7 +42,8 @@ class GenerarCiclosEntitlement extends Command
                         DerechoTenant::query()
                             ->where('politica_reset', '!=', 'ninguno')
                             ->whereNotNull('ciclo_fin')
-                            ->whereDate('ciclo_fin', '<', now()->toDateString())
+                            // Con su último día ya terminado en el negocio (no en UTC).
+                            ->whereDate('ciclo_fin', '<', app(FechasNegocioTenant::class)->hoy())
                             ->chunkById(200, function (Collection $derechos) use (&$n, $generarTenant): void {
                                 /** @var Collection<int, DerechoTenant> $derechos */
                                 foreach ($derechos as $derecho) {

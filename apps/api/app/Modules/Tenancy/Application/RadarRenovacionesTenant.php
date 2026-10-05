@@ -41,7 +41,7 @@ class RadarRenovacionesTenant
      */
     public function miembros(int $dias, ?array $sucursales): array
     {
-        $hoy = CarbonImmutable::now()->startOfDay();
+        $hoy = app(FechasNegocioTenant::class)->dia();
 
         // MAX vencimiento por persona entre sus acuerdos ACTIVOS (una sola consulta).
         $filas = DerechoTenant::query()

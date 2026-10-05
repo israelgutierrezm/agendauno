@@ -1803,12 +1803,22 @@ export default {
       ocupacion: "ocupación",
     },
     metricas: {
-      ingresos: "Ingresos",
+      ingresos: "Ingresos netos",
       ocupacion: "Ocupación",
       noShow: "Inasistencias",
       alumnos: "Alumnos activos",
       arpu: "ARPU",
       clases: "Clases",
+    },
+    // El dinero del periodo por moneda (nunca se suman monedas distintas).
+    dinero: {
+      moneda: "Moneda",
+      vendido: "Vendido",
+      cobrado: "Cobrado",
+      devuelto: "Devuelto",
+      neto: "Neto",
+      ayuda:
+        "Vendido: compras y ventas de mostrador por su fecha. Cobrado: el dinero que entró, por la fecha del cobro. Neto: cobrado menos devuelto.",
     },
     // Agenda del equipo (ADR 0081).
     equipo: {

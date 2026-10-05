@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\Creditos\TipoMovimiento;
+use App\Modules\Tenancy\Membresias\Aniversario;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\PoliticaRollover;
@@ -24,7 +25,10 @@ class GenerarCicloEntitlementTenant
     // Tope defensivo de ciclos a avanzar en una corrida (evita bucles patológicos).
     private const MAX_CICLOS = 120;
 
-    public function __construct(private readonly LibroMayorTenant $libro) {}
+    public function __construct(
+        private readonly LibroMayorTenant $libro,
+        private readonly FechasNegocioTenant $fechas,
+    ) {}
 
     public function ejecutar(DerechoTenant $derecho): int
     {
@@ -37,7 +41,8 @@ class GenerarCicloEntitlementTenant
             return 0;
         }
 
-        $hoy = Carbon::now()->startOfDay();
+        // El ciclo termina al final de su último día EN EL NEGOCIO.
+        $hoy = Carbon::parse($this->fechas->hoy());
 
         return DB::connection('tenant')->transaction(function () use ($derecho, $hoy): int {
             $bloqueado = DerechoTenant::query()->whereKey($derecho->getKey())->lockForUpdate()->firstOrFail();
@@ -93,6 +98,9 @@ class GenerarCicloEntitlementTenant
             return [$inicio->toDateString(), $inicio->copy()->endOfMonth()->toDateString()];
         }
 
-        return [$siguiente->toDateString(), $siguiente->copy()->addMonth()->subDay()->toDateString()];
+        // Aniversario: anclado al día de su inicio (ver Aniversario), sin desbordar febrero.
+        $ancla = $derecho->acuerdo->dia_ancla ?? Aniversario::diaDe($derecho->acuerdo->fecha_inicio);
+
+        return Aniversario::ventana($siguiente, (int) $ancla);
     }
 }

@@ -77,7 +77,7 @@ class ResolverSegmentoTenant
      */
     private function porVencimiento(bool $porVencer): Collection
     {
-        $hoy = CarbonImmutable::now()->startOfDay();
+        $hoy = app(FechasNegocioTenant::class)->dia();
 
         $filas = DerechoTenant::query()
             ->join('acuerdos', 'acuerdos.id', '=', 'derechos.acuerdo_id')

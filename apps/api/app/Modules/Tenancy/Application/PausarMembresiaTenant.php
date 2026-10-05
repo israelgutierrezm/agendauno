@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\Exceptions\PausaNoPermitida;
+use App\Modules\Tenancy\Membresias\Aniversario;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
@@ -40,7 +41,7 @@ class PausarMembresiaTenant
 
     public function pausar(AcuerdoTenant $acuerdo, CarbonImmutable $hasta, ?string $motivo, ?Usuario $actor): PausaAcuerdoTenant
     {
-        $hoy = CarbonImmutable::today();
+        $hoy = app(FechasNegocioTenant::class)->dia();
         $hasta = $hasta->startOfDay();
 
         if ($hasta->lt($hoy)) {
@@ -107,7 +108,7 @@ class PausarMembresiaTenant
      */
     public function reanudar(AcuerdoTenant $acuerdo, ?Usuario $actor, ?CarbonImmutable $hoy = null): AcuerdoTenant
     {
-        $hoy = ($hoy ?? CarbonImmutable::today())->startOfDay();
+        $hoy = ($hoy ?? app(FechasNegocioTenant::class)->dia())->startOfDay();
 
         return DB::connection('tenant')->transaction(function () use ($acuerdo, $actor, $hoy): AcuerdoTenant {
             $bloqueado = AcuerdoTenant::query()->whereKey($acuerdo->getKey())->lockForUpdate()->firstOrFail();
@@ -162,7 +163,7 @@ class PausarMembresiaTenant
      */
     public function reanudarVencidas(?CarbonImmutable $hoy = null): int
     {
-        $hoy = ($hoy ?? CarbonImmutable::today())->startOfDay();
+        $hoy = ($hoy ?? app(FechasNegocioTenant::class)->dia())->startOfDay();
         $reanudadas = 0;
 
         PausaAcuerdoTenant::query()
@@ -189,6 +190,9 @@ class PausarMembresiaTenant
     {
         if ($acuerdo->proxima_cobro_en !== null) {
             $acuerdo->proxima_cobro_en = $acuerdo->proxima_cobro_en->copy()->addDays($dias);
+            // Los aniversarios siguen al cobro corrido (si no, el siguiente ciclo
+            // volvería al día de antes y saldría más corto).
+            $acuerdo->dia_ancla = Aniversario::diaDe($acuerdo->proxima_cobro_en);
         }
 
         $derechos = DerechoTenant::query()

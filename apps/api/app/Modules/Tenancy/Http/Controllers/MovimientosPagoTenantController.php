@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\MovimientosDePagoTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Usuario;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +20,7 @@ use Symfony\Component\HttpFoundation\Response;
  * ventas de mostrador y cancelaciones, con totales del rango completo por moneda. Sin
  * fechas, el día de hoy (en la zona del negocio). La lista trae a lo más `limite`
  * filas por tipo (avisa si se cortó); `?formato=csv` descarga TODAS con los mismos
- * totales.
+ * totales. Quien está acotado a sedes solo ve (y exporta) lo de las suyas.
  */
 class MovimientosPagoTenantController
 {
@@ -29,6 +31,7 @@ class MovimientosPagoTenantController
     public function __construct(
         private readonly MovimientosDePagoTenant $movimientos,
         private readonly GestorDeConexionTenant $gestor,
+        private readonly ResolverAccesoTenant $acceso,
     ) {}
 
     public function index(Request $request): JsonResponse|Response
@@ -52,14 +55,17 @@ class MovimientosPagoTenantController
             throw ValidationException::withMessages(['hasta' => ['Consulta a lo más un año a la vez.']]);
         }
 
+        $actor = $request->attributes->get('usuario_tenant');
+        $sedes = $actor instanceof Usuario ? $this->acceso->sucursalesPermitidas($actor) : null;
+
         if (($validado['formato'] ?? 'json') === 'csv') {
-            $todo = $this->movimientos->listar($desde, $hasta, $validado['usuario'] ?? null, $validado['tipo'] ?? null, null);
+            $todo = $this->movimientos->listar($desde, $hasta, $validado['usuario'] ?? null, $validado['tipo'] ?? null, null, $sedes);
 
             return $this->csv($todo['movimientos'], $todo['totales'], $desde, $hasta, $zona);
         }
 
         $limite = (int) ($validado['limite'] ?? MovimientosDePagoTenant::LIMITE);
-        $resultado = $this->movimientos->listar($desde, $hasta, $validado['usuario'] ?? null, $validado['tipo'] ?? null, $limite);
+        $resultado = $this->movimientos->listar($desde, $hasta, $validado['usuario'] ?? null, $validado['tipo'] ?? null, $limite, $sedes);
 
         return response()->json([
             'data' => $resultado['movimientos'],

@@ -13,11 +13,14 @@ Schedule::command('agendauno:latido')->everyMinute()->evenInMaintenanceMode();
 // Resumen de alertas de la plataforma al superadmin (ALERTAS_CORREO), agrupado.
 Schedule::command('agendauno:enviar-alertas')->everyTenMinutes()->withoutOverlapping();
 
-// Reanuda las membresías cuya pausa terminó (antes de renovar ciclos y cobrar).
-Schedule::command('agendauno:reanudar-pausas')->dailyAt('00:05')->withoutOverlapping();
+// Reanuda las membresías cuya pausa terminó (antes de renovar ciclos y cobrar). Cada
+// hora: el día termina en la zona de cada negocio, no a medianoche UTC; reanudar una
+// pausa que ya se reanudó no hace nada.
+Schedule::command('agendauno:reanudar-pausas')->hourlyAt(5)->withoutOverlapping();
 
-// Reinicia/renueva a diario los ciclos vencidos de los derechos recurrentes.
-Schedule::command('agendauno:generar-ciclos')->dailyAt('00:15')->withoutOverlapping();
+// Reinicia/renueva los ciclos vencidos de los derechos recurrentes en cuanto termina
+// su último día en el negocio (por eso cada hora; un ciclo ya renovado no se repite).
+Schedule::command('agendauno:generar-ciclos')->hourlyAt(15)->withoutOverlapping();
 
 // Publica los eventos de dominio pendientes del outbox de cada estudio (R39).
 // Frecuente para baja latencia; withoutOverlapping evita relays solapados.
@@ -49,9 +52,10 @@ Schedule::command('agendauno:conciliar-reembolsos')->everyFiveMinutes()->without
 // habría aplicado el aviso. Antes de que venza el apartado de una cita (30 min).
 Schedule::command('agendauno:conciliar-pagos')->everyFiveMinutes()->withoutOverlapping();
 
-// Cobra las renovaciones recurrentes vencidas y reintenta a los morosos (Etapa 2).
-// Antes de escalar el dunning, para dar oportunidad a los reintentos del día.
-Schedule::command('agendauno:cobrar-suscripciones')->dailyAt('00:45')->withoutOverlapping();
+// Cobra las renovaciones recurrentes vencidas y reintenta a los morosos (Etapa 2), a
+// las 00:45 de CDMX (ya empezó el día del cobro en el negocio). Una vez al día: es la
+// cadencia de los reintentos.
+Schedule::command('agendauno:cobrar-suscripciones')->dailyAt('06:45')->withoutOverlapping();
 
 // Aviso de renovación próxima (3 días antes), a las 09:00 de CDMX: cuándo, cuánto y
 // cómo se paga; a quien paga a mano le abre la renovación para pagarla por adelantado.

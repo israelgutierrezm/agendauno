@@ -6,7 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
-use App\Modules\Tenancy\Models\PagoTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Models\ReembolsoTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
@@ -17,18 +17,19 @@ use Illuminate\Http\Request;
  * parcial, con reversión del entitlement segun politica (ver
  * {@see ReembolsarPagoTenant}). Operacion sensible: exige `motivo`, queda con actor
  * en la devolucion y en la bitacora de auditoria. Opera SIEMPRE sobre la BD del
- * estudio resuelto.
+ * estudio resuelto. Quien está acotado a sedes (R19) solo devuelve cobros de las suyas.
  */
 class ReembolsosTenantController
 {
     public function __construct(
         private readonly ReembolsarPagoTenant $reembolsos,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly ResolverAccesoTenant $acceso,
     ) {}
 
     public function index(Request $request): JsonResponse
     {
-        $pago = PagoTenant::query()->where('ulid', (string) $request->route('pago'))->firstOrFail();
+        $pago = PagosTenantController::pagoDeMiSede($request, $this->acceso);
 
         $lista = $pago->reembolsos()->orderByDesc('id')->get();
 
@@ -39,7 +40,7 @@ class ReembolsosTenantController
 
     public function store(Request $request): JsonResponse
     {
-        $pago = PagoTenant::query()->where('ulid', (string) $request->route('pago'))->firstOrFail();
+        $pago = PagosTenantController::pagoDeMiSede($request, $this->acceso);
 
         $validado = $request->validate([
             'monto_minor' => ['nullable', 'integer', 'min:1'],

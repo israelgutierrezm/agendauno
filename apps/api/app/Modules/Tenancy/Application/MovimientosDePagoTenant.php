@@ -16,6 +16,8 @@ use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 /**
@@ -34,6 +36,10 @@ use Illuminate\Support\Str;
  * Quién: el usuario que registró el cobro, hizo la devolución, vendió o canceló; si
  * no hubo uno, lo dice ("En línea", "Pago automático", "Sistema").
  *
+ * Sucursales (R19): con `$sucursales` (las de un usuario acotado), lista, totales y
+ * exportación solo cuentan lo de esas sedes: cobros y devoluciones por la sucursal de
+ * su compra, ventas de mostrador por la suya. Lo que no tiene sede no es de ninguna.
+ *
  * @phpstan-type Movimiento array{fecha: string, tipo: string, monto_minor: int, moneda: string, metodo: string|null, persona: string|null, concepto: string, quien: string, quien_id: string|null, referencia: string, orden: string|null, pago: string|null, detalle: string|null}
  * @phpstan-type Totales array{moneda: string, cobrado_minor: int, devuelto_minor: int, neto_minor: int, por_cobrar_minor: int, por_metodo: array<string, int>, por_usuario: list<array{quien: string, cobrado_minor: int, devuelto_minor: int}>}
  */
@@ -46,16 +52,40 @@ class MovimientosDePagoTenant
      */
     private const COBRADOS = [EstadoPago::Aprobado, EstadoPago::ParcialmenteReembolsado, EstadoPago::Reembolsado];
 
+    /** @var list<int>|null Sedes a las que se acota la consulta en curso (null = todas). */
+    private ?array $sucursales = null;
+
     public function __construct(private readonly GestorDeConexionTenant $gestor) {}
+
+    /**
+     * Acota una consulta por la sede de la compra (`$columnaOrden`: la columna con el
+     * id de la orden, p. ej. `pagos.orden_id`).
+     *
+     * @template TModelo of Model
+     *
+     * @param  Builder<TModelo>  $consulta
+     * @return Builder<TModelo>
+     */
+    private function porSedeDeLaOrden(Builder $consulta, string $columnaOrden): Builder
+    {
+        if ($this->sucursales === null) {
+            return $consulta;
+        }
+        $sedes = $this->sucursales;
+
+        return $consulta->whereIn($columnaOrden, fn ($q) => $q->select('id')->from('ordenes')->whereIn('sucursal_id', $sedes));
+    }
 
     /**
      * @param  string|null  $usuarioUlid  solo lo que hizo esa persona del equipo
      * @param  string|null  $tipo  cobro | devolucion | venta | cancelacion
      * @param  int|null  $limite  filas por tipo en la lista (null = todas, p. ej. para el CSV)
+     * @param  list<int>|null  $sucursales  solo lo de estas sedes (null = todas)
      * @return array{movimientos: list<Movimiento>, totales: list<Totales>, truncado: bool}
      */
-    public function listar(string $desde, string $hasta, ?string $usuarioUlid = null, ?string $tipo = null, ?int $limite = self::LIMITE): array
+    public function listar(string $desde, string $hasta, ?string $usuarioUlid = null, ?string $tipo = null, ?int $limite = self::LIMITE, ?array $sucursales = null): array
     {
+        $this->sucursales = $sucursales;
         $zona = (string) ($this->gestor->actual()?->zona_horaria ?: 'America/Mexico_City');
         $inicio = CarbonImmutable::parse($desde, $zona)->startOfDay()->utc();
         $fin = CarbonImmutable::parse($hasta, $zona)->endOfDay()->utc();
@@ -92,11 +122,64 @@ class MovimientosDePagoTenant
     }
 
     /**
+     * El dinero de un periodo por moneda, para reportes (nunca se suman monedas):
+     * - ventas: lo vendido, por su fecha (compras no canceladas y ventas de mostrador);
+     * - cobrado: el dinero que entró, por la fecha del cobro (incluye mostrador);
+     * - devuelto: lo devuelto, por la fecha de la devolución (también parciales);
+     * - neto: cobrado menos devuelto.
+     *
+     * @param  list<int>|null  $sucursales  solo lo de estas sedes (null = todas)
+     * @return list<array{moneda: string, ventas_minor: int, cobrado_minor: int, devuelto_minor: int, neto_minor: int}>
+     */
+    public function porMoneda(string $desde, string $hasta, ?array $sucursales = null): array
+    {
+        $this->sucursales = $sucursales;
+        $zona = (string) ($this->gestor->actual()?->zona_horaria ?: 'America/Mexico_City');
+        $inicio = CarbonImmutable::parse($desde, $zona)->startOfDay()->utc();
+        $fin = CarbonImmutable::parse($hasta, $zona)->endOfDay()->utc();
+
+        /** @var array<string, array{moneda: string, ventas_minor: int, cobrado_minor: int, devuelto_minor: int, neto_minor: int}> $por */
+        $por = [];
+        $fila = static fn (string $moneda): array => ['moneda' => $moneda, 'ventas_minor' => 0, 'cobrado_minor' => 0, 'devuelto_minor' => 0, 'neto_minor' => 0];
+        foreach ($this->totales($inicio, $fin, null, static fn (string $t): bool => true) as $t) {
+            $por[$t['moneda']] = [...$fila($t['moneda']), 'cobrado_minor' => $t['cobrado_minor'], 'devuelto_minor' => $t['devuelto_minor'], 'neto_minor' => $t['neto_minor']];
+        }
+
+        $vendido = OrdenTenant::query()
+            ->selectRaw('moneda, SUM(total_minor) AS total')
+            ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
+            ->where('estado', '!=', EstadoOrden::Cancelada->value)
+            ->whereBetween('created_at', [$inicio, $fin])
+            ->groupBy('moneda')
+            ->toBase()
+            ->get()
+            ->concat(VentaPosTenant::query()
+                ->selectRaw('moneda, SUM(total_minor) AS total')
+                ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
+                ->whereNull('anulada_en')
+                ->whereBetween('created_at', [$inicio, $fin])
+                ->groupBy('moneda')
+                ->toBase()
+                ->get());
+        foreach ($vendido as $v) {
+            $moneda = (string) $v->moneda;
+            $por[$moneda] ??= $fila($moneda);
+            $por[$moneda]['ventas_minor'] += (int) $v->total;
+        }
+
+        $lista = array_values($por);
+        // Primero la moneda con más dinero (la principal del negocio).
+        usort($lista, static fn (array $a, array $b): int => [$b['cobrado_minor'], $b['ventas_minor']] <=> [$a['cobrado_minor'], $a['ventas_minor']]);
+
+        return $lista;
+    }
+
+    /**
      * @return array{0: list<Movimiento>, 1: bool}
      */
     private function cobros(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId, ?int $limite): array
     {
-        $pagos = PagoTenant::query()
+        $pagos = $this->porSedeDeLaOrden(PagoTenant::query(), 'pagos.orden_id')
             ->whereIn('estado', array_map(static fn (EstadoPago $e): string => $e->value, self::COBRADOS))
             ->whereBetween('aprobado_en', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('registrado_por', $usuarioId))
@@ -135,6 +218,8 @@ class MovimientosDePagoTenant
     private function devoluciones(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId, ?int $limite): array
     {
         $reembolsos = ReembolsoTenant::query()
+            ->when($this->sucursales !== null, fn ($q) => $q->whereIn('pago_id', fn ($p) => $p->select('pagos.id')->from('pagos')
+                ->whereIn('pagos.orden_id', fn ($o) => $o->select('id')->from('ordenes')->whereIn('sucursal_id', $this->sucursales ?? []))))
             ->where('estado', EstadoReembolso::Aprobado->value)
             ->whereBetween('aplicado_en', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('actor_id', $usuarioId))
@@ -175,6 +260,7 @@ class MovimientosDePagoTenant
         $ventas = VentaPosTenant::query()
             // Una venta anulada nunca ocurrió (ADR 0089).
             ->whereNull('anulada_en')
+            ->when($this->sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $this->sucursales))
             ->whereBetween('created_at', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('usuario_id', $usuarioId))
             ->with('lineas.articulo')
@@ -214,6 +300,7 @@ class MovimientosDePagoTenant
     private function cancelaciones(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId, ?int $limite): array
     {
         $ordenes = OrdenTenant::query()
+            ->when($this->sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $this->sucursales))
             ->where('estado', EstadoOrden::Cancelada->value)
             ->whereBetween('cancelada_en', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('cancelada_por', $usuarioId))
@@ -273,7 +360,7 @@ class MovimientosDePagoTenant
         };
 
         if ($incluye('cobro')) {
-            $filas = PagoTenant::query()
+            $filas = $this->porSedeDeLaOrden(PagoTenant::query(), 'pagos.orden_id')
                 ->selectRaw('moneda, metodo, proveedor, registrado_por, CASE WHEN domiciliacion_id IS NULL THEN 0 ELSE 1 END AS automatico, SUM(monto_minor) AS total')
                 ->whereIn('estado', array_map(static fn (EstadoPago $e): string => $e->value, self::COBRADOS))
                 ->whereBetween('aprobado_en', [$inicio, $fin])
@@ -291,7 +378,7 @@ class MovimientosDePagoTenant
         }
 
         if ($incluye('devolucion')) {
-            $filas = ReembolsoTenant::query()
+            $filas = $this->porSedeDeLaOrden(ReembolsoTenant::query(), 'pagos.orden_id')
                 ->join('pagos', 'pagos.id', '=', 'reembolsos.pago_id')
                 ->selectRaw('reembolsos.moneda AS moneda, pagos.metodo AS metodo, pagos.proveedor AS proveedor, reembolsos.actor_id AS actor_id, reembolsos.actor_nombre AS actor_nombre, SUM(reembolsos.monto_minor) AS total')
                 ->where('reembolsos.estado', EstadoReembolso::Aprobado->value)
@@ -313,6 +400,7 @@ class MovimientosDePagoTenant
             $filas = VentaPosTenant::query()
                 ->selectRaw('moneda, metodo_pago, usuario_id, SUM(total_minor) AS total')
                 ->whereNull('anulada_en')
+                ->when($this->sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $this->sucursales))
                 ->whereBetween('created_at', [$inicio, $fin])
                 ->when($usuarioId !== null, fn ($q) => $q->where('usuario_id', $usuarioId))
                 ->groupBy('moneda', 'metodo_pago', 'usuario_id')
@@ -328,6 +416,7 @@ class MovimientosDePagoTenant
         // Lo que sigue por cobrar: compras del rango aún pendientes de pago.
         $pendientes = OrdenTenant::query()
             ->selectRaw('moneda, SUM(total_minor) AS total')
+            ->when($this->sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $this->sucursales))
             ->where('estado', EstadoOrden::Pendiente->value)
             ->whereBetween('created_at', [$inicio, $fin])
             ->groupBy('moneda')

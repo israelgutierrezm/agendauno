@@ -94,7 +94,8 @@ it('en pausa no reserva; al terminar se reanuda sola y corre sus fechas', functi
     expect(derechoEnFicha($m)['pausa_hasta'])->toBe('2026-09-19');
 
     // Al día siguiente del último día en pausa se reanuda sola: 10 días después.
-    $this->travelTo('2026-09-20 00:10:00');
+    // 00:10 del 20 en el negocio (Ciudad de México): ya terminó su último día de pausa.
+    $this->travelTo('2026-09-20 06:10:00');
     $this->artisan('agendauno:reanudar-pausas')->assertSuccessful();
 
     $despues = derechoEnFicha($m);

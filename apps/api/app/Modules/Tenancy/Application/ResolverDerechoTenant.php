@@ -22,7 +22,10 @@ use Illuminate\Support\Collection;
  */
 class ResolverDerechoTenant
 {
-    public function __construct(private readonly LibroMayorTenant $libro) {}
+    public function __construct(
+        private readonly LibroMayorTenant $libro,
+        private readonly FechasNegocioTenant $fechas,
+    ) {}
 
     public function paraSesion(PersonaTenant $persona, SesionTenant $sesion, int $unidades): ?DerechoTenant
     {
@@ -103,7 +106,7 @@ class ResolverDerechoTenant
         $derechos = DerechoTenant::query()
             ->whereHas('acuerdo', fn (Builder $q) => $q->where('persona_id', $persona->getKey())
                 ->where('estado', '!=', EstadoAcuerdo::Cancelado->value))
-            ->where(fn ($q) => $q->whereNull('valido_hasta')->orWhere('valido_hasta', '>=', now()->toDateString()))
+            ->where(fn ($q) => $q->whereNull('valido_hasta')->orWhere('valido_hasta', '>=', $this->fechas->hoy()))
             ->with(['acuerdo', 'ofertas:id'])
             ->get();
         $saldo = $derechos->mapWithKeys(fn (DerechoTenant $d): array => [
@@ -217,16 +220,12 @@ class ResolverDerechoTenant
         return $ofertas->isEmpty() || $ofertas->contains('id', (int) $sesion->oferta_id);
     }
 
+    /**
+     * Las fechas de vigencia son días del negocio (su zona horaria): el último día
+     * cubre hasta las 23:59 locales, no hasta la medianoche UTC.
+     */
     private function vigente(DerechoTenant $derecho, CarbonInterface $momento): bool
     {
-        if ($derecho->valido_desde !== null && $momento->lessThan($derecho->valido_desde)) {
-            return false;
-        }
-
-        if ($derecho->valido_hasta !== null && $momento->greaterThan($derecho->valido_hasta->copy()->endOfDay())) {
-            return false;
-        }
-
-        return true;
+        return $this->fechas->cubre($derecho->valido_desde, $derecho->valido_hasta, $momento);
     }
 }

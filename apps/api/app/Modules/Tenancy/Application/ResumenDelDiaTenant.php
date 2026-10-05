@@ -79,12 +79,33 @@ class ResumenDelDiaTenant
     {
         $esperan = [EstadoReserva::Confirmada->value, EstadoReserva::PendientePago->value];
 
-        // Un día por lado de holgura (las horas se guardan en UTC y cada sede tiene su
-        // zona); luego se queda solo lo que cae en la fecha LOCAL de su sede.
+        // Primero se acota la jornada: el día LOCAL exacto de cada zona (las horas se
+        // guardan en UTC y cada sede tiene la suya), con un día de holgura como marco.
+        // Así ninguna sesión de ayer o de mañana desplaza a las de hoy; los totales se
+        // cuentan sobre todas y solo la lista se corta.
+        $desde = $fecha->startOfDay()->subDay()->utc();
+        $hasta = $fecha->startOfDay()->addDays(2)->utc();
+        $dia = $fecha->toDateString();
+        $zonas = SesionTenant::query()
+            ->where('inicia_en', '>=', $desde)
+            ->where('inicia_en', '<', $hasta)
+            ->whereNotNull('zona_horaria')
+            ->distinct()
+            ->pluck('zona_horaria')
+            ->all();
         $sesiones = SesionTenant::query()
             ->with(['oferta', 'sucursal', 'instructor'])
-            ->where('inicia_en', '>=', $fecha->startOfDay()->subDay()->utc())
-            ->where('inicia_en', '<', $fecha->startOfDay()->addDays(2)->utc())
+            ->where('inicia_en', '>=', $desde)
+            ->where('inicia_en', '<', $hasta)
+            ->where(function ($q) use ($zonas, $dia): void {
+                $q->whereRaw('1 = 0');
+                foreach ($zonas as $zona) {
+                    $local = CarbonImmutable::parse($dia, (string) $zona)->startOfDay();
+                    $q->orWhere(fn ($w) => $w->where('zona_horaria', $zona)
+                        ->where('inicia_en', '>=', $local->utc())
+                        ->where('inicia_en', '<', $local->addDay()->utc()));
+                }
+            })
             ->when($this->acceso->esInstructorAcotado($usuario), fn ($q) => $q->where('instructor_id', $usuario->getKey()))
             ->when($permitidas !== null, fn ($q) => $q->whereIn('sucursal_id', $permitidas))
             ->withCount([
@@ -96,16 +117,13 @@ class ResumenDelDiaTenant
                 'reservas as en_espera' => fn ($q) => $q->where('estado', EstadoReserva::EnEspera->value),
             ])
             ->orderBy('inicia_en')
-            ->limit(self::LIMITE_SESIONES)
-            ->get()
-            ->filter(fn (SesionTenant $s): bool => $s->inicia_en->copy()->setTimezone((string) $s->zona_horaria)->toDateString() === $fecha->toDateString())
-            ->values();
+            ->get();
 
         // A quién se atiende en cada cita y si falta cobrarla (una consulta para todas).
         $titulares = ReservaTenant::query()
             ->whereIn('sesion_id', $sesiones->filter(fn (SesionTenant $s): bool => $s->esCita())->pluck('id'))
             ->whereIn('estado', $esperan)
-            ->with(['persona', 'orden'])
+            ->with(['persona', 'orden', 'asistencia'])
             ->get()
             ->keyBy(fn (ReservaTenant $r): int => (int) $r->sesion_id);
 
@@ -114,8 +132,11 @@ class ResumenDelDiaTenant
             'sesiones' => 0, 'esperados' => 0, 'llegaron' => 0, 'sin_marcar' => 0,
             // Lugares de las clases con cupo, listas por registrar y lista de espera.
             'capacidad' => 0, 'listas_pendientes' => 0, 'en_espera' => 0,
-            // Citas que faltan por atender y por cobrar.
+            // Citas sin registro (por llegar o ya pasadas sin registrar) y por cobrar.
             'por_atender' => 0, 'por_cobrar' => 0,
+            // Cada cita en un solo estado: el paso del tiempo no sustituye el registro.
+            'por_llegar' => 0, 'en_atencion' => 0, 'pendientes_registrar' => 0,
+            'finalizadas' => 0, 'no_asistio' => 0,
         ];
         $lista = [];
         foreach ($sesiones as $s) {
@@ -139,8 +160,14 @@ class ResumenDelDiaTenant
                 $totales['capacidad'] += $s->esCita() ? 0 : (int) ($s->capacidad ?? 0);
                 $totales['listas_pendientes'] += $sinMarcar > 0 ? 1 : 0;
                 $totales['en_espera'] += $enEspera;
-                // Por atender: aún no termina y queda alguien sin llegar ni faltar.
-                $totales['por_atender'] += ! $termino && $esperados - $llegaron - $faltaron > 0 ? 1 : 0;
+                if ($s->esCita()) {
+                    if ($titular instanceof ReservaTenant) {
+                        $totales[$this->estadoDeCita($titular, $termino)]++;
+                    }
+                } else {
+                    // Clases: aún no termina y queda alguien sin llegar ni faltar.
+                    $totales['por_atender'] += ! $termino && $esperados - $llegaron - $faltaron > 0 ? 1 : 0;
+                }
                 $totales['por_cobrar'] += $porCobrar ? 1 : 0;
             }
 
@@ -165,7 +192,16 @@ class ResumenDelDiaTenant
             ];
         }
 
-        return ['totales' => $totales, 'sesiones' => $lista];
+        // Citas por atender: las que no tienen registro, hayan pasado o no (como en
+        // Recepción); las ya pasadas sin registrar también están en `pendientes_registrar`.
+        $totales['por_atender'] += $totales['por_llegar'] + $totales['pendientes_registrar'];
+
+        // La lista se corta (a lo más LIMITE_SESIONES); los totales son de todo el día.
+        return [
+            'totales' => $totales,
+            'sesiones' => array_slice($lista, 0, self::LIMITE_SESIONES),
+            'truncado' => count($lista) > self::LIMITE_SESIONES,
+        ];
     }
 
     /**
@@ -240,5 +276,19 @@ class ResumenDelDiaTenant
         $porVencer = count(array_filter($miembros, static fn (array $m): bool => $m['estado'] === 'por_vencer'));
 
         return ['por_vencer' => $porVencer, 'vencidas' => count($miembros) - $porVencer, 'dias' => $dias];
+    }
+
+    /**
+     * El estado de una cita para el día: no asistió o llegó (en atención mientras dura,
+     * finalizada después); sin registro, por llegar mientras dura y pendiente de
+     * registrar cuando ya terminó.
+     */
+    private function estadoDeCita(ReservaTenant $titular, bool $termino): string
+    {
+        return match ($titular->asistencia?->estado) {
+            EstadoAsistencia::Ausente => 'no_asistio',
+            EstadoAsistencia::Presente => $termino ? 'finalizadas' : 'en_atencion',
+            default => $termino ? 'pendientes_registrar' : 'por_llegar',
+        };
     }
 }

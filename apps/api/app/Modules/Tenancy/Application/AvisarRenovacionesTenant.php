@@ -43,7 +43,7 @@ class AvisarRenovacionesTenant
 
     public function ejecutar(?CarbonImmutable $hoy = null): int
     {
-        $hoy = ($hoy ?? CarbonImmutable::now())->startOfDay();
+        $hoy = ($hoy ?? app(FechasNegocioTenant::class)->dia())->startOfDay();
         $enLinea = $this->pasarelas->enLinea() !== null;
         $avisados = 0;
 

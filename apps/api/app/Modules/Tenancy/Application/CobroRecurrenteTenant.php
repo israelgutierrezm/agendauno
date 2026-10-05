@@ -174,7 +174,7 @@ class CobroRecurrenteTenant
             return $resultado;
         }
 
-        $limite = Carbon::today()->subDays($this->parametros->entero('cobranza.dias_gracia_pago_automatico'));
+        $limite = Carbon::parse(app(FechasNegocioTenant::class)->hoy())->subDays($this->parametros->entero('cobranza.dias_gracia_pago_automatico'));
         if ($acuerdo->proxima_cobro_en !== null && $acuerdo->proxima_cobro_en->lt($limite)) {
             $this->dunning->registrarFallo($acuerdo, 'No hemos recibido el cobro automático de tu suscripción.');
 
@@ -207,7 +207,7 @@ class CobroRecurrenteTenant
         $acuerdos = AcuerdoTenant::query()
             ->where('estado', EstadoAcuerdo::Activo->value)
             ->whereNotNull('proxima_cobro_en')
-            ->whereDate('proxima_cobro_en', '<=', Carbon::now()->toDateString())
+            ->whereDate('proxima_cobro_en', '<=', app(FechasNegocioTenant::class)->hoy())
             ->when($conDunning !== [], fn ($q) => $q->whereNotIn('id', $conDunning))
             ->with(['persona', 'producto'])
             ->get();

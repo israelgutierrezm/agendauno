@@ -182,6 +182,13 @@
   html {
     font-size: 16px;
   }
+  /* Un fieldset mide por omisión lo que su contenido (min-content): una tira que se
+     desplaza por dentro (profesionales, días) ensanchaba el formulario y la página en
+     el teléfono. Así solo se desplaza la tira. */
+  fieldset {
+    min-width: 0;
+    min-inline-size: 0;
+  }
   html[data-densidad="compacta"] {
     font-size: 14px;
   }

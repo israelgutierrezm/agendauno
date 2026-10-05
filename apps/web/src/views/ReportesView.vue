@@ -25,6 +25,14 @@ interface Negocio {
   no_show_pct: number | null;
   alumnos_activos: number;
   arpu_minor: number | null;
+  // Por moneda (nunca se suman): vendido, cobrado, devuelto y neto.
+  dinero_por_moneda?: {
+    moneda: string;
+    ventas_minor: number;
+    cobrado_minor: number;
+    devuelto_minor: number;
+    neto_minor: number;
+  }[];
 }
 interface SucursalReporte {
   id: string;
@@ -585,6 +593,44 @@ onMounted(cargar);
         class="mt-4"
         :tarjetas="tarjetas"
       />
+      <!-- El dinero del periodo por moneda: vendido, cobrado, devuelto y neto -->
+      <div
+        v-if="pestana === 'resumen' && negocio?.dinero_por_moneda?.length"
+        class="mt-4 tu-card overflow-x-auto"
+        data-prueba="dinero-por-moneda"
+      >
+        <table class="tu-tabla">
+          <thead>
+            <tr>
+              <th>{{ $t("reportes.dinero.moneda") }}</th>
+              <th class="text-right">{{ $t("reportes.dinero.vendido") }}</th>
+              <th class="text-right">{{ $t("reportes.dinero.cobrado") }}</th>
+              <th class="text-right">{{ $t("reportes.dinero.devuelto") }}</th>
+              <th class="text-right">{{ $t("reportes.dinero.neto") }}</th>
+            </tr>
+          </thead>
+          <tbody class="tu-tabla-cuerpo">
+            <tr v-for="d in negocio.dinero_por_moneda" :key="d.moneda">
+              <td>{{ d.moneda }}</td>
+              <td class="text-right tabular-nums">
+                {{ dinero(d.ventas_minor, d.moneda) }}
+              </td>
+              <td class="text-right tabular-nums">
+                {{ dinero(d.cobrado_minor, d.moneda) }}
+              </td>
+              <td class="text-right tabular-nums">
+                {{ dinero(d.devuelto_minor, d.moneda) }}
+              </td>
+              <td class="text-right tabular-nums font-medium">
+                {{ dinero(d.neto_minor, d.moneda) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="px-4 py-3 text-xs" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("reportes.dinero.ayuda") }}
+        </p>
+      </div>
 
       <!-- Tendencias de ingresos (Etapa 2) -->
       <template v-if="pestana === 'ingresos'">

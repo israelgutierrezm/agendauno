@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -171,7 +172,7 @@ class EscaparateController
      */
     private function horarioClases(): array
     {
-        $hoy = CarbonImmutable::today();
+        $hoy = app(FechasNegocioTenant::class)->hoy();
         $filas = [];
         PlantillaHorarioTenant::query()
             ->where('activo', true)

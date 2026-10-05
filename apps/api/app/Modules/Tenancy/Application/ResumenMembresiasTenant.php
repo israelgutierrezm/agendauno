@@ -9,7 +9,6 @@ use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
 use App\Modules\Tenancy\Models\RetencionCreditoTenant;
-use Carbon\CarbonImmutable;
 
 /**
  * Estado de la membresía o paquete de varias personas a la vez: el resumen de una
@@ -21,7 +20,10 @@ use Carbon\CarbonImmutable;
  */
 final class ResumenMembresiasTenant
 {
-    public function __construct(private readonly ParametrosTenant $parametros) {}
+    public function __construct(
+        private readonly ParametrosTenant $parametros,
+        private readonly FechasNegocioTenant $fechas,
+    ) {}
 
     /**
      * @param  list<int>  $personaIds
@@ -58,7 +60,8 @@ final class ResumenMembresiasTenant
             ->selectRaw('derecho_id, SUM(unidades) as total')
             ->pluck('total', 'derecho_id');
 
-        $hoy = CarbonImmutable::now()->startOfDay();
+        // Hoy en el negocio (no en UTC): un plan que vence hoy sigue vigente hasta la noche.
+        $hoy = $this->fechas->dia();
         $porVencer = $hoy->addDays($this->parametros->entero('membresias.dias_por_vencer'));
 
         foreach ($derechos->groupBy(fn (DerechoTenant $d): int => (int) $d->acuerdo?->persona_id) as $personaId => $lista) {
