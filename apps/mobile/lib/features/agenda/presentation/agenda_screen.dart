@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../../perfil/presentation/perfil_screen.dart';
@@ -124,9 +125,9 @@ class _TiraSemana extends ConsumerWidget {
                         child: Container(
                           height: 60,
                           decoration: BoxDecoration(
-                            color: sel ? const Color(0xFF0070FF) : Colors.transparent,
+                            color: sel ? TemaAgendaUno.acento : Colors.transparent,
                             borderRadius: BorderRadius.circular(14),
-                            border: esHoy && !sel ? Border.all(color: const Color(0xFF0070FF), width: 1.5) : null,
+                            border: esHoy && !sel ? Border.all(color: TemaAgendaUno.acento, width: 1.5) : null,
                           ),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\CatalogoTemas;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use Illuminate\Support\Facades\File;
 
@@ -26,7 +27,7 @@ it('un usuario nuevo ve el tema predeterminado y el catálogo de temas', functio
     $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
         ->assertOk()
         ->assertJsonPath('data.usuario.apariencia.clave', 'agendauno')
-        ->assertJsonPath('data.usuario.apariencia.tokens.acento', '#0070FF')
+        ->assertJsonPath('data.usuario.apariencia.tokens.acento', '#006DF7')
         // El predeterminado es claro (barra lateral blanca).
         ->assertJsonPath('data.usuario.apariencia.tokens.barra', '#FFFFFF');
 
@@ -108,4 +109,29 @@ it('la apariencia es de cada usuario: no afecta a otros del mismo estudio', func
         ->assertOk()->assertJsonPath('data.usuario.apariencia.clave', 'agendauno');
     $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($recep))
         ->assertOk()->assertJsonPath('data.usuario.apariencia.clave', 'esmeralda');
+});
+
+/** Luminancia relativa de un color «#RRGGBB» (WCAG 2). */
+function luminanciaTemaContraste(string $hex): float
+{
+    $canal = static function (int $v): float {
+        $c = $v / 255;
+
+        return $c <= 0.03928 ? $c / 12.92 : (($c + 0.055) / 1.055) ** 2.4;
+    };
+    [$r, $g, $b] = sscanf($hex, '#%02x%02x%02x');
+
+    return 0.2126 * $canal((int) $r) + 0.7152 * $canal((int) $g) + 0.0722 * $canal((int) $b);
+}
+
+it('en todos los temas el texto de los botones y de lo activo de la barra se lee (AA)', function (): void {
+    foreach (CatalogoTemas::disponibles() as $tema) {
+        $tokens = CatalogoTemas::resolver($tema['clave'], null)['tokens'];
+        foreach ([['acento', 'acento_texto'], ['barra_activo', 'barra_activo_texto']] as [$fondo, $texto]) {
+            $a = luminanciaTemaContraste($tokens[$fondo]);
+            $b = luminanciaTemaContraste($tokens[$texto]);
+            $contraste = (max($a, $b) + 0.05) / (min($a, $b) + 0.05);
+            expect($contraste)->toBeGreaterThanOrEqual(4.5, "{$tema['clave']}: {$texto} sobre {$fondo}");
+        }
+    }
 });

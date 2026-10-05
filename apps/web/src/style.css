@@ -31,7 +31,8 @@
   --texto: #031b4e;
   --texto-suave: #5e6b84;
   --borde: #d9e0ec;
-  --acento: #0070ff;
+  /* Azul de marca: con texto blanco encima llega a 4.6:1 (AA). */
+  --acento: #006df7;
   --primario: var(--acento);
   --primario-fuerte: color-mix(in srgb, var(--acento), black 12%);
   --primario-contraste: #ffffff;
@@ -41,7 +42,7 @@
   --enlace: color-mix(in srgb, var(--acento), black 15%);
   --barra: #031b4e;
   --barra-suave: #0b2b62;
-  --barra-activo: #0070ff;
+  --barra-activo: #006df7;
   --barra-texto: #bdc9de;
   --barra-borde: rgb(255 255 255 / 10%);
   --exito: #198754;

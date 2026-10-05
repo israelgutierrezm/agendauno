@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 /// Tema claro de AgendaUno, el mismo de la web (tokens de `CatalogoTemas`):
 /// fondo gris muy claro, superficies blancas con borde fino y acento azul de marca.
 abstract final class TemaAgendaUno {
-  static const acento = Color(0xFF0070FF);
+  // Un 1.5 % más oscuro que #0070FF: con texto blanco encima llega a 4.6:1 (AA).
+  static const acento = Color(0xFF006DF7);
   static const acentoSuave = Color(0xFFEAF1FF);
   static const fondo = Color(0xFFF6F7FB);
   static const superficie = Color(0xFFFFFFFF);
