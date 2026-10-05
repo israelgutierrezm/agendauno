@@ -12,6 +12,7 @@ import LayoutConfiguracion from "@/components/LayoutConfiguracion.vue";
 import NavLateral from "@/components/NavLateral.vue";
 import PestanasArea from "@/components/PestanasArea.vue";
 import AppToaster from "@/components/AppToaster.vue";
+import AvisoSinSucursal from "@/components/AvisoSinSucursal.vue";
 import DialogoConfirmar from "@/components/DialogoConfirmar.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import PanelRoles from "@/components/PanelRoles.vue";
@@ -367,6 +368,8 @@ onMounted(() => {
           class="tu-lienzo"
           :class="{ 'tu-lienzo-ampliado': agendaAmpliada }"
         >
+          <!-- Personal sin sucursal (con varias en el negocio): no ve nada aún. -->
+          <AvisoSinSucursal v-if="sesion.usuario?.sin_sucursal" />
           <LayoutConfiguracion v-if="enConfiguracion">
             <RouterView />
           </LayoutConfiguracion>

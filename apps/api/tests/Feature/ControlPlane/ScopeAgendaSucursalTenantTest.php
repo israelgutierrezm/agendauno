@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\File;
 /*
 | Alcance por sucursal (R19) en AGENDA: el staff ACOTADO a sedes (recepcionista/
 | instructor con asignación explícita, no propietario/admin) solo VE las clases de SUS
-| sucursales; sin asignación ve todas (compatibilidad con una sola sucursal). Crear
+| sucursales; con varias sucursales, sin asignación no ve ninguna (ADR 0098). Crear
 | clases exige agenda.gestionar (propietario/admin, nunca acotados), por eso aquí se
 | prueba el ALCANCE DE LECTURA, que es donde el recepcionista/instructor sí llega.
 */
@@ -31,10 +31,10 @@ it('un recepcionista asignado a una sucursal solo ve las clases de esa sede', fu
 
     $recep = personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista');
 
-    // Sin asignación: ve las clases de AMBAS sedes.
-    $todas = $this->getJson("/api/v1/app/{$e['slug']}/sesiones", conBearer($recep))
+    // Sin asignación (con varias sucursales): no ve ninguna clase (ADR 0098).
+    $ninguna = $this->getJson("/api/v1/app/{$e['slug']}/sesiones", conBearer($recep))
         ->assertOk()->json('data');
-    expect($todas)->toHaveCount(2);
+    expect($ninguna)->toHaveCount(0);
 
     // Se le asigna la sucursal A → queda ACOTADO y solo ve la clase de A (capacidad 5).
     asignarSucursal($e, usuarioIdPorEmail($e, 'recep@correo.mx'), $sedeA['sucursal']);

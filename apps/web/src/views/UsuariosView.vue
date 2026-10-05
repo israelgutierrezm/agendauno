@@ -152,6 +152,23 @@ async function cargar(): Promise<void> {
   }
 }
 
+// Personal acotado por sucursal (ADR 0098): ni propietario ni administración ni
+// solo cliente. Con varias sucursales necesita al menos una para ver algo.
+function esPersonalAcotado(u: UsuarioRow): boolean {
+  return (
+    !u.roles.some((r) => r === "propietario" || r === "admin") &&
+    u.roles.some((r) => r !== "miembro")
+  );
+}
+function sinSucursal(u: UsuarioRow): boolean {
+  return (
+    hayMultiSucursal.value &&
+    u.activo &&
+    esPersonalAcotado(u) &&
+    !asignaciones.value.some((a) => a.usuario_id === u.id)
+  );
+}
+
 // Asignaciones del usuario que se está editando.
 const asignacionesDeEditando = computed(() =>
   editando.value === null
@@ -386,6 +403,14 @@ onMounted(cargar);
             >
               {{ (fila as UsuarioRow).email ?? $t("usuarios.sinCorreo") }}
             </div>
+            <div
+              v-if="sinSucursal(fila as UsuarioRow)"
+              class="text-xs"
+              :style="{ color: 'var(--aviso)' }"
+              data-prueba="usuario-sin-sucursal"
+            >
+              {{ $t("sucursalOperativa.sinSucursalUsuario") }}
+            </div>
           </div>
         </div>
       </template>
@@ -508,15 +533,40 @@ onMounted(cargar);
               class="tu-enlace text-sm"
               style="color: var(--error)"
               type="button"
-              :disabled="guardandoSede"
+              :disabled="
+                guardandoSede ||
+                (editando !== null &&
+                  esPersonalAcotado(editando) &&
+                  asignacionesDeEditando.length === 1)
+              "
+              :title="
+                editando !== null &&
+                esPersonalAcotado(editando) &&
+                asignacionesDeEditando.length === 1
+                  ? $t('sucursalOperativa.ultimaSucursal')
+                  : undefined
+              "
               @click="quitarSede(a)"
             >
               {{ $t("usuarios.sedeQuitar") }}
             </button>
           </li>
         </ul>
-        <p v-else class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("usuarios.sedesVacio") }}
+        <p
+          v-else
+          class="mt-3 text-sm"
+          :style="{
+            color:
+              editando !== null && esPersonalAcotado(editando)
+                ? 'var(--aviso)'
+                : 'var(--texto-suave)',
+          }"
+        >
+          {{
+            editando !== null && esPersonalAcotado(editando)
+              ? $t("sucursalOperativa.sinSucursalUsuario")
+              : $t("usuarios.sedesVacio")
+          }}
         </p>
 
         <div

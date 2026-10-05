@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\MovimientosDePagoTenant;
 use App\Modules\Tenancy\Application\OcupacionDeAgendaTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\EstadoSesionTenant;
@@ -59,7 +60,7 @@ class ReporteNegocioTenantController
 
         // El dinero, por moneda: vendido, cobrado, devuelto y neto.
         $dinero = $movimientos->porMoneda($desde, $hasta, $sedes);
-        $principal = $dinero[0] ?? ['moneda' => 'MXN', 'ventas_minor' => 0, 'cobrado_minor' => 0, 'devuelto_minor' => 0, 'neto_minor' => 0];
+        $principal = $dinero[0] ?? ['moneda' => app(ParametrosTenant::class)->moneda(), 'ventas_minor' => 0, 'cobrado_minor' => 0, 'devuelto_minor' => 0, 'neto_minor' => 0];
         $ingresos = $principal['neto_minor'];
         // Órdenes que quedaron pagadas en el periodo (por la fecha del pago).
         $ordenesPagadas = OrdenTenant::query()

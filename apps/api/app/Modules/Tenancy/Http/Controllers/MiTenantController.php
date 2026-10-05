@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Application\FormulariosDePersonaTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\PaseAccesoTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\PortalDelClienteTenant;
@@ -325,7 +326,7 @@ class MiTenantController
     private function coberturaDe(SesionTenant $sesion, array $cobertura): ?array
     {
         if ($sesion->oferta?->politica_reserva === PoliticaReservaTenant::Pago) {
-            return ['estado' => 'de_pago', 'motivo' => null, 'precio_minor' => (int) $sesion->oferta->precio_clase_minor, 'moneda' => 'MXN'];
+            return ['estado' => 'de_pago', 'motivo' => null, 'precio_minor' => (int) $sesion->oferta->precio_clase_minor, 'moneda' => app(ParametrosTenant::class)->monedaDe($sesion->sucursal)];
         }
 
         return $cobertura[(int) $sesion->getKey()] ?? null;
@@ -358,7 +359,7 @@ class MiTenantController
                 $sesion,
                 $persona,
                 $monto,
-                'MXN',
+                app(ParametrosTenant::class)->monedaDe($sesion->sucursal),
                 (int) $sesion->sucursal_id,
             );
 

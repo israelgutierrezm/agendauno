@@ -64,6 +64,8 @@ class UsuarioTenantPresenter
             // Sucursales que puede operar (todas o las que tiene asignadas): con más de
             // una, el panel ofrece elegir con cuál trabaja; con una, se usa esa.
             'sucursales' => self::sucursales($usuario),
+            // Personal sin sucursal en un negocio con varias: no ve nada (ADR 0098).
+            'sin_sucursal' => app(ResolverAccesoTenant::class)->sinSucursal($usuario),
         ];
     }
 

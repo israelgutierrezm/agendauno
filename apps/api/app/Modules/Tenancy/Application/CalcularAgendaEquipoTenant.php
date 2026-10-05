@@ -39,7 +39,7 @@ class CalcularAgendaEquipoTenant
         $zona = (string) (SucursalTenant::query()->value('zona_horaria') ?? config('app.timezone', 'UTC'));
         $inicio = CarbonImmutable::parse($desde.' 00:00:00', $zona)->utc();
         $fin = CarbonImmutable::parse($hasta.' 00:00:00', $zona)->addDay()->utc();
-        $moneda = (string) (SucursalTenant::query()->value('moneda') ?? 'MXN');
+        $moneda = (string) (SucursalTenant::query()->value('moneda') ?? app(ParametrosTenant::class)->moneda());
 
         $sesiones = SesionTenant::query()
             ->whereBetween('inicia_en', [$inicio, $fin])

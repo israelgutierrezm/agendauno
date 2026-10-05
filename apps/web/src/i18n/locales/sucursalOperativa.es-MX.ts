@@ -8,4 +8,13 @@ export default {
   seRegistraEn: "Se registra en {sucursal}",
   ayuda:
     "Elige una sucursal y el panel la usa en la agenda, el mostrador y los formularios.",
+  // Personal sin sucursal asignada (ADR 0098).
+  sinSucursal: {
+    titulo: "Aún no tienes una sucursal asignada",
+    detalle:
+      "Mientras tanto no verás agenda, clientes ni cobros. Pide al administrador del negocio que te asigne una.",
+  },
+  // En Usuarios: el personal necesita al menos una sucursal.
+  sinSucursalUsuario: "Sin sucursal: no ve nada hasta que le asignes una.",
+  ultimaSucursal: "Debe tener al menos una sucursal.",
 };

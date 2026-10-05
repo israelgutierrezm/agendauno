@@ -434,18 +434,26 @@ onMounted(cargar);
             required
           />
         </div>
+        <!-- Con varias sucursales, la suya es obligatoria (ADR 0098). -->
         <div v-if="hayMultiSucursal">
           <label class="tu-label" for="is">{{
             $t("instructores.invitar.sede")
           }}</label>
-          <select id="is" v-model="form.sucursalId" class="tu-input">
-            <option value="">
-              {{ $t("instructores.invitar.todasSedes") }}
+          <select
+            id="is"
+            v-model="form.sucursalId"
+            class="tu-input"
+            required
+            data-prueba="sucursal-invitar"
+          >
+            <option value="" disabled>
+              {{ $t("instructores.invitar.eligeSede") }}
             </option>
             <option v-for="s in sucursales" :key="s.id" :value="s.id">
               {{ s.nombre }}
             </option>
           </select>
+          <p class="tu-hint mt-1">{{ $t("instructores.invitar.sedeAyuda") }}</p>
         </div>
       </form>
       <div v-if="activacion" class="in-activacion mt-4 text-sm">
@@ -461,7 +469,12 @@ onMounted(cargar);
           <button
             class="tu-btn tu-btn-primario"
             type="button"
-            :disabled="invitando || form.nombre === '' || form.email === ''"
+            :disabled="
+              invitando ||
+              form.nombre === '' ||
+              form.email === '' ||
+              (hayMultiSucursal && form.sucursalId === '')
+            "
             @click="invitar"
           >
             {{

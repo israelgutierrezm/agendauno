@@ -38,9 +38,14 @@ class AccesoSesionTenant
             return true;
         }
 
-        // Scope por sucursal (R19): un rol asignado en la sucursal de la sesion amplia
-        // su alcance mas alla de sus propias sesiones. `sucursal_id` es obligatorio.
-        return $this->acceso->rolAsignadoPermite($usuario, 'asistencia.marcar', (int) $sesion->sucursal_id);
+        // Scope por sucursal (R19): un rol DEL EQUIPO asignado en la sucursal de la sesion
+        // (p. ej. recepción de esa sede) amplía su alcance más allá de sus propias
+        // sesiones. Estar asignado como quien imparte solo dice dónde trabaja (ADR 0098).
+        $rol = $this->acceso->rolAsignado($usuario, (int) $sesion->sucursal_id);
+
+        return $rol !== null
+            && $this->roles->tieneFaceta([$rol], 'equipo')
+            && $this->acceso->rolAsignadoPermite($usuario, 'asistencia.marcar', (int) $sesion->sucursal_id);
     }
 
     /**

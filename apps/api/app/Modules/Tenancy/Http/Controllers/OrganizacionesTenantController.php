@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\AsignarSucursalAlPersonalTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
+use App\Modules\Tenancy\Pagos\CatalogoMonedas;
 use App\Modules\Tenancy\Support\EnlaceMapa;
 use App\Modules\Tenancy\Support\HorarioSucursal;
 use App\Modules\Tenancy\Support\RedesSociales;
@@ -33,7 +36,22 @@ class OrganizacionesTenantController
                 'nombre' => $organizacion->nombre,
                 'sucursales' => $organizacion->sucursales->map(fn (SucursalTenant $sucursal): array => $this->presentarSucursal($sucursal))->all(),
             ])->all(),
+            'meta' => $this->monedas(),
         ]);
+    }
+
+    /**
+     * Para elegir la moneda de una sucursal: el catálogo y la del negocio (la que usa
+     * si no elige otra, ADR 0097).
+     *
+     * @return array{monedas: list<array{codigo: string, nombre: string}>, moneda_negocio: string}
+     */
+    private function monedas(): array
+    {
+        return [
+            'monedas' => CatalogoMonedas::lista(),
+            'moneda_negocio' => app(ParametrosTenant::class)->moneda(),
+        ];
     }
 
     public function crearOrganizacion(Request $request): JsonResponse
@@ -50,6 +68,8 @@ class OrganizacionesTenantController
         $organizacion = OrganizacionTenant::query()->where('ulid', (string) $request->route('organizacion'))->firstOrFail();
 
         $validado = $this->validarSucursal($request, obligarNombre: true);
+        // ¿Es la segunda? Entonces la primera era «todo» para el personal sin asignar.
+        $unica = SucursalTenant::query()->count() === 1 ? SucursalTenant::query()->first() : null;
 
         $sucursal = $organizacion->sucursales()->create([
             'nombre' => $validado['nombre'],
@@ -62,6 +82,9 @@ class OrganizacionesTenantController
         ]);
         $this->aplicarPerfilPublico($sucursal, $validado);
         $sucursal->save();
+        if ($unica instanceof SucursalTenant) {
+            app(AsignarSucursalAlPersonalTenant::class)->sinAsignar([(int) $unica->getKey()]);
+        }
 
         return response()->json(['data' => $this->presentarSucursal($sucursal)], 201);
     }
@@ -101,6 +124,8 @@ class OrganizacionesTenantController
 
         return response()->json([
             'data' => $sucursales->map(fn (SucursalTenant $sucursal): array => $this->presentarSucursal($sucursal))->all(),
+            // Para elegir la moneda de una sucursal (sin elegir: la del negocio, ADR 0097).
+            'meta' => $this->monedas(),
         ]);
     }
 
@@ -113,7 +138,7 @@ class OrganizacionesTenantController
             'nombre' => [$obligarNombre ? 'required' : 'sometimes', 'string', 'max:255'],
             'zona_horaria' => ['nullable', 'timezone'],
             'region' => ['nullable', 'string', 'max:255'],
-            'moneda' => ['nullable', 'string', 'size:3'],
+            'moneda' => ['nullable', 'string', 'size:3', CatalogoMonedas::regla()],
             'impuesto_tasa_bps' => ['nullable', 'integer', 'min:0', 'max:100000'],
             // Ubicación del local (para el clima): las dos o ninguna.
             'latitud' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitud'],

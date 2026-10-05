@@ -176,7 +176,7 @@ const visibilidad = ref<Visibilidad>("publica");
 function pesos(minor: number): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
-    currency: "MXN",
+    currency: sesion.moneda,
     maximumFractionDigits: 0,
   }).format(minor / 100);
 }
@@ -548,7 +548,7 @@ async function guardarPlanes(): Promise<void> {
     const comun = {
       nombre: p.nombre.trim(),
       precio_minor: aCentavos(p.precio),
-      moneda: "MXN",
+      moneda: sesion.moneda,
     };
     const datos =
       p.clave === "suelta"

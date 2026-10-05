@@ -145,6 +145,8 @@ class Sesion {
     this.terminologia = const Terminologia(),
     this.estudioNombre,
     this.perfil,
+    this.moneda = 'MXN',
+    this.sinSucursal = false,
   });
 
   final String slug;
@@ -186,6 +188,13 @@ class Sesion {
 
   /// Nombre del negocio y su giro (perfil: pole, barberia, spa…).
   final String? estudioNombre;
+
+  /// Moneda del negocio (ISO 4217, ADR 0097): la de sus precios nuevos.
+  final String moneda;
+
+  /// Personal sin sucursal en un negocio con varias: no ve nada hasta que le
+  /// asignen una (ADR 0098).
+  final bool sinSucursal;
   final String? perfil;
 
   bool get esCitas => modalidad == Modalidad.citas;
@@ -238,6 +247,8 @@ class Sesion {
     'modalidad': modalidad.name,
     'terminologia': terminologia.aJson(),
     'estudio_nombre': estudioNombre,
+    'moneda': moneda,
+    'sin_sucursal': sinSucursal,
     'perfil': perfil,
   };
 
@@ -276,6 +287,8 @@ class Sesion {
         datos['terminologia'] as Map<String, dynamic>?,
       ),
       estudioNombre: datos['estudio_nombre'] as String?,
+      moneda: (datos['moneda'] ?? 'MXN') as String,
+      sinSucursal: (datos['sin_sucursal'] ?? false) as bool,
       perfil: datos['perfil'] as String?,
     );
   }
@@ -312,6 +325,8 @@ class Sesion {
         config?['terminologia'] as Map<String, dynamic>?,
       ),
       estudioNombre: estudio?['nombre'] as String?,
+      moneda: (estudio?['moneda'] ?? 'MXN') as String,
+      sinSucursal: (usuario['sin_sucursal'] ?? false) as bool,
       perfil: estudio?['perfil'] as String?,
     );
   }
@@ -364,6 +379,8 @@ class Sesion {
     modalidad: modalidad,
     terminologia: terminologia,
     estudioNombre: estudioNombre,
+    moneda: moneda,
+    sinSucursal: (usuario['sin_sucursal'] ?? sinSucursal) as bool,
     perfil: perfil,
   );
 

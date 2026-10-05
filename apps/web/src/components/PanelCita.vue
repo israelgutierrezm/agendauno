@@ -103,7 +103,7 @@ const horas = computed(() => {
 function dinero(minor: number, decimales = 0): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
-    currency: "MXN",
+    currency: sesionTenant.moneda,
     minimumFractionDigits: decimales,
     maximumFractionDigits: decimales,
   }).format(minor / 100);

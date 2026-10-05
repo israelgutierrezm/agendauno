@@ -53,7 +53,7 @@ const form = ref({
 function dinero(minor: number): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
-    currency: "MXN",
+    currency: sesion.moneda,
   }).format(minor / 100);
 }
 

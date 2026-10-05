@@ -6,12 +6,14 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CalcularNominaTenant;
 use App\Modules\Tenancy\Application\MargenesServicio;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\VerificarAgendaTenant;
 use App\Modules\Tenancy\Models\AsignacionSesionTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Nomina\TipoPago;
+use App\Modules\Tenancy\Pagos\CatalogoMonedas;
 use App\Modules\Tenancy\RolSesionTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -78,12 +80,12 @@ class StaffTenantController
         $validado = $request->validate([
             'tipo' => ['required', Rule::enum(TipoPago::class)],
             'monto_minor' => ['required', 'integer', 'min:0'],
-            'moneda' => ['required', 'string', 'size:3'],
+            'moneda' => ['nullable', 'string', 'size:3', CatalogoMonedas::regla()],
         ]);
 
         $esquema = EsquemaPagoTenant::query()->updateOrCreate(
             ['usuario_id' => $usuario->getKey()],
-            ['tipo' => $validado['tipo'], 'monto_minor' => (int) $validado['monto_minor'], 'moneda' => $validado['moneda'], 'activo' => true],
+            ['tipo' => $validado['tipo'], 'monto_minor' => (int) $validado['monto_minor'], 'moneda' => mb_strtoupper((string) ($validado['moneda'] ?? app(ParametrosTenant::class)->moneda())), 'activo' => true],
         );
 
         return response()->json(['data' => [

@@ -8,8 +8,8 @@ use Illuminate\Support\Facades\File;
 /*
 | Alcance por sucursal (R19) en MIEMBROS: el staff ACOTADO a sedes (recepcionista/
 | instructor con asignación explícita, no propietario/admin) solo ve/gestiona a los
-| alumnos de SUS sucursales. Sin asignación = ve todo (compatibilidad con estudios de
-| una sola sucursal). Aquí se prueba la DENEGACIÓN, no solo la ampliación.
+| alumnos de SUS sucursales. Con varias sucursales, sin asignación no ve a nadie
+| (ADR 0098). Aquí se prueba la DENEGACIÓN, no solo la ampliación.
 */
 
 beforeEach(function (): void {
@@ -31,10 +31,10 @@ it('un recepcionista asignado a una sucursal solo ve a los alumnos de esa sede',
     $recep = personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista');
     $recepId = usuarioIdPorEmail($e, 'recep@correo.mx');
 
-    // Sin asignación: ve a TODOS (compatibilidad con una sola sucursal).
-    $todos = collect($this->getJson("/api/v1/app/{$e['slug']}/miembros", conBearer($recep))
+    // Sin asignación (con varias sucursales): no ve a nadie (ADR 0098).
+    $nadie = collect($this->getJson("/api/v1/app/{$e['slug']}/miembros", conBearer($recep))
         ->assertOk()->json('data'))->pluck('nombre');
-    expect($todos)->toContain('AnaA', 'BetoB');
+    expect($nadie)->toBeEmpty();
 
     // Se le asigna la sucursal A → queda ACOTADO.
     asignarSucursal($e, $recepId, $sedeA['sucursal']);

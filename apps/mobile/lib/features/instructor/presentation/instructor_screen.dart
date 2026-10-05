@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/aviso_sin_sucursal.dart';
 import '../../../core/calendario/agregar_calendario.dart';
 import '../../../core/calendario/calendario.dart';
 import '../../../core/calendario/calendario_vistas.dart';
@@ -183,6 +184,8 @@ class _Inicio extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
+              // Sin sucursal (con varias en el negocio): no ve nada aún.
+              if (sesion?.sinSucursal ?? false) const AvisoSinSucursal(),
               Text(
                 nombre.isEmpty ? '¡Hola!' : '¡Hola, $nombre!',
                 style: const TextStyle(

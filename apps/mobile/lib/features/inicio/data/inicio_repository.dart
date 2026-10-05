@@ -11,10 +11,13 @@ import 'resumen_mes.dart';
 /// Datos del Inicio del negocio (`/app/{slug}/inicio/hoy` y `/clima`) sobre el
 /// estudio de la sesión activa.
 class InicioRepository {
-  InicioRepository(this._dio, this._slug);
+  InicioRepository(this._dio, this._slug, [this._moneda = 'MXN']);
 
   final Dio _dio;
   final String _slug;
+
+  /// Moneda del negocio: lo por cobrar se suma solo en ella.
+  final String _moneda;
 
   String get _base => '/api/v1/app/$_slug';
 
@@ -26,6 +29,7 @@ class InicioRepository {
     );
     return ResumenHoy.desdeJson(
       (res.data?['data'] ?? const {}) as Map<String, dynamic>,
+      moneda: _moneda,
     );
   }
 
@@ -72,7 +76,7 @@ final inicioRepositoryProvider = Provider<InicioRepository?>((ref) {
   if (sesion == null) {
     return null;
   }
-  return InicioRepository(ref.watch(dioProvider), sesion.slug);
+  return InicioRepository(ref.watch(dioProvider), sesion.slug, sesion.moneda);
 });
 
 /// El día de hoy del negocio. Como todo lo de una sesión, se descarta al salir.

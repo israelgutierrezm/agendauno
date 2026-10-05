@@ -445,7 +445,7 @@ function suma(
     ? [...porMoneda]
         .map(([moneda, minor]) => `${dinero(minor, moneda)} ${moneda}`)
         .join(" · ")
-    : dinero(0, pagos.value[0]?.moneda ?? "MXN");
+    : dinero(0, pagos.value[0]?.moneda ?? sesion.moneda);
 }
 const indicadores = computed<Indicador[]>(() => {
   if (vista.value === "movimientos") {
@@ -493,7 +493,7 @@ const indicadores = computed<Indicador[]>(() => {
             ? debe.por_cobrar
                 .map((m) => dinero(m.total_minor, m.moneda))
                 .join(" + ")
-            : dinero(0, "MXN"),
+            : dinero(0, sesion.moneda),
         icono: "dinero",
         aviso: (debe?.total ?? 0) > 0,
       },

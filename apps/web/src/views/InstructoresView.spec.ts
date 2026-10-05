@@ -101,3 +101,56 @@ describe("equipo en cuadrícula", () => {
     expect(sofia).not.toContain("Reseñas");
   });
 });
+
+describe("invitar al equipo con varias sucursales", () => {
+  it("pide su sucursal (no hay «todas»): sin ella no se puede invitar", async () => {
+    mocks.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/sucursales")
+            ? [
+                { id: "s1", nombre: "Roma Norte" },
+                { id: "s2", nombre: "Condesa" },
+              ]
+            : [],
+        },
+      }),
+    );
+    const w = mount(InstructoresView, {
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            missingWarn: false,
+            fallbackWarn: false,
+            messages: { es: { ...esMX, tarjetas, listados, profesional } },
+          }),
+        ],
+        stubs: { teleport: true, BotonImportar: true },
+      },
+    });
+    await flushPromises();
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Invitar")!
+      .trigger("click");
+
+    const sede = w.get('[data-prueba="sucursal-invitar"]');
+    expect(sede.findAll("option").map((o) => o.text())).toEqual([
+      "Elige su sucursal",
+      "Roma Norte",
+      "Condesa",
+    ]);
+    await w.get("#in").setValue("Ana");
+    await w.get("#ie").setValue("ana@correo.mx");
+    const invitar = () =>
+      w
+        .findAll("button")
+        .filter((b) => b.text() === "Invitar")
+        .at(-1)!;
+    expect(invitar().attributes("disabled")).toBeDefined();
+    await sede.setValue("s2");
+    expect(invitar().attributes("disabled")).toBeUndefined();
+  });
+});

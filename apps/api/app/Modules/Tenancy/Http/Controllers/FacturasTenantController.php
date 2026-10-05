@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\EmitirFacturaTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
+use App\Modules\Tenancy\Pagos\CatalogoMonedas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -47,7 +49,7 @@ class FacturasTenantController
             'receptor.codigo_postal' => ['required', 'string', 'regex:/^[0-9]{5}$/'],
             'uso_cfdi' => ['required', 'string', 'max:4'],
             'forma_pago' => ['nullable', 'string', 'max:2'],
-            'moneda' => ['nullable', 'string', 'size:3'],
+            'moneda' => ['nullable', 'string', 'size:3', CatalogoMonedas::regla()],
             'items' => ['required', 'array', 'min:1'],
             'items.*.descripcion' => ['required', 'string', 'max:1000'],
             'items.*.cantidad' => ['required', 'integer', 'min:1'],
@@ -72,7 +74,7 @@ class FacturasTenantController
             $items,
             (string) $validado['uso_cfdi'],
             (string) ($validado['forma_pago'] ?? '01'),
-            mb_strtoupper((string) ($validado['moneda'] ?? 'MXN')),
+            mb_strtoupper((string) ($validado['moneda'] ?? app(ParametrosTenant::class)->moneda())),
         );
 
         $estado = $factura->estado === EstadoFactura::Timbrada ? 201 : 422;

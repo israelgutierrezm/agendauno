@@ -13,7 +13,10 @@ class ResumenHoy {
     this.libres,
   });
 
-  factory ResumenHoy.desdeJson(Map<String, dynamic> j) {
+  factory ResumenHoy.desdeJson(
+    Map<String, dynamic> j, {
+    String moneda = 'MXN',
+  }) {
     final agenda = j['agenda'];
     final cobros = j['cobros'];
     final renovaciones = j['renovaciones'];
@@ -31,7 +34,7 @@ class ResumenHoy {
           ? AgendaHoy.desdeJson(agenda)
           : null,
       cobros: cobros is Map<String, dynamic>
-          ? CobrosHoy.desdeJson(cobros)
+          ? CobrosHoy.desdeJson(cobros, moneda: moneda)
           : null,
       renovaciones: renovaciones is Map<String, dynamic>
           ? RenovacionesHoy.desdeJson(renovaciones)
@@ -196,12 +199,15 @@ class CobrosHoy {
     required this.enMora,
   });
 
-  factory CobrosHoy.desdeJson(Map<String, dynamic> j) => CobrosHoy(
+  factory CobrosHoy.desdeJson(
+    Map<String, dynamic> j, {
+    String moneda = 'MXN',
+  }) => CobrosHoy(
     ordenesPendientes: (j['ordenes_pendientes'] as num? ?? 0).toInt(),
-    // Los montos de la app son en pesos (MXN); otras monedas se suman aparte.
+    // Se suma en la moneda del negocio; nunca se mezclan monedas.
     porCobrarMinor: ((j['por_cobrar'] ?? const []) as List)
         .whereType<Map<String, dynamic>>()
-        .where((m) => (m['moneda'] ?? 'MXN') == 'MXN')
+        .where((m) => (m['moneda'] ?? moneda) == moneda)
         .fold<int>(0, (a, m) => a + (m['total_minor'] as num? ?? 0).toInt()),
     enMora: (j['en_mora'] as num? ?? 0).toInt(),
   );

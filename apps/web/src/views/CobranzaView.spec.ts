@@ -23,6 +23,7 @@ vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
     esCitas: mocks.esCitas,
+    moneda: "MXN",
     puede: () => true,
   }),
 }));

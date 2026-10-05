@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\CorteDePlanesTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\MembresiasTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\PoliticaRollover;
@@ -20,6 +21,7 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Pagos\CatalogoMonedas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -65,7 +67,8 @@ class MembresiasTenantController
             'nombre' => ['required', 'string', 'max:255'],
             'tipo' => ['required', Rule::enum(TipoProducto::class)],
             'precio_minor' => ['required', 'integer', 'min:0'],
-            'moneda' => ['required', 'string', 'size:3'],
+            // Sin moneda, la del negocio; siempre una del catálogo (ADR 0097).
+            'moneda' => ['nullable', 'string', 'size:3', CatalogoMonedas::regla()],
             'ilimitado' => ['boolean'],
             'creditos_incluidos' => ['nullable', 'integer', 'min:0'],
             'vigencia_tipo' => ['nullable', Rule::enum(TipoVigencia::class)],
@@ -86,7 +89,7 @@ class MembresiasTenantController
             $validado['nombre'],
             TipoProducto::from($validado['tipo']),
             (int) $validado['precio_minor'],
-            $validado['moneda'],
+            mb_strtoupper((string) ($validado['moneda'] ?? app(ParametrosTenant::class)->moneda())),
             (bool) ($validado['ilimitado'] ?? false),
             isset($validado['creditos_incluidos']) ? (int) $validado['creditos_incluidos'] : null,
             isset($validado['politica_reset']) ? PoliticaReset::from($validado['politica_reset']) : PoliticaReset::Ninguno,
@@ -119,7 +122,7 @@ class MembresiasTenantController
             'nombre' => ['sometimes', 'string', 'max:255'],
             'tipo' => ['sometimes', Rule::enum(TipoProducto::class)],
             'precio_minor' => ['sometimes', 'integer', 'min:0'],
-            'moneda' => ['sometimes', 'string', 'size:3'],
+            'moneda' => ['sometimes', 'string', 'size:3', CatalogoMonedas::regla()],
             'ilimitado' => ['sometimes', 'boolean'],
             'creditos_incluidos' => ['nullable', 'integer', 'min:0'],
             'vigencia_tipo' => ['sometimes', 'nullable', Rule::enum(TipoVigencia::class)],
@@ -146,6 +149,9 @@ class MembresiasTenantController
             if ($request->has($campo)) {
                 $atributos[$campo] = $validado[$campo] ?? null;
             }
+        }
+        if (isset($atributos['moneda'])) {
+            $atributos['moneda'] = mb_strtoupper((string) $atributos['moneda']);
         }
         if ($request->has('tipo')) {
             $atributos['tipo'] = TipoProducto::from($validado['tipo']);

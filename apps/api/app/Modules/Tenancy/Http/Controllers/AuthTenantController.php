@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\AutenticacionGoogleTenant;
 use App\Modules\Tenancy\Application\AutenticacionTenant;
 use App\Modules\Tenancy\Application\CambiarCorreoTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RestablecerContrasenaTenant;
 use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
@@ -273,6 +274,8 @@ class AuthTenantController
             'perfil_config' => $estudio->perfilConfig(),
             // Manda avisos por WhatsApp a sus clientes (ADR 0069).
             'whatsapp_clientes' => app(WhatsAppTenant::class)->enUso(),
+            // Su moneda (ADR 0097): la de lo nuevo; cada importe trae la suya.
+            'moneda' => app(ParametrosTenant::class)->moneda(),
         ];
     }
 }

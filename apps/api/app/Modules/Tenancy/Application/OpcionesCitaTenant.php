@@ -107,7 +107,7 @@ class OpcionesCitaTenant
                 'precio_por_separado_minor' => $o->precioPorSeparadoMinor(),
                 'foto_url' => $o->fotoUrl(),
                 'precio_minor' => $o->precio_clase_minor,
-                'moneda' => 'MXN',
+                'moneda' => app(ParametrosTenant::class)->moneda(),
                 'duracion_minutos' => $o->duracion_minutos,
                 // Se descuenta de su bono o membresía (no se paga al agendar).
                 'con_plan' => $o->politica_reserva !== PoliticaReservaTenant::Pago,

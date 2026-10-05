@@ -45,6 +45,10 @@ function referencia(p: Parametro): number {
   return (props.modo === "negocio" ? p.plataforma : p.defecto) ?? 0;
 }
 function texto(p: Parametro, valor: number): string {
+  const etiqueta = p.etiquetas?.[String(valor)];
+  if (etiqueta) {
+    return etiqueta;
+  }
   if (p.tipo === "si_no") {
     return valor === 1 ? t("parametrosConfig.si") : t("parametrosConfig.no");
   }

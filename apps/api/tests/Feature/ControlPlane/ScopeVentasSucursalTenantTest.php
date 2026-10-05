@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\File;
 /*
 | Alcance por sucursal (R19) en VENTAS/ÓRDENES: la orden se atribuye a una sucursal
 | (la del comprador o, si no tiene, la del vendedor acotado); el staff ACOTADO solo ve
-| y crea órdenes de SUS sedes. Sin asignación ve todo (compatibilidad).
+| y crea órdenes de SUS sedes. Sin asignación (con varias sucursales) no ve ninguna
+| (ADR 0098).
 */
 
 beforeEach(function (): void {

@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\File;
 
 /*
 | Alcance por sucursal (R19) en RECEPCIÓN: el staff ACOTADO a sedes solo ve el
-| front-desk del día y el radar de retención de SUS sucursales; sin asignación ve
-| todo (compatibilidad con una sola sucursal).
+| front-desk del día y el radar de retención de SUS sucursales; con varias
+| sucursales, sin asignación no ve nada (ADR 0098).
 */
 
 beforeEach(function (): void {
@@ -47,10 +47,10 @@ it('el front-desk del día se acota a las sucursales del staff', function (): vo
 
     $recep = personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista');
 
-    // Sin asignación: ve el día de AMBAS sedes.
-    $todas = $this->getJson("/api/v1/app/{$e['slug']}/front-desk?fecha=2026-10-01", conBearer($recep))
+    // Sin asignación (con varias sucursales): no ve el día de ninguna (ADR 0098).
+    $ninguna = $this->getJson("/api/v1/app/{$e['slug']}/front-desk?fecha=2026-10-01", conBearer($recep))
         ->assertOk()->json('sesiones');
-    expect($todas)->toHaveCount(2);
+    expect($ninguna)->toHaveCount(0);
 
     // Asignado a A: solo la clase de A (capacidad 5).
     asignarSucursal($e, usuarioIdPorEmail($e, 'recep@correo.mx'), $sedeA['sucursal']);

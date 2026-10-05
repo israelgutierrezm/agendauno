@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Pagos\CatalogoMonedas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -150,7 +151,7 @@ class InventarioTenantController
             'nombre' => ['required', 'string', 'max:255'],
             'sku' => ['nullable', 'string', 'max:64'],
             'precio_minor' => ['required', 'integer', 'min:0'],
-            'moneda' => ['nullable', 'string', 'size:3'],
+            'moneda' => ['nullable', 'string', 'size:3', CatalogoMonedas::regla()],
             'activo' => ['boolean'],
         ]);
 
@@ -158,7 +159,7 @@ class InventarioTenantController
             'nombre' => $validado['nombre'],
             'sku' => $validado['sku'] ?? null,
             'precio_minor' => (int) $validado['precio_minor'],
-            'moneda' => strtoupper($validado['moneda'] ?? 'MXN'),
+            'moneda' => strtoupper($validado['moneda'] ?? app(ParametrosTenant::class)->moneda()),
             'activo' => (bool) ($validado['activo'] ?? true),
         ];
     }

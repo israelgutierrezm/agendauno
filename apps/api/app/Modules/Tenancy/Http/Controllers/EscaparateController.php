@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -142,6 +143,9 @@ class EscaparateController
      */
     private function servicios(): array
     {
+        // Los precios, en la moneda del negocio (ADR 0097).
+        $moneda = app(ParametrosTenant::class)->moneda();
+
         return OfertaTenant::query()
             ->with(['actividad.niveles', 'incluidas'])
             ->orderBy('nombre')
@@ -158,7 +162,7 @@ class EscaparateController
                 'grupal' => $o->modalidad === ModalidadOfertaTenant::Grupal,
                 'duracion_minutos' => $o->duracion_minutos,
                 'precio_minor' => $o->precio_clase_minor,
-                'moneda' => 'MXN',
+                'moneda' => $moneda,
                 'agendable' => $o->politica_reserva === PoliticaReservaTenant::Pago,
                 'niveles' => $o->actividad?->niveles->sortBy('orden')->pluck('nombre')->values()->all() ?? [],
             ])->values()->all();

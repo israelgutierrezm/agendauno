@@ -168,7 +168,7 @@ async function guardar(): Promise<void> {
     nombre: form.nombre.trim(),
     tipo: form.tipo,
     precio_minor: Math.round((numero(form.precio) ?? 0) * 100),
-    moneda: p?.moneda ?? "MXN",
+    moneda: p?.moneda ?? sesion.moneda,
     ilimitado: recurrente && form.ilimitado,
     creditos_incluidos:
       recurrente || esSuelta.value ? null : unidades(form.clases),

@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\File;
 
 /*
 | Alcance por sucursal (R19) en POS/INVENTARIO: el staff ACOTADO a sedes solo vende,
-| mueve stock y ve existencias/ventas de SUS sucursales; sin asignación, todas.
+| mueve stock y ve existencias/ventas de SUS sucursales; sin asignación (con varias
+| sucursales), ninguna (ADR 0098).
 */
 
 beforeEach(function (): void {

@@ -49,6 +49,43 @@ function montar() {
 }
 
 describe("editor de parámetros", () => {
+  it("una opción con nombre se muestra con él (la moneda del negocio)", () => {
+    const w = mount(ParametrosEditor, {
+      props: {
+        modo: "negocio",
+        parametros: [
+          {
+            clave: "negocio.moneda",
+            grupo: "Moneda",
+            etiqueta: "Moneda del negocio",
+            ayuda: "",
+            tipo: "entero",
+            minimo: 1,
+            maximo: 999,
+            unidad: "",
+            opciones: [484, 840],
+            etiquetas: { 484: "MXN · Peso mexicano", 840: "USD · Dólar" },
+            valor: 840,
+            plataforma: 484,
+          },
+        ],
+      },
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            messages: { es: { parametrosConfig } },
+          }),
+        ],
+      },
+    });
+    const opciones = w.findAll("option").map((o) => o.text());
+    expect(opciones).toContain("MXN · Peso mexicano");
+    expect(opciones).toContain("USD · Dólar");
+    expect(w.text()).toContain("MXN · Peso mexicano");
+  });
+
   it("muestra el valor de la plataforma como referencia y agrupa", () => {
     const w = montar();
     expect(w.text()).toContain("Reservas y lista de espera");

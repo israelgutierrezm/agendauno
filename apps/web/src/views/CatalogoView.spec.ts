@@ -12,7 +12,12 @@ vi.mock("@/lib/api", () => ({
   mensajeDeError: (e: unknown) => String(e),
 }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "a", puede: () => true, esCitas: true }),
+  useSesionTenantStore: () => ({
+    slug: "a",
+    puede: () => true,
+    esCitas: true,
+    moneda: "MXN",
+  }),
 }));
 
 const oferta = (extra: Record<string, unknown>) => ({

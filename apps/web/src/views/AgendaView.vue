@@ -744,7 +744,7 @@ const profesionalesVisibles = computed(() =>
 function dineroMx(minor: number): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
-    currency: "MXN",
+    currency: sesion.moneda,
     maximumFractionDigits: 0,
   }).format(minor / 100);
 }

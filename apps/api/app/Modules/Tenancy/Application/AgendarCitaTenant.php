@@ -239,7 +239,7 @@ class AgendarCitaTenant
                         $sesion,
                         $persona,
                         (int) ($oferta->precio_clase_minor ?? 0),
-                        'MXN',
+                        app(ParametrosTenant::class)->monedaDe($sucursal),
                         (int) $sucursal->getKey(),
                     );
                 }
@@ -248,7 +248,7 @@ class AgendarCitaTenant
                     $sesion,
                     $persona,
                     (int) ($oferta->precio_clase_minor ?? 0),
-                    'MXN',
+                    app(ParametrosTenant::class)->monedaDe($sucursal),
                     (int) $sucursal->getKey(),
                 );
             }

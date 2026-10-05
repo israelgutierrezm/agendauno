@@ -171,7 +171,7 @@ const sinEsquema = computed(
 const total = computed(() =>
   filas.value.reduce((s, f) => s + f.monto_total_minor, 0),
 );
-const moneda = computed(() => filas.value[0]?.moneda ?? "MXN");
+const moneda = computed(() => filas.value[0]?.moneda ?? sesion.moneda);
 
 const indicadores = computed<Indicador[]>(() => [
   {
@@ -241,7 +241,7 @@ async function guardarEsquema(): Promise<void> {
       {
         tipo: esquema.value.tipo,
         monto_minor: Math.round(Number(esquema.value.monto) * 100),
-        moneda: "MXN",
+        moneda: sesion.moneda,
       },
     );
     guardado.value = true;

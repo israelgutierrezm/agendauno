@@ -17,6 +17,9 @@ export interface UsuarioTenant {
   ulid: string;
   // Sucursales que puede operar: con más de una, elige con cuál trabaja.
   sucursales?: SucursalSesion[];
+  // Personal sin sucursal asignada en un negocio con varias: no ve nada hasta que
+  // le asignen una (ADR 0098).
+  sin_sucursal?: boolean;
   nombre: string;
   email: string;
   // Rol ACTIVO: con el que entró (el menú, su inicio y los permisos son de este).
@@ -82,6 +85,8 @@ export interface EstudioSesion {
   perfil_config?: PerfilConfig;
   // El negocio manda avisos por WhatsApp a sus clientes (ADR 0069).
   whatsapp_clientes?: boolean;
+  // Su moneda (ADR 0097): la de lo nuevo; cada importe trae la suya.
+  moneda?: string;
 }
 
 const TERMINOLOGIA_DEFAULT: Terminologia = {
@@ -188,6 +193,8 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     () => estudio.value?.perfil_config?.modalidad ?? "clases",
   );
   const esCitas = computed(() => modalidad.value === "citas");
+  /** Moneda del negocio (ISO 4217): la de los precios nuevos. */
+  const moneda = computed(() => estudio.value?.moneda ?? "MXN");
 
   /** Terminología del perfil (p. ej. Cita / Cliente / Barbero). */
   const terminologia = computed<Terminologia>(
@@ -428,6 +435,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     confirmarRolInicial,
     modalidad,
     esCitas,
+    moneda,
     terminologia,
     iniciarSesion,
     iniciarSesionConGoogle,

@@ -80,6 +80,9 @@ const ZONAS = [
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
+// Monedas que puede usar una sucursal y la del negocio (la de una sin moneda propia).
+const monedas = ref<{ codigo: string; nombre: string }[]>([]);
+const monedaNegocio = ref(sesion.moneda);
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("sucursales.gestionar"));
 
@@ -100,7 +103,7 @@ const form = ref({
   nombre: "",
   region: "",
   zona_horaria: "America/Mexico_City",
-  moneda: "MXN",
+  moneda: "",
   iva: "16",
   ubicacion: "",
   direccion: "",
@@ -132,10 +135,16 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const { data } = await api.get<{ data: Organizacion[] }>(
-      `${base.value}/organizaciones`,
-    );
+    const { data } = await api.get<{
+      data: Organizacion[];
+      meta?: {
+        monedas: { codigo: string; nombre: string }[];
+        moneda_negocio: string;
+      };
+    }>(`${base.value}/organizaciones`);
     organizaciones.value = data.data;
+    monedas.value = data.meta?.monedas ?? [];
+    monedaNegocio.value = data.meta?.moneda_negocio ?? sesion.moneda;
     if (orgId.value === "" && data.data.length > 0) {
       orgId.value = data.data[0].id;
     }
@@ -153,7 +162,7 @@ function abrirNueva(): void {
     nombre: "",
     region: "",
     zona_horaria: "America/Mexico_City",
-    moneda: "MXN",
+    moneda: "",
     iva: "16",
     ubicacion: "",
     direccion: "",
@@ -174,7 +183,7 @@ function abrirEdicion(s: Sucursal): void {
     nombre: s.nombre,
     region: s.region ?? "",
     zona_horaria: s.zona_horaria ?? "America/Mexico_City",
-    moneda: s.moneda ?? "MXN",
+    moneda: s.moneda ?? "",
     iva: String(s.impuesto_tasa_bps / 100),
     ubicacion:
       s.latitud != null && s.longitud != null
@@ -310,7 +319,7 @@ async function guardar(): Promise<void> {
 }
 
 function dinero(moneda: string | null): string {
-  return moneda ?? "MXN";
+  return moneda ?? monedaNegocio.value;
 }
 
 onMounted(cargar);
@@ -475,12 +484,20 @@ onMounted(cargar);
             <label class="tu-label" for="s-moneda">{{
               $t("sedes.moneda")
             }}</label>
-            <input
+            <!-- Sin elegir: la del negocio (ADR 0097). -->
+            <select
               id="s-moneda"
               v-model="form.moneda"
-              class="tu-input uppercase"
-              maxlength="3"
-            />
+              class="tu-input"
+              data-prueba="moneda-sucursal"
+            >
+              <option value="">
+                {{ $t("sedes.monedaNegocio", { moneda: monedaNegocio }) }}
+              </option>
+              <option v-for="m in monedas" :key="m.codigo" :value="m.codigo">
+                {{ m.codigo }} · {{ m.nombre }}
+              </option>
+            </select>
           </div>
           <div>
             <label class="tu-label" for="s-iva">{{

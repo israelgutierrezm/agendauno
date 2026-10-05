@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\MovimientosDePagoTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -71,7 +72,7 @@ class MovimientosPagoTenantController
             'data' => $resultado['movimientos'],
             // La moneda principal (compatibilidad) y todas por separado: nunca se suman.
             'totales' => $resultado['totales'][0] ?? [
-                'moneda' => 'MXN', 'cobrado_minor' => 0, 'devuelto_minor' => 0, 'neto_minor' => 0,
+                'moneda' => app(ParametrosTenant::class)->moneda(), 'cobrado_minor' => 0, 'devuelto_minor' => 0, 'neto_minor' => 0,
                 'por_cobrar_minor' => 0, 'por_metodo' => [], 'por_usuario' => [],
             ],
             'totales_por_moneda' => $resultado['totales'],

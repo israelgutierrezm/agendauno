@@ -133,7 +133,7 @@ function fotoCambiada(o: Oferta, url: string | null): void {
 function dinero(minor: number | null): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
-    currency: "MXN",
+    currency: sesion.moneda,
   }).format((minor ?? 0) / 100);
 }
 
@@ -611,7 +611,7 @@ onMounted(cargar);
                 :style="precioInvalido ? { borderColor: 'var(--error)' } : {}"
               />
               <span class="text-sm" :style="{ color: 'var(--texto-suave)' }">{{
-                $t("catalogo.moneda")
+                sesion.moneda
               }}</span>
             </div>
             <span

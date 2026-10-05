@@ -9,7 +9,8 @@ namespace App\Modules\Tenancy\Parametros;
  * puede estar. `defecto` es solo el valor inicial: la plataforma (superadmin) fija el
  * suyo y cada negocio (administrador) puede ajustar el propio, salvo los que son solo
  * de plataforma (`porNegocio = false`). Los sí/no se guardan como 1/0. Con `opciones`,
- * solo valen esos valores (p. ej. la tasa de IVA: 16 u 8).
+ * solo valen esos valores (p. ej. la tasa de IVA: 16 u 8); `etiquetas` les pone nombre
+ * cuando el número no dice nada (p. ej. la moneda: 484 = «MXN · Peso mexicano»).
  */
 final readonly class DefinicionParametro
 {
@@ -30,6 +31,8 @@ final readonly class DefinicionParametro
         public bool $porNegocio = true,
         /** @var list<int> */
         public array $opciones = [],
+        /** @var array<int, string> */
+        public array $etiquetas = [],
     ) {}
 
     /**
@@ -48,6 +51,8 @@ final readonly class DefinicionParametro
             'unidad' => $this->unidad,
             'por_negocio' => $this->porNegocio,
             'opciones' => $this->opciones,
+            // Nombre de cada opción (por valor); vacío si el número basta.
+            'etiquetas' => (object) $this->etiquetas,
         ];
     }
 }

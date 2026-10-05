@@ -7,7 +7,9 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\ParametroNegocioTenant;
+use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Pagos\CatalogoMonedas;
 use App\Modules\Tenancy\Parametros\CatalogoParametros;
 use App\Modules\Tenancy\Parametros\DefinicionParametro;
 use Illuminate\Database\QueryException;
@@ -51,6 +53,25 @@ class ParametrosTenant
     public function siNo(string $clave): bool
     {
         return $this->entero($clave) === 1;
+    }
+
+    /**
+     * La moneda del negocio (código ISO 4217, p. ej. «MXN»): la que ajustó, la de la
+     * plataforma o pesos mexicanos.
+     */
+    public function moneda(): string
+    {
+        return CatalogoMonedas::codigoDe($this->entero('negocio.moneda'));
+    }
+
+    /**
+     * La moneda de una sucursal: la suya, si tiene, o la del negocio.
+     */
+    public function monedaDe(?SucursalTenant $sucursal): string
+    {
+        $propia = $sucursal?->moneda;
+
+        return is_string($propia) && CatalogoMonedas::existe($propia) ? mb_strtoupper($propia) : $this->moneda();
     }
 
     /**

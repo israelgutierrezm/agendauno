@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
@@ -48,7 +49,7 @@ class ReporteTendenciasTenantController
         $ordenesQuery = OrdenTenant::query()
             ->where('estado', EstadoOrden::Pagada->value)
             ->whereBetween('created_at', [$inicio, $fin]);
-        $moneda = (string) ((clone $ordenesQuery)->value('moneda') ?? 'MXN');
+        $moneda = (string) ((clone $ordenesQuery)->value('moneda') ?? app(ParametrosTenant::class)->moneda());
         $ordenes = $ordenesQuery->get(['created_at', 'total_minor']);
 
         $ingresosTotal = 0;
