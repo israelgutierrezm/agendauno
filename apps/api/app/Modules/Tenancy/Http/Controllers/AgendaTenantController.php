@@ -248,10 +248,12 @@ class AgendaTenantController
         $consulta = SesionTenant::query()
             ->with(['oferta', 'sucursal', 'instructor', 'recurso', 'serie'])
             // Ocupacion = reservas que toman un lugar (confirmadas, ofrecidas y
-            // pendientes de pago); mas cuantos esperan (estado "lista de espera").
+            // pendientes de pago); mas cuantos esperan (estado "lista de espera") y a
+            // cuantos ya se les paso lista (para saber si falta pasarla).
             ->withCount([
                 'reservas as ocupados' => fn ($q) => $q->whereIn('estado', self::OCUPAN_LUGAR),
                 'reservas as en_espera' => fn ($q) => $q->where('estado', EstadoReserva::EnEspera->value),
+                'reservas as marcadas' => fn ($q) => $q->whereIn('estado', self::OCUPAN_LUGAR)->whereHas('asistencia'),
             ])
             ->orderBy('inicia_en');
 
@@ -451,6 +453,8 @@ class AgendaTenantController
             'capacidad' => $sesion->capacidad,
             'ocupados' => (int) ($sesion->getAttribute('ocupados') ?? 0),
             'en_espera' => (int) ($sesion->getAttribute('en_espera') ?? 0),
+            // A cuántos de los que ocupan lugar ya se les pasó lista.
+            'marcadas' => (int) ($sesion->getAttribute('marcadas') ?? 0),
             'estado' => $sesion->estado->value,
             // Solo en citas: a quién se atiende y el estado de su reserva.
             'cita' => $titular instanceof ReservaTenant ? [

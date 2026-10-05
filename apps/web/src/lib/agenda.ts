@@ -46,6 +46,8 @@ export interface SesionAgenda {
   capacidad: number | null;
   ocupados: number;
   en_espera: number;
+  // A cuántos de los que ocupan lugar ya se les pasó lista.
+  marcadas?: number;
   estado: string;
   cita?: CitaTitular | null;
 }

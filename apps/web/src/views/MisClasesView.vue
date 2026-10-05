@@ -11,7 +11,7 @@ import CalendarioVistas, {
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import PanelCita from "@/components/PanelCita.vue";
 import PanelClase from "@/components/PanelClase.vue";
-import { cuandoCorto } from "@/lib/miCuenta";
+import { useRecargarAlVolver } from "@/lib/alVolver";
 import { useMisClases, type ClaseMia } from "@/lib/misClases";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -83,7 +83,48 @@ async function alCambiarRango(r: { desde: string; hasta: string }) {
   ahora.value = Date.now();
   await cargar(r.desde, r.hasta);
 }
+// Las próximas, por día (la lista ya no repite la fecha en cada fila).
+const porDia = computed(() => {
+  const grupos: { dia: string; clases: ClaseMia[] }[] = [];
+  for (const c of proximas.value) {
+    const dia = new Intl.DateTimeFormat("es-MX", {
+      timeZone: c.zona_horaria,
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }).format(new Date(c.inicia_en));
+    const ultimo = grupos.at(-1);
+    if (ultimo?.dia === dia) {
+      ultimo.clases.push(c);
+    } else {
+      grupos.push({ dia, clases: [c] });
+    }
+  }
+  return grupos;
+});
+function hora(c: ClaseMia): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: c.zona_horaria,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(c.inicia_en));
+}
+// En citas, a quién atiende va primero; en clases, la actividad.
+function titulo(c: ClaseMia): string {
+  return c.tipo === "cita"
+    ? c.cita?.asiste || c.cita?.cliente || (c.oferta ?? "—")
+    : (c.oferta ?? "—");
+}
+function segunda(c: ClaseMia): string {
+  const lugar = [c.sucursal, c.sala].filter(Boolean).join(" · ");
+  return c.tipo === "cita"
+    ? [c.oferta, lugar].filter(Boolean).join(" · ")
+    : lugar;
+}
+
 async function recargar(): Promise<void> {
+  ahora.value = Date.now();
   if (rango.value) {
     await cargar(rango.value.desde, rango.value.hasta);
   }
@@ -92,6 +133,8 @@ async function recargar(): Promise<void> {
       clases.value.find((c) => c.id === abierta.value?.id) ?? null;
   }
 }
+useRecargarAlVolver(recargar);
+
 function abrir(id: string): void {
   abierta.value = clases.value.find((c) => c.id === id) ?? null;
 }
@@ -114,10 +157,6 @@ const eventoCalendario = computed(() =>
   <section class="tu-pagina">
     <EncabezadoSeccion :titulo="$t('portal.instructor.calendario.titulo')" />
 
-    <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
-      {{ error }}
-    </p>
-
     <CalendarioVistas
       class="mt-4"
       clave="tu.instructor.vista"
@@ -125,13 +164,25 @@ const eventoCalendario = computed(() =>
       :dias-lista="diasLista"
       :eventos="eventos"
       :cargando="cargando"
+      :error="error"
       @abrir="abrir"
       @rango="alCambiarRango"
+      @reintentar="recargar"
     >
       <template #barra>
-        <RouterLink :to="{ name: 'mi-perfil' }" class="tu-enlace text-sm">{{
-          $t("portal.instructor.calendario.sincronizar")
-        }}</RouterLink>
+        <div class="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            class="tu-btn tu-btn-fantasma text-sm"
+            :disabled="cargando"
+            @click="recargar"
+          >
+            {{ $t("portal.instructor.inicio.actualizar") }}
+          </button>
+          <RouterLink :to="{ name: 'mi-perfil' }" class="tu-enlace text-sm">{{
+            $t("portal.instructor.calendario.sincronizar")
+          }}</RouterLink>
+        </div>
       </template>
 
       <!-- LISTA: próximos 30 días -->
@@ -144,35 +195,40 @@ const eventoCalendario = computed(() =>
                 : $t("portal.instructor.calendario.proximas")
             }}
           </h2>
-          <ul
-            v-if="proximas.length > 0"
-            class="mt-3 divide-y divide-[var(--borde)]"
-          >
-            <li v-for="c in proximas" :key="c.id">
-              <button type="button" class="mc-fila" @click="abrir(c.id)">
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate font-medium">{{
-                    c.oferta ?? "—"
-                  }}</span>
-                  <span
-                    class="block truncate text-sm first-letter:uppercase"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{ cuandoCorto(c.inicia_en, c.zona_horaria)
-                    }}{{ detalle(c) ? ` · ${detalle(c)}` : "" }}</span
-                  >
-                </span>
-                <span
-                  v-if="cupo(c)"
-                  class="shrink-0 text-xs tabular-nums"
-                  :style="{
-                    color:
-                      c.en_espera > 0 ? 'var(--aviso)' : 'var(--texto-suave)',
-                  }"
-                  >{{ cupo(c) }}</span
-                >
-              </button>
-            </li>
-          </ul>
+          <template v-if="porDia.length > 0">
+            <section v-for="g in porDia" :key="g.dia" class="mt-3">
+              <h3 class="mc-dia first-letter:uppercase">{{ g.dia }}</h3>
+              <ul class="divide-y divide-[var(--borde)]">
+                <li v-for="c in g.clases" :key="c.id">
+                  <button type="button" class="mc-fila" @click="abrir(c.id)">
+                    <span class="mc-hora tabular-nums">{{ hora(c) }}</span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate font-medium">{{
+                        titulo(c)
+                      }}</span>
+                      <span
+                        v-if="segunda(c)"
+                        class="block truncate text-sm"
+                        :style="{ color: 'var(--texto-suave)' }"
+                        >{{ segunda(c) }}</span
+                      >
+                    </span>
+                    <span
+                      v-if="cupo(c)"
+                      class="shrink-0 text-xs tabular-nums"
+                      :style="{
+                        color:
+                          c.en_espera > 0
+                            ? 'var(--aviso)'
+                            : 'var(--texto-suave)',
+                      }"
+                      >{{ cupo(c) }}</span
+                    >
+                  </button>
+                </li>
+              </ul>
+            </section>
+          </template>
           <p
             v-else
             class="mt-3 text-sm"
@@ -224,5 +280,15 @@ const eventoCalendario = computed(() =>
 }
 .mc-fila:hover .font-medium {
   color: var(--primario);
+}
+.mc-dia {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+}
+.mc-hora {
+  width: 3.2rem;
+  flex-shrink: 0;
+  font-weight: 500;
 }
 </style>

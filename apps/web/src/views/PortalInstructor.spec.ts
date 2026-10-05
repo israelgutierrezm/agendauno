@@ -107,6 +107,34 @@ describe("portal del instructor", () => {
     api.get.mockResolvedValue({ data: { data: SESIONES } });
   });
 
+  it("el inicio muestra lo de hoy con los pases de lista que faltan, y se actualiza", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: [
+          // Hoy a las 10:00 en CDMX: ya empezó y faltan 3 por marcar.
+          sesion("s0", "Pole Mañana", "2030-01-09T16:00:00Z", { marcadas: 1 }),
+          ...SESIONES,
+        ],
+      },
+    });
+    const w = montar(InicioInstructorView);
+    await flushPromises();
+
+    const hoy = w.get('[data-prueba="hoy-instructor"]');
+    const filas = hoy.findAll(".pi-hoy-fila").map((f) => f.text());
+    expect(filas[0]).toContain("10:00");
+    expect(filas[0]).toContain("Pole Mañana");
+    expect(filas[0]).toContain("Falta pasar lista");
+    // La de las 19:00 aún no empieza: no pide lista.
+    expect(filas[1]).toContain("Pole Nivel 1");
+    expect(filas[1]).not.toContain("Falta pasar lista");
+
+    const antes = api.get.mock.calls.length;
+    await hoy.get('[data-prueba="actualizar"]').trigger("click");
+    await flushPromises();
+    expect(api.get.mock.calls.length).toBeGreaterThan(antes);
+  });
+
   it("«Próximos 7 días» abre 7 días, y lo que ya terminó hoy no es «próximo»", async () => {
     ruta.query = { vista: "lista", dias: "7" };
     api.get.mockResolvedValue({

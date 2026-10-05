@@ -116,13 +116,18 @@ const subtitulo = computed(() =>
     .join(" · "),
 );
 
+/** «Jueves 10 de enero, 19:00»: la fecha completa (no solo la hora). */
 function hora(iso: string, zona: string): string {
-  return new Intl.DateTimeFormat("es-MX", {
+  const texto = new Intl.DateTimeFormat("es-MX", {
     timeZone: zona,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   }).format(new Date(iso));
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
 async function cargar(): Promise<void> {

@@ -176,6 +176,11 @@ export default {
       con: "Con {nombre}",
       pasarLista: "Pasar lista",
       verCita: "Ver cita",
+      // Hoy: lo que ya empezó y aún no tiene lista (o llegada) marcada.
+      faltaLista: "Falta pasar lista",
+      faltaLlegada: "Falta marcar llegada",
+      sinHoy: "Hoy no tienes clases ni citas.",
+      actualizar: "Actualizar",
       verCalendario: "Ver en mi calendario →",
       tarjetas: {
         hoy: "Hoy",

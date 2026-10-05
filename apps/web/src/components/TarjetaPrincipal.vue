@@ -5,7 +5,8 @@ import type { Clima } from "@/lib/clima";
 /**
  * La tarjeta grande de los Inicios (alumno, instructor y negocio): a la izquierda
  * una etiqueta corta en mayúsculas y lo que toca (slot), a la derecha la foto del
- * giro con el clima encima; en móvil la foto va arriba. Siempre se muestra: cada
+ * giro con el clima encima. En el teléfono, lo que toca va primero y la foto debajo,
+ * más baja: la foto adorna, no empuja la información. Siempre se muestra: cada
  * Inicio decide qué decir cuando no hay nada agendado.
  */
 defineProps<{
@@ -52,21 +53,21 @@ defineProps<{
 </template>
 
 <style scoped>
-/* Texto a la izquierda, foto del giro a la derecha (arriba en móvil), con el
-   clima sobre la foto. */
+/* Texto a la izquierda, foto del giro a la derecha (debajo y más baja en el
+   teléfono), con el clima sobre la foto. */
 .tp {
   display: grid;
   overflow: hidden;
   padding: 0;
 }
 .tp-texto {
-  order: 2;
+  order: 1;
   padding: 1.5rem;
 }
 .tp-foto {
   position: relative;
-  order: 1;
-  min-height: 11rem;
+  order: 2;
+  min-height: 7rem;
   background: var(--superficie-2);
 }
 .tp-foto img {
