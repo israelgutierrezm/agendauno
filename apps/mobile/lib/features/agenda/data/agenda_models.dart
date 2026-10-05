@@ -62,6 +62,7 @@ class SesionAgenda {
     required this.estado,
     this.precioMinor,
     this.cita,
+    this.marcadas = 0,
   });
 
   final String id;
@@ -77,6 +78,9 @@ class SesionAgenda {
   final int? capacidad;
   final int ocupados;
   final int enEspera;
+
+  /// A cuántos de los que ocupan lugar ya se les pasó lista.
+  final int marcadas;
   final String estado;
   final int? precioMinor;
   final CitaTitular? cita;
@@ -84,6 +88,18 @@ class SesionAgenda {
   bool get esCita => tipo == 'cita';
   bool get programada => estado == 'programada';
   int get duracionMin => terminaEn.difference(iniciaEn).inMinutes;
+
+  /// Ya empezó y falta pasar lista (clase) o marcar si llegó (cita), igual que en
+  /// el inicio web de quien imparte.
+  bool faltaMarcar(DateTime ahora) {
+    if (iniciaEn.isAfter(ahora)) {
+      return false;
+    }
+    if (esCita) {
+      return cita?.asistencia == null;
+    }
+    return ocupados > 0 && marcadas < ocupados;
+  }
 
   /// Ocupación 0–1 de una clase (null si no tiene cupo definido).
   double? get ocupacion => capacidad != null && capacidad! > 0 ? (ocupados / capacidad!).clamp(0, 1).toDouble() : null;
@@ -128,6 +144,7 @@ class SesionAgenda {
       capacidad: json['capacidad'] as int?,
       ocupados: (json['ocupados'] ?? 0) as int,
       enEspera: (json['en_espera'] ?? 0) as int,
+      marcadas: (json['marcadas'] ?? 0) as int,
       estado: (json['estado'] ?? 'programada') as String,
       precioMinor: json['oferta_precio_clase'] as int?,
       cita: cita is Map<String, dynamic> ? CitaTitular.desdeJson(cita) : null,

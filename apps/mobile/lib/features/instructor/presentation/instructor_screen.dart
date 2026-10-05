@@ -169,6 +169,14 @@ class _Inicio extends ConsumerWidget {
         final esperados = deHoy.fold<int>(0, (n, s) => n + s.ocupados);
         String cuantas(int n) =>
             n == 0 ? 'Sin $clases' : (n == 1 ? '1 $clase' : '$n $clases');
+        // Lo de hoy que ya empezó y aún pide pasar lista o marcar si llegó.
+        final faltan = deHoy.where((s) => s.faltaMarcar(ahora)).toList();
+        final listas = faltan.where((s) => !s.esCita).length;
+        final llegadas = faltan.length - listas;
+        final pendientesHoy = [
+          if (listas > 0) '$listas por pasar lista',
+          if (llegadas > 0) '$llegadas por marcar llegada',
+        ].join(' · ');
 
         return RefreshIndicator(
           onRefresh: () => ref.refresh(proximasMisClasesProvider.future),
@@ -288,7 +296,9 @@ class _Inicio extends ConsumerWidget {
                   icono: Icons.today_outlined,
                   titulo: 'Hoy',
                   tono: TonosAcceso.reservar,
-                  valor: cuantas(deHoy.length),
+                  valor: pendientesHoy.isEmpty
+                      ? cuantas(deHoy.length)
+                      : '${cuantas(deHoy.length)} · $pendientesHoy',
                   onTap: () =>
                       onIr(PestanaInstructor.clases, vista: VistaCal.dia),
                 ),
