@@ -25,6 +25,7 @@ use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,6 +42,9 @@ use Symfony\Component\HttpFoundation\Response;
 class MiembrosTenantController
 {
     private const LIMITE = 100;
+
+    /** Cuántos se exportan como máximo en un CSV. */
+    private const LIMITE_EXPORTAR = 5000;
 
     public function __construct(
         private readonly RegistrarAuditoria $auditoria,
@@ -64,6 +68,112 @@ class MiembrosTenantController
     public function index(Request $request): JsonResponse
     {
         $tipo = (string) $request->query('tipo', TipoPersonaTenant::Miembro->value);
+        $consulta = $this->consulta($request, $tipo);
+
+        // Paginación OPT-IN: con `page` devuelve meta; sin él, comportamiento previo
+        // (tope LIMITE) para no romper selectores existentes.
+        if ($request->has('page')) {
+            $perPage = min(max((int) $request->query('per_page', 25), 1), 100);
+            $pagina = $consulta->paginate($perPage, ['*'], 'page', max(1, (int) $request->query('page', 1)));
+            /** @var Collection<int, PersonaTenant> $items */
+            $items = $pagina->getCollection();
+            $asistencias = $this->conteoAsistencias($items->pluck('id')->all());
+            $quienes = $this->nombresDe($items->pluck('eliminado_por')->filter()->all());
+            $cuentas = $this->cuentasPorCorreo($items);
+            // `?resumen=1` (tarjetas del listado): membresía, visitas y adeudo en lote.
+            $resumenes = $request->boolean('resumen') && $tipo === TipoPersonaTenant::Miembro->value
+                ? $this->resumenes($items)
+                : [];
+
+            return response()->json([
+                'data' => $items->map(fn (PersonaTenant $persona): array => [
+                    ...$this->presentar($persona, (int) ($asistencias[$persona->getKey()] ?? 0), $quienes, $cuentas),
+                    ...(isset($resumenes[$persona->getKey()]) ? ['resumen' => $resumenes[$persona->getKey()]] : []),
+                ])->all(),
+                'meta' => [
+                    'total' => $pagina->total(),
+                    'page' => $pagina->currentPage(),
+                    'per_page' => $pagina->perPage(),
+                    'ultima_pagina' => $pagina->lastPage(),
+                ],
+            ]);
+        }
+
+        $personas = $consulta->limit(self::LIMITE)->get();
+        $asistencias = $this->conteoAsistencias($personas->pluck('id')->all());
+        $quienes = $this->nombresDe($personas->pluck('eliminado_por')->filter()->all());
+        $cuentas = $this->cuentasPorCorreo($personas);
+
+        return response()->json([
+            'data' => $personas->map(fn (PersonaTenant $persona): array => $this->presentar(
+                $persona,
+                (int) ($asistencias[$persona->getKey()] ?? 0),
+                $quienes,
+                $cuentas,
+            ))->all(),
+        ]);
+    }
+
+    /**
+     * El listado en CSV, con los mismos filtros, alcance y orden que en pantalla: datos
+     * de contacto, plan, saldo, última clase y estado. Queda en la bitácora (son datos
+     * personales). Con BOM para que Excel lea los acentos.
+     */
+    public function exportar(Request $request): Response
+    {
+        $tipo = TipoPersonaTenant::Miembro->value;
+        $personas = $this->consulta($request, $tipo)->limit(self::LIMITE_EXPORTAR)->get();
+
+        $lineas = ['Nombre,Correo,Celular,Sucursal,Plan,Vence,Saldo,Ultima clase,Estado,Alta'];
+        foreach ($personas->chunk(200) as $tanda) {
+            $resumenes = $this->resumenes(new Collection($tanda->all()));
+            foreach ($tanda as $persona) {
+                $r = $resumenes[$persona->getKey()] ?? null;
+                $m = $r['membresia'] ?? null;
+                $ultima = $r['ultima'] ?? null;
+                $saldo = $m === null ? '' : ($m['ilimitado'] ? 'Ilimitado' : (string) intdiv((int) $m['saldo_unidades'], 1000));
+                $lineas[] = implode(',', array_map(
+                    fn (string $v): string => $this->escaparCsv($v),
+                    [
+                        $persona->nombreCompleto(),
+                        (string) ($persona->email ?? ''),
+                        (string) ($persona->celular ?? ''),
+                        (string) ($persona->sucursal->nombre ?? ''),
+                        (string) ($m['plan'] ?? ''),
+                        (string) ($m['valido_hasta'] ?? ''),
+                        $saldo,
+                        $ultima === null ? '' : trim(substr((string) $ultima['inicia_en'], 0, 16).' '.($ultima['clase'] ?? '')),
+                        $persona->trashed() ? 'Dado de baja' : ($persona->activo ? 'Activo' : 'Suspendido'),
+                        (string) ($persona->created_at?->toDateString() ?? ''),
+                    ],
+                ));
+            }
+        }
+
+        $this->auditoria->registrar(
+            $this->actor($request),
+            'miembros.exportados',
+            'persona',
+            null,
+            null,
+            ['total' => $personas->count()],
+            'Exportó la lista de clientes.',
+        );
+
+        return response("\u{FEFF}".implode("\n", $lineas)."\n", 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="clientes.csv"',
+        ]);
+    }
+
+    /**
+     * La consulta del listado: tipo, búsqueda, alcance (sede e instructor), filtros
+     * y orden (`?orden=nombre|-nombre`; por omisión, lo más reciente primero).
+     *
+     * @return Builder<PersonaTenant>
+     */
+    private function consulta(Request $request, string $tipo): Builder
+    {
         $busqueda = trim((string) $request->query('q', ''));
 
         // `?estado=baja`: los dados de baja (con cuándo y quién); si no, los vigentes.
@@ -113,50 +223,15 @@ class MiembrosTenantController
             $consulta->where('archivado', true);
         }
 
-        $consulta->orderByDesc('id');
-
-        // Paginación OPT-IN: con `page` devuelve meta; sin él, comportamiento previo
-        // (tope LIMITE) para no romper selectores existentes.
-        if ($request->has('page')) {
-            $perPage = min(max((int) $request->query('per_page', 25), 1), 100);
-            $pagina = $consulta->paginate($perPage, ['*'], 'page', max(1, (int) $request->query('page', 1)));
-            /** @var Collection<int, PersonaTenant> $items */
-            $items = $pagina->getCollection();
-            $asistencias = $this->conteoAsistencias($items->pluck('id')->all());
-            $quienes = $this->nombresDe($items->pluck('eliminado_por')->filter()->all());
-            $cuentas = $this->cuentasPorCorreo($items);
-            // `?resumen=1` (tarjetas del listado): membresía, visitas y adeudo en lote.
-            $resumenes = $request->boolean('resumen') && $tipo === TipoPersonaTenant::Miembro->value
-                ? $this->resumenes($items)
-                : [];
-
-            return response()->json([
-                'data' => $items->map(fn (PersonaTenant $persona): array => [
-                    ...$this->presentar($persona, (int) ($asistencias[$persona->getKey()] ?? 0), $quienes, $cuentas),
-                    ...(isset($resumenes[$persona->getKey()]) ? ['resumen' => $resumenes[$persona->getKey()]] : []),
-                ])->all(),
-                'meta' => [
-                    'total' => $pagina->total(),
-                    'page' => $pagina->currentPage(),
-                    'per_page' => $pagina->perPage(),
-                    'ultima_pagina' => $pagina->lastPage(),
-                ],
-            ]);
+        $orden = (string) $request->query('orden', '');
+        if ($orden === 'nombre' || $orden === '-nombre') {
+            $sentido = $orden === 'nombre' ? 'asc' : 'desc';
+            $consulta->orderBy('nombre', $sentido)->orderBy('primer_apellido', $sentido)->orderBy('id', $sentido);
+        } else {
+            $consulta->orderByDesc('id');
         }
 
-        $personas = $consulta->limit(self::LIMITE)->get();
-        $asistencias = $this->conteoAsistencias($personas->pluck('id')->all());
-        $quienes = $this->nombresDe($personas->pluck('eliminado_por')->filter()->all());
-        $cuentas = $this->cuentasPorCorreo($personas);
-
-        return response()->json([
-            'data' => $personas->map(fn (PersonaTenant $persona): array => $this->presentar(
-                $persona,
-                (int) ($asistencias[$persona->getKey()] ?? 0),
-                $quienes,
-                $cuentas,
-            ))->all(),
-        ]);
+        return $consulta;
     }
 
     /**
@@ -233,6 +308,16 @@ class MiembrosTenantController
             ->groupBy('reservas.persona_id')
             ->selectRaw('reservas.persona_id as pid, MAX(sesiones.inicia_en) as ultima')
             ->pluck('ultima', 'pid');
+        // De esa última visita, la sesión (clase y zona) para la columna «Última clase».
+        $sesionesUltimas = $ultimas->isEmpty() ? collect() : ReservaTenant::query()
+            ->join('asistencias', 'asistencias.reserva_id', '=', 'reservas.id')
+            ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
+            ->where('asistencias.estado', EstadoAsistencia::Presente->value)
+            ->whereIn('reservas.persona_id', $ids)
+            ->whereIn('sesiones.inicia_en', $ultimas->values()->all())
+            ->get(['reservas.persona_id', 'sesiones.inicia_en', 'sesiones.zona_horaria', 'sesiones.oferta_id'])
+            ->filter(fn (ReservaTenant $r): bool => (string) $r->getAttribute('inicia_en') === (string) $ultimas->get((int) $r->getAttribute('persona_id')))
+            ->keyBy('persona_id');
 
         $proximas = ReservaTenant::query()
             ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
@@ -244,7 +329,9 @@ class MiembrosTenantController
             ->get(['reservas.persona_id', 'sesiones.inicia_en', 'sesiones.zona_horaria', 'sesiones.oferta_id'])
             ->unique('persona_id')
             ->keyBy('persona_id');
-        $ofertas = OfertaTenant::query()->whereIn('id', $proximas->pluck('oferta_id')->unique()->all())->pluck('nombre', 'id');
+        $ofertas = OfertaTenant::query()
+            ->whereIn('id', $proximas->pluck('oferta_id')->merge($sesionesUltimas->pluck('oferta_id'))->unique()->all())
+            ->pluck('nombre', 'id');
 
         $conAdeudo = ProcesoDunningTenant::query()
             ->whereIn('estado', [EstadoDunning::EnMora->value, EstadoDunning::Suspendido->value])
@@ -258,9 +345,15 @@ class MiembrosTenantController
         foreach ($ids as $id) {
             $proxima = $proximas->get($id);
             $ultima = $ultimas->get($id);
+            $sesionUltima = $sesionesUltimas->get($id);
             $resumenes[$id] = [
                 'membresia' => $membresias[$id],
                 'ultima_visita' => is_string($ultima) ? CarbonImmutable::parse($ultima, 'UTC')->toIso8601String() : null,
+                'ultima' => $sesionUltima instanceof ReservaTenant ? [
+                    'inicia_en' => CarbonImmutable::parse((string) $sesionUltima->getAttribute('inicia_en'), 'UTC')->toIso8601String(),
+                    'zona_horaria' => $sesionUltima->getAttribute('zona_horaria'),
+                    'clase' => $ofertas->get((int) $sesionUltima->getAttribute('oferta_id')),
+                ] : null,
                 'proxima' => $proxima instanceof ReservaTenant ? [
                     'inicia_en' => CarbonImmutable::parse((string) $proxima->getAttribute('inicia_en'), 'UTC')->toIso8601String(),
                     'zona_horaria' => $proxima->getAttribute('zona_horaria'),
@@ -556,6 +649,10 @@ class MiembrosTenantController
 
     private function escaparCsv(string $valor): string
     {
+        if ($valor !== '' && str_contains('=+-@', $valor[0])) {
+            $valor = "'".$valor;
+        }
+
         return str_contains($valor, ',') || str_contains($valor, '"') || str_contains($valor, "\n")
             ? '"'.str_replace('"', '""', $valor).'"'
             : $valor;

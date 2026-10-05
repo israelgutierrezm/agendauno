@@ -58,6 +58,7 @@ use App\Modules\Tenancy\Http\Controllers\MiReprogramarTenantController;
 use App\Modules\Tenancy\Http\Controllers\MisDocumentosTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiTenantController;
 use App\Modules\Tenancy\Http\Controllers\MovimientosPagoTenantController;
+use App\Modules\Tenancy\Http\Controllers\NotasPersonaTenantController;
 use App\Modules\Tenancy\Http\Controllers\OnboardingController;
 use App\Modules\Tenancy\Http\Controllers\OrdenesTenantController;
 use App\Modules\Tenancy\Http\Controllers\OrganizacionesTenantController;
@@ -360,6 +361,12 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/miembros/padron', [MiembrosTenantController::class, 'padron'])->middleware('puede:facturacion.ver')->name('miembros.padron');
             // Números del directorio de clientes. Ruta literal antes de {persona}.
             Route::get('/miembros/resumen', ResumenClientesTenantController::class)->middleware('puede:miembros.ver')->name('miembros.resumen');
+            // El listado en CSV (mismos filtros que en pantalla). Ruta literal antes de {persona}.
+            Route::get('/miembros/exportar', [MiembrosTenantController::class, 'exportar'])->middleware('puede:miembros.gestionar')->name('miembros.exportar');
+            // Notas internas del equipo sobre un cliente.
+            Route::get('/miembros/{persona}/notas', [NotasPersonaTenantController::class, 'index'])->middleware('puede:miembros.ver')->name('miembros.notas.index');
+            Route::post('/miembros/{persona}/notas', [NotasPersonaTenantController::class, 'crear'])->middleware('puede:miembros.gestionar')->name('miembros.notas.store');
+            Route::delete('/miembros/{persona}/notas/{nota}', [NotasPersonaTenantController::class, 'eliminar'])->middleware('puede:miembros.gestionar')->name('miembros.notas.destroy');
             Route::post('/miembros', [MiembrosTenantController::class, 'store'])->middleware('puede:miembros.gestionar')->name('miembros.store');
             // Editar datos y estado del alumno (suspender/archivar/no-facturable) con auditoría (P0).
             Route::put('/miembros/{persona}', [MiembrosTenantController::class, 'actualizar'])->middleware('puede:miembros.gestionar')->name('miembros.update');

@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Models\AceptacionWaiverTenant;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\Documento;
 use App\Modules\Tenancy\Models\MensajeTenant;
+use App\Modules\Tenancy\Models\NotaPersonaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\RespuestaFormulario;
@@ -115,6 +116,7 @@ class BajaDePersonaTenant
             Documento::query()->whereKey($documentos->modelKeys())->delete();
             RespuestaFormulario::query()->where('persona_id', $persona->getKey())->delete();
             MensajeTenant::query()->where('persona_id', $persona->getKey())->delete();
+            NotaPersonaTenant::query()->where('persona_id', $persona->getKey())->delete();
             AceptacionWaiverTenant::query()->where('persona_id', $persona->getKey())->update(['ip' => null]);
 
             $usuario = $persona->usuario_id !== null ? Usuario::query()->find($persona->usuario_id) : null;

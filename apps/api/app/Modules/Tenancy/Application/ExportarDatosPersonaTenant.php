@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\Documento;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\MovimientoCreditoTenant;
+use App\Modules\Tenancy\Models\NotaPersonaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -70,6 +71,12 @@ class ExportarDatosPersonaTenant
                     'moneda' => $o->moneda,
                     'pagada' => $fecha($o->pagada_en),
                     'conceptos' => $o->lineas->map(static fn ($l): ?string => $l->producto?->nombre)->filter()->values()->all(),
+                ])->all(),
+            // Lo que el equipo anotó de la persona (también son sus datos).
+            'notas_del_negocio' => NotaPersonaTenant::query()->where('persona_id', $id)->orderBy('id')->get()
+                ->map(static fn (NotaPersonaTenant $n): array => [
+                    'texto' => $n->texto,
+                    'fecha' => $fecha($n->created_at),
                 ])->all(),
             'accesos' => AccesoTenant::query()->where('persona_id', $id)->orderBy('id')->get()
                 ->map(static fn (AccesoTenant $a): array => [

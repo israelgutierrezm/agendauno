@@ -94,6 +94,28 @@ class ResumenMiembroTenantController
             ->where('reservas.persona_id', $persona->getKey())
             ->count();
 
+        // Lo que hizo en el periodo (`?dias=`, 30 por omisión): sesiones que ya pasaron.
+        $dias = min(max((int) $request->query('dias', 30), 1), 366);
+        $enPeriodo = fn () => ReservaTenant::query()
+            ->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')
+            ->where('reservas.persona_id', $persona->getKey())
+            ->whereBetween('sesiones.inicia_en', [$ahora->subDays($dias), $ahora]);
+        $conAsistencia = fn (EstadoAsistencia $estado): int => $enPeriodo()
+            ->join('asistencias', 'asistencias.reserva_id', '=', 'reservas.id')
+            ->where('asistencias.estado', $estado->value)
+            ->count();
+        $estadisticas = [
+            'dias' => $dias,
+            'asistencias' => $conAsistencia(EstadoAsistencia::Presente),
+            // Reservadas: las que tomaron un lugar (las canceladas cuentan; la lista de
+            // espera que no se concretó, no).
+            'reservadas' => $enPeriodo()
+                ->whereNotIn('reservas.estado', [EstadoReserva::EnEspera->value, EstadoReserva::Ofrecida->value, EstadoReserva::Expirada->value])
+                ->count(),
+            'canceladas' => $enPeriodo()->where('reservas.estado', EstadoReserva::Cancelada->value)->count(),
+            'no_asistio' => $conAsistencia(EstadoAsistencia::Ausente),
+        ];
+
         // Documentos/waivers pendientes de firma (R-waivers).
         $documentosPendientes = $this->waivers->pendientesDe($persona)->count();
 
@@ -113,6 +135,7 @@ class ResumenMiembroTenantController
             'activo' => $persona->activo,
             'asistencias' => $asistencias,
             'primera_vez' => $asistencias === 0,
+            'estadisticas' => $estadisticas,
             // Lo que puede usar de sus paquetes vigentes; con una membresía ilimitada
             // vigente, `ilimitado` (y el saldo no es lo que manda).
             'ilimitado' => (bool) $membresia['ilimitado'],
