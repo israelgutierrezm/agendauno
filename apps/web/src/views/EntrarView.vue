@@ -277,6 +277,13 @@ onMounted(async () => {
           width="1122"
           height="1402"
         />
+        <img
+          :src="'/assets/landing/disciplinas/barberia-v1.jpg'"
+          alt=""
+          width="1122"
+          height="1402"
+          decoding="async"
+        />
         <div class="tu-login-actividad tu-login-actividad--cita">
           <span class="tu-login-icono">✓</span>
           <span>
@@ -289,6 +296,23 @@ onMounted(async () => {
           <span>
             <strong>{{ $t("entrar.panelClase") }}</strong>
             <small>{{ $t("entrar.panelClaseDetalle") }}</small>
+          </span>
+        </div>
+        <div class="tu-login-actividad tu-login-actividad--barberia">
+          <span class="tu-login-icono tu-login-icono--barberia">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+            >
+              <rect x="4" y="5" width="16" height="16" rx="3" />
+              <path d="M8 3v4m8-4v4M4 11h16m-11 5 2 2 4-4" />
+            </svg>
+          </span>
+          <span>
+            <strong>{{ $t("entrar.panelBarberia") }}</strong>
+            <small>{{ $t("entrar.panelBarberiaDetalle") }}</small>
           </span>
         </div>
       </div>
@@ -654,22 +678,30 @@ onMounted(async () => {
 }
 .tu-login-collage > img {
   position: absolute;
-  width: 42%;
-  height: 88%;
+  width: 35%;
+  height: 82%;
   border: 0.35rem solid rgb(255 255 255 / 66%);
   border-radius: 1.5rem;
   object-fit: cover;
   box-shadow: 0 1.5rem 4rem rgb(45 55 70 / 18%);
 }
 .tu-login-collage > img:first-child {
-  left: 3%;
-  bottom: 0;
-  transform: rotate(-4deg);
+  left: 1%;
+  bottom: 10%;
+  transform: rotate(-5deg);
 }
 .tu-login-collage > img:nth-child(2) {
   top: 0;
-  right: 9%;
-  transform: rotate(4deg);
+  left: 32%;
+  object-position: 65% center;
+  transform: rotate(2deg);
+}
+.tu-login-collage > img:nth-child(3) {
+  right: 0;
+  bottom: 2%;
+  height: 78%;
+  object-position: 47% center;
+  transform: rotate(5deg);
 }
 .tu-login-actividad {
   position: absolute;
@@ -685,12 +717,16 @@ onMounted(async () => {
   backdrop-filter: blur(16px);
 }
 .tu-login-actividad--cita {
-  top: 14%;
-  left: 31%;
+  top: -6%;
+  left: 0;
 }
 .tu-login-actividad--clase {
+  left: 17%;
+  bottom: 0;
+}
+.tu-login-actividad--barberia {
   right: 0;
-  bottom: 7%;
+  bottom: 3%;
 }
 .tu-login-actividad strong,
 .tu-login-actividad small {
@@ -718,6 +754,13 @@ onMounted(async () => {
 }
 .tu-login-icono--clase {
   background: #1674cd;
+}
+.tu-login-icono--barberia {
+  background: #008c9e;
+}
+.tu-login-icono--barberia svg {
+  width: 1.15rem;
+  height: 1.15rem;
 }
 .tu-login-explorar {
   position: absolute;

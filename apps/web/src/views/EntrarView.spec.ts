@@ -97,7 +97,25 @@ describe("acceso por negocio", () => {
     recordarCinco();
     const wrapper = montar();
     expect(wrapper.findAll(".tu-negocio-principal")).toHaveLength(5);
-    expect(wrapper.findAll(".tu-login-collage > img")).toHaveLength(2);
+    expect(
+      wrapper
+        .findAll(".tu-login-collage > img")
+        .map((img) => img.attributes("src")),
+    ).toEqual([
+      "/assets/landing/disciplinas/pilates-v1.jpg",
+      "/assets/landing/disciplinas/pole-v1.jpg",
+      "/assets/landing/disciplinas/barberia-v1.jpg",
+    ]);
+    expect(wrapper.get(".tu-login-collage").attributes("aria-hidden")).toBe(
+      "true",
+    );
+    expect(wrapper.findAll(".tu-login-actividad")).toHaveLength(3);
+    expect(wrapper.get(".tu-login-actividad--barberia").text()).toContain(
+      "Corte y barba",
+    );
+    expect(wrapper.get(".tu-login-actividad--barberia").text()).toContain(
+      "12:30 · Marco · Confirmada",
+    );
     expect(wrapper.find(".tu-login-visual").exists()).toBe(true);
     expect(wrapper.find(".tu-login-visual .agendauno-logo").exists()).toBe(
       false,
