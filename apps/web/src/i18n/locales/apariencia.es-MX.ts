@@ -8,6 +8,8 @@ export default {
   tema: "Tema",
   predeterminado: "Predeterminado",
   oscuro: "Oscuro",
+  fuente: "Tipo de letra",
+  fuentePredeterminada: "Predeterminada",
   letra: "Tamaño de letra",
   letraAyuda: "Sólo en este navegador.",
   densidades: {

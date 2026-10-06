@@ -4,15 +4,16 @@ import { useI18n } from "vue-i18n";
 
 import PanelLateral from "@/components/PanelLateral.vue";
 import { mensajeDeError } from "@/lib/api";
+import { cargarFuente, pilaDeFuente } from "@/lib/fuentes";
 import { useAparienciaStore } from "@/stores/apariencia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useTemaStore } from "@/stores/tema";
 import { useToastStore } from "@/stores/toast";
 
 /**
- * Panel lateral de apariencia (al estilo de Acadion): elegir un tema, ajustar el
- * tamaño de letra y —si el tema lo permite— algunos colores propios. El tema y los
- * colores se guardan en la cuenta; el tamaño de letra, en este navegador.
+ * Panel lateral de apariencia (al estilo de Acadion): elegir un tema, el tipo y el
+ * tamaño de letra y —si el tema lo permite— algunos colores propios. El tema, los
+ * colores y el tipo de letra se guardan en la cuenta; el tamaño, en este navegador.
  */
 const props = defineProps<{ abierto: boolean }>();
 const emit = defineEmits<{ cerrar: [] }>();
@@ -37,6 +38,10 @@ watch(
         toast.error(mensajeDeError(e, t("apariencia.error")));
       }
     }
+    // Cada opción se muestra con su propia letra.
+    if (abierto) {
+      apariencia.fuentes.forEach((f) => cargarFuente(f.nombre));
+    }
   },
 );
 
@@ -59,6 +64,14 @@ function elegir(clave: string): void {
 function personalizar(token: string, evento: Event): void {
   const valor = (evento.target as HTMLInputElement).value;
   void guardar(() => apariencia.personalizar(base.value, token, valor));
+}
+const fuenteActual = computed(
+  () => apariencia.actual?.fuente?.clave ?? "poppins",
+);
+function elegirFuente(clave: string): void {
+  if (clave !== fuenteActual.value) {
+    void guardar(() => apariencia.elegirFuente(base.value, clave));
+  }
 }
 function restablecer(): void {
   void guardar(() => apariencia.restablecer(base.value));
@@ -146,6 +159,39 @@ function restablecer(): void {
             >
               <path d="M4.5 12.75l6 6 9-13.5" />
             </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- Tipo de letra -->
+      <section v-if="apariencia.fuentes.length > 0">
+        <h3 class="pa-seccion">{{ $t("apariencia.fuente") }}</h3>
+        <div
+          class="mt-3 grid grid-cols-2 gap-2"
+          role="radiogroup"
+          :aria-label="$t('apariencia.fuente')"
+        >
+          <button
+            v-for="f in apariencia.fuentes"
+            :key="f.clave"
+            type="button"
+            role="radio"
+            class="pa-fuente"
+            :class="{ 'pa-activo': f.clave === fuenteActual }"
+            :style="{ fontFamily: pilaDeFuente(f.nombre) }"
+            :disabled="guardando"
+            :aria-checked="f.clave === fuenteActual"
+            :data-prueba="`fuente-${f.clave}`"
+            @click="elegirFuente(f.clave)"
+          >
+            <span class="block text-base font-medium">{{ f.nombre }}</span>
+            <span
+              class="block text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              >{{
+                f.es_default ? $t("apariencia.fuentePredeterminada") : "Aa 123"
+              }}</span
+            >
           </button>
         </div>
       </section>
@@ -291,6 +337,15 @@ function restablecer(): void {
   height: 0.55rem;
   border-radius: 999px;
   align-self: flex-end;
+}
+.pa-fuente {
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--borde);
+  background: var(--superficie);
+  color: var(--texto);
+  text-align: left;
+  cursor: pointer;
 }
 .pa-letra {
   display: grid;

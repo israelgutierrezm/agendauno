@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\CatalogoFuentes;
 use App\Modules\Tenancy\CatalogoTemas;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
@@ -11,7 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * Apariencia del usuario (tema y ajustes de color), al estilo de Acadion. Es una
+ * Apariencia del usuario (tema, ajustes de color y tipo de letra), al estilo de Acadion. Es una
  * preferencia personal: no requiere permiso especial, cada quien la cambia sobre su
  * propia cuenta y se guarda en ella (viaja entre dispositivos).
  */
@@ -25,9 +26,10 @@ class AparienciaTenantController
         $usuario = $this->usuario($request);
 
         return response()->json(['data' => [
-            'actual' => CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion),
+            'actual' => CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion, $usuario->fuente),
             'disponibles' => CatalogoTemas::disponibles(),
             'personalizables' => CatalogoTemas::PERSONALIZABLES,
+            'fuentes' => CatalogoFuentes::disponibles(),
         ]]);
     }
 
@@ -62,7 +64,7 @@ class AparienciaTenantController
             'valor' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
         ]);
 
-        $actual = CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion);
+        $actual = CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion, $usuario->fuente);
 
         $propios = $actual['personalizacion'];
         if (($validado['valor'] ?? '') === '') {
@@ -72,6 +74,27 @@ class AparienciaTenantController
         }
 
         $usuario->forceFill(['tema' => $actual['clave'], 'tema_personalizacion' => $propios === [] ? null : $propios])->save();
+
+        return $this->respuesta($usuario);
+    }
+
+    /**
+     * Elige el tipo de letra (sin valor, vuelve al predeterminado). No depende del
+     * tema: cambiar de tema lo conserva.
+     */
+    public function fuente(Request $request): JsonResponse
+    {
+        $usuario = $this->usuario($request);
+        $validado = $request->validate([
+            'fuente' => ['nullable', 'string', function (string $campo, mixed $valor, \Closure $falla): void {
+                if ($valor !== null && (! is_string($valor) || ! CatalogoFuentes::existe($valor))) {
+                    $falla('Ese tipo de letra no está disponible.');
+                }
+            }],
+        ]);
+
+        $fuente = $validado['fuente'] ?? null;
+        $usuario->forceFill(['fuente' => $fuente === CatalogoFuentes::POR_DEFECTO ? null : $fuente])->save();
 
         return $this->respuesta($usuario);
     }
@@ -89,7 +112,7 @@ class AparienciaTenantController
 
     private function respuesta(Usuario $usuario): JsonResponse
     {
-        return response()->json(['data' => CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion)]);
+        return response()->json(['data' => CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion, $usuario->fuente)]);
     }
 
     private function usuario(Request $request): Usuario

@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Storage;
  * @property list<string>|null $roles
  * @property string|null $tema
  * @property array<string, string>|null $tema_personalizacion
+ * @property string|null $fuente
  * @property string|null $nombre
  * @property string|null $primer_apellido
  * @property string|null $segundo_apellido
@@ -43,7 +44,7 @@ class Usuario extends Authenticatable
 
     protected $fillable = [
         'name', 'email', 'password', 'google_id', 'activo', 'activation_token', 'rol', 'roles',
-        'tema', 'tema_personalizacion', 'nombre', 'primer_apellido', 'segundo_apellido', 'foto_ruta',
+        'tema', 'tema_personalizacion', 'fuente', 'nombre', 'primer_apellido', 'segundo_apellido', 'foto_ruta',
         'ultimo_rol',
     ];
 

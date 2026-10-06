@@ -60,7 +60,7 @@ class UsuarioTenantPresenter
             'roles_disponibles' => $catalogo->disponibles($roles),
             'permisos' => $catalogo->permisosDe($usuario->rolesVigentes()),
             // Tema y colores propios: el front los aplica al entrar (ver /apariencia).
-            'apariencia' => CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion),
+            'apariencia' => CatalogoTemas::resolver($usuario->tema, $usuario->tema_personalizacion, $usuario->fuente),
             // Sucursales que puede operar (todas o las que tiene asignadas): con más de
             // una, el panel ofrece elegir con cuál trabaja; con una, se usa esa.
             'sucursales' => self::sucursales($usuario),

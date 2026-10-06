@@ -135,3 +135,31 @@ it('en todos los temas el texto de los botones y de lo activo de la barra se lee
         }
     }
 });
+
+it('elige su tipo de letra: se guarda en su cuenta, llega con la sesión y cambiar de tema lo conserva', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $base = "/api/v1/app/{$e['slug']}";
+
+    // Predeterminada: Poppins; el catálogo trae las seis.
+    $data = $this->getJson("{$base}/apariencia", conBearer($e['bearer']))->assertOk()->json('data');
+    expect($data['actual']['fuente'])->toBe(['clave' => 'poppins', 'nombre' => 'Poppins'])
+        ->and(collect($data['fuentes'])->pluck('nombre')->all())->toBe(['Inter', 'Roboto', 'Open Sans', 'Lato', 'Poppins', 'Montserrat']);
+
+    $this->putJson("{$base}/apariencia/fuente", ['fuente' => 'open_sans'], conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.fuente.nombre', 'Open Sans');
+    $this->getJson("{$base}/yo", conBearer($e['bearer']))
+        ->assertJsonPath('data.usuario.apariencia.fuente.clave', 'open_sans');
+
+    // El tema es otra cosa: cambiarlo no le quita su letra.
+    $this->putJson("{$base}/apariencia", ['tema' => 'oceano'], conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.fuente.clave', 'open_sans');
+
+    // Sin valor, vuelve a la predeterminada; una que no está en la lista no se acepta.
+    $this->putJson("{$base}/apariencia/fuente", ['fuente' => null], conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.fuente.clave', 'poppins');
+    $this->putJson("{$base}/apariencia/fuente", ['fuente' => 'comic_sans'], conBearer($e['bearer']))
+        ->assertStatus(422);
+});

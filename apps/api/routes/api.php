@@ -257,6 +257,7 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/apariencia', [AparienciaTenantController::class, 'elegir'])->name('apariencia.elegir');
             Route::put('/apariencia/color', [AparienciaTenantController::class, 'personalizar'])->name('apariencia.color');
             Route::delete('/apariencia/personalizacion', [AparienciaTenantController::class, 'restablecer'])->name('apariencia.restablecer');
+            Route::put('/apariencia/fuente', [AparienciaTenantController::class, 'fuente'])->name('apariencia.fuente');
             // Mi perfil: cada quien ajusta su nombre, su foto y su contraseña.
             Route::put('/yo/perfil', [PerfilTenantController::class, 'actualizar'])->name('yo.perfil');
             Route::put('/yo/contrasena', [PerfilTenantController::class, 'cambiarContrasena'])->name('yo.contrasena');

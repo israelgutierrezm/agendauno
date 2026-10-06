@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 
 import { api } from "@/lib/api";
+import { cargarFuente, pilaDeFuente } from "@/lib/fuentes";
 import { useTemaStore } from "@/stores/tema";
 
 /** Tema resuelto del usuario (tema + sus ajustes propios), tal como lo da la API. */
@@ -12,6 +13,14 @@ export interface Apariencia {
   permite_personalizar: boolean;
   tokens: Record<string, string>;
   personalizacion: Record<string, string>;
+  // Su tipo de letra (sin él, la predeterminada).
+  fuente?: { clave: string; nombre: string };
+}
+
+export interface FuenteDisponible {
+  clave: string;
+  nombre: string;
+  es_default: boolean;
 }
 
 export interface TemaDisponible {
@@ -45,6 +54,7 @@ export const useAparienciaStore = defineStore("apariencia", () => {
   const actual = ref<Apariencia | null>(null);
   const disponibles = ref<TemaDisponible[]>([]);
   const personalizables = ref<string[]>([]);
+  const fuentes = ref<FuenteDisponible[]>([]);
   let aplicados: string[] = [];
   // Fuera del panel (páginas públicas con sesión) se ve la apariencia pública.
   let enPausa = false;
@@ -66,6 +76,14 @@ export const useAparienciaStore = defineStore("apariencia", () => {
       aplicados.push(nombre);
     }
     raiz.classList.toggle("dark", apariencia.oscuro);
+    if (apariencia.fuente) {
+      cargarFuente(apariencia.fuente.nombre);
+      raiz.style.setProperty(
+        "--fuente",
+        pilaDeFuente(apariencia.fuente.nombre),
+      );
+      aplicados.push("--fuente");
+    }
   }
 
   function activar(apariencia: Apariencia | null | undefined): void {
@@ -130,10 +148,12 @@ export const useAparienciaStore = defineStore("apariencia", () => {
         actual: Apariencia;
         disponibles: TemaDisponible[];
         personalizables: string[];
+        fuentes?: FuenteDisponible[];
       };
     }>(`${base}/apariencia`);
     disponibles.value = data.data.disponibles;
     personalizables.value = data.data.personalizables;
+    fuentes.value = data.data.fuentes ?? [];
     activar(data.data.actual);
   }
 
@@ -156,6 +176,18 @@ export const useAparienciaStore = defineStore("apariencia", () => {
     activar(data.data);
   }
 
+  /** Tipo de letra (null = la predeterminada). */
+  async function elegirFuente(
+    base: string,
+    clave: string | null,
+  ): Promise<void> {
+    const { data } = await api.put<{ data: Apariencia }>(
+      `${base}/apariencia/fuente`,
+      { fuente: clave },
+    );
+    activar(data.data);
+  }
+
   async function restablecer(base: string): Promise<void> {
     const { data } = await api.delete<{ data: Apariencia }>(
       `${base}/apariencia/personalizacion`,
@@ -167,6 +199,7 @@ export const useAparienciaStore = defineStore("apariencia", () => {
     actual,
     disponibles,
     personalizables,
+    fuentes,
     activar,
     restaurar,
     pausar,
@@ -174,6 +207,7 @@ export const useAparienciaStore = defineStore("apariencia", () => {
     cargarCatalogo,
     elegir,
     personalizar,
+    elegirFuente,
     restablecer,
   };
 });

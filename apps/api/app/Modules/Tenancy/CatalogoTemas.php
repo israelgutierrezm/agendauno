@@ -119,10 +119,12 @@ final class CatalogoTemas
      * "AgendaUno marino", "AgendaUno noche", "Índigo" y "Alto contraste") cae en el
      * predeterminado.
      *
+     * Trae también su tipo de letra ({@see CatalogoFuentes}).
+     *
      * @param  array<string, string>|null  $personalizacion
-     * @return array{clave: string, nombre: string, oscuro: bool, permite_personalizar: bool, tokens: array<string, string>, personalizacion: array<string, string>}
+     * @return array{clave: string, nombre: string, oscuro: bool, permite_personalizar: bool, tokens: array<string, string>, personalizacion: array<string, string>, fuente: array{clave: string, nombre: string}}
      */
-    public static function resolver(?string $clave, ?array $personalizacion): array
+    public static function resolver(?string $clave, ?array $personalizacion, ?string $fuente = null): array
     {
         $clave = $clave !== null && self::existe($clave) ? $clave : self::POR_DEFECTO;
         $tema = self::TEMAS[$clave];
@@ -137,6 +139,7 @@ final class CatalogoTemas
             'permite_personalizar' => true,
             'tokens' => [...$tema['tokens'], ...$propios],
             'personalizacion' => $propios,
+            'fuente' => CatalogoFuentes::resolver($fuente),
         ];
     }
 

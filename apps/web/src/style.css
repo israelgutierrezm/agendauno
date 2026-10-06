@@ -200,9 +200,18 @@
     margin: 0;
     background: var(--fondo);
     color: var(--texto);
-    font-family:
-      "Poppins", ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial,
-      sans-serif;
+    /* El tipo de letra que eligió el usuario en Apariencia (lib/fuentes.ts). */
+    font-family: var(
+      --fuente,
+      "Poppins",
+      ui-sans-serif,
+      system-ui,
+      "Segoe UI",
+      Roboto,
+      Helvetica,
+      Arial,
+      sans-serif
+    );
     letter-spacing: -0.008em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
