@@ -18,6 +18,7 @@ use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Http\Requests\ActivarTenantRequest;
 use App\Modules\Tenancy\Http\Requests\LoginTenantRequest;
 use App\Modules\Tenancy\Http\UsuarioTenantPresenter;
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
@@ -282,6 +283,8 @@ class AuthTenantController
             'zona_horaria' => app(FechasNegocioTenant::class)->zona(),
             'cobra_en_linea_posible' => app(RegionNegocioTenant::class)->enPesos(),
             'factura_posible' => app(RegionNegocioTenant::class)->factura(),
+            // ¿La plataforma ya factura? En producción, solo con la llave de FacturAPI.
+            'facturacion_disponible' => ConfiguracionPlataforma::facturacionDisponible(),
         ];
     }
 }

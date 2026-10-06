@@ -216,9 +216,15 @@ onMounted(cargar);
         </template>
       </TablaDatos>
 
+      <!-- La plataforma aún no factura (sin proveedor en producción). -->
+      <AvisoRegion
+        v-if="puedeEmitir && sesion.estudio?.facturacion_disponible === false"
+        class="mt-6"
+        tipo="facturacionPlataforma"
+      />
       <!-- Emitir: solo en pesos mexicanos y en México (ADR 0099). -->
       <AvisoRegion
-        v-if="puedeEmitir && sesion.estudio?.factura_posible === false"
+        v-else-if="puedeEmitir && sesion.estudio?.factura_posible === false"
         class="mt-6"
         tipo="facturacion"
       />

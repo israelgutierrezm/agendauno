@@ -8,6 +8,8 @@ use App\Modules\Tenancy\Application\EmitirFacturaTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\EstadoFactura;
+use App\Modules\Tenancy\Facturacion\FacturacionNoConfigurada;
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
 use Illuminate\Http\JsonResponse;
@@ -41,6 +43,10 @@ class FacturasTenantController
 
     public function emitir(Request $request): JsonResponse
     {
+        // Sin proveedor real en producción no se factura (ni se simula).
+        if (! ConfiguracionPlataforma::facturacionDisponible()) {
+            throw ValidationException::withMessages(['facturacion' => [FacturacionNoConfigurada::MOTIVO]]);
+        }
         // Solo en pesos mexicanos y en México (ADR 0099).
         if (! app(RegionNegocioTenant::class)->factura()) {
             throw ValidationException::withMessages(['facturacion' => [RegionNegocioTenant::MOTIVO_FACTURACION]]);

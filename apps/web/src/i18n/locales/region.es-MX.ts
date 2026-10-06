@@ -58,6 +58,9 @@ export default {
       "La facturación solo funciona en pesos mexicanos y en México",
     facturacionDetalle:
       "Facturar a tus propios clientes (CFDI) solo está disponible para negocios en México que trabajan en pesos mexicanos (MXN).",
+    facturacionPlataformaTitulo: "La facturación aún no está disponible",
+    facturacionPlataformaDetalle:
+      "Todavía no puedes emitir facturas (CFDI) desde AgendaUno. Te avisaremos en cuanto esté lista.",
     cambiar: "Ver moneda y zona horaria",
   },
 };

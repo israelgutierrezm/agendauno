@@ -577,6 +577,13 @@ onMounted(() => {
                       {{ $t("renta.factura.xml") }}
                     </button>
                   </span>
+                  <!-- La plataforma aún no factura: no se ofrece. -->
+                  <span
+                    v-else-if="sesion.estudio?.facturacion_disponible === false"
+                    class="text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                    >{{ $t("renta.factura.noDisponible") }}</span
+                  >
                   <!-- Pagado sin factura (o con error): emitir/reintentar -->
                   <button
                     v-else

@@ -10,9 +10,14 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * y la facturación a los clientes (esta, además, solo para negocios en México). Se
  * explica claro y se lleva a «Moneda y zona horaria».
  */
-const props = defineProps<{ tipo: "pasarelas" | "facturacion" }>();
+const props = defineProps<{
+  // `facturacionPlataforma`: la plataforma aún no factura; no depende del negocio.
+  tipo: "pasarelas" | "facturacion" | "facturacionPlataforma";
+}>();
 const sesion = useSesionTenantStore();
-const puedeCambiar = computed(() => puedeEntrar("region", sesion));
+const puedeCambiar = computed(
+  () => props.tipo !== "facturacionPlataforma" && puedeEntrar("region", sesion),
+);
 </script>
 
 <template>

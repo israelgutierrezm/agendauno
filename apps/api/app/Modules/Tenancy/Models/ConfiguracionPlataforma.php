@@ -52,6 +52,16 @@ class ConfiguracionPlataforma extends Model
      * Llave de la cuenta FacturAPI: la config de plataforma (BD) tiene prioridad;
      * si no, cae a la variable de entorno. Tolera que la tabla aún no exista.
      */
+    /**
+     * ¿Se puede facturar (CFDI)? Con llave de FacturAPI, sí. Sin llave, solo fuera de
+     * producción (con el proveedor falso de desarrollo y pruebas): en producción la
+     * facturación queda apagada en lugar de entregar CFDI simulados.
+     */
+    public static function facturacionDisponible(): bool
+    {
+        return static::llaveFacturapi() !== null || ! app()->environment('production');
+    }
+
     public static function llaveFacturapi(): ?string
     {
         try {

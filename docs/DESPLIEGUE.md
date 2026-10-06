@@ -47,6 +47,11 @@ Así no hay CORS entre subdominios.
    `X-Forwarded-For`: los límites por IP de la API dependen de ella.
 5. **Correo**: cuenta SMTP (Resend, Postmark, Amazon SES, Brevo…) con el dominio del
    remitente verificado (SPF y DKIM).
+6. **Facturación (opcional)**: llave de FacturAPI (`FACTURAPI_LLAVE` o en la
+   configuración del superadmin). Sin ella, en producción la facturación queda
+   apagada: los negocios no emiten CFDI ni reciben la factura de su renta, y la
+   pantalla lo dice. Nunca se simula un timbre fuera de desarrollo y pruebas.
+   `agendauno:verificar-produccion` lo marca como aviso.
 
 ## Primera instalación
 

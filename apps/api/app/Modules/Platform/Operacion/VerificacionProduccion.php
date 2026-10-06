@@ -64,6 +64,7 @@ class VerificacionProduccion
             ...$this->respaldos(),
             ...$this->alertas(),
             ...$this->legales(),
+            ...$this->facturacion(),
             ...$this->pagos($apertura || $this->aperturaComercial()),
         ];
     }
@@ -274,6 +275,19 @@ class VerificacionProduccion
                 $leible && $sinRespaldo === [],
                 $sinRespaldo === [] ? '' : 'Sin respaldo reciente: '.implode(', ', array_slice($sinRespaldo, 0, 10)).(count($sinRespaldo) > 10 ? '…' : ''),
             ),
+        ];
+    }
+
+    /**
+     * Sin llave de FacturAPI se puede abrir, pero sin facturas: los negocios no emiten
+     * CFDI a sus clientes ni reciben el de su renta.
+     *
+     * @return list<array{seccion: string, punto: string, estado: string, detalle: string}>
+     */
+    private function facturacion(): array
+    {
+        return [
+            $this->punto('Facturación', 'Llave de FacturAPI (CFDI)', ConfiguracionPlataforma::llaveFacturapi() !== null, 'Sin ella la facturación queda apagada: los negocios no emiten facturas a sus clientes ni reciben la de su renta. Captúrala en Configuración del superadmin o define FACTURAPI_LLAVE.', critico: false),
         ];
     }
 

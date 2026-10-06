@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\EmitirFacturaPlataforma;
 use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Exceptions\DatosFiscalesRequeridos;
 use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
+use App\Modules\Tenancy\Facturacion\FacturacionNoConfigurada;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
@@ -15,6 +16,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FacturaPlataforma;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -38,6 +40,10 @@ class FacturaRentaController
             ->where('estudio_id', $estudio->getKey())
             ->where('ulid', (string) $request->route('cargo'))
             ->firstOrFail();
+        // Sin proveedor real en producción no se factura (ni se simula).
+        if (! ConfiguracionPlataforma::facturacionDisponible()) {
+            throw ValidationException::withMessages(['facturacion' => [FacturacionNoConfigurada::MOTIVO]]);
+        }
 
         // Receptor = datos fiscales del estudio (conexión tenant ya activa por estudio.resolver).
         $datos = DatosFiscalesTenant::query()->first();

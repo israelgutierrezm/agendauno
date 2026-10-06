@@ -1724,6 +1724,7 @@ export default {
     factura: {
       facturar: "Facturar",
       reintentar: "Reintentar",
+      noDisponible: "Facturación aún no disponible",
       procesando: "Emitiendo…",
       pdf: "PDF",
       xml: "XML",
