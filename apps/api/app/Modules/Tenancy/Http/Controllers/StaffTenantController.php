@@ -7,13 +7,13 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\CalcularNominaTenant;
 use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\VerificarAgendaTenant;
 use App\Modules\Tenancy\Models\AsignacionSesionTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Nomina\TipoPago;
-use App\Modules\Tenancy\Pagos\CatalogoMonedas;
 use App\Modules\Tenancy\RolSesionTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -80,7 +80,7 @@ class StaffTenantController
         $validado = $request->validate([
             'tipo' => ['required', Rule::enum(TipoPago::class)],
             'monto_minor' => ['required', 'integer', 'min:0'],
-            'moneda' => ['nullable', 'string', 'size:3', CatalogoMonedas::regla()],
+            'moneda' => ['nullable', 'string', 'size:3', app(RegionNegocioTenant::class)->reglaMoneda()],
         ]);
 
         $esquema = EsquemaPagoTenant::query()->updateOrCreate(

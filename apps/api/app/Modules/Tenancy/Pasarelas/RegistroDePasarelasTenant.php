@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Pasarelas;
 
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaTenant;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
@@ -33,6 +34,7 @@ class RegistroDePasarelasTenant
         private readonly PasarelaStripeTenant $stripe,
         private readonly PasarelaMercadoPagoTenant $mercadoPago,
         private readonly PasarelaOpenPayTenant $openPay,
+        private readonly RegionNegocioTenant $region,
     ) {}
 
     public function resolver(string $proveedor): PasarelaTenant
@@ -57,6 +59,10 @@ class RegistroDePasarelasTenant
             return true;
         }
         if (! ProveedorPasarela::disponible($proveedor)) {
+            return false;
+        }
+        // Las de cobro en línea solo funcionan en pesos mexicanos (ADR 0099).
+        if (in_array($proveedor, ProveedorPasarela::enLinea(), true) && ! $this->region->enPesos()) {
             return false;
         }
 

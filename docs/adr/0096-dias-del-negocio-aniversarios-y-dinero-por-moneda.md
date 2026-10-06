@@ -53,4 +53,22 @@ lugares con criterios distintos:
 - La migración `000110` llena `dia_ancla` de los acuerdos existentes con el día de su
   próximo cobro (respeta pausas), salvo aniversarios del 29 al 31, que vuelven al día de
   su inicio; de calendario, el 1.
-- Queda pendiente llevar moneda y sucursal a Tendencias y Cohortes.
+- ~~Queda pendiente llevar moneda y sucursal a Tendencias y Cohortes.~~ Hecho; ver la
+  ampliación.
+
+## Ampliación (2026-10-05): los demás reportes
+
+- **Tendencias** usa las mismas reglas de dinero, día por día
+  (`MovimientosDePagoTenant::diario`): cada punto trae lo vendido (y cuántas ventas),
+  lo cobrado, lo devuelto y el neto, cada uno por su fecha. La serie, los totales y el
+  desglose por producto son de la moneda del negocio (ADR 0099); lo que haya en otras
+  (historia de antes) va aparte en `otras_monedas`, nunca sumado. La pantalla dice qué
+  muestra cada gráfica: «cobrado neto» (por la fecha del cobro) o «vendido» (por la
+  fecha de la compra). El CSV trae una fila por fecha y moneda.
+- **Alcance por sucursal en todos los reportes**: Tendencias, Cohortes, Rentabilidad,
+  Equipo, Demanda y Sucursales se limitan a las sucursales de quien consulta
+  (`ResolverAccesoTenant::deLaSolicitud`), en consultas, totales, desgloses y
+  exportaciones. Cohortes cuenta a los clientes de esas sedes, su asistencia en clases
+  de esas sedes y sus compras ahí; la ocupación de agenda usa solo los horarios de esas
+  sedes; Equipo, solo al personal asignado a ellas. El dueño y el administrador siguen
+  viendo todo.

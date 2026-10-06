@@ -85,8 +85,12 @@ export interface EstudioSesion {
   perfil_config?: PerfilConfig;
   // El negocio manda avisos por WhatsApp a sus clientes (ADR 0069).
   whatsapp_clientes?: boolean;
-  // Su moneda (ADR 0097): la de lo nuevo; cada importe trae la suya.
+  // Su moneda y su zona horaria (ADR 0099): una sola moneda para todo el negocio.
   moneda?: string;
+  zona_horaria?: string;
+  // Con pesos mexicanos cobra en línea y (en México) factura a sus clientes.
+  cobra_en_linea_posible?: boolean;
+  factura_posible?: boolean;
 }
 
 const TERMINOLOGIA_DEFAULT: Terminologia = {

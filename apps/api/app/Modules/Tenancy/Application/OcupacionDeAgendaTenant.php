@@ -31,11 +31,12 @@ class OcupacionDeAgendaTenant
 {
     /**
      * @param  Collection<int, SesionTenant>  $sesiones  no canceladas del periodo
+     * @param  list<int>|null  $sucursales  solo los horarios de estas sedes (null = todas)
      * @return array{por_profesional: array<int, array{disponible: int, agendado: int}>, por_franja: array<string, array{dia: int, hora: int, disponible: int, agendado: int}>}
      */
-    public function calcular(string $desde, string $hasta, Collection $sesiones): array
+    public function calcular(string $desde, string $hasta, Collection $sesiones, ?array $sucursales = null): array
     {
-        $ventanas = $this->ventanas($desde, $hasta);
+        $ventanas = $this->ventanas($desde, $hasta, $sucursales);
         $asignaciones = AsignacionSesionTenant::query()
             ->whereIn('sesion_id', $sesiones->pluck('id'))
             ->get()
@@ -75,16 +76,20 @@ class OcupacionDeAgendaTenant
     /**
      * Los tramos disponibles de cada profesional, en UTC, con la zona de su sede.
      *
+     * @param  list<int>|null  $sucursales
      * @return array<int, list<array{0: CarbonImmutable, 1: CarbonImmutable, 2: string}>>
      */
-    private function ventanas(string $desde, string $hasta): array
+    private function ventanas(string $desde, string $hasta, ?array $sucursales): array
     {
-        $horarios = HorarioAtencionTenant::query()->get()->groupBy('dia_semana');
+        $horarios = HorarioAtencionTenant::query()
+            ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
+            ->get()
+            ->groupBy('dia_semana');
         if ($horarios->isEmpty()) {
             return [];
         }
         $zonas = SucursalTenant::query()->pluck('zona_horaria', 'id');
-        $zonaNegocio = (string) config('app.timezone', 'UTC');
+        $zonaNegocio = app(FechasNegocioTenant::class)->zona();
         $primerDia = CarbonImmutable::parse($desde);
         $ultimoDia = CarbonImmutable::parse($hasta);
 

@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\AsignacionPersonalTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use Illuminate\Http\Request;
 
 /**
  * Control de acceso tenant-local con SCOPE por sucursal (R19, ADR 0098). Un permiso lo
@@ -134,6 +135,19 @@ class ResolverAccesoTenant
         }
 
         return $asignadas;
+    }
+
+    /**
+     * Las sucursales que puede ver quien hace la solicitud (null = todas): el mismo
+     * alcance para listas, totales, desgloses y exportaciones de cualquier reporte.
+     *
+     * @return list<int>|null
+     */
+    public function deLaSolicitud(Request $request): ?array
+    {
+        $actor = $request->attributes->get('usuario_tenant');
+
+        return $actor instanceof Usuario ? $this->sucursalesPermitidas($actor) : null;
     }
 
     /**

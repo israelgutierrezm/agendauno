@@ -7,7 +7,6 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
-use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -40,16 +39,18 @@ class CalcularDemandaTenant
     ];
 
     /**
+     * @param  list<int>|null  $sucursales  solo las sesiones y horarios de estas sedes (null = todas)
      * @return array<string, mixed>
      */
-    public function calcular(string $desde, string $hasta): array
+    public function calcular(string $desde, string $hasta, ?array $sucursales = null): array
     {
-        $zona = (string) (SucursalTenant::query()->value('zona_horaria') ?? config('app.timezone', 'UTC'));
+        $zona = app(FechasNegocioTenant::class)->zona();
         $inicio = CarbonImmutable::parse($desde.' 00:00:00', $zona)->utc();
         $fin = CarbonImmutable::parse($hasta.' 00:00:00', $zona)->addDay()->utc();
 
         $sesiones = SesionTenant::query()
             ->whereBetween('inicia_en', [$inicio, $fin])
+            ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
             ->where('estado', '!=', EstadoSesionTenant::Cancelada->value)
             ->with('oferta.actividad')
             ->get();
@@ -110,7 +111,7 @@ class CalcularDemandaTenant
         // Ocupación de la agenda por franja, con las horas disponibles sin nada agendado.
         $totales['disponible_min'] = 0;
         $totales['agendado_min'] = 0;
-        foreach ($this->ocupacion->calcular($desde, $hasta, $sesiones)['por_franja'] as $clave => $franja) {
+        foreach ($this->ocupacion->calcular($desde, $hasta, $sesiones, $sucursales)['por_franja'] as $clave => $franja) {
             $matriz[$clave] ??= ['dia' => $franja['dia'], 'hora' => $franja['hora'], 'sesiones' => 0, 'capacidad' => 0, 'confirmadas' => 0, 'espera' => 0];
             $matriz[$clave]['disponible_min'] = $franja['disponible'];
             $matriz[$clave]['agendado_min'] = $franja['agendado'];

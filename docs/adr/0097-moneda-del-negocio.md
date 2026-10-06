@@ -1,6 +1,8 @@
 # ADR 0097 — Moneda del negocio: catálogo y parámetro
 
-Estado: Aceptado (2026-10-05).
+Estado: Reemplazado en parte por el ADR 0099 (2026-10-05): la moneda es UNA por negocio
+(sin valor de plataforma ni moneda por sucursal) y las pasarelas en línea y la
+facturación solo funcionan en pesos mexicanos.
 
 ## Contexto
 

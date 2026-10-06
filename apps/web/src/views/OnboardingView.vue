@@ -7,6 +7,7 @@ import CargadorLogo from "@/components/CargadorLogo.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
+import { claveZona, ZONA_POR_OMISION, ZONAS_HORARIAS } from "@/lib/region";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -78,16 +79,6 @@ const ICONOS: Record<Paso, string> = {
   reglas: "documentos",
   publicacion: "contenido",
 };
-const ZONAS = [
-  "America/Mexico_City",
-  "America/Tijuana",
-  "America/Monterrey",
-  "America/Cancun",
-  "America/Bogota",
-  "America/Lima",
-  "America/Santiago",
-  "America/Argentina/Buenos_Aires",
-];
 const DURACIONES = [15, 20, 30, 45, 60, 75, 90, 120, 150, 180];
 const DIAS = [1, 2, 3, 4, 5, 6, 7] as const;
 
@@ -140,7 +131,7 @@ const logoUrl = ref<string | null>(sesion.estudio?.logo_url ?? null);
 const negocio = ref({
   sucursal: "",
   direccion: "",
-  zona: "America/Mexico_City",
+  zona: ZONA_POR_OMISION,
 });
 interface Fila {
   nombre: string;
@@ -295,7 +286,8 @@ function prellenar(s: Sugerencias): void {
   negocio.value = {
     sucursal: sede?.nombre ?? "",
     direccion: sede?.direccion ?? "",
-    zona: sede?.zona_horaria ?? "America/Mexico_City",
+    zona:
+      sede?.zona_horaria ?? sesion.estudio?.zona_horaria ?? ZONA_POR_OMISION,
   };
   // Con lo más común del giro, si aún no hay nada.
   if (ofertas.value.length === 0) {
@@ -386,6 +378,12 @@ async function guardarNegocio(): Promise<void> {
       datos,
     );
     sucursales.value = [data.data];
+  }
+  // La zona elegida también es la del negocio: sus reportes, cortes y días (ADR 0099).
+  if (negocio.value.zona !== sesion.estudio?.zona_horaria) {
+    await api.put(`${base.value}/negocio/region`, {
+      zona_horaria: negocio.value.zona,
+    });
   }
 }
 
@@ -904,8 +902,8 @@ onMounted(cargar);
                   $t("configuracionInicial.negocio.zona")
                 }}</span>
                 <select v-model="negocio.zona" class="tu-input">
-                  <option v-for="z in ZONAS" :key="z" :value="z">
-                    {{ z.replace("America/", "").replace(/_/g, " ") }}
+                  <option v-for="z in ZONAS_HORARIAS" :key="z" :value="z">
+                    {{ $t(`region.zonas.${claveZona(z)}`, z) }}
                   </option>
                 </select>
               </label>

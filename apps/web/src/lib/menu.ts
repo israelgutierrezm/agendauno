@@ -109,6 +109,13 @@ export const CATEGORIAS_CONFIGURACION: CategoriaConfiguracion[] = [
         "horario",
         "ubicación",
       ]),
+      o("region", "region", "configNegocio.opciones.region", [
+        "moneda",
+        "pesos",
+        "dólares",
+        "zona horaria",
+        "hora",
+      ]),
       o("fiscales", "datos-fiscales", "configNegocio.opciones.fiscales", [
         "rfc",
         "factura",

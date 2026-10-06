@@ -6,10 +6,10 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\EmitirFacturaTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\FacturaTenant;
-use App\Modules\Tenancy\Pagos\CatalogoMonedas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -41,6 +41,10 @@ class FacturasTenantController
 
     public function emitir(Request $request): JsonResponse
     {
+        // Solo en pesos mexicanos y en México (ADR 0099).
+        if (! app(RegionNegocioTenant::class)->factura()) {
+            throw ValidationException::withMessages(['facturacion' => [RegionNegocioTenant::MOTIVO_FACTURACION]]);
+        }
         $validado = $request->validate([
             'receptor.nombre' => ['required', 'string', 'max:255'],
             'receptor.rfc' => ['required', 'string', 'regex:/^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/i'],
@@ -49,7 +53,7 @@ class FacturasTenantController
             'receptor.codigo_postal' => ['required', 'string', 'regex:/^[0-9]{5}$/'],
             'uso_cfdi' => ['required', 'string', 'max:4'],
             'forma_pago' => ['nullable', 'string', 'max:2'],
-            'moneda' => ['nullable', 'string', 'size:3', CatalogoMonedas::regla()],
+            'moneda' => ['nullable', 'string', 'size:3', app(RegionNegocioTenant::class)->reglaMoneda()],
             'items' => ['required', 'array', 'min:1'],
             'items.*.descripcion' => ['required', 'string', 'max:1000'],
             'items.*.cantidad' => ['required', 'integer', 'min:1'],

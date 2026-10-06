@@ -90,7 +90,7 @@ class ReporteNegocioTenantController
         $ausentes = AsistenciaTenant::query()->whereIn('reserva_id', $reservaIds)->where('estado', EstadoAsistencia::Ausente->value)->count();
         $marcadas = $presentes + $ausentes;
 
-        $agenda = $ocupacion->calcular($validado['desde'], $validado['hasta'], SesionTenant::query()
+        $agenda = $ocupacion->calcular($validado['desde'], $validado['hasta'], sucursales: $sedes, sesiones: SesionTenant::query()
             ->whereBetween('inicia_en', [$inicio, $fin])
             ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes))
             ->where('estado', '!=', EstadoSesionTenant::Cancelada->value)

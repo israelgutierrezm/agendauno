@@ -9,7 +9,9 @@ use App\Modules\Tenancy\Application\AutenticacionGoogleTenant;
 use App\Modules\Tenancy\Application\AutenticacionTenant;
 use App\Modules\Tenancy\Application\CambiarCorreoTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\RestablecerContrasenaTenant;
 use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
@@ -274,8 +276,12 @@ class AuthTenantController
             'perfil_config' => $estudio->perfilConfig(),
             // Manda avisos por WhatsApp a sus clientes (ADR 0069).
             'whatsapp_clientes' => app(WhatsAppTenant::class)->enUso(),
-            // Su moneda (ADR 0097): la de lo nuevo; cada importe trae la suya.
+            // Su moneda y su zona horaria (ADR 0099); con pesos mexicanos cobra en
+            // línea y (en México) factura.
             'moneda' => app(ParametrosTenant::class)->moneda(),
+            'zona_horaria' => app(FechasNegocioTenant::class)->zona(),
+            'cobra_en_linea_posible' => app(RegionNegocioTenant::class)->enPesos(),
+            'factura_posible' => app(RegionNegocioTenant::class)->factura(),
         ];
     }
 }

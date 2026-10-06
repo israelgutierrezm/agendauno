@@ -136,10 +136,17 @@ interface Equipo {
   totales: CifrasEquipo;
   profesionales: ProfesionalEquipo[];
 }
-interface PuntoSerie {
+// Lo vendido cuenta por la fecha de la compra; lo cobrado, devuelto y neto, por la
+// fecha en que el dinero entró o salió (como el corte de caja).
+interface DineroTendencia {
+  ventas: number;
+  ventas_minor: number;
+  cobrado_minor: number;
+  devuelto_minor: number;
+  neto_minor: number;
+}
+interface PuntoSerie extends DineroTendencia {
   fecha: string;
-  ingresos_minor: number;
-  ordenes: number;
 }
 interface Tendencias {
   agrupacion: string;
@@ -147,14 +154,12 @@ interface Tendencias {
   serie: PuntoSerie[];
   por_producto: {
     producto: string;
-    ingresos_minor: number;
+    ventas_minor: number;
     unidades: number;
   }[];
-  totales: {
-    ingresos_minor: number;
-    ordenes: number;
-    ticket_promedio_minor: number | null;
-  };
+  totales: DineroTendencia & { ticket_promedio_minor: number | null };
+  // Dinero en otras monedas (de antes de elegir una sola): aparte, nunca sumado.
+  otras_monedas: (Omit<DineroTendencia, "ventas"> & { moneda: string })[];
 }
 interface Cohorte {
   mes: string;
@@ -220,13 +225,25 @@ function pctConv(n: number): string {
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
-// Altura de cada barra (0..100%) relativa al ingreso máximo de la serie.
-const maxIngreso = computed(() =>
-  Math.max(1, ...(tendencias.value?.serie.map((p) => p.ingresos_minor) ?? [0])),
+// Qué muestra la gráfica: el dinero que entró menos devoluciones, o lo vendido.
+const metrica = ref<"neto" | "ventas">("neto");
+function valorDe(p: PuntoSerie): number {
+  return metrica.value === "neto" ? p.neto_minor : p.ventas_minor;
+}
+// Altura de cada barra (0..100%) relativa al máximo de la serie (sin negativos).
+const maxSerie = computed(() =>
+  Math.max(1, ...(tendencias.value?.serie.map((p) => valorDe(p)) ?? [0])),
 );
 function barra(p: PuntoSerie): string {
-  return `${Math.round((p.ingresos_minor / maxIngreso.value) * 100)}%`;
+  return `${Math.round((Math.max(0, valorDe(p)) / maxSerie.value) * 100)}%`;
 }
+const serieVacia = computed(
+  () =>
+    tendencias.value === null ||
+    tendencias.value.serie.every(
+      (p) => p.ventas_minor === 0 && p.cobrado_minor === 0,
+    ),
+);
 function fechaBucket(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
   return agrupacion.value === "mes"
@@ -653,9 +670,7 @@ onMounted(cargar);
             <button
               class="tu-btn tu-btn-fantasma"
               type="button"
-              :disabled="
-                exportando || !tendencias || tendencias.serie.length === 0
-              "
+              :disabled="exportando || !tendencias || serieVacia"
               @click="exportarTendencias"
             >
               {{
@@ -669,29 +684,48 @@ onMounted(cargar);
 
         <template v-if="tendencias">
           <!-- Totales del periodo -->
-          <div class="mt-3 tu-card px-5 py-4 grid grid-cols-3 gap-4">
+          <div
+            class="mt-3 tu-card px-5 py-4 grid gap-4 sm:grid-cols-3"
+            data-prueba="tendencias-totales"
+          >
             <div>
               <div class="text-xl font-semibold tabular-nums">
-                {{
-                  dinero(tendencias.totales.ingresos_minor, tendencias.moneda)
-                }}
+                {{ dinero(tendencias.totales.neto_minor, tendencias.moneda) }}
               </div>
               <div
                 class="text-xs mt-1"
                 :style="{ color: 'var(--texto-suave)' }"
               >
-                {{ $t("reportes.tendencias.ingresos") }}
+                {{ $t("reportes.tendencias.cobradoNeto") }} ·
+                {{
+                  $t("reportes.tendencias.cobradoDevuelto", {
+                    cobrado: dinero(
+                      tendencias.totales.cobrado_minor,
+                      tendencias.moneda,
+                    ),
+                    devuelto: dinero(
+                      tendencias.totales.devuelto_minor,
+                      tendencias.moneda,
+                    ),
+                  })
+                }}
               </div>
             </div>
             <div>
               <div class="text-xl font-semibold tabular-nums">
-                {{ tendencias.totales.ordenes }}
+                {{ dinero(tendencias.totales.ventas_minor, tendencias.moneda) }}
               </div>
               <div
                 class="text-xs mt-1"
                 :style="{ color: 'var(--texto-suave)' }"
               >
-                {{ $t("reportes.tendencias.ordenes") }}
+                {{
+                  $t(
+                    "reportes.tendencias.vendidoN",
+                    { n: tendencias.totales.ventas },
+                    tendencias.totales.ventas,
+                  )
+                }}
               </div>
             </div>
             <div>
@@ -712,18 +746,49 @@ onMounted(cargar);
             </div>
           </div>
 
-          <!-- Barras de ingresos por bucket -->
+          <!-- La gráfica: cobrado neto (por fecha del cobro) o vendido (por fecha de la compra) -->
           <div class="mt-4 tu-card p-5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div
+                class="tu-segmentado"
+                role="group"
+                :aria-label="$t('reportes.tendencias.queMuestra')"
+              >
+                <button
+                  type="button"
+                  :aria-pressed="metrica === 'neto'"
+                  data-prueba="metrica-neto"
+                  @click="metrica = 'neto'"
+                >
+                  {{ $t("reportes.tendencias.cobradoNeto") }}
+                </button>
+                <button
+                  type="button"
+                  :aria-pressed="metrica === 'ventas'"
+                  data-prueba="metrica-ventas"
+                  @click="metrica = 'ventas'"
+                >
+                  {{ $t("reportes.tendencias.vendido") }}
+                </button>
+              </div>
+              <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+                {{
+                  metrica === "neto"
+                    ? $t("reportes.tendencias.ayudaNeto")
+                    : $t("reportes.tendencias.ayudaVendido")
+                }}
+              </p>
+            </div>
             <p
-              v-if="tendencias.totales.ingresos_minor === 0"
-              class="text-sm"
+              v-if="serieVacia"
+              class="mt-4 text-sm"
               :style="{ color: 'var(--texto-suave)' }"
             >
               {{ $t("reportes.tendencias.vacio") }}
             </p>
             <template v-else>
               <div
-                class="flex items-end gap-1 h-40 border-b"
+                class="mt-4 flex items-end gap-1 h-40 border-b"
                 :style="{ borderColor: 'var(--borde)' }"
               >
                 <div
@@ -733,9 +798,9 @@ onMounted(cargar);
                   :style="{
                     height: barra(p),
                     background: 'var(--primario)',
-                    minHeight: p.ingresos_minor > 0 ? '3px' : '0',
+                    minHeight: valorDe(p) > 0 ? '3px' : '0',
                   }"
-                  :title="`${fechaBucket(p.fecha)} · ${dinero(p.ingresos_minor, tendencias.moneda)} · ${p.ordenes} órd.`"
+                  :title="`${fechaBucket(p.fecha)} · ${dinero(valorDe(p), tendencias.moneda)}`"
                 />
               </div>
               <div
@@ -774,7 +839,7 @@ onMounted(cargar);
                     {{ $t("reportes.tendencias.colUnidades") }}
                   </th>
                   <th class="text-right">
-                    {{ $t("reportes.tendencias.colIngresos") }}
+                    {{ $t("reportes.tendencias.colVendido") }}
                   </th>
                 </tr>
               </thead>
@@ -783,12 +848,63 @@ onMounted(cargar);
                   <td class="font-semibold">{{ p.producto }}</td>
                   <td class="text-right">{{ p.unidades }}</td>
                   <td class="text-right">
-                    {{ dinero(p.ingresos_minor, tendencias.moneda) }}
+                    {{ dinero(p.ventas_minor, tendencias.moneda) }}
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
+
+          <!-- Otras monedas (de antes de trabajar con una sola): aparte, nunca sumadas -->
+          <template v-if="tendencias.otras_monedas.length > 0">
+            <h3 class="mt-6 font-semibold">
+              {{ $t("reportes.tendencias.otrasMonedas") }}
+            </h3>
+            <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+              {{ $t("reportes.tendencias.otrasMonedasAyuda") }}
+            </p>
+            <div
+              class="mt-3 tu-card overflow-x-auto"
+              data-prueba="tendencias-otras-monedas"
+            >
+              <table class="tu-tabla">
+                <thead>
+                  <tr>
+                    <th>{{ $t("reportes.dinero.moneda") }}</th>
+                    <th class="text-right">
+                      {{ $t("reportes.dinero.vendido") }}
+                    </th>
+                    <th class="text-right">
+                      {{ $t("reportes.dinero.cobrado") }}
+                    </th>
+                    <th class="text-right">
+                      {{ $t("reportes.dinero.devuelto") }}
+                    </th>
+                    <th class="text-right">
+                      {{ $t("reportes.dinero.neto") }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="m in tendencias.otras_monedas" :key="m.moneda">
+                    <td>{{ m.moneda }}</td>
+                    <td class="text-right tabular-nums">
+                      {{ dinero(m.ventas_minor, m.moneda) }}
+                    </td>
+                    <td class="text-right tabular-nums">
+                      {{ dinero(m.cobrado_minor, m.moneda) }}
+                    </td>
+                    <td class="text-right tabular-nums">
+                      {{ dinero(m.devuelto_minor, m.moneda) }}
+                    </td>
+                    <td class="text-right tabular-nums font-medium">
+                      {{ dinero(m.neto_minor, m.moneda) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
         </template>
       </template>
 

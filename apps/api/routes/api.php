@@ -84,6 +84,7 @@ use App\Modules\Tenancy\Http\Controllers\PublicoCitasController;
 use App\Modules\Tenancy\Http\Controllers\PuntoDeVentaTenantController;
 use App\Modules\Tenancy\Http\Controllers\RecursosTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReembolsosTenantController;
+use App\Modules\Tenancy\Http\Controllers\RegionNegocioTenantController;
 use App\Modules\Tenancy\Http\Controllers\RegistroEstudioController;
 use App\Modules\Tenancy\Http\Controllers\RegistroWhatsAppController;
 use App\Modules\Tenancy\Http\Controllers\ReporteCohortesTenantController;
@@ -446,6 +447,9 @@ Route::prefix('v1')->group(function (): void {
             // Perfil público: portada, descripción y redes (página pública y de enlaces).
             Route::post('/marca/portada', [MarcaEstudioController::class, 'subirPortada'])->middleware('puede:estudio.gestionar')->name('marca.portada.store');
             Route::delete('/marca/portada', [MarcaEstudioController::class, 'eliminarPortada'])->middleware('puede:estudio.gestionar')->name('marca.portada.destroy');
+            // Moneda y zona horaria del negocio (ADR 0099).
+            Route::get('/negocio/region', [RegionNegocioTenantController::class, 'mostrar'])->middleware('puede:estudio.gestionar')->name('negocio.region.show');
+            Route::put('/negocio/region', [RegionNegocioTenantController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('negocio.region.guardar');
             Route::get('/perfil-publico', [PerfilPublicoController::class, 'mostrar'])->middleware('puede:estudio.gestionar')->name('perfil-publico.show');
             Route::put('/perfil-publico', [PerfilPublicoController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('perfil-publico.guardar');
 

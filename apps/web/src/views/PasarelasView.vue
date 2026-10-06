@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 
+import AvisoRegion from "@/components/AvisoRegion.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -76,14 +77,23 @@ useCambiosPendientes(() =>
   }),
 );
 
+// Con otra moneda que no sea el peso mexicano, las de cobro en línea no aplican; la
+// ventanilla (depósito con comprobante) sí.
+const enLineaDisponible = ref(true);
+function configurable(p: Pasarela): boolean {
+  return enLineaDisponible.value || p.proveedor === "ventanilla";
+}
+
 async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const { data } = await api.get<{ data: Pasarela[] }>(
-      `${base.value}/pasarelas`,
-    );
+    const { data } = await api.get<{
+      data: Pasarela[];
+      meta?: { en_linea_disponible: boolean };
+    }>(`${base.value}/pasarelas`);
     pasarelas.value = data.data;
+    enLineaDisponible.value = data.meta?.en_linea_disponible !== false;
     for (const p of data.data) {
       edicion[p.proveedor] = {
         activa: p.activa,
@@ -163,8 +173,12 @@ onMounted(cargar);
     </p>
 
     <div v-if="!cargando" class="mt-6 space-y-4">
+      <!-- Fuera de pesos mexicanos no se cobra en línea (ADR 0099). -->
+      <AvisoRegion v-if="!enLineaDisponible" tipo="pasarelas" />
       <div
-        v-for="p in pasarelas.filter((x) => x.disponible === false)"
+        v-for="p in pasarelas.filter(
+          (x) => x.disponible === false || !configurable(x),
+        )"
         :key="p.proveedor"
         class="tu-card p-6"
       >
@@ -172,14 +186,22 @@ onMounted(cargar);
           <h2 class="font-medium text-lg">
             {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
           </h2>
-          <span class="tu-badge">{{ $t("pasarelasEstado.proximamente") }}</span>
+          <span v-if="p.disponible === false" class="tu-badge">{{
+            $t("pasarelasEstado.proximamente")
+          }}</span>
         </div>
         <p class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("pasarelasEstado.noDisponible") }}
+          {{
+            p.disponible === false
+              ? $t("pasarelasEstado.noDisponible")
+              : $t("region.avisos.soloPesos")
+          }}
         </p>
       </div>
       <div
-        v-for="p in pasarelas.filter((x) => x.disponible !== false)"
+        v-for="p in pasarelas.filter(
+          (x) => x.disponible !== false && configurable(x),
+        )"
         :key="p.proveedor"
         class="tu-card p-6"
       >

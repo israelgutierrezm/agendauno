@@ -6,13 +6,13 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\InventarioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Inventario\Exceptions\StockInsuficiente;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
-use App\Modules\Tenancy\Pagos\CatalogoMonedas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -151,7 +151,7 @@ class InventarioTenantController
             'nombre' => ['required', 'string', 'max:255'],
             'sku' => ['nullable', 'string', 'max:64'],
             'precio_minor' => ['required', 'integer', 'min:0'],
-            'moneda' => ['nullable', 'string', 'size:3', CatalogoMonedas::regla()],
+            'moneda' => ['nullable', 'string', 'size:3', app(RegionNegocioTenant::class)->reglaMoneda()],
             'activo' => ['boolean'],
         ]);
 

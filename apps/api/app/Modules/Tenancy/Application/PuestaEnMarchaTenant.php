@@ -145,7 +145,7 @@ class PuestaEnMarchaTenant
 
         $mejor = null;
         foreach (SucursalTenant::query()->orderBy('id')->get() as $sucursal) {
-            $zona = (string) ($sucursal->zona_horaria ?? config('app.timezone', 'UTC'));
+            $zona = (string) ($sucursal->zona_horaria ?: app(FechasNegocioTenant::class)->zona());
             $hoy = CarbonImmutable::now($zona)->toDateString();
             foreach ($this->disponibilidad->diasConAtencion($sucursal, $hoy, self::DIAS_A_REVISAR) as $dia) {
                 if (! $dia['abierto']) {

@@ -63,14 +63,17 @@ it('crea y edita una sucursal como unidad de negocio (moneda/impuesto/region)', 
 
     $id = (string) $creada->json('data.id');
 
-    // Edicion parcial: cambia impuesto y moneda, conserva la region.
+    // Edicion parcial: cambia el impuesto y conserva la region; la moneda es la del
+    // negocio (una sola, ADR 0099): otra no se acepta.
     test()->putJson("/api/v1/app/{$e['slug']}/sucursales/{$id}", [
-        'impuesto_tasa_bps' => 0, 'moneda' => 'usd',
+        'impuesto_tasa_bps' => 0,
     ], conBearer($e['bearer']))
         ->assertOk()
         ->assertJsonPath('data.impuesto_tasa_bps', 0)
-        ->assertJsonPath('data.moneda', 'USD')
+        ->assertJsonPath('data.moneda', 'MXN')
         ->assertJsonPath('data.region', 'Centro');
+    test()->putJson("/api/v1/app/{$e['slug']}/sucursales/{$id}", ['moneda' => 'usd'], conBearer($e['bearer']))
+        ->assertUnprocessable()->assertJsonValidationErrors(['moneda'], 'meta.errors');
 });
 
 it('asigna sucursal de casa al miembro y permite filtrar por sucursal', function (): void {

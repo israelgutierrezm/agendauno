@@ -233,6 +233,12 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      path: "/region",
+      name: "region",
+      component: () => import("@/views/RegionNegocioView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/datos-fiscales",
       name: "datos-fiscales",
       component: () => import("@/views/DatosFiscalesView.vue"),

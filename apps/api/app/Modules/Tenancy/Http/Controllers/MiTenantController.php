@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\ClimaTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\CorteDePlanesTenant;
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\FormulariosDePersonaTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
@@ -241,7 +242,7 @@ class MiTenantController
             'sucursal_id' => ['nullable', 'string'],
         ]);
 
-        $zona = (string) (SucursalTenant::query()->value('zona_horaria') ?? config('app.timezone', 'UTC'));
+        $zona = app(FechasNegocioTenant::class)->zona();
         $desde = CarbonImmutable::parse($validado['desde'] ?? CarbonImmutable::now($zona)->toDateString(), 'UTC');
         $hasta = isset($validado['hasta']) ? CarbonImmutable::parse($validado['hasta'], 'UTC') : $desde->addDays(30);
         if ($desde->diffInDays($hasta) > self::DIAS_AGENDA) {

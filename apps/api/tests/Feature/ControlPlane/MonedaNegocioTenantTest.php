@@ -3,14 +3,15 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
-use Illuminate\Support\Facades\Config;
+use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Support\Facades\File;
+use Illuminate\Testing\TestResponse;
 
 /*
-| La moneda del negocio (ADR 0097): un parámetro con las monedas del catálogo, pesos
-| mexicanos si nadie la cambia. La plataforma fija la suya y cada negocio puede usar
-| otra; lo nuevo (productos, nómina, inventario) la toma si no se indica, y una
-| moneda fuera del catálogo no se acepta.
+| La región del negocio (ADR 0099): UNA moneda para todo el negocio (pesos mexicanos
+| por omisión), que se elige antes de empezar a cobrar, y su zona horaria (la de la
+| Ciudad de México por omisión). Con pesos mexicanos funcionan las pasarelas en línea
+| y la facturación (esta, solo en México); con otra moneda, ni se cargan sus datos.
 */
 
 beforeEach(function (): void {
@@ -35,52 +36,119 @@ function monedaDeProductoNuevo(array $e): string
     ], conBearer($e['bearer']))->assertCreated()->json('data.moneda');
 }
 
-it('sin cambiarla es el peso mexicano, y se ofrece el catálogo con nombre', function (): void {
+/**
+ * Cambia la moneda o la zona horaria del negocio.
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ * @param  array<string, string>  $datos
+ */
+function cambiarRegionNegocio(array $e, array $datos): TestResponse
+{
+    return test()->putJson("/api/v1/app/{$e['slug']}/negocio/region", $datos, conBearer($e['bearer']));
+}
+
+it('por omisión trabaja en pesos mexicanos y con la hora de la Ciudad de México', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
 
+    $this->getJson("/api/v1/app/{$e['slug']}/negocio/region", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.moneda', 'MXN')
+        ->assertJsonPath('data.zona_horaria', 'America/Mexico_City')
+        ->assertJsonPath('data.puede_cambiar_moneda', true)
+        ->assertJsonPath('data.pasarelas.disponibles', true)
+        ->assertJsonPath('data.facturacion.disponible', true)
+        ->assertJsonPath('data.monedas.0', ['codigo' => 'MXN', 'nombre' => 'Peso mexicano']);
     $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.estudio.moneda', 'MXN');
+        ->assertOk()
+        ->assertJsonPath('data.estudio.moneda', 'MXN')
+        ->assertJsonPath('data.estudio.zona_horaria', 'America/Mexico_City');
     expect(monedaDeProductoNuevo($e))->toBe('MXN');
-
-    $parametro = collect($this->getJson("/api/v1/app/{$e['slug']}/parametros", conBearer($e['bearer']))->assertOk()->json('data'))
-        ->firstWhere('clave', 'negocio.moneda');
-    expect($parametro['plataforma'])->toBe(484)
-        ->and($parametro['opciones'])->toContain(484, 840, 978)
-        ->and($parametro['etiquetas']['484'])->toBe('MXN · Peso mexicano')
-        ->and($parametro['etiquetas']['840'])->toBe('USD · Dólar estadounidense');
 });
 
-it('el negocio usa otra moneda del catálogo y lo nuevo la toma', function (): void {
+it('una sola moneda: lo creado pasa a la nueva y no se acepta otra', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/parametros", ['valores' => ['negocio.moneda' => 840]], conBearer($e['bearer']))
-        ->assertOk();
+    $antes = (string) $this->postJson("/api/v1/app/{$e['slug']}/productos", [
+        'nombre' => 'Mensual', 'tipo' => 'paquete', 'precio_minor' => 99900,
+        'ilimitado' => false, 'creditos_incluidos' => 8000,
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
 
-    $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.estudio.moneda', 'USD');
-    expect(monedaDeProductoNuevo($e))->toBe('USD');
+    cambiarRegionNegocio($e, ['moneda' => 'usd'])->assertOk()->assertJsonPath('data.moneda', 'USD');
 
-    // Una sucursal puede usar otra, elegida del catálogo.
-    $this->getJson("/api/v1/app/{$e['slug']}/sucursales", conBearer($e['bearer']))
-        ->assertOk()
-        ->assertJsonPath('meta.moneda_negocio', 'USD')
-        ->assertJsonPath('meta.monedas.0', ['codigo' => 'MXN', 'nombre' => 'Peso mexicano']);
-
-    // Fuera del catálogo: ni como parámetro ni en un producto.
-    $this->putJson("/api/v1/app/{$e['slug']}/parametros", ['valores' => ['negocio.moneda' => 999]], conBearer($e['bearer']))
-        ->assertUnprocessable();
+    // Lo ya creado (sin ventas) pasa a la nueva moneda; lo nuevo, también.
+    $productos = collect($this->getJson("/api/v1/app/{$e['slug']}/productos", conBearer($e['bearer']))->assertOk()->json('data'));
+    expect($productos->firstWhere('id', $antes)['moneda'])->toBe('USD')
+        ->and(monedaDeProductoNuevo($e))->toBe('USD');
+    // Otra moneda no se acepta, ni fuera del catálogo.
     $this->postJson("/api/v1/app/{$e['slug']}/productos", [
-        'nombre' => 'Otro', 'tipo' => 'paquete', 'precio_minor' => 100, 'moneda' => 'XYZ',
+        'nombre' => 'En pesos', 'tipo' => 'paquete', 'precio_minor' => 100, 'moneda' => 'MXN',
         'ilimitado' => false, 'creditos_incluidos' => 1000,
     ], conBearer($e['bearer']))->assertUnprocessable()->assertJsonValidationErrors(['moneda'], 'meta.errors');
+    cambiarRegionNegocio($e, ['moneda' => 'XYZ'])->assertUnprocessable();
 });
 
-it('la plataforma fija la moneda de los negocios que no la cambiaron', function (): void {
+it('con cobros registrados, la moneda ya no cambia', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    Config::set('agendauno.plataforma.token', 'token-plataforma');
-    $this->putJson('/api/v1/plataforma/parametros', ['valores' => ['negocio.moneda' => 978]], conPlataforma())
-        ->assertOk();
+    $orden = (string) $this->postJson("/api/v1/app/{$e['slug']}/ordenes", [
+        'comprador_id' => crearMiembroTenant($e, 'Ana'), 'items' => [['producto_id' => crearPackTenant($e), 'cantidad' => 1]],
+    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
 
-    expect(monedaDeProductoNuevo($e))->toBe('EUR');
+    $this->getJson("/api/v1/app/{$e['slug']}/negocio/region", conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.puede_cambiar_moneda', false);
+    cambiarRegionNegocio($e, ['moneda' => 'USD'])
+        ->assertUnprocessable()
+        ->assertJsonPath('meta.errors.moneda.0', 'Ya hay cobros en MXN: la moneda se elige antes de empezar a cobrar.');
+});
+
+it('fuera de pesos mexicanos no se cobra en línea ni se factura, ni se cargan sus datos', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    // En pesos, una pasarela conectada cobra.
+    $this->putJson("/api/v1/app/{$e['slug']}/pasarelas/stripe", [
+        'activa' => true, 'modo' => 'test', 'credenciales' => ['secret_key' => 'sk_test_x'],
+    ], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.lista', true);
+
+    cambiarRegionNegocio($e, ['moneda' => 'EUR'])
+        ->assertOk()
+        ->assertJsonPath('data.pasarelas.disponibles', false)
+        ->assertJsonPath('data.facturacion.disponible', false);
+
+    // La pasarela que ya estaba deja de cobrar y no se cargan llaves nuevas.
+    $pasarelas = $this->getJson("/api/v1/app/{$e['slug']}/pasarelas", conBearer($e['bearer']))->assertOk();
+    expect(collect($pasarelas->json('data'))->firstWhere('proveedor', 'stripe')['lista'])->toBeFalse()
+        ->and($pasarelas->json('meta.en_linea_disponible'))->toBeFalse();
+    $this->putJson("/api/v1/app/{$e['slug']}/pasarelas/mercadopago", [
+        'activa' => true, 'modo' => 'test', 'credenciales' => ['access_token' => 'x'],
+    ], conBearer($e['bearer']))->assertUnprocessable()
+        ->assertJsonPath('meta.errors.proveedor.0', 'Las pasarelas de pago en línea solo funcionan con pesos mexicanos (MXN).');
+
+    // Facturación: ni datos fiscales ni facturas.
+    $this->getJson("/api/v1/app/{$e['slug']}/datos-fiscales", conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('meta.disponible', false);
+    $this->putJson("/api/v1/app/{$e['slug']}/datos-fiscales", [
+        'razon_social' => 'Estudio Demo SA de CV', 'rfc' => 'ABC010101AB9', 'regimen_fiscal' => '601', 'codigo_postal' => '06700',
+    ], conBearer($e['bearer']))->assertUnprocessable()
+        ->assertJsonPath('meta.errors.facturacion.0', 'La facturación a tus clientes solo funciona en pesos mexicanos (MXN) y para negocios en México.');
+    $this->postJson("/api/v1/app/{$e['slug']}/facturas", [], conBearer($e['bearer']))->assertUnprocessable();
+});
+
+it('la facturación es solo para negocios en México', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    Estudio::query()->where('slug', $e['slug'])->update(['pais' => 'CO']);
+
+    $this->getJson("/api/v1/app/{$e['slug']}/negocio/region", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.pasarelas.disponibles', true)
+        ->assertJsonPath('data.facturacion.disponible', false);
+});
+
+it('elige su zona horaria; una que no existe no se acepta', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+
+    cambiarRegionNegocio($e, ['zona_horaria' => 'America/Tijuana'])
+        ->assertOk()->assertJsonPath('data.zona_horaria', 'America/Tijuana');
     $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.estudio.moneda', 'EUR');
+        ->assertOk()->assertJsonPath('data.estudio.zona_horaria', 'America/Tijuana');
+    expect(Estudio::query()->where('slug', $e['slug'])->value('zona_horaria'))->toBe('America/Tijuana');
+
+    cambiarRegionNegocio($e, ['zona_horaria' => 'Marte/Olympus'])->assertUnprocessable();
 });

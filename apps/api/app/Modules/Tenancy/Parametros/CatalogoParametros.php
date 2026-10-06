@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Parametros;
 
-use App\Modules\Tenancy\Pagos\CatalogoMonedas;
-
 /**
  * Todos los límites y datos de negocio que se pueden configurar (ADR 0042). Nada de
  * esto vive fijo en el código: el valor que aplica sale del negocio, si lo ajustó; si
@@ -21,12 +19,6 @@ final class CatalogoParametros
         $e = DefinicionParametro::ENTERO;
         $sn = DefinicionParametro::SI_NO;
         $lista = [
-            // Moneda del negocio (ADR 0097): número ISO 4217 de una moneda del catálogo.
-            new DefinicionParametro('negocio.moneda', 'Moneda', 'Moneda del negocio',
-                'La de los precios, cobros y reportes de lo nuevo; lo ya creado conserva su moneda. Una sucursal puede usar otra.',
-                $e, CatalogoMonedas::numero(CatalogoMonedas::PREDETERMINADA), 1, 999,
-                opciones: array_keys(CatalogoMonedas::etiquetasPorNumero()), etiquetas: CatalogoMonedas::etiquetasPorNumero()),
-
             // Reservas y lista de espera.
             new DefinicionParametro('reservas.minutos_para_pagar', 'Reservas y lista de espera', 'Tiempo para pagar una reserva apartada',
                 'Si no se paga en este tiempo, el lugar se libera.', $e, 30, 5, 1440, 'min'),

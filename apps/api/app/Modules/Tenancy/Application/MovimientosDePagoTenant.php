@@ -175,6 +175,80 @@ class MovimientosDePagoTenant
     }
 
     /**
+     * El dinero de un periodo día por día (días del negocio) y por moneda, con las
+     * mismas reglas que {@see porMoneda}: lo vendido por la fecha de la compra
+     * (compras no canceladas y mostrador, y cuántas ventas); lo cobrado por la fecha
+     * del cobro (con mostrador); lo devuelto por la fecha de la devolución.
+     *
+     * @param  list<int>|null  $sucursales  solo lo de estas sedes (null = todas)
+     * @return array<string, array<string, array{ventas: int, ventas_minor: int, cobrado_minor: int, devuelto_minor: int}>> moneda → día (AAAA-MM-DD) → cifras
+     */
+    public function diario(string $desde, string $hasta, ?array $sucursales = null): array
+    {
+        $this->sucursales = $sucursales;
+        $zona = (string) ($this->gestor->actual()?->zona_horaria ?: 'America/Mexico_City');
+        $inicio = CarbonImmutable::parse($desde, $zona)->startOfDay()->utc();
+        $fin = CarbonImmutable::parse($hasta, $zona)->endOfDay()->utc();
+
+        /** @var array<string, array<string, array{ventas: int, ventas_minor: int, cobrado_minor: int, devuelto_minor: int}>> $por */
+        $por = [];
+        $sumar = static function (string $moneda, mixed $momento, string $campo, int $monto, bool $esVenta = false) use (&$por, $zona): void {
+            if ($momento === null || $momento === '') {
+                return;
+            }
+            $dia = CarbonImmutable::parse((string) $momento, 'UTC')->setTimezone($zona)->toDateString();
+            $por[$moneda][$dia] ??= ['ventas' => 0, 'ventas_minor' => 0, 'cobrado_minor' => 0, 'devuelto_minor' => 0];
+            $por[$moneda][$dia][$campo] += $monto;
+            if ($esVenta) {
+                $por[$moneda][$dia]['ventas']++;
+            }
+        };
+
+        $compras = OrdenTenant::query()
+            ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
+            ->where('estado', '!=', EstadoOrden::Cancelada->value)
+            ->whereBetween('created_at', [$inicio, $fin])
+            ->toBase()
+            ->get(['moneda', 'total_minor', 'created_at']);
+        foreach ($compras as $o) {
+            $sumar((string) $o->moneda, $o->created_at, 'ventas_minor', (int) $o->total_minor, true);
+        }
+
+        // Mostrador: se vende y se cobra en el momento.
+        $mostrador = VentaPosTenant::query()
+            ->whereNull('anulada_en')
+            ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
+            ->whereBetween('created_at', [$inicio, $fin])
+            ->toBase()
+            ->get(['moneda', 'total_minor', 'created_at']);
+        foreach ($mostrador as $v) {
+            $sumar((string) $v->moneda, $v->created_at, 'ventas_minor', (int) $v->total_minor, true);
+            $sumar((string) $v->moneda, $v->created_at, 'cobrado_minor', (int) $v->total_minor);
+        }
+
+        $cobros = $this->porSedeDeLaOrden(PagoTenant::query(), 'pagos.orden_id')
+            ->whereIn('estado', array_map(static fn (EstadoPago $e): string => $e->value, self::COBRADOS))
+            ->whereBetween('aprobado_en', [$inicio, $fin])
+            ->toBase()
+            ->get(['moneda', 'monto_minor', 'aprobado_en']);
+        foreach ($cobros as $p) {
+            $sumar((string) $p->moneda, $p->aprobado_en, 'cobrado_minor', (int) $p->monto_minor);
+        }
+
+        $devoluciones = $this->porSedeDeLaOrden(ReembolsoTenant::query(), 'pagos.orden_id')
+            ->join('pagos', 'pagos.id', '=', 'reembolsos.pago_id')
+            ->where('reembolsos.estado', EstadoReembolso::Aprobado->value)
+            ->whereBetween('reembolsos.aplicado_en', [$inicio, $fin])
+            ->toBase()
+            ->get(['reembolsos.moneda as moneda', 'reembolsos.monto_minor as monto', 'reembolsos.aplicado_en as fecha']);
+        foreach ($devoluciones as $r) {
+            $sumar((string) $r->moneda, $r->fecha, 'devuelto_minor', (int) $r->monto);
+        }
+
+        return $por;
+    }
+
+    /**
      * @return array{0: list<Movimiento>, 1: bool}
      */
     private function cobros(CarbonImmutable $inicio, CarbonImmutable $fin, ?int $usuarioId, ?int $limite): array

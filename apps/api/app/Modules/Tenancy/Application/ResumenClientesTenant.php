@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
@@ -26,7 +25,7 @@ final class ResumenClientesTenant
 {
     public function __construct(
         private readonly RadarRenovacionesTenant $radar,
-        private readonly GestorDeConexionTenant $gestor,
+        private readonly FechasNegocioTenant $fechas,
     ) {}
 
     /**
@@ -35,7 +34,7 @@ final class ResumenClientesTenant
      */
     public function calcular(?array $sucursales): array
     {
-        $zona = (string) ($this->gestor->actual()?->zona_horaria ?: config('app.timezone'));
+        $zona = $this->fechas->zona();
         $ahora = CarbonImmutable::now($zona);
 
         $clientes = fn (): Builder => PersonaTenant::query()

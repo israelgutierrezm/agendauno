@@ -122,7 +122,7 @@ class AgendarCitaTenant
 
         [$duracion] = $this->disponibilidad->duracionYMargenes($oferta, $duracionMin);
         $termina = $inicia->addMinutes($duracion);
-        $dia = $inicia->setTimezone((string) ($sucursal->zona_horaria ?? config('app.timezone', 'UTC')));
+        $dia = $inicia->setTimezone((string) ($sucursal->zona_horaria ?: app(FechasNegocioTenant::class)->zona()));
 
         $candidatos = $this->disponibilidad->profesionalesDeSede($sucursal, $dia->toDateString())
             ->filter(fn (Usuario $u): bool => $this->disponibilidad->cabeEnHorario((int) $u->getKey(), $sucursal, $inicia, $termina));

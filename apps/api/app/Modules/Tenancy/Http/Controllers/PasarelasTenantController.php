@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaTenant;
@@ -27,6 +28,7 @@ class PasarelasTenantController
         private readonly RegistroDePasarelasTenant $registro,
         private readonly GestorDeConexionTenant $gestor,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly RegionNegocioTenant $region,
     ) {}
 
     /**
@@ -49,7 +51,14 @@ class PasarelasTenantController
             $this->configurables(),
         );
 
-        return response()->json(['data' => $data]);
+        return response()->json([
+            'data' => $data,
+            // Fuera de pesos mexicanos no se cobra en línea (ADR 0099).
+            'meta' => [
+                'en_linea_disponible' => $this->region->enPesos(),
+                'motivo' => $this->region->enPesos() ? null : RegionNegocioTenant::MOTIVO_PASARELAS,
+            ],
+        ]);
     }
 
     /**
@@ -93,6 +102,10 @@ class PasarelasTenantController
             'credenciales.*' => ['nullable', 'string'],
         ]);
 
+        // Las de cobro en línea solo en pesos mexicanos: ni se cargan sus llaves.
+        if (in_array($proveedor, ProveedorPasarela::enLinea(), true) && ! $this->region->enPesos()) {
+            throw ValidationException::withMessages(['proveedor' => [RegionNegocioTenant::MOTIVO_PASARELAS]]);
+        }
         if ((bool) $validado['activa'] && ! ProveedorPasarela::disponible($proveedor)) {
             throw ValidationException::withMessages(['activa' => ['Esta pasarela aún no está disponible.']]);
         }

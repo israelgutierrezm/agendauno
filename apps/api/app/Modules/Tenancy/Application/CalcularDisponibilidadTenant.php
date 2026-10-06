@@ -64,7 +64,7 @@ class CalcularDisponibilidadTenant
         }
 
         $paso = $pasoMin !== null && $pasoMin > 0 ? $pasoMin : $duracionMin + $margenes->total();
-        $zona = (string) ($sucursal->zona_horaria ?? config('app.timezone', 'UTC'));
+        $zona = (string) ($sucursal->zona_horaria ?: app(FechasNegocioTenant::class)->zona());
         $diaSemana = (int) CarbonImmutable::parse($fecha, $zona)->isoWeekday();
 
         $ventanas = HorarioAtencionTenant::query()
@@ -111,7 +111,7 @@ class CalcularDisponibilidadTenant
      */
     public function profesionalesDeSede(SucursalTenant $sucursal, string $fecha): Collection
     {
-        $zona = (string) ($sucursal->zona_horaria ?? config('app.timezone', 'UTC'));
+        $zona = (string) ($sucursal->zona_horaria ?: app(FechasNegocioTenant::class)->zona());
         $diaSemana = (int) CarbonImmutable::parse($fecha, $zona)->isoWeekday();
 
         return Usuario::query()
@@ -135,7 +135,7 @@ class CalcularDisponibilidadTenant
      */
     public function diasConAtencion(SucursalTenant $sucursal, string $desde, int $dias, ?int $instructorId = null): array
     {
-        $zona = (string) ($sucursal->zona_horaria ?? config('app.timezone', 'UTC'));
+        $zona = (string) ($sucursal->zona_horaria ?: app(FechasNegocioTenant::class)->zona());
         $ahora = CarbonImmutable::now($zona);
         $inicio = CarbonImmutable::parse($desde, $zona)->startOfDay();
         $fin = $inicio->addDays($dias - 1);
@@ -202,7 +202,7 @@ class CalcularDisponibilidadTenant
      */
     public function cabeEnHorario(int $instructorId, SucursalTenant $sucursal, CarbonImmutable $inicia, CarbonImmutable $termina): bool
     {
-        $zona = (string) ($sucursal->zona_horaria ?? config('app.timezone', 'UTC'));
+        $zona = (string) ($sucursal->zona_horaria ?: app(FechasNegocioTenant::class)->zona());
         $desde = $inicia->setTimezone($zona);
         $hasta = $termina->setTimezone($zona);
 

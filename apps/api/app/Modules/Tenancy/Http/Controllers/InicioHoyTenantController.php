@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ResumenDelDiaTenant;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
-use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -28,7 +28,7 @@ class InicioHoyTenantController
         $usuario = $request->attributes->get('usuario_tenant');
         abort_unless($usuario instanceof Usuario, 403);
 
-        $zona = (string) (SucursalTenant::query()->value('zona_horaria') ?? config('app.timezone', 'UTC'));
+        $zona = app(FechasNegocioTenant::class)->zona();
         $dia = isset($validado['fecha']) ? (string) $validado['fecha'] : CarbonImmutable::now($zona)->toDateString();
 
         $estudio = $request->attributes->get('estudio');

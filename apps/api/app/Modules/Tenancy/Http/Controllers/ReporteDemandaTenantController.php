@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CalcularDemandaTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -23,6 +24,11 @@ class ReporteDemandaTenantController
             'hasta' => ['required', 'date', 'after_or_equal:desde'],
         ]);
 
-        return response()->json(['data' => $this->calculadora->calcular($validado['desde'], $validado['hasta'])]);
+        return response()->json(['data' => $this->calculadora->calcular(
+            $validado['desde'],
+            $validado['hasta'],
+            // Quien está acotado a sucursales solo ve lo de las suyas.
+            app(ResolverAccesoTenant::class)->deLaSolicitud($request),
+        )]);
     }
 }

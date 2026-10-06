@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 
+import AvisoRegion from "@/components/AvisoRegion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -30,6 +31,8 @@ useCambiosPendientes(() => fotoForm.cambio());
 const sellosCargados = ref(false);
 const guardado = ref(false);
 const cargando = ref(true);
+// ¿Puede facturar? Solo en pesos mexicanos y en México.
+const disponible = ref(true);
 const guardando = ref(false);
 const error = ref<string | null>(null);
 const mensaje = ref<string | null>(null);
@@ -57,9 +60,11 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const { data } = await api.get<{ data: DatosFiscales | null }>(
-      `${base.value}/datos-fiscales`,
-    );
+    const { data } = await api.get<{
+      data: DatosFiscales | null;
+      meta?: { disponible: boolean };
+    }>(`${base.value}/datos-fiscales`);
+    disponible.value = data.meta?.disponible !== false;
     if (data.data !== null) {
       aplicar(data.data);
     }
@@ -126,6 +131,9 @@ onMounted(cargar);
     <p v-if="cargando" class="mt-8" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
+
+    <!-- Solo en pesos mexicanos y en México (ADR 0099): ni se cargan datos. -->
+    <AvisoRegion v-else-if="!disponible" class="mt-6" tipo="facturacion" />
 
     <template v-else>
       <!-- Datos fiscales -->

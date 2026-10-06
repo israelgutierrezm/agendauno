@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Pagos;
 
 /**
- * Las monedas con las que puede trabajar un negocio (ADR 0097). Todas tienen dos
+ * Las monedas con las que puede trabajar un negocio (ADR 0097/0099). Todas tienen dos
  * decimales: el dinero se guarda en centavos (`*_minor`), así que una moneda sin
  * centavos (p. ej. el peso chileno) necesita otro tratamiento antes de entrar aquí.
  *
- * La moneda del negocio es un parámetro (`negocio.moneda`); como los parámetros se
- * guardan como enteros, se identifica con su número ISO 4217 (484 = MXN).
+ * Un negocio trabaja con una sola (`RegionNegocioTenant`); se guarda con su número ISO
+ * 4217 (484 = MXN).
  */
 final class CatalogoMonedas
 {
@@ -36,32 +36,9 @@ final class CatalogoMonedas
         'BRL' => [986, 'Real brasileño'],
     ];
 
-    /**
-     * @return list<string>
-     */
-    public static function codigos(): array
-    {
-        return array_keys(self::MONEDAS);
-    }
-
     public static function existe(string $codigo): bool
     {
         return array_key_exists(mb_strtoupper($codigo), self::MONEDAS);
-    }
-
-    /**
-     * Regla de validación: una moneda del catálogo (sin importar mayúsculas; se guarda
-     * en mayúsculas).
-     *
-     * @return \Closure(string, mixed, \Closure): void
-     */
-    public static function regla(): \Closure
-    {
-        return static function (string $atributo, mixed $valor, \Closure $falla): void {
-            if (! is_string($valor) || ! self::existe($valor)) {
-                $falla('Elige una moneda del catálogo.');
-            }
-        };
     }
 
     /**
@@ -99,20 +76,5 @@ final class CatalogoMonedas
         }
 
         return $lista;
-    }
-
-    /**
-     * Para listas: «MXN · Peso mexicano», por número ISO.
-     *
-     * @return array<int, string>
-     */
-    public static function etiquetasPorNumero(): array
-    {
-        $etiquetas = [];
-        foreach (self::MONEDAS as $codigo => [$iso, $nombre]) {
-            $etiquetas[$iso] = "{$codigo} · {$nombre}";
-        }
-
-        return $etiquetas;
     }
 }

@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
@@ -118,12 +120,18 @@ it('los totales son del rango completo aunque la lista se corte, y el CSV coinci
 it('no suma monedas distintas', function (): void {
     $this->travelTo('2026-09-28 17:00:00');
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    $enDolares = (string) $this->postJson("/api/v1/app/{$e['slug']}/productos", [
-        'nombre' => 'Clase suelta', 'tipo' => 'paquete', 'precio_minor' => 2000, 'moneda' => 'USD',
+    $claseSuelta = (string) $this->postJson("/api/v1/app/{$e['slug']}/productos", [
+        'nombre' => 'Clase suelta', 'tipo' => 'paquete', 'precio_minor' => 2000,
         'ilimitado' => false, 'creditos_incluidos' => 1000,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
     cobroCajaDe($e, 'Ana', crearPackTenant($e));
-    cobroCajaDe($e, 'Bea', $enDolares);
+    cobroCajaDe($e, 'Bea', $claseSuelta);
+    // Hoy un negocio cobra en una sola moneda (ADR 0099), pero su historia puede traer
+    // otra: ese cobro de 20 quedó en dólares.
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->sole(), function (): void {
+        DB::connection('tenant')->table('ordenes')->where('total_minor', 2000)->update(['moneda' => 'USD']);
+        DB::connection('tenant')->table('pagos')->where('monto_minor', 2000)->update(['moneda' => 'USD']);
+    });
 
     $porMoneda = collect(corte($e, '2026-09-28')['totales_por_moneda'])->keyBy('moneda');
     expect($porMoneda)->toHaveCount(2)

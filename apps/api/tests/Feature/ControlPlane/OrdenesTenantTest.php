@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 
 beforeEach(function (): void {
@@ -97,8 +99,13 @@ it('rechaza una orden que mezcla monedas (MIXED_CURRENCY 422)', function (): voi
     $packMxn = crearPackTenant($e, 8000);
     $packUsd = (string) $this->postJson("/api/v1/app/{$e['slug']}/productos", [
         'nombre' => 'Pack USD', 'tipo' => 'paquete', 'precio_minor' => 5000,
-        'moneda' => 'USD', 'ilimitado' => false, 'creditos_incluidos' => 8000,
+        'ilimitado' => false, 'creditos_incluidos' => 8000,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    // El negocio cobra en una sola moneda (ADR 0099); un producto que quedó en otra (de
+    // antes) tampoco se mezcla en una orden.
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->sole(), function () use ($packUsd): void {
+        DB::connection('tenant')->table('productos_comerciales')->where('ulid', $packUsd)->update(['moneda' => 'USD']);
+    });
 
     $this->postJson("/api/v1/app/{$e['slug']}/ordenes", [
         'comprador_id' => $comprador,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\EstadoSesionTenant;
@@ -45,7 +46,7 @@ class FrontDeskTenantController
         } else {
             // "Todas": interpreta el día en la zona de una sucursal del estudio (no UTC),
             // para no dejar fuera las clases de la tarde cuya hora en UTC cae al día siguiente.
-            $zona = (string) (SucursalTenant::query()->value('zona_horaria') ?? config('app.timezone', 'UTC'));
+            $zona = app(FechasNegocioTenant::class)->zona();
         }
 
         // El dia se interpreta en la zona de la sucursal (o del sistema) y se acota en UTC.

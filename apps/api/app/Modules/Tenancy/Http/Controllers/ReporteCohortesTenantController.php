@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
+use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
-use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
@@ -22,6 +23,8 @@ use Illuminate\Support\Collection;
  * (triángulo de retención). El embudo mide, sobre esas altas recientes, cuántos
  * compraron y cuántos se activaron (asistieron). Todo derivado de los datos del
  * tenant (altas, asistencias, órdenes pagadas); consultas acotadas a la ventana.
+ * Quien está acotado a sucursales solo cuenta a los clientes, las clases y las ventas
+ * de las suyas.
  */
 class ReporteCohortesTenantController
 {
@@ -31,8 +34,10 @@ class ReporteCohortesTenantController
             'meses' => ['nullable', 'integer', 'min:2', 'max:12'],
         ]);
         $n = (int) ($validado['meses'] ?? 6);
+        // Quien está acotado a sucursales: sus clientes, sus clases y sus ventas.
+        $sedes = app(ResolverAccesoTenant::class)->deLaSolicitud($request);
 
-        $zona = (string) (SucursalTenant::query()->value('zona_horaria') ?? config('app.timezone', 'UTC'));
+        $zona = app(FechasNegocioTenant::class)->zona();
         $mesActual = CarbonImmutable::now($zona)->startOfMonth();
         $primerMes = $mesActual->subMonths($n - 1);
 
@@ -47,12 +52,13 @@ class ReporteCohortesTenantController
             ->where('tipo', TipoPersonaTenant::Miembro->value)
             ->where('archivado', false)
             ->where('created_at', '>=', $primerMes->utc())
+            ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes))
             ->get(['id', 'created_at', 'como_nos_conocio']);
 
         // Meses con asistencia (presente) por persona, dentro de la ventana.
-        $mesesActivos = $this->mesesActivosPorPersona($primerMes, $zona);
+        $mesesActivos = $this->mesesActivosPorPersona($primerMes, $zona, $sedes);
         // Personas que compraron (órden pagada) — para el embudo.
-        $compradores = $this->compradores();
+        $compradores = $this->compradores($sedes);
 
         // Agrupa miembros por mes de alta.
         $porCohorte = $miembros->groupBy(fn (PersonaTenant $p): string => CarbonImmutable::instance($p->created_at)->setTimezone($zona)->format('Y-m'));
@@ -123,14 +129,17 @@ class ReporteCohortesTenantController
     }
 
     /**
-     * Meses (Y-m, en la zona) con asistencia `presente` por persona, desde `$desde`.
+     * Meses (Y-m, en la zona) con asistencia `presente` por persona, desde `$desde`,
+     * en las sedes que ve quien consulta.
      *
+     * @param  list<int>|null  $sedes
      * @return array<int, list<string>>
      */
-    private function mesesActivosPorPersona(CarbonImmutable $desde, string $zona): array
+    private function mesesActivosPorPersona(CarbonImmutable $desde, string $zona, ?array $sedes): array
     {
         $filas = ReservaTenant::query()
             ->join('asistencias', 'asistencias.reserva_id', '=', 'reservas.id')
+            ->when($sedes !== null, fn ($q) => $q->join('sesiones', 'sesiones.id', '=', 'reservas.sesion_id')->whereIn('sesiones.sucursal_id', $sedes))
             ->where('asistencias.estado', EstadoAsistencia::Presente->value)
             ->where('asistencias.registrada_en', '>=', $desde->utc())
             ->get(['reservas.persona_id', 'asistencias.registrada_en']);
@@ -146,14 +155,17 @@ class ReporteCohortesTenantController
     }
 
     /**
-     * Personas con al menos una orden pagada (para el embudo de conversión).
+     * Personas con al menos una orden pagada (para el embudo de conversión), en las
+     * sedes que ve quien consulta.
      *
+     * @param  list<int>|null  $sedes
      * @return array<int, bool>
      */
-    private function compradores(): array
+    private function compradores(?array $sedes): array
     {
         return OrdenTenant::query()
             ->where('estado', EstadoOrden::Pagada->value)
+            ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes))
             ->whereNotNull('persona_id')
             ->distinct()
             ->pluck('persona_id')

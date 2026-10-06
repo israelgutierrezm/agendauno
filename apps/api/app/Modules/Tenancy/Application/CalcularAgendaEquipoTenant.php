@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Models\AsignacionPersonalTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
-use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
@@ -22,7 +22,8 @@ use Carbon\CarbonImmutable;
  * - Valor de lo atendido en sus sesiones, lo que se le paga (nómina, incluso cuando
  *   asiste en la de otro) y el margen ({@see ValorDeSesionesTenant}).
  *
- * Montos en minor.
+ * Montos en minor. Quien está acotado a sucursales solo ve las sesiones, los horarios y
+ * el personal de las suyas.
  */
 class CalcularAgendaEquipoTenant
 {
@@ -32,22 +33,25 @@ class CalcularAgendaEquipoTenant
     ) {}
 
     /**
+     * @param  list<int>|null  $sucursales  solo las sesiones, horarios y personal de estas sedes (null = todas)
      * @return array<string, mixed>
      */
-    public function calcular(string $desde, string $hasta): array
+    public function calcular(string $desde, string $hasta, ?array $sucursales = null): array
     {
-        $zona = (string) (SucursalTenant::query()->value('zona_horaria') ?? config('app.timezone', 'UTC'));
+        $zona = app(FechasNegocioTenant::class)->zona();
         $inicio = CarbonImmutable::parse($desde.' 00:00:00', $zona)->utc();
         $fin = CarbonImmutable::parse($hasta.' 00:00:00', $zona)->addDay()->utc();
-        $moneda = (string) (SucursalTenant::query()->value('moneda') ?? app(ParametrosTenant::class)->moneda());
+        // Una sola moneda: la del negocio (ADR 0099).
+        $moneda = app(ParametrosTenant::class)->moneda();
 
         $sesiones = SesionTenant::query()
             ->whereBetween('inicia_en', [$inicio, $fin])
+            ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
             ->where('estado', '!=', EstadoSesionTenant::Cancelada->value)
             ->with('oferta')
             ->get();
         $valores = $this->valor->calcular($sesiones);
-        $ocupacion = $this->ocupacion->calcular($desde, $hasta, $sesiones)['por_profesional'];
+        $ocupacion = $this->ocupacion->calcular($desde, $hasta, $sesiones, $sucursales)['por_profesional'];
 
         $filas = [];
         $fila = static fn (): array => [
@@ -77,7 +81,10 @@ class CalcularAgendaEquipoTenant
 
         // Quienes atienden hoy aparecen aunque no hayan tenido agenda; los que ya no
         // están (baja) solo si trabajaron en el periodo.
-        $profesionales = Usuario::query()->profesionales()->pluck('id')->all();
+        // Acotado a sucursales: solo quienes trabajan en las suyas.
+        $profesionales = Usuario::query()->profesionales()
+            ->when($sucursales !== null, fn ($q) => $q->whereIn('id', AsignacionPersonalTenant::query()->whereIn('sucursal_id', $sucursales)->select('usuario_id')))
+            ->pluck('id')->all();
         foreach ($profesionales as $usuarioId) {
             $filas[(int) $usuarioId] ??= $fila();
         }

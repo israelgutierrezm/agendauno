@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AsignarSucursalAlPersonalTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
-use App\Modules\Tenancy\Pagos\CatalogoMonedas;
 use App\Modules\Tenancy\Support\EnlaceMapa;
 use App\Modules\Tenancy\Support\HorarioSucursal;
 use App\Modules\Tenancy\Support\RedesSociales;
@@ -36,22 +37,7 @@ class OrganizacionesTenantController
                 'nombre' => $organizacion->nombre,
                 'sucursales' => $organizacion->sucursales->map(fn (SucursalTenant $sucursal): array => $this->presentarSucursal($sucursal))->all(),
             ])->all(),
-            'meta' => $this->monedas(),
         ]);
-    }
-
-    /**
-     * Para elegir la moneda de una sucursal: el catálogo y la del negocio (la que usa
-     * si no elige otra, ADR 0097).
-     *
-     * @return array{monedas: list<array{codigo: string, nombre: string}>, moneda_negocio: string}
-     */
-    private function monedas(): array
-    {
-        return [
-            'monedas' => CatalogoMonedas::lista(),
-            'moneda_negocio' => app(ParametrosTenant::class)->moneda(),
-        ];
     }
 
     public function crearOrganizacion(Request $request): JsonResponse
@@ -73,9 +59,10 @@ class OrganizacionesTenantController
 
         $sucursal = $organizacion->sucursales()->create([
             'nombre' => $validado['nombre'],
-            'zona_horaria' => $validado['zona_horaria'] ?? 'America/Mexico_City',
+            // Sin zona, la del negocio; la moneda es la del negocio (ADR 0099).
+            'zona_horaria' => $validado['zona_horaria'] ?? app(FechasNegocioTenant::class)->zona(),
             'region' => $validado['region'] ?? null,
-            'moneda' => $validado['moneda'] ?? null,
+            'moneda' => null,
             'impuesto_tasa_bps' => $validado['impuesto_tasa_bps'] ?? 0,
             'latitud' => $validado['latitud'] ?? null,
             'longitud' => $validado['longitud'] ?? null,
@@ -100,7 +87,6 @@ class OrganizacionesTenantController
             'nombre' => $validado['nombre'] ?? null,
             'zona_horaria' => $validado['zona_horaria'] ?? null,
             'region' => $validado['region'] ?? null,
-            'moneda' => $validado['moneda'] ?? null,
         ], static fn ($v): bool => $v !== null));
 
         if (array_key_exists('impuesto_tasa_bps', $validado)) {
@@ -124,8 +110,6 @@ class OrganizacionesTenantController
 
         return response()->json([
             'data' => $sucursales->map(fn (SucursalTenant $sucursal): array => $this->presentarSucursal($sucursal))->all(),
-            // Para elegir la moneda de una sucursal (sin elegir: la del negocio, ADR 0097).
-            'meta' => $this->monedas(),
         ]);
     }
 
@@ -138,7 +122,7 @@ class OrganizacionesTenantController
             'nombre' => [$obligarNombre ? 'required' : 'sometimes', 'string', 'max:255'],
             'zona_horaria' => ['nullable', 'timezone'],
             'region' => ['nullable', 'string', 'max:255'],
-            'moneda' => ['nullable', 'string', 'size:3', CatalogoMonedas::regla()],
+            'moneda' => ['nullable', 'string', 'size:3', app(RegionNegocioTenant::class)->reglaMoneda()],
             'impuesto_tasa_bps' => ['nullable', 'integer', 'min:0', 'max:100000'],
             // Ubicación del local (para el clima): las dos o ninguna.
             'latitud' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitud'],
@@ -238,7 +222,8 @@ class OrganizacionesTenantController
             'nombre' => $sucursal->nombre,
             'zona_horaria' => $sucursal->zona_horaria,
             'region' => $sucursal->region,
-            'moneda' => $sucursal->moneda !== null ? mb_strtoupper((string) $sucursal->moneda) : null,
+            // La del negocio: una sola moneda (ADR 0099).
+            'moneda' => app(ParametrosTenant::class)->moneda(),
             'impuesto_tasa_bps' => (int) $sucursal->impuesto_tasa_bps,
             'latitud' => $sucursal->latitud,
             'longitud' => $sucursal->longitud,

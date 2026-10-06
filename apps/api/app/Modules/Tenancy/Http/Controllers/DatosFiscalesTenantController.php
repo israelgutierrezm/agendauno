@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,11 +21,31 @@ class DatosFiscalesTenantController
     {
         $datos = DatosFiscalesTenant::query()->first();
 
-        return response()->json(['data' => $datos instanceof DatosFiscalesTenant ? $this->presentar($datos) : null]);
+        $region = app(RegionNegocioTenant::class);
+
+        return response()->json([
+            'data' => $datos instanceof DatosFiscalesTenant ? $this->presentar($datos) : null,
+            // Fuera de pesos mexicanos o de México no se factura (ADR 0099).
+            'meta' => [
+                'disponible' => $region->factura(),
+                'motivo' => $region->factura() ? null : RegionNegocioTenant::MOTIVO_FACTURACION,
+            ],
+        ]);
+    }
+
+    /**
+     * Fuera de pesos mexicanos o de México no se cargan datos para facturar.
+     */
+    private function exigirFacturacion(): void
+    {
+        if (! app(RegionNegocioTenant::class)->factura()) {
+            throw ValidationException::withMessages(['facturacion' => [RegionNegocioTenant::MOTIVO_FACTURACION]]);
+        }
     }
 
     public function guardar(Request $request): JsonResponse
     {
+        $this->exigirFacturacion();
         $validado = $request->validate([
             'razon_social' => ['required', 'string', 'max:255'],
             // RFC persona moral (12) o física (13).
@@ -50,6 +71,7 @@ class DatosFiscalesTenantController
      */
     public function subirSello(Request $request): JsonResponse
     {
+        $this->exigirFacturacion();
         $request->validate([
             'certificado' => ['required', 'file', 'max:64'],
             'llave' => ['required', 'file', 'max:64'],

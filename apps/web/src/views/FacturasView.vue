@@ -3,6 +3,7 @@ import axios from "axios";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import AvisoRegion from "@/components/AvisoRegion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -215,8 +216,13 @@ onMounted(cargar);
         </template>
       </TablaDatos>
 
-      <!-- Emitir -->
-      <div v-if="puedeEmitir" class="mt-6 tu-card p-6">
+      <!-- Emitir: solo en pesos mexicanos y en México (ADR 0099). -->
+      <AvisoRegion
+        v-if="puedeEmitir && sesion.estudio?.factura_posible === false"
+        class="mt-6"
+        tipo="facturacion"
+      />
+      <div v-else-if="puedeEmitir" class="mt-6 tu-card p-6">
         <h2 class="font-medium text-lg">{{ $t("facturas.nueva.titulo") }}</h2>
 
         <form class="mt-4 space-y-5" @submit.prevent="emitir">

@@ -21,6 +21,14 @@ export default {
     cobrarTitulo: "Cobrar",
     cobranza: "Lo pendiente de pago: registra el cobro de cada cita.",
   },
+  // «Actualizado hace…» y su botón (components/ActualizadoHace.vue).
+  actualizado: {
+    recien: "Actualizado hace un momento",
+    minutos: "Actualizado hace {n} min",
+    horas: "Actualizado hace {n} h",
+    boton: "Actualizar",
+    actualizando: "Actualizando…",
+  },
   comun: {
     cambiosSinGuardar:
       "Tienes cambios sin guardar. Si sales ahora, se pierden.",
@@ -168,6 +176,7 @@ export default {
       datos: "Datos e imagen del negocio",
       pagina: "Página pública",
       sucursales: "Sucursales",
+      region: "Moneda y zona horaria",
       fiscales: "Datos fiscales",
       terminologia: "Terminología",
       planes: "Planes y paquetes",
@@ -1728,15 +1737,28 @@ export default {
       mes: "Por mes",
       exportar: "Exportar CSV",
       exportando: "Exportando…",
-      ingresos: "Ingresos del periodo",
-      ordenes: "Órdenes pagadas",
       ticket: "Ticket promedio",
-      vacio: "Sin ventas en el periodo.",
-      porProducto: "Ingresos por producto",
+      vacio: "Sin ventas ni cobros en el periodo.",
+      // Qué representa cada cifra: lo vendido (por la fecha de la compra) o el
+      // dinero que entró menos devoluciones (por la fecha del cobro).
+      queMuestra: "Qué muestra la gráfica",
+      cobradoNeto: "Cobrado neto",
+      cobradoDevuelto: "cobrado {cobrado}, devuelto {devuelto}",
+      vendido: "Vendido",
+      vendidoN:
+        "Vendido · sin ventas | Vendido · 1 venta | Vendido · {n} ventas",
+      ayudaNeto:
+        "El dinero que entró (en caja, en línea y mostrador) menos lo devuelto, por la fecha del cobro.",
+      ayudaVendido:
+        "Lo que se vendió (compras y mostrador, pagado o no), por la fecha de la compra.",
+      porProducto: "Ventas por producto",
       sinProducto: "Sin ventas por producto en el periodo.",
       colProducto: "Producto",
       colUnidades: "Unidades",
-      colIngresos: "Ingresos",
+      colVendido: "Vendido",
+      otrasMonedas: "Otras monedas",
+      otrasMonedasAyuda:
+        "Dinero registrado en otra moneda antes de trabajar con una sola. Se muestra aparte: las monedas nunca se suman.",
     },
     conversion: {
       titulo: "Conversión",

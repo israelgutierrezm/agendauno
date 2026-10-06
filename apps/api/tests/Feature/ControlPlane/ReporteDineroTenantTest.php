@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 
 /*
@@ -22,15 +24,16 @@ afterEach(function (): void {
 });
 
 /**
- * Un producto en esa moneda y una compra de él (sin cobrar); devuelve la orden.
+ * Un producto (en la moneda del negocio) y una compra de él (sin cobrar); devuelve la
+ * orden.
  *
  * @param  array{slug: string, bearer: string}  $e
  */
-function comprarReporteDinero(array $e, string $persona, int $precio, string $moneda): string
+function comprarReporteDinero(array $e, string $persona, int $precio): string
 {
     $producto = (string) test()->postJson("/api/v1/app/{$e['slug']}/productos", [
-        'nombre' => "Paquete {$moneda}", 'tipo' => 'paquete', 'precio_minor' => $precio,
-        'moneda' => $moneda, 'ilimitado' => false, 'creditos_incluidos' => 4000,
+        'nombre' => "Paquete {$precio}", 'tipo' => 'paquete', 'precio_minor' => $precio,
+        'ilimitado' => false, 'creditos_incluidos' => 4000,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
 
     return (string) test()->postJson("/api/v1/app/{$e['slug']}/ordenes", [
@@ -41,9 +44,17 @@ function comprarReporteDinero(array $e, string $persona, int $precio, string $mo
 it('separa monedas (sin convertir) y resta lo devuelto del neto', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $ana = crearMiembroTenant($e, 'Ana');
-    foreach ([comprarReporteDinero($e, $ana, 10000, 'MXN'), comprarReporteDinero($e, $ana, 1000, 'USD')] as $orden) {
+    $ordenUsd = comprarReporteDinero($e, $ana, 1000);
+    foreach ([comprarReporteDinero($e, $ana, 10000), $ordenUsd] as $orden) {
         $this->postJson("/api/v1/app/{$e['slug']}/ordenes/{$orden}/liquidar", ['metodo' => 'efectivo'], conBearer($e['bearer']))->assertOk();
     }
+    // Hoy un negocio trabaja con una sola moneda (ADR 0099), pero su historia puede
+    // traer otra: esa compra y su cobro quedaron en dólares.
+    app(GestorDeConexionTenant::class)->ejecutarEn(Estudio::query()->where('slug', $e['slug'])->sole(), function () use ($ordenUsd): void {
+        $id = DB::connection('tenant')->table('ordenes')->where('ulid', $ordenUsd)->value('id');
+        DB::connection('tenant')->table('ordenes')->where('id', $id)->update(['moneda' => 'USD']);
+        DB::connection('tenant')->table('pagos')->where('orden_id', $id)->update(['moneda' => 'USD']);
+    });
     $pagoMxn = collect($this->getJson("/api/v1/app/{$e['slug']}/pagos", conBearer($e['bearer']))->assertOk()->json('data'))
         ->firstWhere('moneda', 'MXN')['id'];
     $this->postJson("/api/v1/app/{$e['slug']}/pagos/{$pagoMxn}/reembolsos", ['monto_minor' => 2500, 'motivo' => 'Ajuste', 'revertir_creditos' => false], conBearer($e['bearer']))
@@ -66,7 +77,7 @@ it('separa monedas (sin convertir) y resta lo devuelto del neto', function (): v
 it('lo vendido cuenta el día de la compra y lo cobrado, el día del cobro', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $ana = crearMiembroTenant($e, 'Ana');
-    $orden = comprarReporteDinero($e, $ana, 10000, 'MXN');
+    $orden = comprarReporteDinero($e, $ana, 10000);
 
     // Se paga tres días después.
     $this->travelTo(CarbonImmutable::parse('2026-10-04 12:00', 'America/Mexico_City'));

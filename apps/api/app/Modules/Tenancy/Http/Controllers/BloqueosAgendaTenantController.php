@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\EliminacionesTenant;
+use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\BloqueoAgendaTenant;
@@ -198,7 +199,7 @@ class BloqueosAgendaTenantController
 
         return $estudio instanceof Estudio && $estudio->zona_horaria !== ''
             ? $estudio->zona_horaria
-            : (string) config('app.timezone', 'UTC');
+            : app(FechasNegocioTenant::class)->zona();
     }
 
     /**

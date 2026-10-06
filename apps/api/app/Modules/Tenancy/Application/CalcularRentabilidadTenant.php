@@ -6,7 +6,6 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
-use App\Modules\Tenancy\Models\SucursalTenant;
 use Carbon\CarbonImmutable;
 
 /**
@@ -17,24 +16,27 @@ use Carbon\CarbonImmutable;
  * sesión, ADR 0081). El margen es ingreso − costo. `sin_costo_unitario` cuenta a los
  * asistentes sin valor por crédito (membresías ilimitadas o cortesías) para no engañar
  * con el número. El valor de cada sesión sale de {@see ValorDeSesionesTenant}. Montos
- * en minor (entero).
+ * en minor (entero). Quien está acotado a sucursales solo ve las clases de las suyas.
  */
 class CalcularRentabilidadTenant
 {
     public function __construct(private readonly ValorDeSesionesTenant $valor) {}
 
     /**
+     * @param  list<int>|null  $sucursales  solo las sesiones de estas sedes (null = todas)
      * @return array<string, mixed>
      */
-    public function calcular(string $desde, string $hasta): array
+    public function calcular(string $desde, string $hasta, ?array $sucursales = null): array
     {
-        $zona = (string) (SucursalTenant::query()->value('zona_horaria') ?? config('app.timezone', 'UTC'));
+        $zona = app(FechasNegocioTenant::class)->zona();
         $inicio = CarbonImmutable::parse($desde.' 00:00:00', $zona)->utc();
         $fin = CarbonImmutable::parse($hasta.' 00:00:00', $zona)->addDay()->utc();
-        $moneda = (string) (SucursalTenant::query()->value('moneda') ?? app(ParametrosTenant::class)->moneda());
+        // Una sola moneda: la del negocio (ADR 0099).
+        $moneda = app(ParametrosTenant::class)->moneda();
 
         $sesiones = SesionTenant::query()
             ->whereBetween('inicia_en', [$inicio, $fin])
+            ->when($sucursales !== null, fn ($q) => $q->whereIn('sucursal_id', $sucursales))
             ->where('estado', '!=', EstadoSesionTenant::Cancelada->value)
             ->with('oferta')
             ->get();

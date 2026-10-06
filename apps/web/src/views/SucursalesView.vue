@@ -8,6 +8,7 @@ import IconoNav from "@/components/IconoNav.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { claveZona, ZONA_POR_OMISION, zonasConActual } from "@/lib/region";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Sucursal {
@@ -66,23 +67,13 @@ interface Organizacion {
   sucursales: Sucursal[];
 }
 
-// Zonas horarias frecuentes en México (más una opción para el resto del mundo).
-const ZONAS = [
-  "America/Mexico_City",
-  "America/Cancun",
-  "America/Merida",
-  "America/Monterrey",
-  "America/Hermosillo",
-  "America/Tijuana",
-  "America/Bogota",
-  "UTC",
-];
-
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
-// Monedas que puede usar una sucursal y la del negocio (la de una sin moneda propia).
-const monedas = ref<{ codigo: string; nombre: string }[]>([]);
-const monedaNegocio = ref(sesion.moneda);
+// Sin zona propia, la del negocio (CDMX si no eligió otra). La moneda es la del
+// negocio: una sola para todas sus sucursales (ADR 0099).
+const zonaNegocio = computed(
+  () => sesion.estudio?.zona_horaria ?? ZONA_POR_OMISION,
+);
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("sucursales.gestionar"));
 
@@ -102,8 +93,7 @@ const guardando = ref(false);
 const form = ref({
   nombre: "",
   region: "",
-  zona_horaria: "America/Mexico_City",
-  moneda: "",
+  zona_horaria: ZONA_POR_OMISION,
   iva: "16",
   ubicacion: "",
   direccion: "",
@@ -135,16 +125,10 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const { data } = await api.get<{
-      data: Organizacion[];
-      meta?: {
-        monedas: { codigo: string; nombre: string }[];
-        moneda_negocio: string;
-      };
-    }>(`${base.value}/organizaciones`);
+    const { data } = await api.get<{ data: Organizacion[] }>(
+      `${base.value}/organizaciones`,
+    );
     organizaciones.value = data.data;
-    monedas.value = data.meta?.monedas ?? [];
-    monedaNegocio.value = data.meta?.moneda_negocio ?? sesion.moneda;
     if (orgId.value === "" && data.data.length > 0) {
       orgId.value = data.data[0].id;
     }
@@ -161,8 +145,7 @@ function abrirNueva(): void {
   form.value = {
     nombre: "",
     region: "",
-    zona_horaria: "America/Mexico_City",
-    moneda: "",
+    zona_horaria: zonaNegocio.value,
     iva: "16",
     ubicacion: "",
     direccion: "",
@@ -182,8 +165,7 @@ function abrirEdicion(s: Sucursal): void {
   form.value = {
     nombre: s.nombre,
     region: s.region ?? "",
-    zona_horaria: s.zona_horaria ?? "America/Mexico_City",
-    moneda: s.moneda ?? "",
+    zona_horaria: s.zona_horaria ?? zonaNegocio.value,
     iva: String(s.impuesto_tasa_bps / 100),
     ubicacion:
       s.latitud != null && s.longitud != null
@@ -276,10 +258,6 @@ async function guardar(): Promise<void> {
       nombre: form.value.nombre.trim(),
       region: form.value.region.trim() !== "" ? form.value.region.trim() : null,
       zona_horaria: form.value.zona_horaria,
-      moneda:
-        form.value.moneda.trim() !== ""
-          ? form.value.moneda.trim().toUpperCase()
-          : null,
       impuesto_tasa_bps: Math.round((Number(form.value.iva) || 0) * 100),
       latitud: coordenadas.value === null ? null : coordenadas.value.latitud,
       longitud: coordenadas.value === null ? null : coordenadas.value.longitud,
@@ -316,10 +294,6 @@ async function guardar(): Promise<void> {
   } finally {
     guardando.value = false;
   }
-}
-
-function dinero(moneda: string | null): string {
-  return moneda ?? monedaNegocio.value;
 }
 
 onMounted(cargar);
@@ -375,9 +349,6 @@ onMounted(cargar);
                 <th class="hidden md:table-cell">
                   {{ $t("sucursalesVisual.col.zona") }}
                 </th>
-                <th class="hidden sm:table-cell">
-                  {{ $t("sucursalesVisual.col.moneda") }}
-                </th>
                 <th class="hidden sm:table-cell text-right">
                   {{ $t("sucursalesVisual.col.iva") }}
                 </th>
@@ -415,9 +386,15 @@ onMounted(cargar);
                   class="hidden md:table-cell"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
-                  {{ s.zona_horaria }}
+                  {{
+                    s.zona_horaria
+                      ? $t(
+                          `region.zonas.${claveZona(s.zona_horaria)}`,
+                          s.zona_horaria,
+                        )
+                      : "—"
+                  }}
                 </td>
-                <td class="hidden sm:table-cell">{{ dinero(s.moneda) }}</td>
                 <td class="hidden sm:table-cell text-right tabular-nums">
                   {{ s.impuesto_tasa_bps / 100 }}%
                 </td>
@@ -476,43 +453,26 @@ onMounted(cargar);
         <div>
           <label class="tu-label" for="s-zona">{{ $t("sedes.zona") }}</label>
           <select id="s-zona" v-model="form.zona_horaria" class="tu-input">
-            <option v-for="z in ZONAS" :key="z" :value="z">{{ z }}</option>
+            <option
+              v-for="z in zonasConActual(form.zona_horaria)"
+              :key="z"
+              :value="z"
+            >
+              {{ $t(`region.zonas.${claveZona(z)}`, z) }}
+            </option>
           </select>
         </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="tu-label" for="s-moneda">{{
-              $t("sedes.moneda")
-            }}</label>
-            <!-- Sin elegir: la del negocio (ADR 0097). -->
-            <select
-              id="s-moneda"
-              v-model="form.moneda"
-              class="tu-input"
-              data-prueba="moneda-sucursal"
-            >
-              <option value="">
-                {{ $t("sedes.monedaNegocio", { moneda: monedaNegocio }) }}
-              </option>
-              <option v-for="m in monedas" :key="m.codigo" :value="m.codigo">
-                {{ m.codigo }} · {{ m.nombre }}
-              </option>
-            </select>
-          </div>
-          <div>
-            <label class="tu-label" for="s-iva">{{
-              $t("sedes.ivaLabel")
-            }}</label>
-            <input
-              id="s-iva"
-              v-model="form.iva"
-              type="number"
-              min="0"
-              max="100"
-              step="0.5"
-              class="tu-input"
-            />
-          </div>
+        <div>
+          <label class="tu-label" for="s-iva">{{ $t("sedes.ivaLabel") }}</label>
+          <input
+            id="s-iva"
+            v-model="form.iva"
+            type="number"
+            min="0"
+            max="100"
+            step="0.5"
+            class="tu-input"
+          />
         </div>
         <div>
           <label class="tu-label" for="s-ubicacion">{{
