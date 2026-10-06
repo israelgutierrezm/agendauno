@@ -918,6 +918,7 @@ class ItemHistorial {
     this.iniciaEn,
     this.canceladaPor,
     this.reprogramada = false,
+    this.retardo = false,
     this.calificacion,
     this.comentario,
     this.calificable = false,
@@ -932,12 +933,15 @@ class ItemHistorial {
   final String? iniciaEn;
   final String? canceladaPor;
   final bool reprogramada;
+
+  /// Llegó tarde (cuenta como asistencia, ADR 0101).
+  final bool retardo;
   final int? calificacion;
   final String? comentario;
   final bool calificable;
 
   String get estadoTexto => switch (estado) {
-    'asistio' => 'Asististe',
+    'asistio' => retardo ? 'Asististe (llegaste tarde)' : 'Asististe',
     'no_asistio' => 'No asististe',
     'cancelada' =>
       canceladaPor == 'cliente' ? 'Cancelaste' : 'Cancelada por el negocio',
@@ -958,6 +962,7 @@ class ItemHistorial {
       instructor: j['instructor'] as String?,
       iniciaEn: j['inicia_en'] as String?,
       canceladaPor: j['cancelada_por'] as String?,
+      retardo: (j['retardo'] ?? false) as bool,
       reprogramada: (j['reprogramada'] ?? false) as bool,
       calificacion: resena is Map<String, dynamic>
           ? (resena['calificacion'] as num?)?.toInt()

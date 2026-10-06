@@ -105,6 +105,15 @@ final class DemoGrecon extends DemoBase
         'ilimitada' => ['Ilimitada', TipoProducto::Membresia, 220000, null, 4],
     ];
 
+    /** Descripción de muestra de cada categoría (el documento solo da los nombres). */
+    private const DESCRIPCIONES = [
+        'Pole' => 'Técnica de pole por nivel: giros, subidas, figuras y fuerza, con calentamiento y estiramiento.',
+        'Exotic' => 'Exotic pole con tacones: floorwork, transiciones y coreografía, cuidando la fluidez.',
+        'Flexibilidad' => 'Flexibilidad activa y pasiva para splits, espalda y hombros. Para todos los niveles.',
+        'Danza' => 'Danza para trabajar ritmo, coordinación y expresión.',
+        'Open Training' => 'Práctica libre en el estudio con un coach que supervisa. Incluida en la Ilimitada.',
+    ];
+
     /** Cupo de prueba: clases regulares y Open Training. */
     private const CUPO = 8;
 
@@ -297,7 +306,7 @@ final class DemoGrecon extends DemoBase
             $programas[$categoria] ??= ProgramaTenant::query()->create(['slug' => str($categoria)->slug()->value(), 'nombre' => $categoria]);
             $actividades[$categoria] ??= $programas[$categoria]->actividades()->create(['slug' => str($categoria)->slug()->value(), 'nombre' => $categoria]);
             $this->clases[$nombre] = $actividades[$categoria]->ofertas()->create([
-                'nombre' => $nombre, 'modalidad' => ModalidadOfertaTenant::Grupal->value,
+                'nombre' => $nombre, 'descripcion' => self::DESCRIPCIONES[$categoria] ?? null, 'modalidad' => ModalidadOfertaTenant::Grupal->value,
                 'capacidad' => $categoria === 'Open Training' ? self::CUPO_OPEN : self::CUPO,
                 'politica_reserva' => PoliticaReservaTenant::Entitlement->value, 'duracion_minutos' => $s['duracion_minutos'],
             ]);
@@ -661,16 +670,18 @@ final class DemoGrecon extends DemoBase
         if ($momento->daysInMonth - $momento->day < self::SIN_COMPRA_ULTIMOS_DIAS) {
             return false;
         }
+        // Las cuentas para revisar «Mi cuenta» conservan el plan que dice su descripción.
+        $conCuenta = $a['persona']->usuario_id !== null;
         if ($mismoMes) {
             // Se le acabaron las clases del mes: unos compran otro paquete (o uno más
             // grande); los demás esperan al mes siguiente.
             if (! $this->prob(40)) {
                 return false;
             }
-            if (in_array($a['plan'], ['p4', 'p8'], true) && $this->prob(50)) {
+            if (! $conCuenta && in_array($a['plan'], ['p4', 'p8'], true) && $this->prob(50)) {
                 $this->cambiarPlan($i, $a['plan'] === 'p4' ? 'p8' : 'p12');
             }
-        } elseif ($this->prob(10)) {
+        } elseif (! $conCuenta && $this->prob(10)) {
             $this->cambiarPlan($i, (string) $this->elegir(['p4' => 20, 'p8' => 40, 'p12' => 20, 'ilimitada' => 20]));
         }
         $this->alumnas[$i]['compra'] = $momento;

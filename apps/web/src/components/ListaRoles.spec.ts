@@ -9,7 +9,11 @@ import ListaRoles from "./ListaRoles.vue";
 | base: en una barbería, «Barbero» con sus citas y sus clientes.
 */
 
-const negocio = vi.hoisted(() => ({ citas: true }));
+const negocio = vi.hoisted(() => ({
+  citas: true,
+  miembro: "Alumno",
+  genero: null as string | null,
+}));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     get esCitas() {
@@ -18,7 +22,14 @@ vi.mock("@/stores/sesionTenant", () => ({
     get terminologia() {
       return negocio.citas
         ? { sesion: "Cita", miembro: "Cliente", instructor: "Barbero" }
-        : { sesion: "Clase", miembro: "Alumno", instructor: "Instructor" };
+        : {
+            sesion: "Clase",
+            miembro: negocio.miembro,
+            instructor: "Instructor",
+          };
+    },
+    get usuario() {
+      return { genero: negocio.genero };
     },
   }),
 }));
@@ -60,5 +71,28 @@ describe("selector de roles con las palabras del negocio", () => {
     expect(barbero).toContain(
       "Tus clases, tu agenda y la asistencia de tus alumnos.",
     );
+  });
+
+  it("nombra los roles en el género de quien entra (su ficha)", () => {
+    negocio.citas = false;
+    negocio.miembro = "Alumna";
+    negocio.genero = "hombre";
+    const roles = mount(ListaRoles, {
+      props: {
+        roles: [
+          { clave: "propietario", faceta: "equipo" },
+          { clave: "miembro", faceta: "miembro" },
+        ],
+        marcado: null,
+        etiquetaMarca: "Activo",
+        aplicando: null,
+      },
+      global: { plugins: [i18n] },
+    })
+      .findAll(".lr-nombre")
+      .map((n) => n.text());
+    expect(roles).toEqual(["Dueño", "Alumno"]);
+    negocio.genero = null;
+    negocio.miembro = "Alumno";
   });
 });

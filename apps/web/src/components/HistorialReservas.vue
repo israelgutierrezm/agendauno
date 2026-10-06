@@ -27,6 +27,8 @@ export interface ItemHistorial {
   inicia_en: string | null;
   zona_horaria: string | null;
   estado: string;
+  // Llegó tarde (cuenta como asistencia, ADR 0101).
+  retardo?: boolean;
   cancelada_por: string | null;
   reprogramada: boolean;
   resena: { calificacion: number; comentario: string | null } | null;
@@ -115,7 +117,11 @@ function estado(i: ItemHistorial): { texto: string; tono: string } {
   switch (i.estado) {
     case "asistio":
       return {
-        texto: t("portal.historial.estados.asistio"),
+        texto: t(
+          i.retardo
+            ? "portal.historial.estados.llegasteTarde"
+            : "portal.historial.estados.asistio",
+        ),
         tono: "var(--exito)",
       };
     case "no_asistio":

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Console\Commands\Demos\DemoGrecon;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -115,6 +116,12 @@ it('siembra Grecon en «demo» con su agenda de octubre, sus planes y 80 miembro
             'recompensas_lealtad', 'movimientos_puntos', 'difusiones', 'mensajes', 'reglas_automatizacion', 'facturas', 'accesos',
         ] as $tabla) {
             expect(DB::connection('tenant')->table($tabla)->count())->toBeGreaterThan(0, "Sin datos en {$tabla}");
+        }
+        // Las cuentas para revisar «Mi cuenta» conservan el plan que dice su descripción.
+        foreach (['valeria.rios@correo.test' => 'Paquete 8 clases', 'renata.soto@correo.test' => 'Ilimitada'] as $correo => $plan) {
+            $persona = PersonaTenant::query()->where('email', $correo)->sole();
+            expect(AcuerdoTenant::query()->with('producto')->where('persona_id', $persona->getKey())->get()
+                ->map(fn (AcuerdoTenant $a): ?string => $a->producto?->nombre)->unique()->values()->all())->toBe([$plan]);
         }
         expect(PersonaTenant::query()->whereNull('genero')->count())->toBe(0)
             ->and(DB::connection('tenant')->table('mensajes')->where('estado', 'encolado')->count())->toBe(0);

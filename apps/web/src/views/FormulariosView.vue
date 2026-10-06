@@ -246,7 +246,10 @@ onMounted(cargar);
       {{ error }}
     </p>
 
-    <div v-if="!cargando" class="mt-6 grid gap-6 md:grid-cols-[240px_1fr]">
+    <div
+      v-if="!cargando"
+      class="mt-6 grid gap-6 grid-cols-[minmax(0,1fr)] md:grid-cols-[240px_minmax(0,1fr)]"
+    >
       <!-- Lista + nuevo -->
       <div class="tu-card p-4 h-max">
         <EstadoVacio
@@ -425,7 +428,7 @@ onMounted(cargar);
                 <div class="flex w-full items-center justify-between gap-3">
                   <button
                     type="button"
-                    class="min-w-0 text-left"
+                    class="min-w-0 flex-1 text-left"
                     :aria-expanded="abierta === r.id"
                     @click="abierta = abierta === r.id ? null : r.id"
                   >

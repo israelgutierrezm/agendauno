@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import IconoNav from "@/components/IconoNav.vue";
 import { puedeEntrar } from "@/lib/acceso";
 import { facetaActiva, nombreDeRol } from "@/lib/roles";
+import { terminoParaPersona } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -27,13 +28,20 @@ const iniciales = computed(
       .join("")
       .toUpperCase() || "·",
 );
-const rol = computed(() =>
-  nombreDeRol(
-    sesion.usuario?.rol ?? "",
+// Los roles del sistema en el género de quien entra (Alumno o Alumna, Dueña); un
+// rol propio del negocio se queda con su nombre.
+const rol = computed(() => {
+  const clave = sesion.usuario?.rol ?? "";
+  const nombre = nombreDeRol(
+    clave,
     sesion.usuario?.roles_disponibles,
     (llave) => (te(llave) ? t(llave) : null),
-  ),
-);
+  );
+  const propio = sesion.usuario?.roles_disponibles?.some(
+    (r) => r.clave === clave && Boolean(r.nombre),
+  );
+  return propio ? nombre : terminoParaPersona(nombre, sesion.usuario?.genero);
+});
 // Configuración del negocio: si alguna opción se puede abrir. Quien entra como
 // instructor no administra el negocio: su único permiso de documentos le abriría
 // una portada con «Documentos requeridos», sin nada que configurar.

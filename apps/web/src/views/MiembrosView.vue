@@ -35,6 +35,7 @@ import {
   estadoMembresia,
   type ResumenTarjeta,
 } from "@/lib/resumenTarjeta";
+import { esInstructor } from "@/lib/roles";
 import { plural } from "@/lib/terminologia";
 import { useVistaListado } from "@/lib/vistaListado";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -713,7 +714,9 @@ onMounted(() => {
   form.value.tipo = tipo.value;
   void cargarSucursales();
   void cargar();
-  if (tipo.value === "miembro") {
+  // Quien solo imparte ve a SUS alumnos (ADR 0095): los totales del negocio no son
+  // suyos y la API no se los da.
+  if (tipo.value === "miembro" && !esInstructor(sesion.usuario)) {
     void cargarResumen();
   }
 });

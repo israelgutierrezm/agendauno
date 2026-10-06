@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands\Demos;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
+use App\Modules\Tenancy\Application\AsignarSucursalAlPersonalTenant;
 use App\Modules\Tenancy\Application\AsistenciaTenant;
 use App\Modules\Tenancy\Application\InventarioTenant;
 use App\Modules\Tenancy\Application\MembresiasTenant;
@@ -227,6 +228,20 @@ final class DemoBarberia extends DemoBase
         $this->equipo['daniel'] = $this->usuario('daniel@lanavaja.test', 'Daniel', 'Ortiz', [$caja ?? 'recepcionista']);
         $contador = $this->rolPropio($dueno, 'Pagos en línea', ['pagos.configurar']);
         $this->equipo['hector'] = $this->usuario('hector@lanavaja.test', 'Héctor', 'Solís', [$contador ?? 'recepcionista']);
+
+        // Cada quien en su sede (ADR 0098): con dos sedes, el personal sin sucursal no
+        // ve nada. El dueño y la administradora ven las dos.
+        $asignar = app(AsignarSucursalAlPersonalTenant::class);
+        foreach ([
+            'lupita' => [['roma', 'recepcionista']], 'daniel' => [['valle', $caja ?? 'recepcionista']],
+            'hector' => [['roma', $contador ?? 'recepcionista'], ['valle', $contador ?? 'recepcionista']],
+            'tono' => [['roma', 'instructor']], 'memo' => [['roma', 'instructor']],
+            'ivan' => [['valle', 'instructor']], 'chava' => [['valle', 'instructor'], ['roma', 'instructor']],
+        ] as $clave => $asignaciones) {
+            foreach ($asignaciones as [$sede, $rol]) {
+                $asignar->asignar($this->equipo[$clave], (int) $this->sedes[$sede]->getKey(), $rol);
+            }
+        }
 
         // Turnos: [sede, días, abre, cierra, comida].
         $this->turnos = [
@@ -687,6 +702,17 @@ final class DemoBarberia extends DemoBase
             }
             $termina = CarbonImmutable::instance($sesion->termina_en)->setTimezone($this->zona);
             if ($esHoy && $termina->greaterThan($ahora)) {
+                // Ya empezó: llegó y está en el sillón; se cobra al terminar.
+                $inicia = CarbonImmutable::instance($sesion->inicia_en)->setTimezone($this->zona);
+                if ($inicia->lessThanOrEqualTo($ahora) && $this->prob(90)) {
+                    $this->en($inicia->subMinutes($this->azar(0, 8)));
+                    try {
+                        app(AsistenciaTenant::class)->marcar($reserva, EstadoAsistencia::Presente, $this->cajero($sesion->sucursal_id, $dia, (int) $sesion->instructor_id));
+                    } catch (RuntimeException|ValidationException) {
+                        // No se pudo registrar: queda por atender.
+                    }
+                }
+
                 continue;
             }
             $this->reloj($dia, $termina->format('H:i'));
@@ -803,7 +829,9 @@ final class DemoBarberia extends DemoBase
             $yaAgendan = max(15, 85 - (int) $this->hoy->diffInDays($dia) * 5);
             foreach ($this->clientes as $i => $c) {
                 if ($c['proxima']->toDateString() !== $dia->toDateString()
-                    || ($c['deja'] instanceof CarbonImmutable && $dia->greaterThan($c['deja'])) || ! $this->prob($yaAgendan)) {
+                    || ($c['deja'] instanceof CarbonImmutable && $dia->greaterThan($c['deja']))
+                    // El cliente con cuenta siempre tiene su siguiente cita agendada.
+                    || ($i !== 0 && ! $this->prob($yaAgendan))) {
                     continue;
                 }
                 $conBono = $c['bono'] && $c['servicio'] === 'corte';

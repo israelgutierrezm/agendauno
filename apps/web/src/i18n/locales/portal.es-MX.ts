@@ -154,6 +154,7 @@ export default {
     quitarFiltro: "Quitar filtro",
     estados: {
       asistio: "Asististe",
+      llegasteTarde: "Asististe (llegaste tarde)",
       no_asistio: "No asististe",
       cancelada: "Cancelada",
       cancelaste: "Cancelaste",

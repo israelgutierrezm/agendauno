@@ -39,6 +39,10 @@ it('siembra la barbería con citas, bonos que se descuentan y datos en cada apar
         // El bono y la membresía se venden en caja y sus cortes se descuentan al agendar.
         $jorge = PersonaTenant::query()->where('email', 'jorge.pineda@correo.test')->sole();
         expect(AcuerdoTenant::query()->where('persona_id', $jorge->getKey())->exists())->toBeTrue()
+            // Y siempre tiene su siguiente cita.
+            ->and(ReservaTenant::query()->where('persona_id', $jorge->getKey())
+                ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', CarbonImmutable::parse('2026-10-03 13:00', 'America/Mexico_City')->utc()))
+                ->exists())->toBeTrue()
             ->and(ReservaTenant::query()->whereNull('orden_id')
                 ->whereHas('sesion.oferta', fn ($q) => $q->where('nombre', 'Corte con bono'))
                 ->exists())->toBeTrue();
@@ -52,6 +56,9 @@ it('siembra la barbería con citas, bonos que se descuentan y datos en cada apar
         }
         expect(PersonaTenant::query()->whereNull('genero')->count())->toBe(0)
             ->and(DB::connection('tenant')->table('eventos_outbox')->whereNull('publicado_en')->count())->toBe(0)
-            ->and(Usuario::query()->where('email', 'karla@lanavaja.test')->exists())->toBeTrue();
+            ->and(Usuario::query()->where('email', 'karla@lanavaja.test')->exists())->toBeTrue()
+            // Con dos sedes, todo el personal (menos dueño y administradora) tiene la suya
+            // (ADR 0098): sin sucursal no vería nada.
+            ->and(DB::connection('tenant')->table('asignaciones_personal')->distinct()->count('usuario_id'))->toBe(7);
     });
 });

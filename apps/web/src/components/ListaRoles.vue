@@ -2,7 +2,7 @@
 import { useI18n } from "vue-i18n";
 
 import type { RolDisponible } from "@/lib/roles";
-import { plural } from "@/lib/terminologia";
+import { plural, terminoParaPersona } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -29,14 +29,16 @@ function nombre(rol: RolDisponible): string {
   if (rol.nombre) {
     return rol.nombre;
   }
+  // En el género de quien entra, si su ficha lo dice (Alumno o Alumna, Dueña).
+  const genero = sesion.usuario?.genero;
   if (rol.clave === "instructor") {
-    return sesion.terminologia.instructor;
+    return terminoParaPersona(sesion.terminologia.instructor, genero);
   }
   if (rol.clave === "miembro") {
-    return sesion.terminologia.miembro;
+    return terminoParaPersona(sesion.terminologia.miembro, genero);
   }
   return te(`usuarios.rol.${rol.clave}`)
-    ? t(`usuarios.rol.${rol.clave}`)
+    ? terminoParaPersona(t(`usuarios.rol.${rol.clave}`), genero)
     : rol.clave;
 }
 function detalle(rol: RolDisponible): string {

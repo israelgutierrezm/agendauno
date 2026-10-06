@@ -121,7 +121,7 @@ trait ApartadosDemo
         }
 
         $personas = PersonaTenant::query()->whereIn('id', $this->idsDeClientes())->orderBy('id')->get()->all();
-        foreach (array_slice($this->mezclar($personas), 0, $documentos) as $persona) {
+        foreach (array_slice($this->conCuentaPrimero($personas), 0, $documentos) as $persona) {
             $tipo = $this->uno($modelos);
             $subido = $this->en($this->despuesDelAlta($persona, 1, 60));
             $archivo = 'documentos/'.$this->estudio->getKey().'/'.Str::random(40).'.pdf';
@@ -173,7 +173,7 @@ trait ApartadosDemo
         }
 
         $personas = PersonaTenant::query()->whereIn('id', $this->idsDeClientes())->orderBy('id')->get()->all();
-        foreach (array_slice($this->mezclar($personas), 0, $respuestas) as $persona) {
+        foreach (array_slice($this->conCuentaPrimero($personas), 0, $respuestas) as $persona) {
             $valores = [];
             foreach ($modelos as [$campo, $c]) {
                 if (! $c[2] && $this->prob(30)) {
@@ -407,6 +407,21 @@ trait ApartadosDemo
         $ids = PersonaTenant::query()->where('tipo', TipoPersonaTenant::Miembro->value)->orderBy('id')->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
 
         return $ids;
+    }
+
+    /**
+     * Las personas con cuenta primero (para revisar «Mi cuenta» con datos) y las demás
+     * en otro orden.
+     *
+     * @param  list<PersonaTenant>  $personas
+     * @return list<PersonaTenant>
+     */
+    private function conCuentaPrimero(array $personas): array
+    {
+        $conCuenta = array_values(array_filter($personas, static fn (PersonaTenant $p): bool => $p->usuario_id !== null));
+        $resto = array_values(array_filter($personas, static fn (PersonaTenant $p): bool => $p->usuario_id === null));
+
+        return [...$conCuenta, ...$this->mezclar($resto)];
     }
 
     /** Un momento entre unos días después de su alta, nunca después de ahora. */
