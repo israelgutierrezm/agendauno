@@ -54,13 +54,15 @@ const pantalla = usePantallaCompleta();
     >
       <IconoNav nombre="intercambio" :tam="18" />
       <span>{{ $t("operacion.rolActivo.cambiar") }}</span>
+      <!-- Tiene otro rol con el cual entrar (el mismo punto que en la barra). -->
+      <span class="tu-rol-punto ml-auto" aria-hidden="true" />
     </button>
     <button
       type="button"
       class="tu-side-link w-full"
       @click="emit('apariencia')"
     >
-      <IconoNav nombre="configuracion" :tam="18" />
+      <IconoNav nombre="apariencia" :tam="18" />
       <span>{{ $t("tema.apariencia") }}</span>
     </button>
     <RouterLink

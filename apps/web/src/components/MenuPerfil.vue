@@ -88,7 +88,7 @@ const { iniciales, rol, puedeConfigurar } = usePerfilActual();
           :to="{ name: 'ajustes' }"
           @click="emit('cerrar')"
         >
-          <IconoNav nombre="configuracion" :tam="18" />
+          <IconoNav nombre="ajustes" :tam="18" />
           <span class="flex-1">{{ $t("nav.configuracion") }}</span>
           <IconoNav nombre="chevron" :tam="16" class="tu-perfil-ir" />
         </RouterLink>

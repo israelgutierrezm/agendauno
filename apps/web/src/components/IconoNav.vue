@@ -61,15 +61,16 @@ const RUTAS: Record<string, string[]> = {
     "M7 14.5h3",
   ],
   integraciones: ["M13 3 4.5 13.5H11l-1 7.5 8.5-10.5H12z"],
-  configuracion: [
-    "M4 7h10",
-    "M18 7h2",
-    "M4 17h4",
-    "M12 17h8",
-    "M14 5v4",
-    "M8 15v4",
-  ],
   ajustes: ["M4 7h10", "M18 7h2", "M4 17h4", "M12 17h8", "M14 5v4", "M8 15v4"],
+  // Apariencia (tema y colores): la paleta del pintor, para no confundirla con los
+  // ajustes y la configuración.
+  apariencia: [
+    "M12 21a9 9 0 1 1 9-9c0 2.5-2 4.5-4.5 4.5H15a1.5 1.5 0 0 0-1.2 2.4l.3.4A1.5 1.5 0 0 1 12.9 21z",
+    "M8.1 12.5a.6.6 0 1 1-1.2 0a.6.6 0 1 1 1.2 0",
+    "M9.1 8a.6.6 0 1 1-1.2 0a.6.6 0 1 1 1.2 0",
+    "M13.1 6.5a.6.6 0 1 1-1.2 0a.6.6 0 1 1 1.2 0",
+    "M17.1 8.75a.6.6 0 1 1-1.2 0a.6.6 0 1 1 1.2 0",
+  ],
   personas: [
     "M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
     "M3 20a6 6 0 0 1 12 0",

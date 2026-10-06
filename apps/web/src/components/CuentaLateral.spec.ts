@@ -53,4 +53,20 @@ describe("cuenta al pie del menú lateral", () => {
       expect.arrayContaining(["roles", "apariencia", "salir"]),
     );
   });
+
+  it("con un solo rol no ofrece cambiarlo ni muestra el punto", () => {
+    sesion.tieneVariosRoles = false;
+    const w = mount(CuentaLateral, { global: { plugins: [i18n] } });
+    expect(w.text()).not.toContain("Cambiar");
+    expect(w.find(".tu-rol-punto").exists()).toBe(false);
+    sesion.tieneVariosRoles = true;
+  });
+
+  it("con varios roles, el punto acompaña a «Cambiar de rol»", () => {
+    const w = mount(CuentaLateral, { global: { plugins: [i18n] } });
+    const boton = w
+      .findAll("button")
+      .find((b) => b.text().includes("Cambiar"))!;
+    expect(boton.find(".tu-rol-punto").exists()).toBe(true);
+  });
 });

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/calendario/logo_calendario.dart';
 import '../../../core/google/google_auth.dart';
+import '../../../core/punto_que_late.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
@@ -730,6 +731,8 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                     orElse: () => RolDisponible(clave: sesion.rol, faceta: sesion.facetaActiva),
                   ), sesion.terminologia)}',
                 ),
+                // Tiene otro rol con el cual entrar: el mismo punto que en la web.
+                trailing: const PuntoQueLate(key: Key('punto-cambiar-rol')),
                 onTap: _guardando ? null : _cambiarRol,
               ),
             ),

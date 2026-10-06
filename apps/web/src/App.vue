@@ -357,11 +357,13 @@ onMounted(() => {
           />
           <!-- Con una sola sucursal, solo su nombre (informativo) -->
           <SelectorSucursal variante="unica" />
-          <!-- Cambiar de rol: solo si puede entrar con más de uno -->
+          <!-- Cambiar de rol: solo si puede entrar con más de uno; el punto que late
+               avisa que tiene otro rol con el cual entrar. -->
           <button
             v-if="sesion.tieneVariosRoles"
             type="button"
-            class="tu-icono-btn"
+            class="tu-icono-btn relative"
+            data-prueba="boton-cambiar-rol"
             :aria-label="$t('operacion.rolActivo.cambiar')"
             :title="$t('operacion.rolActivo.cambiar')"
             @click="
@@ -370,6 +372,10 @@ onMounted(() => {
             "
           >
             <IconoNav nombre="intercambio" :tam="18" />
+            <span
+              class="tu-rol-punto tu-rol-punto-esquina"
+              aria-hidden="true"
+            />
           </button>
 
           <!-- Apariencia: tema y colores propios (panel lateral) -->
@@ -383,7 +389,7 @@ onMounted(() => {
               menuPerfil = false;
             "
           >
-            <IconoNav nombre="configuracion" :tam="18" />
+            <IconoNav nombre="apariencia" :tam="18" />
           </button>
 
           <BotonPantallaCompleta />
@@ -646,6 +652,61 @@ a.tu-miga:hover {
 .tu-barra-superior .tu-solo-movil .ss-unica {
   color: var(--texto);
   font-weight: 500;
+}
+/* «Cambiar de rol»: un punto que late, siempre, para que se note que se puede entrar
+   con otro rol (en la barra y en el menú lateral del teléfono). */
+.tu-rol-punto {
+  position: relative;
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--primario);
+}
+.tu-rol-punto::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--primario);
+  animation: tu-rol-latido 1.8s ease-out infinite;
+}
+.tu-rol-punto-esquina {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  box-shadow: 0 0 0 2px var(--superficie);
+}
+@keyframes tu-rol-latido {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  80%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tu-rol-punto::after {
+    animation: none;
+  }
+}
+/* En el menú lateral (fondo de la barra, oscuro en casi todos los temas) el acento
+   apenas contrasta: el punto toma el color del texto de la barra. */
+.tu-side-link .tu-rol-punto,
+.tu-side-link .tu-rol-punto::after {
+  background: currentColor;
+}
+/* Alto contraste del sistema: los fondos se quitan; el punto se pinta como texto. */
+@media (forced-colors: active) {
+  .tu-rol-punto,
+  .tu-rol-punto::after {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
 }
 /* El menú móvil (cajón) no existe en escritorio: ahí el lateral siempre se ve.
    Va aquí y no como `lg:hidden` porque `.tu-icono-btn` no está en una capa. */
