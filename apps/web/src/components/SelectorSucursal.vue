@@ -80,8 +80,8 @@ function elegir(evento: Event): void {
     :title="$t('sucursalOperativa.etiqueta')"
     data-prueba="sucursal-unica"
   >
-    <IconoNav nombre="ubicacion" :tam="15" />
-    {{ sucursales.actual.value?.nombre }}
+    <IconoNav nombre="ubicacion" :tam="15" class="shrink-0" />
+    <span class="ss-unica-nombre">{{ sucursales.actual.value?.nombre }}</span>
   </span>
 </template>
 
@@ -185,8 +185,14 @@ function elegir(evento: Event): void {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+  min-width: 0;
+  max-width: 100%;
   color: var(--texto-suave);
   font-size: 0.875rem;
   white-space: nowrap;
+}
+.ss-unica-nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

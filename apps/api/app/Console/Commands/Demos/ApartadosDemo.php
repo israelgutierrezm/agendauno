@@ -343,7 +343,7 @@ trait ApartadosDemo
             $this->en(CarbonImmutable::instance($orden->pagada_en ?? $this->ahora)->addHours($this->azar(1, 48)));
             try {
                 $emitir->emitir($datos, [
-                    'nombre' => mb_strtoupper(NombresDemo::ascii($persona->nombreCompleto())), 'rfc' => $this->rfcDe($persona),
+                    'nombre' => mb_strtoupper(Str::ascii($persona->nombreCompleto())), 'rfc' => $this->rfcDe($persona),
                     'email' => $persona->email, 'codigo_postal' => $this->uno(['06700', '03100', '06600', '04100', '11590', '03810']),
                     'regimen_fiscal' => '612',
                 ], $items, 'G03', $this->uno(['01', '04', '03']));
@@ -445,7 +445,7 @@ trait ApartadosDemo
     /** Un PDF de una página con un título y un nombre (los documentos de muestra). */
     private function pdf(string $titulo, string $nombre): string
     {
-        $texto = static fn (string $t): string => str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], NombresDemo::ascii($t));
+        $texto = static fn (string $t): string => str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], Str::ascii($t));
         $contenido = 'BT /F1 20 Tf 72 760 Td ('.$texto($titulo).') Tj ET BT /F1 12 Tf 72 730 Td ('.$texto($nombre).') Tj ET'
             .' BT /F1 10 Tf 72 700 Td (Documento de muestra del demo) Tj ET';
         $objetos = [

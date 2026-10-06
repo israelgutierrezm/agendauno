@@ -13,6 +13,7 @@ import NavLateral from "@/components/NavLateral.vue";
 import PestanasArea from "@/components/PestanasArea.vue";
 import AppToaster from "@/components/AppToaster.vue";
 import AvisoSinSucursal from "@/components/AvisoSinSucursal.vue";
+import CuentaLateral from "@/components/CuentaLateral.vue";
 import DialogoConfirmar from "@/components/DialogoConfirmar.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import PanelRoles from "@/components/PanelRoles.vue";
@@ -77,6 +78,11 @@ const lugar = useUbicacionActual();
 const sucursalesSesion = useSucursales();
 const selectorEnBarra = computed(
   () => sucursalesSesion.varias.value && !esMiembro(sesion.usuario),
+);
+// En el teléfono la barra solo dice con qué sucursal se trabaja: con una sola, su
+// nombre (en lugar del título, que ya está en las pestañas de abajo).
+const sucursalUnicaEnMovil = computed(
+  () => !esMiembro(sesion.usuario) && sucursalesSesion.lista.value.length === 1,
 );
 
 // El panel es para las pantallas privadas. Las públicas (la página del negocio,
@@ -203,6 +209,28 @@ onMounted(() => {
           :compacto="compactoEfectivo"
           @navegar="menuLateral = false"
         />
+        <!-- En el teléfono, la cuenta y sus opciones (la barra de arriba solo lleva la
+             sucursal). -->
+        <div
+          class="sm:hidden mt-4 pt-3 border-t"
+          :style="{ borderColor: 'var(--barra-borde)' }"
+        >
+          <CuentaLateral
+            @navegar="menuLateral = false"
+            @roles="
+              menuLateral = false;
+              menuRoles = true;
+            "
+            @apariencia="
+              menuLateral = false;
+              menuApariencia = true;
+            "
+            @salir="
+              menuLateral = false;
+              salir();
+            "
+          />
+        </div>
       </div>
 
       <!-- Contraer (solo escritorio) -->
@@ -239,7 +267,7 @@ onMounted(() => {
           borderColor: 'var(--borde)',
         }"
       >
-        <div class="flex items-center gap-3 min-w-0">
+        <div class="flex flex-1 items-center gap-3 min-w-0">
           <button
             type="button"
             class="tu-icono-btn tu-barra-menu"
@@ -260,10 +288,19 @@ onMounted(() => {
           </button>
           <!-- Con varias sucursales: con cuál se trabaja (en lugar del título). -->
           <SelectorSucursal v-if="selectorEnBarra" />
+          <!-- En el teléfono, con una sola sucursal: su nombre. -->
+          <span
+            v-else-if="sucursalUnicaEnMovil"
+            class="tu-solo-movil min-w-0"
+            data-prueba="sucursal-movil"
+          >
+            <SelectorSucursal variante="unica" />
+          </span>
           <!-- Dónde está: el área (su ícono y su nombre). -->
           <div
-            v-else-if="lugar.titulo.value"
+            v-if="!selectorEnBarra && lugar.titulo.value"
             class="tu-barra-titulo"
+            :class="{ 'tu-sin-movil': sucursalUnicaEnMovil }"
             data-prueba="titulo-barra"
           >
             <span v-if="lugar.icono.value" class="tu-barra-icono">
@@ -273,7 +310,10 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="flex items-center gap-1 sm:gap-2 shrink-0">
+        <!-- En el teléfono van al pie del menú lateral (CuentaLateral). -->
+        <div
+          class="tu-barra-acciones flex items-center gap-1 sm:gap-2 shrink-0"
+        >
           <!-- Ruta de ubicación, al final (con ancho de sobra). -->
           <nav
             v-if="lugar.migas.value.length > 1"
@@ -316,7 +356,7 @@ onMounted(() => {
             aria-hidden="true"
           />
           <!-- Con una sola sucursal, solo su nombre (informativo) -->
-          <SelectorSucursal variante="unica" class="hidden sm:inline-flex" />
+          <SelectorSucursal variante="unica" />
           <!-- Cambiar de rol: solo si puede entrar con más de uno -->
           <button
             v-if="sesion.tieneVariosRoles"
@@ -436,6 +476,7 @@ onMounted(() => {
   align-items: center;
   gap: 0.7rem;
   min-width: 0;
+  overflow: hidden;
   color: var(--texto);
   font-size: 1.05rem;
   font-weight: 600;
@@ -576,6 +617,7 @@ a.tu-miga:hover {
 /* Botón de icono del encabezado. */
 .tu-icono-btn {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   height: 2.25rem;
@@ -587,6 +629,23 @@ a.tu-miga:hover {
 .tu-icono-btn:hover {
   background: var(--superficie-2);
   color: var(--texto);
+}
+/* En el teléfono la barra solo lleva el menú y la sucursal activa: el perfil, el rol,
+   la apariencia y la pantalla completa van al pie del menú lateral. */
+@media (max-width: 639.98px) {
+  .tu-barra-acciones,
+  .tu-sin-movil {
+    display: none !important;
+  }
+}
+@media (min-width: 640px) {
+  .tu-solo-movil {
+    display: none;
+  }
+}
+.tu-barra-superior .tu-solo-movil .ss-unica {
+  color: var(--texto);
+  font-weight: 500;
 }
 /* El menú móvil (cajón) no existe en escritorio: ahí el lateral siempre se ve.
    Va aquí y no como `lg:hidden` porque `.tu-icono-btn` no está en una capa. */
