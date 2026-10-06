@@ -378,7 +378,11 @@ onMounted(cargar);
     <EncabezadoSeccion
       :titulo="$t('catalogo.titulo')"
       :total="ofertas.length"
-      :subtitulo="$t('listadosVisual.catalogo.subtitulo')"
+      :subtitulo="
+        esCitas
+          ? $t('listadosVisual.catalogo.subtituloCitas')
+          : $t('listadosVisual.catalogo.subtitulo')
+      "
     >
       <template #acciones>
         <button

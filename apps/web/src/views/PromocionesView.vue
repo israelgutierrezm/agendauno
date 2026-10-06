@@ -385,7 +385,7 @@ onMounted(cargar);
     <template v-else>
       <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
 
-      <div class="tu-card mt-5 overflow-x-auto">
+      <div class="relative tu-card mt-5 overflow-x-auto">
         <div class="tu-filtros">
           <label class="tu-buscar">
             <IconoNav nombre="buscar" :tam="16" />

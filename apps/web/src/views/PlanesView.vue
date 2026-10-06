@@ -247,7 +247,7 @@ onMounted(cargar);
           </label>
         </div>
 
-        <div class="overflow-x-auto">
+        <div class="relative overflow-x-auto">
           <table class="pv-tabla">
             <thead>
               <tr>

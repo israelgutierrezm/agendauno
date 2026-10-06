@@ -24,6 +24,7 @@ export default {
     proximaReserva: "Tu próxima reserva",
     sinReservas: "Nada agendado por ahora",
     sinProximaAyuda: "Elige tu próxima clase y aparta tu lugar.",
+    sinProximaAyudaCitas: "Elige tu próxima cita y aparta tu horario.",
     reservar: "Reservar",
     clima: {
       pronostico: "Pronóstico para tu clase en {lugar}",
@@ -95,7 +96,7 @@ export default {
     agendarCita: "Agendar una cita",
     detalle: "Detalle",
     con: "Con {nombre}",
-    lugares: "{libres} de {total} lugares",
+    lugares: "{libres} de {total} lugares libres",
     llena: "Llena",
     sucursal: "Sucursal",
     todasSucursales: "Todas las sucursales",

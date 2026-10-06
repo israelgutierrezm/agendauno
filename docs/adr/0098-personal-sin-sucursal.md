@@ -38,3 +38,11 @@ negocio con varias, olvidar asignar a alguien le daba acceso a todo.
 - Nadie del personal ve sucursales que no le asignaron.
 - Un instructor sin sucursal en un negocio con varias tampoco ve sus clases hasta que se
   le asigne una.
+
+## Precisión (2026-10-06)
+
+Quien ES dueño o administrador del negocio no se acota por sucursal aunque entre con
+otro rol (p. ej. el dueño que también atiende y entra como barbero): la sucursal es de
+lo que la persona es, no de sus permisos (ADR 0055). Antes veía «Aún no tienes una
+sucursal asignada» al cambiar a su rol de profesional. Lo que ve con ese rol ya lo acota
+el alcance de quien imparte (ADR 0095).

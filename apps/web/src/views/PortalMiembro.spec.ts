@@ -371,7 +371,8 @@ describe("portal del alumno", () => {
     const texto = w.text();
 
     // Sin reserva, el término general.
-    expect(texto).toContain("Tu próxima reserva");
+    // Sin nada agendado, lo que ofrece el negocio: su próxima clase.
+    expect(texto).toContain("Tu próxima clase");
     expect(texto).toContain("Nada agendado por ahora");
     expect(texto).toContain("24°");
     expect(texto).toContain("Ahora cerca de Guadalajara");

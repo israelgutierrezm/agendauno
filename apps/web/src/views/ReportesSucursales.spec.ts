@@ -73,6 +73,8 @@ describe("reporte por sucursal", () => {
       .findAll(".tu-pestanas button")
       .find((b) => b.text() === "Equipo y sucursales")!
       .trigger("click");
+    // La pestaña pide lo suyo al abrirse.
+    await flushPromises();
     expect(w.find('input[type="date"]').exists()).toBe(true);
     expect(w.text()).toContain("Estado actual");
 

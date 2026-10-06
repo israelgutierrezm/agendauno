@@ -651,7 +651,10 @@ onMounted(cargarReferencias);
                 </div>
               </header>
 
-              <div v-if="vista === 'semana'" class="mt-4 overflow-x-auto">
+              <div
+                v-if="vista === 'semana'"
+                class="relative mt-4 overflow-x-auto"
+              >
                 <SemanaHorario
                   :semana="semana"
                   :puede-gestionar="puedeGestionar"

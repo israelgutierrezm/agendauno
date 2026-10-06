@@ -8,7 +8,7 @@ export default {
   nav: {
     membresias: "Membresías",
     planes: "Planes y paquetes",
-    vender: "Vender a un alumno",
+    vender: "Ventas",
     puntoVenta: "Punto de venta",
     mostrador: "Mostrador",
     inventario: "Inventario",

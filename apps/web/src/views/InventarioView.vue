@@ -373,7 +373,7 @@ onMounted(cargar);
             </label>
           </div>
 
-          <div class="overflow-x-auto">
+          <div class="relative overflow-x-auto">
             <table class="iv-tabla">
               <thead>
                 <tr>

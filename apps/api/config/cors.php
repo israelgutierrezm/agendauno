@@ -30,7 +30,9 @@ return [
 
     'exposed_headers' => ['X-Correlation-ID'],
 
-    'max_age' => 0,
+    // El navegador recuerda la respuesta al preflight (2 h, lo más que respeta
+    // Chrome): cada llamada con token no paga un OPTIONS extra.
+    'max_age' => 7200,
 
     // Required for Sanctum cookie-based SPA authentication.
     'supports_credentials' => true,

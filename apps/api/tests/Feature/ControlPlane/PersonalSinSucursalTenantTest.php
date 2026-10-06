@@ -86,3 +86,18 @@ it('al abrir la segunda sucursal, el personal sin asignar se queda con la primer
         ->assertJsonPath('data.usuario.sin_sucursal', false)
         ->assertJsonCount(1, 'data.usuario.sucursales');
 });
+
+it('el dueño que también atiende no queda «sin sucursal» al entrar como profesional', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    agendaSemilla($e);
+    agendaSemilla($e);
+    $ulid = (string) $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))->json('data.usuario.ulid');
+    $this->putJson("/api/v1/app/{$e['slug']}/usuarios/{$ulid}/roles", ['roles' => ['propietario', 'instructor']], conBearer($e['bearer']))
+        ->assertOk();
+
+    $this->putJson("/api/v1/app/{$e['slug']}/yo/rol-activo", ['rol' => 'instructor'], conBearer($e['bearer']))->assertOk();
+
+    $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.usuario.sin_sucursal', false);
+});

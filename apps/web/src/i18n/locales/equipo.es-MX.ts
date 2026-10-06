@@ -28,7 +28,7 @@ export const miPerfil = {
   seccionPreferencias: "Preferencias y privacidad",
   celular: "Celular",
   celularAyuda:
-    "Para avisarte de tus clases y citas (también por WhatsApp, si lo activas).",
+    "Para avisarte de tus clases (también por WhatsApp, si lo activas).",
   // Zona de la foto: arrastrar y soltar o clic.
   fotoArrastra: "Arrastra tu foto aquí o haz clic para elegirla",
   fotoSuelta: "Suelta la imagen para subirla",
@@ -73,7 +73,7 @@ export const miPerfil = {
   cambiada: "Contraseña actualizada. Cerramos tus otras sesiones.",
   calendario: "Calendario",
   calendarioAyuda:
-    "Tus clases y citas en Google Calendar, Apple u Outlook. Se actualiza solo.",
+    "Tus clases en Google Calendar, Apple u Outlook. Se actualiza solo.",
   calendarioObtener: "Conectar mi calendario",
   calendarioAbrir: "Abrir en mi calendario",
   calendarioCopiar: "Copiar enlace",

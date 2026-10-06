@@ -193,6 +193,14 @@ function atencion(s: SesionAgenda): { texto: string; tono: string } {
     tono: tono[e] ?? "var(--primario)",
   };
 }
+// Cuánto dura la cita (como en el Inicio y la agenda).
+function duracion(s: SesionAgenda): string {
+  const minutos = Math.round(
+    (new Date(s.termina_en).getTime() - new Date(s.inicia_en).getTime()) /
+      60_000,
+  );
+  return minutos > 0 ? t("agendaVisual.cita.minutos", { n: minutos }) : "";
+}
 // Pago, aparte de la atención: solo si falta.
 function pago(s: SesionAgenda): string | null {
   const p = pagoCita(s);
@@ -311,7 +319,9 @@ defineExpose({ cargar });
               class="block text-sm rc-detalle"
               :style="{ color: 'var(--texto-suave)' }"
               >{{
-                [s.oferta, s.instructor, s.sucursal].filter(Boolean).join(" · ")
+                [s.oferta, duracion(s), s.instructor, s.sucursal]
+                  .filter(Boolean)
+                  .join(" · ")
               }}</span
             >
           </span>

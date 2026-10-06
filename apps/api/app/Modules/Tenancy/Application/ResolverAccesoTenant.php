@@ -87,10 +87,17 @@ class ResolverAccesoTenant
     }
 
     /**
-     * ¿El usuario (con el rol con que trabaja) se acota por sucursal?
+     * ¿El usuario (con el rol con que trabaja) se acota por sucursal? Quien ES dueño o
+     * administrador del negocio no, aunque entre con otro rol (p. ej. el dueño que
+     * también atiende): la sucursal es de lo que la persona es, no de sus permisos
+     * (ADR 0055); lo que ve como barbero ya lo acota su rol.
      */
     public function esPersonalAcotable(Usuario $usuario): bool
     {
+        if (array_intersect(['propietario', 'admin'], $usuario->rolesEfectivos()) !== []) {
+            return false;
+        }
+
         return $this->rolesAcotables($usuario->rolesVigentes());
     }
 

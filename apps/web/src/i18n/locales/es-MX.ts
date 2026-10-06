@@ -2086,7 +2086,7 @@ export default {
     reservar: {
       miembro: "Alumno",
       elegir: "Elige…",
-      esperar: "A lista de espera si esta llena",
+      esperar: "A lista de espera si está llena",
       reservar: "Reservar",
       canal: "Canal",
     },

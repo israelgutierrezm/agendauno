@@ -393,7 +393,7 @@ onMounted(cargar);
       v-if="!cargando && pestana === 'documentos'"
       class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]"
     >
-      <div class="tu-card min-w-0 overflow-x-auto">
+      <div class="relative tu-card min-w-0 overflow-x-auto">
         <div class="tu-filtros">
           <h2 class="font-medium mr-auto">
             {{ $t("documentos.docs.titulo") }}

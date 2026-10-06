@@ -379,6 +379,8 @@ onMounted(cargar);
 <style scoped>
 .rs-cuerpo {
   display: grid;
+  /* Una columna que se encoge: los filtros no ensanchan la página en el teléfono. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.25rem;
   align-items: start;
 }

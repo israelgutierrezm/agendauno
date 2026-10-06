@@ -151,6 +151,8 @@ async function irA(
     .findAll(".tu-pestanas button")
     .find((b) => b.text() === pestana)!
     .trigger("click");
+  // Cada pestaña pide lo suyo al abrirse.
+  await flushPromises();
 }
 
 beforeEach(() => {

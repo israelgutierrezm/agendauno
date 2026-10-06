@@ -53,7 +53,10 @@ const proxima = computed(() =>
 // Por lo que es: "Tu próxima cita" o "Tu próxima clase"; sin reserva, "reserva".
 const etiquetaProxima = computed(() => {
   if (!proxima.value) {
-    return t("portal.inicio.proximaReserva");
+    // Sin nada agendado, lo que el negocio ofrece: su próxima clase o cita.
+    return sesion.esCitas
+      ? t("portal.inicio.proximaCita")
+      : t("portal.inicio.proxima");
   }
   return proxima.value.tipo === "cita"
     ? t("portal.inicio.proximaCita")
@@ -472,7 +475,11 @@ onMounted(() => {
           {{ $t("portal.inicio.sinReservas") }}
         </p>
         <p class="mt-2" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("portal.inicio.sinProximaAyuda") }}
+          {{
+            sesion.esCitas
+              ? $t("portal.inicio.sinProximaAyudaCitas")
+              : $t("portal.inicio.sinProximaAyuda")
+          }}
         </p>
         <div class="mt-6">
           <RouterLink

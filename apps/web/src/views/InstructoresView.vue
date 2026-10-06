@@ -333,7 +333,7 @@ onMounted(cargar);
         </ul>
 
         <!-- Lista: una fila por persona -->
-        <div v-else class="mt-4 tu-card overflow-x-auto">
+        <div v-else class="relative mt-4 tu-card overflow-x-auto">
           <table class="tu-tabla">
             <thead>
               <tr>

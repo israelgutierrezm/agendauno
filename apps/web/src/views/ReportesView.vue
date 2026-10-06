@@ -485,22 +485,36 @@ async function cargarCohortes(): Promise<void> {
   }
 }
 
+async function cargarSucursales(): Promise<void> {
+  const s = await api.get<{ data: ReporteSucursales }>(
+    `${base.value}/reportes/sucursales`,
+  );
+  sucursales.value = s.data.data.sucursales;
+  sinSucursal.value = s.data.data.sin_sucursal.miembros_activos;
+  totalesSucursales.value = s.data.data.totales;
+}
+
+// Lo que pide cada pestaña. Se carga al abrirla (no todo al entrar: cada reporte
+// cuesta) y, si cambia el periodo, se vuelve a pedir al verla de nuevo.
+const CARGAS: Record<Pestana, () => Promise<unknown>[]> = {
+  resumen: () => [cargarNegocio()],
+  ingresos: () => [cargarTendencias(), cargarRentabilidad()],
+  ocupacion: () => [cargarDemanda()],
+  clientes: () => [cargarCohortes()],
+  equipo: () => [cargarEquipo(), cargarSucursales()],
+};
+const cargadas = new Set<Pestana>();
 async function cargar(): Promise<void> {
+  const actual = pestana.value;
+  if (cargadas.has(actual)) {
+    return;
+  }
+  cargadas.add(actual);
   cargando.value = true;
   try {
-    const [, s] = await Promise.all([
-      cargarNegocio(),
-      api.get<{ data: ReporteSucursales }>(`${base.value}/reportes/sucursales`),
-      cargarRentabilidad(),
-      cargarDemanda(),
-      cargarTendencias(),
-      cargarCohortes(),
-      cargarEquipo(),
-    ]);
-    sucursales.value = s.data.data.sucursales;
-    sinSucursal.value = s.data.data.sin_sucursal.miembros_activos;
-    totalesSucursales.value = s.data.data.totales;
+    await Promise.all(CARGAS[actual]());
   } catch (e) {
+    cargadas.delete(actual);
     error.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
@@ -547,14 +561,15 @@ function esteMes(): void {
   hasta.value = hoyEnNegocio(sesion.zonaHoraria);
 }
 
+// Otro periodo: lo que dependía de él se vuelve a pedir (Clientes, no).
 watch([desde, hasta], () => {
-  void cargarNegocio();
-  void cargarRentabilidad();
-  void cargarDemanda();
-  void cargarTendencias();
-  void cargarEquipo();
+  for (const p of ["resumen", "ingresos", "ocupacion", "equipo"] as const) {
+    cargadas.delete(p);
+  }
+  void cargar();
 });
 watch(agrupacion, () => void cargarTendencias());
+watch(pestana, () => void cargar());
 
 onMounted(cargar);
 </script>

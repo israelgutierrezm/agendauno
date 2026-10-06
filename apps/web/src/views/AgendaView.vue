@@ -616,7 +616,35 @@ async function cargarReferencias(): Promise<void> {
   cargando.value = false;
 }
 
+// Una carga en curso con los mismos parámetros se reusa: al entrar, la sucursal de
+// la barra se fija mientras carga lo demás y no hace falta pedir dos veces lo mismo.
+let cargaEnCurso: { clave: string; promesa: Promise<void> } | null = null;
+// Lo último que se cargó (para no repetirlo al terminar de montar).
+let ultimaCargada: string | null = null;
+function claveDeCarga(): string {
+  return JSON.stringify([
+    rangoCarga.value,
+    sucursalFiltro.value,
+    vista.value === "mes",
+  ]);
+}
 async function cargarSesiones(): Promise<void> {
+  const clave = claveDeCarga();
+  if (cargaEnCurso?.clave === clave) {
+    return cargaEnCurso.promesa;
+  }
+  const promesa = cargarSesionesAhora();
+  cargaEnCurso = { clave, promesa };
+  try {
+    await promesa;
+    ultimaCargada = clave;
+  } finally {
+    if (cargaEnCurso?.promesa === promesa) {
+      cargaEnCurso = null;
+    }
+  }
+}
+async function cargarSesionesAhora(): Promise<void> {
   cargandoSesiones.value = true;
   error.value = null;
   try {
@@ -1753,7 +1781,10 @@ async function crearRecurrente(): Promise<void> {
 
 onMounted(async () => {
   await cargarReferencias();
-  await cargarSesiones();
+  // Si mientras tanto ya se cargó (al fijarse la sucursal de la barra), no se repite.
+  if (ultimaCargada !== claveDeCarga()) {
+    await cargarSesiones();
+  }
 });
 </script>
 
@@ -1826,7 +1857,7 @@ onMounted(async () => {
     <div v-if="!cargando" class="flex flex-col">
       <!-- Una sola barra: la fecha, la vista y los filtros (plegados, con cuántos
            hay puestos). Así el calendario aparece casi de inmediato. -->
-      <div class="mt-4 flex flex-wrap items-center gap-2 sm:gap-3">
+      <div class="mt-3 flex flex-wrap items-center gap-2 sm:gap-3">
         <div class="flex items-center gap-1 max-sm:mr-auto">
           <button
             class="tu-btn tu-btn-fantasma ag-paso"
@@ -1948,7 +1979,7 @@ onMounted(async () => {
           <select
             v-model="instructorFiltro"
             class="tu-input w-auto max-sm:w-full"
-            :aria-label="$t('agenda.nueva.instructor')"
+            :aria-label="sesion.terminologia.instructor"
           >
             <option value="">
               {{
@@ -2003,12 +2034,16 @@ onMounted(async () => {
            colores, en una sola línea. En el teléfono van después del calendario. -->
       <div
         v-if="vista !== 'mes' || leyenda.length > 0"
-        class="mt-3 max-lg:order-last"
+        class="mt-2 max-lg:order-last"
       >
         <div
           class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2"
         >
-          <AgendaKpis v-if="vista !== 'mes'" :tarjetas="tarjetasKpi" />
+          <AgendaKpis
+            v-if="vista !== 'mes'"
+            class="min-w-0 flex-1"
+            :tarjetas="tarjetasKpi"
+          />
           <button
             v-if="leyenda.length > 0"
             type="button"
@@ -2097,7 +2132,7 @@ onMounted(async () => {
       <!-- ===== Vista SEMANA de clases: franjas con cupos ===== -->
       <div
         v-if="vista === 'semana' && !sesion.esCitas"
-        class="mt-4 hidden lg:block"
+        class="mt-3 hidden lg:block"
       >
         <AgendaClasesSemana
           :dias="dias"

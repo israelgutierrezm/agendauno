@@ -507,11 +507,20 @@
   .tu-segmentado {
     display: inline-flex;
     gap: 0.2rem;
+    max-width: 100%;
     padding: 0.2rem;
+    overflow-x: auto;
     border-radius: 0.7rem;
     background: var(--superficie-2);
+    /* En un teléfono angosto, las opciones que no caben se desplazan aquí dentro
+       (la página no se ensancha). */
+    scrollbar-width: none;
+  }
+  .tu-segmentado::-webkit-scrollbar {
+    display: none;
   }
   .tu-segmentado > button {
+    flex-shrink: 0;
     padding: 0.4rem 0.8rem;
     border: 0;
     border-radius: 0.55rem;

@@ -26,6 +26,7 @@ export default {
   },
   catalogo: {
     subtitulo: "Lo que ofreces: duración, precio o lugares, y cómo se reserva.",
+    subtituloCitas: "Lo que ofreces: duración, precio y cómo se agenda.",
     nuevoServicio: "Nuevo servicio",
     nuevaClase: "Nueva clase",
     servicio: "Servicio",

@@ -506,7 +506,7 @@ onMounted(cargar);
           compacto
           :titulo="$t('pos.ventas.vacio')"
         />
-        <div v-else class="tu-card mt-3 overflow-x-auto">
+        <div v-else class="relative tu-card mt-3 overflow-x-auto">
           <table class="mo-tabla">
             <thead>
               <tr>

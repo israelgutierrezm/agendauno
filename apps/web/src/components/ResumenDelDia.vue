@@ -503,7 +503,7 @@ onMounted(() => {
       <!-- Agenda de hoy -->
       <section
         v-if="hoy.agenda"
-        class="tu-card p-5 lg:col-span-2"
+        class="tu-card p-5 lg:col-span-2 min-w-0"
         aria-labelledby="hoy-agenda"
       >
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -686,7 +686,7 @@ onMounted(() => {
 
       <div
         v-if="libres || hoy.cobros || hoy.renovaciones"
-        class="grid content-start gap-6"
+        class="grid content-start gap-6 min-w-0"
         :class="{ 'lg:col-span-3': !hoy.agenda }"
       >
         <!-- Espacios libres de hoy (citas) -->

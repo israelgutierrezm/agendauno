@@ -165,4 +165,40 @@ describe("tendencias del dinero", () => {
       w.get('[data-prueba="exportar-tendencias"]').attributes("disabled"),
     ).toBeUndefined();
   });
+
+  it("cada pestaña pide sus reportes al abrirse, no todos al entrar", async () => {
+    api.get.mockReset();
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/reportes/tendencias") ? tendencias : null,
+        },
+      }),
+    );
+    const w = mount(ReportesView, {
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            missingWarn: false,
+            fallbackWarn: false,
+            messages: { es: { ...esMX, operacion } },
+          }),
+        ],
+        stubs: { EncabezadoSeccion: true },
+      },
+    });
+    await flushPromises();
+    const pedidos = () =>
+      api.get.mock.calls.map(([url]) => String(url).split("/reportes/")[1]);
+    expect(pedidos()).toEqual(["negocio"]);
+
+    await w
+      .findAll(".tu-pestanas button")
+      .find((b) => b.text() === "Ingresos")!
+      .trigger("click");
+    await flushPromises();
+    expect(pedidos()).toEqual(["negocio", "tendencias", "rentabilidad"]);
+  });
 });

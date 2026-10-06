@@ -859,7 +859,7 @@ onMounted(() => {
                 </div>
               </li>
             </ul>
-            <div v-else class="overflow-x-auto">
+            <div v-else class="relative overflow-x-auto">
               <table class="tu-tabla" data-prueba="tabla-miembros">
                 <thead>
                   <tr>

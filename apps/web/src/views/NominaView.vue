@@ -514,7 +514,8 @@ onMounted(async () => {
           calculado ? $t('nominaVisual.vacio') : $t('nominaVisual.sinCalcular')
         "
       />
-      <div v-else class="mt-4 overflow-x-auto">
+      <!-- relative: lo oculto para lectores de pantalla no ensancha la página. -->
+      <div v-else class="relative mt-4 overflow-x-auto">
         <table class="nm-tabla">
           <thead>
             <tr>
