@@ -8,6 +8,7 @@ import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import MoverReserva from "@/components/MoverReserva.vue";
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
+import { asistenciaAbierta } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { confirmarAsistencia } from "@/lib/confirmarAsistencia";
@@ -25,6 +26,8 @@ interface Reserva {
   documentos_pendientes: number;
   unidades: number;
   asistencia: string | null;
+  retardo?: boolean;
+  asistencia_automatica?: boolean;
 }
 export interface SesionResumen {
   id: string;
@@ -47,6 +50,20 @@ const puedeMarcar = computed(() => sesionStore.puede("asistencia.marcar"));
 const puedeGestionar = computed(() => sesionStore.puede("reservas.gestionar"));
 
 const roster = ref<Reserva[]>([]);
+// Pase de lista (ADR 0101): desde cuándo se registra y si ya empezó la clase.
+const asistenciaDesde = ref<string | null>(null);
+const empezo = ref(false);
+const abierta = computed(() => asistenciaAbierta(asistenciaDesde.value));
+const abreA = computed(() =>
+  asistenciaDesde.value
+    ? new Intl.DateTimeFormat("es-MX", {
+        timeZone: props.sesion.zona_horaria,
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(new Date(asistenciaDesde.value))
+    : "",
+);
 const cargando = ref(true);
 const accionando = ref(false);
 const error = ref<string | null>(null);
@@ -141,10 +158,13 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const { data } = await api.get<{ data: Reserva[] }>(
-      `${base.value}/sesiones/${props.sesion.id}/reservas`,
-    );
+    const { data } = await api.get<{
+      data: Reserva[];
+      meta?: { asistencia_desde?: string; empezo?: boolean };
+    }>(`${base.value}/sesiones/${props.sesion.id}/reservas`);
     roster.value = data.data;
+    asistenciaDesde.value = data.meta?.asistencia_desde ?? null;
+    empezo.value = data.meta?.empezo ?? false;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -170,13 +190,41 @@ async function accion(fn: () => Promise<unknown>): Promise<void> {
 async function marcar(
   r: Reserva,
   estado: "presente" | "ausente",
+  retardo = false,
 ): Promise<void> {
-  if (!(await confirmarAsistencia(t, r.persona ?? "", r.asistencia, estado))) {
+  // Solo cambiar si llegó tarde no mueve créditos: no hace falta confirmarlo.
+  const soloRetardo = r.asistencia === "presente" && estado === "presente";
+  if (
+    !soloRetardo &&
+    !(await confirmarAsistencia(t, r.persona ?? "", r.asistencia, estado))
+  ) {
     return;
   }
   return accion(() =>
-    api.post(`${base.value}/reservas/${r.id}/asistencia`, { estado }),
+    api.post(`${base.value}/reservas/${r.id}/asistencia`, { estado, retardo }),
   );
+}
+// Terminar de pasar lista: quien sigue sin registro «no se presentó».
+async function terminarLista(): Promise<void> {
+  if (
+    !(await confirmar(
+      t("recepcion.panel.terminarListaConfirmar", { n: sinMarcar.value }),
+      { aceptar: t("recepcion.panel.terminarLista"), peligro: true },
+    ))
+  ) {
+    return;
+  }
+  let cuantas = 0;
+  await accion(async () => {
+    const { data } = await api.post<{ data: { no_se_presentaron: number } }>(
+      `${base.value}/sesiones/${props.sesion.id}/terminar-lista`,
+      {},
+    );
+    cuantas = data.data.no_se_presentaron;
+  });
+  if (!error.value) {
+    aviso.value = t("recepcion.panel.listaTerminada", cuantas);
+  }
 }
 function aceptar(r: Reserva): Promise<void> {
   return accion(() => api.post(`${base.value}/reservas/${r.id}/aceptar`, {}));
@@ -314,6 +362,14 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             : $t("recepcionVisual.lugaresDisponibles", { n: libres }, libres)
         }}</span
       >
+      <p
+        v-if="!cargando && !error && !abierta && puedeMarcar"
+        class="mt-3 text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+        data-prueba="lista-abre"
+      >
+        {{ $t("recepcion.panel.abreDesde", { hora: abreA }) }}
+      </p>
       <div v-if="!cargando && !error" class="pc-lista-resumen">
         <div>
           <IconoNav nombre="miembros" :tam="18" /><strong>{{
@@ -330,6 +386,16 @@ watch(() => props.sesion.id, cargar, { immediate: true });
           ><span>{{ $t("portal.instructor.lista.sinMarcar") }}</span>
         </div>
       </div>
+      <button
+        v-if="!cargando && !error && puedeMarcar && empezo && sinMarcar > 0"
+        type="button"
+        class="tu-btn tu-btn-fantasma mt-3 text-sm"
+        :disabled="accionando"
+        data-prueba="terminar-lista"
+        @click="terminarLista"
+      >
+        {{ $t("recepcion.panel.terminarLista") }}
+      </button>
       <p
         v-if="!cargando && !error && enEspera.length > 0"
         class="mt-3 text-sm"
@@ -458,13 +524,21 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             <span
               v-if="r.asistencia === 'presente'"
               class="tu-badge tu-badge-exito shrink-0"
-              >{{ $t("agenda.roster.presente") }}</span
+              >{{
+                r.retardo
+                  ? $t("agenda.roster.retardo")
+                  : $t("agenda.roster.presente")
+              }}</span
             >
             <span
               v-else-if="r.asistencia === 'ausente'"
               class="text-xs shrink-0"
               :style="{ color: 'var(--texto-suave)' }"
-              >{{ $t("agenda.roster.ausente") }}</span
+              >{{
+                r.asistencia_automatica
+                  ? $t("agenda.roster.ausenteAutomatica")
+                  : $t("agenda.roster.ausente")
+              }}</span
             >
           </div>
           <div class="mt-2 flex flex-wrap items-center gap-2">
@@ -486,7 +560,8 @@ watch(() => props.sesion.id, cargar, { immediate: true });
                     ? 'tu-btn-fantasma'
                     : 'tu-btn-primario'
                 "
-                :disabled="accionando"
+                :disabled="accionando || !abierta"
+                data-prueba="lista-llego"
                 @click="marcar(r, 'presente')"
               >
                 <IconoNav nombre="hecho" :tam="16" />
@@ -495,7 +570,18 @@ watch(() => props.sesion.id, cargar, { immediate: true });
               <button
                 type="button"
                 class="tu-btn tu-btn-fantasma pc-lista-accion text-sm"
-                :disabled="accionando"
+                :aria-pressed="r.asistencia === 'presente' && r.retardo"
+                :disabled="accionando || !abierta"
+                data-prueba="lista-retardo"
+                @click="marcar(r, 'presente', true)"
+              >
+                <IconoNav nombre="reloj" :tam="16" />
+                {{ $t("recepcion.panel.retardo") }}
+              </button>
+              <button
+                type="button"
+                class="tu-btn tu-btn-fantasma pc-lista-accion text-sm"
+                :disabled="accionando || !abierta"
                 @click="marcar(r, 'ausente')"
               >
                 <IconoNav nombre="ausente" :tam="16" />

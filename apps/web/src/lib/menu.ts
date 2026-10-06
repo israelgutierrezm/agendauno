@@ -469,15 +469,17 @@ export const MENU_PORTALES: GrupoMenu[] = [
 export const MENU: GrupoMenu[] = [...MENU_PORTALES, ...MENU_NEGOCIO];
 
 /**
- * La clave i18n para el tipo de negocio: con clases, `<clave>Clases` si existe (p. ej.
- * «Clases y catálogos» en lugar de «Servicios y catálogos»); si no, la de siempre.
+ * La clave i18n para el tipo de negocio: `<clave>Clases` o `<clave>Citas` si existe
+ * (p. ej. «Clases y catálogos» en lugar de «Servicios y catálogos», o «Citas» en
+ * lugar de «Reservas»); si no, la de siempre.
  */
 export function claveSegunModalidad(
   clave: string,
   esCitas: boolean,
   existe: (clave: string) => boolean,
 ): string {
-  return !esCitas && existe(`${clave}Clases`) ? `${clave}Clases` : clave;
+  const variante = `${clave}${esCitas ? "Citas" : "Clases"}`;
+  return existe(variante) ? variante : clave;
 }
 
 /** Las vistas de un área que esta sesión puede abrir, en su orden. */

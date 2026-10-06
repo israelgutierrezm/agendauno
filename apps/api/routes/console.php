@@ -42,6 +42,9 @@ Schedule::command('agendauno:expirar-ofertas')->everyMinute()->withoutOverlappin
 // sale por las plantillas activas en los siguientes minutos.
 Schedule::command('agendauno:enviar-recordatorios')->everyFiveMinutes()->withoutOverlapping();
 
+// Al terminar una clase o cita, quien no tiene registro «no se presentó» (ADR 0101).
+Schedule::command('agendauno:marcar-inasistencias')->everyFiveMinutes()->withoutOverlapping();
+
 // Libera las reservas pago-para-reservar (citas) no pagadas a tiempo (R-citas).
 Schedule::command('agendauno:expirar-reservas-pago')->everyMinute()->withoutOverlapping();
 

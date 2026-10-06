@@ -53,3 +53,20 @@ negocio también debe poder usar otras palabras ("Consulta", "Paciente", "Estili
 - Las reglas son deliberadamente simples. Un texto con otra construcción ("clases
   grupales") se lee en el término del negocio ("citas grupales").
 - La app aún muestra los mensajes de error de la API sin adaptar.
+
+## Ampliación: género (octubre de 2026)
+
+- **Término femenino** (Alumna, Socia): «alumno(s)» y «miembro(s)» pasan al término
+  con su concordancia: artículos y determinantes de antes («el», «los», «un», «del»,
+  «al», «nuevo», «todos»…) y el participio o adjetivo que sigue («activo»,
+  «inscrito», «esperado»…). «Todos los alumnos activos» se lee «todas las alumnas
+  activas». Antes, con Alumna, «alumno» se quedaba igual.
+- **Una persona** se nombra en su género si se sabe (`personas.genero`):
+  `terminoParaPersona` da «Alumno» a un hombre en un negocio de «Alumna» y «Socia» a
+  una mujer en uno de «Socio». Los términos de género común (Cliente, Paciente) y las
+  personas sin género quedan como el negocio. El resumen del miembro
+  (`GET /miembros/{id}/resumen`) devuelve `genero` para eso.
+- **Menú por modalidad**: una etiqueta puede tener variante `<clave>Citas` o
+  `<clave>Clases` (`claveSegunModalidad`); en el portal de un negocio de citas,
+  «Reservas» se lee «Citas».
+

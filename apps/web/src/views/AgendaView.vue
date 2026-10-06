@@ -25,6 +25,7 @@ import ModalDialogo from "@/components/ModalDialogo.vue";
 import PanelCita from "@/components/PanelCita.vue";
 import PanelNuevaCita from "@/components/PanelNuevaCita.vue";
 import {
+  asistenciaAbierta,
   kpisCitas,
   kpisClases,
   COLOR_ESTADO_CITA,
@@ -71,6 +72,8 @@ interface Sesion {
   recurso_id: string | null;
   inicia_en: string;
   termina_en: string;
+  // Desde cuándo se registra la asistencia (ADR 0101).
+  asistencia_desde?: string;
   zona_horaria: string;
   capacidad: number | null;
   ocupados: number;
@@ -106,6 +109,7 @@ interface Reserva {
   primera_vez: boolean;
   unidades: number;
   asistencia: string | null;
+  retardo?: boolean;
 }
 interface ReglaCanal {
   id: string;
@@ -1378,9 +1382,13 @@ async function marcar(
   reservaId: string,
   estado: "presente" | "ausente",
   sesionId: string,
+  retardo = false,
 ): Promise<void> {
   const r = roster.value.find((x) => x.id === reservaId);
+  // Solo cambiar si llegó tarde no mueve créditos: no hace falta confirmarlo.
+  const soloRetardo = r?.asistencia === "presente" && estado === "presente";
   if (
+    !soloRetardo &&
     !(await confirmarAsistencia(
       t,
       r?.persona ?? "",
@@ -1395,6 +1403,7 @@ async function marcar(
   try {
     await api.post(`${base.value}/reservas/${reservaId}/asistencia`, {
       estado,
+      retardo,
     });
     await cargarRoster(sesionId);
   } catch (e) {
@@ -2857,16 +2866,40 @@ onMounted(async () => {
                       >
                         <button
                           type="button"
-                          :aria-pressed="r.asistencia === 'presente'"
-                          :disabled="accionando || r.asistencia === 'presente'"
+                          :aria-pressed="
+                            r.asistencia === 'presente' && !r.retardo
+                          "
+                          :disabled="
+                            accionando ||
+                            !asistenciaAbierta(detalle.asistencia_desde) ||
+                            (r.asistencia === 'presente' && !r.retardo)
+                          "
                           @click="marcar(r.id, 'presente', detalle.id)"
                         >
                           {{ $t("agendaVisual.cita.marcarLlegada") }}
                         </button>
                         <button
                           type="button"
+                          :aria-pressed="
+                            r.asistencia === 'presente' && r.retardo
+                          "
+                          :disabled="
+                            accionando ||
+                            !asistenciaAbierta(detalle.asistencia_desde) ||
+                            (r.asistencia === 'presente' && r.retardo)
+                          "
+                          @click="marcar(r.id, 'presente', detalle.id, true)"
+                        >
+                          {{ $t("recepcion.panel.retardo") }}
+                        </button>
+                        <button
+                          type="button"
                           :aria-pressed="r.asistencia === 'ausente'"
-                          :disabled="accionando || r.asistencia === 'ausente'"
+                          :disabled="
+                            accionando ||
+                            !asistenciaAbierta(detalle.asistencia_desde) ||
+                            r.asistencia === 'ausente'
+                          "
                           @click="marcar(r.id, 'ausente', detalle.id)"
                         >
                           {{ $t("agendaVisual.cita.noAsistio") }}

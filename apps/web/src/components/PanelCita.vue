@@ -9,6 +9,7 @@ import CorregirCobro from "@/components/CorregirCobro.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import {
+  asistenciaAbierta,
   aHora,
   COLOR_ESTADO_CITA,
   duracionMin,
@@ -183,13 +184,31 @@ async function accion(
 
 // ---- Asistencia: llegó / no asistió (y corregir una ya marcada) ----
 type Asistencia = "presente" | "ausente";
+// La asistencia se registra desde unos minutos antes (ADR 0101).
+const abierta = computed(() =>
+  asistenciaAbierta(props.sesion?.asistencia_desde),
+);
+const abreA = computed(() =>
+  props.sesion?.asistencia_desde
+    ? new Intl.DateTimeFormat("es-MX", {
+        timeZone: props.sesion.zona_horaria,
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(new Date(props.sesion.asistencia_desde))
+    : "",
+);
 const marcable = computed(
   () =>
     props.puedeMarcar &&
     cita.value !== null &&
-    cita.value.estado === "confirmada",
+    cita.value.estado === "confirmada" &&
+    abierta.value,
 );
 const subtituloLlego = computed(() => {
+  if (!abierta.value && cita.value?.asistencia == null) {
+    return t("detalleCita.asistencia.abreDesde", { hora: abreA.value });
+  }
   if (cita.value?.asistencia !== "presente") {
     return t("detalleCita.asistencia.llegoAyuda");
   }
@@ -197,9 +216,23 @@ const subtituloLlego = computed(() => {
     ? t("detalleCita.asistencia.enEspera")
     : t(`agendaVisual.estadosCita.${estado.value}`);
 });
-async function marcar(asistencia: Asistencia): Promise<void> {
+async function marcar(asistencia: Asistencia, retardo = false): Promise<void> {
   const c = cita.value;
-  if (c === null || c.asistencia === asistencia) {
+  if (c === null) {
+    return;
+  }
+  // Llegó ↔ llegó tarde: no mueve créditos, se guarda sin preguntar.
+  if (c.asistencia === asistencia) {
+    if (asistencia === "presente" && Boolean(c.retardo) !== retardo) {
+      void accion(
+        () =>
+          api.post(`${props.base}/reservas/${c.reserva_id}/asistencia`, {
+            estado: asistencia,
+            retardo,
+          }),
+        t("agendaVisual.cita.okCorregida"),
+      );
+    }
     return;
   }
   const nombre = (e: string): string =>
@@ -228,6 +261,7 @@ async function marcar(asistencia: Asistencia): Promise<void> {
     () =>
       api.post(`${props.base}/reservas/${c.reserva_id}/asistencia`, {
         estado: asistencia,
+        retardo,
       }),
     c.asistencia
       ? t("agendaVisual.cita.okCorregida")
@@ -604,10 +638,17 @@ watch(
               <button
                 type="button"
                 class="pc-opcion"
-                :class="{ 'pc-opcion-bien': cita?.asistencia === 'presente' }"
-                :aria-pressed="cita?.asistencia === 'presente'"
+                :class="{
+                  'pc-opcion-bien':
+                    cita?.asistencia === 'presente' && !cita?.retardo,
+                }"
+                :aria-pressed="
+                  cita?.asistencia === 'presente' && !cita?.retardo
+                "
                 :disabled="
-                  !marcable || accionando || cita?.asistencia === 'presente'
+                  !marcable ||
+                  accionando ||
+                  (cita?.asistencia === 'presente' && !cita?.retardo)
                 "
                 @click="marcar('presente')"
               >
@@ -619,6 +660,36 @@ watch(
                     $t("detalleCita.asistencia.llego")
                   }}</span>
                   <span class="pc-opcion-sub">{{ subtituloLlego }}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="pc-opcion"
+                :class="{
+                  'pc-opcion-bien':
+                    cita?.asistencia === 'presente' && cita?.retardo,
+                }"
+                :aria-pressed="
+                  cita?.asistencia === 'presente' && !!cita?.retardo
+                "
+                :disabled="
+                  !marcable ||
+                  accionando ||
+                  (cita?.asistencia === 'presente' && !!cita?.retardo)
+                "
+                data-prueba="cita-retardo"
+                @click="marcar('presente', true)"
+              >
+                <span class="pc-opcion-icono" aria-hidden="true">
+                  <IconoNav nombre="reloj" :tam="20" />
+                </span>
+                <span class="min-w-0">
+                  <span class="pc-opcion-titulo">{{
+                    $t("detalleCita.asistencia.retardo")
+                  }}</span>
+                  <span class="pc-opcion-sub">{{
+                    $t("detalleCita.asistencia.retardoAyuda")
+                  }}</span>
                 </span>
               </button>
               <button

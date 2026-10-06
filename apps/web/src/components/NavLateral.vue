@@ -4,7 +4,13 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 
 import IconoNav from "@/components/IconoNav.vue";
-import { destinoDe, menuVisible, ubicacion, type Area } from "@/lib/menu";
+import {
+  claveSegunModalidad,
+  destinoDe,
+  menuVisible,
+  ubicacion,
+  type Area,
+} from "@/lib/menu";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -16,7 +22,7 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 defineProps<{ compacto: boolean }>();
 const emit = defineEmits<{ navegar: [] }>();
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const route = useRoute();
 const sesion = useSesionTenantStore();
 
@@ -29,9 +35,10 @@ function etiqueta(a: Area): string {
       grupo: plural(sesion.terminologia[a.termino]).toLowerCase(),
     });
   }
+  // El texto del tipo de negocio (p. ej. «Citas» en lugar de «Reservas»).
   return a.termino !== undefined
     ? plural(sesion.terminologia[a.termino])
-    : t(a.etiqueta);
+    : t(claveSegunModalidad(a.etiqueta, sesion.esCitas, te));
 }
 </script>
 

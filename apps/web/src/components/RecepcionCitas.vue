@@ -188,10 +188,14 @@ function atencion(s: SesionAgenda): { texto: string; tono: string } {
     cancelada: "var(--texto-suave)",
     sin_registrar: "var(--aviso)",
   };
-  return {
-    texto: t(`agendaVisual.estadosCita.${e}`),
-    tono: tono[e] ?? "var(--primario)",
-  };
+  // Llegó tarde o la marcó el sistema al terminar (ADR 0101): se dice.
+  const texto =
+    e === "no_asistio" && s.cita?.asistencia_automatica
+      ? t("agenda.roster.ausenteAutomatica")
+      : s.cita?.asistencia === "presente" && s.cita.retardo
+        ? `${t(`agendaVisual.estadosCita.${e}`)} · ${t("agenda.roster.retardo")}`
+        : t(`agendaVisual.estadosCita.${e}`);
+  return { texto, tono: tono[e] ?? "var(--primario)" };
 }
 // Cuánto dura la cita (como en el Inicio y la agenda).
 function duracion(s: SesionAgenda): string {

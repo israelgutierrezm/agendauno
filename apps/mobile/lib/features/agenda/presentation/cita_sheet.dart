@@ -9,12 +9,13 @@ import 'agenda_screen.dart';
 
 /// Abre la hoja de una cita: quién, qué, a qué hora y cómo va, con las acciones de
 /// recepción (llegó, no asistió, cobrar en caja, cancelar).
-Future<void> mostrarHojaCita(BuildContext context, SesionAgenda sesion) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  showDragHandle: true,
-  builder: (_) => _HojaCita(sesionId: sesion.id),
-);
+Future<void> mostrarHojaCita(BuildContext context, SesionAgenda sesion) =>
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _HojaCita(sesionId: sesion.id),
+    );
 
 class _HojaCita extends ConsumerStatefulWidget {
   const _HojaCita({required this.sesionId});
@@ -29,7 +30,10 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
   var _ocupado = false;
   var _metodo = 'efectivo';
 
-  Future<void> _hacer(Future<void> Function(AgendaController c) accion, String ok) async {
+  Future<void> _hacer(
+    Future<void> Function(AgendaController c) accion,
+    String ok,
+  ) async {
     setState(() => _ocupado = true);
     final mensajero = ScaffoldMessenger.of(context);
     try {
@@ -37,7 +41,9 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
       mensajero.showSnackBar(SnackBar(content: Text(ok)));
     } on DioException catch (e) {
       final data = e.response?.data;
-      final msg = data is Map<String, dynamic> ? (data['message'] ?? 'No se pudo completar.') : 'No se pudo completar.';
+      final msg = data is Map<String, dynamic>
+          ? (data['message'] ?? 'No se pudo completar.')
+          : 'No se pudo completar.';
       mensajero.showSnackBar(SnackBar(content: Text('$msg')));
     } finally {
       if (mounted) {
@@ -54,16 +60,28 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
     final puedeCobrar = sesion?.puede('ordenes.gestionar') ?? false;
     final puedeMarcar = sesion?.puede('asistencia.marcar') ?? false;
     final puedeCancelar = sesion?.puede('reservas.gestionar') ?? false;
-    final s = agenda?.sesiones.where((x) => x.id == widget.sesionId).firstOrNull;
+    final s = agenda?.sesiones
+        .where((x) => x.id == widget.sesionId)
+        .firstOrNull;
     if (s == null || s.cita == null) {
-      return const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()));
+      return const SizedBox(
+        height: 120,
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
     final estado = s.estadoCita(DateTime.now());
     final (fondo, tinta) = estiloEstado(estado);
     final tono = TonoServicio.de(s.ofertaId);
-    final activa = !const [EstadoCita.cancelada, EstadoCita.completada, EstadoCita.noAsistio].contains(estado);
-    final precio = s.precioMinor != null ? '\$${(s.precioMinor! / 100).round()}' : null;
-    String hhmm(DateTime d) => '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    final activa = !const [
+      EstadoCita.cancelada,
+      EstadoCita.completada,
+      EstadoCita.noAsistio,
+    ].contains(estado);
+    final precio = s.precioMinor != null
+        ? '\$${(s.precioMinor! / 100).round()}'
+        : null;
+    String hhmm(DateTime d) =>
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
     return SafeArea(
       child: Padding(
@@ -87,7 +105,10 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                   const Chip(
                     label: Text(
                       'Por cobrar',
-                      style: TextStyle(color: Color(0xFF7A5200), fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        color: Color(0xFF7A5200),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     backgroundColor: Color(0xFFFFF1CC),
                     side: BorderSide.none,
@@ -102,8 +123,15 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                   radius: 26,
                   backgroundColor: tono.fondo,
                   child: Text(
-                    Profesional(id: '', nombre: s.cita!.cliente ?? '?').iniciales,
-                    style: TextStyle(color: tono.tinta, fontWeight: FontWeight.w800, fontSize: 17),
+                    Profesional(
+                      id: '',
+                      nombre: s.cita!.cliente ?? '?',
+                    ).iniciales,
+                    style: TextStyle(
+                      color: tono.tinta,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -113,11 +141,17 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                     children: [
                       Text(
                         s.cita!.cliente ?? 'Sin cliente',
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                       Text(
                         '${hhmm(s.iniciaEn)}–${hhmm(s.terminaEn)} · ${s.oferta ?? '—'}',
-                        style: const TextStyle(color: Color(0xFF596275), fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          color: Color(0xFF596275),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -136,17 +170,33 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                   children: [
                     DropdownButton<String>(
                       value: _metodo,
-                      onChanged: _ocupado ? null : (v) => setState(() => _metodo = v ?? 'efectivo'),
+                      onChanged: _ocupado
+                          ? null
+                          : (v) => setState(() => _metodo = v ?? 'efectivo'),
                       items: const [
-                        DropdownMenuItem(value: 'efectivo', child: Text('Efectivo')),
-                        DropdownMenuItem(value: 'transferencia', child: Text('Transferencia')),
-                        DropdownMenuItem(value: 'manual', child: Text('Tarjeta (terminal)')),
+                        DropdownMenuItem(
+                          value: 'efectivo',
+                          child: Text('Efectivo'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'transferencia',
+                          child: Text('Transferencia'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'manual',
+                          child: Text('Tarjeta (terminal)'),
+                        ),
                       ],
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: FilledButton(
-                        onPressed: _ocupado ? null : () => _hacer((c) => c.cobrar(s, _metodo), 'Cita cobrada.'),
+                        onPressed: _ocupado
+                            ? null
+                            : () => _hacer(
+                                (c) => c.cobrar(s, _metodo),
+                                'Cita cobrada.',
+                              ),
                         child: Text('Cobrar ${precio ?? ''}'),
                       ),
                     ),
@@ -157,31 +207,60 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                 Row(
                   children: [
                     if (s.cita!.asistencia != 'presente')
+                      Expanded(
+                        child: FilledButton.tonal(
+                          onPressed: _ocupado
+                              ? null
+                              : () => _hacer(
+                                  (c) => c.marcarLlegada(s),
+                                  'Llegada registrada.',
+                                ),
+                          child: const Text('Llegó'),
+                        ),
+                      ),
+                    if (s.cita!.asistencia != 'presente')
+                      const SizedBox(width: 8),
+                    // Llegó, pero tarde: cuenta como que llegó.
+                    if (s.cita!.asistencia != 'presente' || !s.cita!.retardo)
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _ocupado
+                              ? null
+                              : () => _hacer(
+                                  (c) => c.marcarLlegada(s, retardo: true),
+                                  'Se registró que llegó tarde.',
+                                ),
+                          child: const Text('Llegó tarde'),
+                        ),
+                      ),
+                    if (s.cita!.asistencia != 'presente' || !s.cita!.retardo)
+                      const SizedBox(width: 8),
                     Expanded(
-                      child: FilledButton.tonal(
-                        onPressed: _ocupado ? null : () => _hacer((c) => c.marcarLlegada(s), 'Llegada registrada.'),
-                        child: const Text('Llegó'),
+                      child: OutlinedButton(
+                        onPressed: _ocupado
+                            ? null
+                            : () => _hacer(
+                                (c) => c.marcarNoAsistio(s),
+                                'Se marcó como no asistió.',
+                              ),
+                        child: const Text('No asistió'),
                       ),
                     ),
-                  if (s.cita!.asistencia != 'presente') const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _ocupado
-                          ? null
-                          : () => _hacer((c) => c.marcarNoAsistio(s), 'Se marcó como no asistió.'),
-                      child: const Text('No asistió'),
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
               if (puedeCancelar)
                 TextButton(
                   onPressed: _ocupado
                       ? null
-                      : () => _hacer((c) => c.cancelar(s), 'Cita cancelada; el horario quedó libre.'),
-                style: TextButton.styleFrom(foregroundColor: const Color(0xFFB42318)),
-                child: const Text('Cancelar cita'),
-              ),
+                      : () => _hacer(
+                          (c) => c.cancelar(s),
+                          'Cita cancelada; el horario quedó libre.',
+                        ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFB42318),
+                  ),
+                  child: const Text('Cancelar cita'),
+                ),
             ],
           ],
         ),

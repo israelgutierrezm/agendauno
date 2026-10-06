@@ -7,6 +7,8 @@ export default {
   nav: {
     inicio: "Inicio",
     reservas: "Reservas",
+    // En un negocio de citas, lo que el cliente agenda son citas.
+    reservasCitas: "Citas",
     pagos: "Pagos",
     expediente: "Expediente",
   },
@@ -81,6 +83,7 @@ export default {
   },
   reservas: {
     titulo: "Reservas",
+    tituloCitas: "Citas",
     descripcionClases:
       "Encuentra tu próxima clase, revisa qué incluye tu plan y administra tus reservas.",
     descripcionCitas:

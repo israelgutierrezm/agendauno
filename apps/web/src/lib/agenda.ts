@@ -13,6 +13,8 @@ export interface CitaTitular {
   email?: string | null;
   estado: string; // estado de la reserva (confirmada, pendiente_pago…)
   asistencia: string | null; // presente | ausente | null
+  retardo?: boolean; // llegó tarde (cuenta como que llegó)
+  asistencia_automatica?: boolean; // la marcó el sistema al terminar sin registro
   orden_id?: string | null; // orden del servicio (si es de pago)
   por_cobrar?: boolean; // agendada por el negocio y aún sin cobrar en caja
   nota?: string | null; // lo que el cliente pidió que supiéramos al agendar
@@ -39,6 +41,8 @@ export interface SesionAgenda {
   sucursal?: string | null;
   inicia_en: string;
   termina_en: string;
+  // Desde cuándo se registra la asistencia (ADR 0101).
+  asistencia_desde?: string;
   // Lo que ocupa con la preparación y la limpieza del servicio (2.3).
   ocupa_desde?: string | null;
   ocupa_hasta?: string | null;
@@ -257,6 +261,17 @@ export function pagoCita(s: SesionAgenda): PagoCita | null {
     return null;
   }
   return c.por_cobrar === true ? "por_cobrar" : "pagada";
+}
+
+/**
+ * ¿Ya se puede registrar la asistencia? Desde `asistencia_desde` (unos minutos antes
+ * de que empiece, configurable por el negocio; ADR 0101). Sin el dato, sí.
+ */
+export function asistenciaAbierta(
+  desde: string | null | undefined,
+  ahora: Date = new Date(),
+): boolean {
+  return !desde || ahora.getTime() >= new Date(desde).getTime();
 }
 
 // ------------------------------------------------------------ cupo clase

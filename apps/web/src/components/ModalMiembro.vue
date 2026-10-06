@@ -87,6 +87,8 @@ interface Reserva {
   zona_horaria: string | null;
   estado: string;
   asistencia: string | null;
+  // Llegó tarde (cuenta como asistencia, ADR 0101).
+  retardo?: boolean;
   instructor?: string | null;
 }
 interface Orden {
@@ -943,7 +945,11 @@ function colorAlerta(codigo: string): string {
                       ? 'var(--aviso)'
                       : 'var(--texto-suave)',
               }"
-              >{{ $t(`agenda.roster.${r.asistencia ?? r.estado}`) }}</span
+              >{{
+                r.retardo && r.asistencia === "presente"
+                  ? $t("agenda.roster.retardo")
+                  : $t(`agenda.roster.${r.asistencia ?? r.estado}`)
+              }}</span
             >
           </li>
         </ul>

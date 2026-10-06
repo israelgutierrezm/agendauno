@@ -143,7 +143,7 @@ describe("asistencia", () => {
     );
     expect(mocks.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/reservas/r1/asistencia",
-      { estado: "ausente" },
+      { estado: "ausente", retardo: false },
     );
   });
 
@@ -165,7 +165,7 @@ describe("asistencia", () => {
     );
     expect(mocks.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/reservas/r1/asistencia",
-      { estado: "ausente" },
+      { estado: "ausente", retardo: false },
     );
   });
 });

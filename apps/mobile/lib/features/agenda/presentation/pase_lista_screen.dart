@@ -9,13 +9,14 @@ import '../data/agenda_models.dart';
 import '../data/agenda_repository.dart';
 
 /// Lista de una clase para el pase de lista (por sesión).
-final rosterProvider = FutureProvider.autoDispose.family<List<Asistente>, String>((ref, sesionId) async {
-  final repo = ref.watch(agendaRepositoryProvider);
-  if (repo == null) {
-    return const [];
-  }
-  return repo.roster(sesionId);
-});
+final rosterProvider = FutureProvider.autoDispose
+    .family<List<Asistente>, String>((ref, sesionId) async {
+      final repo = ref.watch(agendaRepositoryProvider);
+      if (repo == null) {
+        return const [];
+      }
+      return repo.roster(sesionId);
+    });
 
 /// Pase de lista de una clase: quién llegó (botón grande por persona), con avisos de
 /// primera vez y adeudo. Cada toque registra la asistencia al momento.
@@ -31,7 +32,39 @@ class PaseListaScreen extends ConsumerStatefulWidget {
 class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
   final _marcando = <String>{};
 
-  Future<void> _marcar(Asistente a, String estado) async {
+  Future<void> _terminarLista() async {
+    final repo = ref.read(agendaRepositoryProvider);
+    if (repo == null) {
+      return;
+    }
+    final mensajero = ScaffoldMessenger.of(context);
+    try {
+      final cuantos = await repo.terminarLista(widget.sesion.id);
+      ref.invalidate(rosterProvider(widget.sesion.id));
+      ref.invalidate(agendaProvider);
+      mensajero.showSnackBar(
+        SnackBar(
+          content: Text(
+            cuantos == 0
+                ? 'Lista terminada.'
+                : 'Lista terminada: $cuantos no se presentaron.',
+          ),
+        ),
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final msg = data is Map<String, dynamic>
+          ? (data['message'] ?? 'No se pudo terminar la lista.')
+          : 'No se pudo terminar la lista.';
+      mensajero.showSnackBar(SnackBar(content: Text('$msg')));
+    }
+  }
+
+  Future<void> _marcar(
+    Asistente a,
+    String estado, {
+    bool retardo = false,
+  }) async {
     final repo = ref.read(agendaRepositoryProvider);
     if (repo == null) {
       return;
@@ -39,12 +72,14 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     setState(() => _marcando.add(a.reservaId));
     final mensajero = ScaffoldMessenger.of(context);
     try {
-      await repo.marcarAsistencia(a.reservaId, estado);
+      await repo.marcarAsistencia(a.reservaId, estado, retardo: retardo);
       ref.invalidate(rosterProvider(widget.sesion.id));
       ref.invalidate(agendaProvider);
     } on DioException catch (e) {
       final data = e.response?.data;
-      final msg = data is Map<String, dynamic> ? (data['message'] ?? 'No se pudo marcar.') : 'No se pudo marcar.';
+      final msg = data is Map<String, dynamic>
+          ? (data['message'] ?? 'No se pudo marcar.')
+          : 'No se pudo marcar.';
       mensajero.showSnackBar(SnackBar(content: Text('$msg')));
     } finally {
       if (mounted) {
@@ -58,11 +93,15 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     final s = widget.sesion;
     final tono = TonoServicio.de(s.ofertaId);
     final roster = ref.watch(rosterProvider(s.id));
-    String hhmm(DateTime d) => '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    String hhmm(DateTime d) =>
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7FB),
-      appBar: AppBar(title: const Text('Pase de lista'), backgroundColor: const Color(0xFFF6F7FB)),
+      appBar: AppBar(
+        title: const Text('Pase de lista'),
+        backgroundColor: const Color(0xFFF6F7FB),
+      ),
       body: roster.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('No se pudo cargar la lista: $e')),
@@ -74,7 +113,10 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: tono.fondo, borderRadius: BorderRadius.circular(18)),
+                decoration: BoxDecoration(
+                  color: tono.fondo,
+                  borderRadius: BorderRadius.circular(18),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -86,18 +128,29 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                             children: [
                               Text(
                                 s.oferta ?? '—',
-                                style: TextStyle(color: tono.tinta, fontSize: 20, fontWeight: FontWeight.w800),
+                                style: TextStyle(
+                                  color: tono.tinta,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                               Text(
                                 '${hhmm(s.iniciaEn)}–${hhmm(s.terminaEn)}${s.sala != null ? ' · ${s.sala}' : ''}',
-                                style: TextStyle(color: tono.tinta, fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                  color: tono.tinta,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ],
                           ),
                         ),
                         Text(
                           '$llegaron/${enSala.length}',
-                          style: TextStyle(color: tono.tinta, fontSize: 26, fontWeight: FontWeight.w800),
+                          style: TextStyle(
+                            color: tono.tinta,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ],
                     ),
@@ -108,9 +161,13 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                           Expanded(
                             child: Container(
                               height: 8,
-                              margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 1.5,
+                              ),
                               decoration: BoxDecoration(
-                                color: a.llego ? const Color(0xFF079455) : Colors.white.withValues(alpha: 0.85),
+                                color: a.llego
+                                    ? const Color(0xFF079455)
+                                    : Colors.white.withValues(alpha: 0.85),
                                 borderRadius: BorderRadius.circular(99),
                               ),
                             ),
@@ -130,6 +187,20 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                   ),
                 ),
               for (final a in enSala) _fila(a),
+              // Ya empezada la clase: quien sigue sin registro «no se presentó».
+              if ((ref.watch(sesionProvider)?.puede('asistencia.marcar') ??
+                      false) &&
+                  !s.iniciaEn.isAfter(DateTime.now()) &&
+                  enSala.any(
+                    (a) => a.estado == 'confirmada' && a.asistencia == null,
+                  ))
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: OutlinedButton(
+                    onPressed: _terminarLista,
+                    child: const Text('Terminar lista'),
+                  ),
+                ),
             ],
           );
         },
@@ -139,7 +210,8 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
 
   Widget _fila(Asistente a) {
     // Sin permiso de marcar asistencia, la lista solo se consulta.
-    final puedeMarcar = ref.watch(sesionProvider)?.puede('asistencia.marcar') ?? false;
+    final puedeMarcar =
+        ref.watch(sesionProvider)?.puede('asistencia.marcar') ?? false;
     final ocupado = _marcando.contains(a.reservaId);
     return Card(
       elevation: 0,
@@ -147,38 +219,89 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
       margin: const EdgeInsets.only(bottom: 6),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: a.llego ? BorderSide.none : const BorderSide(color: Color(0xFFFEC84B), width: 1.5),
+        side: a.llego
+            ? BorderSide.none
+            : const BorderSide(color: Color(0xFFFEC84B), width: 1.5),
       ),
       child: ListTile(
-        title: Text(a.nombre, style: const TextStyle(fontWeight: FontWeight.w700)),
+        title: Text(
+          a.nombre,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
         subtitle: Wrap(
           spacing: 6,
           children: [
-            if (a.primeraVez) const Text('Primera vez', style: TextStyle(color: Color(0xFF7A5200))),
-            if (a.adeudo) const Text('Adeudo', style: TextStyle(color: Color(0xFFB42318))),
-            if (a.estado == 'pendiente_pago') const Text('Pago pendiente', style: TextStyle(color: Color(0xFF7A5200))),
-            if (a.asistencia == 'ausente') const Text('No asistió', style: TextStyle(color: Color(0xFFA11B1B))),
+            if (a.primeraVez)
+              const Text(
+                'Primera vez',
+                style: TextStyle(color: Color(0xFF7A5200)),
+              ),
+            if (a.adeudo)
+              const Text('Adeudo', style: TextStyle(color: Color(0xFFB42318))),
+            if (a.estado == 'pendiente_pago')
+              const Text(
+                'Pago pendiente',
+                style: TextStyle(color: Color(0xFF7A5200)),
+              ),
+            if (a.asistencia == 'ausente')
+              Text(
+                a.automatica ? 'No se presentó (automático)' : 'No asistió',
+                style: const TextStyle(color: Color(0xFFA11B1B)),
+              ),
+            if (a.llego && a.retardo)
+              const Text(
+                'Llegó tarde',
+                style: TextStyle(color: Color(0xFF7A5200)),
+              ),
           ],
         ),
-        trailing: Semantics(
-          button: true,
-          label: a.llego ? 'Quitar llegada de ${a.nombre}' : 'Marcar llegada de ${a.nombre}',
-          child: InkResponse(
-            onTap: ocupado || !puedeMarcar ? null : () => _marcar(a, a.llego ? 'ausente' : 'presente'),
-            radius: 28,
-            child: Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: a.llego ? const Color(0xFF12B76A) : Colors.white,
-                border: a.llego ? null : Border.all(color: const Color(0xFFC3CAD5), width: 2),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Llegó tarde (cuenta como asistencia).
+            if (!(a.llego && a.retardo))
+              IconButton(
+                tooltip: 'Llegó tarde',
+                onPressed: ocupado || !puedeMarcar
+                    ? null
+                    : () => _marcar(a, 'presente', retardo: true),
+                icon: const Icon(Icons.schedule, color: Color(0xFF7A5200)),
               ),
-              child: ocupado
-                  ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2))
-                  : Icon(Icons.check, color: a.llego ? Colors.white : const Color(0xFFC3CAD5)),
+            Semantics(
+              button: true,
+              label: a.llego
+                  ? 'Quitar llegada de ${a.nombre}'
+                  : 'Marcar llegada de ${a.nombre}',
+              child: InkResponse(
+                onTap: ocupado || !puedeMarcar
+                    ? null
+                    : () => _marcar(a, a.llego ? 'ausente' : 'presente'),
+                radius: 28,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: a.llego ? const Color(0xFF12B76A) : Colors.white,
+                    border: a.llego
+                        ? null
+                        : Border.all(color: const Color(0xFFC3CAD5), width: 2),
+                  ),
+                  child: ocupado
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          Icons.check,
+                          color: a.llego
+                              ? Colors.white
+                              : const Color(0xFFC3CAD5),
+                        ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

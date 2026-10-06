@@ -101,6 +101,8 @@ class MiHistorialTenantController
                     'inicia_en' => $sesion?->inicia_en->toIso8601String(),
                     'zona_horaria' => $sesion?->zona_horaria,
                     'estado' => $this->estado($r),
+                    // Asistió, pero llegó tarde.
+                    'retardo' => (bool) $r->asistencia?->retardo,
                     'cancelada_por' => $r->estado === EstadoReserva::Cancelada ? $r->cancelada_por : null,
                     'cancelada_en' => $r->cancelada_en?->toIso8601String(),
                     'reprogramada' => $reprogramadas->has((string) $r->ulid),

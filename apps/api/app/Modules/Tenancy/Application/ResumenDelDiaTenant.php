@@ -182,6 +182,7 @@ class ResumenDelDiaTenant
                 'cliente' => $titular?->persona?->nombreCompleto(),
                 // Cita: si llegó o no vino (null = sin registro). Clases: null.
                 'asistencia' => $titular?->asistencia?->estado?->value,
+                'retardo' => (bool) $titular?->asistencia?->retardo,
                 'por_cobrar' => $porCobrar,
                 'en_espera' => $enEspera,
                 'inicia_en' => $s->inicia_en->toIso8601String(),

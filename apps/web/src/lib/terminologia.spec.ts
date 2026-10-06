@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   adaptarMensajes,
   adaptarTexto,
+  terminoParaPersona,
   plural,
   type TerminosNegocio,
 } from "./terminologia";
@@ -70,16 +71,37 @@ describe("terminologia / adaptarTexto", () => {
     );
   });
 
-  it("con una terminología femenina no cambia «alumno» (el artículo no cuadraría)", () => {
+  it("con un término femenino concuerdan el artículo y los adjetivos", () => {
     const pole: TerminosNegocio = {
       sesion: "Clase",
       miembro: "Alumna",
       instructor: "Coach",
     };
     expect(adaptarTexto("Nuevo alumno de la clase", pole)).toBe(
-      "Nuevo alumno de la clase",
+      "Nueva alumna de la clase",
     );
+    expect(adaptarTexto("Alumnos esperados hoy", pole)).toBe(
+      "Alumnas esperadas hoy",
+    );
+    expect(adaptarTexto("Lo que compran todos los alumnos activos", pole)).toBe(
+      "Lo que compran todas las alumnas activas",
+    );
+    expect(adaptarTexto("Vender a un alumno", pole)).toBe(
+      "Vender a una alumna",
+    );
+    expect(adaptarTexto("La ficha del alumno", pole)).toBe(
+      "La ficha de la alumna",
+    );
+    expect(adaptarTexto("Miembro del equipo", pole)).toBe("Miembro del equipo");
+    expect(adaptarTexto("{n} alumnos", pole)).toBe("{n} alumnas");
     expect(adaptarTexto("Instructor", pole)).toBe("Coach");
+    const gym: TerminosNegocio = {
+      sesion: "Clase",
+      miembro: "Socia",
+      instructor: "Instructor",
+    };
+    expect(adaptarTexto("La alumna reservó", gym)).toBe("La socia reservó");
+    expect(adaptarTexto("Los alumnos nuevos", gym)).toBe("Las socias nuevas");
   });
 
   it("«alumna» solo pasa a términos de género común", () => {
@@ -104,5 +126,17 @@ describe("terminologia / adaptarTexto", () => {
       agenda: { titulo: "Citas de hoy", lista: ["Una cita"] },
       landing: { titulo: "Para clases y citas" },
     });
+  });
+});
+
+describe("terminologia / terminoParaPersona", () => {
+  it("nombra a cada persona en su género cuando el término cambia", () => {
+    expect(terminoParaPersona("Alumno", "mujer")).toBe("Alumna");
+    expect(terminoParaPersona("Alumna", "hombre")).toBe("Alumno");
+    expect(terminoParaPersona("Socio", "mujer")).toBe("Socia");
+    expect(terminoParaPersona("Alumna", null)).toBe("Alumna");
+    expect(terminoParaPersona("Alumna", "no_binario")).toBe("Alumna");
+    expect(terminoParaPersona("Cliente", "mujer")).toBe("Cliente");
+    expect(terminoParaPersona("Paciente", "hombre")).toBe("Paciente");
   });
 });

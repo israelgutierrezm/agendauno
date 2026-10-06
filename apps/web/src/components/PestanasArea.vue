@@ -3,7 +3,13 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
-import { destinoDe, ubicacion, vistasDeArea, type Vista } from "@/lib/menu";
+import {
+  claveSegunModalidad,
+  destinoDe,
+  ubicacion,
+  vistasDeArea,
+  type Vista,
+} from "@/lib/menu";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -14,7 +20,7 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * una sola, no hay pestañas. En un teléfono, una lista con la vista activa.
  * Configuración usa su propia navegación.
  */
-const { t } = useI18n();
+const { t, te } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const sesion = useSesionTenantStore();
@@ -34,7 +40,7 @@ const mostrar = computed(
 function etiqueta(x: Vista): string {
   return x.termino !== undefined
     ? plural(sesion.terminologia[x.termino])
-    : t(x.etiqueta);
+    : t(claveSegunModalidad(x.etiqueta, sesion.esCitas, te));
 }
 const nombreArea = computed(() => {
   const a = actual.value?.area;

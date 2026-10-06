@@ -123,6 +123,8 @@ class ResumenMiembroTenantController
             'id' => $persona->ulid,
             'nombre_completo' => $persona->nombreCompleto(),
             'email' => $persona->email,
+            // Para nombrarla con el término del negocio en su género (Alumno/Alumna).
+            'genero' => $persona->genero?->value,
             // Cómo conoció al negocio (ADR 0067).
             'como_nos_conocio' => $persona->como_nos_conocio,
             // Avisos por WhatsApp (ADR 0069): solo si el negocio los usa.

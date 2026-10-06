@@ -6,12 +6,14 @@ import { RouterLink } from "vue-router";
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { terminoParaPersona } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Resumen {
   id: string;
   nombre_completo: string;
   email: string | null;
+  genero?: string | null;
   // Cómo conoció al negocio (lo dijo al agendar en línea).
   como_nos_conocio?: string | null;
   // Avisos por WhatsApp (ADR 0069): solo si el negocio los usa.
@@ -289,7 +291,9 @@ function cancelarVenta(): void {
 <template>
   <MarcoDetalle
     :incrustado="incrustado"
-    :etiqueta="sesionStore.terminologia.miembro"
+    :etiqueta="
+      terminoParaPersona(sesionStore.terminologia.miembro, resumen?.genero)
+    "
     :titulo="resumen?.nombre_completo ?? nombre"
     :subtitulo="resumen?.email ?? undefined"
     :etiqueta-cerrar="$t('recepcion.panel.cerrar')"

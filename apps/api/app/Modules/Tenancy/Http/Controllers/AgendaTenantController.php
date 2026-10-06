@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\AnularCobroTenant;
 use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
 use App\Modules\Tenancy\Application\MargenesServicio;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\VerificarAgendaTenant;
@@ -446,6 +447,8 @@ class AgendaTenantController
             'fecha_serie' => $sesion->fecha_serie?->toDateString(),
             'inicia_en' => $sesion->inicia_en->toIso8601String(),
             'termina_en' => $sesion->termina_en->toIso8601String(),
+            // Desde cuándo se registra la asistencia (ADR 0101).
+            'asistencia_desde' => $sesion->inicia_en->copy()->subMinutes(app(ParametrosTenant::class)->entero('asistencia.minutos_antes'))->toIso8601String(),
             // Lo que ocupa en la agenda con preparación y limpieza (solo para el equipo).
             'ocupa_desde' => $sesion->ocupa_desde?->toIso8601String(),
             'ocupa_hasta' => $sesion->ocupa_hasta?->toIso8601String(),
@@ -467,6 +470,9 @@ class AgendaTenantController
                 'estado' => $titular->estado->value,
                 // Llegó (presente) / no asistió (ausente); null = aún sin marcar.
                 'asistencia' => $titular->asistencia?->estado->value,
+                // Llegó tarde (cuenta como que llegó) y si la marcó el sistema al terminar.
+                'retardo' => (bool) $titular->asistencia?->retardo,
+                'asistencia_automatica' => (bool) $titular->asistencia?->automatica,
                 // Orden de la cita (servicio de pago) y si falta cobrarla en caja.
                 'orden_id' => $titular->orden?->ulid,
                 'por_cobrar' => $titular->orden !== null && $titular->orden->estado === EstadoOrden::Pendiente,

@@ -1977,6 +1977,15 @@ export default {
       espera: "{n} en espera",
       llego: "Llegó",
       noVino: "No vino",
+      // Llegó tarde: cuenta como asistencia (ADR 0101).
+      retardo: "Retardo",
+      // La lista se pasa desde unos minutos antes (configurable).
+      abreDesde: "La asistencia se registra desde las {hora}.",
+      terminarLista: "Terminar lista",
+      terminarListaConfirmar:
+        "Quien sigue sin registro ({n}) quedará como «no se presentó», con la política de inasistencias del negocio.",
+      listaTerminada:
+        "Lista terminada: nadie quedó sin registro. | Lista terminada: 1 persona quedó como «no se presentó». | Lista terminada: {n} personas quedaron como «no se presentó».",
       listaEspera: "Lista de espera",
       promover: "Ofrecer cupos",
       agregar: "Agregar alumno",
@@ -2133,6 +2142,9 @@ export default {
       cancelada: "Cancelada",
       presente: "Presente",
       ausente: "Ausente",
+      retardo: "Llegó tarde",
+      // La marcó el sistema al terminar la clase o cita sin registro.
+      ausenteAutomatica: "No se presentó (automático)",
       marcarPresente: "Presente",
       marcarAusente: "Ausente",
       aceptar: "Aceptar",

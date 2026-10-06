@@ -443,7 +443,11 @@ onMounted(() => void cuenta.asegurar());
 <template>
   <section class="tu-pagina">
     <EncabezadoSeccion
-      :titulo="$t('portal.reservas.titulo')"
+      :titulo="
+        sesion.esCitas
+          ? $t('portal.reservas.tituloCitas')
+          : $t('portal.reservas.titulo')
+      "
       :subtitulo="
         $t(
           sesion.esCitas

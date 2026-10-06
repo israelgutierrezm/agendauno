@@ -14,7 +14,9 @@ class FechaAgenda extends Notifier<DateTime> {
   void elegir(DateTime dia) => state = DateTime(dia.year, dia.month, dia.day);
 }
 
-final fechaAgendaProvider = NotifierProvider<FechaAgenda, DateTime>(FechaAgenda.new);
+final fechaAgendaProvider = NotifierProvider<FechaAgenda, DateTime>(
+  FechaAgenda.new,
+);
 
 /// Profesional elegido en la agenda de citas (null = el primero).
 class ProfesionalAgenda extends Notifier<String?> {
@@ -25,7 +27,10 @@ class ProfesionalAgenda extends Notifier<String?> {
 }
 
 // De la sesión (un profesional de ESTE negocio): se descarta al salir.
-final profesionalAgendaProvider = NotifierProvider.autoDispose<ProfesionalAgenda, String?>(ProfesionalAgenda.new);
+final profesionalAgendaProvider =
+    NotifierProvider.autoDispose<ProfesionalAgenda, String?>(
+      ProfesionalAgenda.new,
+    );
 
 /// Lo que muestra la agenda de un día: sus sesiones y los profesionales.
 class AgendaDia {
@@ -44,17 +49,28 @@ class AgendaController extends AsyncNotifier<AgendaDia> {
     if (repo == null) {
       return const AgendaDia(sesiones: [], profesionales: []);
     }
-    final resultados = await Future.wait([repo.sesionesDelDia(dia), repo.profesionales()]);
-    return AgendaDia(sesiones: resultados[0] as List<SesionAgenda>, profesionales: resultados[1] as List<Profesional>);
+    final resultados = await Future.wait([
+      repo.sesionesDelDia(dia),
+      repo.profesionales(),
+    ]);
+    return AgendaDia(
+      sesiones: resultados[0] as List<SesionAgenda>,
+      profesionales: resultados[1] as List<Profesional>,
+    );
   }
 
-  Future<void> marcarLlegada(SesionAgenda s) => _accion((r) => r.marcarAsistencia(s.cita!.reservaId, 'presente'));
+  Future<void> marcarLlegada(SesionAgenda s, {bool retardo = false}) => _accion(
+    (r) => r.marcarAsistencia(s.cita!.reservaId, 'presente', retardo: retardo),
+  );
 
-  Future<void> marcarNoAsistio(SesionAgenda s) => _accion((r) => r.marcarAsistencia(s.cita!.reservaId, 'ausente'));
+  Future<void> marcarNoAsistio(SesionAgenda s) =>
+      _accion((r) => r.marcarAsistencia(s.cita!.reservaId, 'ausente'));
 
-  Future<void> cobrar(SesionAgenda s, String metodo) => _accion((r) => r.cobrar(s.cita!.ordenId!, metodo));
+  Future<void> cobrar(SesionAgenda s, String metodo) =>
+      _accion((r) => r.cobrar(s.cita!.ordenId!, metodo));
 
-  Future<void> cancelar(SesionAgenda s) => _accion((r) => r.cancelarReserva(s.cita!.reservaId));
+  Future<void> cancelar(SesionAgenda s) =>
+      _accion((r) => r.cancelarReserva(s.cita!.reservaId));
 
   Future<void> _accion(Future<void> Function(AgendaRepository repo) fn) async {
     final repo = ref.read(agendaRepositoryProvider);
@@ -71,4 +87,7 @@ class AgendaController extends AsyncNotifier<AgendaDia> {
 }
 
 // Lo de una sesión se descarta al salir: la siguiente no arranca con el valor anterior.
-final agendaProvider = AsyncNotifierProvider.autoDispose<AgendaController, AgendaDia>(AgendaController.new);
+final agendaProvider =
+    AsyncNotifierProvider.autoDispose<AgendaController, AgendaDia>(
+      AgendaController.new,
+    );

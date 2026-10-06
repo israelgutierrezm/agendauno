@@ -32,7 +32,11 @@ class AgendaRepository {
     return ((res.data?['data'] ?? []) as List)
         .map((e) => SesionAgenda.desdeJson(e as Map<String, dynamic>))
         // El servidor ensancha la ventana un día por lado (zonas): se filtran los días locales.
-        .where((s) => ymd(s.iniciaEn).compareTo(a) >= 0 && ymd(s.iniciaEn).compareTo(b) <= 0)
+        .where(
+          (s) =>
+              ymd(s.iniciaEn).compareTo(a) >= 0 &&
+              ymd(s.iniciaEn).compareTo(b) <= 0,
+        )
         .toList()
       ..sort((x, y) => x.iniciaEn.compareTo(y.iniciaEn));
   }
@@ -51,19 +55,46 @@ class AgendaRepository {
 
   Future<List<Profesional>> profesionales() async {
     final res = await _dio.get<Map<String, dynamic>>('$_base/instructores');
-    return ((res.data?['data'] ?? []) as List).map((e) => Profesional.desdeJson(e as Map<String, dynamic>)).toList();
+    return ((res.data?['data'] ?? []) as List)
+        .map((e) => Profesional.desdeJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<Asistente>> roster(String sesionId) async {
-    final res = await _dio.get<Map<String, dynamic>>('$_base/sesiones/$sesionId/reservas');
-    return ((res.data?['data'] ?? []) as List).map((e) => Asistente.desdeJson(e as Map<String, dynamic>)).toList();
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/sesiones/$sesionId/reservas',
+    );
+    return ((res.data?['data'] ?? []) as List)
+        .map((e) => Asistente.desdeJson(e as Map<String, dynamic>))
+        .toList();
   }
 
-  Future<void> marcarAsistencia(String reservaId, String estado) =>
-      _dio.post<Map<String, dynamic>>('$_base/reservas/$reservaId/asistencia', data: {'estado': estado});
+  /// `retardo`: llegó tarde (solo con «presente»; cuenta como asistencia).
+  Future<void> marcarAsistencia(
+    String reservaId,
+    String estado, {
+    bool retardo = false,
+  }) => _dio.post<Map<String, dynamic>>(
+    '$_base/reservas/$reservaId/asistencia',
+    data: {'estado': estado, 'retardo': retardo},
+  );
+
+  /// Terminar de pasar lista: quien sigue sin registro «no se presentó». Devuelve cuántos.
+  Future<int> terminarLista(String sesionId) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '$_base/sesiones/$sesionId/terminar-lista',
+    );
+    return ((res.data?['data'] as Map<String, dynamic>?)?['no_se_presentaron']
+                as num? ??
+            0)
+        .toInt();
+  }
 
   Future<void> cobrar(String ordenId, String metodo) =>
-      _dio.post<Map<String, dynamic>>('$_base/ordenes/$ordenId/liquidar', data: {'metodo': metodo});
+      _dio.post<Map<String, dynamic>>(
+        '$_base/ordenes/$ordenId/liquidar',
+        data: {'metodo': metodo},
+      );
 
   Future<void> cancelarReserva(String reservaId) =>
       _dio.post<Map<String, dynamic>>('$_base/reservas/$reservaId/cancelar');

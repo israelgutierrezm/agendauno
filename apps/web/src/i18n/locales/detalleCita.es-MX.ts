@@ -19,6 +19,11 @@ export default {
     enEspera: "En espera",
     noAsistio: "No asistió",
     noAsistioAyuda: "No se presentó",
+    // Llegó, pero tarde: cuenta como que llegó.
+    retardo: "Llegó tarde",
+    retardoAyuda: "Cuenta como que llegó",
+    abreDesde: "Se registra desde las {hora}",
+    automatica: "Marcado automáticamente al terminar",
     cancelada: "Cancelada",
     canceladaAyuda: "Libera el horario",
   },

@@ -82,6 +82,8 @@ interface Reserva {
   zona_horaria: string | null;
   estado: string;
   asistencia: string | null;
+  // Llegó tarde (cuenta como asistencia, ADR 0101).
+  retardo?: boolean;
   cancelada_por?: "cliente" | "negocio" | "sistema" | null;
   tipo?: "clase" | "cita" | null;
   instructor?: string | null;
@@ -1125,7 +1127,13 @@ const regreso = useRegreso({
                     <span
                       v-if="r.asistencia === 'presente'"
                       class="tu-badge tu-badge-exito shrink-0"
-                      >{{ $t("agenda.roster.presente") }}</span
+                      >{{
+                        $t(
+                          r.retardo
+                            ? "agenda.roster.retardo"
+                            : "agenda.roster.presente",
+                        )
+                      }}</span
                     >
                     <span
                       v-else

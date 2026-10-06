@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Integraciones\ResolvedorDns;
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -16,6 +17,12 @@ use Tests\TestCase;
 */
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    ->beforeEach(function (): void {
+        // Con el reloj fijo, muchas pruebas marcan asistencia en clases que aún no
+        // empiezan: la ventana para pasar lista (ADR 0101, 30 min por omisión) se
+        // abre del todo aquí y se prueba aparte, con el valor del negocio.
+        ConfiguracionPlataforma::establecer('parametros', (string) json_encode(['asistencia.minutos_antes' => 525600]));
+    })
     ->in('Feature');
 
 pest()->extend(TestCase::class)->in('Unit');

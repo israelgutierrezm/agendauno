@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\HistorialCitaTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
@@ -79,6 +80,12 @@ class ReservasTenantController
                 ...$this->presentar($reserva, $yaAsistieron, $conAdeudo, $docsPendientes),
                 'transferencias' => $transferencias->get($reserva->ulid, []),
             ])->all(),
+            // Pase de lista (ADR 0101): desde cuándo se registra y si ya empezó (para
+            // terminar la lista).
+            'meta' => [
+                'asistencia_desde' => $sesion->inicia_en->copy()->subMinutes(app(ParametrosTenant::class)->entero('asistencia.minutos_antes'))->toIso8601String(),
+                'empezo' => $sesion->inicia_en->lessThanOrEqualTo(now()),
+            ],
         ]);
     }
 
@@ -326,6 +333,9 @@ class ReservasTenantController
             'inicia_en' => $reserva->sesion?->inicia_en->toIso8601String(),
             'unidades' => $reserva->unidades,
             'asistencia' => $reserva->asistencia?->estado->value,
+            // Llegó tarde (cuenta como asistencia) y si la marcó el sistema al terminar.
+            'retardo' => (bool) $reserva->asistencia?->retardo,
+            'asistencia_automatica' => (bool) $reserva->asistencia?->automatica,
         ];
     }
 }

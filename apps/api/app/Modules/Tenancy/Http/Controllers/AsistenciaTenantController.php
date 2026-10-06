@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\AsistenciaTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Models\ReservaTenant;
+use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Support\AccesoSesionTenant;
 use Illuminate\Http\JsonResponse;
@@ -37,20 +38,38 @@ class AsistenciaTenantController
 
         $validado = $request->validate([
             'estado' => ['required', Rule::enum(EstadoAsistencia::class)],
+            // Llegó tarde (solo con «presente»): cuenta como asistencia.
+            'retardo' => ['sometimes', 'boolean'],
         ]);
 
         $asistencia = $this->asistencia->marcar(
             $reserva,
             EstadoAsistencia::from($validado['estado']),
             $usuario instanceof Usuario ? $usuario : null,
+            (bool) ($validado['retardo'] ?? false),
         );
 
         return response()->json([
             'data' => [
                 'reserva' => $reserva->ulid,
                 'estado' => $asistencia->estado->value,
+                'retardo' => (bool) $asistencia->retardo,
                 'registrada_en' => $asistencia->registrada_en->toIso8601String(),
             ],
         ], 201);
+    }
+
+    /**
+     * Terminar de pasar lista: quien sigue sin registro «no se presentó» (ADR 0101).
+     */
+    public function terminar(Request $request): JsonResponse
+    {
+        $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->firstOrFail();
+        $usuario = $request->attributes->get('usuario_tenant');
+        abort_unless($this->acceso->puedeOperar($sesion, $usuario instanceof Usuario ? $usuario : null), 403);
+
+        $cuantas = $this->asistencia->terminarLista($sesion, $usuario instanceof Usuario ? $usuario : null);
+
+        return response()->json(['data' => ['no_se_presentaron' => $cuantas]]);
     }
 }

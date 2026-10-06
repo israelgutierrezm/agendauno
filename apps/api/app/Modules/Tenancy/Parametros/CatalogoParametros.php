@@ -50,6 +50,12 @@ final class CatalogoParametros
             new DefinicionParametro('agenda.dias_a_generar', 'Clases recurrentes', 'Fechas creadas por adelantado',
                 'Días hacia adelante con fechas de las clases recurrentes listas para reservar.', $e, 30, 7, 365, 'días'),
 
+            // Asistencia (ADR 0101).
+            new DefinicionParametro('asistencia.minutos_antes', 'Asistencia', 'Se puede pasar lista desde',
+                'Minutos antes de que empiece la clase o cita. Antes no se registra la asistencia.', $e, 30, 0, 240, 'min'),
+            new DefinicionParametro('asistencia.no_asistio_al_terminar', 'Asistencia', 'Al terminar, quien no tiene registro «no se presentó»',
+                'Si nadie registró la asistencia de alguien, al terminar la clase o cita queda como que no se presentó, con la política de inasistencias del negocio.', $sn, 1),
+
             // Acceso.
             new DefinicionParametro('acceso.minutos_antes', 'Acceso', 'Se puede entrar desde',
                 'Minutos antes de que empiece su clase o cita.', $e, 30, 0, 240, 'min'),

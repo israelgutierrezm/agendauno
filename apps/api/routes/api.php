@@ -648,6 +648,8 @@ Route::prefix('v1')->group(function (): void {
             // Transferir/regalar el lugar a otra persona (R9).
             Route::post('/reservas/{reserva}/transferir', [ReservasTenantController::class, 'transferir'])->middleware('puede:reservas.gestionar')->name('reservas.transferir');
             Route::post('/reservas/{reserva}/asistencia', [AsistenciaTenantController::class, 'marcar'])->middleware('puede:asistencia.marcar')->name('reservas.asistencia.store');
+            // Terminar de pasar lista: quien no tiene registro «no se presentó» (ADR 0101).
+            Route::post('/sesiones/{sesion}/terminar-lista', [AsistenciaTenantController::class, 'terminar'])->middleware('puede:asistencia.marcar')->name('sesiones.terminar-lista');
 
             // Politica de cancelacion/no-show (R8): la reserva congela la vigente al
             // crearse; esto configura la global y overrides por actividad a futuro.

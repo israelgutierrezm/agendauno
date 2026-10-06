@@ -23,6 +23,7 @@ class CitaTitular {
     required this.cliente,
     required this.estado,
     this.asistencia,
+    this.retardo = false,
     this.ordenId,
     this.porCobrar = false,
   });
@@ -31,6 +32,9 @@ class CitaTitular {
   final String? cliente;
   final String estado; // confirmada | pendiente_pago …
   final String? asistencia; // presente | ausente | null
+
+  /// Llegó tarde (cuenta como que llegó).
+  final bool retardo;
   final String? ordenId;
   final bool porCobrar;
 
@@ -39,6 +43,7 @@ class CitaTitular {
     cliente: json['cliente'] as String?,
     estado: (json['estado'] ?? 'confirmada') as String,
     asistencia: json['asistencia'] as String?,
+    retardo: (json['retardo'] ?? false) as bool,
     ordenId: json['orden_id'] as String?,
     porCobrar: (json['por_cobrar'] ?? false) as bool,
   );
@@ -194,6 +199,8 @@ class Asistente {
     required this.nombre,
     required this.estado,
     this.asistencia,
+    this.retardo = false,
+    this.automatica = false,
     this.primeraVez = false,
     this.adeudo = false,
   });
@@ -202,6 +209,10 @@ class Asistente {
   final String nombre;
   final String estado; // confirmada | ofrecida | en_espera | pendiente_pago
   final String? asistencia; // presente | ausente | null
+
+  /// Llegó tarde (cuenta como que llegó) y si la marcó el sistema al terminar.
+  final bool retardo;
+  final bool automatica;
   final bool primeraVez;
   final bool adeudo;
 
@@ -213,6 +224,8 @@ class Asistente {
     nombre: (json['persona'] ?? '—') as String,
     estado: (json['estado'] ?? 'confirmada') as String,
     asistencia: json['asistencia'] as String?,
+    retardo: (json['retardo'] ?? false) as bool,
+    automatica: (json['asistencia_automatica'] ?? false) as bool,
     primeraVez: (json['primera_vez'] ?? false) as bool,
     adeudo: (json['adeudo'] ?? false) as bool,
   );

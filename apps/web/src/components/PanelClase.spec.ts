@@ -21,6 +21,10 @@ vi.mock("@/stores/sesionTenant", () => ({
   }),
 }));
 vi.mock("vue-router", () => ({ RouterLink: { template: "<a><slot /></a>" } }));
+vi.mock("@/lib/confirmar", () => ({ confirmar: () => Promise.resolve(true) }));
+vi.mock("@/lib/confirmarAsistencia", () => ({
+  confirmarAsistencia: () => Promise.resolve(true),
+}));
 
 const reserva = (id: string, estado: string, asistencia: string | null) => ({
   id,
@@ -81,7 +85,8 @@ describe("pase de lista visual", () => {
     await flushPromises();
     const resumen = w.findAll(".pc-lista-resumen > div");
     expect(resumen.map((r) => r.get("strong").text())).toEqual(["3", "1", "1"]);
-    expect(w.findAll(".pc-lista-accion")).toHaveLength(6);
+    // Por reserva confirmada: Llegó, Retardo y No vino.
+    expect(w.findAll(".pc-lista-accion")).toHaveLength(9);
     expect(w.findAll("a")).toHaveLength(0);
     expect(w.text()).not.toContain("Persona d");
     expect(api.post).not.toHaveBeenCalled();
@@ -107,5 +112,57 @@ describe("pase de lista visual", () => {
     expect(w.find(".md-pastilla").exists()).toBe(false);
     expect(w.text()).toContain("Sin conexión");
     w.unmount();
+  });
+
+  it("retardo, ventana del pase de lista y terminar la lista (ADR 0101)", async () => {
+    permisos.add("asistencia.marcar");
+    // Aún no se puede: la lista abre a las 9:30.
+    api.get.mockResolvedValueOnce({
+      data: {
+        data: [reserva("a", "confirmada", null)],
+        meta: { asistencia_desde: "2030-01-09T15:30:00Z", empezo: false },
+      },
+    });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2030-01-09T14:00:00Z"));
+    const w = montar();
+    await flushPromises();
+    expect(w.get('[data-prueba="lista-abre"]').text()).toContain("09:30");
+    expect(
+      w.get('[data-prueba="lista-retardo"]').attributes("disabled"),
+    ).toBeDefined();
+    expect(w.find('[data-prueba="terminar-lista"]').exists()).toBe(false);
+    w.unmount();
+
+    // Ya empezó: se marca un retardo y se termina la lista.
+    vi.setSystemTime(new Date("2030-01-09T16:10:00Z"));
+    api.get.mockResolvedValue({
+      data: {
+        data: [
+          { ...reserva("a", "confirmada", "presente"), retardo: true },
+          reserva("b", "confirmada", null),
+        ],
+        meta: { asistencia_desde: "2030-01-09T15:30:00Z", empezo: true },
+      },
+    });
+    api.post.mockResolvedValue({ data: { data: { no_se_presentaron: 1 } } });
+    const v = montar();
+    await flushPromises();
+    vi.useRealTimers();
+    expect(v.text()).toContain("Llegó tarde");
+    (
+      v.findAll('[data-prueba="lista-retardo"]')[1].element as HTMLButtonElement
+    ).click();
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/reservas/b/asistencia",
+      { estado: "presente", retardo: true },
+    );
+    await v.get('[data-prueba="terminar-lista"]').trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/sesiones/s1/terminar-lista",
+      {},
+    );
   });
 });

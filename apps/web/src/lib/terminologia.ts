@@ -34,6 +34,33 @@ export interface TerminosNegocio {
 
 export type TerminoEditable = "sesion" | "miembro" | "instructor";
 
+/**
+ * El término del negocio para UNA persona, en su género si se sabe: con «Alumno» y una
+ * mujer, «Alumna»; con «Socia» y un hombre, «Socio». Los términos que no cambian
+ * (Cliente, Paciente, Miembro) y las personas sin género quedan como el negocio.
+ */
+export function terminoParaPersona(
+  termino: string,
+  genero: string | null | undefined,
+): string {
+  const t = termino.trim();
+  const ultima = t.slice(-1).toLowerCase();
+  if (ultima !== "o" && ultima !== "a") {
+    return t;
+  }
+  const base = t.slice(0, -1);
+  const conMayuscula = ultima === t.slice(-1) ? "" : "M";
+  const final = (letra: string): string =>
+    conMayuscula ? letra.toUpperCase() : letra;
+  if (genero === "mujer") {
+    return `${base}${final("a")}`;
+  }
+  if (genero === "hombre") {
+    return `${base}${final("o")}`;
+  }
+  return t;
+}
+
 /** Terminología de un negocio para editarla (GET/PUT …/terminologia). */
 export interface DatosTerminologia {
   opciones: Record<TerminoEditable, string[]>;
@@ -44,6 +71,88 @@ export interface DatosTerminologia {
 
 /** Términos de quien toma el servicio que valen para "la alumna" y "el alumno". */
 const GENERO_COMUN = new Set(["cliente", "paciente"]);
+
+/**
+ * ¿El término es femenino (Alumna, Socia, Clienta)? Termina en «a» y no es de género
+ * común. Con él, «el alumno» se lee «la alumna»: cambian también el artículo y los
+ * adjetivos de alrededor (ver `feminizar`).
+ */
+function esFemenino(termino: string): boolean {
+  const t = termino.trim().toLowerCase();
+  return t.endsWith("a") && !GENERO_COMUN.has(t);
+}
+
+// Lo que va antes del sustantivo y concuerda con él (masculino → femenino).
+const ANTES: Record<string, string> = {
+  el: "la",
+  los: "las",
+  un: "una",
+  unos: "unas",
+  del: "de la",
+  al: "a la",
+  este: "esta",
+  estos: "estas",
+  ese: "esa",
+  esos: "esas",
+  nuevo: "nueva",
+  nuevos: "nuevas",
+  otro: "otra",
+  otros: "otras",
+  ningún: "ninguna",
+  algún: "alguna",
+  primer: "primera",
+  mismo: "misma",
+  mismos: "mismas",
+  cuántos: "cuántas",
+  varios: "varias",
+  pocos: "pocas",
+  muchos: "muchas",
+  todos: "todas",
+};
+// Lo que va justo después y concuerda (alumnos activos → alumnas activas).
+const DESPUES = [
+  "activo",
+  "inactivo",
+  "nuevo",
+  "inscrito",
+  "registrado",
+  "esperado",
+  "archivado",
+  "suspendido",
+  "vencido",
+  "asignado",
+  "atendido",
+  "invitado",
+  "confirmado",
+  "facturado",
+];
+
+/** «todos los alumnos activos» → «todas las alumnas activas» (con su forma). */
+function feminizar(texto: string, singular: string, plurales: string): string {
+  const antes = Object.keys(ANTES).join("|");
+  const patron = new RegExp(
+    `(?<!\\p{L})((?:(?:${antes})\\s+){0,2})(alumno|miembro)(s)?(?!\\p{L})(?!\\s+del\\s+(?:equipo|staff|personal))((?:\\s+(?:${DESPUES.join("|")})s?(?!\\p{L}))?)`,
+    "giu",
+  );
+  return texto.replace(
+    patron,
+    (
+      _m,
+      previas: string,
+      raiz: string,
+      sufijo: string | undefined,
+      sigue: string,
+    ) => {
+      const articulos = previas.replace(/\p{L}+/gu, (w) =>
+        ANTES[w.toLowerCase()] !== undefined
+          ? conMismaForma(w, ANTES[w.toLowerCase()])
+          : w,
+      );
+      const adjetivo = sigue.replace(/(\p{L}+?)o(s?)$/u, "$1a$2");
+      return `${articulos}${conMismaForma(raiz, sufijo ? plurales : singular)}${adjetivo}`;
+    },
+  );
+}
 
 interface Regla {
   patron: RegExp;
@@ -96,7 +205,8 @@ function reglas(t: TerminosNegocio): Regla[] {
     });
   }
   const miembro = t.miembro.toLowerCase();
-  if (miembro !== "alumna") {
+  // Femenino (Alumna, Socia): lo hace `feminizar`, con artículos y adjetivos.
+  if (!esFemenino(miembro)) {
     if (miembro !== "alumno") {
       lista.push({
         patron: palabra("alumno", "s"),
@@ -123,6 +233,13 @@ function reglas(t: TerminosNegocio): Regla[] {
         plural: miembros,
       });
     }
+  } else if (miembro !== "alumna") {
+    // Socia, Clienta: «la alumna» también es «la socia».
+    lista.push({
+      patron: palabra("alumna", "s"),
+      singular: t.miembro,
+      plural: miembros,
+    });
   }
   return lista;
 }
@@ -137,7 +254,7 @@ const INTOCABLE = /(\{[^}]*\}|@(?:\.\w+)?:[\w.]+)/;
  */
 export function adaptarTexto(texto: string, t: TerminosNegocio): string {
   const lista = reglas(t);
-  if (lista.length === 0) {
+  if (lista.length === 0 && !esFemenino(t.miembro)) {
     return texto;
   }
   const destinos = lista
@@ -154,7 +271,9 @@ export function adaptarTexto(texto: string, t: TerminosNegocio): string {
       if (i % 2 === 1) {
         return parte;
       }
-      let salida = parte;
+      let salida = esFemenino(t.miembro)
+        ? feminizar(parte, t.miembro, t.miembros ?? plural(t.miembro))
+        : parte;
       for (const r of lista) {
         salida = salida.replace(r.patron, (_m, raiz: string, sufijo?: string) =>
           conMismaForma(raiz, sufijo ? r.plural : r.singular),
