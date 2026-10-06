@@ -4,32 +4,55 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Demos;
 
+use App\Modules\Tenancy\Acceso\MetodoAcceso;
 use App\Modules\Tenancy\Application\AsistenciaTenant;
 use App\Modules\Tenancy\Application\GenerarAgendaTenant;
+use App\Modules\Tenancy\Application\InventarioTenant;
 use App\Modules\Tenancy\Application\MembresiasTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
+use App\Modules\Tenancy\Application\PausarMembresiaTenant;
+use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
+use App\Modules\Tenancy\Application\RegistrarAccesoTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\Automatizacion\EventoAutomatizacion;
+use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
+use App\Modules\Tenancy\Comunicaciones\SegmentoComunicacion;
+use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
+use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\Membresias\TipoVigencia;
 use App\Modules\Tenancy\Membresias\VigenciaProducto;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
+use App\Modules\Tenancy\Models\ActividadTenant;
+use App\Modules\Tenancy\Models\AcuerdoTenant;
+use App\Modules\Tenancy\Models\ArticuloTenant;
+use App\Modules\Tenancy\Models\AsistenciaTenant as AsistenciaModelo;
+use App\Modules\Tenancy\Models\EsquemaPagoTenant;
+use App\Modules\Tenancy\Models\NivelTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\ProgramaTenant;
+use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\ResenaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Nomina\TipoPago;
+use App\Modules\Tenancy\Ordenes\TipoPromocion;
+use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\PoliticaReservaTenant;
+use App\Modules\Tenancy\Recursos\ModoRecurso;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\Exceptions\SinDerechoDisponible;
 use App\Modules\Tenancy\Reservas\QuienCancela;
+use App\Modules\Tenancy\TipoCampo;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\File;
 use Illuminate\Validation\ValidationException;
@@ -40,8 +63,14 @@ use RuntimeException;
  * el horario y los precios de prueba de `docs/DEMO_GRECON.md`. Solo lo que el
  * documento da: la agenda pública de octubre de 2026 (191 sesiones de 26 clases con
  * 11 profesores) y los planes de prueba (paquetes de 4, 8 y 12 clases hasta fin de
- * mes e Ilimitada, la única que incluye Open Training). Sin inventario, nómina ni
- * reglas que el sistema aún no aplica (permanencia, inscripción y anualidad).
+ * mes e Ilimitada, la única que incluye Open Training). Sin reglas que el sistema aún
+ * no aplica (permanencia, inscripción y anualidad).
+ *
+ * Lo que el documento no da es inventado para que cada apartado tenga datos (ver
+ * {@see ApartadosDemo}): lo que se vende en recepción con su inventario, la nómina por
+ * clase, los niveles de pole, un rol propio, expedientes, el cuestionario de salud,
+ * promociones, lealtad, comunicaciones, facturas, accesos con QR, una membresía en
+ * pausa, una devolución y una solicitud de privacidad.
  *
  * El horario es el semanal que publica el estudio (44 clases a la semana). Octubre
  * queda exactamente como la agenda publicada: suplencias, clases sin profesor
@@ -60,6 +89,8 @@ use RuntimeException;
  */
 final class DemoGrecon extends DemoBase
 {
+    use ApartadosDemo;
+
     /** La agenda pública de octubre (instantánea). */
     private const AGENDA = 'demo/grecon-octubre-2026.json';
 
@@ -93,6 +124,17 @@ final class DemoGrecon extends DemoBase
 
     private const NUEVOS = 18;
 
+    /** Lo que se vende en recepción: [nombre, sku, precio (centavos), existencias iniciales]. */
+    private const ARTICULOS = [
+        ['Agua natural 600 ml', 'GR-AGU-01', 2500, 48],
+        ['Bebida isotónica', 'GR-ISO-02', 3800, 24],
+        ['Grip líquido para pole', 'GR-GRP-03', 39000, 10],
+        ['Calcetas antiderrapantes', 'GR-CAL-04', 18000, 20],
+        ['Rodilleras para pole', 'GR-ROD-05', 52000, 8],
+        ['Shorts Grecon', 'GR-SHO-06', 45000, 12],
+        ['Top deportivo Grecon', 'GR-TOP-07', 48000, 12],
+    ];
+
     private const COMENTARIOS = [
         5 => ['Me encantó la clase, súper bien explicada.', 'Por fin me salió el combo.', 'Excelente ambiente, muy seguro.', 'La mejor clase de la semana.', 'Muy buena corrección de técnica.'],
         4 => ['Muy buena, aunque el grupo estaba lleno.', 'Me gustó mucho, quisiera más calentamiento.'],
@@ -104,6 +146,11 @@ final class DemoGrecon extends DemoBase
     private Usuario $dueno;
 
     private Usuario $recepcion;
+
+    private Usuario $admin;
+
+    /** @var list<ArticuloTenant> */
+    private array $articulos = [];
 
     /** @var array<string, Usuario> nombre publicado => cuenta */
     private array $profes = [];
@@ -161,6 +208,7 @@ final class DemoGrecon extends DemoBase
         $this->sedeYEquipo($agenda);
         $this->catalogoYPlanes($agenda);
         $this->horarioSemanal($agenda);
+        $this->inventario();
         $this->darDeAltaMiembros();
 
         for ($dia = $this->inicio; $dia->lessThanOrEqualTo($this->hoy); $dia = $dia->addDay()) {
@@ -168,6 +216,7 @@ final class DemoGrecon extends DemoBase
         }
         $this->proximasSemanas();
         $this->porCobrar();
+        $this->apartados();
     }
 
     /**
@@ -209,8 +258,25 @@ final class DemoGrecon extends DemoBase
             $this->profes[$profe['nombre']] = $this->usuario($correo, $partes[0], $partes[1] ?? '', $roles);
         }
         $this->dueno = $this->profes[self::DUENO];
-        $this->usuario('admin@grecon.test', 'Administración', 'Grecon', ['admin']);
+        $this->admin = $this->usuario('admin@grecon.test', 'Administración', 'Grecon', ['admin']);
         $this->recepcion = $this->usuario('recepcion@grecon.test', 'Fernanda', 'Ruiz', ['recepcionista']);
+
+        // Nómina: cada coach cobra por clase impartida (el dueño no se paga la suya).
+        foreach ($this->profes as $nombre => $profe) {
+            if ($nombre !== self::DUENO) {
+                EsquemaPagoTenant::query()->create([
+                    'usuario_id' => $profe->getKey(), 'tipo' => TipoPago::PorClase->value,
+                    'monto_minor' => $this->uno([35000, 40000, 45000]), 'moneda' => 'MXN', 'activo' => true,
+                ]);
+            }
+        }
+        // Un rol propio para quien coordina la agenda (sin cobros ni configuración).
+        $this->rolPropio($this->dueno, 'Coordinación', [
+            'agenda.ver', 'agenda.gestionar', 'catalogo.ver', 'sucursales.ver', 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'miembros.ver', 'tareas.ver', 'tareas.gestionar',
+        ]);
+        // Los tubos y la sala, para saber con qué se cuenta.
+        RecursoTenant::query()->create(['sucursal_id' => $this->sede->getKey(), 'nombre' => 'Tubos de pole', 'tipo' => 'Equipo', 'modo' => ModoRecurso::Pool->value, 'capacidad' => self::CUPO, 'activo' => true]);
+        RecursoTenant::query()->create(['sucursal_id' => $this->sede->getKey(), 'nombre' => 'Sala principal', 'tipo' => 'Sala', 'modo' => ModoRecurso::Unidad->value, 'capacidad' => 1, 'activo' => true]);
     }
 
     /**
@@ -238,6 +304,13 @@ final class DemoGrecon extends DemoBase
             $this->nombreDeOferta[(int) $this->clases[$nombre]->getKey()] = $nombre;
         }
         $this->sumar('clases del catálogo', count($this->clases));
+        // Los niveles de pole que usa el estudio (POLE LEVEL 1 a 3).
+        $pole = $actividades['Pole'] ?? null;
+        if ($pole instanceof ActividadTenant) {
+            foreach (['Nivel 1 (principiante)', 'Nivel 2 (intermedio)', 'Nivel 3 (avanzado)'] as $orden => $nivel) {
+                NivelTenant::query()->create(['actividad_id' => $pole->getKey(), 'nombre' => $nivel, 'orden' => $orden + 1]);
+            }
+        }
 
         // Los paquetes no incluyen Open Training (lista explícita: vacía serían todas).
         $sinOpen = [];
@@ -359,6 +432,17 @@ final class DemoGrecon extends DemoBase
         return preg_match('/LEVEL (\d)/i', $clase, $m) === 1 ? (int) $m[1] : null;
     }
 
+    /** Lo que se vende en recepción, con sus existencias iniciales. */
+    private function inventario(): void
+    {
+        $inventario = app(InventarioTenant::class);
+        foreach (self::ARTICULOS as [$nombre, $sku, $precio, $stock]) {
+            $articulo = ArticuloTenant::query()->create(['nombre' => $nombre, 'sku' => $sku, 'precio_minor' => $precio, 'moneda' => 'MXN', 'activo' => true]);
+            $this->articulos[] = $articulo;
+            $inventario->registrar((int) $articulo->getKey(), (int) $this->sede->getKey(), $stock, TipoMovimientoInventario::Entrada, 'Inventario inicial', $this->admin);
+        }
+    }
+
     // ---------------------------------------------------------------- miembros
 
     /**
@@ -377,7 +461,7 @@ final class DemoGrecon extends DemoBase
             $hombre = $this->prob(12);
             $persona = $this->persona(
                 $this->uno($hombre ? NombresDemo::HOMBRES : NombresDemo::MUJERES), $this->uno(NombresDemo::APELLIDOS), $this->uno(NombresDemo::APELLIDOS),
-                $alta, (int) $this->sede->getKey(), $this->prob(85),
+                $alta, (int) $this->sede->getKey(), $this->prob(85), ['genero' => $hombre ? 'hombre' : 'mujer'],
             );
             $plan = (string) $this->elegir(['p4' => 22, 'p8' => 36, 'p12' => 17, 'ilimitada' => 25]);
             $this->alumnas[] = $this->costumbre($persona, $plan, $antiguo ? $this->inicio : $alta->startOfDay(), ! $antiguo);
@@ -388,7 +472,7 @@ final class DemoGrecon extends DemoBase
 
         // El dueño también es alumno: su ficha ligada a su cuenta, con Ilimitada.
         $dueno = $this->persona('Constantino', 'Escobar', '', $this->inicio->subDays(900), (int) $this->sede->getKey(), false, [
-            'email' => 'constantino@grecon.test', 'usuario_id' => $this->dueno->getKey(),
+            'email' => 'constantino@grecon.test', 'usuario_id' => $this->dueno->getKey(), 'genero' => 'hombre',
         ]);
         $this->alumnas[] = [
             ...$this->costumbre($dueno, 'ilimitada', $this->inicio, false),
@@ -399,7 +483,7 @@ final class DemoGrecon extends DemoBase
     private function conCuenta(int $i, string $nombre, string $apellido1, string $apellido2, string $correo, string $plan): void
     {
         $persona = $this->alumnas[$i]['persona'];
-        $persona->update(['nombre' => $nombre, 'primer_apellido' => $apellido1, 'segundo_apellido' => $apellido2, 'email' => $correo]);
+        $persona->update(['nombre' => $nombre, 'primer_apellido' => $apellido1, 'segundo_apellido' => $apellido2, 'email' => $correo, 'genero' => 'mujer']);
         $cuenta = $this->usuario($correo, $nombre, $apellido1, ['miembro']);
         $persona->update(['usuario_id' => $cuenta->getKey()]);
         $this->alumnas[$i] = [...$this->costumbre($persona, $plan, $this->inicio, false), 'deja' => null];
@@ -489,6 +573,7 @@ final class DemoGrecon extends DemoBase
                 $this->asistencia($sesion, $termina);
             }
         }
+        $this->ventasDeMostrador($dia, $esHoy);
     }
 
     /**
@@ -683,6 +768,36 @@ final class DemoGrecon extends DemoBase
     }
 
     /**
+     * En recepción se vende agua y bebidas (casi siempre), grip, calcetas y ropa del
+     * estudio. Cuando algo se acaba, se compra al proveedor.
+     */
+    private function ventasDeMostrador(CarbonImmutable $dia, bool $esHoy): void
+    {
+        $pos = app(PuntoDeVentaTenant::class);
+        $inventario = app(InventarioTenant::class);
+        $finDeSemana = $dia->isoWeekday() >= 6;
+        $ventas = $this->azar(0, $finDeSemana ? 2 : 4);
+        for ($n = 0; $n < $ventas; $n++) {
+            $hora = sprintf('%02d:%02d', $finDeSemana ? $this->azar(8, 11) : (int) $this->elegir([10 => 20, 12 => 10, 18 => 35, 19 => 25, 20 => 10]), $this->azar(0, 59));
+            if ($esHoy && CarbonImmutable::parse($dia->toDateString().' '.$hora, $this->zona)->greaterThan($this->ahora)) {
+                continue;
+            }
+            $cual = (int) $this->elegir([0 => 38, 1 => 18, 2 => 10, 3 => 12, 4 => 5, 5 => 9, 6 => 8]);
+            $articulo = $this->articulos[$cual];
+            $this->reloj($dia, $hora);
+            if ($inventario->stock((int) $articulo->getKey(), (int) $this->sede->getKey()) < 2) {
+                $inventario->registrar((int) $articulo->getKey(), (int) $this->sede->getKey(), $cual <= 1 ? 24 : 6, TipoMovimientoInventario::Entrada, 'Compra a proveedor', $this->admin);
+            }
+            try {
+                $pos->vender($this->sede, [['articulo' => $articulo, 'cantidad' => $cual <= 1 && $this->prob(25) ? 2 : 1]], (string) $this->elegir(['efectivo' => 50, 'tarjeta' => 40, 'transferencia' => 10]), $this->recepcion);
+                $this->sumar('ventas de mostrador');
+            } catch (RuntimeException|ValidationException) {
+                // Sin existencias: no se vende.
+            }
+        }
+    }
+
+    /**
      * Las próximas dos semanas: los miembros activos ya apartaron sus clases (menos
      * cuanto más lejos). Quien aún no paga su mes lo compra en línea antes de apartar.
      */
@@ -760,5 +875,144 @@ final class DemoGrecon extends DemoBase
             $adeudos++;
         }
         $this->sumar('adeudos de quienes dejaron de venir', $adeudos);
+    }
+
+    // ---------------------------------------------------------------- apartados
+
+    /** Lo que el documento no da (inventado): cada apartado con datos. */
+    private function apartados(): void
+    {
+        $nueva = $this->alumnas[self::ANTIGUOS + self::NUEVOS - 1]['persona'];
+        $this->tareasDelEquipo([
+            ['Pedir grip líquido y calcetas al proveedor', 'Quedan pocas piezas en recepción.', 2, $this->recepcion, false],
+            ['Revisar el tubo 6: rechina al girar', 'Avisar a mantenimiento si hay que cambiar el rodamiento.', -1, $this->admin, false],
+            ['Publicar el horario del próximo mes', 'En la página de reservas y en Instagram.', 5, $this->admin, false],
+            ['Llamar a las alumnas que no renovaron', 'Ofrecerles el Paquete 4 clases.', 1, $this->recepcion, false],
+            ["Dar seguimiento a la primera clase de {$nueva->nombre}", 'Preguntarle cómo le fue y qué plan le conviene.', 0, $this->recepcion, false, $nueva],
+            ['Preparar la coreografía del showcase', null, 12, $this->profes['ABRIL VON'], false],
+            ['Limpiar los tubos con alcohol al cierre', null, -3, $this->recepcion, true],
+            ['Corte de caja del fin de semana', null, -2, $this->admin, true],
+            ['Actualizar las fotos de los coaches', null, -6, $this->admin, true],
+            ['Mandar la lista de canciones de Exotic Choreo', null, -4, $this->profes['LEO ARELLANO'], true],
+        ], $this->admin);
+
+        $this->notasEnFichas([
+            'Lesión en la muñeca izquierda: cuidar los apoyos en invertidas.',
+            'Prefiere clases por la tarde, después de las 7.',
+            'Viene con su amiga; quieren el mismo horario.',
+            'Pidió factura de su paquete: ya mandó sus datos.',
+            'Le interesa Flying Pole cuando abra cupo.',
+            'Pagó por transferencia; el comprobante está en el correo.',
+            'Quiere subir a Nivel 2 el próximo mes.',
+            'Se le olvidan las calcetas: ofrecerle las de recepción.',
+            'Tuvo una cirugía de rodilla hace dos años; ya tiene alta médica.',
+            'Recomendó a dos amigas este mes.',
+            'Avisó que viaja la última semana del mes.',
+            'Prefiere que le escriban por WhatsApp, no por correo.',
+        ], [$this->recepcion, $this->admin, $this->profes['ABRIL VON']]);
+
+        $this->expedientes(
+            [['Certificado médico', 'Que puede hacer actividad física de alto impacto.', true], ['Identificación oficial', 'Para el registro y las facturas.', false]],
+            ['deslinde', 'Deslinde de responsabilidad', "Entiendo que el pole, el exotic y la flexibilidad son actividades físicas con riesgo de lesión.\n\nSigo las indicaciones de mi coach, aviso de cualquier lesión o condición médica y uso el equipo como me indican. Grecon Art House no se hace responsable de lesiones por no seguir las indicaciones."],
+            $this->admin, 32, 88,
+        );
+
+        $this->formularioConRespuestas('Cuestionario de salud', 'Antes de tu primera clase, para cuidarte mejor.', [
+            ['¿Tienes alguna lesión o cirugía reciente?', TipoCampo::Booleano, true],
+            ['Cuéntanos de tu lesión, si tienes', TipoCampo::Textarea, false, ['Esguince de tobillo hace un año, ya recuperado.', 'Dolor lumbar de vez en cuando.', 'Operación de rodilla en 2024.', 'Tendinitis en el hombro derecho.']],
+            ['Experiencia en pole', TipoCampo::Seleccion, true, ['Nunca he tomado', 'Menos de 6 meses', 'De 6 meses a 2 años', 'Más de 2 años']],
+            ['¿Cómo te enteraste de Grecon?', TipoCampo::Seleccion, false, ['Instagram', 'Una amiga', 'Google', 'TikTok']],
+            ['Contacto de emergencia', TipoCampo::Texto, true, ['Mamá: 55 1234 5678', 'Pareja: 55 8765 4321', 'Hermana: 55 2468 1357', 'Amiga: 55 9753 1864']],
+        ], 46);
+
+        $this->promociones([
+            ['BIENVENIDA10', 'Tu primer plan con 10 % de descuento', TipoPromocion::Porcentaje, 1000, null, null, 14, null, true],
+            ['AMIGA15', 'Si vienes con una amiga, 15 % en tu plan', TipoPromocion::Porcentaje, 1500, 80000, 40, 9, 60, true],
+            ['PLAN200', '$200 menos en planes de $1,400 o más', TipoPromocion::MontoFijo, 20000, 140000, 30, 6, 25, true],
+            ['VERANO20', 'Promoción de verano', TipoPromocion::Porcentaje, 2000, null, 50, 31, -40, false],
+        ]);
+
+        $this->lealtad(10, 1, [
+            ['Clase extra', 'Una clase de cualquier nivel, este mes.', 1500],
+            ['Calcetas antiderrapantes', 'Un par, en recepción.', 2500],
+            ['Grip líquido', 'El de recepción.', 4000],
+            ['Top Grecon', 'Edición del estudio.', 6000],
+        ], $this->recepcion);
+
+        $this->comunicaciones([
+            [45, SegmentoComunicacion::Todos, CanalComunicacion::Email, 'Nuevo horario de clases', "Hola {{persona_nombre}}:\n\nYa está el nuevo horario, con dos clases de Exotic por la mañana. Aparta tu lugar desde tu cuenta.\n\nNos vemos en el estudio."],
+            [26, SegmentoComunicacion::Primerizos, CanalComunicacion::Email, '¿Cómo te fue en tu primera clase?', "Hola {{persona_nombre}}:\n\nGracias por venir. Si quieres seguir, el Paquete 4 clases es la mejor forma de empezar. Cualquier duda, escríbenos."],
+            [9, SegmentoComunicacion::PorVencer, CanalComunicacion::Email, 'Tu plan vence a fin de mes', "Hola {{persona_nombre}}:\n\nTu plan vence a fin de mes. Renueva desde tu cuenta para conservar tus horarios."],
+            [3, SegmentoComunicacion::Todos, CanalComunicacion::Interno, 'Showcase de fin de año', 'El showcase será el 12 de diciembre. Pregunta en recepción cómo participar.'],
+        ], [
+            ['Lugar ofrecido de la lista de espera', EventoAutomatizacion::ReservaOfrecida, 'Avisar a {{persona_nombre}} que tiene un lugar', 'Si no lo acepta a tiempo, se ofrece a la siguiente.', 0],
+            ['Membresía suspendida por falta de pago', EventoAutomatizacion::MembresiaSuspendida, 'Llamar a {{persona_nombre}} por su pago', null, 60],
+        ]);
+
+        // Datos fiscales de prueba del SAT (no son los del estudio).
+        $this->facturas(['GRECON ART HOUSE DEMO', 'EKU9003173C9', '601', '26015'], 6, '86121600');
+
+        $pago = PagoTenant::query()->where('estado', EstadoPago::Aprobado->value)->orderByDesc('id')->skip(6)->first();
+        $this->devolucion($pago, null, 'Se cambió de ciudad antes de usar su paquete.', $this->admin);
+
+        foreach ($this->alumnas as $a) {
+            if ($a['deja'] instanceof CarbonImmutable && $a['persona']->usuario_id === null) {
+                $this->solicitudDePrivacidad($a['persona'], 'Ya no voy a tomar clases; por favor borren mis datos.');
+                break;
+            }
+        }
+
+        $this->llaveDeApi('Sitio web (horario de clases)', ['agenda.ver']);
+        $this->accesosConQr();
+        $this->unaPausa();
+    }
+
+    /** La entrada con QR de quienes llegaron a clase en los últimos diez días. */
+    private function accesosConQr(): void
+    {
+        $acceso = app(RegistrarAccesoTenant::class);
+        $asistencias = AsistenciaModelo::query()->with('reserva.persona', 'reserva.sesion')
+            ->where('estado', EstadoAsistencia::Presente->value)
+            ->whereHas('reserva.sesion', fn ($q) => $q->where('inicia_en', '>=', $this->hoy->subDays(10)->utc()))
+            ->orderBy('id')
+            ->get();
+        foreach ($asistencias as $asistencia) {
+            $persona = $asistencia->reserva?->persona;
+            $sesion = $asistencia->reserva?->sesion;
+            if (! $persona instanceof PersonaTenant || ! $sesion instanceof SesionTenant || ! $this->prob(85)) {
+                continue;
+            }
+            $llega = $this->en(CarbonImmutable::instance($sesion->inicia_en)->subMinutes($this->azar(3, 20)));
+            $acceso->registrar($persona, MetodoAcceso::Qr, (int) $this->sede->getKey(), $llega);
+            $this->sumar('accesos con QR');
+        }
+    }
+
+    /** Una alumna con Ilimitada pausó su membresía por un viaje. */
+    private function unaPausa(): void
+    {
+        $acuerdos = AcuerdoTenant::query()
+            ->where('estado', EstadoAcuerdo::Activo->value)
+            ->where('producto_comercial_id', $this->planes['ilimitada']->getKey())
+            ->orderBy('id')
+            ->get();
+        foreach ($acuerdos as $acuerdo) {
+            $conReservas = ReservaTenant::query()->where('persona_id', $acuerdo->persona_id)
+                ->where('estado', EstadoReserva::Confirmada->value)
+                ->whereHas('sesion', fn ($q) => $q->where('inicia_en', '>', $this->ahora->utc()))
+                ->exists();
+            if ($conReservas || PersonaTenant::query()->whereKey($acuerdo->persona_id)->value('usuario_id') !== null) {
+                continue;
+            }
+            $this->en($this->ahora->subHours(4));
+            try {
+                app(PausarMembresiaTenant::class)->pausar($acuerdo, $this->hoy->addDays(10), 'Viaje de trabajo', $this->recepcion);
+                $this->sumar('membresías en pausa');
+            } catch (RuntimeException) {
+                continue;
+            }
+
+            return;
+        }
     }
 }

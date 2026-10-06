@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Demos;
 
+use App\Modules\Tenancy\Application\GenerarCargoRenta;
 use App\Modules\Tenancy\Application\GestionarRolesTenant;
 use App\Modules\Tenancy\Application\RegistrarEstudio;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\Models\Estudio;
@@ -49,6 +51,9 @@ abstract class DemoBase
     protected CarbonImmutable $inicio;
 
     protected string $password = '';
+
+    /** El negocio que se siembra (para guardar sus archivos y su renta). */
+    protected Estudio $estudio;
 
     /** Azar con semilla fija (el nombre del negocio). */
     private Randomizer $aleatorio;
@@ -152,6 +157,7 @@ abstract class DemoBase
             'redes' => RedesSociales::normalizar(['instagram' => $d['instagram']]),
         ]);
         $this->logo($estudio, $d['color']);
+        $this->estudio = $estudio;
 
         try {
             $this->gestor->ejecutarEn($estudio, function () use ($estudio): void {
@@ -167,11 +173,34 @@ abstract class DemoBase
                 $this->sembrar();
                 $this->cerrarHistoria();
             });
+            $this->rentaDeLaPlataforma($estudio->refresh());
         } finally {
             Carbon::setTestNow();
         }
 
         return ['estudio' => $estudio->refresh(), 'cuenta' => $this->cuenta];
+    }
+
+    /**
+     * Lo que el negocio paga a la plataforma: el cargo de cada mes ya cerrado de la
+     * historia (con su medición de uso), emitido al cerrar el mes y pagado a los pocos
+     * días. Un cargo ya emitido no se recalcula.
+     */
+    private function rentaDeLaPlataforma(Estudio $estudio): void
+    {
+        $generar = app(GenerarCargoRenta::class);
+        for ($mes = $this->inicio->startOfMonth(); $mes->lessThan($this->hoy->startOfMonth()); $mes = $mes->addMonth()) {
+            Carbon::setTestNow($mes->addMonth()->setTime(6, 0)->utc());
+            $cargo = $generar->paraEstudio($estudio, $mes->format('Y-m'));
+            if ($cargo->estado === EstadoCargoRenta::Pendiente) {
+                $cargo->update([
+                    'estado' => EstadoCargoRenta::Pagado->value, 'metodo_pago' => 'stripe',
+                    'pagado_en' => $mes->addMonth()->addDays(3)->setTime(11, 20)->utc(),
+                ]);
+            }
+            $this->sumar('cargos de renta pagados');
+        }
+        Carbon::setTestNow();
     }
 
     /** Rehacer desde cero: borra la BD del negocio (solo SQLite de desarrollo). */
@@ -323,7 +352,8 @@ abstract class DemoBase
     }
 
     /**
-     * Da de alta a un cliente o alumna con datos creíbles, con su fecha de alta.
+     * Da de alta a un cliente o alumna con datos creíbles, con su fecha de alta. El
+     * género va en `$extra` (lo sabe quien elige el nombre).
      *
      * @param  array<string, mixed>  $extra
      */
@@ -339,7 +369,10 @@ abstract class DemoBase
             $this->correos[$correo] = true;
         }
 
+        // Casi todos dieron su fecha de nacimiento (adultos).
+        $nacimiento = $this->prob(85) ? $this->hoy->subYears($this->azar(18, 56))->subDays($this->azar(0, 364))->toDateString() : null;
         $persona = PersonaTenant::query()->create([
+            'fecha_nacimiento' => $nacimiento,
             'nombre' => $nombre,
             'primer_apellido' => $apellido1,
             'segundo_apellido' => $apellido2,

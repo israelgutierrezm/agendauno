@@ -7,12 +7,19 @@ namespace App\Console\Commands\Demos;
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\AsistenciaTenant;
 use App\Modules\Tenancy\Application\InventarioTenant;
+use App\Modules\Tenancy\Application\MembresiasTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
 use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
 use App\Modules\Tenancy\Application\ReprogramarTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\Automatizacion\EventoAutomatizacion;
+use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
+use App\Modules\Tenancy\Comunicaciones\SegmentoComunicacion;
 use App\Modules\Tenancy\Inventario\TipoMovimientoInventario;
+use App\Modules\Tenancy\Membresias\TipoProducto;
+use App\Modules\Tenancy\Membresias\TipoVigencia;
+use App\Modules\Tenancy\Membresias\VigenciaProducto;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\BloqueoAgendaTenant;
@@ -22,18 +29,26 @@ use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\OrganizacionTenant;
+use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
+use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\ProgramaTenant;
+use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\ResenaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Nomina\TipoPago;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Ordenes\TipoPromocion;
+use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\PoliticaReservaTenant;
+use App\Modules\Tenancy\Recursos\ModoRecurso;
+use App\Modules\Tenancy\Reservas\Exceptions\SinDerechoDisponible;
 use App\Modules\Tenancy\Reservas\QuienCancela;
 use App\Modules\Tenancy\Support\RedesSociales;
+use App\Modules\Tenancy\TipoCampo;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -49,9 +64,17 @@ use RuntimeException;
  * anticipación), se cancela o reprograma alguna, al terminar se marca la asistencia
  * y se cobra en caja (efectivo, tarjeta o transferencia), se venden productos y
  * algunos clientes dejan su reseña. Hacia adelante quedan dos semanas de citas.
+ *
+ * Algunos clientes de corte compran en caja un bono de cinco cortes (o, el último mes,
+ * la membresía de dos cortes al mes) y sus siguientes visitas se descuentan de él
+ * (ADR 0091). Además, cada apartado tiene datos ({@see ApartadosDemo}): tareas, notas,
+ * expedientes, preferencias de corte, promociones, lealtad, comunicaciones, facturas,
+ * una devolución y una solicitud de privacidad.
  */
 final class DemoBarberia extends DemoBase
 {
+    use ApartadosDemo;
+
     /** clave => [nombre, actividad, minutos, precio (centavos), descripción] */
     private const SERVICIOS = [
         'corte' => ['Corte de cabello', 'Cortes', 30, 25000, 'Corte a tijera o máquina, lavado y peinado. Incluye asesoría de estilo.'],
@@ -99,7 +122,10 @@ final class DemoBarberia extends DemoBase
      * Clientes con su costumbre: persona, barbero, servicio, cada cuántos días, franja
      * preferida, próxima visita y desde/hasta cuándo viene.
      *
-     * @var list<array{persona: PersonaTenant, barbero: int, servicio: string, cada: int, franja: string, proxima: CarbonImmutable, deja: CarbonImmutable|null}>
+     * Con `bono`, sus cortes se descuentan de su bono o membresía; con `quiereBono`,
+     * compra uno en caja en alguna visita.
+     *
+     * @var list<array{persona: PersonaTenant, barbero: int, servicio: string, cada: int, franja: string, proxima: CarbonImmutable, deja: CarbonImmutable|null, bono: bool, quiereBono: bool}>
      */
     private array $clientes = [];
 
@@ -108,6 +134,11 @@ final class DemoBarberia extends DemoBase
 
     /** @var list<ArticuloTenant> */
     private array $articulos = [];
+
+    /** El bono de cinco cortes y la membresía de dos cortes al mes (ADR 0091). */
+    private ProductoTenant $bono;
+
+    private ProductoTenant $membresia;
 
     protected function datos(): array
     {
@@ -152,6 +183,7 @@ final class DemoBarberia extends DemoBase
             $this->unDia($dia);
         }
         $this->proximasSemanas();
+        $this->apartados();
     }
 
     // ---------------------------------------------------------------- estructura
@@ -206,6 +238,16 @@ final class DemoBarberia extends DemoBase
         ];
 
         // Nómina: por cliente atendido (lo usual en barbería).
+        // Las sillas de cada sede.
+        foreach (['roma' => 3, 'valle' => 3] as $sede => $sillas) {
+            for ($n = 1; $n <= $sillas; $n++) {
+                RecursoTenant::query()->create([
+                    'sucursal_id' => $this->sedes[$sede]->getKey(), 'nombre' => "Silla {$n}", 'tipo' => 'Silla',
+                    'modo' => ModoRecurso::Unidad->value, 'capacidad' => 1, 'activo' => true,
+                ]);
+            }
+        }
+
         foreach (['tono' => 12000, 'memo' => 12000, 'ivan' => 11000, 'chava' => 11000] as $clave => $monto) {
             EsquemaPagoTenant::query()->create([
                 'usuario_id' => $this->equipo[$clave]->getKey(), 'tipo' => TipoPago::PorAsistente->value,
@@ -227,6 +269,24 @@ final class DemoBarberia extends DemoBase
                 'precio_clase_minor' => $precio, 'duracion_minutos' => $minutos,
             ]);
         }
+
+        // El corte que se toma con bono o membresía: sin precio, se descuenta de su saldo.
+        $this->servicios['corte_bono'] = $actividades['Cortes']->ofertas()->create([
+            'nombre' => 'Corte con bono', 'descripcion' => 'Corte de cabello que se descuenta de tu bono o de tu membresía.',
+            'modalidad' => ModalidadOfertaTenant::Individual->value, 'capacidad' => 1,
+            'politica_reserva' => PoliticaReservaTenant::Entitlement->value, 'duracion_minutos' => 30,
+        ]);
+        // «Corte y barba» es un combo: incluye los dos servicios en la misma visita.
+        $this->servicios['corte_barba']->incluidas()->sync([
+            $this->servicios['corte']->getKey() => ['posicion' => 1],
+            $this->servicios['barba']->getKey() => ['posicion' => 2],
+        ]);
+        $membresias = app(MembresiasTenant::class);
+        $conBono = [(int) $this->servicios['corte_bono']->getKey()];
+        $this->bono = $membresias->crearProducto('Bono 5 cortes', TipoProducto::Paquete, 110000, 'MXN', false, 5000,
+            vigencia: new VigenciaProducto(TipoVigencia::Meses, 4), ofertaIds: $conBono);
+        $this->membresia = $membresias->crearProducto('Membresía La Navaja', TipoProducto::Membresia, 45000, 'MXN', false, 2000,
+            vigencia: new VigenciaProducto(TipoVigencia::Meses, 1), ofertaIds: $conBono);
     }
 
     private function horarios(): void
@@ -315,22 +375,28 @@ final class DemoBarberia extends DemoBase
             $clave = (string) $this->elegir($barberos);
             $barbero = (int) $this->equipo[$clave]->getKey();
             $sede = in_array($clave, ['ivan', 'chava'], true) ? 'valle' : 'roma';
-            $persona = $this->persona($nombre, $this->uno(NombresDemo::APELLIDOS), $this->uno(NombresDemo::APELLIDOS), $alta, (int) $this->sedes[$sede]->getKey(), $this->prob(65));
+            $persona = $this->persona($nombre, $this->uno(NombresDemo::APELLIDOS), $this->uno(NombresDemo::APELLIDOS), $alta, (int) $this->sedes[$sede]->getKey(), $this->prob(65), ['genero' => $esMujer ? 'mujer' : 'hombre']);
             $cada = $this->azar(14, 35);
+            $servicio = (string) $this->elegir($esMujer ? ['corte' => 100] : ['corte' => 52, 'corte_barba' => 26, 'barba' => 10, 'afeitado' => 5, 'infantil' => 7]);
             $this->clientes[] = [
                 'persona' => $persona,
                 'barbero' => $barbero,
-                'servicio' => (string) $this->elegir($esMujer ? ['corte' => 100] : ['corte' => 52, 'corte_barba' => 26, 'barba' => 10, 'afeitado' => 5, 'infantil' => 7]),
+                'servicio' => $servicio,
                 'cada' => $cada,
                 'franja' => (string) $this->elegir(['manana' => 30, 'tarde' => 30, 'noche' => 40]),
                 'proxima' => $antiguo ? $this->inicio->addDays($this->azar(0, $cada)) : $alta->startOfDay(),
                 'deja' => $this->prob(14) ? $this->inicio->addDays($this->azar(15, $dias + 30)) : null,
+                'bono' => false,
+                // Quien viene seguido por un corte suele comprar el bono.
+                'quiereBono' => $servicio === 'corte' && $this->prob($cada <= 21 ? 40 : 12),
             ];
         }
 
         // Un cliente con cuenta para revisar «Mi cuenta».
         $jorge = $this->clientes[0]['persona'];
-        $jorge->update(['nombre' => 'Jorge', 'primer_apellido' => 'Pineda', 'segundo_apellido' => 'Luna', 'email' => 'jorge.pineda@correo.test']);
+        $jorge->update(['nombre' => 'Jorge', 'primer_apellido' => 'Pineda', 'segundo_apellido' => 'Luna', 'email' => 'jorge.pineda@correo.test', 'genero' => 'hombre']);
+        // Viene por su corte cada dos semanas y en su primera visita compra el bono.
+        $this->clientes[0] = [...$this->clientes[0], 'servicio' => 'corte', 'cada' => 14, 'proxima' => $this->inicio, 'quiereBono' => true, 'deja' => null];
         $cuenta = $this->usuario('jorge.pineda@correo.test', 'Jorge', 'Pineda', ['miembro']);
         $jorge->update(['usuario_id' => $cuenta->getKey()]);
     }
@@ -362,7 +428,7 @@ final class DemoBarberia extends DemoBase
 
                 continue;
             }
-            $reserva = $this->agendarVisita($dia, $c);
+            $reserva = $this->agendarVisita($dia, $i);
             if ($reserva instanceof ReservaTenant) {
                 $citas[] = [$reserva, $i];
                 $this->clientes[$i]['proxima'] = $dia->addDays($c['cada'] + $this->azar(-3, 4));
@@ -403,13 +469,14 @@ final class DemoBarberia extends DemoBase
     /**
      * Agenda la visita de un cliente con su barbero (o con otro si el suyo no trabaja
      * ese día), en su franja preferida si se puede. Casi siempre la agendan con días
-     * de anticipación (por WhatsApp o en recepción).
-     *
-     * @param  array{persona: PersonaTenant, barbero: int, servicio: string, cada: int, franja: string, proxima: CarbonImmutable, deja: CarbonImmutable|null}  $c
+     * de anticipación (por WhatsApp o en recepción). Con bono, el corte se descuenta de
+     * él; si ya no le quedan cortes, paga este y quizá compre otro bono al terminar.
      */
-    private function agendarVisita(CarbonImmutable $dia, array $c): ?ReservaTenant
+    private function agendarVisita(CarbonImmutable $dia, int $i): ?ReservaTenant
     {
-        $servicio = $this->servicios[$c['servicio']];
+        $c = $this->clientes[$i];
+        $conBono = $c['bono'] && $c['servicio'] === 'corte';
+        $servicio = $this->servicios[$conBono ? 'corte_bono' : $c['servicio']];
         $barberos = [$c['barbero'], ...array_values(array_diff(array_keys($this->turnos), [$c['barbero']]))];
         if ($this->prob(15)) {
             $barberos = $this->mezclar($barberos);
@@ -423,7 +490,15 @@ final class DemoBarberia extends DemoBase
                 if ($alta->greaterThan($momento)) {
                     $this->en($alta->addMinutes(2));
                 }
-                $reserva = $this->agendar($servicio, $sede, $c['persona'], $barbero, $dia, $minuto);
+                try {
+                    $reserva = $this->agendar($servicio, $sede, $c['persona'], $barbero, $dia, $minuto, $conBono);
+                } catch (SinDerechoDisponible) {
+                    // Se le acabó (o venció) el bono: esta vez paga el corte.
+                    $this->clientes[$i]['bono'] = false;
+                    $conBono = false;
+                    $servicio = $this->servicios[$c['servicio']];
+                    $reserva = $this->agendar($servicio, $sede, $c['persona'], $barbero, $dia, $minuto);
+                }
                 if ($reserva instanceof ReservaTenant) {
                     if ($c['servicio'] === 'infantil') {
                         $reserva->update(['asiste' => $this->uno(['Mateo', 'Santiago', 'Leonardo', 'Emiliano', 'Diego']).' (su hijo)']);
@@ -451,7 +526,7 @@ final class DemoBarberia extends DemoBase
                     continue;
                 }
                 $alta = $llega->subMinutes(2);
-                $persona = $this->persona($this->uno(NombresDemo::HOMBRES), $this->uno(NombresDemo::APELLIDOS), $this->uno(NombresDemo::APELLIDOS), $alta, (int) $sede->getKey(), $this->prob(30), ['como_nos_conocio' => 'paso_por_aqui']);
+                $persona = $this->persona($this->uno(NombresDemo::HOMBRES), $this->uno(NombresDemo::APELLIDOS), $this->uno(NombresDemo::APELLIDOS), $alta, (int) $sede->getKey(), $this->prob(30), ['como_nos_conocio' => 'paso_por_aqui', 'genero' => 'hombre']);
                 $this->reloj($dia, $llega->format('H:i'));
                 $reserva = $this->agendar($servicio, $sede, $persona, $barbero, $dia, $minuto);
                 if ($reserva instanceof ReservaTenant) {
@@ -459,7 +534,7 @@ final class DemoBarberia extends DemoBase
                     if ($this->prob(45)) {
                         $this->clientes[] = [
                             'persona' => $persona, 'barbero' => $barbero, 'servicio' => 'corte', 'cada' => $this->azar(18, 35),
-                            'franja' => 'tarde', 'proxima' => $dia->addDays($this->azar(18, 35)), 'deja' => null,
+                            'franja' => 'tarde', 'proxima' => $dia->addDays($this->azar(18, 35)), 'deja' => null, 'bono' => false, 'quiereBono' => false,
                         ];
                     }
 
@@ -520,11 +595,18 @@ final class DemoBarberia extends DemoBase
         return false;
     }
 
-    private function agendar(OfertaTenant $servicio, SucursalTenant $sede, PersonaTenant $persona, int $barbero, CarbonImmutable $dia, int $minuto): ?ReservaTenant
+    /** Con `$conBono`, avisa (excepción) si ya no le quedan cortes en su bono. */
+    private function agendar(OfertaTenant $servicio, SucursalTenant $sede, PersonaTenant $persona, int $barbero, CarbonImmutable $dia, int $minuto, bool $conBono = false): ?ReservaTenant
     {
         $inicia = $dia->startOfDay()->addMinutes($minuto);
         try {
             $reserva = app(AgendarCitaTenant::class)->agendar($servicio, $sede, $persona, $barbero, $inicia->utc(), (int) $servicio->duracion_minutos, porNegocio: true);
+        } catch (SinDerechoDisponible $e) {
+            if ($conBono) {
+                throw $e;
+            }
+
+            return null;
         } catch (RuntimeException|ValidationException) {
             return null;
         }
@@ -598,7 +680,7 @@ final class DemoBarberia extends DemoBase
     private function atenderYCobrar(CarbonImmutable $dia, array $citas, bool $esHoy): void
     {
         $ahora = $this->ahora;
-        foreach ($citas as [$reserva]) {
+        foreach ($citas as [$reserva, $cliente]) {
             $sesion = $reserva->sesion()->first();
             if ($sesion === null) {
                 continue;
@@ -637,7 +719,28 @@ final class DemoBarberia extends DemoBase
                 ]);
                 $this->sumar('reseñas');
             }
+            if ($cliente !== null && $this->clientes[$cliente]['quiereBono'] && ! $this->clientes[$cliente]['bono'] && $this->prob($cliente === 0 ? 100 : 35)) {
+                $this->venderBono($cliente, $dia, $cajero, $sesion->sucursal_id);
+            }
         }
+    }
+
+    /**
+     * Al pagar su corte compra el bono de cinco cortes (o, el último mes, la
+     * membresía): sus siguientes cortes se descuentan de él.
+     */
+    private function venderBono(int $cliente, CarbonImmutable $dia, Usuario $cajero, ?int $sucursalId): void
+    {
+        $producto = $dia->greaterThanOrEqualTo($this->hoy->subDays(30)) && $this->prob(40) ? $this->membresia : $this->bono;
+        try {
+            $ordenes = app(OrdenesTenant::class);
+            $orden = $ordenes->crear($this->clientes[$cliente]['persona'], [['producto' => $producto, 'cantidad' => 1]], sucursalId: $sucursalId);
+            $ordenes->liquidar($orden, (string) $this->elegir(['efectivo' => 40, 'manual' => 45, 'transferencia' => 15]), null, $cajero);
+        } catch (RuntimeException|ValidationException) {
+            return;
+        }
+        $this->clientes[$cliente]['bono'] = true;
+        $this->sumar($producto === $this->bono ? 'bonos vendidos' : 'membresías vendidas');
     }
 
     /** Quién cobra: recepción en Roma (lun a sáb), caja en Del Valle (mar a sáb); si no, el barbero. */
@@ -703,10 +806,17 @@ final class DemoBarberia extends DemoBase
                     || ($c['deja'] instanceof CarbonImmutable && $dia->greaterThan($c['deja'])) || ! $this->prob($yaAgendan)) {
                     continue;
                 }
-                $servicio = $this->servicios[$c['servicio']];
+                $conBono = $c['bono'] && $c['servicio'] === 'corte';
+                $servicio = $this->servicios[$conBono ? 'corte_bono' : $c['servicio']];
                 foreach ($this->huecos($c['barbero'], $dia, (int) $servicio->duracion_minutos, $c['franja']) as [$sede, $minuto]) {
                     $this->hace(20, 4 * 24 * 60, $c['persona']->created_at);
-                    if ($this->agendar($servicio, $sede, $c['persona'], $c['barbero'], $dia, $minuto) instanceof ReservaTenant) {
+                    try {
+                        $reserva = $this->agendar($servicio, $sede, $c['persona'], $c['barbero'], $dia, $minuto, $conBono);
+                    } catch (SinDerechoDisponible) {
+                        // Ya no le quedan cortes: esa la paga.
+                        $reserva = $this->agendar($this->servicios[$c['servicio']], $sede, $c['persona'], $c['barbero'], $dia, $minuto);
+                    }
+                    if ($reserva instanceof ReservaTenant) {
                         $this->clientes[$i]['proxima'] = $dia->addDays($c['cada']);
                         break;
                     }
@@ -720,5 +830,87 @@ final class DemoBarberia extends DemoBase
         [$h, $m] = array_map('intval', explode(':', $hhmm));
 
         return $h * 60 + $m;
+    }
+
+    // ---------------------------------------------------------------- apartados
+
+    /** Cada apartado con datos: tareas, notas, expedientes, promociones, lealtad… */
+    private function apartados(): void
+    {
+        $e = $this->equipo;
+        $habitual = $this->clientes[3]['persona'];
+        $this->tareasDelEquipo([
+            ['Pedir navajas y talco al proveedor', 'Quedan dos cajas de navajas en Roma Norte.', 1, $e['karla'], false],
+            ['Afilar y desinfectar tijeras', null, -1, $e['tono'], false],
+            ['Confirmar por WhatsApp las citas del sábado', null, 2, $e['lupita'], false],
+            ['Revisar la cafetera de Del Valle', 'Hace ruido al moler.', 4, $e['daniel'], false],
+            ["Llamar a {$habitual->nombre} para su siguiente corte", 'Ya pasó su tiempo de siempre.', 0, $e['lupita'], false, $habitual],
+            ['Publicar fotos de los cortes de la semana', null, -2, $e['karla'], true],
+            ['Corte de caja de Roma Norte', null, -1, $e['lupita'], true],
+            ['Contar pomadas y ceras', null, -5, $e['daniel'], true],
+        ], $e['karla']);
+
+        $this->notasEnFichas([
+            'Degradado bajo con raya marcada.',
+            'Piel sensible: no usar after shave con alcohol.',
+            'Siempre pide con Toño.',
+            'Trae a su hijo cada mes; agendar juntos.',
+            'Paga con transferencia.',
+            'Llega 10 minutos antes: ofrecerle café.',
+            'Barba de candado, perfilar con navaja.',
+            'No le gusta la cera; usar pomada mate.',
+            'Pidió factura a nombre de su empresa.',
+            'Prefiere los sábados temprano.',
+        ], [$e['lupita'], $e['karla'], $e['tono'], $e['ivan']]);
+
+        $this->expedientes(
+            [['Autorización del tutor', 'Para cortes de menores que vienen sin su mamá o papá.', false], ['Identificación oficial', 'Para facturas y bonos a nombre de una empresa.', false]],
+            ['fotos', 'Fotos de tu corte en redes', "Autorizo que Barbería La Navaja tome fotos de mi corte y las publique en sus redes sociales, sin mostrar mi nombre.\n\nPuedo retirar este permiso cuando quiera."],
+            $e['karla'], 12, 35,
+        );
+
+        $this->formularioConRespuestas('Preferencias de corte', 'Para que tu barbero sepa cómo te gusta.', [
+            ['¿Cómo te gusta el degradado?', TipoCampo::Seleccion, true, ['Bajo', 'Medio', 'Alto', 'Sin degradado']],
+            ['Tipo de cabello', TipoCampo::Seleccion, false, ['Lacio', 'Ondulado', 'Rizado']],
+            ['¿Te arreglas la barba con nosotros?', TipoCampo::Booleano, false],
+            ['Alergias o piel sensible', TipoCampo::Texto, false, ['Piel sensible al alcohol.', 'Alergia a la lavanda.', 'Ninguna.']],
+            ['¿Qué te ofrecemos mientras esperas?', TipoCampo::Seleccion, false, ['Café', 'Agua', 'Cerveza', 'Nada, gracias']],
+        ], 60);
+
+        $this->promociones([
+            ['PRIMERCORTE', 'Tu primer corte con 20 % de descuento', TipoPromocion::Porcentaje, 2000, null, null, 23, null, true],
+            ['NAVAJA50', '$50 menos en corte y barba', TipoPromocion::MontoFijo, 5000, 38000, 100, 17, 30, true],
+            ['REFERIDO15', 'Si vienes recomendado, 15 % en tu corte', TipoPromocion::Porcentaje, 1500, null, null, 11, null, true],
+            ['BUENFIN', 'Buen Fin', TipoPromocion::Porcentaje, 2500, null, 80, 52, -320, false],
+        ]);
+
+        $this->lealtad(0, 1, [
+            ['Arreglo de barba gratis', 'En tu siguiente visita.', 1800],
+            ['Corte gratis', 'Con tu barbero de siempre.', 2500],
+            ['Pomada mate La Navaja', 'Para llevar.', 3000],
+        ], $e['lupita']);
+
+        $this->comunicaciones([
+            [52, SegmentoComunicacion::Todos, CanalComunicacion::Email, 'Ahora también abrimos domingo en Roma Norte', "Hola {{persona_nombre}}:\n\nDesde este domingo abrimos en Roma Norte de 10 a 15 h. Agenda tu cita por WhatsApp o en línea."],
+            [30, SegmentoComunicacion::Primerizos, CanalComunicacion::Email, 'Gracias por tu primera visita', "Hola {{persona_nombre}}:\n\nGracias por venir a La Navaja. Con el Bono 5 cortes ahorras $150 y tu barbero te aparta tu horario."],
+            [6, SegmentoComunicacion::Todos, CanalComunicacion::Interno, 'Horario de días festivos', 'El 2 de noviembre cerramos. El resto de la semana, horario normal.'],
+        ], [
+            ['Devolución de un pago', EventoAutomatizacion::PagoReembolsado, 'Confirmar con {{persona_nombre}} que recibió su devolución', null, 1440],
+            ['Factura emitida', EventoAutomatizacion::FacturaTimbrada, 'Enviar la factura a {{persona_nombre}}', 'Por correo o WhatsApp.', 0],
+        ]);
+
+        // Datos fiscales de prueba del SAT (no son de un negocio real).
+        $this->facturas(['BARBERIA LA NAVAJA DEMO', 'EKU9003173C9', '601', '26015'], 8, '86121600');
+
+        $pago = PagoTenant::query()->where('estado', EstadoPago::Aprobado->value)->orderByDesc('id')->skip(12)->first();
+        $this->devolucion($pago, $pago === null ? null : intdiv((int) $pago->monto_minor, 2), 'No quedó conforme con el corte: se le devolvió la mitad.', $e['karla']);
+
+        foreach ($this->clientes as $c) {
+            if ($c['deja'] instanceof CarbonImmutable && $c['deja']->lessThan($this->hoy) && $c['persona']->usuario_id === null && $c['persona']->email !== null) {
+                $this->solicitudDePrivacidad($c['persona'], 'Me cambié de ciudad. Por favor borren mis datos.');
+                break;
+            }
+        }
+        $this->llaveDeApi('Contabilidad (cobros)', ['ordenes.ver']);
     }
 }

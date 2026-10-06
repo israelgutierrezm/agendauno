@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Console\Commands\Demos\DemoGrecon;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
@@ -105,7 +106,24 @@ it('siembra Grecon en «demo» con su agenda de octubre, sus planes y 80 miembro
         $cortos = DB::connection('tenant')->table('derechos')->whereNotNull('acuerdo_id')->get(['valido_desde', 'valido_hasta'])
             ->filter(fn (object $d): bool => CarbonImmutable::parse($d->valido_desde)->diffInDays(CarbonImmutable::parse($d->valido_hasta)) < 7);
         expect($cortos)->toHaveCount(0);
+
+        // Cada apartado tiene datos (lo que el documento no da es inventado), y cada
+        // miembro su género para nombrarla Alumna o Alumno.
+        foreach ([
+            'articulos', 'ventas_pos', 'esquemas_pago', 'niveles', 'recursos', 'roles', 'tareas', 'notas_persona',
+            'tipos_documento', 'documentos', 'aceptaciones_waiver', 'formularios', 'respuestas_formulario', 'promociones',
+            'recompensas_lealtad', 'movimientos_puntos', 'difusiones', 'mensajes', 'reglas_automatizacion', 'facturas', 'accesos',
+        ] as $tabla) {
+            expect(DB::connection('tenant')->table($tabla)->count())->toBeGreaterThan(0, "Sin datos en {$tabla}");
+        }
+        expect(PersonaTenant::query()->whereNull('genero')->count())->toBe(0)
+            ->and(DB::connection('tenant')->table('mensajes')->where('estado', 'encolado')->count())->toBe(0);
     });
+
+    // Lo que paga a la plataforma: el mes ya cerrado, medido y pagado (sin tarifas en
+    // las pruebas, queda sin cargo); ninguno se queda pendiente.
+    $cargo = CargoRenta::query()->where('estudio_id', Estudio::query()->where('slug', 'demo')->value('id'))->where('periodo', '2026-09')->first();
+    expect($cargo?->estado->value)->toBeIn(['pagado', 'sin_cargo']);
 
     $this->postJson('/api/v1/app/demo/login', ['email' => 'admin@grecon.test', 'password' => 'password'])
         ->assertOk()->assertJsonStructure(['data' => ['token']]);
