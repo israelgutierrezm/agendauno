@@ -12,6 +12,7 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -216,7 +217,14 @@ onMounted(cargar);
   <section class="tu-pagina">
     <EncabezadoSeccion
       :titulo="$t('resenas.titulo')"
-      :subtitulo="$t('listadosVisual.resenas.subtitulo')"
+      :subtitulo="
+        sesion.esCitas
+          ? $t('listadosVisual.resenas.subtitulo')
+          : $t('listadosVisual.resenas.subtituloClases', {
+              miembros: plural(sesion.terminologia.miembro).toLowerCase(),
+              instructor: sesion.terminologia.instructor.toLowerCase(),
+            })
+      "
     />
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">

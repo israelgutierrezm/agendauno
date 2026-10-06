@@ -5,6 +5,7 @@ import { RouterLink, useRoute } from "vue-router";
 
 import IconoNav from "@/components/IconoNav.vue";
 import {
+  claveSegunModalidad,
   CATEGORIAS_CONFIGURACION,
   destinoDe,
   coincideBusqueda,
@@ -26,7 +27,10 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * formulario cómodo), la navegación se abre con «Secciones de configuración» en un
  * panel dentro de la página, que no se encima con el menú principal.
  */
-const { t } = useI18n();
+const { t, te } = useI18n();
+// Con clases no se habla de «servicios»: cada texto, el del tipo de negocio.
+const tm = (clave: string): string =>
+  t(claveSegunModalidad(clave, sesion.esCitas, te));
 const route = useRoute();
 const sesion = useSesionTenantStore();
 
@@ -73,7 +77,7 @@ const resultados = computed(() => {
   return categorias.value.flatMap((c) =>
     c.opciones
       .filter((op) =>
-        [t(op.etiqueta), t(c.etiqueta), ...op.sinonimos].some((texto) =>
+        [tm(op.etiqueta), tm(c.etiqueta), ...op.sinonimos].some((texto) =>
           coincideBusqueda(texto, q),
         ),
       )
@@ -125,9 +129,9 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
             class="lc-resultado"
             @click="alNavegar"
           >
-            <span class="block font-medium">{{ t(r.opcion.etiqueta) }}</span>
+            <span class="block font-medium">{{ tm(r.opcion.etiqueta) }}</span>
             <span class="block text-xs lc-suave">{{
-              t(r.categoria.etiqueta)
+              tm(r.categoria.etiqueta)
             }}</span>
           </RouterLink>
         </template>
@@ -140,7 +144,7 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
               @click="alternar(c.clave)"
             >
               <IconoNav :nombre="c.icono" :tam="18" class="shrink-0" />
-              <span class="flex-1 text-left">{{ t(c.etiqueta) }}</span>
+              <span class="flex-1 text-left">{{ tm(c.etiqueta) }}</span>
               <IconoNav
                 nombre="chevron"
                 :tam="14"
@@ -158,7 +162,7 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
                   :class="{ 'lc-opcion-activa': esActiva(op) }"
                   :aria-current="esActiva(op) ? 'page' : undefined"
                   @click="alNavegar"
-                  >{{ t(op.etiqueta) }}</RouterLink
+                  >{{ tm(op.etiqueta) }}</RouterLink
                 >
               </li>
             </ul>
@@ -208,9 +212,9 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
             class="lc-resultado"
             @click="alNavegar"
           >
-            <span class="block font-medium">{{ t(r.opcion.etiqueta) }}</span>
+            <span class="block font-medium">{{ tm(r.opcion.etiqueta) }}</span>
             <span class="block text-xs lc-suave">{{
-              t(r.categoria.etiqueta)
+              tm(r.categoria.etiqueta)
             }}</span>
           </RouterLink>
         </template>
@@ -218,7 +222,7 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
           <div v-for="c in categorias" :key="c.clave">
             <p class="lc-panel-titulo">
               <IconoNav :nombre="c.icono" :tam="16" />
-              {{ t(c.etiqueta) }}
+              {{ tm(c.etiqueta) }}
             </p>
             <RouterLink
               v-for="op in c.opciones"
@@ -230,7 +234,7 @@ const esActiva = (op: OpcionConfiguracion): boolean =>
               :class="{ 'lc-opcion-activa': esActiva(op) }"
               :aria-current="esActiva(op) ? 'page' : undefined"
               @click="alNavegar"
-              >{{ t(op.etiqueta) }}</RouterLink
+              >{{ tm(op.etiqueta) }}</RouterLink
             >
           </div>
         </div>

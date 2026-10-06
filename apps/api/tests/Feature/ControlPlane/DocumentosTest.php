@@ -77,3 +77,25 @@ it('rechazar un documento guarda el motivo', function (): void {
         ->assertJsonPath('data.estado', 'rechazado')
         ->assertJsonPath('data.motivo', 'ilegible');
 });
+
+it('el listado se pagina: los anteriores siguen a la mano en la página siguiente', function (): void {
+    Storage::fake('local');
+    $a = estudioConSesion('estudio-a', 'a@correo.mx');
+    $persona = (string) $this->postJson("/api/v1/app/{$a['slug']}/miembros", ['nombre' => 'Rosa'], conBearer($a['bearer']))
+        ->assertCreated()->json('data.id');
+    $subidos = [];
+    foreach (['uno', 'dos', 'tres'] as $nombre) {
+        $subidos[] = (string) $this->post("/api/v1/app/{$a['slug']}/documentos", [
+            'persona_id' => $persona, 'nombre' => $nombre, 'archivo' => UploadedFile::fake()->image("{$nombre}.jpg"),
+        ], [...conBearer($a['bearer']), 'Accept' => 'application/json'])->assertCreated()->json('data.id');
+    }
+
+    $primera = $this->getJson("/api/v1/app/{$a['slug']}/documentos?per_page=2", conBearer($a['bearer']))->assertOk();
+    $primera->assertJsonCount(2, 'data')
+        ->assertJsonPath('meta.total', 3)
+        ->assertJsonPath('meta.ultima_pagina', 2);
+    // El más antiguo no se pierde: está en la segunda página.
+    $this->getJson("/api/v1/app/{$a['slug']}/documentos?per_page=2&page=2", conBearer($a['bearer']))->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $subidos[0]);
+});

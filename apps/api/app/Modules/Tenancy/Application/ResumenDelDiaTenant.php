@@ -24,8 +24,9 @@ use Carbon\CarbonImmutable;
  * El Inicio del negocio: el día de hoy de un vistazo, para quien atiende o dirige.
  * Responde lo que pregunta cada tipo de negocio (ADR 0091):
  *
- * - citas: quién viene después, quién ya llegó, qué citas faltan por atender, cuáles
- *   faltan por cobrar y dónde hay espacios libres (`libres`, por profesional);
+ * - citas: quién viene después, quién ya llegó, qué citas faltan por atender (aún no
+ *   terminan), cuáles terminaron sin registrar la llegada, cuáles faltan por cobrar y
+ *   dónde hay espacios libres (`libres`, por profesional);
  * - clases: qué clases hay, cuántos lugares están ocupados, qué listas faltan por
  *   registrar, quién está en espera y qué planes están por vencer.
  *
@@ -132,7 +133,8 @@ class ResumenDelDiaTenant
             'sesiones' => 0, 'esperados' => 0, 'llegaron' => 0, 'sin_marcar' => 0,
             // Lugares de las clases con cupo, listas por registrar y lista de espera.
             'capacidad' => 0, 'listas_pendientes' => 0, 'en_espera' => 0,
-            // Citas sin registro (por llegar o ya pasadas sin registrar) y por cobrar.
+            // Lo que falta atender (aún no termina y nadie registró la llegada) y lo
+            // que falta cobrar.
             'por_atender' => 0, 'por_cobrar' => 0,
             // Cada cita en un solo estado: el paso del tiempo no sustituye el registro.
             'por_llegar' => 0, 'en_atencion' => 0, 'pendientes_registrar' => 0,
@@ -178,6 +180,8 @@ class ResumenDelDiaTenant
                 'instructor' => $s->instructor?->name,
                 'sucursal' => $s->sucursal?->nombre,
                 'cliente' => $titular?->persona?->nombreCompleto(),
+                // Cita: si llegó o no vino (null = sin registro). Clases: null.
+                'asistencia' => $titular?->asistencia?->estado?->value,
                 'por_cobrar' => $porCobrar,
                 'en_espera' => $enEspera,
                 'inicia_en' => $s->inicia_en->toIso8601String(),
@@ -192,9 +196,10 @@ class ResumenDelDiaTenant
             ];
         }
 
-        // Citas por atender: las que no tienen registro, hayan pasado o no (como en
-        // Recepción); las ya pasadas sin registrar también están en `pendientes_registrar`.
-        $totales['por_atender'] += $totales['por_llegar'] + $totales['pendientes_registrar'];
+        // Citas por atender: las que aún no terminan y no tienen registro. Las que ya
+        // terminaron sin registrar la llegada NO se atienden: les falta el registro
+        // (`pendientes_registrar`), como en Recepción.
+        $totales['por_atender'] += $totales['por_llegar'];
 
         // La lista se corta (a lo más LIMITE_SESIONES); los totales son de todo el día.
         return [

@@ -74,6 +74,7 @@ class AgendaHoy {
     this.listasPendientes = 0,
     this.enEspera = 0,
     this.porAtender = 0,
+    this.sinRegistrar = 0,
     this.porCobrar = 0,
   });
 
@@ -89,6 +90,7 @@ class AgendaHoy {
       listasPendientes: n('listas_pendientes'),
       enEspera: n('en_espera'),
       porAtender: n('por_atender'),
+      sinRegistrar: n('pendientes_registrar'),
       porCobrar: n('por_cobrar'),
       lista: ((j['sesiones'] ?? const []) as List)
           .whereType<Map<String, dynamic>>()
@@ -109,8 +111,10 @@ class AgendaHoy {
   final int listasPendientes;
   final int enEspera;
 
-  /// Citas: las que aún no terminan con alguien por llegar, y las por cobrar.
+  /// Citas: las que aún no terminan con alguien por llegar, las que terminaron sin
+  /// registrar si vino (no son atención pendiente) y las por cobrar.
   final int porAtender;
+  final int sinRegistrar;
   final int porCobrar;
 
   /// Lo que está en curso, si hay.

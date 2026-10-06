@@ -10,6 +10,7 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { hoyEnNegocio, inicioDeMesEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const { t } = useI18n();
@@ -178,17 +179,13 @@ interface Cohortes {
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
-function iso(d: Date): string {
-  const p = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
+// El mes en curso y «hoy» del negocio (su zona horaria), no del navegador.
 function inicioMes(): string {
-  const d = new Date();
-  return iso(new Date(d.getFullYear(), d.getMonth(), 1));
+  return inicioDeMesEnNegocio(sesion.zonaHoraria);
 }
 
 const desde = ref(inicioMes());
-const hasta = ref(iso(new Date()));
+const hasta = ref(hoyEnNegocio(sesion.zonaHoraria));
 const negocio = ref<Negocio | null>(null);
 const sucursales = ref<SucursalReporte[]>([]);
 const sinSucursal = ref(0);
@@ -230,19 +227,35 @@ const metrica = ref<"neto" | "ventas">("neto");
 function valorDe(p: PuntoSerie): number {
   return metrica.value === "neto" ? p.neto_minor : p.ventas_minor;
 }
-// Altura de cada barra (0..100%) relativa al máximo de la serie (sin negativos).
-const maxSerie = computed(() =>
-  Math.max(1, ...(tendencias.value?.serie.map((p) => valorDe(p)) ?? [0])),
+// Escala de la gráfica: lo positivo arriba de la línea del cero y lo negativo (un
+// neto con más devoluciones que cobros) debajo, cada parte en su proporción.
+const escala = computed(() => {
+  const valores = tendencias.value?.serie.map((p) => valorDe(p)) ?? [];
+  const arriba = Math.max(0, ...valores);
+  const abajo = Math.max(0, ...valores.map((v) => -v));
+  return { arriba, abajo, total: arriba + abajo || 1 };
+});
+const zonaArriba = computed(
+  () => `${(escala.value.arriba / escala.value.total) * 100}%`,
+);
+const zonaAbajo = computed(
+  () => `${(escala.value.abajo / escala.value.total) * 100}%`,
 );
 function barra(p: PuntoSerie): string {
-  return `${Math.round((Math.max(0, valorDe(p)) / maxSerie.value) * 100)}%`;
+  const v = valorDe(p);
+  const zona = v >= 0 ? escala.value.arriba : escala.value.abajo;
+  return zona > 0 ? `${(Math.abs(v) / zona) * 100}%` : "0";
 }
+// Sin ningún movimiento: ni ventas, ni cobros, ni devoluciones, ni otras monedas.
+// Un periodo solo con devoluciones SÍ tiene algo que mostrar (y exportar).
 const serieVacia = computed(
   () =>
     tendencias.value === null ||
-    tendencias.value.serie.every(
-      (p) => p.ventas_minor === 0 && p.cobrado_minor === 0,
-    ),
+    (tendencias.value.serie.every(
+      (p) =>
+        p.ventas_minor === 0 && p.cobrado_minor === 0 && p.devuelto_minor === 0,
+    ) &&
+      tendencias.value.otras_monedas.length === 0),
 );
 function fechaBucket(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
@@ -531,7 +544,7 @@ const periodoTexto = computed(() => {
 
 function esteMes(): void {
   desde.value = inicioMes();
-  hasta.value = iso(new Date());
+  hasta.value = hoyEnNegocio(sesion.zonaHoraria);
 }
 
 watch([desde, hasta], () => {
@@ -671,6 +684,7 @@ onMounted(cargar);
               class="tu-btn tu-btn-fantasma"
               type="button"
               :disabled="exportando || !tendencias || serieVacia"
+              data-prueba="exportar-tendencias"
               @click="exportarTendencias"
             >
               {{
@@ -787,21 +801,42 @@ onMounted(cargar);
               {{ $t("reportes.tendencias.vacio") }}
             </p>
             <template v-else>
+              <!-- Cada barra desde la línea del cero: arriba lo positivo, abajo
+                   (en rojo) un neto negativo. -->
               <div
-                class="mt-4 flex items-end gap-1 h-40 border-b"
-                :style="{ borderColor: 'var(--borde)' }"
+                class="rt-grafica mt-4 h-40"
+                data-prueba="tendencias-grafica"
               >
+                <span
+                  class="rt-cero"
+                  :style="{ top: zonaArriba }"
+                  aria-hidden="true"
+                ></span>
                 <div
                   v-for="p in tendencias.serie"
                   :key="p.fecha"
-                  class="flex-1 min-w-[2px] rounded-t transition-all"
-                  :style="{
-                    height: barra(p),
-                    background: 'var(--primario)',
-                    minHeight: valorDe(p) > 0 ? '3px' : '0',
-                  }"
+                  class="rt-columna"
                   :title="`${fechaBucket(p.fecha)} · ${dinero(valorDe(p), tendencias.moneda)}`"
-                />
+                >
+                  <div class="rt-arriba" :style="{ height: zonaArriba }">
+                    <div
+                      v-if="valorDe(p) > 0"
+                      class="rt-barra rounded-t"
+                      :style="{
+                        height: barra(p),
+                        background: 'var(--primario)',
+                      }"
+                    />
+                  </div>
+                  <div class="rt-abajo" :style="{ height: zonaAbajo }">
+                    <div
+                      v-if="valorDe(p) < 0"
+                      class="rt-barra rounded-b"
+                      :style="{ height: barra(p), background: 'var(--error)' }"
+                      data-prueba="barra-negativa"
+                    />
+                  </div>
+                </div>
               </div>
               <div
                 class="flex justify-between text-xs mt-1"
@@ -1507,5 +1542,37 @@ onMounted(cargar);
   display: block;
   height: 100%;
   background: var(--primario);
+}
+/* Tendencias: columnas con su zona positiva y negativa, y la línea del cero. */
+.rt-grafica {
+  position: relative;
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--borde);
+}
+.rt-cero {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--borde);
+}
+.rt-columna {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 2px;
+}
+.rt-arriba {
+  display: flex;
+  align-items: flex-end;
+}
+.rt-abajo {
+  display: flex;
+  align-items: flex-start;
+}
+.rt-barra {
+  width: 100%;
+  min-height: 3px;
+  transition: height 0.2s;
 }
 </style>

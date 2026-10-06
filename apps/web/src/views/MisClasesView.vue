@@ -270,6 +270,7 @@ const eventoCalendario = computed(() =>
     <CalendarioVistas
       class="mt-4"
       clave="tu.instructor.vista"
+      :zona="sesion.zonaHoraria"
       :vista-inicial="vistaInicial"
       :dias-lista="diasLista"
       :eventos="eventos"

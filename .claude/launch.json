@@ -16,6 +16,26 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "apps/web", "run", "dev"],
       "port": 5175
+    },
+    {
+      "name": "api-8001",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location apps/api; $env:XDEBUG_MODE='off'; $env:APP_URL='http://localhost:8001'; php -d opcache.enable=1 -d opcache.enable_cli=1 artisan serve --port=8001"
+      ],
+      "port": 8001
+    },
+    {
+      "name": "web-8001",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "Set-Location apps/web; $env:VITE_API_URL='http://localhost:8001'; npx vite --host 127.0.0.1 --port 5176 --strictPort"
+      ],
+      "port": 5176
     }
   ]
 }

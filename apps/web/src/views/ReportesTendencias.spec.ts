@@ -103,4 +103,66 @@ describe("tendencias del dinero", () => {
     // En es-MX el dólar se escribe «USD 10.00» (con espacio duro).
     expect(otras).toMatch(/USD\s10\.00/);
   });
+
+  it("un periodo solo con devoluciones no sale vacío: neto negativo bajo el cero y se puede exportar", async () => {
+    const devolucion = {
+      fecha: "2026-10-02",
+      ventas: 0,
+      ventas_minor: 0,
+      cobrado_minor: 0,
+      devuelto_minor: 2500,
+      neto_minor: -2500,
+    };
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/reportes/tendencias")
+            ? {
+                ...tendencias,
+                serie: [punto("2026-10-01", 0, 0), devolucion],
+                por_producto: [],
+                totales: {
+                  ventas: 0,
+                  ventas_minor: 0,
+                  cobrado_minor: 0,
+                  devuelto_minor: 2500,
+                  neto_minor: -2500,
+                  ticket_promedio_minor: null,
+                },
+                otras_monedas: [],
+              }
+            : null,
+        },
+      }),
+    );
+    const w = mount(ReportesView, {
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: "es",
+            missingWarn: false,
+            fallbackWarn: false,
+            messages: { es: { ...esMX, operacion } },
+          }),
+        ],
+        stubs: { EncabezadoSeccion: true },
+      },
+    });
+    await flushPromises();
+    await w
+      .findAll(".tu-pestanas button")
+      .find((b) => b.text() === "Ingresos")!
+      .trigger("click");
+    await flushPromises();
+
+    expect(w.text()).not.toContain("Sin ventas ni cobros en el periodo.");
+    expect(w.get('[data-prueba="tendencias-totales"]').text()).toContain(
+      "-$25.00",
+    );
+    expect(w.findAll('[data-prueba="barra-negativa"]')).toHaveLength(1);
+    expect(
+      w.get('[data-prueba="exportar-tendencias"]').attributes("disabled"),
+    ).toBeUndefined();
+  });
 });

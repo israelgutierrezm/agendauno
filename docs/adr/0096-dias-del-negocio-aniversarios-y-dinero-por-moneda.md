@@ -72,3 +72,9 @@ lugares con criterios distintos:
   de esas sedes y sus compras ahí; la ocupación de agenda usa solo los horarios de esas
   sedes; Equipo, solo al personal asignado a ellas. El dueño y el administrador siguen
   viendo todo.
+- **Cohortes con archivados** (2026-10-06): la población de cada cohorte incluye a
+  los clientes archivados; archivar a alguien no achica su cohorte ni mejora la
+  retención.
+- **Tendencias con devoluciones** (2026-10-06): un periodo solo con devoluciones no
+  se trata como vacío (se ve y se exporta) y un neto negativo se dibuja debajo de la
+  línea del cero.

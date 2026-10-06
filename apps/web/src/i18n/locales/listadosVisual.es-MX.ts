@@ -3,6 +3,8 @@ export default {
   resenas: {
     subtitulo:
       "Lo que opinan tus clientes de cada servicio y de cada profesional.",
+    subtituloClases:
+      "Lo que opinan tus {miembros} de cada clase y de cada {instructor}.",
     promedio: "Calificación promedio",
     total: "Reseñas",
     cinco: "Con 5 estrellas",

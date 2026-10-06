@@ -34,7 +34,15 @@ function entrarComo(rol: string, permisos: string[]): void {
     rol,
     roles: [rol],
     roles_disponibles: [
-      { clave: rol, faceta: rol === "miembro" ? "miembro" : "equipo" },
+      {
+        clave: rol,
+        faceta:
+          rol === "miembro"
+            ? "miembro"
+            : rol === "instructor"
+              ? "instructor"
+              : "equipo",
+      },
     ],
     permisos,
   } as never;
@@ -75,5 +83,17 @@ describe("menú de perfil", () => {
     const w = montar(true);
     const opciones = w.findAll('[role="menuitem"]').map((o) => o.text());
     expect(opciones).toEqual(["Mi perfil", "Configuración", "Cerrar sesión"]);
+  });
+
+  it("quien entra como instructor no ve Configuración aunque suba documentos", () => {
+    entrarComo("instructor", [
+      "agenda.ver",
+      "documentos.subir",
+      "catalogo.ver",
+      "sucursales.ver",
+    ]);
+    const w = montar(true);
+    const opciones = w.findAll('[role="menuitem"]').map((o) => o.text());
+    expect(opciones).toEqual(["Mi perfil", "Cerrar sesión"]);
   });
 });

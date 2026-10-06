@@ -44,6 +44,8 @@ interface Opcion {
   nombre: string;
   zona_horaria?: string | null;
   foto_url?: string | null;
+  // Profesional: sedes donde atiende (tiene horario). Sin el dato, en todas.
+  sucursales?: string[];
 }
 interface Slot {
   inicia: string;
@@ -92,6 +94,29 @@ const verHorariosDe = computed<string>({
 const servicio = computed(
   () => servicios.value.find((s) => s.id === servicioId.value) ?? null,
 );
+// Solo quienes atienden en la sede elegida: con alguien de otra sede no habría
+// fechas disponibles.
+const profesionalesSede = computed(() =>
+  profesionales.value.filter(
+    (p) =>
+      p.sucursales === undefined ||
+      sucursalId.value === "" ||
+      p.sucursales.includes(sucursalId.value),
+  ),
+);
+// Al cambiar de sede, si quien estaba elegido no atiende ahí, se parte de nuevo:
+// todo el equipo de la sede o, si es una sola persona, ella.
+function ajustarProfesional(): void {
+  const lista = profesionalesSede.value;
+  if (
+    profesionalId.value !== CUALQUIERA &&
+    lista.some((p) => p.id === profesionalId.value)
+  ) {
+    return;
+  }
+  profesionalId.value = lista.length > 1 ? CUALQUIERA : (lista[0]?.id ?? "");
+}
+watch(sucursalId, ajustarProfesional);
 const sucursal = computed(
   () => sucursales.value.find((s) => s.id === sucursalId.value) ?? null,
 );
@@ -278,6 +303,7 @@ onMounted(async () => {
     ) {
       profesionalId.value = antes.profesional;
     }
+    ajustarProfesional();
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -441,9 +467,9 @@ onMounted(async () => {
 
       <!-- Ver horarios de: todo el equipo o alguien, por su foto. -->
       <ElegirProfesional
-        v-if="profesionales.length > 1"
+        v-if="profesionalesSede.length > 1"
         v-model="verHorariosDe"
-        :profesionales="profesionales"
+        :profesionales="profesionalesSede"
       />
 
       <!-- Días desde hoy; los que no tienen atención no se eligen (ADR 0065). -->

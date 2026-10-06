@@ -154,6 +154,7 @@ export default {
     categorias: {
       negocio: "Negocio",
       servicios: "Servicios y catálogos",
+      serviciosClases: "Clases y catálogos",
       agenda: "Agenda y reservas",
       pagos: "Pagos e integraciones",
       accesos: "Accesos y permisos",
@@ -163,7 +164,9 @@ export default {
       negocio:
         "Datos, imagen y página pública del negocio, sus sucursales, datos fiscales y cómo se llaman las cosas.",
       servicios:
-        "Qué se ofrece y a qué precio: clases o servicios, planes y paquetes, y los espacios que usan.",
+        "Qué se ofrece y a qué precio: servicios, bonos y membresías, y los espacios que usan.",
+      serviciosClases:
+        "Qué se ofrece y a qué precio: clases, planes y paquetes, y los espacios que usan.",
       agenda:
         "Reglas para reservar y cancelar, días de cierre y la programación recurrente.",
       pagos:
@@ -1206,6 +1209,8 @@ export default {
     titulo: "Catálogo",
     vacio:
       "Aún no hay servicios en el catálogo. Créalos desde el onboarding o la agenda.",
+    vacioClases:
+      "Aún no hay clases en el catálogo. Créalas desde el onboarding o la agenda.",
     modalidad: {
       grupal: "Grupal",
       privada: "Privada",
@@ -1225,6 +1230,8 @@ export default {
     duracion: "Duración (min)",
     duracionReq: "Define la duración de la cita para calcular los huecos.",
     duracionAyuda: "Cuánto dura el servicio; con esto se arman los horarios.",
+    duracionAyudaClases:
+      "Cuánto dura la clase; con esto se calcula su hora de término.",
     lugares: "Lugares numerados",
     lugaresAyuda: "0 = sin numerar. Útil para salas con lugar asignado.",
     configurar: "Configurar",
@@ -1232,6 +1239,7 @@ export default {
     guardar: "Guardar",
     guardando: "Guardando…",
     guardado: "Servicio actualizado.",
+    guardadoClases: "Clase actualizada.",
     badgePago: "Cita con pago",
     badgeEntitlement: "Con membresía",
     // Negocio de citas: un servicio se paga o se toma con bono (ADR 0091).

@@ -179,6 +179,7 @@ export const promocionesVisual = {
 export const recursosVisual = {
   subtitulo:
     "Las salas, cabinas o equipos que usa cada servicio, por sucursal.",
+  subtituloClases: "Las salas o equipos que usa cada clase, por sucursal.",
   buscar: "Buscar por nombre o tipo",
   sinResultados: "Ningún recurso coincide con la búsqueda.",
   acciones: "Acciones",

@@ -23,6 +23,7 @@ export default {
       citas: "Citas",
       llegaron: "Ya llegaron",
       porAtender: "Por atender",
+      sinRegistrar: "Sin registrar",
       porCobrar: "Por cobrar",
     },
   },

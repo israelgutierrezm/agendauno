@@ -21,6 +21,8 @@ const props = defineProps<{
    * esto, el color ya no es por servicio sino "mía" (primario) o "no mía" (gris).
    */
   destacadas?: ReadonlySet<string>;
+  /** «Hoy» (AAAA-MM-DD) del negocio; sin él, el del navegador. */
+  hoy?: string;
 }>();
 
 const emit = defineEmits<{
@@ -78,7 +80,7 @@ const semanas = computed(() => {
   const ultimo = new Date(props.mes.getFullYear(), props.mes.getMonth() + 1, 0);
   const inicio = new Date(primero);
   inicio.setDate(primero.getDate() - ((primero.getDay() + 6) % 7));
-  const hoy = isoDe(new Date());
+  const hoy = props.hoy ?? isoDe(new Date());
   const filas = [];
   for (let d = new Date(inicio); d <= ultimo || d.getDay() !== 1;) {
     const semana = [];

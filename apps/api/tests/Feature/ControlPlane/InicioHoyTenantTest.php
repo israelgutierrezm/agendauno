@@ -200,7 +200,7 @@ it('muchas sesiones del día anterior no esconden las de hoy (se acota la jornad
         ->assertJsonPath('data.agenda.truncado', false);
 });
 
-it('cada cita del día está en un solo estado y «por atender» es lo que sigue sin registro', function (): void {
+it('cada cita del día está en un solo estado; «por atender» no cuenta las que terminaron sin registro', function (): void {
     // 8:00 en la Ciudad de México.
     $this->travelTo('2026-10-05 14:00:00');
     $e = estudioConSesion('barberia-b', 'dueno@barberia-b.mx');
@@ -232,7 +232,8 @@ it('cada cita del día está en un solo estado y «por atender» es lo que sigue
         ->assertOk()->json('data.agenda.totales');
     expect($totales)->toMatchArray([
         'por_llegar' => 1, 'en_atencion' => 1, 'pendientes_registrar' => 1, 'finalizadas' => 1, 'no_asistio' => 1,
-        // Sin registro: Eva (por llegar) y Cris (pasó sin registrar), como en Recepción.
-        'por_atender' => 2,
+        // Por atender solo Eva (aún no llega); Cris ya pasó: le falta el registro, no
+        // la atención.
+        'por_atender' => 1,
     ]);
 });

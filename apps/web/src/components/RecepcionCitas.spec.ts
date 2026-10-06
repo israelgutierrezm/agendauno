@@ -88,7 +88,7 @@ describe("recepción en un negocio de citas", () => {
     expect(w.text()).not.toContain("lugares");
 
     expect(w.emitted("resumen")?.at(-1)).toEqual([
-      { citas: 2, llegaron: 1, porAtender: 1, porCobrar: 1 },
+      { citas: 2, llegaron: 1, porAtender: 1, sinRegistrar: 0, porCobrar: 1 },
     ]);
   });
   it("filtra la jornada sin alterar las métricas ni realizar acciones", async () => {
@@ -101,7 +101,7 @@ describe("recepción en un negocio de citas", () => {
     expect(w.findAll(".rc-fila")).toHaveLength(1);
     expect(w.get(".rc-fila").text()).toContain("Bea");
     expect(w.emitted("resumen")?.at(-1)).toEqual([
-      { citas: 2, llegaron: 1, porAtender: 1, porCobrar: 1 },
+      { citas: 2, llegaron: 1, porAtender: 1, sinRegistrar: 0, porCobrar: 1 },
     ]);
     await w.get('input[type="search"]').setValue("");
     await w
@@ -127,5 +127,29 @@ describe("recepción en un negocio de citas", () => {
       .find((b) => b.text() === "Limpiar filtros")!
       .trigger("click");
     expect(w.findAll(".rc-fila")).toHaveLength(3);
+  });
+
+  it("una cita que ya terminó sin registro va a «Sin registrar», no a «Por atender»", async () => {
+    // 12:30: la de las 11 (Bea) ya terminó y nadie dijo si vino.
+    vi.setSystemTime(new Date("2030-01-07T12:30:00Z"));
+    const w = mount(RecepcionCitas, {
+      props: { fecha: "2030-01-07", sucursalId: "" },
+      global: { plugins: [i18n], stubs: { PanelCita: true } },
+    });
+    await flushPromises();
+
+    expect(w.emitted("resumen")?.at(-1)).toEqual([
+      { citas: 2, llegaron: 1, porAtender: 0, sinRegistrar: 1, porCobrar: 1 },
+    ]);
+    const bea = w.findAll(".rc-fila").find((f) => f.text().includes("Bea"))!;
+    expect(bea.text()).toContain("Sin registrar");
+    // El filtro las separa.
+    await w
+      .findAll(".rc-segmentado button")
+      .find((b) => b.text() === "Sin registrar")!
+      .trigger("click");
+    expect(w.findAll(".rc-fila").map((f) => f.text())).toEqual([
+      expect.stringContaining("Bea"),
+    ]);
   });
 });

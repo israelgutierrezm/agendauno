@@ -324,6 +324,11 @@ class _Indicadores extends StatelessWidget {
               dato('Citas hoy', agenda.sesiones),
               dato('Ya llegaron', agenda.llegaron),
               dato('Por atender', agenda.porAtender),
+              dato(
+                'Sin registrar',
+                agenda.sinRegistrar,
+                aviso: agenda.sinRegistrar > 0,
+              ),
               dato('Por cobrar', agenda.porCobrar, aviso: agenda.porCobrar > 0),
             ]
           : [

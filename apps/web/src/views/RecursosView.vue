@@ -175,7 +175,11 @@ onMounted(cargar);
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-8">
     <EncabezadoSeccion
       :titulo="$t('recursos.titulo')"
-      :subtitulo="$t('recursosVisual.subtitulo')"
+      :subtitulo="
+        sesion.esCitas
+          ? $t('recursosVisual.subtitulo')
+          : $t('recursosVisual.subtituloClases')
+      "
     >
       <template v-if="puedeGestionar && sucursales.length > 0" #acciones>
         <button

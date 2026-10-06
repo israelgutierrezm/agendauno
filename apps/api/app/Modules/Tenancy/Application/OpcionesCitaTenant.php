@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\ModalidadOfertaTenant;
+use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
@@ -41,6 +42,8 @@ class OpcionesCitaTenant
      */
     public function listar(?PersonaTenant $persona = null): array
     {
+        $sedes = $this->sedesDeCadaProfesional();
+
         return [
             'servicios' => $this->servicios($persona),
             // Hay servicios que se toman con bono o membresía (desde la cuenta).
@@ -70,12 +73,34 @@ class OpcionesCitaTenant
                     'id' => $u->ulid,
                     'nombre' => (string) $u->name,
                     'foto_url' => $u->fotoUrl(),
+                    // Dónde atiende (tiene horario): en otra sede no se le ofrece.
+                    'sucursales' => $sedes[(int) $u->getKey()] ?? [],
                 ])->values()->all(),
             // Si se paga en línea para confirmar o se puede pagar en la sucursal.
             'cobro' => $this->cobro->paraPantalla(),
             // Si se ofrece recibir los avisos de la cita por WhatsApp (ADR 0069).
             'whatsapp' => $this->whatsapp->enUso(),
         ];
+    }
+
+    /**
+     * Las sedes (ULID) donde atiende cada profesional: en las que tiene horario de
+     * atención, que es de donde sale su disponibilidad.
+     *
+     * @return array<int, list<string>> id del profesional → sedes
+     */
+    private function sedesDeCadaProfesional(): array
+    {
+        $sedes = [];
+        $filas = HorarioAtencionTenant::query()
+            ->join('sucursales', 'sucursales.id', '=', 'horarios_atencion.sucursal_id')
+            ->distinct()
+            ->get(['horarios_atencion.instructor_id as profesional', 'sucursales.ulid as sede']);
+        foreach ($filas as $fila) {
+            $sedes[(int) $fila->getAttribute('profesional')][] = (string) $fila->getAttribute('sede');
+        }
+
+        return $sedes;
     }
 
     /**

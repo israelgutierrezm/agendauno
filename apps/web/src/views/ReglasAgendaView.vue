@@ -9,8 +9,8 @@ import ProgramacionSemanal from "@/components/ProgramacionSemanal.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { instantanea, useCambiosPendientes } from "@/lib/cambiosPendientes";
 import { confirmar } from "@/lib/confirmar";
-import { isoLocal } from "@/lib/misClases";
 import type { SerieProgramada } from "@/lib/programacion";
+import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -122,7 +122,8 @@ function desdeAncla(hash: string): Pestana | null {
     : null;
 }
 
-const hoy = isoLocal(new Date());
+// «Hoy» del negocio (su zona horaria).
+const hoy = hoyEnNegocio(sesion.zonaHoraria);
 const cerradosProximos = computed(() =>
   cerrados.value.filter((d) => d.fecha >= hoy),
 );

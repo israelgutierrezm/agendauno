@@ -107,3 +107,16 @@ it('las opciones públicas solo existen para estudios en el directorio', functio
 
     $this->getJson("/api/v1/app/{$e['slug']}/citas/opciones")->assertNotFound();
 });
+
+it('dice en qué sedes atiende cada profesional (donde tiene horario)', function (): void {
+    ['e' => $e, 'sede' => $sede, 'coach' => $coach] = estudioConServicioDeCita();
+    $otra = agendaSemilla($e);
+    abrirHorarioDeCitas($e, $coach, $sede['sucursal']);
+
+    $instructores = collect($this->getJson("/api/v1/app/{$e['slug']}/citas/opciones")->assertOk()->json('data.instructores'))
+        ->keyBy('id');
+
+    // Atiende solo en la primera sede: en la otra no se le ofrece.
+    expect($instructores[$coach]['sucursales'])->toBe([$sede['sucursal']])
+        ->and($instructores[$coach]['sucursales'])->not->toContain($otra['sucursal']);
+});

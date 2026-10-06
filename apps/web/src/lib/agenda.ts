@@ -188,6 +188,7 @@ export function iniciales(nombre: string | null): string {
  */
 export type EstadoCita =
   | "confirmada"
+  | "sin_registrar"
   | "llego"
   | "en_servicio"
   | "completada"
@@ -200,6 +201,7 @@ export type EstadoCita =
  */
 export const COLOR_ESTADO_CITA: Record<EstadoCita, string> = {
   confirmada: "var(--exito)",
+  sin_registrar: "var(--aviso)",
   llego: "var(--acento)",
   en_servicio: "var(--acento)",
   completada: "var(--texto-suave)",
@@ -210,7 +212,9 @@ export const COLOR_ESTADO_CITA: Record<EstadoCita, string> = {
 /**
  * Estado operativo de una cita a la hora `ahora`: la reserva dice si está pagada y la
  * asistencia si el cliente llegó; con la hora se distingue "llegó" (antes de
- * empezar), "en servicio" (durante) y "completada" (después).
+ * empezar), "en servicio" (durante) y "completada" (después). Sin registro, está
+ * "confirmada" (por atender) mientras no termina y "sin_registrar" cuando ya terminó:
+ * a esa no le falta atención, le falta registrar si vino.
  */
 export function estadoCita(s: SesionAgenda, ahora: Date): EstadoCita {
   if (s.estado !== "programada" || !s.cita) {
@@ -227,8 +231,10 @@ export function estadoCita(s: SesionAgenda, ahora: Date): EstadoCita {
     }
     return t < new Date(s.termina_en).getTime() ? "en_servicio" : "completada";
   }
-  // Agendada (pagada o no): el pago se muestra aparte.
-  return "confirmada";
+  // Agendada (pagada o no; el pago se muestra aparte). Ya terminada sin registro.
+  return ahora.getTime() < new Date(s.termina_en).getTime()
+    ? "confirmada"
+    : "sin_registrar";
 }
 
 /** Estado de PAGO de una cita, separado de su atención (2.6). */

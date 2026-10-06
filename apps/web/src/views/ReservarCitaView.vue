@@ -56,6 +56,8 @@ interface Persona {
   id: string;
   nombre: string;
   foto_url?: string | null;
+  // Sedes donde atiende (tiene horario). Sin el dato, en todas.
+  sucursales?: string[];
 }
 interface Opciones {
   estudio: {
@@ -254,9 +256,17 @@ const variasSedes = computed(
 const sedesConFoto = computed(() =>
   (opciones.value?.sucursales ?? []).some((s) => s.foto_url),
 );
-const variosProfesionales = computed(
-  () => (opciones.value?.instructores.length ?? 0) > 1,
+// Solo quienes atienden en la sede elegida (tienen horario ahí): ofrecer a alguien
+// de otra sede deja al cliente buscando fechas sin disponibilidad.
+const profesionalesSede = computed<Persona[]>(() =>
+  (opciones.value?.instructores ?? []).filter(
+    (b) =>
+      b.sucursales === undefined ||
+      sucursalId.value === "" ||
+      b.sucursales.includes(sucursalId.value),
+  ),
 );
+const variosProfesionales = computed(() => profesionalesSede.value.length > 1);
 // Tras elegir la hora se elige con quién, salvo que ya se filtró por alguien.
 const eligeConQuien = computed(
   () => variosProfesionales.value && filtro.value === "",
@@ -267,7 +277,7 @@ const slotActual = computed(
 // Quienes están libres a la hora elegida.
 const libresEnHora = computed(() => {
   const ids = slotActual.value?.profesionales ?? [];
-  return (opciones.value?.instructores ?? []).filter((b) => ids.includes(b.id));
+  return profesionalesSede.value.filter((b) => ids.includes(b.id));
 });
 const zona = computed(
   () => sucursalSel.value?.zona_horaria ?? "America/Mexico_City",
@@ -618,7 +628,7 @@ onBeforeUnmount(() => {
 
 // Con quién de partida: el del filtro, el único profesional o «cualquiera».
 function profesionalDePartida(): string {
-  const lista = opciones.value?.instructores ?? [];
+  const lista = profesionalesSede.value;
   if (filtro.value !== "") return filtro.value;
   return lista.length === 1 ? lista[0].id : CUALQUIERA;
 }
@@ -1438,7 +1448,7 @@ onMounted(cargar);
           <!-- Paso: fecha y hora (de todo el equipo o de quien se prefiera) -->
           <template v-else-if="paso === 'horario'">
             <p
-              v-if="opciones.instructores.length === 0"
+              v-if="profesionalesSede.length === 0"
               class="tu-card p-5 reserva-ayuda"
             >
               {{ $t("reservar.sinProfesionales") }}
@@ -1480,21 +1490,21 @@ onMounted(cargar);
                 v-if="variosProfesionales"
                 v-model="filtro"
                 class="mb-4 rc-selector-profesional"
-                :profesionales="opciones.instructores"
+                :profesionales="profesionalesSede"
               />
               <div
-                v-else-if="opciones.instructores.length === 1"
+                v-else-if="profesionalesSede.length === 1"
                 class="rc-profesional-unico"
               >
                 <FotoAmpliable
-                  :nombre="opciones.instructores[0].nombre"
-                  :foto="opciones.instructores[0].foto_url"
+                  :nombre="profesionalesSede[0].nombre"
+                  :foto="profesionalesSede[0].foto_url"
                 />
                 <span
                   ><small>{{
                     $t("perfilPublico.agendar.quienTeAtiende")
                   }}</small
-                  ><strong>{{ opciones.instructores[0].nombre }}</strong></span
+                  ><strong>{{ profesionalesSede[0].nombre }}</strong></span
                 >
               </div>
               <span class="tu-label">{{ $t("reservar.cuando") }}</span>

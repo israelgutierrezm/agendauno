@@ -21,6 +21,7 @@ import {
   useMisClases,
   type ClaseMia,
 } from "@/lib/misClases";
+import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -49,9 +50,10 @@ const { clima, cargar: cargarClima } = useClima(
 const ahora = ref(Date.now());
 let reloj: ReturnType<typeof setInterval> | undefined;
 
-const hoy = isoLocal(new Date());
+// «Hoy» del negocio (su zona horaria) y los siete días que siguen.
+const hoy = hoyEnNegocio(sesion.zonaHoraria);
 const en7 = (() => {
-  const d = new Date();
+  const d = new Date(`${hoy}T12:00:00`);
   d.setDate(d.getDate() + 6);
   return isoLocal(d);
 })();

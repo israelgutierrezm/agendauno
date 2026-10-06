@@ -542,6 +542,7 @@ onMounted(() => void cuenta.asegurar());
       <CalendarioVistas
         class="mt-4"
         clave="tu.portal.vista"
+        :zona="sesion.zonaHoraria"
         :eventos="enCalendario"
         :cargando="cuenta.cargando.value || cargandoClases"
         :error="errorClases"

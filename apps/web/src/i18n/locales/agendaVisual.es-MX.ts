@@ -31,6 +31,7 @@ export default {
   },
   estadosCita: {
     confirmada: "Agendada",
+    sin_registrar: "Sin registrar",
     llego: "Llegó",
     en_servicio: "En servicio",
     completada: "Completada",
@@ -123,6 +124,8 @@ export default {
     okCorregida: "Asistencia corregida.",
     cobrar: "Cobrar {monto}",
     marcarLlegada: "Llegó",
+    // Duración de una cita en las tarjetas de la agenda.
+    minutos: "{n} min",
     noAsistio: "No asistió",
     cancelar: "Cancelar cita",
     okLlego: "Llegada registrada.",
@@ -143,6 +146,7 @@ export default {
   // Botón que abre la leyenda de colores.
   leyendaVerClases: "Colores de las clases ({n})",
   leyendaVerServicios: "Colores de los servicios ({n})",
+  quitarFiltros: "Quitar filtros",
   // Al generar una clase recurrente: las fechas que no se pudieron crear y por qué.
   serieOmitidas:
     "Se crearon {creadas} clases. No se generaron {n} fechas: {detalle}",

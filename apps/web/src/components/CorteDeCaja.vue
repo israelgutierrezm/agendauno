@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -43,10 +44,9 @@ const { t } = useI18n();
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
+// «Hoy» del negocio (su zona horaria), no el del navegador.
 function hoy(): string {
-  const d = new Date();
-  const dos = (n: number): string => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+  return hoyEnNegocio(sesion.zonaHoraria);
 }
 
 const desde = ref(hoy());

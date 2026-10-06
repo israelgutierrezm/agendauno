@@ -19,6 +19,8 @@ vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
     slug: "demo",
     estudio: { nombre: "Estudio Demo", perfil: "pole" },
+    terminologia: { sesion: "Clase", miembro: "Alumno", instructor: "Coach" },
+    zonaHoraria: "America/Mexico_City",
     puede: (permiso: string) =>
       api.permisos === null || api.permisos.includes(permiso),
   }),
@@ -46,7 +48,12 @@ function montar() {
   return mount(ResumenDelDia, {
     global: {
       plugins: [i18n],
-      stubs: { RouterLink: { props: ["to"], template: "<a><slot /></a>" } },
+      stubs: {
+        RouterLink: {
+          props: ["to"],
+          template: "<a :data-to='JSON.stringify(to)'><slot /></a>",
+        },
+      },
     },
   });
 }
@@ -345,5 +352,127 @@ describe("el día de hoy en el Inicio", () => {
     expect(
       w.findAll("a").some((a) => a.text().includes("Ir a recepción")),
     ).toBe(false);
+  });
+
+  it("cada pendiente abre su clase o cita; en citas, sin registrar no es por atender", async () => {
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/clima")
+            ? null
+            : {
+                fecha: "2026-10-01",
+                modalidad: "citas",
+                agenda: {
+                  totales: {
+                    sesiones: 2,
+                    esperados: 2,
+                    llegaron: 0,
+                    sin_marcar: 1,
+                    por_atender: 1,
+                    pendientes_registrar: 1,
+                    por_cobrar: 0,
+                  },
+                  sesiones: [
+                    sesion({
+                      id: "pasada",
+                      tipo: "cita",
+                      oferta: "Corte",
+                      cliente: "Dana",
+                      capacidad: 1,
+                      esperados: 1,
+                      llegaron: 0,
+                      sin_marcar: 1,
+                      termina_en: "2026-10-01T14:45:00Z",
+                      momento: "termino",
+                    }),
+                    sesion({
+                      id: "luego",
+                      tipo: "cita",
+                      oferta: "Barba",
+                      cliente: "Eli",
+                      capacidad: 1,
+                      esperados: 1,
+                      llegaron: 0,
+                      inicia_en: "2026-10-01T18:00:00Z",
+                      termina_en: "2026-10-01T18:30:00Z",
+                      momento: "proxima",
+                    }),
+                  ],
+                },
+                libres: [],
+                cobros: null,
+                renovaciones: null,
+              },
+        },
+      }),
+    );
+    const w = montar();
+    await flushPromises();
+
+    // Por atender (la que sigue) y sin registrar (la que ya pasó), por separado.
+    expect(w.get('[data-prueba="indicador-porAtender"]').text()).toContain("1");
+    expect(w.get('[data-prueba="indicador-sinRegistrar"]').text()).toContain(
+      "1",
+    );
+    const llegadas = w
+      .findAll('[data-prueba="cita-llegada"]')
+      .map((e) => e.text());
+    expect(llegadas).toEqual(["Sin registrar", "Próxima"]);
+    // La cita dice cuánto dura (no su cupo «1/1»).
+    expect(w.text()).toContain("Corte · 45 min · Caro");
+    expect(w.text()).not.toContain("1 de 1");
+    // Cada fila y su pendiente abren ESA cita en la agenda, en su día.
+    const fila = JSON.parse(
+      w.findAll('[data-prueba="abrir-sesion"]')[0].attributes("data-to")!,
+    );
+    expect(fila).toEqual({
+      name: "agenda",
+      query: { fecha: "2026-10-01", sesion: "pasada" },
+    });
+    const marcar = JSON.parse(
+      w.get('[data-prueba="marcar-pendiente"]').attributes("data-to")!,
+    );
+    expect(marcar.query.sesion).toBe("pasada");
+    // Lo que sigue se abre directo.
+    expect(w.get('[data-prueba="abrir-siguiente"]').text()).toBe("Ver clase");
+  });
+
+  it("pasar lista de una clase lleva a Recepción con esa clase", async () => {
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: {
+          data: url.endsWith("/clima")
+            ? null
+            : {
+                fecha: "2026-10-01",
+                modalidad: "clases",
+                agenda: {
+                  totales: {
+                    sesiones: 1,
+                    esperados: 3,
+                    llegaron: 1,
+                    sin_marcar: 2,
+                  },
+                  sesiones: [
+                    sesion({ id: "clase1", momento: "termino", sin_marcar: 2 }),
+                  ],
+                },
+                cobros: null,
+                renovaciones: null,
+              },
+        },
+      }),
+    );
+    const w = montar();
+    await flushPromises();
+
+    const marcar = JSON.parse(
+      w.get('[data-prueba="marcar-pendiente"]').attributes("data-to")!,
+    );
+    expect(marcar).toEqual({
+      name: "recepcion",
+      query: { fecha: "2026-10-01", sesion: "clase1" },
+    });
   });
 });

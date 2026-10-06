@@ -7,6 +7,7 @@ import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import {
+  claveSegunModalidad,
   CATEGORIAS_CONFIGURACION,
   destinoDe,
   coincideBusqueda,
@@ -22,7 +23,10 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * muestra). «Buscar ajuste» encuentra por nombre, categoría o sinónimos (p. ej.
  * «logo», «conectar pagos», «roles»).
  */
-const { t } = useI18n();
+const { t, te } = useI18n();
+// Con clases no se habla de «servicios»: cada texto, el del tipo de negocio.
+const tm = (clave: string): string =>
+  t(claveSegunModalidad(clave, sesion.esCitas, te));
 const sesion = useSesionTenantStore();
 
 const TONOS: Record<string, string> = {
@@ -58,7 +62,7 @@ const resultados = computed(() => {
   return categorias.value.flatMap((c) =>
     c.opciones
       .filter((op) =>
-        [t(op.etiqueta), t(c.etiqueta), ...op.sinonimos].some((texto) =>
+        [tm(op.etiqueta), tm(c.etiqueta), ...op.sinonimos].some((texto) =>
           coincideBusqueda(texto, q),
         ),
       )
@@ -104,9 +108,9 @@ const resultados = computed(() => {
               <IconoNav :nombre="r.categoria.icono" :tam="18" />
             </span>
             <span class="min-w-0 flex-1">
-              <span class="block font-medium">{{ t(r.opcion.etiqueta) }}</span>
+              <span class="block font-medium">{{ tm(r.opcion.etiqueta) }}</span>
               <span class="block text-xs cn-suave">{{
-                t(r.categoria.etiqueta)
+                tm(r.categoria.etiqueta)
               }}</span>
             </span>
             <IconoNav nombre="chevron" :tam="16" class="cn-suave" />
@@ -128,14 +132,14 @@ const resultados = computed(() => {
             <IconoNav :nombre="c.icono" :tam="22" />
           </span>
           <div class="min-w-0">
-            <h2 class="text-base font-semibold">{{ t(c.etiqueta) }}</h2>
-            <p class="mt-0.5 text-sm cn-suave">{{ t(c.descripcion) }}</p>
+            <h2 class="text-base font-semibold">{{ tm(c.etiqueta) }}</h2>
+            <p class="mt-0.5 text-sm cn-suave">{{ tm(c.descripcion) }}</p>
           </div>
         </div>
         <ul class="cn-opciones">
           <li v-for="op in c.opciones" :key="op.clave">
             <RouterLink :to="destinoDe(op)" class="cn-opcion">
-              <span>{{ t(op.etiqueta) }}</span>
+              <span>{{ tm(op.etiqueta) }}</span>
               <IconoNav nombre="chevron" :tam="14" />
             </RouterLink>
           </li>

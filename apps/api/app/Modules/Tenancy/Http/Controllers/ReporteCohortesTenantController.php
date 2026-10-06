@@ -50,7 +50,8 @@ class ReporteCohortesTenantController
         // Alumnos dados de alta en la ventana (la población de las cohortes).
         $miembros = PersonaTenant::query()
             ->where('tipo', TipoPersonaTenant::Miembro->value)
-            ->where('archivado', false)
+            // Los archivados también: archivar a alguien no cambia en qué mes llegó ni
+            // achica su cohorte (si no, la retención mejoraría sola).
             ->where('created_at', '>=', $primerMes->utc())
             ->when($sedes !== null, fn ($q) => $q->whereIn('sucursal_id', $sedes))
             ->get(['id', 'created_at', 'como_nos_conocio']);

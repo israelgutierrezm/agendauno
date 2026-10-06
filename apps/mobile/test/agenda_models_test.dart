@@ -48,6 +48,9 @@ void main() {
     expect(SesionAgenda.desdeJson(_cita(asistencia: 'presente')).estadoCita(durante), EstadoCita.enServicio);
     expect(SesionAgenda.desdeJson(_cita(asistencia: 'presente')).estadoCita(despues), EstadoCita.completada);
     expect(SesionAgenda.desdeJson(_cita(asistencia: 'ausente')).estadoCita(despues), EstadoCita.noAsistio);
+    // Ya terminó y nadie registró si vino: no está «por atender», está sin registrar.
+    expect(SesionAgenda.desdeJson(_cita()).estadoCita(despues), EstadoCita.sinRegistrar);
+    expect(SesionAgenda.desdeJson(_cita()).estadoCita(durante), EstadoCita.confirmada);
   });
 
   test('sabe si ya empezó y falta pasar lista o marcar la llegada', () {

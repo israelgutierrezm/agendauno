@@ -13,7 +13,8 @@ export default {
     mostrador: "Mostrador",
     inventario: "Inventario",
     cobros: "Cobros",
-    clasesServicios: "Clases y servicios",
+    clasesServicios: "Servicios",
+    clasesServiciosClases: "Clases",
   },
   titulo: "Planes y paquetes",
   subtitulo:

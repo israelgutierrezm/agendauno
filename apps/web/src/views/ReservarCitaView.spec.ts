@@ -1239,3 +1239,34 @@ describe("enlace para pagar una cita apartada", () => {
     vista.unmount();
   });
 });
+
+describe("profesionales por sede", () => {
+  it("solo ofrece a quien atiende en la sede elegida", async () => {
+    const op = opciones();
+    op.data.data.instructores = [
+      {
+        id: "ana",
+        nombre: "Ana Pérez",
+        foto_url: "/storage/ana.webp",
+        sucursales: ["centro"],
+      },
+      {
+        id: "luis",
+        nombre: "Luis López",
+        foto_url: null,
+        sucursales: ["norte"],
+      },
+    ] as typeof op.data.data.instructores;
+    api(op);
+    const vista = montar();
+    await flushPromises();
+    await vista.get('input[value="norte"]').setValue();
+    await hastaHorario(vista);
+
+    // En Norte solo atiende Luis: no hay equipo que elegir y no aparece Ana.
+    expect(vista.find('[data-prueba="ver-horarios-de"]').exists()).toBe(false);
+    expect(vista.text()).toContain("Luis López");
+    expect(vista.text()).not.toContain("Ana Pérez");
+    vista.unmount();
+  });
+});

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink } from "vue-router";
+import { RouterLink, type RouteLocationRaw } from "vue-router";
 
 import ActualizadoHace from "@/components/ActualizadoHace.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -11,11 +11,12 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { puedeEntrar } from "@/lib/acceso";
-import { aHora, fechaLocal, minutosLocal } from "@/lib/agenda";
+import { aHora, minutosLocal } from "@/lib/agenda";
 import { useRecargarAlVolver } from "@/lib/alVolver";
 import { api, mensajeDeError } from "@/lib/api";
 import { lugarDelClima, useClima } from "@/lib/clima";
 import { fotoNegocio } from "@/lib/fotoNegocio";
+import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -38,12 +39,15 @@ interface SesionHoy {
   sucursal: string | null;
   cliente: string | null;
   inicia_en: string;
+  termina_en?: string;
   zona_horaria: string;
   capacidad: number | null;
   esperados: number;
   llegaron: number;
   sin_marcar: number;
   por_cobrar?: boolean;
+  // Cita: si llegó o no vino (null = sin registro).
+  asistencia?: "presente" | "ausente" | null;
   en_espera?: number;
   cancelada: boolean;
   momento: "proxima" | "en_curso" | "termino" | "cancelada";
@@ -68,6 +72,7 @@ interface Hoy {
       listas_pendientes?: number;
       en_espera?: number;
       por_atender?: number;
+      pendientes_registrar?: number;
       por_cobrar?: number;
     };
     sesiones: SesionHoy[];
@@ -122,8 +127,6 @@ function ocupacion(s: SesionHoy): number {
     ? Math.max(0, Math.min(100, (s.esperados / s.capacidad) * 100))
     : 0;
 }
-
-const zonaNavegador = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const foto = computed(() => fotoNegocio(sesion.estudio?.perfil));
 const esCitas = computed(() => hoy.value?.modalidad === "citas");
@@ -197,7 +200,8 @@ async function cargar(enSegundoPlano = false): Promise<void> {
       `/api/v1/app/${sesion.slug}/inicio/hoy`,
       {
         params: {
-          fecha: fechaLocal(new Date().toISOString(), zonaNavegador),
+          // El día del negocio (su zona horaria), no el del navegador.
+          fecha: hoyEnNegocio(sesion.zonaHoraria),
         },
       },
     );
@@ -229,6 +233,69 @@ onUnmounted(() => clearInterval(periodico));
 
 function hora(s: SesionHoy): string {
   return aHora(minutosLocal(s.inicia_en, s.zona_horaria));
+}
+
+// Cada pendiente lleva a SU clase o cita (la agenda la abre en ese día), no a una
+// pantalla general donde hay que volver a buscarla.
+const veAgenda = computed(() => puedeEntrar("agenda", sesion));
+function enAgenda(s: SesionHoy): RouteLocationRaw {
+  return {
+    name: "agenda",
+    query: { fecha: hoy.value?.fecha ?? "", sesion: s.id },
+  };
+}
+// Pasar lista de una clase: en Recepción, con esa clase abierta. La llegada de una
+// cita se marca en la cita misma (agenda).
+function paraMarcar(s: SesionHoy): RouteLocationRaw | null {
+  if (s.tipo !== "cita" && puedeEntrar("recepcion", sesion)) {
+    return {
+      name: "recepcion",
+      query: { fecha: hoy.value?.fecha ?? "", sesion: s.id },
+    };
+  }
+  return veAgenda.value ? enAgenda(s) : null;
+}
+
+// Una cita se presenta como cita: cuánto dura, quién atiende, si llegó y si falta
+// cobrarla (el cupo «1/1» no dice nada). Las clases conservan su cupo.
+function duracion(s: SesionHoy): string | null {
+  if (!s.termina_en) {
+    return null;
+  }
+  const minutos = Math.round(
+    (new Date(s.termina_en).getTime() - new Date(s.inicia_en).getTime()) /
+      60_000,
+  );
+  return minutos > 0 ? t("operacion.hoy.citas.duracion", { n: minutos }) : null;
+}
+function detalleFila(s: SesionHoy): string {
+  const partes =
+    s.tipo === "cita"
+      ? [s.oferta, duracion(s), s.instructor, s.sucursal]
+      : [s.instructor, s.sucursal];
+  return partes.filter(Boolean).join(" · ");
+}
+function llegada(s: SesionHoy): { texto: string; tono: string } {
+  if (s.asistencia === "presente" || s.llegaron > 0) {
+    return {
+      texto: t("operacion.hoy.citas.llego"),
+      tono: "var(--exito-texto, var(--exito))",
+    };
+  }
+  if (s.asistencia === "ausente") {
+    return { texto: t("operacion.hoy.citas.noAsistio"), tono: "var(--error)" };
+  }
+  // Ya terminó y nadie registró si vino: no es atención pendiente.
+  if (s.momento === "termino") {
+    return {
+      texto: t("operacion.hoy.citas.sinRegistrar"),
+      tono: "var(--aviso)",
+    };
+  }
+  return {
+    texto: t(`operacion.hoy.momento.${s.momento}`),
+    tono: s.momento === "en_curso" ? "var(--primario)" : "var(--texto-suave)",
+  };
 }
 
 function nombre(s: SesionHoy): string {
@@ -263,10 +330,18 @@ const indicadores = computed<Indicador[]>(() => {
     return [
       { clave: "citas", valor: String(tot.sesiones), icono: "agenda" },
       { clave: "llegaron", valor: String(tot.llegaron), icono: "hecho" },
+      // Por atender: aún no terminan. Sin registrar: ya terminaron y nadie dijo si
+      // vino (no se cuentan como pendientes de atención).
       {
         clave: "porAtender",
         valor: String(tot.por_atender ?? 0),
         icono: "reloj",
+      },
+      {
+        clave: "sinRegistrar",
+        valor: String(tot.pendientes_registrar ?? 0),
+        icono: "lista",
+        aviso: (tot.pendientes_registrar ?? 0) > 0,
       },
       {
         clave: "porCobrar",
@@ -312,7 +387,7 @@ const indicadores = computed<Indicador[]>(() => {
 
 // Espacios libres de hoy (citas): quién tiene huecos y desde qué hora.
 function horaIso(iso: string, zona: string | null): string {
-  return aHora(minutosLocal(iso, zona ?? zonaNavegador));
+  return aHora(minutosLocal(iso, zona ?? sesion.zonaHoraria));
 }
 const libres = computed(() => hoy.value?.libres ?? null);
 
@@ -383,10 +458,27 @@ onMounted(() => {
         }}
       </p>
       <div class="mt-6 flex flex-wrap items-center gap-4">
+        <!-- Lo que sigue se abre directo; la agenda completa queda a un lado. -->
         <RouterLink
-          v-if="puedeEntrar('agenda', sesion)"
-          :to="{ name: 'agenda' }"
+          v-if="siguiente && veAgenda"
+          :to="enAgenda(siguiente)"
           class="tu-btn tu-btn-primario inline-flex"
+          data-prueba="abrir-siguiente"
+        >
+          {{
+            $t("operacion.hoy.verSesion", {
+              sesion: sesion.terminologia.sesion.toLowerCase(),
+            })
+          }}
+        </RouterLink>
+        <RouterLink
+          v-if="veAgenda"
+          :to="{ name: 'agenda' }"
+          :class="
+            siguiente
+              ? 'tu-enlace text-sm'
+              : 'tu-btn tu-btn-primario inline-flex'
+          "
         >
           {{ $t("operacion.hoy.abrirAgenda") }}
         </RouterLink>
@@ -491,42 +583,40 @@ onMounted(() => {
           >
             <span class="hoy-hora">{{ hora(s) }}</span>
             <span class="min-w-0 flex-1">
-              <span
-                class="block font-semibold hoy-nombre"
-                :class="{ 'line-through': s.cancelada }"
-                >{{ esCitas && s.cliente ? s.cliente : nombre(s) }}</span
+              <!-- Tocar la fila abre esa clase o cita en la agenda. -->
+              <component
+                :is="veAgenda ? RouterLink : 'span'"
+                v-bind="veAgenda ? { to: enAgenda(s) } : {}"
+                class="block hoy-abrir"
+                data-prueba="abrir-sesion"
               >
-              <span
-                class="block text-sm hoy-detalle"
-                :style="{ color: 'var(--texto-suave)' }"
-                >{{
-                  [esCitas ? s.oferta : null, s.instructor, s.sucursal]
-                    .filter(Boolean)
-                    .join(" · ")
-                }}</span
-              >
+                <span
+                  class="block font-semibold hoy-nombre"
+                  :class="{ 'line-through': s.cancelada }"
+                  >{{ esCitas && s.cliente ? s.cliente : nombre(s) }}</span
+                >
+                <span
+                  class="block text-sm hoy-detalle"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ detalleFila(s) }}</span
+                >
+              </component>
               <RouterLink
                 v-if="
                   !s.cancelada &&
                   s.sin_marcar > 0 &&
                   sesion.puede('asistencia.marcar') &&
-                  puedeEntrar(esCitas ? 'agenda' : 'recepcion', sesion)
+                  paraMarcar(s) !== null
                 "
-                :to="{ name: esCitas ? 'agenda' : 'recepcion' }"
+                :to="paraMarcar(s) ?? ''"
                 class="mt-0.5 block text-sm"
                 :style="{ color: 'var(--aviso)' }"
+                data-prueba="marcar-pendiente"
                 >{{
                   s.tipo === "cita"
                     ? $t("operacion.hoy.citas.marcarLlegada")
                     : $t("operacion.hoy.pasarLista", s.sin_marcar)
                 }}</RouterLink
-              >
-              <span
-                v-if="s.tipo === 'cita' && !s.cancelada && s.por_cobrar"
-                class="mt-0.5 block text-sm"
-                :style="{ color: 'var(--aviso)' }"
-                data-prueba="cita-por-cobrar"
-                >{{ $t("operacion.hoy.citas.porCobrar") }}</span
               >
               <span
                 v-if="s.tipo !== 'cita' && (s.en_espera ?? 0) > 0"
@@ -538,41 +628,57 @@ onMounted(() => {
               >
             </span>
             <span class="hoy-estado text-sm">
-              <span
-                v-if="s.tipo !== 'cita' && !s.cancelada"
-                class="block tabular-nums"
-                >{{
+              <!-- Clases: su cupo y cómo va. -->
+              <template v-if="s.tipo !== 'cita'">
+                <span v-if="!s.cancelada" class="block tabular-nums">{{
                   s.capacidad
                     ? $t("operacion.hoy.cupo", {
                         n: s.esperados,
                         total: s.capacidad,
                       })
                     : s.esperados
-                }}</span
-              >
-              <span
-                v-if="s.tipo !== 'cita' && !s.cancelada && s.capacidad"
-                class="hoy-ocupacion"
-                aria-hidden="true"
-                ><span :style="{ width: `${ocupacion(s)}%` }"
-              /></span>
-              <span
-                v-if="s.tipo === 'cita' && !s.cancelada && s.llegaron > 0"
-                class="hoy-status"
-                :style="{ '--tono': 'var(--exito-texto, var(--exito))' }"
-                >{{ $t("operacion.hoy.citas.llego") }}</span
-              >
-              <span
-                v-else
-                class="hoy-status"
-                :style="{
-                  '--tono':
-                    s.momento === 'en_curso'
-                      ? 'var(--primario)'
-                      : 'var(--texto-suave)',
-                }"
-                >{{ $t(`operacion.hoy.momento.${s.momento}`) }}</span
-              >
+                }}</span>
+                <span
+                  v-if="!s.cancelada && s.capacidad"
+                  class="hoy-ocupacion"
+                  aria-hidden="true"
+                  ><span :style="{ width: `${ocupacion(s)}%` }"
+                /></span>
+                <span
+                  class="hoy-status"
+                  :style="{
+                    '--tono':
+                      s.momento === 'en_curso'
+                        ? 'var(--primario)'
+                        : 'var(--texto-suave)',
+                  }"
+                  >{{ $t(`operacion.hoy.momento.${s.momento}`) }}</span
+                >
+              </template>
+              <!-- Citas: si llegó y si falta cobrarla. -->
+              <template v-else>
+                <span
+                  v-if="s.cancelada"
+                  class="hoy-status"
+                  :style="{ '--tono': 'var(--texto-suave)' }"
+                  >{{ $t("operacion.hoy.momento.cancelada") }}</span
+                >
+                <template v-else>
+                  <span
+                    class="hoy-status"
+                    :style="{ '--tono': llegada(s).tono }"
+                    data-prueba="cita-llegada"
+                    >{{ llegada(s).texto }}</span
+                  >
+                  <span
+                    v-if="s.por_cobrar"
+                    class="hoy-status"
+                    :style="{ '--tono': 'var(--aviso)' }"
+                    data-prueba="cita-por-cobrar"
+                    >{{ $t("operacion.hoy.citas.porCobrar") }}</span
+                  >
+                </template>
+              </template>
             </span>
           </li>
         </ul>
@@ -780,6 +886,9 @@ onMounted(() => {
 .hoy-nombre,
 .hoy-detalle {
   overflow-wrap: anywhere;
+}
+a.hoy-abrir:hover .hoy-nombre {
+  color: var(--primario);
 }
 .hoy-detalle {
   margin-top: 0.2rem;

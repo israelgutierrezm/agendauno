@@ -15,7 +15,12 @@ vi.mock("@/lib/api", () => ({
   mensajeDeError: () => "Error",
 }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
+  useSesionTenantStore: () => ({
+    slug: "demo",
+    esCitas: true,
+    terminologia: { miembro: "Cliente", instructor: "Profesional" },
+    puede: () => true,
+  }),
 }));
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),

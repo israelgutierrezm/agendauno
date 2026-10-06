@@ -13,6 +13,7 @@ export default {
     atencion: {
       todas: "Todas",
       pendientes: "Por atender",
+      sinRegistrar: "Sin registrar",
       llegaron: "Llegaron",
       canceladas: "Canceladas",
     },
@@ -225,6 +226,8 @@ export default {
     sinResultados: "No hay actividad que coincida con tu búsqueda.",
     limpiar: "Limpiar búsqueda y filtros",
     abrirAgenda: "Abrir agenda",
+    // Abre directo lo que sigue (la clase o la cita), con el término del negocio.
+    verSesion: "Ver {sesion}",
     irRecepcion: "Ir a recepción →",
     agenda: "Agenda de hoy",
     verAgenda: "Ver agenda →",
@@ -256,6 +259,10 @@ export default {
       marcarLlegada: "Falta marcar si llegó",
       porCobrar: "Por cobrar",
       llego: "Llegó",
+      noAsistio: "No asistió",
+      // Ya terminó y nadie registró si vino.
+      sinRegistrar: "Sin registrar",
+      duracion: "{n} min",
       libres: "Espacios libres hoy",
       agendar: "Agendar →",
       nadieAtiende: "Hoy nadie tiene horario de atención.",
@@ -265,7 +272,10 @@ export default {
       kpi: {
         citas: "Citas hoy",
         llegaron: "Ya llegaron",
+        // Aún no terminan y nadie registró la llegada.
         porAtender: "Por atender",
+        // Ya terminaron y falta registrar si vino o no.
+        sinRegistrar: "Sin registrar",
         porCobrar: "Por cobrar",
       },
     },

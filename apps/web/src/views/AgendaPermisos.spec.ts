@@ -92,6 +92,8 @@ describe("agenda con solo «ver agenda»", () => {
     const w = montar();
     await flushPromises();
 
+    // Los filtros van plegados: se abren con «Filtros».
+    await w.get('[data-prueba="mostrar-filtros"]').trigger("click");
     const pedidas = api.get.mock.calls.map((c) => String(c[0]));
     expect(
       pedidas.some((u) => /\/(ofertas|sucursales|miembros)$/.test(u)),
@@ -124,6 +126,7 @@ describe("agenda con solo «ver agenda»", () => {
 
     expect(w.text()).toContain("sin profesionales");
     // Las sesiones cargaron igual.
+    await w.get('[data-prueba="mostrar-filtros"]').trigger("click");
     expect(w.findAll("option").map((o) => o.text())).toContain("Sucursal su1");
   });
 });

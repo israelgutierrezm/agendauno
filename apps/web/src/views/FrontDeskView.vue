@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 
 import ActualizadoHace from "@/components/ActualizadoHace.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -20,6 +20,7 @@ import { useRecargarAlVolver } from "@/lib/alVolver";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { useAnchoMinimo } from "@/lib/pantalla";
+import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Sucursal {
@@ -62,11 +63,24 @@ function iso(d: Date): string {
   const p = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
+// «Hoy» del negocio (su zona horaria), no el del navegador.
 function isoHoy(): string {
-  return iso(new Date());
+  return hoyEnNegocio(sesion.zonaHoraria);
 }
 
-const fecha = ref(isoHoy());
+// `?fecha=&sesion=` (p. ej. «Pasar lista» desde el Inicio) abre ese día con esa
+// clase a la vista; sin ellos, hoy.
+const ruta = useRoute();
+const fechaPedida = ruta?.query.fecha;
+const fecha = ref(
+  typeof fechaPedida === "string" && /^\d{4}-\d{2}-\d{2}$/.test(fechaPedida)
+    ? fechaPedida
+    : isoHoy(),
+);
+let sesionPedida: string | null =
+  typeof ruta?.query.sesion === "string" && ruta.query.sesion !== ""
+    ? ruta.query.sesion
+    : null;
 const sucursalFiltro = ref("");
 // Con una sucursal fija (la de la barra o la única), su filtro sobra.
 const { mostrarSelect: elegirSucursal } = useSucursalOperativa({
@@ -289,6 +303,14 @@ async function cargar(enSegundoPlano = false): Promise<void> {
     }>(`${base.value}/front-desk`, { params });
     metricas.value = data.metricas;
     sesiones.value = data.sesiones;
+    // La clase que se pidió al entrar, una sola vez (también en el teléfono).
+    if (sesionPedida !== null) {
+      const pedida = sesiones.value.find((s) => s.id === sesionPedida);
+      sesionPedida = null;
+      if (pedida !== undefined) {
+        sesionActiva.value = pedida;
+      }
+    }
     // En escritorio siempre hay una clase a la vista (la que sigue).
     if (esEscritorio.value) {
       const misma = sesiones.value.find((s) => s.id === sesionActiva.value?.id);
@@ -341,6 +363,14 @@ const tarjetas = computed<Indicador[]>(() => {
         valor: String(r.porAtender),
         icono: "reloj",
         tono: "cielo",
+      },
+      // Terminaron sin que nadie registrara si vino: no es atención pendiente.
+      {
+        clave: "sinRegistrar",
+        valor: String(r.sinRegistrar),
+        icono: "lista",
+        tono: "morado",
+        aviso: r.sinRegistrar > 0,
       },
       {
         clave: "porCobrar",

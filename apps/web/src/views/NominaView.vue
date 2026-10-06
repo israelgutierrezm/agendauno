@@ -12,6 +12,7 @@ import TarjetasIndicadores, {
 import { api, mensajeDeError } from "@/lib/api";
 import { nombreDeRol } from "@/lib/roles";
 import { plural } from "@/lib/terminologia";
+import { hoyComoFecha } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -76,7 +77,8 @@ function iso(d: Date): string {
   const p = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
-const hoy = new Date();
+// El mes en curso del negocio (su zona horaria).
+const hoy = hoyComoFecha(sesion.zonaHoraria);
 const periodo = ref({
   desde: iso(new Date(hoy.getFullYear(), hoy.getMonth(), 1)),
   hasta: iso(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0)),

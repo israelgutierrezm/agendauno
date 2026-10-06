@@ -409,7 +409,7 @@ onMounted(cargar);
         v-if="ofertas.length === 0"
         class="mt-8"
         icono="etiqueta"
-        :titulo="$t('catalogo.vacio')"
+        :titulo="esCitas ? $t('catalogo.vacio') : $t('catalogo.vacioClases')"
       />
 
       <template v-else>
@@ -456,7 +456,11 @@ onMounted(cargar);
                           v-if="guardadoId === o.id"
                           class="ml-2 text-sm"
                           :style="{ color: 'var(--exito)' }"
-                          >{{ $t("catalogo.guardado") }}</span
+                          >{{
+                            esCitas
+                              ? $t("catalogo.guardado")
+                              : $t("catalogo.guardadoClases")
+                          }}</span
                         >
                       </p>
                       <p class="ct-sub">
@@ -641,7 +645,9 @@ onMounted(cargar);
               >{{ $t("catalogo.duracionReq") }}</span
             >
             <span v-else class="tu-hint">{{
-              $t("catalogo.duracionAyuda")
+              esCitas
+                ? $t("catalogo.duracionAyuda")
+                : $t("catalogo.duracionAyudaClases")
             }}</span>
           </div>
           <div>

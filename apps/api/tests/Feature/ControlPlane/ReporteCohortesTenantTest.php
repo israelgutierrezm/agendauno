@@ -101,3 +101,25 @@ it('el reporte de cohortes exige facturacion.ver (recepción no entra)', functio
 
     $this->getJson("/api/v1/app/{$e['slug']}/reportes/cohortes", conBearer($recep))->assertForbidden();
 });
+
+it('archivar a alguien no achica su cohorte ni mejora la retención', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $ana = crearMiembroTenant($e, 'Ana');
+    crearMiembroTenant($e, 'Beto');
+    $caro = crearMiembroTenant($e, 'Caro');
+
+    // Solo Ana asiste (con su paquete); Caro deja de venir y se archiva.
+    comprarPack($e, $ana, crearPackTenant($e, 8000));
+    $sesion = crearSesionTenant($e, agendaSemilla($e));
+    $reserva = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", ['persona_id' => $ana], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$e['slug']}/reservas/{$reserva}/asistencia", ['estado' => 'presente'], conBearer($e['bearer']))->assertSuccessful();
+    $this->putJson("/api/v1/app/{$e['slug']}/miembros/{$caro}", ['archivado' => true], conBearer($e['bearer']))->assertOk();
+
+    $actual = collect($this->getJson("/api/v1/app/{$e['slug']}/reportes/cohortes?meses=6", conBearer($e['bearer']))
+        ->assertOk()->json('data.cohortes'))->last();
+
+    // Sigue siendo 1 de 3 (33 %), no 1 de 2 (50 %).
+    expect($actual['tamano'])->toBe(3)
+        ->and($actual['retencion'][0])->toBe(33);
+});

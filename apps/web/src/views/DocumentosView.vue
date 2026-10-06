@@ -6,6 +6,7 @@ import { useRoute, useRouter } from "vue-router";
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -89,6 +90,27 @@ const consentimientosVigentes = ref<Consentimiento[]>([]);
 const cargando = ref(true);
 const error = ref<string | null>(null);
 const filtroEstado = ref("");
+// El listado va por páginas: ningún documento se queda fuera (antes, solo los
+// últimos 200).
+interface MetaPaginas {
+  total: number;
+  page: number;
+  per_page: number;
+  ultima_pagina: number;
+}
+const OPCIONES_POR_PAGINA = [25, 50, 100];
+const pagina = ref(1);
+const porPagina = ref(25);
+const meta = ref<MetaPaginas | null>(null);
+function irPagina(n: number): void {
+  pagina.value = n;
+  void cargar();
+}
+function cambiarPorPagina(n: number): void {
+  porPagina.value = n;
+  pagina.value = 1;
+  void cargar();
+}
 
 function fecha(iso: string | null): string {
   if (iso === null) {
@@ -107,8 +129,12 @@ async function cargar(): Promise<void> {
   try {
     const [t, d, c] = await Promise.all([
       api.get<{ data: TipoDoc[] }>(`${base.value}/tipos-documento`),
-      api.get<{ data: Doc[] }>(`${base.value}/documentos`, {
-        params: filtroEstado.value !== "" ? { estado: filtroEstado.value } : {},
+      api.get<{ data: Doc[]; meta?: MetaPaginas }>(`${base.value}/documentos`, {
+        params: {
+          page: pagina.value,
+          per_page: porPagina.value,
+          ...(filtroEstado.value !== "" ? { estado: filtroEstado.value } : {}),
+        },
       }),
       puedeGestionar.value
         ? api.get<{ data: Consentimiento[] }>(`${base.value}/waivers`)
@@ -116,6 +142,7 @@ async function cargar(): Promise<void> {
     ]);
     tipos.value = t.data.data;
     docs.value = d.data.data;
+    meta.value = d.data.meta ?? null;
     consentimientosVigentes.value = c.data.data;
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -380,6 +407,7 @@ onMounted(cargar);
               :data-prueba="`filtro-doc-${f || 'todos'}`"
               @click="
                 filtroEstado = f;
+                pagina = 1;
                 cargar();
               "
             >
@@ -465,6 +493,16 @@ onMounted(cargar);
             </tr>
           </tbody>
         </table>
+        <PaginacionListado
+          v-if="meta && meta.total > 0"
+          :page="meta.page"
+          :ultima-pagina="meta.ultima_pagina"
+          :total="meta.total"
+          :per-page="meta.per_page"
+          :opciones-por-pagina="OPCIONES_POR_PAGINA"
+          @ir="irPagina"
+          @por-pagina="cambiarPorPagina"
+        />
       </div>
 
       <div v-if="puedeSubir" class="tu-card p-5 h-max">

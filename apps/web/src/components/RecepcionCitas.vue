@@ -29,6 +29,7 @@ export interface ResumenCitas {
   citas: number;
   llegaron: number;
   porAtender: number;
+  sinRegistrar: number;
   porCobrar: number;
 }
 
@@ -47,7 +48,9 @@ const cargando = ref(true);
 const error = ref<string | null>(null);
 const abierta = ref<SesionAgenda | null>(null);
 const busqueda = ref("");
-const filtro = ref<"todas" | "pendientes" | "llegaron" | "canceladas">("todas");
+const filtro = ref<
+  "todas" | "pendientes" | "sinRegistrar" | "llegaron" | "canceladas"
+>("todas");
 const visibles = computed(() => {
   const q = normalizar(busqueda.value.trim());
   return citas.value.filter((s) => {
@@ -55,6 +58,7 @@ const visibles = computed(() => {
     const coincide =
       filtro.value === "todas" ||
       (filtro.value === "pendientes" && estado === "confirmada") ||
+      (filtro.value === "sinRegistrar" && estado === "sin_registrar") ||
       (filtro.value === "llegaron" &&
         s.estado === "programada" &&
         s.cita?.asistencia === "presente") ||
@@ -150,8 +154,12 @@ const resumen = computed<ResumenCitas>(() => {
     citas: activas.value.length,
     llegaron: activas.value.filter((s) => s.cita?.asistencia === "presente")
       .length,
+    // Por atender: aún no terminan. Sin registrar: terminaron y nadie dijo si vino.
     porAtender: activas.value.filter(
       (s) => estadoCita(s, ahora) === "confirmada",
+    ).length,
+    sinRegistrar: activas.value.filter(
+      (s) => estadoCita(s, ahora) === "sin_registrar",
     ).length,
     porCobrar: activas.value.filter((s) => {
       const p = pagoCita(s);
@@ -178,6 +186,7 @@ function atencion(s: SesionAgenda): { texto: string; tono: string } {
     completada: "var(--texto-suave)",
     no_asistio: "var(--error)",
     cancelada: "var(--texto-suave)",
+    sin_registrar: "var(--aviso)",
   };
   return {
     texto: t(`agendaVisual.estadosCita.${e}`),
@@ -236,6 +245,7 @@ defineExpose({ cargar });
           v-for="op in [
             'todas',
             'pendientes',
+            'sinRegistrar',
             'llegaron',
             'canceladas',
           ] as const"

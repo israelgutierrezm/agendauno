@@ -4,6 +4,7 @@ import { computed, ref, watch } from "vue";
 import AgendaMes from "@/components/AgendaMes.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import type { SesionAgenda } from "@/lib/agenda";
+import { hoyEnNegocio } from "@/lib/hoyNegocio";
 
 /**
  * Calendario personal en lista, día, semana o mes (portal del alumno y del
@@ -45,6 +46,8 @@ const props = defineProps<{
   diasLista?: number;
   /** Tarjetas de trabajo con hora, nombre y contexto en la vista semanal. */
   detallado?: boolean;
+  /** Zona horaria del negocio: define qué día es «hoy» (sin ella, el navegador). */
+  zona?: string;
 }>();
 const emit = defineEmits<{
   abrir: [id: string];
@@ -73,7 +76,11 @@ watch(vista, (v) => {
   }
 });
 
-const hoy = () => {
+const hoy = (): Date => {
+  if (props.zona) {
+    const [a, m, d] = hoyEnNegocio(props.zona).split("-").map(Number);
+    return new Date(a, m - 1, d);
+  }
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 };
@@ -437,6 +444,7 @@ defineExpose({ irDia });
         :sesiones="comoSesiones"
         :catalogo="[]"
         :destacadas="destacadas"
+        :hoy="isoDe(hoy())"
         @abrir="(s) => emit('abrir', s.id)"
         @dia="irDia"
       />

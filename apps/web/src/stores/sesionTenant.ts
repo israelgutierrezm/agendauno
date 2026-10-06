@@ -199,6 +199,15 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
   const esCitas = computed(() => modalidad.value === "citas");
   /** Moneda del negocio (ISO 4217): la de los precios nuevos. */
   const moneda = computed(() => estudio.value?.moneda ?? "MXN");
+  /**
+   * Zona horaria del negocio (ADR 0099): define qué día es «hoy» en sus pantallas,
+   * aunque quien mira esté en otra zona. Sin dato, la del navegador.
+   */
+  const zonaHoraria = computed(
+    () =>
+      estudio.value?.zona_horaria ||
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+  );
 
   /** Terminología del perfil (p. ej. Cita / Cliente / Barbero). */
   const terminologia = computed<Terminologia>(
@@ -440,6 +449,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     modalidad,
     esCitas,
     moneda,
+    zonaHoraria,
     terminologia,
     iniciarSesion,
     iniciarSesionConGoogle,

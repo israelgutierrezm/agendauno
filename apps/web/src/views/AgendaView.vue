@@ -38,6 +38,7 @@ import {
 } from "@/lib/agenda";
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
+import { hoyComoFecha, hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { confirmarAsistencia } from "@/lib/confirmarAsistencia";
 import { trackEvent } from "@/lib/analytics";
@@ -178,10 +179,18 @@ const vista = ref<Vista>(sesion.esCitas ? "profesionales" : "semana");
 // `?fecha=AAAA-MM-DD` abre la agenda en ese día (p. ej. «Ver en agenda» desde el
 // detalle de un cliente); sin ella, hoy.
 const fechaPedida = useRoute()?.query.fecha;
+// `?sesion=<id>` además abre esa clase o cita (p. ej. un pendiente del Inicio): se
+// llega a lo que hay que atender, no a la agenda general a buscarlo.
+const sesionPedidaQuery = useRoute()?.query.sesion;
+let sesionPedida: string | null =
+  typeof sesionPedidaQuery === "string" && sesionPedidaQuery !== ""
+    ? sesionPedidaQuery
+    : null;
+// «Hoy» es el del negocio (su zona horaria), no el del navegador de quien mira.
 const fechaInicial =
   typeof fechaPedida === "string" && /^\d{4}-\d{2}-\d{2}$/.test(fechaPedida)
     ? new Date(`${fechaPedida}T12:00:00`)
-    : new Date();
+    : hoyComoFecha(sesion.zonaHoraria);
 const semanaInicio = ref(lunesDe(fechaInicial));
 // Vista mensual: primer día del mes que se muestra.
 const mesInicio = ref(
@@ -199,10 +208,26 @@ const ofertaFiltro = ref("");
 const filtrosAbiertos = ref(false);
 const filtrosActivos = computed(
   () =>
-    [sucursalFiltro.value, instructorFiltro.value, ofertaFiltro.value].filter(
-      (v) => v !== "",
-    ).length,
+    [
+      elegirSucursal.value ? sucursalFiltro.value : "",
+      instructorFiltro.value,
+      ofertaFiltro.value,
+    ].filter((v) => v !== "").length,
 );
+// Hay algo que filtrar (varias sucursales, profesionales o clases/servicios).
+const hayFiltros = computed(
+  () =>
+    elegirSucursal.value ||
+    (instructores.value.length > 0 && !soloLoSuyo.value) ||
+    ofertasAgenda.value.length > 1,
+);
+function quitarFiltros(): void {
+  if (elegirSucursal.value) {
+    sucursalFiltro.value = "";
+  }
+  instructorFiltro.value = "";
+  ofertaFiltro.value = "";
+}
 
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
@@ -232,7 +257,7 @@ const dias = computed(() =>
         fecha,
       ),
       dia: fecha.getDate(),
-      esHoy: isoDe(fecha) === isoDe(new Date()),
+      esHoy: isoDe(fecha) === hoyEnNegocio(sesion.zonaHoraria),
     };
   }),
 );
@@ -487,9 +512,37 @@ function colorTipo(s: Sesion): string {
   return tonoServicio(s.oferta_id, catalogo.value, s.oferta).tinta;
 }
 function pctOcupacion(s: Sesion): number | null {
+  // Una cita no tiene cupo que llenar (su «1/1» no dice nada).
+  if (s.tipo === "cita") {
+    return null;
+  }
   return s.capacidad !== null && s.capacidad > 0
     ? Math.round((s.ocupados / s.capacidad) * 100)
     : null;
+}
+// Una cita se presenta como cita: cuánto dura, quién atiende, si llegó y si falta
+// cobrarla. Las clases conservan su cupo.
+function minutosDe(s: Sesion): number {
+  return Math.max(
+    0,
+    Math.round(
+      (new Date(s.termina_en).getTime() - new Date(s.inicia_en).getTime()) /
+        60_000,
+    ),
+  );
+}
+function detalleCita(s: Sesion): string {
+  return [
+    t("agendaVisual.cita.minutos", { n: minutosDe(s) }),
+    s.instructor,
+    s.sala,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+function faltaCobrar(s: Sesion): boolean {
+  const p = pagoCita(s);
+  return p === "por_cobrar" || p === "por_pagar";
 }
 // Estado perceptible por ocupación: disponible / casi (>=80%) / llena / cancelada.
 function estadoAgenda(
@@ -584,6 +637,14 @@ async function cargarSesiones(): Promise<void> {
     ]);
     sesiones.value = data.data;
     sesionesPrevias.value = previas?.data.data ?? [];
+    // La que se pidió al entrar, una sola vez.
+    if (sesionPedida !== null) {
+      const pedida = sesiones.value.find((x) => x.id === sesionPedida);
+      sesionPedida = null;
+      if (pedida !== undefined) {
+        abrirDesdeAgenda(pedida);
+      }
+    }
     if (sesion.esCitas) {
       const b = await api.get<{ data: BloqueoAgenda[] }>(
         `${base.value}/bloqueos`,
@@ -629,13 +690,10 @@ function irSemana(delta: number): void {
   diaSel.value = isoDe(sumarDias(semanaInicio.value, offset >= 0 ? offset : 0));
 }
 function irHoy(): void {
-  semanaInicio.value = lunesDe(new Date());
-  diaSel.value = isoDe(new Date());
-  mesInicio.value = new Date(
-    new Date().getFullYear(),
-    new Date().getMonth(),
-    1,
-  );
+  const hoy = hoyComoFecha(sesion.zonaHoraria);
+  semanaInicio.value = lunesDe(hoy);
+  diaSel.value = isoDe(hoy);
+  mesInicio.value = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
 }
 function irMes(delta: number): void {
   mesInicio.value = new Date(
@@ -1766,102 +1824,10 @@ onMounted(async () => {
 
     <!-- En el teléfono, los indicadores y la leyenda van después de las citas. -->
     <div v-if="!cargando" class="flex flex-col">
-      <!-- Barra de herramientas: filtros + navegacion + vista -->
-      <div class="mt-6 flex flex-wrap items-center gap-2 sm:gap-3">
-        <button
-          v-if="
-            elegirSucursal ||
-            (instructores.length > 0 && !soloLoSuyo) ||
-            ofertasAgenda.length > 1
-          "
-          type="button"
-          class="tu-btn tu-btn-fantasma sm:hidden"
-          data-prueba="mostrar-filtros"
-          :aria-expanded="filtrosAbiertos"
-          :style="
-            filtrosAbiertos || filtrosActivos
-              ? {
-                  borderColor: 'var(--primario)',
-                  color: 'var(--primario-fuerte)',
-                }
-              : {}
-          "
-          @click="filtrosAbiertos = !filtrosAbiertos"
-        >
-          <IconoNav nombre="ajustes" :tam="16" />
-          {{ $t("tabla.filtros") }}
-          <span
-            v-if="filtrosActivos"
-            class="rounded-full px-1.5 text-xs"
-            :style="{
-              background: 'var(--primario)',
-              color: 'var(--primario-contraste)',
-            }"
-            >{{ filtrosActivos }}</span
-          >
-        </button>
-        <span
-          v-if="elegirSucursal"
-          class="tu-select-icono"
-          :class="filtrosAbiertos ? 'max-sm:w-full' : 'max-sm:hidden'"
-        >
-          <IconoNav nombre="ubicacion" :tam="18" />
-          <select
-            v-model="sucursalFiltro"
-            class="tu-input w-auto max-sm:w-full"
-            :aria-label="$t('agenda.nueva.sucursal')"
-          >
-            <option value="">{{ $t("agenda.todasSucursales") }}</option>
-            <option v-for="s in sucursalesAgenda" :key="s.id" :value="s.id">
-              {{ s.nombre }}
-            </option>
-          </select>
-        </span>
-        <span
-          v-if="instructores.length > 0 && !soloLoSuyo"
-          class="tu-select-icono"
-          :class="filtrosAbiertos ? 'max-sm:w-full' : 'max-sm:hidden'"
-        >
-          <IconoNav nombre="instructores" :tam="18" />
-          <select
-            v-model="instructorFiltro"
-            class="tu-input w-auto max-sm:w-full"
-            :aria-label="$t('agenda.nueva.instructor')"
-          >
-            <option value="">
-              {{
-                $t("agendaVisual.todosLos", {
-                  grupo: plural(sesion.terminologia.instructor).toLowerCase(),
-                })
-              }}
-            </option>
-            <option v-for="i in instructores" :key="i.id" :value="i.id">
-              {{ i.nombre }}
-            </option>
-          </select>
-        </span>
-
-        <span
-          v-if="ofertasAgenda.length > 1"
-          class="tu-select-icono"
-          :class="filtrosAbiertos ? 'max-sm:w-full' : 'max-sm:hidden'"
-        >
-          <IconoNav nombre="etiqueta" :tam="18" />
-          <select
-            v-model="ofertaFiltro"
-            class="tu-input w-auto max-sm:w-full"
-            :aria-label="$t('agendaOperacion.servicio')"
-          >
-            <option value="">{{ $t("agendaOperacion.todosServicios") }}</option>
-            <option v-for="o in ofertasAgenda" :key="o.id" :value="o.id">
-              {{ o.nombre }}
-            </option>
-          </select>
-        </span>
-
-        <div
-          class="flex items-center gap-1 sm:ml-auto max-sm:order-first max-sm:mr-auto"
-        >
+      <!-- Una sola barra: la fecha, la vista y los filtros (plegados, con cuántos
+           hay puestos). Así el calendario aparece casi de inmediato. -->
+      <div class="mt-4 flex flex-wrap items-center gap-2 sm:gap-3">
+        <div class="flex items-center gap-1 max-sm:mr-auto">
           <button
             class="tu-btn tu-btn-fantasma ag-paso"
             :aria-label="
@@ -1897,18 +1863,15 @@ onMounted(async () => {
             >{{ vista === "profesionales" ? diaTexto : rangoTexto }}</span
           >
         </div>
-      </div>
 
-      <!-- Alternar vista según la modalidad (citas: por profesional / semana;
-           clases: semana / día). En móvil, las clases siempre se ven por día. -->
-      <div class="mt-3">
+        <!-- Vista según la modalidad (citas: por profesional / semana / mes;
+             clases: semana / día / mes). En el teléfono, las clases se ven por día
+             y las citas, por día o por mes. -->
         <div
-          class="tu-segmentado"
+          class="tu-segmentado sm:ml-auto"
           :class="{ 'hidden lg:inline-flex': !sesion.esCitas }"
           role="group"
         >
-          <!-- En el teléfono las citas se ven por día (por profesional y por
-               semana se ven igual), así que solo se ofrece «Día» y «Mes». -->
           <button
             v-for="op in opcionesVista"
             :key="op"
@@ -1926,50 +1889,158 @@ onMounted(async () => {
             <template v-else>{{ $t(`agendaVisual.vistas.${op}`) }}</template>
           </button>
         </div>
+
+        <button
+          v-if="hayFiltros"
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          data-prueba="mostrar-filtros"
+          :aria-expanded="filtrosAbiertos"
+          :style="
+            filtrosAbiertos || filtrosActivos
+              ? {
+                  borderColor: 'var(--primario)',
+                  color: 'var(--primario-fuerte)',
+                }
+              : {}
+          "
+          @click="filtrosAbiertos = !filtrosAbiertos"
+        >
+          <IconoNav nombre="ajustes" :tam="16" />
+          {{ $t("tabla.filtros") }}
+          <span
+            v-if="filtrosActivos"
+            class="rounded-full px-1.5 text-xs"
+            :style="{
+              background: 'var(--primario)',
+              color: 'var(--primario-contraste)',
+            }"
+            >{{ filtrosActivos }}</span
+          >
+        </button>
       </div>
 
-      <!-- Indicadores del día (citas) o de la semana (clases). -->
-      <AgendaKpis
-        v-if="vista !== 'mes'"
-        class="mt-4 max-lg:order-last"
-        :tarjetas="tarjetasKpi"
-      />
-
-      <!-- Leyenda: el color identifica el servicio o la clase. Plegada: primero
-           el calendario; se abre con un toque y se recuerda. -->
+      <!-- Los filtros, cuando se abren: sucursal, quién atiende y qué clase o
+           servicio. -->
       <div
-        v-if="leyenda.length > 0"
-        class="mt-2 text-xs max-lg:order-last"
-        :style="{ color: 'var(--texto-suave)' }"
+        v-if="hayFiltros && filtrosAbiertos"
+        class="mt-2 flex flex-wrap items-center gap-2"
+        data-prueba="filtros-agenda"
       >
-        <button
-          type="button"
-          class="ag-leyenda-boton"
-          :aria-expanded="leyendaAbierta"
-          data-prueba="leyenda-agenda"
-          @click="leyendaAbierta = !leyendaAbierta"
+        <span v-if="elegirSucursal" class="tu-select-icono max-sm:w-full">
+          <IconoNav nombre="ubicacion" :tam="18" />
+          <select
+            v-model="sucursalFiltro"
+            class="tu-input w-auto max-sm:w-full"
+            :aria-label="$t('agenda.nueva.sucursal')"
+          >
+            <option value="">{{ $t("agenda.todasSucursales") }}</option>
+            <option v-for="s in sucursalesAgenda" :key="s.id" :value="s.id">
+              {{ s.nombre }}
+            </option>
+          </select>
+        </span>
+        <span
+          v-if="instructores.length > 0 && !soloLoSuyo"
+          class="tu-select-icono max-sm:w-full"
         >
-          <span class="ag-leyenda-puntos" aria-hidden="true">
-            <span
-              v-for="l in leyenda.slice(0, 4)"
-              :key="l.id"
-              :style="{ background: l.tinta }"
-            ></span>
-          </span>
-          {{
-            sesion.esCitas
-              ? $t("agendaVisual.leyendaVerServicios", { n: leyenda.length })
-              : $t("agendaVisual.leyendaVerClases", { n: leyenda.length })
-          }}
-          <IconoNav
-            nombre="chevron"
-            :tam="14"
-            :class="{ 'rotate-180': leyendaAbierta }"
-          />
+          <IconoNav nombre="instructores" :tam="18" />
+          <select
+            v-model="instructorFiltro"
+            class="tu-input w-auto max-sm:w-full"
+            :aria-label="$t('agenda.nueva.instructor')"
+          >
+            <option value="">
+              {{
+                $t("agendaVisual.todosLos", {
+                  grupo: plural(sesion.terminologia.instructor).toLowerCase(),
+                })
+              }}
+            </option>
+            <option v-for="i in instructores" :key="i.id" :value="i.id">
+              {{ i.nombre }}
+            </option>
+          </select>
+        </span>
+        <span
+          v-if="ofertasAgenda.length > 1"
+          class="tu-select-icono max-sm:w-full"
+        >
+          <IconoNav nombre="etiqueta" :tam="18" />
+          <select
+            v-model="ofertaFiltro"
+            class="tu-input w-auto max-sm:w-full"
+            :aria-label="
+              sesion.esCitas
+                ? $t('agendaOperacion.servicio')
+                : $t('agendaOperacion.clase')
+            "
+          >
+            <option value="">
+              {{
+                sesion.esCitas
+                  ? $t("agendaOperacion.todosServicios")
+                  : $t("agendaOperacion.todasClases")
+              }}
+            </option>
+            <option v-for="o in ofertasAgenda" :key="o.id" :value="o.id">
+              {{ o.nombre }}
+            </option>
+          </select>
+        </span>
+        <button
+          v-if="filtrosActivos"
+          type="button"
+          class="tu-enlace text-sm"
+          data-prueba="quitar-filtros"
+          @click="quitarFiltros"
+        >
+          {{ $t("agendaVisual.quitarFiltros") }}
         </button>
+      </div>
+
+      <!-- Las cifras (del día en citas, de la semana en clases) y la leyenda de
+           colores, en una sola línea. En el teléfono van después del calendario. -->
+      <div
+        v-if="vista !== 'mes' || leyenda.length > 0"
+        class="mt-3 max-lg:order-last"
+      >
         <div
-          v-if="leyendaAbierta"
-          class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1"
+          class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2"
+        >
+          <AgendaKpis v-if="vista !== 'mes'" :tarjetas="tarjetasKpi" />
+          <button
+            v-if="leyenda.length > 0"
+            type="button"
+            class="ag-leyenda-boton text-xs ml-auto"
+            :style="{ color: 'var(--texto-suave)' }"
+            :aria-expanded="leyendaAbierta"
+            data-prueba="leyenda-agenda"
+            @click="leyendaAbierta = !leyendaAbierta"
+          >
+            <span class="ag-leyenda-puntos" aria-hidden="true">
+              <span
+                v-for="l in leyenda.slice(0, 4)"
+                :key="l.id"
+                :style="{ background: l.tinta }"
+              ></span>
+            </span>
+            {{
+              sesion.esCitas
+                ? $t("agendaVisual.leyendaVerServicios", { n: leyenda.length })
+                : $t("agendaVisual.leyendaVerClases", { n: leyenda.length })
+            }}
+            <IconoNav
+              nombre="chevron"
+              :tam="14"
+              :class="{ 'rotate-180': leyendaAbierta }"
+            />
+          </button>
+        </div>
+        <div
+          v-if="leyenda.length > 0 && leyendaAbierta"
+          class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"
+          :style="{ color: 'var(--texto-suave)' }"
           data-prueba="leyenda-colores"
         >
           <span
@@ -1996,6 +2067,7 @@ onMounted(async () => {
       <!-- ===== Vista MES: el mes en semanas; tocar un día lleva a ese día ===== -->
       <AgendaMes
         v-if="vista === 'mes'"
+        :hoy="hoyEnNegocio(sesion.zonaHoraria)"
         class="mt-4"
         :mes="mesInicio"
         :sesiones="sesionesVisibles"
@@ -2184,7 +2256,31 @@ onMounted(async () => {
                       : (b.sesion.oferta ?? "—")
                   }}
                 </div>
+                <!-- Cita: si llegó (punto), cuánto dura, quién atiende y si falta
+                     cobrarla. Clase: su cupo. -->
                 <div
+                  v-if="b.sesion.tipo === 'cita'"
+                  class="text-[10px] leading-tight truncate flex items-center gap-1"
+                  :style="{ opacity: 0.85 }"
+                  :title="`${$t(`agendaVisual.estadosCita.${estadoCita(b.sesion, new Date())}`)}${faltaCobrar(b.sesion) ? ' · ' + $t('agendaVisual.cita.porCobrar') : ''}`"
+                >
+                  <span
+                    class="tu-estado-dot"
+                    :style="{
+                      background:
+                        COLOR_ESTADO_CITA[estadoCita(b.sesion, new Date())],
+                    }"
+                  ></span>
+                  {{ detalleCita(b.sesion) }}
+                  <span
+                    v-if="faltaCobrar(b.sesion)"
+                    class="ag-por-cobrar"
+                    data-prueba="cita-por-cobrar"
+                    >$</span
+                  >
+                </div>
+                <div
+                  v-else
                   class="text-[10px] leading-tight truncate flex items-center gap-1"
                   :style="{ opacity: 0.85 }"
                 >
@@ -2271,7 +2367,14 @@ onMounted(async () => {
                     }}
                   </div>
                   <div
-                    v-if="s.instructor || s.sala"
+                    v-if="s.tipo === 'cita'"
+                    class="text-sm truncate"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    {{ detalleCita(s) }}
+                  </div>
+                  <div
+                    v-else-if="s.instructor || s.sala"
                     class="text-sm truncate"
                     :style="{ color: 'var(--texto-suave)' }"
                   >
@@ -3519,6 +3622,12 @@ onMounted(async () => {
 
 <style scoped>
 /* La leyenda plegada: un botón discreto con algunos colores de muestra. */
+.ag-por-cobrar {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--aviso);
+  font-weight: 700;
+}
 .ag-leyenda-boton {
   display: inline-flex;
   align-items: center;

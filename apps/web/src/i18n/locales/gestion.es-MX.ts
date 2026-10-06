@@ -1117,6 +1117,9 @@ export const cambiarSerie = {
 export const agendaOperacion = {
   todosServicios: "Todos los servicios",
   servicio: "Servicio",
+  // Negocio de clases: se filtra por clase, no por servicio.
+  todasClases: "Todas las clases",
+  clase: "Clase",
   pago: {
     pagada: "Pagada",
     por_cobrar: "Por cobrar",

@@ -28,11 +28,18 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class DocumentosController
 {
-    private const LIMITE = 200;
+    /** Por página (como Miembros): lo normal y el tope. Nada se queda fuera del listado. */
+    private const POR_PAGINA = 25;
+
+    private const MAX_POR_PAGINA = 100;
 
     public function index(Request $request): JsonResponse
     {
-        $documentos = Documento::query()
+        $validado = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_POR_PAGINA],
+        ]);
+        $pagina = Documento::query()
             ->with(['persona', 'tipo'])
             ->when($request->query('persona_id'), function ($consulta, $ulid): void {
                 $persona = PersonaTenant::query()->where('ulid', $ulid)->first();
@@ -47,11 +54,16 @@ class DocumentosController
             // Quien imparte: solo los de sus clientes.
             ->whereHas('persona', fn ($p) => app(AlcanceClientesTenant::class)->acotar($p, $this->usuario($request)))
             ->orderByDesc('id')
-            ->limit(self::LIMITE)
-            ->get();
+            ->paginate((int) ($validado['per_page'] ?? self::POR_PAGINA), ['*'], 'page', (int) ($validado['page'] ?? 1));
 
         return response()->json([
-            'data' => $documentos->map(fn (Documento $documento): array => $this->presentar($documento))->all(),
+            'data' => $pagina->getCollection()->map(fn (Documento $documento): array => $this->presentar($documento))->all(),
+            'meta' => [
+                'total' => $pagina->total(),
+                'page' => $pagina->currentPage(),
+                'per_page' => $pagina->perPage(),
+                'ultima_pagina' => $pagina->lastPage(),
+            ],
         ]);
     }
 

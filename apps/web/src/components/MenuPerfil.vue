@@ -4,7 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import IconoNav from "@/components/IconoNav.vue";
 import { puedeEntrar } from "@/lib/acceso";
-import { nombreDeRol } from "@/lib/roles";
+import { facetaActiva, nombreDeRol } from "@/lib/roles";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -34,8 +34,14 @@ const rol = computed(() =>
     (llave) => (te(llave) ? t(llave) : null),
   ),
 );
-// Configuración del negocio: si alguna opción se puede abrir.
-const puedeConfigurar = computed(() => puedeEntrar("ajustes", sesion));
+// Configuración del negocio: si alguna opción se puede abrir. Quien entra como
+// instructor no administra el negocio: su único permiso de documentos le abriría
+// una portada con «Documentos requeridos», sin nada que configurar.
+const puedeConfigurar = computed(
+  () =>
+    puedeEntrar("ajustes", sesion) &&
+    facetaActiva(sesion.usuario) !== "instructor",
+);
 </script>
 
 <template>

@@ -468,6 +468,18 @@ export const MENU_PORTALES: GrupoMenu[] = [
 
 export const MENU: GrupoMenu[] = [...MENU_PORTALES, ...MENU_NEGOCIO];
 
+/**
+ * La clave i18n para el tipo de negocio: con clases, `<clave>Clases` si existe (p. ej.
+ * «Clases y catálogos» en lugar de «Servicios y catálogos»); si no, la de siempre.
+ */
+export function claveSegunModalidad(
+  clave: string,
+  esCitas: boolean,
+  existe: (clave: string) => boolean,
+): string {
+  return !esCitas && existe(`${clave}Clases`) ? `${clave}Clases` : clave;
+}
+
 /** Las vistas de un área que esta sesión puede abrir, en su orden. */
 export function vistasVisibles(area: Area, sesion: Sesion): Vista[] {
   return area.vistas.filter(

@@ -4,6 +4,7 @@ import 'dart:ui';
 enum EstadoCita {
   pendientePago('Pago pendiente'),
   confirmada('Confirmada'),
+  sinRegistrar('Sin registrar'),
   llego('Llegó'),
   enServicio('En servicio'),
   completada('Completada'),
@@ -102,7 +103,9 @@ class SesionAgenda {
   }
 
   /// Ocupación 0–1 de una clase (null si no tiene cupo definido).
-  double? get ocupacion => capacidad != null && capacidad! > 0 ? (ocupados / capacidad!).clamp(0, 1).toDouble() : null;
+  double? get ocupacion => capacidad != null && capacidad! > 0
+      ? (ocupados / capacidad!).clamp(0, 1).toDouble()
+      : null;
 
   /// Estado de la cita a la hora `ahora`: pagada o no, y si el cliente llegó.
   EstadoCita estadoCita(DateTime ahora) {
@@ -117,15 +120,25 @@ class SesionAgenda {
       if (ahora.isBefore(iniciaEn)) {
         return EstadoCita.llego;
       }
-      return ahora.isBefore(terminaEn) ? EstadoCita.enServicio : EstadoCita.completada;
+      return ahora.isBefore(terminaEn)
+          ? EstadoCita.enServicio
+          : EstadoCita.completada;
     }
-    return c.estado == 'pendiente_pago' ? EstadoCita.pendientePago : EstadoCita.confirmada;
+    // Ya terminó y nadie registró si vino: le falta el registro, no la atención.
+    if (!ahora.isBefore(terminaEn)) {
+      return EstadoCita.sinRegistrar;
+    }
+    return c.estado == 'pendiente_pago'
+        ? EstadoCita.pendientePago
+        : EstadoCita.confirmada;
   }
 
   /// ¿Falta cobrarla? (pendiente de pago en línea o agendada por el negocio sin cobrar).
   bool get porCobrar {
     final c = cita;
-    return c != null && c.ordenId != null && (c.estado == 'pendiente_pago' || c.porCobrar);
+    return c != null &&
+        c.ordenId != null &&
+        (c.estado == 'pendiente_pago' || c.porCobrar);
   }
 
   factory SesionAgenda.desdeJson(Map<String, dynamic> json) {
@@ -160,12 +173,18 @@ class Profesional {
   final String nombre;
 
   String get iniciales {
-    final partes = nombre.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).take(2);
+    final partes = nombre
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .take(2);
     return partes.map((p) => p[0].toUpperCase()).join();
   }
 
-  factory Profesional.desdeJson(Map<String, dynamic> json) =>
-      Profesional(id: json['id'] as String, nombre: (json['nombre'] ?? '') as String);
+  factory Profesional.desdeJson(Map<String, dynamic> json) => Profesional(
+    id: json['id'] as String,
+    nombre: (json['nombre'] ?? '') as String,
+  );
 }
 
 /// Asistente en la lista de una clase (roster) para el pase de lista.
