@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
-import '../../perfil/presentation/perfil_screen.dart';
+import '../../perfil/presentation/boton_mi_perfil.dart';
 import '../application/agenda_controller.dart';
 import '../data/agenda_models.dart';
 import 'cita_sheet.dart';
@@ -82,13 +82,7 @@ class AgendaScreen extends ConsumerWidget {
             icon: const Icon(Icons.refresh),
             onPressed: () => ref.invalidate(agendaProvider),
           ),
-          IconButton(
-            tooltip: 'Mi perfil',
-            icon: const Icon(Icons.person_outline),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const PerfilScreen()),
-            ),
-          ),
+          const BotonMiPerfil(),
         ],
       ),
       body: Column(

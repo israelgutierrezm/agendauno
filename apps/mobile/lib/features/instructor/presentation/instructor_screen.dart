@@ -15,6 +15,7 @@ import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../../cuenta/presentation/cuenta_widgets.dart';
 import '../../cuenta/presentation/tarjeta_principal.dart';
+import '../../perfil/presentation/boton_mi_perfil.dart';
 import '../../perfil/presentation/perfil_screen.dart';
 import '../application/mis_clases_controller.dart';
 
@@ -59,17 +60,7 @@ class _InstructorScreenState extends ConsumerState<InstructorScreen> {
                     ? 'Inicio'
                     : 'Mis ${terminos.sesiones.toLowerCase()}',
               ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.person_outline),
-                  tooltip: 'Mi perfil',
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const PerfilScreen(),
-                    ),
-                  ),
-                ),
-              ],
+              actions: [const BotonMiPerfil()],
             ),
       body: switch (_pestana) {
         PestanaInstructor.inicio => _Inicio(onIr: _ir),

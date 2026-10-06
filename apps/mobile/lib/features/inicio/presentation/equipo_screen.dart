@@ -9,6 +9,7 @@ import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../../cuenta/presentation/cuenta_widgets.dart';
 import '../../cuenta/presentation/tarjeta_principal.dart';
+import '../../perfil/presentation/boton_mi_perfil.dart';
 import '../../perfil/presentation/perfil_screen.dart';
 import '../data/inicio_repository.dart';
 import '../data/resumen_hoy.dart';
@@ -41,17 +42,7 @@ class _EquipoScreenState extends ConsumerState<EquipoScreen> {
           ? null
           : AppBar(
               title: const Text('Inicio'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.person_outline),
-                  tooltip: 'Mi perfil',
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const PerfilScreen(),
-                    ),
-                  ),
-                ),
-              ],
+              actions: [const BotonMiPerfil()],
             ),
       body: switch (pestana) {
         PestanaEquipo.inicio => _InicioNegocio(onIr: _ir),

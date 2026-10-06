@@ -270,8 +270,9 @@ onMounted(() => {
         <div class="flex flex-1 items-center gap-3 min-w-0">
           <button
             type="button"
-            class="tu-icono-btn tu-barra-menu"
+            class="tu-icono-btn tu-barra-menu relative"
             :aria-label="$t('nav.menu')"
+            data-prueba="boton-menu"
             @click="menuLateral = true"
           >
             <svg
@@ -285,6 +286,12 @@ onMounted(() => {
             >
               <path d="M4 7h16M4 12h16M4 17h16" />
             </svg>
+            <!-- En el teléfono «Cambiar de rol» está en el menú: el punto lo avisa. -->
+            <span
+              v-if="sesion.tieneVariosRoles"
+              class="tu-rol-punto tu-rol-punto-esquina tu-rol-punto-menu"
+              aria-hidden="true"
+            />
           </button>
           <!-- Con varias sucursales: con cuál se trabaja (en lugar del título). -->
           <SelectorSucursal v-if="selectorEnBarra" />
@@ -645,7 +652,8 @@ a.tu-miga:hover {
   }
 }
 @media (min-width: 640px) {
-  .tu-solo-movil {
+  .tu-solo-movil,
+  .tu-barra-menu .tu-rol-punto-menu {
     display: none;
   }
 }

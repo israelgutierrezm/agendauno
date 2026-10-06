@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/tema_agendauno.dart';
-import '../../perfil/presentation/perfil_screen.dart';
+import '../../perfil/presentation/boton_mi_perfil.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
@@ -62,15 +62,7 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_titulos[_pestana]!),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'Mi perfil',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const PerfilScreen()),
-            ),
-          ),
-        ],
+        actions: [const BotonMiPerfil()],
       ),
       body: estado.when(
         loading: () => const Center(child: CircularProgressIndicator()),
