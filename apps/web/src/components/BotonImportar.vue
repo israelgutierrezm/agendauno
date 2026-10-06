@@ -2,8 +2,9 @@
 import { RouterLink } from "vue-router";
 
 /**
- * Botón para ir a una carga masiva por CSV. Va en verde «Excel» con un ícono de
- * hoja de cálculo para que se distinga claramente de las acciones normales.
+ * Botón para ir a una carga masiva por CSV. Es una acción secundaria (la principal de
+ * la pantalla es crear: «Nueva clase», «Agregar», «Invitar»): con borde, y el ícono
+ * de hoja de cálculo en verde «Excel» para reconocerlo de un vistazo.
  */
 defineProps<{ ruta: string; texto: string }>();
 </script>
@@ -11,10 +12,11 @@ defineProps<{ ruta: string; texto: string }>();
 <template>
   <RouterLink
     :to="{ name: ruta }"
-    class="tu-btn tu-btn-importar shrink-0 inline-flex items-center gap-2"
+    class="tu-btn tu-btn-fantasma shrink-0 inline-flex items-center gap-2"
+    data-prueba="boton-importar"
   >
     <svg
-      class="h-4 w-4 shrink-0"
+      class="bi-icono h-4 w-4 shrink-0"
       fill="none"
       viewBox="0 0 24 24"
       stroke-width="1.8"
@@ -32,14 +34,8 @@ defineProps<{ ruta: string; texto: string }>();
 </template>
 
 <style scoped>
-/* Verde «Excel»: color de marca fijo, legible en claro y oscuro. */
-.tu-btn-importar {
-  background: #1d6f42;
-  border-color: #1d6f42;
-  color: #fff;
-}
-.tu-btn-importar:hover {
-  background: #185c37;
-  border-color: #185c37;
+/* El verde «Excel», solo en el ícono (se aclara en temas oscuros). */
+.bi-icono {
+  color: color-mix(in srgb, #1d6f42, var(--texto) 25%);
 }
 </style>

@@ -174,6 +174,16 @@ const columnasMedio = computed(() =>
     padding: 0.95rem 1.15rem 1rem;
   }
 }
+/* Compacta (tableros operativos): menos alto, para que se vea lo de abajo. */
+@container (min-width: 34rem) {
+  .ti-compacta .ti-celda {
+    padding: 0.6rem 0.95rem 0.65rem;
+  }
+  .ti-compacta .ti-valor {
+    margin-top: 0.15rem;
+    font-size: 1.2rem;
+  }
+}
 .ti-etiqueta {
   display: flex;
   align-items: center;

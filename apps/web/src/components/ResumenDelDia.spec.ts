@@ -1,8 +1,11 @@
-import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "@/i18n";
 import ResumenDelDia from "./ResumenDelDia.vue";
+
+// Que ningún Inicio de una prueba anterior siga escuchando el regreso a la pestaña.
+enableAutoUnmount(afterEach);
 
 const api = vi.hoisted(() => ({
   get: vi.fn(),
@@ -119,6 +122,63 @@ describe("el día de hoy en el Inicio", () => {
     expect(texto).toContain("2 órdenes por cobrar");
     expect(texto).toContain("$500.00");
     expect(texto).toContain("3 membresías vencen en 7 días o menos");
+  });
+
+  it("se pone al día con «Actualizar» y al volver a la pestaña, sin quitar lo que se ve", async () => {
+    const dia = (sesiones: number) => ({
+      data: {
+        data: {
+          fecha: "2026-10-01",
+          agenda: {
+            totales: {
+              sesiones,
+              esperados: 0,
+              llegaron: 0,
+              sin_marcar: 0,
+              capacidad: 10,
+              listas_pendientes: 0,
+              en_espera: 0,
+            },
+            sesiones: [sesion({ id: "s1" })],
+          },
+          cobros: null,
+          renovaciones: null,
+        },
+      },
+    });
+    // Cuántas veces se pidió el día (el clima va por su lado).
+    const pedidosDelDia = () =>
+      api.get.mock.calls.filter(([url]) => String(url).endsWith("/inicio/hoy"))
+        .length;
+    api.get.mockImplementation((url: string) =>
+      Promise.resolve(
+        url.endsWith("/clima") ? { data: { data: null } } : dia(1),
+      ),
+    );
+    const w = montar();
+    await flushPromises();
+    expect(pedidosDelDia()).toBe(1);
+    expect(w.get('[data-prueba="actualizado-hace"]').text()).toContain(
+      "Actualizado hace un momento",
+    );
+
+    // «Actualizar»: vuelve a pedir el día; mientras llega, lo de antes sigue a la vista.
+    let terminar: (v: unknown) => void = () => undefined;
+    api.get.mockReturnValueOnce(new Promise((r) => (terminar = r)));
+    await w.get('[data-prueba="actualizar"]').trigger("click");
+    expect(pedidosDelDia()).toBe(2);
+    expect(w.text()).toContain("Pole Nivel 1");
+    expect(w.text()).not.toContain("Cargando…");
+    terminar(dia(1));
+    await flushPromises();
+
+    // Al volver a la pestaña (pasado el mínimo entre recargas), también.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 60_000);
+    window.dispatchEvent(new Event("focus"));
+    await flushPromises();
+    vi.useRealTimers();
+    expect(pedidosDelDia()).toBe(3);
   });
 
   it("sin permisos de cobro ni agenda no muestra esos bloques; el error no es un día vacío", async () => {

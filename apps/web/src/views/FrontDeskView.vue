@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import ActualizadoHace from "@/components/ActualizadoHace.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EscanerPase from "@/components/EscanerPase.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -15,6 +16,7 @@ import PanelMiembro from "@/components/PanelMiembro.vue";
 import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
+import { useRecargarAlVolver } from "@/lib/alVolver";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { useAnchoMinimo } from "@/lib/pantalla";
@@ -256,13 +258,25 @@ function claseInicial(): SesionDia | null {
   );
 }
 
-async function cargar(): Promise<void> {
+// Cuándo se trajo lo que se ve, y si se está volviendo a pedir sin quitarlo.
+const actualizadoEn = ref<Date | null>(null);
+const actualizando = ref(false);
+
+/**
+ * Trae el día. En segundo plano (al volver a la pestaña, cada pocos minutos o con
+ * «Actualizar») no quita lo que se ve mientras llega lo nuevo.
+ */
+async function cargar(enSegundoPlano = false): Promise<void> {
   // En citas, la lista y sus números los carga RecepcionCitas.
   if (sesion.esCitas) {
     cargando.value = false;
     return;
   }
-  cargando.value = true;
+  if (enSegundoPlano && metricas.value !== null) {
+    actualizando.value = true;
+  } else {
+    cargando.value = true;
+  }
   error.value = null;
   try {
     const params: Record<string, string> = { fecha: fecha.value };
@@ -280,12 +294,30 @@ async function cargar(): Promise<void> {
       const misma = sesiones.value.find((s) => s.id === sesionActiva.value?.id);
       sesionActiva.value = misma ?? claseInicial();
     }
+    actualizadoEn.value = new Date();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    // En segundo plano, un fallo no borra lo que ya se ve.
+    if (!enSegundoPlano || metricas.value === null) {
+      error.value = mensajeDeError(e);
+    }
   } finally {
     cargando.value = false;
+    actualizando.value = false;
   }
 }
+
+// La recepción cambia mientras se atiende: al volver a la pestaña y cada pocos
+// minutos (si se está viendo), se pone al día.
+useRecargarAlVolver(() => cargar(true));
+let periodico: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  periodico = setInterval(() => {
+    if (document.visibilityState === "visible") {
+      void cargar(true);
+    }
+  }, 3 * 60_000);
+});
+onUnmounted(() => clearInterval(periodico));
 
 // Las métricas del día en tarjetas, cada una con su ícono y su color.
 const tarjetas = computed<Indicador[]>(() => {
@@ -372,7 +404,7 @@ const tarjetas = computed<Indicador[]>(() => {
   }));
 });
 
-watch([fecha, sucursalFiltro], cargar);
+watch([fecha, sucursalFiltro], () => cargar());
 
 onMounted(async () => {
   try {
@@ -395,6 +427,14 @@ onMounted(async () => {
         $t("recepcion.abrirAgenda")
       }}</RouterLink>
     </div>
+    <!-- Clases: cuándo se trajo lo que se ve (en citas lo dice su propia lista). -->
+    <ActualizadoHace
+      v-if="!sesion.esCitas && actualizadoEn"
+      class="mt-2"
+      :en="actualizadoEn"
+      :actualizando="actualizando"
+      @actualizar="cargar(true)"
+    />
 
     <!-- En citas, la búsqueda principal es la jornada; el directorio queda aparte. -->
     <button
@@ -592,7 +632,7 @@ onMounted(async () => {
           </p>
           <!-- Si falló la consulta, el error ya se muestra arriba: no es "no hay nada". -->
           <p v-else-if="error" class="px-5 py-12 text-center text-sm">
-            <button type="button" class="tu-enlace" @click="cargar">
+            <button type="button" class="tu-enlace" @click="cargar()">
               {{ $t("comun.reintentar") }}
             </button>
           </p>

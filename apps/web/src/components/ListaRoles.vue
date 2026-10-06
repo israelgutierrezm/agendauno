@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
 import type { RolDisponible } from "@/lib/roles";
+import { plural } from "@/lib/terminologia";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
  * Los roles con los que la persona puede entrar, como tarjetas: nombre del rol y qué
@@ -16,6 +20,39 @@ defineProps<{
   aplicando: string | null;
 }>();
 const emit = defineEmits<{ elegir: [clave: string] }>();
+
+// Con las palabras del negocio (Barbero, citas, clientes…): al entrar aún rigen los
+// textos base, así que el nombre y lo que verá se arman aquí.
+const { t, te } = useI18n();
+const sesion = useSesionTenantStore();
+function nombre(rol: RolDisponible): string {
+  if (rol.nombre) {
+    return rol.nombre;
+  }
+  if (rol.clave === "instructor") {
+    return sesion.terminologia.instructor;
+  }
+  if (rol.clave === "miembro") {
+    return sesion.terminologia.miembro;
+  }
+  return te(`usuarios.rol.${rol.clave}`)
+    ? t(`usuarios.rol.${rol.clave}`)
+    : rol.clave;
+}
+function detalle(rol: RolDisponible): string {
+  const terminos = {
+    sesiones: plural(sesion.terminologia.sesion).toLowerCase(),
+    miembros: plural(sesion.terminologia.miembro).toLowerCase(),
+  };
+  const modalidad = sesion.esCitas ? "Citas" : "Clases";
+  if (rol.faceta === "instructor") {
+    return t(`operacion.rolActivo.detalle.instructor${modalidad}`, terminos);
+  }
+  if (rol.faceta === "miembro") {
+    return t(`operacion.rolActivo.detalle.miembro${modalidad}`, terminos);
+  }
+  return t("operacion.rolActivo.detalle.equipo", terminos);
+}
 </script>
 
 <template>
@@ -30,17 +67,8 @@ const emit = defineEmits<{ elegir: [clave: string] }>();
         @click="emit('elegir', rol.clave)"
       >
         <span class="lr-texto">
-          <span class="lr-nombre">
-            {{
-              rol.nombre ??
-              ($te(`usuarios.rol.${rol.clave}`)
-                ? $t(`usuarios.rol.${rol.clave}`)
-                : rol.clave)
-            }}
-          </span>
-          <span class="lr-detalle">
-            {{ $t(`operacion.rolActivo.faceta.${rol.faceta}`) }}
-          </span>
+          <span class="lr-nombre">{{ nombre(rol) }}</span>
+          <span class="lr-detalle">{{ detalle(rol) }}</span>
         </span>
         <span
           v-if="aplicando === rol.clave"

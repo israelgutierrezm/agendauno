@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import ActualizadoHace from "@/components/ActualizadoHace.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import TarjetaPrincipal from "@/components/TarjetaPrincipal.vue";
@@ -11,6 +12,7 @@ import TarjetasIndicadores, {
 } from "@/components/TarjetasIndicadores.vue";
 import { puedeEntrar } from "@/lib/acceso";
 import { aHora, fechaLocal, minutosLocal } from "@/lib/agenda";
+import { useRecargarAlVolver } from "@/lib/alVolver";
 import { api, mensajeDeError } from "@/lib/api";
 import { lugarDelClima, useClima } from "@/lib/clima";
 import { fotoNegocio } from "@/lib/fotoNegocio";
@@ -84,6 +86,9 @@ const sesion = useSesionTenantStore();
 const hoy = ref<Hoy | null>(null);
 const cargando = ref(true);
 const error = ref<string | null>(null);
+// Cuándo se trajo lo que se ve, y si se está volviendo a pedir sin quitarlo.
+const actualizadoEn = ref<Date | null>(null);
+const actualizando = ref(false);
 const busqueda = ref("");
 const filtro = ref<"todas" | "proximas" | "canceladas">("todas");
 const agendaVisible = computed(() => {
@@ -176,8 +181,16 @@ const detalleSiguiente = computed(() => {
   return partes.filter(Boolean).join(" · ");
 });
 
-async function cargar(): Promise<void> {
-  cargando.value = true;
+/**
+ * Trae el día. En segundo plano (al volver a la pestaña, cada pocos minutos o con
+ * «Actualizar») no quita lo que se ve mientras llega lo nuevo.
+ */
+async function cargar(enSegundoPlano = false): Promise<void> {
+  if (enSegundoPlano && hoy.value !== null) {
+    actualizando.value = true;
+  } else {
+    cargando.value = true;
+  }
   error.value = null;
   try {
     const { data } = await api.get<{ data: Hoy }>(
@@ -189,12 +202,30 @@ async function cargar(): Promise<void> {
       },
     );
     hoy.value = data.data;
+    actualizadoEn.value = new Date();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    // En segundo plano, un fallo no borra lo que ya se ve.
+    if (!enSegundoPlano || hoy.value === null) {
+      error.value = mensajeDeError(e);
+    }
   } finally {
     cargando.value = false;
+    actualizando.value = false;
   }
 }
+
+// El negocio sigue operando: al volver a la pestaña y cada pocos minutos (si se está
+// viendo), las cifras y los estados se ponen al día.
+useRecargarAlVolver(() => cargar(true));
+let periodico: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  periodico = setInterval(() => {
+    if (document.visibilityState === "visible") {
+      void cargar(true);
+    }
+  }, 3 * 60_000);
+});
+onUnmounted(() => clearInterval(periodico));
 
 function hora(s: SesionHoy): string {
   return aHora(minutosLocal(s.inicia_en, s.zona_horaria));
@@ -308,16 +339,22 @@ onMounted(() => {
   </p>
   <div v-else-if="error" class="mt-6 tu-card p-5" style="color: var(--error)">
     {{ error }}
-    <button type="button" class="tu-enlace ml-2" @click="cargar">
+    <button type="button" class="tu-enlace ml-2" @click="cargar()">
       {{ $t("comun.reintentar") }}
     </button>
   </div>
 
   <template v-else-if="hoy">
+    <ActualizadoHace
+      class="mt-4"
+      :en="actualizadoEn"
+      :actualizando="actualizando"
+      @actualizar="cargar(true)"
+    />
     <!-- La tarjeta principal: lo que sigue hoy y los indicadores del día -->
     <TarjetaPrincipal
       v-if="hoy.agenda"
-      class="mt-6"
+      class="mt-2"
       :etiqueta="etiquetaDia"
       :etiqueta-viva="enCurso !== null"
       :foto="foto"

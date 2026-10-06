@@ -11,5 +11,6 @@ defineProps<{ tarjetas: Indicador[] }>();
 </script>
 
 <template>
-  <TarjetasIndicadores :tarjetas="tarjetas" decoracion="barras" />
+  <!-- Compactos: en una fila desde un ancho mediano, para dejar ver el calendario. -->
+  <TarjetasIndicadores :tarjetas="tarjetas" decoracion="barras" compacta />
 </template>

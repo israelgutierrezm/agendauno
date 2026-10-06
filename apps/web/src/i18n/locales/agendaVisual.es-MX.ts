@@ -140,6 +140,9 @@ export default {
   diaSiguiente: "Día siguiente",
   leyendaServicios: "Servicios",
   leyendaClases: "Clases",
+  // Botón que abre la leyenda de colores.
+  leyendaVerClases: "Colores de las clases ({n})",
+  leyendaVerServicios: "Colores de los servicios ({n})",
   // Al generar una clase recurrente: las fechas que no se pudieron crear y por qué.
   serieOmitidas:
     "Se crearon {creadas} clases. No se generaron {n} fechas: {detalle}",

@@ -725,6 +725,22 @@ const zonaAgenda = computed(
     sucursalesAgenda.value[0]?.zona_horaria ??
     "America/Mexico_City",
 );
+// La leyenda de colores va plegada (el calendario primero); se recuerda abierta.
+const leyendaAbierta = ref(leerLeyenda());
+watch(leyendaAbierta, (v) => {
+  try {
+    localStorage.setItem("tu.agenda.leyenda", v ? "1" : "0");
+  } catch {
+    // Sin almacenamiento: solo en esta visita.
+  }
+});
+function leerLeyenda(): boolean {
+  try {
+    return localStorage.getItem("tu.agenda.leyenda") === "1";
+  } catch {
+    return false;
+  }
+}
 // Leyenda: solo los servicios/clases que aparecen en lo que se está viendo.
 const leyenda = computed(() => {
   const presentes = new Set(sesionesVisibles.value.map((s) => s.oferta_id));
@@ -1692,12 +1708,6 @@ onMounted(async () => {
       />
       <div class="flex flex-wrap items-center gap-2">
         <!-- En el teléfono, solo la acción principal: lo demás está en el menú. -->
-        <BotonImportar
-          v-if="puedeEntrar('importar-clases', sesion)"
-          class="max-sm:hidden"
-          ruta="importar-clases"
-          :texto="$t('importarClases.titulo')"
-        />
         <!-- De paso, a donde se configuran (cada una guarda sus datos). -->
         <RouterLink
           v-if="puedeEntrar('horarios', sesion)"
@@ -1711,6 +1721,13 @@ onMounted(async () => {
           class="tu-btn tu-btn-fantasma max-sm:hidden"
           >{{ $t("agenda.reglasReserva") }}</RouterLink
         >
+        <!-- Importar es secundaria: la principal es crear (al final). -->
+        <BotonImportar
+          v-if="puedeEntrar('importar-clases', sesion)"
+          class="max-sm:hidden"
+          ruta="importar-clases"
+          :texto="$t('importarClases.titulo')"
+        />
         <!-- Citas: el negocio agenda al cliente. Clases: se programa una clase. -->
         <button
           v-if="sesion.esCitas && puedeReservar"
@@ -1918,27 +1935,54 @@ onMounted(async () => {
         :tarjetas="tarjetasKpi"
       />
 
-      <!-- Leyenda: el color identifica el servicio o la clase. -->
+      <!-- Leyenda: el color identifica el servicio o la clase. Plegada: primero
+           el calendario; se abre con un toque y se recuerda. -->
       <div
         v-if="leyenda.length > 0"
-        class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs max-lg:order-last"
+        class="mt-2 text-xs max-lg:order-last"
         :style="{ color: 'var(--texto-suave)' }"
       >
-        <span class="font-medium" :style="{ color: 'var(--texto)' }">{{
-          sesion.esCitas
-            ? $t("agendaVisual.leyendaServicios")
-            : $t("agendaVisual.leyendaClases")
-        }}</span>
-        <span
-          v-for="l in leyenda"
-          :key="l.id"
-          class="inline-flex items-center gap-1.5"
-          ><span
-            class="inline-block w-2.5 h-2.5 rounded-full"
-            :style="{ background: l.tinta }"
-          ></span
-          >{{ l.nombre }}</span
+        <button
+          type="button"
+          class="ag-leyenda-boton"
+          :aria-expanded="leyendaAbierta"
+          data-prueba="leyenda-agenda"
+          @click="leyendaAbierta = !leyendaAbierta"
         >
+          <span class="ag-leyenda-puntos" aria-hidden="true">
+            <span
+              v-for="l in leyenda.slice(0, 4)"
+              :key="l.id"
+              :style="{ background: l.tinta }"
+            ></span>
+          </span>
+          {{
+            sesion.esCitas
+              ? $t("agendaVisual.leyendaVerServicios", { n: leyenda.length })
+              : $t("agendaVisual.leyendaVerClases", { n: leyenda.length })
+          }}
+          <IconoNav
+            nombre="chevron"
+            :tam="14"
+            :class="{ 'rotate-180': leyendaAbierta }"
+          />
+        </button>
+        <div
+          v-if="leyendaAbierta"
+          class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1"
+          data-prueba="leyenda-colores"
+        >
+          <span
+            v-for="l in leyenda"
+            :key="l.id"
+            class="inline-flex items-center gap-1.5"
+            ><span
+              class="inline-block w-2.5 h-2.5 rounded-full"
+              :style="{ background: l.tinta }"
+            ></span
+            >{{ l.nombre }}</span
+          >
+        </div>
       </div>
 
       <p
@@ -3474,6 +3518,31 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* La leyenda plegada: un botón discreto con algunos colores de muestra. */
+.ag-leyenda-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.25rem 0;
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+}
+.ag-leyenda-boton:hover {
+  color: var(--texto);
+}
+.ag-leyenda-puntos {
+  display: inline-flex;
+}
+.ag-leyenda-puntos > span {
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-left: -0.15rem;
+  border: 1.5px solid var(--fondo);
+  border-radius: 999px;
+}
+.ag-leyenda-puntos > span:first-child {
+  margin-left: 0;
+}
 /* Detalle de una clase: mismo patrón que el de una cita (PanelCita). */
 .dcl {
   display: grid;

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import ActualizadoHace from "@/components/ActualizadoHace.vue";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import PanelCita from "@/components/PanelCita.vue";
@@ -12,6 +13,7 @@ import {
   pagoCita,
   type SesionAgenda,
 } from "@/lib/agenda";
+import { useRecargarAlVolver } from "@/lib/alVolver";
 import { api, mensajeDeError } from "@/lib/api";
 import { normalizar } from "@/lib/menu";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -73,6 +75,8 @@ function limpiar(): void {
   filtro.value = "todas";
 }
 
+// Cuándo se trajo lo que se ve.
+const actualizadoEn = ref<Date | null>(null);
 let pedido = 0;
 async function cargar(): Promise<void> {
   const mio = ++pedido;
@@ -104,6 +108,7 @@ async function cargar(): Promise<void> {
       abierta.value =
         citas.value.find((s) => s.id === abierta.value?.id) ?? null;
     }
+    actualizadoEn.value = new Date();
   } catch (e) {
     if (mio === pedido) {
       error.value = mensajeDeError(e);
@@ -114,7 +119,27 @@ async function cargar(): Promise<void> {
     }
   }
 }
-watch(() => [props.fecha, props.sucursalId], cargar, { immediate: true });
+watch(
+  () => [props.fecha, props.sucursalId],
+  () => cargar(),
+  {
+    immediate: true,
+  },
+);
+
+// La jornada cambia mientras se atiende: al volver a la pestaña y cada pocos minutos
+// (si se está viendo), se pone al día sin quitar la lista (solo se muestra
+// «Cargando…» si aún no hay nada).
+useRecargarAlVolver(() => cargar());
+let periodico: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  periodico = setInterval(() => {
+    if (document.visibilityState === "visible") {
+      void cargar();
+    }
+  }, 3 * 60_000);
+});
+onUnmounted(() => clearInterval(periodico));
 
 const activas = computed(() =>
   citas.value.filter((s) => s.estado === "programada" && s.cita),
@@ -184,6 +209,13 @@ defineExpose({ cargar });
 
 <template>
   <div>
+    <ActualizadoHace
+      v-if="actualizadoEn"
+      class="mb-2"
+      :en="actualizadoEn"
+      :actualizando="cargando && citas.length > 0"
+      @actualizar="cargar()"
+    />
     <div v-if="!error && citas.length > 0" class="rc-filtros">
       <label class="tu-campo-icono rc-buscar">
         <IconoNav nombre="buscar" :tam="18" />
@@ -225,7 +257,7 @@ defineExpose({ cargar });
     </p>
     <p v-else-if="error" class="px-5 py-12 text-center text-sm">
       <span class="block" style="color: var(--error)">{{ error }}</span>
-      <button type="button" class="tu-enlace mt-2" @click="cargar">
+      <button type="button" class="tu-enlace mt-2" @click="cargar()">
         {{ $t("comun.reintentar") }}
       </button>
     </p>

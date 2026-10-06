@@ -191,11 +191,16 @@ export default {
     ultimo: "La última vez",
     cambiado: "Ahora estás como {rol}.",
     error: "No se pudo cambiar de rol.",
-    faceta: {
+    // Lo que verá con cada rol, con las palabras del negocio (Barbero, citas,
+    // clientes…). Se arma aquí porque al entrar aún rigen los textos base.
+    detalle: {
       equipo:
-        "El negocio: agenda, clientes, cobros y reportes, según tus permisos.",
-      instructor: "Tus clases, tu agenda y la asistencia de tus alumnos.",
-      miembro: "Tus reservas, tus pagos y tu expediente.",
+        "El negocio: agenda, {miembros}, cobros y reportes, según tus permisos.",
+      instructorClases:
+        "Tus {sesiones}, tu agenda y la asistencia de tus {miembros}.",
+      instructorCitas: "Tus {sesiones}, tu agenda y tus {miembros}.",
+      miembroClases: "Tus reservas, tus pagos y tu expediente.",
+      miembroCitas: "Tus {sesiones}, tus pagos y tu expediente.",
     },
   },
   confirmar: {

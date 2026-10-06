@@ -18,16 +18,23 @@ String nombreDeRol(RolDisponible rol, Terminologia t) =>
       _ => rol.clave,
     };
 
-/// Qué verá con ese rol.
-String detalleDeFaceta(String faceta, Terminologia t) => switch (faceta) {
-  'instructor' =>
-    'Tus ${t.sesiones.toLowerCase()}, tu agenda y la asistencia de tus '
-        '${t.miembros.toLowerCase()}.',
-  'miembro' => 'Tus reservas, tus pagos y tu expediente.',
-  _ =>
-    'El negocio: agenda, ${t.miembros.toLowerCase()}, cobros y reportes, '
-        'según tus permisos.',
-};
+/// Qué verá con ese rol, con las palabras del negocio (en citas: sus citas y sus
+/// clientes, sin pase de lista).
+String detalleDeFaceta(String faceta, Terminologia t, {bool citas = false}) =>
+    switch (faceta) {
+      'instructor' when citas =>
+        'Tus ${t.sesiones.toLowerCase()}, tu agenda y tus '
+            '${t.miembros.toLowerCase()}.',
+      'instructor' =>
+        'Tus ${t.sesiones.toLowerCase()}, tu agenda y la asistencia de tus '
+            '${t.miembros.toLowerCase()}.',
+      'miembro' when citas =>
+        'Tus ${t.sesiones.toLowerCase()}, tus pagos y tu expediente.',
+      'miembro' => 'Tus reservas, tus pagos y tu expediente.',
+      _ =>
+        'El negocio: agenda, ${t.miembros.toLowerCase()}, cobros y reportes, '
+            'según tus permisos.',
+    };
 
 /// Los roles como tarjetas: nombre, qué verá con él y la marca del activo (o del de
 /// la última vez, al entrar).
@@ -65,7 +72,13 @@ class ListaRoles extends StatelessWidget {
                 nombreDeRol(rol, sesion.terminologia),
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-              subtitle: Text(detalleDeFaceta(rol.faceta, sesion.terminologia)),
+              subtitle: Text(
+                detalleDeFaceta(
+                  rol.faceta,
+                  sesion.terminologia,
+                  citas: sesion.esCitas,
+                ),
+              ),
               trailing: aplicando == rol.clave
                   ? const SizedBox(
                       width: 18,
