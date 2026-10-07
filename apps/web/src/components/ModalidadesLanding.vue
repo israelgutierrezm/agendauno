@@ -1,9 +1,22 @@
 <script setup lang="ts">
-defineEmits<{ elegir: [modo: "clases" | "citas"] }>();
+import { RouterLink } from "vue-router";
+import {
+  NOMBRE_MODALIDAD,
+  NOMBRE_RUTA_MODALIDAD,
+  type Modo,
+} from "@/marketing/modalidades";
+
+/*
+| Las dos modalidades en la portada, bajo el hero: cada tarjeta lleva a su landing
+| (/clases, /citas) y se nombra igual que en los precios y el registro
+| (NOMBRE_MODALIDAD). Al elegir emite `elegir` con el modo; la analítica la pone la
+| página (`marketing_business_mode_selected`).
+*/
+defineEmits<{ elegir: [modo: Modo] }>();
 const opciones = [
   {
     id: "clases" as const,
-    titulo: "Organizo clases",
+    titulo: NOMBRE_MODALIDAD.clases,
     para: "Pilates · Pole dance · Acuáticas · Baile · Yoga · CrossFit / HYROX",
     descripcion:
       "Cuida a tu comunidad, no una hoja de cálculo. Organiza grupos, cupos y membresías desde una misma agenda.",
@@ -17,11 +30,11 @@ const opciones = [
       "Paquetes, membresías y asistencia",
       "Reservas en línea para tus alumnos",
     ],
-    enlace: "Ver agenda de clases",
+    enlace: "Conocer AgendaUno para clases",
   },
   {
     id: "citas" as const,
-    titulo: "Atiendo por cita",
+    titulo: NOMBRE_MODALIDAD.citas,
     para: "Barberías · Estéticas · Spas · Psicólogos · Dentistas · Nutriólogos",
     descripcion:
       "Dale a cada profesional una agenda clara. Tus clientes eligen servicio, quién los atiende y un horario disponible.",
@@ -35,7 +48,7 @@ const opciones = [
       "Servicios con duración y precio",
       "Citas en línea y desde recepción",
     ],
-    enlace: "Ver agenda de citas",
+    enlace: "Conocer AgendaUno para citas",
   },
 ];
 </script>
@@ -83,11 +96,26 @@ const opciones = [
         <p class="modalidad-descripcion">{{ opcion.descripcion }}</p>
         <ul>
           <li v-for="ventaja in opcion.ventajas" :key="ventaja">
-            <span aria-hidden="true">✓</span>{{ ventaja }}
+            <svg
+              class="modalidad-check"
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="m5 12.5 4 4 10-10" /></svg
+            >{{ ventaja }}
           </li>
         </ul>
-        <a href="#producto" @click="$emit('elegir', opcion.id)"
-          >{{ opcion.enlace }} <span aria-hidden="true">↗</span></a
+        <RouterLink
+          :to="{ name: NOMBRE_RUTA_MODALIDAD[opcion.id] }"
+          @click="$emit('elegir', opcion.id)"
+          >{{ opcion.enlace }} <span aria-hidden="true">→</span></RouterLink
         >
       </div>
     </article>
@@ -194,9 +222,10 @@ const opciones = [
 .modalidad-contenido {
   padding: clamp(1.25rem, 3vw, 2rem);
 }
+/* Títulos de tarjeta con peso 500, como los de precios y funciones. */
 h3 {
   font-size: clamp(1.45rem, 2.6vw, 1.75rem);
-  font-weight: 300;
+  font-weight: 500;
   letter-spacing: -0.03em;
   line-height: 1.15;
 }
@@ -223,7 +252,10 @@ li {
   gap: 0.65rem;
   font-size: 0.88rem;
 }
-li > span {
+/* Marca de verificación sin texto ni emoji (SVG, como en /clases y /citas). */
+.modalidad-check {
+  flex: 0 0 auto;
+  margin-top: 0.2rem;
   color: var(--acento);
 }
 a {

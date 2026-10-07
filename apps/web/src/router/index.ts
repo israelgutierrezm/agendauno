@@ -4,9 +4,14 @@ import LandingView from "@/views/LandingView.vue";
 import { trackPageView } from "@/lib/analytics";
 import { puedeEntrar } from "@/lib/acceso";
 import { updateSeo } from "@/lib/seo";
+import { giroDeQuery, modoDeQuery } from "@/marketing/modalidades";
 import { seoParaRuta } from "@/marketing/seoConfig";
-import { soluciones, rutaSolucion } from "@/marketing/soluciones";
-import { slugDeContexto } from "@/lib/tenant";
+import { rutasComerciales } from "@/router/comerciales";
+import {
+  salirA,
+  slugDeContexto,
+  urlEnSubdominioDelNegocio,
+} from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 declare module "vue-router" {
@@ -32,22 +37,27 @@ const router = createRouter({
     return { top: 0 };
   },
   routes: [
-    { path: "/", name: "inicio", component: LandingView },
+    // Portada, /clases, /citas y /software-para-*: la misma lista que el prerender.
+    ...rutasComerciales({
+      landing: LandingView,
+      modalidad: () => import("@/views/ModalidadView.vue"),
+      solucion: () => import("@/views/SolucionView.vue"),
+    }),
     {
       path: "/aviso-de-privacidad",
       name: "aviso-privacidad",
       component: () => import("@/views/AvisoPrivacidadView.vue"),
     },
-    ...soluciones.map((solucion) => ({
-      path: rutaSolucion(solucion.slug),
-      name: `solucion-${solucion.slug}`,
-      component: () => import("@/views/SolucionView.vue"),
-      props: { slug: solucion.slug },
-    })),
     {
+      // `?modo=clases|citas` (desde /clases o /citas) y `?giro=` (desde la página de
+      // un giro) llegan como props; uno inválido, como null.
       path: "/registro",
       name: "registro",
       component: () => import("@/views/RegistroView.vue"),
+      props: (r) => ({
+        modo: modoDeQuery(r.query.modo),
+        giro: giroDeQuery(r.query.giro),
+      }),
     },
     {
       path: "/negocios",
@@ -461,6 +471,14 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to) => {
+  // En el dominio principal no hay rutas con el slug de un negocio: su enlace corto,
+  // su página y sus enlaces viven en su subdominio (en desarrollo, no aplica).
+  const enSubdominio = urlEnSubdominioDelNegocio(to);
+  if (enSubdominio !== null) {
+    salirA(enSubdominio);
+    return false;
+  }
+
   const sesion = useSesionTenantStore();
   await sesion.verificarSesion();
 
@@ -511,11 +529,12 @@ router.beforeEach(async (to) => {
     }
   }
 
-  // En el subdominio de un estudio (`{slug}.agendauno.mx`), la raíz no es la
-  // landing de marketing: pasa por su entrada pública, que va al flujo de citas
-  // solo si el escaparate dice que el negocio es de citas (ADR 0104; elige sede si
-  // tiene varias) y, si es de clases, a su página.
-  if (String(to.name) === "inicio") {
+  // En el subdominio de un estudio (`{slug}.agendauno.mx`), ni la raíz ni ninguna
+  // página comercial (/clases, /citas, /software-para-*) muestran la landing de
+  // AgendaUno: pasan por su entrada pública, que va al flujo de citas solo si el
+  // escaparate dice que el negocio es de citas (ADR 0104; elige sede si tiene varias)
+  // y, si es de clases, a su página.
+  if (to.meta.marketing === true) {
     // El estudio del subdominio o del `?estudio=` de ESTA dirección, no de la página
     // de la que se viene: el logo de AgendaUno en /entrar?estudio=… lleva a la portada.
     const estudio =

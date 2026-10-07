@@ -1,11 +1,44 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-const modo = defineModel<"clases" | "citas">({ default: "clases" });
+
+import type { Modo } from "@/marketing/modalidades";
+
+/*
+| Agenda de ejemplo (datos ficticios, sin API: se prerenderiza).
+| - Sin `modo`: selector clases/citas con v-model, como en la portada de siempre.
+| - Con `modo` (/clases, /citas): fija y sin selector. Clases muestra la semana con el
+|   cupo de cada clase (el panel de clases no tiene columnas por instructor); citas, el
+|   día con una columna por profesional.
+*/
+const props = defineProps<{ modo?: Modo }>();
+const modelo = defineModel<Modo>({ default: "clases" });
+
+const fijo = computed(() => props.modo !== undefined);
+const modo = computed<Modo>(() => props.modo ?? modelo.value);
+const semana = computed(() => fijo.value && modo.value === "clases");
+
 const seleccion = ref(0);
 watch(modo, () => {
   seleccion.value = 0;
 });
-const ejemplos = {
+
+interface EventoDemo {
+  titulo: string;
+  hora: string;
+  /** Día de la semana (solo en la semana de clases). */
+  dia?: string;
+  persona: string;
+  detalle: string;
+  estado: string;
+  /** El estado pide atención (clase llena): punto ámbar. */
+  atencion?: boolean;
+  nota: string;
+  color: "azul" | "violeta" | "verde";
+  columna: number;
+  fila: number;
+}
+
+const ejemplos: Record<Modo, EventoDemo[]> = {
   clases: [
     {
       titulo: "Pilates Reformer",
@@ -99,30 +132,131 @@ const ejemplos = {
     },
   ],
 };
-const eventos = computed(() => ejemplos[modo.value]);
-const actual = computed(() => eventos.value[seleccion.value]!);
-const personas = computed(() =>
-  modo.value === "clases"
-    ? ["Andrea", "Sofía", "Elena"]
-    : ["Marco", "Luis", "Alex"],
+
+// La semana de /clases: una columna por día y el cupo de cada clase.
+const DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie"] as const;
+const semanaClases: EventoDemo[] = [
+  {
+    titulo: "Pilates Reformer",
+    hora: "09:00",
+    dia: "Lunes",
+    persona: "Andrea",
+    detalle: "6 de 8 lugares",
+    estado: "2 lugares disponibles",
+    nota: "Consulta el cupo de cada clase y quién reservó, sin abrir otra pantalla.",
+    color: "azul",
+    columna: 2,
+    fila: 2,
+  },
+  {
+    titulo: "Pole dance básico",
+    hora: "10:00",
+    dia: "Martes",
+    persona: "Sofía",
+    detalle: "8 de 8 lugares",
+    estado: "Clase llena · 2 en lista de espera",
+    atencion: true,
+    nota: "Si alguien cancela, el lugar se ofrece a quien sigue en la lista de espera.",
+    color: "violeta",
+    columna: 3,
+    fila: 4,
+  },
+  {
+    titulo: "Yoga flow",
+    hora: "09:30",
+    dia: "Miércoles",
+    persona: "Elena",
+    detalle: "5 de 10 lugares",
+    estado: "5 lugares disponibles",
+    nota: "Programa la misma clase cada semana y ajusta su cupo cuando lo necesites.",
+    color: "verde",
+    columna: 4,
+    fila: 3,
+  },
+  {
+    titulo: "Pilates mat",
+    hora: "11:00",
+    dia: "Jueves",
+    persona: "Andrea",
+    detalle: "7 de 10 lugares",
+    estado: "3 lugares disponibles",
+    nota: "Al empezar la clase, pasa lista: llegó, retardo o no vino.",
+    color: "azul",
+    columna: 5,
+    fila: 6,
+  },
+  {
+    titulo: "Entrenamiento funcional",
+    hora: "10:30",
+    dia: "Viernes",
+    persona: "Elena",
+    detalle: "10 de 12 lugares",
+    estado: "2 lugares disponibles",
+    nota: "Cada reserva usa un crédito de la membresía o del paquete del alumno.",
+    color: "verde",
+    columna: 6,
+    fila: 5,
+  },
+];
+
+const eventos = computed(() =>
+  semana.value ? semanaClases : ejemplos[modo.value],
 );
-function cambiar(valor: "clases" | "citas"): void {
-  modo.value = valor;
+const actual = computed(() => eventos.value[seleccion.value]!);
+/** Encabezados de columna: días en la semana de clases, profesionales en el resto. */
+const columnas = computed<readonly string[]>(() => {
+  if (semana.value) return DIAS_SEMANA;
+  return modo.value === "clases"
+    ? ["Andrea", "Sofía", "Elena"]
+    : ["Marco", "Luis", "Alex"];
+});
+const lineaDetalle = computed(() =>
+  actual.value.dia
+    ? `${actual.value.dia} ${actual.value.hora} · con ${actual.value.persona}`
+    : `${actual.value.hora} · ${actual.value.persona}`,
+);
+const cabecera = computed(() => {
+  if (!fijo.value) {
+    return {
+      etiqueta: "TODO TU DÍA, A LA VISTA",
+      titulo: "Tu agenda, en orden.",
+    };
+  }
+  return modo.value === "clases"
+    ? { etiqueta: "TU SEMANA DE CLASES", titulo: "Cada clase con su cupo." }
+    : {
+        etiqueta: "CADA PROFESIONAL, SU AGENDA",
+        titulo: "Tu agenda, en orden.",
+      };
+});
+const unidad = computed(() => (modo.value === "clases" ? "clase" : "cita"));
+const regionEtiqueta = computed(() => {
+  if (!fijo.value) {
+    return "Calendario de ejemplo. Selecciona una clase o cita para ver su detalle.";
+  }
+  return semana.value
+    ? "Semana de clases de ejemplo. Selecciona una clase para ver su cupo."
+    : "Agenda de citas de ejemplo. Selecciona una cita para ver su detalle.";
+});
+
+function cambiar(valor: Modo): void {
+  modelo.value = valor;
   seleccion.value = 0;
 }
 </script>
 <template>
-  <div class="producto-demo">
+  <div class="producto-demo" :data-modo="fijo ? modo : undefined">
     <div class="demo-contexto">
       <span class="demo-marca">AgendaUno / Agenda</span>
       <span class="demo-ejemplo">Demo interactiva · Datos de ejemplo</span>
     </div>
     <div class="demo-cabecera">
       <div>
-        <p>TODO TU DÍA, A LA VISTA</p>
-        <h3>Tu agenda, en orden.</h3>
+        <p>{{ cabecera.etiqueta }}</p>
+        <h3>{{ cabecera.titulo }}</h3>
       </div>
       <div
+        v-if="!fijo"
         class="demo-modos"
         role="group"
         aria-label="Tipo de agenda de ejemplo"
@@ -146,25 +280,49 @@ function cambiar(valor: "clases" | "citas"): void {
     <div class="demo-cuerpo">
       <div class="demo-calendario">
         <div class="demo-dia">
-          <strong>Lunes <span>· Vista de día</span></strong
-          ><span>Tu equipo</span>
+          <template v-if="semana">
+            <strong>Esta semana <span>· Vista de semana</span></strong
+            ><span>Cupo por clase</span>
+          </template>
+          <template v-else>
+            <strong>Lunes <span>· Vista de día</span></strong
+            ><span>Tu equipo</span>
+          </template>
         </div>
         <div
           class="demo-scroll"
           tabindex="0"
           role="region"
-          aria-label="Calendario de ejemplo. Selecciona una clase o cita para ver su detalle."
+          :aria-label="regionEtiqueta"
         >
-          <div class="demo-grid">
-            <div
-              v-for="(persona, i) in personas"
-              :key="persona"
-              class="demo-persona"
-              :style="{ gridColumn: i + 2, gridRow: 1 }"
-            >
-              <span>{{ persona.charAt(0) }}</span
-              >{{ persona }}
-            </div>
+          <div
+            class="demo-grid"
+            :class="{ 'demo-grid-semana': semana }"
+            :style="{
+              gridTemplateColumns: `3.2rem repeat(${columnas.length}, minmax(0, 1fr))`,
+            }"
+          >
+            <template v-if="semana">
+              <div
+                v-for="(dia, i) in columnas"
+                :key="dia"
+                class="demo-columna"
+                :style="{ gridColumn: i + 2, gridRow: 1 }"
+              >
+                {{ dia }}
+              </div>
+            </template>
+            <template v-else>
+              <div
+                v-for="(persona, i) in columnas"
+                :key="persona"
+                class="demo-persona"
+                :style="{ gridColumn: i + 2, gridRow: 1 }"
+              >
+                <span>{{ persona.charAt(0) }}</span
+                >{{ persona }}
+              </div>
+            </template>
             <span
               v-for="(hora, i) in ['09:00', '10:00', '11:00', '12:00']"
               :key="hora"
@@ -199,22 +357,36 @@ function cambiar(valor: "clases" | "citas"): void {
           </div>
         </div>
         <p class="demo-pista">
-          <span class="demo-pista-movil"
-            >Desliza la agenda para ver a todo tu equipo →</span
-          >
-          Selecciona una {{ modo === "clases" ? "clase" : "cita" }} para ver sus
-          detalles <span aria-hidden="true">↗</span>
+          <span class="demo-pista-movil">{{
+            semana
+              ? "Desliza la agenda para ver toda la semana →"
+              : "Desliza la agenda para ver a todo tu equipo →"
+          }}</span>
+          <template v-if="semana">
+            Selecciona una clase para ver su cupo
+          </template>
+          <template v-else>
+            Selecciona una {{ unidad }} para ver sus detalles
+          </template>
+          <span aria-hidden="true">↗</span>
         </p>
       </div>
       <aside class="demo-detalle" aria-live="polite" aria-atomic="true">
-        <span class="demo-detalle-icono" aria-hidden="true">✓</span>
+        <span v-if="!fijo" class="demo-detalle-icono" aria-hidden="true"
+          >✓</span
+        >
         <p class="demo-detalle-label">MENOS BÚSQUEDAS. MÁS CONTROL.</p>
         <h4>{{ actual.titulo }}</h4>
-        <p class="demo-profesional">{{ actual.hora }} · {{ actual.persona }}</p>
-        <span class="demo-estado">{{ actual.estado }}</span>
+        <p class="demo-profesional">{{ lineaDetalle }}</p>
+        <span
+          class="demo-estado"
+          :class="{ 'demo-estado-punto': fijo, atencion: actual.atencion }"
+          >{{ actual.estado }}</span
+        >
         <p class="demo-nota">{{ actual.nota }}</p>
         <div class="demo-detalle-pie">
-          <span aria-hidden="true">◷</span> Todo empieza con una agenda clara.
+          <span v-if="!fijo" aria-hidden="true">◷ </span>Todo empieza con una
+          agenda clara.
         </div>
       </aside>
     </div>
@@ -446,6 +618,38 @@ function cambiar(valor: "clases" | "citas"): void {
   font-size: 0.66rem;
   color: var(--primario-fuerte);
   background: var(--superficie);
+}
+.demo-columna {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.7rem;
+}
+.demo-grid-semana {
+  min-width: 560px;
+}
+/* Con modo fijo, el estado es punto + texto (sin caja); ámbar solo si pide atención. */
+.demo-estado.demo-estado-punto {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--texto);
+  font-size: 0.75rem;
+}
+.demo-estado-punto::before {
+  content: "";
+  flex-shrink: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--texto-suave);
+}
+.demo-estado-punto.atencion::before {
+  background: var(--aviso);
 }
 .demo-nota {
   font-size: 0.78rem;

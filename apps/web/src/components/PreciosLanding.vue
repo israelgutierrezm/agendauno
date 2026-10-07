@@ -2,9 +2,26 @@
 import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { trackEvent } from "@/lib/analytics";
+import { NOMBRE_MODALIDAD, type Modo } from "@/marketing/modalidades";
 import { bandasEstudios, ejemplosCitas, pesos } from "@/marketing/precios";
 
-const modo = ref<"clases" | "citas">("clases");
+/*
+| Precios de la suscripción a AgendaUno.
+| - Sin `modo`: selector clases/citas, como en la portada de siempre.
+| - Con `modo` (/clases#precios, /citas#precios): fijo, sin selector, y el registro
+|   lleva `?modo=`.
+| La modalidad se nombra igual que en la portada y el registro (NOMBRE_MODALIDAD). Lo
+| que menciona cobros en línea lleva «*» y la nota de México (ADR 0099).
+*/
+const props = defineProps<{ modo?: Modo }>();
+const elegido = ref<Modo>("clases");
+const fijo = computed(() => props.modo !== undefined);
+const modo = computed<Modo>(() => props.modo ?? elegido.value);
+const registro = computed(() =>
+  fijo.value
+    ? { name: "registro", query: { modo: modo.value } }
+    : { name: "registro" },
+);
 const tarjetas = computed(() =>
   modo.value === "clases" ? bandasEstudios.slice(0, 3) : ejemplosCitas,
 );
@@ -24,8 +41,8 @@ const beneficios = computed(() =>
       ],
 );
 
-function elegirModo(valor: "clases" | "citas") {
-  modo.value = valor;
+function elegirModo(valor: Modo) {
+  elegido.value = valor;
   trackEvent("marketing_business_mode_selected", {
     mode: valor,
     placement: "pricing",
@@ -35,7 +52,15 @@ function elegirModo(valor: "clases" | "citas") {
 
 <template>
   <div class="precios">
+    <p v-if="fijo" class="precios-modelo">
+      <span class="precios-modelo-titulo">{{ NOMBRE_MODALIDAD[modo] }}</span
+      >{{ " · "
+      }}<strong>{{
+        modo === "clases" ? "Por alumnos activos" : "Por profesionales activos"
+      }}</strong>
+    </p>
     <div
+      v-else
       class="precios-selector"
       role="group"
       aria-label="Tipo de negocio para consultar precios"
@@ -45,7 +70,7 @@ function elegirModo(valor: "clases" | "citas") {
         :aria-pressed="modo === 'clases'"
         @click="elegirModo('clases')"
       >
-        <span class="precios-modelo-titulo">Clases y academias</span>
+        <span class="precios-modelo-titulo">{{ NOMBRE_MODALIDAD.clases }}</span>
         <strong>Por alumnos activos</strong>
         <span class="precios-modelo-negocios">
           Pilates, Pole dance, yoga, acuáticas, baile y CrossFit / HYROX.
@@ -56,7 +81,7 @@ function elegirModo(valor: "clases" | "citas") {
         :aria-pressed="modo === 'citas'"
         @click="elegirModo('citas')"
       >
-        <span class="precios-modelo-titulo">Servicios con cita</span>
+        <span class="precios-modelo-titulo">{{ NOMBRE_MODALIDAD.citas }}</span>
         <strong>Por profesionales</strong>
         <span class="precios-modelo-negocios">
           Barberías, estéticas, spas, psicólogos, dentistas y nutriólogos.
@@ -89,11 +114,7 @@ function elegirModo(valor: "clases" | "citas") {
         :key="`${modo}-${indice}`"
         class="precio-tarjeta"
       >
-        <p class="precio-contexto">
-          {{
-            modo === "clases" ? "Estudios y academias" : "Servicios con cita"
-          }}
-        </p>
+        <p class="precio-contexto">{{ NOMBRE_MODALIDAD[modo] }}</p>
         <h4>{{ tarjeta.capacidad }}</h4>
         <p class="precio-importe">
           <strong>{{ pesos(tarjeta.subtotal) }}</strong
@@ -102,12 +123,25 @@ function elegirModo(valor: "clases" | "citas") {
         <p class="precio-impuestos">+ IVA</p>
         <ul>
           <li v-for="beneficio in beneficios" :key="beneficio">
-            <span aria-hidden="true">✓</span>{{ beneficio }}
+            <svg
+              class="precio-check"
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="m5 12.5 4 4 10-10" /></svg
+            >{{ beneficio }}
           </li>
         </ul>
         <RouterLink
-          class="tu-btn tu-btn-primario precio-cta"
-          :to="{ name: 'registro' }"
+          class="tu-btn tu-btn-primario tu-btn-azul precio-cta"
+          :to="registro"
           @click="
             trackEvent('marketing_cta_clicked', {
               placement: 'pricing_card',
@@ -124,8 +158,18 @@ function elegirModo(valor: "clases" | "citas") {
     </div>
 
     <p class="precios-aclaracion">
-      Todas las herramientas de tu modalidad, desde el primer plan. Tarifas
-      mensuales según los alumnos o profesionales activos de tu negocio.
+      <template v-if="!fijo">
+        Todas las herramientas de tu modalidad, desde el primer plan. Tarifas
+        mensuales según los alumnos o profesionales activos de tu negocio.
+      </template>
+      <template v-else-if="modo === 'clases'">
+        Todas las herramientas para clases, desde el primer plan. La tarifa
+        mensual depende de los alumnos activos de tu negocio.
+      </template>
+      <template v-else>
+        Todas las herramientas para citas, desde el primer plan. La tarifa
+        mensual depende de los profesionales activos de tu negocio.
+      </template>
     </p>
 
     <details :key="modo" class="precios-detalle">
@@ -201,14 +245,7 @@ function elegirModo(valor: "clases" | "citas") {
           {{ pesos(246500) }} + IVA al mes, a partir de 20 profesionales.
         </p>
         <p>
-          Cuenta el profesional con al menos una sesión no cancelada en el mes.
-        </p>
-        <p>
-          ¿También das clases o talleres? Cada profesional incluye 10 personas
-          con reservas grupales en el mes (hasta 100 en total). Cada persona
-          adicional suma {{ pesos(900) }} + IVA al mes. Este cargo es adicional
-          al componente por profesionales y no se aplica a los clientes
-          atendidos solo por cita.
+          Cuenta el profesional con al menos una cita no cancelada en el mes.
         </p>
       </div>
     </details>
@@ -228,10 +265,18 @@ function elegirModo(valor: "clases" | "citas") {
       >
     </aside>
     <p class="precios-aclaracion">
-      Tú pones el valor a tus servicios, clases y paquetes. AgendaUno te ayuda a
-      ofrecerlos y gestionar sus cobros. Las comisiones del proveedor de pagos
-      en línea no están incluidas en la suscripción.
+      {{
+        !fijo
+          ? "Tú pones el valor a tus servicios, clases y paquetes."
+          : modo === "clases"
+            ? "Tú pones el precio de tus clases, paquetes y membresías."
+            : "Tú pones el precio de tus servicios y paquetes."
+      }}
+      AgendaUno te ayuda a ofrecerlos y gestionar sus cobros. Las comisiones del
+      proveedor de pagos en línea* no están incluidas en la suscripción.
     </p>
+    <!-- «Pagos en línea*»: solo en México (ADR 0099), como landing.soloMexico. -->
+    <p class="tu-nota-mexico">* Solo para clientes de México.</p>
   </div>
 </template>
 
@@ -261,6 +306,16 @@ function elegirModo(valor: "clases" | "citas") {
 }
 .precios-contacto a {
   padding: 0.75rem 1.25rem;
+}
+.precios-modelo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+}
+.precios-modelo strong {
+  font-size: clamp(1.05rem, 2vw, 1.25rem);
+  font-weight: 500;
 }
 .precios-selector {
   display: grid;
@@ -326,13 +381,14 @@ summary:focus-visible {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
 }
+/* Borde de arriba rosa y botón azul (`tu-btn-azul`): al revés que el hero. */
 .precio-tarjeta {
   display: flex;
   flex-direction: column;
   min-width: 0;
   background: var(--superficie);
   border: 1px solid var(--borde);
-  border-top: 3px solid var(--primario);
+  border-top: 3px solid var(--marketing-cta);
   border-radius: 18px;
   padding: 1.6rem;
 }
@@ -378,10 +434,13 @@ summary:focus-visible {
 }
 .precio-tarjeta li {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 0.6rem;
 }
-.precio-tarjeta li span {
+/* Marca de verificación en SVG, sin «✓» de texto. */
+.precio-check {
+  flex: 0 0 auto;
+  margin-top: 0.25rem;
   color: var(--exito);
 }
 .precio-cta {

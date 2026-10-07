@@ -70,6 +70,7 @@ describe("tipo de negocio", () => {
       "salon",
       "spa",
       "salud",
+      "general_citas",
     ]);
     expect(w.text()).toContain("Tu negocio trabaja con citas.");
   });

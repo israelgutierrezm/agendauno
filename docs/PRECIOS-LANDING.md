@@ -1,15 +1,19 @@
 # Presentación comercial de precios — AgendaUno
 
-Fecha de revisión: 26 de septiembre de 2026.
+Fecha de revisión: 7 de octubre de 2026 (landing por modalidad: portada, `/clases` y
+`/citas`). Revisión anterior: 26 de septiembre de 2026.
 
 ## Modelo presentado
 
 Mantener dos modalidades, con las mismas herramientas dentro de cada modalidad,
 en lugar de inventar niveles Básico / Pro con restricciones que el sistema no aplica.
 
-- Estudios y academias: una banda mensual según alumnos activos.
-- Citas: suma marginal de profesionales activos; cada profesional cuenta completo,
-  sin medio tiempo (ADR 0094).
+- Clases con cupo (estudios y academias): una banda mensual según alumnos activos.
+- Citas 1 a 1: suma marginal de profesionales activos; cada profesional cuenta
+  completo, sin medio tiempo (ADR 0094). La tarifa está publicada: no se anuncia «en
+  preparación».
+- Cada negocio es de una sola modalidad (ADR 0104): quien da clases y atiende con cita
+  registra dos negocios, cada uno con su suscripción.
 - Prueba de 30 días sin tarjeta.
 - Mostrar el precio base como importe principal y la leyenda «+ IVA» debajo.
   Los importes introductorios y las tablas también indican que se agrega IVA.
@@ -46,9 +50,29 @@ cuota fija existente; hasta entonces el cálculo por uso conserva su techo técn
 | 2 | $495 | $574.20 |
 | 3 | $630 | $730.80 |
 
-La landing explica los tramos adicionales, el tope del componente por profesionales
-y los cargos por personas en clases/talleres de un negocio de citas. El precio de
-entrada es el de un profesional: no hay precio de medio tiempo.
+La landing explica los tramos adicionales y el tope del componente por profesionales.
+Cuenta el profesional con al menos una cita no cancelada en el mes. El precio de
+entrada es el de un profesional: no hay precio de medio tiempo. Ya no se anuncian
+cargos por personas en clases o talleres de un negocio de citas: un negocio de citas
+no crea clases (ADR 0104). La regla sigue en la tarifa versionada ya publicada, pero
+no se presenta.
+
+## Dónde se presentan
+
+- **Portada (`/#precios`)**: dos tarjetas «desde…», una por modalidad, con el importe
+  de entrada de `precios.ts` («Clases con cupo · Por alumnos activos · desde $339» y
+  «Citas 1 a 1 · Por profesionales activos · desde $269», más IVA). Llevan a
+  `/clases#precios` y `/citas#precios`. No hay selector ni tabla en la portada.
+- **`/clases#precios`**: `PreciosLanding` fijo en clases, sin selector: tres tarjetas
+  de rangos, la tabla completa de bandas, qué cuenta como alumno activo y el contacto
+  para más de 2,000 alumnos.
+- **`/citas#precios`**: `PreciosLanding` fijo en citas: 1, 2 y 3 profesionales, los
+  tramos marginales y el tope.
+- **Páginas por giro**: dicen cómo se cobra su modalidad («por rango de alumnos
+  activos» o «por profesional activo» al mes, más IVA) y enlazan a `/{modo}#precios`.
+- Las tarjetas llevan al registro con su modalidad (`/registro?modo=clases|citas`).
+- La mención de las comisiones de los «pagos en línea*» lleva la nota «* Solo para
+  clientes de México» (ADR 0099).
 
 ## Referencias de presentación
 
@@ -66,6 +90,7 @@ clínicas sin una política comercial y capacidad operativa que los respalden.
 Los importes públicos están centralizados en `apps/web/src/marketing/precios.ts`.
 Son una referencia comercial estática, no una consulta automática de facturación.
 Antes de publicar otra versión desde el panel de plataforma, actualizar esta referencia,
-los tramos detallados de `PreciosLanding.vue` y sus pruebas, y volver a generar el sitio.
+los tramos detallados de `PreciosLanding.vue`, las tarjetas «desde…» de la portada
+(salen de `precios.ts`) y sus pruebas, y volver a generar el sitio.
 Validar también que las tarifas del entorno de producción coincidan con las anunciadas.
 La fuente operativa sigue siendo la tarifa versionada del backend y su cálculo de uso.

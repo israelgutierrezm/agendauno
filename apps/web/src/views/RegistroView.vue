@@ -1,12 +1,21 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
+import { useI18n } from "vue-i18n";
 import { RouterLink, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
 import { ladaDe, separarTelefono, unirTelefono } from "@/lib/ladas";
-import { girosDe, type ModalidadServicio } from "@/lib/modalidad";
+import { girosDe } from "@/lib/modalidad";
 import { opcionesPais, paisSugerido, zonaSugerida } from "@/lib/region";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, type AnalyticsProperties } from "@/lib/analytics";
+import { MODOS, modoDePerfil, type Modo } from "@/marketing/modalidades";
 import AvisoPrivacidadContenido from "@/components/AvisoPrivacidadContenido.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import SelectorBuscable from "@/components/SelectorBuscable.vue";
@@ -14,7 +23,20 @@ import SelectorBuscable from "@/components/SelectorBuscable.vue";
 // Alta del negocio: crea su base completa (ver el comentario en la petición).
 const TIEMPO_REGISTRO_MS = 120_000;
 
+/**
+ * Con qué llegó, ya normalizado por la ruta (lo inválido llega como `null` y se
+ * ignora):
+ * - `modo` (`/registro?modo=`, desde /clases o /citas): solo se ven sus giros.
+ * - `giro` (`?giro=`, desde la página de un giro): ya viene elegido, con su
+ *   modalidad; si es de otra modalidad que `modo`, manda el giro.
+ */
+const props = withDefaults(
+  defineProps<{ modo?: Modo | null; giro?: string | null }>(),
+  { modo: null, giro: null },
+);
+
 const router = useRouter();
+const { t } = useI18n();
 
 // Alta por pasos: filtra interesados reales y captura datos de contacto útiles.
 const paso = ref(1);
@@ -24,19 +46,109 @@ const pasosRegistro = [
   { numero: 3, titulo: "registro.paso3" },
 ] as const;
 
+// El giro con que llegó, si es un giro del registro, y la modalidad de llegada: la
+// de ese giro (manda sobre `?modo=`) o la de `?modo=`.
+const giroDeLlegada = computed(() =>
+  props.giro !== null && modoDePerfil(props.giro) !== null ? props.giro : null,
+);
+const modoDeLlegada = computed<Modo | null>(() =>
+  giroDeLlegada.value !== null ? modoDePerfil(giroDeLlegada.value) : props.modo,
+);
+
 // Paso 1: el lugar.
 const nombre = ref("");
 const slug = ref("");
 const slugTocado = ref(false);
-const perfilNegocio = ref("");
+const perfilNegocio = ref(giroDeLlegada.value ?? "");
 // País del negocio (ADR 0103): obligatorio; se propone el del navegador (su zona
 // horaria o su idioma) y, si no, México. De él salen la lada y la zona.
 const pais = ref(paisSugerido());
 const paises = opcionesPais();
 
 // El giro da la modalidad del negocio, solo clases o solo citas (ADR 0104): se
-// agrupan para que se vea con cuál va a trabajar.
-const MODALIDADES: ModalidadServicio[] = ["clases", "citas"];
+// agrupan para que se vea con cuál va a trabajar. Con una modalidad de llegada solo
+// se ven sus giros, y un enlace muestra los de la otra; sin ella, los dos grupos.
+const modoVisible = ref<Modo | null>(modoDeLlegada.value);
+const modalidades = computed<readonly Modo[]>(() =>
+  modoVisible.value === null ? MODOS : [modoVisible.value],
+);
+const otroModo = computed<Modo | null>(() =>
+  modoVisible.value === null
+    ? null
+    : (MODOS.find((m) => m !== modoVisible.value) ?? null),
+);
+// Con su giro (`?giro=`), el selector se oculta tras un resumen con «Cambiar».
+const selectorVisible = ref(giroDeLlegada.value === null);
+const selectorPerfil = ref<HTMLSelectElement | null>(null);
+// La modalidad con que nacerá el negocio: la del giro elegido.
+const modoDelGiro = computed<Modo | null>(() =>
+  perfilNegocio.value === "" ? null : modoDePerfil(perfilNegocio.value),
+);
+
+async function enfocarSelector(): Promise<void> {
+  await nextTick();
+  selectorPerfil.value?.focus();
+}
+// «Cambiar» (en el paso 1 o en el resumen del paso 3): vuelve el selector, con los
+// giros de la modalidad del elegido.
+function cambiarGiro(): void {
+  paso.value = 1;
+  selectorVisible.value = true;
+  void enfocarSelector();
+}
+// «¿Das clases? Ver giros de clases»: los giros de la otra modalidad, sin perder lo
+// escrito. El giro elegido, si era de la que se deja, se suelta: ya no está en la lista.
+function verOtraModalidad(): void {
+  if (otroModo.value === null) {
+    return;
+  }
+  modoVisible.value = otroModo.value;
+  if (modoDelGiro.value !== null && modoDelGiro.value !== modoVisible.value) {
+    perfilNegocio.value = "";
+  }
+  void enfocarSelector();
+}
+// Otro `?modo=` o `?giro=` con la vista abierta (la ruta la reutiliza).
+watch([giroDeLlegada, modoDeLlegada], ([giro, modo]) => {
+  modoVisible.value = modo;
+  selectorVisible.value = giro === null;
+  if (giro !== null) {
+    perfilNegocio.value = giro;
+  } else if (
+    modo !== null &&
+    modoDelGiro.value !== null &&
+    modoDelGiro.value !== modo
+  ) {
+    perfilNegocio.value = "";
+  }
+});
+// «Barbería · Citas 1 a 1»: lo que se va a crear, en el paso 1 cuando el giro llegó
+// elegido y en el resumen del paso 3.
+const resumenGiro = computed(() =>
+  [
+    t(`registro.perfiles.${perfilNegocio.value}`),
+    modoDelGiro.value === null
+      ? null
+      : t(`modalidadNegocio.nombres.${modoDelGiro.value}`),
+  ]
+    .filter((parte) => parte !== null)
+    .join(" · "),
+);
+
+// La intención de llegada (`mode_intent` y, con `?giro=`, `business_profile_intent`)
+// va en los eventos del registro, para compararla con lo que de verdad se crea
+// (`mode` y `business_profile` en tenant_created).
+function conIntencion(datos: AnalyticsProperties = {}): AnalyticsProperties {
+  return {
+    ...datos,
+    ...(modoDeLlegada.value === null
+      ? {}
+      : { mode_intent: modoDeLlegada.value }),
+    ...(giroDeLlegada.value === null
+      ? {}
+      : { business_profile_intent: giroDeLlegada.value }),
+  };
+}
 
 // Paso 2: quién eres.
 const contactoNombre = ref("");
@@ -315,7 +427,10 @@ const pasoValido = computed(() =>
 
 function siguiente(): void {
   if (paso.value < 3 && pasoValido.value) {
-    trackEvent("studio_registration_step_completed", { step: paso.value });
+    trackEvent(
+      "studio_registration_step_completed",
+      conIntencion({ step: paso.value }),
+    );
     paso.value++;
   }
 }
@@ -375,10 +490,19 @@ async function enviar(): Promise<void> {
     creado.value = data.data.estudio;
     activacion.value = data.data.activacion;
     correo.value = contactoEmail.value;
-    trackEvent("tenant_created", { business_profile: perfilNegocio.value });
+    trackEvent(
+      "tenant_created",
+      conIntencion({
+        business_profile: perfilNegocio.value,
+        mode: modoDelGiro.value,
+      }),
+    );
   } catch (e) {
     error.value = mensajeDeError(e);
-    trackEvent("studio_registration_failed", { step: paso.value });
+    trackEvent(
+      "studio_registration_failed",
+      conIntencion({ step: paso.value }),
+    );
     // Si el backend rechaza el slug (carrera), regresa al paso 1.
     paso.value = 1;
   } finally {
@@ -419,7 +543,7 @@ function irActivar(): void {
 }
 
 onMounted(() => {
-  trackEvent("studio_registration_started");
+  trackEvent("studio_registration_started", conIntencion());
   void api
     .get<{
       data: {
@@ -564,21 +688,49 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                   required
                 />
               </div>
-              <div>
+              <!-- Llegó con su giro (?giro=): ya está elegido; «Cambiar» abre el
+                   selector con los giros de su modalidad. -->
+              <div
+                v-if="!selectorVisible"
+                class="registro-resumen registro-giro"
+                data-prueba="giro-elegido"
+              >
+                <p class="min-w-0">
+                  <span class="registro-giro-etiqueta">{{
+                    $t("registro.perfilElegido")
+                  }}</span
+                  >{{ " "
+                  }}<strong class="registro-giro-valor">{{
+                    resumenGiro
+                  }}</strong>
+                </p>
+                <button
+                  type="button"
+                  class="tu-enlace registro-resumen-cambiar shrink-0 text-sm"
+                  data-prueba="cambiar-giro"
+                  :aria-label="$t('modalidadNegocio.resumen.cambiarEtiqueta')"
+                  @click="cambiarGiro"
+                >
+                  {{ $t("modalidadNegocio.resumen.cambiar") }}
+                </button>
+              </div>
+              <div v-else>
                 <label class="tu-label" for="perfil">{{
                   $t("registro.perfil")
                 }}</label>
                 <select
                   id="perfil"
+                  ref="selectorPerfil"
                   v-model="perfilNegocio"
                   class="tu-input"
+                  aria-describedby="perfil-ayuda"
                   required
                 >
                   <option value="" disabled>
                     {{ $t("registro.perfilPh") }}
                   </option>
                   <optgroup
-                    v-for="m in MODALIDADES"
+                    v-for="m in modalidades"
                     :key="m"
                     :label="$t(`modalidadNegocio.nombres.${m}`)"
                   >
@@ -592,11 +744,36 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                   </optgroup>
                 </select>
                 <p
+                  id="perfil-ayuda"
                   class="mt-1 text-xs"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
                   {{ $t("registro.perfilAyuda") }}
                   {{ $t("modalidadNegocio.registro") }}
+                </p>
+                <!-- Solo se ven los giros de una modalidad: este enlace muestra los
+                     de la otra, sin perder lo escrito. -->
+                <p
+                  v-if="otroModo !== null"
+                  class="registro-otra-modalidad text-xs"
+                  data-prueba="otra-modalidad"
+                >
+                  <span>{{
+                    $t(
+                      `modalidadNegocio.registroModo.otra.${otroModo}.pregunta`,
+                    )
+                  }}</span>
+                  <button
+                    type="button"
+                    class="tu-enlace registro-otra-modalidad-enlace"
+                    @click="verOtraModalidad"
+                  >
+                    {{
+                      $t(
+                        `modalidadNegocio.registroModo.otra.${otroModo}.enlace`,
+                      )
+                    }}
+                  </button>
                 </p>
               </div>
               <div>
@@ -735,6 +912,27 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
 
             <!-- ===== Paso 3: contacto ===== -->
             <template v-else>
+              <!-- Lo que se va a crear: la modalidad ya no la cambia el negocio. -->
+              <div class="registro-resumen" data-prueba="resumen-modalidad">
+                <div class="min-w-0">
+                  <p class="registro-resumen-etiqueta">
+                    {{ $t("modalidadNegocio.resumen.etiqueta") }}
+                  </p>
+                  <p class="registro-resumen-valor">{{ resumenGiro }}</p>
+                  <p class="registro-resumen-ayuda">
+                    {{ $t("modalidadNegocio.resumen.ayuda") }}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="tu-enlace registro-resumen-cambiar shrink-0 text-sm"
+                  :aria-label="$t('modalidadNegocio.resumen.cambiarEtiqueta')"
+                  :disabled="enviando"
+                  @click="cambiarGiro"
+                >
+                  {{ $t("modalidadNegocio.resumen.cambiar") }}
+                </button>
+              </div>
               <div>
                 <label class="tu-label" for="cwhatsapp">{{
                   $t("registro.whatsapp")
@@ -1216,6 +1414,61 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
   border-radius: 999px;
   background: var(--exito);
 }
+/* Paso 1 con el giro ya elegido: el mismo recuadro que el resumen del paso 3. */
+.registro-giro {
+  align-items: center;
+}
+.registro-giro-etiqueta {
+  color: var(--texto-suave);
+}
+.registro-giro-valor {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+/* Enlace discreto a los giros de la otra modalidad. */
+.registro-otra-modalidad {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.35rem;
+  color: var(--texto-suave);
+}
+.registro-otra-modalidad-enlace {
+  min-height: 44px;
+  padding-inline: 0.25rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.registro-resumen {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 0.75rem;
+  background: var(--fondo);
+}
+.registro-resumen-etiqueta {
+  font-size: 0.75rem;
+  color: var(--texto-suave);
+}
+.registro-resumen-valor {
+  margin-top: 0.15rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.registro-resumen-cambiar {
+  min-height: 44px;
+  padding-inline: 0.25rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.registro-resumen-ayuda {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--texto-suave);
+}
 .registro-codigo {
   max-width: 9rem;
   letter-spacing: 0.3em;
@@ -1234,6 +1487,8 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
   text-underline-offset: 0.2em;
 }
 .registro .tu-btn:focus-visible,
+.registro-resumen-cambiar:focus-visible,
+.registro-otra-modalidad-enlace:focus-visible,
 .registro-legales button:focus-visible,
 .registro-legales input:focus-visible {
   outline: 2px solid var(--acento);

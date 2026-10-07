@@ -1,4 +1,12 @@
 import { soluciones, rutaSolucion } from "./soluciones.ts";
+import {
+  MODALIDADES,
+  MODOS,
+  NOMBRE_RUTA_MODALIDAD,
+  perfilDeSolucion,
+  rutaModalidad,
+  type Modo,
+} from "./modalidades.ts";
 
 export const SITE_URL = "https://agendauno.mx";
 export const DEFAULT_IMAGE = `${SITE_URL}/assets/brand/agendauno/final-v2/open-graph.png`;
@@ -16,10 +24,116 @@ export const DEFAULT_SEO = {
   description:
     "Organiza clases, citas por profesional, membresías y cobros en una agenda visual. Prueba AgendaUno gratis durante 30 días, sin tarjeta.",
 } as const;
-export const rutasMarketing = [
-  "/",
-  ...soluciones.map((s) => rutaSolucion(s.slug)),
+
+/** Qué vista monta cada página comercial (el router elige el componente). */
+export type VistaMarketing = "landing" | "modalidad" | "solucion";
+
+export interface PaginaMarketing {
+  path: string;
+  /** Nombre de la ruta: el mismo en el router y en el prerender. */
+  name: string;
+  vista: VistaMarketing;
+  /** La modalidad de la página: la de /clases y /citas, y la de cada giro. */
+  modo: Modo | null;
+  /** Solo en las páginas por giro: su slug en `soluciones.ts`. */
+  slug?: string;
+  /**
+   * Solo en las páginas por giro: el giro del registro que llevan sus «Probar gratis»
+   * (el del menú también, `?giro=`), o `null` si la página junta varios giros.
+   */
+  giro?: string | null;
+}
+
+/**
+ * LA lista de páginas comerciales: el router, el prerender, el sitemap, el SEO, la
+ * analítica y las revisiones de `scripts/check-marketing*.mjs` salen de aquí.
+ */
+export const paginasMarketing: readonly PaginaMarketing[] = [
+  { path: "/", name: "inicio", vista: "landing", modo: null },
+  ...MODOS.map((modo): PaginaMarketing => ({
+    path: rutaModalidad(modo),
+    name: NOMBRE_RUTA_MODALIDAD[modo],
+    vista: "modalidad",
+    modo,
+  })),
+  ...soluciones.map((s): PaginaMarketing => ({
+    path: rutaSolucion(s.slug),
+    name: `solucion-${s.slug}`,
+    vista: "solucion",
+    modo: s.modo,
+    slug: s.slug,
+    giro: perfilDeSolucion(s.slug),
+  })),
 ];
+export const rutasMarketing: string[] = paginasMarketing.map((p) => p.path);
+
+function organizacionYSoftware(): Record<string, unknown>[] {
+  return [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "AgendaUno",
+      url: SITE_URL,
+      logo: `${SITE_URL}/assets/brand/agendauno/final-v2/logo.png`,
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": `${SITE_URL}/#software`,
+      name: "AgendaUno",
+      url: SITE_URL,
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      description: DEFAULT_SEO.description,
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
+  ];
+}
+
+/** Miga de pan de una página comercial: Inicio → … → la página (`@id` `#breadcrumb`). */
+function migaDePan(
+  url: string,
+  pasos: readonly { name: string; item: string }[],
+): Record<string, unknown> {
+  return {
+    "@type": "BreadcrumbList",
+    "@id": `${url}#breadcrumb`,
+    itemListElement: [{ name: "Inicio", item: `${SITE_URL}/` }, ...pasos].map(
+      (paso, i) => ({ "@type": "ListItem", position: i + 1, ...paso }),
+    ),
+  };
+}
+
+/** /clases y /citas: su WebPage y su miga de pan (sin Offer, FAQPage ni hreflang). */
+function seoDeModalidad(modo: Modo): SeoOptions {
+  const { ruta, seo } = MODALIDADES[modo];
+  const url = `${SITE_URL}${ruta}`;
+  const image = `${SITE_URL}${seo.imagen}`;
+  return {
+    title: seo.title,
+    description: seo.description,
+    path: ruta,
+    image,
+    index: true,
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@graph": [
+        ...organizacionYSoftware(),
+        {
+          "@type": "WebPage",
+          "@id": `${url}#webpage`,
+          url,
+          name: seo.title,
+          description: seo.description,
+          inLanguage: "es-MX",
+          primaryImageOfPage: image,
+          about: { "@id": `${SITE_URL}/#software` },
+          breadcrumb: { "@id": `${url}#breadcrumb` },
+        },
+        migaDePan(url, [{ name: seo.miga, item: url }]),
+      ],
+    },
+  };
+}
 
 export function seoParaRuta(path: string): SeoOptions {
   const ruta = path.split(/[?#]/)[0]!.replace(/\/$/, "") || "/";
@@ -31,11 +145,27 @@ export function seoParaRuta(path: string): SeoOptions {
       index: false,
     };
   }
+  const modalidad = MODOS.find((m) => rutaModalidad(m) === ruta);
+  if (modalidad !== undefined) {
+    return seoDeModalidad(modalidad);
+  }
   const solucion = soluciones.find((s) => rutaSolucion(s.slug) === ruta);
   if (ruta === "/" || solucion) {
     const contenido = solucion
       ? { title: solucion.titulo, description: solucion.descripcion }
       : DEFAULT_SEO;
+    const url = `${SITE_URL}${ruta}`;
+    // La página por giro cuelga de su modalidad, como su miga visible
+    // (AgendaUno / Clases|Citas / giro).
+    const miga = solucion
+      ? migaDePan(url, [
+          {
+            name: MODALIDADES[solucion.modo].seo.miga,
+            item: `${SITE_URL}${rutaModalidad(solucion.modo)}`,
+          },
+          { name: solucion.nombre, item: url },
+        ])
+      : null;
     return {
       ...contenido,
       path: ruta,
@@ -43,32 +173,18 @@ export function seoParaRuta(path: string): SeoOptions {
       jsonLd: {
         "@context": "https://schema.org",
         "@graph": [
-          {
-            "@type": "Organization",
-            "@id": `${SITE_URL}/#organization`,
-            name: "AgendaUno",
-            url: SITE_URL,
-            logo: `${SITE_URL}/assets/brand/agendauno/final-v2/logo.png`,
-          },
+          ...organizacionYSoftware(),
           {
             "@type": "WebPage",
-            "@id": `${SITE_URL}${ruta}#webpage`,
-            url: `${SITE_URL}${ruta}`,
+            "@id": `${url}#webpage`,
+            url,
             name: contenido.title,
             description: contenido.description,
             inLanguage: "es-MX",
             about: { "@id": `${SITE_URL}/#software` },
+            ...(miga ? { breadcrumb: { "@id": `${url}#breadcrumb` } } : {}),
           },
-          {
-            "@type": "SoftwareApplication",
-            "@id": `${SITE_URL}/#software`,
-            name: "AgendaUno",
-            url: SITE_URL,
-            applicationCategory: "BusinessApplication",
-            operatingSystem: "Web",
-            description: DEFAULT_SEO.description,
-            publisher: { "@id": `${SITE_URL}/#organization` },
-          },
+          ...(miga ? [miga] : []),
         ],
       },
     };

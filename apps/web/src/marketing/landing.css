@@ -1,0 +1,272 @@
+/*
+| Secciones de las páginas comerciales (portada, /clases y /citas): títulos, etiquetas,
+| hero de texto, pasos, beneficios, foto de producto, caja de prueba gratis y la
+| aparición al hacer scroll (`lib/revelar.ts`). Solo aplica dentro de `.tu-landing`,
+| nunca en el panel. `:where(.tu-landing)` no suma especificidad: lo que una vista
+| declare en su `<style scoped>` manda sobre esto.
+|
+| `--sobre-banda`: color de las tarjetas y círculos de una banda. Por omisión
+| `--fondo` (bandas blancas); una banda con fondo gris lo cambia a `--superficie`.
+*/
+:where(.tu-landing) {
+  --landing-radius: var(--radio-tarjeta, 18px);
+  overflow: clip;
+}
+:where(.tu-landing) .tu-ancla {
+  scroll-margin-top: 6.5rem;
+}
+
+/* Titulares ligeros; el contraste queda reservado para palabras clave. */
+:where(.tu-landing) .tu-titulo {
+  font-weight: 300;
+  font-size: clamp(2.05rem, 4.35vw, 3.05rem);
+  letter-spacing: -0.028em;
+  line-height: 1.14;
+}
+:where(.tu-landing) .tu-display {
+  font-weight: 300;
+  font-size: clamp(2.8rem, 4.35vw, 4.125rem);
+  letter-spacing: -0.04em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+:where(.tu-landing) .tu-titulo-final {
+  font-size: clamp(1.95rem, 4.35vw, 2.625rem);
+}
+:where(.tu-landing) .tu-seccion-etiqueta {
+  display: inline-block;
+  color: var(--texto-suave);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+:where(.tu-landing) .tu-enfasis-rosa {
+  color: var(--marketing-rosa);
+  font-weight: 700;
+}
+
+/* Hero de texto: titular, subtítulo, botones y prueba gratis. */
+:where(.tu-landing) .tu-hero-layout {
+  display: grid;
+  min-height: calc(100svh - 5rem);
+  align-items: center;
+  gap: clamp(2.5rem, 5vw, 4rem);
+  padding-top: clamp(2.75rem, 6vh, 5rem);
+  padding-bottom: clamp(2.75rem, 6vh, 5rem);
+}
+:where(.tu-landing) .tu-hero-copy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+:where(.tu-landing) .tu-hero-proof {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+/* Tarjetas: radios propios, separados de las imágenes y de los paneles grandes. */
+:where(.tu-landing) .tu-card {
+  border: 0;
+  border-radius: var(--landing-radius);
+}
+:where(.tu-landing) .tu-pasos .tu-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--sobre-banda, var(--fondo));
+}
+:where(.tu-landing) .tu-paso-num {
+  display: inline-flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--texto);
+  color: var(--superficie);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+:where(.tu-landing) .tu-paso-ejemplo {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 1.5rem;
+  padding: 1.1rem;
+  border: 1px solid var(--borde);
+  border-radius: 1rem;
+  background: var(--fondo);
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+}
+:where(.tu-landing) .tu-paso-ejemplo strong {
+  color: var(--texto);
+  font-weight: 500;
+}
+:where(.tu-landing) .tu-paso-ejemplo-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+:where(.tu-landing) .tu-paso-status {
+  padding-top: 0.3rem;
+  color: var(--primario-fuerte);
+  font-weight: 600;
+}
+
+/* Lista de beneficios con su marca. */
+:where(.tu-landing) .tu-check-item {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--texto);
+  font-size: 1rem;
+}
+:where(.tu-landing) .tu-check {
+  display: inline-flex;
+  height: 2rem;
+  width: 2rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--sobre-banda, var(--fondo));
+  color: var(--texto);
+}
+:where(.tu-landing) .tu-link-flecha {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--enlace);
+  font-size: 1.05rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+:where(.tu-landing) .tu-link-flecha:hover {
+  text-decoration: underline;
+}
+
+/* Fotografía de producto: el color vive en la imagen, no en la interfaz. */
+:where(.tu-landing) .tu-imagen-marco {
+  overflow: hidden;
+  border-radius: var(--radio-imagen, 22px);
+  background: var(--fondo);
+}
+:where(.tu-landing) .tu-imagen-marco img {
+  display: block;
+  width: 100%;
+  height: auto;
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+:where(.tu-landing) .tu-imagen-marco:hover img {
+  transform: scale(1.012);
+}
+
+/* Prueba gratis junto a los precios. */
+:where(.tu-landing) .tu-precio-prueba {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-tarjeta, 18px);
+}
+
+/* Nota de alcance para profesionales de la salud. */
+:where(.tu-landing) .tu-alcance-salud {
+  padding: 1rem 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--primario) 16%, var(--borde));
+  border-left: 3px solid var(--acento);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--superficie) 78%, transparent);
+  color: var(--texto-suave);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+:where(.tu-landing) .tu-alcance-salud strong {
+  color: var(--texto);
+  font-weight: 500;
+}
+
+/* Aparición al hacer scroll: sin JS el contenido se ve igual. */
+:where(.tu-landing) .reveal {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+:where(.tu-landing) .reveal-in {
+  animation: tu-landing-entrada 0.7s ease both;
+}
+@keyframes tu-landing-entrada {
+  from {
+    transform: translateY(18px);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.tu-landing) .reveal-in {
+    animation: none;
+  }
+  :where(.tu-landing) .reveal,
+  :where(.tu-landing) .tu-imagen-marco img {
+    transition: none;
+  }
+  :where(.tu-landing) .tu-imagen-marco:hover img {
+    transform: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  :where(.tu-landing) .tu-hero-layout {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  }
+}
+@media (max-width: 1023px) {
+  :where(.tu-landing) .tu-hero-layout {
+    min-height: auto;
+    text-align: center;
+  }
+  :where(.tu-landing) .tu-hero-sub {
+    margin-inline: auto;
+  }
+  :where(.tu-landing) .tu-hero-actions,
+  :where(.tu-landing) .tu-hero-proof {
+    justify-content: center;
+  }
+}
+@media (max-width: 639px) {
+  :where(.tu-landing) .tu-display {
+    font-size: clamp(2.3rem, 10.4vw, 2.85rem);
+  }
+  :where(.tu-landing) .tu-imagen-marco {
+    border-radius: 20px;
+  }
+  :where(.tu-landing) .tu-hero-layout {
+    gap: 1.75rem;
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+  }
+  :where(.tu-landing) .tu-hero-sub {
+    margin-top: 1.25rem;
+    font-size: 1.05rem;
+    line-height: 1.45;
+  }
+  :where(.tu-landing) .tu-hero-actions {
+    margin-top: 1.75rem;
+  }
+  :where(.tu-landing) .tu-hero-proof {
+    margin-top: 0.8rem;
+  }
+  :where(.tu-landing) .tu-precio-prueba .tu-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

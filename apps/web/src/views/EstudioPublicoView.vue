@@ -14,6 +14,7 @@ import {
 } from "@/lib/modalidad";
 import { recordarNegocio } from "@/lib/negociosRecientes";
 import { updateSeo } from "@/lib/seo";
+import { perfilVisibleAlPublico } from "@/marketing/modalidades";
 
 interface Sesion {
   clase: string | null;
@@ -348,9 +349,14 @@ onMounted(cargar);
           <h1 class="mt-5 text-4xl font-extrabold tracking-tight">
             {{ escaparate.estudio.nombre }}
           </h1>
-          <span class="tu-badge mt-4">{{
-            $t(`registro.perfiles.${escaparate.estudio.perfil}`)
-          }}</span>
+          <!-- «Otro negocio con clases / de citas» es para el registro, no para los
+               clientes: sin insignia. -->
+          <span
+            v-if="perfilVisibleAlPublico(escaparate.estudio.perfil)"
+            class="tu-badge mt-4"
+            data-prueba="insignia-giro"
+            >{{ $t(`registro.perfiles.${escaparate.estudio.perfil}`) }}</span
+          >
           <p
             v-if="ubicacion"
             class="mt-2 text-lg"

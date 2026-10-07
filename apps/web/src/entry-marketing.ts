@@ -4,10 +4,12 @@ import { renderToString } from "vue/server-renderer";
 import { createMemoryHistory, createRouter, RouterView } from "vue-router";
 import PublicShell from "@/components/PublicShell.vue";
 import LandingView from "@/views/LandingView.vue";
+import ModalidadView from "@/views/ModalidadView.vue";
 import SolucionView from "@/views/SolucionView.vue";
 import { i18n } from "@/i18n";
-import { soluciones, rutaSolucion } from "@/marketing/soluciones";
+import { rutasComerciales } from "@/router/comerciales";
 export {
+  paginasMarketing,
   rutasMarketing,
   seoParaRuta,
   renderSeoHead,
@@ -21,13 +23,18 @@ export async function render(
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: "/", name: "inicio", component: LandingView },
-      { path: "/aviso-de-privacidad", component: { render: () => null } },
-      ...soluciones.map((s) => ({
-        path: rutaSolucion(s.slug),
-        component: SolucionView,
-        props: { slug: s.slug },
-      })),
+      // Las mismas rutas comerciales (nombre, meta y props) que el router de la app.
+      ...rutasComerciales({
+        landing: LandingView,
+        modalidad: ModalidadView,
+        solucion: SolucionView,
+      }),
+      {
+        path: "/aviso-de-privacidad",
+        name: "aviso-privacidad",
+        component: { render: () => null },
+      },
+      // Destinos de los enlaces por nombre: aquí no se renderizan.
       ...["registro", "entrar", "directorio"].map((name) => ({
         path: name === "directorio" ? "/negocios" : `/${name}`,
         name,

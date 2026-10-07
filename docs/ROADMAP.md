@@ -49,6 +49,14 @@
   limpieza diaria de registros técnicos (ADR 0079).
 - **Suspensión automática por renta** (ADR 0073): con días de gracia y aviso previo;
   suspendido, el dueño solo entra a pagar y se reactiva al pagar.
+- **Landing por modalidad** (ADR 0104): portada corta para elegir «Doy clases» o
+  «Atiendo con cita» y una landing completa para cada modalidad (`/clases`, «Clases
+  con cupo», y `/citas`, «Citas 1 a 1»), con sus funciones, demo, precios, página
+  pública de ejemplo y preguntas; las páginas por giro cuelgan de su modalidad. El
+  registro recibe `?modo=` (sus giros primero, aviso sin bloquear y resumen de la
+  modalidad), la analítica mide `mode` y `mode_intent`, y en producción el enlace corto
+  y la página de un negocio en el dominio principal van a su subdominio. La CI corre
+  `npm run test:marketing` (ver `apps/web/MARKETING-SEO.md`).
 - **Experiencia**: web única (sitio, panel, portal, superadmin) y app Flutter;
   roles propios y rol activo por sesión (ADR 0055, 0057), también de quien imparte
   (ADR 0078), con «eliminar» aparte de «gestionar» (ADR 0077); nombre AgendaUno
@@ -59,6 +67,11 @@
 - Pruebas de punta a punta con llaves de prueba de cada pasarela
   (`docs/VERIFICACION-V1.md`).
 - Instalar en un servidor real y correr `actualizar.sh` / `volver.sh`.
+- Antes de publicar la landing por modalidad, comprobar que ningún negocio usa los
+  slugs `clases` o `citas` (`SELECT slug FROM estudios WHERE slug IN
+  ('clases','citas')`): su enlace corto en el dominio principal quedaría tapado por
+  la landing (en su subdominio sigue funcionando). Reservarlos en el API queda como
+  tarea aparte.
 - WhatsApp (si se enciende): cuenta de WhatsApp Business en Meta, token permanente
   y las plantillas de Configuración → «WhatsApp» aprobadas, de cada uso que se
   encienda (ADR 0069, 0070 y 0071). En la app de Meta, el webhook con la dirección,

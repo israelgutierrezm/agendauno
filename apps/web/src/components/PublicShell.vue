@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 import LogoAgendaUno from "@/components/LogoAgendaUno.vue";
 import { trackEvent } from "@/lib/analytics";
+import {
+  MODOS,
+  NOMBRE_RUTA_MODALIDAD,
+  rutaModalidad,
+} from "@/marketing/modalidades";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const props = defineProps<{
@@ -12,14 +17,50 @@ const props = defineProps<{
   esRutaPublicaDeNegocio?: boolean;
 }>();
 
+// Página comercial según su ruta (`meta.marketing`), igual en la app y en el
+// prerender: el HTML sin JS y la app montada muestran el mismo menú.
+const route = useRoute();
 const comercial = computed(
   () =>
     !props.esAcceso &&
     !props.esRutaPublicaDeNegocio &&
-    (!props.pagina ||
-      props.pagina === "inicio" ||
-      props.pagina.startsWith("solucion-")),
+    route.meta.marketing === true,
 );
+const modo = computed(() => route.meta.modo ?? null);
+const giro = computed(() => route.meta.giro ?? null);
+// «Precios»: en /clases y /citas, la sección de la misma página; en las demás, la
+// de la portada.
+const destinoPrecios = computed(() =>
+  modo.value !== null && route.name === NOMBRE_RUTA_MODALIDAD[modo.value]
+    ? { path: rutaModalidad(modo.value), hash: "#precios" }
+    : { name: "inicio", hash: "#precios" },
+);
+// Clases · Citas · Precios (`nav.clases`, `nav.citas`, `nav.precios`).
+const secciones = computed(() => [
+  ...MODOS.map((m) => ({ clave: m, to: { name: NOMBRE_RUTA_MODALIDAD[m] } })),
+  { clave: "precios", to: destinoPrecios.value },
+]);
+// «Probar gratis» desde una página de una modalidad (o de uno de sus giros) llega al
+// registro con esa modalidad; desde la página de un solo giro, también con el giro
+// (`?giro=`), como los demás «Probar gratis» de esa página.
+const destinoRegistro = computed(() => {
+  if (modo.value === null) return { name: "registro" };
+  return {
+    name: "registro",
+    query:
+      giro.value === null
+        ? { modo: modo.value }
+        : { modo: modo.value, giro: giro.value },
+  };
+});
+function medirRegistro(): void {
+  trackEvent("marketing_cta_clicked", {
+    placement: "navigation",
+    destination: "register",
+    ...(modo.value !== null ? { mode: modo.value } : {}),
+    ...(giro.value !== null ? { business_profile: giro.value } : {}),
+  });
+}
 const mostrarAcceso = computed(
   () => !props.esAcceso && props.pagina !== "entrar",
 );
@@ -61,17 +102,22 @@ defineEmits<{ alternarTema: [] }>();
           class="tu-public-sections"
           :aria-label="$t('nav.marketing')"
         >
-          <RouterLink :to="{ name: 'inicio', hash: '#producto' }">
-            {{ $t("nav.producto") }}
-          </RouterLink>
-          <RouterLink :to="{ name: 'inicio', hash: '#soluciones' }">
-            {{ $t("nav.soluciones") }}
-          </RouterLink>
-          <RouterLink :to="{ name: 'inicio', hash: '#precios' }">
-            {{ $t("nav.precios") }}
-          </RouterLink>
-          <RouterLink :to="{ name: 'inicio', hash: '#para-quien' }">
-            {{ $t("nav.paraQuien") }}
+          <!-- «Precios» sin aria-current: en /clases apunta a la misma página. -->
+          <RouterLink
+            v-for="s in secciones"
+            :key="s.clave"
+            v-slot="{ href, navigate, isExactActive }"
+            :to="s.to"
+            custom
+          >
+            <a
+              :href="href"
+              :aria-current="
+                isExactActive && s.clave !== 'precios' ? 'page' : undefined
+              "
+              @click="navigate"
+              >{{ $t(`nav.${s.clave}`) }}</a
+            >
           </RouterLink>
         </nav>
 
@@ -97,13 +143,8 @@ defineEmits<{ alternarTema: [] }>();
           <RouterLink
             v-if="comercial"
             class="tu-btn tu-btn-primario tu-public-register"
-            :to="{ name: 'registro' }"
-            @click="
-              trackEvent('marketing_cta_clicked', {
-                placement: 'navigation',
-                destination: 'register',
-              })
-            "
+            :to="destinoRegistro"
+            @click="medirRegistro"
           >
             <span class="tu-public-register-full">{{ $t("nav.probar") }}</span>
             <span class="tu-public-register-short">{{
@@ -142,6 +183,30 @@ defineEmits<{ alternarTema: [] }>();
         </svg>
       </button>
     </header>
+    <!-- En pantallas angostas, el menú comercial va en una segunda fila bajo la
+         barra (solo CSS: sirve igual en el HTML prerenderizado sin JS). -->
+    <nav
+      v-if="comercial"
+      class="tu-public-sections tu-public-sections-fila"
+      :aria-label="$t('nav.marketing')"
+    >
+      <RouterLink
+        v-for="s in secciones"
+        :key="s.clave"
+        v-slot="{ href, navigate, isExactActive }"
+        :to="s.to"
+        custom
+      >
+        <a
+          :href="href"
+          :aria-current="
+            isExactActive && s.clave !== 'precios' ? 'page' : undefined
+          "
+          @click="navigate"
+          >{{ $t(`nav.${s.clave}`) }}</a
+        >
+      </RouterLink>
+    </nav>
 
     <main class="flex-1">
       <slot />
@@ -246,7 +311,8 @@ defineEmits<{ alternarTema: [] }>();
 .tu-public-theme {
   position: absolute;
   right: 0.75rem;
-  top: 50%;
+  /* Centro de la barra (min-h-18 = 4.5rem). */
+  top: 2.25rem;
   transform: translateY(-50%);
   display: inline-grid;
   place-items: center;
@@ -285,9 +351,29 @@ defineEmits<{ alternarTema: [] }>();
   font-weight: 600;
   text-decoration: none;
 }
-.tu-public-sections a:hover {
+.tu-public-sections a:hover,
+.tu-public-sections a[aria-current="page"] {
   background: var(--superficie-2);
   color: var(--texto);
+}
+.tu-public-sections a:focus-visible {
+  outline: 2px solid var(--primario);
+  outline-offset: 2px;
+}
+/* Segunda fila del menú comercial (pantallas angostas): no es fija, se va al bajar. */
+.tu-public-sections.tu-public-sections-fila {
+  display: flex;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.25rem 1rem;
+  background: var(--superficie);
+  border-bottom: 1px solid color-mix(in srgb, var(--borde) 70%, transparent);
+}
+.tu-public-sections-fila a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 0.9rem;
 }
 .tu-public-register-short {
   display: none;
@@ -347,6 +433,9 @@ defineEmits<{ alternarTema: [] }>();
 @media (min-width: 1100px) {
   .tu-public-sections {
     display: flex;
+  }
+  .tu-public-sections.tu-public-sections-fila {
+    display: none;
   }
 }
 </style>

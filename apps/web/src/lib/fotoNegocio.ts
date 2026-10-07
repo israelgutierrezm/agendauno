@@ -13,9 +13,12 @@ const FOTOS: Record<string, string> = {
   yoga: "yoga-v1.jpg",
   danza: "danza-v1.jpg",
   gimnasio: "gimnasio-v1.jpg",
+  crossfit: "crossfit-v1.webp",
+  hyrox: "crossfit-hyrox-v1.webp",
   natacion: "natacion-v1.jpg",
   academia: "academias-v1.jpg",
   general: "wellness-v1.webp",
+  general_citas: "wellness-v1.webp",
 };
 
 export function fotoNegocio(perfil: string | null | undefined): string {

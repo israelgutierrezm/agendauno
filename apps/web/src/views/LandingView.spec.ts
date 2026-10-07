@@ -1,14 +1,42 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
+import { createMemoryHistory, createRouter } from "vue-router";
+
 import es from "@/i18n/locales/es-MX";
-import LandingView from "./LandingView.vue";
+import { trackEvent } from "@/lib/analytics";
+import {
+  ETIQUETA_MENU,
+  NOMBRE_MODALIDAD,
+  solucionesDe,
+  type Modo,
+} from "@/marketing/modalidades";
+import { bandasEstudios, ejemplosCitas, pesos } from "@/marketing/precios";
+import { rutaSolucion } from "@/marketing/soluciones";
+import { rutasComerciales } from "@/router/comerciales";
 import CarruselNegocios from "@/components/CarruselNegocios.vue";
+import FuncionesLanding from "@/components/FuncionesLanding.vue";
+import ModalidadesLanding from "@/components/ModalidadesLanding.vue";
+import PreciosLanding from "@/components/PreciosLanding.vue";
+import ProductoDemo from "@/components/ProductoDemo.vue";
+import LandingView from "./LandingView.vue";
+import fuente from "./LandingView.vue?raw";
+
+/*
+| La portada «/» es corta: el visitante elige «Doy clases» o «Atiendo con cita» y cada
+| modalidad tiene su landing completa (/clases, /citas). Aquí no van secciones de una
+| sola modalidad. Router real (las rutas comerciales de la app) para ver los href.
+*/
 
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
+});
 
-function montar() {
+const Vacia = { render: () => null };
+
+async function montar() {
   vi.stubGlobal(
     "IntersectionObserver",
     class {
@@ -17,219 +45,264 @@ function montar() {
       disconnect() {}
     },
   );
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      ...rutasComerciales({
+        landing: Vacia,
+        modalidad: Vacia,
+        solucion: Vacia,
+      }),
+      { path: "/registro", name: "registro", component: Vacia },
+    ],
+  });
+  await router.push("/");
+  await router.isReady();
   return mount(LandingView, {
     global: {
-      plugins: [createI18n({ legacy: false, locale: "es", messages: { es } })],
-      stubs: {
-        RouterLink: { template: "<a><slot /></a>" },
-        CarruselNegocios: true,
-        FuncionesLanding: true,
-      },
+      plugins: [
+        router,
+        createI18n({ legacy: false, locale: "es", messages: { es } }),
+      ],
     },
   });
 }
-describe("landing comercial", () => {
-  it("ofrece 30 días de prueba en todas las secciones", () => {
-    const vista = montar();
+
+const modos: Modo[] = ["clases", "citas"];
+
+describe("portada comercial", () => {
+  it("tiene un solo h1, con la frase de marca", async () => {
+    const vista = await montar();
+    expect(vista.findAll("h1")).toHaveLength(1);
+    expect(vista.get("h1").text()).toBe(es.landing.titulo);
+    expect(vista.get("h1 .tu-titulo-enfasis").text()).toBe("Más");
+    vista.unmount();
+  });
+
+  it("ofrece dos botones grandes, «Doy clases» y «Atiendo con cita», a /clases y /citas", async () => {
+    const vista = await montar();
+    const botones = vista.findAll(".tu-hero .tu-hero-opcion");
+    expect(botones).toHaveLength(2);
+    expect(botones.map((b) => b.attributes("href"))).toEqual([
+      "/clases",
+      "/citas",
+    ]);
+    expect(botones[0]!.text()).toContain("Doy clases");
+    expect(botones[1]!.text()).toContain("Atiendo con cita");
+    // En azul (`tu-btn-azul`, `--primario`); el rosa queda para el menú y el cierre.
+    botones.forEach((b) => expect(b.classes()).toContain("tu-btn-azul"));
+    vista
+      .findAll(".tu-final-acciones a")
+      .forEach((b) => expect(b.classes()).not.toContain("tu-btn-azul"));
+    // Agrupados bajo la pregunta que los nombra.
+    const grupo = vista.get(".tu-hero-opciones");
+    expect(grupo.attributes("role")).toBe("group");
+    expect(vista.get(`#${grupo.attributes("aria-labelledby")}`).text()).toBe(
+      es.landing.portada.elegir,
+    );
+    vista.unmount();
+  });
+
+  it("mide la modalidad elegida en el hero con `mode`", async () => {
+    const vista = await montar();
+    const botones = vista.findAll(".tu-hero-opcion");
+    await botones[1]!.trigger("click");
+    await botones[0]!.trigger("click");
+    await flushPromises();
+    expect(vi.mocked(trackEvent).mock.calls).toEqual([
+      [
+        "marketing_business_mode_selected",
+        { mode: "citas", placement: "hero" },
+      ],
+      [
+        "marketing_business_mode_selected",
+        { mode: "clases", placement: "hero" },
+      ],
+    ]);
+    vista.unmount();
+  });
+
+  it("explica bajo los botones que cada negocio elige una modalidad", async () => {
+    const vista = await montar();
+    expect(vista.get(".tu-hero-modalidad").text()).toBe(
+      es.landing.portada.unaModalidad,
+    );
+    expect(vista.text()).not.toContain("Una sola herramienta");
     expect(vista.get(".tu-hero-proof").text()).toContain("30 días");
     expect(vista.get(".tu-confianza").text()).toContain("30 días");
-    expect(vista.get("#producto").text()).toContain("30 días");
     expect(vista.text()).not.toMatch(/14 días/);
     vista.unmount();
   });
-  it("presenta los negocios animados sin sustituir el titular principal", () => {
-    const vista = montar();
-    expect(vista.get(".tu-hero .negocios-texto").text()).toContain(
-      "estudios de Pilates",
-    );
-    expect(vista.get(".negocios-animados .sr-only").text()).toContain(
-      "barberías",
-    );
-    expect(vista.findAll("h1")).toHaveLength(1);
-    expect(vista.get("h1").text()).toBe(es.landing.titulo);
+
+  it("el sello del precio nombra los dos modelos, sin decir que todo es por profesional", async () => {
+    const vista = await montar();
+    const sellos = vista.get(".tu-confianza").text();
+    expect(sellos).toContain("Precio por alumnos o profesionales activos");
+    expect(sellos).not.toMatch(/clases o citas por profesional/i);
     vista.unmount();
   });
-  it("presenta primero la demo y separa la operación en una banda propia", () => {
-    const vista = montar();
-    const texto = vista.text();
-    expect(texto.indexOf(es.landing.producto.titulo)).toBeLessThan(
-      texto.indexOf("Tu negocio tiene su ritmo."),
-    );
-    expect(vista.find("#soluciones .tu-operacion").exists()).toBe(false);
-    expect(vista.get("#operacion .tu-operacion").exists()).toBe(true);
+
+  it("conserva las anclas del menú: producto (modalidades), precios y soluciones", async () => {
+    const vista = await montar();
+    const ids = vista
+      .findAll("section[id]")
+      .map((seccion) => seccion.attributes("id"));
+    expect(ids).toEqual(["producto", "precios", "soluciones"]);
+    expect(
+      vista.get("#producto").findComponent(ModalidadesLanding).exists(),
+    ).toBe(true);
     vista.unmount();
   });
-  it("alterna el fondo del hero y la superficie entre secciones", () => {
-    const vista = montar();
+
+  it("mide la modalidad elegida en las tarjetas de modalidades", async () => {
+    const vista = await montar();
+    vista.findComponent(ModalidadesLanding).vm.$emit("elegir", "citas");
+    expect(trackEvent).toHaveBeenCalledWith(
+      "marketing_business_mode_selected",
+      { mode: "citas", placement: "business_modes" },
+    );
+    vista.unmount();
+  });
+
+  it("muestra los precios con dos tarjetas «desde…» que llevan a cada modalidad", async () => {
+    const vista = await montar();
+    const tarjetas = vista.findAll("#precios .tu-portada-precio");
+    expect(tarjetas).toHaveLength(2);
+    expect(tarjetas.map((t) => t.get("strong").text())).toEqual([
+      pesos(bandasEstudios[0].subtotal),
+      pesos(ejemplosCitas[0].subtotal),
+    ]);
+    expect(tarjetas[0]!.text()).toContain(NOMBRE_MODALIDAD.clases);
+    expect(tarjetas[0]!.text()).toContain("Por alumnos activos");
+    expect(tarjetas[0]!.text()).toContain("1–49 alumnos activos");
+    expect(tarjetas[1]!.text()).toContain(NOMBRE_MODALIDAD.citas);
+    expect(tarjetas[1]!.text()).toContain("Por profesionales activos");
+    expect(tarjetas[1]!.text()).toContain("1 profesional");
+    tarjetas.forEach((t) => expect(t.text()).toContain("+ IVA"));
+    // Borde de arriba rosa (jsdom no aplica el CSS con scope: se revisa la regla).
+    expect(fuente).toMatch(
+      /\.tu-portada-precio \{[^}]*border-top: 3px solid var\(--marketing-cta\);/,
+    );
+    const enlaces = tarjetas.map((t) => t.get("a"));
+    expect(enlaces.map((a) => a.attributes("href"))).toEqual([
+      "/clases#precios",
+      "/citas#precios",
+    ]);
+    await enlaces[1]!.trigger("click");
+    expect(trackEvent).toHaveBeenCalledWith("marketing_cta_clicked", {
+      placement: "pricing_card",
+      destination: "pricing",
+      mode: "citas",
+    });
+    vista.unmount();
+  });
+
+  it("presenta los giros en dos columnas, cada modalidad con sus páginas", async () => {
+    const vista = await montar();
+    const columnas = vista.findAll("#soluciones .soluciones-columna");
+    expect(columnas.map((c) => c.attributes("data-modo"))).toEqual(modos);
+    columnas.forEach((columna, i) => {
+      const modo = modos[i]!;
+      expect(columna.get("h3").text()).toBe(ETIQUETA_MENU[modo]);
+      expect(
+        columna
+          .findAll(".soluciones-enlaces a")
+          .map((a) => a.attributes("href")),
+      ).toEqual(solucionesDe(modo).map((s) => rutaSolucion(s.slug)));
+      // Al pie, el enlace a la landing de su modalidad.
+      expect(
+        columna.get(".tu-portada-giros-modalidad").attributes("href"),
+      ).toBe(`/${modo}`);
+    });
+    // La nota de alcance para la salud va con las citas.
+    expect(columnas[0]!.find(".tu-alcance-salud").exists()).toBe(false);
+    expect(columnas[1]!.get(".tu-alcance-salud").text()).toContain(
+      es.landing.paraQuien.saludTitulo,
+    );
+    vista.unmount();
+  });
+
+  it("responde preguntas generales: prueba, cancelación, datos, dos negocios y cambiar de modalidad", async () => {
+    const vista = await montar();
+    const preguntas = vista.findAll("details");
+    expect(preguntas.map((p) => p.attributes("data-pregunta"))).toEqual([
+      "prueba",
+      "cancelacion",
+      "datos",
+      "dosNegocios",
+      "cambiarModalidad",
+    ]);
+    // Quién cambia la modalidad se explica aquí (ya no en el registro).
+    expect(preguntas[4]!.get("summary").text()).toBe(
+      "¿Puedo cambiar de clases a citas después?",
+    );
+    expect(preguntas[4]!.get("p").text()).toContain(
+      "Solo AgendaUno puede cambiar la modalidad",
+    );
+    expect(preguntas[4]!.get("p").text()).toContain(
+      "solo antes de que empieces a operar",
+    );
+    preguntas.forEach((p) =>
+      expect(p.get("summary").text()).toContain(
+        es.landing.portada.faq[
+          p.attributes("data-pregunta") as keyof typeof es.landing.portada.faq
+        ],
+      ),
+    );
+    expect(preguntas[0]!.text()).toContain("30 días");
+    expect(preguntas[3]!.text()).toContain("registra dos negocios");
+    // La marca de abrir es una flecha SVG, no un «+» de texto.
+    preguntas.forEach((p) => {
+      expect(p.get("summary").text()).not.toMatch(/\+$/);
+      expect(p.find("summary svg.pregunta-marca").exists()).toBe(true);
+    });
+    vista.unmount();
+  });
+
+  it("cierra con dos botones al registro, cada uno con su modalidad", async () => {
+    const vista = await montar();
+    const botones = vista.findAll(".tu-final-acciones a");
+    expect(botones.map((b) => b.attributes("href"))).toEqual([
+      "/registro?modo=clases",
+      "/registro?modo=citas",
+    ]);
+    expect(botones.map((b) => b.text())).toEqual([
+      "Probar con clases",
+      "Probar con citas",
+    ]);
+    await botones[0]!.trigger("click");
+    expect(trackEvent).toHaveBeenCalledWith("marketing_cta_clicked", {
+      placement: "final",
+      destination: "register",
+      mode: "clases",
+    });
+    vista.unmount();
+  });
+
+  it("no trae secciones de una sola modalidad", async () => {
+    const vista = await montar();
+    for (const componente of [
+      ProductoDemo,
+      PreciosLanding,
+      FuncionesLanding,
+      CarruselNegocios,
+    ]) {
+      expect(vista.findComponent(componente).exists()).toBe(false);
+    }
+    expect(vista.find("#como-funciona").exists()).toBe(false);
+    expect(vista.find("#operacion").exists()).toBe(false);
+    expect(vista.text()).not.toMatch(/anticipos en línea|WhatsApp/i);
+    vista.unmount();
+  });
+
+  it("alterna el fondo del hero y la superficie entre secciones", async () => {
+    const vista = await montar();
     const bandas = vista.findAll("section.tu-banda");
-    expect(bandas).toHaveLength(11);
+    expect(bandas).toHaveLength(6);
     bandas.forEach((banda, indice) => {
       const fondo = indice % 2 === 0 ? "var(--fondo)" : "var(--superficie)";
       expect(banda.attributes("style")).toContain(`background: ${fondo}`);
     });
-    vista.unmount();
-  });
-  it("destaca beneficios sin cambiar los títulos ni su jerarquía SEO", () => {
-    const vista = montar();
-    expect(vista.findAll("h1")).toHaveLength(1);
-    const titulos = vista.findAll("h2");
-    for (const texto of [
-      es.landing.producto.titulo,
-      es.landing.comoFunciona.titulo,
-      es.landing.seccionTitulo,
-      es.landing.operacion.titulo,
-      es.landing.precio.titulo,
-      es.landing.comunidad.titulo,
-      es.landing.paraQuien.titulo,
-      es.landing.ctaFinalTitulo,
-    ]) {
-      const titulo = titulos.find((n) => n.text() === texto);
-      expect(titulo, texto).toBeDefined();
-      expect(titulo!.findAll(".tu-titulo-enfasis")).toHaveLength(
-        [es.landing.seccionTitulo, es.landing.producto.titulo].includes(texto)
-          ? 1
-          : 0,
-      );
-    }
-    expect(
-      titulos
-        .find((n) => n.text() === es.landing.seccionTitulo)!
-        .get(".tu-titulo-enfasis")
-        .text(),
-    ).toBe("crecer");
-    expect(vista.findAll(".tu-titulo-enfasis").map((n) => n.text())).toEqual([
-      "Más",
-      "agenda visual",
-      "crecer",
-    ]);
-    expect(vista.get("#producto .tu-titulo-enfasis").classes()).toContain(
-      "tu-titulo-enfasis--rosa",
-    );
-    expect(vista.get("#producto .tu-titulo-enfasis").classes()).toContain(
-      "tu-titulo-enfasis--negrita",
-    );
-    expect(vista.get("#soluciones .tu-titulo-enfasis").classes()).toContain(
-      "tu-titulo-enfasis--negrita",
-    );
-    expect(vista.findAll(".tu-enfasis-rosa").map((n) => n.text())).toEqual([
-      "ritmo",
-      "agenda",
-    ]);
-    expect(vista.get("#como-funciona h2").text()).toBe(
-      "Empieza en solo tres pasos",
-    );
-    vista.unmount();
-  });
-  it("conserva la frase de marca y presenta el producto con un subtítulo concreto", () => {
-    const vista = montar();
-    expect(vista.get("h1").text()).toBe(
-      "Menos pendientes. Más tiempo para tus clientes.",
-    );
-    expect(vista.get("h1 .tu-titulo-enfasis").text()).toBe("Más");
-    expect(vista.get(".tu-hero-sub").text()).toBe(
-      "Gestiona reservas, clases, membresías, cobros y tu equipo desde un solo lugar.",
-    );
-    expect(vista.get(".tu-hero-actions").text()).toContain(
-      "Probar AgendaUno gratis",
-    );
-    vista.unmount();
-  });
-  it("muestra Pole dance en el hero y categorías específicas de acuáticas y salud", () => {
-    const vista = montar();
-    expect(vista.findAll(".tu-hero-foto img")[1]!.attributes("src")).toBe(
-      "/assets/landing/disciplinas/pole-v1.jpg",
-    );
-    expect(vista.findAll(".tu-hero-foto").map((foto) => foto.text())).toEqual([
-      "Barberías",
-      "Pole dance",
-      "HYROX",
-    ]);
-    expect(
-      vista.findAll(".tu-hero-foto img")[1]!.attributes("fetchpriority"),
-    ).toBe("high");
-    const negocios = vista.findComponent(CarruselNegocios).props("negocios");
-    expect(negocios.map((n) => n.nombre)).toEqual(
-      expect.arrayContaining([
-        "Psicólogos",
-        "Dentistas",
-        "Acuáticas",
-        "Wellness",
-        "Spas",
-        "Terapeutas",
-        "Nutriólogos",
-        "CrossFit",
-        "HYROX",
-      ]),
-    );
-    expect(new Set(negocios.map((n) => n.clave)).size).toBe(negocios.length);
-    expect(negocios).toHaveLength(17);
-    expect(negocios.map((n) => n.nombre)).not.toContain("CrossFit / HYROX");
-    expect(negocios.find((n) => n.clave === "crossfit").src).toBe(
-      "/assets/landing/disciplinas/crossfit-v1.webp",
-    );
-    expect(negocios.find((n) => n.clave === "hyrox").src).toBe(
-      "/assets/landing/disciplinas/crossfit-hyrox-v1.webp",
-    );
-    vista.unmount();
-  });
-  it("conserva el orden editorial de imágenes revisado para el ciclo completo", () => {
-    const vista = montar();
-    const negocios = vista.findComponent(CarruselNegocios).props("negocios");
-    expect(negocios.map((n) => n.clave)).toEqual([
-      "pilates",
-      "pole",
-      "hyrox",
-      "academias",
-      "acuaticas",
-      "crossfit",
-      "estetica",
-      "dentistas",
-      "barberia",
-      "psicologos",
-      "wellness",
-      "nutriologos",
-      "spa",
-      "gimnasio",
-      "terapeutas",
-      "danza",
-      "yoga",
-    ]);
-    expect(negocios.find((n) => n.clave === "yoga").src).toBe(
-      "/assets/landing/disciplinas/yoga-v2.webp",
-    );
-    vista.unmount();
-  });
-  it("presenta los dos modelos con enfoque comercial y sin distinciones de jornada", () => {
-    const vista = montar();
-    expect(vista.get("#precios").text()).toContain("Por alumnos activos");
-    expect(vista.get("#precios").text()).toContain("Por profesionales");
-    expect(vista.get("#precios h2").text()).toContain(
-      "Dos modelos de suscripción",
-    );
-    expect(vista.get("#precios .precio-importe strong").text()).toBe("$339");
-    expect(vista.get("#precios .precio-impuestos").text()).toBe("+ IVA");
-    expect(vista.text()).not.toContain(
-      "Aún no se puede contratar con este esquema",
-    );
-    expect(vista.text()).not.toMatch(
-      /son cobros distintos|los pagos de tus clientes son distintos|medio tiempo|tiempo completo/i,
-    );
-    expect(vista.get("#precios").text()).toContain("Tú pones el valor");
-    expect(es.landing.faq.q7).toBe(
-      "¿Puedo definir mis propios precios y paquetes?",
-    );
-    expect(vista.text()).not.toContain("Tu equipo y administradores no inflan");
-    expect(vista.get(".tu-hero-actions a[href]").attributes("href")).toBe(
-      "#producto",
-    );
-    vista.unmount();
-  });
-  it("conecta ambas rutas comerciales con su ejemplo de agenda", async () => {
-    const vista = montar();
-    await vista.findAll(".modalidad-contenido a")[1]!.trigger("click");
-    expect(vista.get(".demo-detalle h4").text()).toBe("Corte de cabello");
-    await vista.findAll(".modalidad-contenido a")[0]!.trigger("click");
-    expect(vista.get(".demo-detalle h4").text()).toBe("Pilates Reformer");
     vista.unmount();
   });
 });

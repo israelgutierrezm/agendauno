@@ -108,6 +108,39 @@ describe("página pública del estudio", () => {
     expect(conCitas.text()).not.toContain("Reservar primera clase");
   });
 
+  it("muestra el giro como insignia, salvo los generales del registro", async () => {
+    mocks.get.mockResolvedValue(
+      escaparate({ promedio: null, total: 0, recientes: [] }),
+    );
+    const pole = montar();
+    await flushPromises();
+    expect(pole.get('[data-prueba="insignia-giro"]').text()).toBe(
+      es.registro.perfiles.pole,
+    );
+    // «Otro negocio con clases / de citas» es para el selector del registro: a los
+    // clientes no se les muestra.
+    for (const [perfil, modalidad] of [
+      ["general", "clases"],
+      ["general_citas", "citas"],
+    ] as const) {
+      const respuesta = escaparate({ promedio: null, total: 0, recientes: [] });
+      Object.assign(respuesta.data.data.estudio, {
+        perfil,
+        modalidad,
+        capacidades: {
+          clases: modalidad === "clases",
+          citas: modalidad === "citas",
+        },
+      });
+      mocks.get.mockResolvedValue(respuesta);
+      const w = montar();
+      await flushPromises();
+      expect(w.find('[data-prueba="insignia-giro"]').exists()).toBe(false);
+      expect(w.text()).not.toContain("Otro negocio");
+      expect(w.get("h1").text()).toBe("Estudio A");
+    }
+  });
+
   it("muestra el promedio y los comentarios que el negocio deja visibles", async () => {
     mocks.get.mockResolvedValue(
       escaparate({

@@ -2,15 +2,37 @@
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import SolucionesEnlaces from "@/components/SolucionesEnlaces.vue";
+import {
+  ETIQUETA_MENU,
+  NOMBRE_MODALIDAD,
+  perfilDeSolucion,
+  rutaModalidad,
+} from "@/marketing/modalidades";
 import { soluciones } from "@/marketing/soluciones";
 import { trackEvent } from "@/lib/analytics";
 const props = defineProps<{ slug: string }>();
 const solucion = computed(() => soluciones.find((s) => s.slug === props.slug)!);
+// Cada giro es de una sola modalidad (ADR 0104): su página, sus anclas y el registro
+// con su `?modo=` (solo se ven sus giros). Si la página es de un solo giro del
+// registro, también lo manda (`?giro=`) y el registro llega con él elegido.
+const modo = computed(() => solucion.value.modo);
+const giro = computed(() => perfilDeSolucion(props.slug));
+const esClases = computed(() => modo.value === "clases");
+const paginaModalidad = computed(() => rutaModalidad(modo.value));
+const registro = computed(() => ({
+  name: "registro",
+  query:
+    giro.value === null
+      ? { modo: modo.value }
+      : { modo: modo.value, giro: giro.value },
+}));
 function medir(placement: string): void {
   trackEvent("marketing_cta_clicked", {
     placement,
     destination: "register",
     solution: props.slug,
+    mode: modo.value,
+    ...(giro.value === null ? {} : { business_profile: giro.value }),
   });
 }
 </script>
@@ -19,28 +41,38 @@ function medir(placement: string): void {
   <article class="solucion">
     <section class="solucion-hero">
       <div>
-        <RouterLink class="tu-enlace text-sm" to="/"
-          >AgendaUno <span aria-hidden="true">/</span>
-          {{ solucion.nombre }}</RouterLink
-        >
+        <nav class="solucion-miga" aria-label="Ruta de navegación">
+          <ol>
+            <li><RouterLink class="tu-enlace" to="/">AgendaUno</RouterLink></li>
+            <li>
+              <RouterLink
+                class="tu-enlace"
+                :to="paginaModalidad"
+                data-prueba="enlace-modalidad"
+                >{{ ETIQUETA_MENU[modo] }}</RouterLink
+              >
+            </li>
+            <li aria-current="page">{{ solucion.nombre }}</li>
+          </ol>
+        </nav>
         <p class="solucion-etiqueta">
-          {{
-            solucion.modo === "clases"
-              ? "Software de reservas para"
-              : "Agenda de citas para"
-          }}
+          {{ esClases ? "Software de reservas para" : "Agenda de citas para" }}
           {{ solucion.nombre }}
         </p>
         <h1>{{ solucion.encabezado }}</h1>
         <p class="solucion-resumen">{{ solucion.resumen }}</p>
+        <!-- El botón del hero va en azul; el rosa queda para el menú y el cierre. -->
         <RouterLink
-          class="tu-btn tu-btn-primario px-7 py-3"
-          to="/registro"
+          class="tu-btn tu-btn-primario tu-btn-azul px-7 py-3"
+          :to="registro"
+          data-cta="hero"
           @click="medir('solution_hero')"
           >Probar gratis <span aria-hidden="true">↗</span></RouterLink
         >
         <p class="solucion-confianza">30 días para probarlo · Sin tarjeta</p>
-        <RouterLink class="tu-enlace text-sm" to="/#producto"
+        <RouterLink
+          class="tu-enlace text-sm"
+          :to="`${paginaModalidad}#producto`"
           >Ver la agenda en acción</RouterLink
         >
       </div>
@@ -55,9 +87,7 @@ function medir(placement: string): void {
         <figcaption class="solucion-reserva">
           <span class="solucion-hora">10:30</span>
           <div>
-            <small
-              >Ejemplo de
-              {{ solucion.modo === "clases" ? "clase" : "cita" }}</small
+            <small>Ejemplo de {{ esClases ? "clase" : "cita" }}</small
             ><strong>{{ solucion.ejemplo }}</strong
             ><span>Tu día, a la vista.</span>
           </div>
@@ -67,8 +97,7 @@ function medir(placement: string): void {
     <section class="solucion-bloque" aria-labelledby="beneficios-titulo">
       <p class="solucion-etiqueta">Menos pendientes, más claridad</p>
       <h2 id="beneficios-titulo">
-        Lo que tu
-        {{ solucion.modo === "clases" ? "academia" : "negocio" }} necesita para
+        Lo que tu {{ esClases ? "academia" : "negocio" }} necesita para
         organizar su día.
       </h2>
       <div class="solucion-beneficios">
@@ -86,28 +115,39 @@ function medir(placement: string): void {
       <div>
         <p class="solucion-etiqueta">Del registro a tu primera reserva</p>
         <h2>Pruébalo con la forma en que trabajas.</h2>
-        <p>
-          Crea tu negocio, activa tu cuenta y configura
-          {{
-            solucion.modo === "clases"
-              ? "una clase con horario, instructor y cupo"
-              : "un servicio con duración, profesional y disponibilidad"
-          }}. Después comparte tu enlace y revisa el flujo completo.
+        <!-- Clases: registro cerrado (ADR 0093), las cuentas las da el negocio.
+             Citas: el cliente agenda desde la página sin cuenta. -->
+        <p v-if="esClases">
+          Crea tu negocio, activa tu cuenta y configura una clase con horario,
+          instructor y cupo. Después da de alta a tus alumnos, invítalos a su
+          cuenta y comparte tu enlace con tus horarios.
+        </p>
+        <p v-else>
+          Crea tu negocio, activa tu cuenta y configura un servicio con
+          duración, profesional y disponibilidad. Después comparte tu enlace
+          para que tus clientes elijan servicio, profesional y horario.
         </p>
       </div>
-      <div class="tu-card p-6">
+      <div class="tu-card p-6" data-prueba="solucion-precio">
         <h3>Una prueba con tu operación real</h3>
         <p>
+          En {{ NOMBRE_MODALIDAD[modo] }}, la suscripción se cobra
           {{
-            solucion.modo === "clases"
-              ? "La modalidad de clases se cobra por alumno activo al mes."
-              : "El esquema comercial por profesional está en preparación."
+            esClases
+              ? "por rango de alumnos activos al mes."
+              : "por profesional activo al mes."
           }}
-          Consulta las condiciones vigentes antes de contratar.
+          Consulta las tarifas vigentes antes de contratar; los importes son más
+          IVA.
         </p>
-        <RouterLink class="tu-enlace" to="/#precios"
-          >Conocer precios y condiciones →</RouterLink
-        >
+        <p class="solucion-enlaces">
+          <RouterLink class="tu-enlace" :to="`${paginaModalidad}#precios`"
+            >Conocer precios y condiciones →</RouterLink
+          >
+          <RouterLink class="tu-enlace" :to="paginaModalidad"
+            >Todo lo que incluye {{ NOMBRE_MODALIDAD[modo] }} →</RouterLink
+          >
+        </p>
       </div>
     </section>
     <section
@@ -131,14 +171,15 @@ function medir(placement: string): void {
       </p>
       <RouterLink
         class="tu-btn tu-btn-primario px-7 py-3"
-        to="/registro"
+        :to="registro"
         @click="medir('solution_final')"
         >Probar gratis durante 30 días</RouterLink
       >
     </section>
     <section class="solucion-bloque">
       <h2>Otras formas de trabajar con AgendaUno</h2>
-      <SolucionesEnlaces :excluir="solucion.slug" />
+      <!-- Cada giro es de una sola modalidad: los demás, en «Clases» y «Citas». -->
+      <SolucionesEnlaces dos-columnas :excluir="solucion.slug" />
     </section>
   </article>
 </template>
@@ -176,8 +217,29 @@ h2 {
   max-width: 45rem;
 }
 h3 {
-  font-weight: 300;
+  font-weight: 500;
   font-size: 1.05rem;
+}
+.solucion-miga ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  color: var(--texto-suave);
+}
+.solucion-miga li + li::before {
+  content: "/";
+  content: "/" / "";
+  margin-right: 0.35rem;
+}
+.solucion-bloque p.solucion-enlaces {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+  margin-bottom: 0;
 }
 .solucion-resumen {
   font-size: 1.05rem;

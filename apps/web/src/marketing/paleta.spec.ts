@@ -89,6 +89,30 @@ describe("legibilidad de la paleta comercial", () => {
       /\.tu-banda \.tu-titulo\s*\{\s*font-size: clamp\(1\.75rem,/,
     );
   });
+  it("el botón azul (hero y tarjetas de precio) usa los tokens de la marca con contraste AA", () => {
+    // Fondo `--primario`, texto `--primario-contraste` (blanco en claro, oscuro en
+    // oscuro) y el tono fuerte al pasar el cursor.
+    expect(css).toMatch(
+      /\.tu-marketing \.tu-btn-primario\.tu-btn-azul \{\s*background: var\(--primario\);\s*color: var\(--primario-contraste\);\s*\}/,
+    );
+    expect(css).toMatch(
+      /\.tu-marketing \.tu-btn-primario\.tu-btn-azul:hover:not\(:disabled\) \{\s*background: var\(--primario-fuerte\);\s*\}/,
+    );
+    expect(contraste("#ffffff", claro["--primario"]!)).toBeGreaterThanOrEqual(
+      4.5,
+    );
+    for (const paleta of [claro, oscuro]) {
+      for (const fondo of ["--primario", "--primario-fuerte"]) {
+        expect(
+          contraste(paleta["--primario-contraste"]!, paleta[fondo]!),
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    // El rosa (bordes de las tarjetas de precio, menú y cierres) con texto blanco.
+    expect(
+      contraste("#ffffff", claro["--marketing-cta"]!),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
   it("mantiene legibles el rosa en texto grande y las etiquetas turquesa con texto blanco", () => {
     for (const paleta of [claro, oscuro]) {
       for (const fondo of ["--fondo", "--superficie"]) {

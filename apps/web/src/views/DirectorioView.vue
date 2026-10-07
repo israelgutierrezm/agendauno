@@ -5,6 +5,11 @@ import { RouterLink, useRouter } from "vue-router";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 import { recordarNegocio } from "@/lib/negociosRecientes";
+import {
+  MODOS,
+  PERFILES_POR_MODO,
+  perfilVisibleAlPublico,
+} from "@/marketing/modalidades";
 
 interface EstudioDirectorio {
   slug: string;
@@ -22,21 +27,12 @@ const perfil = ref("");
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
-const PERFILES = [
-  "pilates",
-  "pole",
-  "academia",
-  "gimnasio",
-  "yoga",
-  "danza",
-  "natacion",
-  "barberia",
-  "estetica",
-  "salon",
-  "spa",
-  "salud",
-  "general",
-] as const;
+// Los giros del filtro, por modalidad: la misma lista que el registro y que acepta el
+// filtro del API (`PerfilNegocio`), para que no se desalineen.
+const GRUPOS_PERFILES = MODOS.map((modo) => ({
+  modo,
+  perfiles: PERFILES_POR_MODO[modo],
+}));
 
 const CATEGORIAS_DESTACADAS = [
   {
@@ -73,9 +69,12 @@ const IMAGENES_PERFIL: Record<string, string> = {
   yoga: "yoga-v1.jpg",
   danza: "danza-v1.jpg",
   gimnasio: "gimnasio-v1.jpg",
+  crossfit: "crossfit-v1.webp",
+  hyrox: "crossfit-hyrox-v1.webp",
   natacion: "natacion-v1.jpg",
   academia: "academias-v1.jpg",
   general: "academias-v1.jpg",
+  general_citas: "wellness-v1.webp",
 };
 
 function imagenPerfil(valor: string): string {
@@ -194,9 +193,15 @@ onMounted(cargar);
         </label>
         <select v-model="perfil" :aria-label="$t('directorio.disciplina')">
           <option value="">{{ $t("directorio.todas") }}</option>
-          <option v-for="item in PERFILES" :key="item" :value="item">
-            {{ $t(`registro.perfiles.${item}`) }}
-          </option>
+          <optgroup
+            v-for="grupo in GRUPOS_PERFILES"
+            :key="grupo.modo"
+            :label="$t(`modalidadNegocio.nombres.${grupo.modo}`)"
+          >
+            <option v-for="item in grupo.perfiles" :key="item" :value="item">
+              {{ $t(`registro.perfiles.${item}`) }}
+            </option>
+          </optgroup>
         </select>
         <button class="tu-btn tu-btn-primario px-6" type="submit">
           {{ $t("directorio.buscarCta") }}
@@ -326,9 +331,13 @@ onMounted(cargar);
               decoding="async"
             />
             <span class="tu-estudio-degradado" aria-hidden="true"></span>
-            <span class="tu-estudio-perfil">{{
-              $t(`registro.perfiles.${e.perfil}`)
-            }}</span>
+            <!-- «Otro negocio con clases / de citas» es para el registro, no para
+                 los clientes: sin insignia. -->
+            <span
+              v-if="perfilVisibleAlPublico(e.perfil)"
+              class="tu-estudio-perfil"
+              >{{ $t(`registro.perfiles.${e.perfil}`) }}</span
+            >
             <img
               v-if="e.logo_url"
               :src="e.logo_url"

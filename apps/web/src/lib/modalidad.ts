@@ -1,5 +1,7 @@
 import axios from "axios";
 
+import { PERFILES_POR_MODO } from "@/marketing/modalidades";
+
 /**
  * Modalidad del negocio (ADR 0104): cada negocio es solo de clases o solo de citas,
  * nunca de ambas. La guarda el servidor (`estudios.modalidad`) y la manda con sus
@@ -47,22 +49,12 @@ export function capacidadesDeNegocio(
  * modalidad inicial; después solo se cambia a otro giro de la misma (cambiar de
  * modalidad lo hace AgendaUno). Es la misma lista que `ModalidadServicio::perfiles()`
  * del servidor, que la manda en GET /onboarding (`perfiles`) pero aún no en la
- * sesión: la configuración inicial usa la del servidor y Configuración, esta.
+ * sesión: la configuración inicial usa la del servidor y Configuración, esta. Vive en
+ * `marketing/modalidades.ts` (sin dependencias) para que la parte comercial la use
+ * sin traer axios.
  */
 export const GIROS_POR_MODALIDAD: Record<ModalidadServicio, readonly string[]> =
-  {
-    clases: [
-      "pilates",
-      "pole",
-      "yoga",
-      "danza",
-      "gimnasio",
-      "natacion",
-      "academia",
-      "general",
-    ],
-    citas: ["barberia", "estetica", "salon", "spa", "salud"],
-  };
+  PERFILES_POR_MODO;
 
 /** Los giros a los que puede pasar un negocio de esta modalidad. */
 export function girosDe(modalidad: ModalidadServicio): readonly string[] {

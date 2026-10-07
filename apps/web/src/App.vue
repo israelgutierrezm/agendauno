@@ -446,8 +446,19 @@ onMounted(() => {
     :es-ruta-publica-de-negocio="esRutaPublicaDeNegocio"
     @alternar-tema="tema.alternarModo()"
   >
-    <!-- No volver a montar una ruta privada mientras se cierra la sesión. -->
-    <RouterView v-if="route.meta.requiereSesion !== true" />
+    <!-- No volver a montar una ruta privada mientras se cierra la sesión. Las páginas
+         comerciales se montan de nuevo en cada ruta: /clases y /citas comparten vista
+         y no arrastran estado de una a otra. -->
+    <RouterView
+      v-if="route.meta.requiereSesion !== true"
+      v-slot="{ Component, route: ruta }"
+    >
+      <component
+        :is="Component"
+        v-if="Component"
+        :key="ruta.meta.marketing === true ? ruta.path : undefined"
+      />
+    </RouterView>
   </PublicShell>
 
   <!-- Notificaciones flotantes (toasts), montadas una sola vez para toda la app. -->

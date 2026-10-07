@@ -1,14 +1,54 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import { trackEvent } from "@/lib/analytics";
+import { MODALIDADES, type Modo } from "@/marketing/modalidades";
+
+/*
+| Tarjetas de funciones de la parte comercial.
+| - Sin `modo`: las seis funciones generales de siempre (landing.funciones.*).
+| - Con `modo` (/clases, /citas): solo las de esa modalidad, en el orden de
+|   MODALIDADES[modo].funciones, con sus textos en landing.{modo}.funciones.{clave} y
+|   visuales que no mezclan clases con citas. Sin íconos teñidos.
+| Lo que menciona cobros en línea lleva «*» y la nota de México (ADR 0099).
+*/
+const props = defineProps<{ modo?: Modo }>();
 const { t } = useI18n();
 const abierta = ref<string | null>(null);
-const funciones = [
+
+interface Funcion {
+  clave: string;
+  icono: readonly string[];
+  titulo: string;
+  descripcion: string;
+  detalle: string;
+}
+
+const ICONO_AGENDA = [
+  "M4 7h16v13H4z",
+  "M4 11h16M8 4v5M16 4v5M8 15h3M14 15h2",
+] as const;
+const ICONO_PERSONAS = [
+  "M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+  "M3 20a6 6 0 0 1 12 0",
+  "M16 5.5a3 3 0 0 1 0 5.5M18 14a5 5 0 0 1 3 6",
+] as const;
+const ICONO_BOLETO = [
+  "M3 7h18v4a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z",
+  "M15 8v2M15 12v2M15 16v1",
+] as const;
+const ICONO_COBRO = [
+  "M3 6h18v13H3z",
+  "M3 10h18M7 15h4",
+  "m15 14 2 2 3-3",
+] as const;
+
+const generales = [
   {
     clave: "agenda",
-    icono: ["M4 7h16v13H4z", "M4 11h16M8 4v5M16 4v5M8 15h3M14 15h2"],
+    icono: ICONO_AGENDA,
     detalle:
       "Asigna horarios, profesionales y recursos. Consulta clases y citas en una agenda visual para saber qué sigue y quién lo atiende.",
   },
@@ -20,16 +60,13 @@ const funciones = [
   },
   {
     clave: "membresias",
-    icono: [
-      "M3 7h18v4a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z",
-      "M15 8v2M15 12v2M15 16v1",
-    ],
+    icono: ICONO_BOLETO,
     detalle:
       "Ofrece paquetes por sesiones o membresías. Revisa créditos disponibles, vigencias y renovaciones desde la ficha de cada persona.",
   },
   {
     clave: "pagos",
-    icono: ["M3 6h18v13H3z", "M3 10h18M7 15h4", "m15 14 2 2 3-3"],
+    icono: ICONO_COBRO,
     detalle:
       "Conecta una pasarela compatible para cobrar en línea* o registra lo recibido en recepción. Consulta pagos y saldos pendientes sin perder el contexto.",
   },
@@ -46,9 +83,77 @@ const funciones = [
       "Compara ingresos, asistencia y ocupación. Identifica qué clases, servicios y horarios conviene impulsar con datos de tu operación.",
   },
 ] as const;
+
+// Ícono de cada función por modalidad (las claves de MODALIDADES[modo].funciones).
+const ICONOS_MODO: Record<string, readonly string[]> = {
+  cupos: ICONO_PERSONAS,
+  listaEspera: [
+    "M4 6h10M4 12h7M4 18h7",
+    "M17 13a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
+    "M17 15.5V17l1 1",
+  ],
+  membresias: ICONO_BOLETO,
+  asistencia: ["M9 4h6v3H9z", "M7 5H5v16h14V5h-2", "m9 14 2 2 4-4"],
+  paseQr: [
+    "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z",
+    "M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2",
+  ],
+  agendaProfesional: ICONO_AGENDA,
+  cualquierProfesional: ICONO_PERSONAS,
+  paquetes: ["m12 3 9 5-9 5-9-5z", "m3 13 9 5 9-5"],
+  cobroAlAgendar: ICONO_COBRO,
+  recordatorios: ["M3 6h18v12H3z", "m3 7 9 6 9-6"],
+};
+
+const funciones = computed<Funcion[]>(() => {
+  const modo = props.modo;
+  if (modo === undefined) {
+    return generales.map((f) => ({
+      clave: f.clave,
+      icono: f.icono,
+      titulo: t("landing.funciones." + f.clave),
+      descripcion: t("landing.funciones." + f.clave + "Desc"),
+      detalle: f.detalle,
+    }));
+  }
+  return MODALIDADES[modo].funciones.map((clave) => {
+    const base = `landing.${modo}.funciones.${clave}`;
+    return {
+      clave,
+      icono: ICONOS_MODO[clave] ?? ICONO_AGENDA,
+      titulo: t(`${base}.titulo`),
+      descripcion: t(`${base}.descripcion`),
+      detalle: t(`${base}.detalle`),
+    };
+  });
+});
+// La nota de México va solo si alguna función menciona un cobro en línea («*»).
+const conNotaMexico = computed(() =>
+  funciones.value.some((f) =>
+    [f.titulo, f.descripcion, f.detalle].some((texto) => texto.includes("*")),
+  ),
+);
+const registro = computed(() =>
+  props.modo
+    ? { name: "registro", query: { modo: props.modo } }
+    : { name: "registro" },
+);
+// «Probar en mi negocio» es otra entrada al registro: se mide como las demás, con la
+// modalidad de la página (`mode`) cuando la hay.
+function medirRegistro(): void {
+  trackEvent("marketing_cta_clicked", {
+    placement: "features",
+    destination: "register",
+    ...(props.modo ? { mode: props.modo } : {}),
+  });
+}
 </script>
 <template>
-  <div class="funcionalidades">
+  <div
+    class="funcionalidades"
+    :class="{ 'funcionalidades-modo': modo }"
+    :data-modo="modo"
+  >
     <p class="funciones-guia">
       <span>Explora lo que puedes hacer</span><span>Ejemplos ilustrativos</span>
     </p>
@@ -74,17 +179,16 @@ const funciones = [
               <path v-for="(d, i) in f.icono" :key="i" :d="d" />
             </svg>
           </span>
-          <h3>{{ t("landing.funciones." + f.clave) }}</h3>
+          <h3>{{ f.titulo }}</h3>
         </div>
-        <p class="funcion-descripcion">
-          {{ t("landing.funciones." + f.clave + "Desc") }}
-        </p>
+        <p class="funcion-descripcion">{{ f.descripcion }}</p>
 
         <div
           class="funcion-visual"
           :class="'visual-' + f.clave"
           aria-hidden="true"
         >
+          <!-- Generales (sin modo) -->
           <template v-if="f.clave === 'agenda'">
             <div class="mini-agenda-cabecera">
               <span>LUN</span><span>MAR</span><span>MIÉ</span>
@@ -112,7 +216,7 @@ const funciones = [
               ><span>✓</span> Reserva confirmada</span
             >
           </template>
-          <template v-else-if="f.clave === 'membresias'">
+          <template v-else-if="f.clave === 'membresias' && !modo">
             <div class="mini-pase">
               <div><span>PACK DE CLASES</span><strong>8 sesiones</strong></div>
               <span class="pase-sello">A</span>
@@ -157,7 +261,7 @@ const funciones = [
               <strong>7 disponibles</strong>
             </div>
           </template>
-          <template v-else>
+          <template v-else-if="f.clave === 'reportes'">
             <div class="mini-reporte-cabecera">
               <span>Ocupación por día</span><span>Esta semana</span>
             </div>
@@ -167,6 +271,122 @@ const funciones = [
                 ><span>{{ ["L", "M", "M", "J", "V", "S", "D"][i] }}</span>
               </div>
             </div>
+          </template>
+
+          <!-- Clases (/clases) -->
+          <template v-else-if="f.clave === 'cupos'">
+            <div class="mini-agenda-cabecera">
+              <span>LUN</span><span>MAR</span><span>MIÉ</span>
+            </div>
+            <div class="mini-agenda-lineas"></div>
+            <span class="mini-bloque mini-bloque-uno"
+              >Pilates <small>09:00 · 6 de 8</small></span
+            >
+            <span class="mini-bloque mini-bloque-dos"
+              >Pole dance <small>10:00 · 8 de 8</small></span
+            >
+            <span class="mini-bloque mini-bloque-tres"
+              >Yoga <small>11:00 · 5 de 10</small></span
+            >
+          </template>
+          <template v-else-if="f.clave === 'listaEspera'">
+            <div class="mini-reserva">
+              <span>Mar 18:00 · 8 de 8 lugares</span
+              ><strong>Pole dance básico</strong>
+              <div>
+                <span>Clase llena</span
+                ><span class="hora-elegida">2 en espera</span>
+              </div>
+            </div>
+            <span class="mini-confirmacion">Lugar ofrecido al siguiente</span>
+          </template>
+          <template v-else-if="f.clave === 'membresias'">
+            <div class="mini-pase">
+              <div><span>PAQUETE DE CLASES</span><strong>8 clases</strong></div>
+              <span class="pase-sello">A</span>
+              <div class="pase-creditos">
+                <i v-for="n in 8" :key="n" :class="{ usado: n <= 3 }"></i>
+              </div>
+              <small>5 créditos disponibles</small>
+            </div>
+          </template>
+          <template v-else-if="f.clave === 'asistencia'">
+            <div class="mini-cobro">
+              <span>Pase de lista · Pilates 09:00</span>
+              <div><span>Ana López</span><b>Llegó</b></div>
+              <div><span>Luis Pérez</span><b>Retardo</b></div>
+            </div>
+          </template>
+          <template v-else-if="f.clave === 'paseQr'">
+            <div class="mini-producto">
+              <svg
+                viewBox="0 0 24 24"
+                width="34"
+                height="34"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+              >
+                <path
+                  d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"
+                />
+              </svg>
+              <div>
+                <strong>Pase de entrada</strong
+                ><small>Ana López · Reserva de las 09:00</small>
+              </div>
+            </div>
+            <span class="mini-confirmacion">Entrada registrada · 08:52</span>
+          </template>
+
+          <!-- Citas (/citas) -->
+          <template v-else-if="f.clave === 'agendaProfesional'">
+            <div class="mini-agenda-cabecera">
+              <span>MARCO</span><span>LUIS</span><span>ALEX</span>
+            </div>
+            <div class="mini-agenda-lineas"></div>
+            <span class="mini-bloque mini-bloque-uno"
+              >Corte <small>09:00 · 45 min</small></span
+            >
+            <span class="mini-bloque mini-bloque-dos"
+              >Barba <small>10:00 · 30 min</small></span
+            >
+            <span class="mini-bloque mini-bloque-tres"
+              >Corte <small>11:00 · 45 min</small></span
+            >
+          </template>
+          <template v-else-if="f.clave === 'cualquierProfesional'">
+            <div class="mini-reserva">
+              <span>Corte de cabello · Hoy</span
+              ><strong>Cualquier profesional</strong>
+              <div>
+                <span>10:00</span><span class="hora-elegida">10:30</span
+                ><span>11:00</span>
+              </div>
+            </div>
+            <span class="mini-confirmacion">Te atiende Luis</span>
+          </template>
+          <template v-else-if="f.clave === 'paquetes'">
+            <div class="mini-cobro">
+              <span>Paquete de servicios</span
+              ><strong>Corte, barba y lavado</strong>
+              <div><span>Incluye 3 servicios</span><b>75 min</b></div>
+            </div>
+          </template>
+          <template v-else-if="f.clave === 'cobroAlAgendar'">
+            <div class="mini-cobro">
+              <span>Corte y barba · Vie 18:00</span
+              ><strong>Pago en línea*</strong>
+              <div><span>Cita</span><b>Confirmada</b></div>
+            </div>
+          </template>
+          <template v-else-if="f.clave === 'recordatorios'">
+            <div class="mini-reserva">
+              <span>Correo · 24 h antes</span
+              ><strong>Recordatorio de tu cita</strong>
+              <div><span>Vie 18:00</span><span>Con Marco</span></div>
+            </div>
+            <span class="mini-confirmacion">Otro aviso 2 h antes</span>
           </template>
         </div>
         <button
@@ -198,7 +418,7 @@ const funciones = [
             class="funcion-detalle"
           >
             <p>{{ f.detalle }}</p>
-            <RouterLink :to="{ name: 'registro' }"
+            <RouterLink :to="registro" @click="medirRegistro"
               >Probar en mi negocio
               <span aria-hidden="true">↗</span></RouterLink
             >
@@ -207,7 +427,9 @@ const funciones = [
       </article>
     </div>
     <!-- «Cobros en línea*»: solo en México (ADR 0099). -->
-    <p class="tu-nota-mexico">{{ t("landing.soloMexico") }}</p>
+    <p v-if="conNotaMexico" class="tu-nota-mexico">
+      {{ t("landing.soloMexico") }}
+    </p>
   </div>
 </template>
 <style scoped>
@@ -285,6 +507,20 @@ const funciones = [
   font-weight: 300;
   letter-spacing: -0.02em;
   line-height: 1.3;
+}
+/* Con modo (/clases, /citas): íconos sin cuadro teñido y títulos con peso 500. */
+.funcionalidades-modo .funcion-icono,
+.funcionalidades-modo .funcion:hover .funcion-icono,
+.funcionalidades-modo .funcion:focus-within .funcion-icono {
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: transparent;
+  color: var(--texto-suave);
+  transform: none;
+}
+.funcionalidades-modo .funcion-cabecera h3 {
+  font-weight: 500;
 }
 .funcion-descripcion {
   min-height: 6.5rem;

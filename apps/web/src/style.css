@@ -156,6 +156,16 @@
   background: var(--marketing-cta);
   color: var(--marketing-cta-contraste);
 }
+/* Botón azul de las páginas comerciales (`--primario`, el de la marca): el del hero y
+   los de las tarjetas de precio. El rosa queda para «Probar gratis» del menú y los
+   cierres. En oscuro `--primario` es claro y lleva su texto (`--primario-contraste`). */
+.tu-marketing .tu-btn-primario.tu-btn-azul {
+  background: var(--primario);
+  color: var(--primario-contraste);
+}
+.tu-marketing .tu-btn-primario.tu-btn-azul:hover:not(:disabled) {
+  background: var(--primario-fuerte);
+}
 .tu-public-business .tu-btn:focus-visible,
 .tu-marketing .tu-btn:focus-visible {
   outline: 2px solid var(--acento);

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 import es from "@/i18n/locales/es-MX";
 import modalidadNegocio from "@/i18n/locales/modalidad.es-MX";
+import type { Modo } from "@/marketing/modalidades";
 import RegistroView from "./RegistroView.vue";
 
 // La dirección del negocio mide a lo más 40 (como en la API): con ella se nombra la
@@ -18,8 +19,11 @@ vi.mock("vue-router", () => ({
   RouterLink: { template: "<a><slot /></a>" },
 }));
 const montajes: ReturnType<typeof mount>[] = [];
-function montarRegistro() {
+// El modo (`/registro?modo=`) llega como prop de la ruta: la vista no usa useRoute
+// (este simulacro de vue-router no lo trae).
+function montarRegistro(props: { modo?: Modo | null } = {}) {
   const vista = mount(RegistroView, {
+    props,
     global: {
       plugins: [
         createI18n({
@@ -56,6 +60,15 @@ describe("la dirección del negocio", () => {
     expect(vista.get(".registro-direccion-valor span").text()).toBe(
       "estudio-de-pilates-y-yoga-integral-roma",
     );
+  });
+  it("con ?modo= la dirección se arma igual", async () => {
+    for (const modo of ["clases", "citas", null] as const) {
+      const vista = montarRegistro({ modo });
+      await vista.get("#nombre").setValue("Barbería Ñandú");
+      expect(vista.get(".registro-direccion-valor span").text()).toBe(
+        "barberia-nandu",
+      );
+    }
   });
   it("personalizada tampoco pasa de 40 caracteres", async () => {
     const vista = montarRegistro();

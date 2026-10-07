@@ -213,6 +213,7 @@ describe("tipo de negocio en «Tu negocio» (ADR 0104)", () => {
       "salon",
       "spa",
       "salud",
+      "general_citas",
     ]);
     await giro.setValue("spa");
     await w.get('[data-prueba="accion"]').trigger("click");

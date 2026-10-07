@@ -22,7 +22,7 @@ export const soluciones: readonly Solucion[] = [
       "Organiza clases de CrossFit y HYROX, cupos, coaches, membresías y asistencia. Comparte tu agenda de reservas y prueba AgendaUno 30 días gratis.",
     encabezado: "Más tiempo para entrenar a tu comunidad.",
     resumen:
-      "Gestiona las clases de tu box o centro de entrenamiento con horarios, coaches y cupos claros. Tus alumnos reservan desde tu enlace y tu equipo consulta quién asistirá a cada sesión.",
+      "Gestiona las clases de tu box o centro de entrenamiento con horarios, coaches y cupos claros. Tus alumnos entran con la cuenta que les das y reservan desde tu enlace; tu equipo consulta quién asistirá a cada sesión.",
     imagen: "crossfit-hyrox-v1.webp",
     alt: "Atleta empujando un trineo en un centro de entrenamiento funcional",
     modo: "clases",
@@ -141,7 +141,7 @@ export const soluciones: readonly Solucion[] = [
       {
         pregunta: "¿Cómo funciona la suscripción para un estudio?",
         respuesta:
-          "La modalidad de clases se cobra por alumno activo al mes. Consulta la definición de alumno activo y las condiciones vigentes en la sección de precios antes de contratar.",
+          "En Clases con cupo, la suscripción se cobra por rango de alumnos activos al mes. Consulta qué cuenta como alumno activo y las tarifas vigentes en la sección de precios antes de contratar; los importes son más IVA.",
       },
     ],
   },
@@ -184,7 +184,7 @@ export const soluciones: readonly Solucion[] = [
       {
         pregunta: "¿Mis alumnos necesitan buscar mi academia en un directorio?",
         respuesta:
-          "No. Comparte el enlace directo de tu negocio para que consulten tu oferta y accedan a sus reservas.",
+          "No. Comparte el enlace directo de tu negocio: ahí consultan tus horarios y, con la cuenta que les das, reservan su lugar.",
       },
     ],
   },
@@ -227,7 +227,7 @@ export const soluciones: readonly Solucion[] = [
       {
         pregunta: "¿Por dónde empiezo?",
         respuesta:
-          "Crea tu negocio, activa tu cuenta y configura una primera clase con su horario e instructor. Después puedes compartir el enlace con tus alumnos.",
+          "Crea tu negocio, activa tu cuenta y configura una primera clase con su horario, instructor y cupo. Después da de alta a tus alumnos, invítalos a su cuenta y comparte el enlace con tus horarios.",
       },
     ],
   },
@@ -265,12 +265,12 @@ export const soluciones: readonly Solucion[] = [
       {
         pregunta: "¿Un cliente puede elegir a su barbero o estilista?",
         respuesta:
-          "Sí. El flujo de citas permite seleccionar un servicio, un profesional y un horario disponible según la configuración del negocio.",
+          "Sí. Elige servicio, profesional y horario. Si atienden varios y le da igual quién, elige «Cualquier profesional» y la cita queda con alguien libre a esa hora.",
       },
       {
         pregunta: "¿La suscripción se cobra por profesional?",
         respuesta:
-          "El esquema comercial por profesional está en preparación. Puedes probar la agenda; revisa las condiciones disponibles antes de contratar. No anunciamos una tarifa todavía no publicada.",
+          "Sí. En Citas 1 a 1 pagas por los profesionales que atendieron al menos una cita en el mes; cada uno cuenta completo, sin importar sus horas. Consulta las tarifas vigentes en la sección de precios; los importes son más IVA.",
       },
     ],
   },
@@ -314,7 +314,7 @@ export const soluciones: readonly Solucion[] = [
       {
         pregunta: "¿La agenda contempla cabinas y equipamiento?",
         respuesta:
-          "Esta propuesta se centra en citas por profesional. Antes de adoptar el sistema, valida las necesidades de cabinas, equipamiento o atención simultánea de tu spa durante la prueba.",
+          "Sí. Das de alta tus cabinas, camillas o equipos por sucursal y eliges qué servicios los usan: una hora solo se ofrece si hay un profesional y un espacio libres, también en tu página pública.",
       },
     ],
   },
@@ -357,7 +357,7 @@ export const soluciones: readonly Solucion[] = [
       {
         pregunta: "¿Puedo usarlo si atiendo sin un equipo?",
         respuesta:
-          "Puedes organizar la disponibilidad de un profesional. Prueba el flujo con tus servicios y consulta las condiciones comerciales vigentes antes de contratar.",
+          "Sí. Configura un solo profesional con tus servicios y horarios, y suma más cuando tu consultorio crezca. La suscripción se cobra por profesional activo; consulta las tarifas vigentes antes de contratar.",
       },
     ],
   },

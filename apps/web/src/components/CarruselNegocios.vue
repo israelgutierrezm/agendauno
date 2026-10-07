@@ -5,8 +5,15 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  watch,
   watchEffect,
 } from "vue";
+
+/*
+| Carrusel de negocios. Recibe la lista ya filtrada por el padre (los 9 giros de
+| clases, los 8 de citas o todos) y funciona con cualquier largo: si la lista cambia,
+| vuelve al primero; con un solo negocio no gira ni muestra controles.
+*/
 
 interface Negocio {
   clave: string;
@@ -16,22 +23,38 @@ interface Negocio {
   src: string;
 }
 const props = defineProps<{ negocios: readonly Negocio[] }>();
+// Lo de abajo (el botón al registro) recibe el negocio activo y si la persona lo
+// eligió (clic, teclado o deslizar): el giro automático no cuenta como elección.
+// Elegir detiene el giro, para que el negocio elegido (y el `?giro=` del botón) no
+// cambie mientras la persona lee y baja al botón; «Reanudar» lo vuelve a mover.
+defineSlots<{
+  default?(props: { negocio: Negocio | undefined; elegido: boolean }): unknown;
+}>();
 const activo = ref(0);
+const elegido = ref(false);
 const pausado = ref(false);
-const ciclo = ref(0);
 const INTERVALO_GIRO_MS = 5000;
 const visible = ref(false);
 const reducido = ref(false);
 const documentoVisible = ref(true);
 const raiz = ref<HTMLElement>();
 const negocio = computed(() => props.negocios[activo.value]);
+const varios = computed(() => props.negocios.length > 1);
 const girando = computed(
   () =>
     visible.value &&
     !pausado.value &&
     !reducido.value &&
     documentoVisible.value &&
-    props.negocios.length > 1,
+    varios.value,
+);
+// Otra lista (otra modalidad, otro largo): de vuelta al primero, sin índices fuera.
+watch(
+  () => props.negocios.map((n) => n.clave).join("|"),
+  () => {
+    activo.value = 0;
+    elegido.value = false;
+  },
 );
 let observador: IntersectionObserver | undefined;
 let preferencia: MediaQueryList | undefined;
@@ -39,16 +62,16 @@ let inicio: { x: number; y: number } | undefined;
 let deslizado = false;
 
 function posicion(indice: number): number {
+  // Distancia circular al activo, de -mitad a +mitad (cualquier largo, par o impar).
   const total = props.negocios.length;
-  return (
-    ((indice - activo.value + total + Math.floor(total / 2)) % total) -
-    Math.floor(total / 2)
-  );
+  const mitad = Math.floor(total / 2);
+  return ((((indice - activo.value + mitad) % total) + total) % total) - mitad;
 }
 function ir(indice: number, manual = true): void {
   if (props.negocios.length === 0) return;
   activo.value = (indice + props.negocios.length) % props.negocios.length;
-  if (manual) ciclo.value += 1;
+  elegido.value = manual;
+  if (manual) pausado.value = true;
 }
 function seleccionar(indice: number): void {
   if (deslizado) {
@@ -59,7 +82,6 @@ function seleccionar(indice: number): void {
 }
 function teclado(event: KeyboardEvent): void {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-  pausado.value = true;
   event.preventDefault();
   if (event.key === "Home") ir(0);
   else if (event.key === "End") ir(props.negocios.length - 1);
@@ -101,8 +123,6 @@ function actualizarVisibilidad(): void {
   documentoVisible.value = !document.hidden;
 }
 watchEffect((limpiar) => {
-  // Una selección manual reinicia la espera sin desactivar el giro automático.
-  void ciclo.value;
   if (!girando.value) return;
   const intervalo = window.setInterval(
     () => ir(activo.value + 1, false),
@@ -188,7 +208,7 @@ onBeforeUnmount(() => {
         </span>
       </button>
     </div>
-    <div class="orbita-controles">
+    <div v-if="varios" class="orbita-controles">
       <button
         type="button"
         aria-label="Negocio anterior"
@@ -245,7 +265,7 @@ onBeforeUnmount(() => {
         {{ item.nombre }}
       </button>
     </div>
-    <slot :negocio="negocio"></slot>
+    <slot :negocio="negocio" :elegido="elegido"></slot>
   </div>
 </template>
 

@@ -81,10 +81,10 @@ export default {
     irAMiPanel: "Ir a mi panel",
     miPanel: "Mi panel",
     marketing: "Información de AgendaUno",
-    producto: "Producto",
-    soluciones: "Soluciones",
+    // Menú comercial: Clases · Citas · Precios (como ETIQUETA_MENU de modalidades).
+    clases: "Clases",
+    citas: "Citas",
     precios: "Precios",
-    paraQuien: "Para quién",
     encontrarNegocio: "¿Buscas reservar? Encuentra tu negocio",
     reservasPor: "Reservas en línea con AgendaUno",
     panel: "Panel",
@@ -208,6 +208,464 @@ export default {
     // Los cobros en línea y la facturación (CFDI) solo operan en México (ADR 0099):
     // lo que los menciona lleva «*» y esta nota en su sección.
     soloMexico: "* Solo para clientes de México.",
+    // Lo que /clases y /citas (ModalidadView) dicen igual; lo propio de cada una va en
+    // `landing.clases` y `landing.citas`.
+    modalidad: {
+      probar: "Probar AgendaUno gratis",
+      verAgenda: "Ver la agenda de ejemplo",
+      demoEtiqueta: "AgendaUno en acción",
+      demoPie: "{dias} días para probarlo. Sin tarjeta.",
+      pasosTitulo: "Empieza en solo tres pasos",
+      ejemplo: "Ejemplo",
+      operacionEtiqueta: "Recepción y ventas",
+      precioEtiqueta: "Tu suscripción a AgendaUno",
+      precioBadge: "{dias} días gratis · Sin tarjeta",
+      precioDetalle:
+        "Configura tu agenda y comprueba cómo encaja en tu operación antes de contratar.",
+      faqTitulo: "Preguntas frecuentes",
+    },
+    // Landing de cada modalidad (/clases, /citas; ModalidadView). Las funciones son
+    // las de MODALIDADES[modo].funciones (marketing/modalidades.ts), en ese orden, y
+    // solo dicen lo que el producto hace hoy. FuncionesLanding las lee con su `modo`.
+    // Lo demás de cada página va dentro de estos mismos bloques.
+    clases: {
+      funciones: {
+        cupos: {
+          titulo: "Cupos por clase",
+          descripcion:
+            "Define cuántos lugares tiene cada clase y consulta cuántos quedan antes de que empiece.",
+          detalle:
+            "Programa clases recurrentes con su instructor, su sala y su cupo. Tus alumnos con cuenta apartan su lugar y tu equipo sabe quién asistirá a cada horario.",
+        },
+        listaEspera: {
+          titulo: "Lista de espera",
+          descripcion:
+            "Cuando una clase se llena, tus alumnos se anotan en la lista de espera.",
+          detalle:
+            "Si alguien cancela, el lugar se ofrece a quien sigue en la lista, con un tiempo para aceptarlo que tú configuras.",
+        },
+        membresias: {
+          titulo: "Membresías y créditos",
+          descripcion:
+            "Vende paquetes de clases y membresías. Cada reserva usa un crédito del alumno.",
+          detalle:
+            "Consulta créditos disponibles, vigencias y renovaciones desde la ficha de cada alumno. Si cancela a tiempo, el crédito regresa según tu política de cancelación.",
+        },
+        asistencia: {
+          titulo: "Pase de lista con retardos",
+          descripcion:
+            "Marca quién llegó, quién llegó tarde y quién no vino, desde recepción o desde la lista de quien imparte la clase.",
+          detalle:
+            "La lista se abre unos minutos antes de la clase. Quien siga sin registro al terminar queda como inasistencia y se aplica tu política de faltas.",
+        },
+        paseQr: {
+          titulo: "Pase QR de entrada",
+          descripcion:
+            "Cada alumno tiene un pase con código QR para registrar su entrada en recepción.",
+          detalle:
+            "Recepción escanea el pase y ve si la persona tiene una reserva para esa hora o una membresía de acceso libre. La asistencia a cada clase se registra aparte, en el pase de lista.",
+        },
+      },
+      // ModalidadView /clases: claves de MODALIDADES.clases (pasos, operacion,
+      // pagina, preguntas). Sin autorregistro de alumnos ni pago por cuenta propia
+      // desde la página (ADR 0093); el QR es pase de entrada.
+      hero: {
+        titulo: "Tus clases, llenas y en orden.",
+        enfasis: "llenas",
+        subtitulo:
+          "Cupos, lista de espera, membresías y créditos, y pase de lista con retardos: todo tu estudio en un solo lugar.",
+        avisoTitulo: "Lugar reservado",
+        avisoDetalle: "Pole dance · Hoy 18:00 · 2 lugares libres",
+      },
+      confianza: { cobro: "Precio por alumnos activos" },
+      producto: {
+        titulo: "Tu semana de clases, de un vistazo.",
+        enfasis: "de un vistazo",
+        subtitulo:
+          "Explora una agenda de ejemplo, sin registrarte: el cupo de cada clase y cuántos lugares quedan.",
+        cta: "Quiero organizar mis clases",
+      },
+      seccion: {
+        titulo: "Lo que tu estudio necesita para crecer.",
+        enfasis: "crecer",
+        subtitulo:
+          "Hecho para clases con cupo: cada lugar, cada crédito y cada asistencia cuentan.",
+      },
+      comoFunciona: {
+        subtitulo:
+          "Tú armas tu semana. Tus alumnos reservan su lugar. Tú pasas lista.",
+      },
+      pasos: {
+        preparar: {
+          titulo: "Arma tu semana",
+          texto:
+            "Crea tus clases con su cupo, instructor y horario, y repítelas cada semana. Agrega tus membresías y paquetes de créditos.",
+          ejemplo: "Pilates Reformer",
+          linea: "Lunes · 18:00 · Andrea",
+          estado: "8 lugares por clase",
+        },
+        invitar: {
+          titulo: "Invita a tus alumnos",
+          texto:
+            "Da de alta a tus alumnos, uno por uno o con un archivo, e invítalos a su cuenta. Con su membresía o sus créditos reservan su lugar desde tu página.",
+          ejemplo: "Tu página de clases",
+          linea: "tuestudio.agendauno.mx",
+          estado: "Ya soy alumno · Entrar →",
+        },
+        operar: {
+          titulo: "Pasa lista y cobra",
+          texto:
+            "Pasa lista con llegó, retardo o no vino, y registra los pagos en recepción. Si conectas una pasarela, tus alumnos también pagan en línea desde su cuenta*.",
+          ejemplo: "Lista de hoy",
+          linea: "Pilates · 18:00 · 7 de 8",
+          estado: "Sofía · Retardo",
+        },
+      },
+      operacion: {
+        titulo: "Recibe a tus alumnos desde cualquier pantalla.",
+        subtitulo:
+          "Pasa lista, consulta membresías y vende paquetes o productos desde el celular, la tableta o la computadora.",
+        beneficios: {
+          lista: "Pase de lista: llegó, retardo o no vino",
+          paseQr: "Pase QR de entrada para cada alumno",
+          ventas: "Venta de membresías, paquetes y productos del mostrador",
+        },
+        enlace: "Empieza con tu estudio",
+      },
+      pagina: {
+        etiqueta: "Tu página pública",
+        titulo: "Tu horario de clases, listo para compartir.",
+        subtitulo:
+          "Una página con tus clases, lugares libres, precios, instructores y sucursales. Tus alumnos entran a reservar; quien es nuevo te pide acceso.",
+        beneficios: {
+          compartir: "Compártela por Instagram, WhatsApp o un código QR",
+          lugares:
+            "Tus alumnos ven los lugares libres y reservan con su membresía o sus créditos",
+          directorio: "Tú decides si también apareces en el directorio público",
+        },
+        // Ejemplo estático (DemoPaginaPublicaClases); los datos ficticios (estudio,
+        // clases y horas) van en el componente.
+        demo: {
+          abierta: "Agenda abierta",
+          semana: "Esta semana",
+          lugares: "{n} lugar | {n} lugares",
+          lleno: "Lleno",
+        },
+      },
+      precio: {
+        titulo: "Pagas según tus alumnos activos.",
+        subtitulo:
+          "Un solo precio al mes según cuántos alumnos activos tuvo tu estudio, con todas las herramientas desde el primer plan.",
+      },
+      giros: {
+        etiqueta: "Para quién es",
+        titulo: "Estudios, academias y gimnasios.",
+        subtitulo:
+          "Pilates, Pole dance, yoga, danza, natación, CrossFit, HYROX y artes marciales: si das clases con cupo, organiza cada lugar.",
+        cta: "Empieza con tu estudio",
+        pie: "Tus clases. Tus alumnos. Tu próximo lugar reservado.",
+        soluciones: "Conoce AgendaUno para tu tipo de estudio",
+      },
+      faq: {
+        alumnos: {
+          q: "¿Mis alumnos pueden registrarse solos?",
+          a: "No. Tú das de alta a tus alumnos, uno por uno, con un archivo o en recepción, y los invitas a activar su cuenta. En tu página, quien es nuevo te pide acceso y quien ya es alumno entra a reservar.",
+        },
+        creditos: {
+          q: "¿Cómo funcionan las membresías y los créditos?",
+          a: "Vendes membresías con vigencia y paquetes de créditos. Cada reserva usa la membresía o un crédito del alumno y, si cancela a tiempo, el crédito regresa según tu política de cancelación.",
+        },
+        listaEspera: {
+          q: "¿Qué pasa cuando una clase se llena?",
+          a: "Tus alumnos se anotan en la lista de espera. Si alguien cancela, el lugar se ofrece a quien sigue en la lista, con un tiempo para aceptarlo.",
+        },
+        asistencia: {
+          q: "¿Cómo paso lista?",
+          a: "Desde recepción, la agenda o el celular de quien imparte la clase: llegó, retardo o no vino. Al terminar la clase, quien siga sin registro queda como inasistencia y se aplica tu política de faltas.",
+        },
+        paseQr: {
+          q: "¿Para qué sirve el código QR?",
+          a: "Es el pase de entrada de cada alumno: en recepción lo escaneas y ves si puede entrar. La asistencia a cada clase se registra aparte, en el pase de lista.",
+        },
+        sucursales: {
+          q: "¿Sirve para varias sucursales?",
+          a: "Sí. Cada sucursal tiene sus clases, sus horarios, sus salas y su equipo, y tú ves todo desde el mismo panel.",
+        },
+        // Sin nombrar la otra modalidad: esta página habla solo de clases.
+        modalidad: {
+          q: "¿Puedo cambiar de modalidad después?",
+          a: "Solo AgendaUno puede cambiar la modalidad de tu negocio, y solo antes de que empieces a operar: mientras no tengas clases ni reservas. Por eso la eliges con tu tipo de negocio al registrarte.",
+        },
+        precio: {
+          q: "¿Cómo se calcula el precio de AgendaUno?",
+          a: "Por rangos de alumnos activos en el mes: cuenta quien tuvo una reserva confirmada en una clase no cancelada o una compra pagada. No cuenta solo por estar registrado. Todos los importes son más IVA.",
+        },
+      },
+      final: {
+        titulo: "Prueba AgendaUno con tu próxima clase.",
+        subtitulo:
+          "Crea una clase, invita a tus alumnos y recibe tu primera reserva. Tienes {dias} días para probarlo, sin tarjeta.",
+        otra: "¿Atiendes con cita?",
+        otraEnlace: "Conoce AgendaUno para citas",
+      },
+    },
+    citas: {
+      funciones: {
+        agendaProfesional: {
+          titulo: "Agenda por profesional",
+          descripcion:
+            "Cada profesional con su horario de atención, sus servicios y sus citas, en una sola vista.",
+          detalle:
+            "Define la duración, el precio y los tiempos de preparación de cada servicio, y los espacios que usa, como cabinas o sillones. Solo se ofrecen horas con profesional y espacio libres.",
+        },
+        cualquierProfesional: {
+          titulo: "Cualquier profesional disponible",
+          descripcion:
+            "Tu cliente elige la hora sin tener que elegir a quién; la cita va con quien esté libre.",
+          detalle:
+            "Si prefiere a alguien en particular, lo elige. Si no, ve los horarios libres de todo tu equipo y la cita se asigna al profesional con menos citas ese día.",
+        },
+        paquetes: {
+          titulo: "Paquetes de servicios",
+          descripcion:
+            "Arma un servicio que incluye otros, con su propio precio y duración, en una sola cita.",
+          detalle:
+            "Tus clientes ven qué incluye y, si sale más barato, cuánto costaría por separado. Se agenda, se cobra y se reprograma como cualquier servicio.",
+        },
+        cobroAlAgendar: {
+          titulo: "Cobro en línea al agendar*",
+          descripcion:
+            "Con una pasarela conectada, tu cliente paga su cita al agendarla o la paga después en tu negocio.",
+          detalle:
+            "Tú decides si el pago en línea es obligatorio: la cita se aparta hasta pagarla y se libera si no se paga a tiempo. Si no lo es, la cita queda confirmada y se cobra en recepción.",
+        },
+        recordatorios: {
+          titulo: "Recordatorios por correo",
+          descripcion:
+            "Tus clientes reciben un correo antes de su cita: 24 y 2 horas antes, o con la anticipación que tú configures.",
+          detalle:
+            "También reciben la confirmación al agendar. Tú editas el texto de cada correo desde Comunicación.",
+        },
+      },
+      // ModalidadView /citas: claves de MODALIDADES.citas. Agendar sin cuenta (ADR
+      // 0093), «Cualquier profesional» (ADR 0062), cobro al agendar* (ADR 0065) y
+      // recordatorios solo por correo. Nada de cupos, lista de espera ni clases.
+      hero: {
+        titulo: "Tus clientes agendan solos. Tú atiendes.",
+        enfasis: "agendan solos",
+        subtitulo:
+          "Servicios con su duración y precio, la agenda de cada profesional y una página para agendar a cualquier hora. Los recordatorios llegan por correo.",
+        avisoTitulo: "Cita confirmada",
+        avisoDetalle: "Corte y peinado · Hoy 17:30 · con Ana",
+      },
+      confianza: { cobro: "Precio por profesional activo" },
+      producto: {
+        titulo: "La agenda de todo tu equipo, en una vista.",
+        enfasis: "en una vista",
+        subtitulo:
+          "Explora una agenda de ejemplo, sin registrarte: cada profesional con sus citas, sus servicios y su duración.",
+        cta: "Quiero organizar mis citas",
+      },
+      seccion: {
+        titulo: "Lo que tu negocio necesita para crecer.",
+        enfasis: "crecer",
+        subtitulo:
+          "Hecho para citas 1 a 1: el tiempo de cada profesional, bien aprovechado.",
+      },
+      comoFunciona: {
+        subtitulo:
+          "Tú defines servicios y horarios. Tus clientes agendan. Tu equipo atiende.",
+      },
+      pasos: {
+        preparar: {
+          titulo: "Configura servicios y horarios",
+          texto:
+            "Agrega tus servicios con su duración y precio, y el horario de atención de cada profesional en cada sucursal.",
+          ejemplo: "Corte y barba",
+          linea: "60 min · $350",
+          estado: "Marco, Luis y Alex",
+        },
+        compartir: {
+          titulo: "Comparte tu página",
+          texto:
+            "Pon tu página para agendar en Instagram, WhatsApp o un código QR. Tus clientes eligen servicio, profesional y hora, sin crear una cuenta.",
+          ejemplo: "Tu página para agendar",
+          linea: "tunegocio.agendauno.mx",
+          estado: "Elige servicio y hora →",
+        },
+        operar: {
+          titulo: "Atiende y cobra",
+          texto:
+            "Las citas llegan a la agenda de cada profesional. Registra la llegada y el cobro en recepción, o pide el pago en línea al agendar*.",
+          ejemplo: "Cita de hoy",
+          linea: "Corte y barba · 17:30 · Marco",
+          estado: "Confirmada · Recordatorio por correo",
+        },
+      },
+      operacion: {
+        titulo: "De la llegada al cobro, sin vueltas.",
+        subtitulo:
+          "Registra la llegada de tus clientes, cobra el servicio y vende productos desde el celular, la tableta o la computadora.",
+        beneficios: {
+          llegada: "Llegada de cada cita: llegó, llegó tarde o no vino",
+          cobro: "Cobro en recepción o en línea al agendar*",
+          pos: "Punto de venta con inventario por sucursal",
+        },
+        enlace: "Empieza con tu negocio",
+      },
+      pagina: {
+        etiqueta: "Tu página para agendar",
+        titulo: "De tu Instagram a una cita en tu agenda.",
+        subtitulo:
+          "Tus clientes eligen servicio, profesional y hora en una página con tus servicios, precios, equipo y sucursales. No necesitan crear una cuenta.",
+        beneficios: {
+          compartir: "Compártela por Instagram, WhatsApp o un código QR",
+          cualquiera:
+            "«Cualquier profesional» muestra las horas libres de todo tu equipo",
+          cobro: "Si conectas tu pasarela, puedes pedir el pago al agendar*",
+        },
+        // Ejemplo interactivo (DemoPaginaPublicaCitas): servicio → profesional →
+        // hora. Los datos ficticios (negocio, servicios, equipo y horas) van en el
+        // componente.
+        demo: {
+          aria: "Ejemplo de una página para agendar",
+          ejemplo: "Datos de ejemplo",
+          servicio: "Servicio",
+          conQuien: "Con quién",
+          hora: "Hora · Hoy",
+          cualquiera: "Cualquier profesional",
+          resumen: "{servicio} · Hoy {hora} · {con}",
+          confirmar: "Confirmar cita",
+        },
+      },
+      precio: {
+        titulo: "Pagas por profesional activo.",
+        subtitulo:
+          "Un precio por cada profesional con citas en el mes, con todas las herramientas desde el primer plan.",
+      },
+      giros: {
+        etiqueta: "Para quién es",
+        titulo: "Barberías, estéticas, spas y consultorios.",
+        subtitulo:
+          "Barberías, estéticas, spas, wellness, terapeutas, psicólogos, nutriólogos y dentistas: si atiendes con cita, uno a uno, organiza el tiempo de tu equipo.",
+        cta: "Empieza con tu negocio",
+        pie: "Tu agenda. Tu equipo. Tu próxima cita.",
+        soluciones: "Conoce AgendaUno para tu tipo de negocio",
+      },
+      faq: {
+        cuenta: {
+          q: "¿Mis clientes necesitan crear una cuenta?",
+          a: "No. Agendan desde tu página con su nombre, correo y teléfono, y su ficha queda en tu lista de clientes. Si quieres que tengan cuenta, tú los invitas.",
+        },
+        cualquierProfesional: {
+          q: "¿Mi cliente tiene que elegir profesional?",
+          a: "No. Con más de un profesional, «Cualquier profesional» le muestra las horas libres de todo tu equipo y la cita se asigna a quien tiene menos citas ese día. Si prefiere a alguien, lo elige.",
+        },
+        cobro: {
+          q: "¿Puedo cobrar al agendar?",
+          a: "Sí*. Conecta tu pasarela y decide si pides el pago en línea al agendar: la cita se aparta hasta que se paga. Si no lo pides, queda confirmada y se cobra en tu negocio.",
+        },
+        recordatorios: {
+          q: "¿Mis clientes reciben recordatorios?",
+          a: "Sí, por correo: la confirmación al agendar y recordatorios antes de la cita, con la anticipación que tú configures.",
+        },
+        paquetes: {
+          q: "¿Puedo vender paquetes de servicios?",
+          a: "Sí. Un paquete junta varios servicios de tu catálogo con un solo precio y se agenda en una sola cita; tu cliente ve qué incluye antes de agendar. También puedes vender bonos y membresías.",
+        },
+        espacios: {
+          q: "¿Puedo manejar cabinas, sillones o consultorios?",
+          a: "Sí. Indica qué espacios usa cada servicio y solo se ofrecen horas con un espacio libre, para que dos citas no choquen en la misma cabina.",
+        },
+        salud: {
+          q: "¿Sirve para consultorios o profesionales de la salud?",
+          a: "Sí, para organizar citas, disponibilidad, recordatorios y cobros. AgendaUno no sustituye un expediente clínico ni un sistema médico especializado.",
+        },
+        // Sin nombrar la otra modalidad: esta página habla solo de citas.
+        modalidad: {
+          q: "¿Puedo cambiar de modalidad después?",
+          a: "Solo AgendaUno puede cambiar la modalidad de tu negocio, y solo antes de que empieces a operar: mientras no tengas citas ni reservas. Por eso la eliges con tu tipo de negocio al registrarte.",
+        },
+        precio: {
+          q: "¿Cómo se calcula el precio de AgendaUno?",
+          a: "Por cada profesional activo en el mes: cuenta quien tuvo al menos una cita no cancelada. Los tramos se suman y el total tiene un tope. Todos los importes son más IVA.",
+        },
+      },
+      final: {
+        titulo: "Prueba AgendaUno con tu próxima cita.",
+        subtitulo:
+          "Agrega un servicio, comparte tu página y recibe tu primera cita. Tienes {dias} días para probarlo, sin tarjeta.",
+        otra: "¿Das clases con cupo?",
+        otraEnlace: "Conoce AgendaUno para clases",
+      },
+    },
+    // Portada «/» (LandingView): corta, para elegir modalidad. Cada negocio es solo de
+    // clases o solo de citas (ADR 0104); lo de cada una vive en /clases y /citas.
+    portada: {
+      subtitulo:
+        "Agenda, reservas en línea, cobros y tu equipo en un solo lugar.",
+      elegir: "¿Cómo atiendes a tus clientes?",
+      opciones: {
+        clases: "Doy clases",
+        clasesGiros: "Estudios, gimnasios y academias",
+        citas: "Atiendo con cita",
+        citasGiros: "Barberías, estéticas, spas y consultorios",
+      },
+      unaModalidad:
+        "Cada negocio trabaja con una modalidad, clases con cupo o citas 1 a 1, y la eliges al registrarte.",
+      modalidades: {
+        etiqueta: "Dos formas de trabajar",
+        titulo: "Tu negocio tiene su ritmo. Tu agenda también.",
+        subtitulo:
+          "Organiza los lugares de cada clase o el tiempo de cada profesional. Elige la tuya para conocerla a fondo.",
+      },
+      precios: {
+        etiqueta: "Tu suscripción a AgendaUno",
+        titulo: "Dos modelos de suscripción. Uno para tu forma de trabajar.",
+        subtitulo:
+          "Pagas por alumnos activos si das clases o por profesionales activos si atiendes con cita. Todas las herramientas de tu modalidad, desde el primer plan.",
+        clases: "Por alumnos activos",
+        citas: "Por profesionales activos",
+        desde: "Desde",
+        porMes: "MXN / mes",
+        iva: "+ IVA",
+        verClases: "Ver precios de clases",
+        verCitas: "Ver precios de citas",
+        prueba: "Pruébalo {dias} días gratis, sin tarjeta, antes de contratar.",
+      },
+      giros: {
+        etiqueta: "Encuentra tu forma de trabajar",
+        titulo: "Conoce AgendaUno para tu tipo de negocio.",
+        verClases: "Todo sobre las clases",
+        verCitas: "Todo sobre las citas",
+      },
+      faq: {
+        titulo: "Preguntas frecuentes",
+        prueba: "¿Necesito tarjeta para la prueba?",
+        pruebaR:
+          "No. Pruebas AgendaUno gratis durante {dias} días, sin tarjeta y sin compromiso.",
+        cancelacion: "¿Hay plazo forzoso o penalización por cancelar?",
+        cancelacionR:
+          "No. No hay permanencia forzosa ni penalización por cancelar. Pagas mes con mes, según los alumnos o profesionales activos de tu negocio.",
+        datos: "¿Qué pasa con la información de mi negocio?",
+        datosR:
+          "Cada negocio tiene su propia base de datos, separada de la de los demás, y se respalda todos los días. Tus clientes pueden pedir el acceso, la corrección o la cancelación de sus datos, como indica el aviso de privacidad.",
+        dosNegocios: "¿Puedo tener clases y citas en el mismo negocio?",
+        dosNegociosR:
+          "No. Cada negocio trabaja con una modalidad, clases con cupo o citas 1 a 1, y la eliges al registrarte. Si das clases y también atiendes con cita, registra dos negocios, cada uno con su cuenta, su agenda y su suscripción.",
+        // Quién cambia la modalidad (ADR 0104): aquí y no en el registro.
+        cambiarModalidad: "¿Puedo cambiar de clases a citas después?",
+        cambiarModalidadR:
+          "Solo AgendaUno puede cambiar la modalidad, de clases a citas o al revés, y solo antes de que empieces a operar: mientras tu negocio no tenga clases, citas ni reservas.",
+      },
+      final: {
+        titulo: "Prueba AgendaUno con tu próxima clase o cita.",
+        subtitulo:
+          "Elige tu modalidad, configura tu negocio y comparte tu enlace. Tienes {dias} días para probarlo, sin tarjeta.",
+        clases: "Probar con clases",
+        citas: "Probar con citas",
+      },
+    },
     heroEscritura: {
       prefijo: "Una agenda para",
       pausar: "Pausar texto animado",
@@ -231,10 +689,7 @@ export default {
       },
     },
     titulo: "Menos pendientes. Más tiempo para tus clientes.",
-    subtitulo:
-      "Gestiona reservas, clases, membresías, cobros y tu equipo desde un solo lugar.",
     ctaRegistrar: "Probar AgendaUno gratis",
-    ctaProducto: "Explorar la agenda",
     heroVisual: {
       pole: "Pole dance",
       poleAlt: "Atleta practicando Pole dance en un estudio profesional",
@@ -243,17 +698,8 @@ export default {
       hyrox: "HYROX",
       hyroxAlt:
         "Atleta empujando un trineo en un centro de entrenamiento funcional",
-      pilates: "Clases",
-      pilatesAlt: "Alumna practicando Pilates Reformer",
       confirmada: "Reserva confirmada",
       confirmadaDetalle: "Pole dance · Hoy 18:00",
-      flujoTitulo: "Tu operación conectada",
-      flujo: {
-        servicio: "Agenda",
-        profesional: "Equipo",
-        horario: "Cobros",
-        confirmacion: "Reportes",
-      },
     },
     prueba: "Prueba gratis de {dias} días. Sin tarjeta.",
     pieHero: "Cancela cuando quieras.",
@@ -261,24 +707,9 @@ export default {
       titulo: "Condiciones de la prueba y operación",
       prueba: "30 días gratis, sin tarjeta",
       configuracion: "Configuración guiada para empezar",
-      cobro: "Clases o citas por profesional",
+      // Portada: los dos modelos (clases por alumnos, citas por profesionales).
+      cobro: "Precio por alumnos o profesionales activos",
       cancelacion: "Sin permanencia forzosa",
-    },
-    seccionTitulo: "Lo que necesitas para operar y crecer.",
-    seccionSub: "Una sola herramienta, ya trabajes con citas o con clases.",
-    ctaFinalTitulo: "Prueba AgendaUno con tu próxima clase o cita.",
-    ctaFinalSub:
-      "Configura una clase o un servicio, comparte tu enlace y recibe tu primera reserva. Tienes {dias} días para probarlo, sin tarjeta.",
-    comoFunciona: {
-      titulo: "Empieza en solo tres pasos",
-      subtitulo:
-        "Tú preparas la agenda. Tus clientes reservan. Tu equipo tiene todo a la vista.",
-      p1t: "Prepara tu agenda",
-      p1d: "Registra tu estudio, academia o negocio. Agrega clases o servicios, asigna a tu equipo y define horarios, cupos y precios.",
-      p2t: "Comparte tu enlace",
-      p2d: "Pon tu página de reservas en Instagram, WhatsApp o un código QR. Tus clientes eligen una clase o un servicio y un horario disponible.",
-      p3t: "Gestiona tu día",
-      p3d: "Las reservas llegan a tu agenda. Consulta asistentes, revisa membresías y registra cobros; si conectas una pasarela, también puedes cobrar en línea*.",
     },
     funciones: {
       agenda: "Agenda por profesional, recurso o clase",
@@ -299,65 +730,7 @@ export default {
       reportesDesc:
         "Mira qué servicios, clases y horarios dejan más y decide con datos.",
     },
-    producto: {
-      etiqueta: "AgendaUno en acción",
-      titulo: "Una agenda visual para todo tu equipo",
-      subtitulo:
-        "Explora una agenda de ejemplo, sin registrarte. Cambia entre clases y citas por profesional y selecciona una reserva para ver sus detalles.",
-    },
-    operacion: {
-      etiqueta: "Recepción y ventas",
-      titulo: "Todo fluye desde cualquier pantalla.",
-      subtitulo:
-        "Recibe clientes, registra asistencia y cobra servicios o productos sin perder de vista lo que ocurre en tu negocio.",
-      b1: "Check-in de citas y asistencia a clases en segundos",
-      b2: "Cobros, paquetes, membresías y productos en el mismo flujo",
-      b3: "Inventario y operación sincronizados por sucursal",
-      enlace: "Empieza con tu negocio",
-      imagenAlt:
-        "Teléfono, lector de pagos y tableta con controles visuales de asistencia y punto de venta",
-    },
-    precio: {
-      etiqueta: "Tu suscripción a AgendaUno",
-      titulo: "Dos modelos de suscripción. Uno para tu forma de trabajar.",
-      subtitulo:
-        "Por alumnos activos si organizas clases; por profesionales si atiendes por cita. Encuentra tu modalidad y prueba AgendaUno 30 días gratis.",
-      badge: "{dias} días gratis",
-      pruebaDetalle:
-        "Configura tu agenda y comprueba cómo encaja en tu operación antes de contratar.",
-    },
-    comunidad: {
-      etiqueta: "Tu página pública",
-      titulo: "De tu perfil de Instagram a una reserva en tu agenda.",
-      subtitulo:
-        "Obtén una página lista para compartir con tus servicios o clases, precios, profesionales, horarios y ubicaciones.",
-      i1: "Comparte tu página por Instagram, WhatsApp o código QR",
-      i2: "Recibe citas, registros y pagos* directamente desde tu página",
-      i3: "Tú decides si también quieres aparecer en el directorio público",
-      cta: "Probar AgendaUno gratis",
-      demoAbierto: "Agenda abierta",
-      demoTitulo: "Clases disponibles",
-      demoSemana: "Hoy",
-      demo1Dia: "Lun",
-      demo1Hora: "10:30",
-      demo1Clase: "Pilates Reformer",
-      demo1Coach: "con Andrea",
-      demo1Cupo: "Disponible",
-      demo2Dia: "Mar",
-      demo2Hora: "13:00",
-      demo2Clase: "Pole dance básico",
-      demo2Coach: "con Sofía",
-      demo2Cupo: "Disponible",
-      demo3Dia: "Mié",
-      demo3Hora: "17:30",
-      demo3Clase: "Entrenamiento funcional",
-      demo3Coach: "con Elena",
-      demo3Cupo: "Disponible",
-      demoCta: "Elegir clase y horario",
-    },
     paraQuien: {
-      etiqueta: "Encuentra tu forma de trabajar",
-      titulo: "Clases, academias y servicios con cita.",
       saludTitulo: "Para profesionales de la salud:",
       saludAlcance:
         "organiza citas, disponibilidad y cobros de dentistas, psicólogos, nutriólogos y otros profesionales. No sustituye un expediente clínico ni un sistema médico especializado.",
@@ -389,7 +762,7 @@ export default {
         estetica: {
           nombre: "Peluquerías y estéticas",
           descripcion:
-            "Citas por estilista, cabinas, duración y anticipos en línea*.",
+            "Citas por estilista, cabinas, duración y cobro en línea al agendar*.",
           alt: "Estilista atendiendo a una clienta en un salón de belleza",
         },
         pilates: {
@@ -404,7 +777,8 @@ export default {
         },
         gimnasio: {
           nombre: "Gimnasios",
-          descripcion: "Membresías, accesos y cobros recurrentes.",
+          // El cobro automático con tarjeta guardada es en línea: solo México.
+          descripcion: "Membresías, accesos y cobros recurrentes*.",
           alt: "Alumna entrenando con pesa rusa acompañada por un instructor",
         },
         yoga: {
@@ -436,7 +810,8 @@ export default {
           nombre: "Wellness",
           descripcion:
             "Sesiones de bienestar, horarios y reservas por profesional.",
-          alt: "Profesional de bienestar guiando una sesión de respiración consciente",
+          // De citas (ADR 0104): la foto es una sesión individual, no una clase.
+          alt: "Profesional de bienestar acompañando a una clienta en una sesión individual de respiración",
         },
         spa: {
           nombre: "Spas",
@@ -455,27 +830,6 @@ export default {
           alt: "Profesional dental conversando con un paciente antes de una cita",
         },
       },
-    },
-    faq: {
-      titulo: "Preguntas frecuentes",
-      q1: "¿Necesito tarjeta para la prueba?",
-      a1: "No. Empiezas gratis por {dias} días sin tarjeta y sin compromiso; cancelas cuando quieras.",
-      q2: "¿Cómo cobro a mis clientes o alumnos?",
-      a2: "Conectas tu pasarela compatible y cobras citas, clases, paquetes o membresías en línea*. También puedes registrar pagos en recepción.",
-      q3: "¿Puedo emitir facturas (CFDI)?",
-      a3: "Sí*. Cargas tus datos fiscales y emites facturas a tus clientes o alumnos desde el sistema.",
-      q4: "¿Sirve para varias sucursales?",
-      a4: "Sí. Manejas varias sucursales, con su agenda, inventario y personal por sede.",
-      q5: "¿Sirve para consultorios o profesionales de la salud?",
-      a5: "Sí, cuando necesitan organizar citas, disponibilidad, recordatorios y cobros. AgendaUno no sustituye un expediente clínico ni un sistema médico especializado.",
-      q6: "¿Cómo se calcula el precio de AgendaUno?",
-      a6: "Hay dos modelos de suscripción: por rangos de alumnos activos del mes para estudios y academias, o por profesionales activos para negocios con citas. En Precios puedes elegir tu modalidad, consultar las tarifas mensuales y conocer qué actividad se toma en cuenta. Todos los importes se muestran más IVA.",
-      q7: "¿Puedo definir mis propios precios y paquetes?",
-      a7: "Sí. Tú eliges los precios de tus servicios, clases, paquetes y membresías. AgendaUno te ayuda a ofrecerlos, recibir reservas y gestionar los cobros. Para cobrar en línea*, conecta una pasarela compatible; sus comisiones dependen del proveedor.",
-      q8: "¿Tengo que aparecer en el directorio público?",
-      a8: "No. Puedes controlar la publicación desde Configuración. Cuando está visible, las personas pueden consultar servicios o clases, precios y reservar directamente.",
-      q9: "¿Debo configurar todo de una vez?",
-      a9: "No. El inicio es guiado y puedes guardar el progreso. Configura primero sucursal, servicios o clases, horarios y precios; después activa pagos y publicación.",
     },
   },
   // Celular con su lada (components/CampoCelular.vue, ADR 0103).
@@ -497,9 +851,12 @@ export default {
     nombre: "Nombre del negocio",
     nombrePh: "Distrito 27",
     perfil: "Tipo de negocio",
+    // Llegó con su giro (`?giro=`): «Tipo de negocio: Barbería · Citas 1 a 1».
+    perfilElegido: "Tipo de negocio:",
     perfilPh: "Selecciona una opción",
+    // El giro prepara la configuración inicial y los nombres; no limita lo que ofrece.
     perfilAyuda:
-      "Usaremos esta selección para adaptar la configuración inicial y ayudarte a aparecer en búsquedas relevantes.",
+      "Elige el más parecido: sirve para preparar tu configuración inicial y los nombres que verás en tu panel, no limita lo que puedes ofrecer.",
     perfiles: {
       barberia: "Barbería",
       estetica: "Estética o centro de belleza",
@@ -510,10 +867,13 @@ export default {
       pole: "Estudio de Pole dance",
       yoga: "Estudio de Yoga",
       danza: "Escuela de danza",
-      gimnasio: "Gimnasio, CrossFit o HYROX",
+      gimnasio: "Gimnasio",
+      crossfit: "CrossFit",
+      hyrox: "HYROX",
       natacion: "Escuela de natación",
       academia: "Academia o escuela",
-      general: "Otro negocio con agenda",
+      general: "Otro negocio con clases",
+      general_citas: "Otro negocio de citas",
     },
     slug: "Dirección",
     slugAyuda: "Así te encontrarán: {slug}.agendauno.mx",

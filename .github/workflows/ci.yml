@@ -106,6 +106,9 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+      # Las páginas comerciales prerenderizadas (HTML sin JS, SEO, menú, CSS) y su
+      # servicio por HTTP: un dist/clases/index.html vacío no llega a producción.
+      - run: npm run test:marketing
       - run: npm run test
 
   mobile:

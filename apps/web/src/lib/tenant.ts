@@ -65,6 +65,65 @@ export function urlPublicaEstudio(slug: string): string {
   return `${slug}.${DOMINIO_PUBLICO}`;
 }
 
+/**
+ * ¿Es el dominio principal de producción (`agendauno.mx` o `www.agendauno.mx`)? En
+ * desarrollo (localhost) y en el subdominio de un negocio, no.
+ */
+export function esDominioPrincipal(
+  host: string = window.location.hostname,
+): boolean {
+  const h = host.toLowerCase().split(":")[0];
+  const dominio = DOMINIO_PUBLICO.toLowerCase();
+  return h === dominio || h === `www.${dominio}`;
+}
+
+/**
+ * Rutas del dominio principal que llevan el slug de un negocio, y a qué ruta de su
+ * subdominio equivalen. `/agendar/:slug` no está: la generan el API y los correos.
+ * La página del negocio conserva `/estudio/{slug}` (existe en el subdominio): así
+ * no se brinca la página de un negocio de citas ni se pierde el ancla (`#precios`).
+ */
+const RUTAS_CON_SLUG_EN_SUBDOMINIO: Record<string, (slug: string) => string> = {
+  "estudio-corto": () => "/",
+  "estudio-publico": (slug) => `/estudio/${slug}`,
+  "enlaces-estudio": () => "/enlaces",
+};
+
+// Un slug que sirve como subdominio: letras, números y guiones, sin puntos.
+const SLUG_DE_SUBDOMINIO = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+/**
+ * Los negocios viven solo en su subdominio: en el dominio principal de producción, el
+ * enlace corto (`/{slug}`), su página (`/estudio/{slug}`) y sus enlaces
+ * (`/{slug}/enlaces`) van a `https://{slug}.agendauno.mx` con el resto de la ruta, la
+ * query y el ancla. `null` si no aplica: otra ruta, desarrollo (localhost), el
+ * subdominio de un negocio o un slug que no puede ser subdominio.
+ */
+export function urlEnSubdominioDelNegocio(
+  ruta: {
+    name?: unknown;
+    params: Record<string, unknown>;
+    fullPath: string;
+  },
+  host: string = window.location.hostname,
+): string | null {
+  const resto = RUTAS_CON_SLUG_EN_SUBDOMINIO[String(ruta.name ?? "")];
+  if (resto === undefined || !esDominioPrincipal(host)) {
+    return null;
+  }
+  const slug = String(ruta.params.slug ?? "").toLowerCase();
+  if (!SLUG_DE_SUBDOMINIO.test(slug) || RESERVADOS.has(slug)) {
+    return null;
+  }
+  const queryYAncla = ruta.fullPath.replace(/^[^?#]*/, "");
+  return `https://${slug}.${DOMINIO_PUBLICO}${resto(slug)}${queryYAncla}`;
+}
+
+/** Sale de la SPA a otra dirección (p. ej. el subdominio del negocio). */
+export function salirA(url: string): void {
+  window.location.replace(url);
+}
+
 type Ubicacion = Pick<Location, "protocol" | "hostname" | "port">;
 
 /**

@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import http from "node:http";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { preview } from "vite";
 
+const root = fileURLToPath(new URL("../", import.meta.url));
+// La misma lista que prerenderizó el build (seoConfig.rutasMarketing).
+const { rutasMarketing } = await import(
+  pathToFileURL(resolve(root, "dist-ssr/entry-marketing.mjs")).href
+);
 const server = await preview({
-  root: fileURLToPath(new URL("../", import.meta.url)),
+  root,
   preview: {
     host: "127.0.0.1",
     port: 0,
@@ -28,17 +34,7 @@ const get = (path, host = "agendauno.mx") =>
       .on("error", reject);
   });
 try {
-  for (const path of [
-    "/",
-    ...[
-      "pilates",
-      "pole-dance",
-      "academias",
-      "barberias",
-      "spas",
-      "terapeutas",
-    ].map((s) => `/software-para-${s}`),
-  ]) {
+  for (const path of rutasMarketing) {
     const result = await get(path);
     assert.equal(result.status, 200, path);
     assert.match(result.body, /<h1/);
@@ -55,14 +51,20 @@ try {
     assert.match(result.body, /content="noindex,follow"/);
     assert.doesNotMatch(result.body, /rel="canonical"/);
   }
-  const tenant = await get("/", "estudio.agendauno.mx");
-  assert.match(tenant.body, /content="noindex,follow"/);
-  assert.doesNotMatch(tenant.body, /<h1/);
+  // En el subdominio de un negocio, ni la raíz ni las páginas comerciales son la
+  // landing de AgendaUno: la aplicación, sin indexar.
+  for (const path of ["/", "/clases", "/citas"]) {
+    const tenant = await get(path, "estudio.agendauno.mx");
+    assert.equal(tenant.status, 200, `estudio.agendauno.mx${path}`);
+    assert.match(tenant.body, /content="noindex,follow"/);
+    assert.doesNotMatch(tenant.body, /<h1/);
+    assert.doesNotMatch(tenant.body, /rel="canonical"/);
+  }
   assert.equal((await get("/assets/no-existe.js")).status, 404);
   assert.equal((await get("/assets/no-existe.webp")).status, 404);
   assert.equal((await get("/favicon.ico")).status, 200);
   console.log(
-    "HTTP validado: 7 páginas comerciales, acceso, activación, panel, subdominio y 404 de assets.",
+    `HTTP validado: ${rutasMarketing.length} páginas comerciales, acceso, activación, panel, subdominio y 404 de assets.`,
   );
 } finally {
   await new Promise((resolve) => server.httpServer.close(resolve));
