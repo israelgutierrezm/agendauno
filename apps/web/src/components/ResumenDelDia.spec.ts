@@ -10,6 +10,8 @@ enableAutoUnmount(afterEach);
 const api = vi.hoisted(() => ({
   get: vi.fn(),
   permisos: null as string[] | null,
+  // La modalidad sale de la sesión (ADR 0104), no de la respuesta del día.
+  esCitas: false,
 }));
 vi.mock("@/lib/api", () => ({
   api,
@@ -21,6 +23,9 @@ vi.mock("@/stores/sesionTenant", () => ({
     estudio: { nombre: "Estudio Demo", perfil: "pole" },
     terminologia: { sesion: "Clase", miembro: "Alumno", instructor: "Coach" },
     zonaHoraria: "America/Mexico_City",
+    get esCitas() {
+      return api.esCitas;
+    },
     puede: (permiso: string) =>
       api.permisos === null || api.permisos.includes(permiso),
   }),
@@ -62,6 +67,7 @@ describe("el día de hoy en el Inicio", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.permisos = null;
+    api.esCitas = false;
   });
 
   it("indicadores, agenda con lo que falta marcar y pendientes", async () => {
@@ -212,11 +218,11 @@ describe("el día de hoy en el Inicio", () => {
   });
 
   it("en citas: quién viene después, qué falta por atender y cobrar, y los espacios libres", async () => {
+    api.esCitas = true;
     api.get.mockResolvedValue({
       data: {
         data: {
           fecha: "2026-10-01",
-          modalidad: "citas",
           agenda: {
             totales: {
               sesiones: 2,
@@ -355,6 +361,7 @@ describe("el día de hoy en el Inicio", () => {
   });
 
   it("cada pendiente abre su clase o cita; en citas, sin registrar no es por atender", async () => {
+    api.esCitas = true;
     api.get.mockImplementation((url: string) =>
       Promise.resolve({
         data: {
@@ -362,7 +369,6 @@ describe("el día de hoy en el Inicio", () => {
             ? null
             : {
                 fecha: "2026-10-01",
-                modalidad: "citas",
                 agenda: {
                   totales: {
                     sesiones: 2,
@@ -446,7 +452,6 @@ describe("el día de hoy en el Inicio", () => {
             ? null
             : {
                 fecha: "2026-10-01",
-                modalidad: "clases",
                 agenda: {
                   totales: {
                     sesiones: 1,

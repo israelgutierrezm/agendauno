@@ -512,8 +512,9 @@ router.beforeEach(async (to) => {
   }
 
   // En el subdominio de un estudio (`{slug}.agendauno.mx`), la raíz no es la
-  // landing de marketing: pasa por el selector de sucursal, que redirige solo
-  // cuando el estudio tiene una sola sede (o va directo a agendar/su página).
+  // landing de marketing: pasa por su entrada pública, que va al flujo de citas
+  // solo si el escaparate dice que el negocio es de citas (ADR 0104; elige sede si
+  // tiene varias) y, si es de clases, a su página.
   if (String(to.name) === "inicio") {
     // El estudio del subdominio o del `?estudio=` de ESTA dirección, no de la página
     // de la que se viene: el logo de AgendaUno en /entrar?estudio=… lleva a la portada.

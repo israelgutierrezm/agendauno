@@ -32,7 +32,8 @@ function datos(extra: Record<string, unknown> = {}) {
             { red: "sitio_web", url: "https://casanavaja.mx" },
           ],
           whatsapp_url: "https://wa.me/526145517175",
-          tiene_citas: true,
+          modalidad: "citas",
+          capacidades: { clases: false, citas: true },
         },
         sucursales: [
           {
@@ -107,7 +108,10 @@ describe("página de enlaces del negocio", () => {
         { nombre: "Condesa", mapa_url: "https://maps/condesa" },
       ],
     });
-    d.data.data.estudio.tiene_citas = false;
+    Object.assign(d.data.data.estudio, {
+      modalidad: "clases",
+      capacidades: { clases: true, citas: false },
+    });
     mocks.get.mockResolvedValue(d);
     const w = montar();
     await flushPromises();
@@ -123,5 +127,21 @@ describe("página de enlaces del negocio", () => {
     ]);
     expect(botones).toContain("Ubicación · Roma");
     expect(botones).toContain("Ubicación · Condesa");
+    expect(botones).not.toContain("Agenda tu cita");
+  });
+
+  it("un negocio de citas no ofrece reservar clase aunque tenga servicios grupales (ADR 0104)", async () => {
+    mocks.get.mockResolvedValue(
+      datos({ servicios: [{ grupal: true }], horario_clases: [] }),
+    );
+    const w = montar();
+    await flushPromises();
+
+    const botones = w
+      .find('[data-prueba="botones"]')
+      .findAll("a")
+      .map((a) => a.text());
+    expect(botones[0]).toBe("Agenda tu cita");
+    expect(botones).not.toContain("Reserva tu clase");
   });
 });

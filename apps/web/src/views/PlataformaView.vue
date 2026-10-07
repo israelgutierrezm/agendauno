@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import ErroresPlataforma from "@/components/ErroresPlataforma.vue";
+import ModalidadPlataforma from "@/components/ModalidadPlataforma.vue";
 import OperacionPlataforma from "@/components/OperacionPlataforma.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import ParametrosPlataforma from "@/components/ParametrosPlataforma.vue";
@@ -71,6 +72,9 @@ interface FichaApi extends Omit<Estudio, "uso"> {
     whatsapp_verificado?: boolean;
   };
   onboarding_completo: boolean;
+  // Solo clases o solo citas (ADR 0104): se cambia mientras no tenga sesiones ni
+  // reservas, como la moneda antes de cobrar.
+  modalidad_cambiable?: boolean;
   // Sus avisos por WhatsApp a clientes: solo los activa el superadmin (ADR 0083).
   whatsapp_clientes?: EstadoWhatsAppNegocio;
   uso: { periodo: string; metrica: string; cantidad: number }[];
@@ -255,6 +259,20 @@ async function accion(
     toast.error(mensajeDeError(err));
   } finally {
     accionando.value = false;
+  }
+}
+
+// Tras cambiar su modalidad: cambian su cobro, su lista y su ficha.
+async function recargarFicha(): Promise<void> {
+  const slug = ficha.value?.slug;
+  try {
+    await cargarEstudios();
+  } catch (err) {
+    toast.error(mensajeDeError(err));
+  }
+  const actual = estudios.value.find((e) => e.slug === slug);
+  if (actual !== undefined) {
+    await abrirFicha(actual);
   }
 }
 
@@ -1443,6 +1461,18 @@ function borrar(): void {
               </div>
             </dl>
           </section>
+
+          <!-- Solo clases o solo citas: se cambia antes de que opere (ADR 0104) -->
+          <ModalidadPlataforma
+            :key="`modalidad-${ficha.slug}-${ficha.modalidad}`"
+            :api-url="apiUrl"
+            :token="token"
+            :slug="ficha.slug"
+            :nombre="ficha.nombre"
+            :modalidad="ficha.modalidad"
+            :cambiable="ficha.modalidad_cambiable ?? null"
+            @cambiada="recargarFicha"
+          />
 
           <!-- Contacto -->
           <section>

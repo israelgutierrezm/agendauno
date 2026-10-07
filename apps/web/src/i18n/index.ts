@@ -77,6 +77,7 @@ import nominaVisual from "./locales/nominaVisual.es-MX";
 import horariosVisual from "./locales/horariosVisual.es-MX";
 import detalleCita from "./locales/detalleCita.es-MX";
 import configuracionInicial from "./locales/configuracionInicial.es-MX";
+import modalidadNegocio from "./locales/modalidad.es-MX";
 import detalleClase from "./locales/detalleClase.es-MX";
 import listadosVisual from "./locales/listadosVisual.es-MX";
 import sucursalOperativa from "./locales/sucursalOperativa.es-MX";
@@ -172,6 +173,7 @@ const mensajesBase = {
   horariosVisual,
   detalleCita,
   configuracionInicial,
+  modalidadNegocio,
   detalleClase,
   listadosVisual,
   sucursalOperativa,
@@ -215,6 +217,7 @@ const SIN_ADAPTAR = new Set([
   "plataforma",
   "plataformaAdmin",
   "terminologiaNegocio",
+  "modalidadNegocio",
 ]);
 
 /**

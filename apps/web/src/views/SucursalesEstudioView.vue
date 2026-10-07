@@ -3,16 +3,34 @@ import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { api } from "@/lib/api";
+import {
+  capacidadesDeNegocio,
+  type Capacidades,
+  type ModalidadServicio,
+} from "@/lib/modalidad";
 import { recordarNegocio } from "@/lib/negociosRecientes";
 
+/**
+ * Entrada pública del negocio (la raíz de su subdominio). Con citas, elige la sede y
+ * va a agendar; con clases, va a su página. Lo decide la modalidad que dice el
+ * escaparate (ADR 0104), no si tiene servicios de pago.
+ */
 interface Sucursal {
   id: string;
   nombre: string;
   zona_horaria: string | null;
 }
 interface Opciones {
-  estudio: { slug: string; nombre: string; logo_url: string | null };
-  servicios: { id: string }[];
+  estudio: {
+    slug: string;
+    nombre: string;
+    logo_url: string | null;
+    ciudad?: string | null;
+    pais?: string | null;
+    modalidad?: ModalidadServicio;
+    capacidades?: Capacidades;
+    perfil_config?: { modalidad?: ModalidadServicio };
+  };
   sucursales: Sucursal[];
 }
 
@@ -24,21 +42,16 @@ const opciones = ref<Opciones | null>(null);
 const cargando = ref(true);
 const noDisponible = ref(false);
 
-// ¿El estudio ofrece citas en línea? Decide el destino al elegir sede.
-const tieneCitas = computed(() => (opciones.value?.servicios.length ?? 0) > 0);
-
 function destinoSucursal(s: Sucursal): {
   name: string;
   params: Record<string, string>;
   query?: Record<string, string>;
 } {
-  return tieneCitas.value
-    ? {
-        name: "agendar-cita",
-        params: { slug: slug.value },
-        query: { sucursal: s.id },
-      }
-    : { name: "estudio-publico", params: { slug: slug.value } };
+  return {
+    name: "agendar-cita",
+    params: { slug: slug.value },
+    query: { sucursal: s.id },
+  };
 }
 
 async function cargar(): Promise<void> {
@@ -46,21 +59,23 @@ async function cargar(): Promise<void> {
   noDisponible.value = false;
   try {
     const { data } = await api.get<{ data: Opciones }>(
-      `/api/v1/app/${slug.value}/citas/opciones`,
+      `/api/v1/app/${slug.value}/escaparate`,
     );
     opciones.value = data.data;
     recordarNegocio({
       slug: data.data.estudio.slug,
       nombre: data.data.estudio.nombre,
       logo_url: data.data.estudio.logo_url,
-      ciudad: null,
-      pais: null,
+      ciudad: data.data.estudio.ciudad ?? null,
+      pais: data.data.estudio.pais ?? null,
     });
-    // Una sola sede (o ninguna): no hay nada que elegir → directo.
-    if (data.data.sucursales.length <= 1) {
-      const unica = data.data.sucursales[0];
+    // Con clases (o sin sede) no hay cita que agendar: su página. Con citas y una
+    // sola sede, no hay nada que elegir: directo a agendar.
+    const unica = data.data.sucursales[0];
+    const citas = capacidadesDeNegocio(data.data.estudio).citas;
+    if (!citas || data.data.sucursales.length <= 1) {
       void router.replace(
-        unica
+        citas && unica
           ? destinoSucursal(unica)
           : { name: "estudio-publico", params: { slug: slug.value } },
       );
@@ -110,7 +125,11 @@ onMounted(cargar);
     </section>
 
     <section
-      v-else-if="opciones && opciones.sucursales.length > 1"
+      v-else-if="
+        opciones &&
+        capacidadesDeNegocio(opciones.estudio).citas &&
+        opciones.sucursales.length > 1
+      "
       class="mx-auto max-w-2xl px-4 py-10"
     >
       <header class="flex items-center gap-3">

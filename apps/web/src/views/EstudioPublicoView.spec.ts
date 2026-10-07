@@ -32,7 +32,8 @@ function escaparate(resenas: unknown) {
           ciudad: null,
           pais: null,
           whatsapp: null,
-          tiene_citas: false,
+          modalidad: "clases",
+          capacidades: { clases: true, citas: false },
         },
         sucursales: [],
         instructores: [],
@@ -83,6 +84,28 @@ describe("página pública del estudio", () => {
     expect(acceso.get("a[href^='https://wa.me']").text()).toBe(
       "Pedirlo por WhatsApp",
     );
+  });
+
+  it("«Agendar una cita» sale de la modalidad, no de sus ofertas (ADR 0104)", async () => {
+    // Un estudio de clases con una clase de pago no se vuelve de citas.
+    const clases = escaparate({ promedio: null, total: 0, recientes: [] });
+    Object.assign(clases.data.data.estudio, { tiene_citas: true });
+    mocks.get.mockResolvedValue(clases);
+    const w = montar();
+    await flushPromises();
+    expect(w.text()).not.toContain("Agendar una cita");
+    expect(w.text()).toContain("Reservar primera clase");
+
+    const citas = escaparate({ promedio: null, total: 0, recientes: [] });
+    Object.assign(citas.data.data.estudio, {
+      modalidad: "citas",
+      capacidades: { clases: false, citas: true },
+    });
+    mocks.get.mockResolvedValue(citas);
+    const conCitas = montar();
+    await flushPromises();
+    expect(conCitas.text()).toContain("Agendar una cita");
+    expect(conCitas.text()).not.toContain("Reservar primera clase");
   });
 
   it("muestra el promedio y los comentarios que el negocio deja visibles", async () => {

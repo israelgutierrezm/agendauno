@@ -2,6 +2,7 @@ import axios, { type InternalAxiosRequestConfig } from "axios";
 
 import { i18n } from "@/i18n";
 import { getCorrelationId } from "@/lib/correlationId";
+import { ERRORES_MODALIDAD } from "@/lib/modalidad";
 import { conTerminosActuales } from "@/lib/terminologia";
 
 // Una API colgada no deja la pantalla esperando sin fin: a los 30 s la petición
@@ -176,8 +177,23 @@ export function mensajeDeError(
       return i18n.global.t("comun.sinRespuesta");
     }
     const data = e.response?.data as
-      | { message?: string; meta?: { errors?: Record<string, string[]> } }
+      | {
+          code?: string;
+          message?: string;
+          meta?: { errors?: Record<string, string[]> };
+        }
       | undefined;
+
+    // Los de la modalidad hablan de clases y citas en general: «cambiar a clases» no
+    // se lee «cambiar a citas» en una barbería (ADR 0104).
+    if (
+      data?.code !== undefined &&
+      ERRORES_MODALIDAD.has(data.code) &&
+      typeof data.message === "string" &&
+      data.message !== ""
+    ) {
+      return data.message;
+    }
 
     const errores = data?.meta?.errors;
     if (errores) {

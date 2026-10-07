@@ -7,6 +7,11 @@ import IconoRed from "@/components/IconoRed.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
+import {
+  capacidadesDeNegocio,
+  type Capacidades,
+  type ModalidadServicio,
+} from "@/lib/modalidad";
 import { recordarNegocio } from "@/lib/negociosRecientes";
 import { updateSeo } from "@/lib/seo";
 
@@ -94,11 +99,16 @@ interface Escaparate {
     redes?: Red[];
     whatsapp_url?: string | null;
     perfil: string;
-    perfil_config: { terminologia?: Record<string, string> };
+    perfil_config: {
+      terminologia?: Record<string, string>;
+      modalidad?: ModalidadServicio;
+    };
+    // Solo clases o solo citas (ADR 0104): lo dice el servidor, no las ofertas.
+    modalidad?: ModalidadServicio;
+    capacidades?: Capacidades;
     ciudad: string | null;
     pais: string | null;
     whatsapp: string | null;
-    tiene_citas: boolean;
   };
   sucursales: Sucursal[];
   instructores: { nombre: string; foto_url: string | null }[];
@@ -125,7 +135,10 @@ const ubicacion = computed(() => {
   const e = escaparate.value?.estudio;
   return e ? [e.ciudad, e.pais].filter(Boolean).join(", ") : "";
 });
-const usaCitas = computed(() => escaparate.value?.estudio.tiene_citas === true);
+// «Agendar cita» solo si el negocio es de citas (su modalidad, no sus ofertas).
+const usaCitas = computed(
+  () => capacidadesDeNegocio(escaparate.value?.estudio).citas,
+);
 
 // Descripción larga: se recorta y se abre con «Leer más».
 const descripcionAbierta = ref(false);
@@ -242,7 +255,7 @@ async function cargar(): Promise<void> {
       pais: estudio.pais,
     });
     const lugar = [estudio.ciudad, estudio.pais].filter(Boolean).join(", ");
-    const esCitas = estudio.tiene_citas;
+    const esCitas = capacidadesDeNegocio(estudio).citas;
     updateSeo({
       title: `${estudio.nombre} | ${esCitas ? "Servicios y citas" : "Horarios y clases"} en AgendaUno`,
       description: esCitas
@@ -407,7 +420,7 @@ onMounted(cargar);
 
           <div class="mt-7 flex flex-wrap justify-center gap-3">
             <RouterLink
-              v-if="escaparate.estudio.tiene_citas"
+              v-if="usaCitas"
               :to="{ name: 'agendar-cita', params: { slug } }"
               class="tu-btn tu-btn-primario px-6"
               @click="
@@ -640,7 +653,7 @@ onMounted(cargar);
                   >{{ dinero(x.precio_minor, x.moneda) }}</span
                 >
                 <RouterLink
-                  v-if="x.agendable"
+                  v-if="usaCitas && x.agendable"
                   :to="{ name: 'agendar-cita', params: { slug } }"
                   class="tu-btn tu-btn-fantasma"
                   @click="

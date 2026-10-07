@@ -1,4 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
+import { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 import es from "@/i18n/locales/es-MX";
@@ -9,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
   push: vi.fn(),
+  replace: vi.fn(),
   query: {} as Record<string, string>,
   sesion: {
     autenticado: false,
@@ -35,7 +37,7 @@ vi.mock("vue-router", () => ({
     fullPath: "/agendar/demo",
     path: "/agendar/demo",
   }),
-  useRouter: () => ({ replace: vi.fn(), push: mocks.push }),
+  useRouter: () => ({ replace: mocks.replace, push: mocks.push }),
   RouterLink: { template: "<a><slot /></a>" },
 }));
 
@@ -1373,6 +1375,145 @@ describe("profesionales por sede", () => {
     expect(vista.find('[data-prueba="ver-horarios-de"]').exists()).toBe(false);
     expect(vista.text()).toContain("Luis López");
     expect(vista.text()).not.toContain("Ana Pérez");
+    vista.unmount();
+  });
+});
+
+describe("en un negocio de clases (ADR 0104)", () => {
+  it("si el servidor dice que no agenda citas, lleva a su página", async () => {
+    const config = { headers: {} } as InternalAxiosRequestConfig;
+    mocks.get.mockRejectedValue(
+      new AxiosError("Falla", "ERR_BAD_REQUEST", config, null, {
+        status: 403,
+        statusText: "",
+        headers: {},
+        config,
+        data: { code: "MODALITY_NOT_AVAILABLE", message: "Solo con citas." },
+      }),
+    );
+    const vista = montar();
+    await flushPromises();
+
+    expect(mocks.replace).toHaveBeenCalledWith({
+      name: "estudio-publico",
+      params: { slug: "demo" },
+    });
+    expect(vista.text()).not.toContain(es.reservar.noDisponible);
+  });
+
+  it("otro error dice que no está disponible", async () => {
+    mocks.get.mockRejectedValue(new Error("red"));
+    const vista = montar();
+    await flushPromises();
+
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(vista.text()).toContain(es.reservar.noDisponible);
+  });
+
+  // El enlace del correo de apartado (?pagar) y el regreso de la pasarela llegan
+  // aquí también para una clase de pago suelto: se pagan sin /citas/opciones.
+  function negocioDeClases(
+    porPagar: () => Promise<unknown> = () =>
+      Promise.resolve(citaPorPagar({ servicio: "Pilates suelto" })),
+  ): void {
+    const config = { headers: {} } as InternalAxiosRequestConfig;
+    const negado = new AxiosError("Falla", "ERR_BAD_REQUEST", config, null, {
+      status: 403,
+      statusText: "",
+      headers: {},
+      config,
+      data: { code: "MODALITY_NOT_AVAILABLE", message: "Solo con citas." },
+    });
+    mocks.get.mockImplementation((url: string) =>
+      url.endsWith("/escaparate")
+        ? Promise.resolve({
+            data: {
+              data: {
+                estudio: {
+                  slug: "demo",
+                  nombre: "Estudio de clases",
+                  logo_url: null,
+                  modalidad: "clases",
+                },
+              },
+            },
+          })
+        : url.includes("/citas/orden/")
+          ? porPagar()
+          : Promise.reject(negado),
+    );
+  }
+  const aSuPagina = {
+    name: "estudio-publico",
+    params: { slug: "demo" },
+  };
+
+  it("con el enlace para pagar una clase la muestra y la paga, sin llevar a su página", async () => {
+    mocks.query = { pagar: "orden-1" };
+    negocioDeClases();
+    mocks.post.mockResolvedValue({ data: { data: { checkout: null } } });
+    const vista = montar();
+    await flushPromises();
+
+    expect(mocks.replace).not.toHaveBeenCalledWith(aSuPagina);
+    expect(mocks.get).toHaveBeenCalledWith(
+      "/api/v1/app/demo/citas/orden/orden-1",
+    );
+    expect(vista.text()).toContain("Estudio de clases");
+    expect(vista.text()).not.toContain(es.reservar.titulo);
+    const tarjeta = vista.get('[data-prueba="por-pagar"]');
+    expect(tarjeta.text()).toContain(perfilPublico.agendar.pagoClase.titulo);
+    expect(tarjeta.text()).toContain("Pilates suelto");
+    expect(tarjeta.text()).toContain("Págala antes de las 12:30");
+
+    await tarjeta
+      .findAll("button")
+      .find((b) => b.text().startsWith("Pagar ahora"))!
+      .trigger("click");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith("/api/v1/app/demo/citas/pagar", {
+      orden_id: "orden-1",
+      metodo: "tarjeta",
+    });
+    vista.unmount();
+  });
+
+  it("si la clase venció, vuelve a su página para reservar otra", async () => {
+    mocks.query = { pagar: "orden-1" };
+    negocioDeClases(() =>
+      Promise.resolve(
+        citaPorPagar({
+          estado_orden: "cancelada",
+          estado_reserva: "cancelada",
+          vence_en: null,
+        }),
+      ),
+    );
+    const vista = montar();
+    await flushPromises();
+
+    expect(vista.get('[data-prueba="vencida"]').text()).toBe(
+      perfilPublico.agendar.pagoClase.vencida,
+    );
+    await vista
+      .findAll("button")
+      .find((b) => b.text() === perfilPublico.agendar.pagoClase.deNuevo)!
+      .trigger("click");
+    expect(mocks.replace).toHaveBeenCalledWith(aSuPagina);
+    vista.unmount();
+  });
+
+  it("al volver de pagar una clase avisa y ofrece su página", async () => {
+    mocks.query = { pago: "exito" };
+    negocioDeClases();
+    const vista = montar();
+    await flushPromises();
+
+    expect(mocks.replace).not.toHaveBeenCalledWith(aSuPagina);
+    expect(vista.find('[role="status"]').exists()).toBe(true);
+    expect(vista.get('[data-prueba="pago-clase"]').text()).toBe(
+      perfilPublico.agendar.pagoClase.verClases,
+    );
     vista.unmount();
   });
 });

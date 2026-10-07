@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 import es from "@/i18n/locales/es-MX";
+import modalidadNegocio from "@/i18n/locales/modalidad.es-MX";
 import RegistroView from "./RegistroView.vue";
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
@@ -26,7 +27,13 @@ const montajes: ReturnType<typeof mount>[] = [];
 function montar() {
   const vista = mount(RegistroView, {
     global: {
-      plugins: [createI18n({ legacy: false, locale: "es", messages: { es } })],
+      plugins: [
+        createI18n({
+          legacy: false,
+          locale: "es",
+          messages: { es: { ...es, modalidadNegocio } },
+        }),
+      ],
     },
   });
   montajes.push(vista);
@@ -109,6 +116,27 @@ describe("presentación del registro", () => {
     expect(vista.get('[aria-current="step"]').text()).toBe("3Contacto");
     expect(mocks.post).not.toHaveBeenCalled();
   });
+  it("agrupa los tipos de negocio en clases o citas: de ahí sale su modalidad (ADR 0104)", () => {
+    const vista = montar();
+    const grupos = vista.findAll("#perfil optgroup");
+    expect(grupos.map((g) => g.attributes("label"))).toEqual([
+      "Clases con cupo",
+      "Citas 1 a 1",
+    ]);
+    const valores = (i: number) =>
+      grupos[i]!.findAll("option").map((o) => o.attributes("value"));
+    expect(valores(0)).toContain("pilates");
+    expect(valores(0)).toContain("general");
+    expect(valores(1)).toEqual([
+      "barberia",
+      "estetica",
+      "salon",
+      "spa",
+      "salud",
+    ]);
+    expect(vista.text()).toContain("cambiar entre ellas lo hace AgendaUno");
+  });
+
   it("separa los enlaces legales del texto y abre cada documento sin aceptar términos", async () => {
     const vista = montar();
     await flushPromises();

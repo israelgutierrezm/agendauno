@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import CargadorLogo from "@/components/CargadorLogo.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import GiroNegocio from "@/components/GiroNegocio.vue";
 import PerfilPublicoNegocio from "@/components/PerfilPublicoNegocio.vue";
 import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -153,10 +154,17 @@ onMounted(cargar);
         id="pagina-publica"
         class="mt-6 scroll-mt-24"
       />
-      <!-- Cómo se llaman las cosas en el negocio -->
+      <!-- Tipo de negocio: solo los de su modalidad (ADR 0104) -->
+      <GiroNegocio
+        v-if="puedeGestionar"
+        id="tipo-negocio"
+        class="mt-6 scroll-mt-24"
+      />
+      <!-- Cómo se llaman las cosas en el negocio (otro giro trae otros términos) -->
       <TerminologiaNegocio
         v-if="puedeGestionar"
         id="terminologia"
+        :key="sesion.estudio?.perfil"
         class="mt-6 scroll-mt-24"
         :cargar="cargarTerminologia"
         :guardar="guardarTerminologia"

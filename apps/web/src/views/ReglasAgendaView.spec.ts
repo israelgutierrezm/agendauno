@@ -32,6 +32,9 @@ vi.mock("@/stores/sesionTenant", () => ({
     get esCitas() {
       return mocks.sesion.esCitas;
     },
+    get capacidades() {
+      return { clases: !mocks.sesion.esCitas, citas: mocks.sesion.esCitas };
+    },
   }),
 }));
 vi.mock("@/stores/toast", () => ({
@@ -131,7 +134,7 @@ describe("reglas de la agenda", () => {
     expect(w.text()).not.toContain("Agregar día");
   });
 
-  it("en citas sin series no ofrece la programación recurrente", async () => {
+  it("en citas no ofrece la programación recurrente ni la pide (ADR 0104)", async () => {
     mocks.sesion.esCitas = true;
     mocks.get.mockResolvedValue({ data: { data: [] } });
     mocks.ruta.hash = "#programacion";
@@ -142,6 +145,9 @@ describe("reglas de la agenda", () => {
       "Programación recurrente",
     );
     expect(activa(w)).toBe("Políticas");
+    expect(mocks.get).not.toHaveBeenCalledWith(
+      "/api/v1/app/demo/plantillas-horario",
+    );
   });
 
   it("muestra la semana de lunes a domingo y la filtra por actividad e instructor", async () => {

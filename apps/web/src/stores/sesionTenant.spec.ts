@@ -11,10 +11,13 @@ import { useSesionTenantStore } from "./sesionTenant";
 | seguir y se puede reintentar.
 */
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
+const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }));
 vi.mock("@/lib/api", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/api")>();
-  return { ...real, api: { get: mocks.get, post: mocks.post } };
+  return {
+    ...real,
+    api: { get: mocks.get, post: mocks.post, put: mocks.put },
+  };
 });
 vi.mock("@/stores/apariencia", () => ({
   useAparienciaStore: () => ({ activar: vi.fn(), desactivar: vi.fn() }),
@@ -158,5 +161,76 @@ describe("confirmar la sesión guardada al abrir", () => {
     expect(localStorage.getItem(BEARER)).toBeNull();
     expect(sesion.autenticado).toBe(false);
     expect(mocks.post).not.toHaveBeenCalled();
+  });
+});
+
+describe("la modalidad del negocio sale del servidor (ADR 0104)", () => {
+  function conEstudio(estudio: Record<string, unknown>) {
+    mocks.get.mockResolvedValueOnce({
+      data: {
+        data: {
+          ...yo.data.data,
+          estudio: { ...yo.data.data.estudio, ...estudio },
+        },
+      },
+    });
+  }
+
+  it("la que guarda el negocio manda sobre la de su perfil", async () => {
+    const sesion = conSesionGuardada();
+    conEstudio({
+      modalidad: "citas",
+      capacidades: { clases: false, citas: true },
+      perfil_config: { modalidad: "clases" },
+    });
+    await sesion.verificarSesion();
+
+    expect(sesion.modalidad).toBe("citas");
+    expect(sesion.esCitas).toBe(true);
+    expect(sesion.capacidades).toEqual({ clases: false, citas: true });
+  });
+
+  it("sin ella, la de su perfil; las capacidades salen de la modalidad", async () => {
+    const sesion = conSesionGuardada();
+    conEstudio({ perfil_config: { modalidad: "citas" } });
+    await sesion.verificarSesion();
+    expect(sesion.modalidad).toBe("citas");
+    expect(sesion.capacidades).toEqual({ clases: false, citas: true });
+
+    sesion.estudio = null;
+    expect(sesion.modalidad).toBe("clases");
+    expect(sesion.capacidades).toEqual({ clases: true, citas: false });
+  });
+
+  it("otro giro de su modalidad cambia la terminología y conserva la modalidad", async () => {
+    const sesion = conSesionGuardada();
+    conEstudio({
+      perfil: "barberia",
+      modalidad: "citas",
+      capacidades: { clases: false, citas: true },
+    });
+    await sesion.verificarSesion();
+    const terminologia = {
+      sesion: "Cita",
+      miembro: "Cliente",
+      instructor: "Terapeuta",
+    };
+    mocks.put.mockResolvedValueOnce({
+      data: {
+        data: {
+          perfil: "spa",
+          perfil_config: { terminologia, flags: {}, modalidad: "citas" },
+        },
+      },
+    });
+
+    await sesion.cambiarGiro("spa");
+
+    expect(mocks.put).toHaveBeenCalledWith("/api/v1/app/demo/perfil", {
+      perfil_negocio: "spa",
+    });
+    expect(sesion.estudio?.perfil).toBe("spa");
+    expect(sesion.terminologia.instructor).toBe("Terapeuta");
+    expect(sesion.modalidad).toBe("citas");
   });
 });

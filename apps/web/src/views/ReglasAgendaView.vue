@@ -92,11 +92,13 @@ const nuevoDia = ref({ fecha: "", motivo: "" });
 // Días de la ventana cuando la política no fija los suyos (los de la plataforma).
 const ventanaPlataforma = ref(30);
 
-// La programación recurrente es de clases; en citas solo aparece si ya hay series.
+// La programación recurrente es de clases (ADR 0104): en citas ni se pide, el
+// servidor la niega.
+const conProgramacion = computed(() => sesion.capacidades.clases);
 const pestanas = computed<Pestana[]>(() =>
   (["politicas", "cierres", "programacion", "parametros"] as const).filter(
     (p) =>
-      (p !== "programacion" || !sesion.esCitas || series.value.length > 0) &&
+      (p !== "programacion" || conProgramacion.value) &&
       (p !== "parametros" || puedePoliticas.value),
   ),
 );
@@ -171,7 +173,11 @@ async function cargar(): Promise<void> {
         por_defecto?: Omit<FormPolitica, "actividad_id">;
       }>(`${base.value}/politicas-cancelacion`),
       api.get<{ data: DiaCerrado[] }>(`${base.value}/excepciones-horario`),
-      api.get<{ data: SerieProgramada[] }>(`${base.value}/plantillas-horario`),
+      conProgramacion.value
+        ? api.get<{ data: SerieProgramada[] }>(
+            `${base.value}/plantillas-horario`,
+          )
+        : Promise.resolve({ data: { data: [] as SerieProgramada[] } }),
       api.get<{ data: Oferta[] }>(`${base.value}/ofertas`),
     ]);
     politicas.value = p.data.data;

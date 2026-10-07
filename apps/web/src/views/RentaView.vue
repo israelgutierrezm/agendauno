@@ -51,7 +51,6 @@ interface Uso {
   cargo_estimado_minor: number;
 }
 interface Renta {
-  modalidad: "clases" | "citas";
   modo_cobro: string;
   moneda: string;
   cuota_fija_minor: number;
@@ -128,7 +127,8 @@ const ayudaModo = computed(() => {
       monto: dinero(r.cuota_fija_minor, r.moneda),
     });
   }
-  return r.modalidad === "citas"
+  // Por profesional o por alumno: según la modalidad del negocio (ADR 0104).
+  return sesion.esCitas
     ? t("cobro.modo.ayudaCitas")
     : t("cobro.modo.ayudaClases");
 });
@@ -326,7 +326,7 @@ onMounted(() => {
             {{
               renta.modo_cobro === "fijo"
                 ? $t("cobro.modo.fijo")
-                : $t(`cobro.modo.${renta.modalidad}`)
+                : $t(`cobro.modo.${sesion.modalidad}`)
             }}
           </p>
           <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">

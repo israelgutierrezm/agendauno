@@ -12,6 +12,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
 import { separarTelefono } from "@/lib/ladas";
+import { esDeOtraModalidad } from "@/lib/modalidad";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { recordarNegocio } from "@/lib/negociosRecientes";
 import { puedeEntrar } from "@/lib/acceso";
@@ -443,11 +444,77 @@ async function cargar(): Promise<void> {
     }
     paso.value = sucursalId.value !== "" ? "servicio" : "sucursal";
     await Promise.all([retomar(), cargarPorPagar(), sumarServiciosConBono()]);
-  } catch {
-    noDisponible.value = true;
+  } catch (e) {
+    // Un negocio de clases no agenda citas (ADR 0104): a su página. Pero el enlace
+    // para pagar una clase apartada (?pagar) y el regreso de la pasarela llegan
+    // aquí: esos se atienden sin el asistente.
+    if (esDeOtraModalidad(e) && vieneAPagar()) {
+      await cargarParaPagar();
+    } else if (esDeOtraModalidad(e)) {
+      void router.replace({
+        name: "estudio-publico",
+        params: { slug: slug.value },
+      });
+    } else {
+      noDisponible.value = true;
+    }
   } finally {
     cargando.value = false;
   }
+}
+
+// Llega con el enlace para pagar (?pagar=<orden>) o de vuelta de la pasarela.
+function vieneAPagar(): boolean {
+  return String(route.query.pagar ?? "") !== "" || retornoPago.value !== null;
+}
+// Negocio de clases (ADR 0104): solo la clase por pagar del enlace, o el aviso al
+// volver de pagarla. La marca sale del escaparate; la orden y el pago, de las rutas
+// del núcleo (/citas/orden y /citas/pagar), que no dependen de la modalidad.
+const soloPago = ref(false);
+async function cargarParaPagar(): Promise<void> {
+  try {
+    const { data } = await api.get<{ data: { estudio: Opciones["estudio"] } }>(
+      `/api/v1/app/${slug.value}/escaparate`,
+    );
+    opciones.value = {
+      estudio: data.data.estudio,
+      servicios: [],
+      sucursales: [],
+      instructores: [],
+    };
+    soloPago.value = true;
+    await cargarPorPagar();
+  } catch {
+    noDisponible.value = true;
+  }
+}
+// Textos del enlace para pagar: los de la cita o, en un negocio de clases, los de la
+// clase (`perfilPublico.agendar.pagoClase`).
+type TextoPago =
+  | "titulo"
+  | "pagaAntesDe"
+  | "yaPagada"
+  | "vencida"
+  | "deNuevo"
+  | "enlaceInvalido";
+const TEXTOS_PAGO_CITA: Record<TextoPago, string> = {
+  titulo: "pagaTuCita",
+  pagaAntesDe: "pagaAntesDe",
+  yaPagada: "yaPagada",
+  vencida: "vencida",
+  deNuevo: "agendarDeNuevo",
+  enlaceInvalido: "enlaceInvalido",
+};
+function textoPago(
+  clave: TextoPago,
+  valores: Record<string, unknown> = {},
+): string {
+  return t(
+    soloPago.value
+      ? `perfilPublico.agendar.pagoClase.${clave}`
+      : `perfilPublico.agendar.${TEXTOS_PAGO_CITA[clave]}`,
+    valores,
+  );
 }
 
 // Con su cuenta, además de los servicios con precio, los que puede tomar con su
@@ -806,6 +873,14 @@ const sePuedePagar = computed(
     ["pendiente_pago", "confirmada"].includes(porPagar.value.estado_reserva),
 );
 function agendarDeNuevo(): void {
+  // En un negocio de clases se reserva de nuevo desde su página.
+  if (soloPago.value) {
+    void router.replace({
+      name: "estudio-publico",
+      params: { slug: slug.value },
+    });
+    return;
+  }
   porPagar.value = null;
   enlaceInvalido.value = false;
   void router.replace({ path: route.path, query: {} });
@@ -915,9 +990,11 @@ onMounted(cargar);
         }"
       >
         {{
-          retornoPago === "exito"
-            ? $t("pagoEnLinea.citaExito")
-            : $t("pagoEnLinea.cancelado")
+          retornoPago !== "exito"
+            ? $t("pagoEnLinea.cancelado")
+            : soloPago
+              ? $t("pagoEnLinea.exito")
+              : $t("pagoEnLinea.citaExito")
         }}
       </p>
       <!-- Encabezado con marca del estudio -->
@@ -939,30 +1016,25 @@ onMounted(cargar);
         >
         <div>
           <h1 class="text-xl font-light">{{ opciones.estudio.nombre }}</h1>
-          <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+          <p
+            v-if="!soloPago"
+            class="text-sm"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
             {{ $t("reservar.titulo") }}
           </p>
         </div>
       </header>
 
-      <!-- Sin servicios de cita -->
-      <p
-        v-if="opciones.servicios.length === 0"
-        class="mt-10 tu-card p-6 text-center text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("reservar.sinServicios") }}
-      </p>
-
-      <!-- ===== Pagar una cita apartada (enlace del correo) ===== -->
+      <!-- ===== Pagar una cita (o clase) apartada (enlace del correo) ===== -->
       <div
-        v-else-if="porPagar || enlaceInvalido"
+        v-if="porPagar || enlaceInvalido"
         class="mt-8 tu-card p-6"
         data-prueba="por-pagar"
       >
         <template v-if="porPagar">
           <h2 class="text-xl font-semibold">
-            {{ $t("perfilPublico.agendar.pagaTuCita") }}
+            {{ textoPago("titulo") }}
           </h2>
           <p class="mt-2 font-medium">{{ porPagar.servicio }}</p>
           <p v-if="porPagar.inicia_en" class="text-sm">
@@ -993,7 +1065,7 @@ onMounted(cargar);
             class="mt-4 text-sm"
             data-prueba="ya-pagada"
           >
-            {{ $t("perfilPublico.agendar.yaPagada") }}
+            {{ textoPago("yaPagada") }}
           </p>
           <template v-else-if="sePuedePagar">
             <p
@@ -1002,7 +1074,7 @@ onMounted(cargar);
               :style="{ color: 'var(--texto-suave)' }"
             >
               {{
-                $t("perfilPublico.agendar.pagaAntesDe", {
+                textoPago("pagaAntesDe", {
                   hora: horaLocal(
                     porPagar.vence_en,
                     porPagar.zona_horaria ?? zona,
@@ -1036,33 +1108,55 @@ onMounted(cargar);
           </template>
           <template v-else>
             <p class="mt-4 text-sm" data-prueba="vencida">
-              {{ $t("perfilPublico.agendar.vencida") }}
+              {{ textoPago("vencida") }}
             </p>
             <button
               class="tu-btn tu-btn-primario mt-3 w-full"
               type="button"
               @click="agendarDeNuevo"
             >
-              {{ $t("perfilPublico.agendar.agendarDeNuevo") }}
+              {{ textoPago("deNuevo") }}
             </button>
           </template>
         </template>
         <template v-else>
           <p class="text-sm" data-prueba="enlace-invalido">
-            {{ $t("perfilPublico.agendar.enlaceInvalido") }}
+            {{ textoPago("enlaceInvalido") }}
           </p>
           <button
             class="tu-btn tu-btn-primario mt-3 w-full"
             type="button"
             @click="agendarDeNuevo"
           >
-            {{ $t("perfilPublico.agendar.agendarDeNuevo") }}
+            {{ textoPago("deNuevo") }}
           </button>
         </template>
         <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
           {{ error }}
         </p>
       </div>
+
+      <!-- Negocio de clases de vuelta de la pasarela: el aviso va arriba; a su página -->
+      <div
+        v-else-if="soloPago"
+        class="mt-8 tu-card p-6 text-center"
+        data-prueba="pago-clase"
+      >
+        <RouterLink
+          :to="{ name: 'estudio-publico', params: { slug } }"
+          class="tu-btn tu-btn-primario w-full"
+          >{{ $t("perfilPublico.agendar.pagoClase.verClases") }}</RouterLink
+        >
+      </div>
+
+      <!-- Sin servicios de cita -->
+      <p
+        v-else-if="opciones.servicios.length === 0"
+        class="mt-10 tu-card p-6 text-center text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+      >
+        {{ $t("reservar.sinServicios") }}
+      </p>
 
       <!-- ===== Confirmación ===== -->
       <div

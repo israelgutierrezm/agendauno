@@ -124,6 +124,14 @@ export const CATEGORIAS_CONFIGURACION: CategoriaConfiguracion[] = [
         "fiscal",
         "cfdi",
       ]),
+      // Solo los giros de su modalidad (ADR 0104).
+      o(
+        "tipo",
+        "configuracion",
+        "modalidadNegocio.giro.titulo",
+        ["giro", "tipo de negocio", "industria", "categoría"],
+        { hash: "#tipo-negocio" },
+      ),
       o(
         "terminologia",
         "configuracion",

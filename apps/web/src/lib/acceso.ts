@@ -18,7 +18,8 @@ type Sesion = ReturnType<typeof useSesionTenantStore>;
 export interface Politica {
   // Permisos del rol ACTIVO; con varios hacen falta TODOS.
   permiso?: string | string[];
-  // Solo en negocios de esta modalidad.
+  // Solo en negocios de esta modalidad: la misma clasificación que las rutas del
+  // servidor con `modalidad:clases|citas` (ADR 0104).
   modalidad?: ModalidadServicio;
   // Solo si el perfil del negocio activa esta función.
   flag?: "grupos" | "niveles" | "acceso_abierto";
@@ -40,8 +41,13 @@ export const POLITICAS: Record<string, Politica> = {
   recepcion: { permiso: "reservas.gestionar" },
   // Llenar lugares libres de una clase: no aplica a citas 1 a 1.
   oportunidades: { permiso: "reservas.gestionar", modalidad: "clases" },
-  // La pantalla lista a los alumnos de cada grupo.
-  grupos: { permiso: ["agenda.ver", "miembros.ver"], flag: "grupos" },
+  // La pantalla lista a los alumnos de cada grupo. Los grupos son de clases: el
+  // servidor los niega en citas (ADR 0104).
+  grupos: {
+    permiso: ["agenda.ver", "miembros.ver"],
+    flag: "grupos",
+    modalidad: "clases",
+  },
   miembros: { permiso: "miembros.ver" },
   retencion: { permiso: "miembros.gestionar" },
   documentos: { permiso: "documentos.subir" },

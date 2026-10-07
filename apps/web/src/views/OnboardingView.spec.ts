@@ -13,13 +13,22 @@ import OnboardingView from "./OnboardingView.vue";
 const api = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn() }));
 const sesion = vi.hoisted(() => ({
   slug: "demo",
-  estudio: { logo_url: null, nombre: "Demo" },
+  estudio: { logo_url: null, nombre: "Demo", perfil: "barberia" },
+  // La modalidad que guarda el servidor (ADR 0104), no la de los pasos.
+  modalidad: "citas" as "clases" | "citas",
+  esCitas: true,
   moneda: "MXN",
   pais: "MX",
   usuario: { ulid: "u1", rol: "propietario", roles: ["propietario"] },
   terminologia: { sesion: "Cita", miembro: "Cliente", instructor: "Barbero" },
   cargarYo: vi.fn(),
+  cambiarGiro: vi.fn(),
 }));
+function negocioDeClases(): void {
+  sesion.modalidad = "clases";
+  sesion.esCitas = false;
+  sesion.estudio.perfil = "pole";
+}
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: String }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
 vi.mock("@/stores/sesionTenant", () => ({
@@ -54,6 +63,9 @@ const ESTADO = {
   motivo: "sin_horario",
 };
 
+// Los giros que el servidor deja elegir (GET /onboarding `perfiles`), si los manda.
+let perfilesDelServidor: string[] | undefined;
+
 function responder(
   pasos: string[],
   completados: string[],
@@ -66,6 +78,7 @@ function responder(
       return Promise.resolve({
         data: {
           data: {
+            ...(perfilesDelServidor ? { perfiles: perfilesDelServidor } : {}),
             pasos,
             completados,
             completo: false,
@@ -102,8 +115,12 @@ function boton(w: ReturnType<typeof montar>, texto: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   ruta.query = {};
+  perfilesDelServidor = undefined;
   sesion.moneda = "MXN";
   sesion.pais = "MX";
+  sesion.modalidad = "citas";
+  sesion.esCitas = true;
+  sesion.estudio.perfil = "barberia";
   api.put.mockResolvedValue({
     data: { data: { completados: [], completo: false } },
   });
@@ -180,8 +197,98 @@ describe("configuración inicial de un negocio de citas", () => {
   });
 });
 
+describe("tipo de negocio en «Tu negocio» (ADR 0104)", () => {
+  const CITAS = ["negocio", "servicios", "equipo", "reglas", "publicacion"];
+
+  it("solo ofrece los giros de su modalidad y otro giro se guarda con el paso", async () => {
+    responder(CITAS, []);
+    const w = montar();
+    await flushPromises();
+    expect(w.get("article").attributes("data-paso")).toBe("negocio");
+
+    const giro = w.get('[data-prueba="giro"]');
+    expect(giro.findAll("option").map((o) => o.attributes("value"))).toEqual([
+      "barberia",
+      "estetica",
+      "salon",
+      "spa",
+      "salud",
+    ]);
+    await giro.setValue("spa");
+    await w.get('[data-prueba="accion"]').trigger("click");
+    await flushPromises();
+
+    expect(sesion.cambiarGiro).toHaveBeenCalledWith("spa");
+    // Con el giro nuevo llegan sus sugerencias.
+    expect(
+      api.get.mock.calls.filter(
+        ([url]) => url === "/api/v1/app/demo/onboarding",
+      ),
+    ).toHaveLength(2);
+    expect(w.get("article").attributes("data-paso")).toBe("servicios");
+  });
+
+  it("si el servidor manda los giros permitidos, ofrece esos", async () => {
+    perfilesDelServidor = ["barberia", "spa"];
+    responder(CITAS, []);
+    const w = montar();
+    await flushPromises();
+
+    expect(
+      w
+        .get('[data-prueba="giro"]')
+        .findAll("option")
+        .map((o) => o.attributes("value")),
+    ).toEqual(["barberia", "spa"]);
+  });
+
+  it("si el servidor lo niega (MODALITY_LOCKED), lo dice y no avanza", async () => {
+    sesion.cambiarGiro.mockRejectedValueOnce(
+      "Este negocio trabaja con citas; cambiar a clases lo hace AgendaUno.",
+    );
+    responder(CITAS, []);
+    const w = montar();
+    await flushPromises();
+
+    await w.get('[data-prueba="giro"]').setValue("salon");
+    await w.get('[data-prueba="accion"]').trigger("click");
+    await flushPromises();
+
+    expect(w.text()).toContain(
+      "Este negocio trabaja con citas; cambiar a clases lo hace AgendaUno.",
+    );
+    expect(w.get("article").attributes("data-paso")).toBe("negocio");
+    expect(
+      (w.get('[data-prueba="giro"]').element as HTMLSelectElement).value,
+    ).toBe("barberia");
+  });
+
+  it("sin cambiar de giro no lo vuelve a guardar", async () => {
+    negocioDeClases();
+    responder(
+      ["negocio", "clases", "horario", "planes", "reglas", "publicacion"],
+      [],
+    );
+    const w = montar();
+    await flushPromises();
+
+    const opciones = w
+      .get('[data-prueba="giro"]')
+      .findAll("option")
+      .map((o) => o.attributes("value"));
+    expect(opciones).toContain("pole");
+    expect(opciones).not.toContain("barberia");
+    await w.get('[data-prueba="accion"]').trigger("click");
+    await flushPromises();
+
+    expect(sesion.cambiarGiro).not.toHaveBeenCalled();
+    expect(w.get("article").attributes("data-paso")).toBe("clases");
+  });
+});
+
 describe("configuración inicial de un negocio de clases", () => {
   it("cada clase toma sus días y su hora, y se programa cada semana", async () => {
+    negocioDeClases();
     responder(
       ["negocio", "clases", "horario", "planes", "reglas", "publicacion"],
       ["negocio", "clases"],
@@ -355,6 +462,7 @@ describe("precios como se escriben en el país del negocio", () => {
   });
 
   it("los planes en España: «12,50» con el símbolo del euro", async () => {
+    negocioDeClases();
     sesion.pais = "ES";
     sesion.moneda = "EUR";
     responder(

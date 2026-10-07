@@ -4,6 +4,7 @@ import { RouterLink, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
 import { ladaDe, separarTelefono, unirTelefono } from "@/lib/ladas";
+import { girosDe, type ModalidadServicio } from "@/lib/modalidad";
 import { opcionesPais, paisSugerido, zonaSugerida } from "@/lib/region";
 import { trackEvent } from "@/lib/analytics";
 import AvisoPrivacidadContenido from "@/components/AvisoPrivacidadContenido.vue";
@@ -33,21 +34,9 @@ const perfilNegocio = ref("");
 const pais = ref(paisSugerido());
 const paises = opcionesPais();
 
-const PERFILES = [
-  "pilates",
-  "pole",
-  "academia",
-  "gimnasio",
-  "yoga",
-  "danza",
-  "natacion",
-  "barberia",
-  "estetica",
-  "salon",
-  "spa",
-  "salud",
-  "general",
-] as const;
+// El giro da la modalidad del negocio, solo clases o solo citas (ADR 0104): se
+// agrupan para que se vea con cuál va a trabajar.
+const MODALIDADES: ModalidadServicio[] = ["clases", "citas"];
 
 // Paso 2: quién eres.
 const contactoNombre = ref("");
@@ -588,19 +577,26 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                   <option value="" disabled>
                     {{ $t("registro.perfilPh") }}
                   </option>
-                  <option
-                    v-for="perfil in PERFILES"
-                    :key="perfil"
-                    :value="perfil"
+                  <optgroup
+                    v-for="m in MODALIDADES"
+                    :key="m"
+                    :label="$t(`modalidadNegocio.nombres.${m}`)"
                   >
-                    {{ $t(`registro.perfiles.${perfil}`) }}
-                  </option>
+                    <option
+                      v-for="perfil in girosDe(m)"
+                      :key="perfil"
+                      :value="perfil"
+                    >
+                      {{ $t(`registro.perfiles.${perfil}`) }}
+                    </option>
+                  </optgroup>
                 </select>
                 <p
                   class="mt-1 text-xs"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
                   {{ $t("registro.perfilAyuda") }}
+                  {{ $t("modalidadNegocio.registro") }}
                 </p>
               </div>
               <div>

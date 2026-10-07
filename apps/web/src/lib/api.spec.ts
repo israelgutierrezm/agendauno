@@ -14,6 +14,7 @@ import {
   mensajeDeError,
   TIEMPO_LIMITE_MS,
 } from "./api";
+import { fijarTerminosActuales } from "./terminologia";
 
 /*
 | El token de la sesión es de UN negocio: solo viaja a sus rutas. Nunca a las de otro
@@ -261,5 +262,62 @@ describe("mensaje de error", () => {
     expect(
       mensajeDeError(new AxiosError("canceled", "ERR_CANCELED"), "No se pudo"),
     ).toBe("No se pudo");
+  });
+
+  describe("en una barbería (sus citas, sus clientes)", () => {
+    function respuesta(status: number, data: object): AxiosError {
+      const config = { headers: {} } as InternalAxiosRequestConfig;
+      return new AxiosError("Falla", "ERR_BAD_REQUEST", config, null, {
+        status,
+        statusText: "",
+        headers: {},
+        config,
+        data,
+      });
+    }
+    afterEach(() => fijarTerminosActuales(null));
+
+    it("los mensajes del negocio hablan como el negocio", () => {
+      fijarTerminosActuales({
+        sesion: "Cita",
+        miembro: "Cliente",
+        instructor: "Barbero",
+      });
+      expect(
+        mensajeDeError(
+          respuesta(422, {
+            code: "SESSION_FULL",
+            message: "La clase está llena.",
+          }),
+        ),
+      ).toBe("La cita está llena.");
+    });
+
+    it("los de la modalidad se muestran tal cual dice el servidor (ADR 0104)", () => {
+      fijarTerminosActuales({
+        sesion: "Cita",
+        miembro: "Cliente",
+        instructor: "Barbero",
+      });
+      expect(
+        mensajeDeError(
+          respuesta(422, {
+            code: "MODALITY_LOCKED",
+            message:
+              "Este negocio trabaja con citas; cambiar a clases lo hace AgendaUno.",
+          }),
+        ),
+      ).toBe(
+        "Este negocio trabaja con citas; cambiar a clases lo hace AgendaUno.",
+      );
+      expect(
+        mensajeDeError(
+          respuesta(403, {
+            code: "MODALITY_NOT_AVAILABLE",
+            message: "Esta función es de negocios con clases.",
+          }),
+        ),
+      ).toBe("Esta función es de negocios con clases.");
+    });
   });
 });

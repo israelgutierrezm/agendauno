@@ -5,6 +5,11 @@ import { RouterLink, useRoute } from "vue-router";
 import IconoRed from "@/components/IconoRed.vue";
 import { api } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
+import {
+  capacidadesDeNegocio,
+  type Capacidades,
+  type ModalidadServicio,
+} from "@/lib/modalidad";
 import { updateSeo } from "@/lib/seo";
 import { slugDeContexto } from "@/lib/tenant";
 
@@ -27,7 +32,10 @@ interface Datos {
     descripcion?: string | null;
     redes?: Red[];
     whatsapp_url?: string | null;
-    tiene_citas: boolean;
+    // Solo clases o solo citas (ADR 0104): lo dice el servidor, no las ofertas.
+    modalidad?: ModalidadServicio;
+    capacidades?: Capacidades;
+    perfil_config?: { modalidad?: ModalidadServicio };
   };
   sucursales: {
     nombre: string;
@@ -35,7 +43,6 @@ interface Datos {
     whatsapp_url?: string | null;
   }[];
   horario_clases?: unknown[];
-  servicios?: { grupal: boolean }[];
   productos: unknown[];
   resenas?: { promedio: number | null; total: number };
 }
@@ -75,12 +82,9 @@ const botones = computed<Boton[]>(() => {
   }
   const lista: Boton[] = [];
   const pagina = { name: "estudio-publico", params: { slug: slug.value } };
-  // Un negocio mixto (clases y citas) muestra las dos formas de reservar.
-  const daClases =
-    !d.estudio.tiene_citas ||
-    (d.servicios ?? []).some((x) => x.grupal) ||
-    (d.horario_clases ?? []).length > 0;
-  if (d.estudio.tiene_citas) {
+  // Agendar (citas) o reservar (clases): lo que ofrece el negocio, nunca ambas.
+  const capacidades = capacidadesDeNegocio(d.estudio);
+  if (capacidades.citas) {
     lista.push({
       clave: "agendar",
       texto: "agendar",
@@ -90,7 +94,7 @@ const botones = computed<Boton[]>(() => {
       },
     });
   }
-  if (daClases) {
+  if (capacidades.clases) {
     lista.push({
       clave: "reservar",
       texto: "reservarClase",

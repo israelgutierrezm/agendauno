@@ -9,6 +9,12 @@ import {
   mensajeDeError,
   type FallaPasajera,
 } from "@/lib/api";
+import {
+  capacidadesDeNegocio,
+  modalidadDe,
+  type Capacidades,
+  type ModalidadServicio,
+} from "@/lib/modalidad";
 import { esInstructor, esMiembro, type RolDisponible } from "@/lib/roles";
 import { useAparienciaStore, type Apariencia } from "@/stores/apariencia";
 
@@ -60,8 +66,7 @@ export interface UsuarioTenant {
   genero?: string | null;
 }
 
-/** Cómo atiende el negocio: clases con cupo o citas 1 a 1 con un profesional. */
-export type ModalidadServicio = "clases" | "citas";
+export type { Capacidades, ModalidadServicio } from "@/lib/modalidad";
 
 export interface Terminologia {
   sesion: string;
@@ -91,6 +96,10 @@ export interface EstudioSesion {
   en_directorio?: boolean;
   perfil?: string;
   perfil_config?: PerfilConfig;
+  // Solo clases o solo citas (ADR 0104): la guarda el servidor y la manda con lo que
+  // el negocio ofrece. La web no la deduce.
+  modalidad?: ModalidadServicio;
+  capacidades?: Capacidades;
   // El negocio manda avisos por WhatsApp a sus clientes (ADR 0069).
   whatsapp_clientes?: boolean;
   // Su moneda y su zona horaria (ADR 0099): una sola moneda para todo el negocio.
@@ -221,13 +230,18 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
   const destinoAlEntrar = computed<string>(() => rutaInicio.value);
 
   /**
-   * Modalidad de servicio del negocio (derivada de su perfil). La agenda, el menú, la
-   * terminología y el cobro se adaptan a ella; por defecto, clases.
+   * Modalidad del negocio, la que guarda el servidor (ADR 0104): solo clases o solo
+   * citas. La agenda, el menú, la terminología y el cobro se adaptan a ella. Único
+   * origen en la web; sin dato, la de su perfil y, si no, clases.
    */
-  const modalidad = computed<ModalidadServicio>(
-    () => estudio.value?.perfil_config?.modalidad ?? "clases",
+  const modalidad = computed<ModalidadServicio>(() =>
+    modalidadDe(estudio.value),
   );
   const esCitas = computed(() => modalidad.value === "citas");
+  /** Lo que ofrece el negocio: lo nuevo pregunta aquí, no por `esCitas`. */
+  const capacidades = computed<Capacidades>(() =>
+    capacidadesDeNegocio(estudio.value),
+  );
   /** Moneda del negocio (ISO 4217): la de los precios nuevos. */
   const moneda = computed(() => estudio.value?.moneda ?? "MXN");
   /** País del negocio (ISO 3166-1) y su lada (ADR 0103). */
@@ -425,6 +439,24 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     estudio.value = data.data.estudio;
   }
 
+  /**
+   * Cambia el giro del negocio por otro de su misma modalidad: cambia su terminología
+   * y sus opciones. Con un giro de la otra, el servidor responde MODALITY_LOCKED (eso
+   * solo lo cambia AgendaUno, ADR 0104).
+   */
+  async function cambiarGiro(perfil: string): Promise<void> {
+    const { data } = await api.put<{
+      data: { perfil: string; perfil_config: PerfilConfig };
+    }>(`/api/v1/app/${slug.value}/perfil`, { perfil_negocio: perfil });
+    if (estudio.value !== null) {
+      estudio.value = {
+        ...estudio.value,
+        perfil: data.data.perfil,
+        perfil_config: data.data.perfil_config,
+      };
+    }
+  }
+
   /** Tras editar "Mi perfil": la API devuelve el usuario ya actualizado. */
   function actualizarUsuario(datos: UsuarioTenant): void {
     usuario.value = datos;
@@ -520,6 +552,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     confirmarRolInicial,
     modalidad,
     esCitas,
+    capacidades,
     moneda,
     pais,
     lada,
@@ -533,6 +566,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     conectarGoogle,
     desconectarGoogle,
     cambiarRol,
+    cambiarGiro,
     actualizarUsuario,
     verificarSesion,
     reintentarSesion,

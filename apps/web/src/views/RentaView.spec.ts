@@ -14,6 +14,8 @@ const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 const sesion = vi.hoisted(() => ({
   slug: "demo",
   suspendido: false,
+  modalidad: "clases",
+  esCitas: false,
   estudio: { facturacion_disponible: true } as {
     facturacion_disponible?: boolean;
   },

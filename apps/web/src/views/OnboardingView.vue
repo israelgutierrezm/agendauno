@@ -14,6 +14,7 @@ import {
   ejemploPrecio,
   simboloMoneda,
 } from "@/lib/formato";
+import { girosDe } from "@/lib/modalidad";
 import { claveZona, ZONA_POR_OMISION, ZONAS_HORARIAS } from "@/lib/region";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -115,7 +116,8 @@ const estado = ref<EstadoMarcha | null>(null);
 
 const pasoActual = computed<Paso>(() => pasos.value[indice.value] ?? "negocio");
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
-const esCitas = computed(() => pasos.value.includes("servicios"));
+// La modalidad que guarda el servidor (ADR 0104), no la que sugieren los pasos.
+const esCitas = computed(() => sesion.esCitas);
 
 // ---- Lo que ya existe en el negocio ----
 const sucursales = ref<Sucursal[]>([]);
@@ -139,6 +141,15 @@ const negocio = ref({
   sucursal: "",
   direccion: "",
   zona: ZONA_POR_OMISION,
+  giro: sesion.estudio?.perfil ?? "",
+});
+// Tipo de negocio: solo los de su modalidad (los que manda el servidor; si no, los
+// de la lista del front). Pasar a la otra lo hace AgendaUno.
+const perfilesPermitidos = ref<string[] | null>(null);
+const giros = computed(() => {
+  const lista = perfilesPermitidos.value ?? girosDe(sesion.modalidad);
+  const actual = sesion.estudio?.perfil ?? "";
+  return actual === "" || lista.includes(actual) ? lista : [actual, ...lista];
 });
 interface Fila {
   nombre: string;
@@ -192,6 +203,7 @@ async function cargar(): Promise<void> {
   try {
     const { data } = await api.get<{
       data: {
+        perfiles?: string[];
         pasos: Paso[];
         completados: string[];
         completo: boolean;
@@ -201,6 +213,7 @@ async function cargar(): Promise<void> {
       };
     }>(`${base.value}/onboarding`);
     pasos.value = data.data.pasos;
+    perfilesPermitidos.value = data.data.perfiles ?? null;
     completados.value = new Set(data.data.completados);
     completo.value = data.data.completo;
     estado.value = data.data.estado;
@@ -300,8 +313,14 @@ function prellenar(s: Sugerencias): void {
     direccion: sede?.direccion ?? "",
     zona:
       sede?.zona_horaria ?? sesion.estudio?.zona_horaria ?? ZONA_POR_OMISION,
+    giro: sesion.estudio?.perfil ?? "",
   };
-  // Con lo más común del giro, si aún no hay nada.
+  equipo.value.yo = profesionales.value.length === 0;
+  sugerir(s);
+}
+
+// Con lo más común del giro, si aún no hay nada (también al cambiar de giro).
+function sugerir(s: Sugerencias): void {
   if (ofertas.value.length === 0) {
     filas.value = esCitas.value
       ? s.servicios.map((x) => ({
@@ -317,7 +336,6 @@ function prellenar(s: Sugerencias): void {
           cupo: String(x.capacidad),
         }));
   }
-  equipo.value.yo = profesionales.value.length === 0;
   planes.value = s.planes.map((p) => ({
     clave: p.clave,
     incluir: productos.value.length === 0,
@@ -396,6 +414,21 @@ async function guardarNegocio(): Promise<void> {
     await api.put(`${base.value}/negocio/region`, {
       zona_horaria: negocio.value.zona,
     });
+  }
+  // Otro giro de su modalidad: cambia cómo se llaman las cosas. Si el servidor lo
+  // niega (MODALITY_LOCKED), su mensaje lo explica y se vuelve al de antes.
+  const giroActual = sesion.estudio?.perfil ?? "";
+  if (negocio.value.giro !== "" && negocio.value.giro !== giroActual) {
+    try {
+      await sesion.cambiarGiro(negocio.value.giro);
+    } catch (e) {
+      negocio.value.giro = giroActual;
+      throw e;
+    }
+    const { data } = await api.get<{ data: { sugerencias: Sugerencias } }>(
+      `${base.value}/onboarding`,
+    );
+    sugerir(data.data.sugerencias);
   }
 }
 
@@ -925,6 +958,27 @@ onMounted(cargar);
                     {{ $t(`region.zonas.${claveZona(z)}`, z) }}
                   </option>
                 </select>
+              </label>
+              <label v-if="negocio.giro !== ''" class="block sm:col-span-2">
+                <span class="tu-label">{{
+                  $t("modalidadNegocio.giro.etiqueta")
+                }}</span>
+                <select
+                  v-model="negocio.giro"
+                  class="tu-input"
+                  data-prueba="giro"
+                >
+                  <option v-for="g in giros" :key="g" :value="g">
+                    {{ $t(`registro.perfiles.${g}`) }}
+                  </option>
+                </select>
+                <span
+                  class="mt-1 block text-xs"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{
+                    $t(`modalidadNegocio.giro.ayuda.${sesion.modalidad}`)
+                  }}</span
+                >
               </label>
               <label class="block sm:col-span-2">
                 <span class="tu-label"

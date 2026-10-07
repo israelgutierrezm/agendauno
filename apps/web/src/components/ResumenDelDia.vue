@@ -62,7 +62,6 @@ interface Libre {
 }
 interface Hoy {
   fecha: string;
-  modalidad?: "citas" | "clases";
   agenda: {
     totales: {
       sesiones: number;
@@ -130,7 +129,8 @@ function ocupacion(s: SesionHoy): number {
 }
 
 const foto = computed(() => fotoNegocio(sesion.estudio?.perfil));
-const esCitas = computed(() => hoy.value?.modalidad === "citas");
+// La modalidad del negocio, de la sesión (ADR 0104): un solo origen en la web.
+const esCitas = computed(() => sesion.esCitas);
 // El clima del negocio (su sede) o el de la próxima clase de quien entra.
 const { clima, cargar: cargarClima } = useClima(
   () => `/api/v1/app/${sesion.slug}/clima`,

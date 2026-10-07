@@ -255,6 +255,19 @@ export default {
     agendarDeNuevo: "Agendar de nuevo",
     enlaceInvalido:
       "No encontramos esta cita. Revisa el enlace de tu correo o agenda de nuevo.",
+    // El mismo enlace en un negocio de clases (ADR 0104): una clase de pago suelto.
+    pagoClase: {
+      titulo: "Paga tu clase",
+      pagaAntesDe:
+        "Págala antes de las {hora} para confirmarla; después el lugar se libera.",
+      yaPagada: "Esta clase ya está pagada. ¡Te esperamos!",
+      vencida:
+        "Este apartado venció y el lugar se liberó. Puedes reservar de nuevo.",
+      deNuevo: "Ver las clases",
+      enlaceInvalido:
+        "No encontramos esta clase. Revisa el enlace de tu correo o reserva de nuevo.",
+      verClases: "Ver las clases",
+    },
   },
   enlaces: {
     cargando: "Cargando…",
