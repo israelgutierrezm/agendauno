@@ -47,7 +47,14 @@
 }
 
 /* Hero de texto: titular, subtítulo, botones y prueba gratis. */
+:where(.tu-landing) .tu-hero {
+  /* Para el fondo decorativo (FondoHero), que va detrás del contenido. */
+  position: relative;
+  isolation: isolate;
+}
 :where(.tu-landing) .tu-hero-layout {
+  position: relative;
+  z-index: 1;
   display: grid;
   min-height: calc(100svh - 5rem);
   align-items: center;

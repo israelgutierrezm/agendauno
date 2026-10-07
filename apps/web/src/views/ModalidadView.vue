@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import CarruselNegocios from "@/components/CarruselNegocios.vue";
+import FondoHero from "@/components/FondoHero.vue";
 import DemoPaginaPublicaCitas from "@/components/DemoPaginaPublicaCitas.vue";
 import DemoPaginaPublicaClases from "@/components/DemoPaginaPublicaClases.vue";
 import FuncionesLanding from "@/components/FuncionesLanding.vue";
@@ -179,6 +180,7 @@ function medirOtra(): void {
   <div :key="modo" ref="raiz" class="tu-landing tu-modalidad" :data-modo="modo">
     <!-- ===================== HERO ===================== -->
     <section class="tu-banda tu-hero" :style="BANDA_FONDO">
+      <FondoHero />
       <div class="tu-hero-layout mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="tu-hero-copy reveal">
           <p class="tu-seccion-etiqueta tu-modalidad-nombre">

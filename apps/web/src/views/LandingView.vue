@@ -6,6 +6,7 @@ import { RouterLink } from "vue-router";
 import "@/marketing/landing.css";
 import { trackEvent } from "@/lib/analytics";
 import { useRevelar } from "@/lib/revelar";
+import FondoHero from "@/components/FondoHero.vue";
 import HeroCollage from "@/components/HeroCollage.vue";
 import ModalidadesLanding from "@/components/ModalidadesLanding.vue";
 import NegociosAnimados from "@/components/NegociosAnimados.vue";
@@ -137,6 +138,7 @@ useRevelar(raiz);
   <div ref="raiz" class="tu-landing tu-portada">
     <!-- ===================== HERO ===================== -->
     <section class="tu-banda tu-hero" :style="{ background: 'var(--fondo)' }">
+      <FondoHero />
       <div class="tu-hero-layout mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="tu-hero-copy reveal">
           <NegociosAnimados
