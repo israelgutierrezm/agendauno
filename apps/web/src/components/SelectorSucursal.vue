@@ -57,9 +57,17 @@ function elegir(evento: Event): void {
           ? $t("sucursalOperativa.operandoEn")
           : $t("sucursalOperativa.etiquetaCorta")
       }}</span>
-      <span class="ss-nombre" data-prueba="sucursal-actual">{{
-        sucursales.actual.value?.nombre ?? $t("sucursalOperativa.todas")
-      }}</span>
+      <span class="ss-linea">
+        <span class="ss-nombre" data-prueba="sucursal-actual">{{
+          sucursales.actual.value?.nombre ?? $t("sucursalOperativa.todas")
+        }}</span>
+        <span
+          v-if="sucursales.actual.value?.region"
+          class="ss-region"
+          data-prueba="sucursal-region"
+          >{{ sucursales.actual.value.region }}</span
+        >
+      </span>
     </span>
     <IconoNav class="ss-flecha" nombre="chevron" :tam="14" />
     <select
@@ -71,7 +79,7 @@ function elegir(evento: Event): void {
     >
       <option value="">{{ $t("sucursalOperativa.todas") }}</option>
       <option v-for="s in sucursales.lista.value" :key="s.id" :value="s.id">
-        {{ s.nombre }}
+        {{ s.region ? `${s.nombre} · ${s.region}` : s.nombre }}
       </option>
     </select>
   </div>
@@ -84,9 +92,17 @@ function elegir(evento: Event): void {
     <span class="ss-vivo" aria-hidden="true"></span>
     <span class="ss-texto">
       <span class="ss-etiqueta">{{ $t("sucursalOperativa.operandoEn") }}</span>
-      <span class="ss-nombre" data-prueba="sucursal-unica">{{
-        sucursales.actual.value?.nombre
-      }}</span>
+      <span class="ss-linea">
+        <span class="ss-nombre" data-prueba="sucursal-unica">{{
+          sucursales.actual.value?.nombre
+        }}</span>
+        <span
+          v-if="sucursales.actual.value?.region"
+          class="ss-region"
+          data-prueba="sucursal-region"
+          >{{ sucursales.actual.value.region }}</span
+        >
+      </span>
     </span>
   </div>
 </template>
@@ -164,6 +180,34 @@ function elegir(evento: Event): void {
 .ss-etiqueta {
   color: var(--texto-suave);
   font-size: 0.72rem;
+}
+/* El nombre y, discreta, su región o zona (distingue sedes que se llaman igual). */
+.ss-linea {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.ss-region {
+  flex-shrink: 0;
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.ss-region::before {
+  content: "·";
+  margin-right: 0.4rem;
+}
+/* En la computadora, todo en una sola línea: «Operando en Roma Norte · CDMX». */
+@media (min-width: 1024px) {
+  .ss-texto {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+  }
+  .ss-etiqueta {
+    flex-shrink: 0;
+  }
 }
 .ss-nombre {
   overflow: hidden;

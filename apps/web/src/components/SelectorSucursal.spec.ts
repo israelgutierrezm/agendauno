@@ -98,4 +98,24 @@ describe("sucursal con la que se trabaja", () => {
     expect(pantalla.get('[data-prueba="filtro"]').text()).toBe("roma");
     expect(pantalla.find('[data-prueba="propio"]').exists()).toBe(false);
   });
+
+  it("con su región o zona, para distinguir sedes que se llaman igual", async () => {
+    sesion.usuario.sucursales = [
+      { ...ROMA, nombre: "La Navaja", region: "Roma Norte" },
+      { ...VALLE, nombre: "La Navaja", region: "Del Valle" },
+    ];
+    const barra = mount(SelectorSucursal, { global: { plugins: [i18n] } });
+    const opciones = barra.findAll("option").map((o) => o.text());
+    expect(opciones).toContain("La Navaja · Roma Norte");
+    expect(opciones).toContain("La Navaja · Del Valle");
+
+    await barra.get('[data-prueba="selector-sucursal"]').setValue("valle");
+    await nextTick();
+    expect(barra.get('[data-prueba="sucursal-actual"]').text()).toBe(
+      "La Navaja",
+    );
+    expect(barra.get('[data-prueba="sucursal-region"]').text()).toBe(
+      "Del Valle",
+    );
+  });
 });

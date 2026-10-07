@@ -26,7 +26,7 @@ it('el dueño opera todas las sucursales; quien está asignado, solo la suya', f
     $org = (string) $this->postJson("/api/v1/app/{$e['slug']}/organizaciones", ['nombre' => 'Otra'], conBearer($e['bearer']))
         ->assertCreated()->json('data.id');
     $valle = (string) $this->postJson("/api/v1/app/{$e['slug']}/organizaciones/{$org}/sucursales", [
-        'nombre' => 'Del Valle', 'zona_horaria' => 'America/Mexico_City',
+        'nombre' => 'Del Valle', 'zona_horaria' => 'America/Mexico_City', 'region' => 'Benito Juárez',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
 
     $delDueno = $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))->assertOk()->json('data.usuario.sucursales');
@@ -36,6 +36,7 @@ it('el dueño opera todas las sucursales; quien está asignado, solo la suya', f
     asignarSucursal($e, usuarioIdPorEmail($e, 'lupita@barberia-sedes.mx'), $valle);
 
     $deLupita = $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($recepcion))->assertOk()->json('data.usuario.sucursales');
-    expect($deLupita)->toBe([['id' => $valle, 'nombre' => 'Del Valle', 'zona_horaria' => 'America/Mexico_City']])
+    // Con su región o zona, para distinguir sedes que se llaman igual.
+    expect($deLupita)->toBe([['id' => $valle, 'nombre' => 'Del Valle', 'zona_horaria' => 'America/Mexico_City', 'region' => 'Benito Juárez']])
         ->and($roma)->not->toBe($valle);
 });

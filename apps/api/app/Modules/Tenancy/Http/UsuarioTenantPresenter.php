@@ -79,11 +79,13 @@ class UsuarioTenantPresenter
         return SucursalTenant::query()
             ->when($permitidas !== null, fn ($q) => $q->whereIn('id', $permitidas))
             ->orderBy('nombre')
-            ->get(['id', 'ulid', 'nombre', 'zona_horaria'])
+            ->get(['id', 'ulid', 'nombre', 'zona_horaria', 'region'])
             ->map(static fn (SucursalTenant $s): array => [
                 'id' => (string) $s->ulid,
                 'nombre' => (string) $s->nombre,
                 'zona_horaria' => $s->zona_horaria,
+                // Su región o zona: distingue sedes con el mismo nombre (la barra lo dice).
+                'region' => $s->region,
             ])
             ->values()
             ->all();

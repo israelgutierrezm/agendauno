@@ -5,7 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/calendario/logo_calendario.dart';
 import '../../../core/google/google_auth.dart';
-import '../../../core/punto_que_late.dart';
+import '../../../core/flechas_que_se_mueven.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
@@ -723,7 +723,11 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
             Card(
               child: ListTile(
                 key: const Key('cambiar-rol'),
-                leading: const Icon(Icons.swap_horiz),
+                // Tiene otro rol con el cual entrar: las flechas se mueven (como en
+                // la web).
+                leading: const FlechasQueSeMueven(
+                  key: Key('flechas-cambiar-rol'),
+                ),
                 title: const Text('Cambiar de rol'),
                 subtitle: Text(
                   'Ahora: ${nombreDeRol(sesion.rolesDisponibles.firstWhere(
@@ -731,8 +735,6 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                     orElse: () => RolDisponible(clave: sesion.rol, faceta: sesion.facetaActiva),
                   ), sesion.terminologia)}',
                 ),
-                // Tiene otro rol con el cual entrar: el mismo punto que en la web.
-                trailing: const PuntoQueLate(key: Key('punto-cambiar-rol')),
                 onTap: _guardando ? null : _cambiarRol,
               ),
             ),
