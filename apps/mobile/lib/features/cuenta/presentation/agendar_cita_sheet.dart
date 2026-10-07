@@ -21,6 +21,11 @@ class AgendarCitaSheet extends ConsumerStatefulWidget {
   ConsumerState<AgendarCitaSheet> createState() => _AgendarCitaSheetState();
 }
 
+/// Se muestra junto a los horarios cuando la sede está en otra zona horaria que el
+/// teléfono: las horas son las de la sede (las de la cita).
+const textoHorasDeLaSede =
+    'Las horas son las de la sede, que está en otra zona horaria que tu teléfono.';
+
 /// Sin preferencia: el negocio asigna a quien esté libre a esa hora.
 const _cualquiera = OpcionCita(
   id: '',
@@ -33,8 +38,8 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
   OpcionCita? _profesional;
   OpcionCita? _sede;
   DateTime? _dia;
-  List<String> _horarios = [];
-  String? _hora;
+  List<HorarioCita> _horarios = [];
+  HorarioCita? _hora;
   bool _cargando = true;
   bool _buscando = false;
   bool _agendando = false;
@@ -130,13 +135,12 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     final navegador = Navigator.of(context);
     final mensajero = ScaffoldMessenger.of(context);
     await hacerConAviso(context, () async {
-      // El API recibe la hora local de la sede; el dispositivo está en la misma zona.
-      final inicio = DateTime.parse(hora).toLocal();
       final cita = await repo.agendarCita(
         servicioId: _servicio!.id,
         sucursalId: _sede!.id,
         profesionalId: _idProfesional,
-        iniciaEnLocal: '${Formato.iso(inicio)}T${Formato.hora(inicio)}',
+        // La hora de la sede tal cual (no la del teléfono).
+        iniciaEnLocal: hora.iniciaEnLocal,
         duracionMinutos: _servicio!.duracionMinutos ?? 60,
         nota: _nota.text.trim().isEmpty ? null : _nota.text.trim(),
         aceptaWhatsapp: _ofrecerWhatsapp && _aceptaWhatsapp,
@@ -323,10 +327,8 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                           spacing: separacion,
                           runSpacing: separacion,
                           children: _horarios.map((h) {
-                            final elegida = _hora == h;
-                            final texto = Formato.hora(
-                              DateTime.parse(h).toLocal(),
-                            );
+                            final elegida = _hora?.inicia == h.inicia;
+                            final texto = h.hora;
                             return SizedBox(
                               width: ancho,
                               height: 44,
@@ -346,6 +348,14 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                         );
                       },
                     ),
+                  if (!_buscando && _horarios.any((h) => h.enOtraZona)) ...[
+                    const SizedBox(height: 8),
+                    const Text(
+                      textoHorasDeLaSede,
+                      key: Key('horas-de-la-sede'),
+                      style: TextStyle(color: TemaAgendaUno.textoSuave),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   TextField(
                     controller: _nota,

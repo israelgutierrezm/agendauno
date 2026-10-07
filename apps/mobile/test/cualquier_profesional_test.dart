@@ -70,7 +70,7 @@ void main() {
       duracionMinutos: 30,
     );
 
-    expect(horarios, ['2026-10-05T16:00:00+00:00']);
+    expect(horarios.map((h) => h.inicia), ['2026-10-05T16:00:00+00:00']);
     expect(
       api.peticiones.single.queryParameters.containsKey('instructor_id'),
       isFalse,

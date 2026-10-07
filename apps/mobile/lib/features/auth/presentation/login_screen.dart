@@ -22,6 +22,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    // Si el servidor terminó la sesión, ya queda escrita la dirección del negocio.
+    final terminada = ref.read(sesionTerminadaProvider);
+    if (terminada != null) {
+      _slug.text = terminada;
+    }
+  }
+
+  @override
   void dispose() {
     _slug.dispose();
     _email.dispose();
@@ -190,6 +200,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
+                  if (ref.watch(sesionTerminadaProvider) != null) ...[
+                    Container(
+                      key: const Key('sesion-terminada'),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Tu sesión terminó. Vuelve a iniciar sesión para continuar.',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   TextField(
                     controller: _slug,
                     decoration: const InputDecoration(

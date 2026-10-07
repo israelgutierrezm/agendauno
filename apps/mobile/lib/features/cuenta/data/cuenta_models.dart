@@ -55,6 +55,60 @@ class DerechoMiembro {
   );
 }
 
+/// Un horario libre para agendar o mover una cita. `inicia` es el instante (ISO
+/// UTC); `iniciaLocal` (`AAAA-MM-DDTHH:MM`) es la hora en la zona de la sede, la
+/// que se muestra y la que el API espera en `inicia_en_local`: así no importa en
+/// qué zona esté el teléfono (una sede en Cancún vista desde la Ciudad de México).
+/// Si el API no la manda, se usa la hora del teléfono, como antes.
+class HorarioCita {
+  const HorarioCita({required this.inicia, this.iniciaLocal});
+
+  final String inicia;
+  final String? iniciaLocal;
+
+  factory HorarioCita.desdeJson(Map<String, dynamic> j) => HorarioCita(
+    inicia: (j['inicia'] ?? '') as String,
+    iniciaLocal: j['inicia_local'] as String?,
+  );
+
+  /// Los horarios de una lista de `slots` del API (sin los que no traen inicio).
+  static List<HorarioCita> deLista(Object? slots) => ((slots ?? []) as List)
+      .map((s) => HorarioCita.desdeJson(s as Map<String, dynamic>))
+      .where((h) => h.inicia.isNotEmpty)
+      .toList();
+
+  static final _formatoLocal = RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}');
+
+  /// `AAAA-MM-DDTHH:MM` de la sede, o null si no vino (o no se entiende).
+  String? get _local {
+    final local = iniciaLocal;
+    return local != null && _formatoLocal.hasMatch(local)
+        ? local.substring(0, 16)
+        : null;
+  }
+
+  /// La hora del teléfono (solo cuando el API no manda la de la sede).
+  DateTime get _delTelefono => DateTime.parse(inicia).toLocal();
+
+  /// "09:30" en la hora de la sede.
+  String get hora => _local?.substring(11) ?? Formato.hora(_delTelefono);
+
+  /// Lo que se manda como `inicia_en_local` (`AAAA-MM-DDTHH:MM`, hora de la sede).
+  String get iniciaEnLocal =>
+      _local ?? '${Formato.iso(_delTelefono)}T${Formato.hora(_delTelefono)}';
+
+  /// ¿La sede está en otra zona que el teléfono? (se avisa junto a las horas).
+  bool get enOtraZona {
+    final local = _local;
+    final instante = DateTime.tryParse(inicia);
+    if (local == null || instante == null) {
+      return false;
+    }
+    final telefono = instante.toLocal();
+    return local != '${Formato.iso(telefono)}T${Formato.hora(telefono)}';
+  }
+}
+
 /// A qué puede cambiar su reserva (ADR 0044): horarios libres de la cita o
 /// otras fechas de la clase. Si no puede, el motivo.
 class OpcionesReprogramar {
@@ -74,8 +128,8 @@ class OpcionesReprogramar {
   final String tipo;
   final int restantes;
 
-  /// Cita: inicio (ISO UTC) de cada horario libre.
-  final List<String> horarios;
+  /// Cita: cada horario libre (en la hora de la sede).
+  final List<HorarioCita> horarios;
 
   /// Clase: (id, inicio ISO) de cada fecha con lugar.
   final List<({String id, String iniciaEn})> sesiones;
@@ -86,10 +140,7 @@ class OpcionesReprogramar {
         motivo: j['motivo'] as String?,
         tipo: (j['tipo'] ?? 'cita') as String,
         restantes: (j['restantes'] ?? 0) as int,
-        horarios: ((j['slots'] ?? []) as List)
-            .map((s) => ((s as Map<String, dynamic>)['inicia'] ?? '') as String)
-            .where((s) => s.isNotEmpty)
-            .toList(),
+        horarios: HorarioCita.deLista(j['slots']),
         sesiones: ((j['sesiones'] ?? []) as List).map((s) {
           final m = s as Map<String, dynamic>;
           return (

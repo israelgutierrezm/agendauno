@@ -85,7 +85,7 @@ void main() {
       });
       expect(o.puede, isTrue);
       expect(o.tipo, 'cita');
-      expect(o.horarios, ['2030-01-08T18:00:00+00:00']);
+      expect(o.horarios.map((h) => h.inicia), ['2030-01-08T18:00:00+00:00']);
       expect(o.sesiones, isEmpty);
     });
 

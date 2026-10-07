@@ -6,6 +6,7 @@ import '../../../core/theme/tema_agendauno.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
+import 'agendar_cita_sheet.dart' show textoHorasDeLaSede;
 import 'cuenta_screen.dart';
 
 /// Cambiar el horario de una reserva desde la cuenta (ADR 0044): una cita a otro
@@ -24,6 +25,7 @@ class ReprogramarSheet extends ConsumerStatefulWidget {
 class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
   OpcionesReprogramar? _opciones;
   late DateTime _dia;
+  // Cita: el `inicia` del horario elegido; clase: el id de la sesión.
   String? _elegido;
   bool _cargando = true;
   bool _guardando = false;
@@ -82,11 +84,13 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
     final notifier = ref.read(cuentaProvider.notifier);
     await hacerConAviso(context, () async {
       if (opciones.tipo == 'cita') {
-        // El API recibe la hora local de la sede; el dispositivo está en la misma zona.
-        final inicio = DateTime.parse(elegido).toLocal();
+        // La hora de la sede tal cual (no la del teléfono).
+        final horario = opciones.horarios.firstWhere(
+          (h) => h.inicia == elegido,
+        );
         await notifier.reprogramar(
           widget.reserva.id,
-          iniciaEnLocal: '${Formato.iso(inicio)}T${Formato.hora(inicio)}',
+          iniciaEnLocal: horario.iniciaEnLocal,
         );
       } else {
         await notifier.reprogramar(widget.reserva.id, sesionId: elegido);
@@ -170,13 +174,21 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
         children: opciones.horarios
             .map(
               (h) => ChoiceChip(
-                label: Text(Formato.hora(DateTime.parse(h).toLocal())),
-                selected: _elegido == h,
-                onSelected: (_) => setState(() => _elegido = h),
+                label: Text(h.hora),
+                selected: _elegido == h.inicia,
+                onSelected: (_) => setState(() => _elegido = h.inicia),
               ),
             )
             .toList(),
       ),
+    if (!_cargando && opciones.horarios.any((h) => h.enOtraZona)) ...[
+      const SizedBox(height: 8),
+      const Text(
+        textoHorasDeLaSede,
+        key: Key('horas-de-la-sede'),
+        style: TextStyle(color: TemaAgendaUno.textoSuave),
+      ),
+    ],
   ];
 
   Widget _clase(OpcionesReprogramar opciones) => opciones.sesiones.isEmpty

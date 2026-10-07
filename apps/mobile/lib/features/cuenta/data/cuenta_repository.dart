@@ -434,7 +434,7 @@ class CuentaRepository {
 
   /// Sin [profesionalId] («cualquier profesional») salen los huecos en que alguien
   /// del equipo está libre.
-  Future<List<String>> horariosLibres({
+  Future<List<HorarioCita>> horariosLibres({
     required String? profesionalId,
     required String sucursalId,
     required String fecha,
@@ -453,10 +453,7 @@ class CuentaRepository {
     );
     final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
 
-    return ((data['slots'] ?? []) as List)
-        .map((s) => ((s as Map<String, dynamic>)['inicia'] ?? '') as String)
-        .where((s) => s.isNotEmpty)
-        .toList();
+    return HorarioCita.deLista(data['slots']);
   }
 
   /// Agenda la cita; devuelve su estado (`pendiente_pago` si se paga para reservar)

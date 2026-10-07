@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
 import 'auth_token.dart';
+import 'sesion_revocada.dart';
 
 /// Shared Dio client for the app.
 ///
@@ -32,6 +33,14 @@ final dioProvider = Provider<Dio>((ref) {
         }
 
         handler.next(options);
+      },
+      onError: (error, handler) {
+        // Token revocado con la app abierta: la sesión se cierra en el teléfono
+        // y vuelve al login con el aviso (no se queda en «No se pudo cargar»).
+        if (esSesionRevocada(error, ref.read(authTokenProvider))) {
+          ref.read(avisoSesionRevocadaProvider).avisar();
+        }
+        handler.next(error);
       },
     ),
   );

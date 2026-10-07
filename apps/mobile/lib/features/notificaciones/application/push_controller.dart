@@ -100,6 +100,11 @@ class PushController {
     }
   }
 
+  /// La sesión terminó en el servidor (token revocado): deja de volver a registrar
+  /// el teléfono con ella. Sin token ya no se puede pedir que lo olvide; el
+  /// servidor lo reasigna cuando otra sesión lo registre.
+  void soltar() => _sesion = null;
+
   Future<void> _registrarToken(Sesion sesion, String token) async {
     try {
       await _repo.registrar(sesion.slug, token, plataforma);

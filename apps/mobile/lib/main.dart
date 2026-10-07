@@ -46,14 +46,40 @@ class AgendaUnoApp extends ConsumerStatefulWidget {
 class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
   // Para mostrar las notificaciones push que llegan con la app abierta.
   final _avisos = GlobalKey<ScaffoldMessengerState>();
+  // Para volver a la primera pantalla cuando la sesión termina.
+  final _navegador = GlobalKey<NavigatorState>();
+  // Al volver a primer plano se confirma que la sesión sigue viva (pudo cerrarse
+  // en la web u otro teléfono mientras la app estaba en segundo plano).
+  late final AppLifecycleListener _ciclo = AppLifecycleListener(
+    onResume: () => ref.read(sesionProvider.notifier).revisar(),
+  );
 
   @override
   void initState() {
     super.initState();
+    _ciclo;
     // Una sesión restaurada se valida con el servidor (token revocado → login).
     ref.read(sesionProvider.notifier).refrescar();
     ReporteErrores.instancia.estudio = () => ref.read(sesionProvider)?.slug;
     _iniciarPush();
+  }
+
+  @override
+  void dispose() {
+    _ciclo.dispose();
+    super.dispose();
+  }
+
+  /// Sin sesión no queda ninguna pantalla encima del login (detalle, hojas,
+  /// diálogos). Si la terminó el servidor, el login ya lo dice: se quitan los
+  /// «No autenticado.» que dejaron las peticiones que fallaron.
+  void _alSalir() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _navegador.currentState?.popUntil((ruta) => ruta.isFirst);
+      if (ref.read(sesionTerminadaProvider) != null) {
+        _avisos.currentState?.clearSnackBars();
+      }
+    });
   }
 
   Future<void> _iniciarPush() async {
@@ -84,6 +110,9 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
       if (nueva != null && anterior?.bearer != nueva.bearer) {
         ref.read(pushProvider).registrar(nueva);
       }
+      if (nueva == null && anterior != null) {
+        _alSalir();
+      }
     });
     // Con varios roles, al entrar elige con cuál; luego, la pantalla de ese rol.
     final Widget inicio = sesion == null
@@ -100,6 +129,7 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
       title: 'AgendaUno',
       debugShowCheckedModeBanner: false,
       scaffoldMessengerKey: _avisos,
+      navigatorKey: _navegador,
       // El mismo tema claro de la web (tokens de AgendaUno).
       theme: TemaAgendaUno.claro(),
       home: inicio,
