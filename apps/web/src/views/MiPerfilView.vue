@@ -14,7 +14,12 @@ import PanelApariencia from "@/components/PanelApariencia.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { APPS_CALENDARIO } from "@/lib/calendario";
-import { clientIdGoogle, renderizarBotonGoogle } from "@/lib/google";
+import {
+  googleEnDominioRaiz,
+  googleEnEsteSitio,
+  renderizarBotonGoogle,
+} from "@/lib/google";
+import { origenDominioRaiz, urlEntrarEnDominioRaiz } from "@/lib/tenant";
 import { esMiembro, nombreDeRol } from "@/lib/roles";
 import {
   useSesionTenantStore,
@@ -52,7 +57,14 @@ const tituloPreferencias = computed(() =>
 );
 
 // ---- Google: se conecta aquí para entrar con él (ADR 0093: no registra cuentas) ----
-const hayGoogle = clientIdGoogle() !== undefined;
+// El botón de Google solo funciona en el dominio raíz (Google no admite orígenes
+// comodín): en el subdominio del negocio se explica y se enlaza allá.
+const hayGoogle = googleEnEsteSitio();
+const googleEnRaiz = googleEnDominioRaiz();
+const hostRaiz = origenDominioRaiz().replace(/^[a-z]+:\/\//, "");
+const urlConectarGoogle = computed(() =>
+  urlEntrarEnDominioRaiz(sesion.slug ?? "", "/mi-perfil"),
+);
 const botonGoogle = ref<HTMLElement | null>(null);
 const conectandoGoogle = ref(false);
 async function mostrarBotonGoogle(): Promise<void> {
@@ -693,9 +705,10 @@ const aparienciaAbierta = ref(false);
         </form>
 
         <!-- Entrar con Google: solo si el sitio lo tiene configurado (o ya lo conectó,
-           para poder quitarlo). Sin configurar no se ofrece. -->
+           para poder quitarlo). Sin configurar no se ofrece. En el subdominio del
+           negocio se conecta desde el dominio raíz. -->
         <div
-          v-if="hayGoogle || usuario.google_conectado"
+          v-if="hayGoogle || googleEnRaiz || usuario.google_conectado"
           class="mp-fila"
           data-prueba="google"
         >
@@ -719,6 +732,16 @@ const aparienciaAbierta = ref(false);
                 {{ $t("miPerfil.google.desconectar") }}
               </button>
             </template>
+            <p
+              v-else-if="googleEnRaiz"
+              class="mp-ayuda"
+              data-prueba="google-en-raiz"
+            >
+              {{ $t("miPerfil.google.enRaiz", { host: hostRaiz }) }}
+              <a class="tu-enlace" :href="urlConectarGoogle">{{
+                $t("miPerfil.google.conectarEn", { host: hostRaiz })
+              }}</a>
+            </p>
             <div v-else ref="botonGoogle" data-prueba="boton-google" />
           </div>
         </div>

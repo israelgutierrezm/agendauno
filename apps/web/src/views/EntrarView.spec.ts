@@ -1,4 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
+import { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 import es from "@/i18n/locales/es-MX";
@@ -12,23 +13,34 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   route: { query: {} as Record<string, string> },
   sesion: {
-    error: null,
+    error: null as string | null,
     cargando: false,
     requiereElegirRol: false,
     destinoAlEntrar: "panel",
+    rutaInicio: "recepcion",
+    avisoSinConfirmar: null as string | null,
+    volverTrasConfirmar: null as string | null,
     iniciarSesion: vi.fn(),
+    reintentarSesion: vi.fn(),
   },
+  // El subdominio del negocio (`barberia.agendauno.mx`) o el dominio raíz.
+  subdominio: null as string | null,
+  google: { aqui: false, enRaiz: false },
 }));
 vi.mock("@/lib/api", () => ({
   api: { get: mocks.get },
   mensajeDeError: () => "No disponible",
 }));
 vi.mock("@/lib/tenant", () => ({
-  slugDeContexto: () => null,
-  enSubdominioDeEstudio: () => false,
+  slugDeContexto: () => mocks.subdominio,
+  enSubdominioDeEstudio: () => mocks.subdominio !== null,
+  origenDominioRaiz: () => "https://agendauno.mx",
+  urlEntrarEnDominioRaiz: (slug: string, volver: string | null) =>
+    `https://agendauno.mx/entrar?estudio=${slug}${volver ? `&volver=${volver}` : ""}`,
 }));
 vi.mock("@/lib/google", () => ({
-  clientIdGoogle: () => undefined,
+  googleEnEsteSitio: () => mocks.google.aqui,
+  googleEnDominioRaiz: () => mocks.google.enRaiz,
   renderizarBotonGoogle: vi.fn(),
 }));
 vi.mock("@/stores/sesionTenant", () => ({
@@ -73,6 +85,11 @@ describe("acceso por negocio", () => {
     vi.clearAllMocks();
     mocks.route.query = {};
     mocks.sesion.requiereElegirRol = false;
+    mocks.sesion.avisoSinConfirmar = null;
+    mocks.sesion.volverTrasConfirmar = null;
+    mocks.sesion.error = null;
+    mocks.subdominio = null;
+    mocks.google = { aqui: false, enRaiz: false };
     mocks.get.mockResolvedValue({ data: { data: [] } });
   });
   afterEach(() => {
@@ -149,6 +166,40 @@ describe("acceso por negocio", () => {
     expect(wrapper.find("#email").exists()).toBe(false);
     expect(wrapper.get(".tu-login-identidad img").attributes("src")).toContain(
       "isotipo.png",
+    );
+  });
+
+  it("si el negocio ya no existe (404), vuelve a elegir y lo dice", async () => {
+    recordarCinco();
+    const config = { headers: {} } as InternalAxiosRequestConfig;
+    mocks.get.mockRejectedValue(
+      new AxiosError("No encontrado", "ERR_BAD_REQUEST", config, null, {
+        status: 404,
+        statusText: "",
+        headers: {},
+        config,
+        data: {},
+      }),
+    );
+    const wrapper = montar();
+    await wrapper.get(".tu-negocio-principal").trigger("click");
+    await flushPromises();
+    expect(wrapper.get(".tu-selector-error").text()).toBe(
+      "Ese negocio ya no está disponible. Busca otro para continuar.",
+    );
+    expect(wrapper.find("#email").exists()).toBe(false);
+  });
+
+  it("sin conexión no dice que el negocio ya no existe: lo deja elegido", async () => {
+    recordarCinco();
+    mocks.get.mockRejectedValue(new AxiosError("Network Error", "ERR_NETWORK"));
+    const wrapper = montar();
+    await wrapper.get(".tu-negocio-principal").trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".tu-selector-error").exists()).toBe(false);
+    expect(wrapper.find("#email").exists()).toBe(true);
+    expect(mocks.sesion.error).toBe(
+      "No pudimos conectar con el servidor. Revisa tu conexión y vuelve a intentarlo.",
     );
   });
 
@@ -251,5 +302,67 @@ describe("acceso por negocio", () => {
     expect(wrapper.find(".tu-login-identidad .agendauno-logo").exists()).toBe(
       false,
     );
+  });
+  it("en el subdominio del negocio, Google lleva a Entrar del dominio raíz", async () => {
+    mocks.subdominio = "barberia";
+    mocks.google = { aqui: false, enRaiz: true };
+    mocks.route.query = { volver: "/agendar" };
+    mocks.get.mockResolvedValue({
+      data: { data: { nombre: "Barbería Centro", logo_url: null } },
+    });
+    const wrapper = montar();
+    await flushPromises();
+
+    const enlace = wrapper.get('[data-prueba="google-en-raiz"]');
+    expect(enlace.element.tagName).toBe("A");
+    expect(enlace.attributes("href")).toBe(
+      "https://agendauno.mx/entrar?estudio=barberia&volver=/agendar",
+    );
+    expect(wrapper.text()).toContain("te llevamos a agendauno.mx");
+    expect(wrapper.text()).not.toContain("Google SSO estará disponible pronto");
+  });
+
+  it("sin Google configurado, el botón solo avisa que viene pronto", async () => {
+    mocks.route.query = { estudio: "pilates" };
+    mocks.get.mockResolvedValue({
+      data: { data: { nombre: "Pilates Centro", logo_url: null } },
+    });
+    const wrapper = montar();
+    await flushPromises();
+
+    expect(wrapper.find('[data-prueba="google-en-raiz"]').exists()).toBe(false);
+    await wrapper.get("button.tu-btn-fantasma").trigger("click");
+    expect(wrapper.text()).toContain("Google SSO estará disponible pronto");
+  });
+
+  it("con la sesión guardada sin confirmar, avisa y reintenta sin pedir la contraseña", async () => {
+    mocks.sesion.avisoSinConfirmar =
+      "Estamos actualizando AgendaUno. Tu sesión sigue guardada; reintenta en unos minutos.";
+    mocks.sesion.volverTrasConfirmar = "/recepcion?vista=hoy";
+    mocks.sesion.reintentarSesion.mockResolvedValue(true);
+    const wrapper = montar();
+    await flushPromises();
+
+    const aviso = wrapper.get('[data-prueba="sesion-sin-confirmar"]');
+    expect(aviso.text()).toContain("Estamos actualizando AgendaUno");
+    await aviso.get("button").trigger("click");
+    await flushPromises();
+
+    expect(mocks.sesion.reintentarSesion).toHaveBeenCalled();
+    expect(mocks.replace).toHaveBeenCalledWith("/recepcion?vista=hoy");
+  });
+
+  it("si al reintentar sigue sin confirmarse, se queda en Entrar", async () => {
+    mocks.sesion.avisoSinConfirmar = "Sin conexión.";
+    mocks.sesion.reintentarSesion.mockResolvedValue(false);
+    const wrapper = montar();
+    await flushPromises();
+
+    await wrapper
+      .get('[data-prueba="sesion-sin-confirmar"] button')
+      .trigger("click");
+    await flushPromises();
+
+    expect(mocks.replace).not.toHaveBeenCalled();
   });
 });

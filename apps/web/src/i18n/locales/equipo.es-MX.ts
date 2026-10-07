@@ -13,6 +13,10 @@ export const miPerfil = {
     conectadoEstado: "Google conectado",
     desconectar: "Quitar Google",
     desconectado: "Quitaste Google: entra con tu correo y contraseña.",
+    // En el subdominio del negocio, Google se conecta desde el dominio principal.
+    enRaiz:
+      "Google se conecta desde {host}: entra ahí con tu correo y contraseña y conéctalo en Mi perfil.",
+    conectarEn: "Conectar en {host}",
   },
   titulo: "Mi perfil",
   subtitulo: "Tu información, tu acceso y tus preferencias, en un solo lugar.",

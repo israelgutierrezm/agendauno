@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import PanelRoles from "@/components/PanelRoles.vue";
+import axios from "axios";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -12,14 +13,23 @@ import {
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import LogoAgendaUno from "@/components/LogoAgendaUno.vue";
 import { api, mensajeDeError } from "@/lib/api";
-import { clientIdGoogle, renderizarBotonGoogle } from "@/lib/google";
+import {
+  googleEnDominioRaiz,
+  googleEnEsteSitio,
+  renderizarBotonGoogle,
+} from "@/lib/google";
 import {
   leerNegociosRecientes,
   olvidarNegocio,
   recordarNegocio,
   type NegocioReciente,
 } from "@/lib/negociosRecientes";
-import { enSubdominioDeEstudio, slugDeContexto } from "@/lib/tenant";
+import {
+  enSubdominioDeEstudio,
+  origenDominioRaiz,
+  slugDeContexto,
+  urlEntrarEnDominioRaiz,
+} from "@/lib/tenant";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Marca {
@@ -63,9 +73,22 @@ const buscando = ref(false);
 const busquedaRealizada = ref(false);
 const errorBusqueda = ref<string | null>(null);
 
-const hayGoogle = clientIdGoogle() !== undefined;
+// El botón de Google solo funciona en el dominio raíz (Google no admite orígenes
+// comodín): en el subdominio de un negocio, un enlace lleva a «Entrar» del dominio
+// raíz para ese negocio.
+const hayGoogle = googleEnEsteSitio();
+const googleEnRaiz = googleEnDominioRaiz();
+const hostRaiz = origenDominioRaiz().replace(/^[a-z]+:\/\//, "");
+const urlGoogleRaiz = computed(() =>
+  urlEntrarEnDominioRaiz(slug.value.trim(), volverA()),
+);
 const contenedorGoogle = ref<HTMLElement | null>(null);
 const googleRenderizadoPara = ref("");
+function pulsarGoogle(): void {
+  if (!googleEnRaiz) {
+    avisoGoogle.value = true;
+  }
+}
 
 // Tras entrar: de vuelta a donde venía (p. ej. agendar una cita) o a su inicio. Solo
 // rutas internas: un enlace no puede mandar a otro sitio.
@@ -75,6 +98,22 @@ function volverA(): string | null {
 }
 function destino(): RouteLocationRaw {
   return volverA() ?? { name: sesion.destinoAlEntrar };
+}
+
+// Sesión guardada que no se pudo confirmar al abrir (sin red, en mantenimiento): se
+// reintenta aquí sin escribir la contraseña y se vuelve a lo que se había abierto.
+const reintentando = ref(false);
+async function reintentarSesion(): Promise<void> {
+  reintentando.value = true;
+  try {
+    if (await sesion.reintentarSesion()) {
+      const volver = volverA() ?? sesion.volverTrasConfirmar;
+      sesion.volverTrasConfirmar = null;
+      await router.replace(volver ?? { name: sesion.rutaInicio });
+    }
+  } finally {
+    reintentando.value = false;
+  }
 }
 
 // Con más de un rol en el negocio, el panel lateral pregunta con cuál entra (como en
@@ -144,9 +183,14 @@ async function cargarMarca(
       pais: null,
     });
     await prepararGoogle();
-  } catch {
+  } catch (e) {
     marca.value = null;
-    if (volverAlSelectorSiFalla && !estudioFijo) {
+    // Solo si el servidor dice que no existe (404) ya no está disponible. Sin
+    // conexión o con el servidor caído se queda elegido y se avisa eso.
+    const noExiste = axios.isAxiosError(e) && e.response?.status === 404;
+    if (!noExiste) {
+      sesion.error = t("entrar.sinConexion");
+    } else if (volverAlSelectorSiFalla && !estudioFijo) {
       slug.value = "";
       errorBusqueda.value = t("entrar.negocioNoDisponible");
       await router.replace({ name: "entrar" });
@@ -334,6 +378,25 @@ onMounted(async () => {
             @error="logoFallido = true"
           />
           <LogoAgendaUno v-else variante="isotipo" :ancho="64" />
+        </div>
+
+        <!-- La sesión guardada no se pudo confirmar (sin red, en mantenimiento): sigue
+             guardada y se reintenta sin volver a escribir la contraseña. -->
+        <div
+          v-if="sesion.avisoSinConfirmar"
+          class="tu-login-sin-confirmar"
+          role="status"
+          data-prueba="sesion-sin-confirmar"
+        >
+          <p>{{ sesion.avisoSinConfirmar }}</p>
+          <button
+            type="button"
+            class="tu-btn tu-btn-primario"
+            :disabled="reintentando"
+            @click="reintentarSesion"
+          >
+            {{ reintentando ? $t("comun.cargando") : $t("comun.reintentar") }}
+          </button>
         </div>
 
         <template v-if="seleccionando">
@@ -553,11 +616,16 @@ onMounted(async () => {
               ref="contenedorGoogle"
               class="flex justify-center"
             ></div>
+            <!-- En el subdominio de un negocio, un enlace al dominio raíz; sin Google
+                 configurado, «pronto». -->
             <template v-else>
-              <button
+              <component
+                :is="googleEnRaiz ? 'a' : 'button'"
                 class="tu-btn tu-btn-fantasma w-full justify-center"
-                type="button"
-                @click="avisoGoogle = true"
+                :href="googleEnRaiz ? urlGoogleRaiz : undefined"
+                :type="googleEnRaiz ? undefined : 'button'"
+                :data-prueba="googleEnRaiz ? 'google-en-raiz' : undefined"
+                @click="pulsarGoogle"
               >
                 <svg
                   width="18"
@@ -583,8 +651,11 @@ onMounted(async () => {
                   />
                 </svg>
                 {{ $t("entrar.google") }}
-              </button>
-              <p v-if="avisoGoogle" class="tu-login-aviso">
+              </component>
+              <p v-if="googleEnRaiz" class="tu-login-aviso">
+                {{ $t("entrar.googleEnRaiz", { host: hostRaiz }) }}
+              </p>
+              <p v-else-if="avisoGoogle" class="tu-login-aviso">
                 {{ $t("entrar.googlePronto") }}
               </p>
             </template>
@@ -977,6 +1048,18 @@ onMounted(async () => {
   color: var(--texto-suave);
   font-size: 0.8rem;
   text-align: center;
+}
+.tu-login-sin-confirmar {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+  margin-top: 1.25rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--borde);
+  border-inline-start: 4px solid var(--aviso);
+  border-radius: 0.75rem;
+  background: var(--aviso-suave);
+  font-size: 0.88rem;
 }
 .tu-login-registro {
   margin-top: 1.5rem;

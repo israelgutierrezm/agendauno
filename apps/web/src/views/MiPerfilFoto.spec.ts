@@ -43,6 +43,8 @@ vi.mock("@/stores/toast", () => ({
 }));
 vi.mock("@/lib/google", () => ({
   clientIdGoogle: () => undefined,
+  googleEnEsteSitio: () => false,
+  googleEnDominioRaiz: () => false,
   renderizarBotonGoogle: vi.fn(),
 }));
 

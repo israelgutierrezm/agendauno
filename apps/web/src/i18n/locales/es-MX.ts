@@ -41,6 +41,11 @@ export default {
     detalle: "Detalle",
     eliminar: "Eliminar",
     reintentar: "Reintentar",
+    // La petición no tuvo respuesta (sin red, servidor caído o tiempo agotado).
+    sinRespuesta:
+      "No hubo respuesta del servidor. Revisa tu conexión e inténtalo de nuevo.",
+    versionNueva:
+      "Hay una versión nueva de AgendaUno. Recarga la página para continuar.",
     verPassword: "Mostrar contraseña",
     ocultarPassword: "Ocultar contraseña",
   },
@@ -667,6 +672,10 @@ export default {
     sinResultados: "No encontramos negocios con esa búsqueda.",
     negocioNoDisponible:
       "Ese negocio ya no está disponible. Busca otro para continuar.",
+    // El negocio no se pudo consultar (sin red o el servidor no respondió): no es
+    // que ya no exista.
+    sinConexion:
+      "No pudimos conectar con el servidor. Revisa tu conexión y vuelve a intentarlo.",
     elegirOtro: "Elegir otro negocio",
     slug: "Dirección de tu negocio",
     slugPh: "mi-negocio",
@@ -677,6 +686,7 @@ export default {
     entrando: "Entrando…",
     google: "Continuar con Google",
     googlePronto: "Google SSO estará disponible pronto.",
+    googleEnRaiz: "Para entrar con Google te llevamos a {host}.",
     ayudaSlug:
       "Es la dirección web de tu negocio, por ejemplo: mi-negocio.agendauno.mx",
     panelTitulo: "Todo tu día, en una sola agenda.",
@@ -972,6 +982,8 @@ export default {
     hoy: "hoy",
     contactar: "Contactar",
     verFicha: "Ver ficha",
+    // Se usa con llave dinámica (`retencion.estados.${estado}`, RetencionView).
+    estados: { por_vencer: "Por vencer", vencida: "Vencida" },
   },
   cobranza: {
     titulo: "Cobranza",

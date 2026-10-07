@@ -42,9 +42,16 @@ vi.mock("@/lib/api", () => ({
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
 }));
+const google = vi.hoisted(() => ({ aqui: false, enRaiz: false }));
 vi.mock("@/lib/google", () => ({
-  clientIdGoogle: () => undefined,
+  googleEnEsteSitio: () => google.aqui,
+  googleEnDominioRaiz: () => google.enRaiz,
   renderizarBotonGoogle: vi.fn(),
+}));
+vi.mock("@/lib/tenant", () => ({
+  origenDominioRaiz: () => "https://agendauno.mx",
+  urlEntrarEnDominioRaiz: (slug: string, volver: string | null) =>
+    `https://agendauno.mx/entrar?estudio=${slug}&volver=${volver}`,
 }));
 
 function montar() {
@@ -89,6 +96,8 @@ beforeEach(() => {
     tiene_contrasena: true,
     google_conectado: false,
   });
+  google.aqui = false;
+  google.enRaiz = false;
 });
 
 describe("perfil unificado", () => {
@@ -305,6 +314,43 @@ describe("perfil unificado", () => {
     sesion.usuario.rol = "cliente-vip";
     await flushPromises();
     expect(w.find('[data-prueba="privacidad"]').exists()).toBe(true);
+    w.unmount();
+  });
+});
+
+describe("Google en Mi perfil", () => {
+  it("en el dominio raíz se conecta con el botón de Google", () => {
+    google.aqui = true;
+    const w = montar();
+    expect(w.find('[data-prueba="boton-google"]').exists()).toBe(true);
+    expect(w.find('[data-prueba="google-en-raiz"]').exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("en el subdominio del negocio explica que se conecta desde el dominio raíz", () => {
+    google.enRaiz = true;
+    const w = montar();
+    expect(w.find('[data-prueba="boton-google"]').exists()).toBe(false);
+    const aviso = w.get('[data-prueba="google-en-raiz"]');
+    expect(aviso.text()).toContain("Google se conecta desde agendauno.mx");
+    expect(aviso.get("a").attributes("href")).toBe(
+      "https://agendauno.mx/entrar?estudio=demo&volver=/mi-perfil",
+    );
+    w.unmount();
+  });
+
+  it("ya conectado, en el subdominio se puede quitar", () => {
+    google.enRaiz = true;
+    sesion.usuario.google_conectado = true;
+    const w = montar();
+    expect(w.find('[data-prueba="desconectar-google"]').exists()).toBe(true);
+    expect(w.find('[data-prueba="google-en-raiz"]').exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("sin Google configurado no se ofrece", () => {
+    const w = montar();
+    expect(w.find('[data-prueba="google"]').exists()).toBe(false);
     w.unmount();
   });
 });

@@ -446,6 +446,16 @@ export const validacion = {
     google: "No se pudo iniciar sesión con Google.",
     activar: "No se pudo activar la cuenta.",
     registrar: "No se pudo crear la cuenta.",
+    terminada: "Tu sesión terminó. Vuelve a entrar para seguir.",
+    // Hay sesión guardada pero no se pudo confirmar (la sesión NO se borra).
+    sinConfirmar: {
+      sinConexion:
+        "No pudimos confirmar tu sesión: no hay conexión o el servidor no respondió. Tu sesión sigue guardada; reintenta en un momento.",
+      mantenimiento:
+        "Estamos actualizando AgendaUno. Tu sesión sigue guardada; reintenta en unos minutos.",
+      servidor:
+        "El servidor no pudo confirmar tu sesión en este momento. Tu sesión sigue guardada; reintenta en un momento.",
+    },
   },
   recursoTipoPh: "Sala, cancha, carril…",
 };

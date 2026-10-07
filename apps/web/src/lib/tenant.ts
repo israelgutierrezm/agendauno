@@ -64,3 +64,38 @@ export function enSubdominioDeEstudio(host?: string): boolean {
 export function urlPublicaEstudio(slug: string): string {
   return `${slug}.${DOMINIO_PUBLICO}`;
 }
+
+type Ubicacion = Pick<Location, "protocol" | "hostname" | "port">;
+
+/**
+ * Origen del dominio raíz, sin el subdominio del negocio y con el mismo protocolo y
+ * puerto: `https://agendauno.mx` desde `https://barberia.agendauno.mx`, o
+ * `http://localhost:5175` desde `http://barberia.localhost:5175`. Fuera de un
+ * subdominio de negocio, el origen actual.
+ */
+export function origenDominioRaiz(
+  ubicacion: Ubicacion = window.location,
+): string {
+  const host = ubicacion.hostname.toLowerCase();
+  const sub = slugDeSubdominio(host);
+  const raiz = sub === null ? host : host.slice(sub.length + 1);
+  const puerto = ubicacion.port !== "" ? `:${ubicacion.port}` : "";
+  return `${ubicacion.protocol}//${raiz}${puerto}`;
+}
+
+/**
+ * «Entrar» de ese negocio en el dominio raíz (`/entrar?estudio={slug}`), con la ruta
+ * interna a la que volver después. Lo que solo funciona en el dominio raíz (Google)
+ * se manda ahí desde el subdominio.
+ */
+export function urlEntrarEnDominioRaiz(
+  slug: string,
+  volver: string | null = null,
+  ubicacion: Ubicacion = window.location,
+): string {
+  const query = new URLSearchParams({ estudio: slug });
+  if (volver !== null && /^\/(?![/\\])/.test(volver)) {
+    query.set("volver", volver);
+  }
+  return `${origenDominioRaiz(ubicacion)}/entrar?${query.toString()}`;
+}

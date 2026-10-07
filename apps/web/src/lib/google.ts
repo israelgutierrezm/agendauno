@@ -1,3 +1,5 @@
+import { enSubdominioDeEstudio } from "@/lib/tenant";
+
 /**
  * Integracion con Google Identity Services (GIS) para el SSO tenant-local. Carga el
  * script de Google una sola vez y renderiza el boton oficial; su callback entrega
@@ -5,6 +7,10 @@
  *
  * Se activa solo si `VITE_GOOGLE_CLIENT_ID` esta configurado; si no, la UI muestra
  * un aviso de "proximamente".
+ *
+ * Google solo acepta los orígenes registrados uno por uno en el cliente OAuth (sin
+ * comodines como `*.agendauno.mx`), así que el botón vive en el dominio raíz. En el
+ * subdominio de un negocio la UI lleva a «Entrar» del dominio raíz.
  */
 interface CredentialResponse {
   credential: string;
@@ -27,6 +33,22 @@ declare global {
 export function clientIdGoogle(): string | undefined {
   const id = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
   return typeof id === "string" && id !== "" ? id : undefined;
+}
+
+/**
+ * ¿Se puede mostrar aquí el botón de Google? Con el cliente configurado y fuera del
+ * subdominio de un negocio (Google rechazaría ese origen).
+ */
+export function googleEnEsteSitio(host?: string): boolean {
+  return clientIdGoogle() !== undefined && !enSubdominioDeEstudio(host);
+}
+
+/**
+ * Google está configurado pero este es el subdominio de un negocio: se entra (o se
+ * conecta) desde el dominio raíz.
+ */
+export function googleEnDominioRaiz(host?: string): boolean {
+  return clientIdGoogle() !== undefined && enSubdominioDeEstudio(host);
 }
 
 let cargando: Promise<void> | null = null;
@@ -54,14 +76,15 @@ function cargarScript(): Promise<void> {
 
 /**
  * Renderiza el boton de Google dentro de `el` y llama `onCredential` con el ID
- * token cuando el usuario completa el acceso. No hace nada si no hay client_id.
+ * token cuando el usuario completa el acceso. No hace nada si no hay client_id ni
+ * en el subdominio de un negocio.
  */
 export async function renderizarBotonGoogle(
   el: HTMLElement,
   onCredential: (credential: string) => void,
 ): Promise<void> {
   const clientId = clientIdGoogle();
-  if (clientId === undefined) {
+  if (clientId === undefined || !googleEnEsteSitio()) {
     return;
   }
   await cargarScript();

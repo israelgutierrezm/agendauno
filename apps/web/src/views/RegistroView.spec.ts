@@ -196,6 +196,8 @@ describe("WhatsApp del dueño", () => {
     expect(mocks.post).toHaveBeenLastCalledWith(
       "/api/v1/registro",
       expect.objectContaining({ whatsapp_verificacion: "comprobante" }),
+      // Crear el negocio puede tardar más que el límite general.
+      { timeout: 120_000 },
     );
   });
 

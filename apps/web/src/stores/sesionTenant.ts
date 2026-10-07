@@ -2,7 +2,13 @@ import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 
 import { aplicarTerminologia, i18n } from "@/i18n";
-import { api, fijarBearer, mensajeDeError } from "@/lib/api";
+import {
+  api,
+  fallaPasajera,
+  fijarBearer,
+  mensajeDeError,
+  type FallaPasajera,
+} from "@/lib/api";
 import { esInstructor, esMiembro, type RolDisponible } from "@/lib/roles";
 import { useAparienciaStore, type Apariencia } from "@/stores/apariencia";
 
@@ -11,6 +17,8 @@ export interface SucursalSesion {
   id: string;
   nombre: string;
   zona_horaria: string | null;
+  // Su región o zona: distingue sedes que se llaman igual.
+  region?: string | null;
 }
 
 export interface UsuarioTenant {
@@ -111,6 +119,14 @@ const CLAVE_BEARER = "tu.tenant.bearer";
 const CLAVE_SLUG = "tu.tenant.slug";
 const CLAVE_ROL_PENDIENTE = "tu.tenant.rol-pendiente";
 
+// Qué se le dice a quien abrió la web con su sesión guardada cuando no se pudo
+// confirmar (la sesión NO se borra: el token sigue vigente en el servidor).
+const AVISO_SIN_CONFIRMAR: Record<FallaPasajera, string> = {
+  "sin-conexion": "validacion.sesion.sinConfirmar.sinConexion",
+  mantenimiento: "validacion.sesion.sinConfirmar.mantenimiento",
+  servidor: "validacion.sesion.sinConfirmar.servidor",
+};
+
 /**
  * Sesion TENANT-LOCAL: no hay login global. Se resuelve el estudio por slug y se
  * guarda un bearer token que se envia en cada peticion a `/app/{slug}/...`. El
@@ -124,6 +140,15 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
   const cargando = ref(false);
   const error = ref<string | null>(null);
   const verificado = ref(false);
+  // Hay token guardado pero /yo no se pudo consultar (red, mantenimiento, 5xx): por
+  // qué, y la dirección que se abrió, para volver ahí al reintentar.
+  const sinConfirmar = ref<FallaPasajera | null>(null);
+  const volverTrasConfirmar = ref<string | null>(null);
+  const avisoSinConfirmar = computed(() =>
+    sinConfirmar.value === null
+      ? null
+      : i18n.global.t(AVISO_SIN_CONFIRMAR[sinConfirmar.value]),
+  );
   const requiereElegirRol = ref(leer(CLAVE_ROL_PENDIENTE) === "1");
   function confirmarRolInicial(): void {
     requiereElegirRol.value = false;
@@ -241,6 +266,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     estudio.value = datos.estudio;
     useAparienciaStore().activar(datos.usuario.apariencia);
     verificado.value = true;
+    sinConfirmar.value = null;
     fijarBearer(datos.token, datos.estudio.slug);
     guardar(CLAVE_BEARER, datos.token);
     guardar(CLAVE_SLUG, datos.estudio.slug);
@@ -397,17 +423,49 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     usuario.value = datos;
   }
 
+  /**
+   * Confirma con /yo la sesión guardada (al abrir o recargar la web). Solo se borra
+   * cuando el servidor dice que ya no sirve (401, o 404: el negocio ya no existe).
+   * Sin red, en mantenimiento (503 al publicar), con 429 o 5xx se conserva el token
+   * y se deja seguir: `sinConfirmar` dice por qué y la pantalla de Entrar ofrece
+   * reintentar.
+   */
   async function verificarSesion(): Promise<void> {
     if (verificado.value) {
       return;
     }
     try {
       await cargarYo();
-    } catch {
-      limpiar();
+      sinConfirmar.value = null;
+    } catch (e) {
+      const falla = fallaPasajera(e);
+      if (falla === null) {
+        limpiar();
+      } else {
+        sinConfirmar.value = falla;
+        volverTrasConfirmar.value ??= direccionAbierta();
+      }
     } finally {
       verificado.value = true;
     }
+  }
+
+  /** «Reintentar»: vuelve a consultar /yo. ¿Quedó la sesión confirmada? */
+  async function reintentarSesion(): Promise<boolean> {
+    if (bearer.value === null) {
+      return false;
+    }
+    verificado.value = false;
+    await verificarSesion();
+    return autenticado.value;
+  }
+
+  /**
+   * El servidor ya no reconoce el token (401 en plena sesión): se olvida en este
+   * navegador sin llamar a /logout, que también respondería 401.
+   */
+  function olvidarSesion(): void {
+    limpiar();
   }
 
   async function cerrarSesion(): Promise<void> {
@@ -424,6 +482,8 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
 
   function limpiar(): void {
     confirmarRolInicial();
+    sinConfirmar.value = null;
+    volverTrasConfirmar.value = null;
     bearer.value = null;
     usuario.value = null;
     estudio.value = null;
@@ -441,6 +501,9 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     error,
     autenticado,
     validando,
+    sinConfirmar,
+    avisoSinConfirmar,
+    volverTrasConfirmar,
     puede,
     rutaInicio,
     suspendido,
@@ -463,9 +526,24 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     cambiarRol,
     actualizarUsuario,
     verificarSesion,
+    reintentarSesion,
+    olvidarSesion,
     cerrarSesion,
   };
 });
+
+/**
+ * La dirección que se abrió (ruta, búsqueda y ancla), si es interna y no es la de
+ * Entrar: a donde volver cuando la sesión se confirme.
+ */
+function direccionAbierta(): string | null {
+  try {
+    const { pathname, search, hash } = window.location;
+    return pathname.startsWith("/entrar") ? null : pathname + search + hash;
+  } catch {
+    return null;
+  }
+}
 
 function leer(clave: string): string | null {
   try {

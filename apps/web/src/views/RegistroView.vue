@@ -7,6 +7,9 @@ import { PAISES } from "@/lib/ladas";
 import { trackEvent } from "@/lib/analytics";
 import AvisoPrivacidadContenido from "@/components/AvisoPrivacidadContenido.vue";
 
+// Alta del negocio: crea su base completa (ver el comentario en la petición).
+const TIEMPO_REGISTRO_MS = 120_000;
+
 const router = useRouter();
 
 // Alta por pasos: filtra interesados reales y captura datos de contacto útiles.
@@ -208,13 +211,19 @@ const correo = ref("");
 const reenviando = ref(false);
 const reenviado = ref(false);
 
+// Igual que la API: la dirección mide a lo más 40 (con ella se nombra la base del
+// negocio y el subdominio); con un nombre largo se recorta, sin guion al final.
+const LARGO_MAXIMO_SLUG = 40;
+
 function aSlug(valor: string): string {
   return valor
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "") // quita acentos/diacríticos (é→e, ñ→n…)
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/^-+|-+$/g, "")
+    .slice(0, LARGO_MAXIMO_SLUG)
+    .replace(/-+$/, "");
 }
 
 watch(nombre, (v) => {
@@ -318,29 +327,36 @@ async function enviar(): Promise<void> {
         estudio: { slug: string; nombre: string };
         activacion: { email: string; token: string } | null;
       };
-    }>("/api/v1/registro", {
-      nombre: nombre.value,
-      // Si no se personaliza, se OMITE el slug (undefined → axios no lo manda) y el
-      // backend genera la dirección única del nombre; si se personalizó, va la elegida.
-      slug: personalizarSlug.value ? slug.value : undefined,
-      recaptcha_token: recaptchaToken,
-      sitio_web: honeypot.value,
-      perfil_negocio: perfilNegocio.value,
-      contacto_nombre: contactoNombre.value,
-      contacto_segundo_nombre: contactoSegundoNombre.value || null,
-      contacto_primer_apellido: contactoPrimerApellido.value,
-      contacto_segundo_apellido: contactoSegundoApellido.value || null,
-      contacto_whatsapp_pais: whatsappPais.value,
-      contacto_telefono: whatsappNumero.value,
-      contacto_email: contactoEmail.value,
-      whatsapp_verificacion:
-        quiereWhatsApp.value && verificacion.value !== null
-          ? verificacion.value
-          : undefined,
-      acepta_terminos: aceptaTerminos.value,
-      aviso_version: legales.value.versiones?.aviso_privacidad?.version,
-      terminos_version: legales.value.versiones?.terminos?.version,
-    });
+    }>(
+      "/api/v1/registro",
+      {
+        nombre: nombre.value,
+        // Si no se personaliza, se OMITE el slug (undefined → axios no lo manda) y el
+        // backend genera la dirección única del nombre; si se personalizó, va la elegida.
+        slug: personalizarSlug.value ? slug.value : undefined,
+        recaptcha_token: recaptchaToken,
+        sitio_web: honeypot.value,
+        perfil_negocio: perfilNegocio.value,
+        contacto_nombre: contactoNombre.value,
+        contacto_segundo_nombre: contactoSegundoNombre.value || null,
+        contacto_primer_apellido: contactoPrimerApellido.value,
+        contacto_segundo_apellido: contactoSegundoApellido.value || null,
+        contacto_whatsapp_pais: whatsappPais.value,
+        contacto_telefono: whatsappNumero.value,
+        contacto_email: contactoEmail.value,
+        whatsapp_verificacion:
+          quiereWhatsApp.value && verificacion.value !== null
+            ? verificacion.value
+            : undefined,
+        acepta_terminos: aceptaTerminos.value,
+        aviso_version: legales.value.versiones?.aviso_privacidad?.version,
+        terminos_version: legales.value.versiones?.terminos?.version,
+      },
+      // Crear el negocio aprovisiona su base completa: puede tardar más que el
+      // límite general de 30 s. Se espera más que el servidor (60 s): si la web se
+      // rindiera antes, el negocio quedaría creado y el dueño lo intentaría de nuevo.
+      { timeout: TIEMPO_REGISTRO_MS },
+    );
     creado.value = data.data.estudio;
     activacion.value = data.data.activacion;
     correo.value = contactoEmail.value;
@@ -587,6 +603,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                   v-else
                   id="slug"
                   :value="slug"
+                  :maxlength="LARGO_MAXIMO_SLUG"
                   class="tu-input"
                   @input="editarSlug(($event.target as HTMLInputElement).value)"
                 />

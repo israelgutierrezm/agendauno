@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   DOMINIO_PUBLICO,
+  origenDominioRaiz,
   slugDeContexto,
   slugDeSubdominio,
+  urlEntrarEnDominioRaiz,
   urlPublicaEstudio,
 } from "./tenant";
 
@@ -38,5 +40,44 @@ describe("tenant / subdominio", () => {
 
   it("construye la URL pública corta del estudio", () => {
     expect(urlPublicaEstudio("barberia")).toBe(`barberia.${DOMINIO_PUBLICO}`);
+  });
+});
+
+describe("dominio raíz desde el subdominio de un negocio", () => {
+  const prod = {
+    protocol: "https:",
+    hostname: `barberia.${DOMINIO_PUBLICO}`,
+    port: "",
+  };
+  const dev = {
+    protocol: "http:",
+    hostname: "barberia.localhost",
+    port: "5175",
+  };
+
+  it("quita el subdominio y conserva protocolo y puerto", () => {
+    expect(origenDominioRaiz(prod)).toBe(`https://${DOMINIO_PUBLICO}`);
+    expect(origenDominioRaiz(dev)).toBe("http://localhost:5175");
+    // Fuera de un subdominio de negocio, el origen actual.
+    expect(
+      origenDominioRaiz({
+        protocol: "https:",
+        hostname: DOMINIO_PUBLICO,
+        port: "",
+      }),
+    ).toBe(`https://${DOMINIO_PUBLICO}`);
+  });
+
+  it("arma «Entrar» de ese negocio en el dominio raíz, con la ruta interna a la que volver", () => {
+    expect(urlEntrarEnDominioRaiz("barberia", null, prod)).toBe(
+      `https://${DOMINIO_PUBLICO}/entrar?estudio=barberia`,
+    );
+    expect(urlEntrarEnDominioRaiz("barberia", "/mi-perfil", dev)).toBe(
+      "http://localhost:5175/entrar?estudio=barberia&volver=%2Fmi-perfil",
+    );
+    // Solo rutas internas: nunca otro sitio.
+    expect(urlEntrarEnDominioRaiz("barberia", "//otro.sitio", prod)).toBe(
+      `https://${DOMINIO_PUBLICO}/entrar?estudio=barberia`,
+    );
   });
 });
