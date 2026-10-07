@@ -9,8 +9,8 @@
 # la versión anterior siga funcionando con el esquema nuevo (primero se agrega,
 # después se quita en otra versión). Si una actualización cambió datos de forma
 # incompatible, además restaura el respaldo tomado justo antes de actualizar:
-#   docker compose --env-file web.env exec api php artisan agendauno:restaurar-plataforma --force
-#   docker compose --env-file web.env exec api php artisan agendauno:restaurar-estudio {slug} --force
+#   docker compose --env-file web.env exec -u www-data api php artisan agendauno:restaurar-plataforma --force
+#   docker compose --env-file web.env exec -u www-data api php artisan agendauno:restaurar-estudio {slug} --force
 #
 # Como al actualizar: pone mantenimiento, deja terminar la cola y el programador,
 # cambia de versión y solo reabre si la versión atiende (una petición real por nginx
@@ -47,9 +47,9 @@ principal() {
 
   echo "==> Volviendo de $ACTUAL a $DESTINO"
   echo "==> Mantenimiento y sin tareas en curso"
-  $COMPOSE exec -T api php artisan down --retry=60 --secret="$SECRETO" || true
+  $COMPOSE exec -T -u www-data api php artisan down --retry=60 --secret="$SECRETO" || true
   $COMPOSE stop worker scheduler || true
-  $COMPOSE exec -T api php artisan schedule:clear-cache >/dev/null 2>&1 || true
+  $COMPOSE exec -T -u www-data api php artisan schedule:clear-cache >/dev/null 2>&1 || true
 
   echo "==> Levantando $DESTINO (sigue en mantenimiento)"
   # Señales en blanco: solo cuentan las del programador y el worker que arrancan ahora.
@@ -72,13 +72,13 @@ principal() {
     sleep 10
   done
 
-  VERSION="$DESTINO" $COMPOSE exec -T api php artisan up
+  VERSION="$DESTINO" $COMPOSE exec -T -u www-data api php artisan up
   echo "$DESTINO" > .version-actual
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $ACTUAL -> $DESTINO (volver)" >> .historial-versiones
 
   echo "==> Confirmando que la cola procesa"
   intentos=0
-  until VERSION="$DESTINO" $COMPOSE exec -T api php artisan agendauno:latido --verificar=cola --minutos=2 >/dev/null 2>&1; do
+  until VERSION="$DESTINO" $COMPOSE exec -T -u www-data api php artisan agendauno:latido --verificar=cola --minutos=2 >/dev/null 2>&1; do
     intentos=$((intentos + 1))
     if [ "$intentos" -ge 18 ]; then
       echo "!! $DESTINO está abierta, pero la cola no procesó trabajos en 3 minutos."
@@ -88,7 +88,7 @@ principal() {
     sleep 10
   done
   echo "==> Listo: $DESTINO en marcha y atendiendo. Revisa lo demás con:"
-  echo "   VERSION=$DESTINO $COMPOSE exec api php artisan agendauno:verificar-produccion"
+  echo "   VERSION=$DESTINO $COMPOSE exec -u www-data api php artisan agendauno:verificar-produccion"
 }
 
 # Una petición real por nginx y PHP-FPM, con la galleta que deja pasar el

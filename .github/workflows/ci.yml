@@ -127,3 +127,67 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+
+  imagenes:
+    name: Docker · production images
+    runs-on: ubuntu-24.04
+    env:
+      # Igual que docker compose build en el servidor: cada Dockerfile con su
+      # <Dockerfile>.dockerignore, que solo BuildKit respeta.
+      DOCKER_BUILDKIT: 1
+    services:
+      # Para probar los respaldos con el cliente de la imagen contra MySQL 8.4.
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: origen
+          MYSQL_USER: agendauno
+          MYSQL_PASSWORD: secreto
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v5
+
+      # Las imágenes de infra/produccion, como las construye actualizar.sh (contexto: la
+      # raíz del repo), sin publicarlas. Un archivo que el Dockerfile copia y su
+      # .dockerignore deja fuera falla aquí y no al desplegar.
+      - name: Build API image
+        run: docker build -f infra/produccion/api.Dockerfile -t agendauno-api:ci .
+
+      - name: Build web image
+        run: docker build -f infra/produccion/web.Dockerfile -t agendauno-web:ci .
+
+      # Configuraciones que solo se leen al arrancar: el pool de PHP-FPM y nginx con la
+      # plantilla ya sustituida (el entrypoint de la imagen la procesa antes de nginx -t).
+      - name: Check PHP-FPM config
+        run: docker run --rm --entrypoint php-fpm agendauno-api:ci -t
+
+      - name: Check nginx config
+        run: >-
+          docker run --rm -e DOMINIO=agendauno.test -e PROXY_CONFIABLE=172.16.0.0/12
+          agendauno-web:ci nginx -t
+
+      # Los respaldos usan el cliente de la imagen (MariaDB) contra MySQL 8.4: su usuario
+      # normal entra con caching_sha2_password y TLS de certificado autofirmado (como
+      # RESPALDOS_MYSQL_SSL_VERIFICAR=false). Vuelca y carga con las mismas opciones que
+      # VolcadoBaseDatos y comprueba que el dato llegó.
+      - name: Check backup client against MySQL 8.4
+        run: |
+          set -euo pipefail
+          cliente() {
+            docker run --rm -i --network host -e MYSQL_PWD="$1" -v "$PWD/volcado:/volcado" \
+              --entrypoint "$2" agendauno-api:ci --skip-ssl-verify-server-cert \
+              --host=127.0.0.1 --port=3306 "${@:3}"
+          }
+          mkdir -p volcado && chmod 777 volcado
+          cliente root mysql --user=root -e "CREATE DATABASE destino; GRANT ALL ON destino.* TO 'agendauno'@'%'; CREATE TABLE origen.prueba (id INT PRIMARY KEY, nombre VARCHAR(20)); INSERT INTO origen.prueba VALUES (1, 'ñandú');"
+          cliente secreto mysqldump --single-transaction --quick --skip-lock-tables --routines \
+            --user=agendauno --result-file=/volcado/origen.sql origen
+          cliente secreto mysql --user=agendauno destino < volcado/origen.sql
+          test "$(cliente secreto mysql --user=agendauno -N -e 'SELECT nombre FROM destino.prueba WHERE id = 1')" = "ñandú"

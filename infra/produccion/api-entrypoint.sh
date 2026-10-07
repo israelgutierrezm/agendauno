@@ -14,13 +14,17 @@ if [ -z "$APP_KEY" ]; then
 fi
 
 mkdir -p storage/app/public storage/framework/cache/data storage/framework/sessions \
-    storage/framework/views storage/logs storage/tenants
+    storage/framework/views storage/logs storage/tenants storage/app/respaldos-temp
 
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
 chown -R www-data:www-data storage bootstrap/cache
+# Carpeta de trabajo de los respaldos (volcados de las bases): de www-data y solo
+# suya. Si la creara primero un comando con `docker compose exec` (root), el
+# programador ya no podría escribir ahí y los respaldos nocturnos fallarían.
+chmod 700 storage/app/respaldos-temp
 
 if [ "$1" = "php-fpm" ]; then
     exec "$@"

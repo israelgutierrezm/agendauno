@@ -89,7 +89,13 @@ la llave de depuración (sirve para probar en un teléfono, Play la rechaza).
 ## Pendiente para publicar
 
 - Crear la llave de subida (arriba) y la configuración de iOS (equipo y perfil en
-  Xcode).
+  Xcode). iOS mínimo: 15. En Xcode, la capacidad **Push Notifications** (ya está
+  `Runner.entitlements` con `aps-environment`) y, en Firebase, la llave APNs del
+  equipo de Apple; sin ella las notificaciones no llegan a iPhone.
+- Compilar y probar la versión de iOS en una Mac (aquí solo se compila Android).
+- Íconos de las tiendas: hoy salen del isotipo de 192 px ampliado (el de 1024 px se
+  ve suave y con el trazo cortado). Antes de publicar, generarlos desde el isotipo
+  en vector o a 1024 px.
 - Publicar en Google Play y App Store.
 
 ## Pruebas

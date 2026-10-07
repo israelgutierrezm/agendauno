@@ -1,8 +1,12 @@
-# Solo entra lo que la imagen web necesita (contexto = raíz del repo).
+# Solo entra lo que la imagen web necesita (contexto = raíz del repo). Todo archivo
+# que web.Dockerfile copie de infra/produccion debe estar admitido aquí (el CI
+# construye la imagen y lo comprueba).
 *
 !apps/web/
 !infra/produccion/nginx.conf.template
 !infra/produccion/nginx-comun.conf
+!infra/produccion/nginx-cabeceras.conf
+!infra/produccion/web-mapas.sh
 
 apps/web/node_modules/
 apps/web/dist/

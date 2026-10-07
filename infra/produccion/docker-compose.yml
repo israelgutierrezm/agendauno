@@ -5,6 +5,10 @@
 #   cp web.env.example web.env   # y llénalo
 #   docker compose --env-file web.env up -d --build
 #
+# Después: ./actualizar.sh y ./volver.sh. Para aplicar un cambio de api.env, el `up -d`
+# con la VERSION en marcha (docs/DESPLIEGUE.md → «Cambiar api.env»): sin ella, Compose
+# usaría la imagen `latest`, la de la primera instalación.
+#
 # MySQL va aparte (servicio administrado o un servidor propio): cada negocio tiene su
 # propia base, así que el usuario de la API necesita poder crear bases `tenant_%`.
 # nginx escucha solo en 127.0.0.1:8080: el proxy que termina TLS (Caddy, Cloudflare
@@ -96,6 +100,8 @@ services:
       - storage:/var/www/storage-laravel:ro
       # Aquí deja los mapas de origen de su compilación para la API; no se publican.
       - mapas-web:/mapas-compartidos
+    # Solo el orden de arranque: nginx vuelve a resolver `api` cada 10 s
+    # (nginx-comun.conf), así que si se recrea solo la API no hace falta reiniciarla.
     depends_on:
       - api
     restart: unless-stopped

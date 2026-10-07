@@ -7,8 +7,8 @@ Cómo poner AgendaUno en un servidor con Docker. Los archivos están en
 
 | Servicio | Qué hace |
 |---|---|
-| `web` | nginx: sitio comercial (HTML completo), la aplicación (`app.html`), pasa `/api` y `/up` a PHP y sirve `/storage` (logos y fotos). Escucha solo en `127.0.0.1:8080`. |
-| `api` | Laravel en PHP-FPM. |
+| `web` | nginx: sitio comercial (HTML completo), la aplicación (`app.html`), pasa `/api` y `/up` a PHP y sirve `/storage` (logos y fotos). Escucha solo en `127.0.0.1:8080`. Manda las cabeceras de seguridad (HSTS, `X-Frame-Options`, `frame-ancestors`) y el HTML con `Cache-Control: no-cache` (tras publicar nadie se queda con uno viejo; `/assets/` lleva hash y caché de un año). |
+| `api` | Laravel en PHP-FPM, con pool propio (`infra/produccion/php-fpm.conf`): hasta 24 peticiones a la vez, pensado para el servidor de 4 GB. Con otra memoria, ajusta `pm.max_children` (el archivo explica la cuenta). |
 | `worker` | Cola en Redis: correos transaccionales. Chequeo de salud: su latido (`agendauno:latido --verificar=cola`). |
 | `scheduler` | Tareas programadas (`routes/console.php`): recordatorios, renovaciones, agenda recurrente, cobros, outbox, respaldos, alertas… Chequeo de salud: su latido. |
 | `redis` | Caché, colas y sesiones. |
@@ -45,6 +45,13 @@ Así no hay CORS entre subdominios.
    El proxy debe mandar `X-Forwarded-For` y `X-Forwarded-Proto`, y redirigir HTTP a
    HTTPS. Con Cloudflare, pasa la IP real del cliente (`CF-Connecting-IP`) como
    `X-Forwarded-For`: los límites por IP de la API dependen de ella.
+
+   nginx ya manda `Strict-Transport-Security: max-age=31536000; includeSubDomains`,
+   `X-Frame-Options: DENY` y `Content-Security-Policy: frame-ancestors 'none'`. El
+   proxy no debe quitarlas ni reemplazarlas. Por `includeSubDomains`, el navegador
+   exige HTTPS en **todo** subdominio de `DOMINIO` durante un año: si otro servicio
+   usa uno (por ejemplo, el seguimiento de clics del proveedor de correo), debe tener
+   HTTPS.
 5. **Correo**: cuenta SMTP (Resend, Postmark, Amazon SES, Brevo…) con el dominio del
    remitente verificado (SPF y DKIM).
 6. **Facturación (opcional)**: llave de FacturAPI (`FACTURAPI_LLAVE` o en la
@@ -52,6 +59,15 @@ Así no hay CORS entre subdominios.
    apagada: los negocios no emiten CFDI ni reciben la factura de su renta, y la
    pantalla lo dice. Nunca se simula un timbre fuera de desarrollo y pruebas.
    `agendauno:verificar-produccion` lo marca como aviso.
+7. **reCAPTCHA v3** (obligatorio): crea un sitio en la consola de reCAPTCHA con
+   `DOMINIO` y pon su llave secreta en `RECAPTCHA_SECRET` (`api.env`) y la del sitio
+   en `VITE_RECAPTCHA_SITE_KEY` (`web.env`). Cada alta del registro público crea una
+   base completa y manda un correo; sin captcha, `agendauno:verificar-produccion`
+   marca FALTA. Las altas que nadie activa se borran solas (ver «Altas sin activar»).
+8. **Google** (opcional, para entrar con Google): en el cliente OAuth web, registra
+   como orígenes autorizados solo `https://DOMINIO` (y `https://www.DOMINIO` si se
+   sirve). Desde el subdominio de un negocio, la web manda a entrar con Google al
+   dominio principal.
 
 ## Primera instalación
 
@@ -62,8 +78,8 @@ cp api.env.example api.env
 cp web.env.example web.env
 ```
 
-1. Llena `web.env` (`DOMINIO`) y `api.env` (MySQL, correo, `APP_URL`,
-   `APP_TENANT_DOMAIN`, `PLATFORM_ADMIN_TOKEN`…).
+1. Llena `web.env` (`DOMINIO`, `VITE_RECAPTCHA_SITE_KEY`) y `api.env` (MySQL, correo,
+   `APP_URL`, `APP_TENANT_DOMAIN`, `PLATFORM_ADMIN_TOKEN`, `RECAPTCHA_SECRET`…).
 2. Genera la llave de la aplicación **una sola vez** y pégala en `APP_KEY`:
 
    ```bash
@@ -80,10 +96,11 @@ cp web.env.example web.env
    docker compose --env-file web.env up -d
    ```
 
-4. Comprueba:
-   - `docker compose --env-file web.env exec api php artisan agendauno:verificar-produccion`
+4. Comprueba (los comandos de `artisan` con `exec` van con `-u www-data`, ver
+   «Operación»):
+   - `docker compose --env-file web.env exec -u www-data api php artisan agendauno:verificar-produccion`
      termina en «Lista para producción» (dice qué falta si no);
-   - `docker compose --env-file web.env exec api php artisan agendauno:verificar-concurrencia`
+   - `docker compose --env-file web.env exec -u www-data api php artisan agendauno:verificar-concurrencia`
      termina en «Todo cuadró». Crea un negocio temporal con su base
      (`tenant_verificacion_*`), pone a competir procesos a la vez (el último lugar, el
      mismo horario de un profesional, cancelar y reprogramar), migra varios negocios,
@@ -91,7 +108,9 @@ cp web.env.example web.env
      cambias de servidor o de versión de MySQL;
    - `curl -H "Host: DOMINIO" http://127.0.0.1:8080/up` responde 200;
    - `https://DOMINIO` muestra la portada y `https://DOMINIO/registro` el registro;
-   - `docker compose --env-file web.env exec api php artisan agendauno:probar-correo tu@correo.com` llega;
+   - `curl -sI https://DOMINIO` trae `strict-transport-security` y `x-frame-options`
+     (el proxy no las quita);
+   - `docker compose --env-file web.env exec -u www-data api php artisan agendauno:probar-correo tu@correo.com` llega;
    - `docker compose --env-file web.env logs -f worker scheduler` no muestra errores.
 5. En el superadmin (`/plataforma`, con `PLATFORM_ADMIN_TOKEN`): tarifas del SaaS,
    parámetros de plataforma, la pasarela con la que cobras la renta y **los documentos
@@ -157,6 +176,26 @@ funcionando con el esquema nuevo (primero se agrega; lo que se quita, en otra ve
 Si una actualización cambió datos de forma incompatible, restaura además el respaldo
 que se tomó justo antes (ver «Datos y respaldos»).
 
+### Cambiar `api.env`
+
+Tras editar `api.env` (correo, `ALERTAS_CORREO`, llaves…), recrea la API **con la
+versión en marcha**. Sin `VERSION`, Compose usaría la imagen `latest`, que es la de la
+primera instalación:
+
+```bash
+cd agendauno/infra/produccion
+VERSION="$(cat .version-actual 2>/dev/null || echo latest)" docker compose --env-file web.env up -d
+```
+
+Compose recrea `api`, `worker` y `scheduler`, que al arrancar vuelven a cachear la
+configuración con los valores nuevos. Antes, la cola y el programador terminan lo que
+tenían en curso, así que puede tardar unos minutos. `web` no se recrea ni hace falta
+reiniciarla: nginx vuelve a resolver la dirección de `api` cada 10 s, así que `/api`
+responde en cuanto arranca la API nueva (mientras tanto, unos segundos de 502).
+
+Los cambios de `web.env` son distintos: las `VITE_*` van dentro del JavaScript
+compilado, así que se aplican al construir la web, con la siguiente `./actualizar.sh`.
+
 ## Datos y respaldos
 
 Todo respaldo va al disco `RESPALDOS_DISCO`: en producción, un bucket compatible con S3
@@ -183,19 +222,39 @@ probar.
 ### Restaurar
 
 ```bash
-docker compose --env-file web.env exec api php artisan down
+docker compose --env-file web.env exec -u www-data api php artisan down
 # La base central (el más reciente o --respaldo=RUTA; --listar para ver cuáles hay):
-docker compose --env-file web.env exec api php artisan agendauno:restaurar-plataforma --force
+docker compose --env-file web.env exec -u www-data api php artisan agendauno:restaurar-plataforma --force
 # Un negocio:
-docker compose --env-file web.env exec api php artisan agendauno:restaurar-estudio SLUG --force
-docker compose --env-file web.env exec api php artisan up
+docker compose --env-file web.env exec -u www-data api php artisan agendauno:restaurar-estudio SLUG --force
+docker compose --env-file web.env exec -u www-data api php artisan up
 ```
 
 Los archivos subidos se restauran descomprimiendo `respaldos/_archivos/archivos-….tar.gz`
 dentro del volumen `storage` (`private/` → `storage/app/private`, `public/` →
-`storage/app/public`).
+`storage/app/public`). Descárgalo del bucket y descomprímelo **como `www-data`**: con
+root, la aplicación ya no podría reemplazar ni borrar esos archivos.
+
+```bash
+docker compose --env-file web.env cp archivos-FECHA.tar.gz api:/tmp/archivos.tar.gz
+docker compose --env-file web.env exec -u www-data api tar -xzf /tmp/archivos.tar.gz -C storage/app
+docker compose --env-file web.env exec api rm /tmp/archivos.tar.gz
+```
 
 Además de esto, conviene que el proveedor de MySQL haga sus instantáneas diarias.
+
+### Altas sin activar
+
+`agendauno:limpiar-altas-sin-activar` (diario, 03:50 de CDMX) borra los negocios cuyo
+dueño nunca activó su cuenta (ADR 0102): siguen en prueba, se registraron hace más de
+14 días y no tienen nada (ni otro usuario, ni sesiones, ni pagos, ventas o clientes,
+ni cargos de la renta). Se borran su base, sus respaldos y su registro, y su nombre
+queda libre. El plazo se ajusta en el superadmin, «Parámetros» → «Cuentas». Para ver
+qué borraría sin borrar nada:
+
+```bash
+docker compose --env-file web.env exec -u www-data api php artisan agendauno:limpiar-altas-sin-activar --dry-run
+```
 
 ### Limpieza de registros técnicos
 
@@ -243,7 +302,12 @@ del último simulacro y las alertas de los últimos 30 días
 ## Operación
 
 - Logs: `docker compose --env-file web.env logs -f api worker scheduler web`.
-- Mantenimiento: `docker compose … exec api php artisan down` / `up`.
+- Comandos de `artisan` a mano: siempre con `exec -u www-data`, el usuario de la API,
+  la cola y el programador. `exec` entra como root, y lo que el comando cree en
+  `storage` quedaría de root: por ejemplo, la carpeta de trabajo de los respaldos, y
+  entonces fallarían los respaldos nocturnos. (`run --rm api …` ya corre como
+  `www-data`.)
+- Mantenimiento: `docker compose … exec -u www-data api php artisan down` / `up`.
 - Nunca cambies `APP_KEY`.
 - Tampoco cambies `APP_TENANT_DOMAIN` sin cambiar `DOMINIO`: los subdominios de los
   negocios dependen de ambos.

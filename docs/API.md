@@ -41,7 +41,16 @@ resto exige sesión y un permiso (`puede:…`). Ver `docs/AUTHORIZATION.md`.
   idempotentes por la referencia de la pasarela.
 - Listas grandes paginan (`page`, `per_page`).
 - Cada respuesta lleva `X-Correlation-ID`; se acepta uno entrante si es seguro.
-- Límites de peticiones: `throttle:login`, `throttle:tenant`, `throttle:60,1`.
+- Límites de peticiones (`AppServiceProvider`, ADR 0102). En las rutas de un negocio
+  el límite va después de resolver el negocio y la sesión, así que cuenta por usuario
+  (o llave de API) de cada negocio, no por IP:
+  - `login`, `recuperacion`: por correo y por IP;
+  - `confirmar-contrasena`, `tenant` (120/min), `clima`, `whatsapp-panel-codigo`,
+    `whatsapp-panel-verificar`: por usuario del negocio;
+  - `negocio-publico` (marca, escaparate, agendar sin cuenta): por negocio e IP;
+  - `calendario` (iCal): por enlace;
+  - `publico` (registro, directorio, legales) y `plataforma` (superadmin, antes de
+    validar su token): por IP.
 
 ## Errores
 

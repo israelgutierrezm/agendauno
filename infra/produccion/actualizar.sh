@@ -53,12 +53,12 @@ principal() {
   EN_MARCHA="$(VERSION="$ANTERIOR" $COMPOSE ps -q api 2>/dev/null || true)"
   if [ -n "$EN_MARCHA" ]; then
     echo "==> Punto de corte: mantenimiento y sin tareas en curso"
-    VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan down --retry=60 --secret="$SECRETO"
+    VERSION="$ANTERIOR" $COMPOSE exec -T -u www-data api php artisan down --retry=60 --secret="$SECRETO"
     echo "    esperando a que la cola y el programador terminen lo que están haciendo…"
     VERSION="$ANTERIOR" $COMPOSE stop worker scheduler
     # Si alguna tarea se cortó al vencer la espera, su candado no debe dejarla
     # bloqueada 24 h.
-    VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan schedule:clear-cache >/dev/null
+    VERSION="$ANTERIOR" $COMPOSE exec -T -u www-data api php artisan schedule:clear-cache >/dev/null
 
     echo "==> Respaldando (sin escrituras en curso)"
     if ! respaldar; then
@@ -79,7 +79,7 @@ principal() {
     echo "   (sin cola ni programador). Parte del esquema pudo haber cambiado:"
     echo "   - revisa el error y, si $ANTERIOR funciona con el esquema actual, reábrela:"
     echo "       VERSION=$ANTERIOR $COMPOSE start worker scheduler"
-    echo "       VERSION=$ANTERIOR $COMPOSE exec api php artisan up"
+    echo "       VERSION=$ANTERIOR $COMPOSE exec -u www-data api php artisan up"
     echo "   - si no, restaura los respaldos recién tomados (docs/DESPLIEGUE.md → Restaurar)."
     anotar "$ANTERIOR -> $VERSION (fallida: migración)"
     exit 1
@@ -97,8 +97,8 @@ principal() {
     intentos=$((intentos + 1))
     if [ "$intentos" -ge 30 ]; then
       echo "!! $VERSION no quedó lista en 5 minutos. Sigue en MANTENIMIENTO, sin abrir al público:"
-      $COMPOSE exec -T api php artisan agendauno:verificar-produccion --disponibilidad || true
-      echo "   - corrige lo de arriba y ábrela: $COMPOSE exec api php artisan up"
+      $COMPOSE exec -T -u www-data api php artisan agendauno:verificar-produccion --disponibilidad || true
+      echo "   - corrige lo de arriba y ábrela: $COMPOSE exec -u www-data api php artisan up"
       echo "   - o regresa el código a $ANTERIOR: ./volver.sh $ANTERIOR"
       echo "     (la base no se revierte; si la migración no fuera compatible con $ANTERIOR,"
       echo "     restaura los respaldos recién tomados: docs/DESPLIEGUE.md → Restaurar)."
@@ -109,7 +109,7 @@ principal() {
   done
 
   echo "==> Abriendo $VERSION"
-  $COMPOSE exec -T api php artisan up
+  $COMPOSE exec -T -u www-data api php artisan up
   echo "$VERSION" > .version-actual
   anotar "$ANTERIOR -> $VERSION"
 
@@ -122,7 +122,7 @@ principal() {
   fi
 
   echo "==> Verificación completa de producción"
-  if ! $COMPOSE exec -T api php artisan agendauno:verificar-produccion; then
+  if ! $COMPOSE exec -T -u www-data api php artisan agendauno:verificar-produccion; then
     echo "!! $VERSION está abierta y atiende, pero faltan puntos para operar en producción (arriba)."
     echo "   Corrígelos. Si fueran de esta versión, regresa con: ./volver.sh $ANTERIOR"
     exit 2
@@ -135,14 +135,19 @@ anotar() {
 }
 
 respaldar() {
+  # Los respaldos corren como www-data, igual que los nocturnos del programador: su
+  # carpeta de trabajo debe ser suya (antes, un respaldo hecho a mano con
+  # `exec` sin `-u www-data` la dejaba de root).
+  VERSION="$ANTERIOR" $COMPOSE exec -T api sh -c 'd=storage/app/respaldos-temp; mkdir -p "$d" && chown www-data:www-data "$d" && chmod 700 "$d"' \
+    || return 1
   if [ "${SIN_RESPALDO_PLATAFORMA:-0}" = "1" ]; then
     # Solo la primera vez: la versión en marcha aún no tiene este comando; respalda
     # MySQL con la herramienta del proveedor antes de usar esta opción.
     echo "    (se omite el respaldo de la plataforma: SIN_RESPALDO_PLATAFORMA=1)"
   else
-    VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan agendauno:respaldar-plataforma || return 1
+    VERSION="$ANTERIOR" $COMPOSE exec -T -u www-data api php artisan agendauno:respaldar-plataforma || return 1
   fi
-  VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan agendauno:respaldar-estudios || return 1
+  VERSION="$ANTERIOR" $COMPOSE exec -T -u www-data api php artisan agendauno:respaldar-estudios || return 1
 }
 
 limpiar_senales() {
@@ -154,7 +159,7 @@ limpiar_senales() {
 # Ya abierta: el programador encola el latido cada minuto y el worker lo procesa.
 cola_procesa() {
   intentos=0
-  until $COMPOSE exec -T api php artisan agendauno:latido --verificar=cola --minutos=2 >/dev/null 2>&1; do
+  until $COMPOSE exec -T -u www-data api php artisan agendauno:latido --verificar=cola --minutos=2 >/dev/null 2>&1; do
     intentos=$((intentos + 1))
     [ "$intentos" -ge 18 ] && return 1
     sleep 10
@@ -164,14 +169,14 @@ cola_procesa() {
 reabrir_anterior() {
   echo "   Reabriendo la versión en marcha ($ANTERIOR) sin actualizar."
   VERSION="$ANTERIOR" $COMPOSE start worker scheduler || true
-  VERSION="$ANTERIOR" $COMPOSE exec -T api php artisan up || true
+  VERSION="$ANTERIOR" $COMPOSE exec -T -u www-data api php artisan up || true
 }
 
 # ¿Atiende la versión nueva? Lo mínimo por dentro (base, caché, esquema al día,
 # programador latiendo y worker arrancado, ambos de esta versión) y una petición real
 # por nginx y PHP-FPM, con la galleta que deja pasar el mantenimiento.
 disponible() {
-  $COMPOSE exec -T api php artisan agendauno:verificar-produccion --disponibilidad >/dev/null 2>&1 || return 1
+  $COMPOSE exec -T -u www-data api php artisan agendauno:verificar-produccion --disponibilidad >/dev/null 2>&1 || return 1
   galleta="$(curl -s -o /dev/null -D - -H "Host: $DOMINIO" "http://127.0.0.1:8080/$SECRETO" \
     | tr -d '\r' | sed -n 's/^[Ss]et-[Cc]ookie: *\(laravel_maintenance=[^;]*\).*/\1/p' | head -n 1)"
   [ -n "$galleta" ] || return 1

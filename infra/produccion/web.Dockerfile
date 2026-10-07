@@ -33,3 +33,4 @@ COPY --chmod=0755 infra/produccion/web-mapas.sh /docker-entrypoint.d/40-agendaun
 # El dominio se pone al arrancar (variable DOMINIO), con las plantillas de nginx.
 COPY infra/produccion/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY infra/produccion/nginx-comun.conf /etc/nginx/snippets/agendauno-comun.conf
+COPY infra/produccion/nginx-cabeceras.conf /etc/nginx/snippets/agendauno-cabeceras.conf

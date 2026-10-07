@@ -34,7 +34,9 @@
   configuración.
 - Monitoreo de errores sin datos sensibles: trazas sin argumentos, SQL sin valores y
   correos, llaves, tokens y números largos tachados (ADR 0080).
-- Registro público con verificación por correo (ADR 0028) y reCAPTCHA opcional.
+- Registro público con verificación por correo (ADR 0028) y reCAPTCHA v3, obligatorio
+  en producción (`agendauno:verificar-produccion` lo exige). Las altas que nadie
+  activa se borran solas (ADR 0102).
 - Derechos ARCO y aviso de privacidad versionado con aceptación registrada.
 - HTTPS delante de nginx (certificado comodín) y encabezados de seguridad en nginx
   (`infra/produccion`, `docs/DESPLIEGUE.md`).
