@@ -6,23 +6,26 @@ namespace App\Modules\Tenancy;
 
 /**
  * Tipos de letra que cada usuario puede elegir para el panel (Apariencia). Pocos y
- * conocidos: de Google Fonts con los pesos que usa la app (300 a 700), que el front
- * carga solo si se eligen, y dos del equipo que no se descargan: Segoe UI (la de
- * Windows) y Century Gothic (si el equipo la tiene; si no, se ve la del sistema).
- * Se guarda en la cuenta, como el tema.
+ * conocidos: tres del equipo, que no se descargan (Segoe UI, la predeterminada; la
+ * del sistema operativo, y Century Gothic, que la web solo ofrece si el equipo la
+ * tiene), y tres de Google Fonts con los pesos que usa la app (300 a 700), que el
+ * front carga solo si se eligen. Se guarda en la cuenta, como el tema. La
+ * predeterminada va primero.
  */
 final class CatalogoFuentes
 {
-    public const POR_DEFECTO = 'poppins';
+    public const POR_DEFECTO = 'segoe_ui';
 
     /**
-     * clave => nombre (también la familia en Google Fonts y en CSS).
+     * clave => nombre (también la familia en Google Fonts y en CSS; «Sistema» es la
+     * del sistema operativo: `system-ui`). Quien tenía Inter (se retiró) ve la
+     * predeterminada.
      *
      * @var array<string, string>
      */
     private const FUENTES = [
-        'inter' => 'Inter',
         'segoe_ui' => 'Segoe UI',
+        'sistema' => 'Sistema',
         'open_sans' => 'Open Sans',
         'lato' => 'Lato',
         'poppins' => 'Poppins',

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\CatalogoFuentes;
 use App\Modules\Tenancy\CatalogoTemas;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use Illuminate\Support\Facades\File;
@@ -38,14 +39,21 @@ it('un usuario nuevo ve el tema predeterminado y el catálogo de temas', functio
         ->not->toContain('agendauno_marino', 'agendauno_noche', 'indigo', 'alto_contraste');
     // El oscuro va al final.
     expect(end($claves))->toBe('medianoche');
-    // Con los colores de la página comercial: azul marino, rosa y azul petróleo.
+    // Institucional, con los colores del logo: turquesa, azul claro y rosa.
     expect(collect($data['disponibles'])->firstWhere('clave', 'agendauno_alternativo'))->toMatchArray([
         'nombre' => 'Agenda Uno Alternativo',
         'oscuro' => false,
-        'muestra' => ['barra' => '#182B39', 'acento' => '#007E91', 'fondo' => '#F6F8FC', 'superficie' => '#FFFFFF'],
+        'muestra' => ['barra' => '#00485C', 'acento' => '#007594', 'fondo' => '#F3F8FC', 'superficie' => '#FFFFFF'],
     ]);
     $this->putJson("/api/v1/app/{$e['slug']}/apariencia", ['tema' => 'agendauno_alternativo'], conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.tokens.barra_activo', '#C43B80');
+        ->assertOk()
+        ->assertJsonPath('data.tokens.barra_texto', '#6EBEFA')
+        ->assertJsonPath('data.tokens.barra_activo', '#DC5A96');
+    // Océano: Bondi Blue en la barra; Eden solo en la letra.
+    $this->putJson("/api/v1/app/{$e['slug']}/apariencia", ['tema' => 'oceano'], conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.tokens.barra', '#0799B6')
+        ->assertJsonPath('data.tokens.texto', '#114C5F');
     expect($data['personalizables'])->toBe(['acento', 'barra', 'barra_activo']);
 });
 
@@ -74,15 +82,15 @@ it('los ajustes propios sobrescriben el tema y se pueden restablecer', function 
     $this->putJson("/api/v1/app/{$e['slug']}/apariencia/color", ['token' => 'barra', 'valor' => '#112233'], conBearer($e['bearer']))
         ->assertOk()
         ->assertJsonPath('data.tokens.barra', '#112233')
-        ->assertJsonPath('data.tokens.acento', '#006A89');
+        ->assertJsonPath('data.tokens.acento', '#057389');
 
     // Sin valor, ese color vuelve al del tema.
     $this->putJson("/api/v1/app/{$e['slug']}/apariencia/color", ['token' => 'barra', 'valor' => null], conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.tokens.barra', '#00344D');
+        ->assertOk()->assertJsonPath('data.tokens.barra', '#0799B6');
 
     $this->putJson("/api/v1/app/{$e['slug']}/apariencia/color", ['token' => 'acento', 'valor' => '#123456'], conBearer($e['bearer']))->assertOk();
     $this->deleteJson("/api/v1/app/{$e['slug']}/apariencia/personalizacion", [], conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.tokens.acento', '#006A89');
+        ->assertOk()->assertJsonPath('data.tokens.acento', '#057389');
 });
 
 it('solo se personalizan colores válidos y ya no hay tema de alto contraste', function (): void {
@@ -140,10 +148,11 @@ it('elige su tipo de letra: se guarda en su cuenta, llega con la sesión y cambi
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $base = "/api/v1/app/{$e['slug']}";
 
-    // Predeterminada: Poppins; el catálogo trae las seis.
+    // Predeterminada: Segoe UI, primero en la lista; el catálogo trae las seis.
     $data = $this->getJson("{$base}/apariencia", conBearer($e['bearer']))->assertOk()->json('data');
-    expect($data['actual']['fuente'])->toBe(['clave' => 'poppins', 'nombre' => 'Poppins'])
-        ->and(collect($data['fuentes'])->pluck('nombre')->all())->toBe(['Inter', 'Segoe UI', 'Open Sans', 'Lato', 'Poppins', 'Century Gothic']);
+    expect($data['actual']['fuente'])->toBe(['clave' => 'segoe_ui', 'nombre' => 'Segoe UI'])
+        ->and(collect($data['fuentes'])->pluck('nombre')->all())->toBe(['Segoe UI', 'Sistema', 'Open Sans', 'Lato', 'Poppins', 'Century Gothic'])
+        ->and($data['fuentes'][0]['es_default'])->toBeTrue();
 
     $this->putJson("{$base}/apariencia/fuente", ['fuente' => 'open_sans'], conBearer($e['bearer']))
         ->assertOk()
@@ -159,7 +168,11 @@ it('elige su tipo de letra: se guarda en su cuenta, llega con la sesión y cambi
     // Sin valor, vuelve a la predeterminada; una que no está en la lista no se acepta.
     $this->putJson("{$base}/apariencia/fuente", ['fuente' => null], conBearer($e['bearer']))
         ->assertOk()
-        ->assertJsonPath('data.fuente.clave', 'poppins');
+        ->assertJsonPath('data.fuente.clave', 'segoe_ui');
     $this->putJson("{$base}/apariencia/fuente", ['fuente' => 'comic_sans'], conBearer($e['bearer']))
         ->assertStatus(422);
+    // Inter se retiró: ya no se acepta y quien la tenía ve la predeterminada.
+    $this->putJson("{$base}/apariencia/fuente", ['fuente' => 'inter'], conBearer($e['bearer']))
+        ->assertStatus(422);
+    expect(CatalogoFuentes::resolver('inter'))->toBe(['clave' => 'segoe_ui', 'nombre' => 'Segoe UI']);
 });

@@ -10,10 +10,6 @@ export default {
   oscuro: "Oscuro",
   fuente: "Tipo de letra",
   fuentePredeterminada: "Predeterminada",
-  // Las del equipo (no se descargan): Segoe UI viene con Windows; Century Gothic,
-  // si el equipo la tiene.
-  fuenteWindows: "La de Windows",
-  fuenteEquipo: "Si tu equipo la tiene",
   letra: "Tamaño de letra",
   letraAyuda: "Sólo en este navegador.",
   densidades: {

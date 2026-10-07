@@ -4,7 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import PanelLateral from "@/components/PanelLateral.vue";
 import { mensajeDeError } from "@/lib/api";
-import { cargarFuente, FUENTES_DEL_SISTEMA, pilaDeFuente } from "@/lib/fuentes";
+import { cargarFuente, fuenteDisponible, pilaDeFuente } from "@/lib/fuentes";
 import { useAparienciaStore } from "@/stores/apariencia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useTemaStore } from "@/stores/tema";
@@ -66,7 +66,19 @@ function personalizar(token: string, evento: Event): void {
   void guardar(() => apariencia.personalizar(base.value, token, valor));
 }
 const fuenteActual = computed(
-  () => apariencia.actual?.fuente?.clave ?? "poppins",
+  () => apariencia.actual?.fuente?.clave ?? "segoe_ui",
+);
+// La predeterminada primero. Una del equipo que este no tiene (Century Gothic) no se
+// ofrece, salvo que sea la elegida.
+const fuentesVisibles = computed(() =>
+  [...apariencia.fuentes]
+    .sort((a, b) => Number(b.es_default) - Number(a.es_default))
+    .filter(
+      (f) =>
+        f.es_default ||
+        f.clave === fuenteActual.value ||
+        fuenteDisponible(f.nombre),
+    ),
 );
 function elegirFuente(clave: string): void {
   if (clave !== fuenteActual.value) {
@@ -172,7 +184,7 @@ function restablecer(): void {
           :aria-label="$t('apariencia.fuente')"
         >
           <button
-            v-for="f in apariencia.fuentes"
+            v-for="f in fuentesVisibles"
             :key="f.clave"
             type="button"
             role="radio"
@@ -189,11 +201,7 @@ function restablecer(): void {
               class="block text-xs"
               :style="{ color: 'var(--texto-suave)' }"
               >{{
-                f.es_default
-                  ? $t("apariencia.fuentePredeterminada")
-                  : FUENTES_DEL_SISTEMA.has(f.nombre)
-                    ? $t(FUENTES_DEL_SISTEMA.get(f.nombre) ?? "")
-                    : "Aa 123"
+                f.es_default ? $t("apariencia.fuentePredeterminada") : "Aa 123"
               }}</span
             >
           </button>

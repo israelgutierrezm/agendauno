@@ -43,30 +43,37 @@ final class CatalogoTemas
                 'borde' => '#E6E9F0', 'texto' => '#1E2A3B', 'texto_suave' => '#6B7385',
             ],
         ],
-        // Los colores de la página comercial (agendauno.mx): barra azul marino, lo
-        // activo en el rosa de sus botones y el azul petróleo en las acciones.
+        // Institucional, con los tres colores del logo: la barra en su turquesa
+        // (#0096BE) profundo, el menú en su azul claro (#6EBEFA) y lo activo en su rosa
+        // (#DC5A96, con letra oscura: la blanca no se lee). Botones y enlaces en el
+        // turquesa un poco más profundo; el resto blanco sobre un azul muy claro.
         'agendauno_alternativo' => [
             'nombre' => 'Agenda Uno Alternativo',
             'oscuro' => false,
             'tokens' => [
-                'barra' => '#182B39', 'barra_suave' => '#20384A', 'barra_texto' => '#B9C7CC',
-                'barra_activo' => '#C43B80', 'barra_activo_texto' => '#FFFFFF',
+                'barra' => '#00485C', 'barra_suave' => '#003C4D', 'barra_texto' => '#6EBEFA',
+                'barra_activo' => '#DC5A96', 'barra_activo_texto' => '#071A22',
                 'barra_borde' => 'rgb(255 255 255 / 10%)', 'barra_titulo' => '#FFFFFF',
-                'acento' => '#007E91', 'acento_texto' => '#FFFFFF',
-                'fondo' => '#F6F8FC', 'superficie' => '#FFFFFF', 'superficie_2' => '#E9EDF5',
-                'borde' => '#DCE1DE', 'texto' => '#182B39', 'texto_suave' => '#59666B',
+                'acento' => '#007594', 'acento_texto' => '#FFFFFF',
+                'fondo' => '#F3F8FC', 'superficie' => '#FFFFFF', 'superficie_2' => '#E9F2F8',
+                'borde' => '#D5E3EC', 'texto' => '#0B2733', 'texto_suave' => '#4E6672',
             ],
         ],
+        // Paleta «ocean»: Bondi Blue (#0799B6) es el principal y va tal cual en la
+        // barra; Eden (#114C5F) solo en letras e íconos, nunca de fondo (en la barra,
+        // uno más oscuro: Eden no se lee sobre Bondi). Lo activo en Janna (#F2E6CF),
+        // la página en un crema de Janna y los fondos suaves en Sinbad (#9CD2D3).
+        // Botones en un Bondi un poco más profundo: con letra blanca, el puro no se lee.
         'oceano' => [
             'nombre' => 'Océano',
             'oscuro' => false,
             'tokens' => [
-                'barra' => '#00344D', 'barra_suave' => '#00527C', 'barra_texto' => '#B8DCEC',
-                'barra_activo' => '#0077B6', 'barra_activo_texto' => '#FFFFFF',
-                'barra_borde' => 'rgb(255 255 255 / 10%)', 'barra_titulo' => '#FFFFFF',
-                'acento' => '#006A89', 'acento_texto' => '#FFFFFF',
-                'fondo' => '#F2F6F9', 'superficie' => '#FFFFFF', 'superficie_2' => '#E3EDF3',
-                'borde' => '#DCE6EC', 'texto' => '#0F2233', 'texto_suave' => '#5A7382',
+                'barra' => '#0799B6', 'barra_suave' => '#39ADC5', 'barra_texto' => '#08222B',
+                'barra_activo' => '#F2E6CF', 'barra_activo_texto' => '#114C5F',
+                'barra_borde' => '#068AA4', 'barra_titulo' => '#05171C',
+                'acento' => '#057389', 'acento_texto' => '#FFFFFF',
+                'fondo' => '#FAF5EC', 'superficie' => '#FFFFFF', 'superficie_2' => '#DCEFF0',
+                'borde' => '#CEE6E6', 'texto' => '#114C5F', 'texto_suave' => '#3C6B7A',
             ],
         ],
         'esmeralda' => [

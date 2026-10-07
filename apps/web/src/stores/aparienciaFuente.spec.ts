@@ -78,4 +78,53 @@ describe("tipo de letra de la apariencia", () => {
     expect(pila).toContain('"Century Gothic", "URW Gothic"');
     expect(document.head.querySelector("link[id^='fuente-']")).toBeNull();
   });
+
+  it("Segoe UI (la predeterminada) y la del sistema no se descargan", () => {
+    const store = useAparienciaStore();
+    store.activar(apariencia("Segoe UI"));
+    expect(
+      document.documentElement.style.getPropertyValue("--fuente"),
+    ).toContain('"Segoe UI"');
+    store.activar(apariencia("Sistema"));
+    const pila = document.documentElement.style.getPropertyValue("--fuente");
+    expect(pila.startsWith("system-ui")).toBe(true);
+    expect(pila).not.toContain('"Sistema"');
+    expect(document.head.querySelector("link[id^='fuente-']")).toBeNull();
+  });
+});
+
+describe("qué letras se ofrecen en este equipo", () => {
+  it("una del equipo se ofrece solo si está instalada; las demás, siempre", async () => {
+    vi.resetModules();
+    // Con la letra instalada, el texto mide distinto que con las genéricas.
+    const anchos: Record<string, number> = { '"Century Gothic"': 120 };
+    vi.stubGlobal(
+      "OffscreenCanvas",
+      class {
+        getContext() {
+          const lienzo = {
+            font: "",
+            measureText: () => ({
+              width:
+                Object.entries(anchos).find(([f]) =>
+                  lienzo.font.includes(f),
+                )?.[1] ?? 100,
+            }),
+          };
+          return lienzo;
+        }
+      },
+    );
+    const { fuenteDisponible } = await import("@/lib/fuentes");
+    expect(fuenteDisponible("Century Gothic")).toBe(true);
+    expect(fuenteDisponible("Lato")).toBe(true);
+    expect(fuenteDisponible("Sistema")).toBe(true);
+
+    vi.resetModules();
+    delete anchos['"Century Gothic"'];
+    const otra = await import("@/lib/fuentes");
+    expect(otra.fuenteDisponible("Century Gothic")).toBe(false);
+    expect(otra.fuenteDisponible("Segoe UI")).toBe(true);
+    vi.unstubAllGlobals();
+  });
 });
