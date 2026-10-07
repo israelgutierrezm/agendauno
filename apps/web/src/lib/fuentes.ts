@@ -6,10 +6,19 @@
 export const FUENTE_PREDETERMINADA = "Poppins";
 
 /**
- * Las del sistema: no se descargan (Segoe UI viene con Windows; en otros equipos se
- * ve la letra del sistema).
+ * Las del equipo: no se descargan. Segoe UI viene con Windows; Century Gothic, si el
+ * equipo la tiene (Windows con Office, por ejemplo). Si no, se ve la parecida que
+ * haya o la del sistema. El valor es la llave del texto que lo explica en Apariencia.
  */
-export const FUENTES_DEL_SISTEMA = new Set(["Segoe UI"]);
+export const FUENTES_DEL_SISTEMA = new Map<string, string>([
+  ["Segoe UI", "apariencia.fuenteWindows"],
+  ["Century Gothic", "apariencia.fuenteEquipo"],
+]);
+
+/** Parecidas, por si el equipo no tiene la elegida. */
+const PARECIDAS: Record<string, string> = {
+  "Century Gothic": '"URW Gothic", "Avant Garde", Futura, ',
+};
 
 /** Agrega la hoja de Google Fonts de esa familia (una sola vez). */
 export function cargarFuente(familia: string): void {
@@ -33,5 +42,5 @@ export function cargarFuente(familia: string): void {
 
 /** El valor de `font-family` con esa familia primero y las del sistema de respaldo. */
 export function pilaDeFuente(familia: string): string {
-  return `"${familia}", ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
+  return `"${familia}", ${PARECIDAS[familia] ?? ""}ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
 }

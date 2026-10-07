@@ -355,8 +355,8 @@ onMounted(() => {
             class="tu-barra-division"
             aria-hidden="true"
           />
-          <!-- Cambiar de rol: solo si puede entrar con más de uno; el punto que late
-               avisa que tiene otro rol con el cual entrar. -->
+          <!-- Cambiar de rol: solo si puede entrar con más de uno; las flechas se
+               mueven para avisar que tiene otro rol con el cual entrar. -->
           <button
             v-if="sesion.tieneVariosRoles"
             type="button"
@@ -369,11 +369,7 @@ onMounted(() => {
               menuPerfil = false;
             "
           >
-            <IconoNav nombre="intercambio" :tam="18" />
-            <span
-              class="tu-rol-punto tu-rol-punto-esquina"
-              aria-hidden="true"
-            />
+            <IconoNav nombre="intercambio" :tam="18" class="tu-rol-flechas" />
           </button>
 
           <!-- Apariencia: tema y colores propios (panel lateral) -->
@@ -646,8 +642,35 @@ a.tu-miga:hover {
     display: none;
   }
 }
-/* «Cambiar de rol»: un punto que late, siempre, para que se note que se puede entrar
-   con otro rol (en la barra y en el menú lateral del teléfono). */
+/* «Cambiar de rol»: sus flechas van y vienen, siempre, para que se note que se puede
+   entrar con otro rol (en la barra y en el menú lateral). En el teléfono, el botón
+   del menú lleva un punto que late (ahí está «Cambiar de rol»). */
+.tu-rol-flechas path:nth-of-type(-n + 2) {
+  animation: tu-rol-flecha-izq 2.4s ease-in-out infinite;
+}
+.tu-rol-flechas path:nth-of-type(n + 3) {
+  animation: tu-rol-flecha-der 2.4s ease-in-out infinite;
+}
+@keyframes tu-rol-flecha-izq {
+  0%,
+  55%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+}
+@keyframes tu-rol-flecha-der {
+  0%,
+  55%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(3px);
+  }
+}
 .tu-rol-punto {
   position: relative;
   display: inline-block;
@@ -683,15 +706,10 @@ a.tu-miga:hover {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .tu-rol-punto::after {
+  .tu-rol-punto::after,
+  .tu-rol-flechas path {
     animation: none;
   }
-}
-/* En el menú lateral (fondo de la barra, oscuro en casi todos los temas) el acento
-   apenas contrasta: el punto toma el color del texto de la barra. */
-.tu-side-link .tu-rol-punto,
-.tu-side-link .tu-rol-punto::after {
-  background: currentColor;
 }
 /* Alto contraste del sistema: los fondos se quitan; el punto se pinta como texto. */
 @media (forced-colors: active) {

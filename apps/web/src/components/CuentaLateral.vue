@@ -52,10 +52,9 @@ const pantalla = usePantallaCompleta();
       class="tu-side-link w-full"
       @click="emit('roles')"
     >
-      <IconoNav nombre="intercambio" :tam="18" />
+      <!-- Tiene otro rol con el cual entrar: las flechas se mueven (como en la barra). -->
+      <IconoNav nombre="intercambio" :tam="18" class="tu-rol-flechas" />
       <span>{{ $t("operacion.rolActivo.cambiar") }}</span>
-      <!-- Tiene otro rol con el cual entrar (el mismo punto que en la barra). -->
-      <span class="tu-rol-punto ml-auto" aria-hidden="true" />
     </button>
     <button
       type="button"

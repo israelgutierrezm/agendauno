@@ -7,8 +7,9 @@ namespace App\Modules\Tenancy;
 /**
  * Tipos de letra que cada usuario puede elegir para el panel (Apariencia). Pocos y
  * conocidos: de Google Fonts con los pesos que usa la app (300 a 700), que el front
- * carga solo si se eligen, y Segoe UI, la del sistema en Windows (no se descarga;
- * en otros equipos se ve la del sistema). Se guarda en la cuenta, como el tema.
+ * carga solo si se eligen, y dos del equipo que no se descargan: Segoe UI (la de
+ * Windows) y Century Gothic (si el equipo la tiene; si no, se ve la del sistema).
+ * Se guarda en la cuenta, como el tema.
  */
 final class CatalogoFuentes
 {
@@ -25,7 +26,7 @@ final class CatalogoFuentes
         'open_sans' => 'Open Sans',
         'lato' => 'Lato',
         'poppins' => 'Poppins',
-        'montserrat' => 'Montserrat',
+        'century_gothic' => 'Century Gothic',
     ];
 
     public static function existe(string $clave): bool

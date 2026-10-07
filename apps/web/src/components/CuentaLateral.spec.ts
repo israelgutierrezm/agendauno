@@ -54,19 +54,19 @@ describe("cuenta al pie del menú lateral", () => {
     );
   });
 
-  it("con un solo rol no ofrece cambiarlo ni muestra el punto", () => {
+  it("con un solo rol no ofrece cambiarlo", () => {
     sesion.tieneVariosRoles = false;
     const w = mount(CuentaLateral, { global: { plugins: [i18n] } });
     expect(w.text()).not.toContain("Cambiar");
-    expect(w.find(".tu-rol-punto").exists()).toBe(false);
+    expect(w.find(".tu-rol-flechas").exists()).toBe(false);
     sesion.tieneVariosRoles = true;
   });
 
-  it("con varios roles, el punto acompaña a «Cambiar de rol»", () => {
+  it("con varios roles, las flechas de «Cambiar de rol» se mueven", () => {
     const w = mount(CuentaLateral, { global: { plugins: [i18n] } });
     const boton = w
       .findAll("button")
       .find((b) => b.text().includes("Cambiar"))!;
-    expect(boton.find(".tu-rol-punto").exists()).toBe(true);
+    expect(boton.find(".tu-rol-flechas").exists()).toBe(true);
   });
 });

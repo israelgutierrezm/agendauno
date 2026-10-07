@@ -192,7 +192,7 @@ function restablecer(): void {
                 f.es_default
                   ? $t("apariencia.fuentePredeterminada")
                   : FUENTES_DEL_SISTEMA.has(f.nombre)
-                    ? $t("apariencia.fuenteSistema")
+                    ? $t(FUENTES_DEL_SISTEMA.get(f.nombre) ?? "")
                     : "Aa 123"
               }}</span
             >

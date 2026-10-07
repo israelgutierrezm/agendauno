@@ -143,7 +143,7 @@ it('elige su tipo de letra: se guarda en su cuenta, llega con la sesión y cambi
     // Predeterminada: Poppins; el catálogo trae las seis.
     $data = $this->getJson("{$base}/apariencia", conBearer($e['bearer']))->assertOk()->json('data');
     expect($data['actual']['fuente'])->toBe(['clave' => 'poppins', 'nombre' => 'Poppins'])
-        ->and(collect($data['fuentes'])->pluck('nombre')->all())->toBe(['Inter', 'Segoe UI', 'Open Sans', 'Lato', 'Poppins', 'Montserrat']);
+        ->and(collect($data['fuentes'])->pluck('nombre')->all())->toBe(['Inter', 'Segoe UI', 'Open Sans', 'Lato', 'Poppins', 'Century Gothic']);
 
     $this->putJson("{$base}/apariencia/fuente", ['fuente' => 'open_sans'], conBearer($e['bearer']))
         ->assertOk()
