@@ -35,6 +35,13 @@ class CatalogoTenantController
     /** Servicios que puede incluir un paquete. */
     private const MAX_INCLUIDOS = 20;
 
+    /**
+     * Límite técnico del precio en unidades menores (cabe en BIGINT y en un Number de
+     * JS): no es un tope de negocio, para que monedas como COP o ARS den de alta
+     * servicios de millones.
+     */
+    private const MAX_PRECIO_MINOR = 999_999_999_999;
+
     public function programas(): JsonResponse
     {
         $programas = ProgramaTenant::query()->with('actividades.ofertas')->orderBy('id')->get();
@@ -107,7 +114,7 @@ class CatalogoTenantController
             'items' => ['required', 'array', 'min:1', 'max:30'],
             'items.*.nombre' => ['required', 'string', 'max:120'],
             'items.*.duracion_minutos' => ['required', 'integer', 'min:5', 'max:600'],
-            'items.*.precio_minor' => [$esCitas ? 'required' : 'prohibited', 'integer', 'min:0', 'max:100000000'],
+            'items.*.precio_minor' => [$esCitas ? 'required' : 'prohibited', 'integer', 'min:0', 'max:'.self::MAX_PRECIO_MINOR],
             'items.*.capacidad' => [$esCitas ? 'prohibited' : 'required', 'integer', 'min:1', 'max:500'],
         ]);
         $items = array_values($validado['items']);
@@ -134,7 +141,7 @@ class CatalogoTenantController
             'lugares' => ['nullable', 'integer', 'min:0', 'max:1000'],
             // Política de reserva (citas): entitlement (default) o pago-para-reservar.
             'politica_reserva' => ['nullable', Rule::enum(PoliticaReservaTenant::class)],
-            'precio_clase_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
+            'precio_clase_minor' => ['nullable', 'integer', 'min:0', 'max:'.self::MAX_PRECIO_MINOR],
             // Duración del servicio como cita (minutos); solo la usan las ofertas de cita.
             'duracion_minutos' => ['nullable', 'integer', 'min:5', 'max:1440'],
             // Preparación antes y limpieza después: ocupan la agenda, no se le cobran
@@ -176,7 +183,7 @@ class CatalogoTenantController
         $validado = $request->validate([
             'lugares' => ['required', 'integer', 'min:0', 'max:1000'],
             'descripcion' => ['nullable', 'string', 'max:'.self::MAX_DESCRIPCION],
-            'precio_clase_minor' => ['nullable', 'integer', 'min:0', 'max:100000000'],
+            'precio_clase_minor' => ['nullable', 'integer', 'min:0', 'max:'.self::MAX_PRECIO_MINOR],
             'politica_reserva' => ['nullable', Rule::enum(PoliticaReservaTenant::class)],
             'duracion_minutos' => ['nullable', 'integer', 'min:5', 'max:1440'],
             'preparacion_min' => ['nullable', 'integer', 'min:0', 'max:240'],

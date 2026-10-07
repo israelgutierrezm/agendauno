@@ -6,7 +6,9 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\GenerarCargoRenta;
 use App\Modules\Tenancy\Application\MedirUsoSaas;
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Models\CargoRenta;
+use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FacturaPlataforma;
 use Illuminate\Http\JsonResponse;
@@ -68,6 +70,8 @@ class FacturacionController
             'moneda' => $estudio->moneda,
             'cuota_fija_minor' => $estudio->cuota_fija_minor,
             'trial_termina_en' => $estudio->trial_termina_en?->toDateString(),
+            // ¿Puede recibir la factura (CFDI) de la renta? Si no, se ofrece el recibo sin valor fiscal.
+            'factura_renta_posible' => $this->facturaRentaPosible(),
             'actual' => $this->estimacion($estudio),
             'cargos' => $cargos->map(function (CargoRenta $c) use ($facturas): array {
                 $factura = $facturas->get($c->getKey());
@@ -97,6 +101,17 @@ class FacturacionController
                 ];
             })->all(),
         ]]);
+    }
+
+    /**
+     * La factura de la renta se emite con el RFC del negocio: la recibe quien ya lo
+     * capturó o quien puede capturarlo (pesos mexicanos y en México, ADR 0099).
+     */
+    private function facturaRentaPosible(): bool
+    {
+        $rfc = DatosFiscalesTenant::query()->value('rfc');
+
+        return (is_string($rfc) && $rfc !== '') || app(RegionNegocioTenant::class)->factura();
     }
 
     /**

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\EmitirFacturaPlataforma;
+use App\Modules\Tenancy\Application\ReciboRentaPdf;
+use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\EstadoFactura;
 use App\Modules\Tenancy\Exceptions\DatosFiscalesRequeridos;
 use App\Modules\Tenancy\Facturacion\ClienteFacturacion;
@@ -23,6 +25,7 @@ use Symfony\Component\HttpFoundation\Response;
  * Facturación (CFDI) de la RENTA del SaaS al dueño: emite el CFDI de un cargo pagado y
  * entrega el PDF/XML. AgendaUno es el emisor (llave de plataforma) y el estudio el
  * receptor (sus datos fiscales tenant-locales, que ya usa para facturar a sus alumnos).
+ * Quien no puede recibir la factura descarga un recibo sin valor fiscal.
  */
 class FacturaRentaController
 {
@@ -90,6 +93,27 @@ class FacturaRentaController
         return response($contenido, 200, [
             'Content-Type' => $tipo,
             'Content-Disposition' => "attachment; filename=\"{$nombre}\"",
+        ]);
+    }
+
+    /**
+     * Recibo sin valor fiscal (PDF) de un cargo pagado: el comprobante de quien no puede
+     * recibir la factura de la renta (otra moneda u otro país, ADR 0099).
+     */
+    public function recibo(Request $request, ReciboRentaPdf $recibo): Response
+    {
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+
+        $cargo = CargoRenta::query()
+            ->where('estudio_id', $estudio->getKey())
+            ->where('ulid', (string) $request->route('cargo'))
+            ->firstOrFail();
+        abort_unless($cargo->estado === EstadoCargoRenta::Pagado, 409, 'Solo hay recibo de un cargo pagado.');
+
+        return response($recibo->generar($cargo, $estudio), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"recibo-agendauno-{$cargo->periodo}.pdf\"",
         ]);
     }
 

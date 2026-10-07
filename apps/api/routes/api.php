@@ -429,6 +429,8 @@ Route::prefix('v1')->group(function (): void {
             // entrega el PDF/XML (AgendaUno emisor, el estudio receptor).
             Route::post('/renta/cargos/{cargo}/factura', [FacturaRentaController::class, 'emitir'])->middleware('puede:facturacion.ver')->name('renta.factura');
             Route::get('/renta/facturas/{factura}/{formato}', [FacturaRentaController::class, 'descargar'])->middleware('puede:facturacion.ver')->name('renta.factura.descargar');
+            // Recibo sin valor fiscal de un cargo pagado (quien no puede recibir la factura).
+            Route::get('/renta/cargos/{cargo}/recibo', [FacturaRentaController::class, 'recibo'])->middleware('puede:facturacion.ver')->name('renta.recibo');
 
             // Bitacora de auditoria (append-only): operaciones sensibles del estudio.
             Route::get('/auditorias', [AuditoriaController::class, 'index'])->middleware('puede:auditoria.ver')->name('auditorias.index');

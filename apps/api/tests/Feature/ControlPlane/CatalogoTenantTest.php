@@ -54,3 +54,32 @@ it('un instructor puede ver el catálogo pero no gestionarlo (RBAC tenant-local)
     $this->getJson("/api/v1/app/{$e['slug']}/programas", conBearer($coach))->assertOk();
     $this->postJson("/api/v1/app/{$e['slug']}/programas", ['nombre' => 'Nuevo'], conBearer($coach))->assertStatus(403);
 });
+
+it('el precio de un servicio no tiene tope de negocio: 1,200,000.00 se guarda (COP, ARS)', function (): void {
+    $e = estudioConSesion('barberia-precio', 'dueno@barberia-precio.mx');
+    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $millon200 = 120_000_000;
+
+    // Alta en una línea (Catálogo y configuración inicial).
+    $this->postJson("/api/v1/app/{$e['slug']}/ofertas/rapidas", ['items' => [
+        ['nombre' => 'Tratamiento completo', 'duracion_minutos' => 90, 'precio_minor' => $millon200],
+    ]], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.0.precio_minor', $millon200);
+
+    // Alta y edición completas.
+    $programa = (string) $this->postJson("/api/v1/app/{$e['slug']}/programas", ['nombre' => 'Spa'], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+    $actividad = (string) $this->postJson("/api/v1/app/{$e['slug']}/programas/{$programa}/actividades", ['nombre' => 'Faciales'], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+    $oferta = (string) $this->postJson("/api/v1/app/{$e['slug']}/actividades/{$actividad}/ofertas", [
+        'nombre' => 'Facial premium', 'modalidad' => 'individual', 'precio_clase_minor' => $millon200,
+    ], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.precio_clase_minor', $millon200)->json('data.id');
+
+    $this->putJson("/api/v1/app/{$e['slug']}/ofertas/{$oferta}", [
+        'lugares' => 0, 'precio_clase_minor' => 250_000_000,
+    ], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.precio_clase_minor', 250_000_000);
+
+    // Solo queda el límite técnico (BIGINT y Number de JS).
+    $this->putJson("/api/v1/app/{$e['slug']}/ofertas/{$oferta}", [
+        'lugares' => 0, 'precio_clase_minor' => 1_000_000_000_000,
+    ], conBearer($e['bearer']))->assertStatus(422)->assertJsonValidationErrors(['precio_clase_minor'], 'meta.errors');
+});

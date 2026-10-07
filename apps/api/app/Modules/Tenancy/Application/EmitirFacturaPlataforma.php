@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Facturacion\TimbradoFallido;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\FacturaPlataforma;
+use App\Modules\Tenancy\ModoCobroSaas;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -20,15 +21,14 @@ use Illuminate\Support\Facades\DB;
  * FacturAPI de plataforma) y el estudio el receptor. Reusa {@see ClienteFacturacion}.
  * A diferencia del CFDI tenant (precio + IVA por encima), aquí el `monto_minor` del
  * cargo es el TOTAL ya cobrado (IVA incluido): se desglosa hacia atrás para que el CFDI
- * cuadre exactamente con lo pagado. Idempotente: un CFDI por cargo (unique
- * cargo_renta_id); si ya está timbrado, lo devuelve sin volver a timbrar.
+ * cuadre exactamente con lo pagado. La tasa de IVA es la del desglose del cargo (la
+ * misma con que {@see CalcularRentaSaas} lo cobró). Idempotente: un CFDI por cargo
+ * (unique cargo_renta_id); si ya está timbrado, lo devuelve sin volver a timbrar.
  */
 class EmitirFacturaPlataforma
 {
-    /** IVA estándar (16%): factor 1.16 = 29/25 para desglose entero exacto. */
-    private const IVA_NUM = 25;
-
-    private const IVA_DEN = 29;
+    /** IVA cuando el cargo no trae su tasa (cargos anteriores) o es cuota fija. */
+    private const IVA_POR_OMISION = 16;
 
     public function __construct(private readonly ClienteFacturacion $cliente) {}
 
@@ -47,12 +47,13 @@ class EmitirFacturaPlataforma
         }
 
         // El monto del cargo es el TOTAL (IVA incluido); se desglosa hacia atrás.
+        $iva = self::ivaPorcentaje($cargo);
         $total = $cargo->monto_minor;
-        $subtotal = intdiv($total * self::IVA_NUM, self::IVA_DEN);
+        $subtotal = intdiv($total * 100, 100 + $iva);
         $impuesto = $total - $subtotal;
 
         $llave = (string) (ConfiguracionPlataforma::llaveFacturapi() ?? '');
-        $cuerpo = $this->armarCuerpo($cargo, $receptor);
+        $cuerpo = $this->armarCuerpo($cargo, $receptor, $iva);
 
         return DB::transaction(function () use ($cargo, $receptor, $subtotal, $impuesto, $total, $llave, $cuerpo): FacturaPlataforma {
             $comun = [
@@ -101,7 +102,7 @@ class EmitirFacturaPlataforma
      * @param  array{nombre: string, rfc: string, email?: string|null, codigo_postal: string, regimen_fiscal?: string|null}  $receptor
      * @return array<string, mixed>
      */
-    private function armarCuerpo(CargoRenta $cargo, array $receptor): array
+    private function armarCuerpo(CargoRenta $cargo, array $receptor, int $iva): array
     {
         return [
             'customer' => [
@@ -120,12 +121,27 @@ class EmitirFacturaPlataforma
                     // El precio es IVA incluido: FacturAPI extrae el impuesto para cuadrar con lo cobrado.
                     'price' => $cargo->monto_minor / 100,
                     'tax_included' => true,
-                    'taxes' => [['type' => 'IVA', 'rate' => 0.16]],
+                    'taxes' => [['type' => 'IVA', 'rate' => $iva / 100]],
                 ],
             ]],
             'use' => (string) config('agendauno.facturapi.renta.uso_cfdi'),
             'payment_form' => (string) config('agendauno.facturapi.renta.forma_pago'),
             'currency' => $cargo->moneda,
         ];
+    }
+
+    /**
+     * Tasa de IVA (en %) con que se cobró el cargo: `desglose.iva_porcentaje`. La cuota
+     * fija se pacta con IVA incluido y su desglose no lo separa (0), así que se factura
+     * con la tasa por omisión, como siempre.
+     */
+    public static function ivaPorcentaje(CargoRenta $cargo): int
+    {
+        $porcentaje = is_array($cargo->desglose) ? ($cargo->desglose['iva_porcentaje'] ?? null) : null;
+        if ($cargo->modo_cobro === ModoCobroSaas::Fijo || ! is_numeric($porcentaje)) {
+            return self::IVA_POR_OMISION;
+        }
+
+        return max(0, min(100, (int) $porcentaje));
     }
 }
