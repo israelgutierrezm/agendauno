@@ -61,6 +61,8 @@ class UsuariosTenantController
             ->orderBy('name')
             ->get(['id', 'ulid', 'name', 'nombre', 'primer_apellido', 'foto_ruta']);
 
+        $sucursales = $this->sucursalesDe(array_map('intval', $instructores->modelKeys()));
+
         // `?resumen=1` (tarjetas del equipo): su agenda de la semana, sus sedes y, para
         // quien ve a los clientes, sus reseñas. Nada de contacto: eso es privado.
         $resumenes = [];
@@ -79,9 +81,41 @@ class UsuariosTenantController
                 // Para ubicarlo (tarjetas): primer nombre + apellido paterno y foto.
                 'nombre_corto' => $u->nombreCorto(),
                 'foto_url' => $u->fotoUrl(),
+                // Dónde atiende (ulid de cada sucursal): la agenda de una sucursal muestra
+                // solo a los suyos. Vacío = no tiene sucursal propia (aparece en todas).
+                'sucursales' => $sucursales[$u->getKey()] ?? [],
                 ...(isset($resumenes[$u->getKey()]) ? ['resumen' => $resumenes[$u->getKey()]] : []),
             ])->all(),
         ]);
+    }
+
+    /**
+     * Las sucursales donde atiende cada profesional: las que tiene asignadas (puede
+     * ser más de una) y aquellas donde tiene horario de atención.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, list<string>>
+     */
+    private function sucursalesDe(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $sucursales = [];
+        $agregar = static function (int $usuario, ?string $sucursal) use (&$sucursales): void {
+            if (is_string($sucursal) && ! in_array($sucursal, $sucursales[$usuario] ?? [], true)) {
+                $sucursales[$usuario][] = $sucursal;
+            }
+        };
+        foreach (AsignacionPersonalTenant::query()->whereIn('usuario_id', $ids)->with('sucursal:id,ulid')->get() as $asignacion) {
+            $agregar((int) $asignacion->usuario_id, $asignacion->sucursal?->ulid);
+        }
+        foreach (HorarioAtencionTenant::query()->whereIn('instructor_id', $ids)->whereNotNull('sucursal_id')->with('sucursal:id,ulid')->get() as $horario) {
+            $agregar((int) $horario->instructor_id, $horario->sucursal?->ulid);
+        }
+
+        return $sucursales;
     }
 
     /**

@@ -36,6 +36,8 @@ import {
   type SesionAgenda,
   type BloqueoAgenda,
   type VentanaAtencion,
+  profesionalesDeSucursal,
+  type ProfesionalAgenda,
 } from "@/lib/agenda";
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
@@ -157,7 +159,8 @@ const CANALES = [
 const ofertas = ref<Oferta[]>([]);
 const sucursales = ref<Sucursal[]>([]);
 const sesiones = ref<Sesion[]>([]);
-const instructores = ref<{ id: string; nombre: string }[]>([]);
+// Profesionales con las sucursales donde atienden (vacío = no tienen sucursal propia).
+const instructores = ref<ProfesionalAgenda[]>([]);
 const recursos = ref<Recurso[]>([]);
 // Horario de atención de cada profesional (sombrea lo que queda fuera en citas).
 const ventanas = ref<VentanaAtencion[]>([]);
@@ -580,7 +583,7 @@ async function cargarReferencias(): Promise<void> {
   // Cada lista por separado: si una falla, las demás y la agenda siguen.
   const tareas: Promise<unknown>[] = [
     // Profesionales (id + nombre) para filtrar y para las columnas por profesional.
-    pedir<{ id: string; nombre: string }[]>("/instructores").then((d) => {
+    pedir<ProfesionalAgenda[]>("/instructores").then((d) => {
       instructores.value = d;
     }),
   ];
@@ -843,11 +846,36 @@ const leyenda = computed(() => {
       ...tonoServicio(o.id, catalogo.value),
     }));
 });
+// Con una sucursal elegida, solo quienes atienden ahí (uno puede atender en varias).
+// Quien no tiene sucursal propia aparece en todas, y quien ya tiene algo ese día en
+// esa sucursal también: ninguna cita se queda sin su columna.
+const instructoresDeSucursal = computed(() =>
+  profesionalesDeSucursal(
+    instructores.value,
+    sucursalFiltro.value,
+    new Set(
+      sesionesVisibles.value
+        .map((s) => s.instructor_id)
+        .filter((id): id is string => id !== null),
+    ),
+  ),
+);
 const profesionalesVisibles = computed(() =>
   instructorFiltro.value === ""
-    ? instructores.value
-    : instructores.value.filter((i) => i.id === instructorFiltro.value),
+    ? instructoresDeSucursal.value
+    : instructoresDeSucursal.value.filter(
+        (i) => i.id === instructorFiltro.value,
+      ),
 );
+// Al cambiar de sucursal, si el profesional elegido no atiende ahí, se ven todos.
+watch(instructoresDeSucursal, (lista) => {
+  if (
+    instructorFiltro.value !== "" &&
+    !lista.some((i) => i.id === instructorFiltro.value)
+  ) {
+    instructorFiltro.value = "";
+  }
+});
 // La marca «por cobrar» de una cita: el símbolo de la moneda del negocio.
 const simboloCobro = computed(() => simboloMoneda(sesion.moneda, sesion.pais));
 function dineroMx(minor: number): string {
@@ -1998,7 +2026,11 @@ onMounted(async () => {
                 })
               }}
             </option>
-            <option v-for="i in instructores" :key="i.id" :value="i.id">
+            <option
+              v-for="i in instructoresDeSucursal"
+              :key="i.id"
+              :value="i.id"
+            >
               {{ i.nombre }}
             </option>
           </select>

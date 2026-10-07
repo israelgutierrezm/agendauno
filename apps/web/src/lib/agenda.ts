@@ -450,3 +450,32 @@ export function kpisClases(
     libresPorLlenar: libres,
   };
 }
+
+/** Un profesional con las sucursales donde atiende (vacío = no tiene sucursal propia). */
+export interface ProfesionalAgenda {
+  id: string;
+  nombre: string;
+  sucursales?: string[];
+}
+
+/**
+ * Los profesionales de la agenda de una sucursal: quienes atienden ahí (uno puede
+ * atender en varias). Quien no tiene sucursal propia aparece en todas, y quien ya
+ * tiene algo en lo que se ve también: ninguna cita se queda sin su columna. Sin
+ * sucursal elegida, todos.
+ */
+export function profesionalesDeSucursal<T extends ProfesionalAgenda>(
+  lista: readonly T[],
+  sucursal: string,
+  conAgenda: ReadonlySet<string>,
+): T[] {
+  if (sucursal === "") {
+    return [...lista];
+  }
+  return lista.filter(
+    (p) =>
+      !p.sucursales?.length ||
+      p.sucursales.includes(sucursal) ||
+      conAgenda.has(p.id),
+  );
+}

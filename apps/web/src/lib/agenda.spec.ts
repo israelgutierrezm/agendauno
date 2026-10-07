@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   carriles,
+  profesionalesDeSucursal,
   diaIso,
   estadoCita,
   fueraDeHorario,
@@ -216,5 +217,29 @@ describe("agenda / KPIs", () => {
       enEspera: 2,
       libresPorLlenar: 5,
     });
+  });
+});
+
+describe("profesionales de la agenda de una sucursal", () => {
+  const tono = { id: "tono", nombre: "Toño", sucursales: ["roma"] };
+  const ivan = { id: "ivan", nombre: "Iván", sucursales: ["roma", "valle"] };
+  const sal = { id: "sal", nombre: "Salvador", sucursales: ["valle"] };
+  const ramon = { id: "ramon", nombre: "Ramón", sucursales: [] };
+  const todos = [tono, ivan, sal, ramon];
+
+  it("solo quienes atienden ahí; uno puede estar en varias sucursales", () => {
+    expect(
+      profesionalesDeSucursal(todos, "roma", new Set()).map((p) => p.id),
+    ).toEqual(["tono", "ivan", "ramon"]);
+    expect(
+      profesionalesDeSucursal(todos, "valle", new Set()).map((p) => p.id),
+    ).toEqual(["ivan", "sal", "ramon"]);
+  });
+
+  it("sin sucursal elegida, todos; con algo en esa sucursal, aunque no sea suya", () => {
+    expect(profesionalesDeSucursal(todos, "", new Set())).toHaveLength(4);
+    expect(
+      profesionalesDeSucursal(todos, "roma", new Set(["sal"])).map((p) => p.id),
+    ).toContain("sal");
   });
 });
