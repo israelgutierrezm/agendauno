@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
-use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\AccesoTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Documento;
@@ -34,6 +33,8 @@ class PortalDelClienteTenant
     /** Ventana de la asistencia que se le muestra (días). */
     private const DIAS_ASISTENCIA = 30;
 
+    public function __construct(private readonly ModalidadNegocioTenant $modalidad) {}
+
     /**
      * @return array{creditos: bool, pase: bool, expediente: bool}
      */
@@ -46,7 +47,7 @@ class PortalDelClienteTenant
 
         return [
             'creditos' => $tieneDerechos
-                || ($estudio->modalidad() === ModalidadServicio::Clases && ProductoTenant::query()->where('archivado', false)->exists()),
+                || ($this->modalidad->esClases() && ProductoTenant::query()->where('archivado', false)->exists()),
             'pase' => (bool) ($flags['acceso_abierto'] ?? false) || AccesoTenant::query()->exists(),
             'expediente' => WaiverTenant::query()->where('activo', true)->exists()
                 || Formulario::query()->where('activo', true)->exists()

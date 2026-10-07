@@ -137,6 +137,7 @@ class BitacoraTenant
             'sesion.reprogramada' => 'Cambió el horario de '.((string) ($despues['actividad'] ?? 'una clase')).(isset($despues['fecha']) ? " al {$despues['fecha']} {$despues['hora']}" : ''),
             'plantilla_horario.cambiada' => 'Cambió una clase recurrente desde el '.((string) ($despues['desde'] ?? '')).(isset($despues['movidas']) ? " ({$despues['movidas']} fechas)" : ''),
             'bloqueo_agenda.creado' => 'Bloqueó la agenda'.(isset($despues['motivo']) ? ': '.$despues['motivo'] : ''),
+            'estudio.modalidad' => 'AgendaUno cambió el negocio a '.((string) ($despues['modalidad'] ?? '')).(isset($despues['perfil']) ? " (giro: {$despues['perfil']})" : ''),
             'pasarela.configurada' => 'Configuró la pasarela '.((string) ($despues['proveedor'] ?? '')).(isset($despues['activa']) ? ($despues['activa'] ? ' (activa)' : ' (inactiva)') : ''),
             default => self::eliminacion($a->accion, $antes, $despues) ?? $a->accion,
         };

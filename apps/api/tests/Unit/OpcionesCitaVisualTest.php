@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Application\CobroDeCitasTenant;
+use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\ResolverDerechoTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
@@ -62,7 +63,10 @@ it('expone solo la foto pública del profesional y la región de la sede dentro 
         // Sin cuenta (página pública) no se consultan bonos.
         $derechos = Mockery::mock(ResolverDerechoTenant::class);
         $derechos->shouldNotReceive('ofertasCubiertas');
-        $opciones = (new OpcionesCitaTenant($cobro, $whatsapp, $derechos))->listar();
+        // Un negocio de citas (ADR 0104).
+        $modalidad = Mockery::mock(ModalidadNegocioTenant::class);
+        $modalidad->shouldReceive('esCitas')->andReturn(true);
+        $opciones = (new OpcionesCitaTenant($cobro, $whatsapp, $derechos, $modalidad))->listar();
         expect($opciones['hay_con_plan'])->toBeFalse();
         expect($opciones['instructores'])->toBe([
             ['id' => 'Ana', 'nombre' => 'Ana', 'foto_url' => Storage::disk('public')->url('tenants/demo/perfiles/ana.webp'), 'sucursales' => ['sede-publica']],

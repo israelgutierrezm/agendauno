@@ -264,6 +264,7 @@ it('el cobro de una cita dice qué servicio, con quién y cuándo', function ():
     ], conBearer($e['bearer']))->assertOk();
     personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
     $coach = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->assertOk()->json('data.0.id');
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $coach, $sede['sucursal']);
     activarCobroEnLinea($e);
     $a = alumnoConSesion($e, 'Ana', 'ana@correo.mx');

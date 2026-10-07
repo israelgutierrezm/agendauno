@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
+use App\Modules\Tenancy\Comunicaciones\DatosDeSesion;
 use App\Modules\Tenancy\Creditos\OrigenMovimiento;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\AsistenciaTenant as ModeloAsistenciaTenant;
@@ -90,7 +91,10 @@ class AsistenciaTenant
             );
 
             // Evento de dominio (outbox): habilita acumular puntos de lealtad al asistir.
+            // Lleva los datos de la sesión con su `tipo` (clase o cita), como `reserva.*`.
+            $sesion = $bloqueada->sesion;
             $this->eventos->registrar('asistencia.marcada', 'asistencia', $asistencia->ulid, [
+                ...($sesion instanceof SesionTenant ? DatosDeSesion::para($sesion) : []),
                 'persona_id' => $bloqueada->persona?->ulid,
                 'estado' => $estado->value,
                 'retardo' => $retardo,

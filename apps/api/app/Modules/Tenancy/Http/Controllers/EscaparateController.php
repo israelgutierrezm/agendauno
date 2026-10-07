@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PlantillaHorarioTenant;
@@ -51,6 +52,9 @@ class EscaparateController
         // La lada del país del negocio completa los números capturados sin «+» (ADR 0103).
         $region = app(RegionNegocioTenant::class);
         $lada = $region->lada();
+        // Solo clases o solo citas (ADR 0104): la modalidad guardada, no sus ofertas.
+        $modalidad = $estudio->modalidad();
+        $esCitas = $modalidad === ModalidadServicio::Citas;
 
         return response()->json(['data' => [
             'estudio' => [
@@ -67,14 +71,14 @@ class EscaparateController
                 'lada' => $lada,
                 'whatsapp' => $estudio->whatsappCompleto(),
                 'whatsapp_url' => self::enlaceWhatsapp($estudio->whatsappCompleto(), $estudio->contacto_whatsapp_pais),
-                // ¿Ofrece servicios agendables como cita en línea? (para el CTA de reserva).
-                'tiene_citas' => OfertaTenant::query()
-                    ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
-                    ->exists(),
+                'modalidad' => $modalidad->value,
+                'capacidades' => $modalidad->capacidades(),
+                // ¿Se agendan citas en línea? (para el CTA de reserva): un negocio de citas.
+                'tiene_citas' => $esCitas,
             ],
             'sucursales' => $this->sucursales($lada),
             'instructores' => $this->instructores(),
-            'servicios' => $this->servicios(),
+            'servicios' => $this->servicios($esCitas),
             'horario_clases' => $this->horarioClases(),
             'productos' => $this->productos(),
             'proximas_sesiones' => $this->proximasSesiones(),
@@ -140,11 +144,12 @@ class EscaparateController
 
     /**
      * Servicios o clases con su descripción, agrupables por categoría (la actividad del
-     * catálogo) y con sus niveles; los de cita dicen si se agendan en línea.
+     * catálogo) y con sus niveles. En un negocio de citas, los que se cobran al agendar
+     * se agendan en línea; una clase de pago suelto no es una cita.
      *
      * @return list<array<string, mixed>>
      */
-    private function servicios(): array
+    private function servicios(bool $esCitas): array
     {
         // Los precios, en la moneda del negocio (ADR 0097).
         $moneda = app(ParametrosTenant::class)->moneda();
@@ -166,7 +171,7 @@ class EscaparateController
                 'duracion_minutos' => $o->duracion_minutos,
                 'precio_minor' => $o->precio_clase_minor,
                 'moneda' => $moneda,
-                'agendable' => $o->politica_reserva === PoliticaReservaTenant::Pago,
+                'agendable' => $esCitas && $o->politica_reserva === PoliticaReservaTenant::Pago,
                 'niveles' => $o->actividad?->niveles->sortBy('orden')->pluck('nombre')->values()->all() ?? [],
             ])->values()->all();
     }

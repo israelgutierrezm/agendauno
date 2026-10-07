@@ -8,11 +8,13 @@ use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\AnularCobroTenant;
 use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
 use App\Modules\Tenancy\Application\MargenesServicio;
+use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\VerificarAgendaTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Http\SesionTenantPresenter;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -45,11 +47,7 @@ class AgendaTenantController
     /**
      * Estados de reserva que ocupan un lugar en la sesión.
      */
-    private const OCUPAN_LUGAR = [
-        EstadoReserva::Confirmada->value,
-        EstadoReserva::Ofrecida->value,
-        EstadoReserva::PendientePago->value,
-    ];
+    private const OCUPAN_LUGAR = SesionTenantPresenter::OCUPAN_LUGAR;
 
     public function __construct(
         private readonly AccesoSesionTenant $acceso,
@@ -58,6 +56,8 @@ class AgendaTenantController
         private readonly ResolverAccesoTenant $resolver,
         private readonly CorregirMetodoPagoTenant $corregirMetodo,
         private readonly AnularCobroTenant $anularCobro,
+        private readonly ModalidadNegocioTenant $modalidad,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -101,9 +101,14 @@ class AgendaTenantController
             ? RecursoTenant::query()->where('ulid', $validado['recurso_id'])->firstOrFail()
             : null;
 
+        // El tipo sale de la modalidad del negocio, nunca de la pantalla (ADR 0104); una
+        // cita es de una sola persona.
+        $tipo = $this->modalidad->tipoSesion();
+        $capacidad = $tipo === TipoSesionTenant::Cita ? 1 : ($validado['capacidad'] ?? $oferta->capacidad);
+
         // Se revalida al GUARDAR, bajo candado del profesional y del recurso: dos
         // solicitudes simultáneas no pueden encimarse.
-        $sesion = DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $instructorId, $recurso, $inicia, $termina, $validado): SesionTenant {
+        $sesion = DB::connection('tenant')->transaction(function () use ($oferta, $sucursal, $instructorId, $recurso, $inicia, $termina, $tipo, $capacidad): SesionTenant {
             $this->agenda->bloquear($instructorId, $recurso);
             $this->agenda->exigirSinConflictos($instructorId, $recurso, $inicia, $termina, null, (int) $sucursal->getKey(), MargenesServicio::de($oferta));
 
@@ -115,12 +120,13 @@ class AgendaTenantController
                 'inicia_en' => $inicia,
                 'termina_en' => $termina,
                 'zona_horaria' => $sucursal->zona_horaria,
-                'capacidad' => $validado['capacidad'] ?? $oferta->capacidad,
+                'capacidad' => $capacidad,
                 'estado' => EstadoSesionTenant::Programada->value,
+                'tipo' => $tipo->value,
             ]);
         });
 
-        return response()->json(['data' => $this->presentar($sesion->load(['oferta', 'instructor', 'recurso']))], 201);
+        return response()->json(['data' => $this->presentarUna($sesion, $request)], 201);
     }
 
     /**
@@ -156,15 +162,18 @@ class AgendaTenantController
             );
         }
 
-        $duracion = (int) ($validado['duracion_minutos'] ?? $oferta->duracion_minutos ?? 30);
+        // La que mande la pantalla, la del servicio o la que fijó el negocio para citas.
+        $duracion = (int) ($validado['duracion_minutos'] ?? $oferta->duracion_minutos ?? 0);
+        if ($duracion <= 0) {
+            $duracion = $this->parametros->entero('citas.duracion_defecto');
+        }
         $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sucursal->zona_horaria)->utc();
 
         $reserva = $agendar->agendar($oferta, $sucursal, $persona, (int) $instructor->getKey(), $inicia, $duracion, porNegocio: true);
 
-        $sesion = SesionTenant::query()->whereKey($reserva->sesion_id)->with(['oferta', 'instructor', 'recurso'])->firstOrFail();
-        $reserva->load(['persona', 'asistencia', 'orden']);
+        $sesion = SesionTenant::query()->whereKey($reserva->sesion_id)->firstOrFail();
 
-        return response()->json(['data' => $this->presentar($sesion, [(int) $sesion->getKey() => $reserva])], 201);
+        return response()->json(['data' => $this->presentarUna($sesion, $request)], 201);
     }
 
     /**
@@ -230,7 +239,7 @@ class AgendaTenantController
             ]);
         });
 
-        return response()->json(['data' => $this->presentar($sesion->refresh()->load(['oferta', 'instructor', 'recurso']))]);
+        return response()->json(['data' => $this->presentarUna($sesion->refresh(), $request)]);
     }
 
     private function resolverInstructor(?string $ulid): ?int
@@ -251,11 +260,7 @@ class AgendaTenantController
             // Ocupacion = reservas que toman un lugar (confirmadas, ofrecidas y
             // pendientes de pago); mas cuantos esperan (estado "lista de espera") y a
             // cuantos ya se les paso lista (para saber si falta pasarla).
-            ->withCount([
-                'reservas as ocupados' => fn ($q) => $q->whereIn('estado', self::OCUPAN_LUGAR),
-                'reservas as en_espera' => fn ($q) => $q->where('estado', EstadoReserva::EnEspera->value),
-                'reservas as marcadas' => fn ($q) => $q->whereIn('estado', self::OCUPAN_LUGAR)->whereHas('asistencia'),
-            ])
+            ->withCount($this->conteos())
             ->orderBy('inicia_en');
 
         // Un instructor solo ve SUS sesiones asignadas.
@@ -297,6 +302,35 @@ class AgendaTenantController
         return response()->json([
             'data' => $sesiones->map(fn (SesionTenant $sesion): array => $this->presentar($sesion, $titulares, $verContacto))->all(),
         ]);
+    }
+
+    /**
+     * Ocupación y lista de espera (los del contrato común) y, para el equipo, a cuántos
+     * de los que ocupan lugar ya se les pasó lista (para saber si falta pasarla).
+     *
+     * @return array<string, mixed>
+     */
+    private function conteos(): array
+    {
+        return [
+            ...SesionTenantPresenter::conteos(),
+            'reservas as marcadas' => fn ($q) => $q->whereIn('estado', self::OCUPAN_LUGAR)->whereHas('asistencia'),
+        ];
+    }
+
+    /**
+     * Una sesión suelta (al crearla, agendarla, reasignarla o cancelarla) con la misma
+     * forma que en la lista: sus conteos y, si es cita, su titular.
+     *
+     * @return array<string, mixed>
+     */
+    private function presentarUna(SesionTenant $sesion, Request $request): array
+    {
+        $sesion->loadMissing(['oferta', 'sucursal', 'instructor', 'recurso', 'serie'])->loadCount($this->conteos());
+        $usuario = $request->attributes->get('usuario_tenant');
+        $verContacto = $usuario instanceof Usuario && $usuario->puede('miembros.ver');
+
+        return $this->presentar($sesion, $this->titularesDeCitas(new Collection([$sesion])), $verContacto);
     }
 
     /**
@@ -379,7 +413,7 @@ class AgendaTenantController
         $usuario = $request->attributes->get('usuario_tenant');
         $this->reservas->cancelarSesion($sesion, $usuario instanceof Usuario ? $usuario : null);
 
-        return response()->json(['data' => $this->presentar($sesion->refresh()->load('oferta'))]);
+        return response()->json(['data' => $this->presentarUna($sesion->refresh(), $request)]);
     }
 
     /**
@@ -420,16 +454,20 @@ class AgendaTenantController
     }
 
     /**
+     * Contrato de la agenda (ADR 0104): los campos de siempre más `tipo`, `clase` (o
+     * null), `cita` (o null) y `ocupacion` (o null). Ver docs/API.md, «Agenda».
+     *
      * @param  array<int, ReservaTenant>  $titulares  titular de cada cita, por id de sesión
      * @param  bool  $verContacto  incluir el teléfono y el correo del cliente
      * @return array<string, mixed>
      */
     private function presentar(SesionTenant $sesion, array $titulares = [], bool $verContacto = false): array
     {
-        $titular = $titulares[(int) $sesion->getKey()] ?? null;
+        $titular = $sesion->esCita() ? ($titulares[(int) $sesion->getKey()] ?? null) : null;
 
         return [
             'id' => $sesion->ulid,
+            // 'clase' | 'cita': el de la modalidad del negocio.
             'tipo' => $sesion->tipo->value,
             'oferta' => $sesion->oferta?->nombre,
             'oferta_id' => $sesion->oferta?->ulid,
@@ -459,8 +497,15 @@ class AgendaTenantController
             // A cuántos de los que ocupan lugar ya se les pasó lista.
             'marcadas' => (int) ($sesion->getAttribute('marcadas') ?? 0),
             'estado' => $sesion->estado->value,
-            // Solo en citas: a quién se atiende y el estado de su reserva.
+            // Solo en clases: cupo, lista de espera y si se paga por clase.
+            'clase' => SesionTenantPresenter::clase($sesion),
+            // Solo en clases con cupo: la ocupación que se muestra (0–100).
+            'ocupacion' => SesionTenantPresenter::ocupacion($sesion),
+            // Solo en citas con cliente: a quién se atiende y en qué va (null = sin
+            // titular: cancelada o aún sin cliente; ver `estado`).
             'cita' => $titular instanceof ReservaTenant ? [
+                // En qué va su atención y su pago, calculados aquí (no en la web ni la app).
+                ...SesionTenantPresenter::estadoCita($sesion, $titular, CarbonImmutable::now()),
                 'reserva_id' => $titular->ulid,
                 'cliente' => $titular->persona?->nombreCompleto(),
                 // Para abrir su ficha; el contacto, solo si se puede ver miembros.

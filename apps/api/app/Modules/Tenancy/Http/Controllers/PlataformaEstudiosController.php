@@ -4,27 +4,32 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CambiarModalidadEstudio;
 use App\Modules\Tenancy\Application\SuspensionPorRenta;
 use App\Modules\Tenancy\Application\TerminologiaEstudio;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\AvisoDueno;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FacturaPlataforma;
 use App\Modules\Tenancy\Models\MedicionUso;
+use App\Modules\Tenancy\PerfilNegocio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Ficha de un estudio para el operador de la plataforma (PlatformAdmin): datos del
  * negocio y su contacto, uso medido, cargos de renta y facturas; y las acciones de
  * soporte sobre su cuenta (suspender, reactivar, extender la prueba gratis, cambiar
- * su terminología, activar sus avisos por WhatsApp).
+ * su terminología, activar sus avisos por WhatsApp, cambiar entre clases y citas
+ * antes de que opere).
  */
 class PlataformaEstudiosController
 {
@@ -32,7 +37,7 @@ class PlataformaEstudiosController
 
     private const CARGOS = 12;
 
-    public function show(string $estudio, ClienteWhatsApp $whatsapp): JsonResponse
+    public function show(string $estudio, ClienteWhatsApp $whatsapp, CambiarModalidadEstudio $cambioModalidad): JsonResponse
     {
         $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
 
@@ -79,6 +84,8 @@ class PlataformaEstudiosController
                 'whatsapp_verificado' => $modelo->contacto_whatsapp_verificado_en !== null,
             ],
             'onboarding_completo' => (bool) $modelo->onboarding_completo,
+            // Clases o citas solo cambia antes de operar (ADR 0104).
+            'modalidad_cambiable' => $cambioModalidad->cambiable($modelo),
             'whatsapp_clientes' => self::whatsappClientes($modelo, $whatsapp),
             'uso' => $uso,
             'cargos' => $cargos,
@@ -192,6 +199,31 @@ class PlataformaEstudiosController
         }
 
         return response()->json(['data' => self::whatsappClientes($modelo, $whatsapp)]);
+    }
+
+    /**
+     * Cambia la modalidad del negocio, clases o citas (ADR 0104): solo mientras no
+     * tenga sesiones ni reservas. `perfil_negocio` (opcional, de la nueva modalidad)
+     * es su giro; sin él, conserva el suyo si encaja o toma el predeterminado.
+     */
+    public function modalidad(Request $request, string $estudio, CambiarModalidadEstudio $cambio): JsonResponse
+    {
+        $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
+        $validado = $request->validate([
+            'modalidad' => ['required', Rule::enum(ModalidadServicio::class)],
+            'perfil_negocio' => ['nullable', Rule::enum(PerfilNegocio::class)],
+        ]);
+
+        $modelo = $cambio->cambiar(
+            $modelo,
+            ModalidadServicio::from((string) $validado['modalidad']),
+            isset($validado['perfil_negocio']) ? PerfilNegocio::from((string) $validado['perfil_negocio']) : null,
+        );
+
+        return response()->json(['data' => [
+            ...self::resumen($modelo),
+            'modalidad_cambiable' => $cambio->cambiable($modelo),
+        ]]);
     }
 
     /**

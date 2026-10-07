@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\PuestaEnMarchaTenant;
+use App\Modules\Tenancy\Exceptions\ModalidadBloqueada;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -39,6 +41,8 @@ class OnboardingController
 
         return response()->json(['data' => [
             'modalidad' => $estudio->modalidad()->value,
+            // Los giros que puede elegir: solo los de su modalidad (ADR 0104).
+            'perfiles' => array_map(static fn (PerfilNegocio $p): string => $p->value, $estudio->modalidad()->perfiles()),
             'pasos' => $pasos,
             'completados' => $hechos,
             'completo' => $estudio->onboarding_completo || count($hechos) === count($pasos),
@@ -148,8 +152,9 @@ class OnboardingController
     }
 
     /**
-     * Cambia el perfil de negocio del estudio (R35): solo ajusta
-     * defaults/terminologia/feature-flags, sin forks.
+     * Cambia el giro del negocio (R35) dentro de su modalidad: ajusta terminología,
+     * flags y sugerencias, nunca la modalidad ni el cobro. Un giro de la otra
+     * modalidad se rechaza: ese cambio lo hace AgendaUno (ADR 0104).
      */
     public function perfil(Request $request): JsonResponse
     {
@@ -158,8 +163,12 @@ class OnboardingController
         $validado = $request->validate([
             'perfil_negocio' => ['required', Rule::enum(PerfilNegocio::class)],
         ]);
+        $perfil = PerfilNegocio::from((string) $validado['perfil_negocio']);
+        if (ModalidadServicio::paraPerfil($perfil) !== $estudio->modalidad()) {
+            throw new ModalidadBloqueada($estudio->modalidad());
+        }
 
-        $estudio->update(['perfil_negocio' => $validado['perfil_negocio']]);
+        $estudio->update(['perfil_negocio' => $perfil->value]);
 
         return response()->json(['data' => [
             'perfil' => $estudio->perfil_negocio->value,

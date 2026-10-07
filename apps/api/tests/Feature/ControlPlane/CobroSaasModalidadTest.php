@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\SesionTenant;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -74,8 +75,7 @@ it('clases: cobra la banda de alumnos activos del mes con IVA', function (): voi
 });
 
 it('citas: cobra por profesional activo, completo sin importar sus horas', function (): void {
-    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
     terminarPrueba($e);
     $sede = agendaSemilla($e);
     foreach (['beto', 'carlos', 'diego'] as $n) {
@@ -112,18 +112,44 @@ it('citas: cobra por profesional activo, completo sin importar sus horas', funct
         ->and($quien['detalle'])->not->toHaveKey('fte_milesimas');
 });
 
-it('citas: las personas atendidas fuera de cita por encima de lo incluido se cobran', function (): void {
-    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+it('citas: un taller nuevo nace como cita y no suma personas atendidas fuera de cita', function (): void {
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
     terminarPrueba($e);
     $sede = agendaSemilla($e);
-    // Un taller (clase grupal) de mañana con cupo 20.
+    personalConSesion($e['slug'], $e['bearer'], 'beto@barberia.mx', 'instructor');
+    $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->assertOk()->json('data.0.id');
+
+    // Sin negocios mixtos (ADR 0104): aunque se pida cupo 20, es una cita de una persona.
+    $taller = $this->postJson("/api/v1/app/{$e['slug']}/sesiones", [
+        'oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'], 'instructor_id' => $pro, 'capacidad' => 20,
+        'inicia_en_local' => now('America/Mexico_City')->addDay()->format('Y-m-d').' 18:00:00', 'duracion_minutos' => 60,
+    ], conBearer($e['bearer']))->assertCreated()->assertJsonPath('data.tipo', 'cita')->assertJsonPath('data.capacidad', 1)->json('data.id');
+    $d = venderPackAMiembroTenant($e, 8000, 'Persona 1');
+    $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$taller}/reservas", ['persona_id' => $d['persona']], conBearer($e['bearer']))
+        ->assertCreated();
+
+    $uso = $this->getJson("/api/v1/app/{$e['slug']}/facturacion", conBearer($e['bearer']))->assertOk()->json('data.uso');
+
+    expect($uso['detalle']['personas_fuera_de_cita'])->toBe(0)
+        ->and($uso['desglose']['subtotal_minor'])->toBe(26900);
+})->skip(fn (): bool => now('America/Mexico_City')->isLastOfMonth(), 'El taller de mañana caería en el siguiente mes.');
+
+it('citas: las personas de una clase de antes de la modalidad excluyente por encima de lo incluido se cobran', function (): void {
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
+    terminarPrueba($e);
+    $sede = agendaSemilla($e);
     personalConSesion($e['slug'], $e['bearer'], 'beto@barberia.mx', 'instructor');
     $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->assertOk()->json('data.0.id');
     $taller = (string) $this->postJson("/api/v1/app/{$e['slug']}/sesiones", [
-        'oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'], 'instructor_id' => $pro, 'capacidad' => 20,
+        'oferta_id' => $sede['oferta'], 'sucursal_id' => $sede['sucursal'], 'instructor_id' => $pro,
         'inicia_en_local' => now('America/Mexico_City')->addDay()->format('Y-m-d').' 18:00:00', 'duracion_minutos' => 60,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    // Un taller grupal (cupo 20) que quedó de antes de la decisión (ADR 0018, 0104): la
+    // tarifa publicada conserva la regla y agendauno:revisar-modalidades lo señala.
+    app(GestorDeConexionTenant::class)->ejecutarEn(
+        Estudio::query()->where('slug', $e['slug'])->firstOrFail(),
+        fn () => SesionTenant::query()->where('ulid', $taller)->update(['tipo' => 'clase', 'capacidad' => 20]),
+    );
 
     // 12 personas en el taller: 1 profesional incluye 10 → 2 adicionales.
     for ($i = 1; $i <= 12; $i++) {

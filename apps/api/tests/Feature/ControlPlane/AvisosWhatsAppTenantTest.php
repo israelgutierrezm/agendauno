@@ -314,6 +314,7 @@ it('con cuenta, al agendar se puede aceptar WhatsApp si tiene celular', function
     ], conBearer($e['bearer']))->assertOk();
     personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia.mx', 'instructor');
     $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $pro, $sede['sucursal']);
     $cliente = alumnoConSesion($e);
     habilitarWhatsApp($e);
@@ -345,6 +346,7 @@ it('al agendar en la página pública se puede aceptar recibir los avisos por Wh
     ], conBearer($e['bearer']))->assertOk();
     personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia.mx', 'instructor');
     $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $pro, $sede['sucursal']);
 
     // Solo se ofrece con la plataforma encendida, el negocio activado y algún aviso

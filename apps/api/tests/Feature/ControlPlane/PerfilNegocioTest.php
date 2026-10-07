@@ -60,10 +60,8 @@ it('cambiar el perfil actualiza la terminologia y los flags en la sesion', funct
 });
 
 it('barberia usa citas, clientes y barberos sin crear un dominio separado', function (): void {
-    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
-
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.perfil', 'barberia');
+    // Un giro de citas se elige al registrarse: después el negocio ya no cambia de modalidad.
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
 
     $estudio = $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
         ->assertOk()->json('data.estudio');
@@ -74,10 +72,8 @@ it('barberia usa citas, clientes y barberos sin crear un dominio separado', func
 });
 
 it('salud usa citas y pacientes sin ofrecer funciones clinicas', function (): void {
-    $e = estudioConSesion('consultorio-a', 'dueno@consultorio.mx');
-
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'salud'], conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.perfil', 'salud');
+    // Un giro de citas se elige al registrarse: después el negocio ya no cambia de modalidad.
+    $e = estudioConSesion('consultorio-a', 'dueno@consultorio.mx', 'salud');
 
     $estudio = $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
         ->assertOk()->json('data.estudio');

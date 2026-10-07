@@ -31,6 +31,7 @@ class ImportarClasesTenant
         private readonly ResolverAccesoTenant $acceso,
         private readonly ParametrosTenant $parametros,
         private readonly AccesoSesionTenant $accesoSesion,
+        private readonly ModalidadNegocioTenant $modalidad,
     ) {}
 
     /**
@@ -181,6 +182,7 @@ class ImportarClasesTenant
                                 'instructor_id' => $instructor?->id, 'recurso_id' => $recurso?->id,
                                 'inicia_en' => $inicio, 'termina_en' => $inicio->addMinutes($duracion),
                                 'zona_horaria' => $sucursal->zona_horaria, 'capacidad' => $capacidad, 'estado' => $estado,
+                                'tipo' => $this->modalidad->tipoSesion()->value,
                             ])]);
                         }
                         $resultado['sesiones'] = $sesiones->map(fn ($s): array => [

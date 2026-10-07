@@ -38,6 +38,8 @@ it('el directorio lista por defecto; el estudio puede optar por salirse o marcar
     expect($data[0] ?? [])->not->toHaveKey('id'); // sin IDs internos
 
     $this->getJson("/api/v1/app/{$privado['slug']}/escaparate")->assertOk();
+    // Agendar sin cuenta es de los negocios de citas (ADR 0104).
+    pasarNegocioACitas($privado);
     $this->getJson("/api/v1/app/{$privado['slug']}/citas/opciones")->assertOk();
     $this->getJson("/api/v1/app/{$oculto['slug']}/escaparate")->assertNotFound();
 });
@@ -106,8 +108,7 @@ it('configuración inicial de un negocio de clases: sus pasos se dan por hechos 
 });
 
 it('configuración inicial de un negocio de citas: servicio, duración y precio en una línea', function (): void {
-    $e = estudioConSesion('barberia-b', 'dueno@barberia-b.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('barberia-b', 'dueno@barberia-b.mx', 'barberia');
     $url = "/api/v1/app/{$e['slug']}/onboarding";
 
     $this->getJson($url, conBearer($e['bearer']))
@@ -129,8 +130,7 @@ it('configuración inicial de un negocio de citas: servicio, duración y precio 
 });
 
 it('en Catálogo también se da de alta un servicio en una línea; quien no gestiona el catálogo, no', function (): void {
-    $e = estudioConSesion('barberia-c', 'dueno@barberia-c.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('barberia-c', 'dueno@barberia-c.mx', 'barberia');
 
     $this->postJson("/api/v1/app/{$e['slug']}/ofertas/rapidas", ['items' => [
         ['nombre' => 'Afeitado clásico', 'duracion_minutos' => 45, 'precio_minor' => 28000],

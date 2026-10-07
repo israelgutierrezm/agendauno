@@ -44,6 +44,7 @@ function spaConCabinas(array $cabinas): array
         'recursos' => $ids,
     ], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.recursos', $ids);
 
+    pasarNegocioACitas($e);
     $pros = [];
     foreach (['uno@correo.mx', 'dos@correo.mx'] as $email) {
         personalConSesion($e['slug'], $e['bearer'], $email, 'instructor');

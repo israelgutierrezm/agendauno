@@ -85,6 +85,7 @@ it('a un profesional con rol propio se le agenda una cita', function (): void {
     ], conBearer($e['bearer']))->assertCreated()->json('data.clave');
     personalConSesion($e['slug'], $e['bearer'], 'junior@correo.mx', $rol);
     $junior = usuarioIdPorEmail($e, 'junior@correo.mx');
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $junior, $sede['sucursal']);
     activarCobroEnLinea($e);
     $a = alumnoConSesion($e, 'Ana', 'ana@correo.mx');

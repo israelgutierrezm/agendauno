@@ -40,6 +40,7 @@ function citaCobradaEnEfectivo(): array
     $pro = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
         ->assertOk()->json('data.0.id');
     $dia = now()->addDay()->format('Y-m-d');
+    pasarNegocioACitas($e);
 
     $cita = test()->postJson("/api/v1/app/{$e['slug']}/agenda/citas", [
         'persona_id' => crearMiembroTenant($e, 'Israel'), 'oferta_id' => $sede['oferta'],

@@ -12,8 +12,9 @@ namespace App\Modules\Tenancy;
  * - `Citas`: atención 1 a 1 con un profesional (barbería, salón, spa, salud…) →
  *   cobro por profesional activo.
  *
- * Se deriva del perfil de negocio (la industria solo elige el default; el dominio
- * decide por modalidad, nunca por `if ($industria === …)`).
+ * Se guarda en el negocio (`estudios.modalidad`, ADR 0104) y es excluyente: el giro
+ * solo da el valor inicial al registrarse y solo el superadmin la cambia, antes de
+ * operar. El dominio decide por modalidad, nunca por `if ($industria === …)`.
  */
 enum ModalidadServicio: string
 {
@@ -30,6 +31,53 @@ enum ModalidadServicio: string
     public static function paraPerfil(PerfilNegocio $perfil): self
     {
         return in_array($perfil->value, self::PERFILES_CITAS, true) ? self::Citas : self::Clases;
+    }
+
+    /**
+     * Los giros de esta modalidad: los únicos que el negocio puede elegir (PUT /perfil).
+     *
+     * @return list<PerfilNegocio>
+     */
+    public function perfiles(): array
+    {
+        return array_values(array_filter(
+            PerfilNegocio::cases(),
+            fn (PerfilNegocio $perfil): bool => self::paraPerfil($perfil) === $this,
+        ));
+    }
+
+    /**
+     * El giro con que queda un negocio al que el superadmin le cambia la modalidad sin
+     * elegir giro: el de terminología más neutra de cada una.
+     */
+    public function perfilPredeterminado(): PerfilNegocio
+    {
+        return match ($this) {
+            self::Clases => PerfilNegocio::General,
+            self::Citas => PerfilNegocio::Estetica,
+        };
+    }
+
+    /**
+     * Tipo de toda sesión de un negocio de esta modalidad: un negocio es solo de clases
+     * o solo de citas, nunca de ambas (ADR 0104).
+     */
+    public function tipoSesion(): TipoSesionTenant
+    {
+        return match ($this) {
+            self::Clases => TipoSesionTenant::Clase,
+            self::Citas => TipoSesionTenant::Cita,
+        };
+    }
+
+    /**
+     * Lo que el negocio ofrece, para que la web y la app no lo deduzcan (ADR 0104).
+     *
+     * @return array{clases: bool, citas: bool}
+     */
+    public function capacidades(): array
+    {
+        return ['clases' => $this === self::Clases, 'citas' => $this === self::Citas];
     }
 
     /**

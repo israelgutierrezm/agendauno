@@ -50,6 +50,10 @@ class ReservasTenant
     // Costo por defecto de una sesion: 1 credito = 1000 unidades escaladas.
     public const UNIDADES_POR_SESION = 1000;
 
+    private const CITA_SIN_ESPERA = 'Una cita no tiene lista de espera.';
+
+    private const CITA_OCUPADA = 'Esta cita ya está ocupada.';
+
     // Reservas que ocupan (o esperan) un lugar.
     private const ACTIVAS = [
         EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
@@ -122,6 +126,7 @@ class ReservasTenant
             if ($duplicada) {
                 throw new YaReservado('Ya existe una reserva para esta sesion.');
             }
+            $this->exigirCitaLibre($bloqueada);
 
             if ($bloqueada->capacidad !== null && $this->disponiblesParaCanal($bloqueada, $canal) <= 0) {
                 throw new CupoLleno('La sesion esta llena.');
@@ -212,6 +217,8 @@ class ReservasTenant
                 if ($activa) {
                     throw new YaReservado('Ya existe una reserva para esta sesion.');
                 }
+                // Revalida bajo el candado: otra solicitud pudo tomar la cita.
+                $this->exigirCitaLibre($bloqueada);
 
                 $derecho = $this->resolver->paraSesion($persona, $bloqueada, $costo);
 
@@ -334,6 +341,19 @@ class ReservasTenant
         $reglas['sin_reserva_previa'] = ! $duplicada;
         if ($duplicada) {
             return DecisionReserva::rechazar('ALREADY_BOOKED', 'Ya existe una reserva para esta sesion.', $reglas);
+        }
+
+        // Una cita es de una sola persona (ADR 0104): no tiene lista de espera ni admite
+        // una segunda reserva activa.
+        if ($sesion->esCita()) {
+            $reglas['sin_lista_de_espera'] = ! $permitirEspera;
+            if ($permitirEspera) {
+                return DecisionReserva::rechazar('SESSION_NOT_BOOKABLE', self::CITA_SIN_ESPERA, $reglas);
+            }
+            $reglas['cita_libre'] = $libre = ! $this->citaOcupada($sesion);
+            if (! $libre) {
+                return DecisionReserva::rechazar('SESSION_NOT_BOOKABLE', self::CITA_OCUPADA, $reglas);
+            }
         }
 
         $derecho = $this->resolver->paraSesion($persona, $sesion, $costo);
@@ -484,7 +504,7 @@ class ReservasTenant
                     'unidades' => 0,
                     'oferta_expira_en' => null,
                 ]);
-                $this->promover($sesion);
+                $this->liberarLugar($sesion);
 
                 return $bloqueada;
             }
@@ -524,9 +544,7 @@ class ReservasTenant
             // Si su orden (cita de pago) seguía sin cobrar, ya no se entregará: se cancela.
             $this->cancelarOrdenPendiente($bloqueada);
 
-            if (! $this->liberarCita($sesion)) {
-                $this->promover($sesion);
-            }
+            $this->liberarLugar($sesion);
 
             return $bloqueada;
         });
@@ -602,8 +620,10 @@ class ReservasTenant
      * Mueve la reserva de un alumno a OTRA fecha de la misma clase (2.1): conserva su
      * crédito apartado, su canal y su historial. Bloquea ambas sesiones (en orden de
      * id, para no trabarse) y revalida el cupo del destino para su canal. El lugar
-     * elegido no se traslada. El cupo liberado se ofrece a la lista de espera del
-     * origen. Debe llamarse dentro de una transacción con la reserva bloqueada.
+     * elegido no se traslada. El origen se libera como al cancelar: el cupo se ofrece
+     * a su lista de espera o, si era una cita, su horario vuelve a quedar libre. Una
+     * cita de destino debe estar libre. Debe llamarse dentro de una transacción con la
+     * reserva bloqueada.
      */
     public function moverA(ReservaTenant $reserva, SesionTenant $destino): void
     {
@@ -626,6 +646,7 @@ class ReservasTenant
         if ($nueva->estado !== EstadoSesionTenant::Programada || ! $nueva->inicia_en->isFuture()) {
             throw new SesionNoReservable('Esa clase ya no se puede reservar.');
         }
+        $this->exigirCitaLibre($nueva);
         $yaEsta = ReservaTenant::query()
             ->where('sesion_id', $nueva->getKey())
             ->where('persona_id', $reserva->persona_id)
@@ -639,7 +660,7 @@ class ReservasTenant
         }
 
         $reserva->update(['sesion_id' => $nueva->getKey(), 'lugar' => null]);
-        $this->promover($origen);
+        $this->liberarLugar($origen);
     }
 
     /**
@@ -652,7 +673,8 @@ class ReservasTenant
      */
     public function promover(SesionTenant $sesion): ?ReservaTenant
     {
-        if ($sesion->capacidad === null) {
+        // Una cita no tiene lista de espera: nunca se ofrece a otra persona.
+        if ($sesion->capacidad === null || $sesion->esCita()) {
             return null;
         }
 
@@ -800,7 +822,7 @@ class ReservasTenant
                     $expiradas++;
 
                     // El cupo liberado se re-ofrece al siguiente de la lista.
-                    $this->promover($sesion);
+                    $this->liberarLugar($sesion);
                 });
             });
 
@@ -849,9 +871,7 @@ class ReservasTenant
 
                     // Una cita sin pagar libera el horario del profesional; en una clase,
                     // el cupo liberado se ofrece al siguiente en lista de espera.
-                    if (! $this->liberarCita($sesion)) {
-                        $this->promover($sesion);
-                    }
+                    $this->liberarLugar($sesion);
                 });
             });
 
@@ -886,6 +906,10 @@ class ReservasTenant
         }
 
         if ($sesion->esCita()) {
+            // Una cita es de una sola persona: si ya es de otra, no se reconfirma.
+            if ($this->citaOcupada($sesion)) {
+                return false;
+            }
             // Mismo punto de serialización por profesional que al agendar una cita.
             $this->agenda->bloquear($sesion->instructor_id !== null ? (int) $sesion->instructor_id : null, null);
             if ($sesion->estado !== EstadoSesionTenant::Programada
@@ -1030,10 +1054,24 @@ class ReservasTenant
     }
 
     /**
-     * Una CITA es la sesión de una sola persona: cuando su reserva termina (cancelada o
-     * sin pagar a tiempo) la sesión se cancela para liberar el horario del profesional
-     * (si no, quedaría una "clase" de cupo 1 huérfana que bloquea la disponibilidad).
-     * Debe llamarse con la sesión ya bloqueada. Devuelve si la liberó.
+     * Lo que pasa con una sesión cuando una reserva la deja (cancelar, vencer, mover):
+     * una cita libera el horario del profesional; en una clase, el cupo se ofrece al
+     * siguiente de la lista de espera. Debe llamarse con la sesión ya bloqueada.
+     */
+    private function liberarLugar(SesionTenant $sesion): void
+    {
+        if (! $this->liberarCita($sesion)) {
+            $this->promover($sesion);
+        }
+    }
+
+    /**
+     * Una CITA es la sesión de una sola persona: cuando su reserva termina (cancelada,
+     * sin pagar a tiempo o movida) la sesión se cancela para liberar el horario del
+     * profesional (si no, quedaría una "clase" de cupo 1 huérfana que bloquea la
+     * disponibilidad). Una espera que quedara de antes no la retiene: una cita no tiene
+     * lista de espera, así que también se cancela. Debe llamarse con la sesión ya
+     * bloqueada. Devuelve si la liberó.
      */
     private function liberarCita(SesionTenant $sesion): bool
     {
@@ -1041,20 +1079,50 @@ class ReservasTenant
             return false;
         }
 
-        $activas = ReservaTenant::query()
+        $ocupada = ReservaTenant::query()
             ->where('sesion_id', $sesion->getKey())
             ->whereIn('estado', [
-                EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
-                EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value,
+                EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::PendientePago->value,
             ])
             ->exists();
-        if ($activas) {
+        if ($ocupada) {
             return false;
         }
 
+        ReservaTenant::query()
+            ->where('sesion_id', $sesion->getKey())
+            ->where('estado', EstadoReserva::EnEspera->value)
+            ->update([
+                'estado' => EstadoReserva::Cancelada->value,
+                'motivo_cancelacion' => 'sesion_cancelada',
+                'cancelada_en' => now(),
+                'cancelada_por' => QuienCancela::Sistema->value,
+            ]);
         $sesion->update(['estado' => EstadoSesionTenant::Cancelada->value]);
 
         return true;
+    }
+
+    /**
+     * ¿La cita ya es de alguien? Cualquier reserva viva la ocupa: una cita no admite
+     * una segunda reserva activa ni lista de espera (ADR 0104).
+     */
+    private function citaOcupada(SesionTenant $sesion): bool
+    {
+        return ReservaTenant::query()
+            ->where('sesion_id', $sesion->getKey())
+            ->whereIn('estado', self::ACTIVAS)
+            ->exists();
+    }
+
+    /**
+     * Rechaza reservar una cita que ya es de alguien. En una clase no hace nada.
+     */
+    private function exigirCitaLibre(SesionTenant $sesion): void
+    {
+        if ($sesion->esCita() && $this->citaOcupada($sesion)) {
+            throw new SesionNoReservable(self::CITA_OCUPADA);
+        }
     }
 
     /**
@@ -1074,11 +1142,13 @@ class ReservasTenant
 
     /**
      * Asienta en el outbox el evento `reserva.creada` (dentro de la transaccion de
-     * creacion, para que evento y reserva sean atomicos). R39.
+     * creacion, para que evento y reserva sean atomicos). R39. Lleva los datos de la
+     * sesión con su `tipo` (clase o cita), como los demás `reserva.*`.
      */
     private function emitirCreada(ReservaTenant $reserva, SesionTenant $sesion, PersonaTenant $persona): void
     {
         $this->eventos->registrar('reserva.creada', 'reserva', $reserva->ulid, [
+            ...DatosDeSesion::para($sesion),
             'sesion_id' => $sesion->ulid,
             'persona_id' => $persona->ulid,
             'estado' => $reserva->estado->value,

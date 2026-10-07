@@ -69,6 +69,7 @@ it('la cita pública no reactiva a nadie, no cambia la ficha ni usa membresías'
     $sede = agendaSemilla($e);
     personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia.mx', 'instructor');
     $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    pasarNegocioACitas($e);
     $this->putJson("/api/v1/app/{$e['slug']}/horarios-atencion", [
         'instructor_id' => $pro, 'sucursal_id' => $sede['sucursal'],
         'horarios' => array_map(static fn (int $d): array => ['dia_semana' => $d, 'hora_inicio' => '09:00', 'hora_fin' => '18:00'], range(1, 7)),

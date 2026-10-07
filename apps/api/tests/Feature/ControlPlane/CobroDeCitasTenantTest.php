@@ -40,6 +40,7 @@ function barberiaParaCobrar(): array
     ], conBearer($e['bearer']))->assertOk();
     personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia.mx', 'instructor');
     $pro = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $pro, $sede['sucursal']);
 
     return ['e' => $e, 'sede' => $sede, 'pro' => $pro];
@@ -210,6 +211,7 @@ it('el calendario ofrece desde hoy los días en que alguien atiende, sin los cer
     $sede = agendaSemilla($e);
     personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia.mx', 'instructor');
     $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    pasarNegocioACitas($e);
     // Atiende de lunes a viernes, de 9 a 18; el miércoles 9 el negocio cierra.
     $this->putJson("/api/v1/app/{$e['slug']}/horarios-atencion", [
         'instructor_id' => $pro, 'sucursal_id' => $sede['sucursal'],

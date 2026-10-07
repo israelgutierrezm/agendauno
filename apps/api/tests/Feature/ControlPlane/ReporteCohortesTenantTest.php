@@ -37,6 +37,7 @@ it('dice cómo conocieron al negocio los clientes nuevos, de más a menos', func
     ], conBearer($e['bearer']))->assertOk();
     personalConSesion($e['slug'], $e['bearer'], 'barbero@correo.mx', 'instructor');
     $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $pro, $sede['sucursal']);
     $dia = now('America/Mexico_City')->addDays(3)->format('Y-m-d');
     // Clientes nuevos que agendan en línea y dicen cómo nos conocieron.

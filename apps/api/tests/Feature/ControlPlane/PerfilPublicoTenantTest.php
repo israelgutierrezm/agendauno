@@ -150,6 +150,7 @@ it('si la sede no tiene horario capturado, se publica el de sus profesionales', 
     personalConSesion($e['slug'], $e['bearer'], 'ana@barberia.mx', 'instructor');
     personalConSesion($e['slug'], $e['bearer'], 'beto@barberia.mx', 'instructor');
     $ids = collect($this->getJson("{$base}/instructores", conBearer($e['bearer']))->json('data'))->pluck('id');
+    pasarNegocioACitas($e);
     $this->putJson("{$base}/horarios-atencion", ['instructor_id' => $ids[0], 'sucursal_id' => $semilla['sucursal'], 'horarios' => [
         ['dia_semana' => 1, 'hora_inicio' => '10:00', 'hora_fin' => '18:00'],
     ]], conBearer($e['bearer']))->assertSuccessful();

@@ -39,6 +39,7 @@ function consultorioConPaquete(?int $precioDiagnostico = 15000): array
         'nombre' => $nombre, 'modalidad' => 'individual', 'capacidad' => 1,
         'politica_reserva' => 'pago', 'precio_clase_minor' => $precio, 'duracion_minutos' => 30,
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    pasarNegocioACitas($e);
 
     return [
         'e' => $e,

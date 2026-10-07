@@ -26,6 +26,15 @@ return [
     'url_app' => env('APP_SPA_URL', 'http://localhost:5175'),
 
     /*
+    | App móvil (ADR 0104). `version_minima`: la versión más antigua de la app que aún
+    | se acepta; viaja en /yo y una instalada más vieja pide actualizarse. Se sube
+    | cuando cambia un contrato que las versiones anteriores no entienden.
+    */
+    'app' => [
+        'version_minima' => env('APP_VERSION_MINIMA_APP', '0.0.0'),
+    ],
+
+    /*
     | Facturación electrónica (CFDI) vía FacturAPI. La plataforma usa UNA cuenta
     | FacturAPI (multi-organización): su llave MAESTRA vive aquí (env, gestionada
     | por ops), y cada tenant carga sus propios datos fiscales que se materializan

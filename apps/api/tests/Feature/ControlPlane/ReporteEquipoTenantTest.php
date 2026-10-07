@@ -53,6 +53,7 @@ it('mide la ocupación de la agenda, la asistencia, el valor y el pago de cada p
     personalConSesion($e['slug'], $e['bearer'], 'barbero@correo.mx', 'instructor');
     $barbero = usuarioIdPorEmail($e, 'barbero@correo.mx');
     $this->putJson("/api/v1/app/{$e['slug']}/staff/{$barbero}/esquema-pago", ['tipo' => 'por_clase', 'monto_minor' => 10000, 'moneda' => 'MXN'], conBearer($e['bearer']))->assertCreated();
+    pasarNegocioACitas($e);
 
     // Atiende los lunes de 10:00 a 14:00; el 5 de octubre bloquea de 13:00 a 14:00 y el 12 el negocio cierra.
     $this->putJson("/api/v1/app/{$e['slug']}/horarios-atencion", [
@@ -77,11 +78,12 @@ it('mide la ocupación de la agenda, la asistencia, el valor y el pago de cada p
     $fila = collect($r['profesionales'])->firstWhere('id', $barbero);
     expect($fila)->toMatchArray([
         'nombre' => 'Personal',
-        'clases' => 3, 'citas' => 0,
+        // El negocio es de citas (ADR 0104): sus sesiones nacen como citas.
+        'clases' => 0, 'citas' => 3,
         // Disponible: 10:00–13:00 del día 5 (el 12 cerró). Agendado en horario: 60 + 60.
         'disponible_min' => 180, 'agendado_min' => 180, 'agendado_en_horario_min' => 120, 'ocupacion_pct' => 67,
         'presentes' => 1, 'ausentes' => 1, 'inasistencia_pct' => 50,
-        // Una asistencia × 250.00; tres clases × 100.00 de pago, sin asignarlo aparte.
+        // Una asistencia × 250.00; tres citas × 100.00 de pago, sin asignarlo aparte.
         'ingreso_minor' => 25000, 'costo_minor' => 30000, 'margen_minor' => -5000,
     ]);
     expect($r['totales']['ocupacion_pct'])->toBe(67);

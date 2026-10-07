@@ -184,8 +184,9 @@ it('no permite usar un token de otro negocio ni importar clases en modo citas', 
     $csv = csvFechasClases("a,Nivel 1,Roma Norte,,,2026-10-05,10:00,11:00,,\n");
     $token = cargaClases($e, $csv)->assertOk()->json('data.confirmacion');
     cargaClases($otro, $csv, token: $token)->assertUnprocessable();
-    Estudio::query()->where('slug', $otro['slug'])->update(['perfil_negocio' => 'barberia']);
-    cargaClases($otro, $csv)->assertForbidden();
+    // La modalidad está guardada (ADR 0104): el giro solo ya no la cambia.
+    Estudio::query()->where('slug', $otro['slug'])->update(['perfil_negocio' => 'barberia', 'modalidad' => 'citas']);
+    cargaClases($otro, $csv)->assertForbidden()->assertJsonPath('code', 'MODALITY_NOT_AVAILABLE');
 });
 
 it('un rol de instructor con permiso de agenda solo importa sus propias sesiones', function (): void {

@@ -82,6 +82,7 @@ class Estudio extends Model
     protected $casts = [
         'estado' => EstadoEstudio::class,
         'perfil_negocio' => PerfilNegocio::class,
+        'modalidad' => ModalidadServicio::class,
         'terminologia' => 'array',
         'redes' => 'array',
         'estado_facturacion' => EstadoFacturacion::class,
@@ -101,6 +102,19 @@ class Estudio extends Model
         'suspendido_en' => 'datetime',
         'sin_suspension_hasta' => 'date',
     ];
+
+    /**
+     * Todo negocio nace con su modalidad guardada (ADR 0104): la de su giro si nadie
+     * la fijó. No es asignable en masa: después solo la cambia el superadmin.
+     */
+    protected static function booted(): void
+    {
+        static::creating(static function (Estudio $estudio): void {
+            if ($estudio->getAttribute('modalidad') === null) {
+                $estudio->setAttribute('modalidad', $estudio->modalidad());
+            }
+        });
+    }
 
     /**
      * ¿Se suspendió solo por una renta vencida? Entonces el dueño aún puede entrar a
@@ -130,12 +144,17 @@ class Estudio extends Model
     }
 
     /**
-     * Modalidad de servicio del estudio (clases con cupo vs citas 1 a 1), derivada de
-     * su perfil de negocio.
+     * Modalidad de servicio del negocio: solo clases o solo citas (ADR 0104). Es un
+     * dato guardado; el giro solo da el valor inicial (y el respaldo de un modelo
+     * aún sin guardar). Solo la cambia el superadmin, con `CambiarModalidadEstudio`.
      */
     public function modalidad(): ModalidadServicio
     {
-        return ModalidadServicio::paraPerfil($this->perfil_negocio);
+        $guardada = $this->getAttribute('modalidad');
+
+        return $guardada instanceof ModalidadServicio
+            ? $guardada
+            : ModalidadServicio::paraPerfil($this->perfil_negocio ?? PerfilNegocio::General);
     }
 
     /**

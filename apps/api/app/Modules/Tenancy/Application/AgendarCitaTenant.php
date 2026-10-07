@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
-use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
@@ -30,8 +29,8 @@ use Illuminate\Support\Facades\DB;
  * reserva según la política de la oferta — `pago` crea reserva pendiente + orden por la
  * sesión (a pagar para confirmar); `entitlement` consume la membresía. Todo atómico.
  *
- * El servidor no confía en lo que ofreció la pantalla: el servicio debe agendarse
- * como cita, el profesional debe serlo, la duración es la del servicio y, cuando
+ * El servidor no confía en lo que ofreció la pantalla: el negocio debe ser de citas
+ * (ADR 0104), el profesional debe serlo, la duración es la del servicio y, cuando
  * agenda el cliente (página pública o su cuenta), la hora debe ser futura y caer en
  * la atención del profesional en esa sede, en un día abierto. El negocio (recepción)
  * puede agendar fuera de horario, pero nunca encimado.
@@ -58,6 +57,7 @@ class AgendarCitaTenant
         private readonly ElegirRecursoTenant $recursos,
         private readonly ParametrosTenant $parametros,
         private readonly CobroDeCitasTenant $cobro,
+        private readonly ModalidadNegocioTenant $modalidad,
     ) {}
 
     public function agendar(
@@ -69,10 +69,7 @@ class AgendarCitaTenant
         int $duracionMin,
         bool $porNegocio = false,
     ): ReservaTenant {
-        if ($oferta->politica_reserva !== PoliticaReservaTenant::Pago
-            && ! in_array($oferta->modalidad, [ModalidadOfertaTenant::Individual, ModalidadOfertaTenant::Privada], true)) {
-            throw new SesionNoReservable('Ese servicio no se agenda como cita.');
-        }
+        $this->exigirNegocioDeCitas();
 
         // La duración la fija el servicio; la que manda la pantalla solo cuenta si el
         // servicio no tiene una.
@@ -116,6 +113,7 @@ class AgendarCitaTenant
         CarbonImmutable $inicia,
         int $duracionMin,
     ): ReservaTenant {
+        $this->exigirNegocioDeCitas();
         if (! $inicia->isFuture()) {
             throw new SesionNoReservable('Ese horario ya pasó.');
         }
@@ -147,6 +145,17 @@ class AgendarCitaTenant
         }
 
         throw $ultimo ?? new SesionNoReservable('No hay profesionales disponibles a esa hora.');
+    }
+
+    /**
+     * Un negocio es solo de clases o solo de citas (ADR 0104): en uno de citas todo
+     * servicio se agenda como cita; en uno de clases, ninguno.
+     */
+    private function exigirNegocioDeCitas(): void
+    {
+        if (! $this->modalidad->esCitas()) {
+            throw new SesionNoReservable('Este negocio trabaja con clases.');
+        }
     }
 
     /**
@@ -226,7 +235,7 @@ class AgendarCitaTenant
                 'zona_horaria' => $sucursal->zona_horaria,
                 'capacidad' => 1,
                 'estado' => EstadoSesionTenant::Programada->value,
-                'tipo' => TipoSesionTenant::Cita->value,
+                'tipo' => $this->modalidad->tipoSesion()->value,
             ]);
 
             if ($oferta->politica_reserva === PoliticaReservaTenant::Pago) {

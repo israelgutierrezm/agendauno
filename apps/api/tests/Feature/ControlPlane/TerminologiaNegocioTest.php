@@ -23,8 +23,7 @@ afterEach(function (): void {
 });
 
 it('una barbería habla de citas, clientes y barberos; un estudio de clases, de clases', function (): void {
-    $barberia = estudioConSesion('barberia-a', 'dueno@barberia.mx');
-    $this->putJson("/api/v1/app/{$barberia['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($barberia['bearer']))->assertOk();
+    $barberia = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
 
     $this->getJson("/api/v1/app/{$barberia['slug']}/yo", conBearer($barberia['bearer']))
         ->assertOk()->assertJsonPath('data.estudio.perfil_config.terminologia', [
@@ -40,8 +39,7 @@ it('una barbería habla de citas, clientes y barberos; un estudio de clases, de 
 });
 
 it('el administrador elige otros términos de cada lista y puede volver a los de su giro', function (): void {
-    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
 
     $this->getJson("/api/v1/app/{$e['slug']}/terminologia", conBearer($e['bearer']))
         ->assertOk()
@@ -72,8 +70,7 @@ it('cambiar la terminología exige administrar el negocio', function (): void {
 });
 
 it('el superadmin ajusta la terminología de un negocio', function (): void {
-    $e = estudioConSesion('consultorio-a', 'dueno@consultorio.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'salud'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('consultorio-a', 'dueno@consultorio.mx', 'salud');
 
     $this->getJson("/api/v1/plataforma/estudios/{$e['slug']}/terminologia", conPlataforma())
         ->assertOk()->assertJsonPath('data.vigente.sesion', 'Cita')->assertJsonPath('data.vigente.miembro', 'Paciente');

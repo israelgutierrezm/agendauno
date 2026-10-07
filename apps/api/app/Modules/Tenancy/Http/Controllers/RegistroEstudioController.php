@@ -122,6 +122,8 @@ class RegistroEstudioController
                     'slug' => $estudio->slug,
                     'nombre' => $estudio->nombre,
                     'perfil' => $estudio->perfil_negocio->value,
+                    // Queda guardada desde su giro (ADR 0104).
+                    'modalidad' => $estudio->modalidad()->value,
                     'estado' => $estudio->estado->value,
                     'url' => url('/app/'.$estudio->slug),
                 ],

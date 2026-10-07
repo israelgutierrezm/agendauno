@@ -29,15 +29,18 @@ pest()->extend(TestCase::class)->in('Unit');
 
 /**
  * Registra, aprovisiona, activa e inicia sesión en un estudio; devuelve su slug y
- * un bearer token tenant-local.
+ * un bearer token tenant-local. El giro da su modalidad, que queda guardada (ADR
+ * 0104): sin giro es `general` (clases); un negocio de citas se registra con uno de
+ * citas (p. ej. `barberia`), porque después el negocio ya no la cambia.
  *
  * @return array{slug: string, bearer: string}
  */
-function estudioConSesion(string $slug, string $email): array
+function estudioConSesion(string $slug, string $email, ?string $perfil = null): array
 {
     $r = test()->postJson('/api/v1/registro', [
         'nombre' => 'Estudio '.$slug,
         'slug' => $slug,
+        'perfil_negocio' => $perfil,
         'contacto_nombre' => 'Dueño',
         'contacto_primer_apellido' => 'Demo',
         'contacto_email' => $email,
@@ -410,6 +413,18 @@ function abrirHorarioDeCitas(array $e, string $instructorUlid, string $sucursalU
             range(1, 7),
         ),
     ], conBearer($e['bearer']))->assertCreated();
+}
+
+/**
+ * Deja de citas un negocio que se registró sin giro (ADR 0104), como lo haría el
+ * superadmin antes de su primera sesión: no toca el giro ni lo ya creado (sede,
+ * catálogo). Las rutas de citas (horarios de atención, agendar) solo existen ahí.
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ */
+function pasarNegocioACitas(array $e): void
+{
+    Estudio::query()->where('slug', $e['slug'])->update(['modalidad' => 'citas']);
 }
 
 /**

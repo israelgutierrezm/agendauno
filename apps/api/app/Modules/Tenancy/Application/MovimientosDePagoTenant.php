@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\EstadoReembolso;
 use App\Modules\Tenancy\Pagos\MetodoPago;
+use App\Modules\Tenancy\Pasarelas\ConceptoDeCobro;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -257,7 +258,7 @@ class MovimientosDePagoTenant
             ->whereIn('estado', array_map(static fn (EstadoPago $e): string => $e->value, self::COBRADOS))
             ->whereBetween('aprobado_en', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('registrado_por', $usuarioId))
-            ->with(['orden.persona', 'orden.lineas.producto'])
+            ->with(['orden.persona', 'orden.lineas.producto', 'orden.sesion'])
             ->orderByDesc('aprobado_en')
             ->orderByDesc('id')
             ->when($limite !== null, fn ($q) => $q->limit($limite + 1))
@@ -297,7 +298,7 @@ class MovimientosDePagoTenant
             ->where('estado', EstadoReembolso::Aprobado->value)
             ->whereBetween('aplicado_en', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('actor_id', $usuarioId))
-            ->with(['pago.orden.persona', 'pago.orden.lineas.producto'])
+            ->with(['pago.orden.persona', 'pago.orden.lineas.producto', 'pago.orden.sesion'])
             ->orderByDesc('aplicado_en')
             ->orderByDesc('id')
             ->when($limite !== null, fn ($q) => $q->limit($limite + 1))
@@ -378,7 +379,7 @@ class MovimientosDePagoTenant
             ->where('estado', EstadoOrden::Cancelada->value)
             ->whereBetween('cancelada_en', [$inicio, $fin])
             ->when($usuarioId !== null, fn ($q) => $q->where('cancelada_por', $usuarioId))
-            ->with(['persona', 'lineas.producto'])
+            ->with(['persona', 'lineas.producto', 'sesion'])
             ->orderByDesc('cancelada_en')
             ->orderByDesc('id')
             ->when($limite !== null, fn ($q) => $q->limit($limite + 1))
@@ -564,6 +565,6 @@ class MovimientosDePagoTenant
             return Str::limit($nombres, 120);
         }
 
-        return $orden?->sesion_id !== null ? 'Cita' : ($orden?->renueva_acuerdo_id !== null ? 'Renovación' : 'Compra');
+        return ConceptoDeCobro::deLaSesion($orden) ?? ($orden?->renueva_acuerdo_id !== null ? 'Renovación' : 'Compra');
     }
 }

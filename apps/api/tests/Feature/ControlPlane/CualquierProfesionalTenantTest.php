@@ -43,6 +43,7 @@ function barberiaConDosBarberos(): array
     $ids = collect(test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->assertOk()->json('data'))
         ->pluck('id', 'nombre');
 
+    pasarNegocioACitas($e);
     $fecha = now('America/Mexico_City')->addDays(3)->format('Y-m-d');
     $dia = (int) now('America/Mexico_City')->addDays(3)->isoWeekday();
     foreach ([['Beto', '09:00', '11:00'], ['Carla', '10:00', '12:00']] as [$nombre, $abre, $cierra]) {

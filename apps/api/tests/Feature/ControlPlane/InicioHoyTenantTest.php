@@ -112,6 +112,7 @@ it('las citas dicen a quién se atiende y lo pendiente de cobro sale en cobros',
     ], conBearer($e['bearer']))->assertOk();
     personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
     $coach = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $coach, $sede['sucursal']);
     $ana = alumnoConSesion($e, 'Ana', 'ana@correo.mx');
     $this->postJson("/api/v1/app/{$e['slug']}/mi/citas", [
@@ -137,8 +138,7 @@ it('las citas dicen a quién se atiende y lo pendiente de cobro sale en cobros',
 it('en citas responde quién sigue, qué falta por atender y cobrar, y dónde hay espacios libres', function (): void {
     // 9:00 en la Ciudad de México.
     $this->travelTo('2026-10-05 15:00:00');
-    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
     $sede = agendaSemilla($e);
     $corte = (string) $this->postJson("/api/v1/app/{$e['slug']}/ofertas/rapidas", ['items' => [
         ['nombre' => 'Corte de cabello', 'duracion_minutos' => 30, 'precio_minor' => 25000],
@@ -203,8 +203,7 @@ it('muchas sesiones del día anterior no esconden las de hoy (se acota la jornad
 it('cada cita del día está en un solo estado; «por atender» no cuenta las que terminaron sin registro', function (): void {
     // 8:00 en la Ciudad de México.
     $this->travelTo('2026-10-05 14:00:00');
-    $e = estudioConSesion('barberia-b', 'dueno@barberia-b.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('barberia-b', 'dueno@barberia-b.mx', 'barberia');
     $sede = agendaSemilla($e);
     $this->putJson("/api/v1/app/{$e['slug']}/ofertas/{$sede['oferta']}", [
         'lugares' => 0, 'politica_reserva' => 'pago', 'precio_clase_minor' => 15000, 'duracion_minutos' => 30,

@@ -189,6 +189,9 @@ class AuthTenantController
         return response()->json(['data' => [
             'usuario' => UsuarioTenantPresenter::datos($usuario),
             'estudio' => $this->presentarEstudio($this->estudioDe($request)),
+            // La versión más antigua de la app que aún se acepta (ADR 0104): una más
+            // vieja pide actualizar en lugar de leer contratos que ya no entiende.
+            'app' => ['version_minima' => (string) config('agendauno.app.version_minima', '0.0.0')],
         ]]);
     }
 
@@ -275,6 +278,10 @@ class AuthTenantController
             // Perfil de negocio (R35): el frontend adapta terminologia/flags sin forks.
             'perfil' => $estudio->perfil_negocio->value,
             'perfil_config' => $estudio->perfilConfig(),
+            // Solo clases o solo citas (ADR 0104): la web y la app preguntan por la
+            // capacidad que manda el servidor, no la deducen del giro ni de las ofertas.
+            'modalidad' => $estudio->modalidad()->value,
+            'capacidades' => $estudio->modalidad()->capacidades(),
             // Manda avisos por WhatsApp a sus clientes (ADR 0069).
             'whatsapp_clientes' => app(WhatsAppTenant::class)->enUso(),
             // Su moneda y su zona horaria (ADR 0099); con pesos mexicanos cobra en

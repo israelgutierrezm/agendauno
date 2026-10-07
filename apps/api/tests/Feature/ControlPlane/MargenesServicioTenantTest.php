@@ -40,6 +40,7 @@ function spaConLimpieza(): array
     ], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.limpieza_min', 15);
     personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
     $coach = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $coach, $sede['sucursal']);
 
     return ['e' => $e, 'sede' => $sede, 'coach' => $coach, 'ana' => alumnoConSesion($e, 'Ana', 'ana@correo.mx')];

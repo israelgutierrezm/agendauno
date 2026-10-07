@@ -68,6 +68,7 @@ function citaApartadaSinPagar(): array
     ], conBearer($e['bearer']))->assertOk();
     personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
     $coach = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $coach, $sede['sucursal']);
 
     $cita = citaPublicaDe($e, $sede, $coach, 'Bea', 'bea@correo.mx');

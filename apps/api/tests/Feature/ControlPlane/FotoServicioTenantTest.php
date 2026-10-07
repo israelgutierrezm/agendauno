@@ -28,6 +28,7 @@ it('sube la foto del servicio, la reemplaza y la quita; se ve al agendar y en la
     $this->putJson("/api/v1/app/{$e['slug']}/ofertas/{$oferta}", [
         'lugares' => 0, 'politica_reserva' => 'pago', 'precio_clase_minor' => 25000, 'duracion_minutos' => 30,
     ], conBearer($e['bearer']))->assertOk();
+    pasarNegocioACitas($e);
 
     $url = $this->post("/api/v1/app/{$e['slug']}/ofertas/{$oferta}/foto", [
         'foto' => UploadedFile::fake()->image('corte.jpg', 800, 600),

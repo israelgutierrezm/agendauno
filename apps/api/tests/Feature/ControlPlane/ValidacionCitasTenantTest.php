@@ -38,6 +38,7 @@ function barberiaQueValida(): array
     personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia.mx', 'instructor');
     $pro = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
         ->assertOk()->json('data.0.id');
+    pasarNegocioACitas($e);
     test()->putJson("/api/v1/app/{$e['slug']}/horarios-atencion", [
         'instructor_id' => $pro, 'sucursal_id' => $sede['sucursal'],
         'horarios' => array_map(static fn (int $d): array => ['dia_semana' => $d, 'hora_inicio' => '09:00', 'hora_fin' => '12:00'], range(1, 7)),
@@ -91,10 +92,11 @@ it('no acepta a quien no atiende citas ni un servicio que no se agenda', functio
     $dueno = (string) $this->getJson("/api/v1/app/{$ctx['e']['slug']}/yo", conBearer($ctx['e']['bearer']))->json('data.usuario.ulid');
     citaPublica($ctx, '10:00', ['instructor_id' => $dueno])->assertStatus(422);
 
-    // Una clase grupal sin cobro por cita no se agenda como cita.
+    // Un servicio que se toma con membresía (sin cobro por cita) no se agenda desde la
+    // página pública: se reserva desde la cuenta (ADR 0104: en citas todo es cita).
     $this->putJson("/api/v1/app/{$ctx['e']['slug']}/ofertas/{$ctx['sede']['oferta']}", ['lugares' => 0, 'politica_reserva' => 'entitlement'], conBearer($ctx['e']['bearer']))
         ->assertOk();
-    citaPublica($ctx, '10:00')->assertStatus(422);
+    citaPublica($ctx, '10:00')->assertStatus(422)->assertJsonPath('message', 'Este servicio se reserva desde tu cuenta.');
 });
 
 it('un profesional invitado que aún no activa su cuenta atiende citas; dado de baja, ya no', function (): void {

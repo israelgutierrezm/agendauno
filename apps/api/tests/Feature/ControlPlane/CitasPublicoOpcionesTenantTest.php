@@ -37,6 +37,7 @@ function estudioConServicioDeCita(): array
     personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
     $coach = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
         ->assertOk()->json('data.0.id');
+    pasarNegocioACitas($e);
 
     return ['e' => $e, 'sede' => $sede, 'coach' => $coach];
 }
@@ -76,6 +77,7 @@ it('expone las opciones públicas para agendar (servicios de pago, sucursales y 
 it('no lista servicios que no son de pago en las opciones públicas', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     agendaSemilla($e); // La oferta se queda en política entitlement (default).
+    pasarNegocioACitas($e);
 
     $data = $this->getJson("/api/v1/app/{$e['slug']}/citas/opciones")->assertOk()->json('data');
 
@@ -101,6 +103,7 @@ it('calcula la disponibilidad pública de un barbero para elegir hora', function
 
 it('las opciones públicas solo existen para estudios en el directorio', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    pasarNegocioACitas($e);
     // Sacar del directorio: despublicar.
     $this->putJson("/api/v1/app/{$e['slug']}/publicacion", ['publicado' => false, 'privado' => true], conBearer($e['bearer']))
         ->assertOk();

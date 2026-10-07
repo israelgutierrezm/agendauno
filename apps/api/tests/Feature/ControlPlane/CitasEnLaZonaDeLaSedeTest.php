@@ -39,6 +39,7 @@ function negocioDeCitasEnCancun(): array
     ], conBearer($e['bearer']))->assertOk();
     personalConSesion($e['slug'], $e['bearer'], 'pro@cancun.mx', 'instructor');
     $pro = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $pro, $sede['sucursal']);
 
     return ['e' => $e, 'sede' => $sede, 'pro' => $pro, 'ana' => alumnoConSesion($e, 'Ana', 'ana@cancun.mx')];

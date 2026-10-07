@@ -22,8 +22,7 @@ afterEach(function (): void {
  */
 function barberiaConClienta(): array
 {
-    $e = estudioConSesion('estudio-a', 'a@correo.mx');
-    test()->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('estudio-a', 'a@correo.mx', 'barberia');
     $sede = agendaSemilla($e);
     test()->putJson("/api/v1/app/{$e['slug']}/ofertas/{$sede['oferta']}", [
         'lugares' => 0, 'politica_reserva' => 'pago', 'precio_clase_minor' => 25000,

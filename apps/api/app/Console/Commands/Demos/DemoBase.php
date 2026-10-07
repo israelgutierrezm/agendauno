@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoOutboxTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -156,6 +157,8 @@ abstract class DemoBase
             'descripcion' => $d['descripcion'],
             'redes' => RedesSociales::normalizar(['instagram' => $d['instagram']]),
         ]);
+        // Rehecho desde cero (sin sesiones): su modalidad es la de su giro (ADR 0104).
+        $estudio->forceFill(['modalidad' => ModalidadServicio::paraPerfil($d['perfil'])])->save();
         $this->logo($estudio, $d['color']);
         $this->estudio = $estudio;
 

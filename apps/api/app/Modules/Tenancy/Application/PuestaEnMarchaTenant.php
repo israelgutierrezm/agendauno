@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\EstadoSesionTenant;
-use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -46,6 +45,7 @@ class PuestaEnMarchaTenant
 
     public function __construct(
         private readonly CalcularDisponibilidadTenant $disponibilidad,
+        private readonly ModalidadNegocioTenant $modalidad,
     ) {}
 
     /**
@@ -53,7 +53,7 @@ class PuestaEnMarchaTenant
      */
     public function pasos(Estudio $estudio): array
     {
-        return $estudio->modalidad() === ModalidadServicio::Citas ? self::PASOS_CITAS : self::PASOS_CLASES;
+        return $this->modalidad->esCitas() ? self::PASOS_CITAS : self::PASOS_CLASES;
     }
 
     /**
@@ -70,8 +70,9 @@ class PuestaEnMarchaTenant
     {
         return match ($paso) {
             'negocio' => SucursalTenant::query()->exists(),
-            // En citas, lo que el cliente puede agendar en línea: un servicio con precio.
-            'servicios' => OfertaTenant::query()->where('politica_reserva', PoliticaReservaTenant::Pago->value)->exists(),
+            // En un negocio de citas toda oferta es un servicio (ADR 0104): se cobre al
+            // agendar o se tome con un bono.
+            'servicios' => OfertaTenant::query()->exists(),
             'clases' => OfertaTenant::query()->exists(),
             'equipo', 'horario' => $this->horariosListos($estudio),
             'planes' => ProductoTenant::query()->exists(),
@@ -90,7 +91,7 @@ class PuestaEnMarchaTenant
         $configuracion = array_values(array_diff($this->pasos($estudio), ['publicacion']));
         $configurado = array_diff($configuracion, $this->hechos($estudio)) === [];
         $publicado = $estudio->paginaPublica();
-        [$primera, $motivo] = $estudio->modalidad() === ModalidadServicio::Citas
+        [$primera, $motivo] = $this->modalidad->esCitas()
             ? $this->primeraCita()
             : $this->primeraClase();
         $reservable = $publicado && $primera !== null;
@@ -118,7 +119,7 @@ class PuestaEnMarchaTenant
      */
     public function horariosListos(Estudio $estudio): bool
     {
-        return $estudio->modalidad() === ModalidadServicio::Citas
+        return $this->modalidad->esCitas()
             ? HorarioAtencionTenant::query()->exists()
             : PlantillaHorarioTenant::query()->exists() || SesionTenant::query()->exists();
     }
@@ -132,7 +133,6 @@ class PuestaEnMarchaTenant
     private function primeraCita(): array
     {
         $servicio = OfertaTenant::query()
-            ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
             ->orderBy('duracion_minutos')
             ->first();
         if (! $servicio instanceof OfertaTenant) {

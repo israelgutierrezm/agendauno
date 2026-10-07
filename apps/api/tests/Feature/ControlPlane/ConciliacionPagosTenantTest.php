@@ -289,6 +289,7 @@ it('la cita pagada cuyo aviso se perdió queda confirmada antes de que venza el 
     ], conBearer($e['bearer']))->assertOk();
     personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
     $coach = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $coach, $sede['sucursal']);
     $cita = $this->postJson("/api/v1/app/{$e['slug']}/citas", [
         'nombre' => 'Bea', 'email' => 'bea@correo.mx',

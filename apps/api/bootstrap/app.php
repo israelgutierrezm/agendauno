@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Http\Middleware\AlcanceLlaveApi;
 use App\Modules\Tenancy\Http\Middleware\AutenticarLlaveApi;
 use App\Modules\Tenancy\Http\Middleware\AutenticarPlataforma;
 use App\Modules\Tenancy\Http\Middleware\AutenticarTenant;
+use App\Modules\Tenancy\Http\Middleware\ModalidadRequerida;
 use App\Modules\Tenancy\Http\Middleware\PermisoTenant;
 use App\Modules\Tenancy\Http\Middleware\ResolverEstudio;
 use App\Support\Http\ApiExceptionRenderer;
@@ -51,6 +52,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'alcance' => AlcanceLlaveApi::class,
             // Operador de plataforma (PlatformAdmin): token global.
             'plataforma.auth' => AutenticarPlataforma::class,
+            // Rutas exclusivas de clases o de citas (ADR 0104): modalidad:clases|citas.
+            'modalidad' => ModalidadRequerida::class,
         ]);
 
         // Resolve the tenant (and its query scope) BEFORE route-model binding,
@@ -59,6 +62,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // de peticiones: así el límite cuenta por usuario de cada negocio y no por IP
         // (toda una red detrás de una IP compartiría el cupo). AutenticarPlataforma se
         // queda DESPUÉS a propósito: su límite es por IP y frena a quien adivina el token.
+        // La modalidad (ADR 0104) se revisa con el negocio resuelto, después de la sesión
+        // (sin sesión, 401) y del límite (cada intento cuenta), y antes de resolver los
+        // modelos de la ruta: lo del otro modelo no revela si el recurso existe.
         $middleware->priority([
             HandlePrecognitiveRequests::class,
             EncryptCookies::class,
@@ -71,6 +77,7 @@ return Application::configure(basePath: dirname(__DIR__))
             AutenticarLlaveApi::class,
             ThrottleRequests::class,
             ThrottleRequestsWithRedis::class,
+            ModalidadRequerida::class,
             AuthenticatesSessions::class,
             SubstituteBindings::class,
             Authorize::class,

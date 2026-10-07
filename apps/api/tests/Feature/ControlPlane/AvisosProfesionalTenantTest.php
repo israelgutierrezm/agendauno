@@ -86,6 +86,7 @@ function publicarYEnviar(array $e): void
 
 it('al barbero le llega la cita nueva y la cancelada', function (): void {
     $ctx = barberoConApp();
+    pasarNegocioACitas($ctx['e']);
     $cita = agendarCitaDeMarco($ctx);
     publicarYEnviar($ctx['e']);
 
@@ -127,6 +128,7 @@ it('en una clase grupal no se avisa al instructor por cada reserva', function ()
 
 it('el negocio puede avisarle también por correo, pero no a una bandeja del equipo', function (): void {
     $ctx = barberoConApp();
+    pasarNegocioACitas($ctx['e']);
     $this->putJson("/api/v1/app/{$ctx['e']['slug']}/plantillas-mensaje", [
         'clave' => 'reserva.confirmada', 'canal' => 'email', 'destinatario' => 'profesional',
         'asunto' => 'Te agendaron a {{persona_nombre}}', 'cuerpo' => '{{fecha}} a las {{hora}}.',

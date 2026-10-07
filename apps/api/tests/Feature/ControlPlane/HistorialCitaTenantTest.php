@@ -39,6 +39,7 @@ function citaParaHistorial(): array
         'nombre' => 'Diego Mora', 'email' => 'diego@correo.mx', 'celular' => '5512345678', 'tipo' => 'miembro',
     ], conBearer($e['bearer']))->assertCreated()->json('data.id');
     $dia = now()->addDay()->format('Y-m-d');
+    pasarNegocioACitas($e);
 
     $cita = test()->postJson("/api/v1/app/{$e['slug']}/agenda/citas", [
         'persona_id' => $persona, 'oferta_id' => $sede['oferta'],

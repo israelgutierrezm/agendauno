@@ -20,8 +20,7 @@ afterEach(function (): void {
 });
 
 it('en una barbería sin bonos, ni créditos ni expediente ni pase', function (): void {
-    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
     agendaSemilla($e);
     $ana = alumnoConSesion($e, 'Ana', 'ana@correo.mx');
 

@@ -102,8 +102,7 @@ it('clases: listo solo con todo configurado, publicado y una clase con lugar a l
 });
 
 it('citas: recibe reservas cuando un servicio tiene una hora libre con quien atiende', function (): void {
-    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
     $url = "/api/v1/app/{$e['slug']}/onboarding";
     $sede = agendaSemilla($e);
     $this->postJson("{$url}/catalogo", ['items' => [['nombre' => 'Corte de cabello', 'duracion_minutos' => 30, 'precio_minor' => 25000]]], conBearer($e['bearer']))->assertCreated();

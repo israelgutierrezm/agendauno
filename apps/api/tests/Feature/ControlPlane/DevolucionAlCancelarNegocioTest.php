@@ -48,6 +48,7 @@ function citaPagadaEnLinea(): array
     ], conBearer($e['bearer']))->assertOk();
     personalConSesion($e['slug'], $e['bearer'], 'pro@correo.mx', 'instructor');
     $pro = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $pro, $sede['sucursal']);
     test()->putJson("/api/v1/app/{$e['slug']}/pasarelas/stripe", [
         'activa' => true, 'modo' => 'test', 'credenciales' => ['secret_key' => 'sk_test_x'],

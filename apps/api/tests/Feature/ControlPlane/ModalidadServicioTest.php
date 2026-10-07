@@ -6,9 +6,9 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use Illuminate\Support\Facades\File;
 
 /*
-| Modalidad de servicio del tenant (clases con cupo vs citas 1 a 1), derivada del
-| perfil de negocio y expuesta en `perfil_config.modalidad` para que agenda,
-| terminología, menú y cobro se adapten sin forks por industria.
+| Modalidad de servicio del tenant (clases con cupo vs citas 1 a 1): la da el giro al
+| registrarse y queda guardada (ADR 0104); se expone en `perfil_config.modalidad` para
+| que agenda, terminología, menú y cobro se adapten sin forks por industria.
 */
 
 beforeEach(function (): void {
@@ -30,29 +30,27 @@ it('un estudio de clases expone la modalidad clases en su sesion', function (): 
         ->assertOk()->assertJsonPath('data.estudio.perfil_config.modalidad', 'clases');
 });
 
-it('un negocio de citas expone la modalidad citas y vuelve a clases al cambiar de perfil', function (): void {
-    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
-
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.perfil_config.modalidad', 'citas');
+it('un negocio de citas expone la modalidad citas y su giro ya no lo vuelve de clases (ADR 0104)', function (): void {
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
 
     $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
         ->assertOk()->assertJsonPath('data.estudio.perfil_config.modalidad', 'citas');
 
     $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'yoga'], conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.perfil_config.modalidad', 'clases');
+        ->assertStatus(422)->assertJsonPath('code', 'MODALITY_LOCKED');
+    $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.estudio.modalidad', 'citas');
 });
 
 it('los perfiles de salud y belleza operan con citas', function (string $perfil): void {
-    $e = estudioConSesion("negocio-{$perfil}", "dueno@{$perfil}.mx");
+    $e = estudioConSesion("negocio-{$perfil}", "dueno@{$perfil}.mx", $perfil);
 
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => $perfil], conBearer($e['bearer']))
-        ->assertOk()->assertJsonPath('data.perfil_config.modalidad', 'citas');
+    $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.estudio.perfil_config.modalidad', 'citas');
 })->with(['estetica', 'salon', 'spa', 'salud']);
 
 it('en un negocio de citas, un servicio nuevo nace como cita de pago de 30 min', function (): void {
-    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
 
     $programa = (string) $this->postJson("/api/v1/app/{$e['slug']}/programas", ['nombre' => 'Cortes'], conBearer($e['bearer']))
         ->assertCreated()->json('data.id');
@@ -85,8 +83,7 @@ it('en un estudio de clases, una oferta nueva se reserva con la membresía', fun
 });
 
 it('en citas, el paso de equipo pide el horario de atención de los profesionales', function (): void {
-    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
     $sede = agendaSemilla($e);
 
     // Una clase suelta no cuenta: en citas lo que importa es cuándo atiende cada quién.

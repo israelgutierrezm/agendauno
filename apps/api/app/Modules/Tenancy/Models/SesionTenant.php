@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\TipoSesionTenant;
 use App\Support\Concerns\HasPublicId;
@@ -30,13 +31,6 @@ class SesionTenant extends Model
     protected $fillable = ['oferta_id', 'sucursal_id', 'serie_id', 'recurso_id', 'instructor_id', 'inicia_en', 'termina_en', 'zona_horaria', 'capacidad', 'estado', 'tipo', 'margen_antes_min', 'margen_despues_min', 'fecha_serie', 'editada_en'];
 
     /**
-     * @var array<string, mixed>
-     */
-    protected $attributes = [
-        'tipo' => 'clase',
-    ];
-
-    /**
      * @var array<string, string>
      */
     protected $casts = [
@@ -59,6 +53,11 @@ class SesionTenant extends Model
         // cada que se guarda (si cambia el horario, cambia con él).
         static::saving(function (self $sesion): void {
             if (! $sesion->exists) {
+                // Su tipo es el de la modalidad del negocio (ADR 0104), no un «clase»
+                // por omisión: quien la crea sin fijarlo obtiene el del negocio.
+                if ($sesion->getAttribute('tipo') === null) {
+                    $sesion->setAttribute('tipo', app(ModalidadNegocioTenant::class)->tipoSesion());
+                }
                 $margenes = OfertaTenant::query()->find($sesion->oferta_id);
                 $sesion->margen_antes_min ??= (int) ($margenes->preparacion_min ?? 0);
                 $sesion->margen_despues_min ??= (int) ($margenes->limpieza_min ?? 0);

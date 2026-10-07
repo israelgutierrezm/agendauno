@@ -56,8 +56,7 @@ it('un instructor puede ver el catálogo pero no gestionarlo (RBAC tenant-local)
 });
 
 it('el precio de un servicio no tiene tope de negocio: 1,200,000.00 se guarda (COP, ARS)', function (): void {
-    $e = estudioConSesion('barberia-precio', 'dueno@barberia-precio.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('barberia-precio', 'dueno@barberia-precio.mx', 'barberia');
     $millon200 = 120_000_000;
 
     // Alta en una línea (Catálogo y configuración inicial).

@@ -175,6 +175,7 @@ it('un cambio de región que no se puede no cambia nada: ni el país ni la zona'
 it('las opciones para agendar una cita traen el país y la lada del negocio', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     agendaSemilla($e);
+    pasarNegocioACitas($e);
     cambiarPaisDelNegocio($e, ['pais' => 'CO'])->assertOk();
 
     $this->getJson("/api/v1/app/{$e['slug']}/citas/opciones")

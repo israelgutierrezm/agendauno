@@ -35,6 +35,7 @@ function barberiaConCliente(): array
     personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia.mx', 'instructor');
     $pro = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
         ->assertOk()->json('data.0.id');
+    pasarNegocioACitas($e);
 
     return [
         'e' => $e, 'sede' => $sede, 'pro' => $pro,

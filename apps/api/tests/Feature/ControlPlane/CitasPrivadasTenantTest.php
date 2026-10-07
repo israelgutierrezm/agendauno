@@ -37,6 +37,7 @@ function estudioConServicioDeCitas(): array
     $pro = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
         ->assertOk()->json('data.0.id');
 
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $pro, $sede['sucursal']);
     // Se paga en línea para confirmar (la cita se aparta hasta pagarla).
     activarCobroEnLinea($e);
@@ -72,14 +73,24 @@ it('la cita de un cliente no aparece en la agenda de otros miembros ni en el esc
     expect($publico['estudio']['tiene_citas'])->toBeTrue();
 });
 
-it('las clases abiertas siguen apareciendo en la agenda del miembro', function (): void {
+it('las clases abiertas aparecen en la agenda del miembro solo en un negocio de clases', function (): void {
+    // Un negocio no tiene clases y citas a la vez (ADR 0104): en uno de citas, una
+    // sesión nueva también es una cita y la agenda del miembro no lista nada.
     $ctx = estudioConServicioDeCitas();
     $ana = alumnoConSesion($ctx['e'], 'Ana', 'ana@correo.mx');
     crearSesionTenant($ctx['e'], $ctx['sede'], null, now()->addDays(5)->format('Y-m-d').' 08:00:00');
     agendarCitaComo($ctx, $ana['bearer']);
 
     $this->getJson("/api/v1/app/{$ctx['e']['slug']}/mi/agenda", conBearer($ana['bearer']))
-        ->assertOk()->assertJsonCount(1, 'data');
+        ->assertOk()->assertJsonCount(0, 'data');
+
+    // En uno de clases, la clase abierta sí aparece.
+    $clases = estudioConSesion('pilates-a', 'dueno@pilates.mx');
+    crearSesionTenant($clases, agendaSemilla($clases), null, now()->addDays(5)->format('Y-m-d').' 08:00:00');
+    $vale = alumnoConSesion($clases, 'Vale', 'vale@correo.mx');
+
+    $this->getJson("/api/v1/app/{$clases['slug']}/mi/agenda", conBearer($vale['bearer']))
+        ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.tipo', 'clase');
 });
 
 it('nadie más puede reservar ni esperar el lugar de una cita ajena', function (): void {

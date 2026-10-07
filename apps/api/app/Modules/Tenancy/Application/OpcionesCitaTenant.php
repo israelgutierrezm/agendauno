@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
-use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\HorarioAtencionTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
@@ -18,10 +17,12 @@ use Illuminate\Database\Eloquent\Builder;
  * Lo que se puede elegir al agendar una cita: los servicios agendables, las sedes y
  * los profesionales. Lo usan la página pública del negocio y la cuenta del cliente.
  *
- * En la página pública solo se agendan servicios con precio (se pagan ahí o en la
- * sucursal). Con la cuenta, además, los que se toman con un bono o membresía que la
- * persona tiene vigente y con saldo (`con_plan`): así se canjean sus sesiones
- * (ADR 0091). `hay_con_plan` avisa a la página pública que existen.
+ * Los servicios son las ofertas del negocio de citas (ADR 0104); uno de clases no
+ * agenda citas y no tiene ninguno. En la página pública solo se agendan los que se
+ * cobran al agendar (se pagan ahí o en la sucursal). Con la cuenta, además, los que se
+ * toman con un bono o membresía que la persona tiene vigente y con saldo
+ * (`con_plan`): así se canjean sus sesiones (ADR 0091). `hay_con_plan` avisa a la
+ * página pública que existen.
  */
 class OpcionesCitaTenant
 {
@@ -35,6 +36,7 @@ class OpcionesCitaTenant
         private readonly CobroDeCitasTenant $cobro,
         private readonly WhatsAppTenant $whatsapp,
         private readonly ResolverDerechoTenant $derechos,
+        private readonly ModalidadNegocioTenant $modalidad,
     ) {}
 
     /**
@@ -47,7 +49,7 @@ class OpcionesCitaTenant
         return [
             'servicios' => $this->servicios($persona),
             // Hay servicios que se toman con bono o membresía (desde la cuenta).
-            'hay_con_plan' => $this->conPlan()->exists(),
+            'hay_con_plan' => $this->modalidad->esCitas() && $this->conPlan()->exists(),
             'sucursales' => SucursalTenant::query()
                 ->orderBy('nombre')
                 ->get()
@@ -108,6 +110,11 @@ class OpcionesCitaTenant
      */
     private function servicios(?PersonaTenant $persona): array
     {
+        if (! $this->modalidad->esCitas()) {
+            return [];
+        }
+
+        // Se cobran al agendar: `pago` dice cómo se habilita la reserva, no si es cita.
         $deCobro = OfertaTenant::query()
             ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
             ->with(['actividad', 'incluidas'])
@@ -140,14 +147,13 @@ class OpcionesCitaTenant
     }
 
     /**
-     * Servicios de cita (individuales o privados) que se toman con un bono o membresía.
+     * Servicios que se toman con un bono o membresía (no se cobran al agendar).
      *
      * @return Builder<OfertaTenant>
      */
     private function conPlan(): Builder
     {
         return OfertaTenant::query()
-            ->where('politica_reserva', '!=', PoliticaReservaTenant::Pago->value)
-            ->whereIn('modalidad', [ModalidadOfertaTenant::Individual->value, ModalidadOfertaTenant::Privada->value]);
+            ->where('politica_reserva', '!=', PoliticaReservaTenant::Pago->value);
     }
 }

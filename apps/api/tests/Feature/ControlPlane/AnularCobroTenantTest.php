@@ -108,6 +108,7 @@ it('anular el cobro de una cita la deja otra vez por cobrar', function (): void 
     personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia-anula.mx', 'instructor');
     $pro = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
     $dia = now()->addDay()->format('Y-m-d');
+    pasarNegocioACitas($e);
     $cita = $this->postJson("/api/v1/app/{$e['slug']}/agenda/citas", [
         'persona_id' => crearMiembroTenant($e, 'Israel'), 'oferta_id' => $sede['oferta'],
         'sucursal_id' => $sede['sucursal'], 'instructor_id' => $pro, 'inicia_en_local' => "{$dia} 11:00:00",

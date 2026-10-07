@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\RespaldosEstudio;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -117,8 +118,12 @@ class VerificarConcurrencia extends Command
 
             $this->caso('Dos personas por el último lugar de una clase', fn () => $this->ultimoLugar($escenarios, $rondas, $procesos));
             $this->caso('Reservas a la vez con el último crédito del paquete', fn () => $this->ultimoCredito($escenarios, $rondas));
+            // Un negocio es solo de clases o solo de citas (ADR 0104): las citas se
+            // prueban con el negocio temporal pasado a citas y luego vuelve a clases.
+            $this->modalidad(ModalidadServicio::Citas);
             $this->caso('Mismo profesional y horario (agendar y reprogramar)', fn () => $this->mismaCita($escenarios, $rondas, $procesos));
             $this->caso('Misma hora con cualquier profesional disponible', fn () => $this->cualquierProfesional($escenarios, $rondas, $procesos));
+            $this->modalidad(ModalidadServicio::Clases);
             $this->caso('Cancelar y reprogramar la misma reserva a la vez', fn () => $this->cancelarYReprogramar($escenarios, $rondas));
             $this->caso('Reprogramaciones y reservas por el último lugar', fn () => $this->reprogramarAlUltimoLugar($escenarios, $rondas, $procesos));
             $this->caso('Una cancelación libera lugar mientras otros lo piden', fn () => $this->cancelacionLiberaLugar($escenarios, $rondas));
@@ -140,6 +145,15 @@ class VerificarConcurrencia extends Command
         $this->info('Todo cuadró con procesos simultáneos en MySQL.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Fija la modalidad del negocio temporal. Los procesos hijos la leen al conectarse
+     * y este proceso usa la misma instancia que tiene la conexión.
+     */
+    private function modalidad(ModalidadServicio $modalidad): void
+    {
+        $this->principal->forceFill(['modalidad' => $modalidad])->save();
     }
 
     /**

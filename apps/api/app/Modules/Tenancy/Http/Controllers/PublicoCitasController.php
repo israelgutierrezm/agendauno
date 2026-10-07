@@ -12,6 +12,8 @@ use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
+use App\Modules\Tenancy\Exceptions\ModalidadNoDisponible;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
@@ -58,15 +60,14 @@ class PublicoCitasController
     ) {}
 
     /**
-     * Opciones para agendar una cita (guest): servicios cobrables como cita
+     * Opciones para agendar una cita (guest): los servicios que se cobran al agendar
      * (política = pago), sucursales y proveedores (barberos), todos por ULID —
-     * el identificador público. Solo con la página pública abierta.
+     * el identificador público. Solo con la página pública abierta de un negocio de
+     * citas.
      */
     public function opciones(Request $request): JsonResponse
     {
-        $estudio = $request->attributes->get('estudio');
-        abort_unless($estudio instanceof Estudio, 404);
-        abort_unless($estudio->paginaPublica(), 404);
+        $estudio = $this->paginaDeCitas($request);
 
         return response()->json(['data' => [
             'estudio' => [
@@ -90,9 +91,7 @@ class PublicoCitasController
      */
     public function disponibilidad(Request $request): JsonResponse
     {
-        $estudio = $request->attributes->get('estudio');
-        abort_unless($estudio instanceof Estudio, 404);
-        abort_unless($estudio->paginaPublica(), 404);
+        $this->paginaDeCitas($request);
 
         $validado = $request->validate([
             'instructor_id' => ['nullable', 'string'],
@@ -125,9 +124,7 @@ class PublicoCitasController
      */
     public function dias(Request $request): JsonResponse
     {
-        $estudio = $request->attributes->get('estudio');
-        abort_unless($estudio instanceof Estudio, 404);
-        abort_unless($estudio->paginaPublica(), 404);
+        $this->paginaDeCitas($request);
 
         $validado = $request->validate([
             'sucursal_id' => ['required', 'string'],
@@ -148,9 +145,7 @@ class PublicoCitasController
 
     public function agendar(Request $request): JsonResponse
     {
-        $estudio = $request->attributes->get('estudio');
-        abort_unless($estudio instanceof Estudio, 404);
-        abort_unless($estudio->paginaPublica(), 404);
+        $this->paginaDeCitas($request);
 
         $validado = $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
@@ -298,6 +293,23 @@ class PublicoCitasController
             'estado' => $pago->estado->value,
             'checkout' => $pago->checkout,
         ]], 201);
+    }
+
+    /**
+     * El negocio con su página pública abierta y que trabaja con citas: uno de clases
+     * no agenda citas (ADR 0104). Pagar y ver la orden de una sesión no pasan por aquí:
+     * también los usa la clase de pago suelto (ADR 0065).
+     */
+    private function paginaDeCitas(Request $request): Estudio
+    {
+        $estudio = $request->attributes->get('estudio');
+        abort_unless($estudio instanceof Estudio, 404);
+        abort_unless($estudio->paginaPublica(), 404);
+        if ($estudio->modalidad() !== ModalidadServicio::Citas) {
+            throw new ModalidadNoDisponible($estudio->modalidad());
+        }
+
+        return $estudio;
     }
 
     /**

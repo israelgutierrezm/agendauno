@@ -7,8 +7,6 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\ImportarClasesTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
-use App\Modules\Tenancy\ModalidadServicio;
-use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
@@ -89,11 +87,10 @@ class ImportarClasesTenantController
         return response()->json(['data' => $resultado], $resultado['ok'] ? 201 : 422);
     }
 
+    /** Solo negocios de clases: lo cuida la ruta (`modalidad:clases`). */
     private function actor(Request $request): Usuario
     {
-        $estudio = $request->attributes->get('estudio');
         $actor = $request->attributes->get('usuario_tenant');
-        abort_unless($estudio instanceof Estudio && $estudio->modalidad() === ModalidadServicio::Clases, 403, 'Esta importación es para la agenda de clases, no para citas.');
         abort_unless($actor instanceof Usuario && $actor->puede('agenda.gestionar'), 403);
 
         return $actor;

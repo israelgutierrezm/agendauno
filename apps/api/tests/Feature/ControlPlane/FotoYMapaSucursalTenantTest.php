@@ -27,6 +27,7 @@ it('sube la foto de la sede, la reemplaza y la quita; al agendar se ve', functio
     Storage::fake('public');
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $sede = agendaSemilla($e)['sucursal'];
+    pasarNegocioACitas($e);
 
     $primera = $this->post("/api/v1/app/{$e['slug']}/sucursales/{$sede}/foto", [
         'foto' => UploadedFile::fake()->image('sede.jpg', 800, 600),
@@ -69,6 +70,7 @@ it('solo acepta imágenes y solo quien gestiona sucursales sube la foto', functi
 it('guarda el enlace de Google Maps de la sede y es el que se ve para llegar', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $sede = agendaSemilla($e)['sucursal'];
+    pasarNegocioACitas($e);
     $this->putJson("/api/v1/app/{$e['slug']}/sucursales/{$sede}", [
         'direccion' => 'Av. Álvaro Obregón 120, Roma Norte',
     ], conBearer($e['bearer']))->assertOk();

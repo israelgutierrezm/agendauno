@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\FormulariosDePersonaTenant;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
+use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
@@ -24,6 +25,7 @@ use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\ResolverDerechoTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
+use App\Modules\Tenancy\Http\SesionTenantPresenter;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -48,6 +50,7 @@ use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\Reservas\QuienCancela;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -80,6 +83,7 @@ class MiTenantController
         private readonly FormulariosDePersonaTenant $formularios,
         private readonly DomiciliacionesTenant $domiciliaciones,
         private readonly PortalDelClienteTenant $portal,
+        private readonly ModalidadNegocioTenant $modalidad,
     ) {}
 
     /**
@@ -177,7 +181,12 @@ class MiTenantController
                 EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
                 EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value,
             ])
-            ->with(['sesion.oferta', 'sesion.sucursal', 'sesion.instructor', 'orden'])
+            // Con los conteos de su sesión, su asistencia y su orden: el contrato de la
+            // agenda (`clase`, `cita`, `ocupacion`) sin una consulta por reserva.
+            ->with([
+                'sesion' => fn ($q) => $q->withCount(SesionTenantPresenter::conteos()),
+                'sesion.oferta', 'sesion.sucursal', 'sesion.instructor', 'orden', 'asistencia',
+            ])
             ->get()
             ->filter(fn (ReservaTenant $r): bool => $r->sesion !== null && ! $r->sesion->inicia_en->isPast())
             ->map(fn (ReservaTenant $r): array => $this->presentarReserva($r))
@@ -260,17 +269,18 @@ class MiTenantController
         // su zona); luego se queda solo lo que cae en el periodo en la fecha LOCAL.
         $inicio = $desde->subDay()->startOfDay();
         $ahora = CarbonImmutable::now();
-        $sesiones = SesionTenant::query()
+        // Solo clases abiertas, y solo en un negocio de clases: en uno de citas cada
+        // cita es privada de su titular y no hay nada que listar (ADR 0104).
+        $sesiones = ! $this->modalidad->esClases() ? new Collection : SesionTenant::query()
             ->where('estado', 'programada')
-            // Solo clases abiertas: las citas son privadas de su titular.
             ->where('tipo', TipoSesionTenant::Clase->value)
             ->where('inicia_en', '>=', $inicio->greaterThan($ahora) ? $inicio : $ahora)
             ->where('inicia_en', '<', $hasta->addDays(2)->startOfDay())
             ->when($sucursalId !== null, fn ($q) => $q->where('sucursal_id', $sucursalId))
             ->with(['oferta.actividad', 'sucursal', 'instructor'])
             // Cupo ocupado = reservas que toman lugar (confirmadas, ofrecidas y
-            // pendientes de pago, que retienen el cupo mientras se pagan).
-            ->withCount(['reservas as ocupados' => fn ($q) => $q->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::PendientePago->value])])
+            // pendientes de pago, que retienen el cupo mientras se pagan) y cuántos esperan.
+            ->withCount(SesionTenantPresenter::conteos())
             ->orderBy('inicia_en')
             ->limit(self::LIMITE_AGENDA + 1)
             ->get();
@@ -306,6 +316,11 @@ class MiTenantController
                 'capacidad' => $s->capacidad,
                 'ocupados' => (int) ($s->getAttribute('ocupados') ?? 0),
                 'cobertura' => $this->coberturaDe($s, $cobertura),
+                // Contrato de la agenda (ADR 0104): aquí siempre son clases.
+                'tipo' => $s->tipo->value,
+                'clase' => SesionTenantPresenter::clase($s),
+                'cita' => null,
+                'ocupacion' => SesionTenantPresenter::ocupacion($s),
             ])->values()->all(),
             'meta' => [
                 'desde' => $desde->toDateString(),
@@ -319,7 +334,8 @@ class MiTenantController
     }
 
     /**
-     * Cómo entra a esa clase: de pago por clase (con su precio) o con su plan.
+     * Cómo entra a esa clase: de pago por clase (con su precio) o con su plan. La
+     * política de la oferta solo dice cómo se habilita la reserva, nunca si es cita.
      *
      * @param  array<int, array{estado: string, motivo: string|null}>  $cobertura
      * @return array{estado: string, motivo: string|null, precio_minor?: int, moneda?: string}|null
@@ -345,14 +361,15 @@ class MiTenantController
 
         $sesion = SesionTenant::query()->where('ulid', $validado['sesion_id'])->with('oferta')->firstOrFail();
 
-        // Una cita es de su titular: nadie más puede reservarla ni esperar su lugar.
-        if ($sesion->esCita()) {
+        // Aquí solo se reservan clases abiertas. En un negocio de citas cada cita es de
+        // su titular: nadie más puede reservarla ni esperar su lugar (ADR 0104).
+        if (! $this->modalidad->esClases() || $sesion->esCita()) {
             throw new SesionNoReservable('Esta cita es privada.');
         }
 
-        // Citas (pago-para-reservar): si la oferta EXIGE pago, se crea una reserva
-        // pendiente (retiene el cupo) + una orden por la sesión; el miembro paga esa
-        // orden (checkout con las pasarelas) para CONFIRMAR. Si no, flujo por membresía.
+        // Cómo se habilita la reserva de la clase: si es de pago por clase, se crea una
+        // reserva pendiente (retiene el cupo) + una orden por la sesión, y el miembro
+        // paga esa orden (checkout con las pasarelas) para CONFIRMAR. Si no, con su plan.
         if ($sesion->oferta?->politica_reserva === PoliticaReservaTenant::Pago) {
             $monto = (int) ($sesion->oferta->precio_clase_minor ?? 0);
             abort_if($monto <= 0, 422, 'Esta clase requiere pago pero no tiene precio configurado.');
@@ -601,10 +618,15 @@ class MiTenantController
     }
 
     /**
+     * Su reserva con el contrato de la agenda (ADR 0104): los campos de siempre más
+     * `tipo`, `clase` (o null), `cita` (o null) y `ocupacion` (o null). Ver docs/API.md.
+     *
      * @return array<string, mixed>
      */
     private function presentarReserva(ReservaTenant $reserva): array
     {
+        $sesion = $reserva->sesion;
+
         return [
             'id' => $reserva->ulid,
             // `sesion_id` + sucursal identifican la clase exacta: dos clases iguales en
@@ -627,8 +649,34 @@ class MiTenantController
             'zona_horaria' => $reserva->sesion?->zona_horaria,
             // Vencimiento de la oferta de lista de espera (si la reserva está ofrecida).
             'oferta_expira_en' => $reserva->oferta_expira_en?->toIso8601String(),
-            // Pago-para-reservar (citas): orden a pagar para confirmar (si aplica).
+            // Orden a pagar para confirmar (cita o clase de pago por clase), si aplica.
             'orden_id' => $reserva->orden?->ulid,
+            // Lo de su clase (cupo, lista de espera, pago por clase); null si es cita.
+            'clase' => $sesion instanceof SesionTenant ? SesionTenantPresenter::clase($sesion) : null,
+            // Su cita y en qué va (atención y pago, calculados aquí); null si es clase.
+            'cita' => $sesion instanceof SesionTenant && $sesion->esCita() ? $this->citaDeReserva($reserva, $sesion) : null,
+            // La ocupación de su clase que se muestra (0–100); null en citas.
+            'ocupacion' => $sesion instanceof SesionTenant ? SesionTenantPresenter::ocupacion($sesion) : null,
+        ];
+    }
+
+    /**
+     * Su cita: el estado de su reserva, si ya llegó, la orden y en qué va.
+     *
+     * @return array<string, mixed>
+     */
+    private function citaDeReserva(ReservaTenant $reserva, SesionTenant $sesion): array
+    {
+        return [
+            'reserva_id' => $reserva->ulid,
+            'estado' => $reserva->estado->value,
+            // Llegó (presente) / no asistió (ausente); null = aún sin marcar.
+            'asistencia' => $reserva->asistencia?->estado->value,
+            'orden_id' => $reserva->orden?->ulid,
+            // Lo que pidió que supieran al agendar y, si es para otra persona, quién asiste.
+            'nota' => $reserva->nota_cliente,
+            'asiste' => $reserva->asiste,
+            ...SesionTenantPresenter::estadoCita($sesion, $reserva, CarbonImmutable::now()),
         ];
     }
 

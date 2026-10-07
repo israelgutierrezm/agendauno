@@ -49,6 +49,7 @@ it('calcula huecos libres del proveedor dentro de su horario de atención', func
     personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
     $coachId = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
         ->assertOk()->json('data.0.id');
+    pasarNegocioACitas($e);
 
     $fecha = '2026-10-05';
     $dia = (int) CarbonImmutable::parse($fecha)->isoWeekday();
@@ -64,6 +65,7 @@ it('excluye los huecos que chocan con una clase/cita del proveedor', function ()
     personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
     $coachId = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
         ->assertOk()->json('data.0.id');
+    pasarNegocioACitas($e);
 
     $fecha = '2026-10-05';
     $dia = (int) CarbonImmutable::parse($fecha)->isoWeekday();
@@ -86,6 +88,7 @@ it('sin proveedor, lista las ventanas de atención de todos (agenda por profesio
     personalConSesion($e['slug'], $e['bearer'], 'coach2@correo.mx', 'instructor');
     $ids = collect($this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
         ->assertOk()->json('data'))->pluck('id')->all();
+    pasarNegocioACitas($e);
 
     fijarHorarioAtencion($e, $ids[0], $sede['sucursal'], 1);
     fijarHorarioAtencion($e, $ids[1], $sede['sucursal'], 2);
@@ -104,6 +107,7 @@ it('un día cerrado del negocio no ofrece huecos de cita', function (): void {
     personalConSesion($e['slug'], $e['bearer'], 'coach@correo.mx', 'instructor');
     $coachId = (string) $this->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
         ->assertOk()->json('data.0.id');
+    pasarNegocioACitas($e);
 
     $fecha = '2026-10-05';
     fijarHorarioAtencion($e, $coachId, $sede['sucursal'], (int) CarbonImmutable::parse($fecha)->isoWeekday());

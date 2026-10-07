@@ -20,7 +20,6 @@ use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 
 /**
  * El cliente cambia el horario de su reserva desde su cuenta (ADR 0044): una cita a
@@ -28,6 +27,10 @@ use Illuminate\Validation\ValidationException;
  * misma clase. Hasta cuántas horas antes y cuántas veces por reserva lo decide el
  * negocio (parámetros `reprogramar.*`). Usa las mismas reglas que el negocio (2.1):
  * no se vuelve a cobrar y se avisa del cambio.
+ *
+ * La forma de entrada y de salida la decide el TIPO de la sesión (ADR 0104): las
+ * opciones traen `tipo` y, según él, `slots` (cita) o `sesiones` (clase); al cambiar,
+ * lo del otro tipo se rechaza con 422. Ver docs/API.md, «Agenda».
  */
 class MiReprogramarTenantController
 {
@@ -51,7 +54,7 @@ class MiReprogramarTenantController
         $base = [
             'puede' => $motivo === null,
             'motivo' => $motivo,
-            'tipo' => $sesion->esCita() ? 'cita' : 'clase',
+            'tipo' => $sesion->tipo->value,
             'restantes' => max(0, $this->parametros->entero('reprogramar.maximo_cliente') - (int) $reserva->reprogramaciones_cliente),
             'hasta' => $this->limite($sesion)->toIso8601String(),
         ];
@@ -106,7 +109,8 @@ class MiReprogramarTenantController
     }
 
     /**
-     * Cita: `inicia_en_local`. Clase: `sesion_id` (otra fecha de la misma clase).
+     * Cita: `inicia_en_local` (obligatorio). Clase: `sesion_id` (obligatorio, otra fecha
+     * de la misma clase).
      */
     public function reprogramar(Request $request): JsonResponse
     {
@@ -117,18 +121,18 @@ class MiReprogramarTenantController
         if ($motivo !== null) {
             throw new SesionNoReservable($motivo);
         }
-        $validado = $request->validate([
-            'inicia_en_local' => ['nullable', 'date'],
-            'sesion_id' => ['nullable', 'string'],
-        ]);
         $actor = $request->attributes->get('usuario_tenant');
         $actor = $actor instanceof Usuario ? $actor : null;
         $antes = $sesion->inicia_en->toIso8601String();
 
         if ($sesion->esCita()) {
-            if (($validado['inicia_en_local'] ?? '') === '') {
-                throw ValidationException::withMessages(['inicia_en_local' => ['Elige el nuevo horario.']]);
-            }
+            $validado = $request->validate([
+                'inicia_en_local' => ['required', 'date'],
+                'sesion_id' => ['prohibited'],
+            ], [
+                'inicia_en_local.required' => 'Elige el nuevo horario.',
+                'sesion_id.prohibited' => 'Una cita se cambia de horario, no a otra sesión.',
+            ]);
             $sucursal = SucursalTenant::query()->findOrFail($sesion->sucursal_id);
             $inicia = CarbonImmutable::parse((string) $validado['inicia_en_local'], (string) $sucursal->zona_horaria)->utc();
             $termina = $inicia->addMinutes((int) $sesion->inicia_en->diffInMinutes($sesion->termina_en, true));
@@ -139,14 +143,24 @@ class MiReprogramarTenantController
             }
             $movida = $this->reprogramar->moverCita($reserva, $inicia, null, $actor);
         } else {
-            $destino = SesionTenant::query()->where('ulid', (string) ($validado['sesion_id'] ?? ''))->firstOrFail();
+            $validado = $request->validate([
+                'sesion_id' => ['required', 'string'],
+                'inicia_en_local' => ['prohibited'],
+            ], [
+                'sesion_id.required' => 'Elige la nueva fecha.',
+                'inicia_en_local.prohibited' => 'En una clase se elige otra fecha de la clase.',
+            ]);
+            $destino = SesionTenant::query()->where('ulid', (string) $validado['sesion_id'])->firstOrFail();
             $movida = $this->reprogramar->moverAClase($reserva, $destino, $actor);
         }
         $movida->forceFill(['reprogramaciones_cliente' => (int) $movida->reprogramaciones_cliente + 1])->save();
         $movida->load('sesion');
 
         return response()->json(['data' => [
+            // 'clase' | 'cita': qué forma de entrada se usó.
+            'tipo' => $sesion->tipo->value,
             'reserva' => $movida->ulid,
+            'sesion_id' => $movida->sesion?->ulid,
             'antes' => $antes,
             'ahora' => $movida->sesion?->inicia_en->toIso8601String(),
             'restantes' => max(0, $this->parametros->entero('reprogramar.maximo_cliente') - (int) $movida->reprogramaciones_cliente),

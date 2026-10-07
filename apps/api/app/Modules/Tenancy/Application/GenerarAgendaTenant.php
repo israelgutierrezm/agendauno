@@ -25,16 +25,22 @@ use Illuminate\Support\Facades\DB;
  *   el instructor no puede tener otra cosa a esa hora y la sala no puede pasarse de su
  *   cupo, bajo el mismo candado por profesional y recurso.
  * - Lo que no se puede generar se omite y se REPORTA (fecha y motivo).
+ * - Una serie es de clases: en un negocio de citas no genera nada (ADR 0104) y el
+ *   tipo de cada sesión es el de la modalidad del negocio.
  */
 class GenerarAgendaTenant
 {
-    public function __construct(private readonly VerificarAgendaTenant $agenda) {}
+    public function __construct(
+        private readonly VerificarAgendaTenant $agenda,
+        private readonly ModalidadNegocioTenant $modalidad,
+    ) {}
 
     public function ejecutar(PlantillaHorarioTenant $plantilla, string $desde, string $hasta): GeneracionDeAgenda
     {
-        if (! $plantilla->activo) {
+        if (! $plantilla->activo || ! $this->modalidad->esClases()) {
             return new GeneracionDeAgenda(0, []);
         }
+        $tipo = $this->modalidad->tipoSesion()->value;
 
         $zona = is_string($plantilla->sucursal?->zona_horaria) ? $plantilla->sucursal->zona_horaria : 'UTC';
         $capacidad = $plantilla->capacidad ?? $plantilla->oferta?->capacidad;
@@ -63,7 +69,7 @@ class GenerarAgendaTenant
             ->map(fn ($fecha): string => $fecha->toDateString())
             ->flip();
 
-        return DB::connection('tenant')->transaction(function () use ($plantilla, $inicio, $fin, $dias, $zona, $capacidad, $excepciones, $recurso): GeneracionDeAgenda {
+        return DB::connection('tenant')->transaction(function () use ($plantilla, $inicio, $fin, $dias, $zona, $capacidad, $excepciones, $recurso, $tipo): GeneracionDeAgenda {
             $this->agenda->bloquear($plantilla->instructor_id !== null ? (int) $plantilla->instructor_id : null, $recurso);
 
             $creadas = 0;
@@ -113,6 +119,7 @@ class GenerarAgendaTenant
                         'zona_horaria' => $zona,
                         'capacidad' => $capacidad,
                         'estado' => EstadoSesionTenant::Programada->value,
+                        'tipo' => $tipo,
                         'fecha_serie' => $dia->toDateString(),
                     ],
                 );

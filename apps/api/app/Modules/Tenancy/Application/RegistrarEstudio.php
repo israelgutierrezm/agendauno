@@ -8,7 +8,9 @@ use App\Modules\Tenancy\CatalogoPaises;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\Exceptions\SlugNoDisponible;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\PerfilNegocio;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Str;
 
@@ -114,11 +116,12 @@ class RegistrarEstudio
             : self::nombreDeBase($slug);
         // Todo negocio tiene país (ADR 0103): México si no se dice otro.
         $pais = CatalogoPaises::codigo($datos['pais'] ?? null) ?: CatalogoPaises::PREDETERMINADO;
+        $perfil = PerfilNegocio::from($datos['perfil_negocio'] ?? PerfilNegocio::General->value);
 
-        return Estudio::create([
+        $estudio = new Estudio([
             'nombre' => $datos['nombre'],
             'slug' => $slug,
-            'perfil_negocio' => $datos['perfil_negocio'] ?? 'general',
+            'perfil_negocio' => $perfil->value,
             'estado' => EstadoEstudio::Provisioning->value,
             'estado_facturacion' => EstadoFacturacion::Trial->value,
             // Por defecto el estudio aparece en el directorio en cuanto queda
@@ -139,5 +142,10 @@ class RegistrarEstudio
             'db_driver' => $driver,
             'db_database' => $dbDatabase,
         ]);
+        // Solo clases o solo citas (ADR 0104): el giro elegido da la modalidad, que
+        // queda guardada; después solo la cambia el superadmin.
+        $estudio->forceFill(['modalidad' => ModalidadServicio::paraPerfil($perfil)])->save();
+
+        return $estudio;
     }
 }

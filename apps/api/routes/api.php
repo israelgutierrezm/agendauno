@@ -169,6 +169,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/estudios/{estudio}/extender-prueba', [PlataformaEstudiosController::class, 'extenderPrueba'])->name('estudios.extender-prueba');
         // Avisos por WhatsApp del negocio a sus clientes: solo los activa la plataforma (ADR 0083).
         Route::put('/estudios/{estudio}/whatsapp', [PlataformaEstudiosController::class, 'whatsapp'])->name('estudios.whatsapp');
+        // Clases o citas (excluyente): solo la plataforma la cambia, antes de operar (ADR 0104).
+        Route::put('/estudios/{estudio}/modalidad', [PlataformaEstudiosController::class, 'modalidad'])->name('estudios.modalidad');
         // Cómo se llaman las cosas en el negocio (ADR 0049).
         Route::get('/estudios/{estudio}/terminologia', [PlataformaEstudiosController::class, 'terminologia'])->name('estudios.terminologia');
         Route::put('/estudios/{estudio}/terminologia', [PlataformaEstudiosController::class, 'guardarTerminologia'])->name('estudios.terminologia.guardar');
@@ -231,10 +233,12 @@ Route::prefix('v1')->group(function (): void {
         // Citas públicas (guest, sin cuenta): opciones (servicios/sucursales/barberos)
         // y disponibilidad para elegir hueco; luego agendar y pagar en línea (el
         // orden_id devuelto es la capacidad para pagar). Solo directorio.
-        Route::get('/citas/opciones', [PublicoCitasController::class, 'opciones'])->middleware('throttle:negocio-publico')->name('citas.opciones');
-        Route::get('/citas/disponibilidad', [PublicoCitasController::class, 'disponibilidad'])->middleware('throttle:negocio-publico')->name('citas.disponibilidad');
-        Route::get('/citas/dias', [PublicoCitasController::class, 'dias'])->middleware('throttle:negocio-publico')->name('citas.dias');
-        Route::post('/citas', [PublicoCitasController::class, 'agendar'])->middleware('throttle:login')->name('citas.agendar');
+        Route::get('/citas/opciones', [PublicoCitasController::class, 'opciones'])->middleware(['throttle:negocio-publico', 'modalidad:citas'])->name('citas.opciones');
+        Route::get('/citas/disponibilidad', [PublicoCitasController::class, 'disponibilidad'])->middleware(['throttle:negocio-publico', 'modalidad:citas'])->name('citas.disponibilidad');
+        Route::get('/citas/dias', [PublicoCitasController::class, 'dias'])->middleware(['throttle:negocio-publico', 'modalidad:citas'])->name('citas.dias');
+        Route::post('/citas', [PublicoCitasController::class, 'agendar'])->middleware(['throttle:login', 'modalidad:citas'])->name('citas.agendar');
+        // Pagar y ver la orden de una sesión por el enlace del correo: también la clase
+        // de pago suelto (ADR 0065), así que son del núcleo, sin modalidad.
         Route::post('/citas/pagar', [PublicoCitasController::class, 'pagar'])->middleware('throttle:login')->name('citas.pagar');
         // La cita por pagar del enlace del correo de apartado (el ULID de la orden es la capacidad).
         Route::get('/citas/orden/{orden}', [PublicoCitasController::class, 'orden'])->middleware('throttle:negocio-publico')->name('citas.orden');
@@ -275,10 +279,10 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/agenda', [MiTenantController::class, 'agenda'])->name('mi.agenda');
             Route::post('/mi/reservas', [MiTenantController::class, 'reservar'])->name('mi.reservas.store');
             // Agenda una cita desde un hueco de disponibilidad (F-08): crea la sesión + reserva/pago.
-            Route::get('/mi/citas/opciones', [MiTenantController::class, 'opcionesCita'])->name('mi.citas.opciones');
-            Route::get('/mi/citas/disponibilidad', [MiTenantController::class, 'disponibilidadCita'])->name('mi.citas.disponibilidad');
-            Route::get('/mi/citas/dias', [MiTenantController::class, 'diasCita'])->name('mi.citas.dias');
-            Route::post('/mi/citas', [MiTenantController::class, 'agendarCita'])->name('mi.citas.store');
+            Route::get('/mi/citas/opciones', [MiTenantController::class, 'opcionesCita'])->middleware('modalidad:citas')->name('mi.citas.opciones');
+            Route::get('/mi/citas/disponibilidad', [MiTenantController::class, 'disponibilidadCita'])->middleware('modalidad:citas')->name('mi.citas.disponibilidad');
+            Route::get('/mi/citas/dias', [MiTenantController::class, 'diasCita'])->middleware('modalidad:citas')->name('mi.citas.dias');
+            Route::post('/mi/citas', [MiTenantController::class, 'agendarCita'])->middleware('modalidad:citas')->name('mi.citas.store');
             Route::post('/mi/reservas/{reserva}/cancelar', [MiTenantController::class, 'cancelar'])->name('mi.reservas.cancelar');
             // Cambiar el horario desde su cuenta (ADR 0044).
             Route::get('/mi/reservas/{reserva}/reprogramar', [MiReprogramarTenantController::class, 'opciones'])->name('mi.reservas.reprogramar.opciones');
@@ -289,7 +293,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/derechos/{derecho}/movimientos', [MiTenantController::class, 'movimientosDerecho'])->name('mi.derechos.movimientos');
             Route::get('/mi/planes', [MiTenantController::class, 'planes'])->name('mi.planes');
             Route::get('/mi/clima', [MiTenantController::class, 'clima'])->middleware('throttle:clima')->name('mi.clima');
-            Route::post('/mi/reservas/{reserva}/aceptar', [MiTenantController::class, 'aceptar'])->name('mi.reservas.aceptar');
+            // El lugar que le ofreció la lista de espera (solo en clases).
+            Route::post('/mi/reservas/{reserva}/aceptar', [MiTenantController::class, 'aceptar'])->middleware('modalidad:clases')->name('mi.reservas.aceptar');
             Route::get('/mi/waivers', [MiTenantController::class, 'waiversPendientes'])->name('mi.waivers.index');
             Route::post('/mi/waivers/{waiver}/aceptar', [MiTenantController::class, 'aceptarWaiver'])->name('mi.waivers.aceptar');
             Route::get('/mi/formularios', [MiTenantController::class, 'formularios'])->name('mi.formularios.index');
@@ -361,7 +366,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/solicitudes-privacidad/{solicitud}/atender', [SolicitudesPrivacidadTenantController::class, 'atender'])->middleware('puede:miembros.gestionar')->name('solicitudes-privacidad.atender');
             Route::post('/solicitudes-privacidad/{solicitud}/rechazar', [SolicitudesPrivacidadTenantController::class, 'rechazar'])->middleware('puede:miembros.gestionar')->name('solicitudes-privacidad.rechazar');
             // Padrón facturable (P0): base de la renta SaaS; `?formato=csv` para exportar. Ruta literal antes de {persona}.
-            Route::get('/miembros/padron', [MiembrosTenantController::class, 'padron'])->middleware('puede:facturacion.ver')->name('miembros.padron');
+            Route::get('/miembros/padron', [MiembrosTenantController::class, 'padron'])->middleware(['puede:facturacion.ver', 'modalidad:clases'])->name('miembros.padron');
             // Números del directorio de clientes. Ruta literal antes de {persona}.
             Route::get('/miembros/resumen', ResumenClientesTenantController::class)->middleware('puede:miembros.ver')->name('miembros.resumen');
             // El listado en CSV (mismos filtros que en pantalla). Ruta literal antes de {persona}.
@@ -384,10 +389,10 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/importaciones/instructores', [ImportacionesTenantController::class, 'importarInstructores'])->middleware('puede:usuarios.invitar')->name('importaciones.instructores.store');
 
             // Importación de clases por fecha o programación semanal (ADR 0092).
-            Route::get('/importaciones/clases/catalogos', [ImportarClasesTenantController::class, 'catalogos'])->middleware('puede:agenda.gestionar')->name('importaciones.clases.catalogos');
-            Route::get('/importaciones/clases/plantilla', [ImportarClasesTenantController::class, 'plantilla'])->middleware('puede:agenda.gestionar')->name('importaciones.clases.plantilla');
-            Route::post('/importaciones/clases/preview', [ImportarClasesTenantController::class, 'preview'])->middleware('puede:agenda.gestionar')->name('importaciones.clases.preview');
-            Route::post('/importaciones/clases', [ImportarClasesTenantController::class, 'importar'])->middleware('puede:agenda.gestionar')->name('importaciones.clases.store');
+            Route::get('/importaciones/clases/catalogos', [ImportarClasesTenantController::class, 'catalogos'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('importaciones.clases.catalogos');
+            Route::get('/importaciones/clases/plantilla', [ImportarClasesTenantController::class, 'plantilla'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('importaciones.clases.plantilla');
+            Route::post('/importaciones/clases/preview', [ImportarClasesTenantController::class, 'preview'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('importaciones.clases.preview');
+            Route::post('/importaciones/clases', [ImportarClasesTenantController::class, 'importar'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('importaciones.clases.store');
 
             // Tareas de seguimiento (R16): bandeja de pendientes del staff (manuales o automaticas).
             Route::get('/tareas', [TareasTenantController::class, 'index'])->middleware('puede:tareas.ver')->name('tareas.index');
@@ -488,7 +493,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/programas', [CatalogoTenantController::class, 'programas'])->middleware('puede:catalogo.ver')->name('programas.index');
             Route::post('/programas', [CatalogoTenantController::class, 'crearPrograma'])->middleware('puede:catalogo.gestionar')->name('programas.store');
             Route::post('/programas/{programa}/actividades', [CatalogoTenantController::class, 'crearActividad'])->middleware('puede:catalogo.gestionar')->name('actividades.store');
-            Route::post('/actividades/{actividad}/niveles', [CatalogoTenantController::class, 'crearNivel'])->middleware('puede:catalogo.gestionar')->name('niveles.store');
+            // Niveles de una actividad: solo en clases (y si el giro los usa).
+            Route::post('/actividades/{actividad}/niveles', [CatalogoTenantController::class, 'crearNivel'])->middleware(['puede:catalogo.gestionar', 'modalidad:clases'])->name('niveles.store');
             Route::post('/actividades/{actividad}/ofertas', [CatalogoTenantController::class, 'crearOferta'])->middleware('puede:catalogo.gestionar')->name('ofertas.store');
             Route::get('/ofertas', [CatalogoTenantController::class, 'ofertas'])->middleware('puede:catalogo.ver')->name('ofertas.index');
             // Servicios o clases en una línea (nombre, duración y precio o cupo).
@@ -499,9 +505,9 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/ofertas/{oferta}/foto', [CatalogoTenantController::class, 'eliminarFoto'])->middleware('puede:catalogo.gestionar')->name('ofertas.foto.destroy');
 
             // Capacidad por canal / marketplace (R20): reserva cupos de una oferta para un canal.
-            Route::get('/ofertas/{oferta}/capacidad-canal', [CapacidadCanalTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('ofertas.capacidad-canal.index');
-            Route::put('/ofertas/{oferta}/capacidad-canal', [CapacidadCanalTenantController::class, 'guardar'])->middleware('puede:agenda.gestionar')->name('ofertas.capacidad-canal.guardar');
-            Route::delete('/capacidad-canal/{regla}', [CapacidadCanalTenantController::class, 'eliminar'])->middleware('puede:agenda.eliminar')->name('capacidad-canal.destroy');
+            Route::get('/ofertas/{oferta}/capacidad-canal', [CapacidadCanalTenantController::class, 'index'])->middleware(['puede:agenda.ver', 'modalidad:clases'])->name('ofertas.capacidad-canal.index');
+            Route::put('/ofertas/{oferta}/capacidad-canal', [CapacidadCanalTenantController::class, 'guardar'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('ofertas.capacidad-canal.guardar');
+            Route::delete('/capacidad-canal/{regla}', [CapacidadCanalTenantController::class, 'eliminar'])->middleware(['puede:agenda.eliminar', 'modalidad:clases'])->name('capacidad-canal.destroy');
 
             // Estructura del estudio (data plane del tenant): Organización → Sucursal.
             Route::get('/organizaciones', [OrganizacionesTenantController::class, 'organizaciones'])->middleware('puede:organizaciones.ver')->name('organizaciones.index');
@@ -537,7 +543,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/sesiones', [AgendaTenantController::class, 'sesiones'])->middleware('puede:agenda.ver')->name('sesiones.index');
             // Smart-fill (R32): clases proximas con lugares libres (oportunidades de llenado).
             // Ruta literal ANTES de cualquier /sesiones/{sesion} para no ser sombreada.
-            Route::get('/sesiones/oportunidades', [AgendaTenantController::class, 'oportunidades'])->middleware('puede:agenda.ver')->name('sesiones.oportunidades');
+            Route::get('/sesiones/oportunidades', [AgendaTenantController::class, 'oportunidades'])->middleware(['puede:agenda.ver', 'modalidad:clases'])->name('sesiones.oportunidades');
             // Verifica conflictos (instructor/sala/recurso) SIN guardar (rework Agenda).
             // Literal antes de /sesiones/{sesion} para no ser sombreada.
             Route::post('/sesiones/verificar', [AgendaTenantController::class, 'verificar'])->middleware('puede:agenda.gestionar')->name('sesiones.verificar');
@@ -547,25 +553,25 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/sesiones/{sesion}/cancelacion', [AgendaTenantController::class, 'previsualizarCancelacion'])->middleware('puede:agenda.gestionar')->name('sesiones.cancelacion');
             // El negocio agenda una cita para un cliente (recepción/teléfono): confirmada,
             // se cobra en caja. Quien gestiona reservas puede agendar.
-            Route::post('/agenda/citas', [AgendaTenantController::class, 'agendarCita'])->middleware('puede:reservas.gestionar')->name('agenda.citas.store');
+            Route::post('/agenda/citas', [AgendaTenantController::class, 'agendarCita'])->middleware(['puede:reservas.gestionar', 'modalidad:citas'])->name('agenda.citas.store');
 
             // Front desk (R13): vista de un dia en una sucursal con metricas.
             Route::get('/front-desk', [FrontDeskTenantController::class, 'dia'])->middleware('puede:agenda.ver')->name('front-desk.dia');
 
             // Disponibilidad para citas (F-08): horario de atención del proveedor +
             // huecos libres para agendar (elegir barbero → disponibilidad → agendar).
-            Route::get('/horarios-atencion', [DisponibilidadTenantController::class, 'horarios'])->middleware('puede:agenda.ver')->name('horarios-atencion.index');
-            Route::put('/horarios-atencion', [DisponibilidadTenantController::class, 'guardarHorarios'])->middleware('puede:agenda.gestionar')->name('horarios-atencion.guardar');
-            Route::get('/disponibilidad', [DisponibilidadTenantController::class, 'disponibilidad'])->middleware('puede:agenda.ver')->name('disponibilidad.index');
+            Route::get('/horarios-atencion', [DisponibilidadTenantController::class, 'horarios'])->middleware(['puede:agenda.ver', 'modalidad:citas'])->name('horarios-atencion.index');
+            Route::put('/horarios-atencion', [DisponibilidadTenantController::class, 'guardarHorarios'])->middleware(['puede:agenda.gestionar', 'modalidad:citas'])->name('horarios-atencion.guardar');
+            Route::get('/disponibilidad', [DisponibilidadTenantController::class, 'disponibilidad'])->middleware(['puede:agenda.ver', 'modalidad:citas'])->name('disponibilidad.index');
 
             // Agenda recurrente (R5): plantillas de horario (materializan sesiones con
             // serie_id), excepciones (feriados/cierres) y generacion bajo demanda.
-            Route::get('/plantillas-horario', [PlantillasHorarioTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('plantillas-horario.index');
-            Route::post('/plantillas-horario', [PlantillasHorarioTenantController::class, 'crear'])->middleware('puede:agenda.gestionar')->name('plantillas-horario.store');
-            Route::delete('/plantillas-horario/{plantilla}', [PlantillasHorarioTenantController::class, 'eliminar'])->middleware('puede:agenda.eliminar')->name('plantillas-horario.eliminar');
+            Route::get('/plantillas-horario', [PlantillasHorarioTenantController::class, 'index'])->middleware(['puede:agenda.ver', 'modalidad:clases'])->name('plantillas-horario.index');
+            Route::post('/plantillas-horario', [PlantillasHorarioTenantController::class, 'crear'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('plantillas-horario.store');
+            Route::delete('/plantillas-horario/{plantilla}', [PlantillasHorarioTenantController::class, 'eliminar'])->middleware(['puede:agenda.eliminar', 'modalidad:clases'])->name('plantillas-horario.eliminar');
             // "Esta y las siguientes" (2.5), con vista previa.
-            Route::post('/plantillas-horario/{plantilla}/cambiar', [PlantillasHorarioTenantController::class, 'cambiar'])->middleware('puede:agenda.gestionar')->name('plantillas-horario.cambiar');
-            Route::post('/plantillas-horario/{plantilla}/generar', [PlantillasHorarioTenantController::class, 'generar'])->middleware('puede:agenda.gestionar')->name('plantillas-horario.generar');
+            Route::post('/plantillas-horario/{plantilla}/cambiar', [PlantillasHorarioTenantController::class, 'cambiar'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('plantillas-horario.cambiar');
+            Route::post('/plantillas-horario/{plantilla}/generar', [PlantillasHorarioTenantController::class, 'generar'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('plantillas-horario.generar');
             // Bloqueos (2.2): comida/vacaciones de un profesional, cierre de sede, sala en mantenimiento.
             Route::get('/bloqueos', [BloqueosAgendaTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('bloqueos.index');
             Route::post('/bloqueos/previsualizar', [BloqueosAgendaTenantController::class, 'previsualizar'])->middleware('puede:agenda.gestionar')->name('bloqueos.previsualizar');
@@ -584,10 +590,10 @@ Route::prefix('v1')->group(function (): void {
 
             // Grupos / cursos con inscripcion (R25): un grupo sigue una serie; inscribir
             // auto-reserva las ocurrencias futuras.
-            Route::get('/grupos', [GruposTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('grupos.index');
-            Route::post('/grupos', [GruposTenantController::class, 'crear'])->middleware('puede:agenda.gestionar')->name('grupos.store');
-            Route::get('/grupos/{grupo}/inscripciones', [GruposTenantController::class, 'inscripciones'])->middleware('puede:agenda.ver')->name('grupos.inscripciones.index');
-            Route::post('/grupos/{grupo}/inscripciones', [GruposTenantController::class, 'inscribir'])->middleware('puede:agenda.gestionar')->name('grupos.inscripciones.store');
+            Route::get('/grupos', [GruposTenantController::class, 'index'])->middleware(['puede:agenda.ver', 'modalidad:clases'])->name('grupos.index');
+            Route::post('/grupos', [GruposTenantController::class, 'crear'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('grupos.store');
+            Route::get('/grupos/{grupo}/inscripciones', [GruposTenantController::class, 'inscripciones'])->middleware(['puede:agenda.ver', 'modalidad:clases'])->name('grupos.inscripciones.index');
+            Route::post('/grupos/{grupo}/inscripciones', [GruposTenantController::class, 'inscribir'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('grupos.inscripciones.store');
 
             // Recursos reservables (R3): salas/canchas/carriles/equipos. El motor de
             // agenda evita sobre-reservarlos (unidad = 1; pool = capacidad).
@@ -644,11 +650,11 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/reservas/{reserva}/cancelar', [ReservasTenantController::class, 'cancelar'])->middleware('puede:reservas.gestionar')->name('reservas.cancelar');
             Route::get('/reservas/{reserva}/cancelacion', [ReservasTenantController::class, 'previsualizarCancelacion'])->middleware('puede:reservas.gestionar')->name('reservas.cancelacion');
             // Historial de una cita para recepción (lo que pasó y quién lo hizo).
-            Route::get('/reservas/{reserva}/historial', [ReservasTenantController::class, 'historial'])->middleware('puede:reservas.ver')->name('reservas.historial');
+            Route::get('/reservas/{reserva}/historial', [ReservasTenantController::class, 'historial'])->middleware(['puede:reservas.ver', 'modalidad:citas'])->name('reservas.historial');
             // Waitlist robusta (R7): el ofrecido acepta su cupo antes de que expire.
-            Route::post('/reservas/{reserva}/aceptar', [ReservasTenantController::class, 'aceptar'])->middleware('puede:reservas.gestionar')->name('reservas.aceptar');
+            Route::post('/reservas/{reserva}/aceptar', [ReservasTenantController::class, 'aceptar'])->middleware(['puede:reservas.gestionar', 'modalidad:clases'])->name('reservas.aceptar');
             // Smart-fill (R32): ofrece de golpe los cupos libres al inicio de la lista de espera.
-            Route::post('/sesiones/{sesion}/promover', [ReservasTenantController::class, 'promover'])->middleware('puede:reservas.gestionar')->name('sesiones.promover');
+            Route::post('/sesiones/{sesion}/promover', [ReservasTenantController::class, 'promover'])->middleware(['puede:reservas.gestionar', 'modalidad:clases'])->name('sesiones.promover');
             // Transferir/regalar el lugar a otra persona (R9).
             Route::post('/reservas/{reserva}/transferir', [ReservasTenantController::class, 'transferir'])->middleware('puede:reservas.gestionar')->name('reservas.transferir');
             Route::post('/reservas/{reserva}/asistencia', [AsistenciaTenantController::class, 'marcar'])->middleware('puede:asistencia.marcar')->name('reservas.asistencia.store');
@@ -776,8 +782,9 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/comunicaciones/segmentos', [DifusionesTenantController::class, 'segmentos'])->middleware('puede:comunicaciones.ver')->name('difusiones.segmentos');
             Route::get('/comunicaciones/difusiones', [DifusionesTenantController::class, 'index'])->middleware('puede:comunicaciones.ver')->name('difusiones.index');
             Route::post('/comunicaciones/difusiones', [DifusionesTenantController::class, 'difundir'])->middleware('puede:comunicaciones.gestionar')->name('difusiones.store');
-            Route::post('/checkins', [CheckinsTenantController::class, 'registrar'])->middleware('puede:checkins.registrar')->name('checkins.store');
-            Route::get('/sesiones/{sesion}/checkins', [CheckinsTenantController::class, 'index'])->middleware('puede:checkins.registrar')->name('sesiones.checkins.index');
+            // Check-ins de Wellhub / TotalPass en las clases.
+            Route::post('/checkins', [CheckinsTenantController::class, 'registrar'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('checkins.store');
+            Route::get('/sesiones/{sesion}/checkins', [CheckinsTenantController::class, 'index'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('sesiones.checkins.index');
 
             // Control de acceso (R12): la puerta registra un intento y el motor decide
             // (reserva vigente u OPEN_ACCESS por membresia ilimitada); deja bitacora.

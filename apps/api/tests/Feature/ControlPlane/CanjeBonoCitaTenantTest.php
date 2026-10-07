@@ -21,8 +21,7 @@ afterEach(function (): void {
 });
 
 it('el masaje con bono aparece solo en la cuenta de quien tiene el bono, y la cita se descuenta', function (): void {
-    $e = estudioConSesion('spa-a', 'dueno@spa.mx');
-    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'spa'], conBearer($e['bearer']))->assertOk();
+    $e = estudioConSesion('spa-a', 'dueno@spa.mx', 'spa');
     $sede = agendaSemilla($e);
     $programa = (string) $this->postJson("/api/v1/app/{$e['slug']}/programas", ['nombre' => 'Masajes'], conBearer($e['bearer']))->json('data.id');
     $actividad = (string) $this->postJson("/api/v1/app/{$e['slug']}/programas/{$programa}/actividades", ['nombre' => 'Masajes'], conBearer($e['bearer']))->json('data.id');

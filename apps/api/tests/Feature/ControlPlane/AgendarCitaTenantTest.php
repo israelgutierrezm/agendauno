@@ -37,6 +37,7 @@ function estudioDeCitas(): array
     $coach = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))
         ->assertOk()->json('data.0.id');
 
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $coach, $sede['sucursal']);
     // Se paga en línea para confirmar (la cita se aparta hasta pagarla).
     activarCobroEnLinea($e);

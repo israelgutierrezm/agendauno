@@ -33,6 +33,7 @@ function barberiaParaDatos(): array
     ], conBearer($e['bearer']))->assertOk();
     personalConSesion($e['slug'], $e['bearer'], 'barbero@barberia.mx', 'instructor');
     $pro = (string) test()->getJson("/api/v1/app/{$e['slug']}/instructores", conBearer($e['bearer']))->json('data.0.id');
+    pasarNegocioACitas($e);
     abrirHorarioDeCitas($e, $pro, $sede['sucursal']);
 
     return ['e' => $e, 'sede' => $sede, 'pro' => $pro, 'dia' => now('America/Mexico_City')->addDays(3)->format('Y-m-d')];
