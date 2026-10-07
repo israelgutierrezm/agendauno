@@ -11,8 +11,7 @@ import '../../auth/data/sesion.dart';
 import '../../perfil/presentation/boton_mi_perfil.dart';
 import '../application/agenda_controller.dart';
 import '../data/agenda_models.dart';
-import 'cita_sheet.dart';
-import 'pase_lista_screen.dart';
+import 'abrir_sesion.dart';
 
 const _diasCortos = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 const _meses = [
@@ -44,7 +43,8 @@ String _hhmm(DateTime d) =>
 
 /// Agenda del día para el staff. En negocios de CITAS: el día de cada profesional
 /// como línea de tiempo con sus citas y estados. En negocios de CLASES: las clases
-/// del día con su cupo.
+/// del día con su cupo. Tocar una sesión abre lo de su tipo (hoja de la cita o pase
+/// de lista), sea cual sea la vista.
 class AgendaScreen extends ConsumerWidget {
   const AgendaScreen({super.key});
 
@@ -227,13 +227,13 @@ class _AgendaCitas extends ConsumerWidget {
     final citas = agenda.sesiones
         .where((s) => s.instructorId == pro.id)
         .toList();
-    final ahora = DateTime.now();
+    // En qué va cada cita lo dice el servidor.
     final enLocal = citas
         .where(
           (s) => const [
             EstadoCita.llego,
             EstadoCita.enServicio,
-          ].contains(s.estadoCita(ahora)),
+          ].contains(s.estadoCita),
         )
         .length;
     final porCobrar = citas
@@ -325,13 +325,23 @@ class _LineaTiempo extends ConsumerStatefulWidget {
 
 class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
   static const _pxHora = 84.0;
+
+  /// Cada cuántos minutos se vuelve a pedir el día: el estado de cada cita (llegó,
+  /// en servicio, completada) cambia con la hora y lo calcula el servidor.
+  static const _refrescarCada = 2;
   final _scroll = ScrollController();
   Timer? _reloj;
+  var _minutos = 0;
 
   @override
   void initState() {
     super.initState();
-    _reloj = Timer.periodic(const Duration(minutes: 1), (_) => setState(() {}));
+    _reloj = Timer.periodic(const Duration(minutes: 1), (_) {
+      setState(() {});
+      if (++_minutos % _refrescarCada == 0) {
+        ref.invalidate(agendaProvider);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _enfocar());
   }
 
@@ -387,6 +397,7 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
     final alto = (fin - ini) / 60 * _pxHora;
     final ahora = DateTime.now();
     final minutoAhora = ahora.hour * 60 + ahora.minute;
+    final sesion = ref.watch(sesionProvider);
     final verAhora =
         _mismoDia(ahora, widget.dia) &&
         minutoAhora >= ini &&
@@ -429,7 +440,7 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
                         ),
                       ),
                     ],
-                    for (final s in widget.citas) _tarjeta(context, s, ahora),
+                    for (final s in widget.citas) _tarjeta(context, s, sesion),
                     if (verAhora) ...[
                       Positioned(
                         left: 52,
@@ -470,9 +481,9 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
     );
   }
 
-  Widget _tarjeta(BuildContext context, SesionAgenda s, DateTime ahora) {
+  Widget _tarjeta(BuildContext context, SesionAgenda s, Sesion? sesion) {
     final tono = TonoServicio.de(s.ofertaId);
-    final estado = s.esCita ? s.estadoCita(ahora) : null;
+    final estado = s.esCita ? s.estadoCita : null;
     final estilo = estado != null ? estiloEstado(estado) : null;
     final top = _y(s.iniciaEn.hour * 60 + s.iniciaEn.minute) + 1;
     final alto = math.max(28.0, s.duracionMin / 60 * _pxHora - 3);
@@ -480,11 +491,11 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
         !s.programada ||
         estado == EstadoCita.completada ||
         estado == EstadoCita.noAsistio;
-    final titulo = s.esCita
-        ? (s.cita?.cliente ?? 'Sin cliente')
-        : (s.oferta ?? '—');
-    final detalle =
-        '${_hhmm(s.iniciaEn)}–${_hhmm(s.terminaEn)} · ${s.esCita ? (s.oferta ?? '—') : '${s.ocupados}/${s.capacidad ?? '∞'}'}';
+    final (titulo, que) = switch (s.tipo) {
+      TipoSesion.cita => (s.cita?.cliente ?? 'Sin cliente', s.oferta ?? '—'),
+      TipoSesion.clase => (s.oferta ?? '—', cupoTexto(s)),
+    };
+    final detalle = '${_hhmm(s.iniciaEn)}–${_hhmm(s.terminaEn)} · $que';
 
     return Positioned(
       left: 58,
@@ -498,7 +509,7 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: s.esCita ? () => mostrarHojaCita(context, s) : null,
+            onTap: alTocarSesion(context, s, sesion),
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: 10,
@@ -566,14 +577,19 @@ class _LineaTiempoState extends ConsumerState<_LineaTiempo> {
   }
 }
 
+/// "6/10" de una clase (o "6/∞" sin cupo), con el cupo que cuenta el servidor.
+String cupoTexto(SesionAgenda s) {
+  final clase = s.clase;
+  return '${clase?.ocupados ?? s.ocupados}/${clase?.capacidad ?? '∞'}';
+}
+
+/// Colores (fondo, tinta) del pago pendiente de una cita (por pagar o por cobrar).
+const estiloPago = (Color(0xFFFFF1CC), Color(0xFF7A5200));
+
 /// Colores (fondo, tinta) de cada estado de cita.
 (Color, Color) estiloEstado(EstadoCita e) => switch (e) {
   EstadoCita.confirmada => (const Color(0xFFE3F5EB), const Color(0xFF0F6B3E)),
   EstadoCita.sinRegistrar => (const Color(0xFFFFEAD5), const Color(0xFF9A3412)),
-  EstadoCita.pendientePago => (
-    const Color(0xFFFFF1CC),
-    const Color(0xFF7A5200),
-  ),
   EstadoCita.llego => (const Color(0xFFE3EDFF), const Color(0xFF0B4FD1)),
   EstadoCita.enServicio => (const Color(0xFFEDE7FF), const Color(0xFF5B21B6)),
   EstadoCita.completada => (const Color(0xFFEEF0F4), const Color(0xFF475063)),
@@ -598,10 +614,11 @@ class _AgendaClases extends StatelessWidget {
       );
     }
     final programadas = clases.where((s) => s.programada);
-    final conCupo = programadas.where((s) => !s.esCita);
-    final cap = conCupo.fold<int>(0, (a, s) => a + (s.capacidad ?? 0));
-    final res = conCupo.fold<int>(0, (a, s) => a + s.ocupados);
-    final espera = programadas.fold<int>(0, (a, s) => a + s.enEspera);
+    // Solo las clases tienen cupo y lista de espera (su bloque `clase`).
+    final cupos = programadas.map((s) => s.clase).whereType<BloqueClase>();
+    final cap = cupos.fold<int>(0, (a, c) => a + (c.capacidad ?? 0));
+    final res = cupos.fold<int>(0, (a, c) => a + c.ocupados);
+    final espera = cupos.fold<int>(0, (a, c) => a + c.enEspera);
     final ahora = DateTime.now();
 
     return ListView(
@@ -634,20 +651,21 @@ class _TarjetaClase extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final s = sesion;
-    // El pase de lista muestra quién va: pide ver reservas.
-    final verLista = ref.watch(sesionProvider)?.puede('reservas.ver') ?? false;
     final tono = TonoServicio.de(s.ofertaId);
     final pasada = !s.terminaEn.isAfter(ahora);
     final enCurso =
         !s.iniciaEn.isAfter(ahora) &&
         s.terminaEn.isAfter(ahora) &&
         s.programada;
-    final pct = s.ocupacion ?? 0;
-    final color = pct >= 0.9
+    // La ocupación que se muestra la decide el servidor (null: sin anillo).
+    final ocupacion = s.ocupacion;
+    final pct = ocupacion?.porcentaje ?? 0;
+    final color = pct >= 90
         ? const Color(0xFF079455)
-        : (pct >= 0.4 ? const Color(0xFF0070FF) : const Color(0xFFDC6803));
-    final libres = s.capacidad != null ? s.capacidad! - s.ocupados : null;
-    final estadoCita = s.esCita ? s.estadoCita(ahora) : null;
+        : (pct >= 40 ? const Color(0xFF0070FF) : const Color(0xFFDC6803));
+    final libres = s.clase?.libres;
+    final enEspera = s.clase?.enEspera ?? 0;
+    final estadoCita = s.esCita ? s.estadoCita : null;
     final chip = estadoCita != null
         ? estadoCita.etiqueta
         : !s.programada
@@ -656,24 +674,18 @@ class _TarjetaClase extends ConsumerWidget {
         ? 'En curso'
         : pasada
         ? null
-        : s.enEspera > 0
-        ? '${s.enEspera} en espera'
+        : enEspera > 0
+        ? '$enEspera en espera'
         : libres == 0
         ? 'Llena'
         : (libres != null && libres <= 2 ? 'Quedan $libres' : null);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      // Tocar la clase abre su pase de lista.
+      // Tocar abre lo de su tipo: el pase de lista de la clase o la hoja de la cita.
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: s.programada && verLista
-            ? () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => PaseListaScreen(sesion: s),
-                ),
-              )
-            : null,
+        onTap: alTocarSesion(context, s, ref.watch(sesionProvider)),
         child: Opacity(
           opacity: pasada || !s.programada ? 0.55 : 1,
           child: Row(
@@ -759,7 +771,7 @@ class _TarjetaClase extends ConsumerWidget {
                                 if (s.esCita) s.oferta,
                                 s.instructor,
                                 s.sala,
-                                if (s.esCita && s.porCobrar) 'Por cobrar',
+                                if (s.porCobrar) s.cita!.estadoPago!.etiqueta,
                               ].whereType<String>().join(' · '),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -772,7 +784,7 @@ class _TarjetaClase extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      if (s.capacidad != null && !s.esCita)
+                      if (ocupacion != null)
                         SizedBox(
                           width: 54,
                           height: 54,
@@ -783,7 +795,7 @@ class _TarjetaClase extends ConsumerWidget {
                                 width: 54,
                                 height: 54,
                                 child: CircularProgressIndicator(
-                                  value: pct,
+                                  value: ocupacion.fraccion,
                                   strokeWidth: 6,
                                   strokeCap: StrokeCap.round,
                                   backgroundColor: Colors.white.withValues(
@@ -795,7 +807,7 @@ class _TarjetaClase extends ConsumerWidget {
                                 ),
                               ),
                               Text(
-                                '${s.ocupados}/${s.capacidad}',
+                                '${ocupacion.ocupados}/${ocupacion.capacidad}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w800,

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -29,6 +30,9 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
   String? _elegido;
   bool _cargando = true;
   bool _guardando = false;
+  // Por qué no se pudieron cargar las opciones (sin red o una respuesta que esta
+  // versión no entiende).
+  String? _error;
 
   @override
   void initState() {
@@ -46,15 +50,31 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
     setState(() {
       _cargando = true;
       _elegido = null;
+      _error = null;
     });
-    final opciones = await repo.opcionesReprogramar(
-      widget.reserva.id,
-      fecha: Formato.iso(_dia),
-    );
+    try {
+      final opciones = await repo.opcionesReprogramar(
+        widget.reserva.id,
+        fecha: Formato.iso(_dia),
+      );
+      if (mounted) {
+        setState(() {
+          _opciones = opciones;
+          _cargando = false;
+        });
+      }
+    } on TipoSesionDesconocido catch (e) {
+      _fallo('$e');
+    } on DioException {
+      _fallo('No se pudieron cargar los horarios. Intenta de nuevo.');
+    }
+  }
+
+  void _fallo(String mensaje) {
     if (mounted) {
       setState(() {
-        _opciones = opciones;
         _cargando = false;
+        _error = mensaje;
       });
     }
   }
@@ -83,17 +103,18 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
     final navegador = Navigator.of(context);
     final notifier = ref.read(cuentaProvider.notifier);
     await hacerConAviso(context, () async {
-      if (opciones.tipo == 'cita') {
-        // La hora de la sede tal cual (no la del teléfono).
-        final horario = opciones.horarios.firstWhere(
-          (h) => h.inicia == elegido,
-        );
-        await notifier.reprogramar(
-          widget.reserva.id,
-          iniciaEnLocal: horario.iniciaEnLocal,
-        );
-      } else {
-        await notifier.reprogramar(widget.reserva.id, sesionId: elegido);
+      switch (opciones.tipo) {
+        case TipoSesion.cita:
+          // La hora de la sede tal cual (no la del teléfono).
+          final horario = opciones.horarios.firstWhere(
+            (h) => h.inicia == elegido,
+          );
+          await notifier.reprogramar(
+            widget.reserva.id,
+            iniciaEnLocal: horario.iniciaEnLocal,
+          );
+        case TipoSesion.clase:
+          await notifier.reprogramar(widget.reserva.id, sesionId: elegido);
       }
       navegador.pop();
     }, exito: 'Listo: cambiamos tu horario.');
@@ -122,7 +143,9 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
               style: const TextStyle(color: TemaAgendaUno.textoSuave),
             ),
             const SizedBox(height: 16),
-            if (opciones == null)
+            if (_error != null && opciones == null)
+              Text(_error!, style: const TextStyle(color: TemaAgendaUno.error))
+            else if (opciones == null)
               const SizedBox(
                 height: 120,
                 child: Center(child: CircularProgressIndicator()),
@@ -137,10 +160,10 @@ class _ReprogramarSheetState extends ConsumerState<ReprogramarSheet> {
                 style: const TextStyle(color: TemaAgendaUno.textoSuave),
               ),
               const SizedBox(height: 12),
-              if (opciones.tipo == 'cita')
-                ..._cita(opciones)
-              else
-                _clase(opciones),
+              ...switch (opciones.tipo) {
+                TipoSesion.cita => _cita(opciones),
+                TipoSesion.clase => [_clase(opciones)],
+              },
               const SizedBox(height: 20),
               FilledButton(
                 onPressed: _elegido == null || _guardando ? null : _cambiar,

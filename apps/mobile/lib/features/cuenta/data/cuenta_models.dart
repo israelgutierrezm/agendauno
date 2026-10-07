@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/agenda/contrato_agenda.dart';
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
+
+export '../../../core/agenda/contrato_agenda.dart';
 
 /// Modelos del autoservicio del miembro (Mi cuenta).
 class DerechoMiembro {
@@ -124,8 +127,8 @@ class OpcionesReprogramar {
   final bool puede;
   final String? motivo;
 
-  /// 'cita' o 'clase'.
-  final String tipo;
+  /// El de la sesión: decide si se elige otro horario o otra fecha.
+  final TipoSesion tipo;
   final int restantes;
 
   /// Cita: cada horario libre (en la hora de la sede).
@@ -138,7 +141,8 @@ class OpcionesReprogramar {
       OpcionesReprogramar(
         puede: (j['puede'] ?? false) as bool,
         motivo: j['motivo'] as String?,
-        tipo: (j['tipo'] ?? 'cita') as String,
+        // Siempre viene; uno desconocido es un error (no se supone cita).
+        tipo: TipoSesion.desde(j['tipo']),
         restantes: (j['restantes'] ?? 0) as int,
         horarios: HorarioCita.deLista(j['slots']),
         sesiones: ((j['sesiones'] ?? []) as List).map((s) {
@@ -208,10 +212,13 @@ class MovimientoCredito {
   }
 }
 
+/// Una reserva suya (clase o cita). Lo propio de cada tipo va en su bloque:
+/// `clase` y `ocupacion` en una clase, `cita` en una cita; el otro es null.
 class ReservaMiembro {
   const ReservaMiembro({
     required this.id,
     required this.estado,
+    required this.tipo,
     this.sesionId,
     this.oferta,
     this.sucursal,
@@ -221,9 +228,11 @@ class ReservaMiembro {
     this.zonaHoraria,
     this.ofertaExpiraEn,
     this.ordenId,
-    this.tipo,
     this.asiste,
     this.mapaUrl,
+    this.clase,
+    this.ocupacion,
+    this.cita,
   });
 
   final String id;
@@ -237,8 +246,17 @@ class ReservaMiembro {
   final String? asiste;
 
   /// Clase o cita (de la sesión): se nombra por lo que es.
-  final String? tipo;
-  bool get esCita => tipo == 'cita';
+  final TipoSesion tipo;
+  bool get esCita => tipo == TipoSesion.cita;
+
+  /// Su clase: cupo y lista de espera (null en una cita).
+  final BloqueClase? clase;
+
+  /// La ocupación de su clase que se muestra (null en citas o sin cupo).
+  final Ocupacion? ocupacion;
+
+  /// Su cita y en qué va (null en una clase).
+  final CitaReserva? cita;
   final String? oferta;
   final String? sucursal;
   final String? iniciaEn;
@@ -262,21 +280,71 @@ class ReservaMiembro {
     _ => estado,
   };
 
-  factory ReservaMiembro.desdeJson(Map<String, dynamic> j) => ReservaMiembro(
-    id: (j['id'] ?? '') as String,
+  factory ReservaMiembro.desdeJson(Map<String, dynamic> j) {
+    final tipo = TipoSesion.desde(j['tipo']);
+    final cita = j['cita'];
+    return ReservaMiembro(
+      id: (j['id'] ?? '') as String,
+      estado: (j['estado'] ?? '') as String,
+      tipo: tipo,
+      sesionId: j['sesion_id'] as String?,
+      oferta: j['oferta'] as String?,
+      sucursal: j['sucursal'] as String?,
+      iniciaEn: j['inicia_en'] as String?,
+      terminaEn: j['termina_en'] as String?,
+      instructor: j['instructor'] as String?,
+      zonaHoraria: j['zona_horaria'] as String?,
+      ofertaExpiraEn: j['oferta_expira_en'] as String?,
+      ordenId: j['orden_id'] as String?,
+      asiste: j['asiste'] as String?,
+      mapaUrl: j['mapa_url'] as String?,
+      clase: tipo == TipoSesion.clase && j['clase'] is Map<String, dynamic>
+          ? BloqueClase.desdeJson(j['clase'])
+          : null,
+      ocupacion: Ocupacion.desdeJson(j['ocupacion']),
+      cita: tipo == TipoSesion.cita && cita is Map<String, dynamic>
+          ? CitaReserva.desdeJson(cita)
+          : null,
+    );
+  }
+}
+
+/// Su cita: el estado de su reserva, si ya llegó, la orden y en qué va su
+/// atención y su pago (calculados por el servidor).
+class CitaReserva {
+  const CitaReserva({
+    required this.reservaId,
+    required this.estado,
+    this.asistencia,
+    this.ordenId,
+    this.nota,
+    this.asiste,
+    this.estadoAtencion,
+    this.estadoPago,
+  });
+
+  final String reservaId;
+  final String estado;
+  final String? asistencia; // presente | ausente | null
+  final String? ordenId;
+
+  /// Lo que pidió que supieran al agendar.
+  final String? nota;
+
+  /// Si la agendó para otra persona: quién asiste.
+  final String? asiste;
+  final EstadoCita? estadoAtencion;
+  final EstadoPagoCita? estadoPago;
+
+  factory CitaReserva.desdeJson(Map<String, dynamic> j) => CitaReserva(
+    reservaId: (j['reserva_id'] ?? '') as String,
     estado: (j['estado'] ?? '') as String,
-    sesionId: j['sesion_id'] as String?,
-    oferta: j['oferta'] as String?,
-    sucursal: j['sucursal'] as String?,
-    iniciaEn: j['inicia_en'] as String?,
-    terminaEn: j['termina_en'] as String?,
-    instructor: j['instructor'] as String?,
-    zonaHoraria: j['zona_horaria'] as String?,
-    ofertaExpiraEn: j['oferta_expira_en'] as String?,
+    asistencia: j['asistencia'] as String?,
     ordenId: j['orden_id'] as String?,
-    tipo: j['tipo'] as String?,
+    nota: j['nota'] as String?,
     asiste: j['asiste'] as String?,
-    mapaUrl: j['mapa_url'] as String?,
+    estadoAtencion: EstadoCita.desde(j['estado_atencion']),
+    estadoPago: EstadoPagoCita.desde(j['estado_pago']),
   );
 }
 
@@ -332,6 +400,8 @@ class CoberturaClase {
       : null;
 }
 
+/// Una clase abierta de la agenda (GET /mi/agenda; en un negocio de citas viene
+/// vacía).
 class ClaseMiembro {
   const ClaseMiembro({
     required this.id,
@@ -343,6 +413,8 @@ class ClaseMiembro {
     this.zonaHoraria,
     this.capacidad,
     this.ocupados = 0,
+    this.clase,
+    this.ocupacion,
     this.cobertura,
   });
 
@@ -356,27 +428,45 @@ class ClaseMiembro {
   final int? capacidad;
   final int ocupados;
 
+  /// Cupo, lugares libres y lista de espera, como los cuenta el servidor.
+  final BloqueClase? clase;
+
+  /// La ocupación que se muestra (null sin cupo).
+  final Ocupacion? ocupacion;
+
   /// Si su plan la cubre (null si el servidor no lo dice).
   final CoberturaClase? cobertura;
 
+  /// Lugares libres (null sin cupo).
+  int? get libres => clase?.libres;
+
   /// Sin lugares: se ofrece anotarse en la lista de espera.
-  bool get llena => capacidad != null && ocupados >= capacidad!;
+  bool get llena => clase?.llena ?? false;
 
   /// Se puede reservar (sin dato de cobertura, se intenta).
   bool get reservable => cobertura?.reservable ?? true;
 
-  factory ClaseMiembro.desdeJson(Map<String, dynamic> j) => ClaseMiembro(
-    id: (j['id'] ?? '') as String,
-    oferta: j['oferta'] as String?,
-    sucursal: j['sucursal'] as String?,
-    iniciaEn: j['inicia_en'] as String?,
-    terminaEn: j['termina_en'] as String?,
-    instructor: j['instructor'] as String?,
-    zonaHoraria: j['zona_horaria'] as String?,
-    capacidad: j['capacidad'] as int?,
-    ocupados: (j['ocupados'] ?? 0) as int,
-    cobertura: CoberturaClase.desdeJson(j['cobertura']),
-  );
+  factory ClaseMiembro.desdeJson(Map<String, dynamic> j) {
+    // Aquí solo hay clases; un API anterior no mandaba el tipo.
+    if (j.containsKey('tipo') &&
+        TipoSesion.desde(j['tipo']) != TipoSesion.clase) {
+      throw TipoSesionDesconocido(j['tipo'], esperado: TipoSesion.clase);
+    }
+    return ClaseMiembro(
+      id: (j['id'] ?? '') as String,
+      oferta: j['oferta'] as String?,
+      sucursal: j['sucursal'] as String?,
+      iniciaEn: j['inicia_en'] as String?,
+      terminaEn: j['termina_en'] as String?,
+      instructor: j['instructor'] as String?,
+      zonaHoraria: j['zona_horaria'] as String?,
+      capacidad: j['capacidad'] as int?,
+      ocupados: (j['ocupados'] ?? 0) as int,
+      clase: BloqueClase.desdeJson(j['clase'], respaldo: j),
+      ocupacion: Ocupacion.desdeJson(j['ocupacion']),
+      cobertura: CoberturaClase.desdeJson(j['cobertura']),
+    );
+  }
 }
 
 /// Consentimiento (carta responsiva, reglamento) que el negocio pide firmar.

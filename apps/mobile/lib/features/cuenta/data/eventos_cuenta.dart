@@ -27,13 +27,15 @@ List<ClaseMiembro> clasesDisponibles(MiCuenta c) => c.clases
     )
     .toList();
 
+/// "3 de 10 lugares" o "Llena", con los lugares libres que cuenta el servidor.
 String lugaresTexto(ClaseMiembro c) {
   if (c.llena) {
     return 'Llena';
   }
-  return c.capacidad == null
+  final clase = c.clase;
+  return clase?.capacidad == null || clase?.libres == null
       ? ''
-      : '${c.capacidad! - c.ocupados} de ${c.capacidad} lugares';
+      : '${clase!.libres} de ${clase.capacidad} lugares';
 }
 
 /// Lo que pinta su calendario: sus reservas resaltadas y las clases disponibles

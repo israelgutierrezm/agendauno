@@ -8,6 +8,7 @@ import 'core/network/auth_token.dart';
 import 'core/storage/almacen_sesion.dart';
 import 'core/theme/tema_agendauno.dart';
 import 'features/auth/data/sesion.dart';
+import 'features/auth/presentation/actualizar_app_screen.dart';
 import 'features/auth/presentation/elegir_rol_screen.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/cuenta/presentation/cuenta_screen.dart';
@@ -113,14 +114,19 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
     ref.listen(sesionProvider, (anterior, nueva) {
       if (nueva != null && anterior?.bearer != nueva.bearer) {
         ref.read(pushProvider).registrar(nueva);
+        // Recién entró: /yo dice qué versión mínima de la app acepta el servidor.
+        ref.read(sesionProvider.notifier).revisar();
       }
       if (nueva == null && anterior != null) {
         _alSalir();
       }
     });
-    // Con varios roles, al entrar elige con cuál; luego, la pantalla de ese rol.
+    // Con varios roles, al entrar elige con cuál; luego, la pantalla de ese rol. Si
+    // el servidor ya no acepta esta versión de la app, primero hay que actualizarla.
     final Widget inicio = sesion == null
         ? const LoginScreen()
+        : sesion.debeActualizar
+        ? const ActualizarAppScreen()
         : sesion.eligiendoRol
         ? const ElegirRolScreen()
         : sesion.esMiembro

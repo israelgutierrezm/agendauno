@@ -24,8 +24,9 @@ class CuentaController extends AsyncNotifier<MiCuenta> {
     return repo.cargar(conClases: _conClases);
   }
 
-  /// En negocios de citas no hay clases que listar: se agenda una cita.
-  bool get _conClases => ref.read(sesionProvider)?.esCitas != true;
+  /// Solo un negocio de clases tiene clases que listar; en uno de citas se agenda
+  /// una cita (lo dicen las capacidades de la sesión).
+  bool get _conClases => ref.read(sesionProvider)?.capacidades.clases ?? true;
 
   Future<void> reservar(String sesionId, {bool esperar = false}) =>
       _hacer((repo) => repo.reservar(sesionId, esperar: esperar));

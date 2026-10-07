@@ -28,6 +28,7 @@ void main() {
     final r = ReservaMiembro.desdeJson({
       'id': 'r1',
       'estado': 'confirmada',
+      'tipo': 'clase',
       'oferta': 'Nivel 1',
       'inicia_en': '2026-10-01T14:00:00+00:00',
       'zona_horaria': 'America/Mexico_City',
@@ -84,7 +85,7 @@ void main() {
         ],
       });
       expect(o.puede, isTrue);
-      expect(o.tipo, 'cita');
+      expect(o.tipo, TipoSesion.cita);
       expect(o.horarios.map((h) => h.inicia), ['2030-01-08T18:00:00+00:00']);
       expect(o.sesiones, isEmpty);
     });
@@ -117,12 +118,17 @@ void main() {
       final r = ReservaMiembro.desdeJson({
         'id': 'r1',
         'estado': 'confirmada',
+        'tipo': 'cita',
         'asiste': 'Juanito',
       });
 
       expect(r.asiste, 'Juanito');
       expect(
-        ReservaMiembro.desdeJson({'id': 'r2', 'estado': 'confirmada'}).asiste,
+        ReservaMiembro.desdeJson({
+          'id': 'r2',
+          'estado': 'confirmada',
+          'tipo': 'cita',
+        }).asiste,
         isNull,
       );
     });

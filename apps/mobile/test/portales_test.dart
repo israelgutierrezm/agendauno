@@ -16,6 +16,7 @@ void main() {
         ReservaMiembro.desdeJson({
           'id': 'r1',
           'sesion_id': 's1',
+          'tipo': 'clase',
           'estado': 'confirmada',
           'oferta': 'Pole Nivel 1',
           'sucursal': 'Roma Norte',
@@ -26,6 +27,7 @@ void main() {
         ReservaMiembro.desdeJson({
           'id': 'r2',
           'sesion_id': 's9',
+          'tipo': 'clase',
           'estado': 'en_espera',
           'oferta': 'Exotic',
           'inicia_en': '2030-01-09T15:00:00+00:00',
@@ -33,6 +35,7 @@ void main() {
         // Cancelada: ya no va a su calendario.
         ReservaMiembro.desdeJson({
           'id': 'r3',
+          'tipo': 'clase',
           'estado': 'cancelada',
           'inicia_en': '2030-01-08T15:00:00+00:00',
         }),

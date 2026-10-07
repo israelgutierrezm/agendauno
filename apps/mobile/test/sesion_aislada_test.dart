@@ -49,7 +49,12 @@ class _Repo extends CuentaRepository {
     return const MiCuenta(
       derechos: [],
       reservas: [
-        ReservaMiembro(id: 'r1', estado: 'confirmada', oferta: 'Pole de Ana'),
+        ReservaMiembro(
+          id: 'r1',
+          estado: 'confirmada',
+          tipo: TipoSesion.clase,
+          oferta: 'Pole de Ana',
+        ),
       ],
       clases: [],
     );

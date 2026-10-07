@@ -62,6 +62,7 @@ void main() {
         ReservaMiembro(
           id: 'r1',
           estado: 'confirmada',
+          tipo: TipoSesion.clase,
           sesionId: 's1',
           oferta: 'Pole Nivel 1',
           sucursal: 'Roma Norte',
@@ -77,6 +78,8 @@ void main() {
           iniciaEn: iso(inicio.add(const Duration(hours: 3))),
           capacidad: 8,
           ocupados: 8,
+          // Los lugares libres los cuenta el servidor.
+          clase: BloqueClase(capacidad: 8, ocupados: 8, libres: 0),
         ),
       ],
       consentimientos: const [
@@ -225,7 +228,7 @@ void main() {
               ReservaMiembro(
                 id: 'r1',
                 estado: 'confirmada',
-                tipo: 'cita',
+                tipo: TipoSesion.cita,
                 oferta: 'Corte de cabello',
                 sucursal: 'Roma Norte',
                 iniciaEn: iso(cita),

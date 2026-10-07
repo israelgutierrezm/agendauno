@@ -8,9 +8,8 @@ import '../../../core/calendario/calendario_vistas.dart';
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../agenda/data/agenda_models.dart';
+import '../../agenda/presentation/abrir_sesion.dart';
 import '../../agenda/presentation/agenda_screen.dart';
-import '../../agenda/presentation/cita_sheet.dart';
-import '../../agenda/presentation/pase_lista_screen.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../../cuenta/presentation/cuenta_widgets.dart';
@@ -95,28 +94,22 @@ class _InstructorScreenState extends ConsumerState<InstructorScreen> {
   }
 }
 
-/// Abre lo que corresponde: el pase de lista de una clase o la hoja de una cita.
-void abrirSesion(BuildContext context, SesionAgenda s) {
-  if (s.esCita) {
-    mostrarHojaCita(context, s);
-  } else {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => PaseListaScreen(sesion: s)));
-  }
-}
-
-/// "6 de 10 lugares ocupados · 2 en lista de espera" o "Con Ana".
+/// "6 de 10 lugares ocupados · 2 en lista de espera" o "Con Ana", según el tipo.
 String detalleSesion(SesionAgenda s) {
-  if (s.esCita) {
-    return s.cita?.cliente != null ? 'Con ${s.cita!.cliente}' : '';
+  switch (s.tipo) {
+    case TipoSesion.cita:
+      return s.cita?.cliente != null ? 'Con ${s.cita!.cliente}' : '';
+    case TipoSesion.clase:
+      final ocupados = s.clase?.ocupados ?? s.ocupados;
+      final capacidad = s.clase?.capacidad;
+      final enEspera = s.clase?.enEspera ?? 0;
+      return [
+        capacidad != null
+            ? '$ocupados de $capacidad lugares ocupados'
+            : (ocupados == 1 ? '1 inscrito' : '$ocupados inscritos'),
+        if (enEspera > 0) '$enEspera en lista de espera',
+      ].join(' · ');
   }
-  return [
-    s.capacidad != null
-        ? '${s.ocupados} de ${s.capacidad} lugares ocupados'
-        : (s.ocupados == 1 ? '1 inscrito' : '${s.ocupados} inscritos'),
-    if (s.enEspera > 0) '${s.enEspera} en lista de espera',
-  ].join(' · ');
 }
 
 // ------------------------------------------------------------------ INICIO

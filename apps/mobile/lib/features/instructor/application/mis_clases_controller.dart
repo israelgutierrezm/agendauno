@@ -63,10 +63,14 @@ final climaEquipoProvider = FutureProvider.autoDispose<ClimaMiembro?>((
 
 /// Cupo de una clase ("6/10") o, en una cita, con quién.
 String cupoDe(SesionAgenda s) {
-  if (s.esCita) {
-    return s.cita?.cliente ?? '';
+  switch (s.tipo) {
+    case TipoSesion.cita:
+      return s.cita?.cliente ?? '';
+    case TipoSesion.clase:
+      final ocupados = s.clase?.ocupados ?? s.ocupados;
+      final capacidad = s.clase?.capacidad;
+      return capacidad != null ? '$ocupados/$capacidad' : '$ocupados';
   }
-  return s.capacidad != null ? '${s.ocupados}/${s.capacidad}' : '${s.ocupados}';
 }
 
 /// Lo que pinta su calendario: todo es suyo (resaltado); lo que tiene lista de

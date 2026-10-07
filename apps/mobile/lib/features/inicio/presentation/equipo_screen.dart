@@ -111,9 +111,8 @@ class _InicioNegocio extends ConsumerWidget {
         final agenda = hoy?.agenda;
         final siguiente = agenda?.siguiente;
         final enCurso = agenda?.enCurso != null;
-        final esCitas = hoy?.modalidad == null
-            ? (sesion?.esCitas ?? false)
-            : hoy!.esCitas;
+        // La modalidad es la guardada del negocio, que llega con la sesión.
+        final esCitas = sesion?.esCitas ?? false;
         final libres = hoy?.libres;
 
         return RefreshIndicator(

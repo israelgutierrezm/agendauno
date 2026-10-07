@@ -1,12 +1,14 @@
+import '../../../core/agenda/contrato_agenda.dart';
+
 /// El día de hoy para el Inicio del negocio (GET /inicio/hoy): la agenda del día
 /// con quién se espera, quién llegó y a quién falta pasar lista; y, si quien entra
 /// tiene permiso, lo pendiente de cobro y las renovaciones por atender. Cada bloque
 /// es null cuando no le toca verlo. En un negocio de citas trae además dónde hay
-/// espacios libres hoy (ADR 0091).
+/// espacios libres hoy (ADR 0091). La modalidad del negocio no se lee de aquí: es
+/// la de la sesión (ADR 0104).
 class ResumenHoy {
   const ResumenHoy({
     required this.fecha,
-    this.modalidad,
     this.agenda,
     this.cobros,
     this.renovaciones,
@@ -23,7 +25,6 @@ class ResumenHoy {
     final libres = j['libres'];
     return ResumenHoy(
       fecha: (j['fecha'] ?? '') as String,
-      modalidad: j['modalidad'] as String?,
       libres: libres is List
           ? libres
                 .whereType<Map<String, dynamic>>()
@@ -43,17 +44,12 @@ class ResumenHoy {
   }
 
   final String fecha;
-
-  /// 'citas' o 'clases' (null si el API no lo dice).
-  final String? modalidad;
   final AgendaHoy? agenda;
   final CobrosHoy? cobros;
   final RenovacionesHoy? renovaciones;
 
   /// Citas: quién tiene espacios libres hoy y desde qué hora (null en clases).
   final List<LibreHoy>? libres;
-
-  bool get esCitas => modalidad == 'citas';
 
   /// ¿Hay algo que cobrar o renovar?
   bool get hayPendientes =>
@@ -142,7 +138,8 @@ class SesionHoy {
 
   factory SesionHoy.desdeJson(Map<String, dynamic> j) => SesionHoy(
     id: (j['id'] ?? '') as String,
-    tipo: (j['tipo'] ?? 'clase') as String,
+    // Uno desconocido es un error (no se supone clase).
+    tipo: TipoSesion.desde(j['tipo']),
     iniciaEn: DateTime.parse(j['inicia_en'] as String).toLocal(),
     esperados: (j['esperados'] as num? ?? 0).toInt(),
     sinMarcar: (j['sin_marcar'] as num? ?? 0).toInt(),
@@ -154,7 +151,7 @@ class SesionHoy {
   );
 
   final String id;
-  final String tipo;
+  final TipoSesion tipo;
   final DateTime iniciaEn;
   final int esperados;
   final int sinMarcar;
@@ -167,7 +164,7 @@ class SesionHoy {
   final String? cliente;
 
   /// "Pole Nivel 1" o, en una cita, "Corte · Dana".
-  String get nombre => tipo == 'cita' && cliente != null
+  String get nombre => tipo == TipoSesion.cita && cliente != null
       ? '${oferta ?? ''} · $cliente'
       : (oferta ?? '—');
 }

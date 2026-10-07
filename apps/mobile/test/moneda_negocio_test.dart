@@ -50,6 +50,9 @@ Map<String, dynamic> _citaPorCobrar() => {
     'estado': 'confirmada',
     'orden_id': 'o9',
     'por_cobrar': true,
+    // En qué va, calculado por el servidor.
+    'estado_atencion': 'confirmada',
+    'estado_pago': 'por_cobrar',
   },
 };
 

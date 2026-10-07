@@ -144,7 +144,7 @@ void main() {
               ReservaMiembro(
                 id: 'r1',
                 estado: 'confirmada',
-                tipo: 'cita',
+                tipo: TipoSesion.cita,
                 oferta: 'Corte de cabello',
                 sucursal: 'Centro',
                 iniciaEn: _iso(cita),

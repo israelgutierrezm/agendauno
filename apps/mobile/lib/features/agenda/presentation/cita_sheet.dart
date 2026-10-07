@@ -8,8 +8,9 @@ import '../application/agenda_controller.dart';
 import '../data/agenda_models.dart';
 import 'agenda_screen.dart';
 
-/// Abre la hoja de una cita: quién, qué, a qué hora y cómo va, con las acciones de
-/// recepción (llegó, no asistió, cobrar en caja, cancelar).
+/// Abre la hoja de una cita: quién, qué, a qué hora y cómo va (su atención y su
+/// pago, como los calcula el servidor), con las acciones de recepción (llegó, no
+/// asistió, cobrar en caja, cancelar).
 Future<void> mostrarHojaCita(BuildContext context, SesionAgenda sesion) =>
     showModalBottomSheet<void>(
       context: context,
@@ -70,14 +71,11 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    final estado = s.estadoCita(DateTime.now());
-    final (fondo, tinta) = estiloEstado(estado);
+    final estado = s.estadoCita;
+    final pago = s.porCobrar ? s.cita!.estadoPago : null;
     final tono = TonoServicio.de(s.ofertaId);
-    final activa = !const [
-      EstadoCita.cancelada,
-      EstadoCita.completada,
-      EstadoCita.noAsistio,
-    ].contains(estado);
+    // Cancelada, completada o sin asistencia: ya no hay acciones.
+    final activa = !(estado?.cerrada ?? false);
     // Con centavos y en la moneda del negocio (una sola, ADR 0099).
     final precio = s.precioMinor != null
         ? Formato.dinero(s.precioMinor!, sesion?.moneda ?? 'MXN')
@@ -94,28 +92,32 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
           children: [
             Row(
               children: [
-                Chip(
-                  label: Text(
-                    estado.etiqueta,
-                    style: TextStyle(color: tinta, fontWeight: FontWeight.w800),
-                  ),
-                  backgroundColor: fondo,
-                  side: BorderSide.none,
-                ),
-                if (s.porCobrar) ...[
-                  const SizedBox(width: 8),
-                  const Chip(
+                if (estado != null) ...[
+                  Chip(
                     label: Text(
-                      'Por cobrar',
+                      estado.etiqueta,
                       style: TextStyle(
-                        color: Color(0xFF7A5200),
+                        color: estiloEstado(estado).$2,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    backgroundColor: Color(0xFFFFF1CC),
+                    backgroundColor: estiloEstado(estado).$1,
                     side: BorderSide.none,
                   ),
+                  const SizedBox(width: 8),
                 ],
+                if (pago != null)
+                  Chip(
+                    label: Text(
+                      pago.etiqueta,
+                      style: TextStyle(
+                        color: estiloPago.$2,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    backgroundColor: estiloPago.$1,
+                    side: BorderSide.none,
+                  ),
               ],
             ),
             const SizedBox(height: 8),

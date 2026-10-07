@@ -1,12 +1,40 @@
-/// Cómo atiende el negocio a su gente (derivado de su perfil en el servidor):
-/// clases con cupo o citas 1 a 1 con un profesional. La app adapta la agenda, las
-/// etiquetas y las opciones a esta modalidad (sin ramas por industria).
+import '../../../core/version/version_app.dart';
+
+/// Cómo atiende el negocio a su gente: clases con cupo o citas 1 a 1 con un
+/// profesional. Cada negocio es de una sola (ADR 0104); el servidor la guarda y la
+/// manda en la sesión. La app adapta la agenda, las etiquetas y las opciones a esta
+/// modalidad (sin ramas por industria).
 enum Modalidad {
   clases,
   citas;
 
   static Modalidad desde(Object? valor) =>
       valor == 'citas' ? Modalidad.citas : Modalidad.clases;
+}
+
+/// Lo que el negocio opera, dicho por el servidor (ADR 0104): solo clases o solo
+/// citas. Lo nuevo pregunta por la capacidad, no por el giro ni por la forma de
+/// sus servicios.
+class Capacidades {
+  const Capacidades({required this.clases, required this.citas});
+
+  /// Las de un negocio de esa modalidad (cuando el servidor no las manda).
+  factory Capacidades.de(Modalidad modalidad) => Capacidades(
+    clases: modalidad == Modalidad.clases,
+    citas: modalidad == Modalidad.citas,
+  );
+
+  final bool clases;
+  final bool citas;
+
+  Map<String, dynamic> aJson() => {'clases': clases, 'citas': citas};
+
+  static Capacidades? desdeJson(Object? json) => json is Map<String, dynamic>
+      ? Capacidades(
+          clases: json['clases'] == true,
+          citas: json['citas'] == true,
+        )
+      : null;
 }
 
 /// Terminología del negocio (p. ej. Cita / Cliente / Barbero), con plurales. La
@@ -142,6 +170,8 @@ class Sesion {
     this.fechaNacimiento,
     this.genero,
     this.modalidad = Modalidad.clases,
+    this._capacidades,
+    this.versionMinima = versionMinimaDesconocida,
     this.terminologia = const Terminologia(),
     this.estudioNombre,
     this.perfil,
@@ -186,6 +216,18 @@ class Sesion {
   final String? fechaNacimiento;
   final String? genero;
   final Modalidad modalidad;
+  final Capacidades? _capacidades;
+
+  /// Lo que opera el negocio (clases o citas); si el servidor no lo mandó, el de
+  /// su modalidad.
+  Capacidades get capacidades => _capacidades ?? Capacidades.de(modalidad);
+
+  /// La versión más antigua de la app que el servidor aún acepta (de /yo). Con una
+  /// más vieja se pide actualizar en lugar de leer respuestas que ya no entiende.
+  final String versionMinima;
+
+  /// ¿Esta app es más vieja que la que acepta el servidor?
+  bool get debeActualizar => esMasVieja(versionApp, versionMinima);
   final Terminologia terminologia;
 
   /// Nombre del negocio y su giro (perfil: pole, barberia, spa…).
@@ -252,6 +294,8 @@ class Sesion {
     'fecha_nacimiento': fechaNacimiento,
     'genero': genero,
     'modalidad': modalidad.name,
+    'capacidades': capacidades.aJson(),
+    'version_minima': versionMinima,
     'terminologia': terminologia.aJson(),
     'estudio_nombre': estudioNombre,
     'moneda': moneda,
@@ -292,6 +336,8 @@ class Sesion {
       fechaNacimiento: datos['fecha_nacimiento'] as String?,
       genero: datos['genero'] as String?,
       modalidad: Modalidad.desde(datos['modalidad']),
+      capacidades: Capacidades.desdeJson(datos['capacidades']),
+      versionMinima: _version(datos['version_minima']),
       terminologia: Terminologia.desdeJson(
         datos['terminologia'] as Map<String, dynamic>?,
       ),
@@ -304,11 +350,14 @@ class Sesion {
     );
   }
 
+  /// La sesión del login o de /yo: el usuario, su negocio y, de /yo, la versión
+  /// mínima de la app (`app.version_minima`).
   factory Sesion.desdeJson(
     String slug,
     String bearer,
     Map<String, dynamic> usuario, [
     Map<String, dynamic>? estudio,
+    Map<String, dynamic>? app,
   ]) {
     final config = estudio?['perfil_config'] as Map<String, dynamic>?;
     return Sesion(
@@ -331,7 +380,10 @@ class Sesion {
       celular: usuario['celular'] as String?,
       fechaNacimiento: usuario['fecha_nacimiento'] as String?,
       genero: usuario['genero'] as String?,
-      modalidad: Modalidad.desde(config?['modalidad']),
+      // La guardada del negocio; un API anterior solo la mandaba en su perfil.
+      modalidad: Modalidad.desde(estudio?['modalidad'] ?? config?['modalidad']),
+      capacidades: Capacidades.desdeJson(estudio?['capacidades']),
+      versionMinima: _version(app?['version_minima']),
       terminologia: Terminologia.desdeJson(
         config?['terminologia'] as Map<String, dynamic>?,
       ),
@@ -347,9 +399,12 @@ class Sesion {
   /// La misma sesión con los datos de usuario que devuelve el servidor (p. ej. tras
   /// editar el perfil o cambiar de rol), conservando el estudio y la configuración
   /// del negocio.
+  ///
+  /// `versionMinima`: la que acaba de decir /yo (si no, se conserva la anterior).
   Sesion conUsuario(
     Map<String, dynamic> usuario, {
     bool? eligiendoRol,
+    String? versionMinima,
   }) => Sesion(
     slug: slug,
     bearer: bearer,
@@ -390,6 +445,8 @@ class Sesion {
         ? usuario['genero'] as String?
         : genero,
     modalidad: modalidad,
+    capacidades: _capacidades,
+    versionMinima: versionMinima ?? this.versionMinima,
     terminologia: terminologia,
     estudioNombre: estudioNombre,
     moneda: moneda,
@@ -398,6 +455,12 @@ class Sesion {
     sinSucursal: (usuario['sin_sucursal'] ?? sinSucursal) as bool,
     perfil: perfil,
   );
+
+  /// La versión mínima tal como vino; sin ella, no se exige ninguna.
+  static String _version(Object? valor) =>
+      valor is String && valor.trim().isNotEmpty
+      ? valor.trim()
+      : versionMinimaDesconocida;
 
   /// País del negocio en mayúsculas; sin país (o uno raro), México.
   static String _pais(Object? valor) {

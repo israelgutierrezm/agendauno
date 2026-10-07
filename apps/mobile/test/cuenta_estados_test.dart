@@ -30,11 +30,13 @@ void main() {
       final ofrecida = ReservaMiembro.desdeJson({
         'id': 'r1',
         'sesion_id': 's1',
+        'tipo': 'clase',
         'estado': 'ofrecida',
       });
       final apartada = ReservaMiembro.desdeJson({
         'id': 'r2',
         'sesion_id': 's2',
+        'tipo': 'clase',
         'estado': 'pendiente_pago',
         'orden_id': 'o1',
       });

@@ -1,22 +1,11 @@
 import 'dart:ui';
 
-/// Estado operativo de una cita (mismo criterio que la agenda web).
-enum EstadoCita {
-  pendientePago('Pago pendiente'),
-  confirmada('Confirmada'),
-  sinRegistrar('Sin registrar'),
-  llego('Llegó'),
-  enServicio('En servicio'),
-  completada('Completada'),
-  noAsistio('No asistió'),
-  cancelada('Cancelada');
+import '../../../core/agenda/contrato_agenda.dart';
 
-  const EstadoCita(this.etiqueta);
+export '../../../core/agenda/contrato_agenda.dart';
 
-  final String etiqueta;
-}
-
-/// Titular de una cita: a quién se atiende y cómo va su reserva.
+/// Titular de una cita: a quién se atiende, cómo va su reserva y en qué va su
+/// atención y su pago (calculados por el servidor).
 class CitaTitular {
   const CitaTitular({
     required this.reservaId,
@@ -25,7 +14,8 @@ class CitaTitular {
     this.asistencia,
     this.retardo = false,
     this.ordenId,
-    this.porCobrar = false,
+    this.estadoAtencion,
+    this.estadoPago,
   });
 
   final String reservaId;
@@ -36,7 +26,12 @@ class CitaTitular {
   /// Llegó tarde (cuenta como que llegó).
   final bool retardo;
   final String? ordenId;
-  final bool porCobrar;
+
+  /// En qué va: confirmada, llegó, en servicio… (null si el servidor no lo dijo).
+  final EstadoCita? estadoAtencion;
+
+  /// Por pagar en línea, por cobrar o pagada (null: no lleva cobro).
+  final EstadoPagoCita? estadoPago;
 
   factory CitaTitular.desdeJson(Map<String, dynamic> json) => CitaTitular(
     reservaId: json['reserva_id'] as String,
@@ -45,11 +40,14 @@ class CitaTitular {
     asistencia: json['asistencia'] as String?,
     retardo: (json['retardo'] ?? false) as bool,
     ordenId: json['orden_id'] as String?,
-    porCobrar: (json['por_cobrar'] ?? false) as bool,
+    estadoAtencion: EstadoCita.desde(json['estado_atencion']),
+    estadoPago: EstadoPagoCita.desde(json['estado_pago']),
   );
 }
 
-/// Sesión de la agenda del staff (clase abierta o cita privada), en hora local.
+/// Sesión de la agenda del staff (clase abierta o cita privada), en hora local. Lo
+/// propio de cada tipo va en su bloque: `clase` (cupo, lista de espera) o `cita`
+/// (a quién se atiende); el del otro tipo es null.
 class SesionAgenda {
   const SesionAgenda({
     required this.id,
@@ -67,12 +65,14 @@ class SesionAgenda {
     required this.enEspera,
     required this.estado,
     this.precioMinor,
+    this.clase,
+    this.ocupacion,
     this.cita,
     this.marcadas = 0,
   });
 
   final String id;
-  final String tipo;
+  final TipoSesion tipo;
   final String? oferta;
   final String? ofertaId;
   final String? instructor;
@@ -89,9 +89,17 @@ class SesionAgenda {
   final int marcadas;
   final String estado;
   final int? precioMinor;
+
+  /// Solo en clases: cupo, libres y lista de espera.
+  final BloqueClase? clase;
+
+  /// Solo en clases con cupo: la ocupación que se muestra.
+  final Ocupacion? ocupacion;
+
+  /// Solo en citas con cliente (sin titular: cancelada o aún sin cliente).
   final CitaTitular? cita;
 
-  bool get esCita => tipo == 'cita';
+  bool get esCita => tipo == TipoSesion.cita;
   bool get programada => estado == 'programada';
   int get duracionMin => terminaEn.difference(iniciaEn).inMinutes;
 
@@ -101,56 +109,29 @@ class SesionAgenda {
     if (iniciaEn.isAfter(ahora)) {
       return false;
     }
-    if (esCita) {
-      return cita?.asistencia == null;
-    }
-    return ocupados > 0 && marcadas < ocupados;
+    return switch (tipo) {
+      TipoSesion.cita => cita != null && cita!.asistencia == null,
+      TipoSesion.clase => ocupados > 0 && marcadas < ocupados,
+    };
   }
 
-  /// Ocupación 0–1 de una clase (null si no tiene cupo definido).
-  double? get ocupacion => capacidad != null && capacidad! > 0
-      ? (ocupados / capacidad!).clamp(0, 1).toDouble()
-      : null;
+  /// En qué va la cita, como lo calculó el servidor. Sin titular se lee por el
+  /// estado de la sesión: cancelada, o aún sin cliente (null).
+  EstadoCita? get estadoCita =>
+      cita?.estadoAtencion ?? (programada ? null : EstadoCita.cancelada);
 
-  /// Estado de la cita a la hora `ahora`: pagada o no, y si el cliente llegó.
-  EstadoCita estadoCita(DateTime ahora) {
-    final c = cita;
-    if (!programada || c == null) {
-      return EstadoCita.cancelada;
-    }
-    if (c.asistencia == 'ausente') {
-      return EstadoCita.noAsistio;
-    }
-    if (c.asistencia == 'presente') {
-      if (ahora.isBefore(iniciaEn)) {
-        return EstadoCita.llego;
-      }
-      return ahora.isBefore(terminaEn)
-          ? EstadoCita.enServicio
-          : EstadoCita.completada;
-    }
-    // Ya terminó y nadie registró si vino: le falta el registro, no la atención.
-    if (!ahora.isBefore(terminaEn)) {
-      return EstadoCita.sinRegistrar;
-    }
-    return c.estado == 'pendiente_pago'
-        ? EstadoCita.pendientePago
-        : EstadoCita.confirmada;
-  }
-
-  /// ¿Falta cobrarla? (pendiente de pago en línea o agendada por el negocio sin cobrar).
+  /// ¿Falta cobrarla? (pendiente de pago en línea o agendada sin cobrar).
   bool get porCobrar {
     final c = cita;
-    return c != null &&
-        c.ordenId != null &&
-        (c.estado == 'pendiente_pago' || c.porCobrar);
+    return c != null && c.ordenId != null && (c.estadoPago?.pendiente ?? false);
   }
 
   factory SesionAgenda.desdeJson(Map<String, dynamic> json) {
+    final tipo = TipoSesion.desde(json['tipo']);
     final cita = json['cita'];
     return SesionAgenda(
       id: json['id'] as String,
-      tipo: (json['tipo'] ?? 'clase') as String,
+      tipo: tipo,
       oferta: json['oferta'] as String?,
       ofertaId: json['oferta_id'] as String?,
       instructor: json['instructor'] as String?,
@@ -165,7 +146,13 @@ class SesionAgenda {
       marcadas: (json['marcadas'] ?? 0) as int,
       estado: (json['estado'] ?? 'programada') as String,
       precioMinor: json['oferta_precio_clase'] as int?,
-      cita: cita is Map<String, dynamic> ? CitaTitular.desdeJson(cita) : null,
+      clase: tipo == TipoSesion.clase
+          ? BloqueClase.desdeJson(json['clase'], respaldo: json)
+          : null,
+      ocupacion: Ocupacion.desdeJson(json['ocupacion']),
+      cita: tipo == TipoSesion.cita && cita is Map<String, dynamic>
+          ? CitaTitular.desdeJson(cita)
+          : null,
     );
   }
 }

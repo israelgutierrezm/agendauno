@@ -205,7 +205,7 @@ void main() {
                       id: 'r1',
                       estado: 'confirmada',
                       oferta: 'Corte',
-                      tipo: 'cita',
+                      tipo: TipoSesion.cita,
                       iniciaEn: _inicia,
                     ),
                   ),

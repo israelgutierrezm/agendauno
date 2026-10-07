@@ -98,7 +98,15 @@ class SesionController extends Notifier<Sesion?> {
 
     ref.read(authTokenProvider.notifier).establecer(bearer);
     ref.read(sesionTerminadaProvider.notifier).olvidar();
-    final sesion = Sesion.desdeJson(slug, bearer, usuario, estudio);
+    // La versión mínima llega con /yo (la app la pide al entrar); si el login la
+    // trae, se toma de una vez.
+    final sesion = Sesion.desdeJson(
+      slug,
+      bearer,
+      usuario,
+      estudio,
+      data['app'] as Map<String, dynamic>?,
+    );
     await ref.read(almacenSesionProvider).guardar(sesion.aJson());
     // Con más de un rol, primero «¿Cómo quieres entrar?».
     state = sesion.tieneVariosRoles
@@ -164,6 +172,7 @@ class SesionController extends Notifier<Sesion?> {
         actual.bearer,
         usuario,
         data['estudio'] as Map<String, dynamic>?,
+        data['app'] as Map<String, dynamic>?,
       );
       await ref.read(almacenSesionProvider).guardar(state!.aJson());
     } on DioException catch (e) {
@@ -171,18 +180,30 @@ class SesionController extends Notifier<Sesion?> {
     }
   }
 
-  /// Al volver a la app: confirma con el servidor que la sesión sigue viva (pudo
-  /// cerrarse en la web u otro teléfono mientras estaba en segundo plano). Sin red
-  /// no pasa nada; con 401 vuelve al login con el aviso.
+  /// Al volver a la app (y al entrar): confirma con el servidor que la sesión sigue
+  /// viva (pudo cerrarse en la web u otro teléfono mientras estaba en segundo
+  /// plano) y toma la versión mínima de la app que acepta. Sin red no pasa nada;
+  /// con 401 vuelve al login con el aviso.
   Future<void> revisar() async {
     final actual = state;
     if (actual == null) {
       return;
     }
     try {
-      await ref
+      final res = await ref
           .read(dioProvider)
           .get<Map<String, dynamic>>('/api/v1/app/${actual.slug}/yo');
+      final app = (res.data?['data'] as Map<String, dynamic>?)?['app'];
+      final minima = app is Map<String, dynamic> ? app['version_minima'] : null;
+      // Si mientras tanto se cerró o cambió la sesión, la respuesta ya no aplica.
+      final vigente = state;
+      if (minima is String &&
+          vigente != null &&
+          vigente.bearer == actual.bearer &&
+          minima != vigente.versionMinima) {
+        state = vigente.conUsuario(const {}, versionMinima: minima);
+        await ref.read(almacenSesionProvider).guardar(state!.aJson());
+      }
     } on DioException catch (e) {
       _siRevocada(e, actual);
     }
