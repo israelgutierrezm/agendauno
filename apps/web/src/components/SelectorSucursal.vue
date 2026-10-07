@@ -172,14 +172,16 @@ function elegir(evento: Event): void {
     animation: none;
   }
 }
+/* «Operando en», el nombre y la zona, del mismo tamaño: solo el peso y el color
+   los distinguen. */
 .ss-texto {
   display: grid;
   min-width: 0;
-  line-height: 1.15;
+  font-size: 0.875rem;
+  line-height: 1.2;
 }
 .ss-etiqueta {
   color: var(--texto-suave);
-  font-size: 0.72rem;
 }
 /* El nombre y, discreta, su región o zona (distingue sedes que se llaman igual). */
 .ss-linea {
@@ -191,7 +193,6 @@ function elegir(evento: Event): void {
 .ss-region {
   flex-shrink: 0;
   color: var(--texto-suave);
-  font-size: 0.75rem;
   white-space: nowrap;
 }
 .ss-region::before {
@@ -212,7 +213,6 @@ function elegir(evento: Event): void {
 .ss-nombre {
   overflow: hidden;
   color: var(--texto);
-  font-size: 0.98rem;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
