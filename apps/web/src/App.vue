@@ -79,9 +79,9 @@ const sucursalesSesion = useSucursales();
 const selectorEnBarra = computed(
   () => sucursalesSesion.varias.value && !esMiembro(sesion.usuario),
 );
-// En el teléfono la barra solo dice con qué sucursal se trabaja: con una sola, su
-// nombre (en lugar del título, que ya está en las pestañas de abajo).
-const sucursalUnicaEnMovil = computed(
+// Para el personal, la barra dice con qué sucursal se trabaja en lugar del título
+// (que ya está en las pestañas de abajo): con varias, el selector; con una, su nombre.
+const sucursalUnicaEnBarra = computed(
   () => !esMiembro(sesion.usuario) && sucursalesSesion.lista.value.length === 1,
 );
 
@@ -295,19 +295,12 @@ onMounted(() => {
           </button>
           <!-- Con varias sucursales: con cuál se trabaja (en lugar del título). -->
           <SelectorSucursal v-if="selectorEnBarra" />
-          <!-- En el teléfono, con una sola sucursal: su nombre. -->
-          <span
-            v-else-if="sucursalUnicaEnMovil"
-            class="tu-solo-movil min-w-0"
-            data-prueba="sucursal-movil"
-          >
-            <SelectorSucursal variante="unica" />
-          </span>
-          <!-- Dónde está: el área (su ícono y su nombre). -->
+          <!-- Con una sola sucursal: con cuál se trabaja (sin poder cambiarla). -->
+          <SelectorSucursal v-else-if="sucursalUnicaEnBarra" variante="unica" />
+          <!-- Clientes y personal sin sucursal: dónde está (el área). -->
           <div
-            v-if="!selectorEnBarra && lugar.titulo.value"
+            v-else-if="lugar.titulo.value"
             class="tu-barra-titulo"
-            :class="{ 'tu-sin-movil': sucursalUnicaEnMovil }"
             data-prueba="titulo-barra"
           >
             <span v-if="lugar.icono.value" class="tu-barra-icono">
@@ -362,8 +355,6 @@ onMounted(() => {
             class="tu-barra-division"
             aria-hidden="true"
           />
-          <!-- Con una sola sucursal, solo su nombre (informativo) -->
-          <SelectorSucursal variante="unica" />
           <!-- Cambiar de rol: solo si puede entrar con más de uno; el punto que late
                avisa que tiene otro rol con el cual entrar. -->
           <button
@@ -646,20 +637,14 @@ a.tu-miga:hover {
 /* En el teléfono la barra solo lleva el menú y la sucursal activa: el perfil, el rol,
    la apariencia y la pantalla completa van al pie del menú lateral. */
 @media (max-width: 639.98px) {
-  .tu-barra-acciones,
-  .tu-sin-movil {
+  .tu-barra-acciones {
     display: none !important;
   }
 }
 @media (min-width: 640px) {
-  .tu-solo-movil,
   .tu-barra-menu .tu-rol-punto-menu {
     display: none;
   }
-}
-.tu-barra-superior .tu-solo-movil .ss-unica {
-  color: var(--texto);
-  font-weight: 500;
 }
 /* «Cambiar de rol»: un punto que late, siempre, para que se note que se puede entrar
    con otro rol (en la barra y en el menú lateral del teléfono). */

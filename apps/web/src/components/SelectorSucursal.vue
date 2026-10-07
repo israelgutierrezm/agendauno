@@ -10,7 +10,8 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
  * Con qué sucursal se trabaja, en la barra superior (en lugar del título de la
  * página). Con varias: «Todas las sucursales» o una; con una elegida se ve «Operando
  * en» con un punto que late, para que se note en todo momento. Con una sola sucursal
- * solo se muestra su nombre, a la derecha. Los clientes (su cuenta) no lo ven.
+ * se ve igual, sin lista que abrir. Va en lugar del título de la barra. Los clientes
+ * (su cuenta) no lo ven.
  *
  * El `select` nativo va encima, transparente: se abre y se usa con el teclado como
  * cualquier lista; lo que se ve es la etiqueta de abajo.
@@ -74,15 +75,20 @@ function elegir(evento: Event): void {
       </option>
     </select>
   </div>
-  <span
+  <!-- Con una sola sucursal: se opera siempre en ella (sin lista que abrir). -->
+  <div
     v-else-if="mostrarUnica"
-    class="ss-unica"
+    class="ss ss-fija ss-estatica"
     :title="$t('sucursalOperativa.etiqueta')"
-    data-prueba="sucursal-unica"
   >
-    <IconoNav nombre="ubicacion" :tam="15" class="shrink-0" />
-    <span class="ss-unica-nombre">{{ sucursales.actual.value?.nombre }}</span>
-  </span>
+    <span class="ss-vivo" aria-hidden="true"></span>
+    <span class="ss-texto">
+      <span class="ss-etiqueta">{{ $t("sucursalOperativa.operandoEn") }}</span>
+      <span class="ss-nombre" data-prueba="sucursal-unica">{{
+        sucursales.actual.value?.nombre
+      }}</span>
+    </span>
+  </div>
 </template>
 
 <style scoped>
@@ -181,18 +187,10 @@ function elegir(evento: Event): void {
   opacity: 0;
   cursor: pointer;
 }
-.ss-unica {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-width: 0;
-  max-width: 100%;
-  color: var(--texto-suave);
-  font-size: 0.875rem;
-  white-space: nowrap;
-}
-.ss-unica-nombre {
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* Una sola sucursal: se ve igual que el selector fijo, sin lista que abrir. */
+.ss-estatica,
+.ss-estatica:hover {
+  border-color: color-mix(in srgb, var(--exito) 45%, var(--borde));
+  cursor: default;
 }
 </style>
