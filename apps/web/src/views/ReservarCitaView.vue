@@ -11,12 +11,14 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { separarTelefono } from "@/lib/ladas";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { recordarNegocio } from "@/lib/negociosRecientes";
 import { puedeEntrar } from "@/lib/acceso";
 import { esMiembro, nombreDeRol } from "@/lib/roles";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import CalendarioDias from "@/components/CalendarioDias.vue";
+import CampoCelular from "@/components/CampoCelular.vue";
 import ElegirProfesional from "@/components/ElegirProfesional.vue";
 import FotoAmpliable from "@/components/FotoAmpliable.vue";
 import IconoNav from "@/components/IconoNav.vue";
@@ -66,6 +68,9 @@ interface Opciones {
     logo_url: string | null;
     // Cómo llama el negocio a quien atiende (p. ej. «Barbero»).
     profesional?: string;
+    // Su país y su lada (ADR 0103): la que se propone para el celular.
+    pais?: string | null;
+    lada?: string | null;
   };
   servicios: Servicio[];
   sucursales: Sucursal[];
@@ -169,13 +174,13 @@ const filtro = ref("");
 const barberoId = ref("");
 const fecha = ref("");
 const slotSel = ref<string>("");
-// Datos del invitado (ADR 0067): apellidos, lada del celular y cómo nos conoció; y si
-// acepta los avisos por WhatsApp (ADR 0069).
+// Datos del invitado (ADR 0067): apellidos, celular con lada («+57 3001234567», de
+// la lista completa de países, ADR 0103) y cómo nos conoció; y si acepta los avisos
+// por WhatsApp (ADR 0069).
 function datosVacios() {
   return {
     nombre: "",
     apellidos: "",
-    lada: "+52",
     celular: "",
     email: "",
     origen: "",
@@ -192,7 +197,26 @@ const nota = ref("");
 // Para otra persona (ADR 0068): la cita es de quien agenda; se guarda quién asiste.
 const paraOtra = ref(false);
 const asiste = ref("");
-const LADAS = ["+52", "+1", "+57", "+34", "+54", "+56", "+51", "+593", "+502"];
+// País y lada del negocio: la lada que se propone. Si las opciones no los traen, se
+// piden al escaparate al llegar a los datos (una vez).
+const paisNegocio = ref<string | null>(null);
+const ladaNegocio = ref<string | null>(null);
+let regionPedida = false;
+async function cargarRegionNegocio(): Promise<void> {
+  if (regionPedida || ladaNegocio.value !== null) {
+    return;
+  }
+  regionPedida = true;
+  try {
+    const { data } = await api.get<{
+      data: { estudio?: { pais?: string | null; lada?: string | null } };
+    }>(`/api/v1/app/${slug.value}/escaparate`);
+    paisNegocio.value = data?.data?.estudio?.pais ?? null;
+    ladaNegocio.value = data?.data?.estudio?.lada ?? null;
+  } catch {
+    // Sin escaparate, el celular va sin lada y el API le pone la del negocio.
+  }
+}
 const ORIGENES = [
   "instagram",
   "facebook",
@@ -400,6 +424,8 @@ async function cargar(): Promise<void> {
       `/api/v1/app/${slug.value}/citas/opciones`,
     );
     opciones.value = data.data;
+    paisNegocio.value = data.data.estudio.pais ?? null;
+    ladaNegocio.value = data.data.estudio.lada ?? null;
     recordarNegocio({
       slug: data.data.estudio.slug,
       nombre: data.data.estudio.nombre,
@@ -668,6 +694,26 @@ function elegirServicio(id: string): void {
   ir("horario");
 }
 
+// El celular como lo pide el API: el número y su lada («+57»), o nada. Sin la lada
+// del negocio, la que el campo propuso por su cuenta no se manda: el API le pone la
+// del negocio (no se supone México).
+function celularConLada(): { celular: string | null; lada: string | null } {
+  const propuesta = ladaNegocio.value ?? sesion.lada;
+  const { lada, numero } = separarTelefono(datos.value.celular, propuesta);
+  if (numero === "") {
+    return { celular: null, lada: null };
+  }
+  return ladaNegocio.value === null && lada === propuesta
+    ? { celular: numero, lada: null }
+    : { celular: numero, lada: `+${lada}` };
+}
+// Al llegar a los datos (ahí se escribe el celular) se pide la lada del negocio.
+watch(paso, (p) => {
+  if (p === "confirmar") {
+    void cargarRegionNegocio();
+  }
+});
+
 async function agendar(): Promise<void> {
   if (!listoParaAgendar.value) {
     error.value = null;
@@ -719,9 +765,7 @@ async function agendar(): Promise<void> {
       }>(`/api/v1/app/${slug.value}/citas`, {
         nombre: datos.value.nombre.trim(),
         apellidos: datos.value.apellidos.trim() || null,
-        celular:
-          datos.value.celular.trim() !== "" ? datos.value.celular.trim() : null,
-        lada: datos.value.celular.trim() !== "" ? datos.value.lada : null,
+        ...celularConLada(),
         email: datos.value.email.trim(),
         como_nos_conocio: datos.value.origen || null,
         ...(ofrecerWhatsApp.value && datos.value.whatsapp
@@ -1979,26 +2023,15 @@ onMounted(cargar);
                         <label class="tu-label" for="rc-cel">{{
                           $t("reservar.celular")
                         }}</label>
-                        <div class="flex gap-2">
-                          <select
-                            id="rc-lada"
-                            v-model="datos.lada"
-                            class="tu-input w-auto"
-                            :aria-label="$t('perfilPublico.agendar.lada')"
-                          >
-                            <option v-for="l in LADAS" :key="l" :value="l">
-                              {{ l }}
-                            </option>
-                          </select>
-                          <input
-                            id="rc-cel"
-                            v-model="datos.celular"
-                            class="tu-input"
-                            inputmode="tel"
-                            autocomplete="tel-national"
-                            :placeholder="$t('perfilPublico.agendar.opcional')"
-                          />
-                        </div>
+                        <CampoCelular
+                          id="rc-cel"
+                          v-model="datos.celular"
+                          :pais="paisNegocio"
+                          :lada="ladaNegocio"
+                          maxlength="20"
+                          autocomplete="tel-national"
+                          :placeholder="$t('perfilPublico.agendar.opcional')"
+                        />
                       </div>
                       <div>
                         <label class="tu-label" for="rc-email">{{

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 /**
@@ -41,11 +42,9 @@ const nota = ref("");
 const guardando = ref(false);
 const error = ref<string | null>(null);
 
-function dinero(minor: number, moneda: string): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda || "MXN",
-  }).format(minor / 100);
+// Sin moneda, la del negocio (ADR 0099); con los números de su país.
+function dinero(minor: number, moneda: string | null): string {
+  return dineroDelPais(minor, moneda || sesion.moneda, sesion.pais);
 }
 
 async function cargar(): Promise<void> {
@@ -121,7 +120,7 @@ defineExpose({ cargar });
                     i.tipo === "pago_duplicado"
                       ? "porConciliar.pagoDuplicado"
                       : "porConciliar.pagoTardio",
-                    { monto: dinero(i.monto_minor, i.moneda ?? "MXN") },
+                    { monto: dinero(i.monto_minor, i.moneda) },
                   )
                 }}
               </template>

@@ -2,6 +2,7 @@
 import { reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import CampoCelular from "@/components/CampoCelular.vue";
 import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -15,6 +16,8 @@ export interface MiembroEditable {
   primer_apellido: string | null;
   segundo_apellido: string | null;
   email: string | null;
+  // Sin el dato (quien abre no lo tiene), el celular no se edita aquí.
+  celular?: string | null;
   activo: boolean;
   es_facturable: boolean;
   archivado: boolean;
@@ -38,6 +41,7 @@ const form = reactive({
   primer_apellido: props.miembro.primer_apellido ?? "",
   segundo_apellido: props.miembro.segundo_apellido ?? "",
   email: props.miembro.email ?? "",
+  celular: props.miembro.celular ?? "",
   fecha_nacimiento: props.miembro.fecha_nacimiento ?? "",
   genero: props.miembro.genero ?? "",
   activo: props.miembro.activo,
@@ -84,6 +88,11 @@ async function guardar(): Promise<void> {
         primer_apellido: form.primer_apellido || null,
         segundo_apellido: form.segundo_apellido || null,
         email: form.email || null,
+        // Solo si lo cambió: uno guardado sin lada se queda como está (ADR 0103).
+        ...(props.miembro.celular !== undefined &&
+        form.celular !== (props.miembro.celular ?? "")
+          ? { celular: form.celular || null }
+          : {}),
         fecha_nacimiento: form.fecha_nacimiento || null,
         genero: form.genero || null,
         activo: form.activo,
@@ -121,6 +130,16 @@ async function guardar(): Promise<void> {
       <div>
         <label class="tu-label" for="ee">{{ $t("miembros.email") }}</label>
         <input id="ee" v-model="form.email" class="tu-input" type="email" />
+      </div>
+      <div v-if="miembro.celular !== undefined">
+        <label class="tu-label" for="ec">{{ $t("miembros.celular") }}</label>
+        <CampoCelular
+          id="ec"
+          v-model="form.celular"
+          maxlength="30"
+          autocomplete="off"
+          data-prueba="celular-miembro"
+        />
       </div>
       <CamposDatosPersonales
         id="em"

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -63,11 +64,9 @@ const cargando = ref(false);
 const descargando = ref(false);
 const error = ref<string | null>(null);
 
-function dinero(minor: number, moneda = "MXN"): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+// En la moneda del negocio (ADR 0099) y con los números de su país.
+function dinero(minor: number, moneda = sesion.moneda): string {
+  return dineroDelPais(minor, moneda, sesion.pais);
 }
 function fechaHora(iso: string): string {
   return new Intl.DateTimeFormat("es-MX", {
@@ -208,7 +207,7 @@ onMounted(cargar);
     <!-- Totales: una franja por moneda (nunca se suman monedas distintas) -->
     <template
       v-for="totales in totalesPorMoneda"
-      :key="totales.moneda ?? 'MXN'"
+      :key="totales.moneda ?? sesion.moneda"
     >
       <p v-if="totalesPorMoneda.length > 1" class="mt-4 text-sm font-semibold">
         {{ $t("corteCaja.enMoneda", { moneda: totales.moneda }) }}

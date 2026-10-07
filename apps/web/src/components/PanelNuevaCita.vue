@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import BuscarPersona, {
   type PersonaBuscable,
 } from "@/components/BuscarPersona.vue";
+import CampoCelular from "@/components/CampoCelular.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import LeyendaSucursal from "@/components/LeyendaSucursal.vue";
 import {
@@ -290,17 +291,18 @@ async function agendar(): Promise<void> {
             }}</span>
             <input v-model="nuevoCliente.nombre" class="tu-input" required />
           </label>
-          <label class="block">
-            <span class="tu-label">{{
+          <div>
+            <label class="tu-label" for="pnc-celular">{{
               $t("agendaVisual.nuevaCita.celular")
-            }}</span>
-            <input
+            }}</label>
+            <!-- Con su lada: la del negocio si no se elige otra (ADR 0103). -->
+            <CampoCelular
+              id="pnc-celular"
               v-model="nuevoCliente.celular"
-              class="tu-input"
-              type="tel"
-              inputmode="tel"
+              maxlength="30"
+              autocomplete="off"
             />
-          </label>
+          </div>
           <label v-if="ofrecerWhatsApp" class="flex items-start gap-2 text-sm">
             <input
               v-model="nuevoCliente.whatsapp"

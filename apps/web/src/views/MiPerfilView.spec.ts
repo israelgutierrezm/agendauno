@@ -233,19 +233,34 @@ describe("perfil unificado", () => {
     w.unmount();
   });
 
-  it("con ficha de cliente edita su celular junto a su nombre", async () => {
+  it("con ficha de cliente edita su celular (con lada) junto a su nombre", async () => {
     Object.assign(sesion.usuario, { tiene_ficha: true, celular: "5511112222" });
     api.put.mockResolvedValue({ data: { data: { usuario: sesion.usuario } } });
     const w = montar();
+    // Guardado sin lada: se ve con la del negocio (México, sin otro dato).
     const celular = w.get('[data-prueba="celular"]');
     expect(celular.element).toHaveProperty("value", "5511112222");
+    expect(w.get('[data-prueba="lada-celular"]').text()).toBe("MX +52");
 
     await celular.setValue("55 3333 4444");
     await w.findAll("form")[0].trigger("submit");
     await flushPromises();
     expect(api.put).toHaveBeenCalledWith(
       "/api/v1/app/demo/yo/perfil",
-      expect.objectContaining({ nombre: "Ana", celular: "55 3333 4444" }),
+      expect.objectContaining({ nombre: "Ana", celular: "+52 5533334444" }),
+    );
+    w.unmount();
+  });
+
+  it("si no toca su celular, se manda como estaba guardado", async () => {
+    Object.assign(sesion.usuario, { tiene_ficha: true, celular: "5511112222" });
+    api.put.mockResolvedValue({ data: { data: { usuario: sesion.usuario } } });
+    const w = montar();
+    await w.findAll("form")[0].trigger("submit");
+    await flushPromises();
+    expect(api.put).toHaveBeenCalledWith(
+      "/api/v1/app/demo/yo/perfil",
+      expect.objectContaining({ celular: "5511112222" }),
     );
     w.unmount();
   });

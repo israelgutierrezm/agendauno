@@ -10,6 +10,7 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { dinero as dineroDelPais, simboloMoneda } from "@/lib/formato";
 import { nombreDeRol } from "@/lib/roles";
 import { plural } from "@/lib/terminologia";
 import { hoyComoFecha } from "@/lib/hoyNegocio";
@@ -91,12 +92,12 @@ const calculado = ref(false);
 
 const termino = computed(() => sesion.terminologia.sesion.toLowerCase());
 
-function dinero(minor: number, moneda = "MXN"): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+// En la moneda del negocio (ADR 0099) y con los números de su país.
+function dinero(minor: number, moneda = sesion.moneda): string {
+  return dineroDelPais(minor, moneda, sesion.pais);
 }
+// Junto al monto del esquema: el símbolo de la moneda del negocio.
+const simbolo = computed(() => simboloMoneda(sesion.moneda, sesion.pais));
 function fechaCorta(isoFecha: string): string {
   const [a, m, d] = isoFecha.split("-");
   return `${d}/${m}/${a}`;
@@ -359,7 +360,9 @@ onMounted(async () => {
             <div>
               <label class="tu-label" for="em">{{ $t("nomina.monto") }}</label>
               <div class="nm-monto">
-                <span aria-hidden="true">$</span>
+                <span aria-hidden="true" data-prueba="simbolo-monto">{{
+                  simbolo
+                }}</span>
                 <input
                   id="em"
                   v-model="esquema.monto"

@@ -42,7 +42,7 @@ export default {
     opcional: "(opcional)",
     sucursal: "Nombre de tu sucursal",
     sucursalAyuda:
-      "Por ejemplo, la colonia: «Roma Norte». Si tienes más, agrégalas después.",
+      "Por ejemplo, el barrio o la zona: «Centro». Si tienes más, agrégalas después.",
     direccion: "Dirección",
     zona: "Zona horaria",
   },

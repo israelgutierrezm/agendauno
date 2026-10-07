@@ -61,7 +61,6 @@ export default {
       "En Google Maps busca tu sede, toca Compartir y pega aquí el enlace. Si lo dejas vacío, se usa la dirección.",
     telefono: "Teléfono",
     whatsapp: "WhatsApp",
-    whatsappPh: "Con lada, por ejemplo 52 55 1234 5678",
     redes: "Redes de esta sede",
     redesAyuda:
       "Solo si la sede tiene cuentas propias; si no, se muestran las del negocio.",
@@ -232,7 +231,6 @@ export default {
     correo: "Correo",
     correoAyuda: "Te enviamos ahí la confirmación de tu cita.",
     apellidos: "Apellidos",
-    lada: "Lada",
     comoNosConociste: "¿Cómo nos conociste? (opcional)",
     prefieroNoDecir: "Prefiero no decir",
     nota: "Nota para el negocio (opcional)",

@@ -20,6 +20,7 @@ import {
 } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -101,13 +102,12 @@ const horas = computed(() => {
   const dur = duracionMin(s);
   return `${aHora(ini)} – ${aHora(ini + dur)} (${t("detalleCita.minutos", { n: dur })})`;
 });
+// En la moneda del negocio y con los números de su país.
 function dinero(minor: number, decimales = 0): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: sesionTenant.moneda,
+  return dineroDelPais(minor, sesionTenant.moneda, sesionTenant.pais, {
     minimumFractionDigits: decimales,
     maximumFractionDigits: decimales,
-  }).format(minor / 100);
+  });
 }
 const precio = computed(() =>
   props.sesion?.oferta_precio_clase

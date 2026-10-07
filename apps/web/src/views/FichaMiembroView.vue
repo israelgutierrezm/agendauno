@@ -15,6 +15,7 @@ import RegistrarPagoOrden, {
 } from "@/components/RegistrarPagoOrden.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { edadDe, fechaNacimientoTexto } from "@/lib/datosPersonales";
 import { useRegreso } from "@/lib/regreso";
 import { plural } from "@/lib/terminologia";
@@ -113,6 +114,7 @@ interface Ficha {
     primer_apellido?: string | null;
     segundo_apellido?: string | null;
     email: string | null;
+    celular?: string | null;
     fecha_nacimiento?: string | null;
     genero?: string | null;
     tipo: string;
@@ -400,11 +402,9 @@ const error = ref<string | null>(null);
 const editando = ref<MiembroEditable | null>(null);
 const vendiendo = ref(false);
 
+// Con los números del país del negocio («$ 1.250,50» en Colombia).
 function dinero(minor: number, moneda: string): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+  return dineroDelPais(minor, moneda, sesion.pais);
 }
 function fechaHora(iso: string | null, zona: string | null): string {
   if (iso === null) {
@@ -475,6 +475,7 @@ function abrirEditar(): void {
     primer_apellido: p.primer_apellido ?? null,
     segundo_apellido: p.segundo_apellido ?? null,
     email: p.email,
+    celular: p.celular ?? null,
     activo: p.activo,
     es_facturable: p.es_facturable,
     archivado: p.archivado,

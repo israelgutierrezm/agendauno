@@ -21,8 +21,14 @@ vi.mock("@/lib/api", () => ({
   mensajeDeError: () => "Error",
 }));
 vi.mock("@/lib/confirmar", () => ({ confirmar: mocks.confirmar }));
+const sesion = vi.hoisted(() => ({
+  slug: "demo",
+  puede: () => true,
+  moneda: "MXN",
+  pais: "MX",
+}));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
+  useSesionTenantStore: () => sesion,
 }));
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
@@ -70,6 +76,8 @@ const ARTICULOS = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sesion.moneda = "MXN";
+  sesion.pais = "MX";
   mocks.confirmar.mockResolvedValue(true);
   mocks.put.mockResolvedValue({ data: {} });
   mocks.get.mockImplementation((url: string) =>
@@ -144,5 +152,24 @@ describe("ventas recientes del mostrador", () => {
       metodo_pago: "tarjeta",
       items: [{ articulo_id: "a1", cantidad: 2 }],
     });
+  });
+
+  it("el total y la confirmación van en la moneda del negocio, no en pesos", async () => {
+    sesion.moneda = "EUR";
+    sesion.pais = "ES";
+    mocks.post.mockResolvedValue({ data: {} });
+    const w = mount(PosView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    await w.get('[data-prueba="producto"]').trigger("click");
+    const plano = (s: string): string => s.replace(/\s/g, " ");
+    expect(plano(w.get(".mo-total").text())).toContain("280,00 €");
+    await w.get('[data-prueba="cobrar"]').trigger("click");
+    await flushPromises();
+
+    expect(plano(String(mocks.confirmar.mock.calls[0]![0]))).toContain(
+      "280,00 €",
+    );
+    expect(w.text()).not.toContain("$");
   });
 });

@@ -11,6 +11,12 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import {
+  aMinor,
+  dinero as dineroDelPais,
+  ejemploPrecio,
+  simboloMoneda,
+} from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 type Politica = "entitlement" | "pago";
@@ -131,11 +137,10 @@ function fotoCambiada(o: Oferta, url: string | null): void {
 }
 
 function dinero(minor: number | null): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: sesion.moneda,
-  }).format((minor ?? 0) / 100);
+  return dineroDelPais(minor ?? 0, sesion.moneda, sesion.pais);
 }
+// Junto a los campos de precio: el símbolo de la moneda del negocio.
+const simbolo = computed(() => simboloMoneda(sesion.moneda, sesion.pais));
 
 // Para el pago-al-agendar hace falta un precio mayor a 0.
 const precioInvalido = computed(
@@ -298,13 +303,19 @@ function abrirAlta(): void {
   agregarFila();
   dandoAlta.value = true;
 }
+// El precio se escribe como en el país del negocio («25.000» en Colombia, «12,50» en
+// España); lo que no se puede leer sin adivinar se marca en su campo y no se guarda.
+const precioDe = (f: FilaAlta): number | null => aMinor(f.valor, sesion.pais);
+const precioIlegible = (f: FilaAlta): boolean =>
+  esCitas.value && f.valor.trim() !== "" && precioDe(f) === null;
+const errorPrecio = computed(() =>
+  t("validacion.precioIlegible", { ejemplo: ejemploPrecio(sesion.pais) }),
+);
 const filasValidas = computed(() =>
   filas.value.filter(
     (f) =>
       f.nombre.trim() !== "" &&
-      (esCitas.value
-        ? Number(f.valor.replace(/[^\d.]/g, "")) > 0
-        : Number(f.valor) > 0),
+      (esCitas.value ? (precioDe(f) ?? 0) > 0 : Number(f.valor) > 0),
   ),
 );
 async function guardarAlta(): Promise<void> {
@@ -317,9 +328,7 @@ async function guardarAlta(): Promise<void> {
           ? {
               nombre: f.nombre.trim(),
               duracion_minutos: f.duracion,
-              precio_minor: Math.round(
-                Number(f.valor.replace(/[^\d.]/g, "")) * 100,
-              ),
+              precio_minor: precioDe(f) ?? 0,
             }
           : {
               nombre: f.nombre.trim(),
@@ -608,7 +617,11 @@ onMounted(cargar);
               $t("catalogo.precio")
             }}</label>
             <div class="flex items-center gap-2">
-              <span :style="{ color: 'var(--texto-suave)' }">$</span>
+              <span
+                :style="{ color: 'var(--texto-suave)' }"
+                data-prueba="simbolo-precio"
+                >{{ simbolo }}</span
+              >
               <input
                 :id="`precio-${o.id}`"
                 v-model="form.precio"
@@ -818,13 +831,20 @@ onMounted(cargar);
               </option>
             </select>
           </label>
-          <div v-if="esCitas" class="ct-precio">
-            <span aria-hidden="true">$</span>
+          <div
+            v-if="esCitas"
+            class="ct-precio"
+            :style="{ '--ancho-simbolo': `${simbolo.length}ch` }"
+          >
+            <span aria-hidden="true">{{ simbolo }}</span>
             <input
               v-model="f.valor"
               class="tu-input"
               inputmode="decimal"
               :aria-label="$t('listadosVisual.catalogo.precio')"
+              :aria-invalid="precioIlegible(f)"
+              :style="precioIlegible(f) ? { borderColor: 'var(--error)' } : {}"
+              data-prueba="precio-alta"
             />
           </div>
           <input
@@ -844,6 +864,14 @@ onMounted(cargar);
           >
             <IconoNav nombre="cerrar" :tam="16" />
           </button>
+          <p
+            v-if="precioIlegible(f)"
+            class="col-span-full text-xs"
+            style="color: var(--error)"
+            data-prueba="precio-ilegible"
+          >
+            {{ errorPrecio }}
+          </p>
         </div>
       </div>
       <button
@@ -867,7 +895,11 @@ onMounted(cargar);
           class="tu-btn tu-btn-primario"
           type="button"
           data-prueba="guardar-alta"
-          :disabled="dandoAltaGuardando || filasValidas.length === 0"
+          :disabled="
+            dandoAltaGuardando ||
+            filasValidas.length === 0 ||
+            filas.some(precioIlegible)
+          "
           @click="guardarAlta"
         >
           {{ $t("catalogo.guardar") }}
@@ -959,7 +991,8 @@ onMounted(cargar);
   transform: translateY(-50%);
   color: var(--texto-suave);
 }
+/* El símbolo de la moneda del negocio: «$», «€», «S/» o un código («USD»). */
 .ct-precio > input {
-  padding-left: 1.6rem;
+  padding-left: calc(1.05rem + var(--ancho-simbolo, 1ch));
 }
 </style>

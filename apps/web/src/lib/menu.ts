@@ -110,6 +110,8 @@ export const CATEGORIAS_CONFIGURACION: CategoriaConfiguracion[] = [
         "ubicación",
       ]),
       o("region", "region", "configNegocio.opciones.region", [
+        "país",
+        "lada",
         "moneda",
         "pesos",
         "dólares",

@@ -10,6 +10,7 @@ import TarjetasIndicadores, {
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { dinero } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Programa {
@@ -43,6 +44,10 @@ interface Movimiento {
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
+// Una unidad de la moneda del negocio, para la ayuda de los puntos («$1», «1 €»).
+const unaUnidad = computed(() =>
+  dinero(100, sesion.moneda, sesion.pais, { maximumFractionDigits: 0 }),
+);
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("lealtad.gestionar"));
 
@@ -333,8 +338,8 @@ const indicadores = computed<Indicador[]>(() => {
               class="tu-input"
               :disabled="!puedeGestionar"
             />
-            <span class="tu-hint">{{
-              $t("lealtad.programa.porMonedaAyuda")
+            <span class="tu-hint" data-prueba="ayuda-por-moneda">{{
+              $t("lealtad.programa.porMonedaAyuda", { monto: unaUnidad })
             }}</span>
           </div>
         </div>

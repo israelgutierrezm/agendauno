@@ -3,19 +3,23 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import SelectorBuscable from "@/components/SelectorBuscable.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
-import { claveZona, zonasConActual } from "@/lib/region";
+import { opcionesPais, opcionesZona } from "@/lib/region";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
 /**
- * Moneda y zona horaria del negocio (ADR 0099). Una sola moneda para todo el negocio
- * (pesos mexicanos si no elige otra), que se elige antes de empezar a cobrar; con ella
- * funcionan, o no, las pasarelas en línea y la facturación. La zona horaria cuenta los
- * días de reportes, cortes, vigencias y horarios.
+ * País, moneda y zona horaria del negocio (ADR 0099 y 0103). El país da la lada de los
+ * celulares capturados sin ella y, con pesos mexicanos, la facturación (solo en
+ * México). Una sola moneda para todo el negocio (pesos mexicanos si no elige otra),
+ * que se elige antes de empezar a cobrar; con ella funcionan, o no, las pasarelas en
+ * línea. La zona horaria cuenta los días de reportes, cortes, vigencias y horarios.
  */
 interface Region {
+  pais: string;
+  lada?: string;
   moneda: string;
   zona_horaria: string;
   monedas: { codigo: string; nombre: string }[];
@@ -30,6 +34,7 @@ const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 const region = ref<Region | null>(null);
+const pais = ref("MX");
 const moneda = ref("MXN");
 const zona = ref("America/Mexico_City");
 const cargando = ref(true);
@@ -39,12 +44,22 @@ const guardando = ref(false);
 const cambios = computed(
   () =>
     region.value !== null &&
-    (moneda.value !== region.value.moneda ||
+    (pais.value !== region.value.pais ||
+      moneda.value !== region.value.moneda ||
       zona.value !== region.value.zona_horaria),
 );
 
+// Los países con buscador (los más usados primero) y las zonas, con las del país
+// elegido primero.
+const paises = opcionesPais();
+const zonas = computed(() => opcionesZona(pais.value, zona.value));
+// Lo que solo funciona en México y en pesos (ADR 0099), según lo elegido.
+const enPesos = computed(() => moneda.value === "MXN");
+const factura = computed(() => enPesos.value && pais.value === "MX");
+
 function aplicar(r: Region): void {
   region.value = r;
+  pais.value = r.pais ?? "MX";
   moneda.value = r.moneda;
   zona.value = r.zona_horaria;
 }
@@ -80,6 +95,7 @@ async function guardar(): Promise<void> {
     const { data } = await api.put<{ data: Region }>(
       `${base.value}/negocio/region`,
       {
+        ...(pais.value !== region.value.pais ? { pais: pais.value } : {}),
         ...(cambiaMoneda ? { moneda: moneda.value } : {}),
         ...(zona.value !== region.value.zona_horaria
           ? { zona_horaria: zona.value }
@@ -87,7 +103,7 @@ async function guardar(): Promise<void> {
       },
     );
     aplicar(data.data);
-    // La sesión usa la moneda y la zona en todo el panel.
+    // La sesión usa el país, la moneda y la zona en todo el panel.
     await sesion.cargarYo();
     toast.exito(t("region.guardado"));
   } catch (e) {
@@ -126,6 +142,29 @@ onMounted(cargar);
       class="mt-6 grid gap-4 lg:grid-cols-2"
       @submit.prevent="guardar"
     >
+      <!-- País -->
+      <section class="tu-card p-5 sm:p-6" data-prueba="region-pais">
+        <h2 class="font-medium">{{ $t("region.pais.titulo") }}</h2>
+        <label class="tu-label mt-4" for="rg-pais">{{
+          $t("region.pais.etiqueta")
+        }}</label>
+        <SelectorBuscable
+          id="rg-pais"
+          v-model="pais"
+          :opciones="paises"
+          data-prueba="pais-negocio"
+        />
+        <p class="tu-hint mt-1">{{ $t("region.pais.ayuda") }}</p>
+        <p
+          v-if="pais !== 'MX'"
+          class="tu-hint mt-2"
+          :style="{ color: 'var(--aviso)' }"
+          data-prueba="fuera-de-mexico"
+        >
+          {{ $t("region.pais.fueraDeMexico") }}
+        </p>
+      </section>
+
       <!-- Moneda -->
       <section class="tu-card p-5 sm:p-6" data-prueba="region-moneda">
         <h2 class="font-medium">{{ $t("region.moneda.titulo") }}</h2>
@@ -161,11 +200,10 @@ onMounted(cargar);
               <span
                 class="tu-pildora"
                 :style="{
-                  '--tono':
-                    moneda === 'MXN' ? 'var(--exito)' : 'var(--texto-suave)',
+                  '--tono': enPesos ? 'var(--exito)' : 'var(--texto-suave)',
                 }"
                 >{{
-                  moneda === "MXN"
+                  enPesos
                     ? $t("region.avisos.disponible")
                     : $t("region.avisos.soloPesos")
                 }}</span
@@ -178,13 +216,10 @@ onMounted(cargar);
               <span
                 class="tu-pildora"
                 :style="{
-                  '--tono':
-                    moneda === 'MXN' && region.facturacion.disponible
-                      ? 'var(--exito)'
-                      : 'var(--texto-suave)',
+                  '--tono': factura ? 'var(--exito)' : 'var(--texto-suave)',
                 }"
                 >{{
-                  moneda === "MXN" && region.facturacion.disponible
+                  factura
                     ? $t("region.avisos.disponible")
                     : $t("region.avisos.soloPesosMexico")
                 }}</span
@@ -200,16 +235,12 @@ onMounted(cargar);
         <label class="tu-label mt-4" for="rg-zona">{{
           $t("region.zona.etiqueta")
         }}</label>
-        <select
+        <SelectorBuscable
           id="rg-zona"
           v-model="zona"
-          class="tu-input"
+          :opciones="zonas"
           data-prueba="zona-negocio"
-        >
-          <option v-for="z in zonasConActual(zona)" :key="z" :value="z">
-            {{ $t(`region.zonas.${claveZona(z)}`, z) }}
-          </option>
-        </select>
+        />
         <p class="tu-hint mt-1">{{ $t("region.zona.ayuda") }}</p>
       </section>
 

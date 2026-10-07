@@ -458,6 +458,8 @@ export const validacion = {
     },
   },
   recursoTipoPh: "Sala, cancha, carril…",
+  // Un precio escrito a mano que no se puede leer con los separadores del país.
+  precioIlegible: "No entendimos este precio. Escríbelo así: {ejemplo}.",
 };
 
 export const instructorClase = {

@@ -11,6 +11,7 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -81,11 +82,9 @@ async function cargar(): Promise<void> {
   }
 }
 
-function dinero(minor: number, moneda = "MXN"): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+// En la moneda del negocio (ADR 0099) y con los números de su país.
+function dinero(minor: number, moneda = sesion.moneda): string {
+  return dineroDelPais(minor, moneda, sesion.pais);
 }
 
 // El stock que cuenta: el de la sucursal fija o el total.

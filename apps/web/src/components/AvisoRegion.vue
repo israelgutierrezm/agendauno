@@ -8,7 +8,7 @@ import { useSesionTenantStore } from "@/stores/sesionTenant";
 /**
  * Lo que solo funciona en pesos mexicanos (ADR 0099): las pasarelas de pago en línea
  * y la facturación a los clientes (esta, además, solo para negocios en México). Se
- * explica claro y se lleva a «Moneda y zona horaria».
+ * explica claro y se lleva a «País, moneda y zona horaria».
  */
 const props = defineProps<{
   // `facturacionPlataforma`: la plataforma aún no factura; no depende del negocio.

@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
+import CampoCelular from "@/components/CampoCelular.vue";
 import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -501,14 +502,12 @@ const aparienciaAbierta = ref(false);
               <label class="tu-label" for="mp-celular">{{
                 $t("miPerfil.celular")
               }}</label>
-              <input
+              <!-- Con su lada: la del negocio si no elige otra (ADR 0103). -->
+              <CampoCelular
                 id="mp-celular"
                 v-model="datos.celular"
-                class="tu-input"
-                type="tel"
-                inputmode="tel"
-                maxlength="30"
-                autocomplete="tel"
+                maxlength="24"
+                autocomplete="tel-national"
                 data-prueba="celular"
               />
               <p class="tu-hint mt-1">{{ $t("miPerfil.celularAyuda") }}</p>

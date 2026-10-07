@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
     slug: null as string | null,
     usuario: null as Record<string, unknown> | null,
     puede: () => false,
+    // Sin sesión, la tienda trae la región por omisión (México).
+    pais: "MX",
+    lada: "52",
   },
 }));
 vi.mock("@/lib/api", () => ({
@@ -124,17 +127,21 @@ function api(
   porPagar: () => Promise<unknown> = () => Promise.reject(new Error("404")),
   // Las opciones de la cuenta del cliente (con los servicios de su bono).
   mias: () => Promise<unknown> = () => Promise.reject(new Error("401")),
+  // El escaparate (de ahí sale la lada del negocio si las opciones no la traen).
+  escaparate: () => Promise<unknown> = () => Promise.reject(new Error("404")),
 ) {
   mocks.get.mockImplementation((url: string) =>
-    url.endsWith("/mi/citas/opciones")
-      ? mias()
-      : url.endsWith("/citas/opciones")
-        ? Promise.resolve(op)
-        : url.endsWith("/citas/dias")
-          ? Promise.resolve(dias)
-          : url.includes("/citas/orden/")
-            ? porPagar()
-            : huecos(),
+    url.endsWith("/escaparate")
+      ? escaparate()
+      : url.endsWith("/mi/citas/opciones")
+        ? mias()
+        : url.endsWith("/citas/opciones")
+          ? Promise.resolve(op)
+          : url.endsWith("/citas/dias")
+            ? Promise.resolve(dias)
+            : url.includes("/citas/orden/")
+              ? porPagar()
+              : huecos(),
   );
 }
 // La cita del enlace del correo de apartado.
@@ -851,7 +858,7 @@ describe("datos del cliente", () => {
 
     await vista.get("#rc-nom").setValue("Beto");
     await vista.get("#rc-ape").setValue("López García");
-    await vista.get("#rc-lada").setValue("+1");
+    await vista.get('[data-prueba="elegir-lada"]').setValue("US");
     await vista.get("#rc-cel").setValue("555 123 4567");
     await vista.get("#rc-email").setValue("beto@correo.mx");
     await vista.get("#rc-origen").setValue("instagram");
@@ -868,11 +875,110 @@ describe("datos del cliente", () => {
         nombre: "Beto",
         apellidos: "López García",
         lada: "+1",
-        celular: "555 123 4567",
+        celular: "5551234567",
         email: "beto@correo.mx",
         como_nos_conocio: "instagram",
         nota: "Es mi primera vez.",
       }),
+    );
+    vista.unmount();
+  });
+});
+
+describe("lada del celular", () => {
+  it("propone la lada del negocio que traen las opciones", async () => {
+    const op = opciones(1);
+    api({
+      data: {
+        data: {
+          ...op.data.data,
+          estudio: { ...op.data.data.estudio, pais: "CO", lada: "57" },
+        },
+      },
+    });
+    mocks.post.mockResolvedValue({
+      data: { data: { estado: "pendiente_pago", orden_id: "orden" } },
+    });
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await elegirHora(vista, "09:00");
+    await continuar(vista);
+
+    expect(vista.get('[data-prueba="lada-celular"]').text()).toBe("CO +57");
+    // Ya la tenía: no pide el escaparate.
+    expect(mocks.get).not.toHaveBeenCalledWith("/api/v1/app/demo/escaparate");
+    await vista.get("#rc-cel").setValue("300 123 4567");
+    await agendarComo(vista);
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/citas",
+      expect.objectContaining({ lada: "+57", celular: "3001234567" }),
+    );
+    vista.unmount();
+  });
+
+  it("si las opciones no la traen, la toma del escaparate", async () => {
+    api(opciones(1), undefined, undefined, undefined, () =>
+      Promise.resolve({
+        data: { data: { estudio: { pais: "CL", lada: "56" } } },
+      }),
+    );
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await elegirHora(vista, "09:00");
+    await continuar(vista);
+    await flushPromises();
+
+    expect(mocks.get).toHaveBeenCalledWith("/api/v1/app/demo/escaparate");
+    expect(vista.get('[data-prueba="lada-celular"]').text()).toBe("CL +56");
+    // De la lista completa de países.
+    expect(vista.findAll('[data-prueba="elegir-lada"] option')).toHaveLength(
+      250,
+    );
+    vista.unmount();
+  });
+
+  it("sin la lada del negocio no supone México: manda el celular sin lada", async () => {
+    // Ni las opciones ni el escaparate dicen el país del negocio.
+    api(opciones(1));
+    mocks.post.mockResolvedValue({
+      data: { data: { estado: "pendiente_pago", orden_id: "orden" } },
+    });
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await elegirHora(vista, "09:00");
+    await continuar(vista);
+    await flushPromises();
+
+    await vista.get("#rc-cel").setValue("300 123 4567");
+    await agendarComo(vista);
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/citas",
+      expect.objectContaining({ celular: "3001234567", lada: null }),
+    );
+    vista.unmount();
+  });
+
+  it("sin la lada del negocio, una lada elegida sí se manda", async () => {
+    api(opciones(1));
+    mocks.post.mockResolvedValue({
+      data: { data: { estado: "pendiente_pago", orden_id: "orden" } },
+    });
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await elegirHora(vista, "09:00");
+    await continuar(vista);
+    await flushPromises();
+
+    await vista.get('[data-prueba="elegir-lada"]').setValue("CO");
+    await vista.get("#rc-cel").setValue("300 123 4567");
+    await agendarComo(vista);
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/citas",
+      expect.objectContaining({ celular: "3001234567", lada: "+57" }),
     );
     vista.unmount();
   });
@@ -901,7 +1007,7 @@ describe("avisos por WhatsApp", () => {
     expect(mocks.post).toHaveBeenCalledWith(
       "/api/v1/app/demo/citas",
       expect.objectContaining({
-        celular: "55 1234 5678",
+        celular: "5512345678",
         acepta_whatsapp: true,
       }),
     );

@@ -7,6 +7,13 @@ import CargadorLogo from "@/components/CargadorLogo.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
+import {
+  aMinor,
+  aTexto,
+  dinero,
+  ejemploPrecio,
+  simboloMoneda,
+} from "@/lib/formato";
 import { claveZona, ZONA_POR_OMISION, ZONAS_HORARIAS } from "@/lib/region";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -165,14 +172,19 @@ const VISIBILIDADES: Visibilidad[] = ["publica", "enlace", "cerrada"];
 const visibilidad = ref<Visibilidad>("publica");
 
 function pesos(minor: number): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: sesion.moneda,
+  return dinero(minor, sesion.moneda, sesion.pais, {
     maximumFractionDigits: 0,
-  }).format(minor / 100);
+  });
 }
-const aCentavos = (texto: string): number =>
-  Math.round(Number(texto.replace(/[^\d.]/g, "")) * 100);
+// Los precios se escriben como en el país del negocio («25.000» en Colombia, «12,50»
+// en España); lo que no se puede leer sin adivinar se marca en su campo.
+const simbolo = computed(() => simboloMoneda(sesion.moneda, sesion.pais));
+const precioIlegible = (texto: string): boolean =>
+  texto.trim() !== "" && aMinor(texto, sesion.pais) === null;
+const errorPrecio = computed(() =>
+  t("validacion.precioIlegible", { ejemplo: ejemploPrecio(sesion.pais) }),
+);
+const aCentavos = (texto: string): number => aMinor(texto, sesion.pais) ?? 0;
 
 async function cargar(): Promise<void> {
   cargando.value = true;
@@ -295,7 +307,7 @@ function prellenar(s: Sugerencias): void {
       ? s.servicios.map((x) => ({
           nombre: x.nombre,
           duracion: x.duracion_minutos,
-          precio: String(x.precio_minor / 100),
+          precio: aTexto(x.precio_minor, sesion.pais),
           cupo: "",
         }))
       : s.clases.map((x) => ({
@@ -310,7 +322,7 @@ function prellenar(s: Sugerencias): void {
     clave: p.clave,
     incluir: productos.value.length === 0,
     nombre: p.nombre,
-    precio: String(p.precio_minor / 100),
+    precio: aTexto(p.precio_minor, sesion.pais),
     clases: p.clases !== null ? String(p.clases) : "",
   }));
   prepararHorario();
@@ -391,7 +403,9 @@ const filasValidas = computed(() =>
   filas.value.filter(
     (f) =>
       f.nombre.trim() !== "" &&
-      (esCitas.value ? f.precio.trim() !== "" : Number(f.cupo) > 0),
+      (esCitas.value
+        ? aMinor(f.precio, sesion.pais) !== null
+        : Number(f.cupo) > 0),
   ),
 );
 function agregarFila(): void {
@@ -671,7 +685,9 @@ const accion = computed<{
       return {
         texto: siguiente,
         deshabilitado:
-          g || (ofertas.value.length === 0 && filasValidas.value.length === 0),
+          g ||
+          (ofertas.value.length === 0 && filasValidas.value.length === 0) ||
+          (esCitas.value && filas.value.some((f) => precioIlegible(f.precio))),
         ejecutar: () => void ejecutar(guardarCatalogo),
       };
     case "equipo":
@@ -698,7 +714,10 @@ const accion = computed<{
         deshabilitado:
           g ||
           (productos.value.length === 0 &&
-            !planes.value.some((p) => p.incluir && p.precio.trim() !== "")),
+            !planes.value.some(
+              (p) => p.incluir && aMinor(p.precio, sesion.pais) !== null,
+            )) ||
+          planes.value.some((p) => p.incluir && precioIlegible(p.precio)),
         ejecutar: () => void ejecutar(guardarPlanes),
       };
     case "reglas":
@@ -998,13 +1017,24 @@ onMounted(cargar);
                     </option>
                   </select>
                 </div>
-                <div v-if="esCitas" class="ci-precio">
-                  <span aria-hidden="true">$</span>
+                <div
+                  v-if="esCitas"
+                  class="ci-precio"
+                  :style="{ '--ancho-simbolo': `${simbolo.length}ch` }"
+                >
+                  <span aria-hidden="true">{{ simbolo }}</span>
                   <input
                     v-model="f.precio"
                     class="tu-input"
                     inputmode="decimal"
                     :aria-label="$t('configuracionInicial.catalogo.precio')"
+                    :aria-invalid="precioIlegible(f.precio)"
+                    :style="
+                      precioIlegible(f.precio)
+                        ? { borderColor: 'var(--error)' }
+                        : {}
+                    "
+                    data-prueba="precio-servicio"
                   />
                 </div>
                 <input
@@ -1023,6 +1053,14 @@ onMounted(cargar);
                 >
                   <IconoNav nombre="cerrar" :tam="16" />
                 </button>
+                <p
+                  v-if="esCitas && precioIlegible(f.precio)"
+                  class="col-span-full text-xs"
+                  style="color: var(--error)"
+                  data-prueba="precio-ilegible"
+                >
+                  {{ errorPrecio }}
+                </p>
               </div>
             </div>
             <button
@@ -1300,15 +1338,33 @@ onMounted(cargar);
                 <span class="tu-label">{{
                   $t("configuracionInicial.catalogo.precio")
                 }}</span>
-                <div class="ci-precio">
-                  <span aria-hidden="true">$</span>
+                <div
+                  class="ci-precio"
+                  :style="{ '--ancho-simbolo': `${simbolo.length}ch` }"
+                >
+                  <span aria-hidden="true">{{ simbolo }}</span>
                   <input
                     v-model="p.precio"
                     class="tu-input"
                     inputmode="decimal"
+                    :aria-invalid="p.incluir && precioIlegible(p.precio)"
+                    :style="
+                      p.incluir && precioIlegible(p.precio)
+                        ? { borderColor: 'var(--error)' }
+                        : {}
+                    "
+                    :data-prueba="`precio-plan-${p.clave}`"
                   />
                 </div>
               </label>
+              <p
+                v-if="p.incluir && precioIlegible(p.precio)"
+                class="w-full text-xs"
+                style="color: var(--error)"
+                data-prueba="precio-ilegible"
+              >
+                {{ errorPrecio }}
+              </p>
             </div>
             <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
               {{ $t("configuracionInicial.planes.ayuda") }}
@@ -1711,8 +1767,9 @@ onMounted(cargar);
   transform: translateY(-50%);
   color: var(--texto-suave);
 }
+/* El símbolo de la moneda del negocio: «$», «€», «S/» o un código («USD»). */
 .ci-precio > input {
-  padding-left: 1.6rem;
+  padding-left: calc(1.05rem + var(--ancho-simbolo, 1ch));
 }
 .ci-opcion {
   display: flex;

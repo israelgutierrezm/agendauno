@@ -293,6 +293,25 @@ describe("directorio de clientes", () => {
         .some((f: { clave: string }) => f.clave === "facturable"),
     ).toBe(false);
   });
+  it("da de alta con el celular y su lada (la del negocio, si no elige otra)", async () => {
+    const w = montar();
+    await flushPromises();
+    w.getComponent({ name: "BarraListado" }).vm.$emit("nuevo");
+    await flushPromises();
+
+    await w.get("#mn").setValue("Lía");
+    // Sin país en la sesión, la de México; puede elegir otra.
+    expect(w.get('[data-prueba="lada-celular"]').text()).toBe("MX +52");
+    await w.get('[data-prueba="elegir-lada"]').setValue("AR");
+    await w.get("#mc").setValue("11 2345 6789");
+    await w.get("#mn").element.form!.dispatchEvent(new Event("submit"));
+    await flushPromises();
+
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/app/estudio-a/miembros",
+      expect.objectContaining({ nombre: "Lía", celular: "+54 1123456789" }),
+    );
+  });
   it("un error de carga no se presenta como un directorio vacío", async () => {
     mocks.get.mockRejectedValue(new Error("red"));
     const w = montar();

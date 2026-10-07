@@ -39,6 +39,7 @@ import {
 } from "@/lib/agenda";
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
+import { dinero as dineroDelPais, simboloMoneda } from "@/lib/formato";
 import { hoyComoFecha, hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { confirmarAsistencia } from "@/lib/confirmarAsistencia";
@@ -847,12 +848,12 @@ const profesionalesVisibles = computed(() =>
     ? instructores.value
     : instructores.value.filter((i) => i.id === instructorFiltro.value),
 );
+// La marca «por cobrar» de una cita: el símbolo de la moneda del negocio.
+const simboloCobro = computed(() => simboloMoneda(sesion.moneda, sesion.pais));
 function dineroMx(minor: number): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: sesion.moneda,
+  return dineroDelPais(minor, sesion.moneda, sesion.pais, {
     maximumFractionDigits: 0,
-  }).format(minor / 100);
+  });
 }
 /**
  * Cómo va un indicador contra la semana anterior: porcentaje de cambio, o puntos
@@ -2320,7 +2321,7 @@ onMounted(async () => {
                     v-if="faltaCobrar(b.sesion)"
                     class="ag-por-cobrar"
                     data-prueba="cita-por-cobrar"
-                    >$</span
+                    >{{ simboloCobro }}</span
                   >
                 </div>
                 <div

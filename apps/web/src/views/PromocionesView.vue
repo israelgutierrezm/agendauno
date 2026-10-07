@@ -11,6 +11,7 @@ import TarjetasIndicadores, {
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Promo {
@@ -50,11 +51,9 @@ const form = ref({
   activa: true,
 });
 
+// En la moneda del negocio y con los números de su país.
 function dinero(minor: number): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: sesion.moneda,
-  }).format(minor / 100);
+  return dineroDelPais(minor, sesion.moneda, sesion.pais);
 }
 
 function valorLegible(p: Promo): string {

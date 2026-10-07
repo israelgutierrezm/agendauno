@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import TarjetaOpenPay from "@/components/TarjetaOpenPay.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import type { FormularioOpenPay } from "@/lib/openpay";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -56,10 +57,8 @@ function dinero(minor: number | null, moneda: string | null): string {
   if (minor === null) {
     return "—";
   }
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda ?? "MXN",
-  }).format(minor / 100);
+  // Sin moneda, la del negocio (ADR 0099); con los números de su país.
+  return dineroDelPais(minor, moneda ?? sesion.moneda, sesion.pais);
 }
 function fecha(iso: string | null): string {
   return iso

@@ -102,4 +102,28 @@ describe("nómina", () => {
       mocks.get.mock.calls.filter(([u]) => String(u).endsWith("/nomina")),
     ).toHaveLength(2);
   });
+
+  it("el monto y lo que toca van en la moneda del negocio, con su símbolo", async () => {
+    useSesionTenantStore().estudio = {
+      slug: "demo",
+      nombre: "Demo",
+      estado: "activo",
+      moneda: "EUR",
+      pais: "ES",
+    };
+    mocks.get.mockImplementation(async (url: string) =>
+      url.endsWith("/usuarios")
+        ? { data: { data: USUARIOS } }
+        : { data: { data: [{ ...NOMINA[0], moneda: "EUR" }] } },
+    );
+    const w = montar();
+    await flushPromises();
+
+    expect(w.get("table").text().replace(/\s/g, " ")).toContain("700,00 €");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Editar esquema")!
+      .trigger("click");
+    expect(w.get('[data-prueba="simbolo-monto"]').text()).toBe("€");
+  });
 });

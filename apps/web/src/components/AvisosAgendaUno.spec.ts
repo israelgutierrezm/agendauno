@@ -128,19 +128,20 @@ describe("avisos de AgendaUno al dueño", () => {
     await w.get("#aa-numero").setValue("55 8765 4321");
     await w.get('[data-prueba="cambio-whatsapp"]').trigger("submit");
     await flushPromises();
+    // La lada es la del dueño; el número va sin espacios.
     expect(api.post).toHaveBeenCalledWith(`${URL}/whatsapp/cambio/codigo`, {
       contacto_whatsapp_pais: "52",
-      contacto_telefono: "55 8765 4321",
+      contacto_telefono: "5587654321",
     });
     expect(w.get('[data-prueba="codigo-whatsapp"]').text()).toContain(
-      "+52 55 8765 4321",
+      "+52 5587654321",
     );
 
     await w.get("#aa-codigo").setValue("654321");
     await flushPromises();
     expect(api.put).toHaveBeenCalledWith(`${URL}/whatsapp`, {
       contacto_whatsapp_pais: "52",
-      contacto_telefono: "55 8765 4321",
+      contacto_telefono: "5587654321",
       codigo: "654321",
     });
     expect(w.get('[data-prueba="numero-whatsapp"]').text()).toBe(
@@ -157,7 +158,9 @@ describe("avisos de AgendaUno al dueño", () => {
     expect(w.text()).toContain("aparece en tu página");
 
     await w.get('[data-prueba="cambiar-whatsapp"]').trigger("click");
-    await w.get("select").setValue("57");
+    // De la lista completa de países (la lada del dueño, de inicio).
+    expect(w.get('[data-prueba="lada-celular"]').text()).toBe("MX +52");
+    await w.get("select").setValue("CO");
     await w.get("#aa-numero").setValue("300 123 4567");
     await w.get('[data-prueba="cambio-whatsapp"]').trigger("submit");
     await flushPromises();
@@ -165,10 +168,38 @@ describe("avisos de AgendaUno al dueño", () => {
     expect(api.post).not.toHaveBeenCalled();
     expect(api.put).toHaveBeenCalledWith(`${URL}/whatsapp`, {
       contacto_whatsapp_pais: "57",
-      contacto_telefono: "300 123 4567",
+      contacto_telefono: "3001234567",
     });
     expect(w.get('[data-prueba="numero-whatsapp"]').text()).toBe(
       "+57 300 123 4567",
     );
+  });
+});
+
+describe("lada del dueño fuera de México", () => {
+  it("propone la lada que tiene el dueño, aunque no sea de México", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: {
+          correo: "duena@correo.mx",
+          numero: "+56 912345678",
+          pais: "56",
+          whatsapp: null,
+        },
+      },
+    });
+    api.put.mockResolvedValue(avisos(null, "+56 987654321"));
+    const w = montar();
+    await flushPromises();
+
+    await w.get('[data-prueba="cambiar-whatsapp"]').trigger("click");
+    expect(w.get('[data-prueba="lada-celular"]').text()).toBe("CL +56");
+    await w.get("#aa-numero").setValue("9 8765 4321");
+    await w.get('[data-prueba="cambio-whatsapp"]').trigger("submit");
+    await flushPromises();
+    expect(api.put).toHaveBeenCalledWith(`${URL}/whatsapp`, {
+      contacto_whatsapp_pais: "56",
+      contacto_telefono: "987654321",
+    });
   });
 });

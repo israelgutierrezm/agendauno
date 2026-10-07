@@ -21,8 +21,14 @@ vi.mock("@/lib/api", () => ({
 }));
 vi.mock("@/lib/confirmar", () => ({ confirmar: mocks.confirmar }));
 vi.mock("@/lib/acceso", () => ({ puedeEntrar: () => false }));
+const sesion = vi.hoisted(() => ({
+  slug: "demo",
+  puede: () => true,
+  moneda: "MXN",
+  pais: "MX",
+}));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
+  useSesionTenantStore: () => sesion,
 }));
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
@@ -46,6 +52,8 @@ const plan = (id: string, nombre: string, tipo: string, precio: number) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sesion.moneda = "MXN";
+  sesion.pais = "MX";
   mocks.confirmar.mockResolvedValue(true);
   mocks.post.mockImplementation((url: string) =>
     Promise.resolve({
@@ -115,5 +123,15 @@ describe("vender un plan", () => {
       "/api/v1/app/demo/ordenes/o9/liquidar",
       { metodo: "transferencia" },
     );
+  });
+
+  it("«Vendido hoy» va en la moneda del negocio, no en pesos", async () => {
+    sesion.moneda = "EUR";
+    sesion.pais = "ES";
+    const w = mount(VentasView, { global: { plugins: [i18n] } });
+    await flushPromises();
+
+    expect(w.text().replace(/\s/g, " ")).toContain("0,00 €");
+    expect(w.text()).not.toContain("$0.00");
   });
 });

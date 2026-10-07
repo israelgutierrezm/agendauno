@@ -10,6 +10,14 @@ vi.mock("@/lib/api", () => ({
   mensajeDeError: () => "No disponible",
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
+// El país y la zona que propone el navegador (ADR 0103): fijos en las pruebas.
+const navegador = vi.hoisted(() => ({ pais: "MX" }));
+vi.mock("@/lib/region", async (original) => ({
+  ...(await original<typeof import("@/lib/region")>()),
+  paisSugerido: () => navegador.pais,
+  zonaSugerida: (pais: string) =>
+    ({ MX: "America/Mexico_City", CO: "America/Bogota" })[pais] ?? null,
+}));
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
   RouterLink: { template: "<a><slot /></a>" },
@@ -32,6 +40,7 @@ async function avanzarADatos(vista: ReturnType<typeof montar>) {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
+  navegador.pais = "MX";
   mocks.get.mockResolvedValue({
     data: {
       data: {
@@ -176,7 +185,7 @@ describe("WhatsApp del dueño", () => {
       "/api/v1/registro/whatsapp/codigo",
       expect.objectContaining({
         contacto_whatsapp_pais: "52",
-        contacto_telefono: "55 1234 5678",
+        contacto_telefono: "5512345678",
       }),
     );
     expect(vista.text()).toContain("Puedes pedir otro en 60 s");
@@ -195,7 +204,13 @@ describe("WhatsApp del dueño", () => {
     await flushPromises();
     expect(mocks.post).toHaveBeenLastCalledWith(
       "/api/v1/registro",
-      expect.objectContaining({ whatsapp_verificacion: "comprobante" }),
+      expect.objectContaining({
+        whatsapp_verificacion: "comprobante",
+        pais: "MX",
+        zona_horaria: "America/Mexico_City",
+        contacto_whatsapp_pais: "52",
+        contacto_telefono: "5512345678",
+      }),
       // Crear el negocio puede tardar más que el límite general.
       { timeout: 120_000 },
     );
@@ -207,5 +222,77 @@ describe("WhatsApp del dueño", () => {
 
     expect(vista.find('[data-prueba="whatsapp-dueno"]').exists()).toBe(false);
     expect(vista.text()).toContain(es.registro.whatsappAyuda);
+  });
+});
+
+describe("país del negocio", () => {
+  // Elige en el selector con buscador: escribe y toma la primera coincidencia.
+  async function elegirPais(vista: ReturnType<typeof montar>, texto: string) {
+    const campo = vista.get("#pais");
+    await campo.trigger("click");
+    await campo.setValue(texto);
+    await campo.trigger("keydown", { key: "Enter" });
+  }
+  function ladaElegida(vista: ReturnType<typeof montar>): string {
+    return vista.get('[data-prueba="lada-celular"]').text();
+  }
+
+  it("propone el del navegador y con él la lada del WhatsApp", async () => {
+    navegador.pais = "CO";
+    const vista = montar();
+    await flushPromises();
+    expect((vista.get("#pais").element as HTMLInputElement).value).toBe(
+      "Colombia",
+    );
+    await avanzarADatos(vista);
+    await vista.get("#cnombre").setValue("Ana");
+    await vista.get("#cpaterno").setValue("Pérez");
+    await vista.get("form").trigger("submit");
+    expect(ladaElegida(vista)).toBe("CO +57");
+  });
+
+  it("la lada sigue al país elegido y se mandan el país y su zona", async () => {
+    mocks.post.mockResolvedValue({
+      data: {
+        data: {
+          estudio: { slug: "mi-estudio", nombre: "Mi estudio" },
+          activacion: null,
+        },
+      },
+    });
+    const vista = montar();
+    await flushPromises();
+    await avanzarADatos(vista);
+    await vista.get("#cnombre").setValue("Ana");
+    await vista.get("#cpaterno").setValue("Pérez");
+    await vista.get("form").trigger("submit");
+    expect(ladaElegida(vista)).toBe("MX +52");
+    await vista.get("#cwhatsapp").setValue("300 123 4567");
+
+    // Regresa al primer paso y cambia el país: la lada pasa a la del nuevo.
+    await vista.get("button.tu-btn-fantasma").trigger("click");
+    await vista.get("button.tu-btn-fantasma").trigger("click");
+    await elegirPais(vista, "colombia");
+    await vista.get("form").trigger("submit");
+    await vista.get("form").trigger("submit");
+    expect(ladaElegida(vista)).toBe("CO +57");
+    expect((vista.get("#cwhatsapp").element as HTMLInputElement).value).toBe(
+      "3001234567",
+    );
+
+    await vista.get("#cemail").setValue("ana@correo.mx");
+    await vista.get("#acepta").setValue(true);
+    await vista.get("form").trigger("submit");
+    await flushPromises();
+    expect(mocks.post).toHaveBeenCalledWith(
+      "/api/v1/registro",
+      expect.objectContaining({
+        pais: "CO",
+        zona_horaria: "America/Bogota",
+        contacto_whatsapp_pais: "57",
+        contacto_telefono: "3001234567",
+      }),
+      { timeout: 120_000 },
+    );
   });
 });

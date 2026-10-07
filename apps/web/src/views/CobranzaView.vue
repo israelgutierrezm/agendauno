@@ -18,6 +18,7 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -123,11 +124,9 @@ const PASARELAS_EN_LINEA = ["stripe", "openpay", "mercadopago"];
 const avisoReembolso = ref<string | null>(null);
 const porConciliar = ref<InstanceType<typeof PorConciliar> | null>(null);
 
-function dinero(minor: number, moneda: string): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+// Sin moneda, la del negocio (ADR 0099); con los números de su país.
+function dinero(minor: number, moneda?: string | null): string {
+  return dineroDelPais(minor, moneda || sesion.moneda, sesion.pais);
 }
 function fechaHora(iso: string | null): string {
   if (iso === null) {
@@ -1052,7 +1051,7 @@ watch(vista, cargar, { immediate: true });
                 <td class="text-right">
                   {{
                     s.precio_minor !== null
-                      ? dinero(s.precio_minor, s.moneda ?? "MXN")
+                      ? dinero(s.precio_minor, s.moneda)
                       : "—"
                   }}
                 </td>

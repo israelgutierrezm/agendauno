@@ -10,6 +10,7 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { hoyEnNegocio, inicioDeMesEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -305,10 +306,8 @@ function dinero(minor: number | null, moneda: string): string {
   if (minor === null) {
     return "—";
   }
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+  // Con los números del país del negocio («$ 1.250,50» en Colombia).
+  return dineroDelPais(minor, moneda, sesion.pais);
 }
 function pct(v: number | null): string {
   return v !== null ? `${v}%` : "—";

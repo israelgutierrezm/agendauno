@@ -2,13 +2,15 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import CampoCelular from "@/components/CampoCelular.vue";
 import CargadorImagen from "@/components/CargadorImagen.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
+import SelectorBuscable from "@/components/SelectorBuscable.vue";
 import { api, mensajeDeError } from "@/lib/api";
-import { claveZona, ZONA_POR_OMISION, zonasConActual } from "@/lib/region";
+import { etiquetaZona, opcionesZona, ZONA_POR_OMISION } from "@/lib/region";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Sucursal {
@@ -103,6 +105,10 @@ const form = ref({
   redes: redesVacias(),
   horario: horarioVacio(),
 });
+// Todas las zonas, con las del país del negocio primero (ADR 0103).
+const zonas = computed(() =>
+  opcionesZona(sesion.pais, form.value.zona_horaria),
+);
 // Foto de la sede en edición (se sube aparte, al momento).
 const fotoSede = ref<string | null>(null);
 function fotoCambiada(url: string | null): void {
@@ -386,14 +392,7 @@ onMounted(cargar);
                   class="hidden md:table-cell"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
-                  {{
-                    s.zona_horaria
-                      ? $t(
-                          `region.zonas.${claveZona(s.zona_horaria)}`,
-                          s.zona_horaria,
-                        )
-                      : "—"
-                  }}
+                  {{ s.zona_horaria ? etiquetaZona(s.zona_horaria) : "—" }}
                 </td>
                 <td class="hidden sm:table-cell text-right tabular-nums">
                   {{ s.impuesto_tasa_bps / 100 }}%
@@ -448,19 +447,21 @@ onMounted(cargar);
           <label class="tu-label" for="s-region">{{
             $t("sedes.region")
           }}</label>
-          <input id="s-region" v-model="form.region" class="tu-input" />
+          <input
+            id="s-region"
+            v-model="form.region"
+            class="tu-input"
+            maxlength="255"
+            :placeholder="$t('sedes.regionPh')"
+          />
         </div>
         <div>
           <label class="tu-label" for="s-zona">{{ $t("sedes.zona") }}</label>
-          <select id="s-zona" v-model="form.zona_horaria" class="tu-input">
-            <option
-              v-for="z in zonasConActual(form.zona_horaria)"
-              :key="z"
-              :value="z"
-            >
-              {{ $t(`region.zonas.${claveZona(z)}`, z) }}
-            </option>
-          </select>
+          <SelectorBuscable
+            id="s-zona"
+            v-model="form.zona_horaria"
+            :opciones="zonas"
+          />
         </div>
         <div>
           <label class="tu-label" for="s-iva">{{ $t("sedes.ivaLabel") }}</label>
@@ -599,30 +600,26 @@ onMounted(cargar);
               {{ $t("perfilPublico.sucursal.mapaAyuda") }}
             </p>
           </div>
-          <div class="grid gap-3 grid-cols-2">
+          <!-- Con su lada (ADR 0103): la del negocio si no se elige otra. -->
+          <div class="grid gap-3">
             <div>
               <label class="tu-label" for="s-telefono">{{
                 $t("perfilPublico.sucursal.telefono")
               }}</label>
-              <input
+              <CampoCelular
                 id="s-telefono"
                 v-model="form.telefono"
-                class="tu-input"
-                inputmode="tel"
-                maxlength="30"
+                maxlength="24"
               />
             </div>
             <div>
               <label class="tu-label" for="s-whatsapp">{{
                 $t("perfilPublico.sucursal.whatsapp")
               }}</label>
-              <input
+              <CampoCelular
                 id="s-whatsapp"
                 v-model="form.whatsapp"
-                class="tu-input"
-                inputmode="tel"
-                maxlength="30"
-                :placeholder="$t('perfilPublico.sucursal.whatsappPh')"
+                maxlength="24"
               />
             </div>
           </div>

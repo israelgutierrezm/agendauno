@@ -184,7 +184,7 @@ export default {
       datos: "Datos e imagen del negocio",
       pagina: "Página pública",
       sucursales: "Sucursales",
-      region: "Moneda y zona horaria",
+      region: "País, moneda y zona horaria",
       fiscales: "Datos fiscales",
       terminologia: "Terminología",
       planes: "Planes y paquetes",
@@ -478,8 +478,21 @@ export default {
       a9: "No. El inicio es guiado y puedes guardar el progreso. Configura primero sucursal, servicios o clases, horarios y precios; después activa pagos y publicación.",
     },
   },
+  // Celular con su lada (components/CampoCelular.vue, ADR 0103).
+  campoCelular: {
+    lada: "Lada del país",
+    frecuentes: "Más usados",
+    todos: "Todos los países",
+  },
+  // Lista larga con buscador (components/SelectorBuscable.vue).
+  selectorBuscable: {
+    sinCoincidencias: "Nada coincide con esa búsqueda.",
+  },
   registro: {
     titulo: "Crea tu negocio en AgendaUno",
+    pais: "País de tu negocio",
+    paisAyuda:
+      "Con él te proponemos la lada de los celulares y la zona horaria. Puedes cambiarlo después.",
     subtitulo: "En un minuto tendrás tu agenda lista para configurar.",
     nombre: "Nombre del negocio",
     nombrePh: "Distrito 27",
@@ -537,8 +550,7 @@ export default {
     contactoPrimerApellido: "Apellido paterno",
     contactoSegundoApellido: "Apellido materno",
     whatsapp: "WhatsApp",
-    whatsappPais: "País",
-    whatsappNumeroPh: "55 1234 5678",
+    whatsappNumeroPh: "Tu número de celular",
     whatsappAyuda: "Te contactaremos por aquí para ayudarte a arrancar.",
     whatsappAvisos: "Recibir avisos de AgendaUno por WhatsApp",
     whatsappExplica:
@@ -1329,8 +1341,9 @@ export default {
     editarTitulo: "Editar sucursal",
     organizacion: "Organización",
     nombre: "Nombre",
-    nombrePh: "Ej. Roma Norte",
-    region: "Región / zona",
+    nombrePh: "Ej. Centro",
+    region: "Ciudad o zona (opcional)",
+    regionPh: "Ej. Centro, Zona Norte",
     zona: "Zona horaria",
     moneda: "Moneda",
     monedaNegocio: "La del negocio ({moneda})",
@@ -1448,7 +1461,6 @@ export default {
     cambiar: "Cambiar",
     enTuPagina: "Es el que aparece en tu página para que te escriban.",
     numeroNuevo: "Número nuevo",
-    lada: "Lada",
     cambioConCodigo:
       "Te mandamos un código a ese WhatsApp; el número cambia al confirmarlo. También es el que aparece en tu página.",
     cambioSinCodigo: "También es el que aparece en tu página.",
@@ -1675,7 +1687,8 @@ export default {
       activa: "Programa activo",
       porAsistencia: "Puntos por asistir a una clase",
       porMoneda: "Puntos por unidad de moneda gastada",
-      porMonedaAyuda: "Ej. 1 = un punto por cada $1 pagado.",
+      // {monto}: una unidad de la moneda del negocio («$1», «1 €»).
+      porMonedaAyuda: "Ej. 1 = un punto por cada {monto} pagado.",
     },
     recompensas: {
       titulo: "Recompensas",
@@ -1739,11 +1752,15 @@ export default {
     factura: {
       facturar: "Facturar",
       reintentar: "Reintentar",
-      noDisponible: "Facturación aún no disponible",
       procesando: "Emitiendo…",
       pdf: "PDF",
       xml: "XML",
       timbrada: "Factura emitida. Ya puedes descargar tu CFDI (PDF/XML).",
+    },
+    // Sin factura posible (otra moneda u otro país): recibo sin valor fiscal.
+    recibo: {
+      descargar: "Descargar recibo",
+      nota: "El pago se procesa de forma segura con la pasarela de AgendaUno. De cada pago puedes descargar un recibo sin valor fiscal.",
     },
     pagoNota:
       "El pago se procesa de forma segura con la pasarela de AgendaUno. Tu factura (CFDI) se emite con tus datos fiscales.",

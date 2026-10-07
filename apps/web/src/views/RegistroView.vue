@@ -3,9 +3,12 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
-import { PAISES } from "@/lib/ladas";
+import { ladaDe, separarTelefono, unirTelefono } from "@/lib/ladas";
+import { opcionesPais, paisSugerido, zonaSugerida } from "@/lib/region";
 import { trackEvent } from "@/lib/analytics";
 import AvisoPrivacidadContenido from "@/components/AvisoPrivacidadContenido.vue";
+import CampoCelular from "@/components/CampoCelular.vue";
+import SelectorBuscable from "@/components/SelectorBuscable.vue";
 
 // Alta del negocio: crea su base completa (ver el comentario en la petición).
 const TIEMPO_REGISTRO_MS = 120_000;
@@ -25,6 +28,10 @@ const nombre = ref("");
 const slug = ref("");
 const slugTocado = ref(false);
 const perfilNegocio = ref("");
+// País del negocio (ADR 0103): obligatorio; se propone el del navegador (su zona
+// horaria o su idioma) y, si no, México. De él salen la lada y la zona.
+const pais = ref(paisSugerido());
+const paises = opcionesPais();
 
 const PERFILES = [
   "pilates",
@@ -48,9 +55,25 @@ const contactoSegundoNombre = ref("");
 const contactoPrimerApellido = ref("");
 const contactoSegundoApellido = ref("");
 
-// Paso 3: contacto.
-const whatsappPais = ref("52");
-const whatsappNumero = ref("");
+// Paso 3: contacto. El WhatsApp con su lada («+57 3001234567»): la del país del
+// negocio, salvo que elija otra.
+const whatsapp = ref("");
+const partesWhatsApp = computed(() =>
+  separarTelefono(whatsapp.value, ladaDe(pais.value) ?? "52"),
+);
+const whatsappPais = computed(() => partesWhatsApp.value.lada);
+const whatsappNumero = computed(() => partesWhatsApp.value.numero);
+// Otro país: si el número aún tiene la lada del anterior, pasa a la del nuevo.
+watch(pais, (nuevo, anterior) => {
+  const ladaNueva = ladaDe(nuevo);
+  if (
+    ladaNueva !== null &&
+    whatsappNumero.value !== "" &&
+    whatsappPais.value === ladaDe(anterior)
+  ) {
+    whatsapp.value = unirTelefono(ladaNueva, whatsappNumero.value);
+  }
+});
 const contactoEmail = ref("");
 const aceptaTerminos = ref(false);
 
@@ -266,14 +289,13 @@ function editarSlug(valor: string): void {
 const emailValido = computed(() =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactoEmail.value.trim()),
 );
-const whatsappValido = computed(() =>
-  /^[0-9 -]{7,15}$/.test(whatsappNumero.value.trim()),
-);
+const whatsappValido = computed(() => /^\d{7,15}$/.test(whatsappNumero.value));
 
 const paso1Valido = computed(
   () =>
     nombre.value.trim() !== "" &&
     perfilNegocio.value !== "" &&
+    ladaDe(pais.value) !== null &&
     slug.value.trim().length >= 3 &&
     // La disponibilidad solo bloquea si el dueño personalizó la dirección; si no,
     // el backend genera una única a partir del nombre.
@@ -337,6 +359,10 @@ async function enviar(): Promise<void> {
         recaptcha_token: recaptchaToken,
         sitio_web: honeypot.value,
         perfil_negocio: perfilNegocio.value,
+        // El país y la zona horaria con que nace (la zona, la del navegador si es de
+        // ese país); se corrigen después en «País, moneda y zona horaria».
+        pais: pais.value,
+        zona_horaria: zonaSugerida(pais.value) ?? undefined,
         contacto_nombre: contactoNombre.value,
         contacto_segundo_nombre: contactoSegundoNombre.value || null,
         contacto_primer_apellido: contactoPrimerApellido.value,
@@ -578,6 +604,24 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                 </p>
               </div>
               <div>
+                <label class="tu-label" for="pais">{{
+                  $t("registro.pais")
+                }}</label>
+                <SelectorBuscable
+                  id="pais"
+                  v-model="pais"
+                  :opciones="paises"
+                  required
+                  data-prueba="pais-negocio"
+                />
+                <p
+                  class="mt-1 text-xs"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  {{ $t("registro.paisAyuda") }}
+                </p>
+              </div>
+              <div>
                 <label class="tu-label" for="slug">{{
                   $t("registro.slug")
                 }}</label>
@@ -696,27 +740,18 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
             <!-- ===== Paso 3: contacto ===== -->
             <template v-else>
               <div>
-                <label class="tu-label">{{ $t("registro.whatsapp") }}</label>
-                <div class="flex gap-2">
-                  <select
-                    v-model="whatsappPais"
-                    class="tu-input shrink-0"
-                    style="width: 6.25rem"
-                    :aria-label="$t('registro.whatsappPais')"
-                  >
-                    <option v-for="p in PAISES" :key="p.lada" :value="p.lada">
-                      {{ p.bandera }} +{{ p.lada }}
-                    </option>
-                  </select>
-                  <input
-                    v-model="whatsappNumero"
-                    class="tu-input flex-1 min-w-0"
-                    type="tel"
-                    inputmode="tel"
-                    :placeholder="$t('registro.whatsappNumeroPh')"
-                    required
-                  />
-                </div>
+                <label class="tu-label" for="cwhatsapp">{{
+                  $t("registro.whatsapp")
+                }}</label>
+                <CampoCelular
+                  id="cwhatsapp"
+                  v-model="whatsapp"
+                  :pais="pais"
+                  maxlength="20"
+                  autocomplete="tel-national"
+                  :placeholder="$t('registro.whatsappNumeroPh')"
+                  required
+                />
                 <p
                   v-if="!whatsappDisponible"
                   class="mt-1 text-xs"

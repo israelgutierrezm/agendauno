@@ -1,8 +1,16 @@
-// Moneda y zona horaria del negocio (views/RegionNegocioView.vue, ADR 0099).
+// País, moneda y zona horaria del negocio (views/RegionNegocioView.vue, ADR 0099 y 0103).
 export default {
-  titulo: "Moneda y zona horaria",
+  titulo: "País, moneda y zona horaria",
   subtitulo:
-    "Tu negocio trabaja con una sola moneda y una zona horaria para sus reportes, cortes y agenda.",
+    "Dónde está tu negocio, la moneda con que cobra y la zona horaria de sus reportes, cortes y agenda.",
+  pais: {
+    titulo: "País",
+    etiqueta: "País del negocio",
+    ayuda:
+      "De él sale la lada que se supone en los celulares que se capturan sin ella.",
+    fueraDeMexico:
+      "Fuera de México no hay facturación a tus clientes, y el cobro en línea solo funciona en pesos mexicanos: los cobros se registran en el negocio.",
+  },
   moneda: {
     titulo: "Moneda",
     etiqueta: "Moneda del negocio",
@@ -25,6 +33,13 @@ export default {
     disponible: "Disponible",
     soloPesos: "Solo con pesos mexicanos (MXN)",
     soloPesosMexico: "Solo con pesos mexicanos (MXN) y para negocios en México",
+  },
+  // Grupos de las listas con buscador (lib/region.ts).
+  buscador: {
+    frecuentes: "Más usados",
+    todosLosPaises: "Todos los países",
+    zonasDe: "De {pais}",
+    todasLasZonas: "Todas las zonas",
   },
   guardar: "Guardar",
   guardando: "Guardando…",
@@ -61,6 +76,6 @@ export default {
     facturacionPlataformaTitulo: "La facturación aún no está disponible",
     facturacionPlataformaDetalle:
       "Todavía no puedes emitir facturas (CFDI) desde AgendaUno. Te avisaremos en cuanto esté lista.",
-    cambiar: "Ver moneda y zona horaria",
+    cambiar: "Ver país, moneda y zona horaria",
   },
 };

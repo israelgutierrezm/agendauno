@@ -1,8 +1,8 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
 
-import { margenesServicio } from "@/i18n/locales/gestion.es-MX";
+import { margenesServicio, validacion } from "@/i18n/locales/gestion.es-MX";
 import perfilPublico from "@/i18n/locales/perfilPublico.es-MX";
 import CatalogoView from "./CatalogoView.vue";
 
@@ -11,14 +11,21 @@ vi.mock("@/lib/api", () => ({
   api,
   mensajeDeError: (e: unknown) => String(e),
 }));
-vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({
-    slug: "a",
-    puede: () => true,
-    esCitas: true,
-    moneda: "MXN",
-  }),
+const sesion = vi.hoisted(() => ({
+  slug: "a",
+  puede: () => true,
+  esCitas: true,
+  moneda: "MXN",
+  pais: "MX",
 }));
+vi.mock("@/stores/sesionTenant", () => ({
+  useSesionTenantStore: () => sesion,
+}));
+
+beforeEach(() => {
+  sesion.moneda = "MXN";
+  sesion.pais = "MX";
+});
 
 const oferta = (extra: Record<string, unknown>) => ({
   id: "o1",
@@ -49,7 +56,7 @@ async function montar(ofertas: unknown[]) {
           locale: "es",
           missingWarn: false,
           fallbackWarn: false,
-          messages: { es: { margenesServicio, perfilPublico } },
+          messages: { es: { margenesServicio, perfilPublico, validacion } },
         }),
       ],
       stubs: { teleport: true },
@@ -151,6 +158,68 @@ describe("catálogo", () => {
         },
       ],
     });
+  });
+
+  it("en Colombia el precio del alta se lee como allá: «25.000» son veinticinco mil", async () => {
+    sesion.pais = "CO";
+    sesion.moneda = "COP";
+    api.post.mockResolvedValue({ data: { data: [] } });
+    const w = await montar([oferta({})]);
+    await w.get('[data-prueba="nuevo-servicio"]').trigger("click");
+    const fila = w.get(
+      '[data-prueba="filas-alta"] .ct-fila:not(.ct-fila-cabeza)',
+    );
+    expect(fila.get(".ct-precio span").text()).toBe("$");
+    await fila.get("input").setValue("Corte de cabello");
+    await fila.get('[data-prueba="precio-alta"]').setValue("25.000");
+    await w.get('[data-prueba="guardar-alta"]').trigger("click");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith("/api/v1/app/a/ofertas/rapidas", {
+      items: [
+        expect.objectContaining({
+          nombre: "Corte de cabello",
+          precio_minor: 2500000,
+        }),
+      ],
+    });
+  });
+
+  it("un precio que se presta a confusión se marca y no deja guardar", async () => {
+    api.post.mockClear();
+    const w = await montar([oferta({})]);
+    await w.get('[data-prueba="nuevo-servicio"]').trigger("click");
+    const fila = w.get(
+      '[data-prueba="filas-alta"] .ct-fila:not(.ct-fila-cabeza)',
+    );
+    await fila.get("input").setValue("Corte de cabello");
+    // En México, «12,50» no se puede leer sin adivinar.
+    await fila.get('[data-prueba="precio-alta"]').setValue("12,50");
+    expect(w.get('[data-prueba="precio-ilegible"]').text()).toBe(
+      "No entendimos este precio. Escríbelo así: 1,250.50.",
+    );
+    expect(
+      w.get('[data-prueba="guardar-alta"]').attributes("disabled"),
+    ).toBeDefined();
+
+    await fila.get('[data-prueba="precio-alta"]').setValue("12.50");
+    expect(w.find('[data-prueba="precio-ilegible"]').exists()).toBe(false);
+    await w.get('[data-prueba="guardar-alta"]').trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith("/api/v1/app/a/ofertas/rapidas", {
+      items: [expect.objectContaining({ precio_minor: 1250 })],
+    });
+  });
+
+  it("los precios llevan el símbolo y los números de la moneda del negocio", async () => {
+    sesion.pais = "ES";
+    sesion.moneda = "EUR";
+    const w = await montar([oferta({ precio_clase_minor: 125050 })]);
+    expect(
+      w.get('[data-prueba="servicio"]').text().replace(/\s/g, " "),
+    ).toContain("1250,50 €");
+    await w.get('[data-prueba="configurar"]').trigger("click");
+    expect(w.get('[data-prueba="simbolo-precio"]').text()).toBe("€");
   });
 
   it("con citas, pasar un servicio a «con bono» avisa que deja la página para agendar", async () => {

@@ -2,8 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import CampoCelular from "@/components/CampoCelular.vue";
 import { api, mensajeDeError } from "@/lib/api";
-import { PAISES } from "@/lib/ladas";
+import { separarTelefono } from "@/lib/ladas";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -41,16 +42,16 @@ const esperaReenvio = ref(0);
 let cuentaRegresiva: ReturnType<typeof setInterval> | undefined;
 
 const cambiando = ref(false);
-const nuevoPais = ref("52");
-const nuevoNumero = ref("");
-const ladas = computed(() =>
-  PAISES.some((p) => p.lada === nuevoPais.value)
-    ? PAISES
-    : [...PAISES, { lada: nuevoPais.value, nombre: "", bandera: "" }],
+// El número nuevo con su lada («+57 3001234567»): de la lista completa de países,
+// con la del dueño (o la del negocio) de inicio.
+const nuevo = ref("");
+const ladaDueno = computed(() => avisos.value?.pais ?? sesion.lada ?? "52");
+const partesNuevo = computed(() =>
+  separarTelefono(nuevo.value, ladaDueno.value),
 );
 const numeroNuevo = computed(() => ({
-  contacto_whatsapp_pais: nuevoPais.value,
-  contacto_telefono: nuevoNumero.value.trim(),
+  contacto_whatsapp_pais: partesNuevo.value.lada,
+  contacto_telefono: partesNuevo.value.numero,
 }));
 
 async function cargar(): Promise<void> {
@@ -108,8 +109,7 @@ async function enviarCodigo(paraModo: "verificar" | "cambiar"): Promise<void> {
 
 function abrirCambio(): void {
   cambiando.value = true;
-  nuevoPais.value = avisos.value?.pais ?? "52";
-  nuevoNumero.value = "";
+  nuevo.value = "";
   modo.value = null;
   error.value = null;
 }
@@ -263,27 +263,11 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
         <label class="tu-label" for="aa-numero">{{
           $t("avisosAgendaUno.numeroNuevo")
         }}</label>
-        <div class="flex flex-wrap gap-2">
-          <select
-            v-model="nuevoPais"
-            class="tu-input shrink-0 aa-lada"
-            :aria-label="$t('avisosAgendaUno.lada')"
-          >
-            <option
-              v-for="p in ladas"
-              :key="p.lada"
-              :value="p.lada"
-              :title="p.nombre"
-            >
-              +{{ p.lada }}
-            </option>
-          </select>
-          <input
+        <div class="aa-numero">
+          <CampoCelular
             id="aa-numero"
-            v-model="nuevoNumero"
-            class="tu-input flex-1 min-w-0 aa-numero"
-            type="tel"
-            inputmode="tel"
+            v-model="nuevo"
+            :lada="ladaDueno"
             autocomplete="tel-national"
             required
           />
@@ -299,7 +283,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
           <button
             class="tu-btn tu-btn-primario text-sm"
             type="submit"
-            :disabled="ocupado || nuevoNumero.trim() === ''"
+            :disabled="ocupado || partesNuevo.numero === ''"
           >
             {{
               avisos.whatsapp
@@ -321,7 +305,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
         <label class="tu-label" for="aa-codigo">{{
           modo === "cambiar"
             ? $t("avisosAgendaUno.codigoNuevo", {
-                numero: `+${nuevoPais} ${nuevoNumero.trim()}`,
+                numero: nuevo,
               })
             : $t("avisosAgendaUno.codigo")
         }}</label>
@@ -393,11 +377,8 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
 .aa-gris {
   background: var(--texto-suave);
 }
-.aa-lada {
-  width: 5.5rem;
-}
 .aa-numero {
-  max-width: 16rem;
+  max-width: 20rem;
 }
 .aa-codigo {
   max-width: 9rem;

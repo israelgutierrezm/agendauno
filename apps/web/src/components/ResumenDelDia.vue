@@ -15,6 +15,7 @@ import { aHora, minutosLocal } from "@/lib/agenda";
 import { useRecargarAlVolver } from "@/lib/alVolver";
 import { api, mensajeDeError } from "@/lib/api";
 import { lugarDelClima, useClima } from "@/lib/clima";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { fotoNegocio } from "@/lib/fotoNegocio";
 import { hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -305,11 +306,9 @@ function nombre(s: SesionHoy): string {
   return s.oferta ?? "—";
 }
 
+// Con los números del país del negocio («$ 1.250,50» en Colombia).
 function dinero(minor: number, moneda: string): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+  return dineroDelPais(minor, moneda, sesion.pais);
 }
 
 const porCobrar = computed(() =>

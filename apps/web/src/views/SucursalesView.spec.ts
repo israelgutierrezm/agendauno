@@ -16,7 +16,12 @@ vi.mock("@/lib/api", () => ({
   mensajeDeError: (e: unknown) => String(e),
 }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "demo", puede: () => true }),
+  useSesionTenantStore: () => ({
+    slug: "demo",
+    pais: "MX",
+    lada: "52",
+    puede: () => true,
+  }),
 }));
 
 const roma = {
@@ -31,9 +36,9 @@ const roma = {
   mapa_url: "https://maps.app.goo.gl/roma",
 };
 
-async function montar() {
+async function montar(sede: Record<string, unknown> = roma) {
   api.get.mockResolvedValue({
-    data: { data: [{ id: "org", nombre: "Org", sucursales: [roma] }] },
+    data: { data: [{ id: "org", nombre: "Org", sucursales: [sede] }] },
   });
   const w = mount(SucursalesView, {
     global: {
@@ -131,5 +136,60 @@ describe("sedes: foto y enlace de Google Maps", () => {
     expect(w.text()).toContain(
       "Pega el enlace que da Google Maps al compartir la ubicación de la sede.",
     );
+  });
+});
+
+describe("sedes: teléfono con lada y zona horaria", () => {
+  it("el teléfono y el WhatsApp llevan lada; lo guardado sin «+» se queda si no se toca", async () => {
+    api.put.mockResolvedValue({ data: { data: roma } });
+    const w = await montar({
+      ...roma,
+      telefono: "5512345678",
+      whatsapp: "+57 3001234567",
+    });
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "sedes.editar")!
+      .trigger("click");
+
+    const ladas = w
+      .findAll('[data-prueba="lada-celular"]')
+      .map((l) => l.text());
+    // Sin «+», con la lada del negocio; con «+», la suya.
+    expect(ladas).toEqual(["MX +52", "CO +57"]);
+    expect((w.get("#s-telefono").element as HTMLInputElement).value).toBe(
+      "5512345678",
+    );
+    expect((w.get("#s-whatsapp").element as HTMLInputElement).value).toBe(
+      "3001234567",
+    );
+
+    // Las zonas con buscador: las del país del negocio primero.
+    const zona = w.get("#s-zona");
+    expect((zona.element as HTMLInputElement).value).toBe(
+      "Centro de México (Ciudad de México)",
+    );
+    await zona.trigger("click");
+    expect(w.findAll('[role="option"]')[0].text()).toContain(
+      "Centro de México",
+    );
+    await zona.setValue("chicago");
+    await zona.trigger("keydown", { key: "Enter" });
+
+    await w.get("#s-telefono").setValue("55 8888 9999");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "comun.guardar")!
+      .trigger("click");
+    await flushPromises();
+    expect(api.put).toHaveBeenCalledWith(
+      "/api/v1/app/demo/sucursales/roma",
+      expect.objectContaining({
+        telefono: "+52 5588889999",
+        whatsapp: "+57 3001234567",
+        zona_horaria: "America/Chicago",
+      }),
+    );
+    w.unmount();
   });
 });

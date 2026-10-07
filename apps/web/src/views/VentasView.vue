@@ -15,6 +15,7 @@ import TarjetasIndicadores, {
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import {
   SECCIONES,
   clasesDe,
@@ -83,11 +84,9 @@ const productoSel = computed(
   () => productos.value.find((p) => p.id === venta.value.productoId) ?? null,
 );
 
-function dinero(minor: number, moneda = "MXN"): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+// En la moneda del negocio (ADR 0099) y con los números de su país.
+function dinero(minor: number, moneda = sesion.moneda): string {
+  return dineroDelPais(minor, moneda, sesion.pais);
 }
 function queIncluye(p: Plan): string {
   if (p.tipo === "membresia") {
@@ -447,7 +446,7 @@ onMounted(cargar);
                   $t("ventas.vender.promoDescuento", {
                     monto: dinero(
                       promoPreview.descuento,
-                      productoSel?.moneda ?? "MXN",
+                      productoSel?.moneda ?? sesion.moneda,
                     ),
                   })
                 }}
@@ -457,7 +456,7 @@ onMounted(cargar);
             <div class="vv-total">
               <span>{{ $t("pos.total") }}</span>
               <span class="tabular-nums">{{
-                dinero(total, productoSel?.moneda ?? "MXN")
+                dinero(total, productoSel?.moneda ?? sesion.moneda)
               }}</span>
             </div>
             <button

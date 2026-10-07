@@ -11,7 +11,12 @@ vi.mock("@/lib/api", () => ({
   mensajeDeError: (e: unknown) => String(e),
 }));
 vi.mock("@/stores/sesionTenant", () => ({
-  useSesionTenantStore: () => ({ slug: "estudio-a", puede: () => true }),
+  useSesionTenantStore: () => ({
+    slug: "estudio-a",
+    puede: () => true,
+    moneda: "PEN",
+    pais: "PE",
+  }),
 }));
 
 const devolucionSinConfirmar = {
@@ -126,5 +131,29 @@ describe("por conciliar", () => {
       "/api/v1/app/estudio-a/incidencias-cobro/i2/resolver",
       { resolucion: "Se le avisó", reembolso: null, accion: "devolver" },
     );
+  });
+
+  it("un monto sin moneda va en la del negocio, no en pesos", async () => {
+    api.get.mockResolvedValueOnce({
+      data: {
+        data: [
+          {
+            id: "i3",
+            tipo: "pago_tardio",
+            detalle: "Llegó el pago cuando su apartado ya había vencido.",
+            fecha: null,
+            persona: "Bea",
+            monto_minor: 25000,
+            moneda: null,
+            reembolso: null,
+          },
+        ],
+      },
+    });
+    const w = montar();
+    await flushPromises();
+
+    expect(w.text().replace(/\s/g, " ")).toContain("S/ 250.00");
+    expect(w.text()).not.toContain("MXN");
   });
 });

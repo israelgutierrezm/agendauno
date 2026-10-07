@@ -1,8 +1,10 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "@/i18n";
+import { api } from "@/lib/api";
+import { useSesionTenantStore } from "@/stores/sesionTenant";
 import PanelNuevaCita from "./PanelNuevaCita.vue";
 
 /*
@@ -101,6 +103,36 @@ describe("aviso del horario al agendar", () => {
     const w = await abrir("11:45");
     expect(w.get('[data-prueba="aviso-horario"]').text()).toContain(
       "Choca con un bloqueo de la agenda (Comida)",
+    );
+  });
+});
+
+describe("cliente nuevo desde la agenda", () => {
+  it("su celular lleva la lada del negocio (o la que elija)", async () => {
+    // Un negocio en Colombia; quien agenda puede dar de alta clientes.
+    const sesion = useSesionTenantStore();
+    sesion.estudio = { pais: "CO", lada: "57" } as typeof sesion.estudio;
+    sesion.usuario = { permisos: ["*"] } as typeof sesion.usuario;
+    vi.mocked(api.post).mockRejectedValue(new Error("sin red"));
+    const w = await abrir("10:00");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "Cliente nuevo")!
+      .trigger("click");
+
+    expect(w.get('[data-prueba="lada-celular"]').text()).toBe("CO +57");
+    await w.get("#pnc-celular").setValue("300 123 4567");
+    await w
+      .findAll("label.block")
+      .find((l) => l.text() === "Nombre")!
+      .get("input")
+      .setValue("Lía");
+    await w.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/app/demo/miembros",
+      expect.objectContaining({ nombre: "Lía", celular: "+57 3001234567" }),
     );
   });
 });

@@ -56,6 +56,8 @@ interface Renta {
   moneda: string;
   cuota_fija_minor: number;
   trial_termina_en: string | null;
+  /** ¿Puede recibir la factura de la renta? Si no, se le da un recibo sin valor fiscal. */
+  factura_renta_posible?: boolean;
   actual: Uso;
   cargos: Cargo[];
 }
@@ -103,6 +105,14 @@ function fecha(iso: string): string {
     new Date(a, m - 1, d),
   );
 }
+
+// Sin factura posible (otra moneda u otro país, o la plataforma aún no factura) no se
+// ofrece «Facturar»: de cada cargo pagado se descarga un recibo sin valor fiscal.
+const facturaPosible = computed(
+  () =>
+    renta.value?.factura_renta_posible !== false &&
+    sesion.estudio?.facturacion_disponible !== false,
+);
 
 const enPrueba = computed(() => {
   const fin = renta.value?.trial_termina_en;
@@ -228,24 +238,16 @@ async function facturar(cargo: Cargo): Promise<void> {
   }
 }
 
-async function descargarFactura(
-  cargo: Cargo,
-  formato: "pdf" | "xml",
-): Promise<void> {
-  if (cargo.factura === null) {
-    return;
-  }
+async function descargar(ruta: string, nombre: string): Promise<void> {
+  errorPago.value = null;
   try {
-    const { data } = await api.get<Blob>(
-      `${base.value}/renta/facturas/${cargo.factura.id}/${formato}`,
-      {
-        responseType: "blob",
-      },
-    );
+    const { data } = await api.get<Blob>(`${base.value}${ruta}`, {
+      responseType: "blob",
+    });
     const url = URL.createObjectURL(data);
     const enlace = document.createElement("a");
     enlace.href = url;
-    enlace.download = `factura-${cargo.factura.uuid ?? cargo.factura.id}.${formato}`;
+    enlace.download = nombre;
     document.body.appendChild(enlace);
     enlace.click();
     enlace.remove();
@@ -253,6 +255,26 @@ async function descargarFactura(
   } catch (e) {
     errorPago.value = mensajeDeError(e);
   }
+}
+
+async function descargarFactura(
+  cargo: Cargo,
+  formato: "pdf" | "xml",
+): Promise<void> {
+  if (cargo.factura === null) {
+    return;
+  }
+  await descargar(
+    `/renta/facturas/${cargo.factura.id}/${formato}`,
+    `factura-${cargo.factura.uuid ?? cargo.factura.id}.${formato}`,
+  );
+}
+
+async function descargarRecibo(cargo: Cargo): Promise<void> {
+  await descargar(
+    `/renta/cargos/${cargo.id}/recibo`,
+    `recibo-agendauno-${cargo.periodo}.pdf`,
+  );
 }
 
 // Al volver de la página de pago de la renta: aviso y recarga tras la confirmación.
@@ -577,18 +599,22 @@ onMounted(() => {
                       {{ $t("renta.factura.xml") }}
                     </button>
                   </span>
-                  <!-- La plataforma aún no factura: no se ofrece. -->
-                  <span
-                    v-else-if="sesion.estudio?.facturacion_disponible === false"
-                    class="text-xs"
-                    :style="{ color: 'var(--texto-suave)' }"
-                    >{{ $t("renta.factura.noDisponible") }}</span
+                  <!-- Sin factura posible: recibo sin valor fiscal. -->
+                  <button
+                    v-else-if="!facturaPosible"
+                    type="button"
+                    class="tu-btn tu-btn-fantasma whitespace-nowrap"
+                    data-prueba="recibo"
+                    @click="descargarRecibo(c)"
                   >
+                    {{ $t("renta.recibo.descargar") }}
+                  </button>
                   <!-- Pagado sin factura (o con error): emitir/reintentar -->
                   <button
                     v-else
                     type="button"
                     class="tu-btn tu-btn-fantasma whitespace-nowrap"
+                    data-prueba="facturar"
                     :disabled="facturando === c.id"
                     @click="facturar(c)"
                   >
@@ -648,7 +674,7 @@ onMounted(() => {
         {{ errorPago }}
       </p>
       <p class="mt-3 text-xs" :style="{ color: 'var(--texto-suave)' }">
-        {{ $t("renta.pagoNota") }}
+        {{ facturaPosible ? $t("renta.pagoNota") : $t("renta.recibo.nota") }}
       </p>
 
       <!-- Avisos de AgendaUno al dueño: correo y WhatsApp (ADR 0072). -->

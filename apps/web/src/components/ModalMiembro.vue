@@ -16,6 +16,7 @@ import { fechaLocal } from "@/lib/agenda";
 import { edadDe, fechaNacimientoTexto } from "@/lib/datosPersonales";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -207,11 +208,9 @@ function fechaHora(iso: string | null, zona: string | null): string {
     hour12: false,
   }).format(new Date(iso));
 }
+// Con los números del país del negocio («$ 1.250,50» en Colombia).
 function dinero(minor: number, moneda: string): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+  return dineroDelPais(minor, moneda, sesion.pais);
 }
 
 const planTexto = computed(() => {

@@ -6,6 +6,7 @@ import { RouterLink } from "vue-router";
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { terminoParaPersona } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -127,11 +128,9 @@ const metodo = ref("efectivo");
 const procesando = ref(false);
 const avisoVenta = ref<string | null>(null);
 
+// Con los números del país del negocio («$ 1.250,50» en Colombia).
 function dinero(minor: number, moneda: string): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+  return dineroDelPais(minor, moneda, sesionStore.pais);
 }
 
 async function abrirVenta(): Promise<void> {

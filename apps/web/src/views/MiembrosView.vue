@@ -8,6 +8,7 @@ import { useI18n } from "vue-i18n";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import BarraListado from "@/components/BarraListado.vue";
 import BotonImportar from "@/components/BotonImportar.vue";
+import CampoCelular from "@/components/CampoCelular.vue";
 import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
@@ -470,6 +471,7 @@ function abrirEditar(m: Miembro): void {
     primer_apellido: m.primer_apellido,
     segundo_apellido: m.segundo_apellido,
     email: m.email,
+    celular: m.celular ?? null,
     activo: m.activo,
     es_facturable: m.es_facturable,
     archivado: m.archivado,
@@ -1321,7 +1323,13 @@ onMounted(() => {
         </div>
         <div>
           <label class="tu-label" for="mc">{{ $t("miembros.celular") }}</label>
-          <input id="mc" v-model="form.celular" class="tu-input" type="tel" />
+          <!-- Con su lada: la del negocio si no se elige otra (ADR 0103). -->
+          <CampoCelular
+            id="mc"
+            v-model="form.celular"
+            maxlength="30"
+            autocomplete="off"
+          />
         </div>
         <CamposDatosPersonales
           id="ma"

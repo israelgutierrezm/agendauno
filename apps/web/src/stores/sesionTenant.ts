@@ -96,6 +96,10 @@ export interface EstudioSesion {
   // Su moneda y su zona horaria (ADR 0099): una sola moneda para todo el negocio.
   moneda?: string;
   zona_horaria?: string;
+  // Su país (ISO 3166-1, p. ej. «MX») y la lada de ese país («52», ADR 0103): la
+  // lada que se supone en los celulares que se capturan sin ella.
+  pais?: string;
+  lada?: string;
   // Con pesos mexicanos cobra en línea y (en México) factura a sus clientes.
   cobra_en_linea_posible?: boolean;
   factura_posible?: boolean;
@@ -226,6 +230,9 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
   const esCitas = computed(() => modalidad.value === "citas");
   /** Moneda del negocio (ISO 4217): la de los precios nuevos. */
   const moneda = computed(() => estudio.value?.moneda ?? "MXN");
+  /** País del negocio (ISO 3166-1) y su lada (ADR 0103). */
+  const pais = computed(() => estudio.value?.pais ?? "MX");
+  const lada = computed(() => estudio.value?.lada ?? "52");
   /**
    * Zona horaria del negocio (ADR 0099): define qué día es «hoy» en sus pantallas,
    * aunque quien mira esté en otra zona. Sin dato, la del navegador.
@@ -514,6 +521,8 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     modalidad,
     esCitas,
     moneda,
+    pais,
+    lada,
     zonaHoraria,
     terminologia,
     iniciarSesion,
