@@ -63,8 +63,9 @@ const puedeVender = computed(
     sesionStore.puede("ordenes.gestionar") &&
     sesionStore.puede("productos.ver"),
 );
-const puedeRegistrarEntrada = computed(() =>
-  sesionStore.puede("checkins.registrar"),
+// Solo en negocios que controlan la entrada (acceso libre, ADR 0105).
+const puedeRegistrarEntrada = computed(
+  () => sesionStore.accesoAbierto && sesionStore.puede("checkins.registrar"),
 );
 const puedeEditar = computed(() => sesionStore.puede("miembros.gestionar"));
 

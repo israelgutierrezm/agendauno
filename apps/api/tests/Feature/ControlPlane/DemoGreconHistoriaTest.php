@@ -113,10 +113,12 @@ it('siembra Grecon en «demo» con su agenda de octubre, sus planes y 80 miembro
         foreach ([
             'articulos', 'ventas_pos', 'esquemas_pago', 'niveles', 'recursos', 'roles', 'tareas', 'notas_persona',
             'tipos_documento', 'documentos', 'aceptaciones_waiver', 'formularios', 'respuestas_formulario', 'promociones',
-            'recompensas_lealtad', 'movimientos_puntos', 'difusiones', 'mensajes', 'reglas_automatizacion', 'facturas', 'accesos',
+            'recompensas_lealtad', 'movimientos_puntos', 'difusiones', 'mensajes', 'reglas_automatizacion', 'facturas',
         ] as $tabla) {
             expect(DB::connection('tenant')->table($tabla)->count())->toBeGreaterThan(0, "Sin datos en {$tabla}");
         }
+        // Un estudio no registra entradas: entrar es tomar la clase (ADR 0105).
+        expect(DB::connection('tenant')->table('accesos')->count())->toBe(0);
         // Las cuentas para revisar «Mi cuenta» conservan el plan que dice su descripción.
         foreach (['valeria.rios@correo.test' => 'Paquete 8 clases', 'renata.soto@correo.test' => 'Ilimitada'] as $correo => $plan) {
             $persona = PersonaTenant::query()->where('email', $correo)->sole();

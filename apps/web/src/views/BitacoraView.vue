@@ -40,7 +40,10 @@ type Pestana = "cambios" | "accesos";
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeCambios = computed(() => sesion.puede("auditoria.ver"));
-const puedeAccesos = computed(() => sesion.puede("checkins.registrar"));
+// La bitácora de entradas, solo en negocios que controlan la entrada (ADR 0105).
+const puedeAccesos = computed(
+  () => sesion.accesoAbierto && sesion.puede("checkins.registrar"),
+);
 
 const pestana = ref<Pestana>(puedeCambios.value ? "cambios" : "accesos");
 const cambios = ref<Cambio[]>([]);

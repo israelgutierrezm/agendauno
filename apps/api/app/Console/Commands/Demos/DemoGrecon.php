@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Demos;
 
-use App\Modules\Tenancy\Acceso\MetodoAcceso;
 use App\Modules\Tenancy\Application\AsistenciaTenant;
 use App\Modules\Tenancy\Application\GenerarAgendaTenant;
 use App\Modules\Tenancy\Application\InventarioTenant;
@@ -12,7 +11,6 @@ use App\Modules\Tenancy\Application\MembresiasTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
 use App\Modules\Tenancy\Application\PausarMembresiaTenant;
 use App\Modules\Tenancy\Application\PuntoDeVentaTenant;
-use App\Modules\Tenancy\Application\RegistrarAccesoTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Automatizacion\EventoAutomatizacion;
@@ -27,7 +25,6 @@ use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\ActividadTenant;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\ArticuloTenant;
-use App\Modules\Tenancy\Models\AsistenciaTenant as AsistenciaModelo;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
 use App\Modules\Tenancy\Models\NivelTenant;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -69,7 +66,7 @@ use RuntimeException;
  * Lo que el documento no da es inventado para que cada apartado tenga datos (ver
  * {@see ApartadosDemo}): lo que se vende en recepción con su inventario, la nómina por
  * clase, los niveles de pole, un rol propio, expedientes, el cuestionario de salud,
- * promociones, lealtad, comunicaciones, facturas, accesos con QR, una membresía en
+ * promociones, lealtad, comunicaciones, facturas, una membresía en
  * pausa, una devolución y una solicitud de privacidad.
  *
  * El horario es el semanal que publica el estudio (44 clases a la semana). Octubre
@@ -974,29 +971,7 @@ final class DemoGrecon extends DemoBase
         }
 
         $this->llaveDeApi('Sitio web (horario de clases)', ['agenda.ver']);
-        $this->accesosConQr();
         $this->unaPausa();
-    }
-
-    /** La entrada con QR de quienes llegaron a clase en los últimos diez días. */
-    private function accesosConQr(): void
-    {
-        $acceso = app(RegistrarAccesoTenant::class);
-        $asistencias = AsistenciaModelo::query()->with('reserva.persona', 'reserva.sesion')
-            ->where('estado', EstadoAsistencia::Presente->value)
-            ->whereHas('reserva.sesion', fn ($q) => $q->where('inicia_en', '>=', $this->hoy->subDays(10)->utc()))
-            ->orderBy('id')
-            ->get();
-        foreach ($asistencias as $asistencia) {
-            $persona = $asistencia->reserva?->persona;
-            $sesion = $asistencia->reserva?->sesion;
-            if (! $persona instanceof PersonaTenant || ! $sesion instanceof SesionTenant || ! $this->prob(85)) {
-                continue;
-            }
-            $llega = $this->en(CarbonImmutable::instance($sesion->inicia_en)->subMinutes($this->azar(3, 20)));
-            $acceso->registrar($persona, MetodoAcceso::Qr, (int) $this->sede->getKey(), $llega);
-            $this->sumar('accesos con QR');
-        }
     }
 
     /** Una alumna con Ilimitada pausó su membresía por un viaje. */

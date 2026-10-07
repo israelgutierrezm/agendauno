@@ -150,8 +150,12 @@ const camaraDisponible =
 const registrandoPase = ref(false);
 const avisoPase = ref<{ texto: string; permitido: boolean } | null>(null);
 
+// Solo en negocios que controlan la entrada (acceso libre, ADR 0105); en un estudio
+// el buscador es solo buscador.
+const conPase = computed(() => sesion.accesoAbierto);
+
 function esPase(texto: string): boolean {
-  return texto.trim().startsWith(PREFIJO_PASE);
+  return conPase.value && texto.trim().startsWith(PREFIJO_PASE);
 }
 
 async function registrarPase(codigo: string): Promise<void> {
@@ -499,7 +503,7 @@ onMounted(async () => {
             @keydown.enter.prevent="alEnter"
           />
           <button
-            v-if="camaraDisponible"
+            v-if="camaraDisponible && conPase"
             type="button"
             class="tu-btn tu-btn-fantasma shrink-0"
             @click="escanerAbierto = true"
@@ -557,7 +561,7 @@ onMounted(async () => {
         {{ avisoPase.texto }}
       </p>
       <p
-        v-else-if="!sesion.esCitas"
+        v-else-if="conPase"
         class="mt-2 text-xs"
         :style="{ color: 'var(--texto-suave)' }"
       >
@@ -788,7 +792,7 @@ onMounted(async () => {
       @cerrar="miembroActivo = null"
     />
     <EscanerPase
-      v-if="camaraDisponible"
+      v-if="camaraDisponible && conPase"
       :abierto="escanerAbierto"
       @codigo="registrarPase"
       @cerrar="escanerAbierto = false"

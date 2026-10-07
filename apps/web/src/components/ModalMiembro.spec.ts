@@ -20,6 +20,7 @@ vi.mock("@/lib/confirmar", () => ({ confirmar: () => Promise.resolve(true) }));
 const permisos = vi.hoisted(() => ({
   lista: [] as string[],
   esCitas: false,
+  accesoAbierto: false,
 }));
 vi.mock("@/stores/sesionTenant", () => ({
   useSesionTenantStore: () => ({
@@ -27,6 +28,9 @@ vi.mock("@/stores/sesionTenant", () => ({
     terminologia: { miembro: "Alumno", sesion: "Clase" },
     get esCitas() {
       return permisos.esCitas;
+    },
+    get accesoAbierto() {
+      return permisos.accesoAbierto;
     },
     puede: (p: string) => permisos.lista.includes(p),
     usuario: { rol: "admin" },
@@ -129,6 +133,7 @@ beforeEach(() => {
     "agenda.ver",
   ];
   permisos.esCitas = false;
+  permisos.accesoAbierto = false;
   datosResumen = resumen();
   ficha = { reservas: [], ordenes: [], pendientes: [] };
   api.get.mockImplementation((url: string) =>
@@ -297,5 +302,21 @@ describe("detalle de un cliente en un modal", () => {
         .findAll("button")
         .map((b) => b.text()),
     ).not.toContain("Planes y créditos");
+  });
+
+  it("«Registrar entrada» solo en negocios que controlan la entrada (acceso libre)", async () => {
+    permisos.lista.push("checkins.registrar");
+    const estudio = montar();
+    await flushPromises();
+    await estudio.get('[aria-haspopup="menu"]').trigger("click");
+    // En un estudio, entrar es tomar la clase: no hay entrada que registrar.
+    expect(estudio.text()).not.toContain("Registrar entrada");
+    estudio.unmount();
+
+    permisos.accesoAbierto = true;
+    const gimnasio = montar();
+    await flushPromises();
+    await gimnasio.get('[aria-haspopup="menu"]').trigger("click");
+    expect(gimnasio.text()).toContain("Registrar entrada");
   });
 });

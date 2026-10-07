@@ -45,3 +45,26 @@ it('en un estudio de clases que vende planes, sus créditos; con consentimientos
         ->assertJsonPath('data.portal.expediente', true)
         ->assertJsonPath('data.portal.pase', false);
 });
+
+it('el pase de entrada solo en negocios de acceso libre, aunque un estudio tenga entradas registradas', function (): void {
+    // Un estudio (pole): entrar es tomar la clase. Aunque alguien registre una entrada,
+    // su alumna no ve pase (ADR 0105).
+    $estudio = estudioConSesion('estudio-pase', 'dueno@estudio-pase.mx', 'pole');
+    agendaSemilla($estudio);
+    $ana = alumnoConSesion($estudio, 'Ana', 'ana@correo.mx');
+    $otra = (string) $this->postJson("/api/v1/app/{$estudio['slug']}/miembros", [
+        'nombre' => 'Lu', 'email' => 'lu@correo.mx', 'tipo' => 'miembro',
+    ], conBearer($estudio['bearer']))->assertCreated()->json('data.id');
+    $this->postJson("/api/v1/app/{$estudio['slug']}/accesos", [
+        'persona_id' => $otra, 'metodo' => 'manual',
+    ], conBearer($estudio['bearer']))->assertCreated();
+    $this->getJson("/api/v1/app/{$estudio['slug']}/mi/perfil", conBearer($ana['bearer']))
+        ->assertOk()->assertJsonPath('data.portal.pase', false);
+
+    // Un gimnasio (acceso libre): su cliente sí tiene pase.
+    $gimnasio = estudioConSesion('gimnasio-pase', 'dueno@gimnasio-pase.mx', 'gimnasio');
+    agendaSemilla($gimnasio);
+    $beto = alumnoConSesion($gimnasio, 'Beto', 'beto@correo.mx');
+    $this->getJson("/api/v1/app/{$gimnasio['slug']}/mi/perfil", conBearer($beto['bearer']))
+        ->assertOk()->assertJsonPath('data.portal.pase', true);
+});

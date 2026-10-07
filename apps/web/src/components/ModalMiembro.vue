@@ -129,7 +129,10 @@ const puedeVender = computed(
 const puedeEditar = computed(() => sesion.puede("miembros.gestionar"));
 const puedeDarDeBaja = computed(() => sesion.puede("miembros.eliminar"));
 const puedeVerPlanes = computed(() => sesion.puede("derechos.ver"));
-const puedeEntrada = computed(() => sesion.puede("checkins.registrar"));
+// Solo en negocios que controlan la entrada (acceso libre, ADR 0105).
+const puedeEntrada = computed(
+  () => sesion.accesoAbierto && sesion.puede("checkins.registrar"),
+);
 const puedeCobrarPendiente = computed(() => sesion.puede("ordenes.gestionar"));
 
 const pestana = ref<Pestana>("resumen");

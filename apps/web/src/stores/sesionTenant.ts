@@ -244,6 +244,14 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
   );
   /** Moneda del negocio (ISO 4217): la de los precios nuevos. */
   const moneda = computed(() => estudio.value?.moneda ?? "MXN");
+  /**
+   * ¿El negocio controla la entrada? Solo los de acceso libre (gimnasio, CrossFit,
+   * HYROX): ahí se registra la entrada y el alumno tiene pase QR. En un estudio,
+   * entrar es tomar la clase: no hay entrada que registrar (ADR 0105).
+   */
+  const accesoAbierto = computed(
+    () => estudio.value?.perfil_config?.flags?.acceso_abierto === true,
+  );
   /** País del negocio (ISO 3166-1) y su lada (ADR 0103). */
   const pais = computed(() => estudio.value?.pais ?? "MX");
   const lada = computed(() => estudio.value?.lada ?? "52");
@@ -556,6 +564,7 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     moneda,
     pais,
     lada,
+    accesoAbierto,
     zonaHoraria,
     terminologia,
     iniciarSesion,

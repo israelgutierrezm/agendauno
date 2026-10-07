@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
-use App\Modules\Tenancy\Models\AccesoTenant;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Documento;
 use App\Modules\Tenancy\Models\Estudio;
@@ -24,7 +23,8 @@ use Carbon\CarbonImmutable;
  *
  * - créditos: tiene (o tuvo) un bono, paquete o membresía; o el negocio trabaja con
  *   clases y vende planes;
- * - pase: el negocio controla accesos (acceso abierto, o ya registra entradas);
+ * - pase: el negocio controla la entrada (acceso libre: gimnasio, CrossFit, HYROX;
+ *   ADR 0105). En un estudio, entrar es tomar la clase: no hay pase.
  * - expediente: el negocio pide consentimientos o fichas, o la persona tiene
  *   documentos.
  */
@@ -48,7 +48,7 @@ class PortalDelClienteTenant
         return [
             'creditos' => $tieneDerechos
                 || ($this->modalidad->esClases() && ProductoTenant::query()->where('archivado', false)->exists()),
-            'pase' => (bool) ($flags['acceso_abierto'] ?? false) || AccesoTenant::query()->exists(),
+            'pase' => (bool) ($flags['acceso_abierto'] ?? false),
             'expediente' => WaiverTenant::query()->where('activo', true)->exists()
                 || Formulario::query()->where('activo', true)->exists()
                 || Documento::query()->where('persona_id', $persona->getKey())->exists(),
