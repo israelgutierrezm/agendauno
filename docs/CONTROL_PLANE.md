@@ -7,7 +7,8 @@ Estado: **implementado**. Todo el sistema corre así: el esquema compartido con
 
 - **Control plane (central).** Conexión por defecto. Tabla `estudios`: registro
   de cada tenant SaaS con slug, estado de ciclo de vida, publicación en
-  directorio, prueba, perfil y terminología, modalidad de cobro del SaaS, estado de
+  directorio, prueba, perfil y terminología, `modalidad` (clases o citas, guardada y
+  excluyente, ADR 0104), modalidad de cobro del SaaS, estado de
   facturación, contacto del propietario y **configuración de su BD de tenant**
   (`db_driver`, `db_database`, `version_migraciones`). Junto a ella: `tarifas_saas`
   (versionadas), `mediciones_uso`, `cargos_renta`, `facturas_plataforma`,

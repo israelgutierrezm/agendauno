@@ -59,6 +59,15 @@ Formato `area.accion`. El catálogo completo, agrupado por área, está en
 
 Una prueba exige que todo permiso usado en una ruta esté en el catálogo.
 
+## Modalidad del negocio
+
+Además del permiso, las rutas exclusivas de un modelo llevan `modalidad:clases` o
+`modalidad:citas` (`ModalidadRequerida`, ADR 0104): en un negocio de la otra modalidad
+responden 403 `MODALITY_NOT_AVAILABLE`, tenga quien tenga el permiso. Se revisa antes
+que el permiso y que el recurso. Las del núcleo no lo llevan. Una prueba
+(`RutasPorModalidadTenantTest`) fija la lista y falla si una ruta nueva con nombre de
+un solo modelo (series, grupos, horarios de atención, citas…) queda sin su modalidad.
+
 **Eliminar aparte.** Donde se borra o se da de baja hay un permiso `*.eliminar` que
 pide el `*.gestionar` de su área: alumnos, equipo, agenda, planes (archivar),
 promociones, plantillas de mensajes y automatizaciones (ADR 0077). Reactivar y

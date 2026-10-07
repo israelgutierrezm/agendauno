@@ -24,8 +24,15 @@ academias). Debe cubrir:
 - reprogramar y cancelar desde la cuenta del cliente;
 - recordatorios y avisos al profesional.
 
-Un negocio mixto usa las dos: la modalidad solo decide cómo se cobra el SaaS y qué
-se ve primero.
+Cada negocio es **solo de clases o solo de citas** (ADR 0104): no hay negocios
+mixtos. El giro propone la modalidad al registrarse y queda guardada; el negocio
+cambia de giro solo dentro de ella, y pasar de una a otra lo hace AgendaUno antes de
+que el negocio opere. La modalidad decide qué flujos existen (el servidor niega los de
+la otra), cómo se ve el panel y cómo se cobra el SaaS.
+
+Lo que comparten las dos es el núcleo: clientes, equipo, sucursales, recursos,
+agenda, reservas, asistencia, cancelaciones y comercio. Las membresías y los bonos
+también se venden en citas (ADR 0091).
 
 ## Cobro del SaaS
 

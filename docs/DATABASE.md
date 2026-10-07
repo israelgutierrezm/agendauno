@@ -22,7 +22,7 @@ el esquema.
 
 | Tabla | Para qué |
 |---|---|
-| `estudios` | Cada negocio: slug, estado, prueba, perfil y terminología, modalidad de cobro, contacto (con WhatsApp verificado y aceptación de avisos, ADR 0070), WhatsApp con sus clientes activado por la plataforma (`whatsapp_habilitado`, ADR 0083), suspensión (por renta o por la plataforma, ADR 0073), perfil público (logo, portada, descripción, redes), base de datos y `version_migraciones` |
+| `estudios` | Cada negocio: slug, estado, prueba, perfil y terminología, `modalidad` (clases o citas, guardada y excluyente, ADR 0104), modalidad de cobro, contacto (con WhatsApp verificado y aceptación de avisos, ADR 0070), WhatsApp con sus clientes activado por la plataforma (`whatsapp_habilitado`, ADR 0083), suspensión (por renta o por la plataforma, ADR 0073), perfil público (logo, portada, descripción, redes), base de datos y `version_migraciones` |
 | `tarifas_saas` | Tarifas del SaaS por modalidad, versionadas (ADR 0019) |
 | `mediciones_uso` | Alumnos o profesionales activos medidos por periodo |
 | `cargos_renta` | Renta mensual de cada negocio, inmutable una vez emitida (ADR 0032) |

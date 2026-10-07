@@ -16,7 +16,10 @@ existir por dentro, pero entenderla no es su trabajo.
 
 ## Decisión
 
-### Pasos según cómo trabaja el negocio (la modalidad del perfil)
+### Pasos según cómo trabaja el negocio (su modalidad)
+
+La modalidad es la guardada del negocio, solo clases o solo citas (ADR 0104); el giro
+solo la propone al registrarse.
 
 - **Citas** (barbería, salón, estética, spa, salud):
   tu negocio → servicios → quién atiende y cuándo → publicar.

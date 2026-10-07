@@ -16,6 +16,22 @@ Sources of entitlements:
 - make-up credit
 - guest benefit
 
+## Both service modes (ADR 0091, ADR 0104)
+
+The engine is core, not a classes feature. A business works only with classes or
+only with appointments, and both sell plans through the same products, agreements,
+entitlements, ledger (`movimientos_credito`) and holds (`retenciones_credito`):
+
+- **Classes:** memberships, class packs, passes, extra classes, top-ups.
+- **Appointments:** a session bundle (bono, e.g. five massages) is a pack whose units
+  are visits; a membership gives recurring services for a fee. A service is booked
+  either by paying its price or with an entitlement that covers it, never both: the
+  client account lists covered services as "with your bundle", and the booking holds
+  and consumes units exactly like a class booking.
+
+A plan with no offerings assigned covers every offering of the business; since a
+business has only one mode, that never mixes classes and appointments.
+
 ## Examples
 
 ### Unlimited

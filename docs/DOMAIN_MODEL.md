@@ -12,11 +12,21 @@ Plataforma
       → Recurso                sala, camilla, carril, silla
 ```
 
-El **perfil** del negocio (`PerfilNegocio`: gimnasio, pilates, pole, natación,
+El **perfil** o giro del negocio (`PerfilNegocio`: gimnasio, pilates, pole, natación,
 danza, yoga, academia, barbería, estética, salón, spa, salud, general) solo cambia
 valores por defecto, terminología y flags. La **modalidad** (`ModalidadServicio`:
-clases o citas) decide cómo se cobra el SaaS y qué se ve primero. Nunca hay
-`if ($perfil === …)` en el dominio.
+clases o citas) es excluyente y está guardada en el negocio (`estudios.modalidad`,
+ADR 0104): el giro solo la propone al registrarse y solo el superadmin la cambia,
+antes de que haya sesiones o reservas. Decide:
+
+- el tipo de toda sesión del negocio (clases → `clase`, citas → `cita`);
+- qué flujos existen: las rutas exclusivas del otro modelo responden 403
+  `MODALITY_NOT_AVAILABLE`;
+- las `capacidades` que la sesión manda a la web y la app;
+- la métrica del cobro del SaaS (alumnos o profesionales activos).
+
+Nunca hay `if ($perfil === …)` en el dominio, y lo que depende del modelo pregunta
+por la modalidad del negocio, no por el giro ni por la forma de la oferta.
 
 ## Identidad y personas
 
@@ -39,7 +49,11 @@ Programa → Actividad → Oferta (clase grupal o servicio privado)
 
 - **Clases**: sesiones grupales con capacidad, instructor(es), lista de espera.
 - **Citas**: sesiones privadas con un profesional, duración y márgenes, recursos y
-  horario de atención; bloqueos de agenda.
+  horario de atención; bloqueos de agenda. Una cita no tiene lista de espera ni una
+  segunda reserva activa.
+- Un negocio tiene solo una de las dos (ADR 0104). La oferta no guarda su tipo: es el
+  de la modalidad del negocio; `politica_reserva` solo dice si se reserva con un
+  derecho o pagando.
 - Las sesiones se materializan desde las plantillas (ADR 0010); se reprograman,
   cancelan y cambian en serie (ADR 0038, 0040, 0045).
 
@@ -51,7 +65,8 @@ Producto comercial → Orden (comprador) → Pago aprobado
 ```
 
 - Productos: membresía (ilimitada o limitada por ciclo), paquete de clases, pase,
-  clase extra, servicio.
+  clase extra, servicio. En citas, el bono de sesiones y la membresía son los mismos
+  productos con el mismo ledger (ADR 0091): el comercio es núcleo, no de Clases.
 - Comprador ≠ beneficiario: una línea de orden puede beneficiar a otra persona.
 - Los créditos se mueven en un ledger con holds; el saldo se suma, nunca se guarda
   (ADR 0009, 0011).
@@ -64,8 +79,9 @@ Producto comercial → Orden (comprador) → Pago aprobado
 
 Una reserva valida elegibilidad, ventana de reserva, derecho vigente, capacidad,
 recursos y reglas de cancelación, con bloqueo del registro padre para ser segura
-ante concurrencia (ADR 0011, 0033, 0034). La lista de espera promueve al liberarse
-un lugar.
+ante concurrencia (ADR 0011, 0033, 0034). La lista de espera (solo en clases)
+promueve al liberarse un lugar; una cita que se cancela o se mueve libera el horario
+del profesional.
 
 ## Identificadores
 

@@ -9,7 +9,7 @@ Agenda → Importar clases ofrece dos layouts CSV UTF-8, descargables desde la p
 - **Fechas específicas:** una fila por sesión, con `fecha`.
 - **Programación semanal:** una fila por clase/día/horario, con `dia`, `desde`, `hasta` inclusivos. Se crean plantillas reales compatibles con cambiar una sesión o esta y las siguientes.
 
-Es un flujo de la modalidad **clases**, protegido por `agenda.gestionar` en interfaz y servidor, incluido para roles personalizados. No importa citas privadas ni clientes ni reservas.
+Es un flujo de la modalidad **clases**, protegido por `agenda.gestionar` en interfaz y servidor, incluido para roles personalizados. Un negocio de citas recibe 403 `MODALITY_NOT_AVAILABLE` (`modalidad:clases`, ADR 0104). No importa citas privadas ni clientes ni reservas.
 
 ## Layouts
 

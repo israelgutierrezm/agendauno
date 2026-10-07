@@ -90,6 +90,35 @@ anyone else, and release the professional's slot when their booking ends
 expire; booked by the business they start confirmed with an order to collect at
 the counter. See ADR 0018.
 
+A business works only with classes or only with appointments (ADR 0104), so the
+type of every new session is the business modality (`clases` → `clase`, `citas`
+→ `cita`), on every path: creating a session, series, imports and booking an
+appointment. `SesionTenant` fills it from `ModalidadNegocioTenant` when the
+caller does not set it; there is no `clase` default. `politica_reserva` only says
+how a booking is enabled (`entitlement` or `pago`), never whether it is a cita:
+a paid offer in a classes business is a class paid per session, not an
+appointment, and `AgendarCitaTenant` refuses any offer there
+(`SESSION_NOT_BOOKABLE`, «Este negocio trabaja con clases.»). Series generate
+nothing in an appointments business.
+
+The appointment rules live in the engine, for every caller (staff roster, the
+member's account, the public page):
+- `evaluar` / `crear`: a cita has no waitlist (`esperar=true` →
+  `SESSION_NOT_BOOKABLE`, rule `sin_lista_de_espera`) and no second active
+  booking (`SESSION_NOT_BOOKABLE`, rule `cita_libre`); `crear`,
+  `reservarConPago` and `reservarPorCobrar` re-check it under the session lock.
+- `promover` never offers a cita to anyone.
+- When a booking leaves a session (cancel, unpaid expiry, declined or expired
+  offer, `moverA`) the same strategy applies: a cita releases the professional's
+  slot (a leftover waitlist entry is cancelled with it); a class offers the place
+  to its waitlist. `moverA` into a cita requires it to be free.
+
+`reserva.*` and `asistencia.marcada` events carry the session data
+(`DatosDeSesion`: `sesion_id`, `tipo` `clase|cita`, `inicia_en`, `actividad`,
+`fecha`, `hora`, `sucursal`, `con`), additive to their previous payload. The
+payment concept of an order for a session reads «Cita» only when the session is
+a cita; a class paid per session reads «Clase».
+
 A client may book with "any available professional" (no `instructor_id`): the
 slots are the union of every professional who works at that branch that day, and
 the booking goes to the least busy one that day (then by name). Each attempt is a

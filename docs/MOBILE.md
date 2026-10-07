@@ -37,6 +37,28 @@ Dentro de cada feature: `data/` (repositorios y servicios de API), `application/
 menor lógica posible). La app no reimplementa reglas del negocio: pide a la API y
 muestra el motivo cuando se niega (`code` del error).
 
+## Clases o citas y el contrato de la agenda (ADR 0104)
+
+- **Modalidad:** cada negocio es solo de clases o solo de citas. La app la toma de la
+  sesión (`estudio.modalidad` y `estudio.capacidades` del login y de `/yo`, en
+  `Sesion.modalidad` y `Sesion.capacidades`); no la deduce del giro, del Inicio ni de
+  las ofertas.
+- **Tipo de cada sesión:** `TipoSesion` (`lib/core/agenda/contrato_agenda.dart`) lee
+  `tipo` (`clase` | `cita`). Uno desconocido o ausente es un error explícito
+  (`TipoSesionDesconocido`), nunca una clase por omisión. Tocar una sesión abre lo de
+  su tipo, en cualquier vista (`abrirSesion` / `alTocarSesion`): la hoja de la cita o
+  el pase de lista de la clase.
+- **Lo que calcula el servidor se lee, no se recalcula:** el cupo (`clase`), la
+  ocupación que se muestra (`ocupacion.porcentaje`) y, en citas,
+  `cita.estado_atencion` y `cita.estado_pago`. Si un API anterior no manda `clase`, el
+  cupo sale de los conteos del primer nivel; sin `ocupacion` ni estados no se muestra
+  nada en su lugar.
+- **Versión mínima:** `/yo` trae `app.version_minima`. La versión de la app es
+  `versionApp` (`lib/core/version/version_app.dart`), igual a la de `pubspec.yaml`
+  (una prueba lo vigila); al subir una, se sube la otra. Si es más vieja, la app solo
+  muestra «Actualiza AgendaUno para continuar». Se revisa al abrir, al entrar y al
+  volver a la app.
+
 ## Configuración al compilar
 
 ```bash

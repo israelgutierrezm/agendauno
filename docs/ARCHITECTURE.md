@@ -36,6 +36,63 @@ docs/         Arquitectura, ADRs, despliegue y verificación
 Los controladores validan y delegan; las reglas de negocio no viven en
 controladores, ni en Vue, ni en Flutter.
 
+## Núcleo, Clases y Citas (ADR 0104)
+
+Cada negocio es solo de clases o solo de citas: `estudios.modalidad`, guardada en el
+control plane. Un solo código sirve a los dos modelos, con una frontera explícita:
+
+- **Núcleo**: clientes, personal y permisos, sucursales, recursos y bloqueos; la
+  agenda y su ocupación (`sesiones` con `tipo`, `VerificarAgendaTenant`); la reserva
+  base (retención, política de cancelación, asistencia, reprogramar, reseñas); el
+  comercio (productos, derechos con su ledger, órdenes, pagos, pasarelas), y lo
+  transversal (outbox, comunicaciones, parámetros, auditoría). Membresías y bonos son
+  núcleo: Citas también los vende.
+- **Clases**: series, grupos, niveles, cupo por canal, lista de espera, lugares, pase
+  de lista, check-ins, integraciones e importación de clases.
+- **Citas**: horario de atención y disponibilidad, agendar (también sin cuenta),
+  «cualquier profesional», márgenes, recursos por servicio, combos y cobro al agendar.
+
+```
+┌────────────────────── PLATAFORMA (control plane) ───────────────────────┐
+│ estudios.modalidad: clases | citas (una sola por negocio)               │
+│ tarifas_saas por modalidad · mediciones_uso · cargos_renta              │
+│ log de cambios de modalidad                                             │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │ modalidad y capacidades → web y app
+                 ┌───────────────────┴────────────────────┐
+                 ▼ negocio de clases                      ▼ negocio de citas
+┌──────────── CLASES ────────────┐       ┌──────────── CITAS ─────────────┐
+│ series, grupos, niveles        │       │ horarios de atención           │
+│ cupo por canal, lista espera   │       │ disponibilidad, AgendarCita    │
+│ lugares, pase de lista         │       │ márgenes, oferta_recursos      │
+│ check-ins, importación         │       │ combos, cobro al agendar       │
+│ rutas modalidad:clases         │       │ rutas modalidad:citas          │
+└────────────────┬───────────────┘       └────────────────┬───────────────┘
+                 │ solo hacia abajo                       │ solo hacia abajo
+                 ▼                                        ▼
+┌──────────────────────────────── NÚCLEO ─────────────────────────────────┐
+│ Agenda: sesiones(tipo) · VerificarAgenda · recursos · bloqueos          │
+│ Reserva base: reserva · retención · cancelación · asistencia · reseñas  │
+│ Comercio: productos · derechos + ledger · órdenes · pagos · pasarelas   │
+│ Identidad: personas · users/roles/permisos · sucursales                 │
+│ Transversal: outbox · comunicaciones · parámetros · auditoría           │
+└─────────────────────────────────────────────────────────────────────────┘
+Permitido: Clases → Núcleo, Citas → Núcleo.
+Prohibido: Clases ↔ Citas; el Núcleo importando código de Clases o de Citas.
+```
+
+Cómo se sostiene:
+
+- `ModalidadNegocioTenant` es la única pregunta del dominio por la modalidad (y da el
+  `tipo` de toda sesión nueva); nadie la deduce del giro ni de la oferta.
+- Las rutas exclusivas llevan `modalidad:clases` o `modalidad:citas`
+  (`ModalidadRequerida`, 403 `MODALITY_NOT_AVAILABLE`); las del núcleo no.
+- La sesión manda `modalidad` y `capacidades`; la web y la app muestran según eso.
+- Código nuevo: sin ramas `esCita` en el motor, lo de un modelo en su propio archivo,
+  y el núcleo sin importar código de un modelo.
+- `agendauno:revisar-modalidades` revisa (solo lectura) que los datos de cada negocio
+  correspondan a su modalidad.
+
 ## Eventos y efectos secundarios
 
 ```
