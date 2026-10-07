@@ -12,8 +12,11 @@ namespace App\Modules\Tenancy;
  */
 enum PerfilNegocio: string
 {
+    /** «Otro negocio con clases»: para quien da clases y no encuentra su giro. */
     case General = 'general';
     case Gimnasio = 'gimnasio';
+    case Crossfit = 'crossfit';
+    case Hyrox = 'hyrox';
     case Pilates = 'pilates';
     case Pole = 'pole';
     case Natacion = 'natacion';
@@ -25,6 +28,8 @@ enum PerfilNegocio: string
     case Salon = 'salon';
     case Spa = 'spa';
     case Salud = 'salud';
+    /** «Otro negocio de citas»: para quien atiende con cita y no encuentra su giro. */
+    case GeneralCitas = 'general_citas';
 
     /**
      * Terminologia + feature-flags por defecto del perfil.
@@ -50,7 +55,7 @@ enum PerfilNegocio: string
                 'terminologia' => ['sesion' => 'Sesión', 'miembro' => 'Alumno', 'instructor' => 'Instructor'],
                 'flags' => ['grupos' => false, 'niveles' => false, 'acceso_abierto' => false],
             ],
-            self::Gimnasio => [
+            self::Gimnasio, self::Crossfit, self::Hyrox => [
                 'terminologia' => ['sesion' => 'Clase', 'miembro' => 'Miembro', 'instructor' => 'Coach'],
                 'flags' => ['grupos' => false, 'niveles' => false, 'acceso_abierto' => true],
             ],
@@ -58,7 +63,7 @@ enum PerfilNegocio: string
                 'terminologia' => ['sesion' => 'Cita', 'miembro' => 'Cliente', 'instructor' => 'Barbero'],
                 'flags' => ['grupos' => false, 'niveles' => false, 'acceso_abierto' => false],
             ],
-            self::Estetica, self::Salon => [
+            self::Estetica, self::Salon, self::GeneralCitas => [
                 'terminologia' => ['sesion' => 'Cita', 'miembro' => 'Cliente', 'instructor' => 'Profesional'],
                 'flags' => ['grupos' => false, 'niveles' => false, 'acceso_abierto' => false],
             ],

@@ -46,6 +46,7 @@ final class SugerenciasPerfil
             PerfilNegocio::Estetica => [$s('Limpieza facial', 60, 650), $s('Diseño de cejas', 30, 200), $s('Lifting de pestañas', 60, 600)],
             PerfilNegocio::Spa => [$s('Masaje relajante', 60, 800), $s('Masaje descontracturante', 60, 900), $s('Facial hidratante', 50, 700)],
             PerfilNegocio::Salud => [$s('Consulta', 50, 700), $s('Consulta de seguimiento', 30, 500)],
+            PerfilNegocio::GeneralCitas => [$s('Servicio estándar', 60, 500), $s('Servicio rápido', 30, 300)],
             default => [$s('Sesión individual', 60, 500)],
         };
     }
@@ -64,6 +65,8 @@ final class SugerenciasPerfil
             PerfilNegocio::Danza => [$c('Ballet infantil', 60, 12), $c('Jazz', 60, 15)],
             PerfilNegocio::Natacion => [$c('Natación niños', 45, 6), $c('Natación adultos', 45, 8)],
             PerfilNegocio::Gimnasio => [$c('Funcional', 50, 15), $c('Spinning', 45, 20)],
+            PerfilNegocio::Crossfit => [$c('WOD', 60, 15), $c('Open Box', 60, 20)],
+            PerfilNegocio::Hyrox => [$c('Entrenamiento HYROX', 60, 16), $c('Simulacro HYROX', 90, 12)],
             default => [$c('Clase grupal', 60, 10)],
         };
     }

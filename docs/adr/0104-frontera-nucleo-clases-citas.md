@@ -48,8 +48,9 @@ El dueño decidió: **no se permiten negocios con clases y citas a la vez.**
   tenga sesiones ni reservas, igual que la moneda solo cambia antes de cobrar
   (`PUT /plataforma/estudios/{slug}/modalidad`; si no, 422 `MODALITY_IN_USE`). Con
   ella cambian el giro (el que se elija de la nueva modalidad o, si el suyo no encaja,
-  `general` o `estetica`) y la métrica del cobro. Queda en el log de la plataforma
-  (`plataforma.estudio.modalidad`) y en la bitácora del negocio (`estudio.modalidad`).
+  el «otro negocio» de la nueva: `general` o `general_citas`) y la métrica del cobro.
+  Queda en el log de la plataforma (`plataforma.estudio.modalidad`) y en la bitácora
+  del negocio (`estudio.modalidad`).
   El detalle del negocio en el superadmin trae `modalidad_cambiable`.
 - La revisión de «sin sesiones ni reservas» no bloquea la base del negocio mientras
   se cambia. Se acepta: lo hace el superadmin, antes de que el negocio opere, y

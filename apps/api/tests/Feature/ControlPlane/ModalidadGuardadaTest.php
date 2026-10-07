@@ -73,9 +73,46 @@ it('la configuración inicial dice qué giros puede elegir el negocio: solo los 
     $clases = estudioConSesion('yoga-norte', 'dueno@yoga-norte.mx', 'yoga');
 
     $this->getJson("/api/v1/app/{$citas['slug']}/onboarding", conBearer($citas['bearer']))
-        ->assertOk()->assertJsonPath('data.perfiles', ['barberia', 'estetica', 'salon', 'spa', 'salud']);
+        ->assertOk()->assertJsonPath('data.perfiles', ['barberia', 'estetica', 'salon', 'spa', 'salud', 'general_citas']);
     $this->getJson("/api/v1/app/{$clases['slug']}/onboarding", conBearer($clases['bearer']))
-        ->assertOk()->assertJsonPath('data.perfiles', ['general', 'gimnasio', 'pilates', 'pole', 'natacion', 'danza', 'yoga', 'academia']);
+        ->assertOk()->assertJsonPath('data.perfiles', ['general', 'gimnasio', 'crossfit', 'hyrox', 'pilates', 'pole', 'natacion', 'danza', 'yoga', 'academia']);
+});
+
+it('«otro negocio de citas» registra un negocio de citas que solo cambia a giros de citas', function (): void {
+    $this->postJson('/api/v1/registro', [
+        'nombre' => 'Atención Integral', 'slug' => 'atencion-integral', 'perfil_negocio' => 'general_citas',
+        'contacto_nombre' => 'Dueña', 'contacto_primer_apellido' => 'Demo', 'contacto_email' => 'duena@integral.mx',
+        'contacto_telefono' => '5512345678', 'pais' => 'MX', 'acepta_terminos' => true,
+    ])->assertCreated()
+        ->assertJsonPath('data.estudio.perfil', 'general_citas')
+        ->assertJsonPath('data.estudio.modalidad', 'citas');
+    $this->assertDatabaseHas('estudios', ['slug' => 'atencion-integral', 'perfil_negocio' => 'general_citas', 'modalidad' => 'citas']);
+
+    $e = estudioConSesion('otro-citas', 'dueno@otro-citas.mx', 'general_citas');
+
+    $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.estudio.capacidades', ['clases' => false, 'citas' => true])
+        ->assertJsonPath('data.estudio.perfil_config.terminologia.sesion', 'Cita')
+        ->assertJsonPath('data.estudio.perfil_config.terminologia.miembro', 'Cliente')
+        ->assertJsonPath('data.estudio.perfil_config.terminologia.instructor', 'Profesional');
+
+    // Se lista entre los giros de citas y sugiere servicios genéricos, no de un giro.
+    $this->getJson("/api/v1/app/{$e['slug']}/onboarding", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.perfiles', ['barberia', 'estetica', 'salon', 'spa', 'salud', 'general_citas'])
+        ->assertJsonPath('data.sugerencias.servicios.0', ['nombre' => 'Servicio estándar', 'duracion_minutos' => 60, 'precio_minor' => 50000]);
+
+    // Entre giros de citas va y viene; a uno de clases (ni al «otro» de clases), no.
+    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'barberia'], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.perfil', 'barberia');
+    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'general_citas'], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.perfil', 'general_citas')->assertJsonPath('data.perfil_config.modalidad', 'citas');
+    $this->putJson("/api/v1/app/{$e['slug']}/perfil", ['perfil_negocio' => 'general'], conBearer($e['bearer']))
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'MODALITY_LOCKED')
+        ->assertJsonPath('meta.modalidad', 'citas');
+    $this->assertDatabaseHas('estudios', ['slug' => $e['slug'], 'perfil_negocio' => 'general_citas', 'modalidad' => 'citas']);
 });
 
 it('la sesión trae la modalidad, las capacidades y la versión mínima de la app', function (): void {
@@ -111,11 +148,12 @@ it('el superadmin cambia la modalidad antes de operar y queda en la bitácora de
         ->assertJsonPath('data.modalidad', 'clases')
         ->assertJsonPath('data.modalidad_cambiable', true);
 
-    // Sin giro elegido: el suyo (general) no es de citas, toma el predeterminado.
+    // Sin giro elegido: el suyo (general) no es de citas, toma el predeterminado, el
+    // «otro negocio de citas».
     $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}/modalidad", ['modalidad' => 'citas'], conPlataforma())
         ->assertOk()
         ->assertJsonPath('data.modalidad', 'citas')
-        ->assertJsonPath('data.perfil', 'estetica')
+        ->assertJsonPath('data.perfil', 'general_citas')
         ->assertJsonPath('data.modalidad_cambiable', true);
 
     $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
@@ -128,9 +166,9 @@ it('el superadmin cambia la modalidad antes de operar y queda en la bitácora de
     expect($asiento)->toMatchArray([
         'actor' => null,
         'categoria' => 'configuracion',
-        'descripcion' => 'AgendaUno cambió el negocio a citas (giro: estetica)',
+        'descripcion' => 'AgendaUno cambió el negocio a citas (giro: general_citas)',
         'antes' => ['modalidad' => 'clases', 'perfil' => 'general'],
-        'despues' => ['modalidad' => 'citas', 'perfil' => 'estetica'],
+        'despues' => ['modalidad' => 'citas', 'perfil' => 'general_citas'],
     ]);
 
     // Con un giro de la nueva modalidad, lo toma; uno de la otra, no.

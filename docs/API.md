@@ -90,7 +90,9 @@ Cada negocio es solo de clases o solo de citas, y la modalidad está guardada
   suma, en su nivel superior, `app: {version_minima}` (`APP_VERSION_MINIMA_APP`, por
   omisión `"0.0.0"`): una app más vieja pide actualizarse.
 - **Registro.** `POST /registro` toma la modalidad del giro (`perfil_negocio`; sin giro,
-  `general` → clases) y la devuelve en `data.estudio.modalidad`.
+  `general` → clases) y la devuelve en `data.estudio.modalidad`. Quien no encuentra su
+  giro elige el «otro» de su modalidad: `general` («Otro negocio con clases») o
+  `general_citas` («Otro negocio de citas»: cita, cliente, profesional).
 - **Giro.** `GET /onboarding` trae `perfiles`: los giros que el negocio puede elegir,
   solo los de su modalidad. `PUT /perfil` (`{perfil_negocio}`) con uno de ellos cambia
   terminología y flags; con uno de la otra modalidad responde 422 `MODALITY_LOCKED`
@@ -102,7 +104,7 @@ Cada negocio es solo de clases o solo de citas, y la modalidad está guardada
   200 con el resumen del negocio y `modalidad_cambiable`; 422 `MODALITY_IN_USE` si ya
   tiene sesiones o reservas, y 422 `VALIDATION_FAILED` si el giro es de la otra
   modalidad. Sin giro, conserva el suyo si encaja o toma `general` (clases) o
-  `estetica` (citas). Queda en la bitácora del negocio (`estudio.modalidad`).
+  `general_citas` (citas). Queda en la bitácora del negocio (`estudio.modalidad`).
 - **Escaparate.** `GET /escaparate` suma `estudio.modalidad` y `estudio.capacidades`;
   `estudio.tiene_citas` sale de la modalidad (no de las ofertas) y
   `servicios[].agendable` solo es `true` en un negocio de citas (una clase de pago

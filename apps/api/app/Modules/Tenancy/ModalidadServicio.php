@@ -26,7 +26,7 @@ enum ModalidadServicio: string
      *
      * @var list<string>
      */
-    private const PERFILES_CITAS = ['barberia', 'estetica', 'salon', 'spa', 'salud'];
+    private const PERFILES_CITAS = ['barberia', 'estetica', 'salon', 'spa', 'salud', 'general_citas'];
 
     public static function paraPerfil(PerfilNegocio $perfil): self
     {
@@ -48,13 +48,13 @@ enum ModalidadServicio: string
 
     /**
      * El giro con que queda un negocio al que el superadmin le cambia la modalidad sin
-     * elegir giro: el de terminología más neutra de cada una.
+     * elegir giro: el «otro negocio» de cada una, el de terminología más neutra.
      */
     public function perfilPredeterminado(): PerfilNegocio
     {
         return match ($this) {
             self::Clases => PerfilNegocio::General,
-            self::Citas => PerfilNegocio::Estetica,
+            self::Citas => PerfilNegocio::GeneralCitas,
         };
     }
 

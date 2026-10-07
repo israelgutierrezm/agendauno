@@ -72,6 +72,14 @@ it('el directorio permite buscar por ubicación y filtrar por perfil sin exponer
         ->assertOk()
         ->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.slug', 'casa-yoga');
+
+    // El «otro negocio de citas» también se filtra (la web lo ofrece en el filtro).
+    estudioConSesion('consultorio-integral', 'integral@correo.mx', 'general_citas');
+    $this->getJson('/api/v1/directorio?perfil=general_citas')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.slug', 'consultorio-integral')
+        ->assertJsonPath('data.0.perfil', 'general_citas');
 });
 
 it('configuración inicial de un negocio de clases: sus pasos se dan por hechos con sus datos', function (): void {
