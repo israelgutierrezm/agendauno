@@ -16,7 +16,8 @@ class InicioRepository {
   final Dio _dio;
   final String _slug;
 
-  /// Moneda del negocio: lo por cobrar se suma solo en ella.
+  /// Moneda del negocio: lo por cobrar se suma solo en ella y es el respaldo de los
+  /// ingresos del mes.
   final String _moneda;
 
   String get _base => '/api/v1/app/$_slug';
@@ -56,6 +57,7 @@ class InicioRepository {
       datos(respuestas[0]),
       datos(respuestas[1]),
       esCitas: esCitas,
+      moneda: _moneda,
     );
   }
 

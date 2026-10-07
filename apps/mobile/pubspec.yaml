@@ -30,6 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Viene con Flutter: los selectores de fecha y hora en español.
+  flutter_localizations:
+    sdk: flutter
 
   flutter_riverpod: ^3.4.3
   dio: ^5.11.1

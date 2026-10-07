@@ -146,6 +146,8 @@ class Sesion {
     this.estudioNombre,
     this.perfil,
     this.moneda = 'MXN',
+    this.pais = 'MX',
+    this.lada = '52',
     this.sinSucursal = false,
   });
 
@@ -191,6 +193,11 @@ class Sesion {
 
   /// Moneda del negocio (ISO 4217, ADR 0097): la de sus precios nuevos.
   final String moneda;
+
+  /// País del negocio (ISO 3166-1 alfa-2) y su lada, solo dígitos ("52"): un
+  /// celular que se escribe sin «+» es de ese país.
+  final String pais;
+  final String lada;
 
   /// Personal sin sucursal en un negocio con varias: no ve nada hasta que le
   /// asignen una (ADR 0098).
@@ -248,6 +255,8 @@ class Sesion {
     'terminologia': terminologia.aJson(),
     'estudio_nombre': estudioNombre,
     'moneda': moneda,
+    'pais': pais,
+    'lada': lada,
     'sin_sucursal': sinSucursal,
     'perfil': perfil,
   };
@@ -288,6 +297,8 @@ class Sesion {
       ),
       estudioNombre: datos['estudio_nombre'] as String?,
       moneda: (datos['moneda'] ?? 'MXN') as String,
+      pais: _pais(datos['pais']),
+      lada: _lada(datos['lada']),
       sinSucursal: (datos['sin_sucursal'] ?? false) as bool,
       perfil: datos['perfil'] as String?,
     );
@@ -326,6 +337,8 @@ class Sesion {
       ),
       estudioNombre: estudio?['nombre'] as String?,
       moneda: (estudio?['moneda'] ?? 'MXN') as String,
+      pais: _pais(estudio?['pais']),
+      lada: _lada(estudio?['lada']),
       sinSucursal: (usuario['sin_sucursal'] ?? false) as bool,
       perfil: estudio?['perfil'] as String?,
     );
@@ -380,9 +393,23 @@ class Sesion {
     terminologia: terminologia,
     estudioNombre: estudioNombre,
     moneda: moneda,
+    pais: pais,
+    lada: lada,
     sinSucursal: (usuario['sin_sucursal'] ?? sinSucursal) as bool,
     perfil: perfil,
   );
+
+  /// País del negocio en mayúsculas; sin país (o uno raro), México.
+  static String _pais(Object? valor) {
+    final pais = valor is String ? valor.trim().toUpperCase() : '';
+    return RegExp(r'^[A-Z]{2}$').hasMatch(pais) ? pais : 'MX';
+  }
+
+  /// Lada del negocio, solo dígitos ("+57" → "57"); sin lada, la de México.
+  static String _lada(Object? valor) {
+    final lada = '${valor ?? ''}'.replaceAll(RegExp(r'\D'), '');
+    return lada.isEmpty || lada.length > 4 ? '52' : lada;
+  }
 
   static List<String> _textos(Object? valor) => valor is List
       ? valor.whereType<String>().toList(growable: false)

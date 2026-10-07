@@ -67,7 +67,7 @@ class _ComprarPlanesSeccionState extends ConsumerState<ComprarPlanesSeccion> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          Formato.dinero(p.precioMinor),
+                          Formato.dinero(p.precioMinor, p.moneda),
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,

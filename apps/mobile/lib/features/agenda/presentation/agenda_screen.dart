@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
@@ -238,6 +239,8 @@ class _AgendaCitas extends ConsumerWidget {
     final porCobrar = citas
         .where((s) => s.porCobrar)
         .fold<int>(0, (a, s) => a + (s.precioMinor ?? 0));
+    // Los precios son de la moneda del negocio (una sola, ADR 0099).
+    final moneda = ref.watch(sesionProvider)?.moneda ?? 'MXN';
 
     return Column(
       children: [
@@ -293,7 +296,11 @@ class _AgendaCitas extends ConsumerWidget {
                 const Color(0xFF101828),
               ),
               ('$enLocal', 'en el local', const Color(0xFF5B21B6)),
-              (_dinero(porCobrar), 'por cobrar', const Color(0xFF7A5200)),
+              (
+                Formato.dinero(porCobrar, moneda),
+                'por cobrar',
+                const Color(0xFF7A5200),
+              ),
             ],
           ),
         ),
@@ -304,8 +311,6 @@ class _AgendaCitas extends ConsumerWidget {
     );
   }
 }
-
-String _dinero(int minor) => '\$${(minor / 100).round()}';
 
 /// Día del profesional a escala: horas, citas por estado y la línea de "ahora".
 class _LineaTiempo extends ConsumerStatefulWidget {
@@ -833,12 +838,18 @@ class _Resumen extends StatelessWidget {
             Expanded(
               child: Column(
                 children: [
-                  Text(
-                    valor,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: color,
+                  // Una cantidad larga (p. ej. en pesos colombianos) se achica
+                  // en vez de partirse.
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      valor,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                      ),
                     ),
                   ),
                   Text(

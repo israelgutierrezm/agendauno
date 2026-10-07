@@ -212,7 +212,7 @@ class _PagoAutomaticoScreenState extends ConsumerState<PagoAutomaticoScreen> {
                                     ),
                                     Text(
                                       'Se renueva el ${Formato.fechaLarga(m.proximaCobroEn)}'
-                                      '${m.montoMinor != null ? ' · ${Formato.dinero(m.montoMinor!)}' : ''}',
+                                      '${m.montoMinor != null ? ' · ${Formato.dinero(m.montoMinor!, m.moneda)}' : ''}',
                                       style: const TextStyle(
                                         color: TemaAgendaUno.textoSuave,
                                       ),

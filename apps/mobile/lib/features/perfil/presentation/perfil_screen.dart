@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/calendario/logo_calendario.dart';
 import '../../../core/google/google_auth.dart';
 import '../../../core/flechas_que_se_mueven.dart';
+import '../../../core/paises.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
@@ -544,14 +545,18 @@ class _PerfilScreenState extends ConsumerState<PerfilScreen> {
                   ),
                   if (ref.watch(sesionProvider)?.tieneFicha ?? false) ...[
                     const SizedBox(height: 12),
+                    // El teclado de teléfono deja escribir el «+»: sin él, el
+                    // número es del país del negocio (el servidor le pone su lada).
                     TextField(
+                      key: const Key('celular'),
                       controller: _celular,
                       keyboardType: TextInputType.phone,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Celular',
                         helperText:
-                            'Para avisarte de tus clases y citas (también por WhatsApp, si lo activas).',
-                        helperMaxLines: 2,
+                            'Para avisarte de tus clases y citas (también por WhatsApp, si lo activas). '
+                            '${Paises.ayudaCelular(pais: sesion.pais, lada: sesion.lada)}.',
+                        helperMaxLines: 4,
                       ),
                     ),
                     const SizedBox(height: 12),

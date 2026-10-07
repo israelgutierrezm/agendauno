@@ -66,4 +66,55 @@ void main() {
     // Quien no tiene horario de atención no tiene ocupación.
     expect(find.text('Sin horario'), findsOneWidget);
   });
+
+  test(
+    'los ingresos van en la moneda del reporte o, sin ella, la del negocio',
+    () {
+      expect(
+        ResumenMes.desdeJson(_negocio, _equipo, esCitas: true).moneda,
+        'MXN',
+      );
+      expect(
+        ResumenMes.desdeJson(
+          {..._negocio, 'moneda': 'COP'},
+          _equipo,
+          esCitas: true,
+          moneda: 'MXN',
+        ).moneda,
+        'COP',
+      );
+      expect(
+        ResumenMes.desdeJson(
+          _negocio,
+          _equipo,
+          esCitas: true,
+          moneda: 'EUR',
+        ).moneda,
+        'EUR',
+      );
+    },
+  );
+
+  testWidgets('en otra moneda los ingresos llevan su código', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ResumenMesCard(
+              mes: ResumenMes.desdeJson(
+                {..._negocio, 'moneda': 'COP'},
+                _equipo,
+                esCitas: true,
+              ),
+              clientes: 'clientes',
+              hoy: DateTime(2026, 9, 29),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('COP 104,250.00'), findsOneWidget);
+    expect(find.text(r'$104,250.00'), findsNothing);
+  });
 }

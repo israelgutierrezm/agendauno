@@ -1,9 +1,12 @@
+import '../../../core/formato.dart';
+
 /// El mes en curso para el Inicio de quien ve los números del negocio (ADR 0081):
 /// del resumen (`GET /reportes/negocio`) y de la agenda del equipo
 /// (`GET /reportes/equipo`).
 class ResumenMes {
   const ResumenMes({
     required this.ingresosMinor,
+    this.moneda = 'MXN',
     required this.ocupacionPct,
     required this.inasistenciaPct,
     required this.clientesActivos,
@@ -16,10 +19,13 @@ class ResumenMes {
     Map<String, dynamic> negocio,
     Map<String, dynamic> equipo, {
     required bool esCitas,
+    String moneda = 'MXN',
   }) {
     final profesionales = equipo['profesionales'];
     return ResumenMes(
       ingresosMinor: (negocio['ingresos_minor'] as num?)?.toInt() ?? 0,
+      // Los ingresos son los de la moneda principal (la del negocio).
+      moneda: Formato.moneda(negocio['moneda'], moneda),
       ocupacionPct:
           ((esCitas
                       ? negocio['ocupacion_agenda_pct']
@@ -38,6 +44,7 @@ class ResumenMes {
   }
 
   final int ingresosMinor;
+  final String moneda;
   final int? ocupacionPct;
   final int? inasistenciaPct;
   final int clientesActivos;

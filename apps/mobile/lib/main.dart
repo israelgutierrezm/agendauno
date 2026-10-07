@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/auth/application/sesion_controller.dart';
@@ -38,6 +39,9 @@ Future<void> main() async {
 
 class AgendaUnoApp extends ConsumerStatefulWidget {
   const AgendaUnoApp({super.key});
+
+  /// El idioma de la app.
+  static const idioma = Locale('es');
 
   @override
   ConsumerState<AgendaUnoApp> createState() => _AgendaUnoAppState();
@@ -132,6 +136,11 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
       navigatorKey: _navegador,
       // El mismo tema claro de la web (tokens de AgendaUno).
       theme: TemaAgendaUno.claro(),
+      // En español: los selectores de fecha y hora, sus botones y los textos del
+      // sistema (sin esto salen en inglés).
+      locale: AgendaUnoApp.idioma,
+      supportedLocales: const [AgendaUnoApp.idioma],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       home: inicio,
     );
   }

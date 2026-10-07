@@ -201,6 +201,7 @@ class CobrosHoy {
     required this.ordenesPendientes,
     required this.porCobrarMinor,
     required this.enMora,
+    this.moneda = 'MXN',
   });
 
   factory CobrosHoy.desdeJson(
@@ -214,11 +215,15 @@ class CobrosHoy {
         .where((m) => (m['moneda'] ?? moneda) == moneda)
         .fold<int>(0, (a, m) => a + (m['total_minor'] as num? ?? 0).toInt()),
     enMora: (j['en_mora'] as num? ?? 0).toInt(),
+    moneda: moneda,
   );
 
   final int ordenesPendientes;
   final int porCobrarMinor;
   final int enMora;
+
+  /// En la que se sumó lo por cobrar (la del negocio).
+  final String moneda;
 }
 
 class RenovacionesHoy {

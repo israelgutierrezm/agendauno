@@ -283,11 +283,19 @@ class ReservaMiembro {
 /// Si su plan cubre una clase, dicho por el servidor con la misma regla que al
 /// reservar: incluida, solo con membresía, no incluida (y por qué) o de pago.
 class CoberturaClase {
-  const CoberturaClase({required this.estado, this.motivo, this.precioMinor});
+  const CoberturaClase({
+    required this.estado,
+    this.motivo,
+    this.precioMinor,
+    this.moneda = 'MXN',
+  });
 
   final String estado;
   final String? motivo;
   final int? precioMinor;
+
+  /// Moneda del precio (la del negocio).
+  final String moneda;
 
   /// Se puede reservar con lo que tiene (o pagando la clase).
   bool get reservable => estado == 'incluida' || estado == 'de_pago';
@@ -313,11 +321,13 @@ class CoberturaClase {
           _ => null,
         };
 
-  static CoberturaClase? desdeJson(Object? j) => j is Map<String, dynamic>
+  static CoberturaClase? desdeJson(Object? j, {String moneda = 'MXN'}) =>
+      j is Map<String, dynamic>
       ? CoberturaClase(
           estado: (j['estado'] ?? 'incluida') as String,
           motivo: j['motivo'] as String?,
           precioMinor: (j['precio_minor'] as num?)?.toInt(),
+          moneda: Formato.moneda(j['moneda'], moneda),
         )
       : null;
 }
@@ -449,6 +459,7 @@ class OrdenPorPagar {
     required this.id,
     required this.concepto,
     required this.totalMinor,
+    this.moneda = 'MXN',
     this.detalle,
   });
 
@@ -456,17 +467,26 @@ class OrdenPorPagar {
   final String concepto;
   final int totalMinor;
 
+  /// La de la orden (la del negocio si no la trae).
+  final String moneda;
+
   /// Si es una cita: con quién, cuándo y dónde.
   final String? detalle;
 
   /// Todo lo que debe (GET /mi/ordenes/pendientes, completo): también las citas.
-  static List<OrdenPorPagar> pendientes(List<dynamic> ordenes) => ordenes
+  static List<OrdenPorPagar> pendientes(
+    List<dynamic> ordenes, {
+    String moneda = 'MXN',
+  }) => ordenes
       .whereType<Map<String, dynamic>>()
       .where((o) => o['estado'] == 'pendiente')
-      .map(OrdenPorPagar.desdeJson)
+      .map((o) => OrdenPorPagar.desdeJson(o, moneda: moneda))
       .toList();
 
-  factory OrdenPorPagar.desdeJson(Map<String, dynamic> j) {
+  factory OrdenPorPagar.desdeJson(
+    Map<String, dynamic> j, {
+    String moneda = 'MXN',
+  }) {
     final lineas = ((j['lineas'] ?? []) as List)
         .whereType<Map<String, dynamic>>()
         .map((l) {
@@ -481,6 +501,7 @@ class OrdenPorPagar {
       id: j['id'] as String,
       concepto: concepto.isEmpty ? '—' : concepto,
       totalMinor: (j['total_minor'] as int?) ?? 0,
+      moneda: Formato.moneda(j['moneda'], moneda),
       detalle: sesion is Map<String, dynamic>
           ? [
               if (sesion['profesional'] != null) 'Con ${sesion['profesional']}',
@@ -633,6 +654,7 @@ class MembresiaRenovable {
     this.pendiente = false,
     this.producto,
     this.montoMinor,
+    this.moneda = 'MXN',
     this.proximaCobroEn,
     this.error,
     this.tarjeta,
@@ -648,22 +670,28 @@ class MembresiaRenovable {
   final TarjetaDomiciliada? tarjeta;
   final String? producto;
   final int? montoMinor;
+
+  /// La del plan (la del negocio si no la trae).
+  final String moneda;
   final String? proximaCobroEn;
   final String? error;
 
-  factory MembresiaRenovable.desdeJson(Map<String, dynamic> j) =>
-      MembresiaRenovable(
-        id: (j['id'] ?? '') as String,
-        automatico: (j['automatico'] ?? false) as bool,
-        pendiente: (j['pendiente'] ?? false) as bool,
-        tarjeta: j['tarjeta'] is Map<String, dynamic>
-            ? TarjetaDomiciliada.desdeJson(j['tarjeta'] as Map<String, dynamic>)
-            : null,
-        producto: j['producto'] as String?,
-        montoMinor: j['monto_minor'] as int?,
-        proximaCobroEn: j['proxima_cobro_en'] as String?,
-        error: j['error'] as String?,
-      );
+  factory MembresiaRenovable.desdeJson(
+    Map<String, dynamic> j, {
+    String moneda = 'MXN',
+  }) => MembresiaRenovable(
+    id: (j['id'] ?? '') as String,
+    automatico: (j['automatico'] ?? false) as bool,
+    pendiente: (j['pendiente'] ?? false) as bool,
+    tarjeta: j['tarjeta'] is Map<String, dynamic>
+        ? TarjetaDomiciliada.desdeJson(j['tarjeta'] as Map<String, dynamic>)
+        : null,
+    producto: j['producto'] as String?,
+    montoMinor: j['monto_minor'] as int?,
+    moneda: Formato.moneda(j['moneda'], moneda),
+    proximaCobroEn: j['proxima_cobro_en'] as String?,
+    error: j['error'] as String?,
+  );
 }
 
 class PagoAutomatico {
@@ -827,27 +855,34 @@ class ProductoComprable {
     required this.tipo,
     required this.precioMinor,
     required this.ilimitado,
+    this.moneda = 'MXN',
     this.creditosIncluidos,
     this.vigenciaTipo,
     this.vigenciaCantidad,
   });
 
-  factory ProductoComprable.desdeJson(Map<String, dynamic> j) =>
-      ProductoComprable(
-        id: j['id'] as String,
-        nombre: (j['nombre'] ?? '') as String,
-        tipo: (j['tipo'] ?? '') as String,
-        precioMinor: (j['precio_minor'] as num? ?? 0).toInt(),
-        ilimitado: (j['ilimitado'] ?? false) as bool,
-        creditosIncluidos: (j['creditos_incluidos'] as num?)?.toInt(),
-        vigenciaTipo: j['vigencia_tipo'] as String?,
-        vigenciaCantidad: (j['vigencia_cantidad'] as num?)?.toInt(),
-      );
+  factory ProductoComprable.desdeJson(
+    Map<String, dynamic> j, {
+    String moneda = 'MXN',
+  }) => ProductoComprable(
+    id: j['id'] as String,
+    nombre: (j['nombre'] ?? '') as String,
+    tipo: (j['tipo'] ?? '') as String,
+    precioMinor: (j['precio_minor'] as num? ?? 0).toInt(),
+    moneda: Formato.moneda(j['moneda'], moneda),
+    ilimitado: (j['ilimitado'] ?? false) as bool,
+    creditosIncluidos: (j['creditos_incluidos'] as num?)?.toInt(),
+    vigenciaTipo: j['vigencia_tipo'] as String?,
+    vigenciaCantidad: (j['vigencia_cantidad'] as num?)?.toInt(),
+  );
 
   final String id;
   final String nombre;
   final String tipo;
   final int precioMinor;
+
+  /// La del plan (la del negocio si no la trae).
+  final String moneda;
   final bool ilimitado;
   final int? creditosIncluidos;
   final String? vigenciaTipo;

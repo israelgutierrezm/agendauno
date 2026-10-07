@@ -84,7 +84,7 @@ class ResumenMesCard extends StatelessWidget {
             spacing: 12,
             runSpacing: 10,
             children: [
-              dato('Ingresos', Formato.dinero(mes.ingresosMinor)),
+              dato('Ingresos', Formato.dinero(mes.ingresosMinor, mes.moneda)),
               dato('Ocupación', _pct(mes.ocupacionPct)),
               dato('Inasistencias', _pct(mes.inasistenciaPct)),
               dato(

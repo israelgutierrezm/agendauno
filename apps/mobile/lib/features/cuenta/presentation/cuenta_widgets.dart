@@ -224,8 +224,8 @@ class PorPagarTile extends ConsumerWidget {
         [
           if (o.detalle != null && o.detalle!.isNotEmpty) o.detalle!,
           pagoEnLinea
-              ? Formato.dinero(o.totalMinor)
-              : '${Formato.dinero(o.totalMinor)} · Págalo en recepción',
+              ? Formato.dinero(o.totalMinor, o.moneda)
+              : '${Formato.dinero(o.totalMinor, o.moneda)} · Págalo en recepción',
         ].join('\n'),
       ),
       trailing: pagoEnLinea

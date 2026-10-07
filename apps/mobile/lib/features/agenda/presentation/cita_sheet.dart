@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/formato.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../application/agenda_controller.dart';
 import '../data/agenda_models.dart';
@@ -77,8 +78,9 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
       EstadoCita.completada,
       EstadoCita.noAsistio,
     ].contains(estado);
+    // Con centavos y en la moneda del negocio (una sola, ADR 0099).
     final precio = s.precioMinor != null
-        ? '\$${(s.precioMinor! / 100).round()}'
+        ? Formato.dinero(s.precioMinor!, sesion?.moneda ?? 'MXN')
         : null;
     String hhmm(DateTime d) =>
         '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';

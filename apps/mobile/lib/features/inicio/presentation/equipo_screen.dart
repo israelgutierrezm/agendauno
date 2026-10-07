@@ -461,7 +461,7 @@ class _Pendientes extends StatelessWidget {
             else ...[
               if (c != null && c.ordenesPendientes > 0)
                 linea(
-                  '${c.ordenesPendientes == 1 ? '1 orden' : '${c.ordenesPendientes} órdenes'} por cobrar · ${Formato.dinero(c.porCobrarMinor)}',
+                  '${c.ordenesPendientes == 1 ? '1 orden' : '${c.ordenesPendientes} órdenes'} por cobrar · ${Formato.dinero(c.porCobrarMinor, c.moneda)}',
                 ),
               if (c != null && c.enMora > 0)
                 linea(

@@ -9,10 +9,13 @@ import 'cuenta_models.dart';
 /// Acceso a los datos del autoservicio del miembro (`/app/{slug}/mi/*`), sobre el
 /// estudio de la sesion activa.
 class CuentaRepository {
-  CuentaRepository(this._dio, this._slug);
+  CuentaRepository(this._dio, this._slug, [this._moneda = 'MXN']);
 
   final Dio _dio;
   final String _slug;
+
+  /// Moneda del negocio: la de los precios y adeudos que no traen la suya.
+  final String _moneda;
 
   String get _base => '/api/v1/app/$_slug';
 
@@ -71,7 +74,7 @@ class CuentaRepository {
     final res = await _dio.get<Map<String, dynamic>>('$_base/mi/productos');
     return ((res.data?['data'] ?? []) as List)
         .whereType<Map<String, dynamic>>()
-        .map(ProductoComprable.desdeJson)
+        .map((p) => ProductoComprable.desdeJson(p, moneda: _moneda))
         .toList();
   }
 
@@ -125,7 +128,10 @@ class CuentaRepository {
       final res = await _dio.get<Map<String, dynamic>>(
         '$_base/mi/ordenes/pendientes',
       );
-      return OrdenPorPagar.pendientes((res.data?['data'] ?? []) as List);
+      return OrdenPorPagar.pendientes(
+        (res.data?['data'] ?? []) as List,
+        moneda: _moneda,
+      );
     } on DioException {
       return const [];
     }
@@ -228,7 +234,12 @@ class CuentaRepository {
           ? TarjetaDomiciliada.desdeJson(tarjeta)
           : null,
       membresias: ((data['membresias'] ?? []) as List)
-          .map((e) => MembresiaRenovable.desdeJson(e as Map<String, dynamic>))
+          .map(
+            (e) => MembresiaRenovable.desdeJson(
+              e as Map<String, dynamic>,
+              moneda: _moneda,
+            ),
+          )
           .toList(),
     );
   }
@@ -499,7 +510,7 @@ final cuentaRepositoryProvider = Provider<CuentaRepository?>((ref) {
     return null;
   }
 
-  return CuentaRepository(ref.watch(dioProvider), sesion.slug);
+  return CuentaRepository(ref.watch(dioProvider), sesion.slug, sesion.moneda);
 });
 
 /// La acción se completa en la web (p. ej. capturar la tarjeta con OpenPay.js).
