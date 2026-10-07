@@ -1,13 +1,23 @@
 /**
- * Tipos de letra de Apariencia (la lista la da el API: `CatalogoFuentes`). Todos de
- * Google Fonts con los pesos que usa la app; se carga solo el que hace falta.
+ * Tipos de letra de Apariencia (la lista la da el API: `CatalogoFuentes`). Casi todos
+ * de Google Fonts con los pesos que usa la app; se carga solo el que hace falta.
  * Poppins, la predeterminada, ya viene en index.html.
  */
 export const FUENTE_PREDETERMINADA = "Poppins";
 
+/**
+ * Las del sistema: no se descargan (Segoe UI viene con Windows; en otros equipos se
+ * ve la letra del sistema).
+ */
+export const FUENTES_DEL_SISTEMA = new Set(["Segoe UI"]);
+
 /** Agrega la hoja de Google Fonts de esa familia (una sola vez). */
 export function cargarFuente(familia: string): void {
-  if (familia === FUENTE_PREDETERMINADA || typeof document === "undefined") {
+  if (
+    familia === FUENTE_PREDETERMINADA ||
+    FUENTES_DEL_SISTEMA.has(familia) ||
+    typeof document === "undefined"
+  ) {
     return;
   }
   const id = `fuente-${familia.toLowerCase().replaceAll(" ", "-")}`;

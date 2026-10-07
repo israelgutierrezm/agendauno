@@ -10,6 +10,8 @@ export default {
   oscuro: "Oscuro",
   fuente: "Tipo de letra",
   fuentePredeterminada: "Predeterminada",
+  // Segoe UI: la del sistema en Windows (en otros equipos se ve la del sistema).
+  fuenteSistema: "La de Windows",
   letra: "Tamaño de letra",
   letraAyuda: "Sólo en este navegador.",
   densidades: {

@@ -4,7 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import PanelLateral from "@/components/PanelLateral.vue";
 import { mensajeDeError } from "@/lib/api";
-import { cargarFuente, pilaDeFuente } from "@/lib/fuentes";
+import { cargarFuente, FUENTES_DEL_SISTEMA, pilaDeFuente } from "@/lib/fuentes";
 import { useAparienciaStore } from "@/stores/apariencia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useTemaStore } from "@/stores/tema";
@@ -189,7 +189,11 @@ function restablecer(): void {
               class="block text-xs"
               :style="{ color: 'var(--texto-suave)' }"
               >{{
-                f.es_default ? $t("apariencia.fuentePredeterminada") : "Aa 123"
+                f.es_default
+                  ? $t("apariencia.fuentePredeterminada")
+                  : FUENTES_DEL_SISTEMA.has(f.nombre)
+                    ? $t("apariencia.fuenteSistema")
+                    : "Aa 123"
               }}</span
             >
           </button>

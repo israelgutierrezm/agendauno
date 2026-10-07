@@ -6,8 +6,9 @@ namespace App\Modules\Tenancy;
 
 /**
  * Tipos de letra que cada usuario puede elegir para el panel (Apariencia). Pocos y
- * conocidos, todos de Google Fonts con los pesos que usa la app (300 a 700); el
- * front carga solo el elegido. Se guarda en la cuenta, como el tema.
+ * conocidos: de Google Fonts con los pesos que usa la app (300 a 700), que el front
+ * carga solo si se eligen, y Segoe UI, la del sistema en Windows (no se descarga;
+ * en otros equipos se ve la del sistema). Se guarda en la cuenta, como el tema.
  */
 final class CatalogoFuentes
 {
@@ -20,7 +21,7 @@ final class CatalogoFuentes
      */
     private const FUENTES = [
         'inter' => 'Inter',
-        'roboto' => 'Roboto',
+        'segoe_ui' => 'Segoe UI',
         'open_sans' => 'Open Sans',
         'lato' => 'Lato',
         'poppins' => 'Poppins',

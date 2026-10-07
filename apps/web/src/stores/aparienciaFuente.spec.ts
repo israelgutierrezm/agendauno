@@ -63,4 +63,12 @@ describe("tipo de letra de la apariencia", () => {
       document.documentElement.style.getPropertyValue("--fuente"),
     ).toContain('"Open Sans"');
   });
+
+  it("Segoe UI es del sistema: se aplica sin descargar nada", () => {
+    useAparienciaStore().activar(apariencia("Segoe UI"));
+    expect(
+      document.documentElement.style.getPropertyValue("--fuente"),
+    ).toContain('"Segoe UI"');
+    expect(document.head.querySelector("link[id^='fuente-']")).toBeNull();
+  });
 });
