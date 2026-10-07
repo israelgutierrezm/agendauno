@@ -205,6 +205,9 @@ export default {
     apariencia: "Apariencia",
   },
   landing: {
+    // Los cobros en línea y la facturación (CFDI) solo operan en México (ADR 0099):
+    // lo que los menciona lleva «*» y esta nota en su sección.
+    soloMexico: "* Solo para clientes de México.",
     heroEscritura: {
       prefijo: "Una agenda para",
       pausar: "Pausar texto animado",
@@ -275,7 +278,7 @@ export default {
       p2t: "Comparte tu enlace",
       p2d: "Pon tu página de reservas en Instagram, WhatsApp o un código QR. Tus clientes eligen una clase o un servicio y un horario disponible.",
       p3t: "Gestiona tu día",
-      p3d: "Las reservas llegan a tu agenda. Consulta asistentes, revisa membresías y registra cobros; si conectas una pasarela, también puedes cobrar en línea.",
+      p3d: "Las reservas llegan a tu agenda. Consulta asistentes, revisa membresías y registra cobros; si conectas una pasarela, también puedes cobrar en línea*.",
     },
     funciones: {
       agenda: "Agenda por profesional, recurso o clase",
@@ -287,7 +290,7 @@ export default {
       membresias: "Paquetes y membresías",
       membresiasDesc:
         "Créditos, mensualidades y planes con renovación automática.",
-      pagos: "Cobros en línea",
+      pagos: "Cobros en línea*",
       pagosDesc:
         "Conecta una pasarela compatible o registra pagos en recepción desde el mismo flujo.",
       pos: "Punto de venta",
@@ -329,7 +332,7 @@ export default {
       subtitulo:
         "Obtén una página lista para compartir con tus servicios o clases, precios, profesionales, horarios y ubicaciones.",
       i1: "Comparte tu página por Instagram, WhatsApp o código QR",
-      i2: "Recibe citas, registros y pagos directamente desde tu página",
+      i2: "Recibe citas, registros y pagos* directamente desde tu página",
       i3: "Tú decides si también quieres aparecer en el directorio público",
       cta: "Probar AgendaUno gratis",
       demoAbierto: "Agenda abierta",
@@ -386,7 +389,7 @@ export default {
         estetica: {
           nombre: "Peluquerías y estéticas",
           descripcion:
-            "Citas por estilista, cabinas, duración y anticipos en línea.",
+            "Citas por estilista, cabinas, duración y anticipos en línea*.",
           alt: "Estilista atendiendo a una clienta en un salón de belleza",
         },
         pilates: {
@@ -458,9 +461,9 @@ export default {
       q1: "¿Necesito tarjeta para la prueba?",
       a1: "No. Empiezas gratis por {dias} días sin tarjeta y sin compromiso; cancelas cuando quieras.",
       q2: "¿Cómo cobro a mis clientes o alumnos?",
-      a2: "Conectas tu pasarela compatible y cobras citas, clases, paquetes o membresías en línea. También puedes registrar pagos en recepción.",
+      a2: "Conectas tu pasarela compatible y cobras citas, clases, paquetes o membresías en línea*. También puedes registrar pagos en recepción.",
       q3: "¿Puedo emitir facturas (CFDI)?",
-      a3: "Sí. Cargas tus datos fiscales y emites facturas a tus clientes o alumnos desde el sistema.",
+      a3: "Sí*. Cargas tus datos fiscales y emites facturas a tus clientes o alumnos desde el sistema.",
       q4: "¿Sirve para varias sucursales?",
       a4: "Sí. Manejas varias sucursales, con su agenda, inventario y personal por sede.",
       q5: "¿Sirve para consultorios o profesionales de la salud?",
@@ -468,7 +471,7 @@ export default {
       q6: "¿Cómo se calcula el precio de AgendaUno?",
       a6: "Hay dos modelos de suscripción: por rangos de alumnos activos del mes para estudios y academias, o por profesionales activos para negocios con citas. En Precios puedes elegir tu modalidad, consultar las tarifas mensuales y conocer qué actividad se toma en cuenta. Todos los importes se muestran más IVA.",
       q7: "¿Puedo definir mis propios precios y paquetes?",
-      a7: "Sí. Tú eliges los precios de tus servicios, clases, paquetes y membresías. AgendaUno te ayuda a ofrecerlos, recibir reservas y gestionar los cobros. Para cobrar en línea, conecta una pasarela compatible; sus comisiones dependen del proveedor.",
+      a7: "Sí. Tú eliges los precios de tus servicios, clases, paquetes y membresías. AgendaUno te ayuda a ofrecerlos, recibir reservas y gestionar los cobros. Para cobrar en línea*, conecta una pasarela compatible; sus comisiones dependen del proveedor.",
       q8: "¿Tengo que aparecer en el directorio público?",
       a8: "No. Puedes controlar la publicación desde Configuración. Cuando está visible, las personas pueden consultar servicios o clases, precios y reservar directamente.",
       q9: "¿Debo configurar todo de una vez?",

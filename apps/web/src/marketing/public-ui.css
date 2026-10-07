@@ -275,3 +275,12 @@
   select {
   min-height: 44px;
 }
+
+/* Nota de lo que solo opera en México (cobros en línea y facturación): discreta, bajo
+   la sección que lleva el «*». */
+.tu-nota-mexico {
+  margin-top: 1rem;
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}

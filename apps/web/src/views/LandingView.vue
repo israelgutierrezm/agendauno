@@ -365,6 +365,7 @@ onBeforeUnmount(() => observador?.disconnect());
             </div>
           </div>
         </div>
+        <p class="tu-nota-mexico">{{ $t("landing.soloMexico") }}</p>
       </div>
     </section>
 
@@ -527,6 +528,7 @@ onBeforeUnmount(() => observador?.disconnect());
                 <span>{{ $t(`landing.comunidad.i${n}`) }}</span>
               </li>
             </ul>
+            <p class="tu-nota-mexico">{{ $t("landing.soloMexico") }}</p>
             <div class="mt-8 flex flex-wrap items-center gap-5">
               <RouterLink
                 class="tu-btn tu-btn-primario px-6 py-3"
@@ -627,6 +629,7 @@ onBeforeUnmount(() => observador?.disconnect());
           <p class="mt-3 text-sm" :style="{ color: 'var(--texto-suave)' }">
             Tu agenda. Tu equipo. Tu próxima reserva.
           </p>
+          <p class="tu-nota-mexico">{{ $t("landing.soloMexico") }}</p>
         </CarruselNegocios>
         <div class="mt-10">
           <h3 class="text-lg font-light text-center">
@@ -665,6 +668,7 @@ onBeforeUnmount(() => observador?.disconnect());
             </p>
           </details>
         </div>
+        <p class="tu-nota-mexico">{{ $t("landing.soloMexico") }}</p>
       </div>
     </section>
 

@@ -31,7 +31,7 @@ const funciones = [
     clave: "pagos",
     icono: ["M3 6h18v13H3z", "M3 10h18M7 15h4", "m15 14 2 2 3-3"],
     detalle:
-      "Conecta una pasarela compatible para cobrar en línea o registra lo recibido en recepción. Consulta pagos y saldos pendientes sin perder el contexto.",
+      "Conecta una pasarela compatible para cobrar en línea* o registra lo recibido en recepción. Consulta pagos y saldos pendientes sin perder el contexto.",
   },
   {
     clave: "pos",
@@ -206,6 +206,8 @@ const funciones = [
         </Transition>
       </article>
     </div>
+    <!-- «Cobros en línea*»: solo en México (ADR 0099). -->
+    <p class="tu-nota-mexico">{{ t("landing.soloMexico") }}</p>
   </div>
 </template>
 <style scoped>
