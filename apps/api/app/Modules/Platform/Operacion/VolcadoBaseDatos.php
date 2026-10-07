@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PDO;
+use Pdo\Mysql;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -48,14 +49,14 @@ class VolcadoBaseDatos
             return;
         }
 
-        $proceso = new Process([
+        $this->ejecutar(new Process([
             (string) config('agendauno.respaldos.mysqldump', 'mysqldump'),
+            ...$this->opcionesConexion($config),
             '--single-transaction', '--quick', '--skip-lock-tables', '--routines',
             '--host='.$config['host'], '--port='.$config['port'], '--user='.$config['username'],
             '--result-file='.$destino,
             (string) $config['database'],
-        ], null, ['MYSQL_PWD' => (string) ($config['password'] ?? '')], null, 3600);
-        $proceso->mustRun();
+        ], null, ['MYSQL_PWD' => (string) ($config['password'] ?? '')], null, 3600));
     }
 
     /**
@@ -99,11 +100,66 @@ class VolcadoBaseDatos
             return;
         }
 
-        $proceso = new Process([
+        $this->ejecutar(new Process([
             (string) config('agendauno.respaldos.mysql', 'mysql'),
+            ...$this->opcionesConexion($config),
             '--host='.$config['host'], '--port='.$config['port'], '--user='.$config['username'],
             (string) $config['database'],
-        ], null, ['MYSQL_PWD' => (string) ($config['password'] ?? '')], fopen($origen, 'rb'), 3600);
+        ], null, ['MYSQL_PWD' => (string) ($config['password'] ?? '')], fopen($origen, 'rb'), 3600));
+    }
+
+    /**
+     * Opciones de conexión de mysqldump y mysql (las mismas al volcar y al cargar),
+     * antes que las demás para que una `--defaults-extra-file` quede primero.
+     *
+     * La imagen trae el cliente de MariaDB, que desde la 11.4 cifra con TLS y
+     * verifica el certificado del servidor por omisión: contra un MySQL 8 de la red
+     * privada (certificado autofirmado) se apaga la verificación y contra uno
+     * administrado se le da la CA del proveedor. Sin CA propia de los respaldos se
+     * usa la misma con la que PHP se conecta a esa base (MYSQL_ATTR_SSL_CA).
+     *
+     * @param  array<string, mixed>  $config
+     * @return list<string>
+     */
+    private function opcionesConexion(array $config): array
+    {
+        $opciones = preg_split('/\s+/', trim((string) config('agendauno.respaldos.opciones', '')), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        $ca = trim((string) config('agendauno.respaldos.tls.ca', ''));
+        if ($ca === '') {
+            $ca = $this->caDeLaConexion($config);
+        }
+        if ($ca !== '') {
+            $opciones[] = '--ssl-ca='.$ca;
+        }
+        if (! config('agendauno.respaldos.tls.verificar', true)) {
+            $opciones[] = '--skip-ssl-verify-server-cert';
+        }
+
+        return $opciones;
+    }
+
+    /**
+     * CA con la que PHP verifica la conexión (opción MYSQL_ATTR_SSL_CA), si tiene.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function caDeLaConexion(array $config): string
+    {
+        $opciones = $config['options'] ?? [];
+        if (! is_array($opciones) || ! extension_loaded('pdo_mysql')) {
+            return '';
+        }
+        $atributo = PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA;
+
+        return trim((string) ($opciones[$atributo] ?? ''));
+    }
+
+    /**
+     * Corre un proceso de mysqldump o mysql y falla si termina con error.
+     */
+    protected function ejecutar(Process $proceso): void
+    {
         $proceso->mustRun();
     }
 

@@ -119,7 +119,9 @@ class VerificacionProduccion
             $this->punto('Entorno', 'APP_KEY definida', (string) config('app.key') !== '', 'Genera una con php artisan key:generate --show.'),
             $this->punto('Entorno', 'APP_URL con https', str_starts_with($url, 'https://'), "Ahora: {$url}"),
             $this->punto('Entorno', 'Token de plataforma robusto', strlen($token) >= 32, 'PLATFORM_ADMIN_TOKEN de al menos 32 caracteres.'),
-            $this->punto('Entorno', 'reCAPTCHA en el registro', (string) config('agendauno.recaptcha.secret') !== '', 'Sin RECAPTCHA_SECRET el registro público no filtra bots.', critico: false),
+            // Cada alta crea una base completa y manda un correo: sin captcha, un bot llena
+            // el servidor de bases y usa el remitente para spam.
+            $this->punto('Entorno', 'reCAPTCHA en el registro', (string) config('agendauno.recaptcha.secret') !== '', 'Sin RECAPTCHA_SECRET el registro público no filtra bots: cada alta crea una base y manda un correo. Define RECAPTCHA_SECRET (API) y VITE_RECAPTCHA_SITE_KEY (web).'),
         ];
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Requests;
 
+use App\Modules\Tenancy\Application\RegistrarEstudio;
 use App\Modules\Tenancy\PerfilNegocio;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
@@ -38,8 +39,9 @@ class RegistrarEstudioRequest extends FormRequest
             'nombre' => ['required', 'string', 'max:255'],
             // El enlace público (agendauno.mx/mi-estudio) se genera AUTOMÁTICAMENTE a
             // partir del nombre; el registrante no lo captura. Se acepta opcional por
-            // compatibilidad (p. ej. un slug ya elegido), validado si viene.
-            'slug' => ['nullable', 'string', 'min:3', 'max:50', 'regex:/^[a-z0-9-]+$/', 'unique:estudios,slug'],
+            // compatibilidad (p. ej. un slug ya elegido), validado si viene. Corto: con él
+            // se nombra la base del negocio (MySQL admite 64 caracteres) y el subdominio.
+            'slug' => ['nullable', 'string', 'min:3', 'max:'.RegistrarEstudio::LARGO_MAXIMO_SLUG, 'regex:/^[a-z0-9-]+$/', 'unique:estudios,slug'],
             'perfil_negocio' => ['nullable', Rule::enum(PerfilNegocio::class)],
             // Paso 2: el nombre del propietario (desglosado; apellido materno y segundo nombre opcionales).
             'contacto_nombre' => ['required', 'string', 'max:120'],

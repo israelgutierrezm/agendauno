@@ -41,10 +41,15 @@ class ActivacionPropietario
     }
 
     /**
-     * Activa la cuenta: valida el token, fija la contraseña y marca activo.
+     * Activa la cuenta: valida el token, fija la contraseña y marca activo. El token y
+     * la contraseña no aparecen en las trazas (#[\SensitiveParameter]).
      */
-    public function activar(Estudio $estudio, string $email, string $token, string $password): Usuario
-    {
+    public function activar(
+        Estudio $estudio,
+        string $email,
+        #[\SensitiveParameter] string $token,
+        #[\SensitiveParameter] string $password,
+    ): Usuario {
         return $this->gestor->ejecutarEn($estudio, function () use ($estudio, $email, $token, $password): Usuario {
             $usuario = Usuario::query()->where('email', $email)->first();
 

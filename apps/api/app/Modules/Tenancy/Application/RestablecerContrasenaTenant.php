@@ -58,10 +58,14 @@ class RestablecerContrasenaTenant
     }
 
     /**
-     * Fija la contraseña nueva si el enlace es válido y vigente.
+     * Fija la contraseña nueva si el enlace es válido y vigente. El token y la
+     * contraseña no aparecen en las trazas (#[\SensitiveParameter]).
      */
-    public function restablecer(string $email, string $token, string $password): Usuario
-    {
+    public function restablecer(
+        string $email,
+        #[\SensitiveParameter] string $token,
+        #[\SensitiveParameter] string $password,
+    ): Usuario {
         $usuario = Usuario::query()->where('email', $email)->first();
 
         if (! $usuario instanceof Usuario

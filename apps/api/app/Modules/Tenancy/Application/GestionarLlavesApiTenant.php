@@ -40,7 +40,7 @@ class GestionarLlavesApiTenant
     /**
      * Resuelve una llave ACTIVA por su secreto en claro y registra el último uso.
      */
-    public function resolver(string $secreto): ?LlaveApiTenant
+    public function resolver(#[\SensitiveParameter] string $secreto): ?LlaveApiTenant
     {
         if ($secreto === '') {
             return null;

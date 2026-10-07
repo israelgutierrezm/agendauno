@@ -74,7 +74,9 @@ class MiReprogramarTenantController
                 (int) $sesion->getKey(),
             );
 
-            return response()->json(['data' => [...$base, 'slots' => $slots]]);
+            // Cada horario trae `inicia_local` en la zona de la sede: es lo que se manda
+            // como `inicia_en_local`, sin pasar por la zona del teléfono.
+            return response()->json(['data' => [...$base, 'zona_horaria' => $this->disponibilidad->zona($sucursal), 'slots' => $slots]]);
         }
 
         // Las fechas ya generadas de la misma clase (llegan hasta el horizonte del negocio).
@@ -93,6 +95,8 @@ class MiReprogramarTenantController
             ->map(fn (SesionTenant $s): array => [
                 'id' => $s->ulid,
                 'inicia_en' => $s->inicia_en->toIso8601String(),
+                // La hora de la clase en su sede, para mostrarla igual en cualquier zona.
+                'inicia_local' => CarbonImmutable::instance($s->inicia_en)->setTimezone((string) $s->zona_horaria)->format('Y-m-d\TH:i'),
                 'zona_horaria' => $s->zona_horaria,
             ])
             ->values()

@@ -442,6 +442,9 @@ class MiTenantController
 
         return response()->json(['data' => [
             'fecha' => $validado['fecha'],
+            // Cada horario trae `inicia_local` en esta zona (la de la sede): la app lo
+            // muestra y lo manda tal cual, aunque el teléfono esté en otra zona.
+            'zona_horaria' => $disponibilidad->zona($sucursal),
             'slots' => $instructor instanceof Usuario
                 ? $disponibilidad->paraFecha((int) $instructor->getKey(), $sucursal, $validado['fecha'], $duracion, null, $margenes, $oferta)
                 : $disponibilidad->paraCualquiera($sucursal, $validado['fecha'], $duracion, null, $margenes, $oferta),

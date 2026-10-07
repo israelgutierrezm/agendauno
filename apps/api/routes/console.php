@@ -89,6 +89,11 @@ Schedule::command('agendauno:respaldar-estudios')->dailyAt('03:15')->withoutOver
 // tarjeta), con los plazos de los parámetros de plataforma (ADR 0079). 03:40 de CDMX.
 Schedule::command('agendauno:limpiar-registros')->dailyAt('09:40')->withoutOverlapping();
 
+// Borra los negocios cuyo dueño nunca activó su cuenta tras los días del parámetro de
+// plataforma `registro.dias_sin_activar` (14 por omisión): su base, sus respaldos y su
+// registro. Nunca uno activado, con pagos o con más usuarios. 03:50 de CDMX.
+Schedule::command('agendauno:limpiar-altas-sin-activar')->dailyAt('09:50')->withoutOverlapping();
+
 // Simulacro de restauración (domingos): prueba que los respaldos se pueden restaurar.
 Schedule::command('agendauno:simulacro-restauracion')->weeklyOn(0, '04:30')->withoutOverlapping();
 

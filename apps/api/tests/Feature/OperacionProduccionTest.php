@@ -66,10 +66,13 @@ it('fuera de producción la verificación dice qué falta y sale con error', fun
         'mail.default' => 'log',
         'agendauno.respaldos.disco' => 'local',
         'agendauno.alertas.correo' => null,
+        'agendauno.recaptcha.secret' => null,
     ]);
 
     $this->artisan('agendauno:verificar-produccion')
         ->expectsOutputToContain('FALTA APP_ENV es production')
+        // Sin captcha, cada alta pública crea una base: bloquea operar.
+        ->expectsOutputToContain('FALTA reCAPTCHA en el registro')
         ->expectsOutputToContain('FALTA Proveedor de correo real')
         ->expectsOutputToContain('FALTA Copias fuera del servidor')
         ->expectsOutputToContain('FALTA Correo para alertas de la plataforma')
@@ -78,7 +81,7 @@ it('fuera de producción la verificación dice qué falta y sale con error', fun
 });
 
 it('reconoce lo que sí está listo, incluido el aviso publicado con su responsable', function (): void {
-    config(['mail.default' => 'smtp', 'agendauno.alertas.correo' => 'ops@agendauno.mx']);
+    config(['mail.default' => 'smtp', 'agendauno.alertas.correo' => 'ops@agendauno.mx', 'agendauno.recaptcha.secret' => 'secreto-de-recaptcha']);
     app(LatidoOperacion::class)->marcar(LatidoOperacion::PROGRAMADOR);
     app(LatidoOperacion::class)->marcar(LatidoOperacion::COLA);
     $legales = app(DocumentosLegales::class);
@@ -91,6 +94,7 @@ it('reconoce lo que sí está listo, incluido el aviso publicado con su responsa
     $legales->publicar('terminos');
 
     $this->artisan('agendauno:verificar-produccion')
+        ->expectsOutputToContain('OK    reCAPTCHA en el registro')
         ->expectsOutputToContain('OK    Proveedor de correo real')
         ->expectsOutputToContain('OK    Correo para alertas de la plataforma')
         ->expectsOutputToContain('OK    Programador de tareas latiendo')

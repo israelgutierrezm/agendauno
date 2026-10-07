@@ -17,6 +17,7 @@ use App\Modules\Tenancy\Listeners\EjecutarAutomatizaciones;
 use App\Modules\Tenancy\Listeners\EnviarWebhooksSalientes;
 use App\Modules\Tenancy\Listeners\GenerarComunicaciones;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
+use App\Modules\Tenancy\Models\LlaveApiTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -81,26 +82,49 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        // Los límites de las rutas con sesión corren DESPUÉS de resolver el negocio y
+        // autenticar (prioridad en bootstrap/app.php): ya saben quién pide. Cada familia
+        // lleva su propio contador, así que agotar una no bloquea a las demás.
+
         // Confirmar con la contraseña una acción delicada (descargar mis datos, pedir
         // la baja): pocos intentos por usuario de cada negocio, para que no sirva para
         // adivinarla con una sesión robada.
-        RateLimiter::for('confirmar-contrasena', function (Request $request): Limit {
-            $usuario = $request->attributes->get('usuario_tenant');
-            $estudio = (string) ($request->route('estudio') ?? '');
+        RateLimiter::for('confirmar-contrasena', fn (Request $request): Limit => Limit::perMinute(5)
+            ->by(self::quienEnElNegocio($request)));
 
-            return Limit::perMinute(5)->by($usuario instanceof Usuario
-                ? 'confirmar:'.$estudio.':'.$usuario->getKey()
-                : 'confirmar-ip:'.$request->ip());
-        });
+        // Rutas tenant AUTENTICADAS (sesión o llave de API): por usuario o llave de cada
+        // negocio, para frenar abuso/enumeración sin castigar a todo el estudio ni a
+        // quienes comparten la red (wifi del estudio, datos móviles).
+        RateLimiter::for('tenant', fn (Request $request): Limit => Limit::perMinute(120)
+            ->by(self::quienEnElNegocio($request)));
 
-        // Rate limit de las rutas tenant AUTENTICADAS: por usuario tenant (o IP si no
-        // se resolvio), para frenar abuso/enumeracion sin castigar a todo el estudio.
-        RateLimiter::for('tenant', function (Request $request): Limit {
-            $usuario = $request->attributes->get('usuario_tenant');
-            $clave = $usuario instanceof Usuario ? 'u:'.$usuario->getKey() : 'ip:'.$request->ip();
+        // Clima (Inicio del equipo y del cliente): consulta a un servicio externo, con
+        // su propio tope por usuario.
+        RateLimiter::for('clima', fn (Request $request): Limit => Limit::perMinute(30)
+            ->by(self::quienEnElNegocio($request)));
 
-            return Limit::perMinute(120)->by($clave);
-        });
+        // Verificar el WhatsApp desde el panel: pocos códigos (cuestan y llegan a un
+        // teléfono) y pocos intentos, por usuario y por pantalla.
+        RateLimiter::for('whatsapp-panel-codigo', fn (Request $request): Limit => Limit::perMinutes(10, 5)
+            ->by(self::quienEnElNegocio($request).'|'.self::rutaTenant($request)));
+        RateLimiter::for('whatsapp-panel-verificar', fn (Request $request): Limit => Limit::perMinutes(10, 20)
+            ->by(self::quienEnElNegocio($request).'|'.self::rutaTenant($request)));
+
+        // Página pública del negocio y reserva sin cuenta (marca, escaparate, opciones,
+        // días y horarios): por negocio e IP, con margen para buscar horario varias veces.
+        RateLimiter::for('negocio-publico', fn (Request $request): Limit => Limit::perMinute(120)
+            ->by(self::negocioDe($request).'|'.$request->ip()));
+
+        // Calendario personal (iCal): lo consultan Google, Apple u Outlook desde pocas IP
+        // para los clientes de todos los negocios, así que se cuenta por enlace.
+        RateLimiter::for('calendario', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by(self::negocioDe($request).'|'.self::textoDeRuta($request, 'token')));
+
+        // Páginas públicas de AgendaUno sin negocio (registro, directorio, legales).
+        RateLimiter::for('publico', fn (Request $request): Limit => Limit::perMinute(60)->by((string) $request->ip()));
+
+        // Superadmin: va antes de validar su token (para frenar a quien lo adivina).
+        RateLimiter::for('plataforma', fn (Request $request): Limit => Limit::perMinute(60)->by((string) $request->ip()));
 
         // Consumidores del outbox: los eventos de dominio publicados por el relay se
         // entregan a los webhooks salientes del estudio (R40) y generan las
@@ -131,5 +155,49 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(EventoDeDominioTenant::class, AcumularPuntos::class);
         // Si el negocio cancela algo ya pagado en línea, lo devuelve (si así lo decide; ADR 0046).
         Event::listen(EventoDeDominioTenant::class, DevolverPagoAlCancelarNegocio::class);
+    }
+
+    /**
+     * Quién pide dentro de su negocio: el usuario con sesión, la llave de API o, si
+     * aún no se autenticó, la IP. Siempre con el negocio: los ids son de la base de
+     * cada uno (el usuario 1 de un negocio no es el usuario 1 de otro).
+     */
+    private static function quienEnElNegocio(Request $request): string
+    {
+        $negocio = self::negocioDe($request);
+        $usuario = $request->attributes->get('usuario_tenant');
+        if ($usuario instanceof Usuario) {
+            return $negocio.'|u:'.$usuario->getKey();
+        }
+        $llave = $request->attributes->get('llave_api');
+        if ($llave instanceof LlaveApiTenant) {
+            return $negocio.'|llave:'.$llave->getKey();
+        }
+
+        return $negocio.'|ip:'.$request->ip();
+    }
+
+    /**
+     * Slug del negocio de la ruta (por ruta o por subdominio); vacío fuera de un negocio.
+     */
+    private static function negocioDe(Request $request): string
+    {
+        return Str::lower(self::textoDeRuta($request, 'estudio'));
+    }
+
+    /**
+     * Nombre de la ruta sin el prefijo del montaje (`api.v1.app.` o `api.v1.sub.`):
+     * la misma pantalla cuenta igual entre por ruta o por subdominio.
+     */
+    private static function rutaTenant(Request $request): string
+    {
+        return (string) preg_replace('/^api\.v1\.(app|sub)\./', '', (string) $request->route()?->getName());
+    }
+
+    private static function textoDeRuta(Request $request, string $parametro): string
+    {
+        $valor = $request->route($parametro);
+
+        return is_string($valor) ? $valor : '';
     }
 }

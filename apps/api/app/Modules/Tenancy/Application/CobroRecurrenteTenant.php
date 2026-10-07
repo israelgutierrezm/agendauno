@@ -17,6 +17,7 @@ use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pasarelas\PasarelaConSuscripcion;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
+use App\Support\ReporteDeErrores;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Throwable;
@@ -166,7 +167,7 @@ class CobroRecurrenteTenant
             $resultado = $this->suscripciones->conciliar($domiciliacion);
         } catch (Throwable $e) {
             // La pasarela no respondió: se vuelve a consultar en la siguiente corrida.
-            report($e);
+            ReporteDeErrores::reportarAtrapado($e);
 
             return 'fallido';
         }

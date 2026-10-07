@@ -22,6 +22,7 @@ use App\Modules\Tenancy\Pagos\Exceptions\PagoNoReembolsable;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Pasarelas\PasarelaReembolsable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
+use App\Support\ReporteDeErrores;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -189,7 +190,7 @@ class ReembolsarPagoTenant
             return;
         } catch (Throwable $e) {
             // Sin respuesta (tiempo agotado, red): no sabemos si devolvió.
-            report($e);
+            ReporteDeErrores::reportarAtrapado($e);
             $this->marcarIncierto($reembolso, 'La pasarela no respondió.');
 
             return;

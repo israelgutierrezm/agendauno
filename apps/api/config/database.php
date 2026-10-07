@@ -116,6 +116,12 @@ return [
             // SQLite (dev/pruebas): una escritura concurrente espera su turno en vez de
             // fallar al instante con "database is locked".
             'busy_timeout' => env('TENANT_DB_BUSY_TIMEOUT', 5000),
+            // MySQL con TLS (p. ej. un servicio administrado): la misma CA que la base
+            // central, salvo que las de los negocios vayan en otro servidor. SQLite
+            // ignora la opción.
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('TENANT_MYSQL_ATTR_SSL_CA', env('MYSQL_ATTR_SSL_CA')),
+            ]) : [],
         ],
 
         'pgsql' => [

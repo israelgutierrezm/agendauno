@@ -40,7 +40,7 @@ class PaseAccesoTenant
     /**
      * La persona del pase, si la firma es de este negocio y no ha vencido.
      */
-    public function resolver(string $codigo): PersonaTenant
+    public function resolver(#[\SensitiveParameter] string $codigo): PersonaTenant
     {
         $partes = explode('.', trim($codigo));
         if (count($partes) !== 4 || $partes[0] !== self::PREFIJO || ! ctype_digit($partes[2])) {

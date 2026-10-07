@@ -17,7 +17,8 @@ use Illuminate\Database\Eloquent\Collection;
  * (instructor/barbero) en una fecha, para un servicio de cierta duración. Los huecos
  * salen de sus ventanas de atención ({@see HorarioAtencionTenant}, hora local de la
  * sucursal) troceadas en pasos, descartando los que ya inician o chocan con una
- * clase/cita del instructor (reusa {@see VerificarAgendaTenant}). Devuelve horas en UTC.
+ * clase/cita del instructor (reusa {@see VerificarAgendaTenant}). Devuelve horas en UTC
+ * y, en `inicia_local`, la hora de la sucursal tal cual se agenda (`inicia_en_local`).
  *
  * Con «cualquier profesional disponible» ({@see paraCualquiera}) los huecos son los de
  * todo el equipo que atiende en la sede ese día.
@@ -51,7 +52,11 @@ class CalcularDisponibilidadTenant
      * preparación o limpieza invadiría otra sesión, y el paso por defecto los incluye
      * (una cita tras otra, con su tiempo entre ellas).
      *
-     * @return list<array{inicia: string, termina: string}> ISO-8601 UTC
+     * `inicia` y `termina` van en UTC (ISO-8601); `inicia_local` es la hora en la zona
+     * de la sucursal ('AAAA-MM-DDTHH:MM', sin zona), la que se manda de vuelta como
+     * `inicia_en_local` sin convertir con la zona del dispositivo.
+     *
+     * @return list<array{inicia: string, termina: string, inicia_local: string}>
      */
     public function paraFecha(int $instructorId, SucursalTenant $sucursal, string $fecha, int $duracionMin, ?int $pasoMin = null, ?MargenesServicio $margenes = null, ?OfertaTenant $servicio = null, ?int $excluirSesionId = null): array
     {
@@ -64,7 +69,7 @@ class CalcularDisponibilidadTenant
         }
 
         $paso = $pasoMin !== null && $pasoMin > 0 ? $pasoMin : $duracionMin + $margenes->total();
-        $zona = (string) ($sucursal->zona_horaria ?: app(FechasNegocioTenant::class)->zona());
+        $zona = $this->zona($sucursal);
         $diaSemana = (int) CarbonImmutable::parse($fecha, $zona)->isoWeekday();
 
         $ventanas = HorarioAtencionTenant::query()
@@ -93,6 +98,7 @@ class CalcularDisponibilidadTenant
                     $slots[] = [
                         'inicia' => $inicia->toIso8601String(),
                         'termina' => $termina->toIso8601String(),
+                        'inicia_local' => $cursor->format('Y-m-d\TH:i'),
                     ];
                 }
 
@@ -111,7 +117,7 @@ class CalcularDisponibilidadTenant
      */
     public function profesionalesDeSede(SucursalTenant $sucursal, string $fecha): Collection
     {
-        $zona = (string) ($sucursal->zona_horaria ?: app(FechasNegocioTenant::class)->zona());
+        $zona = $this->zona($sucursal);
         $diaSemana = (int) CarbonImmutable::parse($fecha, $zona)->isoWeekday();
 
         return Usuario::query()
@@ -135,7 +141,7 @@ class CalcularDisponibilidadTenant
      */
     public function diasConAtencion(SucursalTenant $sucursal, string $desde, int $dias, ?int $instructorId = null): array
     {
-        $zona = (string) ($sucursal->zona_horaria ?: app(FechasNegocioTenant::class)->zona());
+        $zona = $this->zona($sucursal);
         $ahora = CarbonImmutable::now($zona);
         $inicio = CarbonImmutable::parse($desde, $zona)->startOfDay();
         $fin = $inicio->addDays($dias - 1);
@@ -178,7 +184,7 @@ class CalcularDisponibilidadTenant
      * Huecos en que al menos un profesional de la sede está libre: la unión de los de
      * cada uno, por hora, con quiénes pueden atender en cada hueco (ULID).
      *
-     * @return list<array{inicia: string, termina: string, profesionales: list<string>}> ISO-8601 UTC
+     * @return list<array{inicia: string, termina: string, inicia_local: string, profesionales: list<string>}> como {@see paraFecha}
      */
     public function paraCualquiera(SucursalTenant $sucursal, string $fecha, int $duracionMin, ?int $pasoMin = null, ?MargenesServicio $margenes = null, ?OfertaTenant $servicio = null): array
     {
@@ -202,7 +208,7 @@ class CalcularDisponibilidadTenant
      */
     public function cabeEnHorario(int $instructorId, SucursalTenant $sucursal, CarbonImmutable $inicia, CarbonImmutable $termina): bool
     {
-        $zona = (string) ($sucursal->zona_horaria ?: app(FechasNegocioTenant::class)->zona());
+        $zona = $this->zona($sucursal);
         $desde = $inicia->setTimezone($zona);
         $hasta = $termina->setTimezone($zona);
 
@@ -224,6 +230,15 @@ class CalcularDisponibilidadTenant
             ->get()
             ->contains(static fn (HorarioAtencionTenant $v): bool => self::hora((string) $v->hora_inicio) <= $horaInicio
                 && self::hora((string) $v->hora_fin) >= $horaFin);
+    }
+
+    /**
+     * Zona horaria de la sucursal (la del negocio si no tiene una propia): en ella se
+     * leen las ventanas de atención y la hora que manda el cliente.
+     */
+    public function zona(SucursalTenant $sucursal): string
+    {
+        return (string) ($sucursal->zona_horaria ?: app(FechasNegocioTenant::class)->zona());
     }
 
     /**

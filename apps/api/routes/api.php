@@ -147,21 +147,21 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('throttle:600,1,whatsapp-webhook')->name('api.v1.webhooks.whatsapp');
 
     Route::post('/registro', [RegistroEstudioController::class, 'store'])->middleware('throttle:login')->name('api.v1.registro');
-    Route::get('/registro/slug', [RegistroEstudioController::class, 'disponibilidad'])->middleware('throttle:60,1')->name('api.v1.registro.slug');
+    Route::get('/registro/slug', [RegistroEstudioController::class, 'disponibilidad'])->middleware('throttle:publico')->name('api.v1.registro.slug');
     // WhatsApp del dueño (ADR 0070): verificar su número con un código al registrarse.
-    Route::get('/registro/whatsapp', [RegistroWhatsAppController::class, 'disponible'])->middleware('throttle:60,1')->name('api.v1.registro.whatsapp');
+    Route::get('/registro/whatsapp', [RegistroWhatsAppController::class, 'disponible'])->middleware('throttle:publico')->name('api.v1.registro.whatsapp');
     // Con prefijo: cada una lleva su propia cuenta por IP (no la comparte con otras rutas).
     Route::post('/registro/whatsapp/codigo', [RegistroWhatsAppController::class, 'codigo'])->middleware('throttle:5,10,whatsapp-codigo')->name('api.v1.registro.whatsapp.codigo');
     Route::post('/registro/whatsapp/verificar', [RegistroWhatsAppController::class, 'verificar'])->middleware('throttle:20,10,whatsapp-verificar')->name('api.v1.registro.whatsapp.verificar');
-    Route::get('/directorio', [DirectorioController::class, 'index'])->middleware('throttle:60,1')->name('api.v1.directorio');
+    Route::get('/directorio', [DirectorioController::class, 'index'])->middleware('throttle:publico')->name('api.v1.directorio');
     // Documentos legales públicos (aviso de privacidad y términos) para el registro.
-    Route::get('/legales', LegalesPublicoController::class)->middleware('throttle:60,1')->name('api.v1.legales');
+    Route::get('/legales', LegalesPublicoController::class)->middleware('throttle:publico')->name('api.v1.legales');
     // Errores de la web y la app para el monitoreo (ADR 0080): sin sesión, con tope por IP.
     Route::post('/errores', ErroresClienteController::class)->middleware('throttle:30,1,errores-cliente')->name('api.v1.errores');
 
     // Administracion de plataforma (PlatformAdmin): token global, sin tenant. Ve todos
     // los estudios y gestiona credenciales globales (cuenta FacturAPI).
-    Route::prefix('plataforma')->middleware(['plataforma.auth', 'throttle:60,1'])->name('api.v1.plataforma.')->group(function (): void {
+    Route::prefix('plataforma')->middleware(['plataforma.auth', 'throttle:plataforma'])->name('api.v1.plataforma.')->group(function (): void {
         Route::get('/estudios', [PlataformaController::class, 'estudios'])->name('estudios');
         Route::get('/estudios/{estudio}', [PlataformaEstudiosController::class, 'show'])->name('estudios.show');
         Route::post('/estudios/{estudio}/suspender', [PlataformaEstudiosController::class, 'suspender'])->name('estudios.suspender');
@@ -218,31 +218,32 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/confirmar-correo', [AuthTenantController::class, 'confirmarCorreo'])->middleware('throttle:login')->name('confirmar-correo');
 
         // Marca pública (branding): nombre + logo del estudio para la pantalla de
-        // acceso (sin auth). Con throttle para mitigar sondeo de slugs.
-        Route::get('/marca', [MarcaEstudioController::class, 'mostrar'])->middleware('throttle:60,1')->name('marca');
+        // acceso (sin auth). Con límite por negocio e IP; un slug que no existe
+        // responde 404 antes del límite (ADR 0102).
+        Route::get('/marca', [MarcaEstudioController::class, 'mostrar'])->middleware('throttle:negocio-publico')->name('marca');
 
         // Escaparate público (P0 #3): identidad, próximas clases, precios, instructores
         // y ubicación. Sin auth; solo con la página pública abierta. Con throttle.
         // Registro cerrado (ADR 0093): los clientes no crean su cuenta; el negocio los
         // da de alta y los invita. Agendar sin cuenta sigue en /citas.
-        Route::get('/escaparate', EscaparateController::class)->middleware('throttle:60,1')->name('escaparate');
+        Route::get('/escaparate', EscaparateController::class)->middleware('throttle:negocio-publico')->name('escaparate');
 
         // Citas públicas (guest, sin cuenta): opciones (servicios/sucursales/barberos)
         // y disponibilidad para elegir hueco; luego agendar y pagar en línea (el
         // orden_id devuelto es la capacidad para pagar). Solo directorio.
-        Route::get('/citas/opciones', [PublicoCitasController::class, 'opciones'])->middleware('throttle:60,1')->name('citas.opciones');
-        Route::get('/citas/disponibilidad', [PublicoCitasController::class, 'disponibilidad'])->middleware('throttle:60,1')->name('citas.disponibilidad');
-        Route::get('/citas/dias', [PublicoCitasController::class, 'dias'])->middleware('throttle:60,1')->name('citas.dias');
+        Route::get('/citas/opciones', [PublicoCitasController::class, 'opciones'])->middleware('throttle:negocio-publico')->name('citas.opciones');
+        Route::get('/citas/disponibilidad', [PublicoCitasController::class, 'disponibilidad'])->middleware('throttle:negocio-publico')->name('citas.disponibilidad');
+        Route::get('/citas/dias', [PublicoCitasController::class, 'dias'])->middleware('throttle:negocio-publico')->name('citas.dias');
         Route::post('/citas', [PublicoCitasController::class, 'agendar'])->middleware('throttle:login')->name('citas.agendar');
         Route::post('/citas/pagar', [PublicoCitasController::class, 'pagar'])->middleware('throttle:login')->name('citas.pagar');
         // La cita por pagar del enlace del correo de apartado (el ULID de la orden es la capacidad).
-        Route::get('/citas/orden/{orden}', [PublicoCitasController::class, 'orden'])->middleware('throttle:60,1')->name('citas.orden');
+        Route::get('/citas/orden/{orden}', [PublicoCitasController::class, 'orden'])->middleware('throttle:negocio-publico')->name('citas.orden');
 
         // Calendario personal (iCal) que leen Google Calendar, Apple u Outlook con el
         // enlace privado de cada quien (sin sesión).
-        Route::get('/calendario/{token}.ics', [CalendarioTenantController::class, 'feed'])->middleware('throttle:60,1')->name('calendario.feed');
+        Route::get('/calendario/{token}.ics', [CalendarioTenantController::class, 'feed'])->middleware('throttle:calendario')->name('calendario.feed');
         Route::get('/calendario/{token}/{evento}.ics', [CalendarioTenantController::class, 'evento'])
-            ->where('evento', '(reserva|sesion)-[0-9A-Za-z]+')->middleware('throttle:60,1')->name('calendario.evento');
+            ->where('evento', '(reserva|sesion)-[0-9A-Za-z]+')->middleware('throttle:calendario')->name('calendario.evento');
 
         Route::middleware(['estudio.auth', 'throttle:tenant'])->group(function (): void {
             Route::get('/yo', [AuthTenantController::class, 'yo'])->name('yo');
@@ -287,7 +288,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/historial', MiHistorialTenantController::class)->name('mi.historial');
             Route::get('/mi/derechos/{derecho}/movimientos', [MiTenantController::class, 'movimientosDerecho'])->name('mi.derechos.movimientos');
             Route::get('/mi/planes', [MiTenantController::class, 'planes'])->name('mi.planes');
-            Route::get('/mi/clima', [MiTenantController::class, 'clima'])->middleware('throttle:30,1')->name('mi.clima');
+            Route::get('/mi/clima', [MiTenantController::class, 'clima'])->middleware('throttle:clima')->name('mi.clima');
             Route::post('/mi/reservas/{reserva}/aceptar', [MiTenantController::class, 'aceptar'])->name('mi.reservas.aceptar');
             Route::get('/mi/waivers', [MiTenantController::class, 'waiversPendientes'])->name('mi.waivers.index');
             Route::post('/mi/waivers/{waiver}/aceptar', [MiTenantController::class, 'aceptarWaiver'])->name('mi.waivers.aceptar');
@@ -402,7 +403,7 @@ Route::prefix('v1')->group(function (): void {
 
             // El día de hoy para el Inicio del negocio: cada bloque según los permisos.
             Route::get('/inicio/hoy', InicioHoyTenantController::class)->name('inicio.hoy');
-            Route::get('/clima', ClimaEquipoTenantController::class)->middleware('throttle:30,1')->name('clima');
+            Route::get('/clima', ClimaEquipoTenantController::class)->middleware('throttle:clima')->name('clima');
 
             // Facturación SaaS del estudio (control plane; separada de pagos de alumnos).
             Route::get('/facturacion', [FacturacionController::class, 'show'])->middleware('puede:facturacion.ver')->name('facturacion');
@@ -411,14 +412,14 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/avisos-plataforma', [AvisosPlataformaTenantController::class, 'mostrar'])->middleware('puede:facturacion.ver')->name('avisos-plataforma');
             Route::put('/avisos-plataforma', [AvisosPlataformaTenantController::class, 'guardar'])->middleware('puede:facturacion.ver')->name('avisos-plataforma.guardar');
             Route::post('/avisos-plataforma/whatsapp/codigo', [AvisosPlataformaTenantController::class, 'codigo'])
-                ->middleware(['puede:facturacion.ver', 'throttle:5,10,panel-whatsapp-codigo'])->name('avisos-plataforma.codigo');
+                ->middleware(['puede:facturacion.ver', 'throttle:whatsapp-panel-codigo'])->name('avisos-plataforma.codigo');
             Route::post('/avisos-plataforma/whatsapp/verificar', [AvisosPlataformaTenantController::class, 'verificar'])
-                ->middleware(['puede:facturacion.ver', 'throttle:20,10,panel-whatsapp-verificar'])->name('avisos-plataforma.verificar');
+                ->middleware(['puede:facturacion.ver', 'throttle:whatsapp-panel-verificar'])->name('avisos-plataforma.verificar');
             // Cambiar el WhatsApp del negocio: con código al número nuevo si hay WhatsApp con los dueños (ADR 0075).
             Route::post('/avisos-plataforma/whatsapp/cambio/codigo', [AvisosPlataformaTenantController::class, 'codigoCambio'])
-                ->middleware(['puede:estudio.gestionar', 'throttle:5,10,panel-whatsapp-cambio-codigo'])->name('avisos-plataforma.cambio.codigo');
+                ->middleware(['puede:estudio.gestionar', 'throttle:whatsapp-panel-codigo'])->name('avisos-plataforma.cambio.codigo');
             Route::put('/avisos-plataforma/whatsapp', [AvisosPlataformaTenantController::class, 'cambiar'])
-                ->middleware(['puede:estudio.gestionar', 'throttle:20,10,panel-whatsapp-cambio'])->name('avisos-plataforma.cambio');
+                ->middleware(['puede:estudio.gestionar', 'throttle:whatsapp-panel-verificar'])->name('avisos-plataforma.cambio');
             // Transparencia del cobro: a quién se contó en el periodo (alumnos o profesionales).
             Route::get('/renta/quien-cuenta', [FacturacionController::class, 'quienCuenta'])->middleware('puede:facturacion.ver')->name('renta.quien-cuenta');
             // Pago de la renta del SaaS con la pasarela de la plataforma (async -> pendiente

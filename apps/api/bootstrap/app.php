@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Http\Middleware\AutenticarTenant;
 use App\Modules\Tenancy\Http\Middleware\PermisoTenant;
 use App\Modules\Tenancy\Http\Middleware\ResolverEstudio;
 use App\Support\Http\ApiExceptionRenderer;
+use App\Support\ReporteDeErrores;
 use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Contracts\Session\Middleware\AuthenticatesSessions;
@@ -54,13 +55,20 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Resolve the tenant (and its query scope) BEFORE route-model binding,
         // so every bound tenant-owned model is filtered to the active tenant.
+        // La autenticación propia (negocio, sesión y llave de API) va ANTES del límite
+        // de peticiones: así el límite cuenta por usuario de cada negocio y no por IP
+        // (toda una red detrás de una IP compartiría el cupo). AutenticarPlataforma se
+        // queda DESPUÉS a propósito: su límite es por IP y frena a quien adivina el token.
         $middleware->priority([
             HandlePrecognitiveRequests::class,
             EncryptCookies::class,
             AddQueuedCookiesToResponse::class,
             StartSession::class,
             ShareErrorsFromSession::class,
+            ResolverEstudio::class,
             AuthenticatesRequests::class,
+            AutenticarTenant::class,
+            AutenticarLlaveApi::class,
             ThrottleRequests::class,
             ThrottleRequestsWithRedis::class,
             AuthenticatesSessions::class,
@@ -71,6 +79,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         // Stable machine-readable JSON error contract for /api/* (see docs/API.md).
         $exceptions->render(new ApiExceptionRenderer);
+        // Las reglas del negocio que la API responde con un 4xx y su código (enlace
+        // vencido, cupo lleno, saldo insuficiente…) no son fallas: no van al log ni al
+        // monitoreo ni alertan al superadmin. Las que se responden con 5xx (la pasarela
+        // no contestó) y todo lo inesperado se siguen reportando. Lo que se atrapa en
+        // segundo plano usa ReporteDeErrores::reportarAtrapado() y sí se reporta.
+        $exceptions->dontReportWhen(ReporteDeErrores::esReglaDelNegocio(...));
         // Todo lo que se reporta queda en el monitoreo de errores con su traza y
         // contexto, y llega al superadmin como alerta si no lo ignoró (ADR 0080); el
         // registro normal en el log sigue igual.

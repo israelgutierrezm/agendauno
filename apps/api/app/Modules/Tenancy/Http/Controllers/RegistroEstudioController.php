@@ -38,7 +38,9 @@ class RegistroEstudioController
     public function disponibilidad(Request $request): JsonResponse
     {
         $slug = Str::slug((string) $request->query('slug', ''));
-        $disponible = $slug !== '' && ! Estudio::query()->where('slug', $slug)->exists();
+        // Uno más largo de lo que acepta el registro tampoco está disponible.
+        $disponible = $slug !== '' && strlen($slug) <= RegistrarEstudio::LARGO_MAXIMO_SLUG
+            && ! Estudio::query()->where('slug', $slug)->exists();
 
         return response()->json(['data' => ['slug' => $slug, 'disponible' => $disponible]]);
     }

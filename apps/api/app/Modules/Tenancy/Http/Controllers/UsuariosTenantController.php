@@ -198,7 +198,9 @@ class UsuariosTenantController
     }
 
     /**
-     * Baja lógica de un usuario del equipo: pierde el acceso (sesiones cerradas).
+     * Baja lógica de un usuario del equipo: pierde el acceso (sesiones cerradas). A
+     * un dueño solo lo da de baja un dueño, y a nadie con permisos que el actor no
+     * tiene ({@see BajasTenant::exigirQueLeAlcance()}).
      */
     public function darDeBaja(Request $request): JsonResponse
     {
@@ -211,13 +213,19 @@ class UsuariosTenantController
     }
 
     /**
-     * Reactiva a un usuario dado de baja con sus roles de antes.
+     * Reactiva a un usuario dado de baja con sus roles de antes: solo si a quien lo
+     * hace le alcanza (un dueño lo reactiva un dueño; nadie devuelve permisos que no
+     * tiene).
      */
     public function reactivar(Request $request): JsonResponse
     {
         $usuario = Usuario::withTrashed()->where('ulid', (string) $request->route('usuario'))->firstOrFail();
 
-        $this->bajas->reactivarUsuario($usuario, $this->actor($request));
+        $actor = $this->actor($request);
+        if ($usuario->trashed()) {
+            $this->bajas->exigirQueLeAlcance($usuario, $actor);
+        }
+        $this->bajas->reactivarUsuario($usuario, $actor);
 
         return response()->json(['data' => $this->presentar($usuario->refresh())]);
     }

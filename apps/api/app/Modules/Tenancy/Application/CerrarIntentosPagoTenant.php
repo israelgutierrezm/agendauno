@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pasarelas\PasarelaCancelable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
+use App\Support\ReporteDeErrores;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -48,7 +49,7 @@ class CerrarIntentosPagoTenant
             }
         } catch (Throwable $e) {
             // La pasarela no respondió: si llega a cobrarse, se atiende como pago tardío.
-            report($e);
+            ReporteDeErrores::reportarAtrapado($e);
         }
 
         PagoTenant::query()->whereKey($pago->getKey())

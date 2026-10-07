@@ -46,7 +46,7 @@ class AutenticacionTenant
      * Resuelve el usuario tenant-local a partir de un token en claro, o null. El
      * usuario queda trabajando con el rol de esa sesión.
      */
-    public function resolver(string $valor): ?Usuario
+    public function resolver(#[\SensitiveParameter] string $valor): ?Usuario
     {
         $token = $this->token($valor);
         if ($token === null) {
@@ -68,7 +68,7 @@ class AutenticacionTenant
      * Cambia el rol de la sesión de este token (solo a uno que la persona tiene) y lo
      * recuerda como el de la última vez. Devuelve false si no se pudo.
      */
-    public function cambiarRol(string $valor, Usuario $usuario, string $rol): bool
+    public function cambiarRol(#[\SensitiveParameter] string $valor, Usuario $usuario, string $rol): bool
     {
         if (! in_array($rol, $usuario->rolesEfectivos(), true)) {
             return false;

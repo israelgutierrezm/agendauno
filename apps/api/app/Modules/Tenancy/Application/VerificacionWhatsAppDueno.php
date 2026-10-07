@@ -94,7 +94,7 @@ class VerificacionWhatsAppDueno
     /**
      * Confirma el código del último envío a ese número y devuelve el comprobante.
      */
-    public function verificar(string $telefono, string $codigo): string
+    public function verificar(string $telefono, #[\SensitiveParameter] string $codigo): string
     {
         // El rechazo se lanza fuera de la transacción: un intento fallido cuenta.
         $resultado = DB::transaction(function () use ($telefono, $codigo): string|ValidationException {

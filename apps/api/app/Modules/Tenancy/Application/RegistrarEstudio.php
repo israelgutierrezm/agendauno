@@ -17,10 +17,20 @@ use Illuminate\Support\Str;
  * con el mismo slug no pueden coexistir; el perdedor recibe SLUG_TAKEN. No crea
  * la BD del tenant (eso lo hace {@see AprovisionarEstudio}).
  *
+ * Largos: el slug mide a lo más {@see LARGO_MAXIMO_SLUG} (también con su sufijo) y
+ * el nombre de la base en MySQL nunca pasa de los 64 caracteres que admite: con un
+ * nombre de negocio largo, el slug automático se recorta.
+ *
  * @phpstan-type DatosRegistro array{nombre: string, slug: string, perfil_negocio?: string|null, contacto_nombre: string, contacto_segundo_nombre?: string|null, contacto_primer_apellido?: string|null, contacto_segundo_apellido?: string|null, contacto_email: string, contacto_whatsapp_pais?: string|null, contacto_telefono?: string|null, pais?: string|null, ciudad?: string|null, zona_horaria?: string|null}
  */
 class RegistrarEstudio
 {
+    /** Largo máximo del slug: el manual se valida con él y el automático se recorta. */
+    public const LARGO_MAXIMO_SLUG = 40;
+
+    /** MySQL no admite nombres de base de más de 64 caracteres. */
+    private const LARGO_MAXIMO_BASE = 64;
+
     /**
      * @param  DatosRegistro  $datos
      */
@@ -39,7 +49,9 @@ class RegistrarEstudio
             // Carrera concurrente sobre un slug autogenerado: reintenta con un sufijo
             // aleatorio (el registrante no lo eligió, no debe ver un error de "ocupado").
             if ($autogenerado) {
-                return $this->crear($datos, $slug.'-'.Str::lower(Str::random(4)));
+                $sufijo = '-'.Str::lower(Str::random(4));
+
+                return $this->crear($datos, self::recortar($slug, self::LARGO_MAXIMO_SLUG - strlen($sufijo)).$sufijo);
             }
 
             throw new SlugNoDisponible('El slug ya está en uso.');
@@ -47,12 +59,13 @@ class RegistrarEstudio
     }
 
     /**
-     * Deriva un slug único desde el nombre del estudio. En colisión agrega un sufijo
-     * numérico; el índice único de `estudios.slug` cierra la carrera concurrente.
+     * Deriva un slug único desde el nombre del estudio, recortado a
+     * {@see LARGO_MAXIMO_SLUG}. En colisión agrega un sufijo numérico (recorta la base
+     * para que quepa); el índice único de `estudios.slug` cierra la carrera concurrente.
      */
     private function generarSlugUnico(string $nombre): string
     {
-        $base = Str::slug($nombre);
+        $base = self::recortar(Str::slug($nombre), self::LARGO_MAXIMO_SLUG);
         if ($base === '') {
             $base = 'estudio';
         }
@@ -61,10 +74,31 @@ class RegistrarEstudio
         $intento = 1;
         while (Estudio::query()->where('slug', $candidato)->exists()) {
             $intento++;
-            $candidato = $base.'-'.$intento;
+            $sufijo = '-'.$intento;
+            $candidato = self::recortar($base, self::LARGO_MAXIMO_SLUG - strlen($sufijo)).$sufijo;
         }
 
         return $candidato;
+    }
+
+    /** Los primeros `$largo` caracteres, sin guion (ni guion bajo) al final. */
+    private static function recortar(string $slug, int $largo): string
+    {
+        return rtrim(substr($slug, 0, max(0, $largo)), '-_');
+    }
+
+    /**
+     * Nombre de la base en MySQL: `tenant_`, el slug (recortado si hace falta) y un
+     * sufijo aleatorio. Mide a lo más {@see LARGO_MAXIMO_BASE} venga de donde venga
+     * el slug (registro, demos, verificación de concurrencia).
+     */
+    private static function nombreDeBase(string $slug): string
+    {
+        $prefijo = 'tenant_';
+        $sufijo = '_'.Str::lower(Str::random(8));
+        $parte = self::recortar(str_replace('-', '_', $slug), self::LARGO_MAXIMO_BASE - strlen($prefijo) - strlen($sufijo));
+
+        return $prefijo.($parte === '' ? 'estudio' : $parte).$sufijo;
     }
 
     /**
@@ -76,7 +110,7 @@ class RegistrarEstudio
 
         $dbDatabase = $driver === 'sqlite'
             ? $slug.'_'.Str::lower(Str::random(8)).'.sqlite'
-            : 'tenant_'.str_replace('-', '_', $slug).'_'.Str::lower(Str::random(8));
+            : self::nombreDeBase($slug);
 
         return Estudio::create([
             'nombre' => $datos['nombre'],

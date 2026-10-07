@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Pasarelas\PasarelaConSuscripcion;
 use App\Modules\Tenancy\Pasarelas\PasarelaDomiciliable;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\Pasarelas\TarjetaGuardada;
+use App\Support\ReporteDeErrores;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -291,7 +292,7 @@ class DomiciliacionesTenant
             try {
                 $pasarela->cancelarSuscripcion($domiciliacion, $this->registro->llaves($domiciliacion->proveedor));
             } catch (Throwable $e) {
-                report($e);
+                ReporteDeErrores::reportarAtrapado($e);
             }
 
             return;
@@ -398,7 +399,7 @@ class DomiciliacionesTenant
                 $pasarela->olvidarTarjeta($metodo, $this->registro->llaves($proveedor));
             }
         } catch (Throwable $e) {
-            report($e);
+            ReporteDeErrores::reportarAtrapado($e);
         }
     }
 

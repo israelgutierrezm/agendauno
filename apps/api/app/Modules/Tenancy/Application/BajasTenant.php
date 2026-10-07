@@ -39,6 +39,7 @@ class BajasTenant
         private readonly DomiciliacionesTenant $domiciliaciones,
         private readonly RegistrarAuditoria $auditoria,
         private readonly DeudaDeRenovacionTenant $deudas,
+        private readonly RolesTenant $roles,
     ) {}
 
     /**
@@ -127,7 +128,8 @@ class BajasTenant
 
     /**
      * Da de baja a un usuario del equipo: pierde el acceso (sesiones cerradas). No
-     * puede darse de baja a sí mismo ni dejar al negocio sin dueño.
+     * puede darse de baja a sí mismo ni dejar al negocio sin dueño, y debe alcanzarle
+     * ({@see exigirQueLeAlcance()}).
      */
     public function darDeBajaUsuario(Usuario $usuario, Usuario $actor, ?string $motivo): void
     {
@@ -137,6 +139,7 @@ class BajasTenant
         if ((int) $usuario->getKey() === (int) $actor->getKey()) {
             throw new BajaNoPermitida('No puedes darte de baja a ti mismo.');
         }
+        $this->exigirQueLeAlcance($usuario, $actor);
         if ($usuario->tieneRol('propietario') && $this->duenos() <= 1) {
             throw new BajaNoPermitida('El negocio debe quedarse con al menos un dueño.');
         }
@@ -155,7 +158,27 @@ class BajasTenant
     }
 
     /**
-     * Reactiva a un usuario del equipo con sus roles de antes.
+     * Nadie da de baja ni reactiva a alguien del equipo por encima de él (ADR 0057),
+     * igual que al cambiar roles: a un dueño solo lo toca quien actúa como dueño (su
+     * rol activo), y los permisos de los roles de la persona deben caber en los del
+     * rol activo de quien actúa.
+     */
+    public function exigirQueLeAlcance(Usuario $usuario, Usuario $actor): void
+    {
+        if ($usuario->tieneRol('propietario') && ! $actor->actuaComo('propietario')) {
+            throw new BajaNoPermitida('Solo un dueño puede dar de baja o reactivar a otro dueño.');
+        }
+        $propios = $this->roles->permisosDe($actor->rolesVigentes());
+        if (! RolesTenant::cabenEn($this->roles->permisosDe($usuario->rolesEfectivos()), $propios)) {
+            throw new BajaNoPermitida('No puedes dar de baja ni reactivar a alguien con permisos que tú no tienes.');
+        }
+    }
+
+    /**
+     * Reactiva a un usuario del equipo con sus roles de antes. Quien lo reactiva así
+     * debe alcanzarle: el controlador lo exige antes con {@see exigirQueLeAlcance()}.
+     * Al invitarlo de nuevo no hace falta: vuelve con el rol de la invitación (que se
+     * revisa allá), no con los de antes.
      */
     public function reactivarUsuario(Usuario $usuario, ?Usuario $actor, ?string $motivo = null): void
     {

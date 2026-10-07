@@ -100,7 +100,7 @@ class ClienteWhatsApp
      * Guarda la configuración. Un token o App Secret vacío conserva el que ya
      * estaba. El token de verificación del webhook se genera una vez.
      */
-    public function guardar(bool $negocios, bool $duenos, string $phoneNumberId, ?string $token, ?string $appSecret = null): void
+    public function guardar(bool $negocios, bool $duenos, string $phoneNumberId, #[\SensitiveParameter] ?string $token, #[\SensitiveParameter] ?string $appSecret = null): void
     {
         $actual = $this->config();
         $conservar = static fn (?string $nuevo, string $anterior): string => is_string($nuevo) && trim($nuevo) !== '' ? trim($nuevo) : $anterior;

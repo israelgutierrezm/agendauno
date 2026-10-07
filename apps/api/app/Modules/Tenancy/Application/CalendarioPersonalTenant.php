@@ -48,7 +48,7 @@ class CalendarioPersonalTenant
         return rtrim((string) config('app.url'), '/').'/api/v1/app/'.$estudio->slug.'/calendario/'.$token.'.ics';
     }
 
-    public function usuarioDe(string $token): ?Usuario
+    public function usuarioDe(#[\SensitiveParameter] string $token): ?Usuario
     {
         if ($token === '') {
             return null;

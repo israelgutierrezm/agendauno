@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Parametros;
 
+use App\Modules\Platform\Operacion\LimpiezaDeAltasSinActivar;
+
 /**
  * Todos los límites y datos de negocio que se pueden configurar (ADR 0042). Nada de
  * esto vive fijo en el código: el valor que aplica sale del negocio, si lo ajustó; si
@@ -132,6 +134,11 @@ final class CatalogoParametros
                 'Horas.', $e, 24, 1, 168, 'h', porNegocio: false),
             new DefinicionParametro('cuentas.minutos_restablecer_contrasena', 'Cuentas', 'Vigencia del enlace para restablecer la contraseña',
                 'Minutos.', $e, 60, 10, 1440, 'min', porNegocio: false),
+
+            // Registro público: las altas que nadie activa se borran (ADR 0102, solo la
+            // plataforma). Al menos 3 días: el correo de activación puede leerse tarde.
+            new DefinicionParametro(LimpiezaDeAltasSinActivar::CLAVE_DIAS, 'Cuentas', 'Días para activar un negocio recién registrado',
+                'Si el dueño no activa su cuenta en este plazo y el negocio no tiene nada, se borra y su nombre queda libre.', $e, 14, 3, 365, 'días', porNegocio: false),
 
             // Suspensión automática por renta vencida (ADR 0073, solo la plataforma).
             new DefinicionParametro('renta.dias_gracia_suspension', 'Renta', 'Días de gracia antes de suspender por renta vencida',

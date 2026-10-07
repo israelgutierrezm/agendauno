@@ -80,11 +80,6 @@ return [
     ],
 
     /*
-    | Respaldos de la base de cada negocio (agendauno:respaldar-estudios, diario).
-    | En producción conviene un disco S3 (otro lugar que el servidor). Se conservan
-    | `dias` días. En MySQL usa los binarios mysqldump/mysql del servidor.
-    */
-    /*
     | Alertas de la plataforma: a quién se avisa (por correo, agrupado) cuando fallan
     | pagos, correos, respaldos o la cola. Sin correo no se avisa a nadie (y la
     | verificación de producción lo marca como pendiente).
@@ -102,12 +97,30 @@ return [
         'mapas_web' => env('MAPAS_WEB_DIR', storage_path('app/mapas-web')),
     ],
 
+    /*
+    | Respaldos de la base de cada negocio y de la plataforma (diarios). En
+    | producción conviene un disco S3 (otro lugar que el servidor). Se conservan
+    | `dias` días. En MySQL usa los binarios mysqldump/mysql del servidor.
+    |
+    | `tls`: cómo se conectan esos binarios. La imagen trae el cliente de MariaDB,
+    | que desde la 11.4 cifra y verifica el certificado del servidor por omisión.
+    | `ca`: la CA con que se verifica (vacía: la de la conexión de PHP,
+    | MYSQL_ATTR_SSL_CA). `verificar` en false acepta el certificado autofirmado de
+    | un MySQL 8 en la red privada (la conexión sigue cifrada). `opciones`: otras
+    | opciones para mysqldump y mysql, separadas por espacios (p. ej.
+    | `--ssl-mode=REQUIRED` con el cliente de Oracle MySQL).
+    */
     'respaldos' => [
         'disco' => env('RESPALDOS_DISCO', 'local'),
         'carpeta' => env('RESPALDOS_CARPETA', 'respaldos'),
         'dias' => (int) env('RESPALDOS_DIAS', 14),
         'mysqldump' => env('RESPALDOS_MYSQLDUMP', 'mysqldump'),
         'mysql' => env('RESPALDOS_MYSQL', 'mysql'),
+        'tls' => [
+            'ca' => env('RESPALDOS_MYSQL_SSL_CA'),
+            'verificar' => (bool) env('RESPALDOS_MYSQL_SSL_VERIFICAR', true),
+        ],
+        'opciones' => env('RESPALDOS_MYSQL_OPCIONES', ''),
     ],
 
     /*

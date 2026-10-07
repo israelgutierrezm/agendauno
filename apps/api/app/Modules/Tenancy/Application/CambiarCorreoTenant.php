@@ -49,7 +49,7 @@ class CambiarCorreoTenant
     /**
      * Aplica el correo nuevo si el enlace es válido y vigente.
      */
-    public function confirmar(Estudio $estudio, string $token): Usuario
+    public function confirmar(Estudio $estudio, #[\SensitiveParameter] string $token): Usuario
     {
         $usuario = Usuario::query()->where('email_nuevo_token', hash('sha256', $token))->first();
 
