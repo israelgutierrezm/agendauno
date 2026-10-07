@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\CatalogoPaises;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\Exceptions\SlugNoDisponible;
@@ -111,6 +112,8 @@ class RegistrarEstudio
         $dbDatabase = $driver === 'sqlite'
             ? $slug.'_'.Str::lower(Str::random(8)).'.sqlite'
             : self::nombreDeBase($slug);
+        // Todo negocio tiene país (ADR 0103): México si no se dice otro.
+        $pais = CatalogoPaises::codigo($datos['pais'] ?? null) ?: CatalogoPaises::PREDETERMINADO;
 
         return Estudio::create([
             'nombre' => $datos['nombre'],
@@ -127,9 +130,10 @@ class RegistrarEstudio
             'contacto_primer_apellido' => $datos['contacto_primer_apellido'] ?? null,
             'contacto_segundo_apellido' => $datos['contacto_segundo_apellido'] ?? null,
             'contacto_email' => $datos['contacto_email'],
-            'contacto_whatsapp_pais' => $datos['contacto_whatsapp_pais'] ?? '52',
+            // La lada del dueño: la que eligió o, si no, la de su país.
+            'contacto_whatsapp_pais' => $datos['contacto_whatsapp_pais'] ?? CatalogoPaises::lada($pais) ?? '52',
             'contacto_telefono' => $datos['contacto_telefono'] ?? null,
-            'pais' => $datos['pais'] ?? null,
+            'pais' => $pais,
             'ciudad' => $datos['ciudad'] ?? null,
             'zona_horaria' => $datos['zona_horaria'] ?? 'America/Mexico_City',
             'db_driver' => $driver,

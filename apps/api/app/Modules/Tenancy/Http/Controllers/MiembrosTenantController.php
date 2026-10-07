@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcanceClientesTenant;
 use App\Modules\Tenancy\Application\BajasTenant;
+use App\Modules\Tenancy\Application\CelularesTenant;
 use App\Modules\Tenancy\Application\MedirUsoSaas;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
@@ -54,6 +55,7 @@ class MiembrosTenantController
         private readonly ResumenMembresiasTenant $membresias,
         private readonly WhatsAppTenant $whatsapp,
         private readonly AlcanceClientesTenant $alcance,
+        private readonly CelularesTenant $celulares,
     ) {}
 
     /**
@@ -401,16 +403,18 @@ class MiembrosTenantController
 
         // Con el celular no se reactiva sola (los números cambian de dueño): el negocio
         // decide si la reactiva o si es otra persona (entonces el número se le quita).
+        // Se compara como número: el «55 1234 5678» de antes es el «+52 5512345678» de hoy.
         $celular = $request->validated('celular');
         $conCelular = is_string($celular) && $celular !== ''
-            ? PersonaTenant::onlyTrashed()->where('celular', $celular)->first()
+            ? $this->celulares->dadaDeBaja($celular)
             : null;
         if ($conCelular instanceof PersonaTenant) {
             if (! $request->boolean('liberar_celular')) {
                 throw new PersonaDadaDeBaja($conCelular);
             }
+            $anterior = $conCelular->celular;
             $conCelular->forceFill(['celular' => null])->save();
-            $this->auditoria->registrar($actor, 'miembro.celular_liberado', 'persona', (string) $conCelular->ulid, ['celular' => $celular], ['celular' => null], 'El número es de otra persona.');
+            $this->auditoria->registrar($actor, 'miembro.celular_liberado', 'persona', (string) $conCelular->ulid, ['celular' => $anterior], ['celular' => null], 'El número es de otra persona.');
         }
 
         $persona = PersonaTenant::query()->create([
@@ -535,9 +539,10 @@ class MiembrosTenantController
             'segundo_nombre' => ['nullable', 'string', 'max:255'],
             'primer_apellido' => ['nullable', 'string', 'max:255'],
             'segundo_apellido' => ['nullable', 'string', 'max:255'],
-            // Correo y teléfono únicos en el estudio (ignorando a la propia persona).
+            // Correo y teléfono únicos en el estudio (ignorando a la propia persona); el
+            // teléfono, comparado como número.
             'email' => ['nullable', 'email', 'max:255', Rule::unique(PersonaTenant::class, 'email')->ignore($persona->getKey())],
-            'celular' => ['nullable', 'string', 'max:40', Rule::unique(PersonaTenant::class, 'celular')->ignore($persona->getKey())],
+            'celular' => ['nullable', 'string', 'max:40', $this->celulares->reglaUnico(CrearMiembroRequest::CELULAR_REPETIDO, (int) $persona->getKey(), conBajas: true)],
             'sucursal_id' => ['nullable', 'string'],
             'activo' => ['sometimes', 'boolean'],
             'es_facturable' => ['sometimes', 'boolean'],
@@ -547,7 +552,6 @@ class MiembrosTenantController
             ...DatosPersonales::reglas(),
         ], [
             'email.unique' => 'Ya existe una persona con ese correo en este estudio.',
-            'celular.unique' => 'Ya existe una persona con ese teléfono en este estudio.',
             ...DatosPersonales::mensajes(),
         ]);
 

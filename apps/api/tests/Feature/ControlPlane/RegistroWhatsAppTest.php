@@ -77,7 +77,7 @@ function registrarConWhatsApp(string $slug, ?string $comprobante, string $telefo
         'contacto_email' => $slug.'@correo.mx',
         'contacto_whatsapp_pais' => '52', 'contacto_telefono' => $telefono,
         'whatsapp_verificacion' => $comprobante,
-        'acepta_terminos' => true,
+        'pais' => 'MX', 'acepta_terminos' => true,
     ]);
 }
 

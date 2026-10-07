@@ -1,6 +1,8 @@
 # ADR 0067 — Más datos del cliente al agendar
 
-Estado: Aceptado (2026-09-29).
+Estado: Aceptado (2026-09-29). Reemplazado en parte por el ADR 0103 (2026-10-07): la
+lada inicial sale del país del negocio (no `+52`) y el celular también puede llegar con
+«+».
 
 ## Contexto
 

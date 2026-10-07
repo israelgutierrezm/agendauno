@@ -42,6 +42,7 @@ function estudioConSesion(string $slug, string $email): array
         'contacto_primer_apellido' => 'Demo',
         'contacto_email' => $email,
         'contacto_telefono' => '5512345678',
+        'pais' => 'MX',
         'acepta_terminos' => true,
     ])->assertCreated();
 

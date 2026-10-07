@@ -52,7 +52,8 @@ return [
     /*
     | WhatsApp (Meta Cloud API, ADR 0069): el superadministrador lo enciende y carga el
     | número y el token desde su panel (se guardan cifrados en la BD). Aquí solo la
-    | versión de la Graph API y la lada que se asume cuando un celular no la trae.
+    | versión de la Graph API y la lada de último respaldo: un celular sin lada se
+    | completa con la del país del negocio (ADR 0103); esta, solo si no hay otra.
     */
     'whatsapp' => [
         'version' => env('WHATSAPP_GRAPH_VERSION', 'v23.0'),

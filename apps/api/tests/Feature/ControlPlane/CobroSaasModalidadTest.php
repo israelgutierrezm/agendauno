@@ -198,7 +198,7 @@ it('los negocios nuevos reciben 30 días de prueba en ambas modalidades', functi
     $this->postJson('/api/v1/registro', [
         'nombre' => 'Barbería B', 'slug' => 'barberia-b', 'perfil_negocio' => 'barberia',
         'contacto_nombre' => 'Dueño', 'contacto_primer_apellido' => 'Demo', 'contacto_email' => 'b@barberia.mx', 'contacto_telefono' => '5512345679',
-        'acepta_terminos' => true,
+        'pais' => 'MX', 'acepta_terminos' => true,
     ])->assertCreated();
 
     $hoy = now()->startOfDay();

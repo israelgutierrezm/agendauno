@@ -51,7 +51,7 @@ class VerificacionWhatsAppDueno
      */
     public static function telefono(string $lada, string $numero): ?string
     {
-        return TelefonoWhatsApp::normalizar('+'.$lada.' '.$numero);
+        return TelefonoWhatsApp::normalizar('+'.$lada.' '.$numero, $lada);
     }
 
     public function enviarCodigo(string $telefono, ?string $ip): void

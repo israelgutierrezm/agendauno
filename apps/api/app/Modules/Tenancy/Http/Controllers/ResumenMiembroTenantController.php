@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcanceClientesTenant;
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Application\ResumenMembresiasTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
@@ -38,6 +39,7 @@ class ResumenMiembroTenantController
         private readonly AlcanceClientesTenant $alcance,
         private readonly ResumenMembresiasTenant $membresias,
         private readonly WhatsAppTenant $whatsapp,
+        private readonly RegionNegocioTenant $region,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -131,7 +133,7 @@ class ResumenMiembroTenantController
             'whatsapp' => [
                 'disponible' => $this->whatsapp->enUso(),
                 'acepta' => $persona->whatsapp_aceptado_en !== null,
-                'con_celular' => TelefonoWhatsApp::normalizar($persona->celular) !== null,
+                'con_celular' => TelefonoWhatsApp::normalizar($persona->celular, $this->region->lada()) !== null,
             ],
             'tipo' => $persona->tipo->value,
             'activo' => $persona->activo,

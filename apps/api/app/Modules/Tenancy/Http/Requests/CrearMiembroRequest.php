@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Requests;
 
+use App\Modules\Tenancy\Application\CelularesTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class CrearMiembroRequest extends FormRequest
 {
+    public const CELULAR_REPETIDO = 'Ya existe una persona con ese teléfono en este estudio.';
+
     public function authorize(): bool
     {
         return true;
@@ -40,7 +43,8 @@ class CrearMiembroRequest extends FormRequest
             // Correo y teléfono son datos primarios: únicos dentro del estudio (tenant).
             // Si son de alguien dado de baja, el alta lo resuelve (reactiva o pregunta).
             'email' => ['nullable', 'email', 'max:255', Rule::unique(PersonaTenant::class, 'email')->whereNull('deleted_at')],
-            'celular' => ['nullable', 'string', 'max:40', Rule::unique(PersonaTenant::class, 'celular')->whereNull('deleted_at')],
+            // El celular se compara como número: «+52 5512345678» es el «55 1234 5678» de antes.
+            'celular' => ['nullable', 'string', 'max:40', app(CelularesTenant::class)->reglaUnico(self::CELULAR_REPETIDO)],
             // El celular es de alguien dado de baja pero es otra persona: se le quita.
             'liberar_celular' => ['sometimes', 'boolean'],
             // El cliente pidió los avisos por WhatsApp (ADR 0069).
@@ -60,7 +64,6 @@ class CrearMiembroRequest extends FormRequest
     {
         return [
             'email.unique' => 'Ya existe una persona con ese correo en este estudio.',
-            'celular.unique' => 'Ya existe una persona con ese teléfono en este estudio.',
             ...DatosPersonales::mensajes(),
         ];
     }

@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\BajaDePersonaTenant;
 use App\Modules\Tenancy\Application\ExportarDatosPersonaTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
@@ -36,6 +37,7 @@ class MiPrivacidadTenantController
         private readonly BajaDePersonaTenant $baja,
         private readonly WhatsAppTenant $whatsapp,
         private readonly RegistrarAuditoria $auditoria,
+        private readonly RegionNegocioTenant $region,
     ) {}
 
     public function mostrar(Request $request): JsonResponse
@@ -97,7 +99,7 @@ class MiPrivacidadTenantController
             'whatsapp_disponible' => $this->whatsapp->enUso(),
             'acepta_whatsapp' => $persona->whatsapp_aceptado_en !== null,
             // Sin un celular válido no hay a dónde mandarlos.
-            'whatsapp_con_celular' => TelefonoWhatsApp::normalizar($persona->celular) !== null,
+            'whatsapp_con_celular' => TelefonoWhatsApp::normalizar($persona->celular, $this->region->lada()) !== null,
             'baja' => $solicitud instanceof SolicitudPrivacidadTenant ? [
                 'estado' => $solicitud->estado,
                 'solicitada_en' => $solicitud->created_at?->toIso8601String(),

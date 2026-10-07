@@ -1,6 +1,7 @@
 # ADR 0069 — Avisos por WhatsApp (Meta Cloud API)
 
-Estado: Aceptado (2026-09-29).
+Estado: Aceptado (2026-09-29). Reemplazado en parte por el ADR 0103 (2026-10-07): sin
+lada se asume la del país del negocio (la del dueño, para sus avisos), no la de México.
 
 ## Contexto
 

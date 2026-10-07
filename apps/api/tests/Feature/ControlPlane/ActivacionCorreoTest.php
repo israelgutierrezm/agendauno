@@ -28,7 +28,7 @@ function registrarEstudioCrudo(string $slug, string $email): string
         'contacto_primer_apellido' => 'Demo',
         'contacto_email' => $email,
         'contacto_telefono' => '5512345678',
-        'acepta_terminos' => true,
+        'pais' => 'MX', 'acepta_terminos' => true,
     ])->assertCreated()->json('data.estudio.slug');
 }
 

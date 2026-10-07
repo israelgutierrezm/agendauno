@@ -85,7 +85,7 @@ it('el registro deja constancia de las versiones aceptadas y pide revisarlas si 
 
     $registro = fn (array $extra): TestResponse => $this->postJson('/api/v1/registro', [
         'nombre' => 'Estudio A', 'slug' => 'estudio-a', 'contacto_nombre' => 'Ana', 'contacto_primer_apellido' => 'Ruiz',
-        'contacto_email' => 'ana@correo.mx', 'contacto_telefono' => '5512345678', 'acepta_terminos' => true, ...$extra,
+        'contacto_email' => 'ana@correo.mx', 'contacto_telefono' => '5512345678', 'pais' => 'MX', 'acepta_terminos' => true, ...$extra,
     ]);
 
     // Leyó los términos v1, pero ya hay v2.
@@ -103,6 +103,6 @@ it('en producción no se registra nadie sin aviso y términos publicados', funct
 
     $this->postJson('/api/v1/registro', [
         'nombre' => 'Estudio A', 'slug' => 'estudio-a', 'contacto_nombre' => 'Ana', 'contacto_primer_apellido' => 'Ruiz',
-        'contacto_email' => 'ana@correo.mx', 'contacto_telefono' => '5512345678', 'acepta_terminos' => true,
+        'contacto_email' => 'ana@correo.mx', 'contacto_telefono' => '5512345678', 'pais' => 'MX', 'acepta_terminos' => true,
     ])->assertUnprocessable()->assertJsonValidationErrors(['acepta_terminos'], 'meta.errors');
 });

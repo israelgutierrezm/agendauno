@@ -281,6 +281,9 @@ class AuthTenantController
             // línea y (en México) factura.
             'moneda' => app(ParametrosTenant::class)->moneda(),
             'zona_horaria' => app(FechasNegocioTenant::class)->zona(),
+            // Su país y su lada (ADR 0103): la de los celulares que se capturan sin «+».
+            'pais' => app(RegionNegocioTenant::class)->pais(),
+            'lada' => app(RegionNegocioTenant::class)->lada(),
             'cobra_en_linea_posible' => app(RegionNegocioTenant::class)->enPesos(),
             'factura_posible' => app(RegionNegocioTenant::class)->factura(),
             // ¿La plataforma ya factura? En producción, solo con la llave de FacturAPI.

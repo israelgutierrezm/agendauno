@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\CatalogoPaises;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\ArticuloTenant;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
@@ -25,6 +26,9 @@ use Illuminate\Validation\ValidationException;
  * si no elige otra) y su zona horaria (la de la Ciudad de México si no elige otra).
  * Las pasarelas de pago en línea y la facturación a sus clientes solo funcionan en
  * pesos mexicanos; la facturación, además, solo para negocios en México.
+ *
+ * Y su país (ADR 0103, ISO 3166-1 alfa-2): de él sale la lada con que se completan los
+ * celulares capturados sin «+».
  */
 class RegionNegocioTenant
 {
@@ -66,12 +70,25 @@ class RegionNegocioTenant
         return $this->moneda() === 'MXN';
     }
 
-    /** ¿Está en México? (sin país registrado, se toma México). */
+    /** El país del negocio (ISO 3166-1 alfa-2, en mayúsculas). */
+    public function pais(): string
+    {
+        return CatalogoPaises::codigo($this->gestor->actual()?->pais);
+    }
+
+    /**
+     * La lada del país del negocio (solo dígitos): la de los celulares que se capturan
+     * sin «+». Con un país fuera del catálogo, la de la plataforma.
+     */
+    public function lada(): string
+    {
+        return CatalogoPaises::lada($this->pais()) ?? (string) config('agendauno.whatsapp.lada', '52');
+    }
+
+    /** ¿Está en México? */
     public function enMexico(): bool
     {
-        $pais = (string) ($this->gestor->actual()->pais ?? '');
-
-        return $pais === '' || mb_strtoupper($pais) === 'MX';
+        return $this->pais() === 'MX';
     }
 
     /** ¿Puede facturar a sus clientes? Solo en pesos mexicanos y en México. */
@@ -108,21 +125,39 @@ class RegionNegocioTenant
     }
 
     /**
+     * Revisa un cambio de región completo antes de aplicar nada: si algo no se puede, no
+     * cambia ninguno (país, moneda y zona se mandan juntos).
+     *
+     * @param  array<string, mixed>  $cambios  `pais`, `moneda` y `zona_horaria` (los que se manden)
+     *
+     * @throws ValidationException
+     */
+    public function validarCambios(array $cambios): void
+    {
+        $errores = array_filter([
+            'pais' => isset($cambios['pais']) ? $this->errorPais((string) $cambios['pais']) : null,
+            'moneda' => isset($cambios['moneda']) ? $this->errorMoneda((string) $cambios['moneda']) : null,
+            'zona_horaria' => isset($cambios['zona_horaria']) ? $this->errorZona((string) $cambios['zona_horaria']) : null,
+        ]);
+        if ($errores !== []) {
+            throw ValidationException::withMessages(array_map(static fn (string $error): array => [$error], $errores));
+        }
+    }
+
+    /**
      * Cambia la moneda del negocio. Solo antes de cobrar: lo ya creado (productos,
      * artículos, pagos del personal y compras sin pagar) pasa a la nueva moneda.
      */
     public function cambiarMoneda(string $codigo, ?Usuario $actor): void
     {
-        $codigo = mb_strtoupper(trim($codigo));
-        if (! CatalogoMonedas::existe($codigo)) {
-            throw ValidationException::withMessages(['moneda' => ['Elige una moneda del catálogo.']]);
+        $error = $this->errorMoneda($codigo);
+        if ($error !== null) {
+            throw ValidationException::withMessages(['moneda' => [$error]]);
         }
+        $codigo = mb_strtoupper(trim($codigo));
         $actual = $this->moneda();
         if ($codigo === $actual) {
             return;
-        }
-        if ($this->hayCobros()) {
-            throw ValidationException::withMessages(['moneda' => ["Ya hay cobros en {$actual}: la moneda se elige antes de empezar a cobrar."]]);
         }
 
         DB::connection('tenant')->transaction(function () use ($codigo, $actor): void {
@@ -139,13 +174,37 @@ class RegionNegocioTenant
     }
 
     /**
+     * Cambia el país del negocio (uno del catálogo). Con él cambia la lada de los
+     * celulares sin «+»; fuera de México no hay facturación a sus clientes.
+     */
+    public function cambiarPais(string $codigo, ?Usuario $actor): void
+    {
+        $error = $this->errorPais($codigo);
+        if ($error !== null) {
+            throw ValidationException::withMessages(['pais' => [$error]]);
+        }
+        $codigo = CatalogoPaises::codigo($codigo);
+        $estudio = $this->gestor->actual();
+        if ($estudio === null) {
+            return;
+        }
+        $antes = CatalogoPaises::codigo($estudio->pais);
+        if ($antes === $codigo) {
+            return;
+        }
+        $estudio->forceFill(['pais' => $codigo])->save();
+        $this->auditoria->registrar($actor, 'negocio.pais', 'estudio', null, ['pais' => $antes], ['pais' => $codigo]);
+    }
+
+    /**
      * Cambia la zona horaria del negocio: la de sus reportes, cortes y días. Las
      * sucursales conservan la suya.
      */
     public function cambiarZona(string $zona, ?Usuario $actor): void
     {
-        if (! in_array($zona, timezone_identifiers_list(), true)) {
-            throw ValidationException::withMessages(['zona_horaria' => ['Elige una zona horaria de la lista.']]);
+        $error = $this->errorZona($zona);
+        if ($error !== null) {
+            throw ValidationException::withMessages(['zona_horaria' => [$error]]);
         }
         $estudio = $this->gestor->actual();
         if ($estudio === null) {
@@ -157,5 +216,29 @@ class RegionNegocioTenant
         }
         $estudio->forceFill(['zona_horaria' => $zona])->save();
         $this->auditoria->registrar($actor, 'negocio.zona_horaria', 'estudio', null, ['zona_horaria' => $antes], ['zona_horaria' => $zona]);
+    }
+
+    private function errorPais(string $codigo): ?string
+    {
+        return CatalogoPaises::existe($codigo) ? null : 'Elige un país de la lista.';
+    }
+
+    /** La moneda debe ser del catálogo y, si es otra, el negocio aún no debe haber cobrado. */
+    private function errorMoneda(string $codigo): ?string
+    {
+        $codigo = mb_strtoupper(trim($codigo));
+        if (! CatalogoMonedas::existe($codigo)) {
+            return 'Elige una moneda del catálogo.';
+        }
+        $actual = $this->moneda();
+
+        return $codigo !== $actual && $this->hayCobros()
+            ? "Ya hay cobros en {$actual}: la moneda se elige antes de empezar a cobrar."
+            : null;
+    }
+
+    private function errorZona(string $zona): ?string
+    {
+        return in_array($zona, timezone_identifiers_list(), true) ? null : 'Elige una zona horaria de la lista.';
     }
 }

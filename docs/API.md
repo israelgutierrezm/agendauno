@@ -34,6 +34,15 @@ resto exige sesión y un permiso (`puede:…`). Ver `docs/AUTHORIZATION.md`.
 
 - Identificadores públicos: ULID. Nunca el `id` interno.
 - Dinero: `*_minor` entero + `moneda`. Créditos: unidades enteras (1000 = 1).
+- País del negocio: ISO 3166-1 alfa-2 (`pais`, obligatorio en `POST /registro` y
+  editable en `PUT /negocio/region`, que aplica país, moneda y zona juntos o ninguno);
+  `lada`, solo dígitos (`52`, `57`, `1`). La sesión, el escaparate y
+  `GET /citas/opciones` traen `estudio.pais` y `estudio.lada` (ADR 0103).
+- Celulares: se mandan con lada como `+<lada> <número>` (`+57 3001234567`) y se guardan
+  como llegan; al usarlos, el número junto a la lada se limpia como nacional (sin el 0
+  de marcación nacional ni la lada repetida) y, sin «+», se completan con la lada del
+  país del negocio. La unicidad del celular de una persona compara el número, no el
+  texto.
 - Fechas en ISO-8601 con zona; las horas se guardan en UTC y se muestran en la zona
   de la sucursal.
 - Operaciones críticas (reservar, crear órdenes, pagar) aceptan `idempotency_key`

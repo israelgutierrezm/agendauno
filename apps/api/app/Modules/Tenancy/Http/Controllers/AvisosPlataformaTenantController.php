@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\VerificacionWhatsAppDueno;
+use App\Modules\Tenancy\CatalogoPaises;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\Usuario;
@@ -171,7 +172,9 @@ class AvisosPlataformaTenantController
      */
     private function numeroNuevo(Request $request, Estudio $estudio, array $extra): array
     {
-        $request->merge(['contacto_whatsapp_pais' => preg_replace('/\D+/', '', (string) $request->input('contacto_whatsapp_pais', '52')) ?: '52']);
+        // Sin lada, la del país del negocio (ADR 0103).
+        $ladaPais = CatalogoPaises::lada($estudio->pais) ?? '52';
+        $request->merge(['contacto_whatsapp_pais' => preg_replace('/\D+/', '', (string) $request->input('contacto_whatsapp_pais', $ladaPais)) ?: $ladaPais]);
         $validado = $request->validate([
             'contacto_whatsapp_pais' => ['required', 'string', 'regex:/^\d{1,4}$/'],
             'contacto_telefono' => ['required', 'string', 'regex:/^[0-9 \-]{7,15}$/'],
@@ -182,7 +185,7 @@ class AvisosPlataformaTenantController
         $telefono = VerificacionWhatsAppDueno::telefono($pais, $numero)
             ?? throw ValidationException::withMessages(['contacto_telefono' => ['Ese número no es válido para WhatsApp.']]);
 
-        $esElMismo = $telefono === TelefonoWhatsApp::normalizar($estudio->whatsappCompleto());
+        $esElMismo = $telefono === TelefonoWhatsApp::normalizar($estudio->whatsappCompleto(), $estudio->contacto_whatsapp_pais);
         if ($esElMismo && ($estudio->contacto_whatsapp_verificado_en !== null || ! $this->verificacion->disponible())) {
             throw ValidationException::withMessages(['contacto_telefono' => ['Ese ya es el WhatsApp de tu negocio.']]);
         }
@@ -192,7 +195,7 @@ class AvisosPlataformaTenantController
 
     private function telefono(Estudio $estudio): string
     {
-        return TelefonoWhatsApp::normalizar($estudio->whatsappCompleto())
+        return TelefonoWhatsApp::normalizar($estudio->whatsappCompleto(), $estudio->contacto_whatsapp_pais)
             ?? throw ValidationException::withMessages(['contacto_telefono' => ['Tu negocio no tiene un número de WhatsApp válido. Escríbenos para corregirlo.']]);
     }
 

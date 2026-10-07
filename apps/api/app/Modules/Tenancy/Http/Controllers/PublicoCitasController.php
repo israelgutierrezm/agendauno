@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\CobroDeCitasTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -74,6 +75,9 @@ class PublicoCitasController
                 'logo_url' => $estudio->logo_url,
                 // Cómo llama el negocio a quien atiende (p. ej. «Barbero»).
                 'profesional' => (string) ($estudio->perfilConfig()['terminologia']['instructor'] ?? ''),
+                // Su país y su lada (ADR 0103): la que se propone para el celular del cliente.
+                'pais' => app(RegionNegocioTenant::class)->pais(),
+                'lada' => app(RegionNegocioTenant::class)->lada(),
             ],
             ...$this->opciones->listar(),
         ]]);
@@ -153,8 +157,10 @@ class PublicoCitasController
             'apellidos' => ['nullable', 'string', 'max:120'],
             // Para mandarle la confirmación y ligar sus citas si luego crea su cuenta.
             'email' => ['required', 'email', 'max:255'],
-            'celular' => ['nullable', 'string', 'max:30', 'regex:/^[0-9 ()-]*$/'],
-            // Lada del país del celular (+52 México por omisión).
+            // Con «+» ya trae su lada (+57 300…); sin ella, la de `lada` o, al avisarle,
+            // la del país del negocio (ADR 0103).
+            'celular' => ['nullable', 'string', 'max:30', 'regex:/^\+?[0-9 ()-]*$/'],
+            // Lada del país del celular.
             'lada' => ['nullable', 'string', 'regex:/^\+[0-9]{1,4}$/'],
             'como_nos_conocio' => ['nullable', Rule::enum(OrigenCliente::class)],
             // Para el negocio: alergias, preferencias, si es su primera vez… (ADR 0067).
@@ -336,7 +342,7 @@ class PublicoCitasController
             'primer_apellido' => ($apellidos[0] ?? '') !== '' ? $apellidos[0] : null,
             'segundo_apellido' => $apellidos[1] ?? null,
             'email' => $email,
-            'celular' => $celular === '' ? null : ($lada !== '' ? $lada.' '.$celular : $celular),
+            'celular' => $celular === '' ? null : ($lada !== '' && ! str_starts_with($celular, '+') ? $lada.' '.$celular : $celular),
             'como_nos_conocio' => $datos['como_nos_conocio'] ?? null,
             'tipo' => TipoPersonaTenant::Miembro->value,
             'activo' => true,

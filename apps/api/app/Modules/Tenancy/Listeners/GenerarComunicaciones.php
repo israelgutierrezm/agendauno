@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Listeners;
 
 use App\Modules\Tenancy\Application\EntregarPushTenant;
 use App\Modules\Tenancy\Application\EnviarMensajesTenant;
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Comunicaciones\AvisosAlEquipo;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
 use App\Modules\Tenancy\Comunicaciones\DestinatarioMensaje;
@@ -40,6 +41,7 @@ class GenerarComunicaciones
         private readonly GestorDeConexionTenant $gestor,
         private readonly EntregarPushTenant $push,
         private readonly ClienteWhatsApp $whatsapp,
+        private readonly RegionNegocioTenant $region,
     ) {}
 
     public function handle(EventoDeDominioTenant $evento): void
@@ -179,7 +181,8 @@ class GenerarComunicaciones
         if ($meta === null || ! $persona instanceof PersonaTenant || $persona->whatsapp_aceptado_en === null || ! $this->whatsapp->activoPara($this->gestor->actual())) {
             return;
         }
-        $telefono = TelefonoWhatsApp::normalizar($persona->celular);
+        // Sin «+», el celular es del país del negocio (ADR 0103).
+        $telefono = TelefonoWhatsApp::normalizar($persona->celular, $this->region->lada());
         if ($telefono === null) {
             return;
         }

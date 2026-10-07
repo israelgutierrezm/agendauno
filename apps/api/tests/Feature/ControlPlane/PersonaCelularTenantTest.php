@@ -96,3 +96,24 @@ it('permite editar un miembro conservando su propio correo y celular', function 
         'nombre' => 'Ana María', 'email' => 'ana@correo.mx', 'celular' => '5511112222',
     ], conBearer($e['bearer']))->assertOk();
 });
+
+it('el celular se compara como número: el «55 1111 2222» de antes es el «+52 5511112222» de la web', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $miembros = "/api/v1/app/{$e['slug']}/miembros";
+    $ana = (string) $this->postJson($miembros, ['nombre' => 'Ana', 'celular' => '55 1111 2222'], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+
+    // Al dar de alta y al editar a otra persona, el mismo número con lada choca.
+    $this->postJson($miembros, ['nombre' => 'Otra', 'celular' => '+52 5511112222'], conBearer($e['bearer']))
+        ->assertStatus(422)
+        ->assertJsonPath('meta.errors.celular.0', 'Ya existe una persona con ese teléfono en este estudio.');
+    $beto = (string) $this->postJson($miembros, ['nombre' => 'Beto', 'celular' => '+52 3311112222'], conBearer($e['bearer']))
+        ->assertCreated()->json('data.id');
+    $this->putJson("{$miembros}/{$beto}", ['celular' => '+52 55 1111 2222'], conBearer($e['bearer']))
+        ->assertStatus(422)
+        ->assertJsonPath('meta.errors.celular.0', 'Ya existe una persona con ese teléfono en este estudio.');
+
+    // La propia persona sí lo guarda con lada; otro país con los mismos últimos dígitos no choca.
+    $this->putJson("{$miembros}/{$ana}", ['celular' => '+52 5511112222'], conBearer($e['bearer']))->assertOk();
+    $this->postJson($miembros, ['nombre' => 'Carla', 'celular' => '+57 3011112222'], conBearer($e['bearer']))->assertCreated();
+});

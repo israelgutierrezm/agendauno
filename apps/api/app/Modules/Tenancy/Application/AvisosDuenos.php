@@ -284,7 +284,7 @@ class AvisosDuenos
         if (filter_var($correo, FILTER_VALIDATE_EMAIL) !== false) {
             $canales[CanalComunicacion::Email->value] = $correo;
         }
-        $telefono = TelefonoWhatsApp::normalizar($estudio->whatsappCompleto());
+        $telefono = TelefonoWhatsApp::normalizar($estudio->whatsappCompleto(), $estudio->contacto_whatsapp_pais);
         if ($telefono !== null && $estudio->contacto_whatsapp_aceptado_en !== null && $this->whatsapp->activoParaDuenos()) {
             $canales[CanalComunicacion::WhatsApp->value] = $telefono;
         }

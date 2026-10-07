@@ -35,7 +35,7 @@ function datosRegistroNombreLargo(string $email, ?string $slug = null): array
         ...($slug !== null ? ['slug' => $slug] : []),
         'contacto_nombre' => 'Ana', 'contacto_primer_apellido' => 'García',
         'contacto_email' => $email, 'contacto_telefono' => '5512345678',
-        'acepta_terminos' => true,
+        'pais' => 'MX', 'acepta_terminos' => true,
     ];
 }
 

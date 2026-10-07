@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Requests;
 
 use App\Modules\Tenancy\Application\RegistrarEstudio;
+use App\Modules\Tenancy\CatalogoPaises;
 use App\Modules\Tenancy\PerfilNegocio;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
@@ -23,9 +24,16 @@ class RegistrarEstudioRequest extends FormRequest
         if ($this->has('slug')) {
             $merge['slug'] = Str::slug((string) $this->input('slug'));
         }
-        // Lada de WhatsApp: default México (52) y solo dígitos (quita "+", espacios).
-        $pais = preg_replace('/\D+/', '', (string) $this->input('contacto_whatsapp_pais', '52'));
-        $merge['contacto_whatsapp_pais'] = ($pais === '' || $pais === null) ? '52' : $pais;
+        // País del negocio: dos letras en mayúsculas (ADR 0103).
+        if (is_string($this->input('pais'))) {
+            $merge['pais'] = CatalogoPaises::codigo($this->input('pais'));
+        }
+        // Lada de WhatsApp: solo dígitos (quita "+", espacios); sin ella, la del país
+        // del negocio (México, 52, si tampoco se dice).
+        $lada = preg_replace('/\D+/', '', (string) $this->input('contacto_whatsapp_pais', ''));
+        $merge['contacto_whatsapp_pais'] = ($lada === '' || $lada === null)
+            ? (CatalogoPaises::lada($merge['pais'] ?? null) ?? '52')
+            : $lada;
         $this->merge($merge);
     }
 
@@ -55,7 +63,9 @@ class RegistrarEstudioRequest extends FormRequest
             // Comprobante de que confirmó su WhatsApp con el código (ADR 0070): con él
             // queda verificado y acepta avisos de la plataforma por WhatsApp.
             'whatsapp_verificacion' => ['nullable', 'string', 'max:100'],
-            'pais' => ['nullable', 'string', 'size:2'],
+            // Dónde está el negocio (ISO 3166-1 alfa-2): de ahí sale la lada de los
+            // celulares sin «+» y si puede facturar (ADR 0103).
+            'pais' => ['required', 'string', Rule::in(CatalogoPaises::codigos())],
             'ciudad' => ['nullable', 'string', 'max:120'],
             'zona_horaria' => ['nullable', 'timezone'],
             'acepta_terminos' => ['accepted'],
@@ -67,6 +77,17 @@ class RegistrarEstudioRequest extends FormRequest
             // campo trampa (honeypot) que debe llegar vacío; si un bot lo llena, falla.
             'recaptcha_token' => ['nullable', 'string'],
             'sitio_web' => ['prohibited'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'pais.required' => 'Elige el país de tu negocio.',
+            'pais.in' => 'Elige un país de la lista.',
         ];
     }
 }

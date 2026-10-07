@@ -296,6 +296,9 @@ it('el miembro edita su celular en Mi perfil, pero no el de otra persona', funct
 
     $this->putJson("/api/v1/app/{$e['slug']}/yo/perfil", ['nombre' => 'Valeria', 'celular' => '5511112222'], conBearer($m['bearer']))
         ->assertUnprocessable()->assertJsonPath('meta.errors.celular.0', 'Ese celular ya es de otra persona en este negocio.');
+    // Con lada (como lo manda la web) es el mismo número.
+    $this->putJson("/api/v1/app/{$e['slug']}/yo/perfil", ['nombre' => 'Valeria', 'celular' => '+52 55 1111 2222'], conBearer($m['bearer']))
+        ->assertUnprocessable()->assertJsonPath('meta.errors.celular.0', 'Ese celular ya es de otra persona en este negocio.');
 
     // Sin ficha de cliente (la dueña), no hay celular que guardar.
     $this->putJson("/api/v1/app/{$e['slug']}/yo/perfil", ['nombre' => 'Dueño', 'celular' => '5599990000'], conBearer($e['bearer']))

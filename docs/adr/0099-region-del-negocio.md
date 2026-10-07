@@ -1,6 +1,7 @@
 # ADR 0099 — Región del negocio: una moneda y su zona horaria
 
-Estado: Aceptado (2026-10-05). Reemplaza en parte el ADR 0097.
+Estado: Aceptado (2026-10-05). Reemplaza en parte el ADR 0097. Precisado por el ADR
+0103 (2026-10-07): todo negocio tiene país y ya no hay «sin país = México».
 
 ## Contexto
 

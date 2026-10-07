@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CambiarCorreoTenant;
+use App\Modules\Tenancy\Application\CelularesTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Http\Requests\DatosPersonales;
 use App\Modules\Tenancy\Http\UsuarioTenantPresenter;
@@ -17,7 +18,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -31,6 +31,7 @@ class PerfilTenantController
     public function __construct(
         private readonly CambiarCorreoTenant $cambioCorreo,
         private readonly PersonaDeUsuarioTenant $personas,
+        private readonly CelularesTenant $celulares,
     ) {}
 
     public function actualizar(Request $request): JsonResponse
@@ -44,12 +45,12 @@ class PerfilTenantController
             'nombre' => ['required', 'string', 'max:80'],
             'primer_apellido' => ['nullable', 'string', 'max:80'],
             'segundo_apellido' => ['nullable', 'string', 'max:80'],
+            // Único en el negocio, comparado como número («+52 5512345678» = «55 1234 5678»).
             'celular' => ['sometimes', 'nullable', 'string', 'max:30', 'regex:/^[0-9 +()-]*$/',
-                Rule::unique(PersonaTenant::class, 'celular')->whereNull('deleted_at')->ignore($persona?->getKey())],
+                $this->celulares->reglaUnico('Ese celular ya es de otra persona en este negocio.', $persona !== null ? (int) $persona->getKey() : null)],
             ...DatosPersonales::reglas(),
         ], [
             'celular.regex' => 'Escribe el celular solo con números.',
-            'celular.unique' => 'Ese celular ya es de otra persona en este negocio.',
             ...DatosPersonales::mensajes(),
         ]);
         if ($persona instanceof PersonaTenant) {

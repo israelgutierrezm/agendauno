@@ -159,6 +159,22 @@ it('con el celular de alguien dado de baja, el negocio decide: reactivarlo o es 
     expect($carla)->not->toBe($beto)->and(idsDeMiembros($e))->toBe([$carla]);
 });
 
+it('el celular de alguien dado de baja se reconoce aunque llegue con lada', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    $beto = (string) altaMiembro($e, ['nombre' => 'Beto', 'celular' => '55 1234 5678'])->json('data.id');
+    $this->deleteJson("/api/v1/app/{$e['slug']}/miembros/{$beto}", [], conBearer($e['bearer']))->assertOk();
+
+    // La web lo manda como «+52 5512345678»: es el mismo número.
+    altaMiembro($e, ['nombre' => 'Roberto', 'celular' => '+52 5512345678'])
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'PERSON_DEACTIVATED_MATCH')
+        ->assertJsonPath('meta.persona.id', $beto);
+
+    // Es otra persona: se le quita a Beto (la bitácora guarda el número como estaba).
+    altaMiembro($e, ['nombre' => 'Carla', 'celular' => '+52 5512345678', 'liberar_celular' => true])->assertCreated();
+    expect(ultimoAsiento($e, 'miembro.celular_liberado')['antes'])->toBe(['celular' => '55 1234 5678']);
+});
+
 it('dar de baja a alguien del equipo le quita el acceso; al invitarlo de nuevo se reactiva', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $bearer = personalConSesion($e['slug'], $e['bearer'], 'recep@correo.mx', 'recepcionista');

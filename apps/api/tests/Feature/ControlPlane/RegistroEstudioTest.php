@@ -29,7 +29,7 @@ function registrarEstudioApi(string $nombre, string $slug, string $email): array
         'contacto_primer_apellido' => 'Demo',
         'contacto_email' => $email,
         'contacto_telefono' => '5512345678',
-        'acepta_terminos' => true,
+        'pais' => 'MX', 'acepta_terminos' => true,
     ])->assertCreated();
 
     return [
@@ -102,7 +102,7 @@ it('guarda el contacto desglosado y el WhatsApp; el dueño recibe el nombre comp
         'contacto_nombre' => 'Ana', 'contacto_segundo_nombre' => 'María',
         'contacto_primer_apellido' => 'García', 'contacto_segundo_apellido' => 'López',
         'contacto_whatsapp_pais' => '52', 'contacto_telefono' => '55 1234 5678',
-        'contacto_email' => 'ana@correo.mx', 'acepta_terminos' => true,
+        'contacto_email' => 'ana@correo.mx', 'pais' => 'MX', 'acepta_terminos' => true,
     ])->assertCreated();
     $token = (string) $resp->json('data.activacion.token');
 
@@ -130,7 +130,7 @@ it('exige apellido paterno y WhatsApp (filtra registros incompletos)', function 
     // Sin apellido paterno ni telefono.
     $this->postJson('/api/v1/registro', [
         'nombre' => 'Sin Datos', 'slug' => 'sin-datos',
-        'contacto_nombre' => 'Ana', 'contacto_email' => 'a@b.mx', 'acepta_terminos' => true,
+        'contacto_nombre' => 'Ana', 'contacto_email' => 'a@b.mx', 'pais' => 'MX', 'acepta_terminos' => true,
     ])->assertStatus(422)
         ->assertJsonPath('meta.errors.contacto_primer_apellido.0', fn ($m): bool => is_string($m))
         ->assertJsonPath('meta.errors.contacto_telefono.0', fn ($m): bool => is_string($m));
@@ -140,7 +140,7 @@ it('la lada de WhatsApp usa México (52) por defecto si no se envía', function 
     $this->postJson('/api/v1/registro', [
         'nombre' => 'Sin Lada', 'slug' => 'sin-lada',
         'contacto_nombre' => 'Ana', 'contacto_primer_apellido' => 'García',
-        'contacto_email' => 'lada@correo.mx', 'contacto_telefono' => '5512345678', 'acepta_terminos' => true,
+        'contacto_email' => 'lada@correo.mx', 'contacto_telefono' => '5512345678', 'pais' => 'MX', 'acepta_terminos' => true,
     ])->assertCreated();
 
     expect(Estudio::query()->where('slug', 'sin-lada')->value('contacto_whatsapp_pais'))->toBe('52');
@@ -159,7 +159,7 @@ it('el slug se verifica por disponibilidad y no se repite', function (): void {
     $this->postJson('/api/v1/registro', [
         'nombre' => 'Otro', 'slug' => 'pole-house',
         'contacto_nombre' => 'X', 'contacto_primer_apellido' => 'Y',
-        'contacto_email' => 'x@y.mx', 'contacto_telefono' => '5512345678', 'acepta_terminos' => true,
+        'contacto_email' => 'x@y.mx', 'contacto_telefono' => '5512345678', 'pais' => 'MX', 'acepta_terminos' => true,
     ])->assertStatus(422);
 });
 
@@ -168,7 +168,7 @@ it('genera el enlace público automáticamente desde el nombre (el registrante n
         'nombre' => 'Pole House',
         'contacto_nombre' => 'Ana', 'contacto_primer_apellido' => 'García',
         'contacto_email' => 'ana@correo.mx', 'contacto_telefono' => '5512345678',
-        'acepta_terminos' => true,
+        'pais' => 'MX', 'acepta_terminos' => true,
     ])->assertCreated();
 
     // El slug se deriva del nombre sin que el registrante lo escriba.
@@ -179,13 +179,13 @@ it('genera el enlace público automáticamente desde el nombre (el registrante n
 it('desambigua el enlace autogenerado cuando el nombre ya existe (sin error para el registrante)', function (): void {
     $this->postJson('/api/v1/registro', [
         'nombre' => 'Pole House', 'contacto_nombre' => 'Ana', 'contacto_primer_apellido' => 'García',
-        'contacto_email' => 'ana@correo.mx', 'contacto_telefono' => '5512345678', 'acepta_terminos' => true,
+        'contacto_email' => 'ana@correo.mx', 'contacto_telefono' => '5512345678', 'pais' => 'MX', 'acepta_terminos' => true,
     ])->assertCreated()->assertJsonPath('data.estudio.slug', 'pole-house');
 
     // Un segundo "Pole House" NO falla: recibe pole-house-2 automáticamente.
     $this->postJson('/api/v1/registro', [
         'nombre' => 'Pole House', 'contacto_nombre' => 'Beto', 'contacto_primer_apellido' => 'Luna',
-        'contacto_email' => 'beto@correo.mx', 'contacto_telefono' => '5598765432', 'acepta_terminos' => true,
+        'contacto_email' => 'beto@correo.mx', 'contacto_telefono' => '5598765432', 'pais' => 'MX', 'acepta_terminos' => true,
     ])->assertCreated()->assertJsonPath('data.estudio.slug', 'pole-house-2');
 });
 
@@ -194,7 +194,7 @@ it('rechaza el registro si el honeypot (sitio_web) viene lleno', function (): vo
         'nombre' => 'Spam', 'slug' => 'spam-x',
         'contacto_nombre' => 'Bot', 'contacto_primer_apellido' => 'X',
         'contacto_email' => 'bot@correo.mx', 'contacto_telefono' => '5512345678',
-        'acepta_terminos' => true,
+        'pais' => 'MX', 'acepta_terminos' => true,
         'sitio_web' => 'http://spam.example',
     ])->assertStatus(422);
 
@@ -211,7 +211,7 @@ function datosRegistroCaptcha(string $slug, string $email): array
         'nombre' => 'Estudio', 'slug' => $slug,
         'contacto_nombre' => 'Dueño', 'contacto_primer_apellido' => 'Demo',
         'contacto_email' => $email, 'contacto_telefono' => '5512345678',
-        'acepta_terminos' => true, 'recaptcha_token' => 'token-cliente',
+        'pais' => 'MX', 'acepta_terminos' => true, 'recaptcha_token' => 'token-cliente',
     ];
 }
 

@@ -38,7 +38,7 @@ function registrarSinActivarAlta(string $slug): Estudio
         'nombre' => 'Negocio '.$slug, 'slug' => $slug,
         'contacto_nombre' => 'Dueño', 'contacto_primer_apellido' => 'Demo',
         'contacto_email' => "{$slug}@correo.mx", 'contacto_telefono' => '5512345678',
-        'acepta_terminos' => true,
+        'pais' => 'MX', 'acepta_terminos' => true,
     ])->assertCreated();
 
     return Estudio::query()->where('slug', $slug)->firstOrFail();

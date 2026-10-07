@@ -6,6 +6,8 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
+use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -46,6 +48,9 @@ class EscaparateController
         abort_unless($estudio instanceof Estudio, 404);
         // El escaparate es la cara pública: solo con la página abierta.
         abort_unless($estudio->paginaPublica(), 404);
+        // La lada del país del negocio completa los números capturados sin «+» (ADR 0103).
+        $region = app(RegionNegocioTenant::class);
+        $lada = $region->lada();
 
         return response()->json(['data' => [
             'estudio' => [
@@ -58,15 +63,16 @@ class EscaparateController
                 'perfil' => $estudio->perfil_negocio->value,
                 'perfil_config' => $estudio->perfilConfig(),
                 'ciudad' => $estudio->ciudad,
-                'pais' => $estudio->pais,
+                'pais' => $region->pais(),
+                'lada' => $lada,
                 'whatsapp' => $estudio->whatsappCompleto(),
-                'whatsapp_url' => self::enlaceWhatsapp($estudio->whatsappCompleto()),
+                'whatsapp_url' => self::enlaceWhatsapp($estudio->whatsappCompleto(), $estudio->contacto_whatsapp_pais),
                 // ¿Ofrece servicios agendables como cita en línea? (para el CTA de reserva).
                 'tiene_citas' => OfertaTenant::query()
                     ->where('politica_reserva', PoliticaReservaTenant::Pago->value)
                     ->exists(),
             ],
-            'sucursales' => $this->sucursales(),
+            'sucursales' => $this->sucursales($lada),
             'instructores' => $this->instructores(),
             'servicios' => $this->servicios(),
             'horario_clases' => $this->horarioClases(),
@@ -77,17 +83,14 @@ class EscaparateController
     }
 
     /**
-     * Enlace de WhatsApp (wa.me) desde un número capturado con o sin lada; un número
-     * de 10 dígitos se toma como de México.
+     * Enlace de WhatsApp (wa.me) desde un número capturado con o sin lada: sin «+» se
+     * completa con la lada que se da (la del país del negocio), como los avisos.
      */
-    public static function enlaceWhatsapp(?string $numero): ?string
+    public static function enlaceWhatsapp(?string $numero, ?string $lada): ?string
     {
-        $digitos = preg_replace('/\D+/', '', (string) $numero) ?? '';
-        if (strlen($digitos) < 10) {
-            return null;
-        }
+        $digitos = TelefonoWhatsApp::normalizar($numero, $lada);
 
-        return 'https://wa.me/'.(strlen($digitos) === 10 ? '52'.$digitos : $digitos);
+        return $digitos !== null ? 'https://wa.me/'.$digitos : null;
     }
 
     /**
@@ -96,12 +99,12 @@ class EscaparateController
      *
      * @return list<array<string, mixed>>
      */
-    private function sucursales(): array
+    private function sucursales(string $lada): array
     {
         return SucursalTenant::query()
             ->orderBy('nombre')
             ->get()
-            ->map(static function (SucursalTenant $s): array {
+            ->map(static function (SucursalTenant $s) use ($lada): array {
                 return [
                     'id' => $s->ulid,
                     'nombre' => $s->nombre,
@@ -112,7 +115,7 @@ class EscaparateController
                     'mapa_url' => $s->enlaceMapa(),
                     'telefono' => $s->telefono,
                     'whatsapp' => $s->whatsapp,
-                    'whatsapp_url' => self::enlaceWhatsapp($s->whatsapp),
+                    'whatsapp_url' => self::enlaceWhatsapp($s->whatsapp, $lada),
                     'redes' => RedesSociales::publicas($s->redes),
                     'horario' => HorarioSucursal::publico($s),
                 ];

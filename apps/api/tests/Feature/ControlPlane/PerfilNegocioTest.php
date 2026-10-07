@@ -29,7 +29,7 @@ it('registrar con un perfil expone su terminologia y flags', function (): void {
         'contacto_primer_apellido' => 'Demo',
         'contacto_email' => 'n@correo.mx',
         'contacto_telefono' => '5512345678',
-        'acepta_terminos' => true,
+        'pais' => 'MX', 'acepta_terminos' => true,
     ])->assertCreated()->json('data.estudio');
 
     expect($estudio['perfil'])->toBe('natacion');

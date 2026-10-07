@@ -1,6 +1,8 @@
 # ADR 0061 — Perfil público del negocio y de sus sedes, y página de enlaces
 
-Estado: Aceptado (2026-09-28).
+Estado: Aceptado (2026-09-28). Reemplazado en parte por el ADR 0103 (2026-10-07): el
+WhatsApp sin lada de una sede se completa con la lada del país del negocio, no con la
+de México.
 
 ## Contexto
 
