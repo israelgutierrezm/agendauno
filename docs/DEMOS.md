@@ -72,7 +72,7 @@ su nombre dice «(demo)».
 | `valeria.rios@correo.test` | Miembro con Paquete 8 clases («Mi cuenta») |
 | `renata.soto@correo.test` | Miembro con Ilimitada, incluye Open Training («Mi cuenta») |
 
-## Barbería La Navaja (`/app/barberia`, citas: cobra por profesionales activos)
+## Barbería La Navaja (`/app/barberia`, citas: plan por profesionales contratados)
 
 - **Sucursales:** Roma Norte y Del Valle, con dirección, horario y ubicación.
 - **Equipo:**

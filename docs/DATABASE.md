@@ -23,9 +23,10 @@ el esquema.
 | Tabla | Para qué |
 |---|---|
 | `estudios` | Cada negocio: slug, estado, prueba, perfil y terminología, `modalidad` (clases o citas, guardada y excluyente, ADR 0104), modalidad de cobro, contacto (con WhatsApp verificado y aceptación de avisos, ADR 0070), WhatsApp con sus clientes activado por la plataforma (`whatsapp_habilitado`, ADR 0083), suspensión (por renta o por la plataforma, ADR 0073), perfil público (logo, portada, descripción, redes), base de datos y `version_migraciones` |
-| `tarifas_saas` | Tarifas del SaaS por modalidad, versionadas (ADR 0019) |
+| `tarifas_saas` | Tarifas del SaaS por modalidad, versionadas (ADR 0019); en USD y, en citas, por niveles (ADR 0107) |
 | `mediciones_uso` | Alumnos o profesionales activos medidos por periodo |
-| `cargos_renta` | Renta mensual de cada negocio, inmutable una vez emitida (ADR 0032) |
+| `cargos_renta` | Cargos de cada negocio, inmutables una vez emitidos (ADR 0032): la renta del periodo, el plan por adelantado, sus ajustes y las compras de timbres (`clave`, `concepto`), con el tipo de cambio aplicado y los intentos de cobro a la tarjeta (ADR 0107) |
+| `tipos_cambio` | Pesos por dólar de cada día (Banco de México o capturado), en diezmilésimas (ADR 0107) |
 | `facturas_plataforma` | Facturas de la plataforma al negocio |
 | `configuraciones_pasarela_plataforma` | Pasarela con la que la plataforma cobra la renta |
 | `configuracion_plataforma` | Parámetros de plataforma (valores por defecto de los límites) y conexión de WhatsApp (cifrada) |
@@ -107,6 +108,7 @@ el esquema.
   (ADR 0020); `sesiones_tarjeta` — sesiones de Stripe para autorizar la tarjeta, por
   conciliar si su aviso no llega (ADR 0076); se limpia a los 30 días (ADR 0079).
 - `datos_fiscales`, `facturas` — facturación del negocio a sus clientes.
+- `saldo_timbres`, `movimientos_timbres` — timbres para facturar: saldo con movimientos (compra suma, cada factura timbrada resta; ADR 0107).
 - `promociones` — descuentos.
 
 **Punto de venta y lealtad**
