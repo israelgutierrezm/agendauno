@@ -233,6 +233,9 @@ defineEmits<{ alternarTema: [] }>();
           <RouterLink class="tu-public-footer-link" to="/aviso-de-privacidad">
             Aviso de privacidad
           </RouterLink>
+          <RouterLink class="tu-public-footer-link" to="/terminos">
+            Términos y condiciones
+          </RouterLink>
           <RouterLink
             v-if="!esRutaPublicaDeNegocio"
             class="tu-public-footer-link"

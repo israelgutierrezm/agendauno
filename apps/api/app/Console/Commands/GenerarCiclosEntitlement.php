@@ -37,7 +37,7 @@ class GenerarCiclosEntitlement extends Command
                         continue;
                     }
 
-                    $avanzados += $gestor->ejecutarEn($estudio, function () use ($generarTenant): int {
+                    $avanzados += $gestor->ejecutarAislado($estudio, function () use ($generarTenant): int {
                         $n = 0;
                         DerechoTenant::query()
                             ->where('politica_reset', '!=', 'ninguno')
@@ -52,7 +52,7 @@ class GenerarCiclosEntitlement extends Command
                             });
 
                         return $n;
-                    });
+                    }, 0);
                 }
             });
 

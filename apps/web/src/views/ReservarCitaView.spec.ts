@@ -25,6 +25,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({
   api: { get: mocks.get, post: mocks.post },
   mensajeDeError: () => "No disponible",
+  noEncontrado: (e: unknown) =>
+    (e as { response?: { status?: number } }).response?.status === 404,
 }));
 vi.mock("@/lib/negociosRecientes", () => ({ recordarNegocio: vi.fn() }));
 vi.mock("@/stores/sesionTenant", () => ({
@@ -1401,13 +1403,23 @@ describe("en un negocio de clases (ADR 0104)", () => {
     expect(vista.text()).not.toContain(es.reservar.noDisponible);
   });
 
-  it("otro error dice que no está disponible", async () => {
-    mocks.get.mockRejectedValue(new Error("red"));
+  it("si no existe (404) dice que no está disponible", async () => {
+    mocks.get.mockRejectedValue({ response: { status: 404 } });
     const vista = montar();
     await flushPromises();
 
     expect(mocks.replace).not.toHaveBeenCalled();
     expect(vista.text()).toContain(es.reservar.noDisponible);
+  });
+
+  it("sin red, lo dice y deja reintentar (no que el negocio no esté)", async () => {
+    mocks.get.mockRejectedValueOnce(new Error("red"));
+    const vista = montar();
+    await flushPromises();
+
+    expect(vista.text()).not.toContain(es.reservar.noDisponible);
+    expect(vista.get('[role="alert"]').text()).toContain("No disponible");
+    expect(vista.get('[role="alert"] button').text()).toBe("Reintentar");
   });
 
   // El enlace del correo de apartado (?pagar) y el regreso de la pasarela llegan

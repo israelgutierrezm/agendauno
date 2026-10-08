@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
@@ -108,6 +109,34 @@ it('cobro Stripe con llaves abre la página de pago de Stripe y el webhook confi
     ])->assertOk();
 
     expect(saldoComprador($e, $o['comprador']))->toBe(8000); // fulfillment tras confirmar
+});
+
+it('con el negocio suspendido, el aviso de la pasarela se registra igual', function (): void {
+    Http::fake([
+        'api.stripe.com/*' => Http::response([
+            'id' => 'cs_suspendido', 'url' => 'https://checkout.stripe.com/c/pay/cs_suspendido',
+        ], 200),
+    ]);
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    test()->putJson("/api/v1/app/{$e['slug']}/pasarelas/stripe", [
+        'activa' => true, 'modo' => 'test', 'credenciales' => ['secret_key' => 'sk_test_x'],
+    ], conBearer($e['bearer']))->assertOk();
+    $o = ordenPendiente($e);
+    test()->postJson("/api/v1/app/{$e['slug']}/ordenes/{$o['orden']}/cobrar", [
+        'proveedor' => 'stripe', 'metodo' => 'tarjeta',
+    ], conBearer($e['bearer']))->assertCreated();
+
+    // El cliente paga y, mientras, el negocio queda suspendido.
+    Estudio::query()->where('slug', $e['slug'])->update(['estado' => 'suspended', 'suspendido_por' => 'renta']);
+    test()->postJson("/api/v1/webhooks/tenant/{$e['slug']}/stripe", [
+        'type' => 'checkout.session.completed',
+        'data' => ['object' => ['id' => 'cs_suspendido', 'payment_status' => 'paid']],
+    ])->assertOk();
+    // Lo demás del negocio sigue cerrado.
+    test()->getJson("/api/v1/app/{$e['slug']}/escaparate")->assertNotFound();
+
+    Estudio::query()->where('slug', $e['slug'])->update(['estado' => 'active', 'suspendido_por' => null]);
+    expect(saldoComprador($e, $o['comprador']))->toBe(8000);
 });
 
 it('con OXXO la sesión se completa sin pagar y solo se entrega al pagar en tienda', function (): void {

@@ -49,6 +49,28 @@ class PasarelaStripePlataforma implements PasarelaPlataforma
     }
 
     /**
+     * Cómo quedó un intento de pago de la renta en Stripe: `pagado`, `terminado` (ya
+     * no se puede pagar) o `en_proceso` (abierto, o un pago en tienda sin completar).
+     *
+     * @param  array<string, string>  $llaves
+     */
+    public function estadoIntento(string $referencia, array $llaves): string
+    {
+        $secretKey = $llaves['secret_key'] ?? '';
+        if (! str_starts_with($referencia, 'cs_') || $secretKey === '') {
+            return 'en_proceso';
+        }
+        $sesion = (new ClienteStripe($secretKey))->sesion($referencia);
+
+        return match (true) {
+            in_array($sesion['pago'], ['paid', 'no_payment_required'], true) => 'pagado',
+            $sesion['estado'] === 'expired',
+            $sesion['estado'] === 'complete' && in_array($sesion['cobro'], ['canceled', 'requires_payment_method'], true) => 'terminado',
+            default => 'en_proceso',
+        };
+    }
+
+    /**
      * Vence el intento anterior de pago de la renta (sesión abierta). `false` si ya
      * se pagó y hay que esperar su confirmación.
      *

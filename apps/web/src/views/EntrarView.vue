@@ -58,7 +58,6 @@ const estudioFijo = enSubdominioDeEstudio();
 const seleccionando = computed(() => slug.value.trim() === "");
 const email = ref("");
 const password = ref("");
-const avisoGoogle = ref(false);
 const marca = ref<Marca | null>(null);
 const marcaCargando = ref(false);
 const logoFallido = ref(false);
@@ -84,11 +83,6 @@ const urlGoogleRaiz = computed(() =>
 );
 const contenedorGoogle = ref<HTMLElement | null>(null);
 const googleRenderizadoPara = ref("");
-function pulsarGoogle(): void {
-  if (!googleEnRaiz) {
-    avisoGoogle.value = true;
-  }
-}
 
 // Tras entrar: de vuelta a donde venía (p. ej. agendar una cita) o a su inicio. Solo
 // rutas internas: un enlace no puede mandar a otro sitio.
@@ -483,7 +477,7 @@ onMounted(async () => {
               </button>
             </form>
 
-            <p v-if="errorBusqueda" class="tu-selector-error">
+            <p v-if="errorBusqueda" class="tu-selector-error" role="alert">
               {{ errorBusqueda }}
             </p>
             <p
@@ -591,7 +585,12 @@ onMounted(async () => {
               </RouterLink>
             </div>
 
-            <p v-if="sesion.error" class="text-sm" style="color: var(--error)">
+            <p
+              v-if="sesion.error"
+              class="text-sm"
+              role="alert"
+              style="color: var(--error)"
+            >
               {{ sesion.error }}
             </p>
 
@@ -605,7 +604,8 @@ onMounted(async () => {
               }}
             </button>
 
-            <div class="tu-login-separador">
+            <!-- Sin Google configurado, ni el botón ni el separador. -->
+            <div v-if="hayGoogle || googleEnRaiz" class="tu-login-separador">
               <span />
               <small>o</small>
               <span />
@@ -616,16 +616,12 @@ onMounted(async () => {
               ref="contenedorGoogle"
               class="flex justify-center"
             ></div>
-            <!-- En el subdominio de un negocio, un enlace al dominio raíz; sin Google
-                 configurado, «pronto». -->
-            <template v-else>
-              <component
-                :is="googleEnRaiz ? 'a' : 'button'"
+            <!-- En el subdominio de un negocio, un enlace al dominio raíz. -->
+            <template v-else-if="googleEnRaiz">
+              <a
                 class="tu-btn tu-btn-fantasma w-full justify-center"
-                :href="googleEnRaiz ? urlGoogleRaiz : undefined"
-                :type="googleEnRaiz ? undefined : 'button'"
-                :data-prueba="googleEnRaiz ? 'google-en-raiz' : undefined"
-                @click="pulsarGoogle"
+                :href="urlGoogleRaiz"
+                data-prueba="google-en-raiz"
               >
                 <svg
                   width="18"
@@ -651,12 +647,9 @@ onMounted(async () => {
                   />
                 </svg>
                 {{ $t("entrar.google") }}
-              </component>
-              <p v-if="googleEnRaiz" class="tu-login-aviso">
+              </a>
+              <p class="tu-login-aviso">
                 {{ $t("entrar.googleEnRaiz", { host: hostRaiz }) }}
-              </p>
-              <p v-else-if="avisoGoogle" class="tu-login-aviso">
-                {{ $t("entrar.googlePronto") }}
               </p>
             </template>
           </form>

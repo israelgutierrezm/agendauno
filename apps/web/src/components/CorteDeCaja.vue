@@ -283,7 +283,7 @@ onMounted(cargar);
       </div>
     </template>
 
-    <div class="mt-3 tu-card overflow-hidden">
+    <div class="mt-3 tu-card overflow-x-auto">
       <p
         v-if="cargando"
         class="p-5 text-sm"

@@ -14,6 +14,7 @@ import {
 } from "@/lib/modalidad";
 import { recordarNegocio } from "@/lib/negociosRecientes";
 import { updateSeo } from "@/lib/seo";
+import { urlCanonicaEstudio } from "@/lib/tenant";
 import { perfilVisibleAlPublico } from "@/marketing/modalidades";
 
 interface Sesion {
@@ -94,6 +95,8 @@ interface Escaparate {
   estudio: {
     slug: string;
     nombre: string;
+    // ¿Publicó su aviso de privacidad para sus clientes?
+    aviso_privacidad?: boolean;
     logo_url: string | null;
     portada_url?: string | null;
     descripcion?: string | null;
@@ -130,6 +133,25 @@ const noDisponible = ref(false);
 
 // Registro cerrado (ADR 0093): nadie crea su cuenta aquí. Quien quiere reservar
 // pide su acceso al negocio (que lo da de alta y lo invita) o entra si ya lo tiene.
+// Por dónde pedir el acceso: el WhatsApp del negocio o, si no tiene, el WhatsApp o el
+// teléfono de una de sus sucursales (nunca un aviso sin ningún canal).
+const canalAcceso = computed<{ whatsapp?: string; telefono?: string } | null>(
+  () => {
+    const e = escaparate.value;
+    if (!e) {
+      return null;
+    }
+    if (e.estudio.whatsapp_url) {
+      return { whatsapp: e.estudio.whatsapp_url };
+    }
+    const conWhatsapp = e.sucursales.find((s) => s.whatsapp_url);
+    if (conWhatsapp?.whatsapp_url) {
+      return { whatsapp: conWhatsapp.whatsapp_url };
+    }
+    const conTelefono = e.sucursales.find((s) => s.telefono);
+    return conTelefono?.telefono ? { telefono: conTelefono.telefono } : null;
+  },
+);
 const pidiendoAcceso = ref(false);
 
 const ubicacion = computed(() => {
@@ -262,14 +284,15 @@ async function cargar(): Promise<void> {
       description: esCitas
         ? `Consulta servicios, profesionales y horarios disponibles de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}. Reserva tu cita en línea.`
         : `Consulta próximas clases, instructores y precios de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}.`,
-      path: `/estudio/${estudio.slug}`,
+      // La página del negocio vive en su subdominio.
+      path: urlCanonicaEstudio(estudio.slug),
       image: estudio.portada_url ?? estudio.logo_url ?? undefined,
       type: "profile",
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "LocalBusiness",
         name: estudio.nombre,
-        url: `https://agendauno.mx/estudio/${estudio.slug}`,
+        url: urlCanonicaEstudio(estudio.slug),
         image: estudio.logo_url ?? undefined,
         address: lugar || undefined,
         description: estudio.descripcion ?? undefined,
@@ -465,7 +488,9 @@ onMounted(cargar);
         <div class="mx-auto max-w-5xl px-4 py-12 sm:py-16">
           <div class="tu-agenda-citas-cabecera">
             <div>
-              <p class="tu-agenda-citas-etiqueta">Agenda en línea</p>
+              <p class="tu-agenda-citas-etiqueta">
+                {{ $t("escaparate.agendaEnLinea") }}
+              </p>
               <h2 class="text-3xl font-light tracking-tight">
                 {{ $t("escaparate.agendaCitasTitulo") }}
               </h2>
@@ -991,6 +1016,14 @@ onMounted(cargar);
         >
           {{ $t("escaparate.reservar") }}
         </button>
+        <p v-if="escaparate.estudio.aviso_privacidad" class="mt-8 text-sm">
+          <RouterLink
+            :to="{ name: 'aviso-negocio', params: { slug } }"
+            class="tu-enlace"
+            data-prueba="aviso-negocio"
+            >{{ $t("escaparate.avisoPrivacidad") }}</RouterLink
+          >
+        </p>
       </section>
 
       <!-- Pedir acceso: el negocio da de alta a sus clientes (ADR 0093) -->
@@ -1032,8 +1065,8 @@ onMounted(cargar);
           </p>
           <div class="mt-5 grid gap-2">
             <a
-              v-if="escaparate.estudio.whatsapp_url"
-              :href="escaparate.estudio.whatsapp_url"
+              v-if="canalAcceso?.whatsapp"
+              :href="canalAcceso.whatsapp"
               target="_blank"
               rel="noopener"
               class="tu-btn tu-btn-primario w-full"
@@ -1042,6 +1075,20 @@ onMounted(cargar);
               "
             >
               {{ $t("escaparate.acceso.whatsapp") }}
+            </a>
+            <a
+              v-else-if="canalAcceso?.telefono"
+              :href="`tel:${canalAcceso.telefono.replace(/[^0-9+]/g, '')}`"
+              class="tu-btn tu-btn-primario w-full"
+              @click="
+                trackEvent('student_access_requested', { channel: 'telefono' })
+              "
+            >
+              {{
+                $t("escaparate.acceso.llamar", {
+                  telefono: canalAcceso.telefono,
+                })
+              }}
             </a>
             <RouterLink
               :to="{ name: 'entrar', query: { estudio: slug } }"

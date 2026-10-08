@@ -48,7 +48,16 @@ const props = defineProps<{
   puedeCrear: boolean;
   // Comida, vacaciones o cierre (2.2): se sombrean como "fuera de horario".
   bloqueos?: BloqueoAgenda[];
+  // La sucursal que se ve ("" o sin ella = todas): su horario y sus cierres.
+  sucursal?: string;
 }>();
+
+// ¿Algo de esta sucursal (o de ninguna en particular) cuenta en lo que se ve?
+function deLaSucursal(sucursalId: string | null): boolean {
+  return (
+    !props.sucursal || sucursalId === null || sucursalId === props.sucursal
+  );
+}
 
 const emit = defineEmits<{
   abrir: [sesion: SesionAgenda];
@@ -77,7 +86,10 @@ const delDia = computed(() =>
 
 const ventanasDelDia = computed(() => {
   const dia = diaIso(props.fecha);
-  return props.ventanas.filter((v) => v.dia_semana === dia);
+  // Solo el horario en la sucursal que se ve: quien atiende en otra, aquí no.
+  return props.ventanas.filter(
+    (v) => v.dia_semana === dia && deLaSucursal(v.sucursal_id),
+  );
 });
 
 // Rango visible: 08–20 h por defecto, ampliado a las ventanas y citas del día.
@@ -198,7 +210,7 @@ function bloqueosDe(
     .filter(
       (b) =>
         (b.ambito === "profesional" && b.instructor_id === instructorId) ||
-        b.ambito === "sede",
+        (b.ambito === "sede" && deLaSucursal(b.sucursal_id)),
     )
     .flatMap((b) => {
       const diaIni = fechaLocal(b.desde, props.zona);

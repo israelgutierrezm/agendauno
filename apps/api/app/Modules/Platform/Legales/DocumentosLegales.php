@@ -16,11 +16,14 @@ use Throwable;
  * Aviso de privacidad y términos de la plataforma: borrador y versiones publicadas.
  *
  * - El superadmin edita el BORRADOR (texto y datos del responsable). Guardar el
- *   borrador no cambia lo que ven los usuarios.
- * - PUBLICAR crea una versión nueva, inmutable y con fecha. En el aviso, los datos
- *   del responsable son obligatorios y reemplazan `{responsable}`, `{domicilio}`,
- *   `{contacto}` y `{area}` del texto. No se publica un texto que aún tenga
- *   marcadores del borrador entre corchetes (p. ej. `[NOMBRE COMPLETO…]`).
+ *   borrador no cambia lo que ven los usuarios. Mientras no haya uno guardado, el
+ *   borrador es el texto base de `resources/legales` (lo que hace AgendaUno) y el
+ *   contacto, el correo de AgendaUno.
+ * - PUBLICAR crea una versión nueva, inmutable y con fecha. Los datos del
+ *   responsable son obligatorios y reemplazan `{responsable}`, `{domicilio}`,
+ *   `{contacto}` y `{area}` del texto (en el aviso y en los términos). No se publica
+ *   un texto que aún tenga marcadores del borrador entre corchetes (p. ej.
+ *   `[NOMBRE COMPLETO…]`).
  * - Al registrarse, un negocio acepta las versiones vigentes y queda constancia
  *   (versión, fecha, IP y navegador).
  */
@@ -34,6 +37,15 @@ class DocumentosLegales
 
     private const RESPONSABLE = 'aviso_responsable';
 
+    /** Texto base de cada documento, mientras el superadmin no guarde el suyo. */
+    private const TEXTO_BASE = [
+        DocumentoLegal::AVISO => 'legales/aviso-privacidad.txt',
+        DocumentoLegal::TERMINOS => 'legales/terminos.txt',
+    ];
+
+    /** Correo de AgendaUno para privacidad y contacto, si no se captura otro. */
+    public const CONTACTO = 'hola@agendauno.mx';
+
     /** Marcadores del borrador que aún no se llenan, p. ej. [NOMBRE COMPLETO…]. */
     private const MARCADOR = '/\[[A-ZÁÉÍÓÚÑÜ0-9 ,.;:()\/\-]{4,}\]/u';
 
@@ -46,15 +58,27 @@ class DocumentosLegales
         $responsable = is_array($responsable) ? $responsable : [];
 
         return [
-            'aviso_privacidad' => (string) ConfiguracionPlataforma::obtener(self::BORRADOR[DocumentoLegal::AVISO]),
-            'terminos' => (string) ConfiguracionPlataforma::obtener(self::BORRADOR[DocumentoLegal::TERMINOS]),
+            'aviso_privacidad' => $this->textoDe(DocumentoLegal::AVISO),
+            'terminos' => $this->textoDe(DocumentoLegal::TERMINOS),
             'responsable' => [
                 'nombre' => (string) ($responsable['nombre'] ?? ''),
                 'domicilio' => (string) ($responsable['domicilio'] ?? ''),
-                'contacto' => (string) ($responsable['contacto'] ?? ''),
+                'contacto' => (string) (($responsable['contacto'] ?? '') !== '' ? $responsable['contacto'] : self::CONTACTO),
                 'area' => (string) ($responsable['area'] ?? ''),
             ],
         ];
+    }
+
+    /** El borrador guardado o, si no hay, el texto base del documento. */
+    private function textoDe(string $tipo): string
+    {
+        $guardado = (string) ConfiguracionPlataforma::obtener(self::BORRADOR[$tipo]);
+        if (trim($guardado) !== '') {
+            return $guardado;
+        }
+        $ruta = resource_path(self::TEXTO_BASE[$tipo]);
+
+        return is_file($ruta) ? (string) file_get_contents($ruta) : '';
     }
 
     /**
@@ -91,7 +115,8 @@ class DocumentosLegales
         $texto = trim($borrador[$tipo]);
         $responsable = null;
 
-        if ($tipo === DocumentoLegal::AVISO) {
+        // El aviso siempre lleva al responsable; los términos, si lo mencionan.
+        if ($tipo === DocumentoLegal::AVISO || preg_match('/\{(responsable|domicilio|contacto|area)\}/', $texto) === 1) {
             $responsable = $borrador['responsable'];
             $faltan = [];
             if ($responsable['nombre'] === '') {
@@ -104,7 +129,8 @@ class DocumentosLegales
                 $faltan[] = 'un correo válido para privacidad y derechos ARCO';
             }
             if ($faltan !== []) {
-                throw ValidationException::withMessages(['responsable' => 'Para publicar el aviso falta '.implode(', ', $faltan).'.']);
+                $documento = $tipo === DocumentoLegal::AVISO ? 'el aviso' : 'los términos';
+                throw ValidationException::withMessages(['responsable' => "Para publicar {$documento} falta ".implode(', ', $faltan).'.']);
             }
             $texto = strtr($texto, [
                 '{responsable}' => $responsable['nombre'],

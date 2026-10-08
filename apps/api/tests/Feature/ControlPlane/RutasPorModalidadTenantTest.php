@@ -67,6 +67,8 @@ function rutasExclusivasPorModalidad(): array
         'mi.reservas.aceptar' => 'clases',
         'checkins.store' => 'clases',
         'sesiones.checkins.index' => 'clases',
+        'integraciones.index' => 'clases',
+        'integraciones.upsert' => 'clases',
         'miembros.padron' => 'clases',
         // Citas: horarios de atención y disponibilidad del equipo, agendar desde el
         // panel, desde la cuenta y sin cuenta, y el historial de una cita.

@@ -1,0 +1,141 @@
+AVISO DE PRIVACIDAD INTEGRAL DE AGENDAUNO
+
+1. Quiénes somos y cómo contactarnos
+
+{responsable} (en adelante, «AgendaUno»), con domicilio en {domicilio}, es responsable del tratamiento de los datos personales que se describen en este aviso, de acuerdo con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares y demás normativa aplicable.
+
+Para cualquier asunto de privacidad, incluido el ejercicio de tus derechos, escríbenos a {contacto}. Área que atiende las solicitudes: {area}.
+
+Este aviso aplica al sitio agendauno.mx, al directorio de negocios, a la página pública de cada negocio, al registro y a la cuenta de cada negocio, a su panel web, al portal de sus clientes y a la aplicación móvil de AgendaUno.
+
+2. Definiciones
+
+• «Negocio»: el estudio, gimnasio, academia, barbería, salón, spa, consultorio u otro establecimiento que usa AgendaUno para administrar su operación.
+• «Equipo»: las personas a las que el Negocio da acceso (dueños, administradores, recepción, instructores y profesionales).
+• «Clientes del negocio»: los alumnos, miembros, clientes o pacientes de un Negocio que reservan, agendan, compran o usan su portal, su página pública o la aplicación.
+• «Datos personales»: cualquier información que identifique a una persona o la haga identificable.
+• «Datos sensibles»: los que afectan la esfera más íntima de una persona, como los de salud.
+
+3. Dos papeles distintos: responsable y encargado
+
+Somos responsables de los datos de las personas que registran un Negocio y de su Equipo, así como de quienes visitan nuestro sitio o nos escriben.
+
+Cada Negocio es responsable de los datos de sus clientes. Sobre esos datos, AgendaUno actúa como encargado y se obliga a:
+• Tratarlos solo para prestar el servicio al Negocio y conforme a sus instrucciones, nunca para fines propios.
+• Guardar confidencialidad y aplicar las medidas de seguridad de este aviso.
+• Apoyarse solo en proveedores con obligaciones equivalentes.
+• Al terminar la relación con el Negocio, entregarle sus datos si los pide y después suprimirlos, salvo lo que deba conservarse por ley.
+
+Cada Negocio debe tener su propio aviso de privacidad para sus clientes y obtener los consentimientos que correspondan. Si eres cliente de un Negocio, consulta su aviso y dirígete primero a él para ejercer tus derechos. También puedes escribirnos y canalizaremos tu solicitud.
+
+4. Datos personales que tratamos
+
+De quien registra un Negocio y de su Equipo:
+• Identificación y contacto: nombre, apellidos, correo electrónico, teléfono o WhatsApp y, si la cargas, fotografía de perfil.
+• Datos del Negocio: nombre comercial, giro, país, zona horaria, sucursales y su dirección, horarios, redes sociales, logotipo e imágenes.
+• Acceso y uso: credenciales (la contraseña se guarda de forma irreversible), roles y permisos, sesiones, dispositivos, bitácora de acciones, dirección IP y datos del navegador o del teléfono.
+• Inicio de sesión con Google, si lo eliges: el nombre, el correo y la fotografía que Google comparte.
+• Suscripción y facturación: la medición de uso para el cobro (solo cifras de alumnos o profesionales activos), cargos, pagos, referencias de la pasarela y, si solicitas factura, tus datos fiscales (RFC, nombre o razón social, régimen fiscal y código postal).
+• Nómina del Equipo, si el Negocio la usa: el esquema de pago y lo que corresponde a cada quien.
+• Atención: los mensajes que nos envías.
+
+De los clientes del Negocio (como encargado), según lo que cada Negocio active y capture:
+• Nombre, correo, celular, fecha de nacimiento, género y fotografía.
+• Membresías, paquetes y créditos; reservas, citas y asistencia; compras, pagos y adeudos; puntos de lealtad.
+• Documentos y consentimientos aceptados, respuestas a los formularios del Negocio y reseñas.
+• Pase de entrada con código QR, en los negocios de acceso libre.
+• Preferencias de comunicación y dispositivos para notificaciones.
+• Quien agenda sin cuenta en la página de un Negocio: los datos que captura para su cita (nombre, correo, celular y lo que quiera comentar).
+
+Algunos negocios (por ejemplo, consultorios, fisioterapia o estética) pueden registrar datos de salud en sus formularios o expedientes. Son datos sensibles: el Negocio debe obtener el consentimiento expreso y por escrito de su titular. AgendaUno no solicita datos sensibles para registrar un Negocio; no los incluyas en campos de contacto o de soporte.
+
+De quienes visitan el sitio: datos técnicos (dirección IP, navegador y páginas visitadas) y los que nos des al contactarnos.
+
+No guardamos números completos de tarjeta: los pagos se capturan en la página segura de la pasarela de pago.
+
+5. Para qué usamos tus datos
+
+Finalidades necesarias (sin ellas no podemos prestar el servicio):
+• Crear, activar y proteger la cuenta; autenticar el acceso y administrar roles y permisos.
+• Prestar el servicio: agenda, reservas y citas, recordatorios y avisos operativos por correo, notificaciones de la aplicación y, si se acepta, mensajes por WhatsApp.
+• Mostrar la información pública del Negocio en su página y en el directorio de negocios.
+• Procesar los cobros que el Negocio hace a sus clientes con la pasarela que el propio Negocio conecta y emitir facturas electrónicas cuando el Negocio lo solicite (solo en México).
+• Medir el uso para calcular y cobrar la suscripción, emitir comprobantes y atender adeudos.
+• Dar soporte; avisar de cambios, mantenimientos e incidentes de seguridad; hacer respaldos y prevenir fraudes y abusos.
+• Cumplir obligaciones legales y fiscales y atender requerimientos de autoridad.
+
+Finalidades secundarias (no son necesarias para el servicio):
+• Enviarte novedades, encuestas y ofertas de AgendaUno.
+• Analizar de forma agregada el uso del sitio y del servicio para mejorarlo.
+
+Si no quieres que usemos tus datos para las finalidades secundarias, escríbenos a {contacto} en cualquier momento; tu negativa no afecta el servicio. Los datos de los clientes del Negocio nunca se usan para finalidades secundarias de AgendaUno ni para enviarles publicidad de AgendaUno.
+
+No tomamos decisiones que te afecten jurídicamente basadas solo en un tratamiento automatizado ni elaboramos perfiles con fines publicitarios. La medición de uso para el cobro es un conteo de actividad del Negocio.
+
+6. Consentimiento
+
+Al registrar un Negocio, aceptar una invitación o usar la plataforma después de poner a tu disposición este aviso, consientes el tratamiento para las finalidades necesarias. Para los datos financieros y patrimoniales (cobros y facturación) y para los datos sensibles, el consentimiento debe ser expreso; en el caso de los clientes del Negocio, lo obtiene el propio Negocio.
+
+7. Con quién compartimos los datos
+
+No vendemos ni rentamos datos personales. Para prestar el servicio nos apoyamos en proveedores que los tratan por nuestra cuenta, con obligaciones de confidencialidad y seguridad:
+• Infraestructura: servidores y almacenamiento de respaldos.
+• Envío de correo electrónico.
+• WhatsApp Business (Meta), para los mensajes que se aceptaron recibir.
+• Firebase Cloud Messaging (Google), para las notificaciones de la aplicación.
+• Google, para iniciar sesión con Google y para la verificación contra registros automatizados (reCAPTCHA).
+• Pasarelas de pago (Stripe, Mercado Pago y OpenPay), con las que el Negocio cobra a sus clientes y AgendaUno cobra la suscripción.
+• FacturAPI, para timbrar facturas electrónicas.
+• Wellhub y TotalPass, solo si el Negocio activa esa integración (en México), para validar la visita de sus usuarios.
+
+Algunos de estos proveedores están fuera de México (por ejemplo, en Estados Unidos). Los datos de los clientes del Negocio se comparten con ese Negocio, que es su responsable. También compartiremos datos con autoridades cuando una ley o una orden lo exija. Conforme a la ley, estas comunicaciones no requieren tu consentimiento.
+
+8. Tus derechos ARCO y cómo ejercerlos
+
+Tienes derecho a acceder a tus datos, rectificarlos, cancelarlos u oponerte a su tratamiento (derechos ARCO). Envía tu solicitud a {contacto} con:
+• Tu nombre y un medio para responderte.
+• Un documento que acredite tu identidad o, en su caso, la representación.
+• La descripción clara de los datos y del derecho que quieres ejercer.
+• Cualquier elemento que ayude a localizarlos.
+
+Te responderemos en un plazo máximo de 20 días hábiles y, si procede, lo haremos efectivo dentro de los 15 días hábiles siguientes. Podremos ampliar estos plazos una sola vez, por un periodo igual, cuando las circunstancias lo justifiquen y te lo comuniquemos.
+
+Si eres cliente de un Negocio, desde tu cuenta puedes descargar tus datos, oponerte a recibir promociones del Negocio y pedir tu baja; el Negocio atiende tu solicitud.
+
+9. Revocar tu consentimiento y limitar el uso de tus datos
+
+Puedes revocar tu consentimiento o limitar el uso de tus datos con el mismo procedimiento del apartado anterior. Para algunas finalidades necesarias, revocarlo implica que ya no podamos prestarte el servicio. Para dejar de recibir publicidad también puedes inscribirte en el Registro Público para Evitar Publicidad (REPEP) de la Procuraduría Federal del Consumidor.
+
+10. Cookies, almacenamiento local y tecnologías similares
+
+Usamos el almacenamiento local de tu navegador para mantener tu sesión iniciada y recordar tus preferencias (tema, negocio y sucursal). El registro de negocios usa reCAPTCHA de Google, que puede usar sus propias cookies. No usamos cookies de publicidad. Si habilitamos herramientas de medición del sitio, lo indicaremos en este aviso. Puedes borrar las cookies y el almacenamiento desde tu navegador; si lo haces, tendrás que volver a iniciar sesión.
+
+11. Cómo protegemos tus datos
+
+Aplicamos medidas administrativas, técnicas y físicas: una base de datos separada para cada Negocio, conexiones cifradas (HTTPS), contraseñas y llaves de acceso guardadas de forma irreversible o cifrada, llaves de las pasarelas cifradas, permisos por rol, bitácora de acciones, respaldos periódicos y vencimiento de las sesiones que no se usan. Los pagos con tarjeta los procesa la pasarela conforme al estándar PCI DSS.
+
+Si ocurre una vulneración de seguridad que afecte de forma significativa tus derechos patrimoniales o morales, te lo informaremos sin demora (y al Negocio, si se trata de datos de sus clientes), con su naturaleza, los datos comprometidos, las medidas que tomamos y lo que puedes hacer para protegerte.
+
+12. Cuánto tiempo conservamos los datos
+
+Los conservamos mientras la cuenta esté activa y, después, el tiempo necesario para cumplir obligaciones legales y fiscales o atender aclaraciones; luego los bloqueamos y los suprimimos. En particular:
+• Un Negocio que se registra y no se activa en el plazo indicado al registrarse se borra junto con sus datos.
+• Las sesiones que no se usan vencen y se borran.
+• Los registros técnicos (envíos de mensajes, códigos de verificación y errores) se borran periódicamente.
+• La información fiscal y contable de la suscripción se conserva por el plazo que exigen las leyes fiscales (cinco años).
+
+13. Capacidad legal y menores de edad
+
+Para registrar un Negocio o formar parte de su Equipo se requiere ser mayor de edad y tener capacidad legal. Los menores de edad solo pueden ser clientes de un Negocio con la autorización de quien ejerce la patria potestad o la tutela, que el Negocio debe obtener.
+
+14. Cambios a este aviso
+
+Publicaremos cualquier cambio en agendauno.mx/aviso-de-privacidad, con su número de versión y su fecha. Si el cambio es relevante, también te avisaremos por correo o dentro de la plataforma.
+
+15. Autoridad
+
+Si consideras que tu derecho a la protección de datos personales fue vulnerado, puedes acudir ante la autoridad competente en materia de protección de datos personales (actualmente, la Secretaría Anticorrupción y Buen Gobierno).
+
+16. Contacto
+
+Para cualquier duda sobre este aviso, escríbenos a {contacto}.

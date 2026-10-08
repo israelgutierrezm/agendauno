@@ -35,7 +35,7 @@ class DespacharOutbox extends Command
                         continue;
                     }
 
-                    $publicados += $gestor->ejecutarEn($estudio, fn (): int => $relay->ejecutar());
+                    $publicados += $gestor->ejecutarAislado($estudio, fn (): int => $relay->ejecutar(), 0);
                 }
             });
 

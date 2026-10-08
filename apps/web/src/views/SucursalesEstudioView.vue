@@ -9,6 +9,7 @@ import {
   type ModalidadServicio,
 } from "@/lib/modalidad";
 import { recordarNegocio } from "@/lib/negociosRecientes";
+import { updateSeo } from "@/lib/seo";
 
 /**
  * Entrada pública del negocio (la raíz de su subdominio). Con citas, elige la sede y
@@ -68,6 +69,12 @@ async function cargar(): Promise<void> {
       logo_url: data.data.estudio.logo_url,
       ciudad: data.data.estudio.ciudad ?? null,
       pais: data.data.estudio.pais ?? null,
+    });
+    updateSeo({
+      title: `${data.data.estudio.nombre} | Sucursales en AgendaUno`,
+      description: `Elige la sucursal de ${data.data.estudio.nombre} y agenda en línea.`,
+      path: `/sucursales/${data.data.estudio.slug}`,
+      image: data.data.estudio.logo_url ?? undefined,
     });
     // Con clases (o sin sede) no hay cita que agendar: su página. Con citas y una
     // sola sede, no hay nada que elegir: directo a agendar.

@@ -55,6 +55,10 @@ Schedule::command('agendauno:conciliar-reembolsos')->everyFiveMinutes()->without
 // habría aplicado el aviso. Antes de que venza el apartado de una cita (30 min).
 Schedule::command('agendauno:conciliar-pagos')->everyFiveMinutes()->withoutOverlapping();
 
+// Renta del SaaS pagada cuyo aviso de Stripe no llegó: se confirma antes de que el
+// negocio se suspenda por renta vencida.
+Schedule::command('agendauno:conciliar-renta')->everyFifteenMinutes()->withoutOverlapping();
+
 // Cobra las renovaciones recurrentes vencidas y reintenta a los morosos (Etapa 2), a
 // las 00:45 de CDMX (ya empezó el día del cobro en el negocio). Una vez al día: es la
 // cadencia de los reintentos.

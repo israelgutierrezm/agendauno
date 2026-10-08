@@ -26,12 +26,20 @@ class CobrarCargoRenta
         private readonly RegistroDePasarelasPlataforma $registro,
         private readonly PasarelaStripePlataforma $stripe,
         private readonly SuspensionPorRenta $suspension,
+        private readonly ConciliarCargosRenta $conciliar,
     ) {}
 
     public function ejecutar(CargoRenta $cargo, string $proveedor): CargoRenta
     {
         if (! $this->registro->activa($proveedor)) {
             throw new PasarelaNoDisponible('La pasarela de la plataforma no esta activa.');
+        }
+
+        // Un intento anterior ya pagado cuyo aviso no llegó: se confirma y no se cobra
+        // de nuevo.
+        if ($cargo->estado === EstadoCargoRenta::Pendiente && $cargo->metodo_pago === 'stripe'
+            && (string) $cargo->referencia_pago !== '' && $this->conciliar->conciliar($cargo)) {
+            return $cargo->refresh();
         }
 
         $cobrado = DB::transaction(function () use ($cargo, $proveedor): CargoRenta {

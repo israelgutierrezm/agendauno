@@ -46,7 +46,8 @@ pueden usar el alias `@/`, vue-i18n ni el i18n del proyecto (su SEO va en texto 
   una prueba lo vigila). El menú dice «Clases» / «Citas».
 - **Textos veraces**: no se anuncia lo que no existe. Nada de «anticipos» (es «cobro en
   línea al agendar*»); recordatorios solo por correo (sin WhatsApp, push ni app); el QR
-  es un pase de entrada (la asistencia se pasa en lista, con retardos); en clases no hay
+  es un pase de entrada y solo en gimnasios, CrossFit y HYROX (acceso libre, ADR 0105;
+  la asistencia se pasa en lista, con retardos); en clases no hay
   autorregistro de alumnos (la página pública termina en «Pedir acceso / Ya soy
   alumno», ADR 0093); los spas sí manejan cabinas y equipos como recursos. Donde se
   mencionan cobros en línea o facturación va «*» y la nota «* Solo para clientes de

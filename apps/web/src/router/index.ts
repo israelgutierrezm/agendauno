@@ -49,6 +49,17 @@ const router = createRouter({
       component: () => import("@/views/AvisoPrivacidadView.vue"),
     },
     {
+      path: "/terminos",
+      name: "terminos",
+      component: () => import("@/views/TerminosView.vue"),
+    },
+    {
+      // El aviso de privacidad de un negocio para sus clientes (público).
+      path: "/estudio/:slug/aviso-de-privacidad",
+      name: "aviso-negocio",
+      component: () => import("@/views/AvisoNegocioView.vue"),
+    },
+    {
       // `?modo=clases|citas` (desde /clases o /citas) y `?giro=` (desde la página de
       // un giro) llegan como props; uno inválido, como null.
       path: "/registro",

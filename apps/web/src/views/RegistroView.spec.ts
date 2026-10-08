@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("@/lib/api", () => ({
   api: mocks,
   mensajeDeError: () => "No disponible",
+  camposConError: (e: unknown) => (e as { campos?: string[] }).campos ?? [],
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
 // El país y la zona que propone el navegador (ADR 0103): fijos en las pruebas.
@@ -244,6 +245,21 @@ describe("registro desde /clases o /citas (?modo=)", () => {
       },
     });
   }
+
+  it("si el servidor rechaza un dato, vuelve a su paso; si no, se queda en la confirmación", async () => {
+    const vista = montar({ modo: "clases" });
+    await hastaContacto(vista, "pilates");
+    // Sin red o sin legales publicados: nada que corregir atrás.
+    mocks.post.mockRejectedValueOnce({});
+    await crear(vista);
+    expect(vista.find("#acepta").exists()).toBe(true);
+    expect(vista.text()).toContain("No disponible");
+    // La dirección ya la ocupó alguien: de vuelta al paso 1.
+    mocks.post.mockRejectedValueOnce({ campos: ["slug"] });
+    await vista.get("form").trigger("submit");
+    await flushPromises();
+    expect(vista.find("#nombre").exists()).toBe(true);
+  });
 
   it("con ?modo=citas solo se ven los giros de citas, con «Otro negocio de citas»", () => {
     const vista = montar({ modo: "citas" });

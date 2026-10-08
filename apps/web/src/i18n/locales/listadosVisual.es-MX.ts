@@ -21,7 +21,7 @@ export default {
     buscar: "Buscar cliente o comentario",
     oculta: "Oculta del público",
     sinCoincidencias: "Ninguna reseña coincide con los filtros.",
-    sinProfesionales: "Aún no hay reseñas de un profesional.",
+    sinProfesionales: "Aún no hay reseñas de un instructor.",
     deCinco: "{n} de 5",
   },
   catalogo: {

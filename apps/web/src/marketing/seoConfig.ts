@@ -137,6 +137,14 @@ function seoDeModalidad(modo: Modo): SeoOptions {
 
 export function seoParaRuta(path: string): SeoOptions {
   const ruta = path.split(/[?#]/)[0]!.replace(/\/$/, "") || "/";
+  if (ruta === "/terminos") {
+    return {
+      title: "Términos y condiciones | AgendaUno",
+      description:
+        "Las condiciones para usar AgendaUno en tu negocio: el servicio, la prueba, el cobro y la cancelación.",
+      index: false,
+    };
+  }
   if (ruta === "/aviso-de-privacidad") {
     return {
       title: "Aviso de privacidad | AgendaUno",

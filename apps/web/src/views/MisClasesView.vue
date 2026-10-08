@@ -223,7 +223,7 @@ const eventoCalendario = computed(() =>
         <span class="sr-only">{{
           $t("portal.instructor.calendario.buscar")
         }}</span>
-        <IconoNav nombre="lista" :tam="18" />
+        <IconoNav nombre="buscar" :tam="18" />
         <input
           v-model="busqueda"
           type="search"

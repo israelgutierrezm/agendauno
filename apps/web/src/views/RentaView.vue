@@ -493,7 +493,7 @@ onMounted(() => {
       >
         {{ $t("renta.sinCargos") }}
       </p>
-      <div v-else class="mt-3 tu-card overflow-hidden">
+      <div v-else class="mt-3 tu-card overflow-x-auto">
         <table class="tu-tabla">
           <thead>
             <tr>

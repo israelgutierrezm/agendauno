@@ -34,6 +34,16 @@ export const consentimientos = {
   avisoVersion:
     "Al publicar una versión nueva, todos los alumnos tendrán que volver a firmarla.",
   publicar: "Publicar",
+  faltanCampos:
+    "Completa los campos entre corchetes (por ejemplo, el domicilio y el correo) antes de publicar.",
+  // El aviso de privacidad del negocio para sus clientes.
+  plantillaAviso: {
+    titulo: "Publica tu aviso de privacidad",
+    ayuda:
+      "La ley te pide ponerlo a disposición de tus alumnos antes de pedir sus datos. Se muestra en tu página y al agendar sin cuenta, y lo aceptan desde su cuenta. Parte de nuestra plantilla y completa tu domicilio y tu correo.",
+    usar: "Usar la plantilla",
+    tituloDocumento: "Aviso de privacidad",
+  },
 };
 
 export const formulariosRespuestas = {
@@ -934,7 +944,7 @@ export const resenas = {
   enviar: "Enviar",
   gracias: "¡Gracias por tu calificación!",
   total: "{n} reseñas",
-  porProfesional: "Por profesional",
+  porProfesional: "Por instructor",
   vacio: "Aún no hay reseñas.",
   oculta: "oculta del público",
   ocultar: "Ocultar del público",
@@ -1029,12 +1039,12 @@ export const corteCaja = {
 export const cancelacion = {
   titulo: "Cancelar",
   porNegocio: "Cancela el negocio",
-  porCliente: "Lo pidió el cliente",
+  porCliente: "Lo pidió el alumno",
   calculando: "Revisando qué pasa con el crédito…",
   confirmar: "Sí, cancelar",
   volver: "Volver",
   canceladaPor: {
-    cliente: "la canceló el cliente",
+    cliente: "la canceló el alumno",
     negocio: "la canceló el negocio",
     sistema: "venció sin pago",
   },

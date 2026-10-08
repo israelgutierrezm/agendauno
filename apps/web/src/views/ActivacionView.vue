@@ -127,6 +127,7 @@ async function enviar(): Promise<void> {
 
       <p
         v-if="errorLocal ?? sesion.error"
+        role="alert"
         class="text-sm"
         style="color: var(--error)"
       >

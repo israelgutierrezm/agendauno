@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import CalendarioDias from "@/components/CalendarioDias.vue";
 import ElegirProfesional from "@/components/ElegirProfesional.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -128,11 +129,9 @@ const listo = computed(
     fecha.value !== "",
 );
 
+// Con los números del país del negocio.
 function dinero(minor: number, moneda: string): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda,
-  }).format(minor / 100);
+  return dineroDelPais(minor, moneda, sesion.pais);
 }
 
 function hora(iso: string): string {
@@ -263,7 +262,11 @@ function otraCita(): void {
   void buscarHorarios();
 }
 
-onMounted(async () => {
+// Si no cargan los servicios, se dice (con «Reintentar»), no «sin servicios».
+const errorCarga = ref<string | null>(null);
+async function cargarOpciones(): Promise<void> {
+  cargando.value = true;
+  errorCarga.value = null;
   try {
     const { data } = await api.get<{
       data: {
@@ -305,10 +308,14 @@ onMounted(async () => {
     }
     ajustarProfesional();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    errorCarga.value = mensajeDeError(e);
   } finally {
     cargando.value = false;
   }
+}
+
+onMounted(async () => {
+  await cargarOpciones();
   try {
     const { data } = await api.get<{
       data: {
@@ -332,6 +339,17 @@ onMounted(async () => {
     <p v-if="cargando" class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("comun.cargando") }}
     </p>
+    <div v-else-if="errorCarga" class="text-sm" role="alert">
+      <p :style="{ color: 'var(--error)' }">{{ errorCarga }}</p>
+      <button
+        type="button"
+        class="tu-btn tu-btn-fantasma mt-2"
+        data-prueba="reintentar-opciones"
+        @click="cargarOpciones"
+      >
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
     <p
       v-else-if="servicios.length === 0 || profesionales.length === 0"
       class="text-sm"

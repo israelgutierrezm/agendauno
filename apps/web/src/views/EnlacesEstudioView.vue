@@ -11,7 +11,7 @@ import {
   type ModalidadServicio,
 } from "@/lib/modalidad";
 import { updateSeo } from "@/lib/seo";
-import { slugDeContexto } from "@/lib/tenant";
+import { slugDeContexto, urlCanonicaEstudio } from "@/lib/tenant";
 
 /**
  * Página de enlaces del negocio (la del link en la bio de Instagram): logo, nombre,
@@ -174,7 +174,7 @@ async function cargar(): Promise<void> {
       description:
         data.data.estudio.descripcion ??
         `Enlaces de ${data.data.estudio.nombre}.`,
-      path: `/${data.data.estudio.slug}/enlaces`,
+      path: urlCanonicaEstudio(data.data.estudio.slug, "/enlaces"),
       image: data.data.estudio.logo_url ?? undefined,
       type: "profile",
     });

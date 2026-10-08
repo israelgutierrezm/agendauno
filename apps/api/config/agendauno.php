@@ -138,6 +138,16 @@ return [
     | dinero real. La verificación de producción exige entonces Stripe en modo live;
     | sin ella, es una instalación de prueba y así lo dice.
     */
+    /*
+    | Plataformas de bienestar (solo negocios en México): Wellhub (Access Control API)
+    | y TotalPass (uso del token). En desarrollo, sus ambientes de prueba:
+    | WELLHUB_API_URL=https://apitesting.partners.gympass.com
+    */
+    'integraciones' => [
+        'wellhub_url' => env('WELLHUB_API_URL', 'https://api.partners.gympass.com'),
+        'totalpass_url' => env('TOTALPASS_API_URL', 'https://api.totalpass.com'),
+    ],
+
     'operacion' => [
         'apertura_comercial' => (bool) env('APERTURA_COMERCIAL', false),
     ],

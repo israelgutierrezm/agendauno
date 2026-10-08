@@ -39,7 +39,7 @@ class GenerarAgenda extends Command
                         continue;
                     }
 
-                    $creadas += $gestor->ejecutarEn($estudio, function () use ($generar, $parametros, $forzado, $desde): int {
+                    $creadas += $gestor->ejecutarAislado($estudio, function () use ($generar, $parametros, $forzado, $desde): int {
                         // Cuántos días adelante: lo que fija el negocio (ADR 0045).
                         $dias = max(1, is_numeric($forzado) ? (int) $forzado : $parametros->entero('agenda.dias_a_generar'));
                         $hasta = now()->addDays($dias)->toDateString();
@@ -54,7 +54,7 @@ class GenerarAgenda extends Command
                             });
 
                         return $n;
-                    });
+                    }, 0);
                 }
             });
 

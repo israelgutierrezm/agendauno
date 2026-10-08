@@ -20,8 +20,12 @@ pest()->extend(TestCase::class)
     ->beforeEach(function (): void {
         // Con el reloj fijo, muchas pruebas marcan asistencia en clases que aún no
         // empiezan: la ventana para pasar lista (ADR 0101, 30 min por omisión) se
-        // abre del todo aquí y se prueba aparte, con el valor del negocio.
-        ConfiguracionPlataforma::establecer('parametros', (string) json_encode(['asistencia.minutos_antes' => 525600]));
+        // abre del todo aquí y se prueba aparte, con el valor del negocio. Igual las
+        // sesiones sin usarse: hay pruebas que viajan meses con la misma sesión.
+        ConfiguracionPlataforma::establecer('parametros', (string) json_encode([
+            'asistencia.minutos_antes' => 525600,
+            'sesion.dias_inactividad' => 36500,
+        ]));
     })
     ->in('Feature');
 

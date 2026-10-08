@@ -534,7 +534,7 @@ const indicadores = computed<Indicador[]>(() => {
         compacto
         :titulo="$t('lealtad.canjes.vacio')"
       />
-      <div v-else class="mt-3 tu-card overflow-hidden">
+      <div v-else class="mt-3 tu-card overflow-x-auto">
         <table class="tu-tabla">
           <thead>
             <tr>

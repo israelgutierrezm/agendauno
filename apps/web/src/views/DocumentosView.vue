@@ -11,6 +11,7 @@ import PanelLateral from "@/components/PanelLateral.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import plantillaAvisoNegocio from "@/marketing/legales/aviso-negocio.txt?raw";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
 
@@ -294,6 +295,22 @@ function nuevoConsentimiento(): void {
   editor.value = { abierto: true, clave: null };
 }
 
+// El aviso de privacidad del negocio para sus clientes (clave reservada): se firma
+// en su cuenta y además se publica en su página y al agendar sin cuenta.
+const CLAVE_AVISO = "aviso-privacidad";
+const tieneAviso = computed(() =>
+  consentimientosVigentes.value.some((c) => c.clave === CLAVE_AVISO),
+);
+function usarPlantillaAviso(): void {
+  borrador.value = {
+    titulo: t("consentimientos.plantillaAviso.tituloDocumento"),
+    contenido: plantillaAvisoNegocio
+      .replaceAll("{negocio}", sesion.estudio?.nombre ?? "")
+      .replaceAll("{servicios}", sesion.esCitas ? "citas" : "clases"),
+  };
+  editor.value = { abierto: true, clave: CLAVE_AVISO };
+}
+
 function nuevaVersion(c: Consentimiento): void {
   borrador.value = { titulo: c.titulo, contenido: c.contenido };
   editor.value = { abierto: true, clave: c.clave };
@@ -318,6 +335,11 @@ function claveNueva(titulo: string): string {
 }
 
 async function publicar(): Promise<void> {
+  // Una plantilla con campos por llenar ([DOMICILIO DEL NEGOCIO]…) no se publica.
+  if (/\[[^\]\n]{4,}\]/.test(borrador.value.contenido)) {
+    toast.error(t("consentimientos.faltanCampos"));
+    return;
+  }
   if (
     !(await confirmar(
       t("confirmaciones.publicarDocumento", { titulo: borrador.value.titulo }),
@@ -715,6 +737,34 @@ onMounted(cargar);
       </form>
     </div>
 
+    <!-- Aviso de privacidad para los clientes: lo pide la ley antes de sus datos -->
+    <div
+      v-if="
+        !cargando &&
+        pestana === 'consentimientos' &&
+        puedeGestionar &&
+        !tieneAviso
+      "
+      class="mt-5 tu-card doc-aviso"
+      data-prueba="plantilla-aviso"
+    >
+      <div class="min-w-0">
+        <p class="font-medium">
+          {{ $t("consentimientos.plantillaAviso.titulo") }}
+        </p>
+        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("consentimientos.plantillaAviso.ayuda") }}
+        </p>
+      </div>
+      <button
+        type="button"
+        class="tu-btn tu-btn-primario shrink-0"
+        @click="usarPlantillaAviso"
+      >
+        {{ $t("consentimientos.plantillaAviso.usar") }}
+      </button>
+    </div>
+
     <!-- Consentimientos -->
     <div
       v-if="!cargando && pestana === 'consentimientos'"
@@ -854,5 +904,18 @@ onMounted(cargar);
 }
 .doc-fila:first-child {
   border-top: 0;
+}
+/* El aviso de privacidad por publicar: texto y botón en una fila (abajo en el
+   teléfono). */
+.doc-aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  padding: 1.1rem 1.25rem;
+}
+.doc-aviso > div {
+  flex: 1 1 18rem;
 }
 </style>

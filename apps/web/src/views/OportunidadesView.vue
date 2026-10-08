@@ -137,7 +137,7 @@ async function promover(o: Oportunidad): Promise<void> {
     const n = data.data.ofrecidas;
     aviso.value =
       n > 0
-        ? t("oportunidades.ofrecidas", { n })
+        ? t("oportunidades.ofrecidas", { n }, n)
         : t("oportunidades.sinPromover");
     await cargar();
   } catch (e) {
@@ -220,14 +220,14 @@ onMounted(cargar);
             v-model="busqueda"
             class="tu-input"
             type="search"
-            placeholder="Buscar clase, sede o instructor"
-            aria-label="Buscar lugares disponibles"
+            :placeholder="$t('oportunidadesVisual.filtros.buscar')"
+            :aria-label="$t('oportunidadesVisual.filtros.buscarEtiqueta')"
           />
           <select
             v-if="sucursales.length > 1"
             v-model="sucursal"
             class="tu-input"
-            aria-label="Filtrar por sucursal"
+            :aria-label="$t('oportunidadesVisual.filtros.sucursal')"
           >
             <option value="">{{ $t("sucursalOperativa.todas") }}</option>
             <option v-for="s in sucursales" :key="s" :value="s">{{ s }}</option>
@@ -236,16 +236,19 @@ onMounted(cargar);
             v-if="instructores.length > 1"
             v-model="instructor"
             class="tu-input"
-            aria-label="Filtrar por instructor"
+            :aria-label="$t('oportunidadesVisual.filtros.instructor')"
           >
-            <option value="">Todos los instructores</option>
+            <option value="">
+              {{ $t("oportunidadesVisual.filtros.todosInstructores") }}
+            </option>
             <option v-for="i in instructores" :key="i" :value="i">
               {{ i }}
             </option>
           </select>
           <label class="flex items-center gap-2 text-sm"
-            ><input v-model="soloEspera" type="checkbox" />Con lista de
-            espera</label
+            ><input v-model="soloEspera" type="checkbox" />{{
+              $t("oportunidadesVisual.filtros.soloEspera")
+            }}</label
           >
           <span class="text-sm" :style="{ color: 'var(--texto-suave)' }">{{
             $t("oportunidades.horizonte")
@@ -263,10 +266,10 @@ onMounted(cargar);
             </button>
           </div>
         </div>
-        <p v-if="filtradas.length === 0" class="tu-sin-resultados">
+        <p v-if="filtradas.length === 0 && !error" class="tu-sin-resultados">
           {{ $t("oportunidades.vacio") }}
         </p>
-        <table v-else class="tu-tabla">
+        <table v-else-if="filtradas.length > 0" class="tu-tabla">
           <thead>
             <tr>
               <th>{{ $t("oportunidadesVisual.col.clase") }}</th>
@@ -314,12 +317,9 @@ onMounted(cargar);
                 {{ o.libres }}
               </td>
               <td class="text-right hidden md:table-cell tabular-nums">
-                <span
-                  v-if="o.en_espera > 0"
-                  class="tu-pildora"
-                  :style="{ '--tono': 'var(--aviso)' }"
-                  >{{ o.en_espera }}</span
-                >
+                <span v-if="o.en_espera > 0" class="tu-badge tu-badge-aviso">{{
+                  o.en_espera
+                }}</span>
                 <template v-else>—</template>
               </td>
               <td class="text-right whitespace-nowrap">

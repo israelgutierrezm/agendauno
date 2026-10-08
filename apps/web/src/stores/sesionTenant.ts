@@ -112,6 +112,8 @@ export interface EstudioSesion {
   // Con pesos mexicanos cobra en línea y (en México) factura a sus clientes.
   cobra_en_linea_posible?: boolean;
   factura_posible?: boolean;
+  // Wellhub y TotalPass solo operan con negocios en México.
+  bienestar_posible?: boolean;
   // ¿La plataforma ya factura? En producción, solo con su proveedor configurado.
   facturacion_disponible?: boolean;
 }

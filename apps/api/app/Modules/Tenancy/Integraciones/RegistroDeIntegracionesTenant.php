@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Integraciones;
 
+use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Models\IntegracionTenant;
 
 /**
@@ -15,6 +16,7 @@ class RegistroDeIntegracionesTenant
     public function __construct(
         private readonly ValidadorWellhub $wellhub,
         private readonly ValidadorTotalPass $totalpass,
+        private readonly RegionNegocioTenant $region,
     ) {}
 
     public function resolver(string $proveedor): ?ValidadorPartner
@@ -26,9 +28,10 @@ class RegistroDeIntegracionesTenant
         };
     }
 
+    /** Activa en el negocio y el negocio está en México (donde operan). */
     public function activa(string $proveedor): bool
     {
-        return (bool) IntegracionTenant::query()
+        return $this->region->enMexico() && IntegracionTenant::query()
             ->where('proveedor', $proveedor)
             ->where('activa', true)
             ->exists();

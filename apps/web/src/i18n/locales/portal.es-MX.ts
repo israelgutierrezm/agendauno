@@ -147,7 +147,7 @@ export default {
   // Historial de clases y citas: qué pasó, su reseña y volver a reservar.
   historial: {
     titulo: "Historial",
-    vacio: "Aquí verás tus clases y citas cuando pasen.",
+    vacio: "Aquí verás tus clases cuando pasen.",
     sinEnFechas: "No hay nada en estas fechas.",
     desde: "Desde",
     hasta: "Hasta",
@@ -189,7 +189,7 @@ export default {
       proxima: "Tu próxima clase",
       proximaCita: "Tu próxima cita",
       proximaGeneral: "Lo próximo en tu agenda",
-      resumen: "Aquí tienes tus clases y citas en {estudio}.",
+      resumen: "Aquí tienes tus clases en {estudio}.",
       resumenClases: "Tu día en {estudio}: clases, participantes y asistencia.",
       resumenCitas: "Tu día en {estudio}: clientes, citas y atención.",
       pendientesHoy: "Asistencia pendiente",
@@ -209,7 +209,7 @@ export default {
       // Hoy: lo que ya empezó y aún no tiene lista (o llegada) marcada.
       faltaLista: "Falta pasar lista",
       faltaLlegada: "Falta marcar llegada",
-      sinHoy: "Hoy no tienes clases ni citas.",
+      sinHoy: "Hoy no tienes clases.",
       actualizar: "Actualizar",
       verCalendario: "Ver en mi calendario →",
       tarjetas: {

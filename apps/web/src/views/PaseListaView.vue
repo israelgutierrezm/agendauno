@@ -316,7 +316,16 @@ async function terminarLista(): Promise<void> {
   });
 }
 
+// Aceptar a nombre de la persona confirma su lugar y usa su plan: se confirma.
 async function aceptar(r: ReservaLista): Promise<void> {
+  if (
+    !(await confirmar(
+      t("confirmaciones.aceptarLugar", { persona: r.persona ?? "" }),
+      { aceptar: t("confirmaciones.aceptarLugarAceptar") },
+    ))
+  ) {
+    return;
+  }
   await accion(() => api.post(`${base.value}/reservas/${r.id}/aceptar`, {}));
 }
 
@@ -336,7 +345,7 @@ async function promover(): Promise<void> {
     const n = data.data.ofrecidas;
     toast.exito(
       n > 0
-        ? t("oportunidades.ofrecidas", { n })
+        ? t("oportunidades.ofrecidas", { n }, n)
         : t("oportunidades.sinPromover"),
     );
   });

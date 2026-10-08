@@ -44,7 +44,7 @@ export default {
     correo: "Correo",
     celular: "Celular",
     sucursal: "Sucursal",
-    alta: "Cliente desde",
+    alta: "Alumno desde",
     origen: "Cómo nos conoció",
     whatsapp: "Avisos por WhatsApp",
     acepta: "Sí",

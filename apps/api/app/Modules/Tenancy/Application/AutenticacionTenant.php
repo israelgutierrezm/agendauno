@@ -21,6 +21,8 @@ use Illuminate\Support\Str;
  */
 class AutenticacionTenant
 {
+    public function __construct(private readonly ParametrosTenant $parametros) {}
+
     /**
      * Crea un token para el usuario y devuelve el valor en claro (solo una vez).
      */
@@ -116,6 +118,15 @@ class AutenticacionTenant
         }
 
         if ($token->expires_at instanceof Carbon && $token->expires_at->isPast()) {
+            return null;
+        }
+
+        // Sin usarse en el plazo del negocio, la sesión vence (y se borra).
+        $ultimoUso = $token->last_used_at ?? $token->created_at;
+        $dias = $this->parametros->entero('sesion.dias_inactividad');
+        if ($ultimoUso instanceof Carbon && $ultimoUso->lessThan(now()->subDays($dias))) {
+            $token->delete();
+
             return null;
         }
 

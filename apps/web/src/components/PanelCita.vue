@@ -109,16 +109,15 @@ function dinero(minor: number, decimales = 0): string {
     maximumFractionDigits: decimales,
   });
 }
+// Lo que se cobra es el total de su orden (fijo desde que se agendó); sin orden, el
+// precio del servicio. Con centavos, se muestran: el monto dicho es el que se cobra.
+const monto = computed<number | null>(
+  () => cita.value?.total_minor ?? props.sesion?.oferta_precio_clase ?? null,
+);
 const precio = computed(() =>
-  props.sesion?.oferta_precio_clase
-    ? dinero(props.sesion.oferta_precio_clase)
-    : null,
+  monto.value ? dinero(monto.value, monto.value % 100 === 0 ? 0 : 2) : null,
 );
-const total = computed(() =>
-  props.sesion?.oferta_precio_clase
-    ? dinero(props.sesion.oferta_precio_clase, 2)
-    : null,
-);
+const total = computed(() => (monto.value ? dinero(monto.value, 2) : null));
 const sucursal = computed(() =>
   [props.sesion?.sucursal, props.sesion?.sala].filter(Boolean).join(" · "),
 );
@@ -1006,9 +1005,10 @@ watch(
   display: grid;
   gap: 0.7rem;
 }
+/* Cuatro opciones: de dos en dos (ninguna queda sola en su fila). */
 @media (min-width: 640px) {
   .pc-opciones {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 .pc-opcion {

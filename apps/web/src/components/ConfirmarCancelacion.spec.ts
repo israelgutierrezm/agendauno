@@ -73,7 +73,7 @@ describe("confirmar cancelación", () => {
       params: { por: "negocio" },
     });
 
-    await boton(w, "Lo pidió el cliente")?.trigger("click");
+    await boton(w, "Lo pidió el alumno")?.trigger("click");
     await flushPromises();
     expect(api.get).toHaveBeenLastCalledWith(expect.any(String), {
       params: { por: "cliente" },

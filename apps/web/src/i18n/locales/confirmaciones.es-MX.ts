@@ -10,7 +10,8 @@ export default {
   facturaRenta:
     "¿Timbrar la factura de este cargo? Un CFDI timbrado no se edita; solo se cancela ante el SAT.",
   timbrar: "Timbrar",
-  pagarRenta: "¿Pagar {monto} de tu suscripción con tu forma de pago guardada?",
+  pagarRenta:
+    "¿Pagar {monto} de tu suscripción? Te llevamos a la página de pago segura de Stripe.",
   pagar: "Pagar",
   recargar:
     "¿Agregar {n} créditos a su saldo? Queda en sus movimientos con el motivo.",
@@ -32,6 +33,12 @@ export default {
   promover:
     "¿Ofrecer los lugares libres a la lista de espera? Se avisa a quienes siguen en la fila.",
   promoverAceptar: "Ofrecer lugares",
+  aceptarLugar:
+    "¿Aceptar el lugar a nombre de {persona}? Queda confirmado en la clase y se usa su plan, como si lo hubiera aceptado.",
+  aceptarLugarAceptar: "Aceptar el lugar",
+  quitarDeEspera:
+    "¿Quitar a {persona} de la lista de espera? Ya no se le ofrecerá un lugar en esta clase.",
+  quitarDeEsperaAceptar: "Quitar de la espera",
   publicarDocumento:
     "¿Publicar «{titulo}»? Tus clientes verán esta versión y tendrán que aceptarla.",
   publicar: "Publicar",

@@ -192,7 +192,7 @@ onMounted(cargar);
         icono="pulso"
         :titulo="$t('operacion.renovaciones.vacio')"
       />
-      <div v-else class="mt-4 tu-card overflow-hidden">
+      <div v-else class="mt-4 tu-card overflow-x-auto">
         <table class="tu-tabla">
           <thead>
             <tr>

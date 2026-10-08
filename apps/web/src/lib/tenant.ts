@@ -66,6 +66,14 @@ export function urlPublicaEstudio(slug: string): string {
 }
 
 /**
+ * Dirección canónica de una página del negocio: vive en su subdominio (en el dominio
+ * principal, esas rutas redirigen ahí). `ruta` es la de dentro del subdominio.
+ */
+export function urlCanonicaEstudio(slug: string, ruta = "/"): string {
+  return `https://${urlPublicaEstudio(slug)}${ruta}`;
+}
+
+/**
  * ¿Es el dominio principal de producción (`agendauno.mx` o `www.agendauno.mx`)? En
  * desarrollo (localhost) y en el subdominio de un negocio, no.
  */
@@ -87,6 +95,7 @@ const RUTAS_CON_SLUG_EN_SUBDOMINIO: Record<string, (slug: string) => string> = {
   "estudio-corto": () => "/",
   "estudio-publico": (slug) => `/estudio/${slug}`,
   "enlaces-estudio": () => "/enlaces",
+  "aviso-negocio": (slug) => `/estudio/${slug}/aviso-de-privacidad`,
 };
 
 // Un slug que sirve como subdominio: letras, números y guiones, sin puntos.

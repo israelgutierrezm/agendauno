@@ -15,6 +15,7 @@ import {
   type BloqueoAgenda,
   type VentanaAtencion,
 } from "@/lib/agenda";
+import { dinero as dineroDelPais } from "@/lib/formato";
 import { api, mensajeDeError } from "@/lib/api";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -120,12 +121,12 @@ watch(
   },
 );
 
+// En la moneda y con los números del país del negocio; los centavos, si los hay.
 function dinero(minor: number): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: useSesionTenantStore().moneda,
-    maximumFractionDigits: 0,
-  }).format(minor / 100);
+  const s = useSesionTenantStore();
+  return dineroDelPais(minor, s.moneda, s.pais, {
+    minimumFractionDigits: minor % 100 === 0 ? 0 : 2,
+  });
 }
 const aviso = computed(() => {
   const o = oferta.value;
@@ -231,6 +232,15 @@ async function agendar(): Promise<void> {
       );
       personaId = data.data.id;
       nombre = nuevoCliente.value.nombre.trim();
+      // Ya existe: si la cita no se puede agendar (hueco ocupado), al reintentar se
+      // usa este cliente y no se crea otro igual.
+      clienteSel.value = {
+        id: personaId,
+        nombre,
+        detalle: nuevoCliente.value.celular.trim() || null,
+      };
+      form.value.clienteId = personaId;
+      nuevo.value = false;
     }
     await api.post(`${props.base}/agenda/citas`, {
       persona_id: personaId,
@@ -269,6 +279,7 @@ async function agendar(): Promise<void> {
         <template v-if="!nuevo">
           <BuscarPersona
             v-model="form.clienteId"
+            :personas="clienteSel ? [clienteSel] : []"
             :buscar-en="`${base}/miembros`"
             :parametros="{ tipo: 'miembro' }"
             :placeholder="$t('agendaVisual.nuevaCita.buscarCliente')"
@@ -369,8 +380,8 @@ async function agendar(): Promise<void> {
       </label>
       <LeyendaSucursal v-else />
 
-      <div class="grid grid-cols-3 gap-3">
-        <label class="block col-span-3 sm:col-span-1">
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <label class="block col-span-2 sm:col-span-1">
           <span class="tu-label">{{ $t("agendaVisual.nuevaCita.fecha") }}</span>
           <input v-model="form.fecha" class="tu-input" type="date" required />
         </label>

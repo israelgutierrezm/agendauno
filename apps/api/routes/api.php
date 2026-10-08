@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Http\Controllers\AsistenciaTenantController;
 use App\Modules\Tenancy\Http\Controllers\AuditoriaController;
 use App\Modules\Tenancy\Http\Controllers\AuthTenantController;
 use App\Modules\Tenancy\Http\Controllers\AutomatizacionesTenantController;
+use App\Modules\Tenancy\Http\Controllers\AvisoPrivacidadNegocioController;
 use App\Modules\Tenancy\Http\Controllers\AvisosPlataformaTenantController;
 use App\Modules\Tenancy\Http\Controllers\BloqueosAgendaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CalendarioTenantController;
@@ -123,7 +124,8 @@ use Illuminate\Support\Facades\Route;
 | inglés; recursos de dominio en español.
 */
 Route::prefix('v1')->group(function (): void {
-    Route::get('/health', HealthController::class)->name('api.v1.health');
+    // Consulta la base y Redis: con tope por IP (sobra para el monitoreo).
+    Route::get('/health', HealthController::class)->middleware('throttle:120,1,health')->name('api.v1.health');
 
     /*
     | Control plane (SaaS multi-tenant por BD). Alta pública de estudios y
@@ -134,12 +136,12 @@ Route::prefix('v1')->group(function (): void {
     // Webhook publico de pasarela por estudio (data plane): resuelve el estudio por
     // slug y confirma el pago pendiente -> fulfillment. Sin sesion; idempotente.
     Route::post('/webhooks/tenant/{estudio}/{proveedor}', WebhookTenantController::class)
-        ->middleware('estudio.resolver')->name('api.v1.webhooks.tenant');
+        ->middleware(['throttle:600,1,pasarela-webhook', 'estudio.resolver'])->name('api.v1.webhooks.tenant');
 
     // Webhook publico de la pasarela de la PLATAFORMA: confirma el cargo de renta del
     // SaaS (plataforma -> dueño) -> pagado. Sin sesion; idempotente.
     Route::post('/webhooks/plataforma/{proveedor}', WebhookPlataformaController::class)
-        ->name('api.v1.webhooks.plataforma');
+        ->middleware('throttle:600,1,plataforma-webhook')->name('api.v1.webhooks.plataforma');
     // Estados de entrega de WhatsApp (Meta): verificación (GET) y avisos (POST), ADR 0074.
     Route::get('/webhooks/whatsapp', [WebhookWhatsAppController::class, 'verificar'])
         ->middleware('throttle:60,1,whatsapp-webhook-verificar')->name('api.v1.webhooks.whatsapp.verificar');
@@ -229,6 +231,8 @@ Route::prefix('v1')->group(function (): void {
         // Registro cerrado (ADR 0093): los clientes no crean su cuenta; el negocio los
         // da de alta y los invita. Agendar sin cuenta sigue en /citas.
         Route::get('/escaparate', EscaparateController::class)->middleware('throttle:negocio-publico')->name('escaparate');
+        // El aviso de privacidad del negocio para sus clientes (antes de dar sus datos).
+        Route::get('/aviso-privacidad', AvisoPrivacidadNegocioController::class)->middleware('throttle:negocio-publico')->name('aviso-privacidad');
 
         // Citas públicas (guest, sin cuenta): opciones (servicios/sucursales/barberos)
         // y disponibilidad para elegir hueco; luego agendar y pagar en línea (el
@@ -754,8 +758,9 @@ Route::prefix('v1')->group(function (): void {
             // Integraciones de bienestar (Wellhub / TotalPass): el propietario conecta
             // llaves (cifradas); el staff valida check-ins de esos usuarios en clases
             // (sin consumir creditos del estudio).
-            Route::get('/integraciones', [IntegracionesTenantController::class, 'index'])->middleware('puede:integraciones.configurar')->name('integraciones.index');
-            Route::put('/integraciones/{proveedor}', [IntegracionesTenantController::class, 'upsert'])->middleware('puede:integraciones.configurar')->name('integraciones.upsert');
+            // Son de clases (ADR 0104).
+            Route::get('/integraciones', [IntegracionesTenantController::class, 'index'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.index');
+            Route::put('/integraciones/{proveedor}', [IntegracionesTenantController::class, 'upsert'])->middleware(['puede:integraciones.configurar', 'modalidad:clases'])->name('integraciones.upsert');
 
             // Webhooks salientes (R40): endpoints firmados que consumen el outbox. El
             // secreto se devuelve solo al crear. Configuracion solo del propietario.

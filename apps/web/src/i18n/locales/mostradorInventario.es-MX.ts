@@ -209,6 +209,14 @@ export const oportunidadesVisual = {
     espera: "En espera",
     acciones: "Acciones",
   },
+  filtros: {
+    buscar: "Buscar clase, sucursal o instructor",
+    buscarEtiqueta: "Buscar lugares disponibles",
+    sucursal: "Filtrar por sucursal",
+    instructor: "Filtrar por instructor",
+    todosInstructores: "Todos los instructores",
+    soloEspera: "Con lista de espera",
+  },
 };
 
 // Grupos (views/GruposView.vue) con el patrón de los listados.

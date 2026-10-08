@@ -105,6 +105,54 @@ it('el dueño paga su renta con Stripe y el webhook de la plataforma lo confirma
         ->assertJsonPath('data.cargos.0.pagado_en', fn (?string $v): bool => $v !== null);
 });
 
+it('si el aviso de Stripe no llega, la conciliación confirma la renta y el reintento no cobra de nuevo', function (): void {
+    // Stripe: la sesión ya se pagó, pero su aviso nunca llega.
+    Http::fake([
+        'api.stripe.com/v1/checkout/sessions/cs_renta_perdida*' => Http::response([
+            'id' => 'cs_renta_perdida', 'status' => 'complete', 'payment_status' => 'paid',
+        ]),
+        'api.stripe.com/*' => Http::response([
+            'id' => 'cs_renta_perdida', 'url' => 'https://checkout.stripe.com/c/pay/cs_renta_perdida',
+        ]),
+    ]);
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    activarStripePlataforma(['secret_key' => 'sk_test_plat']);
+    $cargo = cargoRentaPendiente($e);
+    $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/pagar", ['proveedor' => 'stripe'], conBearer($e['bearer']))
+        ->assertCreated()->assertJsonPath('data.estado', 'pendiente');
+
+    // Al volver a «Pagar», se ve que ya se pagó: se confirma y no se abre otro cobro.
+    $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/pagar", ['proveedor' => 'stripe'], conBearer($e['bearer']))
+        ->assertSuccessful()->assertJsonPath('data.estado', 'pagado');
+    // Una sola sesión de pago: el reintento solo preguntó cómo quedó.
+    Http::assertSentCount(2);
+    Http::assertSent(fn ($r): bool => $r->method() === 'GET' && str_contains($r->url(), 'cs_renta_perdida'));
+});
+
+it('la conciliación programada confirma la renta pagada cuyo aviso no llegó', function (): void {
+    Http::fake([
+        'api.stripe.com/v1/checkout/sessions/cs_renta_perdida*' => Http::response([
+            'id' => 'cs_renta_perdida', 'status' => 'complete', 'payment_status' => 'paid',
+        ]),
+        'api.stripe.com/*' => Http::response([
+            'id' => 'cs_renta_perdida', 'url' => 'https://checkout.stripe.com/c/pay/cs_renta_perdida',
+        ]),
+    ]);
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    activarStripePlataforma(['secret_key' => 'sk_test_plat']);
+    $cargo = cargoRentaPendiente($e);
+    $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/pagar", ['proveedor' => 'stripe'], conBearer($e['bearer']))
+        ->assertCreated();
+
+    // Antes de la gracia, se espera el aviso.
+    $this->artisan('agendauno:conciliar-renta')->expectsOutputToContain('confirmados: 0')->assertSuccessful();
+    $this->travel(11)->minutes();
+    $this->artisan('agendauno:conciliar-renta')->expectsOutputToContain('confirmados: 1')->assertSuccessful();
+
+    $this->getJson("/api/v1/app/{$e['slug']}/renta", conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.cargos.0.estado', 'pagado');
+});
+
 it('rechaza pagar la renta si la plataforma no tiene pasarela activa (GATEWAY_UNAVAILABLE)', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $cargo = cargoRentaPendiente($e); // no se activa ninguna pasarela

@@ -251,7 +251,7 @@ function deReserva(r: Reserva): Evento {
       : (r.oferta ?? "—"),
     inicia: r.inicia_en ?? "",
     termina: r.termina_en ?? null,
-    zona: r.zona_horaria ?? "America/Mexico_City",
+    zona: r.zona_horaria ?? sesion.zonaHoraria,
     sucursal: r.sucursal,
     instructor: r.instructor ?? null,
     estado: r.estado,
@@ -842,6 +842,17 @@ onMounted(() => void cuenta.asegurar());
       @cerrar="cerrar"
     >
       <template v-if="abierto">
+        <!-- Lo que falló al reservar, aceptar o cancelar: aquí, a la vista (el aviso
+             de la página queda detrás del panel). -->
+        <p
+          v-if="cuenta.error.value"
+          class="mb-3 text-sm"
+          role="alert"
+          style="color: var(--error)"
+          data-prueba="error-panel"
+        >
+          {{ cuenta.error.value }}
+        </p>
         <p class="first-letter:uppercase">
           {{ cuandoCorto(abierto.inicia, abierto.zona) }}
         </p>

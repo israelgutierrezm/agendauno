@@ -293,6 +293,8 @@ class AuthTenantController
             'lada' => app(RegionNegocioTenant::class)->lada(),
             'cobra_en_linea_posible' => app(RegionNegocioTenant::class)->enPesos(),
             'factura_posible' => app(RegionNegocioTenant::class)->factura(),
+            // Wellhub y TotalPass solo operan en México.
+            'bienestar_posible' => app(RegionNegocioTenant::class)->enMexico(),
             // ¿La plataforma ya factura? En producción, solo con la llave de FacturAPI.
             'facturacion_disponible' => ConfiguracionPlataforma::facturacionDisponible(),
         ];

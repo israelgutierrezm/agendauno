@@ -18,6 +18,23 @@ use Illuminate\Support\Collection;
  */
 class WaiversTenant
 {
+    /**
+     * Clave reservada del aviso de privacidad del negocio para sus clientes: además
+     * de firmarse en el portal como cualquier consentimiento, se publica en su página
+     * y en el formulario para agendar sin cuenta.
+     */
+    public const AVISO_PRIVACIDAD = 'aviso-privacidad';
+
+    /** La versión vigente del aviso de privacidad del negocio, o null. */
+    public function avisoPrivacidad(): ?WaiverTenant
+    {
+        return WaiverTenant::query()
+            ->where('clave', self::AVISO_PRIVACIDAD)
+            ->where('activo', true)
+            ->orderByDesc('version')
+            ->first();
+    }
+
     public function publicar(string $clave, string $titulo, string $contenido): WaiverTenant
     {
         $ultima = (int) WaiverTenant::query()->where('clave', $clave)->max('version');

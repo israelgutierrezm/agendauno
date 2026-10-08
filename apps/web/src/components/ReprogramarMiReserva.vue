@@ -57,22 +57,36 @@ const elegido = ref("");
 const guardando = ref(false);
 const error = ref<string | null>(null);
 
+// Al cambiar de día rápido, una respuesta vieja no pisa los huecos del día elegido.
+// Mientras llegan los nuevos no se ofrecen los del día anterior.
+let pedido = 0;
+const cargandoHuecos = ref(false);
 async function cargar(): Promise<void> {
+  const mio = ++pedido;
   error.value = null;
   elegido.value = "";
+  cargandoHuecos.value = true;
   try {
     const { data } = await api.get<{ data: Opciones }>(
       `${props.base}/mi/reservas/${props.reservaId}/reprogramar`,
       { params: { fecha: fecha.value } },
     );
-    opciones.value = data.data;
+    if (mio === pedido) {
+      opciones.value = data.data;
+    }
   } catch (e) {
-    error.value = mensajeDeError(e);
+    if (mio === pedido) {
+      error.value = mensajeDeError(e);
+    }
+  } finally {
+    if (mio === pedido) {
+      cargandoHuecos.value = false;
+    }
   }
 }
 
 async function cambiar(): Promise<void> {
-  if (elegido.value === "" || opciones.value === null) {
+  if (elegido.value === "" || opciones.value === null || cargandoHuecos.value) {
     return;
   }
   guardando.value = true;
@@ -188,7 +202,7 @@ onMounted(cargar);
         v-if="opciones?.puede"
         type="button"
         class="tu-btn tu-btn-primario"
-        :disabled="guardando || elegido === ''"
+        :disabled="guardando || cargandoHuecos || elegido === ''"
         @click="cambiar"
       >
         {{ $t("miReprogramar.cambiar") }}

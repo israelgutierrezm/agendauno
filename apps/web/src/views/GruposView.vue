@@ -11,6 +11,7 @@ import TarjetasIndicadores, {
   type Indicador,
 } from "@/components/TarjetasIndicadores.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Grupo {
@@ -61,8 +62,11 @@ const inscripciones = ref<Inscripcion[]>([]);
 const miembroId = ref("");
 const inscribiendo = ref(false);
 const mensaje = ref<string | null>(null);
+// Quedó inscrito sin ninguna clase reservada: se avisa (no es un éxito completo).
+const sinReservas = ref(false);
 
-const LETRAS = ["", "L", "M", "M", "J", "V", "S", "D"];
+// Abreviaturas que no se confunden (martes y miércoles empiezan igual).
+const LETRAS = ["", "Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"];
 function etiquetaPlantilla(p: Plantilla): string {
   const dias = [...p.dias_semana]
     .sort((a, b) => a - b)
@@ -124,6 +128,15 @@ async function inscribir(): Promise<void> {
   if (seleccionado.value === null || miembroId.value === "") {
     return;
   }
+  // Inscribir reserva todas sus clases próximas con su plan: se confirma.
+  if (
+    !(await confirmar(
+      t("cursos.confirmarInscribir", { grupo: seleccionado.value.nombre }),
+      { aceptar: t("cursos.inscribir") },
+    ))
+  ) {
+    return;
+  }
   inscribiendo.value = true;
   mensaje.value = null;
   error.value = null;
@@ -132,7 +145,10 @@ async function inscribir(): Promise<void> {
       `${base.value}/grupos/${seleccionado.value.id}/inscripciones`,
       { persona_id: miembroId.value },
     );
-    mensaje.value = t("cursos.reservadas", { n: data.data.reservadas });
+    const n = data.data.reservadas;
+    sinReservas.value = n === 0;
+    mensaje.value =
+      n === 0 ? t("cursos.sinReservadas") : t("cursos.reservadas", { n });
     miembroId.value = "";
     await seleccionar(seleccionado.value);
     await cargar();
@@ -198,12 +214,12 @@ const indicadores = computed<Indicador[]>(() => {
 
     <template v-if="!cargando">
       <EstadoVacio
-        v-if="grupos.length === 0"
+        v-if="grupos.length === 0 && !error"
         class="tu-card mt-6"
         icono="grupos"
         :titulo="$t('cursos.vacio')"
       />
-      <template v-else>
+      <template v-else-if="grupos.length > 0">
         <TarjetasIndicadores class="mt-6" :tarjetas="indicadores" />
 
         <div class="mt-5 grid gap-5 lg:grid-cols-5">
@@ -241,13 +257,10 @@ const indicadores = computed<Indicador[]>(() => {
                   </td>
                   <td class="text-right tabular-nums">{{ g.inscritos }}</td>
                   <td>
+                    <!-- Estado: punto + texto. -->
                     <span
-                      class="tu-pildora"
-                      :style="{
-                        '--tono': g.activo
-                          ? 'var(--exito)'
-                          : 'var(--texto-suave)',
-                      }"
+                      class="tu-badge"
+                      :class="{ 'tu-badge-exito': g.activo }"
                       >{{
                         g.activo
                           ? $t("gruposVisual.activo")
@@ -309,7 +322,10 @@ const indicadores = computed<Indicador[]>(() => {
               <p
                 v-if="mensaje"
                 class="mt-2 text-sm"
-                :style="{ color: 'var(--exito)' }"
+                role="status"
+                :style="{
+                  color: sinReservas ? 'var(--aviso)' : 'var(--exito)',
+                }"
               >
                 {{ mensaje }}
               </p>
@@ -340,6 +356,14 @@ const indicadores = computed<Indicador[]>(() => {
       @cerrar="cerrar"
     >
       <form class="space-y-4" @submit.prevent="crear">
+        <p
+          v-if="error"
+          class="text-sm"
+          role="alert"
+          :style="{ color: 'var(--error)' }"
+        >
+          {{ error }}
+        </p>
         <div>
           <label class="tu-label" for="gn">{{ $t("cursos.nombre") }}</label>
           <input id="gn" v-model="nuevo.nombre" class="tu-input" required />

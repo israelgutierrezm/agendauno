@@ -32,16 +32,24 @@ const por = ref<"cliente" | "negocio">("negocio");
 const efecto = ref<Efecto | null>(null);
 const error = ref<string | null>(null);
 
+// Al cambiar quién cancela, el efecto anterior se quita (no se confirma con el de
+// la otra opción a la vista) y una respuesta vieja no pisa a la nueva.
+let pedido = 0;
 async function cargar(): Promise<void> {
+  const mio = ++pedido;
   error.value = null;
+  efecto.value = null;
   try {
     const { data } = await api.get<{ data: Efecto }>(props.url, {
       params: props.conQuien ? { por: por.value } : {},
     });
-    efecto.value = data.data;
+    if (mio === pedido) {
+      efecto.value = data.data;
+    }
   } catch (e) {
-    efecto.value = null;
-    error.value = mensajeDeError(e);
+    if (mio === pedido) {
+      error.value = mensajeDeError(e);
+    }
   }
 }
 

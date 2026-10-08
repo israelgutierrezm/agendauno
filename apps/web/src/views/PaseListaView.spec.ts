@@ -193,7 +193,7 @@ describe("pase de lista en su propia pantalla", () => {
       {},
     );
     expect(toast.exito).toHaveBeenCalledWith(
-      "Lista terminada: 2 personas quedaron como «no se presentó».",
+      "Lista terminada: 2 personas quedaron como «no vino».",
     );
     expect(api.get).toHaveBeenCalledTimes(2);
   });

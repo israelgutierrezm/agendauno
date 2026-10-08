@@ -17,6 +17,8 @@ export interface CitaTitular {
   asistencia_automatica?: boolean; // la marcó el sistema al terminar sin registro
   orden_id?: string | null; // orden del servicio (si es de pago)
   por_cobrar?: boolean; // agendada por el negocio y aún sin cobrar en caja
+  total_minor?: number | null; // lo que se cobra: el total de su orden
+  moneda?: string | null;
   nota?: string | null; // lo que el cliente pidió que supiéramos al agendar
   asiste?: string | null; // si la agendó para otra persona: quién asiste
   // Ya pagada: con qué y si esa forma se puede corregir (ADR 0086).
@@ -401,7 +403,7 @@ export function kpisCitas(
     const pago = pagoCita(s);
     if (e !== "no_asistio" && (pago === "por_pagar" || pago === "por_cobrar")) {
       k.pendientesPago++;
-      k.porCobrarMinor += s.oferta_precio_clase ?? 0;
+      k.porCobrarMinor += s.cita?.total_minor ?? s.oferta_precio_clase ?? 0;
     }
     if (e === "no_asistio") {
       k.noAsistieron++;

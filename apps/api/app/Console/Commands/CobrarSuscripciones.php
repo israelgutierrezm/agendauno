@@ -37,7 +37,7 @@ class CobrarSuscripciones extends Command
                         continue;
                     }
 
-                    $resumen = $gestor->ejecutarEn($estudio, function () use ($cobro, $pasarelas): array {
+                    $resumen = $gestor->ejecutarAislado($estudio, function () use ($cobro, $pasarelas): array {
                         // Pasarela en línea lista del estudio (nunca manual ni ventanilla: no
                         // cobrarían de verdad).
                         $proveedor = $pasarelas->enLinea();
@@ -53,7 +53,7 @@ class CobrarSuscripciones extends Command
                             'pendientes' => $vencidas['pendientes'] + $reintentos['pendientes'],
                             'fallidos' => $vencidas['fallidos'] + $reintentos['fallidos'],
                         ];
-                    });
+                    }, ['cobrados' => 0, 'pendientes' => 0, 'fallidos' => 0]);
 
                     $totales['cobrados'] += $resumen['cobrados'];
                     $totales['pendientes'] += $resumen['pendientes'];

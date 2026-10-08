@@ -291,6 +291,14 @@ onMounted(cargar);
       @cerrar="cerrar"
     >
       <form class="space-y-4" @submit.prevent="crear">
+        <p
+          v-if="error"
+          class="text-sm"
+          role="alert"
+          :style="{ color: 'var(--error)' }"
+        >
+          {{ error }}
+        </p>
         <div>
           <label class="tu-label" for="rn">{{ $t("recursos.nombre") }}</label>
           <input id="rn" v-model="form.nombre" class="tu-input" required />

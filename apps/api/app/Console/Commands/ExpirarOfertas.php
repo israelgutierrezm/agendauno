@@ -35,7 +35,7 @@ class ExpirarOfertas extends Command
                         continue;
                     }
 
-                    $expiradas += $gestor->ejecutarEn($estudio, fn (): int => $reservas->expirarOfertasVencidas());
+                    $expiradas += $gestor->ejecutarAislado($estudio, fn (): int => $reservas->expirarOfertasVencidas(), 0);
                 }
             });
 

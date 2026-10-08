@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Middleware;
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\Estudio;
 use Closure;
 use Illuminate\Http\Request;
@@ -45,7 +46,11 @@ class ResolverEstudio
         // Falla seguro (404) si el estudio no existe, no esta operativo, o su BD no
         // esta disponible (aprovisionamiento pendiente/incompleto): nunca un 500.
         if (! $estudio instanceof Estudio
-            || ! ($estudio->estado->operativo() || ($estudio->suspendidoPorRenta() && self::abiertaSuspendido($request)))
+            || ! ($estudio->estado->operativo()
+                || ($estudio->suspendidoPorRenta() && self::abiertaSuspendido($request))
+                // El aviso de una pasarela llega aunque el negocio esté suspendido: el
+                // dinero ya se movió y hay que registrarlo.
+                || ($estudio->estado === EstadoEstudio::Suspended && self::esAvisoDePago($request)))
             || ! $this->gestor->baseDeDatosExiste($estudio)) {
             abort(404, 'Estudio no encontrado.');
         }
@@ -62,6 +67,11 @@ class ResolverEstudio
         } finally {
             $this->gestor->desconectar();
         }
+    }
+
+    private static function esAvisoDePago(Request $request): bool
+    {
+        return $request->route()?->getName() === 'api.v1.webhooks.tenant';
     }
 
     private static function abiertaSuspendido(Request $request): bool

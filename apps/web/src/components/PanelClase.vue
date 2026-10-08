@@ -154,8 +154,28 @@ async function accion(fn: () => Promise<unknown>): Promise<void> {
   }
 }
 
-function aceptar(r: Reserva): Promise<void> {
+// Aceptar a nombre de la persona confirma su lugar y usa su plan: se confirma.
+async function aceptar(r: Reserva): Promise<void> {
+  if (
+    !(await confirmar(
+      t("confirmaciones.aceptarLugar", { persona: r.persona ?? "" }),
+      { aceptar: t("confirmaciones.aceptarLugarAceptar") },
+    ))
+  ) {
+    return;
+  }
   return accion(() => api.post(`${base.value}/reservas/${r.id}/aceptar`, {}));
+}
+async function quitarDeEspera(r: Reserva): Promise<void> {
+  if (
+    !(await confirmar(
+      t("confirmaciones.quitarDeEspera", { persona: r.persona ?? "" }),
+      { aceptar: t("confirmaciones.quitarDeEsperaAceptar"), peligro: true },
+    ))
+  ) {
+    return;
+  }
+  await cancelar(r);
 }
 // Reserva cuya cancelación se está confirmando (con su efecto a la vista).
 const cancelando = ref<string | null>(null);
@@ -196,7 +216,7 @@ async function promover(): Promise<void> {
     const n = data.data.ofrecidas;
     aviso.value =
       n > 0
-        ? t("oportunidades.ofrecidas", { n })
+        ? t("oportunidades.ofrecidas", { n }, n)
         : t("oportunidades.sinPromover");
     await cargar();
     emit("cambio");
@@ -440,7 +460,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             {{ $t("recepcion.panel.listaEspera") }}
           </h3>
           <button
-            v-if="puedeGestionar"
+            v-if="puedeGestionar && (libres ?? 0) > 0"
             type="button"
             class="tu-btn tu-btn-fantasma text-xs px-3 py-1.5"
             :disabled="accionando"
@@ -462,7 +482,7 @@ watch(() => props.sesion.id, cargar, { immediate: true });
               class="tu-enlace text-xs shrink-0"
               style="color: var(--error)"
               :disabled="accionando"
-              @click="cancelar(r)"
+              @click="quitarDeEspera(r)"
             >
               {{ $t("agenda.roster.cancelarReserva") }}
             </button>

@@ -10,11 +10,13 @@ import {
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 
-import { api, mensajeDeError } from "@/lib/api";
+import { dinero as dineroDelPais } from "@/lib/formato";
+import { api, mensajeDeError, noEncontrado } from "@/lib/api";
 import { separarTelefono } from "@/lib/ladas";
 import { esDeOtraModalidad } from "@/lib/modalidad";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { recordarNegocio } from "@/lib/negociosRecientes";
+import { updateSeo } from "@/lib/seo";
 import { puedeEntrar } from "@/lib/acceso";
 import { esMiembro, nombreDeRol } from "@/lib/roles";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -71,6 +73,8 @@ interface Opciones {
     profesional?: string;
     // Su país y su lada (ADR 0103): la que se propone para el celular.
     pais?: string | null;
+    // ¿Publicó su aviso de privacidad para sus clientes?
+    aviso_privacidad?: boolean;
     lada?: string | null;
   };
   servicios: Servicio[];
@@ -123,6 +127,9 @@ const slug = computed(() => String(route.params.slug));
 const opciones = ref<Opciones | null>(null);
 const cargando = ref(true);
 const noDisponible = ref(false);
+// Sin red o con el servidor caído: se dice y se deja reintentar (no es que el negocio
+// no esté disponible).
+const errorCarga = ref<string | null>(null);
 const error = ref<string | null>(null);
 
 // Selección del asistente.
@@ -374,11 +381,9 @@ const listoParaAgendar = computed(
         CORREO.test(datos.value.email.trim()))),
 );
 
+// Con los números del país del negocio (su moneda viene con cada precio).
 function dinero(minor: number | null, moneda: string | null): string {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: moneda ?? "MXN",
-  }).format((minor ?? 0) / 100);
+  return dineroDelPais(minor ?? 0, moneda ?? "MXN", paisNegocio.value);
 }
 function horaLocal(iso: string, tz = zona.value): string {
   return new Intl.DateTimeFormat("es-MX", {
@@ -420,6 +425,7 @@ function relojLocal(iso: string): string {
 async function cargar(): Promise<void> {
   cargando.value = true;
   noDisponible.value = false;
+  errorCarga.value = null;
   try {
     const { data } = await api.get<{ data: Opciones }>(
       `/api/v1/app/${slug.value}/citas/opciones`,
@@ -427,6 +433,12 @@ async function cargar(): Promise<void> {
     opciones.value = data.data;
     paisNegocio.value = data.data.estudio.pais ?? null;
     ladaNegocio.value = data.data.estudio.lada ?? null;
+    updateSeo({
+      title: `Agenda en ${data.data.estudio.nombre} | AgendaUno`,
+      description: `Elige servicio, profesional y horario, y agenda tu cita en ${data.data.estudio.nombre}.`,
+      path: `/agendar/${data.data.estudio.slug}`,
+      image: data.data.estudio.logo_url ?? undefined,
+    });
     recordarNegocio({
       slug: data.data.estudio.slug,
       nombre: data.data.estudio.nombre,
@@ -455,8 +467,10 @@ async function cargar(): Promise<void> {
         name: "estudio-publico",
         params: { slug: slug.value },
       });
-    } else {
+    } else if (noEncontrado(e)) {
       noDisponible.value = true;
+    } else {
+      errorCarga.value = mensajeDeError(e);
     }
   } finally {
     cargando.value = false;
@@ -960,6 +974,16 @@ onMounted(cargar);
       {{ $t("reservar.cargando") }}
     </p>
 
+    <section
+      v-else-if="errorCarga"
+      class="mx-auto max-w-md px-4 py-20 text-center"
+      role="alert"
+    >
+      <p class="text-lg font-semibold">{{ errorCarga }}</p>
+      <button type="button" class="tu-btn tu-btn-primario mt-4" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </section>
     <section
       v-else-if="noDisponible"
       class="mx-auto max-w-md px-4 py-20 text-center"
@@ -2235,6 +2259,26 @@ onMounted(cargar);
                         : $t("perfilPublico.agendar.agendar")
                   }}
                 </button>
+                <!-- Antes de dar sus datos: quién los recibe y su aviso de privacidad. -->
+                <p
+                  v-if="!clienteConCuenta"
+                  class="mt-3 text-xs"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  data-prueba="aviso-datos"
+                >
+                  {{
+                    $t("reservar.avisoDatos", {
+                      negocio: opciones?.estudio.nombre ?? "",
+                    })
+                  }}
+                  <RouterLink
+                    v-if="opciones?.estudio.aviso_privacidad"
+                    :to="{ name: 'aviso-negocio', params: { slug } }"
+                    target="_blank"
+                    class="tu-enlace"
+                    >{{ $t("reservar.verAviso") }}</RouterLink
+                  >
+                </p>
                 <p
                   v-if="error"
                   class="mt-3 text-sm"

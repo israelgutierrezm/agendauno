@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
+use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
@@ -75,6 +76,8 @@ class EscaparateController
                 'capacidades' => $modalidad->capacidades(),
                 // ¿Se agendan citas en línea? (para el CTA de reserva): un negocio de citas.
                 'tiene_citas' => $esCitas,
+                // ¿Publicó su aviso de privacidad para sus clientes? (enlace en su página).
+                'aviso_privacidad' => app(WaiversTenant::class)->avisoPrivacidad() !== null,
             ],
             'sucursales' => $this->sucursales($lada),
             'instructores' => $this->instructores(),

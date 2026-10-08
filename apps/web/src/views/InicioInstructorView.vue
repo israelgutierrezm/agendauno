@@ -486,8 +486,7 @@ onUnmounted(() => clearInterval(reloj));
               </span>
               <span
                 v-if="faltaLista(c)"
-                class="tu-pildora shrink-0 text-xs"
-                :style="{ '--tono': 'var(--aviso)' }"
+                class="tu-badge tu-badge-aviso shrink-0 text-xs"
                 >{{
                   c.tipo === "cita"
                     ? $t("portal.instructor.inicio.faltaLlegada")
@@ -653,7 +652,7 @@ onUnmounted(() => clearInterval(reloj));
     flex-wrap: wrap;
     gap: 0.6rem;
   }
-  .pi-hoy-fila .tu-pildora {
+  .pi-hoy-fila .tu-badge {
     margin-left: 4.1rem;
     white-space: normal;
   }

@@ -15,6 +15,7 @@ import TarjetasIndicadores, {
 import { puedeEntrar } from "@/lib/acceso";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { crearVenta } from "@/lib/venta";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import {
   SECCIONES,
@@ -178,6 +179,8 @@ const total = computed(
   () => promoPreview.value?.total ?? productoSel.value?.precio_minor ?? 0,
 );
 
+// Si el cobro falla, reintentar la misma venta cobra esa orden (no crea otra).
+const cobro = crearVenta();
 async function vender(): Promise<void> {
   const producto = productoSel.value;
   const persona = comprador.value;
@@ -205,8 +208,8 @@ async function vender(): Promise<void> {
   vendiendo.value = true;
   error.value = null;
   try {
-    const orden = await api.post<{ data: { id: string } }>(
-      `${base.value}/ordenes`,
+    await cobro.vender(
+      base.value,
       {
         comprador_id: venta.value.compradorId,
         items: [{ producto_id: venta.value.productoId, cantidad: 1 }],
@@ -215,10 +218,8 @@ async function vender(): Promise<void> {
             ? venta.value.codigoPromo
             : undefined,
       },
+      venta.value.metodo,
     );
-    await api.post(`${base.value}/ordenes/${orden.data.data.id}/liquidar`, {
-      metodo: venta.value.metodo,
-    });
   } catch (e) {
     error.value = mensajeDeError(e);
     vendiendo.value = false;
@@ -540,7 +541,7 @@ onMounted(cargar);
           </tbody>
         </table>
         <RouterLink
-          v-if="ordenes.length > 20"
+          v-if="ordenes.length > 20 && puedeEntrar('cobranza', sesion)"
           :to="{ name: 'cobranza' }"
           class="vv-mas tu-enlace text-sm"
         >

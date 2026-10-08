@@ -2,7 +2,7 @@
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { api } from "@/lib/api";
-import AvisoPrivacidadContenido from "@/components/AvisoPrivacidadContenido.vue";
+import DocumentoLegalContenido from "@/components/DocumentoLegalContenido.vue";
 
 const contenido = ref<string | null>(null);
 // Qué versión se ve y desde cuándo rige.
@@ -62,7 +62,7 @@ onMounted(cargar);
           )
         }}
       </p>
-      <AvisoPrivacidadContenido :contenido="contenido" />
+      <DocumentoLegalContenido :contenido="contenido" />
     </template>
   </article>
 </template>

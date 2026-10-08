@@ -709,7 +709,7 @@ onMounted(cargar);
       />
       <div
         v-else-if="difusiones.length > 0"
-        class="mt-3 tu-card overflow-hidden"
+        class="mt-3 tu-card overflow-x-auto"
       >
         <table class="tu-tabla">
           <thead>

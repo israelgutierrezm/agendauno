@@ -34,7 +34,7 @@ class AvisarRenovaciones extends Command
                         continue;
                     }
 
-                    $avisados += $gestor->ejecutarEn($estudio, fn (): int => $avisos->ejecutar());
+                    $avisados += $gestor->ejecutarAislado($estudio, fn (): int => $avisos->ejecutar(), 0);
                 }
             });
 

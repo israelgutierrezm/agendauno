@@ -17,6 +17,7 @@ import { api, mensajeDeError } from "@/lib/api";
 import { plural } from "@/lib/terminologia";
 import { useVistaListado } from "@/lib/vistaListado";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 // Solo lo necesario para ubicarlo: primer nombre + apellido paterno y foto
 // (el correo y el teléfono son privados).
@@ -135,19 +136,24 @@ async function invitar(): Promise<void> {
   error.value = null;
   activacion.value = null;
   try {
-    const { data } = await api.post<{ data: { activacion: Activacion } }>(
-      `${base.value}/usuarios/invitar`,
-      {
-        nombre: form.value.nombre,
-        email: form.value.email,
-        rol: "instructor",
-        // Sede opcional: si se elige, el instructor queda acotado a ella.
-        sucursal_id:
-          form.value.sucursalId !== "" ? form.value.sucursalId : null,
-      },
-    );
+    const email = form.value.email;
+    const { data } = await api.post<{
+      data: { activacion: Activacion | null };
+    }>(`${base.value}/usuarios/invitar`, {
+      nombre: form.value.nombre,
+      email: form.value.email,
+      rol: "instructor",
+      // Sede opcional: si se elige, el instructor queda acotado a ella.
+      sucursal_id: form.value.sucursalId !== "" ? form.value.sucursalId : null,
+    });
     activacion.value = data.data.activacion;
     form.value = { nombre: "", email: "", sucursalId: "" };
+    // En producción el enlace llega por correo (no hay token que mostrar): se avisa
+    // y se cierra el panel.
+    if (activacion.value === null) {
+      useToastStore().exito(t("instructores.invitar.enviada", { email }));
+      cerrar();
+    }
     await cargar();
   } catch (e) {
     error.value = mensajeDeError(e);
@@ -416,6 +422,14 @@ onMounted(cargar);
       @cerrar="cerrar"
     >
       <form class="space-y-4" @submit.prevent="invitar">
+        <p
+          v-if="error"
+          class="text-sm"
+          role="alert"
+          :style="{ color: 'var(--error)' }"
+        >
+          {{ error }}
+        </p>
         <div>
           <label class="tu-label" for="in">{{
             $t("instructores.invitar.nombre")

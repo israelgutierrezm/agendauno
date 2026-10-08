@@ -521,6 +521,10 @@ class AgendaTenantController
                 // Orden de la cita (servicio de pago) y si falta cobrarla en caja.
                 'orden_id' => $titular->orden?->ulid,
                 'por_cobrar' => $titular->orden !== null && $titular->orden->estado === EstadoOrden::Pendiente,
+                // Lo que se cobra: el total de su orden, fijo desde que se agendó (el
+                // precio del catálogo puede cambiar después).
+                'total_minor' => $titular->orden?->total_minor,
+                'moneda' => $titular->orden?->moneda,
                 // Con qué se pagó y si esa forma se puede corregir (ADR 0086).
                 'pago' => $this->pagoDeCita($titular),
                 // Lo que el cliente pidió que supiéramos al agendar (ADR 0067).

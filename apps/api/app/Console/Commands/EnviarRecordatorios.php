@@ -34,7 +34,7 @@ class EnviarRecordatorios extends Command
                         continue;
                     }
 
-                    $emitidos += $gestor->ejecutarEn($estudio, fn (): int => $recordatorios->ejecutar());
+                    $emitidos += $gestor->ejecutarAislado($estudio, fn (): int => $recordatorios->ejecutar(), 0);
                 }
             });
 

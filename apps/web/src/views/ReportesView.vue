@@ -877,7 +877,7 @@ onMounted(cargar);
           >
             {{ $t("reportes.tendencias.sinProducto") }}
           </p>
-          <div v-else class="mt-3 tu-card overflow-hidden">
+          <div v-else class="mt-3 tu-card overflow-x-auto">
             <table class="tu-tabla">
               <thead>
                 <tr>
@@ -1110,7 +1110,8 @@ onMounted(cargar);
                   <th>
                     {{ $t("reportes.equipo.colProfesional") }}
                   </th>
-                  <th>
+                  <!-- La ocupación se mide contra el horario de atención: solo en citas. -->
+                  <th v-if="sesion.esCitas">
                     {{ $t("reportes.equipo.colOcupacion") }}
                   </th>
                   <th class="text-right hidden sm:table-cell">
@@ -1147,7 +1148,7 @@ onMounted(cargar);
                       {{ p.nombre ?? $t("reportes.equipo.sinProfesional") }}
                     </span>
                   </td>
-                  <td class="re-ocupacion">
+                  <td v-if="sesion.esCitas" class="re-ocupacion">
                     <template v-if="p.ocupacion_pct !== null">
                       <span class="font-semibold tabular-nums">{{
                         pct(p.ocupacion_pct)
@@ -1199,7 +1200,7 @@ onMounted(cargar);
               <tfoot>
                 <tr>
                   <td>{{ $t("reportes.equipo.total") }}</td>
-                  <td>
+                  <td v-if="sesion.esCitas">
                     {{ pct(equipo.totales.ocupacion_pct) }}
                   </td>
                   <td class="text-right hidden sm:table-cell">
@@ -1230,7 +1231,11 @@ onMounted(cargar);
             </table>
           </div>
           <p class="mt-2 text-xs" :style="{ color: 'var(--texto-suave)' }">
-            {{ $t("reportes.equipo.leyenda") }}
+            {{
+              sesion.esCitas
+                ? $t("reportes.equipo.leyenda")
+                : $t("reportes.equipo.leyendaClases")
+            }}
           </p>
         </template>
       </template>
@@ -1249,7 +1254,7 @@ onMounted(cargar);
         >
           {{ $t("reportes.sinSucursales") }}
         </p>
-        <div v-else class="mt-3 tu-card overflow-hidden">
+        <div v-else class="mt-3 tu-card overflow-x-auto">
           <table class="tu-tabla">
             <thead>
               <tr>
@@ -1325,7 +1330,7 @@ onMounted(cargar);
           {{ $t("reportes.rentabilidad.vacio") }}
         </p>
         <template v-else>
-          <div class="mt-3 tu-card overflow-hidden">
+          <div class="mt-3 tu-card overflow-x-auto">
             <table class="tu-tabla">
               <thead>
                 <tr>
@@ -1474,7 +1479,7 @@ onMounted(cargar);
           <h3 class="mt-6 text-lg font-semibold">
             {{ $t("reportes.demanda.porActividad") }}
           </h3>
-          <div class="mt-3 tu-card overflow-hidden">
+          <div class="mt-3 tu-card overflow-x-auto">
             <table class="tu-tabla">
               <thead>
                 <tr>
@@ -1487,7 +1492,8 @@ onMounted(cargar);
                   <th class="text-right">
                     {{ $t("reportes.demanda.colConfirmadas") }}
                   </th>
-                  <th class="text-right">
+                  <!-- Las citas no tienen lista de espera. -->
+                  <th v-if="!sesion.esCitas" class="text-right">
                     {{ $t("reportes.demanda.colEspera") }}
                   </th>
                   <th class="text-right">
@@ -1503,6 +1509,7 @@ onMounted(cargar);
                   </td>
                   <td class="text-right">{{ a.confirmadas }}</td>
                   <td
+                    v-if="!sesion.esCitas"
                     class="text-right font-semibold"
                     :style="{
                       color: a.espera > 0 ? 'var(--aviso)' : 'inherit',
@@ -1524,7 +1531,7 @@ onMounted(cargar);
                   <td class="text-right">
                     {{ demanda.totales.confirmadas }}
                   </td>
-                  <td class="text-right">
+                  <td v-if="!sesion.esCitas" class="text-right">
                     {{ demanda.totales.espera }}
                   </td>
                   <td class="text-right">

@@ -117,7 +117,7 @@ describe("entrada pública del negocio", () => {
     const w = montar();
     await flushPromises();
 
-    expect(w.text()).toContain("Este estudio no está disponible por ahora.");
+    expect(w.text()).toContain("Este negocio no está disponible por ahora.");
     expect(mocks.replace).not.toHaveBeenCalled();
   });
 });

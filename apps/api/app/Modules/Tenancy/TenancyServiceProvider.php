@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Integraciones\ResolvedorDns;
 use App\Modules\Tenancy\Integraciones\ResolvedorDnsSistema;
 use App\Modules\Tenancy\Models\Estudio;
+use Illuminate\Queue\Events\JobExceptionOccurred;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
@@ -65,7 +66,9 @@ class TenancyServiceProvider extends ServiceProvider
             }
         });
 
-        Event::listen([JobProcessed::class, JobFailed::class], function (): void {
+        // También si el trabajo falló y se reintentará: el siguiente trabajo no debe
+        // quedar apuntando a este negocio.
+        Event::listen([JobProcessed::class, JobFailed::class, JobExceptionOccurred::class], function (): void {
             $this->app->make(GestorDeConexionTenant::class)->desconectar();
         });
     }

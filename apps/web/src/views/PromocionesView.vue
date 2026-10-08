@@ -253,6 +253,14 @@ onMounted(cargar);
       @cerrar="mostrarForm = false"
     >
       <form class="grid gap-4" @submit.prevent="guardar">
+        <p
+          v-if="error"
+          class="text-sm"
+          role="alert"
+          :style="{ color: 'var(--error)' }"
+        >
+          {{ error }}
+        </p>
         <div>
           <label class="tu-label" for="p-codigo">{{
             $t("promociones.campos.codigo")

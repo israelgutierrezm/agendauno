@@ -35,7 +35,7 @@ class EnviarMensajes extends Command
                         continue;
                     }
 
-                    $enviados += $gestor->ejecutarEn($estudio, fn (): int => $relay->ejecutar());
+                    $enviados += $gestor->ejecutarAislado($estudio, fn (): int => $relay->ejecutar(), 0);
                 }
             });
 

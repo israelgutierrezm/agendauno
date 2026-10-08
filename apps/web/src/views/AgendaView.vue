@@ -44,6 +44,7 @@ import { dinero as dineroDelPais, simboloMoneda } from "@/lib/formato";
 import { hoyComoFecha, hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
 import { colorEstado, estadoEnLista } from "@/lib/paseLista";
+import { confirmar } from "@/lib/confirmar";
 import { trackEvent } from "@/lib/analytics";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -204,6 +205,14 @@ const mesInicio = ref(
   new Date(fechaInicial.getFullYear(), fechaInicial.getMonth(), 1),
 );
 const diaSel = ref(isoDe(fechaInicial));
+// Los estados de una cita que explica la leyenda de la semana.
+const LEYENDA_CITAS = [
+  "confirmada",
+  "llego",
+  "sin_registrar",
+  "no_asistio",
+  "completada",
+] as const;
 const sucursalFiltro = ref("");
 const instructorFiltro = ref("");
 // Quien imparte (sin un rol del equipo) solo ve sus clases o citas: elegir a otro
@@ -817,7 +826,7 @@ const zonaAgenda = computed(
       ?.zona_horaria ??
     sesiones.value[0]?.zona_horaria ??
     sucursalesAgenda.value[0]?.zona_horaria ??
-    "America/Mexico_City",
+    sesion.zonaHoraria,
 );
 // La leyenda de colores va plegada (el calendario primero); se recuerda abierta.
 const leyendaAbierta = ref(leerLeyenda());
@@ -1068,7 +1077,8 @@ const pestanasClase = computed<PestanaClase[]>(() => {
   if (puedeGestionar.value) {
     lista.push("equipo");
   }
-  if (puedeCheckin.value) {
+  // Wellhub y TotalPass: solo con negocios en México.
+  if (puedeCheckin.value && sesion.estudio?.bienestar_posible === true) {
     lista.push("checkins");
   }
   return lista;
@@ -1271,9 +1281,10 @@ function abrirNuevaCita(datos?: {
   instructorId: string | null;
   hora: string;
 }): void {
-  const ahora = new Date();
+  // La hora de ahora en la zona del negocio (no la del navegador), al cuarto siguiente.
   const minutos =
-    Math.ceil((ahora.getHours() * 60 + ahora.getMinutes()) / 15) * 15;
+    Math.ceil(minutosLocal(new Date().toISOString(), zonaAgenda.value) / 15) *
+    15;
   inicialCita.value = {
     fecha: diaSel.value,
     hora:
@@ -1311,6 +1322,7 @@ async function alCambiarCita(): Promise<void> {
 
 function cerrarDetalle(): void {
   detalle.value = null;
+  error.value = null;
 }
 
 async function cargarRoster(id: string): Promise<void> {
@@ -1408,6 +1420,15 @@ async function guardarLugares(): Promise<void> {
 }
 
 async function aceptar(reservaId: string, sesionId: string): Promise<void> {
+  // Aceptar a nombre de la persona confirma su lugar y usa su plan: se confirma.
+  const persona = roster.value.find((r) => r.id === reservaId)?.persona ?? "";
+  if (
+    !(await confirmar(t("confirmaciones.aceptarLugar", { persona }), {
+      aceptar: t("confirmaciones.aceptarLugarAceptar"),
+    }))
+  ) {
+    return;
+  }
   accionando.value = true;
   error.value = null;
   try {
@@ -2130,6 +2151,7 @@ onMounted(async () => {
         :profesionales="profesionalesVisibles"
         :ventanas="ventanas"
         :bloqueos="bloqueos"
+        :sucursal="sucursalFiltro"
         :catalogo="catalogo"
         :seleccionada="citaAbierta?.id ?? detalle?.id ?? null"
         :puede-crear="puedeReservar"
@@ -2156,33 +2178,20 @@ onMounted(async () => {
         v-if="vista === 'semana' && sesion.esCitas"
         class="mt-4 hidden lg:block"
       >
-        <!-- Leyenda: el color del bloque = tipo de clase; el punto = estado de ocupación. -->
+        <!-- Leyenda: el color del bloque = servicio; el punto = cómo va la cita. -->
         <div
           class="flex flex-wrap items-center gap-4 mb-2 text-xs"
           :style="{ color: 'var(--texto-suave)' }"
+          data-prueba="leyenda-citas"
         >
-          <span class="inline-flex items-center gap-1.5"
+          <span
+            v-for="e in LEYENDA_CITAS"
+            :key="e"
+            class="inline-flex items-center gap-1.5"
             ><span
               class="tu-estado-dot"
-              :style="{ background: COLOR_ESTADO.disponible }"
-            />{{ $t("agenda.estados.disponible") }}</span
-          >
-          <span class="inline-flex items-center gap-1.5"
-            ><span
-              class="tu-estado-dot"
-              :style="{ background: COLOR_ESTADO.casi }"
-            />{{ $t("agenda.estados.casi") }}</span
-          >
-          <span class="inline-flex items-center gap-1.5"
-            ><span
-              class="tu-estado-dot"
-              :style="{ background: COLOR_ESTADO.llena }"
-            />{{ $t("agenda.estados.llena") }}</span
-          >
-          <span class="inline-flex items-center gap-1.5"
-            ><span class="tu-espera-dot" />{{
-              $t("agenda.estados.espera")
-            }}</span
+              :style="{ background: COLOR_ESTADO_CITA[e] }"
+            />{{ $t(`agendaVisual.estadosCita.${e}`) }}</span
           >
         </div>
 
@@ -2582,6 +2591,18 @@ onMounted(async () => {
             >
           </div>
         </div>
+
+        <!-- Lo que falló al reservar, cancelar o mover: dentro del detalle, a la vista
+             (el aviso de la página queda detrás del modal). -->
+        <p
+          v-if="error"
+          class="text-sm"
+          role="alert"
+          :style="{ color: 'var(--error)' }"
+          data-prueba="error-detalle"
+        >
+          {{ error }}
+        </p>
 
         <!-- Quién la da, dónde y cuánto dura -->
         <dl class="tu-detalle-franja">

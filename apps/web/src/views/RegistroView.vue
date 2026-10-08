@@ -10,13 +10,13 @@ import {
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRouter } from "vue-router";
 
-import { api, mensajeDeError } from "@/lib/api";
+import { api, camposConError, mensajeDeError } from "@/lib/api";
 import { ladaDe, separarTelefono, unirTelefono } from "@/lib/ladas";
 import { girosDe } from "@/lib/modalidad";
 import { opcionesPais, paisSugerido, zonaSugerida } from "@/lib/region";
 import { trackEvent, type AnalyticsProperties } from "@/lib/analytics";
 import { MODOS, modoDePerfil, type Modo } from "@/marketing/modalidades";
-import AvisoPrivacidadContenido from "@/components/AvisoPrivacidadContenido.vue";
+import DocumentoLegalContenido from "@/components/DocumentoLegalContenido.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import SelectorBuscable from "@/components/SelectorBuscable.vue";
 
@@ -503,11 +503,34 @@ async function enviar(): Promise<void> {
       "studio_registration_failed",
       conIntencion({ step: paso.value }),
     );
-    // Si el backend rechaza el slug (carrera), regresa al paso 1.
-    paso.value = 1;
+    // Regresa al paso del dato que rechazó el servidor (p. ej. el slug que alguien
+    // ocupó antes, o el correo); sin un dato rechazado (sin red, legales), se queda.
+    paso.value = pasoDelError(e);
   } finally {
     enviando.value = false;
   }
+}
+
+// Paso 1: el negocio; paso 2: el nombre de quien registra; lo demás (WhatsApp,
+// correo, legales), el 3.
+const CAMPOS_PASO_1 = [
+  "nombre",
+  "slug",
+  "perfil_negocio",
+  "pais",
+  "zona_horaria",
+];
+const CAMPOS_PASO_2 = [
+  "contacto_nombre",
+  "contacto_segundo_nombre",
+  "contacto_primer_apellido",
+  "contacto_segundo_apellido",
+];
+function pasoDelError(e: unknown): number {
+  const pasos = camposConError(e).map((campo) =>
+    CAMPOS_PASO_1.includes(campo) ? 1 : CAMPOS_PASO_2.includes(campo) ? 2 : 3,
+  );
+  return pasos.length > 0 ? Math.min(...pasos) : paso.value;
 }
 
 async function reenviar(): Promise<void> {
@@ -1088,7 +1111,12 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
               </div>
             </template>
 
-            <p v-if="error" class="text-sm" style="color: var(--error)">
+            <p
+              v-if="error"
+              class="text-sm"
+              role="alert"
+              style="color: var(--error)"
+            >
               {{ error }}
             </p>
 
@@ -1206,13 +1234,15 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
           class="mt-3 overflow-y-auto text-sm"
           :style="{ color: 'var(--texto-suave)' }"
         >
-          <AvisoPrivacidadContenido
+          <DocumentoLegalContenido
             v-if="legalAbierto === 'aviso'"
             :contenido="legales.aviso_privacidad"
           />
-          <p v-else class="whitespace-pre-wrap">
-            {{ legales.terminos || $t("registro.legalVacio") }}
-          </p>
+          <DocumentoLegalContenido
+            v-else
+            tipo="terminos"
+            :contenido="legales.terminos"
+          />
         </div>
       </div>
     </div>

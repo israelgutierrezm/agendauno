@@ -98,7 +98,7 @@ describe("tarjetas de funcionalidades", () => {
       "Lista de espera",
       "Membresías y créditos",
       "Pase de lista con retardos",
-      "Pase QR de entrada",
+      "Pase QR de entrada en gimnasios",
     ]);
     expect(vista.findAll(".funcion-visual")).toHaveLength(5);
     expect(vista.findAll(".funcion-icono svg")).toHaveLength(5);
@@ -110,7 +110,7 @@ describe("tarjetas de funcionalidades", () => {
     expect(vista.get(".visual-paseQr").text()).toContain("Pase de entrada");
     await vista.findAll(".funcion-abrir")[4]!.trigger("click");
     expect(vista.get("#detalle-funcion-paseQr").text()).toContain(
-      "La asistencia a cada clase se registra aparte",
+      "En los estudios de clases la entrada es la clase misma",
     );
     expect(
       JSON.parse(vista.get("#detalle-funcion-paseQr a").attributes("data-to")!),

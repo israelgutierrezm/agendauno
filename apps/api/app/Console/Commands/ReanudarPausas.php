@@ -34,7 +34,7 @@ class ReanudarPausas extends Command
                         continue;
                     }
 
-                    $reanudadas += $gestor->ejecutarEn($estudio, fn (): int => $pausas->reanudarVencidas());
+                    $reanudadas += $gestor->ejecutarAislado($estudio, fn (): int => $pausas->reanudarVencidas(), 0);
                 }
             });
 

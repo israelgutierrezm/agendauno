@@ -259,11 +259,11 @@ export default {
             "La lista se abre unos minutos antes de la clase. Quien siga sin registro al terminar queda como inasistencia y se aplica tu política de faltas.",
         },
         paseQr: {
-          titulo: "Pase QR de entrada",
+          titulo: "Pase QR de entrada en gimnasios",
           descripcion:
-            "Cada alumno tiene un pase con código QR para registrar su entrada en recepción.",
+            "En gimnasios, CrossFit y HYROX, cada miembro tiene un pase con código QR para registrar su entrada en recepción.",
           detalle:
-            "Recepción escanea el pase y ve si la persona tiene una reserva para esa hora o una membresía de acceso libre. La asistencia a cada clase se registra aparte, en el pase de lista.",
+            "Recepción escanea el pase y ve si la persona tiene una membresía de acceso libre o una reserva para esa hora. En los estudios de clases la entrada es la clase misma: basta con el pase de lista.",
         },
       },
       // ModalidadView /clases: claves de MODALIDADES.clases (pasos, operacion,
@@ -327,7 +327,7 @@ export default {
           "Pasa lista, consulta membresías y vende paquetes o productos desde el celular, la tableta o la computadora.",
         beneficios: {
           lista: "Pase de lista: llegó, retardo o no vino",
-          paseQr: "Pase QR de entrada para cada alumno",
+          paseQr: "Pase QR de entrada en gimnasios y boxes",
           ventas: "Venta de membresías, paquetes y productos del mostrador",
         },
         enlace: "Empieza con tu estudio",
@@ -385,7 +385,7 @@ export default {
         },
         paseQr: {
           q: "¿Para qué sirve el código QR?",
-          a: "Es el pase de entrada de cada alumno: en recepción lo escaneas y ves si puede entrar. La asistencia a cada clase se registra aparte, en el pase de lista.",
+          a: "En gimnasios, CrossFit y HYROX es el pase de entrada de cada miembro: en recepción lo escaneas y ves si puede entrar. En los estudios de clases (pilates, pole, yoga, danza) no hace falta: la asistencia se registra en el pase de lista.",
         },
         sucursales: {
           q: "¿Sirve para varias sucursales?",
@@ -856,7 +856,7 @@ export default {
     perfilPh: "Selecciona una opción",
     // El giro prepara la configuración inicial y los nombres; no limita lo que ofrece.
     perfilAyuda:
-      "Elige el más parecido: sirve para preparar tu configuración inicial y los nombres que verás en tu panel, no limita lo que puedes ofrecer.",
+      "Elige el más parecido: sirve para preparar tu configuración inicial y los nombres que verás en tu panel; no te limita a ese giro.",
     perfiles: {
       barberia: "Barbería",
       estetica: "Estética o centro de belleza",
@@ -890,8 +890,6 @@ export default {
     avisoEnlace: "aviso de privacidad",
     avisoTitulo: "Aviso de privacidad",
     terminosTitulo: "Términos y condiciones",
-    legalVacio:
-      "Este documento aún no ha sido publicado. Escríbenos si tienes dudas.",
     pasoActual: "Paso {n} de 3",
     progreso: "Progreso del registro",
     citaEjemplo: "Ejemplo de cita",
@@ -977,6 +975,8 @@ export default {
     volverDirectorio: "← Volver a negocios",
     reservar: "Reservar primera clase",
     agendarCita: "Agendar una cita",
+    agendaEnLinea: "Agenda en línea",
+    avisoPrivacidad: "Aviso de privacidad",
     agendaCitasTitulo: "Reserva a tu manera",
     agendaCitasDesc:
       "Elige el servicio, la persona que te atenderá y un horario disponible. Puedes pagar en línea si el negocio lo requiere.",
@@ -990,6 +990,7 @@ export default {
       explicacion:
         "Las cuentas de {estudio} las crea el negocio. Pídele tu acceso: te llegará una invitación a tu correo para activar tu cuenta.",
       whatsapp: "Pedirlo por WhatsApp",
+      llamar: "Llamar al {telefono}",
       yaTengo: "Ya tengo cuenta · Entrar",
     },
     yaSoyAlumno: "Ya soy alumno · Entrar",
@@ -1060,7 +1061,6 @@ export default {
     entrar: "Entrar",
     entrando: "Entrando…",
     google: "Continuar con Google",
-    googlePronto: "Google SSO estará disponible pronto.",
     googleEnRaiz: "Para entrar con Google te llevamos a {host}.",
     ayudaSlug:
       "Es la dirección web de tu negocio, por ejemplo: mi-negocio.agendauno.mx",
@@ -1370,7 +1370,7 @@ export default {
       vacio: "Nada pendiente de pago.",
       proximas:
         "1 cita próxima se cobra al atenderla. | {n} citas próximas se cobran al atenderlas.",
-      colCliente: "Cliente",
+      colCliente: "Alumno",
       colConcepto: "Concepto",
       con: "Con {nombre}",
       comprada: "Comprada el {fecha}",
@@ -1548,6 +1548,8 @@ export default {
       enviando: "Invitando…",
       creada:
         "Invitación creada para {email}. Comparte este token de activación:",
+      enviada:
+        "Invitación enviada a {email}: le llega un correo para activar su cuenta.",
     },
   },
   horarios: {
@@ -1645,10 +1647,10 @@ export default {
   },
   reservar: {
     cargando: "Cargando…",
-    noDisponible: "Este estudio no está disponible para agendar en línea.",
-    volverDirectorio: "Ver otros estudios",
+    noDisponible: "Este negocio no está disponible para agendar en línea.",
+    volverDirectorio: "Ver otros negocios",
     sinServicios:
-      "Este estudio aún no ofrece servicios para agendar en línea. Contáctalo para reservar.",
+      "Este negocio aún no ofrece servicios para agendar en línea. Contáctalo para reservar.",
     titulo: "Agendar una cita",
     intro:
       "Elige el servicio, el día y la hora, y con quién. Te toma un minuto.",
@@ -1681,15 +1683,18 @@ export default {
     pagar: "Pagar ahora",
     pagando: "Redirigiendo al pago…",
     pendientePago:
-      "Tu lugar está apartado. El estudio te compartirá cómo completar el pago para confirmarlo.",
+      "Tu lugar está apartado. El negocio te compartirá cómo completar el pago para confirmarlo.",
     otra: "Agendar otra cita",
+    avisoDatos:
+      "Tus datos los recibe {negocio} para agendar y atender tu cita, y los administra en AgendaUno.",
+    verAviso: "Ver su aviso de privacidad",
   },
   sucursalesPub: {
     titulo: "Elige tu sucursal",
     subtitulo:
       "Este negocio tiene varias sedes. Selecciona en cuál quieres tu cita.",
     cargando: "Cargando…",
-    noDisponible: "Este estudio no está disponible por ahora.",
+    noDisponible: "Este negocio no está disponible por ahora.",
     volver: "Ver otros negocios",
   },
   sedes: {
@@ -2260,7 +2265,7 @@ export default {
       vacio: "No hay instructores ni clases en el periodo.",
       colProfesional: "Instructor",
       colOcupacion: "Ocupación",
-      colSesiones: "Clases y citas",
+      colSesiones: "Clases",
       colInasistencia: "Inasistencias",
       colValor: "Valor atendido",
       colPago: "Pago",
@@ -2272,6 +2277,8 @@ export default {
       total: "Total",
       leyenda:
         "Ocupación: horas agendadas dentro de su horario de atención entre las disponibles, sin días cerrados ni bloqueos. El valor atendido es el precio de lo que se atendió (o los créditos que se usaron); el pago sale de su esquema en Nómina, incluidas las clases que cubre o donde apoya.",
+      leyendaClases:
+        "El valor atendido es el precio de lo que se atendió (o los créditos que se usaron); el pago sale de su esquema en Nómina, incluidas las clases que cubre o donde apoya.",
     },
     porSucursal: "Por sucursal",
     colSucursal: "Sucursal",
@@ -2288,9 +2295,10 @@ export default {
     vacio: "No hay clases próximas con lugares libres.",
     libres: "{n} libres",
     enEspera: "{n} en espera",
-    promover: "Promover espera",
-    promoviendo: "Promoviendo…",
-    ofrecidas: "Se ofrecieron {n} lugar(es) a la lista de espera.",
+    promover: "Ofrecer lugares",
+    promoviendo: "Ofreciendo…",
+    ofrecidas:
+      "Se ofreció 1 lugar a la lista de espera. | Se ofrecieron {n} lugares a la lista de espera.",
     sinPromover: "No hay a quién ofrecer en esta clase.",
   },
   recursos: {
@@ -2346,6 +2354,10 @@ export default {
     inscritosTitulo: "Inscritos",
     sinInscritos: "Aún no hay inscritos.",
     reservadas: "Inscrito. Se reservaron {n} clases próximas.",
+    sinReservadas:
+      "Quedó inscrito, pero no se reservó ninguna clase: no hay clases próximas o su plan no le alcanza.",
+    confirmarInscribir:
+      "Al inscribirlo en «{grupo}» se reservan, con su plan, todas las clases próximas del grupo.",
   },
   recepcion: {
     titulo: "Recepción",
@@ -2376,11 +2388,11 @@ export default {
       abreDesde: "La asistencia se registra desde las {hora}.",
       terminarLista: "Terminar lista",
       terminarListaConfirmar:
-        "Quien sigue sin registro ({n}) quedará como «no se presentó», con la política de inasistencias del negocio.",
+        "Quien sigue sin registro ({n}) quedará como «no vino», con la política de inasistencias del negocio.",
       listaTerminada:
-        "Lista terminada: nadie quedó sin registro. | Lista terminada: 1 persona quedó como «no se presentó». | Lista terminada: {n} personas quedaron como «no se presentó».",
+        "Lista terminada: nadie quedó sin registro. | Lista terminada: 1 persona quedó como «no vino». | Lista terminada: {n} personas quedaron como «no vino».",
       listaEspera: "Lista de espera",
-      promover: "Ofrecer cupos",
+      promover: "Ofrecer lugares",
       agregar: "Agregar alumno",
       buscarAgregar: "Buscar alumno para agregar…",
     },
@@ -2708,8 +2720,25 @@ export default {
     guardado: "Guardado.",
     configurada: "configurada",
     nuevaLlave: "Escribe para reemplazar",
-    apiKey: "API key",
-    baseUrl: "URL base (opcional)",
+    // Lo que pide cada plataforma (te lo da al dar de alta tu gimnasio).
+    llaves: {
+      wellhub: {
+        api_key: "Token de API de Wellhub",
+        gym_id: "Gym ID",
+      },
+      totalpass: {
+        api_key: "Llave de API de TotalPass",
+        codigo_gimnasio: "Código de tu gimnasio",
+        codigo_plan: "Código del plan (si tienes varios)",
+      },
+    },
+    ayuda: {
+      wellhub:
+        "Valida la visita con el Wellhub ID de 13 dígitos que la persona ve en su app, en los 20 minutos después de su check-in.",
+      totalpass:
+        "Valida la visita con el token del día que la persona muestra en su app de TotalPass.",
+    },
+    soloMexico: "Disponible para negocios en México.",
     proveedores: {
       wellhub: "Wellhub",
       totalpass: "TotalPass",

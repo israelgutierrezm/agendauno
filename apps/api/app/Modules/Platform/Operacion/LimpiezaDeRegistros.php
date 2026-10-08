@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\SesionTarjetaTenant;
+use App\Modules\Tenancy\Models\TokenAccesoTenant;
 use App\Modules\Tenancy\Models\VerificacionWhatsApp;
 use App\Modules\Tenancy\Models\WhatsAppEnvio;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,6 +27,8 @@ use Illuminate\Support\Carbon;
  *   tarjeta (ADR 0076), que se concilian hasta 48 horas.
  * - `errores_plataforma`: los errores que dejaron de pasar (ADR 0080), por su última
  *   vez.
+ * - Las sesiones de cada negocio que no se usan en su plazo
+ *   (`sesion.dias_inactividad`): ya no sirven para entrar.
  * Borra por lotes para no bloquear las tablas. No toca historial del negocio: los
  * mensajes, los pagos y la bitácora se quedan.
  */
@@ -39,7 +42,7 @@ class LimpiezaDeRegistros
     ) {}
 
     /**
-     * @return array{envios_whatsapp: int, verificaciones_whatsapp: int, sesiones_tarjeta: int, errores: int}
+     * @return array{envios_whatsapp: int, verificaciones_whatsapp: int, sesiones_tarjeta: int, errores: int, sesiones_vencidas: int}
      */
     public function ejecutar(): array
     {
@@ -50,6 +53,7 @@ class LimpiezaDeRegistros
             'verificaciones_whatsapp' => $this->borrar(VerificacionWhatsApp::query()
                 ->where('created_at', '<', $this->limite($ahora, 'limpieza.dias_verificaciones_whatsapp'))),
             'sesiones_tarjeta' => 0,
+            'sesiones_vencidas' => 0,
             'errores' => $this->borrar(ErrorPlataforma::query()
                 ->where('ultima_en', '<', $this->limite($ahora, 'limpieza.dias_errores'))),
         ];
@@ -64,6 +68,14 @@ class LimpiezaDeRegistros
                 $borrados['sesiones_tarjeta'] += $this->gestor->ejecutarEn($estudio, fn (): int => $this->borrar(
                     SesionTarjetaTenant::query()->where('created_at', '<', $limiteSesiones),
                 ));
+                // Con el plazo de cada negocio.
+                $borrados['sesiones_vencidas'] += $this->gestor->ejecutarEn($estudio, function (): int {
+                    $limite = Carbon::now()->subDays($this->parametros->entero('sesion.dias_inactividad'));
+
+                    return $this->borrar(TokenAccesoTenant::query()->where(fn ($q) => $q
+                        ->where('last_used_at', '<', $limite)
+                        ->orWhere(fn ($q2) => $q2->whereNull('last_used_at')->where('created_at', '<', $limite))));
+                });
             }
         });
 

@@ -34,7 +34,7 @@ class ReintentarWebhooks extends Command
                         continue;
                     }
 
-                    $reintentadas += $gestor->ejecutarEn($estudio, fn (): int => $relay->ejecutar());
+                    $reintentadas += $gestor->ejecutarAislado($estudio, fn (): int => $relay->ejecutar(), 0);
                 }
             });
 

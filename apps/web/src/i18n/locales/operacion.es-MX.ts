@@ -404,9 +404,9 @@ export default {
       "No pudimos consultar las renovaciones. Intenta de nuevo en un momento.",
   },
   recepcion: {
-    sinActividad: "No hay clases ni citas programadas este día.",
+    sinActividad: "No hay clases programadas este día.",
     sinActividadFiltros:
-      "No hay clases ni citas este día en la sucursal elegida. Prueba con todas las sucursales.",
+      "No hay clases este día en la sucursal elegida. Prueba con todas las sucursales.",
     irAgenda: "Ir a la agenda →",
   },
   comunicacion: {

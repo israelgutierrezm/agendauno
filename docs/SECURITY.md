@@ -15,19 +15,22 @@
 
 - Una base de datos por negocio; el negocio sale de la ruta o del subdominio, nunca
   del cuerpo (`docs/TENANCY.md`).
-- Tokens propios por negocio: solo se guarda el hash; el token lleva el rol activo
-  y se revoca al salir.
+- Tokens propios por negocio: solo se guarda el hash; el token lleva el rol activo,
+  se revoca al salir y vence si no se usa en `sesion.dias_inactividad` días (ADR 0106).
 - Autorización en el servidor: permiso del rol activo + alcance por sucursal y por
   profesional (`docs/AUTHORIZATION.md`). Nadie da más permisos de los que tiene.
 - ULIDs en la API; nunca IDs internos.
 - Validación estricta de cada petición y `$fillable` explícito.
-- Límites de peticiones en login, recuperación de contraseña, registro y rutas
-  públicas.
-- Webhooks: se verifican con la pasarela, son idempotentes y un cobro no confirmado
-  se concilia consultando a la pasarela (ADR 0013, 0053).
+- Límites de peticiones en login, recuperación de contraseña, registro, rutas
+  públicas, `/health` y avisos de las pasarelas.
+- Webhooks: se verifican con la pasarela (Stripe: firma de 5 minutos o menos, con
+  cualquiera de sus `v1`), son idempotentes y un cobro no confirmado se concilia
+  consultando a la pasarela, también la renta del SaaS y con el negocio suspendido
+  (ADR 0013, 0053, 0106).
 - Llaves de pasarelas y de integraciones cifradas en la base; la web nunca las
   vuelve a mostrar.
-- Webhooks salientes solo a destinos públicos (bloquea redes internas).
+- Webhooks salientes y direcciones propias de Wellhub/TotalPass solo a destinos
+  públicos por https (bloquea redes internas).
 - Archivos del negocio en su propio espacio; los documentos privados se descargan
   solo por la API, con sesión y permiso.
 - Bitácora (`auditorias`) de lo sensible: dinero, roles, bajas, cambios de

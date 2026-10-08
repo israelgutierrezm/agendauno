@@ -6,6 +6,7 @@ import { RouterLink } from "vue-router";
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { crearVenta } from "@/lib/venta";
 import { dinero as dineroDelPais } from "@/lib/formato";
 import { terminoParaPersona } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -149,6 +150,8 @@ async function abrirVenta(): Promise<void> {
   }
 }
 
+// Si el cobro falla, reintentar la misma venta cobra esa orden (no crea otra).
+const cobro = crearVenta();
 async function vender(): Promise<void> {
   if (productoSel.value === "") {
     return;
@@ -172,16 +175,14 @@ async function vender(): Promise<void> {
   error.value = null;
   avisoVenta.value = null;
   try {
-    const { data: orden } = await api.post<{ data: { id: string } }>(
-      `${base.value}/ordenes`,
+    await cobro.vender(
+      base.value,
       {
         comprador_id: props.personaId,
         items: [{ producto_id: productoSel.value, cantidad: 1 }],
       },
+      metodo.value,
     );
-    await api.post(`${base.value}/ordenes/${orden.data.id}/liquidar`, {
-      metodo: metodo.value,
-    });
     avisoVenta.value = t("recepcion.miembro.vendido");
     vendiendo.value = false;
     productoSel.value = "";

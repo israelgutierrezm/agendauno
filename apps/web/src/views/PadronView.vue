@@ -110,12 +110,12 @@ onMounted(cargar);
 
     <template v-else>
       <EstadoVacio
-        v-if="filas.length === 0"
+        v-if="filas.length === 0 && !error"
         class="tu-card mt-6"
         icono="facturas"
         :titulo="$t('padron.vacio')"
       />
-      <div v-else class="mt-4 tu-card overflow-hidden">
+      <div v-else-if="filas.length > 0" class="mt-4 tu-card overflow-x-auto">
         <table class="tu-tabla">
           <thead>
             <tr>

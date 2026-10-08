@@ -159,6 +159,10 @@ final class CatalogoParametros
             new DefinicionParametro('whatsapp.horas_entre_respuestas', 'WhatsApp', 'Horas antes de volver a contestar a la misma persona',
                 'A quien le escribe al número de AgendaUno se le contesta solo, una vez en este plazo aunque escriba varias veces. BAJA siempre se contesta.', $e, 12, 1, 168, 'h', porNegocio: false),
 
+            // Una sesión que no se usa vence (en el negocio, puede ser menos).
+            new DefinicionParametro('sesion.dias_inactividad', 'Sesiones', 'Días sin usarse para que una sesión venza',
+                'Quien no entra en ese plazo vuelve a poner su contraseña. Protege si alguien deja la sesión abierta en una computadora prestada.', $e, 60, 1, 365, 'días'),
+
             // Limpieza de registros técnicos (ADR 0079, solo la plataforma).
             new DefinicionParametro('limpieza.dias_envios_whatsapp', 'Limpieza de registros', 'Días que se guarda el registro de cada WhatsApp enviado',
                 'Sirve para saber si se entregó o se leyó. Después, lo que Meta avise de ese mensaje se ignora.', $e, 30, 7, 365, 'días', porNegocio: false),

@@ -14,6 +14,7 @@ vi.mock("@/lib/api", () => ({
 const sesion = vi.hoisted(() => ({
   slug: "demo",
   modalidad: "citas",
+  esCitas: true,
   puede: () => true,
 }));
 vi.mock("@/stores/sesionTenant", () => ({

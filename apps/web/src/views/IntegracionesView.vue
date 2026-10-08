@@ -19,6 +19,8 @@ const { t } = useI18n();
 interface Integracion {
   proveedor: string;
   activa: boolean;
+  // Las credenciales que pide el proveedor y las que ya se capturaron.
+  llaves: string[];
   llaves_configuradas: string[];
 }
 interface LlaveApi {
@@ -46,13 +48,19 @@ interface Entrega {
 }
 type Pestana = "bienestar" | "llaves" | "webhooks";
 
-const LLAVES = ["api_key", "base_url"];
+// Lo secreto se captura como contraseña; los códigos (Gym ID, gimnasio, plan), no.
+const SECRETAS = new Set(["api_key"]);
 
 const sesion = useSesionTenantStore();
 const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
-const pestana = ref<Pestana>("bienestar");
+// Las plataformas de bienestar (Wellhub, TotalPass) son de clases (ADR 0104) y solo
+// operan con negocios en México.
+const conBienestar = computed(
+  () => !sesion.esCitas && sesion.estudio?.bienestar_posible === true,
+);
+const pestana = ref<Pestana>(conBienestar.value ? "bienestar" : "llaves");
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
@@ -252,16 +260,18 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const [{ data }] = await Promise.all([
-      api.get<{ data: Integracion[] }>(`${base.value}/integraciones`),
+    const [bienestar] = await Promise.all([
+      conBienestar.value
+        ? api.get<{ data: Integracion[] }>(`${base.value}/integraciones`)
+        : null,
       cargarLlaves(),
       cargarWebhooks(),
     ]);
-    integraciones.value = data.data;
-    for (const i of data.data) {
+    integraciones.value = bienestar?.data.data ?? [];
+    for (const i of integraciones.value) {
       edicion[i.proveedor] = {
         activa: i.activa,
-        llaves: { api_key: "", base_url: "" },
+        llaves: Object.fromEntries(i.llaves.map((k) => [k, ""])),
       };
     }
   } catch (e) {
@@ -280,6 +290,7 @@ onMounted(cargar);
 
     <div class="tu-pestanas mt-6" role="group">
       <button
+        v-if="conBienestar"
         type="button"
         :aria-pressed="pestana === 'bienestar'"
         @click="pestana = 'bienestar'"
@@ -310,10 +321,16 @@ onMounted(cargar);
     </p>
 
     <!-- Plataformas de bienestar -->
-    <div v-if="!cargando && pestana === 'bienestar'" class="mt-5 space-y-4">
+    <div
+      v-if="!cargando && conBienestar && pestana === 'bienestar'"
+      class="mt-5 space-y-4"
+    >
+      <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+        {{ $t("integraciones.soloMexico") }}
+      </p>
       <div v-for="i in integraciones" :key="i.proveedor" class="tu-card p-5">
         <div class="flex items-center justify-between gap-3">
-          <h2 class="font-semibold">
+          <h2 class="font-medium">
             {{ $t(`integraciones.proveedores.${i.proveedor}`) }}
           </h2>
           <label class="flex items-center gap-2 text-sm cursor-pointer">
@@ -322,14 +339,13 @@ onMounted(cargar);
           </label>
         </div>
 
+        <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t(`integraciones.ayuda.${i.proveedor}`) }}
+        </p>
         <div class="mt-3 grid sm:grid-cols-2 gap-3">
-          <div v-for="llave in LLAVES" :key="llave">
+          <div v-for="llave in i.llaves" :key="llave">
             <label class="tu-label" :for="`${i.proveedor}-${llave}`">
-              {{
-                llave === "api_key"
-                  ? $t("integraciones.apiKey")
-                  : $t("integraciones.baseUrl")
-              }}
+              {{ $t(`integraciones.llaves.${i.proveedor}.${llave}`) }}
               <span
                 v-if="configurada(i.proveedor, llave)"
                 class="tu-badge tu-badge-exito ml-1"
@@ -340,7 +356,7 @@ onMounted(cargar);
               :id="`${i.proveedor}-${llave}`"
               v-model="edicion[i.proveedor].llaves[llave]"
               class="tu-input"
-              :type="llave === 'api_key' ? 'password' : 'text'"
+              :type="SECRETAS.has(llave) ? 'password' : 'text'"
               autocomplete="off"
               :placeholder="
                 configurada(i.proveedor, llave)

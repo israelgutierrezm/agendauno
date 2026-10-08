@@ -35,7 +35,7 @@ class MarcarInasistencias extends Command
                         continue;
                     }
 
-                    $marcadas += $gestor->ejecutarEn($estudio, fn (): int => app(AsistenciaTenant::class)->marcarInasistenciasAlTerminar());
+                    $marcadas += $gestor->ejecutarAislado($estudio, fn (): int => app(AsistenciaTenant::class)->marcarInasistenciasAlTerminar(), 0);
                 }
             });
 

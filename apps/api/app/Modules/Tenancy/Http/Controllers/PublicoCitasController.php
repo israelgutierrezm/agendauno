@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Application\CobroDeCitasTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
+use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Exceptions\ModalidadNoDisponible;
 use App\Modules\Tenancy\ModalidadServicio;
@@ -79,6 +80,8 @@ class PublicoCitasController
                 // Su país y su lada (ADR 0103): la que se propone para el celular del cliente.
                 'pais' => app(RegionNegocioTenant::class)->pais(),
                 'lada' => app(RegionNegocioTenant::class)->lada(),
+                // ¿Publicó su aviso de privacidad? (se enlaza antes de pedir los datos).
+                'aviso_privacidad' => app(WaiversTenant::class)->avisoPrivacidad() !== null,
             ],
             ...$this->opciones->listar(),
         ]]);

@@ -34,6 +34,11 @@ export async function render(
         name: "aviso-privacidad",
         component: { render: () => null },
       },
+      {
+        path: "/terminos",
+        name: "terminos",
+        component: { render: () => null },
+      },
       // Destinos de los enlaces por nombre: aquí no se renderizan.
       ...["registro", "entrar", "directorio"].map((name) => ({
         path: name === "directorio" ? "/negocios" : `/${name}`,

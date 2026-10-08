@@ -35,7 +35,7 @@ class ExpirarReservasPendientes extends Command
                         continue;
                     }
 
-                    $expiradas += $gestor->ejecutarEn($estudio, fn (): int => $reservas->expirarReservasPendientes());
+                    $expiradas += $gestor->ejecutarAislado($estudio, fn (): int => $reservas->expirarReservasPendientes(), 0);
                 }
             });
 

@@ -49,6 +49,29 @@ it('no publica un aviso sin responsable ni con marcadores del borrador', functio
         ->assertJsonPath('data.versiones.aviso_privacidad', null);
 });
 
+it('sin borrador guardado, el superadmin parte del texto de AgendaUno y lo publica con su responsable', function (): void {
+    $borrador = $this->getJson('/api/v1/plataforma/legales', conPlataforma())->assertOk()
+        ->assertJsonPath('data.responsable.contacto', 'hola@agendauno.mx');
+    expect($borrador->json('data.aviso_privacidad'))->toContain('AVISO DE PRIVACIDAD INTEGRAL DE AGENDAUNO')
+        ->and($borrador->json('data.terminos'))->toContain('TÉRMINOS Y CONDICIONES DE USO DE AGENDAUNO');
+
+    // Sin nombre ni domicilio del responsable no se publica ninguno de los dos.
+    publicarLegal('terminos')->assertUnprocessable()->assertJsonValidationErrors(['responsable'], 'meta.errors');
+
+    guardarBorradorLegal(['responsable' => ['nombre' => 'Ana Pérez', 'domicilio' => 'Calle 1, Puebla, México', 'contacto' => 'hola@agendauno.mx']]);
+    publicarLegal('aviso_privacidad')->assertCreated();
+    publicarLegal('terminos')->assertCreated();
+
+    $publico = $this->getJson('/api/v1/legales')->assertOk();
+    foreach (['aviso_privacidad', 'terminos'] as $tipo) {
+        expect($publico->json("data.{$tipo}"))->toContain('Ana Pérez')
+            ->toContain('hola@agendauno.mx')
+            ->not->toContain('{responsable}')
+            ->not->toContain('{contacto}')
+            ->not->toContain('{domicilio}');
+    }
+});
+
 it('publica versiones inmutables con los datos del responsable y el público ve solo eso', function (): void {
     guardarBorradorLegal([
         'aviso_privacidad' => '{responsable}, con domicilio en {domicilio}, es responsable. Contacto: {contacto} ({area}).',

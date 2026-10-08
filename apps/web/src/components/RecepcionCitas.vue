@@ -161,9 +161,13 @@ const resumen = computed<ResumenCitas>(() => {
     sinRegistrar: activas.value.filter(
       (s) => estadoCita(s, ahora) === "sin_registrar",
     ).length,
+    // Igual que la Agenda: quien no asistió no cuenta como por cobrar.
     porCobrar: activas.value.filter((s) => {
       const p = pagoCita(s);
-      return p === "por_cobrar" || p === "por_pagar";
+      return (
+        estadoCita(s, ahora) !== "no_asistio" &&
+        (p === "por_cobrar" || p === "por_pagar")
+      );
     }).length,
   };
 });

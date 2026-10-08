@@ -34,7 +34,7 @@ class EscalarDunning extends Command
                         continue;
                     }
 
-                    $suspendidas += $gestor->ejecutarEn($estudio, fn (): int => $dunning->escalarVencidos());
+                    $suspendidas += $gestor->ejecutarAislado($estudio, fn (): int => $dunning->escalarVencidos(), 0);
                 }
             });
 

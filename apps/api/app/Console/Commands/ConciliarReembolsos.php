@@ -26,7 +26,9 @@ class ConciliarReembolsos extends Command
         $aclaradas = 0;
 
         Estudio::query()
-            ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value])
+            // También los suspendidos: un cobro o una devolución en la pasarela se
+            // registra aunque el negocio esté suspendido.
+            ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value, EstadoEstudio::Suspended->value])
             ->chunkById(100, function (Collection $estudios) use (&$aclaradas, $conciliar, $gestor): void {
                 /** @var Collection<int, Estudio> $estudios */
                 foreach ($estudios as $estudio) {
@@ -34,7 +36,7 @@ class ConciliarReembolsos extends Command
                         continue;
                     }
 
-                    $aclaradas += $gestor->ejecutarEn($estudio, fn (): int => $conciliar->ejecutar());
+                    $aclaradas += $gestor->ejecutarAislado($estudio, fn (): int => $conciliar->ejecutar(), 0);
                 }
             });
 

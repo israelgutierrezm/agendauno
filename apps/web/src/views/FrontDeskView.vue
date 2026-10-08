@@ -205,6 +205,7 @@ function alEnter(): void {
   }
 }
 
+const errorBusqueda = ref<string | null>(null);
 async function buscar(): Promise<void> {
   const q = busqueda.value.trim();
   if (esPase(q)) {
@@ -221,8 +222,11 @@ async function buscar(): Promise<void> {
       { params: { q } },
     );
     resultados.value = data.data;
-  } catch {
+    errorBusqueda.value = null;
+  } catch (e) {
+    // Si falla, se dice (no «sin resultados»).
     resultados.value = [];
+    errorBusqueda.value = mensajeDeError(e);
   } finally {
     buscando.value = false;
   }
@@ -521,6 +525,14 @@ onMounted(async () => {
             :style="{ color: 'var(--texto-suave)' }"
           >
             {{ $t("comun.cargando") }}
+          </p>
+          <p
+            v-else-if="errorBusqueda"
+            class="px-4 py-3 text-sm"
+            role="alert"
+            :style="{ color: 'var(--error)' }"
+          >
+            {{ errorBusqueda }}
           </p>
           <p
             v-else-if="resultados.length === 0"

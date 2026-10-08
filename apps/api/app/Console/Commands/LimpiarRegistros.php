@@ -21,7 +21,7 @@ class LimpiarRegistros extends Command
     {
         $borrados = $limpieza->ejecutar();
 
-        $this->info("Envíos de WhatsApp: {$borrados['envios_whatsapp']}. Códigos de verificación: {$borrados['verificaciones_whatsapp']}. Sesiones de tarjeta: {$borrados['sesiones_tarjeta']}. Errores: {$borrados['errores']}.");
+        $this->info("Envíos de WhatsApp: {$borrados['envios_whatsapp']}. Códigos de verificación: {$borrados['verificaciones_whatsapp']}. Sesiones de tarjeta: {$borrados['sesiones_tarjeta']}. Errores: {$borrados['errores']}. Sesiones vencidas: {$borrados['sesiones_vencidas']}.");
 
         return self::SUCCESS;
     }

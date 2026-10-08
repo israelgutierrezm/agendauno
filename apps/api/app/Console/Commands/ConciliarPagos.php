@@ -29,7 +29,9 @@ class ConciliarPagos extends Command
         $slug = $this->option('estudio');
 
         Estudio::query()
-            ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value])
+            // También los suspendidos: un cobro o una devolución en la pasarela se
+            // registra aunque el negocio esté suspendido.
+            ->whereIn('estado', [EstadoEstudio::Trialing->value, EstadoEstudio::Active->value, EstadoEstudio::Suspended->value])
             ->when(is_string($slug), fn ($q) => $q->where('slug', $slug))
             ->chunkById(100, function (Collection $estudios) use (&$total, $conciliar, $tarjetas, $gestor): void {
                 /** @var Collection<int, Estudio> $estudios */
@@ -38,10 +40,10 @@ class ConciliarPagos extends Command
                         continue;
                     }
 
-                    $cuenta = $gestor->ejecutarEn($estudio, fn (): array => [
+                    $cuenta = $gestor->ejecutarAislado($estudio, fn (): array => [
                         ...$conciliar->ejecutar(),
                         'tarjetas' => $tarjetas->ejecutar(),
-                    ]);
+                    ], []);
                     foreach ($cuenta as $clave => $n) {
                         $total[$clave] += $n;
                     }

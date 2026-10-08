@@ -162,6 +162,23 @@ export function fallaPasajera(e: unknown): FallaPasajera | null {
   return e.response.status === 503 ? "mantenimiento" : "servidor";
 }
 
+/** ¿La API respondió que no existe (404)? Distinto de no poder preguntarle. */
+export function noEncontrado(e: unknown): boolean {
+  return axios.isAxiosError(e) && e.response?.status === 404;
+}
+
+/** Los campos que la API rechazó (`meta.errors` de un 422); vacío si no los hay. */
+export function camposConError(e: unknown): string[] {
+  if (!axios.isAxiosError(e)) {
+    return [];
+  }
+  const errores = (
+    e.response?.data as
+      { meta?: { errors?: Record<string, unknown> } } | undefined
+  )?.meta?.errors;
+  return errores ? Object.keys(errores) : [];
+}
+
 /**
  * Extrae un mensaje legible del contrato de error de la API
  * `{code, message, meta:{errors}}`. Prefiere el primer error de campo (más

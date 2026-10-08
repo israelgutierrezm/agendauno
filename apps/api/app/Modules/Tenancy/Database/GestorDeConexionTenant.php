@@ -9,7 +9,9 @@ use Closure;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 /**
  * Gestiona la conexión `tenant` (data plane) apuntándola a la BD física de cada
@@ -102,6 +104,32 @@ class GestorDeConexionTenant
             } else {
                 $this->actual = null;
             }
+        }
+    }
+
+    /**
+     * Como `ejecutarEn`, pero un error en este negocio no detiene a los demás: se
+     * reporta (con el negocio en el contexto) y se devuelve `$siFalla`. Para las
+     * tareas programadas que recorren todos los negocios.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $callback
+     * @param  T  $siFalla
+     * @return T
+     */
+    public function ejecutarAislado(Estudio $estudio, Closure $callback, mixed $siFalla): mixed
+    {
+        try {
+            return $this->ejecutarEn($estudio, $callback);
+        } catch (Throwable $e) {
+            Log::error('Falló una tarea en un negocio; se sigue con los demás.', [
+                'estudio' => $estudio->slug,
+                'error' => $e->getMessage(),
+            ]);
+            report($e);
+
+            return $siFalla;
         }
     }
 

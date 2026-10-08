@@ -67,7 +67,10 @@ Así no hay CORS entre subdominios.
 8. **Google** (opcional, para entrar con Google): en el cliente OAuth web, registra
    como orígenes autorizados solo `https://DOMINIO` (y `https://www.DOMINIO` si se
    sirve). Desde el subdominio de un negocio, la web manda a entrar con Google al
-   dominio principal.
+   dominio principal. El mismo Client ID va en `GOOGLE_CLIENT_ID` (`api.env`) y en
+   `VITE_GOOGLE_CLIENT_ID` (`web.env`); sin él, la web no ofrece Google. Para la app
+   móvil, los Client ID de Android e iOS van en `GOOGLE_CLIENT_IDS_APP`, separados por
+   coma (ver `docs/GOOGLE_APP.md`).
 
 ## Primera instalación
 

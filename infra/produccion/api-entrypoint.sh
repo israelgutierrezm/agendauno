@@ -29,4 +29,9 @@ chmod 700 storage/app/respaldos-temp
 if [ "$1" = "php-fpm" ]; then
     exec "$@"
 fi
+# El programador, al arrancar, suelta los candados de «una a la vez» que dejó una
+# caída (OOM, reinicio del servidor): si no, esas tareas se saltan hasta 24 horas.
+if [ "$1" = "php" ] && [ "$2" = "artisan" ] && [ "$3" = "schedule:work" ]; then
+    su-exec www-data php artisan schedule:clear-cache || true
+fi
 exec su-exec www-data "$@"

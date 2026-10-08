@@ -319,10 +319,9 @@ describe("acceso por negocio", () => {
       "https://agendauno.mx/entrar?estudio=barberia&volver=/agendar",
     );
     expect(wrapper.text()).toContain("te llevamos a agendauno.mx");
-    expect(wrapper.text()).not.toContain("Google SSO estará disponible pronto");
   });
 
-  it("sin Google configurado, el botón solo avisa que viene pronto", async () => {
+  it("sin Google configurado no se ofrece: ni botón ni separador", async () => {
     mocks.route.query = { estudio: "pilates" };
     mocks.get.mockResolvedValue({
       data: { data: { nombre: "Pilates Centro", logo_url: null } },
@@ -331,8 +330,8 @@ describe("acceso por negocio", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-prueba="google-en-raiz"]').exists()).toBe(false);
-    await wrapper.get("button.tu-btn-fantasma").trigger("click");
-    expect(wrapper.text()).toContain("Google SSO estará disponible pronto");
+    expect(wrapper.find(".tu-login-separador").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Google");
   });
 
   it("con la sesión guardada sin confirmar, avisa y reintenta sin pedir la contraseña", async () => {
