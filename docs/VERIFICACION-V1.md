@@ -241,7 +241,7 @@ Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado�
 
 ### 10. Renta del SaaS (la plataforma cobra al negocio)
 
-- [ ] En `/plataforma` activa Stripe con llaves de prueba y registra en Stripe el
+- [ ] En `/splataformadm1n` (superadmin) activa Stripe con llaves de prueba y registra en Stripe el
   webhook `APP_URL/api/v1/webhooks/plataforma/stripe` (la pantalla aún no lo
   muestra). Hoy solo Stripe cobra la renta.
 - [ ] Con un negocio fuera de prueba y un mes cerrado,

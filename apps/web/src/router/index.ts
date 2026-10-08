@@ -474,7 +474,8 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
-      path: "/plataforma",
+      // Superadmin de AgendaUno: una dirección que no se adivina (no hay enlace a ella).
+      path: "/splataformadm1n",
       name: "plataforma",
       component: () => import("@/views/PlataformaView.vue"),
     },

@@ -44,7 +44,7 @@ describe("SEO comercial", () => {
       "/negocios",
       "/panel",
       "/miembros/123",
-      "/plataforma",
+      "/splataformadm1n",
     ]) {
       const html = renderSeoHead(seoParaRuta(path));
       expect(html).toContain('content="noindex,follow"');

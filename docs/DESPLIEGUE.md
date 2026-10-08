@@ -124,7 +124,7 @@ cp web.env.example web.env
      (el proxy no las quita);
    - `docker compose --env-file web.env exec -u www-data api php artisan agendauno:probar-correo tu@correo.com` llega;
    - `docker compose --env-file web.env logs -f worker scheduler` no muestra errores.
-5. En el superadmin (`/plataforma`, con `PLATFORM_ADMIN_TOKEN`): tarifas del SaaS,
+5. En el superadmin (`/splataformadm1n`, con `PLATFORM_ADMIN_TOKEN`): tarifas del SaaS,
    parámetros de plataforma, la pasarela con la que cobras la renta y **los documentos
    legales**: llena los datos del responsable y publica el aviso de privacidad y los
    términos. En producción el registro de negocios está cerrado hasta que ambos estén
