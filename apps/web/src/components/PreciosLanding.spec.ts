@@ -1,15 +1,17 @@
-import { mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import PreciosLanding from "./PreciosLanding.vue";
 import fuente from "./PreciosLanding.vue?raw";
 import { trackEvent } from "@/lib/analytics";
 import type { Modo } from "@/marketing/modalidades";
 import {
-  bandasEstudios,
+  PRECIOS_POR_OMISION,
+  desdeCitas,
   dolares,
-  nivelesCitas,
-  preciosCitas,
+  rangosClases,
+  tablaCitas,
 } from "@/marketing/precios";
+import { aplicarPreciosPublicos } from "@/marketing/preciosPublicos";
 
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
 const montar = () =>
@@ -31,6 +33,9 @@ const montarFijo = (modo: Modo) =>
   });
 
 describe("precios públicos (ADR 0107)", () => {
+  // Cada prueba empieza con el respaldo (lo publicado al escribir precios.ts).
+  afterEach(() => aplicarPreciosPublicos(PRECIOS_POR_OMISION));
+
   it("clases: en dólares más impuestos, con la nota de pesos en México y prueba sin tarjeta", () => {
     const vista = montar();
     expect(vista.findAll("article")).toHaveLength(3);
@@ -92,12 +97,14 @@ describe("precios públicos (ADR 0107)", () => {
       vista.findAll(".precio-importe strong").map((n) => n.text()),
     ).toEqual(["$9", "$24", "$33"]);
     expect(vista.get(".precios-intro").text()).toContain("$9 USD al mes");
-    // Funciones que separan los niveles.
+    // Funciones que separan los niveles (el reparto de siempre).
     const tarjetas = vista.findAll(".precio-tarjeta");
     expect(tarjetas[0]!.text()).toContain("Tu página con dirección propia");
     expect(tarjetas[0]!.text()).toContain("Cobro al agendar en línea*");
-    expect(tarjetas[1]!.text()).toContain("Equipo, roles y varias sucursales");
+    expect(tarjetas[1]!.text()).toContain("Equipo y roles");
+    expect(tarjetas[1]!.text()).toContain("Varias sucursales");
     expect(tarjetas[2]!.text()).toContain("Facturación electrónica*");
+    expect(tarjetas[1]!.text()).not.toContain("Facturación electrónica");
 
     const anual = vista
       .findAll(".precios-periodo button")
@@ -113,24 +120,73 @@ describe("precios públicos (ADR 0107)", () => {
     expect(vista.text()).not.toMatch(/talleres|reservas grupales/i);
     vista.unmount();
   });
-  it("conserva los precios publicados (ReservaClase y AgendaPro −15 %, redondeados hacia abajo)", () => {
-    expect(bandasEstudios.map((b) => b.subtotal)).toEqual([
+  it("el respaldo coincide con lo publicado (ReservaClase y AgendaPro −15 %, redondeados hacia abajo)", () => {
+    const { clases, citas } = PRECIOS_POR_OMISION;
+    expect(rangosClases(clases.bandas).map((b) => b.subtotal)).toEqual([
       2100, 3000, 3900, 4800, 6800, 8400, 11100, 16400, 29700,
     ]);
-    expect(nivelesCitas.map((n) => n.desde)).toEqual([900, 2400, 3300]);
-    expect(preciosCitas).toHaveLength(19);
-    expect(preciosCitas[0]).toEqual({
-      profesionales: 2,
+    expect(rangosClases(clases.bandas)[1]!.capacidad).toBe(
+      "41–60 alumnos activos",
+    );
+    expect(desdeCitas(citas.niveles)).toEqual({
+      individual: 900,
       premium: 2400,
       pro: 3300,
     });
-    expect(preciosCitas[18]).toEqual({
+    const tabla = tablaCitas(citas.niveles);
+    expect(tabla).toHaveLength(19);
+    expect(tabla[18]).toEqual({
       profesionales: 20,
       premium: 10100,
       pro: 17700,
     });
     expect(dolares(2100)).toBe("$21");
     expect(dolares(1550)).toBe("$15.50");
+  });
+  it("muestra lo que publica el superadmin: precios, anual, cotización y qué incluye cada nivel", async () => {
+    const vista = montarFijo("citas");
+    aplicarPreciosPublicos({
+      citas: {
+        moneda: "USD",
+        dias_prueba: 15,
+        meses_anual: 11,
+        niveles: {
+          individual: { "1": 1200 },
+          premium: { "2": 3000, "3": 3500 },
+          pro: { "2": 4000, "3": 4500 },
+        },
+        funciones: { lealtad: "premium", equipo: "individual" },
+      },
+      ventas: { correo: "cotiza@agendauno.mx", whatsapp: "525512345678" },
+    });
+    await flushPromises();
+
+    expect(
+      vista.findAll(".precio-importe strong").map((n) => n.text()),
+    ).toEqual(["$12", "$30", "$40"]);
+    const tarjetas = vista.findAll(".precio-tarjeta");
+    expect(tarjetas[0]!.text()).toContain("Equipo y roles");
+    expect(tarjetas[1]!.text()).toContain("Programa de lealtad");
+    expect(vista.get(".precios-contacto").text()).toContain(
+      "Más de 3 profesionales",
+    );
+    expect(
+      vista.get(".precios-contacto a[href^='mailto:']").attributes("href"),
+    ).toContain("mailto:cotiza@agendauno.mx");
+    expect(
+      vista
+        .get(".precios-contacto a[href^='https://wa.me/']")
+        .attributes("href"),
+    ).toBe("https://wa.me/525512345678");
+    expect(vista.findAll("tbody tr")).toHaveLength(3);
+
+    const anual = vista
+      .findAll(".precios-periodo button")
+      .find((b) => b.text().startsWith("Anual"))!;
+    expect(anual.text()).toContain("1 mes de cortesía");
+    await anual.trigger("click");
+    expect(vista.get(".precio-importe strong").text()).toBe("$132");
+    vista.unmount();
   });
   it("nombra las modalidades igual que la portada y el registro, con la nota de México", () => {
     const vista = montar();

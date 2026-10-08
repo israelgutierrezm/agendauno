@@ -2,28 +2,33 @@
 import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { trackEvent } from "@/lib/analytics";
+import { funcionesPorNivel } from "@/lib/suscripcion";
 import { NOMBRE_MODALIDAD, type Modo } from "@/marketing/modalidades";
 import {
-  MAX_ALUMNOS,
-  MAX_PROFESIONALES,
-  MESES_ANUAL,
-  bandasEstudios,
+  type NivelCitas,
+  desdeCitas,
   dolares,
-  nivelesCitas,
-  preciosCitas,
+  maxAlumnos,
+  rangosClases,
+  tablaCitas,
 } from "@/marketing/precios";
+import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 
 /*
-| Precios de la suscripción a AgendaUno (ADR 0107), en dólares y sin impuestos.
+| Precios de la suscripción a AgendaUno (ADR 0107), sin impuestos, tal como los
+| publica el superadmin (`GET /api/v1/precios`; mientras llegan, el respaldo de
+| `precios.ts`).
 | - Sin `modo`: selector clases/citas, como en la portada de siempre.
 | - Con `modo` (/clases#precios, /citas#precios): fijo, sin selector, y el registro
 |   lleva `?modo=`.
 | - Clases: por alumnos activos al mes. Citas: Individual, Premium o Pro por los
-|   profesionales que contratas, mensual o anual (2 meses de cortesía).
+|   profesionales que contratas, mensual o anual; qué incluye cada uno sale del
+|   reparto de funciones de la tarifa.
 | La modalidad se nombra igual que en la portada y el registro (NOMBRE_MODALIDAD). Lo
 | que menciona cobros en línea o facturación lleva «*» y la nota de México (ADR 0099).
 */
 const props = defineProps<{ modo?: Modo }>();
+const precios = usePreciosPublicos();
 const elegido = ref<Modo>("clases");
 const anual = ref(false);
 const fijo = computed(() => props.modo !== undefined);
@@ -33,41 +38,69 @@ const registro = computed(() =>
     ? { name: "registro", query: { modo: modo.value } }
     : { name: "registro" },
 );
+
+const rangos = computed(() => rangosClases(precios.datos.clases.bandas));
+const topeAlumnos = computed(() => maxAlumnos(precios.datos.clases.bandas));
+const tabla = computed(() => tablaCitas(precios.datos.citas.niveles));
+const desde = computed(() => desdeCitas(precios.datos.citas.niveles));
+const topeProfesionales = computed(
+  () => tabla.value[tabla.value.length - 1]?.profesionales ?? null,
+);
+const mesesAnual = computed(() => precios.datos.citas.meses_anual);
+const cortesia = computed(() => Math.max(0, 12 - mesesAnual.value));
+const funciones = computed(() =>
+  funcionesPorNivel(precios.datos.citas.funciones ?? {}),
+);
+const monedaClases = computed(() => precios.datos.clases.moneda);
+const monedaCitas = computed(() => precios.datos.citas.moneda);
+
 const beneficiosClases = [
   "Agenda de clases y control de cupos",
   "Membresías y paquetes de clases",
   "Reservas en línea para tus alumnos",
   "Asistencia y registro de cobros",
 ];
+const NIVELES: { nivel: NivelCitas; nombre: string }[] = [
+  { nivel: "individual", nombre: "Individual" },
+  { nivel: "premium", nombre: "Premium" },
+  { nivel: "pro", nombre: "Pro" },
+];
 const tarjetas = computed(() =>
   modo.value === "clases"
-    ? bandasEstudios.slice(0, 3).map((b) => ({
+    ? rangos.value.slice(0, 3).map((b) => ({
         clave: b.capacidad,
         nombre: b.capacidad,
         capacidad: "",
         desde: false,
         importe: b.subtotal,
-        periodo: "USD / mes",
+        periodo: `${monedaClases.value} / mes`,
         nota: "",
         funciones: beneficiosClases,
       }))
-    : nivelesCitas.map((n) => ({
+    : NIVELES.map((n) => ({
         clave: n.nivel,
         nombre: n.nombre,
-        capacidad: n.capacidad,
+        capacidad:
+          n.nivel === "individual"
+            ? "1 profesional"
+            : `Desde ${tabla.value[0]?.profesionales ?? 2} profesionales`,
         desde: n.nivel !== "individual",
-        importe: anual.value ? n.desde * MESES_ANUAL : n.desde,
-        periodo: anual.value ? "USD / año" : "USD / mes",
+        importe: anual.value
+          ? desde.value[n.nivel] * mesesAnual.value
+          : desde.value[n.nivel],
+        periodo: `${monedaCitas.value} / ${anual.value ? "año" : "mes"}`,
         nota:
           n.nivel === "individual" ? "" : "por los profesionales que contratas",
-        funciones: n.funciones,
+        funciones: funciones.value[n.nivel],
       })),
 );
+const ventasCorreo = computed(
+  () => precios.datos.ventas.correo ?? "ventas@agendauno.mx",
+);
 const ventasWhatsApp = computed(() => {
-  const numero = String(import.meta.env.VITE_VENTAS_WHATSAPP ?? "").replace(
-    /\D/g,
-    "",
-  );
+  const numero = String(
+    precios.datos.ventas.whatsapp ?? import.meta.env.VITE_VENTAS_WHATSAPP ?? "",
+  ).replace(/\D/g, "");
   return numero === "" ? null : `https://wa.me/${numero}`;
 });
 
@@ -124,15 +157,20 @@ function elegirModo(valor: Modo) {
         <h3>Tu comunidad crece. Tu plan la acompaña.</h3>
         <p>
           Organiza tus clases, cupos y membresías desde
-          <strong>{{ dolares(bandasEstudios[0].subtotal) }} USD al mes</strong>
-          para hasta 40 alumnos activos.
+          <strong
+            >{{ dolares(rangos[0]?.subtotal ?? 0) }} {{ monedaClases }} al
+            mes</strong
+          >
+          para {{ rangos[0]?.capacidad.toLowerCase() ?? "" }}.
         </p>
       </template>
       <template v-else>
         <h3>Tu agenda, a solas o con todo tu equipo.</h3>
         <p>
           Organiza servicios, disponibilidad y reservas desde
-          <strong>{{ dolares(nivelesCitas[0]!.desde) }} USD al mes</strong>
+          <strong
+            >{{ dolares(desde.individual) }} {{ monedaCitas }} al mes</strong
+          >
           para un profesional. Con tu equipo, eliges Premium o Pro por los
           profesionales que contratas.
         </p>
@@ -145,7 +183,10 @@ function elegirModo(valor: Modo) {
             Mensual
           </button>
           <button type="button" :aria-pressed="anual" @click="anual = true">
-            Anual · 2 meses de cortesía
+            Anual<template v-if="cortesia > 0">
+              · {{ cortesia }} {{ cortesia === 1 ? "mes" : "meses" }} de
+              cortesía</template
+            >
           </button>
         </div>
       </template>
@@ -217,7 +258,7 @@ function elegirModo(valor: Modo) {
       </template>
       <template v-else>
         En la prueba gratis tienes todo lo de Pro. Subir de plan se cobra al
-        momento por los días que faltan; el anual cuesta 10 meses.
+        momento por los días que faltan; el anual cuesta {{ mesesAnual }} meses.
       </template>
     </p>
 
@@ -232,7 +273,11 @@ function elegirModo(valor: Modo) {
       <div v-if="modo === 'clases'" class="precios-reglas">
         <table>
           <caption>
-            Tarifa mensual para estudios y academias · USD + impuestos
+            Tarifa mensual para estudios y academias ·
+            {{
+              monedaClases
+            }}
+            + impuestos
           </caption>
           <thead>
             <tr>
@@ -241,7 +286,7 @@ function elegirModo(valor: Modo) {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="banda in bandasEstudios" :key="banda.capacidad">
+            <tr v-for="banda in rangos" :key="banda.capacidad">
               <th scope="row">{{ banda.capacidad }}</th>
               <td>{{ dolares(banda.subtotal) }}</td>
             </tr>
@@ -262,7 +307,11 @@ function elegirModo(valor: Modo) {
       <div v-else class="precios-reglas">
         <table>
           <caption>
-            Precio mensual por profesionales contratados · USD + impuestos
+            Precio mensual por profesionales contratados ·
+            {{
+              monedaCitas
+            }}
+            + impuestos
           </caption>
           <thead>
             <tr>
@@ -274,9 +323,9 @@ function elegirModo(valor: Modo) {
           <tbody>
             <tr>
               <th scope="row">1 (Individual)</th>
-              <td colspan="2">{{ dolares(nivelesCitas[0]!.desde) }}</td>
+              <td colspan="2">{{ dolares(desde.individual) }}</td>
             </tr>
-            <tr v-for="fila in preciosCitas" :key="fila.profesionales">
+            <tr v-for="fila in tabla" :key="fila.profesionales">
               <th scope="row">{{ fila.profesionales }}</th>
               <td>{{ dolares(fila.premium) }}</td>
               <td>{{ dolares(fila.pro) }}</td>
@@ -294,16 +343,16 @@ function elegirModo(valor: Modo) {
       class="precios-contacto"
       :aria-label="
         modo === 'clases'
-          ? 'Cotización para más de 1,000 alumnos'
-          : `Cotización para más de ${MAX_PROFESIONALES} profesionales`
+          ? `Cotización para más de ${(topeAlumnos ?? 0).toLocaleString('es-MX')} alumnos`
+          : `Cotización para más de ${topeProfesionales ?? 0} profesionales`
       "
     >
       <div>
         <h4>
           {{
             modo === "clases"
-              ? `¿Más de ${MAX_ALUMNOS.toLocaleString("es-MX")} alumnos activos?`
-              : `¿Más de ${MAX_PROFESIONALES} profesionales?`
+              ? `¿Más de ${(topeAlumnos ?? 0).toLocaleString("es-MX")} alumnos activos?`
+              : `¿Más de ${topeProfesionales ?? 0} profesionales?`
           }}
         </h4>
         <p>Contáctanos para una propuesta a la medida de tu operación.</p>
@@ -319,7 +368,7 @@ function elegirModo(valor: Modo) {
         >
         <a
           class="tu-btn tu-btn-primario"
-          href="mailto:ventas@agendauno.mx?subject=Cotizaci%C3%B3n%20AgendaUno"
+          :href="`mailto:${ventasCorreo}?subject=Cotizaci%C3%B3n%20AgendaUno`"
           >Contáctanos</a
         >
       </div>

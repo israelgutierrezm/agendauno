@@ -314,7 +314,7 @@ export const soluciones: readonly Solucion[] = [
       {
         pregunta: "¿La agenda contempla cabinas y equipamiento?",
         respuesta:
-          "Sí. Das de alta tus cabinas, camillas o equipos por sucursal y eliges qué servicios los usan: una hora solo se ofrece si hay un profesional y un espacio libres, también en tu página pública.",
+          "Sí, en los planes Premium y Pro. Das de alta tus cabinas, camillas o equipos por sucursal y eliges qué servicios los usan: una hora solo se ofrece si hay un profesional y un espacio libres, también en tu página pública.",
       },
     ],
   },

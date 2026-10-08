@@ -14,6 +14,7 @@ import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
 import WhatsAppNegocio, {
   type EstadoWhatsAppNegocio,
 } from "@/components/WhatsAppNegocio.vue";
+import ComercialPlataforma from "@/components/ComercialPlataforma.vue";
 import WhatsAppPlataforma from "@/components/WhatsAppPlataforma.vue";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -59,6 +60,8 @@ interface Estudio {
 interface Cargo {
   id: string;
   periodo: string;
+  // `renta`, `plan`, `ajuste` o `timbres` (ADR 0107).
+  concepto?: string;
   monto_minor: number;
   moneda: string;
   estado: string;
@@ -107,6 +110,13 @@ interface ResumenCobros {
   cobrado_mes_minor: number;
   estudios_con_adeudo: number;
   moneda: string;
+  // Lo cobrado en otras monedas (dólares, fuera de México; ADR 0107): aparte.
+  otras_monedas?: {
+    moneda: string;
+    pendiente_minor: number;
+    vencido_minor: number;
+    cobrado_mes_minor: number;
+  }[];
 }
 interface Pasarela {
   proveedor: string;
@@ -933,6 +943,23 @@ function borrar(): void {
             </p>
           </div>
         </div>
+        <!-- Lo que se cobra en otra moneda (fuera de México): no se suma a los pesos. -->
+        <p
+          v-for="o in resumen?.otras_monedas ?? []"
+          :key="o.moneda"
+          class="mt-2 text-sm"
+          :style="{ color: 'var(--texto-suave)' }"
+          data-prueba="otra-moneda"
+        >
+          {{
+            $t("suscripcion.plataforma.otraMoneda", {
+              moneda: o.moneda,
+              porCobrar: dinero(o.pendiente_minor, o.moneda),
+              vencido: dinero(o.vencido_minor, o.moneda),
+              cobrado: dinero(o.cobrado_mes_minor, o.moneda),
+            })
+          }}
+        </p>
 
         <div class="mt-5 tu-card p-5">
           <div class="flex flex-wrap items-end gap-3">
@@ -944,7 +971,7 @@ function borrar(): void {
             >
               <option value="">{{ $t("plataformaAdmin.cobros.todos") }}</option>
               <option
-                v-for="e in ['pendiente', 'pagado', 'sin_cargo']"
+                v-for="e in ['pendiente', 'pagado', 'sin_cargo', 'cancelado']"
                 :key="e"
                 :value="e"
               >
@@ -977,6 +1004,9 @@ function borrar(): void {
                   class="mt-0.5 text-xs first-letter:uppercase"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
+                  <template v-if="c.concepto && c.concepto !== 'renta'">
+                    {{ $t(`suscripcion.cobro.concepto.${c.concepto}`) }} ·
+                  </template>
                   {{ periodo(c.periodo) }}
                   <template v-if="c.estado === 'pendiente' && c.vence_en">
                     ·
@@ -1165,6 +1195,9 @@ function borrar(): void {
             </button>
           </div>
         </form>
+
+        <!-- Ventas, Banco de México y timbres (ADR 0107). -->
+        <ComercialPlataforma :api-url="apiUrl" :token="token" />
 
         <WhatsAppPlataforma :api-url="apiUrl" :token="token" />
 
@@ -1572,7 +1605,12 @@ function borrar(): void {
             </p>
             <dl v-else class="mt-2 divide-y divide-[var(--borde)]">
               <div v-for="c in ficha.cargos" :key="c.id" class="pl-dato">
-                <dt class="first-letter:uppercase">{{ periodo(c.periodo) }}</dt>
+                <dt class="first-letter:uppercase">
+                  <template v-if="c.concepto && c.concepto !== 'renta'">
+                    {{ $t(`suscripcion.cobro.concepto.${c.concepto}`) }} ·
+                  </template>
+                  {{ periodo(c.periodo) }}
+                </dt>
                 <dd class="text-right">
                   <span class="tabular-nums">{{
                     dinero(c.monto_minor, c.moneda)

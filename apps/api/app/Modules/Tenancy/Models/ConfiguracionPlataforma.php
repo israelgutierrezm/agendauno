@@ -98,4 +98,64 @@ class ConfiguracionPlataforma extends Model
 
         return is_string($env) && filter_var($env, FILTER_VALIDATE_EMAIL) !== false ? $env : null;
     }
+
+    /**
+     * Correo de ventas para cotizaciones (más de 20 profesionales o de 1,000 alumnos,
+     * ADR 0107): el que capturó el superadmin; si no, el de VENTAS_CORREO.
+     */
+    public static function ventasCorreo(): ?string
+    {
+        $valor = self::leer('ventas_correo') ?? config('agendauno.ventas.correo');
+
+        return is_string($valor) && filter_var($valor, FILTER_VALIDATE_EMAIL) !== false ? $valor : null;
+    }
+
+    /** WhatsApp de ventas (solo dígitos, con lada): el del superadmin o VENTAS_WHATSAPP. */
+    public static function ventasWhatsApp(): ?string
+    {
+        $valor = preg_replace('/\D/', '', (string) (self::leer('ventas_whatsapp') ?? config('agendauno.ventas.whatsapp') ?? ''));
+
+        return $valor !== '' ? $valor : null;
+    }
+
+    /** Token de la API del Banco de México (tipo de cambio): el del superadmin o BANXICO_TOKEN. */
+    public static function tokenBanxico(): ?string
+    {
+        $valor = self::leer('banxico_token') ?? config('agendauno.banxico.token');
+
+        return is_string($valor) && $valor !== '' ? $valor : null;
+    }
+
+    /** Paquetes de timbres que se venden por omisión (ADR 0107). */
+    public const PAQUETES_TIMBRES = [50, 100, 200, 350, 500];
+
+    /**
+     * Paquetes de timbres que se venden (cuántos timbres trae cada uno): los que fijó el
+     * superadmin o los de siempre.
+     *
+     * @return list<int>
+     */
+    public static function paquetesTimbres(): array
+    {
+        $guardados = json_decode((string) (self::leer('timbres_paquetes') ?? ''), true);
+        if (! is_array($guardados)) {
+            return self::PAQUETES_TIMBRES;
+        }
+        $paquetes = array_values(array_unique(array_filter(array_map('intval', $guardados), static fn (int $n): bool => $n > 0)));
+        sort($paquetes);
+
+        return $paquetes !== [] ? $paquetes : self::PAQUETES_TIMBRES;
+    }
+
+    /** Lee una clave tolerando que la tabla aún no exista. */
+    private static function leer(string $clave): ?string
+    {
+        try {
+            $valor = static::obtener($clave);
+        } catch (Throwable) {
+            return null;
+        }
+
+        return is_string($valor) && $valor !== '' ? $valor : null;
+    }
 }

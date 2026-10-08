@@ -62,8 +62,10 @@ Así no hay CORS entre subdominios.
    emite a sus clientes gasta un timbre que compra en paquetes en «Mi suscripción»
    (ADR 0107); el precio de cada timbre es el parámetro `timbres.precio_centavos`.
    **Tipo de cambio**: la renta se publica en dólares y a los negocios de México se
-   les cobra en pesos. Con `BANXICO_TOKEN` se usa el FIX del Banco de México del día;
-   sin él, captúralo en el panel del superadmin (Tarifas → Tipo de cambio). Si el
+   les cobra en pesos. Con el token del Banco de México (superadmin → Configuración →
+   Datos comerciales, o `BANXICO_TOKEN`) se usa el FIX del día; sin él, captúralo en
+   Tarifas → Tipo de cambio. El correo y WhatsApp de ventas y los paquetes de timbres
+   también se cargan en Datos comerciales. Si el
    último tiene más de `renta.tipo_cambio_dias_vigencia` días, los cargos esperan y
    llega una alerta.
 7. **reCAPTCHA v3** (obligatorio): crea un sitio en la consola de reCAPTCHA con

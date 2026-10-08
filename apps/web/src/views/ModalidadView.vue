@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 import { computed, ref, type Component } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
@@ -42,7 +43,9 @@ import "@/marketing/landing.css";
 const props = defineProps<{ modo: Modo }>();
 const { t } = useI18n();
 
-const DIAS_PRUEBA = 30;
+// Los días de prueba de su modalidad: los que publica el superadmin (con respaldo).
+const precios = usePreciosPublicos();
+const DIAS_PRUEBA = computed(() => precios.datos[props.modo].dias_prueba);
 const SUAVE = { color: "var(--texto-suave)" };
 // En una banda gris, las tarjetas y los círculos de la banda van en blanco.
 const BANDA_FONDO = {

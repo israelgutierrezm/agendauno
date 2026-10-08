@@ -25,13 +25,6 @@ use Illuminate\Support\Facades\DB;
  */
 class GestionarDunningTenant
 {
-    /**
-     * Backoff de reintentos (días desde el fallo) según el número de intento.
-     *
-     * @var list<int>
-     */
-    private const REINTENTOS_DIAS = [1, 3, 7];
-
     public function __construct(
         private readonly RegistrarEventoTenant $eventos,
         private readonly GestorDeConexionTenant $gestor,
@@ -159,11 +152,17 @@ class GestionarDunningTenant
     }
 
     /**
-     * Fecha del próximo reintento según el intento (backoff creciente, con tope).
+     * Fecha del próximo reintento según el intento (backoff creciente, con tope): los
+     * días los fija el negocio (`cobranza.reintento_N_dias`; 1, 3 y 7 por omisión).
      */
     private function proximoIntento(int $intento): Carbon
     {
-        $dias = self::REINTENTOS_DIAS[min($intento, count(self::REINTENTOS_DIAS)) - 1];
+        $reintentos = [
+            $this->parametros->entero('cobranza.reintento_1_dias'),
+            $this->parametros->entero('cobranza.reintento_2_dias'),
+            $this->parametros->entero('cobranza.reintento_3_dias'),
+        ];
+        $dias = $reintentos[max(1, min($intento, count($reintentos))) - 1];
 
         return Carbon::now()->addDays($dias);
     }

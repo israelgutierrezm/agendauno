@@ -20,7 +20,8 @@ import {
   NOMBRE_RUTA_MODALIDAD,
   type Modo,
 } from "@/marketing/modalidades";
-import { bandasEstudios, dolares, nivelesCitas } from "@/marketing/precios";
+import { desdeCitas, dolares, rangosClases } from "@/marketing/precios";
+import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 
 /*
 | Portada «/»: corta, para que cada visitante elija su modalidad en segundos. Cada
@@ -31,7 +32,12 @@ import { bandasEstudios, dolares, nivelesCitas } from "@/marketing/precios";
 | `onMounted` (la aparición al desplazarse la lleva `useRevelar`).
 */
 const { t } = useI18n();
-const DIAS_PRUEBA = 30;
+// Precios y días de prueba: los que publica el superadmin (con su respaldo).
+const precios = usePreciosPublicos();
+// La prueba más corta de las dos modalidades: lo general no promete de más.
+const DIAS_PRUEBA = computed(() =>
+  Math.min(precios.datos.clases.dias_prueba, precios.datos.citas.dias_prueba),
+);
 
 const negociosAnimados = computed(() =>
   [
@@ -74,24 +80,27 @@ const avisoHero = computed(() => ({
   detalle: t("landing.heroVisual.confirmadaDetalle"),
 }));
 
-// Precio de entrada de cada modalidad (la referencia comercial de precios.ts); el
-// detalle de cada una está en /clases#precios y /citas#precios.
-const preciosDesde = [
-  {
-    modo: "clases" as const,
-    modelo: "landing.portada.precios.clases",
-    capacidad: bandasEstudios[0].capacidad,
-    importe: dolares(bandasEstudios[0].subtotal),
-    enlace: "landing.portada.precios.verClases",
-  },
-  {
-    modo: "citas" as const,
-    modelo: "landing.portada.precios.citas",
-    capacidad: nivelesCitas[0]!.capacidad,
-    importe: dolares(nivelesCitas[0]!.desde),
-    enlace: "landing.portada.precios.verCitas",
-  },
-];
+// Precio de entrada de cada modalidad (lo publicado); el detalle de cada una está en
+// /clases#precios y /citas#precios.
+const preciosDesde = computed(() => {
+  const rango = rangosClases(precios.datos.clases.bandas)[0];
+  return [
+    {
+      modo: "clases" as const,
+      modelo: "landing.portada.precios.clases",
+      capacidad: rango?.capacidad ?? "",
+      importe: dolares(rango?.subtotal ?? 0),
+      enlace: "landing.portada.precios.verClases",
+    },
+    {
+      modo: "citas" as const,
+      modelo: "landing.portada.precios.citas",
+      capacidad: "1 profesional",
+      importe: dolares(desdeCitas(precios.datos.citas.niveles).individual),
+      enlace: "landing.portada.precios.verCitas",
+    },
+  ];
+});
 
 // Preguntas generales; las de cada modalidad van en /clases y /citas. Quién cambia la
 // modalidad (ADR 0104) se explica aquí, no en el registro.
@@ -107,7 +116,7 @@ const preguntas = computed(() =>
   ).map((clave) => ({
     clave,
     pregunta: t(`landing.portada.faq.${clave}`),
-    respuesta: t(`landing.portada.faq.${clave}R`, { dias: DIAS_PRUEBA }),
+    respuesta: t(`landing.portada.faq.${clave}R`, { dias: DIAS_PRUEBA.value }),
   })),
 );
 

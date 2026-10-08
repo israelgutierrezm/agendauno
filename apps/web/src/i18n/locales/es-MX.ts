@@ -355,7 +355,7 @@ export default {
       precio: {
         titulo: "Pagas según tus alumnos activos.",
         subtitulo:
-          "Un solo precio al mes según cuántos alumnos activos tuvo tu estudio, con todas las herramientas desde el primer plan.",
+          "Un solo precio al mes según cuántos alumnos activos tuvo tu estudio, con todas las herramientas desde el primer plan. Precios en dólares; en México se cobran en pesos.",
       },
       giros: {
         etiqueta: "Para quién es",
@@ -398,7 +398,7 @@ export default {
         },
         precio: {
           q: "¿Cómo se calcula el precio de AgendaUno?",
-          a: "Por rangos de alumnos activos en el mes: cuenta quien tuvo una reserva confirmada en una clase no cancelada o una compra pagada. No cuenta solo por estar registrado. Todos los importes son más IVA.",
+          a: "Por rangos de alumnos activos en el mes: cuenta quien tuvo una reserva confirmada en una clase no cancelada o una compra pagada. No cuenta solo por estar registrado. Los precios están en dólares, más impuestos; en México se cobran en pesos al tipo de cambio del día del cobro, más IVA.",
         },
       },
       final: {
@@ -428,7 +428,7 @@ export default {
         paquetes: {
           titulo: "Paquetes de servicios",
           descripcion:
-            "Arma un servicio que incluye otros, con su propio precio y duración, en una sola cita.",
+            "Arma un servicio que incluye otros, con su propio precio y duración, en una sola cita. En los planes Premium y Pro.",
           detalle:
             "Tus clientes ven qué incluye y, si sale más barato, cuánto costaría por separado. Se agenda, se cobra y se reprograma como cualquier servicio.",
         },
@@ -509,7 +509,7 @@ export default {
         beneficios: {
           llegada: "Llegada de cada cita: llegó, llegó tarde o no vino",
           cobro: "Cobro en recepción o en línea al agendar*",
-          pos: "Punto de venta con inventario por sucursal",
+          pos: "Punto de venta con inventario por sucursal (Premium y Pro)",
         },
         enlace: "Empieza con tu negocio",
       },
@@ -571,11 +571,11 @@ export default {
         },
         paquetes: {
           q: "¿Puedo vender paquetes de servicios?",
-          a: "Sí. Un paquete junta varios servicios de tu catálogo con un solo precio y se agenda en una sola cita; tu cliente ve qué incluye antes de agendar. También puedes vender bonos y membresías.",
+          a: "Sí, en los planes Premium y Pro. Un paquete junta varios servicios de tu catálogo con un solo precio y se agenda en una sola cita; tu cliente ve qué incluye antes de agendar. También puedes vender bonos y membresías; venderlos en línea es del plan Pro.",
         },
         espacios: {
           q: "¿Puedo manejar cabinas, sillones o consultorios?",
-          a: "Sí. Indica qué espacios usa cada servicio y solo se ofrecen horas con un espacio libre, para que dos citas no choquen en la misma cabina.",
+          a: "Sí, en los planes Premium y Pro. Indica qué espacios usa cada servicio y solo se ofrecen horas con un espacio libre, para que dos citas no choquen en la misma cabina.",
         },
         salud: {
           q: "¿Sirve para consultorios o profesionales de la salud?",
@@ -588,7 +588,7 @@ export default {
         },
         precio: {
           q: "¿Cómo se calcula el precio de AgendaUno?",
-          a: "Por cada profesional activo en el mes: cuenta quien tuvo al menos una cita no cancelada. Los tramos se suman y el total tiene un tope. Todos los importes son más IVA.",
+          a: "Eliges un plan (Individual, Premium o Pro) y cuántos profesionales contratas, y pagas por adelantado, cada mes o cada año (el anual cuesta 10 meses). Puedes cambiar de plan cuando quieras. Los precios están en dólares, más impuestos; en México se cobran en pesos al tipo de cambio del día del cobro, más IVA.",
         },
       },
       final: {

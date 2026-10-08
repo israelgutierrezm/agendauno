@@ -34,6 +34,8 @@ export interface PlanCitas {
   tipo_cambio: TipoCambio | null;
   /** Precio mensual por nivel y profesionales (`{"premium": {"2": 2400}}`). */
   precios: Partial<Record<NivelPlan, Record<string, number>>>;
+  /** Qué nivel abre cada función (lo fija el superadmin en la tarifa). */
+  funciones?: Partial<Record<string, string>>;
 }
 
 /** El precio mensual de un nivel con esos profesionales (null: no se vende). */
@@ -65,3 +67,83 @@ export type FuncionPlan =
   | "integraciones"
   | "roles_propios"
   | "reportes_avanzados";
+
+/** Lo que todos los planes de citas incluyen (no depende del nivel). */
+export const FUNCIONES_BASE = [
+  "Agenda y citas, con la app",
+  "Recordatorios por correo y en la app",
+  "Tu página con dirección propia",
+  "Cobro al agendar en línea* y en caja",
+  "Clientes, reseñas y reportes básicos",
+] as const;
+
+/**
+ * El nombre de cada función que depende del nivel (ADR 0107), en el orden en que se
+ * presenta. Las que solo operan en México llevan «*».
+ */
+export const ETIQUETAS_FUNCION: Record<FuncionPlan, string> = {
+  equipo: "Equipo y roles",
+  sucursales: "Varias sucursales",
+  recursos: "Cabinas y recursos",
+  paquetes: "Paquetes y membresías",
+  promociones: "Promociones",
+  inventario: "Mostrador e inventario",
+  comisiones: "Comisiones y nómina",
+  documentos: "Documentos y consentimientos",
+  facturacion: "Facturación electrónica*",
+  cobro_automatico: "Cobro automático de membresías*",
+  venta_en_linea: "Venta en línea de paquetes*",
+  formularios: "Formularios personalizables",
+  lealtad: "Programa de lealtad",
+  mensajes: "Mensajes masivos y WhatsApp",
+  integraciones: "Integraciones y API",
+  roles_propios: "Roles propios",
+  reportes_avanzados: "Reportes avanzados",
+};
+
+/**
+ * El nivel que abre cada función si la tarifa no dice otro: el mismo reparto de
+ * siempre del servidor (`FuncionesPlan::NIVEL_MINIMO`).
+ */
+export const NIVEL_POR_OMISION: Record<FuncionPlan, NivelPlan> = {
+  equipo: "premium",
+  sucursales: "premium",
+  recursos: "premium",
+  paquetes: "premium",
+  promociones: "premium",
+  inventario: "premium",
+  comisiones: "premium",
+  documentos: "premium",
+  facturacion: "pro",
+  cobro_automatico: "pro",
+  venta_en_linea: "pro",
+  formularios: "pro",
+  lealtad: "pro",
+  mensajes: "pro",
+  integraciones: "pro",
+  roles_propios: "pro",
+  reportes_avanzados: "pro",
+};
+
+/**
+ * Qué incluye cada nivel según el reparto vigente (`funcion → nivel que la abre`,
+ * lo fija el superadmin en la tarifa): Individual lo de todos más lo que abre;
+ * Premium y Pro, «todo lo del anterior» más lo suyo. Sin «*» si `conAsterisco` es
+ * falso (dentro del panel, donde ya se sabe el país).
+ */
+export function funcionesPorNivel(
+  mapa: Partial<Record<string, string>>,
+  conAsterisco = true,
+): Record<NivelPlan, string[]> {
+  const limpia = (texto: string) =>
+    conAsterisco ? texto : texto.replace("*", "");
+  const de = (nivel: NivelPlan) =>
+    (Object.keys(ETIQUETAS_FUNCION) as FuncionPlan[])
+      .filter((f) => (mapa[f] ?? NIVEL_POR_OMISION[f]) === nivel)
+      .map((f) => limpia(ETIQUETAS_FUNCION[f]));
+  return {
+    individual: [...FUNCIONES_BASE.map(limpia), ...de("individual")],
+    premium: ["Todo lo de Individual", ...de("premium")],
+    pro: ["Todo lo de Premium", ...de("pro")],
+  };
+}

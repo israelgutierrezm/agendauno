@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Platform\Operacion\AlertasPlataforma;
 use App\Modules\Tenancy\Exceptions\TipoCambioNoDisponible;
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\TipoCambio;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -15,7 +16,8 @@ use Throwable;
 
 /**
  * Tipo de cambio para cobrar en pesos la renta publicada en dólares (ADR 0107): el
- * FIX del Banco de México del día en que se emite el cargo (con `BANXICO_TOKEN`) o,
+ * FIX del Banco de México del día en que se emite el cargo (con el token que captura
+ * el superadmin, o `BANXICO_TOKEN`) o,
  * sin él, el último que capturó el superadmin. Se guarda por día (`tipos_cambio`) y
  * en diezmilésimas (17.2345 → 172345): nada de flotantes.
  *
@@ -95,7 +97,7 @@ class TiposDeCambio
 
     public function banxicoConfigurado(): bool
     {
-        return (string) config('agendauno.banxico.token', '') !== '';
+        return ConfiguracionPlataforma::tokenBanxico() !== null;
     }
 
     /**
@@ -150,7 +152,7 @@ class TiposDeCambio
 
         try {
             $respuesta = Http::timeout(10)->acceptJson()
-                ->withHeaders(['Bmx-Token' => (string) config('agendauno.banxico.token')])
+                ->withHeaders(['Bmx-Token' => (string) ConfiguracionPlataforma::tokenBanxico()])
                 ->get($url)->throw();
         } catch (Throwable $e) {
             $this->alertas->registrarExcepcion('renta', 'banxico', $e);

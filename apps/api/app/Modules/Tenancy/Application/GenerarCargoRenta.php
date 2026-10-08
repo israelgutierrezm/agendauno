@@ -40,6 +40,7 @@ class GenerarCargoRenta
         private readonly CalcularRentaSaas $calcular,
         private readonly MonedaDeCobroSaas $moneda,
         private readonly PlanCitasSaas $planes,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -96,7 +97,7 @@ class GenerarCargoRenta
                 'desglose' => $desglose,
                 'monto_minor' => $desglose['total_minor'],
                 'estado' => $desglose['total_minor'] > 0 ? EstadoCargoRenta::Pendiente->value : EstadoCargoRenta::SinCargo->value,
-                'vence_en' => CarbonImmutable::createFromFormat('Y-m-d', $periodo.'-01')?->endOfMonth()->addDays(10)->toDateString(),
+                'vence_en' => CarbonImmutable::createFromFormat('Y-m-d', $periodo.'-01')?->endOfMonth()->addDays(max(1, $this->parametros->entero('renta.dias_para_pagar')))->toDateString(),
                 'emitido_en' => now(),
             ],
         );

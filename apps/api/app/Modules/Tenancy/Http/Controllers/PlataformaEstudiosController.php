@@ -61,11 +61,14 @@ class PlataformaEstudiosController
         $cargos = CargoRenta::query()
             ->where('estudio_id', $modelo->getKey())
             ->orderByDesc('periodo')
+            ->orderByDesc('id')
             ->limit(self::CARGOS)
             ->get()
             ->map(static fn (CargoRenta $c): array => [
                 'id' => $c->ulid,
                 'periodo' => $c->periodo,
+                // `renta`, `plan`, `ajuste` o `timbres` (ADR 0107).
+                'concepto' => $c->concepto ?? 'renta',
                 'monto_minor' => $c->monto_minor,
                 'moneda' => $c->moneda,
                 'estado' => $c->estado->value,

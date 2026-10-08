@@ -79,6 +79,13 @@ final class CatalogoParametros
                 'Antes de suspender la membresía por falta de pago.', $e, 7, 0, 60, 'días'),
             new DefinicionParametro('cobranza.dias_pagar_en_tienda', 'Cobranza', 'Días para pagar en tienda (OXXO)',
                 'Vigencia de la referencia de pago en efectivo de Mercado Pago u OpenPay.', $e, 3, 1, 30, 'días'),
+            // Reintentos de un adeudo en mora (cobranza): días desde el fallo.
+            new DefinicionParametro('cobranza.reintento_1_dias', 'Cobranza', 'Primer reintento de un pago en mora',
+                'Días después del fallo.', $e, 1, 1, 30, 'días'),
+            new DefinicionParametro('cobranza.reintento_2_dias', 'Cobranza', 'Segundo reintento de un pago en mora',
+                'Días después del fallo.', $e, 3, 1, 60, 'días'),
+            new DefinicionParametro('cobranza.reintento_3_dias', 'Cobranza', 'Tercer reintento y los siguientes',
+                'Días después del fallo.', $e, 7, 1, 90, 'días'),
 
             // Facturación (ADR 0047).
             new DefinicionParametro('facturacion.iva_porcentaje', 'Facturación', 'Tasa de IVA de las facturas',
@@ -146,8 +153,14 @@ final class CatalogoParametros
             new DefinicionParametro('renta.dias_aviso_suspension', 'Renta', 'Días antes de la suspensión para avisar al dueño',
                 'Por correo y, si lo aceptó, por WhatsApp.', $e, 3, 1, 14, 'días', porNegocio: false),
             // Renta en dólares cobrada en pesos (ADR 0107, solo la plataforma).
+            new DefinicionParametro('renta.dias_para_pagar', 'Renta', 'Días para pagar cada cargo de la suscripción',
+                'Desde que se emite (o desde el fin del mes, en lo que se cobra mes vencido) hasta que vence.', $e, 10, 1, 60, 'días', porNegocio: false),
+            new DefinicionParametro('renta.reintento_1_dias', 'Renta', 'Primer reintento del cobro automático',
+                'Días después de emitido el cargo, si la tarjeta lo rechazó. 0 = no se reintenta.', $e, 3, 0, 30, 'días', porNegocio: false),
+            new DefinicionParametro('renta.reintento_2_dias', 'Renta', 'Segundo reintento del cobro automático',
+                'Días después de emitido el cargo. 0 = no hay segundo reintento.', $e, 7, 0, 60, 'días', porNegocio: false),
             new DefinicionParametro('timbres.precio_centavos', 'Renta', 'Precio de cada timbre para facturar',
-                'En centavos de peso, sin IVA. Se venden en paquetes de 50 a 500.', $e, 180, 1, 10000, '¢', porNegocio: false),
+                'En centavos de peso, sin IVA. Los paquetes que se venden se fijan en Configuración → Datos comerciales.', $e, 180, 1, 10000, '¢', porNegocio: false),
             new DefinicionParametro('renta.tipo_cambio_dias_vigencia', 'Renta', 'Antigüedad máxima del tipo de cambio',
                 'Para cobrar en pesos la renta en dólares. Uno más viejo ya no se usa: el cargo espera y se te avisa.', $e, 7, 1, 60, 'días', porNegocio: false),
 

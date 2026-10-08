@@ -681,6 +681,7 @@ export const plataformaAdmin = {
     pendiente: "Pendiente",
     pagado: "Pagado",
     sin_cargo: "Sin cargo",
+    cancelado: "Cancelado",
     vencido: "Vencido",
   },
   facturas: {

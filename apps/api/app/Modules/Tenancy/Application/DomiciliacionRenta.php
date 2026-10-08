@@ -22,7 +22,8 @@ use Throwable;
  * la plataforma, sesión de Checkout en modo `setup`) y cada cargo de la renta se le
  * cobra solo (`off_session`).
  *
- * - Si el banco rechaza, se reintenta a los 3 y a los 7 días de emitido el cargo.
+ * - Si el banco rechaza, se reintenta a los días de emitido el cargo que fija la
+ *   plataforma (`renta.reintento_1_dias` y `renta.reintento_2_dias`; 3 y 7).
  * - Si la tarjeta pide autenticación, ya no se reintenta: el dueño paga en «Mi
  *   suscripción» como siempre.
  * - Un cargo con un pago en línea en curso (Checkout) no se cobra a la tarjeta.
@@ -32,16 +33,28 @@ use Throwable;
  */
 class DomiciliacionRenta
 {
-    /** Reintentos tras un rechazo: días después de emitido el cargo. */
-    public const REINTENTOS_DIAS = [3, 7];
-
     /** El tipo de la sesión de Stripe con que se guarda la tarjeta. */
     private const TIPO_SESION = 'domiciliacion_renta';
 
     public function __construct(
         private readonly RegistroDePasarelasPlataforma $registro,
         private readonly SuspensionPorRenta $suspension,
+        private readonly ParametrosTenant $parametros,
     ) {}
+
+    /**
+     * Días después de emitido el cargo en que se reintenta tras un rechazo (sin los
+     * apagados, en 0).
+     *
+     * @return list<int>
+     */
+    public function diasDeReintento(): array
+    {
+        return array_values(array_filter([
+            $this->parametros->entero('renta.reintento_1_dias'),
+            $this->parametros->entero('renta.reintento_2_dias'),
+        ], static fn (int $dias): bool => $dias > 0));
+    }
 
     /**
      * Abre la página de Stripe para guardar la tarjeta. Al volver, la web confirma
@@ -193,7 +206,7 @@ class DomiciliacionRenta
 
             $intentos = $bloqueado->intentos_automaticos + 1;
             $autenticacion = $cobro['status'] === 'requires_action' || $cobro['codigo'] === 'authentication_required';
-            $dias = self::REINTENTOS_DIAS[$intentos - 1] ?? null;
+            $dias = $this->diasDeReintento()[$intentos - 1] ?? null;
             $emitido = $bloqueado->emitido_en ?? Carbon::now();
             $bloqueado->update([
                 'intentos_automaticos' => $intentos,
@@ -230,7 +243,7 @@ class DomiciliacionRenta
             ->whereNull('referencia_pago')
             // Una compra de timbres se paga al comprarla, no a la tarjeta.
             ->where(fn ($q) => $q->whereNull('concepto')->orWhere('concepto', '!=', 'timbres'))
-            ->where('intentos_automaticos', '<=', count(self::REINTENTOS_DIAS))
+            ->where('intentos_automaticos', '<=', count($this->diasDeReintento()))
             ->where(fn ($q) => $q->whereNull('error_cobro')->orWhere('error_cobro', '!=', 'authentication_required'))
             ->where(fn ($q) => $q->where(fn ($q) => $q->where('intentos_automaticos', 0)->whereNull('proximo_intento_en'))
                 ->orWhere('proximo_intento_en', '<=', $ahora))

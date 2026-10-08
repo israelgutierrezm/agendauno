@@ -31,16 +31,31 @@ class PlataformaCobrosController
         ]);
         $hoy = Carbon::today();
 
+        // Por moneda (ADR 0107: a México en pesos, al resto en dólares): no se suman
+        // pesos con dólares. Arriba, los pesos; las demás monedas, aparte.
         $pendientes = CargoRenta::query()->where('estado', EstadoCargoRenta::Pendiente->value);
+        $totales = function (string $moneda) use ($pendientes, $hoy): array {
+            $deMoneda = (clone $pendientes)->where('moneda', $moneda);
+
+            return [
+                'moneda' => $moneda,
+                'pendiente_minor' => (int) (clone $deMoneda)->sum('monto_minor'),
+                'vencido_minor' => (int) (clone $deMoneda)->whereDate('vence_en', '<', $hoy)->sum('monto_minor'),
+                'cobrado_mes_minor' => (int) CargoRenta::query()
+                    ->where('estado', EstadoCargoRenta::Pagado->value)
+                    ->where('moneda', $moneda)
+                    ->whereBetween('pagado_en', [$hoy->copy()->startOfMonth(), $hoy->copy()->endOfMonth()])
+                    ->sum('monto_minor'),
+            ];
+        };
+        $otras = CargoRenta::query()->where('moneda', '!=', 'MXN')->distinct()->pluck('moneda')
+            ->map(fn (string $moneda): array => $totales($moneda))
+            ->filter(fn (array $t): bool => $t['pendiente_minor'] > 0 || $t['cobrado_mes_minor'] > 0)
+            ->values()->all();
         $resumen = [
-            'pendiente_minor' => (int) (clone $pendientes)->sum('monto_minor'),
-            'vencido_minor' => (int) (clone $pendientes)->whereDate('vence_en', '<', $hoy)->sum('monto_minor'),
+            ...$totales('MXN'),
             'estudios_con_adeudo' => (clone $pendientes)->distinct()->count('estudio_id'),
-            'cobrado_mes_minor' => (int) CargoRenta::query()
-                ->where('estado', EstadoCargoRenta::Pagado->value)
-                ->whereBetween('pagado_en', [$hoy->copy()->startOfMonth(), $hoy->copy()->endOfMonth()])
-                ->sum('monto_minor'),
-            'moneda' => 'MXN',
+            'otras_monedas' => $otras,
         ];
 
         $cargos = CargoRenta::query()
@@ -70,6 +85,10 @@ class PlataformaCobrosController
                 'estudio_estado' => $c->estudio?->estado->value,
                 'estudio_suspendido_por' => $c->estudio?->suspendido_por,
                 'periodo' => $c->periodo,
+                // `renta`, `plan` (por adelantado), `ajuste` (cambio de plan) o `timbres`.
+                'concepto' => $c->concepto ?? 'renta',
+                'cubre_desde' => $c->cubre_desde?->toDateString(),
+                'cubre_hasta' => $c->cubre_hasta?->toDateString(),
                 'monto_minor' => $c->monto_minor,
                 'moneda' => $c->moneda,
                 'estado' => $c->estado->value,

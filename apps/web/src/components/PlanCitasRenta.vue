@@ -8,6 +8,7 @@ import {
   type NivelPlan,
   type PlanCitas,
   NIVELES_PLAN,
+  funcionesPorNivel,
   precioPlan,
 } from "@/lib/suscripcion";
 
@@ -23,7 +24,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ cambiado: [mensaje: string] }>();
 
-const { t, tm, rt } = useI18n();
+const { t } = useI18n();
 
 const abierto = ref(false);
 const periodicidad = ref<"mensual" | "anual">(props.plan.periodicidad);
@@ -99,16 +100,9 @@ function disponible(nivel: NivelPlan): boolean {
   return precioDe(nivel) !== null;
 }
 
-const funciones = computed(
-  () =>
-    Object.fromEntries(
-      NIVELES_PLAN.map((n) => [
-        n,
-        (tm(`suscripcion.funciones.${n}`) as unknown[]).map((f) =>
-          rt(f as never),
-        ),
-      ]),
-    ) as Record<NivelPlan, string[]>,
+// Lo que incluye cada nivel: el reparto que fija el superadmin en la tarifa.
+const funciones = computed(() =>
+  funcionesPorNivel(props.plan.funciones ?? {}, false),
 );
 
 const resumen = computed(() =>

@@ -21,10 +21,14 @@ use App\Modules\Tenancy\Models\Estudio;
  *
  * Los negocios de clases, los de cuota fija y los que aún tienen una tarifa anterior
  * tienen todas. En la prueba gratis, las de Pro.
+ *
+ * Qué nivel abre cada función lo fija el superadmin en la tarifa de citas
+ * (`definicion.funciones`, versionada); lo que no fija toma el reparto de siempre
+ * (`NIVEL_MINIMO`).
  */
 class FuncionesPlan
 {
-    /** El nivel mínimo de cada función que no está en todos. */
+    /** El nivel mínimo de cada función, por omisión (la tarifa puede cambiarlo). */
     public const NIVEL_MINIMO = [
         'equipo' => 'premium',
         'sucursales' => 'premium',
@@ -45,7 +49,7 @@ class FuncionesPlan
         'reportes_avanzados' => 'pro',
     ];
 
-    private const ORDEN = ['individual' => 1, 'premium' => 2, 'pro' => 3];
+    public const ORDEN = ['individual' => 1, 'premium' => 2, 'pro' => 3];
 
     public function __construct(private readonly PlanCitasSaas $planes) {}
 
@@ -66,12 +70,35 @@ class FuncionesPlan
         return isset(self::ORDEN[$nivel]) ? $nivel : 'pro';
     }
 
+    /**
+     * El nivel que abre cada función: el de la tarifa de citas vigente o, si no lo
+     * dice, el de siempre.
+     *
+     * @param  array<string, mixed>|null  $definicion
+     * @return array<string, string>
+     */
+    public static function mapa(?array $definicion): array
+    {
+        $mapa = self::NIVEL_MINIMO;
+        $tarifa = is_array($definicion['funciones'] ?? null) ? $definicion['funciones'] : [];
+        foreach ($tarifa as $funcion => $nivel) {
+            if (isset($mapa[$funcion]) && is_string($nivel) && isset(self::ORDEN[$nivel])) {
+                $mapa[$funcion] = $nivel;
+            }
+        }
+
+        return $mapa;
+    }
+
     public function tiene(Estudio $estudio, string $funcion): bool
     {
         $nivel = $this->nivel($estudio);
-        $minimo = self::NIVEL_MINIMO[$funcion] ?? null;
+        if ($nivel === null) {
+            return true;
+        }
+        $minimo = self::mapa($this->planes->tarifa()?->definicion)[$funcion] ?? null;
 
-        return $nivel === null || $minimo === null || self::ORDEN[$nivel] >= self::ORDEN[$minimo];
+        return $minimo === null || self::ORDEN[$nivel] >= self::ORDEN[$minimo];
     }
 
     /**
@@ -90,7 +117,7 @@ class FuncionesPlan
     public function exigir(Estudio $estudio, string $funcion): void
     {
         if (! $this->tiene($estudio, $funcion)) {
-            throw new FuncionNoIncluida($funcion, self::NIVEL_MINIMO[$funcion] ?? 'pro');
+            throw new FuncionNoIncluida($funcion, self::mapa($this->planes->tarifa()?->definicion)[$funcion] ?? 'pro');
         }
     }
 }

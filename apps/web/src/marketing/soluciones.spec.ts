@@ -87,10 +87,10 @@ describe("textos veraces de las páginas por giro", () => {
     }
   });
 
-  it("los spas sí manejan cabinas y equipos (recursos, ADR 0039)", () => {
+  it("los spas sí manejan cabinas y equipos en Premium y Pro (ADR 0039 y 0107)", () => {
     const spas = soluciones.find((s) => s.slug === "spas")!;
     const cabinas = spas.preguntas.find((p) => /cabinas/i.test(p.pregunta))!;
-    expect(cabinas.respuesta).toMatch(/^Sí\./);
+    expect(cabinas.respuesta).toMatch(/^Sí, en los planes Premium y Pro\./);
     expect(cabinas.respuesta).toContain("profesional y un espacio libres");
   });
 

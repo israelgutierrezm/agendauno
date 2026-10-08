@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\TiposDeCambio;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\CargoRenta;
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FacturaPlataforma;
@@ -90,7 +91,7 @@ class FacturacionController
             'cobro' => $porPlan ? 'plan' : 'uso',
             'plan' => $porPlan ? $this->planes->resumen($estudio) : null,
             'tarifa' => $porPlan ? null : $this->tarifa($estudio),
-            'ventas' => ['correo' => config('agendauno.ventas.correo'), 'whatsapp' => config('agendauno.ventas.whatsapp')],
+            'ventas' => ['correo' => ConfiguracionPlataforma::ventasCorreo(), 'whatsapp' => ConfiguracionPlataforma::ventasWhatsApp()],
             // Domiciliación: la tarjeta con que se cobra sola (ADR 0107).
             'tarjeta' => DomiciliacionRenta::tarjeta($estudio),
             'domiciliacion_posible' => $this->pasarelas->activa('stripe'),

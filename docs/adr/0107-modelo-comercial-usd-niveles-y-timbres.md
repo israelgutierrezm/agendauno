@@ -119,6 +119,27 @@ ofrecen la compra en línea ni el pago automático.
   control de cuántas facturas emite; AgendaUno paga a FacturAPI su membresía y cada
   timbre.
 
+### Todo configurable (superadmin)
+
+Nada del modelo comercial vive fijo en el código:
+
+- **Tarifas** (versionadas, Tarifas): la escalera de clases, los precios de citas por
+  nivel y profesionales, los meses del anual, los días de prueba, el IVA (en México y
+  fuera) y **qué nivel abre cada función** (`definicion.funciones`; lo que no se fije
+  toma el reparto de siempre de `FuncionesPlan::NIVEL_MINIMO`).
+- **Tipo de cambio** (Tarifas): el capturado a mano.
+- **Datos comerciales** (Configuración): correo y WhatsApp de ventas, token del Banco
+  de México (se escribe, nunca se muestra; `BANXICO_TOKEN` queda de respaldo) y los
+  paquetes de timbres que se venden.
+- **Parámetros de plataforma**: días para pagar cada cargo (`renta.dias_para_pagar`),
+  reintentos del cobro automático (`renta.reintento_1_dias`, `renta.reintento_2_dias`),
+  precio por timbre (`timbres.precio_centavos`) y antigüedad máxima del tipo de cambio.
+- Del negocio: su plan, su tarjeta y sus timbres (Mi suscripción) y los reintentos de
+  cobro de sus membresías en mora (`cobranza.reintento_N_dias`).
+- La landing lee los precios vigentes de `GET /api/v1/precios` (tarifas, reparto de
+  funciones, días de prueba, ventas y timbres); lo de `precios.ts` es solo el respaldo
+  del HTML pre-generado y de mientras llega la respuesta.
+
 ## Consecuencias
 
 - Los cargos de citas dejan de ser mes vencido por medición: son por adelantado por lo
@@ -128,5 +149,6 @@ ofrecen la compra en línea ni el pago automático.
 - La landing, «Mi suscripción», el superadmin (tarifas por niveles, tipo de cambio,
   cuota fija en USD) y los términos y el aviso de privacidad se actualizaron a USD,
   niveles, anual, domiciliación y timbres.
-- Pendiente: Mercado Pago y OpenPay para la renta; ocultar en la app móvil las
-  funciones que el plan no incluye (el servidor ya las niega).
+- La app móvil guarda el nivel y las funciones que no incluye el plan (de `/yo`) y no
+  ofrece lo que falta (compra en línea, pago automático).
+- Pendiente: Mercado Pago y OpenPay para la renta.

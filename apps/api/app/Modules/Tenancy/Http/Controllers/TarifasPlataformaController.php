@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\TarifaSaas;
 use Illuminate\Http\JsonResponse;
@@ -74,6 +75,9 @@ class TarifasPlataformaController
                 'niveles.premium' => ['required', 'array', 'min:1', 'max:100'],
                 'niveles.pro' => ['required', 'array', 'min:1', 'max:100'],
                 'niveles.*.*' => ['required', 'integer', 'min:0', 'max:100000000'],
+                // Qué nivel abre cada función (ADR 0107); lo que no venga, el de siempre.
+                'funciones' => ['nullable', 'array:'.implode(',', array_keys(FuncionesPlan::NIVEL_MINIMO))],
+                'funciones.*' => ['required', Rule::in(array_keys(FuncionesPlan::ORDEN))],
             ];
         $validado = $request->validate($reglas);
 
@@ -90,6 +94,7 @@ class TarifasPlataformaController
             : $comun + [
                 'meses_anual' => (int) $validado['meses_anual'],
                 'niveles' => $this->niveles($validado['niveles']),
+                'funciones' => FuncionesPlan::mapa(['funciones' => $validado['funciones'] ?? []]),
             ];
 
         // Versión siguiente bajo lock: dos publicaciones simultáneas no chocan.
@@ -176,12 +181,19 @@ class TarifasPlataformaController
      */
     private function presentar(TarifaSaas $tarifa): array
     {
+        $definicion = $tarifa->definicion;
+        // Citas por niveles: con el reparto de funciones completo (lo que la tarifa no
+        // fijó, el de siempre).
+        if (is_array($definicion['niveles'] ?? null)) {
+            $definicion['funciones'] = FuncionesPlan::mapa($definicion);
+        }
+
         return [
             'id' => $tarifa->ulid,
             'modalidad' => $tarifa->modalidad->value,
             'version' => $tarifa->version,
             'vigente_desde' => $tarifa->vigente_desde->toIso8601String(),
-            'definicion' => $tarifa->definicion,
+            'definicion' => $definicion,
         ];
     }
 }

@@ -52,31 +52,6 @@ export default {
     subir:
       "Subir se cobra al momento por los días que faltan; bajar aplica desde el siguiente periodo.",
   },
-  funciones: {
-    individual: [
-      "Agenda y citas, con la app",
-      "Recordatorios por correo y en la app",
-      "Tu página con dirección propia",
-      "Cobro al agendar en línea y en caja",
-      "Clientes, reseñas y reportes básicos",
-    ],
-    premium: [
-      "Todo lo de Individual",
-      "Equipo, roles y varias sucursales",
-      "Cabinas y recursos",
-      "Paquetes, membresías y promociones",
-      "Mostrador, inventario y comisiones",
-      "Documentos y consentimientos",
-    ],
-    pro: [
-      "Todo lo de Premium",
-      "Facturación electrónica",
-      "Cobro automático y venta en línea de paquetes",
-      "Formularios, lealtad y mensajes masivos",
-      "Integraciones, API y roles propios",
-      "Reportes avanzados",
-    ],
-  },
   clases: {
     titulo: "Por alumnos activos",
     ayuda:
@@ -139,7 +114,7 @@ export default {
     tipoCambio: {
       titulo: "Tipo de cambio",
       ayuda:
-        "Con él se cobra en pesos la renta en dólares a los negocios de México. Con BANXICO_TOKEN se usa el FIX del Banco de México; sin él, el que captures aquí.",
+        "Con él se cobra en pesos la renta en dólares a los negocios de México. Con el token del Banco de México (Configuración → Datos comerciales) se usa su FIX del día; sin él, el que captures aquí.",
       banxico: "Banco de México conectado",
       sinBanxico: "Sin token del Banco de México: captura el del día",
       ultimo: "1 USD = {valor} MXN · {fecha}",
@@ -159,7 +134,29 @@ export default {
       precioMensual: "Precio al mes",
       agregarFila: "Agregar profesional",
       quitarFila: "Quitar el último",
+      funciones: "Qué nivel abre cada función",
+      funcionesAyuda:
+        "Lo que se elige aquí decide lo que cada negocio puede usar y lo que muestran la landing y «Mi suscripción».",
     },
     cuotaMoneda: "Moneda de la cuota",
+    otraMoneda:
+      "En {moneda}: por cobrar {porCobrar}, vencido {vencido}, cobrado este mes {cobrado}.",
+    comercial: {
+      titulo: "Datos comerciales",
+      ayuda:
+        "A dónde se manda a quien pide cotización (más profesionales o alumnos de los que ofrece la tarifa), el tipo de cambio y los paquetes de timbres que se venden.",
+      ventasCorreo: "Correo de ventas",
+      ventasWhatsApp: "WhatsApp de ventas (con lada)",
+      banxico: "Token del Banco de México",
+      banxicoGuardado: "Guardado (escribe otro para cambiarlo)",
+      banxicoAyuda:
+        "Sin token, el tipo de cambio se captura a mano en Tarifas. Se pide gratis en banxico.org.mx.",
+      quitar: "Quitar",
+      paquetes: "Paquetes de timbres",
+      paquetesAyuda:
+        "Cuántos timbres trae cada paquete, separados por comas. El precio por timbre está en Parámetros.",
+      guardar: "Guardar",
+      guardado: "Datos comerciales guardados.",
+    },
   },
 };

@@ -81,6 +81,7 @@ use App\Modules\Tenancy\Http\Controllers\PlataformaOperacionController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaWhatsAppController;
 use App\Modules\Tenancy\Http\Controllers\PoliticasCancelacionTenantController;
 use App\Modules\Tenancy\Http\Controllers\PorCobrarTenantController;
+use App\Modules\Tenancy\Http\Controllers\PreciosPublicosController;
 use App\Modules\Tenancy\Http\Controllers\PromocionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\PublicoCitasController;
 use App\Modules\Tenancy\Http\Controllers\PuntoDeVentaTenantController;
@@ -162,6 +163,8 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/directorio', [DirectorioController::class, 'index'])->middleware('throttle:publico')->name('api.v1.directorio');
     // Documentos legales públicos (aviso de privacidad y términos) para el registro.
     Route::get('/legales', LegalesPublicoController::class)->middleware('throttle:publico')->name('api.v1.legales');
+    // Precios de la suscripción para la landing (ADR 0107): lo que publica el superadmin.
+    Route::get('/precios', PreciosPublicosController::class)->middleware('throttle:publico')->name('api.v1.precios');
     // Errores de la web y la app para el monitoreo (ADR 0080): sin sesión, con tope por IP.
     Route::post('/errores', ErroresClienteController::class)->middleware('throttle:30,1,errores-cliente')->name('api.v1.errores');
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Exceptions\TimbresAgotados;
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\MovimientoTimbreTenant;
 use App\Modules\Tenancy\Models\SaldoTimbresTenant;
 use Illuminate\Support\Facades\DB;
@@ -20,9 +21,6 @@ use Illuminate\Support\Facades\DB;
  */
 class TimbresTenant
 {
-    /** Paquetes que se venden. */
-    public const PAQUETES = [50, 100, 200, 350, 500];
-
     public function __construct(private readonly ParametrosTenant $parametros) {}
 
     public function disponibles(): int
@@ -37,7 +35,7 @@ class TimbresTenant
     }
 
     /**
-     * Los paquetes a la venta con su precio (sin IVA, en pesos).
+     * Los paquetes a la venta (los fija el superadmin) con su precio (sin IVA, en pesos).
      *
      * @return list<array{cantidad: int, precio_minor: int}>
      */
@@ -45,7 +43,7 @@ class TimbresTenant
     {
         $precio = $this->precioTimbreMinor();
 
-        return array_map(static fn (int $cantidad): array => ['cantidad' => $cantidad, 'precio_minor' => $cantidad * $precio], self::PAQUETES);
+        return array_map(static fn (int $cantidad): array => ['cantidad' => $cantidad, 'precio_minor' => $cantidad * $precio], ConfiguracionPlataforma::paquetesTimbres());
     }
 
     /**

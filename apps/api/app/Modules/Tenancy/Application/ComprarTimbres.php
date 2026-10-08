@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\CargoRenta;
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\TarifaSaas;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
@@ -31,8 +32,9 @@ class ComprarTimbres
 
     public function comprar(Estudio $estudio, int $cantidad, string $retorno = '/renta'): CargoRenta
     {
-        if (! in_array($cantidad, TimbresTenant::PAQUETES, true)) {
-            throw ValidationException::withMessages(['cantidad' => ['Elige un paquete de '.implode(', ', TimbresTenant::PAQUETES).' timbres.']]);
+        $paquetes = ConfiguracionPlataforma::paquetesTimbres();
+        if (! in_array($cantidad, $paquetes, true)) {
+            throw ValidationException::withMessages(['cantidad' => ['Elige un paquete de '.implode(', ', $paquetes).' timbres.']]);
         }
         if (! $this->registro->activa('stripe')) {
             throw new PasarelaNoDisponible('La plataforma no tiene una pasarela de cobro activa.');

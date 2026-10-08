@@ -46,15 +46,19 @@ class PlanCitasSaas
 
     public const PERIODICIDADES = ['mensual', 'anual'];
 
-    /** Días para pagar un cargo del plan. */
-    private const DIAS_PARA_PAGAR = 10;
-
     public function __construct(
         private readonly CalcularRentaSaas $calcular,
         private readonly MonedaDeCobroSaas $moneda,
         private readonly TiposDeCambio $tipos,
         private readonly GestorDeConexionTenant $gestor,
+        private readonly ParametrosTenant $parametros,
     ) {}
+
+    /** Días para pagar un cargo del plan (parámetro de la plataforma). */
+    private function diasParaPagar(): int
+    {
+        return max(1, $this->parametros->entero('renta.dias_para_pagar'));
+    }
 
     /**
      * La tarifa de citas por niveles vigente en un momento; null si la vigente es de
@@ -285,6 +289,8 @@ class PlanCitasSaas
                 'valor' => TiposDeCambio::formatear($tipo['diezmilesimas']), 'fecha' => $tipo['fecha'], 'fuente' => $tipo['fuente'],
             ],
             'precios' => $definicion['niveles'] ?? [],
+            // Qué nivel abre cada función (lo fija el superadmin en la tarifa).
+            'funciones' => FuncionesPlan::mapa($definicion),
         ];
     }
 
@@ -421,7 +427,7 @@ class PlanCitasSaas
             'monto_minor' => $final['desglose']['total_minor'],
             ...$final['columnas'],
             'estado' => EstadoCargoRenta::Pendiente->value,
-            'vence_en' => $hoy->addDays(self::DIAS_PARA_PAGAR)->toDateString(),
+            'vence_en' => $hoy->addDays($this->diasParaPagar())->toDateString(),
             'emitido_en' => now(),
         ]);
     }
@@ -472,7 +478,7 @@ class PlanCitasSaas
                     'monto_minor' => $total,
                     ...$final['columnas'],
                     'estado' => $total > 0 ? EstadoCargoRenta::Pendiente->value : EstadoCargoRenta::SinCargo->value,
-                    'vence_en' => $periodo['desde']->addDays(self::DIAS_PARA_PAGAR)->toDateString(),
+                    'vence_en' => $periodo['desde']->addDays($this->diasParaPagar())->toDateString(),
                     'emitido_en' => now(),
                 ],
             );

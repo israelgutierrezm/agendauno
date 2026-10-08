@@ -11,7 +11,12 @@ import {
   solucionesDe,
   type Modo,
 } from "@/marketing/modalidades";
-import { bandasEstudios, dolares, nivelesCitas } from "@/marketing/precios";
+import {
+  PRECIOS_POR_OMISION,
+  desdeCitas,
+  dolares,
+  rangosClases,
+} from "@/marketing/precios";
 import { rutaSolucion } from "@/marketing/soluciones";
 import { rutasComerciales } from "@/router/comerciales";
 import CarruselNegocios from "@/components/CarruselNegocios.vue";
@@ -169,8 +174,8 @@ describe("portada comercial", () => {
     const tarjetas = vista.findAll("#precios .tu-portada-precio");
     expect(tarjetas).toHaveLength(2);
     expect(tarjetas.map((t) => t.get("strong").text())).toEqual([
-      dolares(bandasEstudios[0].subtotal),
-      dolares(nivelesCitas[0]!.desde),
+      dolares(rangosClases(PRECIOS_POR_OMISION.clases.bandas)[0]!.subtotal),
+      dolares(desdeCitas(PRECIOS_POR_OMISION.citas.niveles).individual),
     ]);
     expect(tarjetas[0]!.text()).toContain(NOMBRE_MODALIDAD.clases);
     expect(tarjetas[0]!.text()).toContain("Por alumnos activos");

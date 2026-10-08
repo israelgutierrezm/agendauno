@@ -23,6 +23,7 @@ use App\Modules\Tenancy\EstadoDocumento;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Listeners\AcumularPuntos;
 use App\Modules\Tenancy\Models\CampoFormulario;
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\DatosFiscalesTenant;
 use App\Modules\Tenancy\Models\Documento;
 use App\Modules\Tenancy\Models\EventoOutboxTenant;
@@ -317,7 +318,8 @@ trait ApartadosDemo
             ->get()->all();
         $emitir = app(EmitirFacturaTenant::class);
         // Un paquete de timbres ya comprado (ADR 0107): cada factura gasta uno.
-        app(TimbresTenant::class)->acreditar(TimbresTenant::PAQUETES[0], 'demo', 'Paquete de '.TimbresTenant::PAQUETES[0].' timbres');
+        $paquete = ConfiguracionPlataforma::paquetesTimbres()[0];
+        app(TimbresTenant::class)->acreditar($paquete, 'demo', "Paquete de {$paquete} timbres");
         foreach (array_slice($this->mezclar($ordenes), 0, $cuantas) as $orden) {
             $persona = $orden->persona;
             if (! $persona instanceof PersonaTenant) {

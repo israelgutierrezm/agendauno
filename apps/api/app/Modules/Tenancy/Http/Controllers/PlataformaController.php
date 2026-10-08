@@ -189,12 +189,25 @@ class PlataformaController
         $validado = $request->validate([
             'facturapi_llave' => ['nullable', 'string', 'max:255'],
             'correo_alertas' => ['nullable', 'email', 'max:255'],
+            // Modelo comercial (ADR 0107): ventas, Banco de México y paquetes de timbres.
+            'ventas_correo' => ['nullable', 'email', 'max:255'],
+            'ventas_whatsapp' => ['nullable', 'string', 'regex:/^\+?[0-9 ]{8,20}$/'],
+            'banxico_token' => ['nullable', 'string', 'max:255'],
+            'timbres_paquetes' => ['nullable', 'array', 'min:1', 'max:10'],
+            'timbres_paquetes.*' => ['integer', 'distinct', 'min:1', 'max:100000'],
         ]);
 
-        foreach (['facturapi_llave', 'correo_alertas'] as $clave) {
+        foreach (['facturapi_llave', 'correo_alertas', 'ventas_correo', 'banxico_token'] as $clave) {
             if ($request->exists($clave)) {
                 ConfiguracionPlataforma::establecer($clave, $validado[$clave] ?? null);
             }
+        }
+        if ($request->exists('ventas_whatsapp')) {
+            ConfiguracionPlataforma::establecer('ventas_whatsapp', preg_replace('/\D/', '', (string) ($validado['ventas_whatsapp'] ?? '')) ?: null);
+        }
+        if ($request->exists('timbres_paquetes')) {
+            $paquetes = $validado['timbres_paquetes'] ?? null;
+            ConfiguracionPlataforma::establecer('timbres_paquetes', is_array($paquetes) ? (string) json_encode(array_map('intval', $paquetes)) : null);
         }
 
         return response()->json(['data' => $this->presentarConfiguracion()]);
@@ -210,6 +223,11 @@ class PlataformaController
             'facturapi_configurada' => ConfiguracionPlataforma::llaveFacturapi() !== null,
             // A dónde llegan las alertas y las rentas vencidas (ADR 0072).
             'correo_alertas' => ConfiguracionPlataforma::correoAlertas(),
+            // Modelo comercial (ADR 0107). El token del Banco de México nunca se devuelve.
+            'ventas_correo' => ConfiguracionPlataforma::ventasCorreo(),
+            'ventas_whatsapp' => ConfiguracionPlataforma::ventasWhatsApp(),
+            'banxico_configurado' => ConfiguracionPlataforma::tokenBanxico() !== null,
+            'timbres_paquetes' => ConfiguracionPlataforma::paquetesTimbres(),
         ];
     }
 

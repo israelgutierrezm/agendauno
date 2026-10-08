@@ -3,6 +3,8 @@ import axios from "axios";
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { ETIQUETAS_FUNCION, NIVELES_PLAN } from "@/lib/suscripcion";
+
 /**
  * Tarifas del SaaS por modalidad (superadmin, ADR 0019 y 0107). Muestra la versión
  * vigente de cada modalidad y permite publicar una versión NUEVA (las publicadas no
@@ -26,6 +28,8 @@ interface Definicion {
   meses_anual?: number;
   bandas?: { hasta: number | null; monto_minor: number }[];
   niveles?: Partial<Record<Nivel, Record<string, number>>>;
+  /** Qué nivel abre cada función (ADR 0107). */
+  funciones?: Record<string, Nivel>;
 }
 interface Tarifa {
   id: string;
@@ -44,6 +48,8 @@ interface Borrador {
   individual: string;
   /** Una fila por profesionales (desde 2): precio de Premium y de Pro. */
   filas: { premium: string; pro: string }[];
+  /** Qué nivel abre cada función. */
+  funciones: Record<string, Nivel>;
 }
 interface TipoCambio {
   valor: string;
@@ -110,6 +116,7 @@ function borradorDe(tarifa: Tarifa | null): Borrador {
             pro: decimal(pro[String(n)] ?? 0),
           }))
         : [{ premium: "0", pro: "0" }],
+    funciones: { ...(d?.funciones ?? {}) },
   };
 }
 
@@ -192,6 +199,7 @@ function cuerpoDe(m: Modalidad, b: Borrador): Record<string, unknown> {
     ...comun,
     meses_anual: b.meses_anual,
     niveles: { individual: { "1": aMinor(b.individual) }, premium, pro },
+    funciones: b.funciones,
   };
 }
 
@@ -413,6 +421,29 @@ onMounted(() => {
                 {{ $t("suscripcion.plataforma.tarifas.quitarFila") }}
               </button>
             </div>
+            <fieldset class="space-y-2" data-prueba="funciones-por-nivel">
+              <legend class="font-medium text-sm">
+                {{ $t("suscripcion.plataforma.tarifas.funciones") }}
+              </legend>
+              <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+                {{ $t("suscripcion.plataforma.tarifas.funcionesAyuda") }}
+              </p>
+              <label
+                v-for="(etiqueta, funcion) in ETIQUETAS_FUNCION"
+                :key="funcion"
+                class="flex items-center justify-between gap-3 text-sm"
+              >
+                <span>{{ etiqueta.replace("*", "") }}</span>
+                <select
+                  v-model="borradores[m]!.funciones[funcion]"
+                  class="tu-input w-auto"
+                >
+                  <option v-for="n in NIVELES_PLAN" :key="n" :value="n">
+                    {{ $t(`suscripcion.niveles.${n}`) }}
+                  </option>
+                </select>
+              </label>
+            </fieldset>
           </template>
 
           <div class="grid gap-2 grid-cols-2">
