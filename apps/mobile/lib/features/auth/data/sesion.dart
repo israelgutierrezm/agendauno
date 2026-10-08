@@ -179,6 +179,8 @@ class Sesion {
     this.pais = 'MX',
     this.lada = '52',
     this.sinSucursal = false,
+    this.nivelPlan,
+    this.funcionesSin = const [],
   });
 
   final String slug;
@@ -221,6 +223,15 @@ class Sesion {
   /// Lo que opera el negocio (clases o citas); si el servidor no lo mandó, el de
   /// su modalidad.
   Capacidades get capacidades => _capacidades ?? Capacidades.de(modalidad);
+
+  /// El nivel del plan de un negocio de citas (individual, premium o pro; null si
+  /// tiene todas las funciones) y las funciones que no incluye (ADR 0107). El
+  /// servidor ya las niega; la app no las ofrece.
+  final String? nivelPlan;
+  final List<String> funcionesSin;
+
+  /// ¿El plan del negocio incluye esta función (p. ej. `venta_en_linea`)?
+  bool tieneFuncion(String funcion) => !funcionesSin.contains(funcion);
 
   /// La versión más antigua de la app que el servidor aún acepta (de /yo). Con una
   /// más vieja se pide actualizar en lugar de leer respuestas que ya no entiende.
@@ -303,6 +314,8 @@ class Sesion {
     'lada': lada,
     'sin_sucursal': sinSucursal,
     'perfil': perfil,
+    'nivel_plan': nivelPlan,
+    'funciones_sin': funcionesSin,
   };
 
   /// Restaura una sesión guardada (null si le falta lo esencial).
@@ -347,6 +360,8 @@ class Sesion {
       lada: _lada(datos['lada']),
       sinSucursal: (datos['sin_sucursal'] ?? false) as bool,
       perfil: datos['perfil'] as String?,
+      nivelPlan: datos['nivel_plan'] as String?,
+      funcionesSin: _textos(datos['funciones_sin']),
     );
   }
 
@@ -360,6 +375,7 @@ class Sesion {
     Map<String, dynamic>? app,
   ]) {
     final config = estudio?['perfil_config'] as Map<String, dynamic>?;
+    final plan = estudio?['plan'] as Map<String, dynamic>?;
     return Sesion(
       slug: slug,
       bearer: bearer,
@@ -393,6 +409,9 @@ class Sesion {
       lada: _lada(estudio?['lada']),
       sinSucursal: (usuario['sin_sucursal'] ?? false) as bool,
       perfil: estudio?['perfil'] as String?,
+      // Su plan (ADR 0107): un API anterior no lo manda y entonces tiene todo.
+      nivelPlan: plan?['nivel'] as String?,
+      funcionesSin: _textos(plan?['sin']),
     );
   }
 
@@ -454,6 +473,8 @@ class Sesion {
     lada: lada,
     sinSucursal: (usuario['sin_sucursal'] ?? sinSucursal) as bool,
     perfil: perfil,
+    nivelPlan: nivelPlan,
+    funcionesSin: funcionesSin,
   );
 
   /// La versión mínima tal como vino; sin ella, no se exige ninguna.

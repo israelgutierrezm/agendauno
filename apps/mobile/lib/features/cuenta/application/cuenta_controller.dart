@@ -136,12 +136,15 @@ final clasesPeriodoProvider = FutureProvider.autoDispose<AgendaPeriodo>((
 });
 
 /// Los planes que puede comprar (se filtran las clases extra si no tiene paquete).
+/// Si el plan del negocio no incluye la venta en línea (ADR 0107), ninguno.
 final productosProvider = FutureProvider.autoDispose<List<ProductoComprable>>((
   ref,
 ) async {
   final cuenta = await ref.watch(cuentaProvider.future);
   final repo = ref.watch(cuentaRepositoryProvider);
-  if (repo == null) {
+  final ventaEnLinea =
+      ref.read(sesionProvider)?.tieneFuncion('venta_en_linea') ?? true;
+  if (repo == null || !ventaEnLinea) {
     return const [];
   }
   return ProductoComprable.paraComprar(await repo.productos(), cuenta.derechos);

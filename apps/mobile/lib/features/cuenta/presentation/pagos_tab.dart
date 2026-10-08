@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/sesion_controller.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import 'comprar_planes.dart';
@@ -32,7 +33,10 @@ class PagosTab extends ConsumerWidget {
         // El corte de cada plan: qué incluía, cómo lo usó y lo que le queda.
         const TituloSeccion('Mis planes'),
         const CortePlanesSeccion(),
-        if (cuenta.pagoAutomatico) ...[
+        // Si el negocio lo ofrece y su plan lo incluye (ADR 0107).
+        if (cuenta.pagoAutomatico &&
+            (ref.watch(sesionProvider)?.tieneFuncion('cobro_automatico') ??
+                true)) ...[
           const TituloSeccion('Pago automático'),
           Card(
             child: ListTile(
