@@ -94,12 +94,14 @@ describe("textos veraces de las páginas por giro", () => {
     expect(cabinas.respuesta).toContain("profesional y un espacio libres");
   });
 
-  it("el cobro por profesional ya está publicado (ADR 0094)", () => {
+  it("el cobro de citas es por plan y profesionales contratados (ADR 0107)", () => {
     const barberias = soluciones.find((s) => s.slug === "barberias")!;
     const cobro = barberias.preguntas.find((p) =>
       /por profesional/i.test(p.pregunta),
     )!;
     expect(cobro.respuesta).toMatch(/^Sí\./);
-    expect(cobro.respuesta).toContain("cada uno cuenta completo");
+    expect(cobro.respuesta).toContain("Individual, Premium o Pro");
+    expect(cobro.respuesta).toContain("los profesionales que contratas");
+    expect(cobro.respuesta).toContain("en dólares");
   });
 });
