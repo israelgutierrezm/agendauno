@@ -97,7 +97,7 @@ describe("páginas por giro", () => {
       expect(precio).toContain(
         solucion.modo === "clases"
           ? "por rango de alumnos activos al mes"
-          : "por profesional activo al mes",
+          : "con el plan que elijas, por los profesionales que contratas",
       );
       expect(precio).toContain(
         `Todo lo que incluye ${NOMBRE_MODALIDAD[solucion.modo]}`,

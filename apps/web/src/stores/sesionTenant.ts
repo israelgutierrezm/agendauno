@@ -116,6 +116,9 @@ export interface EstudioSesion {
   bienestar_posible?: boolean;
   // ¿La plataforma ya factura? En producción, solo con su proveedor configurado.
   facturacion_disponible?: boolean;
+  // Su plan (ADR 0107): el nivel de un negocio de citas (null: todas las funciones)
+  // y las funciones que no incluye (el servidor ya las niega; aquí se ocultan).
+  plan?: { nivel: string | null; sin: string[] };
 }
 
 const TERMINOLOGIA_DEFAULT: Terminologia = {

@@ -18,9 +18,12 @@ export default {
   },
   actual: {
     titulo: "Mes en curso",
+    siguiente: "Siguiente cobro",
     estimado: "Estimado con IVA",
     alumnos_activos: "alumnos activos",
     profesionales_activos: "profesionales activos",
+    profesionales_contratados: "profesionales contratados",
+    timbres: "timbres",
     fueraDeCita: "{n} personas en clases o talleres",
     sinCargo: "Sin cargo este mes por ahora.",
   },
@@ -29,6 +32,8 @@ export default {
     iva: "IVA ({pct}%)",
     total: "Total",
     prorrateo: "Solo {dias} de {total} días (el resto fue prueba gratis).",
+    prorrateoPlan:
+      "Solo {dias} de {total} días: el primer mes se cobra desde que termina tu prueba.",
     ver: "Ver detalle",
     ocultar: "Ocultar detalle",
   },
@@ -46,6 +51,7 @@ export default {
     pendiente: "Por pagar",
     pagado: "Pagado",
     sin_cargo: "Sin cargo",
+    cancelado: "Cancelado",
   },
   tarifas: {
     titulo: "Tarifas del SaaS",
@@ -53,7 +59,7 @@ export default {
       "Precios mensuales sin IVA. Publicar crea una versión nueva: los cargos ya generados conservan la suya.",
     version: "Versión {n} · vigente desde {fecha}",
     clases: "Clases (por alumnos activos)",
-    citas: "Citas (por profesional activo)",
+    citas: "Citas (por plan, nivel y profesionales)",
     hasta: "Hasta",
     sinTope: "Sin tope (techo)",
     monto: "Precio mensual",

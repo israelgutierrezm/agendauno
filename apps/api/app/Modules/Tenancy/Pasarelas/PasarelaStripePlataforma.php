@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Pasarelas;
 
+use App\Modules\Tenancy\Application\ReciboRentaPdf;
 use App\Modules\Tenancy\Exceptions\PasarelaNoDisponible;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Pasarelas\Stripe\ClienteStripe;
@@ -34,7 +35,7 @@ class PasarelaStripePlataforma implements PasarelaPlataforma
         $sesion = (new ClienteStripe($secretKey))->crearSesionCheckout(
             $cargo->monto_minor,
             $cargo->moneda,
-            'Renta de AgendaUno · '.$cargo->periodo,
+            ReciboRentaPdf::concepto($cargo),
             $retorno['exito'],
             $retorno['cancelado'],
             'tarjeta',
@@ -57,6 +58,14 @@ class PasarelaStripePlataforma implements PasarelaPlataforma
     public function estadoIntento(string $referencia, array $llaves): string
     {
         $secretKey = $llaves['secret_key'] ?? '';
+        // Un cargo a la tarjeta domiciliada (ADR 0107).
+        if (str_starts_with($referencia, 'pi_') && $secretKey !== '') {
+            return match ((new ClienteStripe($secretKey))->estadoIntent($referencia)) {
+                'succeeded' => 'pagado',
+                'canceled', 'requires_payment_method' => 'terminado',
+                default => 'en_proceso',
+            };
+        }
         if (! str_starts_with($referencia, 'cs_') || $secretKey === '') {
             return 'en_proceso';
         }
@@ -79,6 +88,10 @@ class PasarelaStripePlataforma implements PasarelaPlataforma
     public function cancelarIntento(string $referencia, array $llaves): bool
     {
         $secretKey = $llaves['secret_key'] ?? '';
+        // Un cargo a la tarjeta en proceso: solo se anula si aún no se cobra.
+        if (str_starts_with($referencia, 'pi_') && $secretKey !== '') {
+            return (new ClienteStripe($secretKey))->anularIntent($referencia);
+        }
         if (! str_starts_with($referencia, 'cs_') || $secretKey === '') {
             return true;
         }

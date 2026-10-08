@@ -1,4 +1,5 @@
 import { esInstructor, esMiembro } from "@/lib/roles";
+import type { FuncionPlan } from "@/lib/suscripcion";
 import type {
   ModalidadServicio,
   useSesionTenantStore,
@@ -23,6 +24,8 @@ export interface Politica {
   modalidad?: ModalidadServicio;
   // Solo si el perfil del negocio activa esta función.
   flag?: "grupos" | "niveles" | "acceso_abierto";
+  // Solo si el plan del negocio la incluye (ADR 0107; el servidor ya la niega).
+  funcion?: FuncionPlan;
   // Portal del alumno o cliente / de quien imparte.
   soloMiembro?: boolean;
   soloInstructor?: boolean;
@@ -56,22 +59,25 @@ export const POLITICAS: Record<string, Politica> = {
   miembros: { permiso: "miembros.ver" },
   retencion: { permiso: "miembros.gestionar" },
   documentos: { permiso: "documentos.subir" },
-  formularios: { permiso: "formularios.gestionar" },
+  formularios: { permiso: "formularios.gestionar", funcion: "formularios" },
   cobranza: { permiso: "facturacion.ver" },
-  facturas: { permiso: "ordenes.ver" },
+  facturas: { permiso: "ordenes.ver", funcion: "facturacion" },
   instructores: { permiso: "agenda.gestionar" },
   // Horarios de atención de cada profesional (se arman por sucursal).
   horarios: { permiso: ["agenda.ver", "sucursales.ver"], modalidad: "citas" },
-  nomina: { permiso: ["estudio.gestionar", "usuarios.gestionar"] },
+  nomina: {
+    permiso: ["estudio.gestionar", "usuarios.gestionar"],
+    funcion: "comisiones",
+  },
 
   // ---- Gestión ----
   // Vende a un alumno y muestra las órdenes: sin eso la pantalla queda a medias.
   ventas: { permiso: ["productos.ver", "ordenes.ver", "miembros.ver"] },
-  pos: { permiso: ["inventario.ver", "pos.vender"] },
-  inventario: { permiso: "inventario.gestionar" },
-  comunicaciones: { permiso: "comunicaciones.gestionar" },
-  promociones: { permiso: "promociones.gestionar" },
-  lealtad: { permiso: "lealtad.ver" },
+  pos: { permiso: ["inventario.ver", "pos.vender"], funcion: "inventario" },
+  inventario: { permiso: "inventario.gestionar", funcion: "inventario" },
+  comunicaciones: { permiso: "comunicaciones.gestionar", funcion: "mensajes" },
+  promociones: { permiso: "promociones.gestionar", funcion: "promociones" },
+  lealtad: { permiso: "lealtad.ver", funcion: "lealtad" },
   resenas: { permiso: "miembros.ver" },
   reportes: { permiso: "facturacion.ver" },
 
@@ -81,13 +87,16 @@ export const POLITICAS: Record<string, Politica> = {
   "datos-fiscales": { permiso: "estudio.gestionar" },
   region: { permiso: "estudio.gestionar" },
   catalogo: { permiso: "catalogo.gestionar" },
-  planes: { permiso: "productos.ver" },
-  recursos: { permiso: "agenda.gestionar" },
+  planes: { permiso: "productos.ver", funcion: "paquetes" },
+  recursos: { permiso: "agenda.gestionar", funcion: "recursos" },
   "reglas-agenda": { permiso: "agenda.gestionar" },
   pasarelas: { permiso: "pagos.configurar" },
-  integraciones: { permiso: "integraciones.configurar" },
+  integraciones: {
+    permiso: "integraciones.configurar",
+    funcion: "integraciones",
+  },
   usuarios: { permiso: "usuarios.gestionar" },
-  roles: { permiso: "roles.gestionar" },
+  roles: { permiso: "roles.gestionar", funcion: "roles_propios" },
   bitacora: { permiso: "auditoria.ver" },
   privacidad: { permiso: "miembros.gestionar" },
   // Portada: solo reúne opciones; se ve si alguna se puede abrir.
@@ -194,6 +203,12 @@ export function puedeEntrar(
   if (
     politica.flag !== undefined &&
     sesion.estudio?.perfil_config?.flags[politica.flag] !== true
+  ) {
+    return false;
+  }
+  if (
+    politica.funcion !== undefined &&
+    sesion.estudio?.plan?.sin.includes(politica.funcion) === true
   ) {
     return false;
   }

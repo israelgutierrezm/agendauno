@@ -80,6 +80,26 @@ return [
     ],
 
     /*
+    | Tipo de cambio FIX del Banco de México (serie SF43718, API SIE) para cobrar en
+    | pesos a los negocios de México la renta publicada en dólares (ADR 0107). El token
+    | se pide gratis en banxico.org.mx; sin él, rige el que capture el superadmin.
+    */
+    'banxico' => [
+        'token' => env('BANXICO_TOKEN'),
+        'url' => env('BANXICO_URL', 'https://www.banxico.org.mx/SieAPIRest/service/v1'),
+        'serie' => env('BANXICO_SERIE_FIX', 'SF43718'),
+    ],
+
+    /*
+    | Ventas: a dónde se manda a quien pasa de 20 profesionales o de 1,000 alumnos
+    | (cotización, ADR 0107).
+    */
+    'ventas' => [
+        'correo' => env('VENTAS_CORREO', 'ventas@agendauno.mx'),
+        'whatsapp' => env('VENTAS_WHATSAPP'),
+    ],
+
+    /*
     | reCAPTCHA v3 (Google) para el registro público de negocios. Si no hay
     | `secret` configurado, la verificación se omite (dev/local). Con secret, el
     | token del cliente se valida contra Google y se rechaza bajo el umbral.

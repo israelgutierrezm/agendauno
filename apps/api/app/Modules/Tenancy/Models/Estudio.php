@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\CatalogoPaises;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\ModalidadServicio;
@@ -12,6 +13,7 @@ use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\TerminologiaNegocio;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * Registro central de un estudio (tenant SaaS) en el control plane. Vive en la
@@ -24,6 +26,14 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $portada_url
  * @property array<string, string>|null $redes
  * @property bool $whatsapp_habilitado los avisos por WhatsApp a sus clientes; solo los activa el superadministrador (ADR 0083)
+ * @property string|null $plan_nivel el nivel contratado de un negocio de citas (ADR 0107): individual, premium o pro
+ * @property int|null $plan_profesionales los profesionales contratados
+ * @property string $plan_periodicidad mensual o anual
+ * @property Carbon|null $plan_cubierto_hasta hasta qué día cubre lo ya cobrado por adelantado
+ * @property array{nivel?: string, profesionales?: int, periodicidad?: string}|null $plan_siguiente lo que cambia desde el siguiente periodo
+ * @property string $cuota_fija_moneda
+ * @property string|null $stripe_cliente_id
+ * @property string|null $domiciliacion_metodo la tarjeta domiciliada (`pm_…` en la cuenta de la plataforma)
  */
 class Estudio extends Model
 {
@@ -67,7 +77,19 @@ class Estudio extends Model
         'precio_por_alumno_minor',
         'modo_cobro',
         'cuota_fija_minor',
+        'cuota_fija_moneda',
         'moneda',
+        'plan_nivel',
+        'plan_profesionales',
+        'plan_periodicidad',
+        'plan_cubierto_hasta',
+        'plan_siguiente',
+        'stripe_cliente_id',
+        'domiciliacion_metodo',
+        'tarjeta_marca',
+        'tarjeta_ultimos4',
+        'tarjeta_vence',
+        'domiciliada_en',
         'estado_facturacion',
         'db_driver',
         'db_database',
@@ -94,6 +116,10 @@ class Estudio extends Model
         'precio_por_alumno_minor' => 'integer',
         'modo_cobro' => ModoCobroSaas::class,
         'cuota_fija_minor' => 'integer',
+        'plan_profesionales' => 'integer',
+        'plan_cubierto_hasta' => 'date',
+        'plan_siguiente' => 'array',
+        'domiciliada_en' => 'datetime',
         'onboarding_pasos' => 'array',
         'onboarding_completo' => 'boolean',
         'contacto_whatsapp_verificado_en' => 'datetime',
@@ -141,6 +167,12 @@ class Estudio extends Model
     public function paginaPublica(): bool
     {
         return $this->publicado && $this->estado->operativo();
+    }
+
+    /** ¿El negocio está en México? (se le cobra la renta en pesos, ADR 0107). */
+    public function enMexico(): bool
+    {
+        return CatalogoPaises::codigo($this->pais ?: 'MX') === 'MX';
     }
 
     /**

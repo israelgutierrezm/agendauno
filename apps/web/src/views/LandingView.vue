@@ -20,7 +20,7 @@ import {
   NOMBRE_RUTA_MODALIDAD,
   type Modo,
 } from "@/marketing/modalidades";
-import { bandasEstudios, ejemplosCitas, pesos } from "@/marketing/precios";
+import { bandasEstudios, dolares, nivelesCitas } from "@/marketing/precios";
 
 /*
 | Portada «/»: corta, para que cada visitante elija su modalidad en segundos. Cada
@@ -81,14 +81,14 @@ const preciosDesde = [
     modo: "clases" as const,
     modelo: "landing.portada.precios.clases",
     capacidad: bandasEstudios[0].capacidad,
-    importe: pesos(bandasEstudios[0].subtotal),
+    importe: dolares(bandasEstudios[0].subtotal),
     enlace: "landing.portada.precios.verClases",
   },
   {
     modo: "citas" as const,
     modelo: "landing.portada.precios.citas",
-    capacidad: ejemplosCitas[0].capacidad,
-    importe: pesos(ejemplosCitas[0].subtotal),
+    capacidad: nivelesCitas[0]!.capacidad,
+    importe: dolares(nivelesCitas[0]!.desde),
     enlace: "landing.portada.precios.verCitas",
   },
 ];

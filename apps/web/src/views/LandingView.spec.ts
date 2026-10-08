@@ -11,7 +11,7 @@ import {
   solucionesDe,
   type Modo,
 } from "@/marketing/modalidades";
-import { bandasEstudios, ejemplosCitas, pesos } from "@/marketing/precios";
+import { bandasEstudios, dolares, nivelesCitas } from "@/marketing/precios";
 import { rutaSolucion } from "@/marketing/soluciones";
 import { rutasComerciales } from "@/router/comerciales";
 import CarruselNegocios from "@/components/CarruselNegocios.vue";
@@ -137,7 +137,7 @@ describe("portada comercial", () => {
   it("el sello del precio nombra los dos modelos, sin decir que todo es por profesional", async () => {
     const vista = await montar();
     const sellos = vista.get(".tu-confianza").text();
-    expect(sellos).toContain("Precio por alumnos o profesionales activos");
+    expect(sellos).toContain("Precio por alumnos activos o por profesionales");
     expect(sellos).not.toMatch(/clases o citas por profesional/i);
     vista.unmount();
   });
@@ -169,16 +169,17 @@ describe("portada comercial", () => {
     const tarjetas = vista.findAll("#precios .tu-portada-precio");
     expect(tarjetas).toHaveLength(2);
     expect(tarjetas.map((t) => t.get("strong").text())).toEqual([
-      pesos(bandasEstudios[0].subtotal),
-      pesos(ejemplosCitas[0].subtotal),
+      dolares(bandasEstudios[0].subtotal),
+      dolares(nivelesCitas[0]!.desde),
     ]);
     expect(tarjetas[0]!.text()).toContain(NOMBRE_MODALIDAD.clases);
     expect(tarjetas[0]!.text()).toContain("Por alumnos activos");
-    expect(tarjetas[0]!.text()).toContain("1–49 alumnos activos");
+    expect(tarjetas[0]!.text()).toContain("Hasta 40 alumnos activos");
     expect(tarjetas[1]!.text()).toContain(NOMBRE_MODALIDAD.citas);
-    expect(tarjetas[1]!.text()).toContain("Por profesionales activos");
+    expect(tarjetas[1]!.text()).toContain("Por plan y profesionales");
     expect(tarjetas[1]!.text()).toContain("1 profesional");
-    tarjetas.forEach((t) => expect(t.text()).toContain("+ IVA"));
+    tarjetas.forEach((t) => expect(t.text()).toContain("+ impuestos"));
+    tarjetas.forEach((t) => expect(t.text()).toContain("USD / mes"));
     // Borde de arriba rosa (jsdom no aplica el CSS con scope: se revisa la regla).
     expect(fuente).toMatch(
       /\.tu-portada-precio \{[^}]*border-top: 3px solid var\(--marketing-cta\);/,

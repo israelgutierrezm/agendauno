@@ -6,11 +6,13 @@ namespace App\Console\Commands\Demos;
 
 use App\Modules\Tenancy\Application\GenerarCargoRenta;
 use App\Modules\Tenancy\Application\GestionarRolesTenant;
+use App\Modules\Tenancy\Application\PlanCitasSaas;
 use App\Modules\Tenancy\Application\RegistrarEstudio;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
+use App\Modules\Tenancy\Exceptions\TipoCambioNoDisponible;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\EventoOutboxTenant;
@@ -194,7 +196,16 @@ abstract class DemoBase
         $generar = app(GenerarCargoRenta::class);
         for ($mes = $this->inicio->startOfMonth(); $mes->lessThan($this->hoy->startOfMonth()); $mes = $mes->addMonth()) {
             Carbon::setTestNow($mes->addMonth()->setTime(6, 0)->utc());
-            $cargo = $generar->paraEstudio($estudio, $mes->format('Y-m'));
+            // Los meses que su plan de citas cubre por adelantado no se cobran vencidos.
+            if ($generar->porAdelantado($estudio, $mes->format('Y-m'))) {
+                continue;
+            }
+            try {
+                $cargo = $generar->paraEstudio($estudio, $mes->format('Y-m'));
+            } catch (TipoCambioNoDisponible) {
+                // Sin tipo de cambio en desarrollo: el mes queda sin cargo.
+                continue;
+            }
             if ($cargo->estado === EstadoCargoRenta::Pendiente) {
                 $cargo->update([
                     'estado' => EstadoCargoRenta::Pagado->value, 'metodo_pago' => 'stripe',
@@ -204,6 +215,21 @@ abstract class DemoBase
             $this->sumar('cargos de renta pagados');
         }
         Carbon::setTestNow();
+
+        // Un negocio de citas con plan: el periodo en curso, cobrado por adelantado y pagado.
+        $planes = app(PlanCitasSaas::class);
+        if ($planes->aplica($estudio)) {
+            try {
+                foreach ($planes->emitirPendientes($estudio->refresh()) as $cargo) {
+                    if ($cargo->estado === EstadoCargoRenta::Pendiente) {
+                        $cargo->update(['estado' => EstadoCargoRenta::Pagado->value, 'metodo_pago' => 'stripe', 'pagado_en' => now()]);
+                    }
+                    $this->sumar('cargos de renta pagados');
+                }
+            } catch (TipoCambioNoDisponible) {
+                // Sin tipo de cambio en desarrollo: el plan se cobra cuando lo haya.
+            }
+        }
     }
 
     /** Rehacer desde cero: borra la BD del negocio (solo SQLite de desarrollo). */

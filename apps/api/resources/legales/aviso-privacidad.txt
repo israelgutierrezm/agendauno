@@ -35,7 +35,7 @@ De quien registra un Negocio y de su Equipo:
 • Datos del Negocio: nombre comercial, giro, país, zona horaria, sucursales y su dirección, horarios, redes sociales, logotipo e imágenes.
 • Acceso y uso: credenciales (la contraseña se guarda de forma irreversible), roles y permisos, sesiones, dispositivos, bitácora de acciones, dirección IP y datos del navegador o del teléfono.
 • Inicio de sesión con Google, si lo eliges: el nombre, el correo y la fotografía que Google comparte.
-• Suscripción y facturación: la medición de uso para el cobro (solo cifras de alumnos o profesionales activos), cargos, pagos, referencias de la pasarela y, si solicitas factura, tus datos fiscales (RFC, nombre o razón social, régimen fiscal y código postal).
+• Suscripción y facturación: el plan contratado, la medición de uso para el cobro (solo cifras de alumnos o profesionales), cargos, pagos, referencias de la pasarela, el tipo de cambio aplicado, los timbres comprados y, si guardas una tarjeta para el cobro automático, solo su marca, sus últimos 4 dígitos y su vencimiento (la tarjeta la guarda la pasarela); si solicitas factura, tus datos fiscales (RFC, nombre o razón social, régimen fiscal y código postal).
 • Nómina del Equipo, si el Negocio la usa: el esquema de pago y lo que corresponde a cada quien.
 • Atención: los mensajes que nos envías.
 

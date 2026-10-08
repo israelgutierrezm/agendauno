@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AsignarSucursalAlPersonalTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
+use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Models\Estudio;
@@ -54,6 +55,11 @@ class OrganizacionesTenantController
         $organizacion = OrganizacionTenant::query()->where('ulid', (string) $request->route('organizacion'))->firstOrFail();
 
         $validado = $this->validarSucursal($request, obligarNombre: true);
+        // Más de una sucursal es de Premium (ADR 0107).
+        $estudio = $request->attributes->get('estudio');
+        if ($estudio instanceof Estudio && SucursalTenant::query()->exists()) {
+            app(FuncionesPlan::class)->exigir($estudio, 'sucursales');
+        }
         // ¿Es la segunda? Entonces la primera era «todo» para el personal sin asignar.
         $unica = SucursalTenant::query()->count() === 1 ? SucursalTenant::query()->first() : null;
 

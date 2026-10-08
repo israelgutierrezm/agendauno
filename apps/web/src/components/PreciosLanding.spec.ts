@@ -4,7 +4,12 @@ import PreciosLanding from "./PreciosLanding.vue";
 import fuente from "./PreciosLanding.vue?raw";
 import { trackEvent } from "@/lib/analytics";
 import type { Modo } from "@/marketing/modalidades";
-import { bandasEstudios, ejemplosCitas, pesos } from "@/marketing/precios";
+import {
+  bandasEstudios,
+  dolares,
+  nivelesCitas,
+  preciosCitas,
+} from "@/marketing/precios";
 
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
 const montar = () =>
@@ -25,30 +30,32 @@ const montarFijo = (modo: Modo) =>
     },
   });
 
-describe("precios públicos", () => {
-  it("muestra el precio sin IVA y la leyenda debajo, con prueba sin tarjeta", () => {
+describe("precios públicos (ADR 0107)", () => {
+  it("clases: en dólares más impuestos, con la nota de pesos en México y prueba sin tarjeta", () => {
     const vista = montar();
     expect(vista.findAll("article")).toHaveLength(3);
     expect(vista.get('button[aria-pressed="true"] strong').text()).toBe(
       "Por alumnos activos",
     );
-    expect(vista.get(".precio-importe strong").text()).toBe("$339");
-    expect(vista.get(".precio-impuestos").text()).toBe("+ IVA");
-    expect(vista.text()).not.toContain("$393.24");
-    expect(vista.text()).not.toContain("IVA incluido");
+    expect(vista.get(".precio-importe strong").text()).toBe("$21");
+    expect(vista.get(".precio-importe").text()).toContain("USD / mes");
+    expect(vista.get(".precio-impuestos").text()).toBe("+ impuestos");
+    expect(vista.text()).toContain(
+      "En México se cobran en pesos al tipo de cambio del día del cobro, más IVA.",
+    );
     expect(vista.get("article").text()).toContain("Probar 30 días gratis");
     expect(vista.get("article").text()).toContain("Sin tarjeta");
-    expect(vista.findAll("tbody tr")).toHaveLength(6);
+    expect(vista.findAll("tbody tr")).toHaveLength(9);
     expect(vista.get(".precios-contacto a").attributes("href")).toContain(
       "mailto:ventas@agendauno.mx",
     );
     expect(vista.get(".precios-contacto").text()).toContain(
-      "Más de 2,000 alumnos activos",
+      "Más de 1,000 alumnos activos",
     );
-    expect(vista.text()).not.toContain("$1,359");
     expect(vista.text()).toContain(
       "Sin alumnos activos, la renta por uso es $0",
     );
+    expect(vista.text()).not.toMatch(/MXN|\+ IVA/);
     vista.unmount();
   });
   it("presenta ambos modelos y sus negocios antes de elegir", () => {
@@ -59,7 +66,7 @@ describe("precios públicos", () => {
     for (const negocio of ["Pilates", "Pole dance", "acuáticas", "baile"]) {
       expect(modelos[0]!.text()).toContain(negocio);
     }
-    expect(modelos[1]!.text()).toContain("Por profesionales");
+    expect(modelos[1]!.text()).toContain("Por plan y profesionales");
     for (const negocio of [
       "Barberías",
       "estéticas",
@@ -73,42 +80,57 @@ describe("precios públicos", () => {
     expect(modelos[1]!.attributes("aria-pressed")).toBe("false");
     vista.unmount();
   });
-  it("cambia a citas sin distinguir jornadas ni ofrecer clases o talleres", async () => {
+  it("citas: Individual, Premium y Pro; el anual cuesta 10 meses", async () => {
     const vista = montar();
-    await vista.findAll("button")[1]!.trigger("click");
-    expect(vista.get('button[aria-pressed="true"] strong').text()).toBe(
-      "Por profesionales",
-    );
-    expect(vista.get(".precios-intro").text()).toContain("$269");
-    expect(vista.text()).not.toMatch(
-      /medio tiempo|tiempo completo|equivalente|\$134\.50/i,
-    );
-    expect(vista.get(".precio-importe strong").text()).toBe("$269");
-    expect(vista.findAll(".precio-importe strong")[1]!.text()).toBe("$495");
-    expect(vista.findAll(".precio-importe strong")[2]!.text()).toBe("$630");
-    expect(vista.findAll(".precio-impuestos").map((n) => n.text())).toEqual([
-      "+ IVA",
-      "+ IVA",
-      "+ IVA",
+    await vista.findAll(".precios-selector button")[1]!.trigger("click");
+    expect(vista.findAll(".precio-tarjeta h4").map((n) => n.text())).toEqual([
+      "Individual",
+      "Premium",
+      "Pro",
     ]);
-    // Un negocio de citas no da clases (ADR 0104): sin el cargo por reservas grupales.
-    expect(vista.text()).not.toContain("$9 + IVA");
+    expect(
+      vista.findAll(".precio-importe strong").map((n) => n.text()),
+    ).toEqual(["$9", "$24", "$33"]);
+    expect(vista.get(".precios-intro").text()).toContain("$9 USD al mes");
+    // Funciones que separan los niveles.
+    const tarjetas = vista.findAll(".precio-tarjeta");
+    expect(tarjetas[0]!.text()).toContain("Tu página con dirección propia");
+    expect(tarjetas[0]!.text()).toContain("Cobro al agendar en línea*");
+    expect(tarjetas[1]!.text()).toContain("Equipo, roles y varias sucursales");
+    expect(tarjetas[2]!.text()).toContain("Facturación electrónica*");
+
+    const anual = vista
+      .findAll(".precios-periodo button")
+      .find((b) => b.text().startsWith("Anual"))!;
+    await anual.trigger("click");
+    expect(
+      vista.findAll(".precio-importe strong").map((n) => n.text()),
+    ).toEqual(["$90", "$240", "$330"]);
+    expect(vista.get(".precio-importe").text()).toContain("USD / año");
+    expect(vista.get(".precios-contacto").text()).toContain(
+      "Más de 20 profesionales",
+    );
     expect(vista.text()).not.toMatch(/talleres|reservas grupales/i);
-    expect(vista.text()).not.toMatch(/en preparación/i);
-    await vista.findAll("button")[0]!.trigger("click");
-    expect(vista.get("article").text()).toContain("1–49 alumnos activos");
     vista.unmount();
   });
-  it("conserva las tarifas verificadas, sin confundir tramos marginales con precio unitario", () => {
+  it("conserva los precios publicados (ReservaClase y AgendaPro −15 %, redondeados hacia abajo)", () => {
     expect(bandasEstudios.map((b) => b.subtotal)).toEqual([
-      33900, 63900, 90900, 178900, 264900, 288900,
+      2100, 3000, 3900, 4800, 6800, 8400, 11100, 16400, 29700,
     ]);
-    expect(ejemplosCitas.map((b) => b.subtotal)).toEqual([
-      26900,
-      26900 + 22600,
-      26900 + 22600 + 13500,
-    ]);
-    expect(pesos(15602)).toBe("$156.02");
+    expect(nivelesCitas.map((n) => n.desde)).toEqual([900, 2400, 3300]);
+    expect(preciosCitas).toHaveLength(19);
+    expect(preciosCitas[0]).toEqual({
+      profesionales: 2,
+      premium: 2400,
+      pro: 3300,
+    });
+    expect(preciosCitas[18]).toEqual({
+      profesionales: 20,
+      premium: 10100,
+      pro: 17700,
+    });
+    expect(dolares(2100)).toBe("$21");
+    expect(dolares(1550)).toBe("$15.50");
   });
   it("nombra las modalidades igual que la portada y el registro, con la nota de México", () => {
     const vista = montar();
@@ -129,8 +151,8 @@ describe("precios públicos", () => {
       "Clases con cupo · Por alumnos activos",
     );
     expect(vista.findAll("article")).toHaveLength(3);
-    expect(vista.get(".precio-importe strong").text()).toBe("$339");
-    expect(vista.findAll("tbody tr")).toHaveLength(6);
+    expect(vista.get(".precio-importe strong").text()).toBe("$21");
+    expect(vista.findAll("tbody tr")).toHaveLength(9);
     expect(vista.find(".precios-contacto").exists()).toBe(true);
     expect(vista.text()).not.toMatch(/profesionales activos/i);
     expect(vista.get(".tu-nota-mexico").exists()).toBe(true);
@@ -147,34 +169,27 @@ describe("precios públicos", () => {
     });
     vista.unmount();
   });
-  it("con modo citas queda fijo: por profesional, sin talleres y con ?modo=citas", () => {
+  it("con modo citas queda fijo: por plan y profesionales, con ?modo=citas y la tabla de 2 a 20", () => {
     const vista = montarFijo("citas");
     expect(vista.find(".precios-selector").exists()).toBe(false);
     expect(vista.get(".precios-modelo").text()).toBe(
-      "Citas 1 a 1 · Por profesionales activos",
+      "Citas 1 a 1 · Por plan y profesionales",
     );
-    expect(
-      vista.findAll(".precio-importe strong").map((n) => n.text()),
-    ).toEqual(["$269", "$495", "$630"]);
     expect(vista.findAll(".precio-contexto").map((n) => n.text())).toEqual([
       "Citas 1 a 1",
       "Citas 1 a 1",
       "Citas 1 a 1",
     ]);
-    expect(vista.find(".precios-contacto").exists()).toBe(false);
+    // Individual + de 2 a 20 profesionales.
+    expect(vista.findAll("tbody tr")).toHaveLength(20);
     expect(vista.text()).not.toMatch(
       /alumnos activos|talleres|en preparación/i,
     );
-    expect(vista.text()).not.toContain("$9 + IVA");
-    expect(vista.text()).toContain("$269 + $226 = $495");
-    // Quién cuenta, en palabras de citas (como su pregunta frecuente).
-    expect(vista.text()).toContain("al menos una cita no cancelada en el mes");
     // Beneficios con marca SVG, sin «✓» de texto.
     expect(vista.text()).not.toContain("✓");
     expect(vista.findAll(".precio-tarjeta li svg.precio-check").length).toBe(
       vista.findAll(".precio-tarjeta li").length,
     );
-    expect(vista.get(".tu-nota-mexico").exists()).toBe(true);
     for (const cta of vista.findAll(".precio-cta")) {
       expect(JSON.parse(cta.attributes("data-to")!)).toEqual({
         name: "registro",

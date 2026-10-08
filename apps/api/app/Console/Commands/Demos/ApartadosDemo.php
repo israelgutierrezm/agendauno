@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Application\GestionarPromocionesTenant;
 use App\Modules\Tenancy\Application\GestionarTareasTenant;
 use App\Modules\Tenancy\Application\PuntosTenant;
 use App\Modules\Tenancy\Application\ReembolsarPagoTenant;
+use App\Modules\Tenancy\Application\TimbresTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Automatizacion\AccionAutomatizacion;
 use App\Modules\Tenancy\Automatizacion\EventoAutomatizacion;
@@ -315,6 +316,8 @@ trait ApartadosDemo
             ->orderBy('id')
             ->get()->all();
         $emitir = app(EmitirFacturaTenant::class);
+        // Un paquete de timbres ya comprado (ADR 0107): cada factura gasta uno.
+        app(TimbresTenant::class)->acreditar(TimbresTenant::PAQUETES[0], 'demo', 'Paquete de '.TimbresTenant::PAQUETES[0].' timbres');
         foreach (array_slice($this->mezclar($ordenes), 0, $cuantas) as $orden) {
             $persona = $orden->persona;
             if (! $persona instanceof PersonaTenant) {

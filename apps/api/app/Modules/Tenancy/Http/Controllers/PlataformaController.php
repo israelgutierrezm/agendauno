@@ -74,12 +74,15 @@ class PlataformaController
         $validado = $request->validate([
             'modo_cobro' => ['required', Rule::enum(ModoCobroSaas::class)],
             'cuota_fija_minor' => ['required', 'integer', 'min:0'],
+            // La cuota pactada puede ser en dólares (en México se cobra en pesos, ADR 0107).
+            'cuota_fija_moneda' => ['nullable', Rule::in(['MXN', 'USD'])],
             'estado_facturacion' => ['nullable', Rule::enum(EstadoFacturacion::class)],
         ]);
 
         $modelo->update([
             'modo_cobro' => $validado['modo_cobro'],
             'cuota_fija_minor' => (int) $validado['cuota_fija_minor'],
+            'cuota_fija_moneda' => $validado['cuota_fija_moneda'] ?? $modelo->cuota_fija_moneda,
             'estado_facturacion' => $validado['estado_facturacion'] ?? $modelo->estado_facturacion->value,
         ]);
 
@@ -87,6 +90,7 @@ class PlataformaController
             'slug' => $modelo->slug,
             'modo_cobro' => $modelo->modo_cobro->value,
             'cuota_fija_minor' => $modelo->cuota_fija_minor,
+            'cuota_fija_moneda' => $modelo->cuota_fija_moneda,
             'estado_facturacion' => $modelo->estado_facturacion->value,
         ]]);
     }

@@ -27,6 +27,7 @@ class CobrarCargoRenta
         private readonly PasarelaStripePlataforma $stripe,
         private readonly SuspensionPorRenta $suspension,
         private readonly ConciliarCargosRenta $conciliar,
+        private readonly AcreditarTimbresPagados $timbres,
     ) {}
 
     public function ejecutar(CargoRenta $cargo, string $proveedor): CargoRenta
@@ -81,6 +82,7 @@ class CobrarCargoRenta
         // Pagado al momento: si estaba suspendido por renta y ya no debe, se reactiva.
         if ($cobrado->estado === EstadoCargoRenta::Pagado) {
             $this->suspension->reactivarSiPago($cobrado->estudio);
+            $this->timbres->aplicar($cobrado);
         }
 
         return $cobrado;

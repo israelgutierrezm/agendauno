@@ -5,9 +5,13 @@ import { useI18n } from "vue-i18n";
 
 import AvisosAgendaUno from "@/components/AvisosAgendaUno.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import PlanCitasRenta from "@/components/PlanCitasRenta.vue";
+import TarjetaRenta from "@/components/TarjetaRenta.vue";
+import TimbresRenta from "@/components/TimbresRenta.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useRetornoPago } from "@/lib/retornoPago";
+import type { PlanCitas, TipoCambio } from "@/lib/suscripcion";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface LineaDesglose {
@@ -22,6 +26,10 @@ interface Desglose {
   iva_minor: number;
   total_minor: number;
   prorrateo?: { dias_cobrables: number; dias_periodo: number };
+  /** Moneda del desglose (la de cobro; sin tipo de cambio, la de la tarifa). */
+  moneda?: string;
+  /** Con qué tipo de cambio se pasó a pesos lo que estaba en dólares (ADR 0107). */
+  conversion?: { tipo_cambio: string; fecha: string } | null;
 }
 interface FacturaCargo {
   id: string;
@@ -31,6 +39,14 @@ interface FacturaCargo {
 interface Cargo {
   id: string;
   periodo: string;
+  /** `renta` (mes vencido), `plan` (por adelantado), `ajuste` o `timbres`. */
+  concepto?: string;
+  cubre_desde?: string | null;
+  cubre_hasta?: string | null;
+  tipo_cambio?: TipoCambio | null;
+  /** Cobro a la tarjeta domiciliada: el último rechazo y el siguiente intento. */
+  error_cobro?: string | null;
+  proximo_intento_en?: string | null;
   modo_cobro: string;
   metrica: string;
   cantidad: number;
@@ -44,6 +60,9 @@ interface Cargo {
 }
 interface Uso {
   periodo: string;
+  /** Con plan: lo que cubre el siguiente cobro (por adelantado). */
+  cubre_desde?: string;
+  cubre_hasta?: string;
   metrica: string;
   cantidad: number;
   detalle: { personas_fuera_de_cita?: number };
@@ -54,7 +73,23 @@ interface Renta {
   modo_cobro: string;
   moneda: string;
   cuota_fija_minor: number;
+  cuota_fija_moneda?: string;
   trial_termina_en: string | null;
+  /** Por plan contratado, por adelantado (citas), o por uso, mes vencido (ADR 0107). */
+  cobro?: "plan" | "uso";
+  plan?: PlanCitas | null;
+  tarifa?: {
+    moneda_tarifa: string;
+    moneda_cobro: string;
+    tipo_cambio: TipoCambio | null;
+  } | null;
+  ventas?: { correo: string | null; whatsapp: string | null };
+  tarjeta?: {
+    marca: string | null;
+    ultimos4: string | null;
+    vence: string | null;
+  } | null;
+  domiciliacion_posible?: boolean;
   /** ¿Puede recibir la factura de la renta? Si no, se le da un recibo sin valor fiscal. */
   factura_renta_posible?: boolean;
   actual: Uso;
@@ -124,7 +159,7 @@ const ayudaModo = computed(() => {
   }
   if (r.modo_cobro === "fijo") {
     return t("cobro.modo.ayudaFijo", {
-      monto: dinero(r.cuota_fija_minor, r.moneda),
+      monto: dinero(r.cuota_fija_minor, r.cuota_fija_moneda ?? r.moneda),
     });
   }
   // Por profesional o por alumno: según la modalidad del negocio (ADR 0104).
@@ -132,6 +167,43 @@ const ayudaModo = computed(() => {
     ? t("cobro.modo.ayudaCitas")
     : t("cobro.modo.ayudaClases");
 });
+
+// El estimado viene en la moneda de cobro (pesos en México) o, sin tipo de cambio,
+// en la de la tarifa.
+const monedaActual = computed(
+  () => renta.value?.actual.desglose.moneda ?? renta.value?.moneda ?? "MXN",
+);
+const porPlan = computed(
+  () => renta.value?.cobro === "plan" && renta.value.plan != null,
+);
+const avisoPlan = ref<string | null>(null);
+function planCambiado(mensaje: string): void {
+  avisoPlan.value = mensaje;
+  void cargar();
+}
+
+// Qué cubre un cargo: su periodo o, si lo dice, del día tal al tal.
+function cubre(c: Cargo): string {
+  if (c.cubre_desde && c.cubre_hasta) {
+    return t("suscripcion.cobro.cubre", {
+      desde: fecha(c.cubre_desde),
+      hasta: fecha(c.cubre_hasta),
+    });
+  }
+  return c.periodo;
+}
+// Un cobro automático que no pasó: cuándo se reintenta o que hay que pagarlo.
+function notaCobro(c: Cargo): string | null {
+  if (c.estado !== "pendiente" || !c.error_cobro) {
+    return null;
+  }
+  if (c.error_cobro === "authentication_required") {
+    return t("suscripcion.cobro.autenticacion");
+  }
+  return c.proximo_intento_en
+    ? t("suscripcion.cobro.rechazo", { fecha: fecha(c.proximo_intento_en) })
+    : t("suscripcion.cobro.rechazoFinal");
+}
 
 async function cargar(): Promise<void> {
   cargando.value = true;
@@ -318,9 +390,22 @@ onMounted(() => {
     </p>
 
     <template v-else-if="renta">
+      <!-- Plan de un negocio de citas (ADR 0107): nivel, profesionales, mensual o anual. -->
+      <PlanCitasRenta
+        v-if="porPlan && renta.plan"
+        class="mt-6"
+        :plan="renta.plan"
+        :base="base"
+        :ventas="renta.ventas ?? { correo: null, whatsapp: null }"
+        @cambiado="planCambiado"
+      />
+      <p v-if="avisoPlan" class="mt-3 text-sm" style="color: var(--exito)">
+        {{ avisoPlan }}
+      </p>
+
       <div class="mt-6 grid gap-4 lg:grid-cols-5">
-        <!-- Cómo te cobramos -->
-        <div class="tu-card p-5 lg:col-span-2">
+        <!-- Cómo te cobramos (por uso, mes vencido) -->
+        <div v-if="!porPlan" class="tu-card p-5 lg:col-span-2">
           <h2 class="font-medium">{{ $t("cobro.modo.titulo") }}</h2>
           <p class="mt-2 text-lg font-semibold">
             {{
@@ -336,6 +421,33 @@ onMounted(() => {
             {{ $t("cobro.modo.mesVencido") }}
           </p>
           <p
+            v-if="renta.tarifa?.moneda_tarifa === 'USD'"
+            class="mt-3 text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{
+              renta.tarifa.moneda_cobro === "MXN" && renta.tarifa.tipo_cambio
+                ? $t("suscripcion.plan.tipoCambio", {
+                    valor: renta.tarifa.tipo_cambio.valor,
+                  })
+                : $t("suscripcion.plan.enDolares")
+            }}
+          </p>
+          <p
+            v-if="
+              renta.modo_cobro !== 'fijo' &&
+              !sesion.esCitas &&
+              renta.ventas?.correo
+            "
+            class="mt-2 text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("suscripcion.clases.masDe") }}
+            <a class="tu-enlace" :href="`mailto:${renta.ventas.correo}`">{{
+              renta.ventas.correo
+            }}</a>
+          </p>
+          <p
             v-if="enPrueba && renta.trial_termina_en"
             class="mt-3 text-sm rounded-lg px-3 py-2 font-semibold"
             :style="{ background: 'var(--exito-suave)', color: 'var(--exito)' }"
@@ -348,15 +460,30 @@ onMounted(() => {
           </p>
         </div>
 
-        <!-- Mes en curso con su desglose -->
+        <!-- Mes en curso (o, con plan, el siguiente cobro) con su desglose -->
         <div class="tu-card p-5 lg:col-span-3">
           <h2 class="font-medium">
-            {{ $t("cobro.actual.titulo") }} · {{ renta.actual.periodo }}
+            <template
+              v-if="
+                porPlan && renta.actual.cubre_desde && renta.actual.cubre_hasta
+              "
+            >
+              {{ $t("cobro.actual.siguiente") }} ·
+              {{
+                $t("suscripcion.cobro.cubre", {
+                  desde: fecha(renta.actual.cubre_desde),
+                  hasta: fecha(renta.actual.cubre_hasta),
+                })
+              }}
+            </template>
+            <template v-else>
+              {{ $t("cobro.actual.titulo") }} · {{ renta.actual.periodo }}
+            </template>
           </h2>
           <div class="mt-2 flex items-end justify-between gap-4 flex-wrap">
             <div>
               <div class="text-3xl font-semibold">
-                {{ dinero(renta.actual.cargo_estimado_minor, renta.moneda) }}
+                {{ dinero(renta.actual.cargo_estimado_minor, monedaActual) }}
               </div>
               <div
                 class="text-xs mt-1"
@@ -395,11 +522,11 @@ onMounted(() => {
                 <span class="font-semibold">{{ l.concepto }}</span>
                 <span class="block text-xs rt-suave">{{ l.detalle }}</span>
               </dt>
-              <dd>{{ dinero(l.importe_minor, renta.moneda) }}</dd>
+              <dd>{{ dinero(l.importe_minor, monedaActual) }}</dd>
             </template>
             <dt class="rt-suave">{{ $t("cobro.desglose.subtotal") }}</dt>
             <dd class="rt-suave">
-              {{ dinero(renta.actual.desglose.subtotal_minor, renta.moneda) }}
+              {{ dinero(renta.actual.desglose.subtotal_minor, monedaActual) }}
             </dd>
             <template v-if="renta.actual.desglose.iva_porcentaje > 0">
               <dt class="rt-suave">
@@ -410,12 +537,12 @@ onMounted(() => {
                 }}
               </dt>
               <dd class="rt-suave">
-                {{ dinero(renta.actual.desglose.iva_minor, renta.moneda) }}
+                {{ dinero(renta.actual.desglose.iva_minor, monedaActual) }}
               </dd>
             </template>
             <dt class="font-semibold">{{ $t("cobro.desglose.total") }}</dt>
             <dd class="font-semibold">
-              {{ dinero(renta.actual.desglose.total_minor, renta.moneda) }}
+              {{ dinero(renta.actual.desglose.total_minor, monedaActual) }}
             </dd>
           </dl>
           <p
@@ -426,21 +553,38 @@ onMounted(() => {
             {{ $t("cobro.actual.sinCargo") }}
           </p>
           <p
+            v-if="renta.actual.desglose.conversion"
+            class="mt-2 text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{
+              $t("suscripcion.cobro.tipoCambio", {
+                valor: renta.actual.desglose.conversion.tipo_cambio,
+                fecha: fecha(renta.actual.desglose.conversion.fecha),
+              })
+            }}
+          </p>
+          <p
             v-if="renta.actual.desglose.prorrateo"
             class="mt-2 text-xs"
             :style="{ color: 'var(--texto-suave)' }"
           >
             {{
-              $t("cobro.desglose.prorrateo", {
-                dias: renta.actual.desglose.prorrateo.dias_cobrables,
-                total: renta.actual.desglose.prorrateo.dias_periodo,
-              })
+              $t(
+                porPlan
+                  ? "cobro.desglose.prorrateoPlan"
+                  : "cobro.desglose.prorrateo",
+                {
+                  dias: renta.actual.desglose.prorrateo.dias_cobrables,
+                  total: renta.actual.desglose.prorrateo.dias_periodo,
+                },
+              )
             }}
           </p>
 
           <!-- Transparencia: a quién se contó -->
           <button
-            v-if="renta.modo_cobro !== 'fijo'"
+            v-if="renta.modo_cobro !== 'fijo' && !porPlan"
             type="button"
             class="tu-enlace text-sm mt-4"
             :disabled="cargandoQuien"
@@ -484,6 +628,21 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- Cobro automático y timbres para facturar (ADR 0107) -->
+      <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <TarjetaRenta
+          :base="base"
+          :tarjeta="renta.tarjeta ?? null"
+          :posible="renta.domiciliacion_posible ?? false"
+          @cambio="cargar"
+        />
+        <TimbresRenta
+          v-if="sesion.estudio?.factura_posible"
+          :base="base"
+          :pagado="retornoPago === 'exito'"
+        />
+      </div>
+
       <!-- Historial de cargos -->
       <h2 class="mt-8 font-medium text-lg">{{ $t("renta.historial") }}</h2>
       <p
@@ -519,7 +678,12 @@ onMounted(() => {
             <template v-for="c in renta.cargos" :key="c.id">
               <tr>
                 <td class="font-semibold">
-                  {{ c.periodo }}
+                  <span
+                    v-if="c.concepto && c.concepto !== 'renta'"
+                    class="block text-xs font-normal rt-suave"
+                    >{{ $t(`suscripcion.cobro.concepto.${c.concepto}`) }}</span
+                  >
+                  {{ cubre(c) }}
                   <button
                     v-if="c.desglose && c.desglose.lineas.length > 0"
                     type="button"
@@ -553,12 +717,23 @@ onMounted(() => {
                   >
                     {{ $t(`cobro.estados.${c.estado}`) }}
                   </span>
+                  <span
+                    v-if="notaCobro(c)"
+                    class="block text-xs mt-1"
+                    style="color: var(--aviso)"
+                    data-prueba="nota-cobro"
+                    >{{ notaCobro(c) }}</span
+                  >
                 </td>
                 <td
                   class="hidden sm:table-cell"
                   :style="{ color: 'var(--texto-suave)' }"
                 >
-                  {{ c.estado === "sin_cargo" ? "—" : (c.vence_en ?? "—") }}
+                  {{
+                    c.estado === "sin_cargo" || c.estado === "cancelado"
+                      ? "—"
+                      : (c.vence_en ?? "—")
+                  }}
                 </td>
                 <td class="text-right">
                   <!-- Pendiente: pagar la renta -->
@@ -573,9 +748,11 @@ onMounted(() => {
                       pagando === c.id ? $t("renta.pagando") : $t("renta.pagar")
                     }}
                   </button>
-                  <!-- Sin cargo: nada que pagar ni facturar -->
+                  <!-- Sin cargo o cancelado: nada que pagar ni facturar -->
                   <span
-                    v-else-if="c.estado === 'sin_cargo'"
+                    v-else-if="
+                      c.estado === 'sin_cargo' || c.estado === 'cancelado'
+                    "
                     :style="{ color: 'var(--texto-suave)' }"
                     >—</span
                   >
@@ -599,9 +776,9 @@ onMounted(() => {
                       {{ $t("renta.factura.xml") }}
                     </button>
                   </span>
-                  <!-- Sin factura posible: recibo sin valor fiscal. -->
+                  <!-- Sin factura posible (o cobrado en dólares): recibo sin valor fiscal. -->
                   <button
-                    v-else-if="!facturaPosible"
+                    v-else-if="!facturaPosible || c.moneda !== 'MXN'"
                     type="button"
                     class="tu-btn tu-btn-fantasma whitespace-nowrap"
                     data-prueba="recibo"
@@ -653,6 +830,16 @@ onMounted(() => {
                       </dd>
                     </template>
                   </dl>
+                  <p v-if="c.tipo_cambio" class="mt-1 text-xs rt-suave">
+                    {{
+                      $t("suscripcion.cobro.tipoCambio", {
+                        valor: c.tipo_cambio.valor,
+                        fecha: c.tipo_cambio.fecha
+                          ? fecha(c.tipo_cambio.fecha)
+                          : "",
+                      })
+                    }}
+                  </p>
                   <p v-if="c.desglose.prorrateo" class="mt-1 text-xs rt-suave">
                     {{
                       $t("cobro.desglose.prorrateo", {

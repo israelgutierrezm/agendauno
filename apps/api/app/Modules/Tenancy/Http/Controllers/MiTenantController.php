@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Application\CorteDePlanesTenant;
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\FormulariosDePersonaTenant;
+use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\LibroMayorTenant;
 use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
 use App\Modules\Tenancy\Application\OpcionesCitaTenant;
@@ -199,8 +200,10 @@ class MiTenantController
             'persona' => ['nombre' => $persona->nombreCompleto(), 'email' => $persona->email],
             // Si el estudio cobra en línea, el alumno puede pagar aquí sus compras.
             'pago_en_linea' => $this->pasarelas->enLinea() !== null,
-            // La pasarela admite pago automático (domiciliar membresías al pagarlas).
-            'pago_automatico' => $this->domiciliaciones->proveedor() !== null,
+            // La pasarela admite pago automático (domiciliar membresías al pagarlas) y el
+            // plan del negocio lo incluye (ADR 0107).
+            'pago_automatico' => $this->domiciliaciones->proveedor() !== null
+                && app(FuncionesPlan::class)->tiene($this->estudioDe($request), 'cobro_automatico'),
             'derechos' => $derechos,
             'reservas' => $reservas,
             // Qué partes de su cuenta le sirven y su asistencia reciente (ADR 0091).
@@ -681,10 +684,14 @@ class MiTenantController
     }
 
     /**
-     * Catálogo de productos que el alumno puede comprar desde su portal.
+     * Catálogo de productos que el alumno puede comprar desde su portal. Vacío si el
+     * plan del negocio no incluye la venta en línea (ADR 0107).
      */
-    public function productos(): JsonResponse
+    public function productos(Request $request): JsonResponse
     {
+        if (! app(FuncionesPlan::class)->tiene($this->estudioDe($request), 'venta_en_linea')) {
+            return response()->json(['data' => []]);
+        }
         $productos = ProductoTenant::query()->where('archivado', false)->orderBy('precio_minor')->get();
 
         return response()->json([

@@ -7,7 +7,9 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\BajasTenant;
 use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
+use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
+use App\Modules\Tenancy\Application\PlanCitasSaas;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
@@ -47,6 +49,7 @@ class UsuariosTenantController
         private readonly BajasTenant $bajas,
         private readonly RegistrarAuditoria $auditoria,
         private readonly RolesTenant $roles,
+        private readonly PlanCitasSaas $planes,
     ) {}
 
     /**
@@ -258,6 +261,10 @@ class UsuariosTenantController
         $actor = $this->actor($request);
         if ($usuario->trashed()) {
             $this->bajas->exigirQueLeAlcance($usuario, $actor);
+            // Vuelve un profesional: debe caber en el plan del negocio (ADR 0107).
+            if ($this->esProfesional($usuario->rolesEfectivos())) {
+                $this->planes->exigirCupo($this->estudioDe($request));
+            }
         }
         $this->bajas->reactivarUsuario($usuario, $actor);
 
@@ -274,6 +281,13 @@ class UsuariosTenantController
             'sucursal_id' => ['nullable', 'string'],
         ]);
         $this->exigirQuePuedaDar($this->actor($request), [(string) $validado['rol']]);
+        // Un profesional más debe caber en el plan del negocio; el resto del equipo
+        // (recepción, administración) es de Premium (ADR 0107).
+        if ($this->esProfesional([(string) $validado['rol']])) {
+            $this->planes->exigirCupo($this->estudioDe($request));
+        } else {
+            app(FuncionesPlan::class)->exigir($this->estudioDe($request), 'equipo');
+        }
 
         // Email único dentro de la BD del tenant (también el de alguien dado de baja:
         // ese correo es suyo y se reactiva su cuenta).
@@ -352,6 +366,16 @@ class UsuariosTenantController
         ]]);
     }
 
+    /**
+     * ¿Con esos roles atiende (es profesional que se agenda)?
+     *
+     * @param  list<string>  $roles
+     */
+    private function esProfesional(array $roles): bool
+    {
+        return $this->roles->tieneFaceta($roles, 'instructor');
+    }
+
     private function estudioDe(Request $request): Estudio
     {
         $estudio = $request->attributes->get('estudio');
@@ -380,6 +404,10 @@ class UsuariosTenantController
         // Lo que se da o se quita (el de dueño tiene su propia regla, arriba).
         $cambios = array_diff([...array_diff($rolesNuevos, $antes), ...array_diff($antes, $rolesNuevos)], ['propietario']);
         $this->exigirQuePuedaDar($this->actor($request), array_values($cambios));
+        // Si pasa a atender (profesional), debe caber en el plan del negocio (ADR 0107).
+        if (! $this->esProfesional($antes) && $this->esProfesional($rolesNuevos)) {
+            $this->planes->exigirCupo($this->estudioDe($request));
+        }
 
         $usuario->update([
             'roles' => $rolesNuevos,

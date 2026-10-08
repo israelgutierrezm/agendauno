@@ -9,12 +9,18 @@ use App\Modules\Tenancy\Models\TarifaSaas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Tarifas del SaaS por modalidad (superadmin, ADR 0019). Las tarifas son VERSIONADAS:
- * publicar cambios crea una versión nueva (nunca se edita una publicada) y cada cargo
- * guarda la versión con que se calculó. Dinero en minor, sin IVA.
+ * Tarifas del SaaS por modalidad (superadmin, ADR 0019 y 0107). Las tarifas son
+ * VERSIONADAS: publicar cambios crea una versión nueva (nunca se edita una publicada)
+ * y cada cargo guarda la versión con que se calculó. Dinero en minor, sin IVA, en la
+ * moneda de la tarifa (USD; a México se le cobra en pesos al tipo de cambio).
+ *
+ * - Clases: escalera por alumnos activos (`bandas`), mes vencido.
+ * - Citas: precio mensual por nivel y profesionales contratados (`niveles`), por
+ *   adelantado; el anual cuesta `meses_anual` meses.
  */
 class TarifasPlataformaController
 {
@@ -48,8 +54,11 @@ class TarifasPlataformaController
         abort_if($modo === null, 404);
 
         $comunes = [
+            'moneda' => ['nullable', Rule::in(['USD', 'MXN'])],
             'dias_prueba' => ['required', 'integer', 'min:0', 'max:365'],
             'iva_porcentaje' => ['required', 'integer', 'min:0', 'max:50'],
+            // IVA a negocios fuera de México (exportación de servicios: 0 % por omisión).
+            'iva_porcentaje_extranjero' => ['nullable', 'integer', 'min:0', 'max:50'],
             'vigente_desde' => ['nullable', 'date', 'after_or_equal:today'],
         ];
         $reglas = $modo === ModalidadServicio::Clases
@@ -59,31 +68,28 @@ class TarifasPlataformaController
                 'bandas.*.monto_minor' => ['required', 'integer', 'min:0', 'max:100000000'],
             ]
             : $comunes + [
-                'tramos' => ['required', 'array', 'min:1', 'max:30'],
-                'tramos.*.hasta' => ['nullable', 'integer', 'min:1'],
-                'tramos.*.unitario_minor' => ['required', 'integer', 'min:0', 'max:100000000'],
-                'personas_incluidas_por_profesional' => ['required', 'integer', 'min:0', 'max:10000'],
-                'tope_personas_incluidas' => ['required', 'integer', 'min:0', 'max:1000000'],
-                'extra_por_persona_minor' => ['required', 'integer', 'min:0', 'max:100000000'],
+                'meses_anual' => ['required', 'integer', 'min:1', 'max:12'],
+                'niveles' => ['required', 'array:individual,premium,pro'],
+                'niveles.individual' => ['required', 'array', 'size:1'],
+                'niveles.premium' => ['required', 'array', 'min:1', 'max:100'],
+                'niveles.pro' => ['required', 'array', 'min:1', 'max:100'],
+                'niveles.*.*' => ['required', 'integer', 'min:0', 'max:100000000'],
             ];
         $validado = $request->validate($reglas);
 
-        $campo = $modo === ModalidadServicio::Clases ? 'bandas' : 'tramos';
-        $escalones = $this->escalones($campo, $validado[$campo]);
-
+        $comun = [
+            'moneda' => (string) ($validado['moneda'] ?? 'USD'),
+            'dias_prueba' => (int) $validado['dias_prueba'],
+            'iva_porcentaje' => (int) $validado['iva_porcentaje'],
+            'iva_porcentaje_extranjero' => (int) ($validado['iva_porcentaje_extranjero'] ?? 0),
+        ];
         $definicion = $modo === ModalidadServicio::Clases
-            ? [
-                'dias_prueba' => (int) $validado['dias_prueba'],
-                'iva_porcentaje' => (int) $validado['iva_porcentaje'],
-                'bandas' => array_map(static fn (array $b): array => ['hasta' => $b['hasta'], 'monto_minor' => (int) $b['monto_minor']], $escalones),
+            ? $comun + [
+                'bandas' => array_map(static fn (array $b): array => ['hasta' => $b['hasta'], 'monto_minor' => (int) $b['monto_minor']], $this->escalones('bandas', $validado['bandas'])),
             ]
-            : [
-                'dias_prueba' => (int) $validado['dias_prueba'],
-                'iva_porcentaje' => (int) $validado['iva_porcentaje'],
-                'tramos' => array_map(static fn (array $t): array => ['hasta' => $t['hasta'], 'unitario_minor' => (int) $t['unitario_minor']], $escalones),
-                'personas_incluidas_por_profesional' => (int) $validado['personas_incluidas_por_profesional'],
-                'tope_personas_incluidas' => (int) $validado['tope_personas_incluidas'],
-                'extra_por_persona_minor' => (int) $validado['extra_por_persona_minor'],
+            : $comun + [
+                'meses_anual' => (int) $validado['meses_anual'],
+                'niveles' => $this->niveles($validado['niveles']),
             ];
 
         // Versión siguiente bajo lock: dos publicaciones simultáneas no chocan.
@@ -99,6 +105,40 @@ class TarifasPlataformaController
         });
 
         return response()->json(['data' => $this->presentar($tarifa)], 201);
+    }
+
+    /**
+     * Precios por nivel: Individual con un profesional; Premium y Pro con los mismos
+     * profesionales, seguidos desde 2 (más allá del último: cotización).
+     *
+     * @param  array<string, array<int|string, mixed>>  $niveles
+     * @return array{individual: array<int|string, int>, premium: array<int|string, int>, pro: array<int|string, int>}
+     */
+    private function niveles(array $niveles): array
+    {
+        $individual = $niveles['individual'];
+        if (array_keys($individual) !== [1] && array_keys($individual) !== ['1']) {
+            throw ValidationException::withMessages(['niveles.individual' => ['El plan Individual es para un profesional.']]);
+        }
+        $resultado = ['individual' => ['1' => (int) reset($individual)], 'premium' => [], 'pro' => []];
+        $cantidades = null;
+        foreach (['premium', 'pro'] as $nivel) {
+            $precios = $niveles[$nivel];
+            $claves = array_map('intval', array_keys($precios));
+            sort($claves);
+            if ($claves === [] || $claves[0] !== 2 || $claves !== range(2, 1 + count($claves))) {
+                throw ValidationException::withMessages(["niveles.{$nivel}" => ['Los precios van por profesionales seguidos, desde 2.']]);
+            }
+            if ($cantidades !== null && $claves !== $cantidades) {
+                throw ValidationException::withMessages(["niveles.{$nivel}" => ['Premium y Pro deben tener los mismos profesionales.']]);
+            }
+            $cantidades = $claves;
+            foreach ($claves as $profesionales) {
+                $resultado[$nivel][$profesionales] = (int) $precios[$profesionales];
+            }
+        }
+
+        return $resultado;
     }
 
     /**

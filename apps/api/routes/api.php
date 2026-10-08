@@ -70,6 +70,7 @@ use App\Modules\Tenancy\Http\Controllers\PasarelasTenantController;
 use App\Modules\Tenancy\Http\Controllers\PausasMembresiaTenantController;
 use App\Modules\Tenancy\Http\Controllers\PerfilPublicoController;
 use App\Modules\Tenancy\Http\Controllers\PerfilTenantController;
+use App\Modules\Tenancy\Http\Controllers\PlanRentaController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasHorarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlantillasMensajeTenantController;
 use App\Modules\Tenancy\Http\Controllers\PlataformaCobrosController;
@@ -108,7 +109,10 @@ use App\Modules\Tenancy\Http\Controllers\StaffTenantController;
 use App\Modules\Tenancy\Http\Controllers\SuscripcionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\TareasTenantController;
 use App\Modules\Tenancy\Http\Controllers\TarifasPlataformaController;
+use App\Modules\Tenancy\Http\Controllers\TarjetaRentaController;
 use App\Modules\Tenancy\Http\Controllers\TerminologiaTenantController;
+use App\Modules\Tenancy\Http\Controllers\TimbresTenantController;
+use App\Modules\Tenancy\Http\Controllers\TipoCambioPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\TiposDocumentoController;
 use App\Modules\Tenancy\Http\Controllers\UsuariosTenantController;
 use App\Modules\Tenancy\Http\Controllers\WaiversTenantController;
@@ -203,6 +207,9 @@ Route::prefix('v1')->group(function (): void {
         // Tarifas del SaaS por modalidad (versionadas): consultar y publicar una versión nueva.
         Route::get('/tarifas', [TarifasPlataformaController::class, 'index'])->name('tarifas');
         Route::post('/tarifas/{modalidad}', [TarifasPlataformaController::class, 'publicar'])->name('tarifas.publicar');
+        // Tipo de cambio para cobrar en pesos la renta en dólares (ADR 0107).
+        Route::get('/tipo-cambio', [TipoCambioPlataformaController::class, 'index'])->name('tipo-cambio');
+        Route::put('/tipo-cambio', [TipoCambioPlataformaController::class, 'guardar'])->name('tipo-cambio.guardar');
     });
 
     /*
@@ -326,13 +333,13 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/ordenes', [MiTenantController::class, 'ordenes'])->name('mi.ordenes.index');
             // Todo lo que debe, aparte del historial paginado: un adeudo antiguo no se pierde.
             Route::get('/mi/ordenes/pendientes', [MiTenantController::class, 'ordenesPendientes'])->name('mi.ordenes.pendientes');
-            Route::post('/mi/ordenes', [MiTenantController::class, 'comprar'])->name('mi.ordenes.store');
+            Route::post('/mi/ordenes', [MiTenantController::class, 'comprar'])->middleware('plan:venta_en_linea')->name('mi.ordenes.store');
             Route::post('/mi/ordenes/{orden}/cobrar', [MiTenantController::class, 'cobrar'])->name('mi.ordenes.cobrar');
             // Pago automático: qué membresías se cobran solas y con qué tarjeta; activar,
             // quitar o cambiar la tarjeta (se autoriza en la página de la pasarela).
             Route::get('/mi/pago-automatico', [MiPagoAutomaticoTenantController::class, 'mostrar'])->name('mi.pago-automatico');
             Route::post('/mi/pago-automatico/tarjeta', [MiPagoAutomaticoTenantController::class, 'cambiarTarjeta'])->middleware('throttle:login')->name('mi.pago-automatico.tarjeta');
-            Route::post('/mi/pago-automatico/{acuerdo}', [MiPagoAutomaticoTenantController::class, 'activar'])->middleware('throttle:login')->name('mi.pago-automatico.activar');
+            Route::post('/mi/pago-automatico/{acuerdo}', [MiPagoAutomaticoTenantController::class, 'activar'])->middleware(['throttle:login', 'plan:cobro_automatico'])->name('mi.pago-automatico.activar');
             Route::delete('/mi/pago-automatico/{acuerdo}', [MiPagoAutomaticoTenantController::class, 'desactivar'])->name('mi.pago-automatico.desactivar');
 
             // Invitación de personal (crea usuario tenant-local con rol + activación).
@@ -346,9 +353,9 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/usuarios', [UsuariosTenantController::class, 'index'])->middleware('puede:usuarios.gestionar')->name('usuarios.index');
             // Roles propios del negocio (ADR 0057): nadie da permisos que no tiene.
             Route::get('/roles', [RolesTenantController::class, 'index'])->middleware('puede:roles.gestionar')->name('roles.index');
-            Route::post('/roles', [RolesTenantController::class, 'store'])->middleware('puede:roles.gestionar')->name('roles.store');
-            Route::put('/roles/{rol}', [RolesTenantController::class, 'update'])->middleware('puede:roles.gestionar')->name('roles.update');
-            Route::delete('/roles/{rol}', [RolesTenantController::class, 'destroy'])->middleware('puede:roles.gestionar')->name('roles.destroy');
+            Route::post('/roles', [RolesTenantController::class, 'store'])->middleware(['puede:roles.gestionar', 'plan:roles_propios'])->name('roles.store');
+            Route::put('/roles/{rol}', [RolesTenantController::class, 'update'])->middleware(['puede:roles.gestionar', 'plan:roles_propios'])->name('roles.update');
+            Route::delete('/roles/{rol}', [RolesTenantController::class, 'destroy'])->middleware(['puede:roles.gestionar', 'plan:roles_propios'])->name('roles.destroy');
             Route::put('/usuarios/{usuario}/roles', [UsuariosTenantController::class, 'actualizarRoles'])->middleware('puede:usuarios.gestionar')->name('usuarios.roles');
             // Baja lógica del equipo (quita el acceso, conserva el historial) y reactivación.
             Route::delete('/usuarios/{usuario}', [UsuariosTenantController::class, 'darDeBaja'])->middleware('puede:usuarios.eliminar')->name('usuarios.baja');
@@ -406,8 +413,8 @@ Route::prefix('v1')->group(function (): void {
 
             // Motor de automatizacion (R16): reglas trigger->condicion->retraso->accion (crear tarea).
             Route::get('/automatizaciones', [AutomatizacionesTenantController::class, 'index'])->middleware('puede:automatizaciones.gestionar')->name('automatizaciones.index');
-            Route::post('/automatizaciones', [AutomatizacionesTenantController::class, 'store'])->middleware('puede:automatizaciones.gestionar')->name('automatizaciones.store');
-            Route::put('/automatizaciones/{regla}', [AutomatizacionesTenantController::class, 'actualizar'])->middleware('puede:automatizaciones.gestionar')->name('automatizaciones.update');
+            Route::post('/automatizaciones', [AutomatizacionesTenantController::class, 'store'])->middleware(['puede:automatizaciones.gestionar', 'plan:mensajes'])->name('automatizaciones.store');
+            Route::put('/automatizaciones/{regla}', [AutomatizacionesTenantController::class, 'actualizar'])->middleware(['puede:automatizaciones.gestionar', 'plan:mensajes'])->name('automatizaciones.update');
             Route::delete('/automatizaciones/{regla}', [AutomatizacionesTenantController::class, 'eliminar'])->middleware('puede:automatizaciones.eliminar')->name('automatizaciones.destroy');
 
             // El día de hoy para el Inicio del negocio: cada bloque según los permisos.
@@ -434,6 +441,15 @@ Route::prefix('v1')->group(function (): void {
             // Pago de la renta del SaaS con la pasarela de la plataforma (async -> pendiente
             // + checkout; el webhook de la plataforma confirma). El dueño paga su suscripcion.
             Route::post('/renta/cargos/{cargo}/pagar', [PagoRentaController::class, 'pagar'])->middleware('puede:facturacion.ver')->name('renta.pagar');
+            // Plan de un negocio de citas (ADR 0107): nivel, profesionales y mensual o anual.
+            Route::put('/renta/plan', [PlanRentaController::class, 'cambiar'])->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar'])->name('renta.plan');
+            // Domiciliación: la tarjeta con que se cobra sola la renta (ADR 0107).
+            Route::post('/renta/tarjeta', [TarjetaRentaController::class, 'iniciar'])->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar'])->name('renta.tarjeta');
+            Route::post('/renta/tarjeta/confirmar', [TarjetaRentaController::class, 'confirmar'])->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar'])->name('renta.tarjeta.confirmar');
+            Route::delete('/renta/tarjeta', [TarjetaRentaController::class, 'quitar'])->middleware(['puede:facturacion.ver', 'puede:estudio.gestionar'])->name('renta.tarjeta.quitar');
+            // Timbres para facturar a los clientes (ADR 0107): saldo y compra de paquetes.
+            Route::get('/timbres', [TimbresTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('timbres.index');
+            Route::post('/timbres/comprar', [TimbresTenantController::class, 'comprar'])->middleware('puede:facturacion.ver')->name('timbres.comprar');
             // Factura (CFDI) de la renta del SaaS: emite el CFDI de un cargo pagado y
             // entrega el PDF/XML (AgendaUno emisor, el estudio receptor).
             Route::post('/renta/cargos/{cargo}/factura', [FacturaRentaController::class, 'emitir'])->middleware('puede:facturacion.ver')->name('renta.factura');
@@ -469,12 +485,12 @@ Route::prefix('v1')->group(function (): void {
             // Documentos: el admin define tipos requeridos; se cargan por persona y
             // el staff los valida (tenant-local, aislado).
             Route::get('/tipos-documento', [TiposDocumentoController::class, 'index'])->middleware('puede:miembros.ver')->name('tipos-documento.index');
-            Route::post('/tipos-documento', [TiposDocumentoController::class, 'store'])->middleware('puede:documentos.gestionar')->name('tipos-documento.store');
-            Route::put('/tipos-documento/{tipo}', [TiposDocumentoController::class, 'update'])->middleware('puede:documentos.gestionar')->name('tipos-documento.update');
+            Route::post('/tipos-documento', [TiposDocumentoController::class, 'store'])->middleware(['puede:documentos.gestionar', 'plan:documentos'])->name('tipos-documento.store');
+            Route::put('/tipos-documento/{tipo}', [TiposDocumentoController::class, 'update'])->middleware(['puede:documentos.gestionar', 'plan:documentos'])->name('tipos-documento.update');
             Route::get('/documentos', [DocumentosController::class, 'index'])->middleware('puede:miembros.ver')->name('documentos.index');
-            Route::post('/documentos', [DocumentosController::class, 'subir'])->middleware('puede:documentos.subir')->name('documentos.subir');
+            Route::post('/documentos', [DocumentosController::class, 'subir'])->middleware(['puede:documentos.subir', 'plan:documentos'])->name('documentos.subir');
             Route::get('/documentos/{documento}', [DocumentosController::class, 'ver'])->middleware('puede:miembros.ver')->name('documentos.ver');
-            Route::post('/documentos/{documento}/validar', [DocumentosController::class, 'validar'])->middleware('puede:documentos.gestionar')->name('documentos.validar');
+            Route::post('/documentos/{documento}/validar', [DocumentosController::class, 'validar'])->middleware(['puede:documentos.gestionar', 'plan:documentos'])->name('documentos.validar');
 
             // Waivers / consentimientos versionados (R27): publicar versiones y ver
             // vigentes; qué le falta firmar a un miembro (front desk). La persona los
@@ -487,8 +503,8 @@ Route::prefix('v1')->group(function (): void {
             // Formularios dinámicos: el admin define formularios/campos; miembros e
             // instructores responden (validación dinámica). Tenant-local.
             Route::get('/formularios', [FormulariosController::class, 'index'])->middleware('puede:formularios.responder')->name('formularios.index');
-            Route::post('/formularios', [FormulariosController::class, 'store'])->middleware('puede:formularios.gestionar')->name('formularios.store');
-            Route::post('/formularios/{formulario}/campos', [FormulariosController::class, 'agregarCampo'])->middleware('puede:formularios.gestionar')->name('formularios.campos');
+            Route::post('/formularios', [FormulariosController::class, 'store'])->middleware(['puede:formularios.gestionar', 'plan:formularios'])->name('formularios.store');
+            Route::post('/formularios/{formulario}/campos', [FormulariosController::class, 'agregarCampo'])->middleware(['puede:formularios.gestionar', 'plan:formularios'])->name('formularios.campos');
             Route::get('/formularios/{formulario}/respuestas', [RespuestasFormularioController::class, 'index'])->middleware('puede:formularios.gestionar')->name('formularios.respuestas.index');
             Route::post('/formularios/{formulario}/respuestas', [RespuestasFormularioController::class, 'store'])->middleware('puede:formularios.responder')->name('formularios.respuestas.store');
 
@@ -528,15 +544,15 @@ Route::prefix('v1')->group(function (): void {
             // Reporte de negocio (R29): metricas del periodo (ingresos, ocupacion, no-show, ARPU).
             Route::get('/reportes/negocio', ReporteNegocioTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.negocio');
             // Reporte de rentabilidad por clase (R30): ingreso vs costo de instructor por oferta.
-            Route::get('/reportes/rentabilidad', ReporteRentabilidadTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.rentabilidad');
+            Route::get('/reportes/rentabilidad', ReporteRentabilidadTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.rentabilidad');
             // Agenda del equipo (ADR 0081): ocupación, asistencia, valor, pago y margen por profesional.
             Route::get('/reportes/equipo', ReporteEquipoTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.equipo');
             // Analitica de demanda (R31): mapa dia x hora + por actividad (ocupacion y espera).
-            Route::get('/reportes/demanda', ReporteDemandaTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.demanda');
+            Route::get('/reportes/demanda', ReporteDemandaTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.demanda');
             // Tendencias de ingresos (Etapa 2): serie temporal (dia/semana/mes) + desglose por producto. `?formato=csv`.
-            Route::get('/reportes/tendencias', ReporteTendenciasTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.tendencias');
+            Route::get('/reportes/tendencias', ReporteTendenciasTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.tendencias');
             // Cohortes de retención + embudo de conversión (Etapa 2): triángulo por mes de alta.
-            Route::get('/reportes/cohortes', ReporteCohortesTenantController::class)->middleware('puede:facturacion.ver')->name('reportes.cohortes');
+            Route::get('/reportes/cohortes', ReporteCohortesTenantController::class)->middleware(['puede:facturacion.ver', 'plan:reportes_avanzados'])->name('reportes.cohortes');
             // Retención (Etapa 2): radar de membresías por vencer / vencidas para renovar.
             // Es operativo (recepción hace la gestión), por eso `miembros.ver`. `?formato=csv`.
             Route::get('/retencion/por-vencer', [RetencionTenantController::class, 'porVencer'])->middleware('puede:miembros.ver')->name('retencion.por-vencer');
@@ -589,8 +605,8 @@ Route::prefix('v1')->group(function (): void {
             // sustitucion), esquema de pago por staff y nomina de un periodo.
             Route::get('/sesiones/{sesion}/staff', [StaffTenantController::class, 'staffDeSesion'])->middleware('puede:agenda.ver')->name('sesiones.staff.index');
             Route::post('/sesiones/{sesion}/staff', [StaffTenantController::class, 'asignar'])->middleware('puede:agenda.gestionar')->name('sesiones.staff.store');
-            Route::put('/staff/{usuario}/esquema-pago', [StaffTenantController::class, 'esquemaPago'])->middleware('puede:estudio.gestionar')->name('staff.esquema-pago');
-            Route::get('/nomina', [StaffTenantController::class, 'nomina'])->middleware('puede:estudio.gestionar')->name('nomina');
+            Route::put('/staff/{usuario}/esquema-pago', [StaffTenantController::class, 'esquemaPago'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('staff.esquema-pago');
+            Route::get('/nomina', [StaffTenantController::class, 'nomina'])->middleware(['puede:estudio.gestionar', 'plan:comisiones'])->name('nomina');
 
             // Grupos / cursos con inscripcion (R25): un grupo sigue una serie; inscribir
             // auto-reserva las ocurrencias futuras.
@@ -602,7 +618,7 @@ Route::prefix('v1')->group(function (): void {
             // Recursos reservables (R3): salas/canchas/carriles/equipos. El motor de
             // agenda evita sobre-reservarlos (unidad = 1; pool = capacidad).
             Route::get('/recursos', [RecursosTenantController::class, 'index'])->middleware('puede:agenda.ver')->name('recursos.index');
-            Route::post('/recursos', [RecursosTenantController::class, 'crear'])->middleware('puede:agenda.gestionar')->name('recursos.store');
+            Route::post('/recursos', [RecursosTenantController::class, 'crear'])->middleware(['puede:agenda.gestionar', 'plan:recursos'])->name('recursos.store');
             Route::delete('/recursos/{recurso}', [RecursosTenantController::class, 'eliminar'])->middleware('puede:agenda.eliminar')->name('recursos.eliminar');
             Route::put('/sesiones/{sesion}/instructor', [AgendaTenantController::class, 'asignarInstructor'])->middleware('puede:agenda.gestionar')->name('sesiones.instructor');
 
@@ -610,10 +626,10 @@ Route::prefix('v1')->group(function (): void {
             // derecho (entitlement) + ledger de creditos. El saldo se deriva del
             // ledger. La venta y las mutaciones del ledger son concurrency-safe.
             Route::get('/productos', [MembresiasTenantController::class, 'productos'])->middleware('puede:productos.ver')->name('productos.index');
-            Route::post('/productos', [MembresiasTenantController::class, 'crearProducto'])->middleware('puede:productos.gestionar')->name('productos.store');
+            Route::post('/productos', [MembresiasTenantController::class, 'crearProducto'])->middleware(['puede:productos.gestionar', 'plan:paquetes'])->name('productos.store');
             // Editor completo de membresías (Etapa 2): editar plantilla / archivar-reactivar.
             Route::put('/productos/{producto}', [MembresiasTenantController::class, 'actualizarProducto'])->middleware('puede:productos.gestionar')->name('productos.update');
-            Route::post('/acuerdos', [MembresiasTenantController::class, 'vender'])->middleware('puede:membresias.gestionar')->name('acuerdos.store');
+            Route::post('/acuerdos', [MembresiasTenantController::class, 'vender'])->middleware(['puede:membresias.gestionar', 'plan:paquetes'])->name('acuerdos.store');
             // Dunning (R10): morosidad de la membresia ante fallo de cobro.
             Route::get('/dunning', [DunningTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('dunning.index');
             // Lo que ya se debe (compras sin pagar y citas pasadas sin pagar), como en el Inicio.
@@ -688,35 +704,35 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/ordenes/{orden}/cobrar', [OrdenesTenantController::class, 'cobrar'])->middleware('puede:ordenes.gestionar')->name('ordenes.cobrar');
 
             // Promociones / cupones (R22): CRUD (admin) y validacion de un codigo en el checkout.
-            Route::get('/promociones', [PromocionesTenantController::class, 'index'])->middleware('puede:promociones.gestionar')->name('promociones.index');
-            Route::post('/promociones', [PromocionesTenantController::class, 'store'])->middleware('puede:promociones.gestionar')->name('promociones.store');
-            Route::put('/promociones/{promocion}', [PromocionesTenantController::class, 'actualizar'])->middleware('puede:promociones.gestionar')->name('promociones.update');
-            Route::delete('/promociones/{promocion}', [PromocionesTenantController::class, 'eliminar'])->middleware('puede:promociones.eliminar')->name('promociones.destroy');
+            Route::get('/promociones', [PromocionesTenantController::class, 'index'])->middleware(['puede:promociones.gestionar', 'plan:promociones'])->name('promociones.index');
+            Route::post('/promociones', [PromocionesTenantController::class, 'store'])->middleware(['puede:promociones.gestionar', 'plan:promociones'])->name('promociones.store');
+            Route::put('/promociones/{promocion}', [PromocionesTenantController::class, 'actualizar'])->middleware(['puede:promociones.gestionar', 'plan:promociones'])->name('promociones.update');
+            Route::delete('/promociones/{promocion}', [PromocionesTenantController::class, 'eliminar'])->middleware(['puede:promociones.eliminar', 'plan:promociones'])->name('promociones.destroy');
             Route::post('/promociones/validar', [PromocionesTenantController::class, 'validar'])->middleware('puede:ordenes.gestionar')->name('promociones.validar');
 
             // Inventario + punto de venta minorista (R21): stock por sucursal (ledger) y tickets de caja.
-            Route::get('/articulos', [InventarioTenantController::class, 'index'])->middleware('puede:inventario.ver')->name('articulos.index');
-            Route::post('/articulos', [InventarioTenantController::class, 'store'])->middleware('puede:inventario.gestionar')->name('articulos.store');
-            Route::put('/articulos/{articulo}', [InventarioTenantController::class, 'actualizar'])->middleware('puede:inventario.gestionar')->name('articulos.update');
-            Route::post('/articulos/{articulo}/movimientos', [InventarioTenantController::class, 'movimiento'])->middleware('puede:inventario.gestionar')->name('articulos.movimientos.store');
-            Route::get('/pos/ventas', [PuntoDeVentaTenantController::class, 'index'])->middleware('puede:inventario.ver')->name('pos.ventas.index');
-            Route::post('/pos/ventas', [PuntoDeVentaTenantController::class, 'vender'])->middleware('puede:pos.vender')->name('pos.ventas.store');
+            Route::get('/articulos', [InventarioTenantController::class, 'index'])->middleware(['puede:inventario.ver', 'plan:inventario'])->name('articulos.index');
+            Route::post('/articulos', [InventarioTenantController::class, 'store'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.store');
+            Route::put('/articulos/{articulo}', [InventarioTenantController::class, 'actualizar'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.update');
+            Route::post('/articulos/{articulo}/movimientos', [InventarioTenantController::class, 'movimiento'])->middleware(['puede:inventario.gestionar', 'plan:inventario'])->name('articulos.movimientos.store');
+            Route::get('/pos/ventas', [PuntoDeVentaTenantController::class, 'index'])->middleware(['puede:inventario.ver', 'plan:inventario'])->name('pos.ventas.index');
+            Route::post('/pos/ventas', [PuntoDeVentaTenantController::class, 'vender'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.ventas.store');
             // Una venta registrada por error: corregir su forma de pago o anularla (ADR 0089).
-            Route::put('/pos/ventas/{venta}/metodo', [PuntoDeVentaTenantController::class, 'corregirMetodo'])->middleware('puede:pos.vender')->name('pos.ventas.metodo');
+            Route::put('/pos/ventas/{venta}/metodo', [PuntoDeVentaTenantController::class, 'corregirMetodo'])->middleware(['puede:pos.vender', 'plan:inventario'])->name('pos.ventas.metodo');
             Route::post('/pos/ventas/{venta}/anular', [PuntoDeVentaTenantController::class, 'anular'])->middleware('puede:pagos.reembolsar')->name('pos.ventas.anular');
 
             // Lealtad (R24): programa de puntos, recompensas, canjes y saldo por miembro.
-            Route::get('/lealtad/programa', [LealtadTenantController::class, 'programa'])->middleware('puede:lealtad.ver')->name('lealtad.programa');
-            Route::put('/lealtad/programa', [LealtadTenantController::class, 'guardarPrograma'])->middleware('puede:lealtad.gestionar')->name('lealtad.programa.guardar');
-            Route::get('/lealtad/recompensas', [LealtadTenantController::class, 'recompensas'])->middleware('puede:lealtad.ver')->name('lealtad.recompensas.index');
-            Route::post('/lealtad/recompensas', [LealtadTenantController::class, 'crearRecompensa'])->middleware('puede:lealtad.gestionar')->name('lealtad.recompensas.store');
-            Route::put('/lealtad/recompensas/{recompensa}', [LealtadTenantController::class, 'actualizarRecompensa'])->middleware('puede:lealtad.gestionar')->name('lealtad.recompensas.update');
-            Route::get('/lealtad/canjes', [LealtadTenantController::class, 'canjes'])->middleware('puede:lealtad.ver')->name('lealtad.canjes.index');
-            Route::post('/lealtad/canjes', [LealtadTenantController::class, 'canjear'])->middleware('puede:lealtad.gestionar')->name('lealtad.canjes.store');
-            Route::post('/lealtad/canjes/{canje}/entregar', [LealtadTenantController::class, 'entregarCanje'])->middleware('puede:lealtad.gestionar')->name('lealtad.canjes.entregar');
-            Route::post('/lealtad/canjes/{canje}/cancelar', [LealtadTenantController::class, 'cancelarCanje'])->middleware('puede:lealtad.gestionar')->name('lealtad.canjes.cancelar');
-            Route::get('/miembros/{persona}/puntos', [LealtadTenantController::class, 'puntosMiembro'])->middleware('puede:lealtad.ver')->name('miembros.puntos');
-            Route::post('/miembros/{persona}/puntos/ajuste', [LealtadTenantController::class, 'ajustar'])->middleware('puede:lealtad.gestionar')->name('miembros.puntos.ajuste');
+            Route::get('/lealtad/programa', [LealtadTenantController::class, 'programa'])->middleware(['puede:lealtad.ver', 'plan:lealtad'])->name('lealtad.programa');
+            Route::put('/lealtad/programa', [LealtadTenantController::class, 'guardarPrograma'])->middleware(['puede:lealtad.gestionar', 'plan:lealtad'])->name('lealtad.programa.guardar');
+            Route::get('/lealtad/recompensas', [LealtadTenantController::class, 'recompensas'])->middleware(['puede:lealtad.ver', 'plan:lealtad'])->name('lealtad.recompensas.index');
+            Route::post('/lealtad/recompensas', [LealtadTenantController::class, 'crearRecompensa'])->middleware(['puede:lealtad.gestionar', 'plan:lealtad'])->name('lealtad.recompensas.store');
+            Route::put('/lealtad/recompensas/{recompensa}', [LealtadTenantController::class, 'actualizarRecompensa'])->middleware(['puede:lealtad.gestionar', 'plan:lealtad'])->name('lealtad.recompensas.update');
+            Route::get('/lealtad/canjes', [LealtadTenantController::class, 'canjes'])->middleware(['puede:lealtad.ver', 'plan:lealtad'])->name('lealtad.canjes.index');
+            Route::post('/lealtad/canjes', [LealtadTenantController::class, 'canjear'])->middleware(['puede:lealtad.gestionar', 'plan:lealtad'])->name('lealtad.canjes.store');
+            Route::post('/lealtad/canjes/{canje}/entregar', [LealtadTenantController::class, 'entregarCanje'])->middleware(['puede:lealtad.gestionar', 'plan:lealtad'])->name('lealtad.canjes.entregar');
+            Route::post('/lealtad/canjes/{canje}/cancelar', [LealtadTenantController::class, 'cancelarCanje'])->middleware(['puede:lealtad.gestionar', 'plan:lealtad'])->name('lealtad.canjes.cancelar');
+            Route::get('/miembros/{persona}/puntos', [LealtadTenantController::class, 'puntosMiembro'])->middleware(['puede:lealtad.ver', 'plan:lealtad'])->name('miembros.puntos');
+            Route::post('/miembros/{persona}/puntos/ajuste', [LealtadTenantController::class, 'ajustar'])->middleware(['puede:lealtad.gestionar', 'plan:lealtad'])->name('miembros.puntos.ajuste');
 
             // Devoluciones (refunds) de un pago: total (revierte entitlement) o parcial
             // (proporcional). Operacion sensible: exige motivo y queda auditada.
@@ -752,7 +768,7 @@ Route::prefix('v1')->group(function (): void {
 
             // Facturas (CFDI): emitir/timbrar vía FacturAPI, listar y consultar.
             Route::get('/facturas', [FacturasTenantController::class, 'index'])->middleware('puede:ordenes.ver')->name('facturas.index');
-            Route::post('/facturas', [FacturasTenantController::class, 'emitir'])->middleware('puede:ordenes.gestionar')->name('facturas.store');
+            Route::post('/facturas', [FacturasTenantController::class, 'emitir'])->middleware(['puede:ordenes.gestionar', 'plan:facturacion'])->name('facturas.store');
             Route::get('/facturas/{factura}', [FacturasTenantController::class, 'show'])->middleware('puede:ordenes.ver')->name('facturas.show');
 
             // Integraciones de bienestar (Wellhub / TotalPass): el propietario conecta
@@ -765,19 +781,19 @@ Route::prefix('v1')->group(function (): void {
             // Webhooks salientes (R40): endpoints firmados que consumen el outbox. El
             // secreto se devuelve solo al crear. Configuracion solo del propietario.
             Route::get('/webhooks-salientes', [WebhooksSalientesTenantController::class, 'index'])->middleware('puede:integraciones.configurar')->name('webhooks-salientes.index');
-            Route::post('/webhooks-salientes', [WebhooksSalientesTenantController::class, 'crear'])->middleware('puede:integraciones.configurar')->name('webhooks-salientes.store');
+            Route::post('/webhooks-salientes', [WebhooksSalientesTenantController::class, 'crear'])->middleware(['puede:integraciones.configurar', 'plan:integraciones'])->name('webhooks-salientes.store');
             Route::delete('/webhooks-salientes/{webhook}', [WebhooksSalientesTenantController::class, 'eliminar'])->middleware('puede:integraciones.configurar')->name('webhooks-salientes.eliminar');
             Route::get('/webhooks-salientes/{webhook}/entregas', [WebhooksSalientesTenantController::class, 'entregas'])->middleware('puede:integraciones.configurar')->name('webhooks-salientes.entregas');
 
             // Llaves de API con scopes (R40): el secreto se muestra solo al crear.
             Route::get('/llaves-api', [LlavesApiTenantController::class, 'index'])->middleware('puede:integraciones.configurar')->name('llaves-api.index');
-            Route::post('/llaves-api', [LlavesApiTenantController::class, 'store'])->middleware('puede:integraciones.configurar')->name('llaves-api.store');
+            Route::post('/llaves-api', [LlavesApiTenantController::class, 'store'])->middleware(['puede:integraciones.configurar', 'plan:integraciones'])->name('llaves-api.store');
             Route::delete('/llaves-api/{llave}', [LlavesApiTenantController::class, 'destroy'])->middleware('puede:integraciones.configurar')->name('llaves-api.destroy');
 
             // Comunicaciones (R28): plantillas por evento/canal y el historial de
             // mensajes generados/enviados (consumidor del outbox).
             Route::get('/plantillas-mensaje', [PlantillasMensajeTenantController::class, 'index'])->middleware('puede:comunicaciones.gestionar')->name('plantillas-mensaje.index');
-            Route::put('/plantillas-mensaje', [PlantillasMensajeTenantController::class, 'guardar'])->middleware('puede:comunicaciones.gestionar')->name('plantillas-mensaje.guardar');
+            Route::put('/plantillas-mensaje', [PlantillasMensajeTenantController::class, 'guardar'])->middleware(['puede:comunicaciones.gestionar', 'plan:mensajes'])->name('plantillas-mensaje.guardar');
             Route::delete('/plantillas-mensaje/{plantilla}', [PlantillasMensajeTenantController::class, 'eliminar'])->middleware('puede:comunicaciones.eliminar')->name('plantillas-mensaje.eliminar');
             Route::get('/mensajes', [MensajesTenantController::class, 'index'])->middleware('puede:comunicaciones.ver')->name('mensajes.index');
 
@@ -786,7 +802,7 @@ Route::prefix('v1')->group(function (): void {
             // destinatario (lo entrega el relay R28) + historial.
             Route::get('/comunicaciones/segmentos', [DifusionesTenantController::class, 'segmentos'])->middleware('puede:comunicaciones.ver')->name('difusiones.segmentos');
             Route::get('/comunicaciones/difusiones', [DifusionesTenantController::class, 'index'])->middleware('puede:comunicaciones.ver')->name('difusiones.index');
-            Route::post('/comunicaciones/difusiones', [DifusionesTenantController::class, 'difundir'])->middleware('puede:comunicaciones.gestionar')->name('difusiones.store');
+            Route::post('/comunicaciones/difusiones', [DifusionesTenantController::class, 'difundir'])->middleware(['puede:comunicaciones.gestionar', 'plan:mensajes'])->name('difusiones.store');
             // Check-ins de Wellhub / TotalPass en las clases.
             Route::post('/checkins', [CheckinsTenantController::class, 'registrar'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('checkins.store');
             Route::get('/sesiones/{sesion}/checkins', [CheckinsTenantController::class, 'index'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('sesiones.checkins.index');

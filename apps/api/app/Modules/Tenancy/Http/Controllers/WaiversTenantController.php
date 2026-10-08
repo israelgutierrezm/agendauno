@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcanceClientesTenant;
+use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Models\AceptacionWaiverTenant;
+use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Models\WaiverTenant;
@@ -52,6 +54,13 @@ class WaiversTenantController
             'titulo' => ['required', 'string', 'max:255'],
             'contenido' => ['required', 'string', 'max:20000'],
         ]);
+
+        // Los consentimientos son de Premium (ADR 0107); el aviso de privacidad del
+        // negocio lo tiene cualquier plan: es obligatorio.
+        $estudio = $request->attributes->get('estudio');
+        if ($validado['clave'] !== WaiversTenant::AVISO_PRIVACIDAD && $estudio instanceof Estudio) {
+            app(FuncionesPlan::class)->exigir($estudio, 'documentos');
+        }
 
         $waiver = $this->waivers->publicar($validado['clave'], $validado['titulo'], $validado['contenido']);
 

@@ -3,18 +3,29 @@ import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { trackEvent } from "@/lib/analytics";
 import { NOMBRE_MODALIDAD, type Modo } from "@/marketing/modalidades";
-import { bandasEstudios, ejemplosCitas, pesos } from "@/marketing/precios";
+import {
+  MAX_ALUMNOS,
+  MAX_PROFESIONALES,
+  MESES_ANUAL,
+  bandasEstudios,
+  dolares,
+  nivelesCitas,
+  preciosCitas,
+} from "@/marketing/precios";
 
 /*
-| Precios de la suscripción a AgendaUno.
+| Precios de la suscripción a AgendaUno (ADR 0107), en dólares y sin impuestos.
 | - Sin `modo`: selector clases/citas, como en la portada de siempre.
 | - Con `modo` (/clases#precios, /citas#precios): fijo, sin selector, y el registro
 |   lleva `?modo=`.
+| - Clases: por alumnos activos al mes. Citas: Individual, Premium o Pro por los
+|   profesionales que contratas, mensual o anual (2 meses de cortesía).
 | La modalidad se nombra igual que en la portada y el registro (NOMBRE_MODALIDAD). Lo
-| que menciona cobros en línea lleva «*» y la nota de México (ADR 0099).
+| que menciona cobros en línea o facturación lleva «*» y la nota de México (ADR 0099).
 */
 const props = defineProps<{ modo?: Modo }>();
 const elegido = ref<Modo>("clases");
+const anual = ref(false);
 const fijo = computed(() => props.modo !== undefined);
 const modo = computed<Modo>(() => props.modo ?? elegido.value);
 const registro = computed(() =>
@@ -22,24 +33,43 @@ const registro = computed(() =>
     ? { name: "registro", query: { modo: modo.value } }
     : { name: "registro" },
 );
+const beneficiosClases = [
+  "Agenda de clases y control de cupos",
+  "Membresías y paquetes de clases",
+  "Reservas en línea para tus alumnos",
+  "Asistencia y registro de cobros",
+];
 const tarjetas = computed(() =>
-  modo.value === "clases" ? bandasEstudios.slice(0, 3) : ejemplosCitas,
-);
-const beneficios = computed(() =>
   modo.value === "clases"
-    ? [
-        "Agenda de clases y control de cupos",
-        "Membresías y paquetes de clases",
-        "Reservas en línea para tus alumnos",
-        "Asistencia y registro de cobros",
-      ]
-    : [
-        "Agenda y disponibilidad por profesional",
-        "Servicios con su duración y precio",
-        "Página de reservas para tus clientes",
-        "Registro de clientes y cobros",
-      ],
+    ? bandasEstudios.slice(0, 3).map((b) => ({
+        clave: b.capacidad,
+        nombre: b.capacidad,
+        capacidad: "",
+        desde: false,
+        importe: b.subtotal,
+        periodo: "USD / mes",
+        nota: "",
+        funciones: beneficiosClases,
+      }))
+    : nivelesCitas.map((n) => ({
+        clave: n.nivel,
+        nombre: n.nombre,
+        capacidad: n.capacidad,
+        desde: n.nivel !== "individual",
+        importe: anual.value ? n.desde * MESES_ANUAL : n.desde,
+        periodo: anual.value ? "USD / año" : "USD / mes",
+        nota:
+          n.nivel === "individual" ? "" : "por los profesionales que contratas",
+        funciones: n.funciones,
+      })),
 );
+const ventasWhatsApp = computed(() => {
+  const numero = String(import.meta.env.VITE_VENTAS_WHATSAPP ?? "").replace(
+    /\D/g,
+    "",
+  );
+  return numero === "" ? null : `https://wa.me/${numero}`;
+});
 
 function elegirModo(valor: Modo) {
   elegido.value = valor;
@@ -56,7 +86,7 @@ function elegirModo(valor: Modo) {
       <span class="precios-modelo-titulo">{{ NOMBRE_MODALIDAD[modo] }}</span
       >{{ " · "
       }}<strong>{{
-        modo === "clases" ? "Por alumnos activos" : "Por profesionales activos"
+        modo === "clases" ? "Por alumnos activos" : "Por plan y profesionales"
       }}</strong>
     </p>
     <div
@@ -82,7 +112,7 @@ function elegirModo(valor: Modo) {
         @click="elegirModo('citas')"
       >
         <span class="precios-modelo-titulo">{{ NOMBRE_MODALIDAD.citas }}</span>
-        <strong>Por profesionales</strong>
+        <strong>Por plan y profesionales</strong>
         <span class="precios-modelo-negocios">
           Barberías, estéticas, spas, psicólogos, dentistas y nutriólogos.
         </span>
@@ -94,35 +124,56 @@ function elegirModo(valor: Modo) {
         <h3>Tu comunidad crece. Tu plan la acompaña.</h3>
         <p>
           Organiza tus clases, cupos y membresías desde
-          <strong>{{ pesos(33900) }} MXN/mes + IVA</strong> para 1–49 alumnos
-          activos.
+          <strong>{{ dolares(bandasEstudios[0].subtotal) }} USD al mes</strong>
+          para hasta 40 alumnos activos.
         </p>
       </template>
       <template v-else>
         <h3>Tu agenda, a solas o con todo tu equipo.</h3>
         <p>
           Organiza servicios, disponibilidad y reservas desde
-          <strong>{{ pesos(ejemplosCitas[0].subtotal) }} MXN/mes + IVA</strong>
-          para un profesional. Consulta el precio según el tamaño de tu equipo.
+          <strong>{{ dolares(nivelesCitas[0]!.desde) }} USD al mes</strong>
+          para un profesional. Con tu equipo, eliges Premium o Pro por los
+          profesionales que contratas.
         </p>
+        <div
+          class="tu-segmentado precios-periodo"
+          role="group"
+          aria-label="Pago mensual o anual"
+        >
+          <button type="button" :aria-pressed="!anual" @click="anual = false">
+            Mensual
+          </button>
+          <button type="button" :aria-pressed="anual" @click="anual = true">
+            Anual · 2 meses de cortesía
+          </button>
+        </div>
       </template>
     </div>
 
     <div class="precios-tarjetas">
       <article
-        v-for="(tarjeta, indice) in tarjetas"
-        :key="`${modo}-${indice}`"
+        v-for="tarjeta in tarjetas"
+        :key="`${modo}-${tarjeta.clave}`"
         class="precio-tarjeta"
       >
         <p class="precio-contexto">{{ NOMBRE_MODALIDAD[modo] }}</p>
-        <h4>{{ tarjeta.capacidad }}</h4>
-        <p class="precio-importe">
-          <strong>{{ pesos(tarjeta.subtotal) }}</strong
-          ><span> MXN / mes</span>
+        <h4>{{ tarjeta.nombre }}</h4>
+        <p v-if="tarjeta.capacidad" class="precio-capacidad">
+          {{ tarjeta.capacidad }}
         </p>
-        <p class="precio-impuestos">+ IVA</p>
+        <p class="precio-importe">
+          <span v-if="tarjeta.desde">Desde</span>
+          <strong>{{ dolares(tarjeta.importe) }}</strong
+          ><span> {{ tarjeta.periodo }}</span>
+        </p>
+        <p class="precio-impuestos">
+          + impuestos<template v-if="tarjeta.nota">
+            · {{ tarjeta.nota }}</template
+          >
+        </p>
         <ul>
-          <li v-for="beneficio in beneficios" :key="beneficio">
+          <li v-for="beneficio in tarjeta.funciones" :key="beneficio">
             <svg
               class="precio-check"
               aria-hidden="true"
@@ -150,7 +201,7 @@ function elegirModo(valor: Modo) {
             })
           "
           >Probar 30 días gratis<span class="sr-only">
-            · {{ tarjeta.capacidad }}</span
+            · {{ tarjeta.nombre }}</span
           ></RouterLink
         >
         <p class="precio-sin-tarjeta">Sin tarjeta para empezar</p>
@@ -158,17 +209,15 @@ function elegirModo(valor: Modo) {
     </div>
 
     <p class="precios-aclaracion">
-      <template v-if="!fijo">
-        Todas las herramientas de tu modalidad, desde el primer plan. Tarifas
-        mensuales según los alumnos o profesionales activos de tu negocio.
-      </template>
-      <template v-else-if="modo === 'clases'">
-        Todas las herramientas para clases, desde el primer plan. La tarifa
+      Precios en dólares estadounidenses, más impuestos. En México se cobran en
+      pesos al tipo de cambio del día del cobro, más IVA.
+      <template v-if="modo === 'clases'">
+        Todas las herramientas para clases, desde el primer plan; la tarifa
         mensual depende de los alumnos activos de tu negocio.
       </template>
       <template v-else>
-        Todas las herramientas para citas, desde el primer plan. La tarifa
-        mensual depende de los profesionales activos de tu negocio.
+        En la prueba gratis tienes todo lo de Pro. Subir de plan se cobra al
+        momento por los días que faltan; el anual cuesta 10 meses.
       </template>
     </p>
 
@@ -177,13 +226,13 @@ function elegirModo(valor: Modo) {
         {{
           modo === "clases"
             ? "Ver todos los rangos y qué cuenta como alumno activo"
-            : "Ver las tarifas para equipos más grandes"
+            : "Ver el precio según tu número de profesionales"
         }}
       </summary>
       <div v-if="modo === 'clases'" class="precios-reglas">
         <table>
           <caption>
-            Tarifa mensual para estudios y academias · MXN + IVA
+            Tarifa mensual para estudios y academias · USD + impuestos
           </caption>
           <thead>
             <tr>
@@ -194,7 +243,7 @@ function elegirModo(valor: Modo) {
           <tbody>
             <tr v-for="banda in bandasEstudios" :key="banda.capacidad">
               <th scope="row">{{ banda.capacidad }}</th>
-              <td>{{ pesos(banda.subtotal) }}</td>
+              <td>{{ dolares(banda.subtotal) }}</td>
             </tr>
           </tbody>
         </table>
@@ -206,63 +255,74 @@ function elegirModo(valor: Modo) {
         </p>
         <p>
           Se aplica una sola banda a todo el mes, no un precio por cada alumno.
-          Sin alumnos activos, la renta por uso es $0.
+          Sin alumnos activos, la renta por uso es $0. Se cobra al cerrar el
+          mes.
         </p>
       </div>
       <div v-else class="precios-reglas">
         <table>
           <caption>
-            Tarifa por cada profesional de tu equipo · MXN / mes + IVA
+            Precio mensual por profesionales contratados · USD + impuestos
           </caption>
           <thead>
             <tr>
-              <th scope="col">Profesional</th>
-              <th scope="col">Precio por profesional</th>
+              <th scope="col">Profesionales</th>
+              <th scope="col">Premium</th>
+              <th scope="col">Pro</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <th scope="row">Primero</th>
-              <td>$269</td>
+              <th scope="row">1 (Individual)</th>
+              <td colspan="2">{{ dolares(nivelesCitas[0]!.desde) }}</td>
             </tr>
-            <tr>
-              <th scope="row">Segundo</th>
-              <td>$226</td>
-            </tr>
-            <tr>
-              <th scope="row">Del 3.º al 10.º</th>
-              <td>$135</td>
-            </tr>
-            <tr>
-              <th scope="row">Del 11.º al 20.º</th>
-              <td>$89</td>
+            <tr v-for="fila in preciosCitas" :key="fila.profesionales">
+              <th scope="row">{{ fila.profesionales }}</th>
+              <td>{{ dolares(fila.premium) }}</td>
+              <td>{{ dolares(fila.pro) }}</td>
             </tr>
           </tbody>
         </table>
         <p>
-          Los tramos se suman: 2 profesionales cuestan $269 + $226 = $495 antes
-          de IVA. El componente por profesionales tiene un tope de
-          {{ pesos(246500) }} + IVA al mes, a partir de 20 profesionales.
-        </p>
-        <p>
-          Cuenta el profesional con al menos una cita no cancelada en el mes.
+          Pagas por los profesionales que contratas, por adelantado. Puedes
+          cambiar de plan cuando quieras: subir se cobra al momento por los días
+          que faltan y bajar aplica desde el siguiente periodo.
         </p>
       </div>
     </details>
     <aside
-      v-if="modo === 'clases'"
       class="precios-contacto"
-      aria-label="Cotización para más de 2,000 alumnos"
+      :aria-label="
+        modo === 'clases'
+          ? 'Cotización para más de 1,000 alumnos'
+          : `Cotización para más de ${MAX_PROFESIONALES} profesionales`
+      "
     >
       <div>
-        <h4>¿Más de 2,000 alumnos activos?</h4>
+        <h4>
+          {{
+            modo === "clases"
+              ? `¿Más de ${MAX_ALUMNOS.toLocaleString("es-MX")} alumnos activos?`
+              : `¿Más de ${MAX_PROFESIONALES} profesionales?`
+          }}
+        </h4>
         <p>Contáctanos para una propuesta a la medida de tu operación.</p>
       </div>
-      <a
-        class="tu-btn tu-btn-primario"
-        href="mailto:ventas@agendauno.mx?subject=Cotizaci%C3%B3n%20para%20m%C3%A1s%20de%202%2C000%20alumnos"
-        >Contáctanos</a
-      >
+      <div class="precios-contacto-acciones">
+        <a
+          v-if="ventasWhatsApp"
+          class="tu-btn tu-btn-fantasma"
+          :href="ventasWhatsApp"
+          target="_blank"
+          rel="noopener"
+          >WhatsApp</a
+        >
+        <a
+          class="tu-btn tu-btn-primario"
+          href="mailto:ventas@agendauno.mx?subject=Cotizaci%C3%B3n%20AgendaUno"
+          >Contáctanos</a
+        >
+      </div>
     </aside>
     <p class="precios-aclaracion">
       {{
@@ -306,6 +366,19 @@ function elegirModo(valor: Modo) {
 }
 .precios-contacto a {
   padding: 0.75rem 1.25rem;
+}
+.precios-contacto-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.precios-periodo {
+  margin-top: 1rem;
+}
+.precio-capacidad {
+  margin-top: 0.25rem;
+  color: var(--texto-suave);
+  font-size: 0.85rem;
 }
 .precios-modelo {
   display: flex;

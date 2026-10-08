@@ -17,6 +17,9 @@ use Illuminate\Support\Facades\DB;
  * desglose (subtotal + IVA) en minor (entero), arma el cuerpo del CFDI con el emisor
  * del tenant y el receptor dado, y guarda la {@see FacturaTenant} con el resultado
  * (Timbrada con UUID, o Error con el motivo). Emite `factura.timbrada` al outbox.
+ *
+ * Gasta un timbre del negocio por factura timbrada (ADR 0107): sin timbres no se
+ * timbra, y si el proveedor la rechaza no se gasta.
  */
 class EmitirFacturaTenant
 {
@@ -25,6 +28,8 @@ class EmitirFacturaTenant
         private readonly RegistrarEventoTenant $eventos,
         // Tasa de IVA (16, u 8 en la región fronteriza): la fija el negocio (ADR 0047).
         private readonly ParametrosTenant $parametros,
+        // Cada factura timbrada gasta un timbre del negocio (ADR 0107).
+        private readonly TimbresTenant $timbres,
     ) {}
 
     /**
@@ -53,6 +58,7 @@ class EmitirFacturaTenant
         return DB::connection('tenant')->transaction(function () use (
             $receptor, $subtotal, $impuesto, $total, $moneda, $usoCfdi, $llave, $cuerpo
         ): FacturaTenant {
+            $saldo = $this->timbres->apartarParaTimbrar();
             $comun = [
                 'receptor_nombre' => $receptor['nombre'],
                 'receptor_rfc' => mb_strtoupper($receptor['rfc']),
@@ -83,6 +89,7 @@ class EmitirFacturaTenant
                 'xml_url' => "{$base}/invoices/{$resultado->facturaId}/xml",
                 'timbrada_en' => Carbon::now(),
             ]);
+            $this->timbres->gastar($saldo, (string) $factura->ulid);
 
             $this->eventos->registrar('factura.timbrada', 'factura', $factura->ulid, [
                 'factura' => $factura->ulid,

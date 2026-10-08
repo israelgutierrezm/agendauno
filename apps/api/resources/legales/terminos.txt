@@ -33,10 +33,12 @@ Cada negocio nuevo cuenta con una prueba gratuita, sin tarjeta, por el plazo pub
 
 5. Suscripción, precios, impuestos y pagos
 
-• La suscripción se calcula por mes calendario según la modalidad: en clases, por los alumnos activos del mes (quienes tuvieron al menos una reserva o una compra pagada); en citas, por los profesionales activos (quienes atendieron al menos una cita). El Negocio puede consultar quién cuenta en «Mi suscripción».
-• Los precios están en pesos mexicanos, se publican en agendauno.mx y se les agrega el IVA. Cada parte paga los impuestos que le correspondan.
-• Se cobra mes vencido: al cerrar cada mes se emite el cargo por el uso de ese mes, que se paga en línea con las formas de pago disponibles en «Mi suscripción». Si lo solicitas, emitimos la factura de tu suscripción.
-• Podemos actualizar los precios. Los cambios no afectan los cargos ya emitidos y se avisan con al menos 30 días naturales de anticipación.
+• En clases, la suscripción se calcula por mes calendario según los alumnos activos del mes (quienes tuvieron al menos una reserva o una compra pagada) y se cobra mes vencido: al cerrar cada mes se emite el cargo por el uso de ese mes. El Negocio puede consultar quién cuenta en «Mi suscripción».
+• En citas, el Negocio elige un plan (Individual, Premium o Pro) y los profesionales que contrata, con pago mensual o anual, y se cobra por adelantado al inicio de cada periodo. El pago anual equivale a 10 meses. Si sube de plan o de profesionales, se cobra al momento la diferencia de los días que faltan del periodo pagado; si baja, el cambio aplica desde el siguiente periodo. No puede tener más profesionales de los contratados. Las funciones de cada plan se publican en agendauno.mx.
+• Los precios se publican en agendauno.mx en dólares de los Estados Unidos, más impuestos. A los negocios en México se les cobra en pesos mexicanos, al tipo de cambio FIX publicado por el Banco de México vigente el día en que se emite el cargo, más IVA; a los demás, en dólares. Cada parte paga los impuestos que le correspondan. Si lo solicitas, emitimos la factura de los cargos en pesos.
+• Los cargos se pagan en línea con tarjeta desde «Mi suscripción». El Negocio puede guardar su tarjeta para que cada cargo se cobre automáticamente; si un cobro automático no pasa, se reintenta a los 3 y a los 7 días, y el Negocio puede quitar su tarjeta en cualquier momento.
+• Los negocios que superan 20 profesionales o 1,000 alumnos activos pueden acordar con AgendaUno una cuota a la medida.
+• Podemos actualizar los precios. Los cambios no afectan los cargos ya emitidos ni el periodo ya pagado, y se avisan con al menos 30 días naturales de anticipación.
 • Los pagos de la suscripción no son reembolsables, salvo un cobro indebido atribuible a AgendaUno.
 
 6. Falta de pago y suspensión
@@ -51,7 +53,7 @@ Si un cargo no se paga, el Negocio cuenta con un plazo de gracia (actualmente, 1
 
 8. Facturación electrónica
 
-Disponible para negocios en México mediante un proveedor autorizado de certificación. El Negocio es responsable de sus datos fiscales, de su certificado de sello digital y del contenido de las facturas que emite.
+Disponible para negocios en México mediante un proveedor autorizado de certificación, en los planes que la incluyen. Cada factura que el Negocio emite a sus clientes usa un timbre, que se compra en paquetes en «Mi suscripción»; los timbres comprados no son reembolsables. Sin timbres disponibles no se emiten facturas. El Negocio es responsable de sus datos fiscales, de su certificado de sello digital y del contenido de las facturas que emite.
 
 9. Servicios de terceros
 

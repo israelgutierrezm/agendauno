@@ -141,7 +141,7 @@ export const soluciones: readonly Solucion[] = [
       {
         pregunta: "¿Cómo funciona la suscripción para un estudio?",
         respuesta:
-          "En Clases con cupo, la suscripción se cobra por rango de alumnos activos al mes. Consulta qué cuenta como alumno activo y las tarifas vigentes en la sección de precios antes de contratar; los importes son más IVA.",
+          "En Clases con cupo, la suscripción se cobra por rango de alumnos activos al mes. Consulta qué cuenta como alumno activo y las tarifas vigentes en la sección de precios antes de contratar; los importes son en dólares, más impuestos.",
       },
     ],
   },
@@ -270,7 +270,7 @@ export const soluciones: readonly Solucion[] = [
       {
         pregunta: "¿La suscripción se cobra por profesional?",
         respuesta:
-          "Sí. En Citas 1 a 1 pagas por los profesionales que atendieron al menos una cita en el mes; cada uno cuenta completo, sin importar sus horas. Consulta las tarifas vigentes en la sección de precios; los importes son más IVA.",
+          "Sí. En Citas 1 a 1 eliges tu plan (Individual, Premium o Pro) y pagas por los profesionales que contratas, cada mes o cada año. Consulta las tarifas vigentes en la sección de precios; los importes son en dólares, más impuestos.",
       },
     ],
   },
@@ -357,7 +357,7 @@ export const soluciones: readonly Solucion[] = [
       {
         pregunta: "¿Puedo usarlo si atiendo sin un equipo?",
         respuesta:
-          "Sí. Configura un solo profesional con tus servicios y horarios, y suma más cuando tu consultorio crezca. La suscripción se cobra por profesional activo; consulta las tarifas vigentes antes de contratar.",
+          "Sí. El plan Individual es para un profesional, con tus servicios y horarios. Cuando tu consultorio crezca, cambias a Premium o Pro por los profesionales que contrates; consulta las tarifas vigentes antes de contratar.",
       },
     ],
   },

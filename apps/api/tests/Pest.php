@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\TimbresTenant;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Integraciones\ResolvedorDns;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\TipoCambio;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -22,10 +25,16 @@ pest()->extend(TestCase::class)
         // empiezan: la ventana para pasar lista (ADR 0101, 30 min por omisión) se
         // abre del todo aquí y se prueba aparte, con el valor del negocio. Igual las
         // sesiones sin usarse: hay pruebas que viajan meses con la misma sesión.
+        // La renta en dólares se cobra en pesos a los negocios de México (ADR 0107): un
+        // tipo de cambio fijo (20 pesos por dólar) que vale para cualquier fecha, sin
+        // consultar al Banco de México. Se prueba aparte.
         ConfiguracionPlataforma::establecer('parametros', (string) json_encode([
             'asistencia.minutos_antes' => 525600,
             'sesion.dias_inactividad' => 36500,
+            'renta.tipo_cambio_dias_vigencia' => 36500,
         ]));
+        Config::set('agendauno.banxico.token', null);
+        TipoCambio::query()->create(['fecha' => '2020-01-01', 'de' => 'USD', 'a' => 'MXN', 'diezmilesimas' => 200000, 'fuente' => 'manual']);
     })
     ->in('Feature');
 
@@ -324,11 +333,12 @@ function activarStripePlataforma(array $credenciales = []): void
 }
 
 /**
- * Carga datos fiscales válidos (emisor/receptor) del estudio vía API.
+ * Carga datos fiscales válidos (emisor/receptor) del estudio vía API y le da unos
+ * timbres para facturar (cada factura gasta uno, ADR 0107).
  *
  * @param  array{slug: string, bearer: string}  $e
  */
-function cargarDatosFiscales(array $e): void
+function cargarDatosFiscales(array $e, int $timbres = 10): void
 {
     test()->putJson("/api/v1/app/{$e['slug']}/datos-fiscales", [
         'razon_social' => 'Estudio Demo SA de CV',
@@ -336,6 +346,12 @@ function cargarDatosFiscales(array $e): void
         'regimen_fiscal' => '601',
         'codigo_postal' => '06700',
     ], conBearer($e['bearer']))->assertOk();
+    if ($timbres > 0) {
+        app(GestorDeConexionTenant::class)->ejecutarEn(
+            Estudio::query()->where('slug', $e['slug'])->sole(),
+            fn () => app(TimbresTenant::class)->acreditar($timbres, 'prueba', 'Timbres de prueba'),
+        );
+    }
 }
 
 /**

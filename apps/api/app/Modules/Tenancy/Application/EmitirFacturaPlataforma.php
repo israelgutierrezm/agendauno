@@ -40,6 +40,10 @@ class EmitirFacturaPlataforma
         if ($cargo->estado !== EstadoCargoRenta::Pagado) {
             throw new CargoRentaNoFacturable('Solo se factura un cargo pagado.');
         }
+        // Fuera de México se cobra en dólares: sin CFDI, con su recibo (ADR 0107).
+        if ($cargo->moneda !== 'MXN') {
+            throw new CargoRentaNoFacturable('La factura (CFDI) solo se emite por cargos en pesos mexicanos; descarga el recibo.');
+        }
 
         $previa = FacturaPlataforma::query()->where('cargo_renta_id', $cargo->getKey())->first();
         if ($previa instanceof FacturaPlataforma && $previa->estado === EstadoFactura::Timbrada) {
@@ -115,7 +119,7 @@ class EmitirFacturaPlataforma
             'items' => [[
                 'quantity' => 1,
                 'product' => [
-                    'description' => "Suscripción AgendaUno {$cargo->periodo}",
+                    'description' => ReciboRentaPdf::concepto($cargo),
                     'product_key' => (string) config('agendauno.facturapi.renta.clave_prod_serv'),
                     'unit_key' => (string) config('agendauno.facturapi.renta.clave_unidad'),
                     // El precio es IVA incluido: FacturAPI extrae el impuesto para cuadrar con lo cobrado.

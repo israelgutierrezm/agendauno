@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\ConfirmarCargoRenta;
+use App\Modules\Tenancy\Application\DomiciliacionRenta;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
 use App\Modules\Tenancy\Pasarelas\Stripe\VerificarFirmaStripe;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +22,7 @@ class WebhookPlataformaController
     public function __construct(
         private readonly ConfirmarCargoRenta $confirmar,
         private readonly RegistroDePasarelasPlataforma $registro,
+        private readonly DomiciliacionRenta $domiciliacion,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
@@ -65,6 +67,13 @@ class WebhookPlataformaController
         $tipo = isset($payload['type']) ? (string) $payload['type'] : '';
         $objeto = $payload['data']['object'] ?? [];
         $referencia = is_array($objeto) && isset($objeto['id']) ? (string) $objeto['id'] : '';
+
+        // Checkout en modo `setup`: el dueño guardó la tarjeta para domiciliar la renta.
+        if ($tipo === 'checkout.session.completed' && is_array($objeto) && ($objeto['mode'] ?? '') === 'setup' && $referencia !== '') {
+            $this->domiciliacion->guardarDeSesion($referencia);
+
+            return response()->json(['data' => ['ok' => true]]);
+        }
 
         // Checkout: la sesión pagada (tarjeta al momento; OXXO cuando se paga en tienda).
         // PaymentIntent: cobros creados antes de usar Checkout.

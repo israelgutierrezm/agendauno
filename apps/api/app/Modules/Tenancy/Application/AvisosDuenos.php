@@ -78,9 +78,10 @@ class AvisosDuenos
                 $nuevos += $this->avisar($estudio, 'prueba_por_terminar', $termina->toDateString(), ['fecha' => self::fecha($termina)]);
             });
 
-        // Renta lista para pagar.
+        // Renta lista para pagar (una compra de timbres se paga al comprarla).
         CargoRenta::query()->with('estudio')
             ->where('estado', EstadoCargoRenta::Pendiente->value)
+            ->where(fn ($q) => $q->whereNull('concepto')->orWhere('concepto', '!=', 'timbres'))
             ->where('emitido_en', '>=', now()->subDays(self::DIAS_RENTA_EMITIDA))
             ->each(function (CargoRenta $cargo) use (&$nuevos): void {
                 $nuevos += $this->avisarCargo($cargo, 'renta_emitida');

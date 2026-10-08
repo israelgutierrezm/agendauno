@@ -68,10 +68,15 @@ Schedule::command('agendauno:cobrar-suscripciones')->dailyAt('06:45')->withoutOv
 // cómo se paga; a quien paga a mano le abre la renovación para pagarla por adelantado.
 Schedule::command('agendauno:avisar-renovaciones')->dailyAt('15:00')->withoutOverlapping();
 
-// Cobro del SaaS mes vencido (ADR 0019 y 0032): a diario a las 02:00 de CDMX se emiten
-// los cargos de los meses que ya cerraron en la zona de cada negocio (congelando su
-// medición); un cargo emitido no se vuelve a calcular, así que solo emite los que falten.
+// Cobro del SaaS (ADR 0019, 0032 y 0107): a diario a las 02:00 de CDMX se emiten los
+// cargos de los meses que ya cerraron en la zona de cada negocio (congelando su
+// medición) y los periodos de los planes de citas que empiezan (por adelantado); un
+// cargo emitido no se vuelve a calcular, así que solo emite los que falten.
 Schedule::command('agendauno:generar-cargos-renta')->dailyAt('08:00')->withoutOverlapping();
+
+// Renta domiciliada (ADR 0107): cada hora se cobra a la tarjeta lo recién emitido (y un
+// cambio de plan) y se reintentan los rechazos que ya tocan (a los 3 y a los 7 días).
+Schedule::command('agendauno:cobrar-renta-domiciliada')->hourlyAt(20)->withoutOverlapping();
 
 // Suspensión automática por renta vencida tras los días de gracia (ADR 0073), a las
 // 09:30 de CDMX, antes de los avisos a los dueños (que avisan la suspensión). Al pagar

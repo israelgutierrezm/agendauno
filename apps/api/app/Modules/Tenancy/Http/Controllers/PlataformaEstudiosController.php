@@ -279,6 +279,15 @@ class PlataformaEstudiosController
             'modalidad' => $e->modalidad()->value,
             'modo_cobro' => $e->modo_cobro->value,
             'cuota_fija_minor' => $e->cuota_fija_minor,
+            'cuota_fija_moneda' => $e->cuota_fija_moneda,
+            // Plan de un negocio de citas (ADR 0107).
+            'plan' => $e->plan_nivel === null ? null : [
+                'nivel' => $e->plan_nivel,
+                'profesionales' => $e->plan_profesionales,
+                'periodicidad' => $e->plan_periodicidad,
+                'cubierto_hasta' => $e->plan_cubierto_hasta?->toDateString(),
+            ],
+            'domiciliado' => $e->domiciliacion_metodo !== null,
             'trial_termina_en' => $e->trial_termina_en?->toDateString(),
             'moneda' => $e->moneda,
             'publicado' => (bool) $e->publicado,

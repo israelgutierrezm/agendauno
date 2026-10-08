@@ -58,7 +58,14 @@ Así no hay CORS entre subdominios.
    configuración del superadmin). Sin ella, en producción la facturación queda
    apagada: los negocios no emiten CFDI ni reciben la factura de su renta, y la
    pantalla lo dice. Nunca se simula un timbre fuera de desarrollo y pruebas.
-   `agendauno:verificar-produccion` lo marca como aviso.
+   `agendauno:verificar-produccion` lo marca como aviso. Cada factura que un negocio
+   emite a sus clientes gasta un timbre que compra en paquetes en «Mi suscripción»
+   (ADR 0107); el precio de cada timbre es el parámetro `timbres.precio_centavos`.
+   **Tipo de cambio**: la renta se publica en dólares y a los negocios de México se
+   les cobra en pesos. Con `BANXICO_TOKEN` se usa el FIX del Banco de México del día;
+   sin él, captúralo en el panel del superadmin (Tarifas → Tipo de cambio). Si el
+   último tiene más de `renta.tipo_cambio_dias_vigencia` días, los cargos esperan y
+   llega una alerta.
 7. **reCAPTCHA v3** (obligatorio): crea un sitio en la consola de reCAPTCHA con
    `DOMINIO` y pon su llave secreta en `RECAPTCHA_SECRET` (`api.env`) y la del sitio
    en `VITE_RECAPTCHA_SITE_KEY` (`web.env`). Cada alta del registro público crea una

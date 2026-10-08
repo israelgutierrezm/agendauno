@@ -10,6 +10,7 @@ import agendaVisual from "./locales/agendaVisual.es-MX";
 import importarClases from "./locales/importarClases.es-MX";
 import apariencia from "./locales/apariencia.es-MX";
 import cobro from "./locales/cobro.es-MX";
+import suscripcion from "./locales/suscripcion.es-MX";
 import {
   confirmarCorreo,
   expediente,
@@ -109,6 +110,7 @@ const mensajesBase = {
   agendaVisual,
   apariencia,
   cobro,
+  suscripcion,
   recepcionVisual,
   miPerfil,
   confirmarCorreo,

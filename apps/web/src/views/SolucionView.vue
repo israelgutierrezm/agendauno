@@ -135,10 +135,10 @@ function medir(placement: string): void {
           {{
             esClases
               ? "por rango de alumnos activos al mes."
-              : "por profesional activo al mes."
+              : "con el plan que elijas, por los profesionales que contratas."
           }}
-          Consulta las tarifas vigentes antes de contratar; los importes son más
-          IVA.
+          Consulta las tarifas vigentes antes de contratar; los importes son en
+          dólares, más impuestos.
         </p>
         <p class="solucion-enlaces">
           <RouterLink class="tu-enlace" :to="`${paginaModalidad}#precios`"

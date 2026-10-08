@@ -37,6 +37,16 @@ interface Estudio {
   modalidad: "clases" | "citas";
   modo_cobro: string;
   cuota_fija_minor: number;
+  /** La cuota pactada puede ser en dólares (en México se cobra en pesos, ADR 0107). */
+  cuota_fija_moneda?: string;
+  /** El plan de un negocio de citas (ADR 0107). */
+  plan?: {
+    nivel: string;
+    profesionales: number | null;
+    periodicidad: string;
+    cubierto_hasta: string | null;
+  } | null;
+  domiciliado?: boolean;
   trial_termina_en: string | null;
   moneda: string;
   publicado: boolean;
@@ -176,9 +186,13 @@ function periodo(p: string): string {
 }
 
 function cobroLegible(e: Estudio): string {
-  return e.modo_cobro === "fijo"
-    ? `${dinero(e.cuota_fija_minor, e.moneda)} / mes`
-    : t(`cobro.modalidad.${e.modalidad}`);
+  if (e.modo_cobro === "fijo") {
+    return `${dinero(e.cuota_fija_minor, e.cuota_fija_moneda ?? "MXN")} / mes`;
+  }
+  if (e.plan) {
+    return `${t(`suscripcion.niveles.${e.plan.nivel}`)} · ${e.plan.profesionales ?? 1}`;
+  }
+  return t(`cobro.modalidad.${e.modalidad}`);
 }
 
 /** Punto de color del estado: verde activo, ámbar prueba, rojo el resto. */
@@ -215,7 +229,12 @@ async function cargarEstudios(): Promise<void> {
 const ficha = ref<FichaApi | null>(null);
 const fichaAbierta = ref(false);
 const accionando = ref(false);
-const edit = ref({ modo_cobro: "activos", cuota: "0", estado_facturacion: "" });
+const edit = ref({
+  modo_cobro: "activos",
+  cuota: "0",
+  moneda: "MXN",
+  estado_facturacion: "",
+});
 const diasPrueba = ref(15);
 
 async function abrirFicha(e: Estudio): Promise<void> {
@@ -230,6 +249,7 @@ async function abrirFicha(e: Estudio): Promise<void> {
     edit.value = {
       modo_cobro: data.data.modo_cobro,
       cuota: String(data.data.cuota_fija_minor / 100),
+      moneda: data.data.cuota_fija_moneda ?? "MXN",
       estado_facturacion: data.data.estado_facturacion,
     };
   } catch (err) {
@@ -288,6 +308,7 @@ function guardarCobro(): void {
         {
           modo_cobro: edit.value.modo_cobro,
           cuota_fija_minor: Math.round(Number(edit.value.cuota) * 100),
+          cuota_fija_moneda: edit.value.moneda,
           estado_facturacion: edit.value.estado_facturacion,
         },
         encabezados(),
@@ -1660,19 +1681,30 @@ function borrar(): void {
                   </option>
                 </select>
               </div>
-              <div v-if="edit.modo_cobro === 'fijo'" class="col-span-2">
-                <label class="tu-label" for="cf">{{
-                  $t("plataforma.estudios.cuotaFija")
-                }}</label>
-                <input
-                  id="cf"
-                  v-model="edit.cuota"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  class="tu-input"
-                />
-              </div>
+              <template v-if="edit.modo_cobro === 'fijo'">
+                <div>
+                  <label class="tu-label" for="cf">{{
+                    $t("plataforma.estudios.cuotaFija")
+                  }}</label>
+                  <input
+                    id="cf"
+                    v-model="edit.cuota"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="tu-input"
+                  />
+                </div>
+                <div>
+                  <label class="tu-label" for="cfm">{{
+                    $t("suscripcion.plataforma.cuotaMoneda")
+                  }}</label>
+                  <select id="cfm" v-model="edit.moneda" class="tu-input">
+                    <option value="USD">USD</option>
+                    <option value="MXN">MXN</option>
+                  </select>
+                </div>
+              </template>
             </div>
             <button
               class="tu-btn tu-btn-primario text-sm"

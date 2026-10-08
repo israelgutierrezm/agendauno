@@ -17,7 +17,10 @@ use Illuminate\Support\Facades\DB;
  */
 class ConfirmarCargoRenta
 {
-    public function __construct(private readonly SuspensionPorRenta $suspension) {}
+    public function __construct(
+        private readonly SuspensionPorRenta $suspension,
+        private readonly AcreditarTimbresPagados $timbres,
+    ) {}
 
     public function porReferencia(string $referencia, string $proveedor): void
     {
@@ -45,11 +48,14 @@ class ConfirmarCargoRenta
         });
 
         $this->suspension->reactivarSiPago($pagado?->estudio);
+        // Una compra de timbres: se suman al saldo del negocio.
+        $this->timbres->aplicar($pagado);
     }
 
     /**
      * El intento de pago de la renta ya no se puede pagar (sesión vencida, pago en
-     * tienda no completado): el cargo sigue pendiente, sin intento en curso.
+     * tienda no completado): el cargo sigue pendiente, sin intento en curso. Una
+     * compra de timbres, en cambio, se cancela (se compra otra cuando haga falta).
      */
     public function intentoTerminado(string $referencia): void
     {
@@ -57,6 +63,11 @@ class ConfirmarCargoRenta
             return;
         }
 
+        CargoRenta::query()
+            ->where('referencia_pago', $referencia)
+            ->where('estado', EstadoCargoRenta::Pendiente->value)
+            ->where('concepto', 'timbres')
+            ->update(['estado' => EstadoCargoRenta::Cancelado->value]);
         CargoRenta::query()
             ->where('referencia_pago', $referencia)
             ->where('estado', EstadoCargoRenta::Pendiente->value)

@@ -458,7 +458,7 @@ export default {
         avisoTitulo: "Cita confirmada",
         avisoDetalle: "Corte y peinado · Hoy 17:30 · con Ana",
       },
-      confianza: { cobro: "Precio por profesional activo" },
+      confianza: { cobro: "Planes por profesionales contratados" },
       producto: {
         titulo: "La agenda de todo tu equipo, en una vista.",
         enfasis: "en una vista",
@@ -539,9 +539,9 @@ export default {
         },
       },
       precio: {
-        titulo: "Pagas por profesional activo.",
+        titulo: "Elige tu plan por los profesionales que contratas.",
         subtitulo:
-          "Un precio por cada profesional con citas en el mes, con todas las herramientas desde el primer plan.",
+          "Individual para un profesional; Premium o Pro para tu equipo. Mensual o anual, con 2 meses de cortesía.",
       },
       giros: {
         etiqueta: "Para quién es",
@@ -623,12 +623,12 @@ export default {
         etiqueta: "Tu suscripción a AgendaUno",
         titulo: "Dos modelos de suscripción. Uno para tu forma de trabajar.",
         subtitulo:
-          "Pagas por alumnos activos si das clases o por profesionales activos si atiendes con cita. Todas las herramientas de tu modalidad, desde el primer plan.",
+          "Pagas por alumnos activos si das clases, o eliges tu plan por los profesionales que contratas si atiendes con cita.",
         clases: "Por alumnos activos",
-        citas: "Por profesionales activos",
+        citas: "Por plan y profesionales",
         desde: "Desde",
-        porMes: "MXN / mes",
-        iva: "+ IVA",
+        porMes: "USD / mes",
+        iva: "+ impuestos",
         verClases: "Ver precios de clases",
         verCitas: "Ver precios de citas",
         prueba: "Pruébalo {dias} días gratis, sin tarjeta, antes de contratar.",
@@ -646,7 +646,7 @@ export default {
           "No. Pruebas AgendaUno gratis durante {dias} días, sin tarjeta y sin compromiso.",
         cancelacion: "¿Hay plazo forzoso o penalización por cancelar?",
         cancelacionR:
-          "No. No hay permanencia forzosa ni penalización por cancelar. Pagas mes con mes, según los alumnos o profesionales activos de tu negocio.",
+          "No. No hay permanencia forzosa ni penalización por cancelar. Pagas mes con mes según los alumnos activos de tu negocio, o tu plan de citas mensual o anual.",
         datos: "¿Qué pasa con la información de mi negocio?",
         datosR:
           "Cada negocio tiene su propia base de datos, separada de la de los demás, y se respalda todos los días. Tus clientes pueden pedir el acceso, la corrección o la cancelación de sus datos, como indica el aviso de privacidad.",
@@ -708,7 +708,7 @@ export default {
       prueba: "30 días gratis, sin tarjeta",
       configuracion: "Configuración guiada para empezar",
       // Portada: los dos modelos (clases por alumnos, citas por profesionales).
-      cobro: "Precio por alumnos o profesionales activos",
+      cobro: "Precio por alumnos activos o por profesionales",
       cancelacion: "Sin permanencia forzosa",
     },
     funciones: {

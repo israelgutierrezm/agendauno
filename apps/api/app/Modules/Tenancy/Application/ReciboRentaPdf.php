@@ -47,6 +47,16 @@ final class ReciboRentaPdf
         return ['subtotal_minor' => $subtotal, 'iva_porcentaje' => $iva, 'impuesto_minor' => $total - $subtotal, 'total_minor' => $total];
     }
 
+    /** Qué se cobró: la suscripción del periodo, un cambio de plan o timbres. */
+    public static function concepto(CargoRenta $cargo): string
+    {
+        return match ($cargo->concepto) {
+            'timbres' => 'Timbres de facturación AgendaUno',
+            'ajuste' => "Cambio de plan AgendaUno {$cargo->periodo}",
+            default => "Suscripción AgendaUno {$cargo->periodo}",
+        };
+    }
+
     public function generar(CargoRenta $cargo, Estudio $estudio): string
     {
         $zona = (string) ($estudio->zona_horaria ?: 'America/Mexico_City');
@@ -64,7 +74,7 @@ final class ReciboRentaPdf
             ['Negocio', mb_strimwidth((string) $estudio->nombre, 0, 64, '…')],
             ['Folio', (string) $cargo->ulid],
             ['Periodo', $periodo],
-            ['Concepto', "Suscripción AgendaUno {$cargo->periodo}"],
+            ['Concepto', self::concepto($cargo)],
             ['Fecha de pago', $pagado],
         ];
         if ($metodo !== '') {

@@ -11,7 +11,7 @@ namespace App\Modules\Tenancy\Application;
  * el cargo y se muestra al dueño.
  *
  * @phpstan-type Linea array{concepto: string, detalle: string, importe_minor: int}
- * @phpstan-type Desglose array{lineas: list<Linea>, subtotal_minor: int, iva_porcentaje: int, iva_minor: int, total_minor: int, prorrateo?: array{dias_cobrables: int, dias_periodo: int}}
+ * @phpstan-type Desglose array{lineas: list<Linea>, subtotal_minor: int, iva_porcentaje: int, iva_minor: int, total_minor: int, prorrateo?: array{dias_cobrables: int, dias_periodo: int}, moneda?: string, conversion?: array<string, mixed>|null, cubre?: array{desde: string, hasta: string}}
  */
 class CalcularRentaSaas
 {
@@ -93,6 +93,89 @@ class CalcularRentaSaas
     }
 
     /**
+     * Citas por plan (ADR 0107): el precio mensual del nivel con los profesionales
+     * contratados; el anual cuesta `meses_anual` meses (2 de cortesía).
+     *
+     * @param  array<string, mixed>  $definicion
+     * @return Desglose
+     */
+    public function plan(array $definicion, string $nivel, int $profesionales, bool $anual, string $detalle): array
+    {
+        $mensual = self::precioPlan($definicion, $nivel, $profesionales) ?? 0;
+        $meses = $anual ? self::mesesAnual($definicion) : 1;
+        $lineas = $mensual > 0 ? [[
+            'concepto' => 'Plan '.self::nombreNivel($nivel).' · '.$profesionales.' '.($profesionales === 1 ? 'profesional' : 'profesionales'),
+            'detalle' => $detalle,
+            'importe_minor' => $mensual * $meses,
+        ]] : [];
+
+        return $this->totalizar($lineas, $definicion);
+    }
+
+    /**
+     * Precio MENSUAL (minor, sin IVA, en la moneda de la tarifa) de un nivel con esos
+     * profesionales; null si la tarifa no lo tiene (p. ej. más de 20: cotización).
+     *
+     * @param  array<string, mixed>  $definicion
+     */
+    public static function precioPlan(array $definicion, string $nivel, int $profesionales): ?int
+    {
+        $precios = $definicion['niveles'][$nivel] ?? null;
+        if (! is_array($precios)) {
+            return null;
+        }
+        $precio = $precios[(string) $profesionales] ?? null;
+
+        return is_numeric($precio) ? (int) $precio : null;
+    }
+
+    /**
+     * Cuántos meses cuesta el pago anual.
+     *
+     * @param  array<string, mixed>  $definicion
+     */
+    public static function mesesAnual(array $definicion): int
+    {
+        return max(1, (int) ($definicion['meses_anual'] ?? 10));
+    }
+
+    public static function nombreNivel(string $nivel): string
+    {
+        return match ($nivel) {
+            'individual' => 'Individual',
+            'premium' => 'Premium',
+            'pro' => 'Pro',
+            default => ucfirst($nivel),
+        };
+    }
+
+    /**
+     * Pasa el desglose a otra moneda con un tipo de cambio en diezmilésimas: cada línea
+     * y el subtotal se convierten (al centavo) y el IVA se calcula sobre el subtotal ya
+     * convertido.
+     *
+     * @param  Desglose  $desglose
+     * @return Desglose
+     */
+    public function convertir(array $desglose, int $diezmilesimas): array
+    {
+        $lineas = array_map(static fn (array $l): array => [
+            ...$l,
+            'importe_minor' => TiposDeCambio::convertir($l['importe_minor'], $diezmilesimas),
+        ], $desglose['lineas']);
+        $subtotal = TiposDeCambio::convertir($desglose['subtotal_minor'], $diezmilesimas);
+        $iva = $this->iva($subtotal, $desglose['iva_porcentaje']);
+
+        return [
+            ...$desglose,
+            'lineas' => $lineas,
+            'subtotal_minor' => $subtotal,
+            'iva_minor' => $iva,
+            'total_minor' => $subtotal + $iva,
+        ];
+    }
+
+    /**
      * Cuota fija acordada por la plataforma (el monto ya es el total, IVA incluido).
      *
      * @return Desglose
@@ -131,11 +214,13 @@ class CalcularRentaSaas
     }
 
     /**
+     * Suma las líneas y les pone el IVA de la definición.
+     *
      * @param  list<Linea>  $lineas
      * @param  array<string, mixed>  $definicion
      * @return Desglose
      */
-    private function totalizar(array $lineas, array $definicion): array
+    public function totalizar(array $lineas, array $definicion): array
     {
         $subtotal = array_sum(array_column($lineas, 'importe_minor'));
         $porcentaje = (int) ($definicion['iva_porcentaje'] ?? 16);

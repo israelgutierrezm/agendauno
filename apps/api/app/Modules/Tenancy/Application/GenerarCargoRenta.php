@@ -25,6 +25,11 @@ use DomainException;
  * - una vez emitido NO se recalcula: volver a correr el proceso no lo cambia aunque
  *   después cambien la tarifa, la prueba o la medición. Idempotente por (estudio,
  *   periodo). Un periodo sin nada que cobrar queda `sin_cargo`.
+ * - en la moneda de cobro del negocio: la tarifa en dólares se cobra en pesos en
+ *   México, al tipo de cambio del día en que se emite (ADR 0107).
+ *
+ * Los negocios de citas con la tarifa por niveles no se cobran aquí: pagan su plan
+ * por adelantado ({@see PlanCitasSaas}).
  *
  * @phpstan-import-type Desglose from CalcularRentaSaas
  */
@@ -33,7 +38,18 @@ class GenerarCargoRenta
     public function __construct(
         private readonly MedirUsoSaas $medir,
         private readonly CalcularRentaSaas $calcular,
+        private readonly MonedaDeCobroSaas $moneda,
+        private readonly PlanCitasSaas $planes,
     ) {}
+
+    /**
+     * ¿Ese periodo se cobra por adelantado con el plan de citas (y no mes vencido)?
+     * Sí, si al cierre del periodo ya regía la tarifa de citas por niveles.
+     */
+    public function porAdelantado(Estudio $estudio, string $periodo): bool
+    {
+        return $this->planes->aplica($estudio, $this->finDelPeriodo($estudio, $periodo));
+    }
 
     /**
      * ¿El periodo (YYYY-MM) ya terminó en la zona horaria del negocio?
@@ -48,6 +64,7 @@ class GenerarCargoRenta
         $existente = CargoRenta::query()
             ->where('estudio_id', $estudio->getKey())
             ->where('periodo', $periodo)
+            ->where('clave', 'periodo')
             ->first();
         // Un cargo emitido no se recalcula.
         if ($existente instanceof CargoRenta) {
@@ -56,14 +73,20 @@ class GenerarCargoRenta
         if (! $this->cerrado($estudio, $periodo)) {
             throw new DomainException("El periodo {$periodo} aún no cierra para este negocio: por ahora solo hay una estimación.");
         }
+        if ($this->porAdelantado($estudio, $periodo)) {
+            throw new DomainException("El periodo {$periodo} se cobra por adelantado con el plan del negocio.");
+        }
 
         $medicion = $this->medir->congelar($estudio, $periodo);
-        $finDelPeriodo = CarbonImmutable::createFromFormat('Y-m-d', $periodo.'-01', self::zona($estudio))?->endOfMonth();
-        [$desglose, $version] = $this->cotizar($estudio, $medicion->metrica, $medicion->cantidad, $medicion->detalle ?? [], $periodo, $finDelPeriodo);
+        [$desglose, $version, $monedaTarifa] = $this->cotizar($estudio, $medicion->metrica, $medicion->cantidad, $medicion->detalle ?? [], $periodo, $this->finDelPeriodo($estudio, $periodo));
+        $final = $this->moneda->aplicar($estudio, $desglose, $monedaTarifa, CarbonImmutable::now());
+        $desglose = $final['desglose'];
 
         return CargoRenta::query()->firstOrCreate(
-            ['estudio_id' => $estudio->getKey(), 'periodo' => $periodo],
+            ['estudio_id' => $estudio->getKey(), 'periodo' => $periodo, 'clave' => 'periodo'],
             [
+                'concepto' => 'renta',
+                ...$final['columnas'],
                 'modo_cobro' => $estudio->modo_cobro->value,
                 'metrica' => $medicion->metrica,
                 'alumnos_activos' => $medicion->cantidad,
@@ -72,7 +95,6 @@ class GenerarCargoRenta
                 'tarifa_version' => $version,
                 'desglose' => $desglose,
                 'monto_minor' => $desglose['total_minor'],
-                'moneda' => $estudio->moneda,
                 'estado' => $desglose['total_minor'] > 0 ? EstadoCargoRenta::Pendiente->value : EstadoCargoRenta::SinCargo->value,
                 'vence_en' => CarbonImmutable::createFromFormat('Y-m-d', $periodo.'-01')?->endOfMonth()->addDays(10)->toDateString(),
                 'emitido_en' => now(),
@@ -81,31 +103,54 @@ class GenerarCargoRenta
     }
 
     /**
-     * Cotiza un periodo a partir de un uso (medido o estimado): desglose del cargo y
-     * versión de la tarifa aplicada (null con cuota fija). La tarifa es la vigente en
+     * Cotiza un periodo a partir de un uso (medido o estimado): desglose del cargo (en
+     * la moneda de la tarifa, con el IVA del país del negocio), versión de la tarifa
+     * aplicada (null con cuota fija) y su moneda. La tarifa es la vigente en
      * `$tarifaAl` (el cierre del periodo al emitir el cargo; ahora, al estimar).
      *
      * @param  array<string, mixed>  $detalle
-     * @return array{0: Desglose, 1: int|null}
+     * @return array{0: Desglose, 1: int|null, 2: string}
      */
     public function cotizar(Estudio $estudio, string $metrica, int $cantidad, array $detalle, string $periodo, ?CarbonImmutable $tarifaAl = null): array
     {
         if ($estudio->modo_cobro === ModoCobroSaas::Fijo) {
             $desglose = $this->calcular->fija((int) $estudio->cuota_fija_minor);
             $version = null;
+            $monedaTarifa = (string) ($estudio->cuota_fija_moneda ?: 'MXN');
         } else {
             $modalidad = $metrica === ModalidadServicio::Citas->metrica() ? ModalidadServicio::Citas : ModalidadServicio::Clases;
             $tarifa = TarifaSaas::vigenteEn($modalidad, $tarifaAl ?? CarbonImmutable::now());
-            $definicion = $tarifa->definicion ?? [];
+            $definicion = MonedaDeCobroSaas::conIvaDelPais($tarifa->definicion ?? [], $estudio);
             $desglose = $modalidad === ModalidadServicio::Citas
                 ? $this->calcular->citas($definicion, $cantidad, (int) ($detalle['personas_fuera_de_cita'] ?? 0))
                 : $this->calcular->clases($definicion, $cantidad);
             $version = $tarifa?->version;
+            $monedaTarifa = MonedaDeCobroSaas::deTarifa($definicion);
         }
 
         [$cobrables, $dias] = $this->diasCobrables($estudio, $periodo);
 
-        return [$this->calcular->prorratear($desglose, $cobrables, $dias), $version];
+        return [$this->calcular->prorratear($desglose, $cobrables, $dias), $version, $monedaTarifa];
+    }
+
+    /**
+     * La estimación de un periodo en la moneda de cobro (al tipo de cambio de hoy; sin
+     * tipo de cambio, en la moneda de la tarifa).
+     *
+     * @param  array<string, mixed>  $detalle
+     * @return array{0: Desglose, 1: int|null}
+     */
+    public function estimar(Estudio $estudio, string $metrica, int $cantidad, array $detalle, string $periodo): array
+    {
+        [$desglose, $version, $monedaTarifa] = $this->cotizar($estudio, $metrica, $cantidad, $detalle, $periodo);
+
+        return [$this->moneda->aplicar($estudio, $desglose, $monedaTarifa, CarbonImmutable::now(), estimacion: true)['desglose'], $version];
+    }
+
+    private function finDelPeriodo(Estudio $estudio, string $periodo): CarbonImmutable
+    {
+        return CarbonImmutable::createFromFormat('Y-m-d', $periodo.'-01', self::zona($estudio))?->endOfMonth()
+            ?? CarbonImmutable::now()->endOfMonth();
     }
 
     /**

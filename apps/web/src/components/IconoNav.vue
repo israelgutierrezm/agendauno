@@ -218,6 +218,7 @@ const RUTAS: Record<string, string[]> = {
     "M13.5 3.5v5h5",
   ],
   mas: ["M12 5v14", "M5 12h14"],
+  menos: ["M5 12h14"],
   // Más acciones: tres puntos en fila.
   puntos: ["M6 12h.01", "M12 12h.01", "M18 12h.01"],
   // Descargar (exportar): la bandeja con la flecha hacia abajo.

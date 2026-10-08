@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\AutenticacionTenant;
 use App\Modules\Tenancy\Application\CambiarCorreoTenant;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
+use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\RestablecerContrasenaTenant;
@@ -297,6 +298,12 @@ class AuthTenantController
             'bienestar_posible' => app(RegionNegocioTenant::class)->enMexico(),
             // ¿La plataforma ya factura? En producción, solo con la llave de FacturAPI.
             'facturacion_disponible' => ConfiguracionPlataforma::facturacionDisponible(),
+            // Su plan (ADR 0107): con el nivel de un negocio de citas, las funciones que no
+            // tiene (la web y la app las ocultan; el servidor ya las niega).
+            'plan' => [
+                'nivel' => app(FuncionesPlan::class)->nivel($estudio),
+                'sin' => app(FuncionesPlan::class)->faltantes($estudio),
+            ],
         ];
     }
 }

@@ -534,6 +534,13 @@ const PESTANAS: Pestana[] = [
   "clientes",
   "equipo",
 ];
+// Ingresos, ocupación y clientes son reportes avanzados: en citas, del plan Pro
+// (ADR 0107; el servidor ya los niega).
+const pestanas = computed<Pestana[]>(() =>
+  sesion.estudio?.plan?.sin.includes("reportes_avanzados") === true
+    ? PESTANAS.filter((p) => p === "resumen" || p === "equipo")
+    : PESTANAS,
+);
 const pestana = ref<Pestana>("resumen");
 const usaPeriodo = computed(
   () =>
@@ -579,7 +586,7 @@ onMounted(cargar);
 
     <div class="tu-pestanas mt-6" role="group">
       <button
-        v-for="p in PESTANAS"
+        v-for="p in pestanas"
         :key="p"
         type="button"
         :aria-pressed="pestana === p"

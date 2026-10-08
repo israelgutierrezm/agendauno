@@ -14,4 +14,6 @@ enum EstadoCargoRenta: string
     case Pagado = 'pagado';
     // Periodo sin nada que cobrar (sin actividad o cubierto por la prueba gratis).
     case SinCargo = 'sin_cargo';
+    // Una compra (de timbres) cuyo pago caducó sin pagarse: ya no se cobra (ADR 0107).
+    case Cancelado = 'cancelado';
 }

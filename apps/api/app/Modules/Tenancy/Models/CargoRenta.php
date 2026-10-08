@@ -14,6 +14,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Cargo de renta del SaaS a un estudio por periodo (control plane). Es el cobro de
  * AgendaUno al dueño (plataforma→dueño), separado de los pagos alumno→estudio.
  *
+ * Un periodo puede tener varios cargos (`clave`): el del periodo y, en un plan de
+ * citas, los ajustes prorrateados al subir de nivel o de profesionales; `concepto`
+ * dice qué se cobra (`renta`, `plan`, `ajuste`, `timbres`). En la moneda de cobro;
+ * `monto_tarifa_minor`/`moneda_tarifa` y el tipo de cambio dicen de dónde salió
+ * (ADR 0107).
+ *
  * @property int $estudio_id
  * @property int $monto_minor
  * @property int $alumnos_activos
@@ -28,6 +34,9 @@ class CargoRenta extends Model
         'estudio_id', 'periodo', 'modo_cobro', 'metrica', 'alumnos_activos', 'tarifa_version', 'desglose', 'monto_minor',
         'moneda', 'estado', 'vence_en', 'pagado_en', 'metodo_pago', 'referencia_pago',
         'medicion_id', 'regla_version', 'emitido_en',
+        'clave', 'concepto', 'cubre_desde', 'cubre_hasta', 'monto_tarifa_minor', 'moneda_tarifa',
+        'tipo_cambio_diezmilesimas', 'tipo_cambio_fecha', 'tipo_cambio_fuente',
+        'intentos_automaticos', 'proximo_intento_en', 'error_cobro',
     ];
 
     /**
@@ -57,6 +66,13 @@ class CargoRenta extends Model
         'vence_en' => 'date',
         'pagado_en' => 'datetime',
         'emitido_en' => 'datetime',
+        'cubre_desde' => 'date',
+        'cubre_hasta' => 'date',
+        'monto_tarifa_minor' => 'integer',
+        'tipo_cambio_diezmilesimas' => 'integer',
+        'tipo_cambio_fecha' => 'date',
+        'intentos_automaticos' => 'integer',
+        'proximo_intento_en' => 'datetime',
     ];
 
     /**

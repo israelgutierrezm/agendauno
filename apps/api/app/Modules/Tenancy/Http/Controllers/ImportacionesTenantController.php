@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\ImportarInstructoresTenant;
 use App\Modules\Tenancy\Application\ImportarMiembrosTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\PlanCitasSaas;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -55,6 +56,8 @@ class ImportacionesTenantController
     public function importarInstructores(Request $request): JsonResponse
     {
         $filas = $this->parsear($request, ['nombre', 'email'], $this->parametros->entero('importaciones.max_filas'));
+        // Todos deben caber en el plan del negocio (ADR 0107).
+        app(PlanCitasSaas::class)->exigirCupo($this->estudioDe($request), count($filas));
 
         $resultado = $this->instructores->importar($filas, $this->estudioDe($request));
 

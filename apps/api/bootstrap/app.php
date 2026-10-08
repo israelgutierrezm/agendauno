@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Http\Middleware\AlcanceLlaveApi;
 use App\Modules\Tenancy\Http\Middleware\AutenticarLlaveApi;
 use App\Modules\Tenancy\Http\Middleware\AutenticarPlataforma;
 use App\Modules\Tenancy\Http\Middleware\AutenticarTenant;
+use App\Modules\Tenancy\Http\Middleware\FuncionDelPlan;
 use App\Modules\Tenancy\Http\Middleware\ModalidadRequerida;
 use App\Modules\Tenancy\Http\Middleware\PermisoTenant;
 use App\Modules\Tenancy\Http\Middleware\ResolverEstudio;
@@ -54,6 +55,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'plataforma.auth' => AutenticarPlataforma::class,
             // Rutas exclusivas de clases o de citas (ADR 0104): modalidad:clases|citas.
             'modalidad' => ModalidadRequerida::class,
+            // Funciones que dependen del nivel de un negocio de citas (ADR 0107): plan:lealtad.
+            'plan' => FuncionDelPlan::class,
         ]);
 
         // Resolve the tenant (and its query scope) BEFORE route-model binding,
@@ -78,6 +81,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ThrottleRequests::class,
             ThrottleRequestsWithRedis::class,
             ModalidadRequerida::class,
+            FuncionDelPlan::class,
             AuthenticatesSessions::class,
             SubstituteBindings::class,
             Authorize::class,

@@ -10,10 +10,11 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 
 /*
-| Cobro del SaaS por modalidad (ADR 0019): estudios de clases pagan por ALUMNOS
-| ACTIVOS (con actividad en el mes); negocios de citas por PROFESIONALES ACTIVOS
-| (cada uno completo, ADR 0094) más personas atendidas fuera de cita. Tarifas versionadas,
-| cobro mes vencido con la medición congelada y sin cobrar la prueba gratis.
+| Cobro del SaaS por modalidad (ADR 0019 y 0107): estudios de clases pagan por ALUMNOS
+| ACTIVOS (con actividad en el mes), mes vencido con la medición congelada y sin cobrar
+| la prueba gratis; la tarifa está en dólares y en México se cobra en pesos (a 20 en
+| las pruebas). Los negocios de citas pagan su plan por adelantado (PlanCitasSaasTest);
+| la medición de sus profesionales activos queda como referencia («quién cuenta»).
 */
 
 beforeEach(function (): void {
@@ -66,15 +67,16 @@ it('clases: cobra la banda de alumnos activos del mes con IVA', function (): voi
 
     expect($cargo['metrica'])->toBe('alumnos_activos')
         ->and($cargo['cantidad'])->toBe(3)
-        // La versión 2 es la de los rangos de alumnos (2026_09_26_200000_rangos_alumnos_saas).
-        ->and($cargo['tarifa_version'])->toBe(2)
-        ->and($cargo['desglose']['subtotal_minor'])->toBe(33900)
-        ->and($cargo['desglose']['iva_minor'])->toBe(5424)
-        ->and($cargo['monto_minor'])->toBe(39324)
+        // La versión 3 es la de dólares (2026_10_08_000200_tarifas_en_usd): hasta 40
+        // alumnos, 21 USD = 420 pesos.
+        ->and($cargo['tarifa_version'])->toBe(3)
+        ->and($cargo['desglose']['subtotal_minor'])->toBe(42000)
+        ->and($cargo['desglose']['iva_minor'])->toBe(6720)
+        ->and($cargo['monto_minor'])->toBe(48720)
         ->and($cargo['estado'])->toBe('pendiente');
 });
 
-it('citas: cobra por profesional activo, completo sin importar sus horas', function (): void {
+it('citas: cuenta como referencia a cada profesional que atendió, completo sin importar sus horas', function (): void {
     $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
     terminarPrueba($e);
     $sede = agendaSemilla($e);
@@ -96,17 +98,11 @@ it('citas: cobra por profesional activo, completo sin importar sus horas', funct
         ],
     ], conBearer($e['bearer']))->assertCreated();
 
-    $periodo = emitirCargoDelMesEnCurso();
-    $cargo = rentaDe($e)['cargos'][0];
-
-    // 1º ($269) + 2º ($226).
-    expect($cargo['metrica'])->toBe('profesionales_activos')
-        ->and($cargo['cantidad'])->toBe(2)
-        ->and($cargo['desglose']['subtotal_minor'])->toBe(26900 + 22600);
-
-    // Transparencia: el dueño ve quién cuenta.
+    // Transparencia: el dueño ve quién atendió (se cobra por lo contratado, ADR 0107).
+    $periodo = periodoHoy();
     $quien = $this->getJson("/api/v1/app/{$e['slug']}/renta/quien-cuenta?periodo={$periodo}", conBearer($e['bearer']))->assertOk()->json('data');
     expect($quien['metrica'])->toBe('profesionales_activos')
+        ->and($quien['cantidad'])->toBe(2)
         ->and($quien['quienes'])->toHaveCount(2)
         ->and($quien['quienes'][0])->not->toHaveKey('medio_tiempo')
         ->and($quien['detalle'])->not->toHaveKey('fte_milesimas');
@@ -128,13 +124,12 @@ it('citas: un taller nuevo nace como cita y no suma personas atendidas fuera de 
     $this->postJson("/api/v1/app/{$e['slug']}/sesiones/{$taller}/reservas", ['persona_id' => $d['persona']], conBearer($e['bearer']))
         ->assertCreated();
 
-    $uso = $this->getJson("/api/v1/app/{$e['slug']}/facturacion", conBearer($e['bearer']))->assertOk()->json('data.uso');
+    $uso = $this->getJson("/api/v1/app/{$e['slug']}/renta/quien-cuenta", conBearer($e['bearer']))->assertOk()->json('data');
 
-    expect($uso['detalle']['personas_fuera_de_cita'])->toBe(0)
-        ->and($uso['desglose']['subtotal_minor'])->toBe(26900);
+    expect($uso['detalle']['personas_fuera_de_cita'])->toBe(0);
 })->skip(fn (): bool => now('America/Mexico_City')->isLastOfMonth(), 'El taller de mañana caería en el siguiente mes.');
 
-it('citas: las personas de una clase de antes de la modalidad excluyente por encima de lo incluido se cobran', function (): void {
+it('citas: las personas de una clase de antes de la modalidad excluyente se siguen midiendo', function (): void {
     $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
     terminarPrueba($e);
     $sede = agendaSemilla($e);
@@ -158,10 +153,9 @@ it('citas: las personas de una clase de antes de la modalidad excluyente por enc
             ->assertCreated();
     }
 
-    $uso = $this->getJson("/api/v1/app/{$e['slug']}/facturacion", conBearer($e['bearer']))->assertOk()->json('data.uso');
+    $uso = $this->getJson("/api/v1/app/{$e['slug']}/renta/quien-cuenta", conBearer($e['bearer']))->assertOk()->json('data');
 
-    expect($uso['detalle']['personas_fuera_de_cita'])->toBe(12)
-        ->and($uso['desglose']['subtotal_minor'])->toBe(26900 + 2 * 900);
+    expect($uso['detalle']['personas_fuera_de_cita'])->toBe(12);
 })->skip(fn (): bool => now('America/Mexico_City')->isLastOfMonth(), 'El taller de mañana caería en el siguiente mes.');
 
 it('un mes sin actividad queda sin cargo y no se puede pagar', function (): void {
@@ -189,8 +183,9 @@ it('no se cobran los días de prueba gratis: el mes en que termina se prorratea'
     emitirCargoDelMesEnCurso();
     $desglose = rentaDe($e)['cargos'][0]['desglose'];
 
+    // Se prorratea en dólares y se convierte a pesos (a 20).
     expect($desglose['prorrateo'])->toEqual(['dias_cobrables' => $dias - 10, 'dias_periodo' => $dias])
-        ->and($desglose['subtotal_minor'])->toBe(intdiv(33900 * ($dias - 10), $dias));
+        ->and($desglose['subtotal_minor'])->toBe(intdiv(2100 * ($dias - 10), $dias) * 20);
 });
 
 it('mientras dura la prueba gratis el mes queda sin cargo', function (): void {
@@ -240,20 +235,24 @@ it('el superadmin publica una versión nueva de la tarifa y los cargos la usan',
 
     $this->getJson('/api/v1/plataforma/tarifas', conPlataforma())
         ->assertOk()
-        // La 1 es la inicial; la 2, la de los rangos de alumnos actuales.
-        ->assertJsonPath('data.clases.vigente.version', 2)
-        ->assertJsonPath('data.clases.vigente.definicion.bandas.0.hasta', 49)
-        ->assertJsonPath('data.citas.vigente.definicion.tramos.0.unitario_minor', 26900);
+        // La 1 es la inicial; la 2, la de los rangos de alumnos; la 3, la de dólares.
+        ->assertJsonPath('data.clases.vigente.version', 3)
+        ->assertJsonPath('data.clases.vigente.definicion.moneda', 'USD')
+        ->assertJsonPath('data.clases.vigente.definicion.bandas.0.hasta', 40)
+        ->assertJsonPath('data.citas.vigente.definicion.niveles.individual.1', 900);
 
+    // Una versión en pesos se cobra tal cual.
     $this->postJson('/api/v1/plataforma/tarifas/clases', [
-        'dias_prueba' => 30, 'iva_porcentaje' => 16,
+        'moneda' => 'MXN', 'dias_prueba' => 30, 'iva_porcentaje' => 16,
         'bandas' => [['hasta' => 50, 'monto_minor' => 29900], ['hasta' => null, 'monto_minor' => 99900]],
-    ], conPlataforma())->assertCreated()->assertJsonPath('data.version', 3);
+    ], conPlataforma())->assertCreated()->assertJsonPath('data.version', 4);
 
     emitirCargoDelMesEnCurso();
     $cargo = rentaDe($e)['cargos'][0];
 
-    expect($cargo['tarifa_version'])->toBe(3)->and($cargo['desglose']['subtotal_minor'])->toBe(29900);
+    expect($cargo['tarifa_version'])->toBe(4)
+        ->and($cargo['desglose']['subtotal_minor'])->toBe(29900)
+        ->and($cargo['tipo_cambio'])->toBeNull();
 });
 
 it('una tarifa sin techo o con topes desordenados se rechaza', function (): void {
@@ -264,12 +263,11 @@ it('una tarifa sin techo o con topes desordenados se rechaza', function (): void
         'bandas' => [['hasta' => 50, 'monto_minor' => 29900], ['hasta' => 100, 'monto_minor' => 59900]],
     ], conPlataforma())->assertStatus(422)->assertJsonPath('meta.errors.bandas.0', 'El último escalón debe quedar sin tope (el techo).');
 
+    // Citas ya no se publica por tramos: por niveles (ADR 0107).
     $this->postJson('/api/v1/plataforma/tarifas/citas', [
         'dias_prueba' => 14, 'iva_porcentaje' => 16,
-        'tramos' => [['hasta' => 5, 'unitario_minor' => 100], ['hasta' => 3, 'unitario_minor' => 50], ['hasta' => null, 'unitario_minor' => 0]],
-        'personas_incluidas_por_profesional' => 10, 'tope_personas_incluidas' => 100,
-        'extra_por_persona_minor' => 900,
-    ], conPlataforma())->assertStatus(422)->assertJsonPath('meta.errors.tramos.0', 'Los topes deben ir de menor a mayor.');
+        'tramos' => [['hasta' => null, 'unitario_minor' => 26900]],
+    ], conPlataforma())->assertStatus(422)->assertJsonValidationErrors(['niveles', 'meses_anual'], 'meta.errors');
 
     $this->getJson('/api/v1/plataforma/tarifas', ['Accept' => 'application/json'])->assertUnauthorized();
 });

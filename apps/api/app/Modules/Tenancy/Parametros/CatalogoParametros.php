@@ -145,6 +145,11 @@ final class CatalogoParametros
                 'Pasados estos días desde el vencimiento, el negocio se suspende solo hasta que la pague. 0 = nunca.', $e, 15, 0, 90, 'días', porNegocio: false),
             new DefinicionParametro('renta.dias_aviso_suspension', 'Renta', 'Días antes de la suspensión para avisar al dueño',
                 'Por correo y, si lo aceptó, por WhatsApp.', $e, 3, 1, 14, 'días', porNegocio: false),
+            // Renta en dólares cobrada en pesos (ADR 0107, solo la plataforma).
+            new DefinicionParametro('timbres.precio_centavos', 'Renta', 'Precio de cada timbre para facturar',
+                'En centavos de peso, sin IVA. Se venden en paquetes de 50 a 500.', $e, 180, 1, 10000, '¢', porNegocio: false),
+            new DefinicionParametro('renta.tipo_cambio_dias_vigencia', 'Renta', 'Antigüedad máxima del tipo de cambio',
+                'Para cobrar en pesos la renta en dólares. Uno más viejo ya no se usa: el cargo espera y se te avisa.', $e, 7, 1, 60, 'días', porNegocio: false),
 
             // Avisos a los dueños (ADR 0071, solo la plataforma).
             new DefinicionParametro('duenos.dias_aviso_prueba', 'Dueños', 'Días antes del fin de la prueba para avisar al dueño',
