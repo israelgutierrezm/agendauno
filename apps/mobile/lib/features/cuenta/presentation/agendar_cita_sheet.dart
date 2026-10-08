@@ -42,6 +42,10 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
   HorarioCita? _hora;
   bool _cargando = true;
   bool _buscando = false;
+  // Si no cargan los servicios o los horarios, se dice (y se reintenta): nunca un
+  // indicador girando para siempre.
+  String? _errorCarga;
+  String? _errorHorarios;
   bool _agendando = false;
   // Avisos por WhatsApp (ADR 0069): se ofrecen si el negocio los usa, aún no los
   // aceptó y tiene celular.
@@ -67,7 +71,22 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     if (repo == null) {
       return;
     }
-    final opciones = await repo.opcionesCita();
+    setState(() {
+      _cargando = true;
+      _errorCarga = null;
+    });
+    final OpcionesCita opciones;
+    try {
+      opciones = await repo.opcionesCita();
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorCarga = _mensaje(e, 'No se pudieron cargar los servicios.');
+          _cargando = false;
+        });
+      }
+      return;
+    }
     var ofrecerWhatsapp = false;
     try {
       ofrecerWhatsapp = (await repo.privacidad()).ofrecerWhatsapp;
@@ -91,6 +110,14 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     });
   }
 
+  /// El mensaje del servidor, o uno en español si no lo hay (sin red).
+  String _mensaje(DioException e, String porDefecto) {
+    final data = e.response?.data;
+    return data is Map && data['message'] is String
+        ? data['message'] as String
+        : porDefecto;
+  }
+
   String? get _idProfesional =>
       identical(_profesional, _cualquiera) ? null : _profesional?.id;
 
@@ -109,14 +136,28 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     if (!_listo || repo == null) {
       return;
     }
-    setState(() => _buscando = true);
-    final horarios = await repo.horariosLibres(
-      profesionalId: _idProfesional,
-      sucursalId: _sede!.id,
-      fecha: Formato.iso(_dia!),
-      duracionMinutos: _servicio!.duracionMinutos ?? 60,
-      servicioId: _servicio!.id,
-    );
+    setState(() {
+      _buscando = true;
+      _errorHorarios = null;
+    });
+    final List<HorarioCita> horarios;
+    try {
+      horarios = await repo.horariosLibres(
+        profesionalId: _idProfesional,
+        sucursalId: _sede!.id,
+        fecha: Formato.iso(_dia!),
+        duracionMinutos: _servicio!.duracionMinutos ?? 60,
+        servicioId: _servicio!.id,
+      );
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorHorarios = _mensaje(e, 'No se pudieron cargar los horarios.');
+          _buscando = false;
+        });
+      }
+      return;
+    }
     if (mounted) {
       setState(() {
         _horarios = horarios;
@@ -231,7 +272,23 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
         20,
         20 + MediaQuery.of(context).viewInsets.bottom,
       ),
-      child: _cargando || opciones == null
+      child: _errorCarga != null
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_errorCarga!),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: _cargarOpciones,
+                    child: const Text('Reintentar'),
+                  ),
+                ],
+              ),
+            )
+          : _cargando || opciones == null
           ? const SizedBox(
               height: 160,
               child: Center(child: CircularProgressIndicator()),
@@ -306,6 +363,16 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                   const SizedBox(height: 16),
                   if (_buscando)
                     const Center(child: CircularProgressIndicator())
+                  else if (_errorHorarios != null)
+                    Row(
+                      children: [
+                        Expanded(child: Text(_errorHorarios!)),
+                        TextButton(
+                          onPressed: _buscarHorarios,
+                          child: const Text('Reintentar'),
+                        ),
+                      ],
+                    )
                   else if (_listo && _horarios.isEmpty)
                     const Text(
                       'No hay horarios libres ese día. Prueba otro día u otro profesional.',

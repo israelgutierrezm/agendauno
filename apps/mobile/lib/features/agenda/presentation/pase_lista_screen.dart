@@ -9,14 +9,16 @@ import '../data/agenda_models.dart';
 import '../data/agenda_repository.dart';
 
 /// Lista de una clase para el pase de lista (por sesión).
-final rosterProvider = FutureProvider.autoDispose
-    .family<List<Asistente>, String>((ref, sesionId) async {
-      final repo = ref.watch(agendaRepositoryProvider);
-      if (repo == null) {
-        return const [];
-      }
-      return repo.roster(sesionId);
-    });
+final rosterProvider = FutureProvider.autoDispose.family<ListaClase, String>((
+  ref,
+  sesionId,
+) async {
+  final repo = ref.watch(agendaRepositoryProvider);
+  if (repo == null) {
+    return const ListaClase(asistentes: []);
+  }
+  return repo.roster(sesionId);
+});
 
 /// Pase de lista de una clase: quién llegó (botón grande por persona), con avisos de
 /// primera vez y adeudo. Cada toque registra la asistencia al momento.
@@ -47,7 +49,9 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
           content: Text(
             cuantos == 0
                 ? 'Lista terminada.'
-                : 'Lista terminada: $cuantos no se presentaron.',
+                : (cuantos == 1
+                      ? 'Lista terminada: 1 persona quedó como «no vino».'
+                      : 'Lista terminada: $cuantos personas quedaron como «no vino».'),
           ),
         ),
       );
@@ -68,6 +72,30 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     final repo = ref.read(agendaRepositoryProvider);
     if (repo == null) {
       return;
+    }
+    // «No vino» puede cobrar la falta (según la política del negocio): se confirma.
+    if (estado == 'ausente') {
+      final seguir = await showDialog<bool>(
+        context: context,
+        builder: (contexto) => AlertDialog(
+          content: Text(
+            '¿Marcar que ${a.nombre} no vino? Según la política del negocio, puede perder el crédito.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(contexto).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(contexto).pop(true),
+              child: const Text('No vino'),
+            ),
+          ],
+        ),
+      );
+      if (seguir != true || !mounted) {
+        return;
+      }
     }
     setState(() => _marcando.add(a.reservaId));
     final mensajero = ScaffoldMessenger.of(context);
@@ -104,10 +132,16 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
       ),
       body: roster.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('No se pudo cargar la lista: $e')),
+        error: (e, _) => Center(
+          child: TextButton(
+            onPressed: () => ref.invalidate(rosterProvider(s.id)),
+            child: const Text('No se pudo cargar la lista. Reintentar'),
+          ),
+        ),
         data: (lista) {
-          final enSala = lista.where((a) => a.enSala).toList();
+          final enSala = lista.asistentes.where((a) => a.enSala).toList();
           final llegaron = enSala.where((a) => a.llego).length;
+          final abierta = lista.abierta(DateTime.now());
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
@@ -178,6 +212,15 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              // Antes de la ventana (ADR 0101), la lista aún no se pasa.
+              if (!abierta && lista.asistenciaDesde != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'La lista se abre a las ${hhmm(lista.asistenciaDesde!)}.',
+                    style: const TextStyle(color: Color(0xFF5E6B84)),
+                  ),
+                ),
               if (enSala.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(24),
@@ -186,11 +229,12 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-              for (final a in enSala) _fila(a),
-              // Ya empezada la clase: quien sigue sin registro «no se presentó».
+              for (final a in enSala) _fila(a, abierta: abierta),
+              // Ya empezada la clase (lo dice el servidor): quien sigue sin registro
+              // queda como «no vino».
               if ((ref.watch(sesionProvider)?.puede('asistencia.marcar') ??
                       false) &&
-                  !s.iniciaEn.isAfter(DateTime.now()) &&
+                  lista.empezo &&
                   enSala.any(
                     (a) => a.estado == 'confirmada' && a.asistencia == null,
                   ))
@@ -208,10 +252,13 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
     );
   }
 
-  Widget _fila(Asistente a) {
-    // Sin permiso de marcar asistencia, la lista solo se consulta.
+  Widget _fila(Asistente a, {required bool abierta}) {
+    // Sin permiso de marcar asistencia, la lista solo se consulta; y solo se marca a
+    // quien tiene su lugar confirmado, desde que se abre la lista.
     final puedeMarcar =
-        ref.watch(sesionProvider)?.puede('asistencia.marcar') ?? false;
+        (ref.watch(sesionProvider)?.puede('asistencia.marcar') ?? false) &&
+        a.marcable &&
+        abierta;
     final ocupado = _marcando.contains(a.reservaId);
     return Card(
       elevation: 0,
@@ -245,7 +292,7 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
               ),
             if (a.asistencia == 'ausente')
               Text(
-                a.automatica ? 'No se presentó (automático)' : 'No asistió',
+                a.automatica ? 'No se presentó (automático)' : 'No vino',
                 style: const TextStyle(color: Color(0xFFA11B1B)),
               ),
             if (a.llego && a.retardo)

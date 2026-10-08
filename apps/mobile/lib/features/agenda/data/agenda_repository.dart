@@ -60,13 +60,11 @@ class AgendaRepository {
         .toList();
   }
 
-  Future<List<Asistente>> roster(String sesionId) async {
+  Future<ListaClase> roster(String sesionId) async {
     final res = await _dio.get<Map<String, dynamic>>(
       '$_base/sesiones/$sesionId/reservas',
     );
-    return ((res.data?['data'] ?? []) as List)
-        .map((e) => Asistente.desdeJson(e as Map<String, dynamic>))
-        .toList();
+    return ListaClase.desdeJson(res.data ?? const {});
   }
 
   /// `retardo`: llegó tarde (solo con «presente»; cuenta como asistencia).

@@ -158,7 +158,7 @@ class ReservasTab extends ConsumerWidget {
             child: Card(
               child: ListTile(
                 title: const Text('Historial'),
-                subtitle: Text('Tus $clases y citas anteriores'),
+                subtitle: Text('Tus $clases anteriores'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(

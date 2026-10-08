@@ -248,7 +248,7 @@ class InicioTab extends ConsumerWidget {
             ),
             // El pase y el expediente, solo si el negocio los usa (o hay algo por
             // firmar).
-            pase: usa?.pase ?? true
+            pase: usa?.pase ?? false
                 ? TarjetaAcceso(
                     icono: Icons.qr_code_2,
                     titulo: 'Pase de entrada',

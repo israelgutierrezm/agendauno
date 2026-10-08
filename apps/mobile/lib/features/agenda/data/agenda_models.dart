@@ -206,6 +206,10 @@ class Asistente {
   bool get enSala => estado != 'en_espera';
   bool get llego => asistencia == 'presente';
 
+  /// Solo se pasa lista a quien tiene su lugar confirmado (no a una oferta de
+  /// lugar sin aceptar ni a un pago pendiente): el servidor rechaza lo demás.
+  bool get marcable => estado == 'confirmada';
+
   factory Asistente.desdeJson(Map<String, dynamic> json) => Asistente(
     reservaId: json['id'] as String,
     nombre: (json['persona'] ?? '—') as String,
@@ -216,6 +220,36 @@ class Asistente {
     primeraVez: (json['primera_vez'] ?? false) as bool,
     adeudo: (json['adeudo'] ?? false) as bool,
   );
+}
+
+/// La lista de una clase (GET /sesiones/{id}/reservas): quién reservó y desde cuándo
+/// se pasa lista (ADR 0101). `empezo` lo dice el servidor (no el reloj del teléfono).
+class ListaClase {
+  const ListaClase({
+    required this.asistentes,
+    this.asistenciaDesde,
+    this.empezo = false,
+  });
+
+  final List<Asistente> asistentes;
+  final DateTime? asistenciaDesde;
+  final bool empezo;
+
+  /// ¿Ya se puede registrar la asistencia?
+  bool abierta(DateTime ahora) =>
+      asistenciaDesde == null || !ahora.isBefore(asistenciaDesde!);
+
+  factory ListaClase.desdeJson(Map<String, dynamic> json) {
+    final meta = (json['meta'] as Map<String, dynamic>?) ?? const {};
+    final desde = meta['asistencia_desde'] as String?;
+    return ListaClase(
+      asistentes: ((json['data'] ?? []) as List)
+          .map((e) => Asistente.desdeJson(e as Map<String, dynamic>))
+          .toList(),
+      asistenciaDesde: desde == null ? null : DateTime.parse(desde).toLocal(),
+      empezo: (meta['empezo'] ?? false) as bool,
+    );
+  }
 }
 
 /// Colores de servicio (fondo claro + tinta del mismo matiz), como en la web.

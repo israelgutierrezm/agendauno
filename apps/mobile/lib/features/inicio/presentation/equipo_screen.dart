@@ -227,14 +227,18 @@ class _InicioNegocio extends ConsumerWidget {
                     icono: Icons.schedule_outlined,
                     titulo: 'Agenda del día',
                     valor: agenda == null
-                        ? 'Horarios y pase de lista'
+                        ? (esCitas
+                              ? 'Tus citas del día'
+                              : 'Horarios y pase de lista')
                         : (agenda.sesiones == 1
                               ? '1 ${terminos.sesion.toLowerCase()} hoy'
                               : '${agenda.sesiones} $clases hoy'),
                     tono: TonosAcceso.reservar,
                     onTap: () => onIr(PestanaEquipo.agenda),
                   ),
-                if (pasarLista)
+                // El pase de lista es de clases; en citas, la llegada se marca en
+                // cada cita de la agenda (ADR 0104).
+                if (pasarLista && !esCitas)
                   TarjetaAcceso(
                     icono: Icons.fact_check_outlined,
                     titulo: 'Pasar lista',

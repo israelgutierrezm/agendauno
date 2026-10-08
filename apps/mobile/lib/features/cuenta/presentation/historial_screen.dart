@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import '../../auth/application/sesion_controller.dart';
+import '../../auth/data/sesion.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
 import '../data/cuenta_repository.dart';
@@ -99,7 +101,9 @@ class _HistorialState extends ConsumerState<HistorialScreen> {
               ),
             )
           else if (_items.isEmpty && !_cargando)
-            const TextoVacio('Aquí verás tus clases y citas cuando pasen.'),
+            TextoVacio(
+              'Aquí verás tus ${(ref.watch(sesionProvider)?.terminologia ?? const Terminologia()).sesiones.toLowerCase()} cuando pasen.',
+            ),
           if (_items.isNotEmpty)
             Card(
               child: Column(

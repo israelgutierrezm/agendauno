@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- La app habla con la API: el permiso se declara aquí, no solo vía Firebase. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="AgendaUno"
         android:name="${applicationName}"

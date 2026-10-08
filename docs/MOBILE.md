@@ -67,10 +67,16 @@ flutter build appbundle --dart-define=API_BASE_URL=https://DOMINIO \
   --dart-define=WEB_BASE_URL=https://DOMINIO
 ```
 
-- `API_BASE_URL` — la API (por defecto `http://localhost:8000`).
+- `API_BASE_URL` — la API. Por defecto `http://localhost:8000` en desarrollo y
+  `https://agendauno.mx` en una compilación de release (nunca localhost por olvido).
 - `WEB_BASE_URL` — el sitio (fotos del inicio); por defecto, la misma que la API.
 - `APP_VERSION` — la versión que viaja en los errores de la app al monitoreo de la
-  plataforma (ADR 0080); por defecto `dev`.
+  plataforma (ADR 0080); por defecto, la de `pubspec.yaml` (`versionApp`).
+- Entrar con Google en la app: `GOOGLE_SERVER_CLIENT_ID` y, en iOS,
+  `GOOGLE_IOS_CLIENT_ID` (ver `docs/GOOGLE_APP.md`). En iOS hace falta además el
+  esquema de URL invertido del cliente en `ios/Runner/Info.plist`
+  (`CFBundleURLTypes`); sin él, Google falla en iOS. En el servidor, sus Client ID van
+  en `GOOGLE_CLIENT_IDS_APP`.
 
 ## Notificaciones push (Firebase)
 
@@ -86,7 +92,9 @@ La app funciona sin Firebase; solo no recibe push. Para activarlas (ADR 0025):
      --dart-define=FIREBASE_SENDER_ID=... --dart-define=FIREBASE_PROJECT_ID=...
    ```
 
-   En iOS se agrega `--dart-define=FIREBASE_IOS_BUNDLE_ID=...`.
+   En iOS se agrega `--dart-define=FIREBASE_IOS_BUNDLE_ID=...`. `FIREBASE_APP_ID` y
+   `FIREBASE_API_KEY` son distintos para Android e iOS: se compila una vez por
+   plataforma con los suyos.
 3. En el servidor, en `api.env`: `FCM_CREDENTIALS` (ruta al JSON de la cuenta de
    servicio dentro del volumen `storage`, p. ej. `storage/credenciales/fcm.json`) y,
    opcional, `FCM_PROJECT_ID`.

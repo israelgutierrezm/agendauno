@@ -92,8 +92,12 @@ class AgendaScreen extends ConsumerWidget {
           Expanded(
             child: estado.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) =>
-                  Center(child: Text('No se pudo cargar la agenda: $e')),
+              error: (e, _) => Center(
+                child: TextButton(
+                  onPressed: () => ref.invalidate(agendaProvider),
+                  child: const Text('No se pudo cargar la agenda. Reintentar'),
+                ),
+              ),
               data: (agenda) => (sesion?.esCitas ?? false)
                   ? _AgendaCitas(
                       agenda: agenda,

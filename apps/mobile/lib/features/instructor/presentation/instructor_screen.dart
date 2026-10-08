@@ -181,7 +181,7 @@ class _Inicio extends ConsumerWidget {
               Text(
                 estudio == null || estudio.isEmpty
                     ? 'Aquí tienes tus $clases.'
-                    : 'Aquí tienes tus $clases y citas en $estudio.',
+                    : 'Aquí tienes tus $clases en $estudio.',
                 style: const TextStyle(color: TemaAgendaUno.textoSuave),
               ),
               const SizedBox(height: 16),
@@ -321,7 +321,9 @@ class _Inicio extends ConsumerWidget {
                   icono: Icons.schedule_outlined,
                   titulo: 'Agenda',
                   tono: TonosAcceso.pagos,
-                  valor: 'Tu día con horarios y pase de lista',
+                  valor: sesion?.esCitas ?? false
+                      ? 'Tu día con tus $clases'
+                      : 'Tu día con horarios y pase de lista',
                   onTap: () => onIr(PestanaInstructor.agenda),
                 ),
                 TarjetaAcceso(
