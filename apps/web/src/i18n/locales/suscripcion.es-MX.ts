@@ -139,6 +139,11 @@ export default {
         "Lo que se elige aquí decide lo que cada negocio puede usar y lo que muestran la landing y «Mi suscripción».",
     },
     cuotaMoneda: "Moneda de la cuota",
+    plan: "Plan",
+    periodicidad: "Pago",
+    cobrarDiferencia: "Cobrar la diferencia de los días que faltan",
+    cobrarDiferenciaAyuda:
+      "Si lo quitas, sube hoy sin cobrar esos días (cortesía). Bajar o pasar a anual siempre aplica desde el siguiente periodo.",
     otraMoneda:
       "En {moneda}: por cobrar {porCobrar}, vencido {vencido}, cobrado este mes {cobrado}.",
     comercial: {

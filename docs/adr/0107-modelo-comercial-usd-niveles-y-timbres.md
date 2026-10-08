@@ -68,6 +68,9 @@ Pago y OpenPay para la renta quedan pendientes. Hasta ahora:
 - `agendauno:generar-cargos-renta` emite a diario los periodos que empiezan; los meses
   de citas que ya rigen con la tarifa por niveles no se cobran vencidos.
 - El dueño lo cambia en «Mi suscripción» (`PUT /renta/plan`, con `estudio.gestionar`).
+  El superadmin lo ve y lo cambia desde la ficha del negocio
+  (`PUT /plataforma/estudios/{estudio}/plan`) con las mismas reglas; como cortesía,
+  puede subirlo sin cobrar la diferencia de los días que faltan.
 
 ### Funciones por nivel (citas, `FuncionesPlan`)
 

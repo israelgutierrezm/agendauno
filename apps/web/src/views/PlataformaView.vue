@@ -15,6 +15,8 @@ import WhatsAppNegocio, {
   type EstadoWhatsAppNegocio,
 } from "@/components/WhatsAppNegocio.vue";
 import ComercialPlataforma from "@/components/ComercialPlataforma.vue";
+import type { PlanCitas } from "@/lib/suscripcion";
+import PlanEstudioPlataforma from "@/components/PlanEstudioPlataforma.vue";
 import WhatsAppPlataforma from "@/components/WhatsAppPlataforma.vue";
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -92,6 +94,8 @@ interface FichaApi extends Omit<Estudio, "uso"> {
   whatsapp_clientes?: EstadoWhatsAppNegocio;
   uso: { periodo: string; metrica: string; cantidad: number }[];
   cargos: Cargo[];
+  // Su plan de citas (ADR 0107): se ve y se cambia desde aquí.
+  plan_citas?: PlanCitas | null;
   // Últimos avisos de la plataforma al dueño (ADR 0071).
   avisos?: {
     id: number;
@@ -1752,6 +1756,16 @@ function borrar(): void {
               {{ $t("plataforma.estudios.guardar") }}
             </button>
           </form>
+
+          <!-- Plan de un negocio de citas (ADR 0107) -->
+          <PlanEstudioPlataforma
+            v-if="ficha.plan_citas"
+            :api-url="apiUrl"
+            :token="token"
+            :slug="ficha.slug"
+            :plan="ficha.plan_citas"
+            @cambiado="recargarFicha"
+          />
 
           <!-- Cuenta: prueba y acceso -->
           <section class="space-y-3">

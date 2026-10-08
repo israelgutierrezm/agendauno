@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CambiarModalidadEstudio;
+use App\Modules\Tenancy\Application\DomiciliacionRenta;
+use App\Modules\Tenancy\Application\PlanCitasSaas;
 use App\Modules\Tenancy\Application\SuspensionPorRenta;
 use App\Modules\Tenancy\Application\TerminologiaEstudio;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\ModalidadServicio;
@@ -37,7 +40,7 @@ class PlataformaEstudiosController
 
     private const CARGOS = 12;
 
-    public function show(string $estudio, ClienteWhatsApp $whatsapp, CambiarModalidadEstudio $cambioModalidad): JsonResponse
+    public function show(string $estudio, ClienteWhatsApp $whatsapp, CambiarModalidadEstudio $cambioModalidad, PlanCitasSaas $planes, GestorDeConexionTenant $gestor): JsonResponse
     {
         $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
 
@@ -90,6 +93,8 @@ class PlataformaEstudiosController
             // Clases o citas solo cambia antes de operar (ADR 0104).
             'modalidad_cambiable' => $cambioModalidad->cambiable($modelo),
             'whatsapp_clientes' => self::whatsappClientes($modelo, $whatsapp),
+            // Su plan de citas (ADR 0107), para verlo y cambiarlo desde soporte.
+            'plan_citas' => $planes->aplica($modelo) && $gestor->baseDeDatosExiste($modelo) ? $planes->resumen($modelo) : null,
             'uso' => $uso,
             'cargos' => $cargos,
             // Los últimos avisos de la plataforma al dueño (ADR 0071), para soporte.
@@ -108,6 +113,58 @@ class PlataformaEstudiosController
                     'leido' => $a->leido_en !== null,
                     'fecha' => ($a->enviado_en ?? $a->created_at)?->toIso8601String(),
                 ])->all(),
+        ]]);
+    }
+
+    /**
+     * Cambia el plan de un negocio de citas (ADR 0107) con las mismas reglas que su
+     * dueño: subir aplica hoy y cobra la diferencia de los días que faltan (con su
+     * tarjeta, si la domicilió); bajar o cambiar a anual, desde el siguiente periodo.
+     * `cobrar_diferencia` en falso sube sin cobrar la diferencia (cortesía).
+     */
+    public function plan(Request $request, string $estudio, PlanCitasSaas $planes, DomiciliacionRenta $domiciliacion, GestorDeConexionTenant $gestor): JsonResponse
+    {
+        $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
+        $validado = $request->validate([
+            'nivel' => ['required', Rule::in(PlanCitasSaas::NIVELES)],
+            'profesionales' => ['required', 'integer', 'min:1', 'max:1000'],
+            'periodicidad' => ['required', Rule::in(PlanCitasSaas::PERIODICIDADES)],
+            'cobrar_diferencia' => ['sometimes', 'boolean'],
+        ]);
+        if (! $gestor->baseDeDatosExiste($modelo)) {
+            throw ValidationException::withMessages(['estado' => ['El negocio aún no tiene su base de datos.']]);
+        }
+
+        $resultado = $planes->cambiar(
+            $modelo,
+            (string) $validado['nivel'],
+            (int) $validado['profesionales'],
+            (string) $validado['periodicidad'],
+            (bool) ($validado['cobrar_diferencia'] ?? true),
+        );
+        $ajuste = $resultado['ajuste'];
+        if ($ajuste !== null) {
+            $domiciliacion->cobrar($ajuste);
+            $ajuste->refresh();
+        }
+        Log::info('plataforma.estudio.plan', [
+            'estudio' => $modelo->slug,
+            'nivel' => $validado['nivel'],
+            'profesionales' => (int) $validado['profesionales'],
+            'periodicidad' => $validado['periodicidad'],
+            'aplica' => $resultado['aplica'],
+            'ajuste' => $ajuste?->ulid,
+        ]);
+
+        return response()->json(['data' => [
+            'aplica' => $resultado['aplica'],
+            'ajuste' => $ajuste === null ? null : [
+                'id' => $ajuste->ulid,
+                'monto_minor' => $ajuste->monto_minor,
+                'moneda' => $ajuste->moneda,
+                'estado' => $ajuste->estado->value,
+            ],
+            'plan' => $planes->resumen($modelo->refresh()),
         ]]);
     }
 

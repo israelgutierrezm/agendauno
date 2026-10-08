@@ -7,6 +7,7 @@ use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\TipoCambio;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Testing\TestResponse;
 
@@ -189,4 +190,44 @@ it('solo quien gestiona el negocio cambia el plan y solo en negocios de citas', 
 
     $clases = estudioConSesion('pilates-a', 'dueno@pilates.mx');
     cambiarPlanCitas($clases, 'pro', 2)->assertStatus(422)->assertJsonPath('code', 'PLAN_NOT_ALLOWED');
+});
+
+it('el superadmin ve el plan del negocio en su ficha y lo cambia, cobrando o no la diferencia', function (): void {
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
+    terminarPrueba($e);
+    emitirRentaEl('2026-10-01 09:00'); // Individual, octubre pagado por adelantado
+    $this->travelTo(CarbonImmutable::parse('2026-10-11 10:00', 'America/Mexico_City'));
+
+    $this->getJson("/api/v1/plataforma/estudios/{$e['slug']}", conPlataforma())
+        ->assertOk()
+        ->assertJsonPath('data.plan_citas.nivel', 'individual')
+        ->assertJsonPath('data.plan_citas.cubierto_hasta', '2026-10-31');
+
+    // Cortesía: sube a Premium con 3 hoy, sin cobrar los días que faltan.
+    $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}/plan", [
+        'nivel' => 'premium', 'profesionales' => 3, 'periodicidad' => 'mensual', 'cobrar_diferencia' => false,
+    ], conPlataforma())
+        ->assertOk()
+        ->assertJsonPath('data.aplica', 'ahora')
+        ->assertJsonPath('data.ajuste', null)
+        ->assertJsonPath('data.plan.nivel', 'premium')
+        ->assertJsonPath('data.plan.limite_profesionales', 3);
+    expect(CargoRenta::query()->where('concepto', 'ajuste')->count())->toBe(0);
+
+    // Con las reglas de siempre: subir a Pro cobra la diferencia.
+    $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}/plan", [
+        'nivel' => 'pro', 'profesionales' => 3, 'periodicidad' => 'mensual',
+    ], conPlataforma())
+        ->assertOk()
+        ->assertJsonPath('data.aplica', 'ahora')
+        ->assertJsonPath('data.ajuste.moneda', 'MXN');
+    expect(CargoRenta::query()->where('concepto', 'ajuste')->count())->toBe(1);
+
+    $clases = estudioConSesion('pilates-a', 'dueno@pilates.mx');
+    $this->putJson("/api/v1/plataforma/estudios/{$clases['slug']}/plan", [
+        'nivel' => 'pro', 'profesionales' => 2, 'periodicidad' => 'mensual',
+    ], conPlataforma())->assertStatus(422)->assertJsonPath('code', 'PLAN_NOT_ALLOWED');
+    $this->getJson("/api/v1/plataforma/estudios/{$clases['slug']}", conPlataforma())->assertOk()->assertJsonPath('data.plan_citas', null);
+    $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}/plan", ['nivel' => 'pro'], ['Accept' => 'application/json'])->assertUnauthorized();
 });

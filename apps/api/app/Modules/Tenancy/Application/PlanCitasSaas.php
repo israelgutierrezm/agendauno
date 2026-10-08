@@ -300,15 +300,18 @@ class PlanCitasSaas
      * cobra la diferencia de los días que faltan; si cuesta igual o menos, o cambia
      * entre mensual y anual, aplica desde el siguiente periodo.
      *
+     * `$cobrarDiferencia` en falso (solo el superadmin, como cortesía): sube hoy sin
+     * cobrar la diferencia; lo siguiente se cobra con el plan nuevo.
+     *
      * @return array{aplica: 'ahora'|'siguiente', ajuste: CargoRenta|null}
      *
      * @throws PlanNoPermitido
      */
-    public function cambiar(Estudio $estudio, string $nivel, int $profesionales, string $periodicidad): array
+    public function cambiar(Estudio $estudio, string $nivel, int $profesionales, string $periodicidad, bool $cobrarDiferencia = true): array
     {
         $tarifa = $this->aplica($estudio) ? $this->tarifa() : null;
         if ($tarifa === null) {
-            throw new PlanNoPermitido('Tu negocio no se cobra por plan.');
+            throw new PlanNoPermitido('Este negocio no se cobra por plan (es de clases o tiene una cuota pactada).');
         }
         $definicion = $tarifa->definicion;
         $this->validar($definicion, $nivel, $profesionales, $periodicidad, $this->profesionalesActuales($estudio));
@@ -317,11 +320,11 @@ class PlanCitasSaas
         // consulta antes de bloquear. En la prueba no se cobra nada.
         $cubierto = $estudio->plan_cubierto_hasta !== null
             && $estudio->plan_cubierto_hasta->toDateString() >= $this->hoy($estudio)->toDateString();
-        if ($cubierto && $estudio->enMexico() && MonedaDeCobroSaas::deTarifa($definicion) === 'USD') {
+        if ($cobrarDiferencia && $cubierto && $estudio->enMexico() && MonedaDeCobroSaas::deTarifa($definicion) === 'USD') {
             $this->tipos->usdMxn(CarbonImmutable::now());
         }
 
-        return DB::transaction(function () use ($estudio, $definicion, $nivel, $profesionales, $periodicidad): array {
+        return DB::transaction(function () use ($estudio, $definicion, $nivel, $profesionales, $periodicidad, $cobrarDiferencia): array {
             /** @var Estudio $e */
             $e = Estudio::query()->whereKey($estudio->getKey())->lockForUpdate()->firstOrFail();
             $hoy = $this->hoy($e);
@@ -346,7 +349,9 @@ class PlanCitasSaas
             }
 
             // Sube: aplica hoy; mensual/anual cambia hasta el siguiente periodo.
-            $ajuste = $this->cobrarDiferencia($e, $definicion, $actual, $nuevo, $precioNuevo - $precioActual, $hoy);
+            $ajuste = $cobrarDiferencia
+                ? $this->cobrarDiferencia($e, $definicion, $actual, $nuevo, $precioNuevo - $precioActual, $hoy)
+                : null;
             $e->update([
                 'plan_nivel' => $nivel,
                 'plan_profesionales' => $profesionales,

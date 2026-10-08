@@ -176,6 +176,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/estudios/{estudio}/suspender', [PlataformaEstudiosController::class, 'suspender'])->name('estudios.suspender');
         Route::post('/estudios/{estudio}/reactivar', [PlataformaEstudiosController::class, 'reactivar'])->name('estudios.reactivar');
         Route::post('/estudios/{estudio}/extender-prueba', [PlataformaEstudiosController::class, 'extenderPrueba'])->name('estudios.extender-prueba');
+        // Plan de un negocio de citas desde soporte (ADR 0107): mismas reglas que el dueño.
+        Route::put('/estudios/{estudio}/plan', [PlataformaEstudiosController::class, 'plan'])->name('estudios.plan');
         // Avisos por WhatsApp del negocio a sus clientes: solo los activa la plataforma (ADR 0083).
         Route::put('/estudios/{estudio}/whatsapp', [PlataformaEstudiosController::class, 'whatsapp'])->name('estudios.whatsapp');
         // Clases o citas (excluyente): solo la plataforma la cambia, antes de operar (ADR 0104).
