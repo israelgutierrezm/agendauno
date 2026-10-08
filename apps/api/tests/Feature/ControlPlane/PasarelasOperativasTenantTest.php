@@ -32,9 +32,10 @@ afterEach(function (): void {
  */
 function stripeDeIntentos(bool $yaPagada = false): object
 {
-    $estado = (object) ['sesiones' => 0];
+    $estado = (object) ['sesiones' => 0, 'vencidas' => []];
     Http::fake(function (Request $request) use ($estado, $yaPagada) {
         $url = $request->url();
+        $sesion = preg_match('#/checkout/sessions/(cs_[^/?]+)#', $url, $m) === 1 ? $m[1] : '';
 
         if (str_ends_with($url, '/checkout/sessions') && $request->method() === 'POST') {
             $estado->sesiones++;
@@ -43,10 +44,16 @@ function stripeDeIntentos(bool $yaPagada = false): object
             return Http::response(['id' => $id, 'url' => "https://checkout.stripe.com/c/pay/{$id}"]);
         }
         if (str_ends_with($url, '/expire')) {
-            return $yaPagada ? Http::response(['error' => ['message' => 'complete']], 400) : Http::response(['status' => 'expired']);
+            if ($yaPagada) {
+                return Http::response(['error' => ['message' => 'complete']], 400);
+            }
+            $estado->vencidas[] = $sesion;
+
+            return Http::response(['status' => 'expired']);
         }
-        if (str_contains($url, '/checkout/sessions/')) {
-            return Http::response(['status' => $yaPagada ? 'complete' : 'expired']);
+        // Como Stripe: abierta hasta que se vence (o completa si ya se pagó).
+        if ($sesion !== '') {
+            return Http::response(['status' => $yaPagada ? 'complete' : (in_array($sesion, $estado->vencidas, true) ? 'expired' : 'open')]);
         }
 
         return Http::response([], 404);
