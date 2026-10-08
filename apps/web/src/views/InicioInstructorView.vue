@@ -11,6 +11,7 @@ import TarjetaOperacion, {
   type Ilustracion,
 } from "@/components/TarjetaOperacion.vue";
 import TarjetaPrincipal from "@/components/TarjetaPrincipal.vue";
+import { puedeEntrar } from "@/lib/acceso";
 import { useRecargarAlVolver } from "@/lib/alVolver";
 import { lugarDelClima, useClima } from "@/lib/clima";
 import { fotoNegocio } from "@/lib/fotoNegocio";
@@ -211,6 +212,15 @@ async function recargar(): Promise<void> {
   }
 }
 
+// Una clase abre directo su pase de lista (si su rol puede pasarla); una cita, o
+// quien no puede pasar lista, su detalle.
+const listaDirecta = computed(() => puedeEntrar("pase-lista", sesion));
+function paseDeLista(c: ClaseMia): RouteLocationRaw | null {
+  return c.tipo !== "cita" && listaDirecta.value
+    ? { name: "pase-lista", params: { id: c.id } }
+    : null;
+}
+
 // Lo de hoy, en orden: lo que ya empezó y no tiene lista completa la pide.
 function faltaLista(c: ClaseMia): boolean {
   if (new Date(c.inicia_en).getTime() > ahora.value) {
@@ -380,7 +390,16 @@ onUnmounted(() => clearInterval(reloj));
             {{ proxima.tipo === "cita" ? proxima.oferta : detalle(proxima) }}
           </p>
           <div class="mt-6 flex flex-wrap items-center gap-3">
+            <RouterLink
+              v-if="paseDeLista(proxima)"
+              :to="paseDeLista(proxima)!"
+              class="tu-btn tu-btn-primario"
+              data-prueba="pasar-lista"
+            >
+              {{ $t("portal.instructor.inicio.pasarLista") }}
+            </RouterLink>
             <button
+              v-else
               type="button"
               class="tu-btn tu-btn-primario"
               @click="abierta = proxima"
@@ -448,7 +467,14 @@ onUnmounted(() => clearInterval(reloj));
         </header>
         <ul v-if="deHoy.length > 0">
           <li v-for="c in deHoy" :key="c.id">
-            <button type="button" class="pi-hoy-fila" @click="abierta = c">
+            <component
+              :is="paseDeLista(c) ? RouterLink : 'button'"
+              v-bind="
+                paseDeLista(c) ? { to: paseDeLista(c) } : { type: 'button' }
+              "
+              class="pi-hoy-fila"
+              @click="paseDeLista(c) ? undefined : (abierta = c)"
+            >
               <span class="pi-hoy-hora tabular-nums">{{ horaDe(c) }}</span>
               <span class="min-w-0 flex-1">
                 <span class="block font-medium">{{ lineaHoy(c).titulo }}</span>
@@ -469,7 +495,7 @@ onUnmounted(() => clearInterval(reloj));
                 }}</span
               >
               <IconoNav nombre="chevron" :tam="18" class="pi-hoy-abrir" />
-            </button>
+            </component>
           </li>
         </ul>
         <p

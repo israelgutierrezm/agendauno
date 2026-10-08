@@ -81,12 +81,38 @@ class ReservasTenantController
                 'transferencias' => $transferencias->get($reserva->ulid, []),
             ])->all(),
             // Pase de lista (ADR 0101): desde cuándo se registra y si ya empezó (para
-            // terminar la lista).
+            // terminar la lista), y la clase misma (la pantalla de la lista se abre sola).
             'meta' => [
                 'asistencia_desde' => $sesion->inicia_en->copy()->subMinutes(app(ParametrosTenant::class)->entero('asistencia.minutos_antes'))->toIso8601String(),
                 'empezo' => $sesion->inicia_en->lessThanOrEqualTo(now()),
+                'sesion' => $this->resumenDeSesion($sesion),
             ],
         ]);
+    }
+
+    /**
+     * La clase o cita de la lista: qué es, cuándo, con quién y dónde.
+     *
+     * @return array<string, mixed>
+     */
+    private function resumenDeSesion(SesionTenant $sesion): array
+    {
+        $sesion->loadMissing(['oferta', 'instructor', 'sucursal', 'recurso']);
+
+        return [
+            'id' => $sesion->ulid,
+            'tipo' => $sesion->tipo->value,
+            'oferta' => $sesion->oferta?->nombre,
+            'oferta_id' => $sesion->oferta?->ulid,
+            'instructor' => $sesion->instructor?->name,
+            'sala' => $sesion->recurso?->nombre,
+            'sucursal' => $sesion->sucursal?->nombre,
+            'inicia_en' => $sesion->inicia_en->toIso8601String(),
+            'termina_en' => $sesion->termina_en->toIso8601String(),
+            'zona_horaria' => $sesion->zona_horaria,
+            'capacidad' => $sesion->capacidad,
+            'estado' => $sesion->estado->value,
+        ];
     }
 
     /**

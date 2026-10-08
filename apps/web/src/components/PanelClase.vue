@@ -3,32 +3,24 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import AgregarAClase from "@/components/AgregarAClase.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import IconoNav from "@/components/IconoNav.vue";
 import MoverReserva from "@/components/MoverReserva.vue";
 import MarcoDetalle from "@/components/MarcoDetalle.vue";
-import { asistenciaAbierta } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
-import { confirmarAsistencia } from "@/lib/confirmarAsistencia";
+import {
+  colorEstado,
+  estadoEnLista,
+  ocupaLugar,
+  resumenLista,
+  type ReservaLista,
+} from "@/lib/paseLista";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
-interface Reserva {
-  id: string;
-  estado: string;
-  canal: string;
-  lugar: number | null;
-  persona_id: string | null;
-  persona: string | null;
-  primera_vez: boolean;
-  adeudo: boolean;
-  documentos_pendientes: number;
-  unidades: number;
-  asistencia: string | null;
-  retardo?: boolean;
-  asistencia_automatica?: boolean;
-}
+type Reserva = ReservaLista;
 export interface SesionResumen {
   id: string;
   oferta: string | null;
@@ -39,6 +31,9 @@ export interface SesionResumen {
   oferta_id?: string | null;
 }
 
+// Detalle de una clase (Recepción, Mis clases): quién viene y cómo va, la lista de
+// espera y lo que se gestiona de cada lugar. La asistencia se pasa en su propia
+// pantalla (Pasar lista).
 // `incrustado`: se pinta junto a la lista (escritorio); si no, como panel (móvil).
 const props = defineProps<{ sesion: SesionResumen; incrustado?: boolean }>();
 const emit = defineEmits<{ (e: "cerrar"): void; (e: "cambio"): void }>();
@@ -46,53 +41,28 @@ const emit = defineEmits<{ (e: "cerrar"): void; (e: "cambio"): void }>();
 const { t } = useI18n();
 const sesionStore = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesionStore.slug}`);
-const puedeMarcar = computed(() => sesionStore.puede("asistencia.marcar"));
+// Pasar lista: la pantalla de la lista pide ver las reservas y marcar asistencia.
+const puedePasarLista = computed(
+  () =>
+    sesionStore.puede("asistencia.marcar") && sesionStore.puede("reservas.ver"),
+);
 const puedeGestionar = computed(() => sesionStore.puede("reservas.gestionar"));
 
 const roster = ref<Reserva[]>([]);
-// Pase de lista (ADR 0101): desde cuándo se registra y si ya empezó la clase.
-const asistenciaDesde = ref<string | null>(null);
-const empezo = ref(false);
-const abierta = computed(() => asistenciaAbierta(asistenciaDesde.value));
-const abreA = computed(() =>
-  asistenciaDesde.value
-    ? new Intl.DateTimeFormat("es-MX", {
-        timeZone: props.sesion.zona_horaria,
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).format(new Date(asistenciaDesde.value))
-    : "",
-);
 const cargando = ref(true);
 const accionando = ref(false);
 const error = ref<string | null>(null);
 const aviso = ref<string | null>(null);
 
 // Confirmadas, ofrecidas y pendientes de pago (todas ocupan lugar); en espera aparte.
-const enSala = computed(() =>
-  roster.value.filter(
-    (r) =>
-      r.estado === "confirmada" ||
-      r.estado === "ofrecida" ||
-      r.estado === "pendiente_pago",
-  ),
-);
+const enSala = computed(() => roster.value.filter(ocupaLugar));
 const enEspera = computed(() =>
   roster.value.filter((r) => r.estado === "en_espera"),
 );
-const presentes = computed(
-  () => enSala.value.filter((r) => r.asistencia === "presente").length,
+const resumen = computed(() =>
+  resumenLista(roster.value, props.sesion.capacidad),
 );
-const sinMarcar = computed(
-  () =>
-    enSala.value.filter((r) => r.estado === "confirmada" && !r.asistencia)
-      .length,
-);
-const libres = computed(() => {
-  const cap = props.sesion.capacidad;
-  return cap === null ? null : Math.max(0, cap - enSala.value.length);
-});
+const libres = computed(() => resumen.value.libres);
 
 /**
  * Avisos de un alumno en una sola línea de texto: en ámbar lo que hay que atender
@@ -158,13 +128,10 @@ async function cargar(): Promise<void> {
   cargando.value = true;
   error.value = null;
   try {
-    const { data } = await api.get<{
-      data: Reserva[];
-      meta?: { asistencia_desde?: string; empezo?: boolean };
-    }>(`${base.value}/sesiones/${props.sesion.id}/reservas`);
+    const { data } = await api.get<{ data: Reserva[] }>(
+      `${base.value}/sesiones/${props.sesion.id}/reservas`,
+    );
     roster.value = data.data;
-    asistenciaDesde.value = data.meta?.asistencia_desde ?? null;
-    empezo.value = data.meta?.empezo ?? false;
   } catch (e) {
     error.value = mensajeDeError(e);
   } finally {
@@ -187,45 +154,6 @@ async function accion(fn: () => Promise<unknown>): Promise<void> {
   }
 }
 
-async function marcar(
-  r: Reserva,
-  estado: "presente" | "ausente",
-  retardo = false,
-): Promise<void> {
-  // Solo cambiar si llegó tarde no mueve créditos: no hace falta confirmarlo.
-  const soloRetardo = r.asistencia === "presente" && estado === "presente";
-  if (
-    !soloRetardo &&
-    !(await confirmarAsistencia(t, r.persona ?? "", r.asistencia, estado))
-  ) {
-    return;
-  }
-  return accion(() =>
-    api.post(`${base.value}/reservas/${r.id}/asistencia`, { estado, retardo }),
-  );
-}
-// Terminar de pasar lista: quien sigue sin registro «no se presentó».
-async function terminarLista(): Promise<void> {
-  if (
-    !(await confirmar(
-      t("recepcion.panel.terminarListaConfirmar", { n: sinMarcar.value }),
-      { aceptar: t("recepcion.panel.terminarLista"), peligro: true },
-    ))
-  ) {
-    return;
-  }
-  let cuantas = 0;
-  await accion(async () => {
-    const { data } = await api.post<{ data: { no_se_presentaron: number } }>(
-      `${base.value}/sesiones/${props.sesion.id}/terminar-lista`,
-      {},
-    );
-    cuantas = data.data.no_se_presentaron;
-  });
-  if (!error.value) {
-    aviso.value = t("recepcion.panel.listaTerminada", cuantas);
-  }
-}
 function aceptar(r: Reserva): Promise<void> {
   return accion(() => api.post(`${base.value}/reservas/${r.id}/aceptar`, {}));
 }
@@ -279,64 +207,12 @@ async function promover(): Promise<void> {
   }
 }
 
-// Walk-in: agregar a un alumno a la clase en el momento (busca y reserva; si está
-// llena, va a lista de espera). Reusa el buscador server-side y el motor de reservas.
-interface MiembroResultado {
-  id: string;
-  nombre_completo: string;
-  email: string | null;
-}
+// Walk-in: agregar a alguien a la clase en el momento (o a la lista de espera).
 const agregando = ref(false);
-const busqueda = ref("");
-const resultados = ref<MiembroResultado[]>([]);
-const buscando = ref(false);
-let tempBusqueda: ReturnType<typeof setTimeout> | undefined;
-
-async function buscarMiembro(): Promise<void> {
-  const q = busqueda.value.trim();
-  if (q.length < 2) {
-    resultados.value = [];
-    return;
-  }
-  buscando.value = true;
-  try {
-    const { data } = await api.get<{ data: MiembroResultado[] }>(
-      `${base.value}/miembros`,
-      { params: { q } },
-    );
-    resultados.value = data.data;
-  } catch {
-    resultados.value = [];
-  } finally {
-    buscando.value = false;
-  }
-}
-watch(busqueda, () => {
-  clearTimeout(tempBusqueda);
-  tempBusqueda = setTimeout(() => void buscarMiembro(), 300);
-});
-
-async function agregar(m: MiembroResultado): Promise<void> {
-  accionando.value = true;
-  error.value = null;
-  aviso.value = null;
-  try {
-    // Si no hay lugar, entra a lista de espera (esperar=true) en vez de fallar.
-    const esperar = (libres.value ?? 0) <= 0;
-    await api.post(`${base.value}/sesiones/${props.sesion.id}/reservas`, {
-      persona_id: m.id,
-      esperar,
-    });
-    busqueda.value = "";
-    resultados.value = [];
-    agregando.value = false;
-    await cargar();
-    emit("cambio");
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    accionando.value = false;
-  }
+async function agregado(): Promise<void> {
+  agregando.value = false;
+  await cargar();
+  emit("cambio");
 }
 
 watch(() => props.sesion.id, cargar, { immediate: true });
@@ -362,14 +238,6 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             : $t("recepcionVisual.lugaresDisponibles", { n: libres }, libres)
         }}</span
       >
-      <p
-        v-if="!cargando && !error && !abierta && puedeMarcar"
-        class="mt-3 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-        data-prueba="lista-abre"
-      >
-        {{ $t("recepcion.panel.abreDesde", { hora: abreA }) }}
-      </p>
       <div v-if="!cargando && !error" class="pc-lista-resumen">
         <div>
           <IconoNav nombre="miembros" :tam="18" /><strong>{{
@@ -378,24 +246,28 @@ watch(() => props.sesion.id, cargar, { immediate: true });
           ><span>{{ $t("portal.instructor.lista.reservas") }}</span>
         </div>
         <div class="pc-lista-presentes">
-          <IconoNav nombre="hecho" :tam="18" /><strong>{{ presentes }}</strong
+          <IconoNav nombre="hecho" :tam="18" /><strong>{{
+            resumen.llegaron
+          }}</strong
           ><span>{{ $t("portal.instructor.lista.presentes") }}</span>
         </div>
         <div>
-          <IconoNav nombre="reloj" :tam="18" /><strong>{{ sinMarcar }}</strong
+          <IconoNav nombre="reloj" :tam="18" /><strong>{{
+            resumen.porMarcar
+          }}</strong
           ><span>{{ $t("portal.instructor.lista.sinMarcar") }}</span>
         </div>
       </div>
-      <button
-        v-if="!cargando && !error && puedeMarcar && empezo && sinMarcar > 0"
-        type="button"
-        class="tu-btn tu-btn-fantasma mt-3 text-sm"
-        :disabled="accionando"
-        data-prueba="terminar-lista"
-        @click="terminarLista"
+      <!-- La asistencia se pasa en su propia pantalla -->
+      <RouterLink
+        v-if="!cargando && !error && puedePasarLista && enSala.length > 0"
+        :to="{ name: 'pase-lista', params: { id: sesion.id } }"
+        class="tu-btn tu-btn-primario mt-3 inline-flex items-center gap-2"
+        data-prueba="pasar-lista"
       >
-        {{ $t("recepcion.panel.terminarLista") }}
-      </button>
+        <IconoNav nombre="lista" :tam="16" />
+        {{ $t("paseLista.pasarLista") }}
+      </RouterLink>
       <p
         v-if="!cargando && !error && enEspera.length > 0"
         class="mt-3 text-sm"
@@ -426,46 +298,14 @@ watch(() => props.sesion.id, cargar, { immediate: true });
       >
         {{ $t("recepcion.panel.agregar") }}
       </button>
-      <div v-else class="relative">
-        <input
-          v-model="busqueda"
-          type="search"
-          class="tu-input"
-          :placeholder="$t('recepcion.panel.buscarAgregar')"
-        />
-        <div
-          v-if="busqueda.trim().length >= 2"
-          class="absolute z-10 mt-1 w-full tu-card overflow-hidden"
-        >
-          <p
-            v-if="buscando"
-            class="px-3 py-2 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("comun.cargando") }}
-          </p>
-          <p
-            v-else-if="resultados.length === 0"
-            class="px-3 py-2 text-sm"
-            :style="{ color: 'var(--texto-suave)' }"
-          >
-            {{ $t("recepcion.sinResultados") }}
-          </p>
-          <ul v-else class="max-h-56 overflow-y-auto">
-            <li v-for="m in resultados" :key="m.id">
-              <button
-                type="button"
-                class="w-full border-t px-3 py-2 text-left text-sm first:border-t-0 hover:brightness-95"
-                :style="{ borderColor: 'var(--borde)' }"
-                :disabled="accionando"
-                @click="agregar(m)"
-              >
-                {{ m.nombre_completo }}
-              </button>
-            </li>
-          </ul>
-        </div>
-      </div>
+      <AgregarAClase
+        v-else
+        :base="base"
+        :sesion-id="sesion.id"
+        :llena="libres === 0"
+        @agregado="agregado"
+        @cerrar="agregando = false"
+      />
     </div>
 
     <p v-if="cargando" class="text-sm" :style="{ color: 'var(--texto-suave)' }">
@@ -522,26 +362,17 @@ watch(() => props.sesion.id, cargar, { immediate: true });
               </p>
             </div>
             <span
-              v-if="r.asistencia === 'presente'"
-              class="tu-badge tu-badge-exito shrink-0"
-              >{{
-                r.retardo
-                  ? $t("agenda.roster.retardo")
-                  : $t("agenda.roster.presente")
-              }}</span
-            >
-            <span
-              v-else-if="r.asistencia === 'ausente'"
-              class="text-xs shrink-0"
-              :style="{ color: 'var(--texto-suave)' }"
-              >{{
-                r.asistencia_automatica
-                  ? $t("agenda.roster.ausenteAutomatica")
-                  : $t("agenda.roster.ausente")
-              }}</span
+              v-if="r.estado === 'confirmada' && r.asistencia"
+              class="pc-estado shrink-0"
+              :style="{ '--punto': colorEstado(estadoEnLista(r)) }"
+              data-prueba="estado-asistencia"
+              >{{ $t(`paseLista.estados.${estadoEnLista(r)}`) }}</span
             >
           </div>
-          <div class="mt-2 flex flex-wrap items-center gap-2">
+          <div
+            v-if="puedeGestionar"
+            class="mt-2 flex flex-wrap items-center gap-2"
+          >
             <button
               v-if="r.estado === 'ofrecida' && puedeGestionar"
               type="button"
@@ -551,43 +382,6 @@ watch(() => props.sesion.id, cargar, { immediate: true });
             >
               {{ $t("agenda.roster.aceptar") }}
             </button>
-            <template v-if="r.estado === 'confirmada' && puedeMarcar">
-              <button
-                type="button"
-                class="tu-btn pc-lista-accion text-sm"
-                :class="
-                  r.asistencia === 'presente'
-                    ? 'tu-btn-fantasma'
-                    : 'tu-btn-primario'
-                "
-                :disabled="accionando || !abierta"
-                data-prueba="lista-llego"
-                @click="marcar(r, 'presente')"
-              >
-                <IconoNav nombre="hecho" :tam="16" />
-                {{ $t("recepcion.panel.llego") }}
-              </button>
-              <button
-                type="button"
-                class="tu-btn tu-btn-fantasma pc-lista-accion text-sm"
-                :aria-pressed="r.asistencia === 'presente' && r.retardo"
-                :disabled="accionando || !abierta"
-                data-prueba="lista-retardo"
-                @click="marcar(r, 'presente', true)"
-              >
-                <IconoNav nombre="reloj" :tam="16" />
-                {{ $t("recepcion.panel.retardo") }}
-              </button>
-              <button
-                type="button"
-                class="tu-btn tu-btn-fantasma pc-lista-accion text-sm"
-                :disabled="accionando || !abierta"
-                @click="marcar(r, 'ausente')"
-              >
-                <IconoNav nombre="ausente" :tam="16" />
-                {{ $t("recepcion.panel.noVino") }}
-              </button>
-            </template>
             <button
               v-if="
                 puedeGestionar &&
@@ -711,8 +505,20 @@ watch(() => props.sesion.id, cargar, { immediate: true });
 .pc-lista-presentes svg {
   color: var(--exito-texto);
 }
-.pc-lista-accion {
-  min-height: 44px;
+/* Estado de asistencia: punto de color + texto. */
+.pc-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.pc-estado::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--punto);
 }
 @media (max-width: 400px) {
   .pc-lista-resumen > div {

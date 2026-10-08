@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   permisos: null as string[] | null,
   // La modalidad sale de la sesión (ADR 0104), no de la respuesta del día.
   esCitas: false,
+  modalidad: undefined as string | undefined,
 }));
 vi.mock("@/lib/api", () => ({
   api,
@@ -25,6 +26,9 @@ vi.mock("@/stores/sesionTenant", () => ({
     zonaHoraria: "America/Mexico_City",
     get esCitas() {
       return api.esCitas;
+    },
+    get modalidad() {
+      return api.modalidad;
     },
     puede: (permiso: string) =>
       api.permisos === null || api.permisos.includes(permiso),
@@ -68,6 +72,7 @@ describe("el día de hoy en el Inicio", () => {
     vi.clearAllMocks();
     api.permisos = null;
     api.esCitas = false;
+    api.modalidad = undefined;
   });
 
   it("indicadores, agenda con lo que falta marcar y pendientes", async () => {
@@ -444,7 +449,7 @@ describe("el día de hoy en el Inicio", () => {
     expect(w.get('[data-prueba="abrir-siguiente"]').text()).toBe("Ver clase");
   });
 
-  it("pasar lista de una clase lleva a Recepción con esa clase", async () => {
+  it("pasar lista de una clase lleva a su pase de lista; sin él, a Recepción", async () => {
     api.get.mockImplementation((url: string) =>
       Promise.resolve({
         data: {
@@ -479,5 +484,16 @@ describe("el día de hoy en el Inicio", () => {
       name: "recepcion",
       query: { fecha: "2026-10-01", sesion: "clase1" },
     });
+    w.unmount();
+
+    // En un negocio de clases, quien puede pasar lista va directo a la lista.
+    api.modalidad = "clases";
+    const v = montar();
+    await flushPromises();
+    expect(
+      JSON.parse(
+        v.get('[data-prueba="marcar-pendiente"]').attributes("data-to")!,
+      ),
+    ).toEqual({ name: "pase-lista", params: { id: "clase1" } });
   });
 });

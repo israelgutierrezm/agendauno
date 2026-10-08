@@ -22,7 +22,7 @@ export default {
   reservarTitulo: "Reservar un lugar",
   asistentesTitulo: "Quién viene",
   asistentesAyuda:
-    "Marca quién llegó; si hay lista de espera, quien sigue aparece aquí.",
+    "Quién reservó y cómo va su asistencia; la lista se pasa en «Pasar lista».",
   asistencia: "Asistencia",
   moverEsta: "Mover solo esta clase",
   moverSerie: "Mover esta y las siguientes",

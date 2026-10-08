@@ -39,6 +39,11 @@ export const POLITICAS: Record<string, Politica> = {
   tareas: { permiso: "tareas.ver" },
   agenda: { permiso: "agenda.ver" },
   recepcion: { permiso: "reservas.gestionar" },
+  // Pase de lista de una clase (las citas se marcan en su detalle).
+  "pase-lista": {
+    permiso: ["reservas.ver", "asistencia.marcar"],
+    modalidad: "clases",
+  },
   // Llenar lugares libres de una clase: no aplica a citas 1 a 1.
   oportunidades: { permiso: "reservas.gestionar", modalidad: "clases" },
   // La pantalla lista a los alumnos de cada grupo. Los grupos son de clases: el

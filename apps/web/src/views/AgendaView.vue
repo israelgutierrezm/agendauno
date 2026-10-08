@@ -25,7 +25,6 @@ import ModalDialogo from "@/components/ModalDialogo.vue";
 import PanelCita from "@/components/PanelCita.vue";
 import PanelNuevaCita from "@/components/PanelNuevaCita.vue";
 import {
-  asistenciaAbierta,
   kpisCitas,
   kpisClases,
   COLOR_ESTADO_CITA,
@@ -44,7 +43,7 @@ import { api, mensajeDeError } from "@/lib/api";
 import { dinero as dineroDelPais, simboloMoneda } from "@/lib/formato";
 import { hoyComoFecha, hoyEnNegocio } from "@/lib/hoyNegocio";
 import { useSucursalOperativa } from "@/lib/sucursalOperativa";
-import { confirmarAsistencia } from "@/lib/confirmarAsistencia";
+import { colorEstado, estadoEnLista } from "@/lib/paseLista";
 import { trackEvent } from "@/lib/analytics";
 import { plural } from "@/lib/terminologia";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
@@ -376,9 +375,10 @@ function lineaRoster(r: Reserva): { texto: string; color: string }[] {
     });
   }
   if (r.asistencia) {
+    const estado = estadoEnLista(r);
     out.push({
-      texto: t(`agenda.roster.${r.asistencia}`),
-      color: "var(--texto-suave)",
+      texto: t(`paseLista.estados.${estado}`),
+      color: colorEstado(estado),
     });
   }
   if (r.canal && r.canal !== "directo") {
@@ -1407,40 +1407,6 @@ async function guardarLugares(): Promise<void> {
   }
 }
 
-async function marcar(
-  reservaId: string,
-  estado: "presente" | "ausente",
-  sesionId: string,
-  retardo = false,
-): Promise<void> {
-  const r = roster.value.find((x) => x.id === reservaId);
-  // Solo cambiar si llegó tarde no mueve créditos: no hace falta confirmarlo.
-  const soloRetardo = r?.asistencia === "presente" && estado === "presente";
-  if (
-    !soloRetardo &&
-    !(await confirmarAsistencia(
-      t,
-      r?.persona ?? "",
-      r?.asistencia ?? null,
-      estado,
-    ))
-  ) {
-    return;
-  }
-  accionando.value = true;
-  error.value = null;
-  try {
-    await api.post(`${base.value}/reservas/${reservaId}/asistencia`, {
-      estado,
-      retardo,
-    });
-    await cargarRoster(sesionId);
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    accionando.value = false;
-  }
-}
 async function aceptar(reservaId: string, sesionId: string): Promise<void> {
   accionando.value = true;
   error.value = null;
@@ -2810,9 +2776,26 @@ onMounted(async () => {
 
             <!-- Quién viene: asistencia, lista de espera y cambios de su lugar -->
             <section class="tu-detalle-seccion" data-prueba="roster">
-              <header>
-                <h3>{{ $t("detalleClase.asistentesTitulo") }}</h3>
-                <p>{{ $t("detalleClase.asistentesAyuda") }}</p>
+              <header class="dcl-roster-cabecera">
+                <div>
+                  <h3>{{ $t("detalleClase.asistentesTitulo") }}</h3>
+                  <p>{{ $t("detalleClase.asistentesAyuda") }}</p>
+                </div>
+                <!-- La asistencia se pasa en su propia pantalla -->
+                <RouterLink
+                  v-if="
+                    puedeMarcar &&
+                    puedeVerReservas &&
+                    detalle.estado !== 'cancelada' &&
+                    roster.length > 0
+                  "
+                  :to="{ name: 'pase-lista', params: { id: detalle.id } }"
+                  class="tu-btn tu-btn-primario inline-flex items-center gap-2 text-sm"
+                  data-prueba="pasar-lista"
+                >
+                  <IconoNav nombre="lista" :tam="16" />
+                  {{ $t("paseLista.pasarLista") }}
+                </RouterLink>
               </header>
               <p
                 v-if="!puedeVerReservas"
@@ -2891,53 +2874,6 @@ onMounted(async () => {
                       >
                         {{ $t("agenda.roster.aceptar") }}
                       </button>
-                      <span
-                        v-if="r.estado === 'confirmada' && puedeMarcar"
-                        class="tu-segmentado"
-                        role="group"
-                        :aria-label="$t('detalleClase.asistencia')"
-                      >
-                        <button
-                          type="button"
-                          :aria-pressed="
-                            r.asistencia === 'presente' && !r.retardo
-                          "
-                          :disabled="
-                            accionando ||
-                            !asistenciaAbierta(detalle.asistencia_desde) ||
-                            (r.asistencia === 'presente' && !r.retardo)
-                          "
-                          @click="marcar(r.id, 'presente', detalle.id)"
-                        >
-                          {{ $t("agendaVisual.cita.marcarLlegada") }}
-                        </button>
-                        <button
-                          type="button"
-                          :aria-pressed="
-                            r.asistencia === 'presente' && r.retardo
-                          "
-                          :disabled="
-                            accionando ||
-                            !asistenciaAbierta(detalle.asistencia_desde) ||
-                            (r.asistencia === 'presente' && r.retardo)
-                          "
-                          @click="marcar(r.id, 'presente', detalle.id, true)"
-                        >
-                          {{ $t("recepcion.panel.retardo") }}
-                        </button>
-                        <button
-                          type="button"
-                          :aria-pressed="r.asistencia === 'ausente'"
-                          :disabled="
-                            accionando ||
-                            !asistenciaAbierta(detalle.asistencia_desde) ||
-                            r.asistencia === 'ausente'
-                          "
-                          @click="marcar(r.id, 'ausente', detalle.id)"
-                        >
-                          {{ $t("agendaVisual.cita.noAsistio") }}
-                        </button>
-                      </span>
                       <button
                         v-if="
                           puedeReservar &&
@@ -3806,6 +3742,14 @@ onMounted(async () => {
 }
 .dcl-roster {
   display: grid;
+}
+/* «Quién viene» con «Pasar lista» a la derecha (abajo en el teléfono). */
+.dcl-roster-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 .dcl-roster > li {
   padding: 0.6rem 0;

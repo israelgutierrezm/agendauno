@@ -317,6 +317,14 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // Pase de lista de una clase en su propia pantalla (ADR 0101).
+      path: "/pase-de-lista/:id",
+      name: "pase-lista",
+      component: () => import("@/views/PaseListaView.vue"),
+      props: true,
+      meta: { requiereSesion: true },
+    },
+    {
       path: "/grupos",
       name: "grupos",
       component: () => import("@/views/GruposView.vue"),

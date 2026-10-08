@@ -248,6 +248,10 @@ function enAgenda(s: SesionHoy): RouteLocationRaw {
 // Pasar lista de una clase: en Recepción, con esa clase abierta. La llegada de una
 // cita se marca en la cita misma (agenda).
 function paraMarcar(s: SesionHoy): RouteLocationRaw | null {
+  // Una clase, directo a su pase de lista.
+  if (s.tipo !== "cita" && puedeEntrar("pase-lista", sesion)) {
+    return { name: "pase-lista", params: { id: s.id } };
+  }
   if (s.tipo !== "cita" && puedeEntrar("recepcion", sesion)) {
     return {
       name: "recepcion",

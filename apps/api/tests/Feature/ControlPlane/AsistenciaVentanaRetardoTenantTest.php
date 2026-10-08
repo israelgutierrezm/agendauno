@@ -79,6 +79,24 @@ it('la asistencia se registra desde los minutos configurados antes de que empiec
         ->assertCreated();
 });
 
+it('la lista trae la clase misma: la pantalla del pase de lista se abre sola', function (): void {
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    parametrosDeAsistencia($e, ['asistencia.minutos_antes' => 15]);
+    $sesion = crearSesionTenant($e, agendaSemilla($e), capacidad: 12);
+
+    $respuesta = $this->getJson("/api/v1/app/{$e['slug']}/sesiones/{$sesion}/reservas", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('meta.sesion.id', $sesion)
+        ->assertJsonPath('meta.sesion.tipo', 'clase')
+        ->assertJsonPath('meta.sesion.capacidad', 12)
+        ->assertJsonPath('meta.sesion.estado', 'programada')
+        ->assertJsonPath('meta.sesion.zona_horaria', 'America/Mexico_City')
+        ->assertJsonPath('meta.empezo', false);
+    // La clase es a las 8:00: la lista abre a las 7:45.
+    expect(CarbonImmutable::parse((string) $respuesta->json('meta.asistencia_desde'))
+        ->equalTo(CarbonImmutable::parse('2026-10-01 07:45', 'America/Mexico_City')))->toBeTrue();
+});
+
 it('un retardo cuenta como asistencia y se puede corregir sin mover créditos', function (): void {
     $e = estudioConSesion('estudio-a', 'a@correo.mx');
     $sesion = crearSesionTenant($e, agendaSemilla($e));

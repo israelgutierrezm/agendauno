@@ -30,10 +30,16 @@ que alguien llegó tarde.
   quien no tiene registro en las clases y citas que terminaron en el último día. Lo
   que ya marcó alguien no se toca. Se guarda como `asistencias.automatica` y las
   pantallas lo dicen («No se presentó (automático)»).
-- **Pantallas**: «Llegó / Retardo / No vino» en Recepción, en el pase de lista de
-  quien imparte y en el detalle de una clase de la agenda; «Llegó tarde» en la cita;
-  los botones se activan en la ventana; «Terminar lista» aparece ya empezada la clase
-  si falta alguien. Igual en la app.
+- **Pantallas**: el pase de lista de una clase tiene su propia pantalla en la web
+  (`/pase-de-lista/{sesion}`, con `reservas.ver` y `asistencia.marcar`, solo en
+  negocios de clases): orden alfabético fijo, un toque por persona (Llegó / Tarde /
+  No vino) que se ve al momento sin recargar la lista, «Cambiar» para corregir,
+  filtros, búsqueda, agregar a quien llegó sin reservar, lista de espera y «Terminar
+  lista» abajo cuando ya empezó y falta alguien. Recepción, la Agenda, el Inicio y el
+  inicio de quien imparte llevan ahí con «Pasar lista»; el detalle de la clase solo
+  dice cómo va cada quien. Para abrirse sola, la lista de la clase trae la clase
+  misma (`meta.sesion`). «Llegó tarde» en la cita; los botones se activan en la
+  ventana. Igual en la app.
 
 ## Consecuencias
 
