@@ -30,12 +30,19 @@ map $http_x_forwarded_proto $https_cliente {
 # Marcos (cabeceras de nginx-cabeceras.conf): DENY en todo, salvo la vista previa del
 # sitio de un negocio (/estudio/{slug}/vista-previa), que el panel muestra en un iframe
 # del mismo origen (ADR 0114). Con $request_uri: tras try_files, $uri ya es /app.html.
+#
+# Los formularios de captación (/f/{negocio}/{formulario}, ADR 0117) se embeben en el
+# sitio propio del negocio, en cualquier dominio: ahí no va X-Frame-Options (vacío, nginx
+# no la manda) y frame-ancestors admite cualquier origen. Son páginas públicas sin
+# sesión: lo único que hacen es enviar el formulario.
 map $request_uri $marco {
     ~^/estudio/[a-z0-9-]+/vista-previa/?(\?.*)?$ SAMEORIGIN;
+    ~^/f/[a-z0-9-]+/[0-9a-z]+/?(\?.*)?$ "";
     default DENY;
 }
 map $request_uri $marco_csp {
     ~^/estudio/[a-z0-9-]+/vista-previa/?(\?.*)?$ "frame-ancestors 'self'";
+    ~^/f/[a-z0-9-]+/[0-9a-z]+/?(\?.*)?$ "frame-ancestors *";
     default "frame-ancestors 'none'";
 }
 

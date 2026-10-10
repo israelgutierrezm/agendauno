@@ -309,6 +309,9 @@ jobs:
           grep -qi "^x-frame-options: DENY$" <<<"$(cabeceras fluo.agendauno.test /estudio/otro/vista-previa-falsa)"
           grep -qi "^x-frame-options: SAMEORIGIN$" <<<"$(cabeceras fluo.agendauno.test /estudio/fluo/vista-previa)"
           grep -qi "^content-security-policy: frame-ancestors 'self'$" <<<"$(cabeceras fluo.turnouno.test '/estudio/fluo/vista-previa?v=2')"
+          # Un formulario de captación se embebe en cualquier sitio (ADR 0117).
+          if grep -qi "^x-frame-options:" <<<"$(cabeceras fluo.agendauno.test '/f/fluo/01jz0000000000000000000000?embed=1')"; then exit 1; fi
+          grep -qi "^content-security-policy: frame-ancestors \*$" <<<"$(cabeceras fluo.agendauno.test '/f/fluo/01jz0000000000000000000000?embed=1')"
           # Sin la landing, la portada es la aplicación (no un 502).
           docker stop landing-turnouno
           test "$(pedir turnouno.test /)" = 200
