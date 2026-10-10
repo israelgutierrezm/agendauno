@@ -82,6 +82,14 @@ const router = createRouter({
       component: () => import("@/views/EstudioPublicoView.vue"),
     },
     {
+      // Vista previa del sitio con su borrador (la abre su editor, con la sesión de
+      // quien configura el negocio; en el mismo origen que el panel).
+      path: "/estudio/:slug/vista-previa",
+      name: "sitio-vista-previa",
+      component: () => import("@/views/EstudioPublicoView.vue"),
+      props: { vistaPrevia: true },
+    },
+    {
       // Agendar cita (público, guest): elegir servicio → persona → hueco → pagar.
       path: "/agendar/:slug",
       name: "agendar-cita",
@@ -395,6 +403,13 @@ const router = createRouter({
       path: "/configuracion",
       name: "configuracion",
       component: () => import("@/views/ConfiguracionView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      // El sitio del negocio (ADR 0114): plantilla, secciones, banners y publicar.
+      path: "/sitio",
+      name: "sitio-web",
+      component: () => import("@/views/SitioWebView.vue"),
       meta: { requiereSesion: true },
     },
     {

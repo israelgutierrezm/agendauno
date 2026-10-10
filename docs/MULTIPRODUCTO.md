@@ -37,7 +37,7 @@ implementado** · **Requiere autorización**.
 | Color de marca del negocio | Implementado y probado | Configuración → Perfil público; barra de la app instalada |
 | Íconos cuadrados del logo (192/512) | Preparado para futuro | Requiere GD en la imagen del API (cambio de imagen) |
 | Notificaciones push web | No implementado | La app oficial sí tiene push (FCM) |
-| Constructor del sitio (plantillas, secciones, banners) | No implementado | Hoy: escaparate con logo, portada, descripción, redes y color |
+| Constructor del sitio (plantillas, secciones, textos, fotos, banners, vista previa, publicar) | Implementado y probado | ADR 0114: Configuración → Sitio web; borrador y versiones en la base del negocio; probado en pruebas y en el navegador contra la API local (pendiente de despliegue) |
 | Dominios propios de los negocios | Preparado para futuro | Diseño documentado arriba (verificación por DNS, certificados, SEO); no habilitado |
 | App oficial AgendaUno (Android) | Implementado y probado | ADR 0111: sabor `agendauno`, `com.agendauno.app`; APK compilado y revisado |
 | App oficial TurnoUno (Android) | Implementado y probado | Sabor `turnouno`, `com.turnouno.app`, API `turnouno.mx`; APK compilado y revisado; ícono provisional |

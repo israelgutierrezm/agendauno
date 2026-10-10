@@ -58,6 +58,12 @@ final class CatalogoParametros
             new DefinicionParametro('asistencia.no_asistio_al_terminar', 'Asistencia', 'Al terminar, quien no tiene registro «no se presentó»',
                 'Si nadie registró la asistencia de alguien, al terminar la clase o cita queda como que no se presentó, con la política de inasistencias del negocio.', $sn, 1),
 
+            // Sitio del negocio (ADR 0114).
+            new DefinicionParametro('sitio.banners_maximos', 'Sitio del negocio', 'Banners en el sitio',
+                'Cuántos banners (promociones, avisos) puede tener la página del negocio.', $e, 5, 1, 20, 'banners'),
+            new DefinicionParametro('sitio.imagenes_maximas', 'Sitio del negocio', 'Imágenes del sitio',
+                'Cuántas fotos propias puede tener la página del negocio (las de «Nosotros» y los banners).', $e, 30, 5, 200, 'imágenes'),
+
             // Acceso.
             new DefinicionParametro('acceso.minutos_antes', 'Acceso', 'Se puede entrar desde',
                 'Minutos antes de que empiece su clase o cita.', $e, 30, 0, 240, 'min'),

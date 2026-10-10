@@ -107,6 +107,7 @@ use App\Modules\Tenancy\Http\Controllers\ResumenClientesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ResumenMiembroTenantController;
 use App\Modules\Tenancy\Http\Controllers\RetencionTenantController;
 use App\Modules\Tenancy\Http\Controllers\RolesTenantController;
+use App\Modules\Tenancy\Http\Controllers\SitioWebController;
 use App\Modules\Tenancy\Http\Controllers\SolicitudesPrivacidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\StaffTenantController;
 use App\Modules\Tenancy\Http\Controllers\SuscripcionesTenantController;
@@ -499,6 +500,13 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/negocio/region', [RegionNegocioTenantController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('negocio.region.guardar');
             Route::get('/perfil-publico', [PerfilPublicoController::class, 'mostrar'])->middleware('puede:estudio.gestionar')->name('perfil-publico.show');
             Route::put('/perfil-publico', [PerfilPublicoController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('perfil-publico.guardar');
+            // Sitio del negocio (ADR 0114): borrador, vista previa y publicar.
+            Route::get('/sitio', [SitioWebController::class, 'mostrar'])->middleware('puede:estudio.gestionar')->name('sitio.show');
+            Route::put('/sitio', [SitioWebController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('sitio.guardar');
+            Route::post('/sitio/publicar', [SitioWebController::class, 'publicar'])->middleware('puede:estudio.gestionar')->name('sitio.publicar');
+            Route::post('/sitio/descartar', [SitioWebController::class, 'descartar'])->middleware('puede:estudio.gestionar')->name('sitio.descartar');
+            Route::get('/sitio/vista-previa', [SitioWebController::class, 'vistaPrevia'])->middleware('puede:estudio.gestionar')->name('sitio.vista-previa');
+            Route::post('/sitio/imagenes', [SitioWebController::class, 'subirImagen'])->middleware('puede:estudio.gestionar')->name('sitio.imagenes.store');
 
             // Documentos: el admin define tipos requeridos; se cargan por persona y
             // el staff los valida (tenant-local, aislado).

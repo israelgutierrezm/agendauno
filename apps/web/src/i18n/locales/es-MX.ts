@@ -189,6 +189,7 @@ export default {
     opciones: {
       datos: "Datos e imagen del negocio",
       pagina: "Página pública",
+      sitio: "Sitio web",
       sucursales: "Sucursales",
       region: "País, moneda y zona horaria",
       fiscales: "Datos fiscales",

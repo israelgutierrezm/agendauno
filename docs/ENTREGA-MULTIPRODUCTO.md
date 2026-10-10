@@ -73,7 +73,8 @@ Un solo repositorio, sin ramas permanentes por producto.
 | 4 | `e99f83a` | Apps oficiales por sabor; la API rechaza negocios del otro producto; marca blanca |
 | 5 | `525a481` | Imágenes por componente, publicar/volver por componente, Traefik y Cloudflare |
 | 6 | `b8f2139`, `b470a29` | CI por áreas, auditoría de dependencias, GHCR, desplegar y apps firmadas |
-| 7 | (esta) | Producto en los registros, diseño de dominios propios, este informe |
+| 7 | `c50697a` | Producto en los registros, diseño de dominios propios, este informe |
+| 8 | (esta) | Constructor del sitio de cada negocio (ADR 0114) |
 
 ## 5. Aplicaciones web separadas
 
@@ -107,6 +108,16 @@ La aplicación (`dist/app`) es la consola de los dos productos: panel del negoci
 portal del cliente, escaparate y superadmin (uno solo). Se presenta con la marca del
 dominio en que se abre (textos, logo, enlaces) y su registro ofrece solo los giros de
 ese producto. Se publica con `--solo web` sin tocar la API.
+
+### Sitio de cada negocio (fase 8)
+
+Configuración → «Sitio web» (ADR 0114): plantillas (esencial, portada, compacta),
+secciones que se muestran, ocultan y reordenan (portada primero y contacto al final),
+títulos y textos propios, la foto de «Nosotros», banners con fechas y botón, vista
+previa en ancho de teléfono o computadora, publicar y descartar. Lo operativo (horarios,
+precios, servicios, equipo, sedes) sigue saliendo del sistema. Probado: 9 pruebas del
+API, 13 de la web y en el navegador contra la API local (guardar, vista previa,
+plantilla, publicar, 360 px sin desbordes).
 
 ## 9. Cambios backend
 
@@ -369,9 +380,9 @@ Resumen:
 
 | Estado | Componentes |
 |---|---|
-| Implementado y probado | Producto por modalidad; dominios por producto en la API; correos y enlaces por producto; registro por producto y cierre de TurnoUno; interesados; directorio y slugs reservados; un código y tres builds web; consola con la marca del dominio; superadmin de interesados; color de marca; apps Android de los dos productos; la API rechaza negocios del otro producto |
+| Implementado y probado | Constructor del sitio de cada negocio (fase 8, ADR 0114); Producto por modalidad; dominios por producto en la API; correos y enlaces por producto; registro por producto y cierre de TurnoUno; interesados; directorio y slugs reservados; un código y tres builds web; consola con la marca del dominio; superadmin de interesados; color de marca; apps Android de los dos productos; la API rechaza negocios del otro producto |
 | Implementado, pendiente de credenciales | Imágenes en GHCR; despliegue desde GitHub; compilación firmada de las apps |
 | Implementado, pendiente de despliegue | Landings de AgendaUno y TurnoUno; imágenes web separadas; publicar y volver por componente; PWA por negocio; Traefik y certificados comodín; IP real con Cloudflare; CI por áreas |
 | Preparado para futuro | Apps en iOS e iOS en el CI; marca blanca; dominios propios; íconos cuadrados del logo; negocio con los dos productos; documentos legales por producto |
-| No implementado | Push web; constructor del sitio (plantillas, secciones, banners) |
+| No implementado | Push web |
 | Requiere autorización | DNS; cambios en el Traefik y en producción; publicar apps; autorregistro de clientes (se mantiene cerrado) |
