@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
 use App\Modules\Tenancy\Application\CupoProfesionales;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\FuncionesPlan;
+use App\Modules\Tenancy\Application\InvitarUsuarioTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\RolesTenant;
@@ -50,6 +51,7 @@ class UsuariosTenantController
         private readonly RegistrarAuditoria $auditoria,
         private readonly RolesTenant $roles,
         private readonly CupoProfesionales $cupo,
+        private readonly InvitarUsuarioTenant $invitaciones,
     ) {}
 
     /**
@@ -288,61 +290,15 @@ class UsuariosTenantController
         // Premium; un cliente no es equipo. Un profesional más debe caber en el plan del
         // negocio (ADR 0107).
         $this->exigirEquipo($request, [(string) $validado['rol']]);
-        $profesional = $this->esProfesional([(string) $validado['rol']]);
-
-        // Email único dentro de la BD del tenant (también el de alguien dado de baja:
-        // ese correo es suyo y se reactiva su cuenta).
-        $existente = Usuario::withTrashed()->where('email', $validado['email'])->first();
-        if ($existente instanceof Usuario && ! $existente->trashed()) {
-            throw ValidationException::withMessages(['email' => ['Ya existe un usuario con ese correo en este estudio.']]);
-        }
 
         // Si se pide sede, se resuelve ANTES de crear el usuario (falla limpio si no existe).
         $sucursal = isset($validado['sucursal_id']) && $validado['sucursal_id'] !== ''
             ? SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail()
             : null;
 
-        $datos = [
-            'name' => $validado['nombre'],
-            'email' => $validado['email'],
-            'rol' => $validado['rol'],
-            'roles' => [$validado['rol']],
-            'activo' => false,
-            'password' => null,
-        ];
-        $reactivado = $existente instanceof Usuario;
-        $usuario = $this->cupo->sumar($this->estudioDe($request), $profesional ? 1 : 0, function () use ($existente, $datos, $request): Usuario {
-            if ($existente instanceof Usuario) {
-                // Vuelve al equipo: misma cuenta (su historial), con el rol de ahora y una
-                // invitación nueva para definir su contraseña.
-                $this->bajas->reactivarUsuario($existente, $this->actor($request), 'Invitado de nuevo al equipo.');
-                $existente->forceFill($datos)->save();
-
-                return $existente;
-            }
-
-            return Usuario::query()->create($datos);
-        });
-
-        // Asignación de sede (acota al usuario a esa sucursal con su rol).
-        if ($sucursal instanceof SucursalTenant) {
-            AsignacionPersonalTenant::query()->create([
-                'usuario_id' => $usuario->getKey(),
-                'sucursal_id' => $sucursal->getKey(),
-                'rol' => $validado['rol'],
-            ]);
-        }
-
-        if (! $reactivado) {
-            $this->auditoria->registrar($this->actor($request), 'usuario.invitado', 'usuario', (string) $usuario->ulid, null, [
-                'nombre' => $usuario->name,
-                'email' => $usuario->email,
-                'rol' => $validado['rol'],
-            ]);
-        }
-
-        // Genera el token y ENVÍA la invitación por correo.
-        $token = $this->enviarActivacion->enviar($this->estudioDe($request), (string) $usuario->email);
+        ['usuario' => $usuario, 'reactivado' => $reactivado, 'token' => $token] = $this->invitaciones->invitar(
+            $this->estudioDe($request), $this->actor($request), (string) $validado['nombre'], (string) $validado['email'], (string) $validado['rol'], $sucursal,
+        );
 
         return response()->json(['data' => [
             'usuario' => $this->presentar($usuario),
