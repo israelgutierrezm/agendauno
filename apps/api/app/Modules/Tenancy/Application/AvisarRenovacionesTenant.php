@@ -12,6 +12,7 @@ use App\Modules\Tenancy\Models\DomiciliacionTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -113,7 +114,7 @@ class AvisarRenovacionesTenant
                 'monto' => $monto,
                 'como_pagar' => $comoPagar,
                 'automatico' => $domiciliacion instanceof DomiciliacionTenant,
-                'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $this->gestor->actual()?->slug),
+                'enlace' => MarcaProducto::actual()->urlWeb().'/entrar?estudio='.rawurlencode((string) $this->gestor->actual()?->slug),
             ]);
 
             return true;

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Mail;
 
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -29,12 +31,18 @@ class CorreoRestablecimiento extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: "Restablece tu contraseña de {$this->estudioNombre}");
+        $producto = MarcaProducto::deSlug($this->slug);
+
+        return new Envelope(
+            from: new Address(MarcaProducto::remitente($producto), $producto->nombre()),
+            subject: "Restablece tu contraseña de {$this->estudioNombre}",
+        );
     }
 
     public function content(): Content
     {
-        $base = rtrim((string) config('agendauno.url_app'), '/');
+        $producto = MarcaProducto::deSlug($this->slug);
+        $base = $producto->urlWeb();
         $url = $base.'/restablecer/'.$this->slug
             .'?email='.rawurlencode($this->email)
             .'&token='.rawurlencode($this->token);
@@ -44,6 +52,6 @@ class CorreoRestablecimiento extends Mailable implements ShouldQueue
             .'<p>El enlace sirve una sola vez y vence en una hora. Si no lo pediste, ignora este correo: tu contraseña no cambia.</p>'
             .'<p>Si el botón no funciona, copia y pega este enlace en tu navegador:<br>'.e($url).'</p>';
 
-        return new Content(htmlString: DisenoCorreo::envolver($this->estudioNombre, $html));
+        return new Content(htmlString: DisenoCorreo::envolver($this->estudioNombre, $html, $producto));
     }
 }

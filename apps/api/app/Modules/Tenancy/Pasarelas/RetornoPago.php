@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Pasarelas;
 
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\ProductoComercial;
 use Illuminate\Http\Request;
 
 /**
@@ -35,14 +37,18 @@ final class RetornoPago
     /**
      * Sitio (esquema://host[:puerto]) al que vuelve el cliente: el de la petición que
      * inicia el pago (encabezado `Origin` o, si no viene, `Referer`) cuando es nuestro,
-     * es decir, el host de `url_app` o el subdominio de un negocio del dominio base
-     * (en producción, solo con https). Cualquier otro, o sin encabezado (la app móvil,
-     * un cobro programado), vuelve a `url_app` como siempre.
+     * es decir, la web de un producto o el subdominio de un negocio en el dominio de un
+     * producto (en producción, solo con https). Cualquier otro, o sin encabezado (la app
+     * móvil, un cobro programado), vuelve a la web del producto del negocio (ADR 0108)
+     * o, fuera de un negocio, a `url_app`.
      */
     public static function origen(?Request $peticion = null): string
     {
-        $porOmision = rtrim((string) config('agendauno.url_app'), '/');
         $peticion ??= request();
+        $estudio = $peticion->attributes->get('estudio');
+        $porOmision = $estudio instanceof Estudio
+            ? $estudio->producto()->urlWeb()
+            : rtrim((string) config('agendauno.url_app'), '/');
 
         $declarado = trim((string) $peticion->headers->get('Origin'));
         if ($declarado === '' || $declarado === 'null') {
@@ -65,10 +71,12 @@ final class RetornoPago
         $host = strtolower($partes['host']);
         $puerto = $partes['port'] ?? null;
 
-        $hostApp = strtolower((string) parse_url($porOmision, PHP_URL_HOST));
-        $dominio = strtolower(trim((string) config('agendauno.dominio_base'), '.'));
-        $esNuestro = ($hostApp !== '' && $host === $hostApp)
-            || ($dominio !== '' && preg_match('/^([a-z0-9-]+\.)?'.preg_quote($dominio, '/').'$/', $host) === 1);
+        $hostsWeb = [strtolower((string) parse_url($porOmision, PHP_URL_HOST))];
+        foreach (ProductoComercial::cases() as $producto) {
+            $hostsWeb[] = strtolower((string) parse_url($producto->urlWeb(), PHP_URL_HOST));
+        }
+        $esNuestro = in_array($host, array_filter($hostsWeb), true)
+            || ProductoComercial::delHost($host) !== null;
         if (! $esNuestro) {
             return null;
         }

@@ -31,6 +31,23 @@ class RegistrarEstudio
     /** Largo máximo del slug: el manual se valida con él y el automático se recorta. */
     public const LARGO_MAXIMO_SLUG = 40;
 
+    /**
+     * Subdominios que no pueden ser de un negocio (ADR 0108): los de la plataforma en
+     * agendauno.mx y turnouno.mx, y los nombres de los productos y sus modalidades.
+     *
+     * @var list<string>
+     */
+    public const SLUGS_RESERVADOS = [
+        'www', 'app', 'api', 'admin', 'panel', 'consola', 'staging', 'pruebas', 'mail', 'correo',
+        'soporte', 'ayuda', 'status', 'estado', 'cdn', 'static', 'assets', 'blog', 'docs',
+        'agendauno', 'turnouno', 'clases', 'citas', 'registro', 'entrar', 'negocios',
+    ];
+
+    public static function reservado(string $slug): bool
+    {
+        return in_array($slug, self::SLUGS_RESERVADOS, true);
+    }
+
     /** MySQL no admite nombres de base de más de 64 caracteres. */
     private const LARGO_MAXIMO_BASE = 64;
 
@@ -75,7 +92,7 @@ class RegistrarEstudio
 
         $candidato = $base;
         $intento = 1;
-        while (Estudio::query()->where('slug', $candidato)->exists()) {
+        while (self::reservado($candidato) || Estudio::query()->where('slug', $candidato)->exists()) {
             $intento++;
             $sufijo = '-'.$intento;
             $candidato = self::recortar($base, self::LARGO_MAXIMO_SLUG - strlen($sufijo)).$sufijo;

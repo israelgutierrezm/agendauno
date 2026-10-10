@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Requests;
 use App\Modules\Tenancy\Application\RegistrarEstudio;
 use App\Modules\Tenancy\CatalogoPaises;
 use App\Modules\Tenancy\PerfilNegocio;
+use App\Modules\Tenancy\ProductoComercial;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -49,8 +50,11 @@ class RegistrarEstudioRequest extends FormRequest
             // partir del nombre; el registrante no lo captura. Se acepta opcional por
             // compatibilidad (p. ej. un slug ya elegido), validado si viene. Corto: con él
             // se nombra la base del negocio (MySQL admite 64 caracteres) y el subdominio.
-            'slug' => ['nullable', 'string', 'min:3', 'max:'.RegistrarEstudio::LARGO_MAXIMO_SLUG, 'regex:/^[a-z0-9-]+$/', 'unique:estudios,slug'],
+            'slug' => ['nullable', 'string', 'min:3', 'max:'.RegistrarEstudio::LARGO_MAXIMO_SLUG, 'regex:/^[a-z0-9-]+$/', 'unique:estudios,slug', Rule::notIn(RegistrarEstudio::SLUGS_RESERVADOS)],
             'perfil_negocio' => ['nullable', Rule::enum(PerfilNegocio::class)],
+            // Desde qué producto se registra (la web de AgendaUno o la de TurnoUno, ADR
+            // 0108): el giro debe ser de ese producto.
+            'producto' => ['nullable', Rule::enum(ProductoComercial::class)],
             // Paso 2: el nombre del propietario (desglosado; apellido materno y segundo nombre opcionales).
             'contacto_nombre' => ['required', 'string', 'max:120'],
             'contacto_segundo_nombre' => ['nullable', 'string', 'max:120'],
@@ -88,6 +92,7 @@ class RegistrarEstudioRequest extends FormRequest
         return [
             'pais.required' => 'Elige el país de tu negocio.',
             'pais.in' => 'Elige un país de la lista.',
+            'slug.not_in' => 'Esa dirección está reservada. Elige otra.',
         ];
     }
 }

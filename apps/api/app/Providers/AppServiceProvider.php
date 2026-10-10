@@ -186,12 +186,13 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Nombre de la ruta sin el prefijo del montaje (`api.v1.app.` o `api.v1.sub.`):
-     * la misma pantalla cuenta igual entre por ruta o por subdominio.
+     * Nombre de la ruta sin el prefijo del montaje (`api.v1.app.`, `api.v1.sub.` o
+     * `api.v1.sub-{producto}.`): la misma pantalla cuenta igual entre por ruta o por el
+     * subdominio de cualquier producto.
      */
     private static function rutaTenant(Request $request): string
     {
-        return (string) preg_replace('/^api\.v1\.(app|sub)\./', '', (string) $request->route()?->getName());
+        return (string) preg_replace('/^api\.v1\.(app|sub|sub-[a-z]+)\./', '', (string) $request->route()?->getName());
     }
 
     private static function textoDeRuta(Request $request, string $parametro): string

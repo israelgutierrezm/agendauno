@@ -20,8 +20,10 @@ return [
     ))),
 
     'allowed_origins_patterns' => array_values(array_filter([
-        // La app de cada negocio en su subdominio ({slug}.dominio) y el dominio base.
+        // La web de cada producto (ADR 0108) y la de cada negocio en su subdominio
+        // ({slug}.dominio): AgendaUno y TurnoUno.
         '#^https://([a-z0-9-]+\.)?'.preg_quote((string) env('APP_TENANT_DOMAIN', 'agendauno.mx'), '#').'$#',
+        '#^https://([a-z0-9-]+\.)?'.preg_quote((string) env('TURNOUNO_DOMINIO', 'turnouno.mx'), '#').'$#',
         // En desarrollo: localhost, 127.0.0.1 y {slug}.localhost en cualquier puerto.
         env('APP_ENV') === 'local' ? '#^http://(localhost|127\.0\.0\.1|[a-z0-9-]+\.localhost)(:\d+)?$#' : null,
     ])),
