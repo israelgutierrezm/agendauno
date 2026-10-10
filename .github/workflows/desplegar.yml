@@ -1,0 +1,129 @@
+name: Desplegar
+
+# Publica una versión en un servidor (ADR 0113): entra por SSH y corre actualizar.sh,
+# el mismo script que se usa a mano (mantenimiento, respaldo, migraciones, revisión
+# antes de abrir; o --solo para la aplicación web o una landing), o volver.sh para
+# regresar. Después prueba desde fuera los dos dominios. Solo a mano
+# (Actions → Desplegar → Run workflow) y con el entorno de GitHub del servidor
+# (`staging` o `produccion`), que debe pedir aprobación (Required reviewers): nadie
+# publica en producción sin que alguien lo autorice.
+#
+# Secretos de cada entorno (docs/CI-CD.md): SSH_HOST, SSH_USUARIO, SSH_LLAVE (privada,
+# solo para desplegar), SSH_HUELLAS (líneas de known_hosts del servidor) y
+# RUTA_PLATAFORMA (la carpeta infra/produccion del servidor). Variables del entorno:
+# URL_AGENDAUNO y URL_TURNOUNO (https://… de cada producto) para las pruebas de después.
+
+on:
+  workflow_dispatch:
+    inputs:
+      entorno:
+        description: Servidor
+        type: choice
+        options: [staging, produccion]
+        required: true
+      accion:
+        description: Publicar una versión o volver a una anterior
+        type: choice
+        options: [actualizar, volver]
+        default: actualizar
+      componente:
+        description: Qué publicar
+        type: choice
+        options: [todo, web, landing-agendauno, landing-turnouno]
+        default: todo
+      ref:
+        description: Al publicar, rama, etiqueta o commit (por omisión, lo último de main); al volver, la versión (vacío = la anterior)
+        type: string
+        default: origin/main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desplegar-${{ inputs.entorno }}
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    name: ${{ inputs.entorno }} · ${{ inputs.componente }}
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.entorno }}
+    env:
+      ACCION: ${{ inputs.accion }}
+      COMPONENTE: ${{ inputs.componente }}
+      REF: ${{ inputs.ref }}
+      URL_AGENDAUNO: ${{ vars.URL_AGENDAUNO }}
+      URL_TURNOUNO: ${{ vars.URL_TURNOUNO }}
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USUARIO: ${{ secrets.SSH_USUARIO }}
+      SSH_LLAVE: ${{ secrets.SSH_LLAVE }}
+      SSH_HUELLAS: ${{ secrets.SSH_HUELLAS }}
+      RUTA_PLATAFORMA: ${{ secrets.RUTA_PLATAFORMA }}
+    steps:
+      - name: Revisar datos
+        run: |
+          set -euo pipefail
+          for secreto in SSH_HOST SSH_USUARIO SSH_LLAVE SSH_HUELLAS RUTA_PLATAFORMA; do
+            if [ -z "${!secreto}" ]; then
+              echo "::error::Falta el secreto $secreto del entorno ${{ inputs.entorno }} (docs/CI-CD.md)."
+              exit 1
+            fi
+          done
+          # Lo que viaja al servidor por SSH: solo nombres de git y rutas sin espacios ni
+          # caracteres del shell.
+          if [ "$ACCION" = "volver" ] && [ "$REF" = "origin/main" ]; then
+            REF=""
+            echo "REF=" >> "$GITHUB_ENV"
+          fi
+          if [ -n "$REF" ] && ! printf '%s' "$REF" | grep -Eq '^[A-Za-z0-9._/-]{1,100}$'; then
+            echo "::error::Ref inválida: $REF"
+            exit 1
+          fi
+          if ! printf '%s' "$RUTA_PLATAFORMA" | grep -Eq '^/[A-Za-z0-9._/-]+$'; then
+            echo "::error::RUTA_PLATAFORMA inválida."
+            exit 1
+          fi
+
+      - name: Llave SSH
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_LLAVE" > ~/.ssh/despliegue
+          chmod 600 ~/.ssh/despliegue
+          printf '%s\n' "$SSH_HUELLAS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Publicar
+        run: |
+          set -euo pipefail
+          script="./actualizar.sh"
+          [ "$ACCION" = "volver" ] && script="./volver.sh"
+          if [ "$COMPONENTE" = "todo" ]; then
+            orden="$script $REF"
+          else
+            orden="$script --solo $COMPONENTE $REF"
+          fi
+          echo "En ${{ inputs.entorno }}: cd $RUTA_PLATAFORMA && $orden"
+          ssh -i ~/.ssh/despliegue -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            "$SSH_USUARIO@$SSH_HOST" "cd '$RUTA_PLATAFORMA' && $orden"
+
+      # Desde fuera, como un cliente: la API de la plataforma, la landing y la aplicación
+      # de cada producto (sin URL en el entorno, se omite).
+      - name: Pruebas posteriores
+        run: |
+          set -euo pipefail
+          for url in "$URL_AGENDAUNO" "$URL_TURNOUNO"; do
+            [ -z "$url" ] && continue
+            for ruta in /up /robots.txt / /entrar; do
+              curl -fsS --retry 5 --retry-delay 5 --retry-all-errors -o /dev/null "$url$ruta"
+              echo "OK $url$ruta"
+            done
+          done
+          if [ -n "$URL_AGENDAUNO" ]; then
+            curl -fsS -o /dev/null "$URL_AGENDAUNO/api/v1/health"
+            echo "OK $URL_AGENDAUNO/api/v1/health"
+          fi
+
+      - name: Limpiar llave
+        if: always()
+        run: rm -f ~/.ssh/despliegue

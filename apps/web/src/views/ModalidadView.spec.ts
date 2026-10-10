@@ -7,6 +7,13 @@ import { createMemoryHistory, createRouter } from "vue-router";
 
 import es from "@/i18n/locales/es-MX";
 import { trackEvent } from "@/lib/analytics";
+import { PRECIOS_POR_OMISION } from "@/marketing/precios";
+import { aplicarPreciosPublicos } from "@/marketing/preciosPublicos";
+import {
+  FRASES_SOLO_CON_REGISTRO,
+  FRASES_SOLO_EN_PRELANZAMIENTO,
+  frasesEncontradas,
+} from "@/marketing/prelanzamiento";
 import {
   IMAGEN_NEGOCIO,
   MODALIDADES,
@@ -143,6 +150,7 @@ describe("landing de una modalidad (/clases y /citas)", () => {
       for (const enlace of registro) {
         expect(enlace.attributes("href")).toBe(`/registro?modo=${modo}`);
       }
+      // Los dos productos reciben registros: al registro (`register`).
       await vista.get('[data-cta="hero"]').trigger("click");
       expect(trackEvent).toHaveBeenCalledWith("marketing_cta_clicked", {
         placement: "hero",
@@ -159,6 +167,80 @@ describe("landing de una modalidad (/clases y /citas)", () => {
     },
   );
 
+  it.each(MODOS_PRUEBA)(
+    "%s con su registro abierto: la prueba, sus sellos y sus propios botones, sin nada de la lista de interesados",
+    async (modo) => {
+      const vista = montar(modo, { completa: true });
+      await flushPromises();
+      expect(vista.get('[data-cta="hero"]').text()).toBe(
+        es.landing.modalidad.probar,
+      );
+      expect(vista.get('[data-cta="product_demo"]').text()).toBe(
+        es.landing[modo].producto.cta,
+      );
+      expect(vista.get('[data-cta="business_carousel"]').text()).toBe(
+        es.landing[modo].giros.cta,
+      );
+      expect(
+        vista.findAll("[data-sello]").map((s) => s.attributes("data-sello")),
+      ).toEqual(["prueba", "configuracion", "cobro", "cancelacion"]);
+      expect(vista.text()).toContain(es.landing.pieHero);
+      expect(
+        frasesEncontradas(vista.text(), FRASES_SOLO_EN_PRELANZAMIENTO),
+      ).toEqual([]);
+      vista.unmount();
+    },
+  );
+
+  it.each(MODOS_PRUEBA)(
+    "%s con el registro cerrado por el superadmin: todo lleva a la lista, sin ofrecer prueba ni registro",
+    async (modo) => {
+      aplicarPreciosPublicos({
+        registro: { agendauno: false, turnouno: false },
+      });
+      try {
+        const vista = montar(modo, { completa: true });
+        await flushPromises();
+        for (const cta of [
+          "hero",
+          "product_demo",
+          "business_carousel",
+          "public_page",
+          "final",
+        ]) {
+          expect(vista.get(`[data-cta="${cta}"]`).text(), cta).toBe(
+            es.landing.prelanzamiento.cta,
+          );
+        }
+        expect(vista.get(".tu-link-flecha").text()).toBe(
+          es.landing.prelanzamiento.cta,
+        );
+        const texto = vista.text();
+        expect(frasesEncontradas(texto, FRASES_SOLO_CON_REGISTRO)).toEqual([]);
+        expect(texto).not.toContain(es.landing[modo].producto.cta);
+        expect(texto).toContain(es.landing.prelanzamiento.pieHero);
+        expect(texto).toContain(es.landing.prelanzamiento.pasosTitulo);
+        // Sellos: «Abre pronto», sin la prueba ni la permanencia.
+        expect(
+          vista.findAll("[data-sello]").map((s) => s.attributes("data-sello")),
+        ).toEqual(["proximamente", "configuracion", "cobro"]);
+        expect(vista.get('[data-sello="proximamente"]').text()).toBe(
+          es.landing.prelanzamiento.sello,
+        );
+        // Cada botón a la lista se mide como `waitlist`.
+        await vista.get('[data-cta="product_demo"]').trigger("click");
+        expect(trackEvent).toHaveBeenLastCalledWith("marketing_cta_clicked", {
+          placement: "product_demo",
+          destination: "waitlist",
+          mode: modo,
+        });
+        vista.unmount();
+      } finally {
+        aplicarPreciosPublicos(PRECIOS_POR_OMISION);
+      }
+    },
+  );
+
   it.each([
     ["clases", "/citas", "citas"],
     ["citas", "/clases", "clases"],
@@ -169,7 +251,13 @@ describe("landing de una modalidad (/clases y /citas)", () => {
       await flushPromises();
       const enlace = vista.get(".tu-modalidad-otra a");
       expect(enlace.attributes("href")).toBe(ruta);
-      expect(enlace.text()).toContain(es.landing[modo].final.otraEnlace);
+      // El otro producto, con su nombre (ADR 0108).
+      expect(enlace.text()).toContain(
+        es.landing[modo].final.otraEnlace.replace(
+          "{otro}",
+          modo === "clases" ? "TurnoUno" : "AgendaUno",
+        ),
+      );
       await enlace.trigger("click");
       expect(trackEvent).toHaveBeenCalledWith(
         "marketing_business_mode_selected",
@@ -454,8 +542,9 @@ describe("landing de una modalidad (/clases y /citas)", () => {
       expect(pregunta.get("summary").text()).toBe(
         "¿Puedo cambiar de modalidad después?",
       );
+      // Dos productos (ADR 0108): cambiar de modalidad es pasar al otro, sin nombrarlo.
       expect(pregunta.get("p").text()).toContain(
-        "Solo AgendaUno puede cambiar la modalidad de tu negocio, y solo antes de que empieces a operar",
+        "solo el equipo de AgendaUno puede pasarlo al otro, y solo antes de que empieces a operar",
       );
       vista.unmount();
     },

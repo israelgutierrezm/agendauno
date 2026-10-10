@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ResenaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -122,6 +123,9 @@ class ResenasTenantController
                 'instructor_id' => $reserva->sesion->instructor_id,
                 'calificacion' => (int) $validado['calificacion'],
                 'comentario' => is_string($comentario) && trim($comentario) !== '' ? trim($comentario) : null,
+                // Sin revisión, se publica en su página; con revisión, espera a que el
+                // negocio la apruebe (parámetro del negocio).
+                'visible' => app(ParametrosTenant::class)->siNo('resenas.publicar_sin_revisar'),
             ]);
             // Para automatizaciones y webhooks (p. ej. atender una calificación baja).
             $this->eventos->registrar('resena.creada', 'resena', (string) $resena->ulid, [
@@ -130,7 +134,7 @@ class ResenasTenantController
                 'comentario' => (string) $resena->comentario,
                 // Para el aviso al equipo: qué se calificó y dónde verlo.
                 'actividad' => (string) $reserva->sesion->oferta?->nombre,
-                'enlace_panel' => rtrim((string) config('agendauno.url_app'), '/').'/resenas',
+                'enlace_panel' => MarcaProducto::actual()->urlWeb().'/resenas',
             ]);
 
             return $resena;

@@ -43,6 +43,7 @@ use App\Modules\Tenancy\Http\Controllers\IncidenciasCobroTenantController;
 use App\Modules\Tenancy\Http\Controllers\InicioHoyTenantController;
 use App\Modules\Tenancy\Http\Controllers\IntegracionApiTenantController;
 use App\Modules\Tenancy\Http\Controllers\IntegracionesTenantController;
+use App\Modules\Tenancy\Http\Controllers\InteresadosController;
 use App\Modules\Tenancy\Http\Controllers\InventarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\LealtadTenantController;
 use App\Modules\Tenancy\Http\Controllers\LegalesPublicoController;
@@ -85,6 +86,7 @@ use App\Modules\Tenancy\Http\Controllers\PreciosPublicosController;
 use App\Modules\Tenancy\Http\Controllers\PromocionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\PublicoCitasController;
 use App\Modules\Tenancy\Http\Controllers\PuntoDeVentaTenantController;
+use App\Modules\Tenancy\Http\Controllers\PwaNegocioController;
 use App\Modules\Tenancy\Http\Controllers\RecursosTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReembolsosTenantController;
 use App\Modules\Tenancy\Http\Controllers\RegionNegocioTenantController;
@@ -105,6 +107,7 @@ use App\Modules\Tenancy\Http\Controllers\ResumenClientesTenantController;
 use App\Modules\Tenancy\Http\Controllers\ResumenMiembroTenantController;
 use App\Modules\Tenancy\Http\Controllers\RetencionTenantController;
 use App\Modules\Tenancy\Http\Controllers\RolesTenantController;
+use App\Modules\Tenancy\Http\Controllers\SitioWebController;
 use App\Modules\Tenancy\Http\Controllers\SolicitudesPrivacidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\StaffTenantController;
 use App\Modules\Tenancy\Http\Controllers\SuscripcionesTenantController;
@@ -121,6 +124,7 @@ use App\Modules\Tenancy\Http\Controllers\WebhookPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\WebhooksSalientesTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookTenantController;
 use App\Modules\Tenancy\Http\Controllers\WebhookWhatsAppController;
+use App\Modules\Tenancy\ProductoComercial;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -154,6 +158,8 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('throttle:600,1,whatsapp-webhook')->name('api.v1.webhooks.whatsapp');
 
     Route::post('/registro', [RegistroEstudioController::class, 'store'])->middleware('throttle:login')->name('api.v1.registro');
+    // Interesados de un producto que aún no abre registros (ADR 0108): la landing de TurnoUno.
+    Route::post('/interesados', [InteresadosController::class, 'store'])->middleware('throttle:login')->name('api.v1.interesados');
     Route::get('/registro/slug', [RegistroEstudioController::class, 'disponibilidad'])->middleware('throttle:publico')->name('api.v1.registro.slug');
     // WhatsApp del dueño (ADR 0070): verificar su número con un código al registrarse.
     Route::get('/registro/whatsapp', [RegistroWhatsAppController::class, 'disponible'])->middleware('throttle:publico')->name('api.v1.registro.whatsapp');
@@ -188,6 +194,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/estudios/{estudio}/terminologia', [PlataformaEstudiosController::class, 'terminologia'])->name('estudios.terminologia');
         Route::put('/estudios/{estudio}/terminologia', [PlataformaEstudiosController::class, 'guardarTerminologia'])->name('estudios.terminologia.guardar');
         Route::get('/cobros', PlataformaCobrosController::class)->name('cobros');
+        // Quienes esperan el lanzamiento de un producto (ADR 0108).
+        Route::get('/interesados', [InteresadosController::class, 'index'])->name('interesados');
         // Condonar un cargo de renta pendiente (queda cancelado; reactiva si ya no debe).
         Route::post('/cargos/{cargo}/condonar', [PlataformaCobrosController::class, 'condonar'])->name('cargos.condonar');
         // Estado de la operación: versión, procesos, verificación, respaldos y alertas.
@@ -241,6 +249,8 @@ Route::prefix('v1')->group(function (): void {
         // acceso (sin auth). Con límite por negocio e IP; un slug que no existe
         // responde 404 antes del límite (ADR 0102).
         Route::get('/marca', [MarcaEstudioController::class, 'mostrar'])->middleware('throttle:negocio-publico')->name('marca');
+        // La app instalable (PWA) del negocio: su manifiesto, en su subdominio (ADR 0110).
+        Route::get('/pwa/manifest.webmanifest', [PwaNegocioController::class, 'manifest'])->middleware('throttle:negocio-publico')->name('pwa.manifest');
 
         // Escaparate público (P0 #3): identidad, próximas clases, precios, instructores
         // y ubicación. Sin auth; solo con la página pública abierta. Con throttle.
@@ -490,6 +500,13 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/negocio/region', [RegionNegocioTenantController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('negocio.region.guardar');
             Route::get('/perfil-publico', [PerfilPublicoController::class, 'mostrar'])->middleware('puede:estudio.gestionar')->name('perfil-publico.show');
             Route::put('/perfil-publico', [PerfilPublicoController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('perfil-publico.guardar');
+            // Sitio del negocio (ADR 0114): borrador, vista previa y publicar.
+            Route::get('/sitio', [SitioWebController::class, 'mostrar'])->middleware('puede:estudio.gestionar')->name('sitio.show');
+            Route::put('/sitio', [SitioWebController::class, 'guardar'])->middleware('puede:estudio.gestionar')->name('sitio.guardar');
+            Route::post('/sitio/publicar', [SitioWebController::class, 'publicar'])->middleware('puede:estudio.gestionar')->name('sitio.publicar');
+            Route::post('/sitio/descartar', [SitioWebController::class, 'descartar'])->middleware('puede:estudio.gestionar')->name('sitio.descartar');
+            Route::get('/sitio/vista-previa', [SitioWebController::class, 'vistaPrevia'])->middleware('puede:estudio.gestionar')->name('sitio.vista-previa');
+            Route::post('/sitio/imagenes', [SitioWebController::class, 'subirImagen'])->middleware('puede:estudio.gestionar')->name('sitio.imagenes.store');
 
             // Documentos: el admin define tipos requeridos; se cargan por persona y
             // el staff los valida (tenant-local, aislado).
@@ -834,9 +851,17 @@ Route::prefix('v1')->group(function (): void {
     // Acceso por ruta: /api/v1/app/{estudio}/...
     Route::prefix('app/{estudio}')->middleware('estudio.resolver')->name('api.v1.app.')->group($rutasTenant);
 
-    // Acceso por subdominio: {slug}.agendauno.mx/api/v1/... (mismo comportamiento).
-    Route::domain('{estudio}.'.config('agendauno.dominio_base'))
-        ->middleware('estudio.resolver')
-        ->name('api.v1.sub.')
-        ->group($rutasTenant);
+    // Acceso por subdominio del producto (ADR 0108): {slug}.agendauno.mx/api/v1/... y
+    // {slug}.turnouno.mx/api/v1/... (mismo comportamiento). AgendaUno conserva los
+    // nombres `api.v1.sub.`; los demás productos, `api.v1.sub-{producto}.`. Un negocio
+    // solo se abre en el dominio de su producto (ResolverEstudio).
+    foreach (ProductoComercial::cases() as $producto) {
+        if ($producto->dominio() === '') {
+            continue;
+        }
+        Route::domain('{estudio}.'.$producto->dominio())
+            ->middleware('estudio.resolver')
+            ->name($producto === ProductoComercial::AgendaUno ? 'api.v1.sub.' : "api.v1.sub-{$producto->value}.")
+            ->group($rutasTenant);
+    }
 });

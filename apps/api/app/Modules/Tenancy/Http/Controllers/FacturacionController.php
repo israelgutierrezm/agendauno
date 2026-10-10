@@ -91,7 +91,7 @@ class FacturacionController
             'cobro' => $porPlan ? 'plan' : 'uso',
             'plan' => $porPlan ? $this->planes->resumen($estudio) : null,
             'tarifa' => $porPlan ? null : $this->tarifa($estudio),
-            'ventas' => ['correo' => ConfiguracionPlataforma::ventasCorreo(), 'whatsapp' => ConfiguracionPlataforma::ventasWhatsApp()],
+            'ventas' => ['correo' => ConfiguracionPlataforma::ventasCorreo($estudio->producto()), 'whatsapp' => ConfiguracionPlataforma::ventasWhatsApp()],
             // Domiciliación: la tarjeta con que se cobra sola (ADR 0107).
             'tarjeta' => DomiciliacionRenta::tarjeta($estudio),
             'domiciliacion_posible' => $this->pasarelas->activa('stripe'),

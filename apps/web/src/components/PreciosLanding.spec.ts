@@ -62,8 +62,9 @@ describe("precios públicos (ADR 0107)", () => {
       "Más de 1,000 alumnos activos",
     );
     expect(vista.text()).toContain(
-      "Sin alumnos activos, la renta por uso es $0",
+      "Sin alumnos activos, la suscripción de ese mes es de $0 USD.",
     );
+    expect(vista.text()).not.toContain("renta por uso");
     expect(vista.text()).not.toMatch(/MXN|\+ IVA/);
     vista.unmount();
   });
@@ -72,7 +73,7 @@ describe("precios públicos (ADR 0107)", () => {
     const modelos = vista.findAll(".precios-selector button");
     expect(modelos).toHaveLength(2);
     expect(modelos[0]!.text()).toContain("Por alumnos activos");
-    for (const negocio of ["Pilates", "Pole dance", "acuáticas", "baile"]) {
+    for (const negocio of ["Pilates", "Pole dance", "natación", "baile"]) {
       expect(modelos[0]!.text()).toContain(negocio);
     }
     expect(modelos[1]!.text()).toContain("Por plan y profesionales");
@@ -103,8 +104,21 @@ describe("precios públicos (ADR 0107)", () => {
     expect(vista.get(".precios-intro").text()).toContain("$9 USD al mes");
     // Funciones que separan los niveles (el reparto de siempre).
     const tarjetas = vista.findAll(".precio-tarjeta");
-    expect(tarjetas[0]!.text()).toContain("Tu página con dirección propia");
+    // Solo lo que existe: la página en el dominio de TurnoUno, recordatorios por
+    // correo y sin la app (aún no publicada).
+    expect(tarjetas[0]!.text()).toContain("Tu página en tunegocio.turnouno.mx");
+    expect(tarjetas[0]!.text()).toContain("Recordatorios por correo");
     expect(tarjetas[0]!.text()).toContain("Cobro al agendar en línea*");
+    expect(vista.text()).not.toMatch(/\bapp\b|dirección propia/i);
+    expect(tarjetas[2]!.text()).toContain("Mensajes masivos por correo");
+    expect(vista.text()).not.toMatch(/WhatsApp/);
+    // El anual se paga por adelantado (junto al selector y en la aclaración).
+    expect(vista.get('[data-prueba="anual-adelantado"]').text()).toBe(
+      "El plan anual se paga completo por adelantado: 10 meses por 12 de servicio.",
+    );
+    expect(vista.get(".precios-aclaracion").text()).toContain(
+      "el anual cuesta 10 meses y se paga por adelantado",
+    );
     expect(tarjetas[1]!.text()).toContain("Equipo y roles");
     expect(tarjetas[1]!.text()).toContain("Varias sucursales");
     expect(tarjetas[2]!.text()).toContain("Facturación electrónica*");
@@ -161,7 +175,14 @@ describe("precios públicos (ADR 0107)", () => {
         },
         funciones: { lealtad: "premium", equipo: "individual" },
       },
-      ventas: { correo: "cotiza@agendauno.mx", whatsapp: "525512345678" },
+      ventas: {
+        correo: "cotiza@agendauno.mx",
+        whatsapp: "525512345678",
+        // TurnoUno cotiza con su propio correo (ADR 0108).
+        correo_por_producto: { turnouno: "cotiza@turnouno.mx" },
+      },
+      // TurnoUno ya recibe registros (lo abre el superadmin, ADR 0108).
+      registro: { agendauno: true, turnouno: true },
     });
     await flushPromises();
 
@@ -176,7 +197,7 @@ describe("precios públicos (ADR 0107)", () => {
     );
     expect(
       vista.get(".precios-contacto a[href^='mailto:']").attributes("href"),
-    ).toContain("mailto:cotiza@agendauno.mx");
+    ).toContain("mailto:cotiza@turnouno.mx");
     expect(
       vista
         .get(".precios-contacto a[href^='https://wa.me/']")
@@ -192,6 +213,37 @@ describe("precios públicos (ADR 0107)", () => {
     expect(vista.get(".precio-importe strong").text()).toBe("$132");
     // Los días de prueba publicados, no unos fijos.
     expect(vista.get(".precio-cta").text()).toContain("Probar 15 días gratis");
+    vista.unmount();
+  });
+  it("con el registro de TurnoUno abierto, sus tarjetas ofrecen la prueba", () => {
+    const vista = montarFijo("citas");
+    for (const cta of vista.findAll(".precio-cta")) {
+      expect(cta.text()).toContain("Probar 30 días gratis");
+    }
+    expect(vista.text()).toContain("Sin tarjeta para empezar");
+    expect(vista.text()).toContain(
+      "En la prueba gratis tienes todo lo de Pro.",
+    );
+    expect(vista.text()).not.toMatch(/Quiero que me avisen|Próximamente/);
+    vista.unmount();
+  });
+  it("si el superadmin cierra el registro de TurnoUno, sus tarjetas ofrecen avisar", async () => {
+    aplicarPreciosPublicos({ registro: { agendauno: true, turnouno: false } });
+    const vista = montarFijo("citas");
+    for (const cta of vista.findAll(".precio-cta")) {
+      expect(cta.text()).toContain("Quiero que me avisen");
+    }
+    expect(vista.text()).toContain("Próximamente");
+    expect(vista.text()).not.toContain("Sin tarjeta para empezar");
+    // Ni la prueba gratis en la aclaración.
+    expect(vista.text()).not.toMatch(/gratis|prueba/i);
+    // Se mide como `waitlist`: lleva a la lista de interesados.
+    await vista.get(".precio-cta").trigger("click");
+    expect(trackEvent).toHaveBeenLastCalledWith("marketing_cta_clicked", {
+      placement: "pricing_card",
+      destination: "waitlist",
+      mode: "citas",
+    });
     vista.unmount();
   });
   it("la moneda de la tarifa publicada manda: en pesos no habla de dólares", async () => {
@@ -229,7 +281,7 @@ describe("precios públicos (ADR 0107)", () => {
     expect(vista.get(".precio-contexto").text()).toBe("Clases con cupo");
     expect(vista.text()).toContain("pagos en línea*");
     expect(vista.get(".tu-nota-mexico").text()).toBe(
-      "* Solo para clientes de México.",
+      "* Solo para negocios en México (cobros en pesos).",
     );
     vista.unmount();
   });

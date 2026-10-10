@@ -10,8 +10,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Qué tocó el cambio (ADR 0113): en un PR solo corren los trabajos de lo que cambió
+  # (un PR de documentación no levanta MySQL ni compila apps); en main, todo. Si cambia
+  # el propio CI, también todo. Con git diff contra la base, sin acciones de terceros.
+  cambios:
+    name: Cambios
+    runs-on: ubuntu-24.04
+    outputs:
+      api: ${{ steps.detectar.outputs.api }}
+      web: ${{ steps.detectar.outputs.web }}
+      mobile: ${{ steps.detectar.outputs.mobile }}
+      imagenes: ${{ steps.detectar.outputs.imagenes }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: detectar
+        env:
+          EVENTO: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENTO" != "pull_request" ]; then
+            printf 'api=true\nweb=true\nmobile=true\nimagenes=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          archivos="$(git diff --name-only "$BASE"...HEAD)"
+          printf 'Archivos cambiados:\n%s\n' "$archivos"
+          toca() {
+            if printf '%s\n' "$archivos" | grep -Eq "^\.github/workflows/|$1"; then echo true; else echo false; fi
+          }
+          {
+            echo "api=$(toca '^apps/api/')"
+            echo "web=$(toca '^apps/web/')"
+            echo "mobile=$(toca '^apps/mobile/')"
+            echo "imagenes=$(toca '^(apps/api/|apps/web/|infra/produccion/)')"
+          } >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
   api:
     name: API · Laravel
+    needs: cambios
+    if: needs.cambios.outputs.api == 'true'
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -61,6 +102,10 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      # Avisos de seguridad de las dependencias de PHP (ADR 0113).
+      - name: Dependency audit
+        run: composer audit --no-interaction
+
       - name: Prepare environment
         run: |
           cp .env.example .env
@@ -72,6 +117,7 @@ jobs:
       - name: Static analysis (PHPStan)
         run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
 
+      # Toda la suite en un proceso: con más de mil pruebas, 512 MB ya no alcanzan.
       - name: Tests (Pest)
         run: php artisan test
 
@@ -89,6 +135,8 @@ jobs:
 
   web:
     name: Web · Vue
+    needs: cambios
+    if: needs.cambios.outputs.web == 'true'
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -104,6 +152,8 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
 
       - run: npm ci
+      # Avisos de seguridad altos o críticos de las dependencias (ADR 0113).
+      - run: npm audit --audit-level=high
       - run: npm run lint
       - run: npm run build
       # Las páginas comerciales prerenderizadas (HTML sin JS, SEO, menú, CSS) y su
@@ -113,6 +163,8 @@ jobs:
 
   mobile:
     name: Mobile · Flutter
+    needs: cambios
+    if: needs.cambios.outputs.mobile == 'true'
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -131,8 +183,40 @@ jobs:
       - run: flutter analyze
       - run: flutter test
 
+  # Las dos apps oficiales (ADR 0111) compilan con su sabor: cada una es otra app en
+  # las tiendas (id, nombre, ícono). Sin firma de release: debug basta para probarlo.
+  mobile-android:
+    name: Mobile · APK ${{ matrix.sabor }}
+    runs-on: ubuntu-24.04
+    needs: mobile
+    strategy:
+      matrix:
+        sabor: [agendauno, turnouno]
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.0'
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter build apk --debug --flavor ${{ matrix.sabor }}
+
   imagenes:
     name: Docker · production images
+    needs: cambios
+    if: needs.cambios.outputs.imagenes == 'true'
     runs-on: ubuntu-24.04
     env:
       # Igual que docker compose build en el servidor: cada Dockerfile con su
@@ -166,15 +250,69 @@ jobs:
       - name: Build web image
         run: docker build -f infra/produccion/web.Dockerfile -t agendauno-web:ci .
 
+      # La landing de cada producto es su propia imagen (ADR 0112).
+      - name: Build landing images
+        run: |
+          docker build -f infra/produccion/landing.Dockerfile --build-arg PRODUCTO=agendauno -t agendauno-landing-agendauno:ci .
+          docker build -f infra/produccion/landing.Dockerfile --build-arg PRODUCTO=turnouno -t agendauno-landing-turnouno:ci .
+
       # Configuraciones que solo se leen al arrancar: el pool de PHP-FPM y nginx con la
       # plantilla ya sustituida (el entrypoint de la imagen la procesa antes de nginx -t).
       - name: Check PHP-FPM config
         run: docker run --rm --entrypoint php-fpm agendauno-api:ci -t
 
       - name: Check nginx config
-        run: >-
-          docker run --rm -e DOMINIO=agendauno.test -e PROXY_CONFIABLE=172.16.0.0/12
-          agendauno-web:ci nginx -t
+        run: |
+          docker run --rm -e DOMINIO=agendauno.test -e DOMINIO_TURNOUNO=turnouno.test \
+            -e PROXY_CONFIABLE=172.16.0.0/12 -e CABECERA_IP_REAL=X-Forwarded-For \
+            agendauno-web:ci nginx -t
+          docker run --rm agendauno-landing-turnouno:ci nginx -t
+
+      # El compose con y sin los archivos de Traefik y Cloudflare (ADR 0112).
+      - name: Check compose files
+        working-directory: infra/produccion
+        run: |
+          cp api.env.example api.env
+          cp web.env.example web.env
+          docker compose --env-file web.env config -q
+          docker compose --env-file web.env -f docker-compose.yml -f docker-compose.traefik.yml config -q
+          docker compose --env-file web.env -f docker-compose.yml -f docker-compose.traefik.yml \
+            -f docker-compose.cloudflare.yml config -q
+          sh -n actualizar.sh && sh -n volver.sh && sh -n versiones.sh && sh -n compose.sh
+
+      # nginx de `web` pasa la portada, las páginas por giro, el robots y los recursos de
+      # cada dominio a su landing; lo demás es la aplicación, también si la landing cae.
+      - name: Check web and landings routing
+        run: |
+          set -euo pipefail
+          docker network create red-ci
+          docker run -d --name landing-agendauno --network red-ci agendauno-landing-agendauno:ci
+          docker run -d --name landing-turnouno --network red-ci agendauno-landing-turnouno:ci
+          docker run -d --name web --network red-ci -p 127.0.0.1:8080:80 \
+            -e DOMINIO=agendauno.test -e DOMINIO_TURNOUNO=turnouno.test \
+            -e PROXY_CONFIABLE=172.16.0.0/12 -e CABECERA_IP_REAL=X-Forwarded-For agendauno-web:ci
+          pedir() { curl -sS -o /tmp/cuerpo -w '%{http_code}' -H "Host: $1" "http://127.0.0.1:8080$2"; }
+          for i in $(seq 1 30); do curl -fsS -o /dev/null -H 'Host: agendauno.test' http://127.0.0.1:8080/robots.txt && break; sleep 1; done
+          test "$(pedir agendauno.test /)" = 200 && grep -q 'assets-agendauno' /tmp/cuerpo
+          test "$(pedir turnouno.test /)" = 200 && grep -q 'assets-turnouno' /tmp/cuerpo
+          test "$(pedir agendauno.test /robots.txt)" = 200 && grep -qi 'sitemap' /tmp/cuerpo
+          test "$(pedir agendauno.test /software-para-pilates)" = 200 && grep -q 'assets-agendauno' /tmp/cuerpo
+          test "$(pedir agendauno.test /assets-agendauno/no-existe.js)" = 404
+          # Una página que la landing no tiene, y lo que no es de la landing: la aplicación.
+          test "$(pedir agendauno.test /software-para-no-existe)" = 200 && ! grep -q 'assets-agendauno' /tmp/cuerpo
+          test "$(pedir agendauno.test /entrar)" = 200 && ! grep -q 'assets-agendauno' /tmp/cuerpo
+          test "$(pedir fluo.agendauno.test /)" = 200 && ! grep -q 'assets-agendauno' /tmp/cuerpo
+          # Nadie enmarca la plataforma, salvo la vista previa del sitio en su panel (ADR 0114).
+          cabeceras() { curl -sS -D - -o /dev/null -H "Host: $1" "http://127.0.0.1:8080$2" | tr -d '\r'; }
+          grep -qi "^x-frame-options: DENY$" <<<"$(cabeceras fluo.agendauno.test /entrar)"
+          grep -qi "^content-security-policy: frame-ancestors 'none'$" <<<"$(cabeceras agendauno.test /)"
+          grep -qi "^x-frame-options: DENY$" <<<"$(cabeceras fluo.agendauno.test /estudio/otro/vista-previa-falsa)"
+          grep -qi "^x-frame-options: SAMEORIGIN$" <<<"$(cabeceras fluo.agendauno.test /estudio/fluo/vista-previa)"
+          grep -qi "^content-security-policy: frame-ancestors 'self'$" <<<"$(cabeceras fluo.turnouno.test '/estudio/fluo/vista-previa?v=2')"
+          # Sin la landing, la portada es la aplicación (no un 502).
+          docker stop landing-turnouno
+          test "$(pedir turnouno.test /)" = 200
+          docker rm -f web landing-agendauno landing-turnouno
 
       # Los respaldos usan el cliente de la imagen (MariaDB) contra MySQL 8.4: su usuario
       # normal entra con caching_sha2_password y TLS de certificado autofirmado (como

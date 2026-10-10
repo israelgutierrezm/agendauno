@@ -1032,6 +1032,29 @@ describe("avisos por WhatsApp", () => {
   });
 });
 
+describe("negocio que agenda solo con cuenta (ADR 0115)", () => {
+  it("no pide datos de invitado: invita a entrar y no deja confirmar", async () => {
+    const conReglas = opciones(1);
+    Object.assign(conReglas.data.data, {
+      reglas: {
+        minutos_anticipacion_minima: 0,
+        dias_maximos_adelante: 60,
+        agendar_sin_cuenta: false,
+      },
+    });
+    api(conReglas);
+    const vista = montar();
+    await flushPromises();
+    await hastaHorario(vista);
+    await elegirHora(vista, "09:00");
+    await continuar(vista);
+
+    expect(vista.find('[data-prueba="requiere-cuenta"]').exists()).toBe(true);
+    expect(vista.find("#rc-nom").exists()).toBe(false);
+    vista.unmount();
+  });
+});
+
 describe("para otra persona", () => {
   it("manda quién asiste solo si marca que es para otra persona", async () => {
     api(opciones(1));

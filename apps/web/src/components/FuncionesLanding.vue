@@ -5,7 +5,9 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
 import { trackEvent } from "@/lib/analytics";
+import { productoDeModalidad } from "@/lib/producto";
 import { MODALIDADES, type Modo } from "@/marketing/modalidades";
+import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 
 /*
 | Tarjetas de funciones de la parte comercial.
@@ -139,12 +141,18 @@ const registro = computed(() =>
     ? { name: "registro", query: { modo: props.modo } }
     : { name: "registro" },
 );
+// El producto de la página aún puede no recibir registros (ADR 0108).
+const precios = usePreciosPublicos();
+const registroAbierto = computed(
+  () => precios.datos.registro[productoDeModalidad(props.modo ?? "clases")],
+);
 // «Probar en mi negocio» es otra entrada al registro: se mide como las demás, con la
-// modalidad de la página (`mode`) cuando la hay.
+// modalidad de la página (`mode`) cuando la hay; sin registro abierto lleva a la
+// lista de interesados (`waitlist`).
 function medirRegistro(): void {
   trackEvent("marketing_cta_clicked", {
     placement: "features",
-    destination: "register",
+    destination: registroAbierto.value ? "register" : "waitlist",
     ...(props.modo ? { mode: props.modo } : {}),
   });
 }
@@ -420,7 +428,11 @@ function medirRegistro(): void {
           >
             <p>{{ f.detalle }}</p>
             <RouterLink :to="registro" @click="medirRegistro"
-              >Probar en mi negocio
+              >{{
+                registroAbierto
+                  ? "Probar en mi negocio"
+                  : $t("landing.prelanzamiento.cta")
+              }}
               <span aria-hidden="true"
                 ><IconoNav
                   nombre="flecha"

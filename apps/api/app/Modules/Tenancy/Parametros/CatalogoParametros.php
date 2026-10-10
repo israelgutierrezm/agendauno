@@ -24,6 +24,11 @@ final class CatalogoParametros
             // Reservas y lista de espera.
             new DefinicionParametro('reservas.minutos_para_pagar', 'Reservas y lista de espera', 'Tiempo para pagar una reserva apartada',
                 'Si no se paga en este tiempo, el lugar se libera.', $e, 30, 5, 1440, 'min'),
+            // Cuándo reserva el cliente una clase desde su cuenta o la app (el negocio, siempre).
+            new DefinicionParametro('reservas.dias_apertura', 'Reservas y lista de espera', 'El cliente reserva una clase desde',
+                'Días antes de la clase. 0 = en cuanto se programa.', $e, 0, 0, 365, 'días'),
+            new DefinicionParametro('reservas.minutos_cierre', 'Reservas y lista de espera', 'Las reservas de una clase cierran',
+                'Minutos antes de que empiece. 0 = hasta que empieza.', $e, 0, 0, 1440, 'min'),
             new DefinicionParametro('reservas.minutos_para_aceptar_lugar', 'Reservas y lista de espera', 'Tiempo para aceptar un lugar de la lista de espera',
                 'Si no lo acepta a tiempo, se ofrece al siguiente.', $e, 30, 5, 1440, 'min'),
 
@@ -36,6 +41,8 @@ final class CatalogoParametros
             // Reprogramar desde la cuenta del cliente (ADR 0044).
             new DefinicionParametro('reprogramar.horas_limite_cliente', 'Cambios de horario desde la cuenta', 'El cliente puede cambiar su horario hasta',
                 'Horas antes del inicio. Después, solo el negocio.', $e, 12, 0, 720, 'h'),
+            new DefinicionParametro('cancelacion.cliente_cancela_tarde', 'Cambios de horario desde la cuenta', 'El cliente puede cancelar después del límite sin costo',
+                'Si lo apagas, pasado ese límite solo el negocio cancela (el cliente le escribe). Si lo dejas, él cancela y se aplica el cobro por cancelar tarde.', $sn, 1),
             new DefinicionParametro('reprogramar.maximo_cliente', 'Cambios de horario desde la cuenta', 'Cambios por reserva',
                 'Cuántas veces puede cambiar él mismo el horario de una reserva. 0 = solo el negocio.', $e, 1, 0, 20),
 
@@ -45,6 +52,12 @@ final class CatalogoParametros
             // ADR 0065.
             new DefinicionParametro('citas.pago_en_linea_obligatorio', 'Citas', 'Pedir el pago en línea para confirmar una cita',
                 'Si lo apagas, la cita queda confirmada al agendar y el cliente paga en línea o en la sucursal. Sin cobro en línea activo, siempre se paga en la sucursal.', $sn, 1),
+            new DefinicionParametro('citas.minutos_anticipacion_minima', 'Citas', 'Anticipación mínima para agendar en línea',
+                'Minutos antes de la cita. 0 = cualquier horario libre que aún no empiece. El negocio agenda sin este límite.', $e, 0, 0, 10080, 'min'),
+            new DefinicionParametro('citas.dias_maximos_adelante', 'Citas', 'Se agenda en línea hasta',
+                'Días adelante que el cliente ve y puede agendar.', $e, 60, 1, 365, 'días'),
+            new DefinicionParametro('citas.agendar_sin_cuenta', 'Citas', 'Se puede agendar sin cuenta',
+                'Si lo apagas, en tu página solo agendan clientes con cuenta (los que tú invitas).', $sn, 1),
             new DefinicionParametro('citas.maximo_por_pagar', 'Citas', 'Citas por pagar que puede tener un cliente',
                 'Con estas citas próximas sin pagar, el cliente ya no puede agendar otra en línea ni desde su cuenta (el negocio sí puede agendarle). 0 = sin límite.', $e, 5, 0, 50, 'citas'),
 
@@ -57,6 +70,12 @@ final class CatalogoParametros
                 'Minutos antes de que empiece la clase o cita. Antes no se registra la asistencia.', $e, 30, 0, 240, 'min'),
             new DefinicionParametro('asistencia.no_asistio_al_terminar', 'Asistencia', 'Al terminar, quien no tiene registro «no se presentó»',
                 'Si nadie registró la asistencia de alguien, al terminar la clase o cita queda como que no se presentó, con la política de inasistencias del negocio.', $sn, 1),
+
+            // Sitio del negocio (ADR 0114).
+            new DefinicionParametro('sitio.banners_maximos', 'Sitio del negocio', 'Banners en el sitio',
+                'Cuántos banners (promociones, avisos) puede tener la página del negocio.', $e, 5, 1, 20, 'banners'),
+            new DefinicionParametro('sitio.imagenes_maximas', 'Sitio del negocio', 'Imágenes del sitio',
+                'Cuántas fotos propias puede tener la página del negocio (las de «Nosotros» y los banners).', $e, 30, 5, 200, 'imágenes'),
 
             // Acceso.
             new DefinicionParametro('acceso.minutos_antes', 'Acceso', 'Se puede entrar desde',
@@ -109,6 +128,8 @@ final class CatalogoParametros
             // Reseñas.
             new DefinicionParametro('resenas.dias_para_calificar', 'Reseñas', 'Días para calificar una clase o cita',
                 'Después ya no se pide la reseña.', $e, 30, 1, 365, 'días'),
+            new DefinicionParametro('resenas.publicar_sin_revisar', 'Reseñas', 'Publicar las reseñas sin revisarlas',
+                'Si lo apagas, cada reseña nueva queda oculta en tu página hasta que la apruebes en Reseñas.', $sn, 1),
 
             // Inventario del mostrador.
             new DefinicionParametro('inventario.stock_bajo', 'Inventario', 'Stock bajo',
@@ -196,6 +217,13 @@ final class CatalogoParametros
                 'Sirven para registrar la tarjeta del pago automático si el aviso de Stripe no llega; se revisan hasta 48 horas.', $e, 30, 3, 365, 'días', porNegocio: false),
             new DefinicionParametro('limpieza.dias_errores', 'Limpieza de registros', 'Días que se guarda un error que dejó de pasar',
                 'Contados desde la última vez que pasó, esté abierto, resuelto o ignorado.', $e, 90, 7, 730, 'días', porNegocio: false),
+
+            // Registro de negocios por producto (ADR 0108, solo la plataforma). TurnoUno
+            // se lanza después: mientras esté cerrado, su landing junta interesados.
+            new DefinicionParametro('registro.abierto_agendauno', 'Registro de negocios', 'Registro abierto en AgendaUno',
+                'Negocios de clases. Si lo cierras, el registro avisa que por ahora no se reciben altas.', $sn, 1, porNegocio: false),
+            new DefinicionParametro('registro.abierto_turnouno', 'Registro de negocios', 'Registro abierto en TurnoUno',
+                'Negocios de citas. Cerrado, la landing de TurnoUno junta interesados en lugar de registrar negocios.', $sn, 1, porNegocio: false),
 
             // Monitoreo de errores (ADR 0080, solo la plataforma).
             new DefinicionParametro('errores.nuevos_clientes_por_dia', 'Monitoreo de errores', 'Errores nuevos de la web y la app al día',

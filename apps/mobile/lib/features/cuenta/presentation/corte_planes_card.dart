@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
+import '../../auth/application/sesion_controller.dart';
+import '../../auth/data/sesion.dart';
 import '../application/cuenta_controller.dart';
 import '../data/corte_planes.dart';
 import 'cuenta_widgets.dart';
@@ -16,6 +18,9 @@ class CortePlanesSeccion extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final estado = ref.watch(cortePlanesProvider);
+    // «Clases», «Citas», «Lecciones»…: como se llaman en este negocio.
+    final terminologia =
+        ref.watch(sesionProvider)?.terminologia ?? const Terminologia();
     return estado.when(
       loading: () => const Padding(
         padding: EdgeInsets.all(16),
@@ -31,7 +36,7 @@ class CortePlanesSeccion extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final p in actuales) _PlanCard(p),
+            for (final p in actuales) _PlanCard(p, terminologia),
             if (anteriores.isNotEmpty) ...[
               const Padding(
                 padding: EdgeInsets.fromLTRB(4, 12, 4, 4),
@@ -44,7 +49,7 @@ class CortePlanesSeccion extends ConsumerWidget {
                 ),
               ),
               for (final p in anteriores)
-                Opacity(opacity: 0.75, child: _PlanCard(p)),
+                Opacity(opacity: 0.75, child: _PlanCard(p, terminologia)),
             ],
           ],
         );
@@ -54,9 +59,10 @@ class CortePlanesSeccion extends ConsumerWidget {
 }
 
 class _PlanCard extends StatefulWidget {
-  const _PlanCard(this.p);
+  const _PlanCard(this.p, this.terminologia);
 
   final PlanCorte p;
+  final Terminologia terminologia;
 
   @override
   State<_PlanCard> createState() => _PlanCardState();
@@ -107,7 +113,7 @@ class _PlanCardState extends State<_PlanCard> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Text(p.estadoTexto),
+                Text(p.estadoTextoCon(widget.terminologia)),
               ],
             ),
             const SizedBox(height: 2),
@@ -133,9 +139,9 @@ class _PlanCardState extends State<_PlanCard> {
             ),
             if (p.extras.isNotEmpty) ...[
               const SizedBox(height: 12),
-              const Text(
-                'Clases extra',
-                style: TextStyle(fontWeight: FontWeight.w600),
+              Text(
+                '${widget.terminologia.sesiones} extra',
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               for (final x in p.extras)
                 Text(

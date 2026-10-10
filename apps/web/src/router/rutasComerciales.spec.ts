@@ -4,9 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DOMINIO_PUBLICO } from "@/lib/tenant";
 
 /*
-| Rutas comerciales del router de la app: /clases y /citas con su modo, el registro con
-| `?modo=` como prop, la landing que nunca se ve en el subdominio de un negocio y el
-| enlace corto que en producción lleva al subdominio.
+| Rutas comerciales del router de la app (ADR 0108): la portada es la página de la
+| modalidad del producto (en localhost, AgendaUno: clases); /clases lleva a ella y
+| /citas y las páginas de citas, al dominio de TurnoUno. El registro con `?modo=` como
+| prop, la landing que nunca se ve en el subdominio de un negocio y el enlace corto
+| que en producción lleva al subdominio.
 */
 
 // El host del navegador que «ve» el router: jsdom no deja cambiarlo.
@@ -31,8 +33,21 @@ vi.mock("@/lib/api", async (original) => {
   return { ...real, api: { ...real.api, get: vi.fn() } };
 });
 
-// Importar el router completo (con todas sus pantallas) tarda.
-vi.setConfig({ testTimeout: 20_000 });
+// Aquí solo importa a dónde lleva el router, no las pantallas: cargar las reales
+// (compilar cada una con todos sus componentes) hacía que la primera navegación
+// pasara del tiempo de una prueba.
+const pantallaVacia = vi.hoisted(() => () => ({
+  default: { name: "PantallaVacia", render: () => null },
+}));
+vi.mock("@/views/ModalidadView.vue", pantallaVacia);
+vi.mock("@/views/SolucionView.vue", pantallaVacia);
+vi.mock("@/views/PanelView.vue", pantallaVacia);
+vi.mock("@/views/EntrarView.vue", pantallaVacia);
+vi.mock("@/views/EstudioPublicoView.vue", pantallaVacia);
+vi.mock("@/views/ReservarCitaView.vue", pantallaVacia);
+vi.mock("@/views/SucursalesEstudioView.vue", pantallaVacia);
+vi.mock("@/views/EnlacesEstudioView.vue", pantallaVacia);
+vi.mock("@/views/DirectorioView.vue", pantallaVacia);
 
 beforeEach(() => {
   vi.resetModules();
@@ -48,33 +63,35 @@ async function routerComercial() {
 }
 
 describe("rutas comerciales", () => {
-  it("/clases y /citas montan la vista de modalidad con su modo", async () => {
+  it("la portada es la página de clases; /clases lleva a ella y lo de citas, a TurnoUno", async () => {
     const router = await routerComercial();
-    for (const modo of ["clases", "citas"] as const) {
-      await router.push(`/${modo}`);
-      const ruta = router.currentRoute.value;
-      expect(ruta.name).toBe(`modalidad-${modo}`);
-      expect(ruta.meta).toMatchObject({ marketing: true, modo });
-      expect(ruta.matched[0]?.props.default).toEqual({ modo });
-    }
-    await router.push("/software-para-barberias");
-    expect(router.currentRoute.value.meta).toMatchObject({
-      marketing: true,
-      modo: "citas",
-      // Junta dos giros (barbería y estética): sin giro.
-      giro: null,
-    });
+    await router.push("/");
+    let ruta = router.currentRoute.value;
+    expect(ruta.name).toBe("inicio");
+    expect(ruta.meta).toMatchObject({ marketing: true, modo: "clases" });
+    expect(ruta.matched[0]?.props.default).toEqual({ modo: "clases" });
+
+    await router.push("/clases?utm_source=ig");
+    ruta = router.currentRoute.value;
+    expect(ruta.name).toBe("inicio");
+    expect(ruta.query).toEqual({ utm_source: "ig" });
+
     await router.push("/software-para-pilates");
     expect(router.currentRoute.value.meta).toMatchObject({
       marketing: true,
       modo: "clases",
       giro: "pilates",
     });
-    await router.push("/");
-    expect(router.currentRoute.value.meta).toMatchObject({
-      marketing: true,
-      modo: null,
-    });
+
+    // Lo de citas es de TurnoUno: en desarrollo, el mismo sitio con su marca.
+    await router.push("/citas");
+    expect(navegador.salirA).toHaveBeenLastCalledWith("/?producto=turnouno");
+    await router.push("/software-para-barberias");
+    expect(navegador.salirA).toHaveBeenLastCalledWith(
+      "/software-para-barberias?producto=turnouno",
+    );
+    // La navegación se cancela: sigue en la página de clases.
+    expect(router.currentRoute.value.name).toBe("solucion-pilates");
     // Las pantallas de acceso no son comerciales.
     await router.push("/entrar");
     expect(router.currentRoute.value.meta.marketing).toBeUndefined();
@@ -122,7 +139,7 @@ describe("rutas comerciales", () => {
       expect(router.currentRoute.value.params.slug).toBe("demo");
     }
     await router.push("/clases");
-    expect(router.currentRoute.value.name).toBe("modalidad-clases");
+    expect(router.currentRoute.value.name).toBe("inicio");
   });
 
   it("en desarrollo, el enlace corto y la página del negocio siguen en la app", async () => {
@@ -138,7 +155,7 @@ describe("rutas comerciales", () => {
     navegador.host = DOMINIO_PUBLICO;
     const router = await routerComercial();
     await router.push("/clases");
-    expect(router.currentRoute.value.name).toBe("modalidad-clases");
+    expect(router.currentRoute.value.name).toBe("inicio");
 
     await router.push("/barberia?utm_source=ig");
     expect(navegador.salirA).toHaveBeenLastCalledWith(
@@ -154,7 +171,7 @@ describe("rutas comerciales", () => {
       `https://barberia.${DOMINIO_PUBLICO}/enlaces`,
     );
     // La navegación se cancela: la app no muestra la página del negocio.
-    expect(router.currentRoute.value.name).toBe("modalidad-clases");
+    expect(router.currentRoute.value.name).toBe("inicio");
 
     // /agendar/:slug no cambia (lo generan el API, los correos y los pagos).
     navegador.salirA.mockClear();

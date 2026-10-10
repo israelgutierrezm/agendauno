@@ -551,7 +551,7 @@ const horaAhora = computed(() => {
 .cs-aviso-urgente {
   color: var(--error);
 }
-:global(.dark) .cs-tarjeta {
+.dark .cs-tarjeta {
   background: color-mix(in srgb, var(--tf) 18%, var(--superficie));
   border-left-color: var(--tf);
 }

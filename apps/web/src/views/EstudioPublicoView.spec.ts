@@ -4,6 +4,8 @@ import { createI18n } from "vue-i18n";
 
 import es from "@/i18n/locales/es-MX";
 import perfilPublico from "@/i18n/locales/perfilPublico.es-MX";
+import sitioWeb from "@/i18n/locales/sitioWeb.es-MX";
+import { updateSeo } from "@/lib/seo";
 import EstudioPublicoView from "./EstudioPublicoView.vue";
 
 const mocks = vi.hoisted(() => ({ get: vi.fn() }));
@@ -45,14 +47,15 @@ function escaparate(resenas: unknown) {
   };
 }
 
-function montar() {
+function montar(props: { vistaPrevia?: boolean } = {}) {
   return mount(EstudioPublicoView, {
+    props,
     global: {
       plugins: [
         createI18n({
           legacy: false,
           locale: "es",
-          messages: { es: { ...es, perfilPublico } },
+          messages: { es: { ...es, perfilPublico, sitioWeb } },
         }),
       ],
     },
@@ -290,5 +293,129 @@ describe("página pública del estudio", () => {
 
     // Profesionales con foto (o iniciales si no tienen).
     expect(w.find('img[src="https://cdn/caro.jpg"]').exists()).toBe(true);
+  });
+
+  it("su sitio decide el orden, lo que se ve, sus textos, banners y color (ADR 0114)", async () => {
+    const respuesta = escaparate({ promedio: null, total: 0, recientes: [] });
+    Object.assign(respuesta.data.data, {
+      sitio: {
+        plantilla: "compacta",
+        secciones: [
+          {
+            tipo: "inicio",
+            titulo: "Fluō, pole y aéreos",
+            texto: "Clases para todos los niveles.",
+            foto_url: null,
+          },
+          {
+            tipo: "nosotros",
+            titulo: "Quiénes somos",
+            texto: "Un estudio de barrio.",
+            foto_url: "https://cdn/nosotros.jpg",
+          },
+          { tipo: "promociones", titulo: null, texto: null, foto_url: null },
+          {
+            tipo: "precios",
+            titulo: "Membresías",
+            texto: null,
+            foto_url: null,
+          },
+          {
+            tipo: "contacto",
+            titulo: "Escríbenos",
+            texto: "Te respondemos hoy.",
+            foto_url: null,
+          },
+        ],
+        banners: [
+          {
+            id: "b1",
+            titulo: "Primera clase gratis",
+            texto: "Solo en octubre",
+            enlace_texto: "Ver precios",
+            enlace_url: "#precios",
+            foto_url: null,
+          },
+        ],
+      },
+    });
+    Object.assign(respuesta.data.data.estudio, { color_marca: "#f5d76e" });
+    mocks.get.mockResolvedValue(respuesta);
+    const w = montar();
+    await flushPromises();
+
+    expect(w.get("h1").text()).toBe("Fluō, pole y aéreos");
+    expect(w.get('[data-prueba="portada"]').attributes("data-portada")).toBe(
+      "compacta",
+    );
+    expect(w.get('[data-prueba="descripcion"]').text()).toBe(
+      "Clases para todos los niveles.",
+    );
+    // En su orden; lo que ocultó (próximas clases, reseñas…) no está.
+    const ids = w
+      .findAll("section[id]")
+      .map((x) => x.attributes("id"))
+      .filter((id) => id !== "inicio");
+    expect(ids).toEqual(["nosotros", "promociones", "precios", "contacto"]);
+    expect(w.text()).not.toContain("Próximas clases");
+    expect(w.get("#precios h2").text()).toBe("Membresías");
+    expect(w.get("#nosotros img").attributes("src")).toBe(
+      "https://cdn/nosotros.jpg",
+    );
+    const banner = w.get('[data-prueba="promociones"]');
+    expect(banner.text()).toContain("Primera clase gratis");
+    expect(banner.get("a").attributes("href")).toBe("#precios");
+    expect(banner.get("a").attributes("target")).toBeUndefined();
+    expect(w.get('[data-prueba="contacto"]').text()).toContain(
+      "Te respondemos hoy.",
+    );
+    // Su color en los botones, con texto que se lee encima.
+    const estilo = w.get('[data-prueba="sitio"]').attributes("style");
+    expect(estilo).toContain("--marketing-cta: #f5d76e");
+    expect(estilo).toContain("--marketing-cta-contraste: #111111");
+  });
+
+  it("la vista previa pide el borrador y no cuenta como visita", async () => {
+    mocks.get.mockResolvedValue(
+      escaparate({ promedio: null, total: 0, recientes: [] }),
+    );
+    const w = montar({ vistaPrevia: true });
+    await flushPromises();
+    expect(mocks.get).toHaveBeenCalledWith(
+      "/api/v1/app/estudio-a/sitio/vista-previa",
+    );
+    expect(w.find('[data-prueba="aviso-vista-previa"]').exists()).toBe(true);
+    expect(updateSeo).not.toHaveBeenCalled();
+    // Sin sitio en la respuesta, la página de siempre.
+    expect(w.find("#precios").exists()).toBe(true);
+  });
+
+  it("la plantilla «Portada» pone la foto a todo lo ancho; sin foto, la esencial", async () => {
+    for (const [portada, esperada] of [
+      ["https://cdn/portada.jpg", "foto"],
+      [null, "esencial"],
+    ] as const) {
+      const respuesta = escaparate({ promedio: null, total: 0, recientes: [] });
+      Object.assign(respuesta.data.data.estudio, { portada_url: portada });
+      Object.assign(respuesta.data.data, {
+        sitio: {
+          plantilla: "portada",
+          secciones: [
+            { tipo: "inicio", titulo: null, texto: null, foto_url: null },
+            { tipo: "contacto", titulo: null, texto: null, foto_url: null },
+          ],
+          banners: [],
+        },
+      });
+      mocks.get.mockResolvedValue(respuesta);
+      const w = montar();
+      await flushPromises();
+      const hero = w.get('[data-prueba="portada"]');
+      expect(hero.attributes("data-portada")).toBe(esperada);
+      if (portada) {
+        expect(hero.attributes("style")).toContain(portada);
+      }
+      w.unmount();
+    }
   });
 });

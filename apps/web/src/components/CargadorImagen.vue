@@ -26,6 +26,9 @@ const props = withDefaults(
     quitarTexto?: string;
     proporcion?: string;
     puedeGestionar?: boolean;
+    // Quitar solo la deja de usar (sin DELETE): las fotos del sitio del negocio, que
+    // se limpian al guardar o publicar (ADR 0114).
+    quitarSinBorrar?: boolean;
   }>(),
   {
     ruta: "marca/portada",
@@ -36,6 +39,7 @@ const props = withDefaults(
     quitarTexto: undefined,
     proporcion: "8 / 3",
     puedeGestionar: true,
+    quitarSinBorrar: false,
   },
 );
 const emit = defineEmits<{ "update:url": [string | null] }>();
@@ -82,6 +86,10 @@ async function quitar(): Promise<void> {
       peligro: true,
     }))
   ) {
+    return;
+  }
+  if (props.quitarSinBorrar) {
+    emit("update:url", null);
     return;
   }
   subiendo.value = true;

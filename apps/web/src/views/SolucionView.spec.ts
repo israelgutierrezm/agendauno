@@ -1,22 +1,32 @@
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createI18n } from "vue-i18n";
 import { createMemoryHistory, createRouter } from "vue-router";
+import es from "@/i18n/locales/es-MX";
 import { trackEvent } from "@/lib/analytics";
+import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import {
-  ETIQUETA_MENU,
   NOMBRE_MODALIDAD,
   modoDeGiro,
   perfilDeSolucion,
 } from "@/marketing/modalidades";
+import { PRECIOS_POR_OMISION } from "@/marketing/precios";
+import { aplicarPreciosPublicos } from "@/marketing/preciosPublicos";
+import {
+  FRASES_SOLO_CON_REGISTRO,
+  FRASES_SOLO_EN_PRELANZAMIENTO,
+  frasesEncontradas,
+} from "@/marketing/prelanzamiento";
 import { rutaSolucion, soluciones } from "@/marketing/soluciones";
 import { rutasComerciales } from "@/router/comerciales";
 import SolucionView from "./SolucionView.vue";
 
 /*
-| Páginas por giro (/software-para-*): cada giro es de una sola modalidad (ADR 0104),
-| así que enlazan a su página (/clases o /citas), a sus anclas y al registro con su
-| `?modo=` (y su `?giro=` si la página es de un solo giro del registro), y no anuncian
-| nada «en preparación».
+| Páginas por giro (/software-para-*): cada giro es de una sola modalidad (ADR 0104) y
+| su página vive en el dominio de su producto (ADR 0108): enlazan a la portada de su
+| producto, a sus anclas y al registro con su `?modo=` (y su `?giro=` si la página es
+| de un solo giro del registro), hablan con su marca y no anuncian nada «en
+| preparación».
 */
 
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
@@ -29,7 +39,6 @@ function routerComercial() {
     history: createMemoryHistory(),
     routes: [
       ...rutasComerciales({
-        landing: vacia,
         modalidad: vacia,
         solucion: vacia,
       }),
@@ -37,13 +46,20 @@ function routerComercial() {
     ],
   });
 }
+// Desde la portada: en localhost rige AgendaUno, y las páginas de citas viven en el
+// dominio de TurnoUno (su ruta aquí sale a él).
 async function montar(slug: string) {
   const router = routerComercial();
-  await router.push(rutaSolucion(slug));
+  await router.push("/");
   await router.isReady();
   return mount(SolucionView, {
     props: { slug },
-    global: { plugins: [router] },
+    global: {
+      plugins: [
+        router,
+        createI18n({ legacy: false, locale: "es", messages: { es } }),
+      ],
+    },
   });
 }
 const hrefs = (vista: Awaited<ReturnType<typeof montar>>) =>
@@ -57,16 +73,18 @@ describe("páginas por giro", () => {
       expect(modoDeGiro(solucion.slug), solucion.slug).toBe(modo);
       expect(vista.findAll("h1")).toHaveLength(1);
 
-      // Miga de pan: AgendaUno / Clases|Citas / giro.
+      // Miga de pan: su marca / giro.
       const miga = vista.get(".solucion-miga");
-      expect(miga.findAll("a").map((a) => a.attributes("href"))).toEqual([
-        "/",
-        `/${modo}`,
-      ]);
+      expect(miga.findAll("a").map((a) => a.attributes("href"))).toEqual(["/"]);
       expect(vista.get('[data-prueba="enlace-modalidad"]').text()).toBe(
-        ETIQUETA_MENU[modo],
+        PRODUCTOS[productoDeModalidad(modo)].nombre,
       );
-      expect(miga.get('[aria-current="page"]').text()).toBe(solucion.nombre);
+      // Ni la marca del otro producto.
+      const otra =
+        PRODUCTOS[productoDeModalidad(modo === "clases" ? "citas" : "clases")]
+          .nombre;
+      expect(vista.text(), solucion.slug).not.toContain(otra);
+      expect(miga.get('li[aria-current="page"]').text()).toBe(solucion.nombre);
 
       const enlaces = hrefs(vista);
       // «Probar gratis» (arriba y al cierre) llega al registro con su modalidad y,
@@ -80,11 +98,9 @@ describe("páginas por giro", () => {
         enlaces.filter((h) => h?.startsWith("/registro")),
         solucion.slug,
       ).toEqual([destino, destino]);
-      expect(enlaces).toContain(`/${modo}#producto`);
-      expect(enlaces).toContain(`/${modo}#precios`);
-      // Ya no apunta a anclas de la portada.
-      expect(enlaces).not.toContain("/#producto");
-      expect(enlaces).not.toContain("/#precios");
+      // Las anclas de la portada de su producto.
+      expect(enlaces).toContain("/#producto");
+      expect(enlaces).toContain("/#precios");
       vista.unmount();
     }
   });
@@ -100,7 +116,7 @@ describe("páginas por giro", () => {
           : "con el plan que elijas, por los profesionales que contratas",
       );
       expect(precio).toContain(
-        `Todo lo que incluye ${NOMBRE_MODALIDAD[solucion.modo]}`,
+        `Todo lo que incluye ${PRODUCTOS[productoDeModalidad(solucion.modo)].nombre}`,
       );
       expect(vista.text()).not.toMatch(/en preparaci[oó]n/i);
       vista.unmount();
@@ -120,23 +136,16 @@ describe("páginas por giro", () => {
     citas.unmount();
   });
 
-  it("los demás giros van en dos columnas, «Clases» y «Citas», sin la página actual", async () => {
+  it("los demás giros son los de su producto, sin la página actual", async () => {
     const vista = await montar("barberias");
-    const columnas = vista.findAll(".soluciones-columna");
-    expect(columnas.map((c) => c.attributes("data-modo"))).toEqual([
-      "clases",
-      "citas",
-    ]);
-    expect(columnas.map((c) => c.get("h3").text())).toEqual([
-      ETIQUETA_MENU.clases,
-      ETIQUETA_MENU.citas,
-    ]);
-    const citas = columnas[1]!
+    const enlaces = vista
       .findAll(".soluciones-enlaces a")
       .map((a) => a.attributes("href"));
-    expect(citas).not.toContain(rutaSolucion("barberias"));
-    expect(citas.length).toBe(
-      soluciones.filter((s) => s.modo === "citas").length - 1,
+    expect(enlaces).not.toContain(rutaSolucion("barberias"));
+    expect(enlaces).toEqual(
+      soluciones
+        .filter((s) => s.modo === "citas" && s.slug !== "barberias")
+        .map((s) => rutaSolucion(s.slug)),
     );
     vista.unmount();
   });
@@ -184,6 +193,85 @@ describe("páginas por giro", () => {
       mode: "citas",
     });
     barberias.unmount();
+  });
+
+  it("con el registro abierto (los dos productos): la prueba, sin nada de la lista de interesados", async () => {
+    for (const solucion of soluciones) {
+      const vista = await montar(solucion.slug);
+      expect(vista.get('[data-cta="hero"]').text()).toBe(
+        es.landing.solucion.probar,
+      );
+      expect(vista.text()).toContain("30 días para probarlo · Sin tarjeta");
+      expect(vista.text()).toContain(es.landing.solucion.empezar.etiqueta);
+      expect(
+        frasesEncontradas(vista.text(), FRASES_SOLO_EN_PRELANZAMIENTO),
+        solucion.slug,
+      ).toEqual([]);
+      vista.unmount();
+    }
+  });
+
+  it("con el registro cerrado por el superadmin dice cómo funcionará y pide los datos, sin prueba ni registro", async () => {
+    aplicarPreciosPublicos({ registro: { agendauno: false, turnouno: false } });
+    try {
+      for (const solucion of soluciones) {
+        const vista = await montar(solucion.slug);
+        const texto = vista.text();
+        expect(vista.get('[data-cta="hero"]').text()).toBe(
+          es.landing.prelanzamiento.cta,
+        );
+        expect(vista.get('[data-cta="final"]').text()).toBe(
+          es.landing.prelanzamiento.cta,
+        );
+        expect(texto).toContain(es.landing.solucion.prelanzamiento.etiqueta);
+        expect(texto).toContain(
+          `${PRODUCTOS[productoDeModalidad(solucion.modo)].nombre} abre pronto.`,
+        );
+        expect(
+          frasesEncontradas(texto, FRASES_SOLO_CON_REGISTRO),
+          solucion.slug,
+        ).toEqual([]);
+        for (const frase of [
+          /Del registro a tu primera reserva/,
+          /Una prueba con tu operación real/,
+          /antes de contratar/,
+        ]) {
+          expect(texto, `${solucion.slug}: ${String(frase)}`).not.toMatch(
+            frase,
+          );
+        }
+        // Lleva a la lista de interesados: se mide como `waitlist`.
+        await vista.get('[data-cta="final"]').trigger("click");
+        expect(trackEvent).toHaveBeenLastCalledWith(
+          "marketing_cta_clicked",
+          expect.objectContaining({
+            placement: "solution_final",
+            destination: "waitlist",
+            solution: solucion.slug,
+          }),
+        );
+        vista.unmount();
+      }
+    } finally {
+      aplicarPreciosPublicos(PRECIOS_POR_OMISION);
+    }
+  });
+
+  it("nombra el giro a media frase en minúscula y sin «academia» en todos los giros", async () => {
+    const barberias = await montar("barberias");
+    expect(barberias.get(".solucion-etiqueta").text()).toBe(
+      "Agenda de citas para barberías y estéticas",
+    );
+    expect(barberias.get("#beneficios-titulo").text()).toBe(
+      es.landing.solucion.beneficiosTitulo,
+    );
+    barberias.unmount();
+    const crossfit = await montar("crossfit-hyrox");
+    expect(crossfit.get(".solucion-etiqueta").text()).toBe(
+      "Software de reservas para centros de CrossFit y HYROX",
+    );
+    expect(crossfit.get("#beneficios-titulo").text()).not.toMatch(/academia/);
+    crossfit.unmount();
   });
 
   it("el botón del hero va en azul y el del cierre se queda rosa", async () => {

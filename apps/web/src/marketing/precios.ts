@@ -5,6 +5,9 @@
  * página mientras llega la respuesta. Debe coincidir con la tarifa vigente
  * (migración 2026_10_08_000200_tarifas_en_usd). Importes en centavos de dólar.
  */
+// Relativo y con extensión: lo importa `vite.config` (por seoConfig), sin alias `@/`.
+import type { Producto } from "../lib/producto.ts";
+
 export type NivelCitas = "individual" | "premium" | "pro";
 
 export interface Banda {
@@ -21,8 +24,18 @@ export interface PreciosPublicos {
     niveles: Partial<Record<NivelCitas, Record<string, number>>> | null;
     funciones: Partial<Record<string, string>> | null;
   };
-  ventas: { correo: string | null; whatsapp: string | null };
+  ventas: {
+    correo: string | null;
+    whatsapp: string | null;
+    /** El correo con que cotiza cada marca: el suyo o el general (ADR 0108). */
+    correo_por_producto?: Partial<Record<Producto, string | null>>;
+  };
   timbres: { moneda: string; precio_minor: number; paquetes: number[] };
+  /**
+   * ¿Qué producto recibe registros de negocios? (ADR 0108). El superadmin puede cerrar
+   * el de un producto: mientras, su landing junta interesados (prelanzamiento).
+   */
+  registro: { agendauno: boolean; turnouno: boolean };
 }
 
 const PREMIUM = [
@@ -70,6 +83,9 @@ export const PRECIOS_POR_OMISION: PreciosPublicos = {
     precio_minor: 180,
     paquetes: [50, 100, 200, 350, 500],
   },
+  // Los dos productos reciben registros (TurnoUno se lanzó). Debe coincidir con
+  // `registro.abierto_*` del API: es lo que dice el HTML pre-generado.
+  registro: { agendauno: true, turnouno: true },
 };
 
 const numero = (n: number) => n.toLocaleString("es-MX");

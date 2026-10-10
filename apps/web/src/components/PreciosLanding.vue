@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { trackEvent } from "@/lib/analytics";
+import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { funcionesPorNivel } from "@/lib/suscripcion";
 import { NOMBRE_MODALIDAD, type Modo } from "@/marketing/modalidades";
 import {
@@ -33,6 +34,11 @@ const elegido = ref<Modo>("clases");
 const anual = ref(false);
 const fijo = computed(() => props.modo !== undefined);
 const modo = computed<Modo>(() => props.modo ?? elegido.value);
+// El producto de la modalidad que se ve aún puede no recibir registros (ADR 0108).
+const registroAbierto = computed(
+  () => precios.datos.registro[productoDeModalidad(modo.value)],
+);
+const marca = computed(() => PRODUCTOS[productoDeModalidad(modo.value)].nombre);
 const registro = computed(() =>
   fijo.value
     ? { name: "registro", query: { modo: modo.value } }
@@ -104,8 +110,14 @@ const tarjetas = computed(() =>
         funciones: funciones.value[n.nivel],
       })),
 );
+// Cada marca cotiza con su correo de ventas; sin uno propio, con el general.
 const ventasCorreo = computed(
-  () => precios.datos.ventas.correo ?? "ventas@agendauno.mx",
+  () =>
+    precios.datos.ventas.correo_por_producto?.[
+      productoDeModalidad(modo.value)
+    ] ??
+    precios.datos.ventas.correo ??
+    "ventas@agendauno.mx",
 );
 const ventasWhatsApp = computed(() => {
   const numero = String(
@@ -113,6 +125,15 @@ const ventasWhatsApp = computed(() => {
   ).replace(/\D/g, "");
   return numero === "" ? null : `https://wa.me/${numero}`;
 });
+
+// Sin registro abierto, las tarjetas llevan a la lista de interesados: `waitlist`.
+function medirTarjeta(): void {
+  trackEvent("marketing_cta_clicked", {
+    placement: "pricing_card",
+    destination: registroAbierto.value ? "register" : "waitlist",
+    mode: modo.value,
+  });
+}
 
 function elegirModo(valor: Modo) {
   elegido.value = valor;
@@ -146,7 +167,7 @@ function elegirModo(valor: Modo) {
         <span class="precios-modelo-titulo">{{ NOMBRE_MODALIDAD.clases }}</span>
         <strong>Por alumnos activos</strong>
         <span class="precios-modelo-negocios">
-          Pilates, Pole dance, yoga, acuáticas, baile y CrossFit / HYROX.
+          Pilates, Pole dance, yoga, natación, baile y CrossFit / HYROX.
         </span>
       </button>
       <button
@@ -199,6 +220,10 @@ function elegirModo(valor: Modo) {
             >
           </button>
         </div>
+        <p class="precios-periodo-nota" data-prueba="anual-adelantado">
+          El plan anual se paga completo por adelantado: {{ mesesAnual }} meses
+          por 12 de servicio.
+        </p>
       </template>
     </div>
 
@@ -244,20 +269,18 @@ function elegirModo(valor: Modo) {
         <RouterLink
           class="tu-btn tu-btn-primario tu-btn-azul precio-cta"
           :to="registro"
-          @click="
-            trackEvent('marketing_cta_clicked', {
-              placement: 'pricing_card',
-              destination: 'register',
-              mode: modo,
-            })
-          "
+          @click="medirTarjeta"
           >{{
-            diasPrueba > 0
-              ? `Probar ${diasPrueba} días gratis`
-              : "Crear mi cuenta"
+            !registroAbierto
+              ? "Quiero que me avisen"
+              : diasPrueba > 0
+                ? `Probar ${diasPrueba} días gratis`
+                : "Crear mi cuenta"
           }}<span class="sr-only"> · {{ tarjeta.nombre }}</span></RouterLink
         >
-        <p class="precio-sin-tarjeta">Sin tarjeta para empezar</p>
+        <p class="precio-sin-tarjeta">
+          {{ registroAbierto ? "Sin tarjeta para empezar" : "Próximamente" }}
+        </p>
       </article>
     </div>
 
@@ -272,8 +295,11 @@ function elegirModo(valor: Modo) {
         mensual depende de los alumnos activos de tu negocio.
       </template>
       <template v-else>
-        En la prueba gratis tienes todo lo de Pro. Subir de plan se cobra al
-        momento por los días que faltan; el anual cuesta {{ mesesAnual }} meses.
+        <template v-if="registroAbierto"
+          >En la prueba gratis tienes todo lo de Pro.</template
+        >
+        Subir de plan se cobra al momento por los días que faltan; el anual
+        cuesta {{ mesesAnual }} meses y se paga por adelantado.
       </template>
     </p>
 
@@ -315,8 +341,8 @@ function elegirModo(valor: Modo) {
         </p>
         <p>
           Se aplica una sola banda a todo el mes, no un precio por cada alumno.
-          Sin alumnos activos, la renta por uso es $0. Se cobra al cerrar el
-          mes.
+          Sin alumnos activos, la suscripción de ese mes es de
+          {{ dolares(0) }} {{ monedaClases }}. Se cobra al cerrar el mes.
         </p>
       </div>
       <div v-else class="precios-reglas">
@@ -384,7 +410,7 @@ function elegirModo(valor: Modo) {
         <!-- Azul, como las tarjetas: el rosa queda para el menú y el cierre. -->
         <a
           class="tu-btn tu-btn-primario tu-btn-azul"
-          :href="`mailto:${ventasCorreo}?subject=Cotizaci%C3%B3n%20AgendaUno`"
+          :href="`mailto:${ventasCorreo}?subject=${encodeURIComponent(`Cotización ${marca}`)}`"
           >Contáctanos</a
         >
       </div>
@@ -397,11 +423,13 @@ function elegirModo(valor: Modo) {
             ? "Tú pones el precio de tus clases, paquetes y membresías."
             : "Tú pones el precio de tus servicios y paquetes."
       }}
-      AgendaUno te ayuda a ofrecerlos y gestionar sus cobros. Las comisiones del
-      proveedor de pagos en línea* no están incluidas en la suscripción.
+      {{ marca }} te ayuda a ofrecerlos y gestionar sus cobros. Las comisiones
+      del proveedor de pagos en línea* no están incluidas en la suscripción.
     </p>
     <!-- «Pagos en línea*»: solo en México (ADR 0099), como landing.soloMexico. -->
-    <p class="tu-nota-mexico">* Solo para clientes de México.</p>
+    <p class="tu-nota-mexico">
+      * Solo para negocios en México (cobros en pesos).
+    </p>
   </div>
 </template>
 
@@ -439,6 +467,11 @@ function elegirModo(valor: Modo) {
 }
 .precios-periodo {
   margin-top: 1rem;
+}
+.precios-periodo-nota {
+  margin-top: 0.6rem;
+  color: var(--texto-suave);
+  font-size: 0.82rem;
 }
 .precio-capacidad {
   margin-top: 0.25rem;

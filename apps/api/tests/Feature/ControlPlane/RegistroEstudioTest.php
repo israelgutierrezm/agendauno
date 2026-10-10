@@ -226,6 +226,15 @@ it('con reCAPTCHA configurado rechaza un puntaje bajo', function (): void {
     expect(Estudio::query()->where('slug', 'bajo')->exists())->toBeFalse();
 });
 
+it('en producción, sin la llave de reCAPTCHA, el registro se rechaza en vez de dejar pasar a todos', function (): void {
+    app()->detectEnvironment(fn (): string => 'production');
+    Config::set('agendauno.recaptcha.secret', null);
+
+    test()->postJson('/api/v1/registro', datosRegistroCaptcha('sin-llave', 'sin-llave@correo.mx'))
+        ->assertUnprocessable()->assertJsonValidationErrors('recaptcha', 'meta.errors');
+    expect(Estudio::query()->where('slug', 'sin-llave')->exists())->toBeFalse();
+});
+
 it('con reCAPTCHA configurado acepta un puntaje alto', function (): void {
     Config::set('agendauno.recaptcha.secret', 'test-secret');
     Config::set('agendauno.recaptcha.min_score', 0.5);

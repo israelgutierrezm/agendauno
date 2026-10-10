@@ -82,6 +82,8 @@ class AgendarCitaTenant
             if (! $inicia->isFuture()) {
                 throw new SesionNoReservable('Ese horario ya pasó.');
             }
+            // La anticipación mínima y el horizonte que decide el negocio.
+            app(VentanaDeReservaTenant::class)->exigirParaCita($inicia);
             if ($instructorId === null || ! $this->disponibilidad->cabeEnHorario($instructorId, $sucursal, $inicia, $termina)) {
                 throw new SesionNoReservable('Ese horario está fuera de la atención del profesional.');
             }
@@ -117,6 +119,7 @@ class AgendarCitaTenant
         if (! $inicia->isFuture()) {
             throw new SesionNoReservable('Ese horario ya pasó.');
         }
+        app(VentanaDeReservaTenant::class)->exigirParaCita($inicia);
 
         [$duracion] = $this->disponibilidad->duracionYMargenes($oferta, $duracionMin);
         $termina = $inicia->addMinutes($duracion);

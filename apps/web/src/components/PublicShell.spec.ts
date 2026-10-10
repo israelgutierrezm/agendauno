@@ -5,6 +5,8 @@ import { createI18n } from "vue-i18n";
 import { createMemoryHistory, createRouter } from "vue-router";
 import es from "@/i18n/locales/es-MX";
 import { trackEvent } from "@/lib/analytics";
+import { PRECIOS_POR_OMISION } from "@/marketing/precios";
+import { aplicarPreciosPublicos } from "@/marketing/preciosPublicos";
 import { rutasComerciales } from "@/router/comerciales";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import PublicShell from "./PublicShell.vue";
@@ -23,7 +25,6 @@ function routerPublico() {
     history: createMemoryHistory(),
     routes: [
       ...rutasComerciales({
-        landing: vacia,
         modalidad: vacia,
         solucion: vacia,
       }),
@@ -108,7 +109,7 @@ describe("encabezado público", () => {
     }
   });
   it("es comercial por la ruta (meta.marketing), no por el nombre que recibe", async () => {
-    for (const ruta of ["/", "/clases", "/citas", "/software-para-pilates"]) {
+    for (const ruta of ["/", "/clases", "/software-para-pilates"]) {
       // Sin `pagina`, como en el prerender.
       const vista = await montar({}, ruta);
       expect(vista.find(".tu-public-register").exists(), ruta).toBe(true);
@@ -121,48 +122,40 @@ describe("encabezado público", () => {
     expect(vista.find(".tu-public-sections").exists()).toBe(false);
     vista.unmount();
   });
-  it("menú Clases · Citas · Precios: «Precios» en la misma página solo en /clases y /citas", async () => {
-    const esperado = (precios: string) => [
-      ["Clases", "/clases"],
-      ["Citas", "/citas"],
-      ["Precios", precios],
+  it("menú del producto: Funciones · Precios · Preguntas de su portada (ADR 0108)", async () => {
+    const esperado = [
+      ["Funciones", "/#soluciones"],
+      ["Precios", "/#precios"],
+      ["Preguntas", "/#preguntas"],
     ];
-    for (const [ruta, precios] of [
-      ["/", "/#precios"],
-      ["/software-para-barberias", "/#precios"],
-      ["/clases", "/clases#precios"],
-      ["/citas", "/citas#precios"],
-    ] as const) {
+    for (const ruta of ["/", "/software-para-pilates"]) {
       const vista = await montar({}, ruta);
       expect(enlaces(vista, ".tu-public-nav .tu-public-sections")).toEqual(
-        esperado(precios),
+        esperado,
       );
       // La segunda fila del móvil, fuera de la barra fija y sin JS.
-      expect(enlaces(vista, ".tu-public-sections-fila")).toEqual(
-        esperado(precios),
-      );
+      expect(enlaces(vista, ".tu-public-sections-fila")).toEqual(esperado);
       expect(
         vista.find(".tu-public-nav .tu-public-sections-fila").exists(),
       ).toBe(false);
+      // Sin la otra modalidad: es otro producto, en su dominio.
+      expect(vista.text()).not.toContain("Citas");
       vista.unmount();
     }
-    const citas = await montar({}, "/citas");
-    const actual = citas.findAll('.tu-public-sections a[aria-current="page"]');
-    expect(actual.map((a) => a.text())).toEqual(["Citas", "Citas"]);
-    citas.unmount();
   });
   it("«Probar gratis» lleva la modalidad de la página al registro y a la medición", async () => {
-    const citas = await montar({}, "/citas");
-    const boton = citas.get(".tu-public-register");
-    expect(boton.attributes("href")).toBe("/registro?modo=citas");
+    const portada = await montar({}, "/");
+    const boton = portada.get(".tu-public-register");
+    expect(boton.text()).toContain("Probar gratis");
+    expect(boton.attributes("href")).toBe("/registro?modo=clases");
     await boton.trigger("click");
     await flushPromises();
     expect(trackEvent).toHaveBeenCalledWith("marketing_cta_clicked", {
       placement: "navigation",
       destination: "register",
-      mode: "citas",
+      mode: "clases",
     });
-    citas.unmount();
+    portada.unmount();
 
     // Página de un solo giro: el registro llega con el giro ya elegido, igual que
     // los «Probar gratis» del hero y del cierre.
@@ -180,25 +173,34 @@ describe("encabezado público", () => {
       business_profile: "pilates",
     });
     pilates.unmount();
-
-    // Página que junta dos giros: solo la modalidad.
-    const barberias = await montar({}, "/software-para-barberias");
-    expect(barberias.get(".tu-public-register").attributes("href")).toBe(
-      "/registro?modo=citas",
+  });
+  it("si el producto aún no recibe registros, el botón ofrece avisar", async () => {
+    aplicarPreciosPublicos({ registro: { agendauno: false, turnouno: false } });
+    try {
+      const vista = await montar({}, "/");
+      const boton = vista.get(".tu-public-register");
+      expect(boton.text()).toContain("Quiero que me avisen");
+      // Lleva a la lista de interesados: se mide como `waitlist`.
+      await boton.trigger("click");
+      expect(trackEvent).toHaveBeenLastCalledWith("marketing_cta_clicked", {
+        placement: "navigation",
+        destination: "waitlist",
+        mode: "clases",
+      });
+      // Aún no hay negocios que buscar: sin «¿Buscas reservar?».
+      expect(vista.find('footer a[href="/directorio"]').exists()).toBe(false);
+      expect(vista.get("footer").text()).not.toContain(es.nav.encontrarNegocio);
+      vista.unmount();
+    } finally {
+      aplicarPreciosPublicos(PRECIOS_POR_OMISION);
+    }
+  });
+  it("con el registro abierto, el footer ofrece encontrar un negocio", async () => {
+    const vista = await montar({}, "/");
+    expect(vista.get('footer a[href="/directorio"]').text()).toBe(
+      es.nav.encontrarNegocio,
     );
-    barberias.unmount();
-
-    vi.mocked(trackEvent).mockClear();
-    const portada = await montar({}, "/");
-    expect(portada.get(".tu-public-register").attributes("href")).toBe(
-      "/registro",
-    );
-    await portada.get(".tu-public-register").trigger("click");
-    expect(trackEvent).toHaveBeenCalledWith("marketing_cta_clicked", {
-      placement: "navigation",
-      destination: "register",
-    });
-    portada.unmount();
+    vista.unmount();
   });
   it("enlaza el aviso de privacidad desde el footer comercial", async () => {
     const vista = await montar();

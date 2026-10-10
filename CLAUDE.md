@@ -27,10 +27,20 @@ v4, Pinia, Vue Router, vue-i18n. It serves the marketing site, business
 registration, the business panel, the member portal and the superadmin.
 
 Mobile (`apps/mobile`): Flutter, Riverpod, Dio; feature-first (`lib/features/*`),
-repository + service data layer.
+repository + service data layer. One codebase, two official apps (ADR 0111): Android
+flavors `agendauno` (default) and `turnouno`; `ProductoApp.actual` in Dart. Requests
+carry `X-App-Producto`; white-label apps (AgendaUno only) are built from
+`configuraciones/marca_blanca/<negocio>.json` and carry `X-App-Negocio`.
 
-Infrastructure: Docker (`infra/produccion`, `actualizar.sh` / `volver.sh`),
-GitHub Actions CI (API with MySQL, web, mobile).
+Infrastructure: Docker (`infra/produccion`, `actualizar.sh` / `volver.sh`, with
+`--solo web|landing-agendauno|landing-turnouno` for stateless components; `compose.sh`
+for any manual `up`), behind the server's existing Traefik
+(`docker-compose.traefik.yml`, Cloudflare DNS-01 wildcard certificates;
+`docker-compose.cloudflare.yml` for the Cloudflare proxy) — ADR 0112. GitHub Actions
+(ADR 0113, `docs/CI-CD.md`): CI by changed area (API with MySQL, web, mobile with both
+APK flavors, images); `imagenes.yml` publishes immutable per-commit images to GHCR;
+`desplegar.yml` (manual, environment approval, SSH → `actualizar.sh`);
+`apps-moviles.yml` (manual signed AAB, never uploaded to stores).
 
 ## Architectural Style
 

@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Verifica un token de reCAPTCHA v3 (Google) para el registro público. Si no hay
- * `secret` configurado, la verificación se omite (entornos sin llaves, como local).
- * Con secret, valida el token contra Google y exige un puntaje por encima del umbral.
+ * Verifica un token de reCAPTCHA v3 (Google) para el registro público, la lista de
+ * interesados y la verificación de WhatsApp. Con `secret`, valida el token contra
+ * Google y exige un puntaje por encima del umbral. Sin `secret`, solo fuera de
+ * producción se omite (local, pruebas); en producción se rechaza: una llave olvidada
+ * no deja la puerta abierta a bots (`agendauno:verificar-produccion` también la pide).
  */
 class VerificarRecaptcha
 {
@@ -18,7 +21,12 @@ class VerificarRecaptcha
     {
         $secret = config('agendauno.recaptcha.secret');
         if (! is_string($secret) || $secret === '') {
-            // Sin llaves configuradas no se exige captcha (dev/local).
+            if (app()->environment('production')) {
+                Log::error('recaptcha.sin_llave', ['detalle' => 'Falta RECAPTCHA_SECRET: se rechazan el registro y la lista de interesados.']);
+
+                return false;
+            }
+
             return true;
         }
 

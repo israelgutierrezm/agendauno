@@ -146,7 +146,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", alTeclear));
 /* Con cursor: aparece al pasar sobre la foto (o sobre su tarjeta) y al enfocarla. */
 .fa-foto:hover .fa-lupa,
 .fa-abrir:focus-visible .fa-lupa,
-:global(.reserva-eleccion:hover) .fa-lupa {
+.reserva-eleccion:hover .fa-lupa {
   opacity: 1;
 }
 /* En pantallas táctiles no hay "pasar el cursor": siempre visible. */

@@ -3,10 +3,10 @@ import { createSSRApp, h } from "vue";
 import { renderToString } from "vue/server-renderer";
 import { createMemoryHistory, createRouter, RouterView } from "vue-router";
 import PublicShell from "@/components/PublicShell.vue";
-import LandingView from "@/views/LandingView.vue";
 import ModalidadView from "@/views/ModalidadView.vue";
 import SolucionView from "@/views/SolucionView.vue";
-import { i18n } from "@/i18n";
+import { aplicarMarca, i18n } from "@/i18n";
+import { PRODUCTO_COMERCIAL } from "@/marketing/seoConfig";
 import { rutasComerciales } from "@/router/comerciales";
 export {
   paginasMarketing,
@@ -14,7 +14,17 @@ export {
   seoParaRuta,
   renderSeoHead,
   SITE_URL,
+  PRODUCTO_COMERCIAL,
+  // Si el producto recibe registros (el respaldo con que se pre-generó la landing):
+  // scripts/check-marketing.mjs revisa el modo prelanzamiento con él.
+  REGISTRO_ABIERTO_POR_OMISION,
 } from "@/marketing/seoConfig";
+// Lo que la landing puede decir con el registro abierto o cerrado (check-marketing).
+export {
+  FRASES_SOLO_CON_REGISTRO,
+  FRASES_SOLO_EN_PRELANZAMIENTO,
+  frasesEncontradas,
+} from "@/marketing/prelanzamiento";
 
 /** Solo contenido comercial estático: nunca sesión, API ni datos de negocios. */
 export async function render(
@@ -25,7 +35,6 @@ export async function render(
     routes: [
       // Las mismas rutas comerciales (nombre, meta y props) que el router de la app.
       ...rutasComerciales({
-        landing: LandingView,
         modalidad: ModalidadView,
         solucion: SolucionView,
       }),
@@ -47,6 +56,8 @@ export async function render(
       })),
     ],
   });
+  // Los textos con la marca del producto de esta landing (ADR 0108).
+  aplicarMarca(PRODUCTO_COMERCIAL);
   const app = createSSRApp({
     render: () => h(PublicShell, {}, { default: () => h(RouterView) }),
   });

@@ -32,6 +32,27 @@ class CalcularDisponibilidadTenant
     ) {}
 
     /**
+     * Desde cuándo y hasta cuándo se ofrecen huecos (UTC); null = sin límites (el
+     * negocio). Lo fija {@see paraCliente()}.
+     *
+     * @var array{desde: CarbonImmutable, hasta: CarbonImmutable}|null
+     */
+    private ?array $limites = null;
+
+    /**
+     * La disponibilidad que ve el cliente: con la anticipación mínima y el horizonte
+     * que decide el negocio (`citas.minutos_anticipacion_minima`,
+     * `citas.dias_maximos_adelante`). El negocio agenda sin estos límites.
+     */
+    public function paraCliente(): static
+    {
+        $copia = clone $this;
+        $copia->limites = app(VentanaDeReservaTenant::class)->limitesDeCita();
+
+        return $copia;
+    }
+
+    /**
      * Duración y márgenes de una consulta: los del servicio si se indica; si no, la
      * duración que manda la pantalla, sin márgenes propios (los de las sesiones que ya
      * están en la agenda se respetan igual).
@@ -91,8 +112,10 @@ class CalcularDisponibilidadTenant
                 $inicia = $cursor->utc();
                 $termina = $cursor->addMinutes($duracionMin)->utc();
 
-                // Solo huecos futuros y sin conflicto de agenda del instructor.
+                // Solo huecos futuros (y, para el cliente, dentro de sus límites) y sin
+                // conflicto de agenda del instructor.
                 if ($inicia->greaterThan($ahora)
+                    && ($this->limites === null || ($inicia->greaterThanOrEqualTo($this->limites['desde']) && $inicia->lessThanOrEqualTo($this->limites['hasta'])))
                     && $this->agenda->conflictos($instructorId, null, $inicia, $termina, $excluirSesionId, (int) $sucursal->getKey(), margenes: $margenes) === []
                     && ($conRecurso === null || $this->recursos->libre($conRecurso, (int) $sucursal->getKey(), $inicia, $termina, $margenes, $excluirSesionId) !== null)) {
                     $slots[] = [
@@ -173,6 +196,8 @@ class CalcularDisponibilidadTenant
             $abierto = $hastaLas !== null
                 && ! in_array($fecha, $cerrados, true)
                 && ! $dia->isBefore($ahora->startOfDay())
+                // Para el cliente, un día después del horizonte ya no se ofrece.
+                && ($this->limites === null || ! $dia->isAfter($this->limites['hasta']->setTimezone($zona)->endOfDay()))
                 && (! $dia->isSameDay($ahora) || $hastaLas > $ahora->format('H:i:s'));
             $lista[] = ['fecha' => $fecha, 'abierto' => $abierto];
         }

@@ -416,7 +416,7 @@ const reprogramando = ref(false);
 const cancelando = ref(false);
 function reprogramada(datos: { antes: string; ahora: string }): void {
   reprogramando.value = false;
-  const zona = props.sesion?.zona_horaria ?? "America/Mexico_City";
+  const zona = props.sesion?.zona_horaria ?? sesionTenant.zonaHoraria;
   const f = (iso: string): string =>
     new Intl.DateTimeFormat("es-MX", {
       timeZone: zona,

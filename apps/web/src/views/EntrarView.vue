@@ -12,7 +12,7 @@ import {
 
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import IconoNav from "@/components/IconoNav.vue";
-import LogoAgendaUno from "@/components/LogoAgendaUno.vue";
+import LogoProducto from "@/components/LogoProducto.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import {
   googleEnDominioRaiz,
@@ -31,6 +31,7 @@ import {
   slugDeContexto,
   urlEntrarEnDominioRaiz,
 } from "@/lib/tenant";
+import { useRegistroDelProducto } from "@/marketing/registroProducto";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 interface Marca {
@@ -51,6 +52,9 @@ const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const sesion = useSesionTenantStore();
+// Si el producto aún no recibe registros (ADR 0108), quien administra un negocio deja
+// sus datos en la lista de interesados y no se ofrece buscar negocios.
+const { abierto: registroAbierto } = useRegistroDelProducto();
 
 // Un enlace directo o subdominio fija el tenant. En el dominio raíz primero se
 // elige un negocio: el usuario ya no tiene que recordar ni escribir su slug.
@@ -358,7 +362,11 @@ onMounted(async () => {
         </div>
       </div>
 
-      <RouterLink class="tu-login-explorar" :to="{ name: 'directorio' }">
+      <RouterLink
+        v-if="registroAbierto"
+        class="tu-login-explorar"
+        :to="{ name: 'directorio' }"
+      >
         {{ $t("entrar.buscarReserva") }}
         <IconoNav nombre="flecha" :tam="16" />
       </RouterLink>
@@ -375,7 +383,7 @@ onMounted(async () => {
             class="tu-login-logo-negocio"
             @error="logoFallido = true"
           />
-          <LogoAgendaUno v-else variante="isotipo" :ancho="64" />
+          <LogoProducto v-else variante="isotipo" :ancho="64" />
         </div>
 
         <!-- La sesión guardada no se pudo confirmar (sin red, en mantenimiento): sigue
@@ -667,10 +675,12 @@ onMounted(async () => {
         >
           {{ $t("entrar.sinCuentaCliente", { negocio: marca.nombre }) }}
         </p>
-        <p class="tu-login-registro">
+        <p class="tu-login-registro" data-prueba="registrar-negocio">
           {{ $t("entrar.sinCuenta") }}
           <RouterLink class="tu-enlace" :to="{ name: 'registro' }">{{
-            $t("entrar.registrar")
+            registroAbierto
+              ? $t("entrar.registrar")
+              : $t("landing.prelanzamiento.cta")
           }}</RouterLink>
         </p>
       </div>

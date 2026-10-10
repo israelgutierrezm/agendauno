@@ -1,11 +1,12 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-import LandingView from "@/views/LandingView.vue";
+import ModalidadView from "@/views/ModalidadView.vue";
 import { trackPageView } from "@/lib/analytics";
 import { puedeEntrar } from "@/lib/acceso";
 import { updateSeo } from "@/lib/seo";
 import { giroDeQuery, modoDeQuery } from "@/marketing/modalidades";
-import { seoParaRuta } from "@/marketing/seoConfig";
+import { preciosPublicos } from "@/marketing/preciosPublicos";
+import { PRODUCTO_COMERCIAL, seoParaRuta } from "@/marketing/seoConfig";
 import { rutasComerciales } from "@/router/comerciales";
 import {
   salirA,
@@ -37,10 +38,10 @@ const router = createRouter({
     return { top: 0 };
   },
   routes: [
-    // Portada, /clases, /citas y /software-para-*: la misma lista que el prerender.
+    // Portada del producto, /clases, /citas y /software-para-*: la misma lista que el
+    // prerender (ADR 0108: cada dominio, las de su producto).
     ...rutasComerciales({
-      landing: LandingView,
-      modalidad: () => import("@/views/ModalidadView.vue"),
+      modalidad: ModalidadView,
       solucion: () => import("@/views/SolucionView.vue"),
     }),
     {
@@ -80,6 +81,14 @@ const router = createRouter({
       path: "/estudio/:slug",
       name: "estudio-publico",
       component: () => import("@/views/EstudioPublicoView.vue"),
+    },
+    {
+      // Vista previa del sitio con su borrador (la abre su editor, con la sesión de
+      // quien configura el negocio; en el mismo origen que el panel).
+      path: "/estudio/:slug/vista-previa",
+      name: "sitio-vista-previa",
+      component: () => import("@/views/EstudioPublicoView.vue"),
+      props: { vistaPrevia: true },
     },
     {
       // Agendar cita (público, guest): elegir servicio → persona → hueco → pagar.
@@ -398,6 +407,13 @@ const router = createRouter({
       meta: { requiereSesion: true },
     },
     {
+      // El sitio del negocio (ADR 0114): plantilla, secciones, banners y publicar.
+      path: "/sitio",
+      name: "sitio-web",
+      component: () => import("@/views/SitioWebView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
       // Portada de Configuración del negocio: sus categorías y opciones.
       path: "/ajustes",
       name: "ajustes",
@@ -573,7 +589,10 @@ router.beforeEach(async (to) => {
 
 router.afterEach((to, _from, failure) => {
   if (failure) return;
-  const seo = seoParaRuta(to.path);
+  // Con lo que publicó el superadmin, si ya llegó: si el producto recibe registros.
+  const seo = seoParaRuta(to.path, {
+    registroAbierto: preciosPublicos.datos.registro[PRODUCTO_COMERCIAL],
+  });
   updateSeo(seo);
   // No enviar slugs, IDs internos ni URLs de activación a la medición comercial.
   if (seo.index || to.name === "registro") trackPageView(to.path, seo.title);

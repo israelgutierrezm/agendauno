@@ -86,6 +86,12 @@ interface Opciones {
   whatsapp?: boolean;
   // Hay servicios que se toman con bono o membresía (se usan desde la cuenta).
   hay_con_plan?: boolean;
+  // Lo que decide el negocio para agendar en línea (ADR 0115).
+  reglas?: {
+    minutos_anticipacion_minima: number;
+    dias_maximos_adelante: number;
+    agendar_sin_cuenta: boolean;
+  };
 }
 // La cita por pagar del enlace del correo de apartado (?pagar=<orden>).
 interface PorPagar {
@@ -312,7 +318,7 @@ const libresEnHora = computed(() => {
   return profesionalesSede.value.filter((b) => ids.includes(b.id));
 });
 const zona = computed(
-  () => sucursalSel.value?.zona_horaria ?? "America/Mexico_City",
+  () => sucursalSel.value?.zona_horaria ?? sesion.zonaHoraria,
 );
 // Duración del servicio; respaldo de 60 min si el servicio no la definió.
 const duracion = computed(() => servicioSel.value?.duracion_minutos ?? 60);
@@ -370,6 +376,11 @@ const puedeContinuar = computed(
   () => slotSel.value !== "" && barberoId.value !== "",
 );
 
+// ¿Recibe citas de quien no tiene cuenta? Si el negocio lo apagó, se agenda entrando
+// a la cuenta (el equipo agenda con los datos del cliente, como siempre).
+const sinCuentaPermitido = computed(
+  () => opciones.value?.reglas?.agendar_sin_cuenta !== false,
+);
 const listoParaAgendar = computed(
   () =>
     servicioId.value !== "" &&
@@ -377,7 +388,8 @@ const listoParaAgendar = computed(
     barberoId.value !== "" &&
     slotSel.value !== "" &&
     (clienteConCuenta.value ||
-      (datos.value.nombre.trim() !== "" &&
+      ((sinCuentaPermitido.value || sesionDelEquipo.value) &&
+        datos.value.nombre.trim() !== "" &&
         CORREO.test(datos.value.email.trim()))),
 );
 
@@ -2067,6 +2079,7 @@ onMounted(cargar);
                     {{ sesion.usuario?.email }}
                   </p>
                   <button
+                    v-if="sinCuentaPermitido"
                     type="button"
                     class="tu-enlace mt-1 text-sm"
                     @click="comoInvitado = true"
@@ -2095,7 +2108,7 @@ onMounted(cargar);
                     >
                   </p>
                   <p
-                    v-else
+                    v-else-if="sinCuentaPermitido"
                     class="rc-acceso-datos"
                     :style="{ color: 'var(--texto-suave)' }"
                   >
@@ -2109,7 +2122,10 @@ onMounted(cargar);
                       {{ $t("perfilPublico.agendar.entrar") }}
                     </button>
                   </p>
-                  <div class="space-y-3">
+                  <div
+                    v-if="sinCuentaPermitido || sesionDelEquipo"
+                    class="space-y-3"
+                  >
                     <div class="grid sm:grid-cols-2 gap-3">
                       <div>
                         <label class="tu-label" for="rc-nom">{{
@@ -2201,6 +2217,21 @@ onMounted(cargar);
                       {{ $t("perfilPublico.agendar.aceptaWhatsApp") }}
                     </label>
                   </div>
+                  <!-- El negocio solo recibe citas de clientes con cuenta. -->
+                  <p
+                    v-else
+                    class="rc-acceso-datos"
+                    data-prueba="requiere-cuenta"
+                  >
+                    {{ $t("perfilPublico.agendar.requiereCuenta") }}
+                    <button
+                      type="button"
+                      class="tu-enlace"
+                      @click="entrarParaAgendar"
+                    >
+                      {{ $t("perfilPublico.agendar.entrar") }}
+                    </button>
+                  </p>
                 </template>
 
                 <!-- Para otra persona: la cita es de quien agenda (ADR 0068). -->

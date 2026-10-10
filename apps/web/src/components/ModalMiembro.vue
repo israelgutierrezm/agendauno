@@ -249,7 +249,7 @@ const saldoTexto = computed(() => {
 const diaProxima = computed(() => {
   const p = resumen.value?.proxima_reserva;
   return p
-    ? fechaLocal(p.inicia_en, p.zona_horaria ?? "America/Mexico_City")
+    ? fechaLocal(p.inicia_en, p.zona_horaria ?? sesion.zonaHoraria)
     : null;
 });
 

@@ -1,10 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { render, rutasMarketing } from "./entry-marketing";
+import { PRECIOS_POR_OMISION } from "@/marketing/precios";
+import { aplicarPreciosPublicos } from "@/marketing/preciosPublicos";
+import {
+  FRASES_SOLO_CON_REGISTRO,
+  FRASES_SOLO_EN_PRELANZAMIENTO,
+  frasesEncontradas,
+  render,
+  rutasMarketing,
+} from "./entry-marketing";
 
 /*
 | Las páginas comerciales se prerenderizan con su HTML completo (SEO). Si un
-| componente de la barra pública falla en el servidor, la página sale vacía.
+| componente de la barra pública falla en el servidor, la página sale vacía. Sin
+| `VITE_PRODUCTO` rige AgendaUno (ADR 0108): su portada de clases y sus páginas por
+| giro; la landing de TurnoUno la revisan `scripts/check-marketing*.mjs` con su build.
 */
 
 function documento(html: string): Document {
@@ -18,67 +28,81 @@ describe("prerender de marketing", () => {
     expect(html).toContain('href="/entrar"');
   });
 
-  it("prerenderiza las once páginas con un solo h1 y el menú comercial", async () => {
-    expect(rutasMarketing).toHaveLength(11);
+  it("prerenderiza la portada y las páginas por giro con un solo h1 y el menú del producto", async () => {
+    expect(rutasMarketing[0]).toBe("/");
+    expect(rutasMarketing.length).toBeGreaterThan(1);
     for (const path of rutasMarketing) {
       const pagina = documento((await render(path)).html);
       expect(pagina.querySelectorAll("h1"), path).toHaveLength(1);
       // Comercial por su ruta (meta.marketing): menú y «Probar gratis», sin «Inicio».
-      expect(
-        pagina.querySelector('.tu-public-sections a[href="/clases"]'),
-        path,
-      ).not.toBeNull();
-      expect(
-        pagina.querySelector('.tu-public-sections a[href="/citas"]'),
-      ).not.toBeNull();
       expect(pagina.querySelector(".tu-public-register"), path).not.toBeNull();
       expect(pagina.querySelector(".tu-public-back"), path).toBeNull();
-      // Clases · Citas · Precios, en la barra y en la segunda fila del móvil.
+      // Funciones · Precios · Preguntas, en la barra y en la segunda fila del móvil.
       const menus = pagina.querySelectorAll(".tu-public-sections");
       expect(menus).toHaveLength(2);
       for (const menu of menus) {
         expect(
-          [...menu.querySelectorAll("a")].map((a) => a.textContent?.trim()),
-        ).toEqual(["Clases", "Citas", "Precios"]);
+          [...menu.querySelectorAll("a")].map((a) => a.getAttribute("href")),
+        ).toEqual(["/#soluciones", "/#precios", "/#preguntas"]);
       }
+      // Sin la otra modalidad en el menú: es otro producto.
+      expect(
+        pagina.querySelector('.tu-public-sections a[href="/citas"]'),
+      ).toBeNull();
     }
   });
 
-  it("/clases y /citas: su h1, «Precios» en la misma página y registro con su modo", async () => {
-    for (const modo of ["clases", "citas"] as const) {
-      const pagina = documento((await render(`/${modo}`)).html);
-      expect(pagina.querySelectorAll("h1")).toHaveLength(1);
-      expect(pagina.querySelector("h1")?.textContent?.trim()).not.toBe("");
+  it("la portada: su h1 y el registro con su modo", async () => {
+    const pagina = documento((await render("/")).html);
+    expect(pagina.querySelector("h1")?.textContent?.trim()).not.toBe("");
+    expect(
+      pagina.querySelector(".tu-public-register")?.getAttribute("href"),
+    ).toBe("/registro?modo=clases");
+    expect(pagina.getElementById("precios")).not.toBeNull();
+  });
+
+  it("con el registro abierto, ninguna página dice nada de la lista de interesados", async () => {
+    for (const path of rutasMarketing) {
+      const pagina = documento((await render(path)).html);
       expect(
-        pagina.querySelectorAll(
-          `.tu-public-sections a[href="/${modo}#precios"]`,
+        frasesEncontradas(
+          pagina.body.textContent ?? "",
+          FRASES_SOLO_EN_PRELANZAMIENTO,
         ),
-      ).toHaveLength(2);
-      expect(
-        pagina.querySelector(".tu-public-register")?.getAttribute("href"),
-      ).toBe(`/registro?modo=${modo}`);
-      expect(
-        pagina
-          .querySelector(`.tu-public-sections a[href="/${modo}"]`)
-          ?.getAttribute("aria-current"),
-      ).toBe("page");
+        path,
+      ).toEqual([]);
     }
-    // Fuera de /clases y /citas, «Precios» lleva a la portada.
-    const portada = documento((await render("/")).html);
-    expect(
-      portada.querySelector('.tu-public-sections a[href="/#precios"]'),
-    ).not.toBeNull();
-    expect(
-      portada.querySelector(".tu-public-register")?.getAttribute("href"),
-    ).toBe("/registro");
+  });
+
+  it("con el registro cerrado (prelanzamiento), ninguna página ofrece probar, registrarse ni contratar", async () => {
+    aplicarPreciosPublicos({ registro: { agendauno: false, turnouno: false } });
+    try {
+      for (const path of rutasMarketing) {
+        const pagina = documento((await render(path)).html);
+        expect(
+          frasesEncontradas(
+            pagina.body.textContent ?? "",
+            FRASES_SOLO_CON_REGISTRO,
+          ),
+          path,
+        ).toEqual([]);
+        expect(
+          pagina.querySelector(".tu-public-register")?.textContent,
+          path,
+        ).toContain("Quiero que me avisen");
+        // Aún no hay negocios que buscar.
+        expect(pagina.querySelector('a[href="/negocios"]'), path).toBeNull();
+      }
+    } finally {
+      aplicarPreciosPublicos(PRECIOS_POR_OMISION);
+    }
   });
 
   it("en las páginas por giro, «Probar gratis» del menú lleva su giro si es uno solo", async () => {
     for (const [path, destino] of [
       ["/software-para-pilates", "/registro?modo=clases&giro=pilates"],
-      ["/software-para-spas", "/registro?modo=citas&giro=spa"],
       // Junta dos giros: solo la modalidad.
-      ["/software-para-barberias", "/registro?modo=citas"],
+      ["/software-para-crossfit-hyrox", "/registro?modo=clases"],
     ] as const) {
       const pagina = documento((await render(path)).html);
       expect(

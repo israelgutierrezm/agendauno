@@ -869,7 +869,7 @@ onMounted(cargarReferencias);
           :proveedor-nombre="persona?.nombre ?? ''"
           :sucursal-id="sucursalId"
           :sucursal-nombre="sucursalActual?.nombre ?? ''"
-          :zona="sucursalActual?.zona_horaria ?? 'America/Mexico_City'"
+          :zona="sucursalActual?.zona_horaria ?? sesion.zonaHoraria"
           :puede-gestionar="puedeGestionar"
           :puede-eliminar="sesion.puede('agenda.eliminar')"
           @cargados="bloqueos = $event"

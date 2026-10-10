@@ -165,6 +165,9 @@ export default {
       ayuda:
         "A dónde se manda a quien pide cotización (más profesionales o alumnos de los que ofrece la tarifa), el tipo de cambio y los paquetes de timbres que se venden.",
       ventasCorreo: "Correo de ventas",
+      ventasCorreoDe: "Correo de ventas de {marca}",
+      ventasCorreoDeAyuda:
+        "Vacío: sus cotizaciones llegan al correo de ventas.",
       ventasWhatsApp: "WhatsApp de ventas (con lada)",
       banxico: "Token del Banco de México",
       banxicoGuardado: "Guardado (escribe otro para cambiarlo)",

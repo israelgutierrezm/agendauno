@@ -24,6 +24,7 @@ use App\Modules\Tenancy\Application\PortalDelClienteTenant;
 use App\Modules\Tenancy\Application\PresentarMovimientosCreditoTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\ResolverDerechoTenant;
+use App\Modules\Tenancy\Application\VentanaDeReservaTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Http\SesionTenantPresenter;
@@ -369,6 +370,8 @@ class MiTenantController
         if (! $this->modalidad->esClases() || $sesion->esCita()) {
             throw new SesionNoReservable('Esta cita es privada.');
         }
+        // Cuándo abre y cierra la reserva de la clase para el cliente (lo decide el negocio).
+        app(VentanaDeReservaTenant::class)->exigirParaClase($sesion);
 
         // Cómo se habilita la reserva de la clase: si es de pago por clase, se crea una
         // reserva pendiente (retiene el cupo) + una orden por la sesión, y el miembro
@@ -429,7 +432,7 @@ class MiTenantController
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
         $instructor = ($validado['instructor_id'] ?? '') !== '' ? Usuario::query()->where('ulid', $validado['instructor_id'])->firstOrFail() : null;
 
-        return response()->json(['data' => $disponibilidad->diasConAtencion(
+        return response()->json(['data' => $disponibilidad->paraCliente()->diasConAtencion(
             $sucursal,
             $validado['desde'],
             (int) ($validado['dias'] ?? 14),
@@ -466,8 +469,8 @@ class MiTenantController
             // muestra y lo manda tal cual, aunque el teléfono esté en otra zona.
             'zona_horaria' => $disponibilidad->zona($sucursal),
             'slots' => $instructor instanceof Usuario
-                ? $disponibilidad->paraFecha((int) $instructor->getKey(), $sucursal, $validado['fecha'], $duracion, null, $margenes, $oferta)
-                : $disponibilidad->paraCualquiera($sucursal, $validado['fecha'], $duracion, null, $margenes, $oferta),
+                ? $disponibilidad->paraCliente()->paraFecha((int) $instructor->getKey(), $sucursal, $validado['fecha'], $duracion, null, $margenes, $oferta)
+                : $disponibilidad->paraCliente()->paraCualquiera($sucursal, $validado['fecha'], $duracion, null, $margenes, $oferta),
         ]]);
     }
 

@@ -271,12 +271,19 @@ export interface ContenidoModalidad {
   ruta: `/${Modo}`;
   nombreRuta: (typeof NOMBRE_RUTA_MODALIDAD)[Modo];
   nombre: string;
-  /** SEO en texto plano (title, description, Open Graph, miga de pan). */
+  /**
+   * SEO en texto plano (title, description, Open Graph, miga de pan). El título, de
+   * hasta 60 caracteres con la marca. La descripción no lleva la frase de cierre: la
+   * pone seoConfig según si el producto recibe registros (prueba gratis o lista de
+   * interesados).
+   */
   seo: {
     title: string;
     description: string;
     /** Imagen Open Graph: ruta pública existente; seoConfig la vuelve absoluta. */
     imagen: string;
+    /** Su texto alternativo (`og:image:alt`). */
+    imagenAlt: string;
     miga: string;
   };
   perfiles: readonly string[];
@@ -318,11 +325,11 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     nombreRuta: NOMBRE_RUTA_MODALIDAD.clases,
     nombre: NOMBRE_MODALIDAD.clases,
     seo: {
-      title:
-        "Software de clases para estudios, gimnasios y academias | AgendaUno",
+      title: "Software de clases para estudios y gimnasios | AgendaUno",
       description:
-        "Organiza clases con cupo, lista de espera, membresías y créditos, y pasa lista con retardos. Prueba AgendaUno gratis durante 30 días, sin tarjeta.",
+        "Organiza clases con cupo, lista de espera, membresías y créditos, y pasa lista con retardos.",
       imagen: "/assets/landing/disciplinas/pilates-v1.jpg",
+      imagenAlt: "Alumna practicando Pilates Reformer en un estudio moderno",
       miga: ETIQUETA_MENU.clases,
     },
     perfiles: PERFILES_POR_MODO.clases,
@@ -373,11 +380,11 @@ export const MODALIDADES: Record<Modo, ContenidoModalidad> = {
     nombreRuta: NOMBRE_RUTA_MODALIDAD.citas,
     nombre: NOMBRE_MODALIDAD.citas,
     seo: {
-      title:
-        "Software de citas para barberías, estéticas y consultorios | AgendaUno",
+      title: "Agenda de citas: barberías, spas y consultorios | AgendaUno",
       description:
-        "Agenda por profesional, servicios con su duración y precio, paquetes y recordatorios por correo. Prueba AgendaUno gratis durante 30 días, sin tarjeta.",
+        "Agenda por profesional, servicios con su duración y precio, paquetes y recordatorios por correo.",
       imagen: "/assets/landing/disciplinas/barberia-v1.jpg",
+      imagenAlt: "Barbero atendiendo a un cliente en una barbería moderna",
       miga: ETIQUETA_MENU.citas,
     },
     perfiles: PERFILES_POR_MODO.citas,

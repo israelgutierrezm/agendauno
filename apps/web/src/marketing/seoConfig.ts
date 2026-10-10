@@ -1,32 +1,86 @@
 import { soluciones, rutaSolucion } from "./soluciones.ts";
+import { MODALIDADES, perfilDeSolucion, type Modo } from "./modalidades.ts";
+import { PRECIOS_POR_OMISION } from "./precios.ts";
 import {
-  MODALIDADES,
-  MODOS,
-  NOMBRE_RUTA_MODALIDAD,
-  perfilDeSolucion,
-  rutaModalidad,
-  type Modo,
-} from "./modalidades.ts";
+  PRODUCTOS,
+  PRODUCTO_DE_BUILD,
+  conMarca,
+  productoActual,
+  type Producto,
+} from "../lib/producto.ts";
 
-export const SITE_URL = "https://agendauno.mx";
-export const DEFAULT_IMAGE = `${SITE_URL}/assets/brand/agendauno/final-v2/open-graph.png`;
+/**
+ * El producto de las páginas comerciales (ADR 0108): el del build de la landing
+ * (`VITE_PRODUCTO`) o, en la aplicación, el del dominio. Cada dominio publica solo
+ * las páginas de su producto: agendauno.mx las de clases, turnouno.mx las de citas.
+ */
+export const PRODUCTO_COMERCIAL: Producto =
+  PRODUCTO_DE_BUILD ??
+  ("window" in globalThis ? productoActual() : "agendauno");
+const MARCA = PRODUCTOS[PRODUCTO_COMERCIAL];
+/** La modalidad de los negocios del producto: la de su portada y sus páginas. */
+export const MODO_COMERCIAL: Modo = MARCA.modalidad;
+
+export const SITE_URL = `https://${MARCA.dominio}`;
+// TurnoUno aún no tiene imagen de marca: su portada usa la foto de su página.
+export const DEFAULT_IMAGE =
+  PRODUCTO_COMERCIAL === "agendauno"
+    ? `${SITE_URL}/assets/brand/agendauno/final-v2/open-graph.png`
+    : `${SITE_URL}${MODALIDADES[MODO_COMERCIAL].seo.imagen}`;
+export const DEFAULT_IMAGE_ALT =
+  PRODUCTO_COMERCIAL === "agendauno"
+    ? "Logotipo de AgendaUno"
+    : MODALIDADES[MODO_COMERCIAL].seo.imagenAlt;
+
+/** Los textos de SEO están en AgendaUno: en TurnoUno se leen con su marca. */
+function marcar(texto: string): string {
+  return conMarca(texto, PRODUCTO_COMERCIAL);
+}
+
+/**
+ * ¿El producto recibe registros? (ADR 0108). El HTML pre-generado usa el respaldo de
+ * `precios.ts`; la aplicación puede pasar lo que publicó el superadmin.
+ */
+export const REGISTRO_ABIERTO_POR_OMISION: boolean =
+  PRECIOS_POR_OMISION.registro[PRODUCTO_COMERCIAL];
+
+/**
+ * La frase con que cierra la descripción de una página comercial: la prueba gratis si
+ * el producto recibe registros; si el superadmin lo cerró (prelanzamiento), la lista
+ * de interesados. Nunca ofrece una prueba que todavía no se puede empezar.
+ */
+export function cierreSeo(registroAbierto: boolean): string {
+  return registroAbierto
+    ? `Prueba AgendaUno gratis durante ${PRECIOS_POR_OMISION[MODO_COMERCIAL].dias_prueba} días, sin tarjeta.`
+    : "AgendaUno abre pronto: déjanos tus datos y te avisamos.";
+}
+function conCierre(descripcion: string, registroAbierto: boolean): string {
+  return `${descripcion} ${cierreSeo(registroAbierto)}`;
+}
+
 export interface SeoOptions {
   title: string;
   description: string;
   path?: string;
   image?: string;
+  /** Texto alternativo de la imagen (`og:image:alt`). */
+  imageAlt?: string;
   type?: "website" | "profile";
   index?: boolean;
   jsonLd?: Record<string, unknown> | null;
 }
 export const DEFAULT_SEO = {
-  title: "Software de reservas para clases y citas | AgendaUno",
-  description:
-    "Organiza clases, citas por profesional, membresías y cobros en una agenda visual. Prueba AgendaUno gratis durante 30 días, sin tarjeta.",
+  title: marcar(MODALIDADES[MODO_COMERCIAL].seo.title),
+  description: marcar(
+    conCierre(
+      MODALIDADES[MODO_COMERCIAL].seo.description,
+      REGISTRO_ABIERTO_POR_OMISION,
+    ),
+  ),
 } as const;
 
 /** Qué vista monta cada página comercial (el router elige el componente). */
-export type VistaMarketing = "landing" | "modalidad" | "solucion";
+export type VistaMarketing = "modalidad" | "solucion";
 
 export interface PaginaMarketing {
   path: string;
@@ -45,45 +99,50 @@ export interface PaginaMarketing {
 }
 
 /**
- * LA lista de páginas comerciales: el router, el prerender, el sitemap, el SEO, la
- * analítica y las revisiones de `scripts/check-marketing*.mjs` salen de aquí.
+ * LA lista de páginas comerciales del producto: el router, el prerender, el sitemap,
+ * el SEO, la analítica y las revisiones de `scripts/check-marketing*.mjs` salen de
+ * aquí. La portada es la página de la modalidad del producto; las páginas por giro,
+ * solo las de esa modalidad.
  */
 export const paginasMarketing: readonly PaginaMarketing[] = [
-  { path: "/", name: "inicio", vista: "landing", modo: null },
-  ...MODOS.map((modo): PaginaMarketing => ({
-    path: rutaModalidad(modo),
-    name: NOMBRE_RUTA_MODALIDAD[modo],
-    vista: "modalidad",
-    modo,
-  })),
-  ...soluciones.map((s): PaginaMarketing => ({
-    path: rutaSolucion(s.slug),
-    name: `solucion-${s.slug}`,
-    vista: "solucion",
-    modo: s.modo,
-    slug: s.slug,
-    giro: perfilDeSolucion(s.slug),
-  })),
+  { path: "/", name: "inicio", vista: "modalidad", modo: MODO_COMERCIAL },
+  ...soluciones
+    .filter((s) => s.modo === MODO_COMERCIAL)
+    .map((s): PaginaMarketing => ({
+      path: rutaSolucion(s.slug),
+      name: `solucion-${s.slug}`,
+      vista: "solucion",
+      modo: s.modo,
+      slug: s.slug,
+      giro: perfilDeSolucion(s.slug),
+    })),
 ];
 export const rutasMarketing: string[] = paginasMarketing.map((p) => p.path);
 
-function organizacionYSoftware(): Record<string, unknown>[] {
+function organizacionYSoftware(
+  registroAbierto: boolean,
+): Record<string, unknown>[] {
   return [
     {
       "@type": "Organization",
       "@id": `${SITE_URL}/#organization`,
-      name: "AgendaUno",
+      name: MARCA.nombre,
       url: SITE_URL,
-      logo: `${SITE_URL}/assets/brand/agendauno/final-v2/logo.png`,
+      ...(PRODUCTO_COMERCIAL === "agendauno"
+        ? { logo: `${SITE_URL}/assets/brand/agendauno/final-v2/logo.png` }
+        : {}),
     },
     {
       "@type": "SoftwareApplication",
       "@id": `${SITE_URL}/#software`,
-      name: "AgendaUno",
+      name: MARCA.nombre,
       url: SITE_URL,
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
-      description: DEFAULT_SEO.description,
+      description: conCierre(
+        MODALIDADES[MODO_COMERCIAL].seo.description,
+        registroAbierto,
+      ),
       publisher: { "@id": `${SITE_URL}/#organization` },
     },
   ];
@@ -103,39 +162,64 @@ function migaDePan(
   };
 }
 
-/** /clases y /citas: su WebPage y su miga de pan (sin Offer, FAQPage ni hreflang). */
-function seoDeModalidad(modo: Modo): SeoOptions {
-  const { ruta, seo } = MODALIDADES[modo];
-  const url = `${SITE_URL}${ruta}`;
+/** La portada del producto: su WebPage (sin Offer, FAQPage ni hreflang). */
+function seoDeModalidad(modo: Modo, registroAbierto: boolean): SeoOptions {
+  const { seo } = MODALIDADES[modo];
+  const ruta = "/";
+  const url = `${SITE_URL}/`;
   const image = `${SITE_URL}${seo.imagen}`;
+  const description = conCierre(seo.description, registroAbierto);
   return {
     title: seo.title,
-    description: seo.description,
+    description,
     path: ruta,
     image,
+    imageAlt: seo.imagenAlt,
     index: true,
     jsonLd: {
       "@context": "https://schema.org",
       "@graph": [
-        ...organizacionYSoftware(),
+        ...organizacionYSoftware(registroAbierto),
         {
           "@type": "WebPage",
           "@id": `${url}#webpage`,
           url,
           name: seo.title,
-          description: seo.description,
+          description,
           inLanguage: "es-MX",
           primaryImageOfPage: image,
           about: { "@id": `${SITE_URL}/#software` },
-          breadcrumb: { "@id": `${url}#breadcrumb` },
         },
-        migaDePan(url, [{ name: seo.miga, item: url }]),
       ],
     },
   };
 }
 
-export function seoParaRuta(path: string): SeoOptions {
+/**
+ * El SEO de una ruta, con la marca del producto (ADR 0108). `registroAbierto`: si el
+ * producto recibe registros (por omisión, el respaldo de `precios.ts`, el mismo del
+ * HTML pre-generado); decide la frase de cierre de las páginas comerciales.
+ */
+export function seoParaRuta(
+  path: string,
+  { registroAbierto = REGISTRO_ABIERTO_POR_OMISION } = {},
+): SeoOptions {
+  const seo = seoBase(path, registroAbierto);
+  return {
+    ...seo,
+    title: marcar(seo.title),
+    description: marcar(seo.description),
+    ...(seo.imageAlt === undefined ? {} : { imageAlt: marcar(seo.imageAlt) }),
+    jsonLd: seo.jsonLd
+      ? (JSON.parse(marcar(JSON.stringify(seo.jsonLd))) as Record<
+          string,
+          unknown
+        >)
+      : seo.jsonLd,
+  };
+}
+
+function seoBase(path: string, registroAbierto: boolean): SeoOptions {
   const ruta = path.split(/[?#]/)[0]!.replace(/\/$/, "") || "/";
   if (ruta === "/terminos") {
     return {
@@ -153,35 +237,32 @@ export function seoParaRuta(path: string): SeoOptions {
       index: false,
     };
   }
-  const modalidad = MODOS.find((m) => rutaModalidad(m) === ruta);
-  if (modalidad !== undefined) {
-    return seoDeModalidad(modalidad);
+  if (ruta === "/") {
+    return seoDeModalidad(MODO_COMERCIAL, registroAbierto);
   }
-  const solucion = soluciones.find((s) => rutaSolucion(s.slug) === ruta);
-  if (ruta === "/" || solucion) {
-    const contenido = solucion
-      ? { title: solucion.titulo, description: solucion.descripcion }
-      : DEFAULT_SEO;
+  const solucion = soluciones.find(
+    (s) => rutaSolucion(s.slug) === ruta && s.modo === MODO_COMERCIAL,
+  );
+  if (solucion) {
+    const contenido = {
+      title: solucion.titulo,
+      description: conCierre(solucion.descripcion, registroAbierto),
+    };
     const url = `${SITE_URL}${ruta}`;
-    // La página por giro cuelga de su modalidad, como su miga visible
-    // (AgendaUno / Clases|Citas / giro).
-    const miga = solucion
-      ? migaDePan(url, [
-          {
-            name: MODALIDADES[solucion.modo].seo.miga,
-            item: `${SITE_URL}${rutaModalidad(solucion.modo)}`,
-          },
-          { name: solucion.nombre, item: url },
-        ])
-      : null;
+    // Cada página por giro, con la foto de su giro (la de su encabezado).
+    const image = `${SITE_URL}/assets/landing/disciplinas/${solucion.imagen}`;
+    // La página por giro cuelga de la portada del producto (Inicio / giro).
+    const miga = migaDePan(url, [{ name: solucion.nombre, item: url }]);
     return {
       ...contenido,
       path: ruta,
+      image,
+      imageAlt: solucion.alt,
       index: true,
       jsonLd: {
         "@context": "https://schema.org",
         "@graph": [
-          ...organizacionYSoftware(),
+          ...organizacionYSoftware(registroAbierto),
           {
             "@type": "WebPage",
             "@id": `${url}#webpage`,
@@ -189,16 +270,20 @@ export function seoParaRuta(path: string): SeoOptions {
             name: contenido.title,
             description: contenido.description,
             inLanguage: "es-MX",
+            primaryImageOfPage: image,
             about: { "@id": `${SITE_URL}/#software` },
-            ...(miga ? { breadcrumb: { "@id": `${url}#breadcrumb` } } : {}),
+            breadcrumb: { "@id": `${url}#breadcrumb` },
           },
-          ...(miga ? [miga] : []),
+          miga,
         ],
       },
     };
   }
   const titulos: Record<string, string> = {
-    "/registro": "Crea tu negocio gratis | AgendaUno",
+    // Sin registro abierto, /registro es la lista de interesados.
+    "/registro": registroAbierto
+      ? "Crea tu negocio gratis | AgendaUno"
+      : "Quiero que me avisen | AgendaUno",
     "/entrar": "Iniciar sesión | AgendaUno",
     "/negocios": "Encuentra tu negocio | AgendaUno",
     "/activar": "Activa tu cuenta | AgendaUno",
@@ -220,6 +305,14 @@ function escapeHtml(value: string): string {
   );
 }
 
+/** El texto alternativo de la imagen de la página (o el de la imagen por omisión). */
+export function altDeImagen(seo: SeoOptions): string {
+  if (seo.image === undefined) {
+    return marcar(DEFAULT_IMAGE_ALT);
+  }
+  return seo.imageAlt ?? MARCA.nombre;
+}
+
 /** Misma metadata para el HTML estático y la navegación de Vue. */
 export function renderSeoHead(seo: SeoOptions): string {
   const tags = [
@@ -227,15 +320,17 @@ export function renderSeoHead(seo: SeoOptions): string {
     `<meta name="description" content="${escapeHtml(seo.description)}">`,
     `<meta name="robots" content="${seo.index === false ? "noindex,follow" : "index,follow,max-image-preview:large"}">`,
     '<meta property="og:locale" content="es_MX">',
-    '<meta property="og:site_name" content="AgendaUno">',
+    `<meta property="og:site_name" content="${escapeHtml(MARCA.nombre)}">`,
     `<meta property="og:type" content="${seo.type ?? "website"}">`,
     `<meta property="og:title" content="${escapeHtml(seo.title)}">`,
     `<meta property="og:description" content="${escapeHtml(seo.description)}">`,
     `<meta property="og:image" content="${escapeHtml(seo.image ?? DEFAULT_IMAGE)}">`,
+    `<meta property="og:image:alt" content="${escapeHtml(altDeImagen(seo))}">`,
     '<meta name="twitter:card" content="summary_large_image">',
     `<meta name="twitter:title" content="${escapeHtml(seo.title)}">`,
     `<meta name="twitter:description" content="${escapeHtml(seo.description)}">`,
     `<meta name="twitter:image" content="${escapeHtml(seo.image ?? DEFAULT_IMAGE)}">`,
+    `<meta name="twitter:image:alt" content="${escapeHtml(altDeImagen(seo))}">`,
   ];
   if (seo.index !== false) {
     const url = escapeHtml(new URL(seo.path ?? "/", SITE_URL).href);

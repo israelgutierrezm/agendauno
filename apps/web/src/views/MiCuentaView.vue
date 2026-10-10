@@ -5,6 +5,7 @@ import { RouterLink } from "vue-router";
 
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import InstalarApp from "@/components/InstalarApp.vue";
 import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaseEntrada from "@/components/PaseEntrada.vue";
 import TarjetaOperacion, {
@@ -19,6 +20,7 @@ import {
   useMiCuenta,
   type Derecho,
 } from "@/lib/miCuenta";
+import { marcarPwa } from "@/lib/pwa";
 import { useRetornoPago } from "@/lib/retornoPago";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -336,6 +338,10 @@ const accesos = computed<Acceso[]>(() => {
 });
 
 onMounted(() => {
+  // Su app instalable (en el subdominio del negocio): nombre, ícono y color.
+  if (sesion.estudio) {
+    marcarPwa(sesion.estudio);
+  }
   void cuenta.asegurar();
   void cargarClima();
 });
@@ -355,6 +361,11 @@ onMounted(() => {
         $t("portal.inicio.resumen", { estudio: sesion.estudio?.nombre ?? "" })
       }}
     </p>
+    <InstalarApp
+      v-if="sesion.estudio"
+      class="mt-4"
+      :negocio="sesion.estudio.nombre"
+    />
 
     <p
       v-if="cuenta.error.value"

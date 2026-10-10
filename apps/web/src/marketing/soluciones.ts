@@ -1,7 +1,13 @@
 export interface Solucion {
   slug: string;
   nombre: string;
+  /** El nombre a media frase: «Agenda de citas para barberías y estéticas». */
+  nombreEnFrase: string;
   titulo: string;
+  /**
+   * La descripción para buscadores, sin la frase de cierre: la pone seoConfig según si
+   * el producto recibe registros (prueba gratis o lista de interesados).
+   */
   descripcion: string;
   encabezado: string;
   resumen: string;
@@ -17,9 +23,10 @@ export const soluciones: readonly Solucion[] = [
   {
     slug: "crossfit-hyrox",
     nombre: "CrossFit / HYROX",
+    nombreEnFrase: "centros de CrossFit y HYROX",
     titulo: "Software para centros de CrossFit y HYROX | AgendaUno",
     descripcion:
-      "Organiza clases de CrossFit y HYROX, cupos, coaches, membresías y asistencia. Comparte tu agenda de reservas y prueba AgendaUno 30 días gratis.",
+      "Organiza clases de CrossFit y HYROX, cupos, coaches, membresías y asistencia.",
     encabezado: "Más tiempo para entrenar a tu comunidad.",
     resumen:
       "Gestiona las clases de tu box o centro de entrenamiento con horarios, coaches y cupos claros. Tus alumnos entran con la cuenta que les das y reservan desde tu enlace; tu equipo consulta quién asistirá a cada sesión.",
@@ -61,9 +68,10 @@ export const soluciones: readonly Solucion[] = [
   {
     slug: "nutriologos",
     nombre: "Nutriólogos",
+    nombreEnFrase: "nutriólogos",
     titulo: "Agenda de citas para nutriólogos | AgendaUno",
     descripcion:
-      "Organiza consultas de nutrición, citas de seguimiento, disponibilidad y cobros por profesional. Prueba AgendaUno gratis durante 30 días, sin tarjeta.",
+      "Organiza consultas de nutrición, citas de seguimiento, disponibilidad y cobros por profesional.",
     encabezado: "Más tiempo para tus pacientes. Menos mensajes para agendar.",
     resumen:
       "Ya atiendas de forma independiente o en un consultorio con varios nutriólogos, organiza tus consultas y horarios desde una misma agenda. Comparte tu enlace para facilitar la próxima reserva.",
@@ -104,9 +112,10 @@ export const soluciones: readonly Solucion[] = [
   {
     slug: "pilates",
     nombre: "Pilates",
+    nombreEnFrase: "estudios de Pilates",
     titulo: "Software para estudios de Pilates | AgendaUno",
     descripcion:
-      "Organiza clases de Pilates, cupos, membresías y reservas en una agenda visual. Prueba AgendaUno gratis durante 30 días, sin tarjeta.",
+      "Organiza clases de Pilates, cupos, membresías y reservas en una agenda visual.",
     encabezado:
       "Más atención a tus alumnos. Menos tiempo coordinando horarios.",
     resumen:
@@ -141,16 +150,17 @@ export const soluciones: readonly Solucion[] = [
       {
         pregunta: "¿Cómo funciona la suscripción para un estudio?",
         respuesta:
-          "En Clases con cupo, la suscripción se cobra por rango de alumnos activos al mes. Consulta qué cuenta como alumno activo y las tarifas vigentes en la sección de precios antes de contratar; los importes son en dólares, más impuestos.",
+          "En Clases con cupo, la suscripción se cobra por rango de alumnos activos al mes. Consulta qué cuenta como alumno activo y las tarifas vigentes en la sección de precios; los importes son en dólares, más impuestos.",
       },
     ],
   },
   {
     slug: "pole-dance",
     nombre: "Pole dance",
+    nombreEnFrase: "academias de Pole dance",
     titulo: "Software para academias de Pole dance | AgendaUno",
     descripcion:
-      "Gestiona horarios de Pole dance, cupos por clase, alumnos y paquetes. Centraliza tus reservas con AgendaUno y prueba 30 días gratis.",
+      "Gestiona horarios de Pole dance, cupos por clase, alumnos y paquetes en una sola agenda.",
     encabezado: "Llena tu agenda de clases, no de conversaciones pendientes.",
     resumen:
       "Organiza los niveles, instructoras y horarios de tu academia de Pole dance en un solo lugar. Tus alumnos eligen su próxima clase y tú mantienes el control de los cupos.",
@@ -191,9 +201,10 @@ export const soluciones: readonly Solucion[] = [
   {
     slug: "academias",
     nombre: "Academias",
+    nombreEnFrase: "academias",
     titulo: "Software de reservas para academias | AgendaUno",
     descripcion:
-      "Organiza clases, instructores, alumnos, membresías y asistencias de tu academia. Descubre la agenda visual de AgendaUno y prueba gratis.",
+      "Organiza clases, instructores, alumnos, membresías y asistencias de tu academia en una agenda visual.",
     encabezado: "Tu academia en movimiento. Tu operación en orden.",
     resumen:
       "De danza y yoga a actividades acuáticas: reúne los horarios, los grupos y las reservas de tu academia en una agenda que tu equipo pueda consultar cada día.",
@@ -227,16 +238,17 @@ export const soluciones: readonly Solucion[] = [
       {
         pregunta: "¿Por dónde empiezo?",
         respuesta:
-          "Crea tu negocio, activa tu cuenta y configura una primera clase con su horario, instructor y cupo. Después da de alta a tus alumnos, invítalos a su cuenta y comparte el enlace con tus horarios.",
+          "Registras tu negocio, activas tu cuenta y configuras una primera clase con su horario, instructor y cupo. Después das de alta a tus alumnos, los invitas a su cuenta y compartes el enlace con tus horarios.",
       },
     ],
   },
   {
     slug: "barberias",
     nombre: "Barberías y estéticas",
+    nombreEnFrase: "barberías y estéticas",
     titulo: "Agenda de citas para barberías y estéticas | AgendaUno",
     descripcion:
-      "Organiza citas por barbero o estilista, servicios y disponibilidad. Comparte tu enlace de reservas y prueba la agenda de AgendaUno gratis.",
+      "Organiza citas por barbero o estilista, servicios y disponibilidad, y comparte tu enlace de reservas.",
     encabezado: "Que cada cliente encuentre su horario y a su profesional.",
     resumen:
       "Dale a tu barbería o estética una agenda por profesional. Organiza servicios y disponibilidad, y comparte un enlace para que tus clientes encuentren su próxima cita.",
@@ -277,9 +289,10 @@ export const soluciones: readonly Solucion[] = [
   {
     slug: "spas",
     nombre: "Spas y wellness",
+    nombreEnFrase: "spas y centros de bienestar",
     titulo: "Software de citas para spas y wellness | AgendaUno",
     descripcion:
-      "Gestiona citas, servicios y horarios por profesional en tu spa o negocio wellness. Prueba AgendaUno gratis durante 30 días, sin tarjeta.",
+      "Gestiona citas, servicios y horarios por profesional en tu spa o centro de bienestar.",
     encabezado:
       "Una experiencia de bienestar empieza con una reserva sencilla.",
     resumen:
@@ -321,12 +334,14 @@ export const soluciones: readonly Solucion[] = [
   {
     slug: "terapeutas",
     nombre: "Terapeutas y consultorios",
+    nombreEnFrase: "terapeutas y consultorios",
     titulo: "Agenda de citas para terapeutas y consultorios | AgendaUno",
+    // Los nutriólogos tienen su propia página.
     descripcion:
-      "Organiza citas por profesional para terapeutas, psicólogos, nutriólogos y consultorios. Conoce AgendaUno y prueba tu flujo de reservas.",
+      "Organiza citas por profesional para terapeutas, psicólogos y consultorios, y comparte tu enlace.",
     encabezado: "Más tiempo para atender. Una agenda más fácil de coordinar.",
     resumen:
-      "Organiza horarios, servicios y citas para terapeutas, psicólogos, nutriólogos y otros profesionales que atienden con reserva. Comparte tu enlace para facilitar la elección de un horario.",
+      "Organiza horarios, servicios y citas para terapeutas, psicólogos y otros profesionales que atienden con reserva. Comparte tu enlace para facilitar la elección de un horario.",
     imagen: "terapeutas-v1.webp",
     alt: "Profesional de terapia durante una sesión de atención",
     modo: "citas",
@@ -357,7 +372,7 @@ export const soluciones: readonly Solucion[] = [
       {
         pregunta: "¿Puedo usarlo si atiendo sin un equipo?",
         respuesta:
-          "Sí. El plan Individual es para un profesional, con tus servicios y horarios. Cuando tu consultorio crezca, cambias a Premium o Pro por los profesionales que contrates; consulta las tarifas vigentes antes de contratar.",
+          "Sí. El plan Individual es para un profesional, con tus servicios y horarios. Cuando tu consultorio crezca, cambias a Premium o Pro por los profesionales que contrates; consulta las tarifas vigentes en la sección de precios.",
       },
     ],
   },

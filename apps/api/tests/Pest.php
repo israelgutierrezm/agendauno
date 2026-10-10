@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Tenancy\Application\TimbresTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Integraciones\ResolvedorDns;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\TipoCambio;
@@ -28,10 +29,13 @@ pest()->extend(TestCase::class)
         // La renta en dólares se cobra en pesos a los negocios de México (ADR 0107): un
         // tipo de cambio fijo (20 pesos por dólar) que vale para cualquier fecha, sin
         // consultar al Banco de México. Se prueba aparte.
+        // El registro de TurnoUno (citas) abre hasta su lanzamiento (ADR 0108); aquí
+        // va abierto para registrar negocios de citas. El cierre se prueba aparte.
         ConfiguracionPlataforma::establecer('parametros', (string) json_encode([
             'asistencia.minutos_antes' => 525600,
             'sesion.dias_inactividad' => 36500,
             'renta.tipo_cambio_dias_vigencia' => 36500,
+            'registro.abierto_turnouno' => 1,
         ]));
         Config::set('agendauno.banxico.token', null);
         TipoCambio::query()->create(['fecha' => '2020-01-01', 'de' => 'USD', 'a' => 'MXN', 'diezmilesimas' => 200000, 'fuente' => 'manual']);
@@ -201,9 +205,12 @@ function agendaSemilla(array $e): array
         ->assertCreated()->json('data.id');
     $actividad = (string) test()->postJson("/api/v1/app/{$e['slug']}/programas/{$programa}/actividades", ['nombre' => 'Pole Sport'], conBearer($e['bearer']))
         ->assertCreated()->json('data.id');
-    $oferta = (string) test()->postJson("/api/v1/app/{$e['slug']}/actividades/{$actividad}/ofertas", [
-        'nombre' => 'Nivel 1', 'modalidad' => 'grupal', 'capacidad' => 12,
-    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    // La forma de la oferta es la de la modalidad del negocio (ADR 0104).
+    $citas = Estudio::query()->where('slug', $e['slug'])->firstOrFail()->modalidad() === ModalidadServicio::Citas;
+    $oferta = (string) test()->postJson("/api/v1/app/{$e['slug']}/actividades/{$actividad}/ofertas", $citas
+        ? ['nombre' => 'Nivel 1', 'modalidad' => 'individual']
+        : ['nombre' => 'Nivel 1', 'modalidad' => 'grupal', 'capacidad' => 12],
+        conBearer($e['bearer']))->assertCreated()->json('data.id');
 
     $org = (string) test()->postJson("/api/v1/app/{$e['slug']}/organizaciones", ['nombre' => 'Org'], conBearer($e['bearer']))
         ->assertCreated()->json('data.id');

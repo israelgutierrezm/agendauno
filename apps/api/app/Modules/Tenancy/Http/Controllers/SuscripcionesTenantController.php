@@ -11,6 +11,7 @@ use App\Modules\Tenancy\Exceptions\DomiciliacionNoPermitida;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\DomiciliacionTenant;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -80,7 +81,7 @@ class SuscripcionesTenantController
             'acuerdo' => (string) $acuerdo->ulid,
             'persona_id' => $acuerdo->persona?->ulid,
             'producto' => (string) $acuerdo->producto?->nombre,
-            'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $this->gestor->actual()?->slug),
+            'enlace' => MarcaProducto::actual()->urlWeb().'/entrar?estudio='.rawurlencode((string) $this->gestor->actual()?->slug),
         ]);
 
         return response()->json(['data' => ['enviado' => true]]);

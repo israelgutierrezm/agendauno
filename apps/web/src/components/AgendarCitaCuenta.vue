@@ -502,7 +502,7 @@ onMounted(async () => {
               ? profesionalId
               : null
           "
-          :zona="sucursal?.zona_horaria ?? 'America/Mexico_City'"
+          :zona="sucursal?.zona_horaria ?? sesion.zonaHoraria"
         />
       </div>
 

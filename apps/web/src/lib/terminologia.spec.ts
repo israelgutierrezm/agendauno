@@ -23,6 +23,35 @@ describe("terminologia / plural", () => {
     expect(plural("Voz")).toBe("Voces");
     expect(plural("  ")).toBe("");
   });
+
+  it("las agudas en n o s pierden el acento al pluralizar", () => {
+    expect(plural("Sesión")).toBe("Sesiones");
+    expect(plural("Lección")).toBe("Lecciones");
+    expect(plural("Clase")).toBe("Clases");
+  });
+
+  // Los términos de los 16 giros (PerfilNegocio::configuracion) con el plural que manda
+  // el servidor: el respaldo de la web coincide con él.
+  it.each([
+    ["Clase", "Clases"],
+    ["Lección", "Lecciones"],
+    ["Sesión", "Sesiones"],
+    ["Cita", "Citas"],
+    ["Alumno", "Alumnos"],
+    ["Alumna", "Alumnas"],
+    ["Miembro", "Miembros"],
+    ["Cliente", "Clientes"],
+    ["Paciente", "Pacientes"],
+    ["Instructor", "Instructores"],
+    ["Maestro", "Maestros"],
+    ["Coach", "Coaches"],
+    ["Entrenador", "Entrenadores"],
+    ["Barbero", "Barberos"],
+    ["Profesional", "Profesionales"],
+    ["Terapeuta", "Terapeutas"],
+  ])("plural de «%s» es «%s»", (singular, esperado) => {
+    expect(plural(singular)).toBe(esperado);
+  });
 });
 
 const barberia: TerminosNegocio = {
@@ -138,5 +167,14 @@ describe("terminologia / terminoParaPersona", () => {
     expect(terminoParaPersona("Alumna", "no_binario")).toBe("Alumna");
     expect(terminoParaPersona("Cliente", "mujer")).toBe("Cliente");
     expect(terminoParaPersona("Paciente", "hombre")).toBe("Paciente");
+    expect(terminoParaPersona("Maestro", "mujer")).toBe("Maestra");
+  });
+
+  it("los términos que valen para ambos no cambian (nada de «Miembra» ni «Terapeuto»)", () => {
+    expect(terminoParaPersona("Miembro", "mujer")).toBe("Miembro");
+    expect(terminoParaPersona("Terapeuta", "hombre")).toBe("Terapeuta");
+    expect(terminoParaPersona("Especialista", "hombre")).toBe("Especialista");
+    expect(terminoParaPersona("Estilista", "hombre")).toBe("Estilista");
+    expect(terminoParaPersona("Coach", "mujer")).toBe("Coach");
   });
 });

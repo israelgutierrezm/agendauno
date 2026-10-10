@@ -1,0 +1,116 @@
+name: Apps móviles
+
+# Compila la app oficial de un producto para Google Play (ADR 0111 y 0113): el paquete
+# (.aab) firmado con su llave de subida, como artefacto de este flujo. No lo sube a la
+# tienda: publicar requiere autorización y se hace a mano en Play Console. Solo a mano
+# (Actions → Apps móviles → Run workflow), con el entorno de GitHub de cada app
+# (`android-agendauno`, `android-turnouno`), que guarda sus secretos (docs/CI-CD.md):
+# ANDROID_KEYSTORE_BASE64, ANDROID_STORE_PASSWORD, ANDROID_KEY_ALIAS,
+# ANDROID_KEY_PASSWORD y, para las notificaciones, FIREBASE_API_KEY, FIREBASE_APP_ID,
+# FIREBASE_SENDER_ID y FIREBASE_PROJECT_ID. Variable opcional: GOOGLE_SERVER_CLIENT_ID.
+#
+# iOS se compila en una Mac (o un runner macos-*) cuando existan los esquemas de Xcode
+# de cada app (docs/MOBILE.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: App
+        type: choice
+        options: [agendauno, turnouno]
+        required: true
+      numero:
+        description: Número de compilación (versionCode; mayor que el último en Play)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android · ${{ inputs.app }}
+    runs-on: ubuntu-24.04
+    environment: android-${{ inputs.app }}
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      APP: ${{ inputs.app }}
+      NUMERO: ${{ inputs.numero }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+      FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+      FIREBASE_SENDER_ID: ${{ secrets.FIREBASE_SENDER_ID }}
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      GOOGLE_SERVER_CLIENT_ID: ${{ vars.GOOGLE_SERVER_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Revisar datos
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$NUMERO" | grep -Eq '^[1-9][0-9]{0,8}$'; then
+            echo "::error::El número de compilación debe ser un entero positivo."
+            exit 1
+          fi
+          for secreto in ANDROID_KEYSTORE_BASE64 ANDROID_STORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!secreto}" ]; then
+              echo "::error::Falta el secreto $secreto del entorno android-$APP (docs/CI-CD.md)."
+              exit 1
+            fi
+          done
+          if [ -z "$FIREBASE_APP_ID" ]; then
+            echo "::warning::Sin FIREBASE_*: la app se compila sin notificaciones push."
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.0'
+          cache: true
+
+      # La llave de subida solo existe durante esta compilación.
+      - name: Llave de subida
+        run: |
+          set -euo pipefail
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/subida.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/subida.jks"
+            echo "storePassword=$ANDROID_STORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+          } > android/key.properties
+
+      - run: flutter pub get
+
+      - name: Compilar (.aab)
+        run: |
+          set -euo pipefail
+          flutter build appbundle --release --flavor "$APP" --build-number "$NUMERO" \
+            --dart-define=APP_VERSION="$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)" \
+            --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY" \
+            --dart-define=FIREBASE_APP_ID="$FIREBASE_APP_ID" \
+            --dart-define=FIREBASE_SENDER_ID="$FIREBASE_SENDER_ID" \
+            --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
+            --dart-define=GOOGLE_SERVER_CLIENT_ID="$GOOGLE_SERVER_CLIENT_ID"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.app }}-${{ inputs.numero }}-aab
+          path: apps/mobile/build/app/outputs/bundle/${{ inputs.app }}Release/*.aab
+          retention-days: 30
+
+      - name: Limpiar llave
+        if: always()
+        run: rm -f "$RUNNER_TEMP/subida.jks" android/key.properties

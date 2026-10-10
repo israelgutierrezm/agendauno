@@ -87,6 +87,28 @@ describe("textos veraces de las páginas por giro", () => {
     }
   });
 
+  it("la descripción no ofrece la prueba: la frase de cierre la pone el SEO según el registro", () => {
+    for (const s of soluciones) {
+      expect(s.descripcion, s.slug).not.toMatch(
+        /gratis|sin tarjeta|pru[eé]ba|probar/i,
+      );
+    }
+  });
+
+  it("el nombre a media frase va en minúscula, salvo los nombres propios", () => {
+    for (const s of soluciones) {
+      expect(s.nombreEnFrase, s.slug).toMatch(
+        /^([a-záéíóúñ]|Pilates|Pole|CrossFit)/,
+      );
+      expect(s.nombreEnFrase.length).toBeGreaterThan(4);
+    }
+  });
+
+  it("los nutriólogos tienen su página: la de terapeutas no los repite", () => {
+    const terapeutas = soluciones.find((s) => s.slug === "terapeutas")!;
+    expect(textoDe(terapeutas)).not.toMatch(/nutri/i);
+  });
+
   it("los spas sí manejan cabinas y equipos en Premium y Pro (ADR 0039 y 0107)", () => {
     const spas = soluciones.find((s) => s.slug === "spas")!;
     const cabinas = spas.preguntas.find((p) => /cabinas/i.test(p.pregunta))!;

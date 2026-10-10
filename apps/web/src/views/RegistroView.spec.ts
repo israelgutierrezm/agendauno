@@ -5,6 +5,9 @@ import es from "@/i18n/locales/es-MX";
 import modalidadNegocio from "@/i18n/locales/modalidad.es-MX";
 import { trackEvent } from "@/lib/analytics";
 import { giroDeQuery, modoDeQuery, type Modo } from "@/marketing/modalidades";
+import { PRECIOS_POR_OMISION } from "@/marketing/precios";
+import { aplicarPreciosPublicos } from "@/marketing/preciosPublicos";
+import interesados from "@/i18n/locales/interesados.es-MX";
 import RegistroView from "./RegistroView.vue";
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
@@ -42,7 +45,7 @@ function montar(
         createI18n({
           legacy: false,
           locale: "es",
-          messages: { es: { ...es, modalidadNegocio } },
+          messages: { es: { ...es, modalidadNegocio, interesados } },
         }),
       ],
     },
@@ -127,38 +130,23 @@ describe("presentación del registro", () => {
     expect(vista.get('[aria-current="step"]').text()).toBe("3Contacto");
     expect(mocks.post).not.toHaveBeenCalled();
   });
-  it("agrupa los tipos de negocio en clases o citas: de ahí sale su modalidad (ADR 0104)", () => {
+  it("solo los tipos de negocio de su producto: en AgendaUno, los de clases (ADR 0108)", () => {
     const vista = montar();
     const grupos = vista.findAll("#perfil optgroup");
     expect(grupos.map((g) => g.attributes("label"))).toEqual([
       "Clases con cupo",
-      "Citas 1 a 1",
     ]);
-    const valores = (i: number) =>
-      grupos[i]!.findAll("option").map((o) => o.attributes("value"));
-    expect(valores(0)).toContain("pilates");
-    expect(valores(0).at(-1)).toBe("general");
-    expect(valores(1)).toEqual([
-      "barberia",
-      "estetica",
-      "salon",
-      "spa",
-      "salud",
-      "general_citas",
-    ]);
-    // Con el tipo de negocio se elige la modalidad; quién la cambia después va en
-    // las preguntas frecuentes, no aquí.
-    expect(vista.get("#perfil-ayuda").text()).toContain(
-      "Con el tipo de negocio eliges tu modalidad, clases o citas.",
-    );
-    expect(vista.text()).not.toContain("cambiar entre ellas");
+    const valores = grupos[0]!
+      .findAll("option")
+      .map((o) => o.attributes("value"));
+    expect(valores).toContain("pilates");
+    expect(valores.at(-1)).toBe("general");
+    expect(valores).not.toContain("barberia");
     expect(grupos[0]!.get('option[value="general"]').text()).toBe(
       "Otro negocio con clases",
     );
-    expect(grupos[1]!.get('option[value="general_citas"]').text()).toBe(
-      "Otro negocio de citas",
-    );
-    // Sin modalidad de llegada se ven las dos: no hace falta el enlace a la otra.
+    // Ya no se elige la modalidad: es la del producto.
+    expect(vista.text()).not.toContain("eliges tu modalidad");
     expect(vista.find('[data-prueba="otra-modalidad"]').exists()).toBe(false);
   });
 
@@ -212,8 +200,6 @@ describe("registro desde /clases o /citas (?modo=)", () => {
     vista
       .findAll("#perfil option[value]:not([value=''])")
       .map((o) => o.attributes("value"));
-  const enlaceOtra = (vista: ReturnType<typeof montar>) =>
-    vista.get('[data-prueba="otra-modalidad"]');
   async function hastaContacto(
     vista: ReturnType<typeof montar>,
     perfil: string | null,
@@ -261,76 +247,23 @@ describe("registro desde /clases o /citas (?modo=)", () => {
     expect(vista.find("#nombre").exists()).toBe(true);
   });
 
-  it("con ?modo=citas solo se ven los giros de citas, con «Otro negocio de citas»", () => {
+  it("un ?modo= de la otra modalidad no aplica: siguen los giros del producto", () => {
     const vista = montar({ modo: "citas" });
-    expect(etiquetasDeGrupos(vista)).toEqual(["Citas 1 a 1"]);
-    expect(giros(vista)).toEqual([
-      "barberia",
-      "estetica",
-      "salon",
-      "spa",
-      "salud",
-      "general_citas",
-    ]);
-    expect(vista.get('#perfil option[value="general_citas"]').text()).toBe(
-      "Otro negocio de citas",
-    );
-    // Debajo, el enlace discreto a los giros de clases (un botón real).
-    const otra = enlaceOtra(vista);
-    expect(otra.text()).toContain("¿Das clases?");
-    expect(otra.get("button").attributes("type")).toBe("button");
-    expect(otra.get("button").text()).toBe("Ver giros de clases");
+    expect(etiquetasDeGrupos(vista)).toEqual(["Clases con cupo"]);
+    expect(giros(vista)).not.toContain("barberia");
+    expect(vista.find('[data-prueba="otra-modalidad"]').exists()).toBe(false);
     // Nada elegido de antemano: el dueño elige su giro.
     expect((vista.get("#perfil").element as HTMLSelectElement).value).toBe("");
   });
 
-  it("con ?modo=clases solo se ven los de clases y el enlace lleva a los de citas", () => {
-    const vista = montar({ modo: "clases" });
-    expect(etiquetasDeGrupos(vista)).toEqual(["Clases con cupo"]);
-    expect(giros(vista)).toContain("general");
-    expect(giros(vista)).not.toContain("barberia");
-    expect(giros(vista)).not.toContain("general_citas");
-    expect(enlaceOtra(vista).text()).toContain("¿Atiendes con cita?");
-    expect(enlaceOtra(vista).get("button").text()).toBe("Ver giros de citas");
-  });
-
-  it("el enlace cambia de modalidad sin perder lo escrito y lleva el foco al selector", async () => {
-    const vista = montar({ modo: "citas" }, { adjuntar: true });
-    await vista.get("#nombre").setValue("Estudio Norte");
-    await vista.get("#perfil").setValue("barberia");
-    await enlaceOtra(vista).get("button").trigger("click");
-    await flushPromises();
-    expect(etiquetasDeGrupos(vista)).toEqual(["Clases con cupo"]);
-    expect((vista.get("#nombre").element as HTMLInputElement).value).toBe(
-      "Estudio Norte",
-    );
-    // Barbería no está entre los de clases: se suelta para elegir otro.
-    expect((vista.get("#perfil").element as HTMLSelectElement).value).toBe("");
-    expect(document.activeElement?.id).toBe("perfil");
-    expect(enlaceOtra(vista).get("button").text()).toBe("Ver giros de citas");
-    // Y de regreso.
-    await enlaceOtra(vista).get("button").trigger("click");
-    expect(etiquetasDeGrupos(vista)).toEqual(["Citas 1 a 1"]);
-    await vista.get("#perfil").setValue("spa");
-    expect(
-      vista.get('button[type="submit"]').attributes("disabled"),
-    ).toBeUndefined();
-  });
-
-  it("sin modo, o con uno inválido, se ven los dos grupos y no hay enlace", async () => {
+  it("sin modo, o con uno inválido, los giros del producto y sin intención", async () => {
     // La ruta lo normaliza con modoDeQuery: lo inválido llega como null.
     for (const props of [{}, { modo: modoDeQuery("talleres") }]) {
       const vista = montar(props);
-      expect(etiquetasDeGrupos(vista)).toEqual([
-        "Clases con cupo",
-        "Citas 1 a 1",
-      ]);
+      expect(etiquetasDeGrupos(vista)).toEqual(["Clases con cupo"]);
       expect(vista.find('[data-prueba="otra-modalidad"]').exists()).toBe(false);
     }
     expect(trackEvent).toHaveBeenCalledWith("studio_registration_started", {});
-    // Normalizado: con espacios o mayúsculas sigue valiendo.
-    const otra = montar({ modo: modoDeQuery([" CITAS "]) });
-    expect(etiquetasDeGrupos(otra)).toEqual(["Citas 1 a 1"]);
   });
 
   it("ya no avisa de un giro de la otra modalidad: no se puede elegir", async () => {
@@ -344,17 +277,14 @@ describe("registro desde /clases o /citas (?modo=)", () => {
   });
 
   it("en el paso 3 resume «Tipo de negocio · Modalidad» y deja volver a cambiarlo", async () => {
-    const vista = montar({ modo: "citas" }, { adjuntar: true });
-    await hastaContacto(vista, "barberia");
+    const vista = montar({ modo: "clases" }, { adjuntar: true });
+    await hastaContacto(vista, "pilates");
     const resumen = vista.get('[data-prueba="resumen-modalidad"]');
     expect(resumen.text()).toContain("Tipo de negocio · Modalidad");
     expect(resumen.get(".registro-resumen-valor").text()).toBe(
-      "Barbería · Citas 1 a 1",
+      "Estudio de Pilates · Clases con cupo",
     );
     expect(resumen.text()).toContain("Revísalo antes de crear tu negocio.");
-    // Quién cambia la modalidad después va en las preguntas frecuentes: tampoco
-    // se repite en el paso 3.
-    expect(resumen.text()).not.toContain("AgendaUno");
     for (const quitado of [
       "la modalidad solo la cambia",
       "solo antes de operar",
@@ -369,7 +299,7 @@ describe("registro desde /clases o /citas (?modo=)", () => {
     await flushPromises();
     expect(vista.get('[aria-current="step"]').text()).toBe("1Tu negocio");
     expect((vista.get("#perfil").element as HTMLSelectElement).value).toBe(
-      "barberia",
+      "pilates",
     );
     expect(document.activeElement?.id).toBe("perfil");
     expect(mocks.post).not.toHaveBeenCalled();
@@ -385,41 +315,42 @@ describe("registro desde /clases o /citas (?modo=)", () => {
     ).toBe("Otro negocio con clases · Clases con cupo");
   });
 
-  it("mide la intención (mode_intent) y la modalidad creada (mode)", async () => {
+  it("mide la intención (mode_intent) y la modalidad creada (mode), y manda el producto", async () => {
     responderAlta();
-    const vista = montar({ modo: "citas" });
+    const vista = montar({ modo: "clases" });
     expect(trackEvent).toHaveBeenCalledWith("studio_registration_started", {
-      mode_intent: "citas",
+      mode_intent: "clases",
     });
-    // Llegó desde citas, pero da clases: cambia de modalidad con el enlace.
-    await enlaceOtra(vista).get("button").trigger("click");
     await hastaContacto(vista, "pilates");
     expect(trackEvent).toHaveBeenCalledWith(
       "studio_registration_step_completed",
-      { step: 1, mode_intent: "citas" },
+      { step: 1, mode_intent: "clases" },
     );
     await crear(vista);
+    // El producto desde el que se registra (ADR 0108): el servidor revisa el giro.
     expect(mocks.post).toHaveBeenCalledWith(
       "/api/v1/registro",
-      expect.objectContaining({ perfil_negocio: "pilates" }),
+      expect.objectContaining({
+        perfil_negocio: "pilates",
+        producto: "agendauno",
+      }),
       { timeout: 120_000 },
     );
-    // Llegó desde citas y creó un negocio de clases: los dos datos quedan medidos.
     expect(trackEvent).toHaveBeenCalledWith("tenant_created", {
       business_profile: "pilates",
       mode: "clases",
-      mode_intent: "citas",
+      mode_intent: "clases",
     });
   });
 
   it("sin modo, tenant_created lleva la modalidad y no inventa una intención", async () => {
     responderAlta();
     const vista = montar();
-    await hastaContacto(vista, "spa");
+    await hastaContacto(vista, "yoga");
     await crear(vista);
     expect(trackEvent).toHaveBeenCalledWith("tenant_created", {
-      business_profile: "spa",
-      mode: "citas",
+      business_profile: "yoga",
+      mode: "clases",
     });
   });
 });
@@ -428,74 +359,65 @@ describe("registro desde un giro (?giro=)", () => {
   const giroElegido = (vista: ReturnType<typeof montar>) =>
     vista.find('[data-prueba="giro-elegido"]');
 
-  it("con ?modo=citas&giro=barberia el giro ya viene elegido: resumen y no selector", async () => {
-    const vista = montar({ modo: "citas", giro: "barberia" });
+  it("con ?giro=pilates el giro ya viene elegido: resumen y no selector", async () => {
+    const vista = montar({ modo: "clases", giro: "pilates" });
     expect(vista.find("#perfil").exists()).toBe(false);
     expect(giroElegido(vista).get("p").text().replace(/\s+/g, " ")).toBe(
-      "Tipo de negocio: Barbería · Citas 1 a 1",
+      "Tipo de negocio: Estudio de Pilates · Clases con cupo",
     );
     const cambiar = giroElegido(vista).get("button");
     expect(cambiar.attributes("type")).toBe("button");
     expect(cambiar.text()).toBe("Cambiar");
     expect(cambiar.attributes("aria-label")).toBe("Cambiar el tipo de negocio");
     // Sin elegir nada más, el paso 1 se completa con el nombre.
-    await vista.get("#nombre").setValue("Barbería Norte");
+    await vista.get("#nombre").setValue("Pilates Norte");
     await vista.get("form").trigger("submit");
     expect(vista.get('[aria-current="step"]').text()).toBe("2Tus datos");
   });
 
-  it("«Cambiar» vuelve a mostrar el selector, con los giros de su modalidad", async () => {
+  it("«Cambiar» vuelve a mostrar el selector, con los giros de su producto", async () => {
     const vista = montar(
-      { modo: "citas", giro: "barberia" },
+      { modo: "clases", giro: "pilates" },
       { adjuntar: true },
     );
-    await vista.get("#nombre").setValue("Barbería Norte");
+    await vista.get("#nombre").setValue("Pilates Norte");
     await giroElegido(vista).get("button").trigger("click");
     await flushPromises();
     expect(giroElegido(vista).exists()).toBe(false);
     const selector = vista.get("#perfil");
-    expect((selector.element as HTMLSelectElement).value).toBe("barberia");
+    expect((selector.element as HTMLSelectElement).value).toBe("pilates");
     expect(document.activeElement?.id).toBe("perfil");
     expect(
       vista.findAll("#perfil optgroup").map((g) => g.attributes("label")),
-    ).toEqual(["Citas 1 a 1"]);
-    expect(vista.get('[data-prueba="otra-modalidad"] button').text()).toBe(
-      "Ver giros de clases",
-    );
+    ).toEqual(["Clases con cupo"]);
+    expect(vista.find('[data-prueba="otra-modalidad"]').exists()).toBe(false);
     // Lo escrito sigue ahí.
     expect((vista.get("#nombre").element as HTMLInputElement).value).toBe(
-      "Barbería Norte",
+      "Pilates Norte",
     );
   });
 
-  it("un giro inválido se ignora: queda el selector de su modo", () => {
-    // La ruta lo normaliza con giroDeQuery; aun así, la vista no confía en él.
-    for (const giro of [giroDeQuery("wellness"), "wellness", "talleres"]) {
-      const vista = montar({ modo: "citas", giro });
+  it("un giro inválido o del otro producto se ignora: queda el selector", () => {
+    // La ruta lo normaliza con giroDeQuery; aun así, la vista no confía en él. Un giro
+    // de citas es de TurnoUno (ADR 0108): aquí no aplica.
+    for (const giro of [
+      giroDeQuery("wellness"),
+      "wellness",
+      "talleres",
+      "barberia",
+    ]) {
+      const vista = montar({ modo: "clases", giro });
       expect(giroElegido(vista).exists()).toBe(false);
       expect((vista.get("#perfil").element as HTMLSelectElement).value).toBe(
         "",
       );
       expect(
         vista.findAll("#perfil optgroup").map((g) => g.attributes("label")),
-      ).toEqual(["Citas 1 a 1"]);
+      ).toEqual(["Clases con cupo"]);
     }
     expect(trackEvent).toHaveBeenLastCalledWith("studio_registration_started", {
-      mode_intent: "citas",
+      mode_intent: "clases",
     });
-  });
-
-  it("si el giro es de otra modalidad que el modo, manda el giro (y su modo)", async () => {
-    const vista = montar({ modo: "clases", giro: "barberia" });
-    expect(giroElegido(vista).text()).toContain("Barbería · Citas 1 a 1");
-    expect(trackEvent).toHaveBeenCalledWith("studio_registration_started", {
-      mode_intent: "citas",
-      business_profile_intent: "barberia",
-    });
-    await giroElegido(vista).get("button").trigger("click");
-    expect(
-      vista.findAll("#perfil optgroup").map((g) => g.attributes("label")),
-    ).toEqual(["Citas 1 a 1"]);
   });
 
   it("crea el negocio con el giro con que llegó y lo mide como intención", async () => {
@@ -537,16 +459,41 @@ describe("registro desde un giro (?giro=)", () => {
     });
   });
 
-  it("si la ruta cambia con la vista abierta, toma el nuevo giro o modo", async () => {
-    const vista = montar({ modo: "citas", giro: "barberia" });
+  it("si la ruta cambia con la vista abierta, toma el nuevo giro", async () => {
+    const vista = montar({ modo: "clases", giro: "pilates" });
     await vista.setProps({ modo: "clases", giro: null });
     expect(giroElegido(vista).exists()).toBe(false);
     expect(
       vista.findAll("#perfil optgroup").map((g) => g.attributes("label")),
     ).toEqual(["Clases con cupo"]);
-    expect((vista.get("#perfil").element as HTMLSelectElement).value).toBe("");
-    await vista.setProps({ modo: null, giro: "spa" });
-    expect(giroElegido(vista).text()).toContain("Spa o centro de bienestar");
+    await vista.setProps({ modo: null, giro: "yoga" });
+    expect(giroElegido(vista).text()).toContain("Estudio de Yoga");
+  });
+});
+
+describe("producto que aún no recibe registros (ADR 0108)", () => {
+  it("muestra la lista de interesados en lugar del registro", async () => {
+    aplicarPreciosPublicos({ registro: { agendauno: false, turnouno: false } });
+    const vista = montar();
+    await flushPromises();
+    expect(vista.find('[data-prueba="registro-cerrado"]').exists()).toBe(true);
+    expect(vista.text()).toContain("AgendaUno abre pronto");
+    expect(vista.find("#nombre").exists()).toBe(false);
+    aplicarPreciosPublicos(PRECIOS_POR_OMISION);
+  });
+
+  it("la lista llega con el giro de la página (`?giro=`) ya elegido", async () => {
+    aplicarPreciosPublicos({ registro: { agendauno: false, turnouno: false } });
+    try {
+      const vista = montar({ modo: "clases", giro: "pilates" });
+      await flushPromises();
+      const lista = vista.get('[data-prueba="lista-interesados"]');
+      expect((lista.get("select").element as HTMLSelectElement).value).toBe(
+        "pilates",
+      );
+    } finally {
+      aplicarPreciosPublicos(PRECIOS_POR_OMISION);
+    }
   });
 });
 
