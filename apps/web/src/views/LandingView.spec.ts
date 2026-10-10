@@ -183,8 +183,11 @@ describe("portada comercial", () => {
     expect(tarjetas[1]!.text()).toContain(NOMBRE_MODALIDAD.citas);
     expect(tarjetas[1]!.text()).toContain("Por plan y profesionales");
     expect(tarjetas[1]!.text()).toContain("1 profesional");
-    tarjetas.forEach((t) => expect(t.text()).toContain("+ impuestos"));
+    tarjetas.forEach((t) => expect(t.text()).toContain("Más impuestos"));
+    // La moneda es la de la tarifa publicada (el respaldo, en dólares).
     tarjetas.forEach((t) => expect(t.text()).toContain("USD / mes"));
+    // Flechas en SVG, no «›» de texto.
+    tarjetas.forEach((t) => expect(t.text()).not.toMatch(/[›→]/));
     // Borde de arriba rosa (jsdom no aplica el CSS con scope: se revisa la regla).
     expect(fuente).toMatch(
       /\.tu-portada-precio \{[^}]*border-top: 3px solid var\(--marketing-cta\);/,

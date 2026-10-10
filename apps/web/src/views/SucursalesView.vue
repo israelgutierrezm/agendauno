@@ -514,8 +514,12 @@ onMounted(cargar);
               target="_blank"
               rel="noopener"
               class="tu-enlace"
-              >{{ $t("operacion.sedes.verMapa") }}</a
-            >
+              >{{ $t("operacion.sedes.verMapa") }}
+              <IconoNav
+                nombre="flecha"
+                :tam="14"
+                class="inline align-[-0.15em]"
+            /></a>
           </div>
           <p
             v-if="errorUbicacion"

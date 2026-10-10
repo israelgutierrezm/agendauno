@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { useToastStore } from "@/stores/toast";
 
 /**
  * Timbres para facturar a los clientes (ADR 0107): cuántos quedan, sus movimientos y
@@ -28,6 +29,7 @@ interface Timbres {
 }
 
 const props = defineProps<{ base: string; pagado?: boolean }>();
+const toast = useToastStore();
 
 const timbres = ref<Timbres | null>(null);
 const cargando = ref(true);
@@ -38,7 +40,7 @@ const comprando = ref(false);
 function dinero(minor: number): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
-    currency: "MXN",
+    currency: timbres.value?.moneda ?? "MXN",
   }).format(minor / 100);
 }
 function fecha(iso: string): string {
@@ -66,7 +68,6 @@ async function comprar(): Promise<void> {
     return;
   }
   comprando.value = true;
-  error.value = null;
   try {
     const { data } = await api.post<{
       data: { checkout?: { url?: string } };
@@ -78,7 +79,7 @@ async function comprar(): Promise<void> {
     }
     await cargar();
   } catch (e) {
-    error.value = mensajeDeError(e);
+    toast.error(mensajeDeError(e));
   } finally {
     comprando.value = false;
   }
@@ -125,9 +126,14 @@ defineExpose({ cargar });
       >
         {{ timbres.motivo }}
       </p>
-      <div v-else class="mt-4 flex items-end gap-2 flex-wrap">
+      <div
+        v-else-if="timbres.posible"
+        class="mt-4 flex items-end gap-2 flex-wrap"
+      >
         <label>
-          <span class="sr-only">{{ $t("suscripcion.timbres.titulo") }}</span>
+          <span class="sr-only">{{
+            $t("suscripcion.timbres.paqueteEtiqueta")
+          }}</span>
           <select
             v-model.number="paquete"
             class="tu-input"
@@ -149,7 +155,7 @@ defineExpose({ cargar });
         </label>
         <button
           type="button"
-          class="tu-btn tu-btn-primario"
+          class="tu-btn tu-btn-fantasma"
           :disabled="comprando || paquete === null"
           data-prueba="comprar-timbres"
           @click="comprar"
@@ -186,6 +192,9 @@ defineExpose({ cargar });
     </template>
     <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
       {{ error }}
+      <button type="button" class="tu-enlace ml-2" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
     </p>
   </div>
 </template>

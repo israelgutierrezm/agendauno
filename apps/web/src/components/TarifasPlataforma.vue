@@ -3,7 +3,10 @@ import axios from "axios";
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import { ETIQUETAS_FUNCION, NIVELES_PLAN } from "@/lib/suscripcion";
+import { useToastStore } from "@/stores/toast";
 
 /**
  * Tarifas del SaaS por modalidad (superadmin, ADR 0019 y 0107). Muestra la versión
@@ -18,6 +21,7 @@ import { ETIQUETAS_FUNCION, NIVELES_PLAN } from "@/lib/suscripcion";
 const props = defineProps<{ apiUrl: string; token: string }>();
 
 const { t } = useI18n();
+const toast = useToastStore();
 
 type Nivel = "individual" | "premium" | "pro";
 interface Definicion {
@@ -63,14 +67,14 @@ type Modalidad = (typeof MODALIDADES)[number];
 const vigentes = ref<Partial<Record<Modalidad, Tarifa | null>>>({});
 const borradores = ref<Partial<Record<Modalidad, Borrador>>>({});
 const publicando = ref<Modalidad | null>(null);
-const aviso = ref<string | null>(null);
-const error = ref<string | null>(null);
+const cargando = ref(true);
+const errorCarga = ref<string | null>(null);
 
 const banxico = ref(false);
 const ultimoCambio = ref<TipoCambio | null>(null);
 const nuevoCambio = ref("");
 const guardandoCambio = ref(false);
-const avisoCambio = ref<string | null>(null);
+// El error del valor capturado va debajo de su campo.
 const errorCambio = ref<string | null>(null);
 
 function cliente() {
@@ -121,7 +125,8 @@ function borradorDe(tarifa: Tarifa | null): Borrador {
 }
 
 async function cargar(): Promise<void> {
-  error.value = null;
+  cargando.value = true;
+  errorCarga.value = null;
   try {
     const { data } = await cliente().get<{
       data: Record<Modalidad, { vigente: Tarifa | null }>;
@@ -130,8 +135,10 @@ async function cargar(): Promise<void> {
       vigentes.value[m] = data.data[m]?.vigente ?? null;
       borradores.value[m] = borradorDe(vigentes.value[m] ?? null);
     }
-  } catch {
-    error.value = t("plataforma.tokenInvalido");
+  } catch (e) {
+    errorCarga.value = mensajeDeError(e);
+  } finally {
+    cargando.value = false;
   }
 }
 
@@ -143,7 +150,7 @@ async function cargarCambio(): Promise<void> {
     banxico.value = data.data.banxico_configurado;
     ultimoCambio.value = data.data.ultimo;
   } catch {
-    // El token inválido ya lo avisan las tarifas.
+    // Si la API falla, ya lo avisan las tarifas (con su «Reintentar»).
   }
 }
 
@@ -208,18 +215,27 @@ async function publicar(m: Modalidad): Promise<void> {
   if (b === undefined) {
     return;
   }
+  // Una versión publicada no se edita ni se borra: se confirma antes.
+  if (
+    !(await confirmar(
+      t("cobro.tarifas.confirmarPublicar", {
+        modalidad: t(`cobro.modalidad.${m}`).toLowerCase(),
+      }),
+      { aceptar: t("cobro.tarifas.publicar") },
+    ))
+  ) {
+    return;
+  }
   publicando.value = m;
-  aviso.value = null;
-  error.value = null;
   try {
     const { data } = await cliente().post<{ data: Tarifa }>(
       `/api/v1/plataforma/tarifas/${m}`,
       cuerpoDe(m, b),
     );
-    aviso.value = t("cobro.tarifas.publicada", { n: data.data.version });
+    toast.exito(t("cobro.tarifas.publicada", { n: data.data.version }));
     await cargar();
   } catch (e) {
-    error.value = mensaje(e);
+    toast.error(mensajeDeError(e));
   } finally {
     publicando.value = null;
   }
@@ -227,7 +243,6 @@ async function publicar(m: Modalidad): Promise<void> {
 
 async function guardarCambio(): Promise<void> {
   guardandoCambio.value = true;
-  avisoCambio.value = null;
   errorCambio.value = null;
   try {
     const { data } = await cliente().put<{
@@ -235,22 +250,12 @@ async function guardarCambio(): Promise<void> {
     }>("/api/v1/plataforma/tipo-cambio", { valor: nuevoCambio.value });
     ultimoCambio.value = data.data.ultimo;
     nuevoCambio.value = "";
-    avisoCambio.value = t("suscripcion.plataforma.tipoCambio.guardado");
+    toast.exito(t("suscripcion.plataforma.tipoCambio.guardado"));
   } catch (e) {
-    errorCambio.value = mensaje(e);
+    errorCambio.value = mensajeDeError(e);
   } finally {
     guardandoCambio.value = false;
   }
-}
-
-function mensaje(e: unknown): string {
-  const datos = axios.isAxiosError(e) ? e.response?.data : null;
-  const errores = datos?.meta?.errors as Record<string, string[]> | undefined;
-  return (
-    (errores ? Object.values(errores)[0]?.[0] : null) ??
-    datos?.message ??
-    t("plataforma.tokenInvalido")
-  );
 }
 
 function fecha(iso: string): string {
@@ -260,10 +265,12 @@ function fecha(iso: string): string {
   );
 }
 
-onMounted(() => {
+function reintentar(): void {
   void cargar();
   void cargarCambio();
-});
+}
+
+onMounted(reintentar);
 </script>
 
 <template>
@@ -272,7 +279,26 @@ onMounted(() => {
     <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
       {{ $t("cobro.tarifas.ayuda") }}
     </p>
-    <div class="mt-3 grid gap-4 lg:grid-cols-2">
+    <p
+      v-if="cargando && !vigentes.clases && !vigentes.citas"
+      class="mt-3 text-sm"
+      role="status"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
+      {{ $t("comun.cargando") }}
+    </p>
+    <div
+      v-else-if="errorCarga"
+      class="mt-3 flex flex-wrap items-center gap-3 text-sm"
+      role="alert"
+      data-prueba="tarifas-error"
+    >
+      <span style="color: var(--error)">{{ errorCarga }}</span>
+      <button type="button" class="tu-btn tu-btn-fantasma" @click="reintentar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
+    <div v-else class="mt-3 grid gap-4 lg:grid-cols-2">
       <form
         v-for="m in MODALIDADES"
         :key="m"
@@ -513,12 +539,6 @@ onMounted(() => {
         </template>
       </form>
     </div>
-    <p v-if="aviso" class="mt-2 text-sm" style="color: var(--exito)">
-      {{ aviso }}
-    </p>
-    <p v-if="error" class="mt-2 text-sm" style="color: var(--error)">
-      {{ error }}
-    </p>
 
     <!-- Tipo de cambio para cobrar en pesos la renta en dólares (ADR 0107) -->
     <form
@@ -526,9 +546,9 @@ onMounted(() => {
       data-prueba="tipo-cambio"
       @submit.prevent="guardarCambio"
     >
-      <h3 class="font-medium">
+      <h2 class="font-medium text-lg">
         {{ $t("suscripcion.plataforma.tipoCambio.titulo") }}
-      </h3>
+      </h2>
       <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("suscripcion.plataforma.tipoCambio.ayuda") }}
       </p>
@@ -573,6 +593,8 @@ onMounted(() => {
             class="tu-input"
             inputmode="decimal"
             placeholder="17.2345"
+            :aria-invalid="errorCambio ? 'true' : undefined"
+            aria-describedby="tipo-cambio-error"
           />
         </label>
         <button
@@ -583,10 +605,12 @@ onMounted(() => {
           {{ $t("suscripcion.plataforma.tipoCambio.guardar") }}
         </button>
       </div>
-      <p v-if="avisoCambio" class="text-sm" style="color: var(--exito)">
-        {{ avisoCambio }}
-      </p>
-      <p v-if="errorCambio" class="text-sm" style="color: var(--error)">
+      <p
+        v-if="errorCambio"
+        id="tipo-cambio-error"
+        class="text-sm"
+        style="color: var(--error)"
+      >
         {{ errorCambio }}
       </p>
     </form>

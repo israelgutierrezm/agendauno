@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 
 import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import {
   type NivelPlan,
   type PlanCitas,
@@ -116,7 +117,37 @@ const resumen = computed(() =>
   ),
 );
 
+// Lo que pasará al elegir, como lo decide el servidor: con un periodo pagado, subir
+// (cuesta más al mes) aplica hoy y cobra la diferencia; bajar, desde el siguiente.
+function confirmacion(nivel: NivelPlan): string {
+  const n = cantidadDe(nivel);
+  const nuevo = `${t(
+    "suscripcion.plan.resumen",
+    { nivel: t(`suscripcion.niveles.${nivel}`), n },
+    n,
+  )} · ${t(`suscripcion.periodicidad.${periodicidad.value}`).toLowerCase()}`;
+  const hoy = new Date().toLocaleDateString("en-CA");
+  const cubierto =
+    props.plan.cubierto_hasta !== null && props.plan.cubierto_hasta >= hoy;
+  if (!cubierto) {
+    return t("suscripcion.plan.confirmarAhora", { plan: nuevo });
+  }
+  const actual =
+    precioPlan(props.plan, props.plan.nivel, props.plan.profesionales) ?? 0;
+  const siguiente = precioPlan(props.plan, nivel, n) ?? 0;
+  return siguiente > actual
+    ? t("suscripcion.plan.confirmarSubir", { plan: nuevo })
+    : t("suscripcion.plan.confirmarSiguiente", { plan: nuevo });
+}
+
 async function elegir(nivel: NivelPlan): Promise<void> {
+  if (
+    !(await confirmar(confirmacion(nivel), {
+      aceptar: t("suscripcion.plan.cambiar"),
+    }))
+  ) {
+    return;
+  }
   guardando.value = nivel;
   error.value = null;
   try {
@@ -179,6 +210,7 @@ const enlaceWhatsApp = computed(() =>
         type="button"
         class="tu-btn tu-btn-fantasma"
         data-prueba="cambiar-plan"
+        :aria-expanded="abierto"
         @click="abierto = !abierto"
       >
         {{
@@ -233,7 +265,11 @@ const enlaceWhatsApp = computed(() =>
 
     <div v-if="abierto" class="mt-5" data-prueba="selector-plan">
       <div class="flex items-center gap-4 flex-wrap">
-        <div class="tu-segmentado" role="group">
+        <div
+          class="tu-segmentado"
+          role="group"
+          :aria-label="$t('suscripcion.plan.formaPago')"
+        >
           <button
             v-for="p in ['mensual', 'anual'] as const"
             :key="p"
@@ -245,7 +281,16 @@ const enlaceWhatsApp = computed(() =>
           </button>
         </div>
         <span v-if="periodicidad === 'anual'" class="text-sm pc-suave">
-          {{ $t("suscripcion.periodicidad.anualAyuda") }}
+          {{
+            plan.meses_anual < 12
+              ? $t("suscripcion.periodicidad.anualAyuda", {
+                  meses: plan.meses_anual,
+                  cortesia: 12 - plan.meses_anual,
+                })
+              : $t("suscripcion.periodicidad.anualSinCortesia", {
+                  meses: plan.meses_anual,
+                })
+          }}
         </span>
       </div>
 
@@ -318,6 +363,17 @@ const enlaceWhatsApp = computed(() =>
           <ul class="mt-3 space-y-1 text-sm">
             <li v-for="f in funciones[nivel]" :key="f">{{ f }}</li>
           </ul>
+          <!-- Por qué no se puede elegir (Individual con más de un profesional). -->
+          <p
+            v-if="nivel === 'individual' && !disponible(nivel)"
+            class="mt-3 text-xs pc-suave"
+          >
+            {{
+              $t("suscripcion.plan.individualUno", {
+                n: plan.profesionales_actuales,
+              })
+            }}
+          </p>
           <button
             type="button"
             class="tu-btn mt-4 w-full"

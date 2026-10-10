@@ -1,22 +1,35 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
 import type { Modo } from "@/marketing/modalidades";
+import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 
 /*
 | Sellos de confianza bajo el hero de las páginas comerciales (portada, /clases y
 | /citas). Con `modo`, el sello del precio habla solo de esa modalidad
 | (`landing.{modo}.confianza.cobro`); sin él, el general (`landing.confianza.cobro`).
+| Los días de prueba son los publicados: los de su modalidad o, en la portada, los
+| de la prueba más corta (lo general no promete de más).
 */
 const props = defineProps<{ modo?: Modo | null }>();
 const { t } = useI18n();
+const precios = usePreciosPublicos();
+const diasPrueba = computed(() =>
+  props.modo
+    ? precios.datos[props.modo].dias_prueba
+    : Math.min(
+        precios.datos.clases.dias_prueba,
+        precios.datos.citas.dias_prueba,
+      ),
+);
 
 const SELLOS = ["prueba", "configuracion", "cobro", "cancelacion"] as const;
 
 function texto(sello: (typeof SELLOS)[number]): string {
   return sello === "cobro" && props.modo
     ? t(`landing.${props.modo}.confianza.cobro`)
-    : t(`landing.confianza.${sello}`);
+    : t(`landing.confianza.${sello}`, { dias: diasPrueba.value });
 }
 </script>
 

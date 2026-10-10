@@ -18,6 +18,7 @@ import { trackEvent, type AnalyticsProperties } from "@/lib/analytics";
 import { MODOS, modoDePerfil, type Modo } from "@/marketing/modalidades";
 import DocumentoLegalContenido from "@/components/DocumentoLegalContenido.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import SelectorBuscable from "@/components/SelectorBuscable.vue";
 
 // Alta del negocio: crea su base completa (ver el comentario en la petición).
@@ -622,7 +623,9 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
             decoding="async"
           />
           <div class="registro-mini-cita">
-            <span class="registro-mini-cita-icono">✓</span>
+            <span class="registro-mini-cita-icono"
+              ><IconoNav nombre="hecho" :tam="20"
+            /></span>
             <span>
               <small>{{ $t("registro.citaEjemplo") }}</small>
               <strong>{{ $t("registro.citaTitulo") }}</strong>
@@ -1227,7 +1230,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
             :aria-label="$t('comun.cerrar')"
             @click="legalAbierto = null"
           >
-            ✕
+            <IconoNav nombre="cerrar" :tam="18" />
           </button>
         </div>
         <div

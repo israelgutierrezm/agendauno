@@ -100,6 +100,8 @@ describe("operación de la plataforma", () => {
       headers: { Authorization: "Bearer tk" },
     });
     expect(w.find('[data-prueba="franja"]').text()).toContain("abc1234");
+    // APP_ENV en palabras, no la llave cruda.
+    expect(w.find('[data-prueba="entorno"]').text()).toBe("Producción");
     expect(w.find('[data-prueba="proceso-cola"]').text()).toContain("Atrasado");
     expect(w.find('[data-prueba="resumen-verificacion"]').text()).toBe(
       "1 punto por resolver · 1 aviso",

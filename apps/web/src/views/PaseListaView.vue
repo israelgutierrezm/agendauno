@@ -596,14 +596,10 @@ watch(
           </div>
 
           <div v-if="conBotones(r)" class="pl-botones">
+            <!-- Los tres iguales; el elegido se resalta (aria-pressed). -->
             <button
               type="button"
-              class="tu-btn pl-boton"
-              :class="
-                r.asistencia === 'presente' && !r.retardo
-                  ? 'tu-btn-fantasma'
-                  : 'tu-btn-primario'
-              "
+              class="tu-btn tu-btn-fantasma pl-boton"
               :aria-pressed="r.asistencia === 'presente' && !r.retardo"
               :aria-label="`${$t('paseLista.acciones.llego')}: ${r.persona ?? ''}`"
               :disabled="!abierta || marcando.has(r.id)"
@@ -975,9 +971,12 @@ watch(
     display: none;
   }
 }
+/* El estado elegido resalta: borde y fondo suave del color de acción. */
 .pl-boton[aria-pressed="true"] {
   border-color: var(--primario);
+  background: var(--primario-suave);
   color: var(--primario-fuerte);
+  font-weight: 600;
 }
 .pl-dejar {
   grid-column: 1 / -1;

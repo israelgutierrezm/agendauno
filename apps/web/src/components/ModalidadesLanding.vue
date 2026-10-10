@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconoNav from "@/components/IconoNav.vue";
 import { RouterLink } from "vue-router";
 import {
   NOMBRE_MODALIDAD,
@@ -115,8 +116,13 @@ const opciones = [
         <RouterLink
           :to="{ name: NOMBRE_RUTA_MODALIDAD[opcion.id] }"
           @click="$emit('elegir', opcion.id)"
-          >{{ opcion.enlace }} <span aria-hidden="true">→</span></RouterLink
-        >
+          >{{ opcion.enlace }}
+          <span aria-hidden="true"
+            ><IconoNav
+              nombre="flecha"
+              :tam="14"
+              class="inline align-[-0.15em]" /></span
+        ></RouterLink>
       </div>
     </article>
   </div>

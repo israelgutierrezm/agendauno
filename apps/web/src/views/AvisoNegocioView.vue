@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconoNav from "@/components/IconoNav.vue";
 import { computed, onMounted, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 
@@ -64,7 +65,8 @@ onMounted(cargar);
     <RouterLink
       :to="{ name: 'estudio-publico', params: { slug } }"
       class="tu-enlace text-sm"
-      >← {{ aviso?.negocio ?? "Volver" }}</RouterLink
+      ><IconoNav nombre="atras" :tam="14" class="inline align-[-0.15em]" />
+      {{ aviso?.negocio ?? "Volver" }}</RouterLink
     >
     <p v-if="cargando" class="mt-8" role="status">Cargando el aviso…</p>
     <div v-else-if="error" class="mt-8" role="alert">

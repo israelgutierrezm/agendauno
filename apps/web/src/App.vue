@@ -448,7 +448,8 @@ onMounted(() => {
   >
     <!-- No volver a montar una ruta privada mientras se cierra la sesión. Las páginas
          comerciales se montan de nuevo en cada ruta: /clases y /citas comparten vista
-         y no arrastran estado de una a otra. -->
+         y no arrastran estado de una a otra. Las de un negocio (con `slug`), igual: de
+         /agendar/uno a /agendar/otro no se queda con los datos del primero. -->
     <RouterView
       v-if="route.meta.requiereSesion !== true"
       v-slot="{ Component, route: ruta }"
@@ -456,7 +457,11 @@ onMounted(() => {
       <component
         :is="Component"
         v-if="Component"
-        :key="ruta.meta.marketing === true ? ruta.path : undefined"
+        :key="
+          ruta.meta.marketing === true || ruta.params.slug
+            ? ruta.path
+            : undefined
+        "
       />
     </RouterView>
   </PublicShell>
@@ -699,10 +704,12 @@ a.tu-miga:hover {
   background: var(--primario);
   animation: tu-rol-latido 1.8s ease-out infinite;
 }
+/* En la esquina del botón, fuera del ícono: más adentro tocaba la raya de arriba del
+   menú y se veían como una sola figura. */
 .tu-rol-punto-esquina {
   position: absolute;
-  top: 0.3rem;
-  right: 0.3rem;
+  top: 0;
+  right: 0;
   box-shadow: 0 0 0 2px var(--superficie);
 }
 @keyframes tu-rol-latido {

@@ -10,6 +10,7 @@ import DemoPaginaPublicaCitas from "@/components/DemoPaginaPublicaCitas.vue";
 import DemoPaginaPublicaClases from "@/components/DemoPaginaPublicaClases.vue";
 import FuncionesLanding from "@/components/FuncionesLanding.vue";
 import HeroCollage, { type FotoCollage } from "@/components/HeroCollage.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import NegociosAnimados from "@/components/NegociosAnimados.vue";
 import PreciosLanding from "@/components/PreciosLanding.vue";
 import PreguntasFrecuentes from "@/components/PreguntasFrecuentes.vue";
@@ -266,8 +267,9 @@ function medirOtra(): void {
         <ProductoDemo :modo="modo" />
         <div class="mt-8 text-center">
           <RouterLink
-            class="tu-btn tu-btn-primario px-7 py-3"
+            class="tu-btn tu-btn-primario tu-btn-azul px-7 py-3"
             :to="registro"
+            data-cta="product_demo"
             @click="medirRegistro('product_demo')"
           >
             {{ t(k("producto.cta")) }}
@@ -361,7 +363,7 @@ function medirOtra(): void {
           :negocios="negocios"
         >
           <RouterLink
-            class="tu-btn tu-btn-primario px-7 py-3"
+            class="tu-btn tu-btn-primario tu-btn-azul px-7 py-3"
             :to="registroCon(elegido ? perfilDeNegocio(activo?.clave) : null)"
             data-cta="business_carousel"
             @click="
@@ -372,7 +374,7 @@ function medirOtra(): void {
             "
           >
             {{ t(k("giros.cta")) }}
-            <span aria-hidden="true">↗</span>
+            <IconoNav nombre="flecha" :tam="18" />
           </RouterLink>
           <p class="mt-3 text-sm" :style="SUAVE">{{ t(k("giros.pie")) }}</p>
           <p v-if="notas.giros" class="tu-nota-mexico">
@@ -441,7 +443,7 @@ function medirOtra(): void {
               @click="medirRegistro('operations')"
             >
               {{ t(k("operacion.enlace")) }}
-              <span aria-hidden="true">›</span>
+              <IconoNav nombre="chevron" :tam="16" />
             </RouterLink>
           </div>
           <figure class="tu-imagen-marco tu-modalidad-recepcion reveal">
@@ -470,23 +472,8 @@ function medirOtra(): void {
             {{ t(k("precio.subtitulo")) }}
           </p>
         </div>
+        <!-- Cada tarjeta ya lleva su «Probar» y «Sin tarjeta»: sin repetirlo aquí. -->
         <PreciosLanding :modo="modo" />
-        <div class="tu-precio-prueba mt-6">
-          <div>
-            <strong class="font-medium">{{
-              t("landing.modalidad.precioBadge", { dias: DIAS_PRUEBA })
-            }}</strong>
-            <p class="mt-1 text-sm" :style="SUAVE">
-              {{ t("landing.modalidad.precioDetalle") }}
-            </p>
-          </div>
-          <RouterLink
-            class="tu-btn tu-btn-primario px-7 py-3"
-            :to="registro"
-            @click="medirRegistro('pricing')"
-            >{{ t("landing.modalidad.probar") }}</RouterLink
-          >
-        </div>
       </div>
     </section>
 
@@ -534,8 +521,9 @@ function medirOtra(): void {
             </p>
             <div class="mt-8">
               <RouterLink
-                class="tu-btn tu-btn-primario px-6 py-3"
+                class="tu-btn tu-btn-primario tu-btn-azul px-6 py-3"
                 :to="registro"
+                data-cta="public_page"
                 @click="medirRegistro('public_page')"
               >
                 {{ t("landing.modalidad.probar") }}
@@ -583,10 +571,12 @@ function medirOtra(): void {
         <!-- Enlace discreto a la otra modalidad: cada negocio es de una sola. -->
         <p class="tu-modalidad-otra">
           {{ t(k("final.otra")) }}
-          <RouterLink :to="otra" @click="medirOtra"
-            >{{ t(k("final.otraEnlace")) }}
-            <span aria-hidden="true">→</span></RouterLink
-          >
+          <RouterLink
+            :to="otra"
+            class="inline-flex items-center gap-1"
+            @click="medirOtra"
+            >{{ t(k("final.otraEnlace")) }} <IconoNav nombre="flecha" :tam="16"
+          /></RouterLink>
         </p>
       </div>
     </section>

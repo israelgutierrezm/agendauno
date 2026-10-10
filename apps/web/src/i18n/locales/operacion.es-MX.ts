@@ -228,9 +228,9 @@ export default {
     abrirAgenda: "Abrir agenda",
     // Abre directo lo que sigue (la clase o la cita), con el término del negocio.
     verSesion: "Ver {sesion}",
-    irRecepcion: "Ir a recepción →",
+    irRecepcion: "Ir a recepción",
     agenda: "Agenda de hoy",
-    verAgenda: "Ver agenda →",
+    verAgenda: "Ver agenda",
     sinSesiones: "No hay clases hoy.",
     cupo: "{n} de {total}",
     pasarLista:
@@ -264,7 +264,7 @@ export default {
       sinRegistrar: "Sin registrar",
       duracion: "{n} min",
       libres: "Espacios libres hoy",
-      agendar: "Agendar →",
+      agendar: "Agendar",
       nadieAtiende: "Hoy nadie tiene horario de atención.",
       huecos: "1 espacio | {n} espacios",
       sinHuecos: "Sin espacios",
@@ -363,7 +363,7 @@ export default {
       "Pega las coordenadas desde Google Maps (clic derecho sobre el lugar y copia los números) o usa tu ubicación si estás en la sucursal.",
     usarMiUbicacion: "Usar mi ubicación actual",
     ubicando: "Ubicando…",
-    verMapa: "Ver en el mapa →",
+    verMapa: "Ver en el mapa",
     invalida:
       "Escribe la latitud y la longitud separadas por una coma (p. ej. 19.4194, -99.1617).",
     sinPermiso: "No pudimos obtener tu ubicación desde este dispositivo.",

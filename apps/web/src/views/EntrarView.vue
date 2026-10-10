@@ -11,6 +11,7 @@ import {
 } from "vue-router";
 
 import CampoContrasena from "@/components/CampoContrasena.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import LogoAgendaUno from "@/components/LogoAgendaUno.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import {
@@ -323,7 +324,9 @@ onMounted(async () => {
           decoding="async"
         />
         <div class="tu-login-actividad tu-login-actividad--cita">
-          <span class="tu-login-icono">✓</span>
+          <span class="tu-login-icono"
+            ><IconoNav nombre="hecho" :tam="14"
+          /></span>
           <span>
             <strong>{{ $t("entrar.panelCita") }}</strong>
             <small>{{ $t("entrar.panelCitaDetalle") }}</small>
@@ -356,7 +359,8 @@ onMounted(async () => {
       </div>
 
       <RouterLink class="tu-login-explorar" :to="{ name: 'directorio' }">
-        {{ $t("entrar.buscarReserva") }} <span aria-hidden="true">→</span>
+        {{ $t("entrar.buscarReserva") }}
+        <IconoNav nombre="flecha" :tam="16" />
       </RouterLink>
     </section>
 
@@ -429,7 +433,7 @@ onMounted(async () => {
                       ubicacion(negocio) || $t("entrar.accesoGuardado")
                     }}</small>
                   </span>
-                  <span aria-hidden="true">→</span>
+                  <IconoNav class="shrink-0" nombre="flecha" :tam="16" />
                 </button>
                 <button
                   type="button"
@@ -505,7 +509,7 @@ onMounted(async () => {
                       ubicacion(negocio) || $t("directorio.ubicacionPendiente")
                     }}</small>
                   </span>
-                  <span aria-hidden="true">→</span>
+                  <IconoNav class="shrink-0" nombre="flecha" :tam="16" />
                 </button>
               </li>
             </ul>
@@ -519,7 +523,7 @@ onMounted(async () => {
             class="tu-login-cambiar"
             @click="elegirOtro"
           >
-            <span aria-hidden="true">←</span> {{ $t("entrar.elegirOtro") }}
+            <IconoNav nombre="atras" :tam="16" /> {{ $t("entrar.elegirOtro") }}
           </button>
           <h1 class="tu-login-titulo">
             {{

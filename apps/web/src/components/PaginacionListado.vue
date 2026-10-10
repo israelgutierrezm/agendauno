@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconoNav from "@/components/IconoNav.vue";
 import { computed } from "vue";
 
 /**
@@ -87,7 +88,7 @@ function ir(n: number): void {
         :aria-label="$t('tabla.anterior')"
         @click="ir(page - 1)"
       >
-        ‹
+        <IconoNav nombre="chevron" :tam="16" class="inline rotate-180" />
       </button>
       <template v-for="(n, i) in paginas" :key="i">
         <span
@@ -123,7 +124,7 @@ function ir(n: number): void {
         :aria-label="$t('tabla.siguiente')"
         @click="ir(page + 1)"
       >
-        ›
+        <IconoNav nombre="chevron" :tam="16" class="inline" />
       </button>
     </div>
   </nav>

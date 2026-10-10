@@ -8,6 +8,7 @@ import { trackEvent } from "@/lib/analytics";
 import { useRevelar } from "@/lib/revelar";
 import FondoHero from "@/components/FondoHero.vue";
 import HeroCollage from "@/components/HeroCollage.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import ModalidadesLanding from "@/components/ModalidadesLanding.vue";
 import NegociosAnimados from "@/components/NegociosAnimados.vue";
 import PreguntasFrecuentes from "@/components/PreguntasFrecuentes.vue";
@@ -90,6 +91,7 @@ const preciosDesde = computed(() => {
       modelo: "landing.portada.precios.clases",
       capacidad: rango?.capacidad ?? "",
       importe: dolares(rango?.subtotal ?? 0),
+      moneda: precios.datos.clases.moneda,
       enlace: "landing.portada.precios.verClases",
     },
     {
@@ -97,6 +99,7 @@ const preciosDesde = computed(() => {
       modelo: "landing.portada.precios.citas",
       capacidad: "1 profesional",
       importe: dolares(desdeCitas(precios.datos.citas.niveles).individual),
+      moneda: precios.datos.citas.moneda,
       enlace: "landing.portada.precios.verCitas",
     },
   ];
@@ -186,8 +189,8 @@ useRevelar(raiz);
             >
               <span class="tu-hero-opcion-titulo"
                 >{{ $t(`landing.portada.opciones.${modo}`) }}
-                <span aria-hidden="true">→</span></span
-              >
+                <IconoNav nombre="flecha" :tam="18"
+              /></span>
               <span class="tu-hero-opcion-giros">{{
                 $t(`landing.portada.opciones.${modo}Giros`)
               }}</span>
@@ -269,7 +272,9 @@ useRevelar(raiz);
             <p class="tu-portada-precio-importe">
               <span>{{ $t("landing.portada.precios.desde") }}</span>
               <strong>{{ precio.importe }}</strong>
-              <span>{{ $t("landing.portada.precios.porMes") }}</span>
+              <span>{{
+                $t("landing.portada.precios.porMes", { moneda: precio.moneda })
+              }}</span>
             </p>
             <p class="tu-portada-precio-detalle">
               {{ $t("landing.portada.precios.iva") }} · {{ precio.capacidad }}
@@ -283,7 +288,7 @@ useRevelar(raiz);
               @click="medirPrecios(precio.modo)"
             >
               {{ $t(precio.enlace) }}
-              <span aria-hidden="true">›</span>
+              <IconoNav nombre="chevron" :tam="16" />
             </RouterLink>
           </article>
         </div>
@@ -322,7 +327,7 @@ useRevelar(raiz);
                     : "landing.portada.giros.verCitas",
                 )
               }}
-              <span aria-hidden="true">›</span>
+              <IconoNav nombre="chevron" :tam="16" />
             </RouterLink>
             <p v-if="modo === 'citas'" class="tu-alcance-salud mt-6">
               <strong>{{ $t("landing.paraQuien.saludTitulo") }}</strong>

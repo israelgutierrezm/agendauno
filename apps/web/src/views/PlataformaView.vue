@@ -6,6 +6,7 @@ import { useI18n } from "vue-i18n";
 import ErroresPlataforma from "@/components/ErroresPlataforma.vue";
 import ModalidadPlataforma from "@/components/ModalidadPlataforma.vue";
 import OperacionPlataforma from "@/components/OperacionPlataforma.vue";
+import PaisPlataforma from "@/components/PaisPlataforma.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import ParametrosPlataforma from "@/components/ParametrosPlataforma.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
@@ -15,6 +16,7 @@ import WhatsAppNegocio, {
   type EstadoWhatsAppNegocio,
 } from "@/components/WhatsAppNegocio.vue";
 import ComercialPlataforma from "@/components/ComercialPlataforma.vue";
+import CondonarCargo from "@/components/CondonarCargo.vue";
 import type { PlanCitas } from "@/lib/suscripcion";
 import PlanEstudioPlataforma from "@/components/PlanEstudioPlataforma.vue";
 import WhatsAppPlataforma from "@/components/WhatsAppPlataforma.vue";
@@ -33,6 +35,8 @@ interface Estudio {
   slug: string;
   nombre: string;
   estado: string;
+  // ISO 3166-1 (MX): define la moneda, el IVA y la factura de su suscripción.
+  pais?: string;
   // Suspendido solo por renta (se reactiva al pagar) o por la plataforma (ADR 0073).
   suspendido_por?: string | null;
   estado_facturacion: string;
@@ -77,6 +81,8 @@ interface Cargo {
   estudio_estado?: string | null;
   // `renta`: se suspendió solo y se reactiva al pagar (ADR 0073).
   estudio_suspendido_por?: string | null;
+  // Pendiente: el superadmin lo puede condonar (queda cancelado).
+  condonable?: boolean;
 }
 interface FichaApi extends Omit<Estudio, "uso"> {
   contacto: {
@@ -166,6 +172,8 @@ const token = ref<string>(leer());
 const tokenInput = ref("");
 const autenticado = ref(false);
 const cargando = ref(false);
+// Con un token guardado no se pinta la puerta mientras se comprueba (sin parpadeo).
+const comprobando = ref(token.value !== "");
 const error = ref<string | null>(null);
 const pestana = ref<Pestana>("estudios");
 
@@ -201,10 +209,15 @@ function periodo(p: string): string {
 
 function cobroLegible(e: Estudio): string {
   if (e.modo_cobro === "fijo") {
-    return `${dinero(e.cuota_fija_minor, e.cuota_fija_moneda ?? "MXN")} / mes`;
+    return `${dinero(e.cuota_fija_minor, e.cuota_fija_moneda ?? "MXN")} ${t("suscripcion.plan.porMes")}`;
   }
   if (e.plan) {
-    return `${t(`suscripcion.niveles.${e.plan.nivel}`)} · ${e.plan.profesionales ?? 1}`;
+    const n = e.plan.profesionales ?? 1;
+    return t(
+      "suscripcion.plan.resumen",
+      { nivel: t(`suscripcion.niveles.${e.plan.nivel}`), n },
+      n,
+    );
   }
   return t(`cobro.modalidad.${e.modalidad}`);
 }
@@ -250,9 +263,14 @@ const edit = ref({
   estado_facturacion: "",
 });
 const diasPrueba = ref(15);
+// Por qué se suspende (opcional): se escribe en la ficha, junto a las acciones.
+const motivoSuspension = ref("");
 
 async function abrirFicha(e: Estudio): Promise<void> {
   fichaAbierta.value = true;
+  if (ficha.value?.slug !== e.slug) {
+    motivoSuspension.value = "";
+  }
   ficha.value = null;
   try {
     const { data } = await cliente.get<{ data: FichaApi }>(
@@ -275,9 +293,9 @@ async function abrirFicha(e: Estudio): Promise<void> {
 async function accion(
   hacer: () => Promise<unknown>,
   exito: string,
-): Promise<void> {
+): Promise<boolean> {
   if (ficha.value === null) {
-    return;
+    return false;
   }
   const slug = ficha.value.slug;
   accionando.value = true;
@@ -289,8 +307,10 @@ async function accion(
     if (actual !== undefined) {
       await abrirFicha(actual);
     }
+    return true;
   } catch (err) {
     toast.error(mensajeDeError(err));
+    return false;
   } finally {
     accionando.value = false;
   }
@@ -377,16 +397,19 @@ async function suspender(): Promise<void> {
   ) {
     return;
   }
-  const motivo = window.prompt(t("plataformaAdmin.ficha.motivo")) ?? "";
-  void accion(
+  const motivo = motivoSuspension.value.trim();
+  const listo = await accion(
     () =>
       cliente.post(
         `/api/v1/plataforma/estudios/${f.slug}/suspender`,
-        { motivo: motivo.trim() || null },
+        { motivo: motivo || null },
         encabezados(),
       ),
     t("plataformaAdmin.ficha.suspendido"),
   );
+  if (listo) {
+    motivoSuspension.value = "";
+  }
 }
 
 // Suspender desde Cobros → Vencidos, sin abrir la ficha del negocio.
@@ -439,12 +462,51 @@ function reactivar(): void {
   );
 }
 
+// Condonar un cargo pendiente (desde Cobros o desde la ficha): queda cancelado, con el
+// motivo en la bitácora; si ya no debe nada vencido, el negocio se reactiva.
+const condonando = ref<string | null>(null);
+async function condonar(
+  c: Cargo,
+  motivo: string,
+  recargar: () => Promise<void>,
+): Promise<void> {
+  if (
+    !(await confirmar(
+      t("plataformaAdmin.cobros.confirmarCondonar", {
+        monto: dinero(c.monto_minor, c.moneda),
+        estudio: c.estudio ?? ficha.value?.nombre ?? "",
+      }),
+      { aceptar: t("plataformaAdmin.cobros.condonar"), peligro: true },
+    ))
+  ) {
+    return;
+  }
+  condonando.value = c.id;
+  try {
+    await cliente.post(
+      `/api/v1/plataforma/cargos/${c.id}/condonar`,
+      { motivo },
+      encabezados(),
+    );
+    toast.exito(t("plataformaAdmin.cobros.condonado"));
+    await recargar();
+  } catch (err) {
+    toast.error(mensajeDeError(err));
+  } finally {
+    condonando.value = null;
+  }
+}
+
 // ---- Cobros ----
 const cargos = ref<Cargo[]>([]);
 const resumen = ref<ResumenCobros | null>(null);
 const filtro = ref({ estado: "", periodo: "" });
+const cargandoCobros = ref(false);
+const errorCobros = ref<string | null>(null);
 
 async function cargarCobros(): Promise<void> {
+  cargandoCobros.value = true;
+  errorCobros.value = null;
   try {
     const { data } = await cliente.get<{
       data: Cargo[];
@@ -464,7 +526,9 @@ async function cargarCobros(): Promise<void> {
     cargos.value = data.data;
     resumen.value = data.resumen;
   } catch (err) {
-    toast.error(mensajeDeError(err));
+    errorCobros.value = mensajeDeError(err);
+  } finally {
+    cargandoCobros.value = false;
   }
 }
 
@@ -696,13 +760,21 @@ async function cargar(): Promise<void> {
   try {
     await Promise.all([cargarEstudios(), cargarConfiguracion()]);
     autenticado.value = true;
-  } catch {
+  } catch (err) {
     autenticado.value = false;
-    error.value = t("plataforma.tokenInvalido");
-    token.value = "";
-    borrar();
+    const estado = axios.isAxiosError(err) ? err.response?.status : undefined;
+    if (estado === 401 || estado === 403) {
+      // El token no sirve: se olvida.
+      error.value = t("plataforma.tokenInvalido");
+      token.value = "";
+      borrar();
+    } else {
+      // Sin red o la API falló: el token se queda para reintentar.
+      error.value = mensajeDeError(err);
+    }
   } finally {
     cargando.value = false;
+    comprobando.value = false;
   }
 }
 
@@ -732,33 +804,62 @@ onMounted(() => {
   }
 });
 
+// El token abre las llaves de Stripe de la plataforma: vive solo mientras dure la
+// pestaña (sessionStorage), no para siempre en el navegador.
 function leer(): string {
+  let guardado: string | null = null;
   try {
-    return localStorage.getItem(CLAVE_TOKEN) ?? "";
+    guardado = sessionStorage.getItem(CLAVE_TOKEN);
   } catch {
-    return "";
+    // sin sessionStorage: se pide de nuevo
   }
+  // Antes se guardaba en localStorage: se mueve a la sesión y se borra de ahí.
+  try {
+    const anterior = localStorage.getItem(CLAVE_TOKEN);
+    if (anterior !== null) {
+      localStorage.removeItem(CLAVE_TOKEN);
+      if (guardado === null) {
+        guardado = anterior;
+        guardar(anterior);
+      }
+    }
+  } catch {
+    // sin localStorage: nada que mover
+  }
+  return guardado ?? "";
 }
 function guardar(v: string): void {
   try {
-    localStorage.setItem(CLAVE_TOKEN, v);
+    sessionStorage.setItem(CLAVE_TOKEN, v);
   } catch {
-    // sin localStorage: se mantiene solo en memoria
+    // sin sessionStorage: se mantiene solo en memoria
   }
 }
 function borrar(): void {
-  try {
-    localStorage.removeItem(CLAVE_TOKEN);
-  } catch {
-    // ignora
+  for (const almacen of ["sessionStorage", "localStorage"] as const) {
+    try {
+      window[almacen].removeItem(CLAVE_TOKEN);
+    } catch {
+      // ignora
+    }
   }
 }
 </script>
 
 <template>
   <section class="mx-auto max-w-6xl px-4 sm:px-6 py-10">
+    <!-- Con un token guardado: se comprueba sin enseñar la puerta. -->
+    <p
+      v-if="comprobando"
+      class="text-center text-sm"
+      role="status"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
+      {{ $t("comun.cargando") }}
+    </p>
+
     <!-- Puerta por token -->
-    <div v-if="!autenticado" class="mx-auto max-w-sm tu-card p-6">
+    <div v-else-if="!autenticado" class="mx-auto max-w-sm tu-card p-6">
       <h1 class="font-light text-xl">{{ $t("plataforma.titulo") }}</h1>
       <p class="mt-1 text-sm" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("plataforma.tokenAyuda") }}
@@ -784,6 +885,16 @@ function borrar(): void {
         >
           {{ $t("plataforma.entrar") }}
         </button>
+        <!-- Falló la red, no el token: se puede volver a intentar con el guardado. -->
+        <button
+          v-if="token !== ''"
+          class="tu-btn tu-btn-fantasma w-full"
+          type="button"
+          :disabled="cargando"
+          @click="cargar"
+        >
+          {{ $t("comun.reintentar") }}
+        </button>
       </form>
     </div>
 
@@ -802,7 +913,7 @@ function borrar(): void {
         </button>
       </div>
 
-      <div class="tu-segmentado mt-6" role="group">
+      <div class="tu-pestanas mt-6" role="group">
         <button
           v-for="p in [
             'estudios',
@@ -847,12 +958,10 @@ function borrar(): void {
           >
         </template>
         <template #col-estado="{ fila }">
-          <span class="inline-flex items-center gap-1.5 text-sm">
-            <span
-              class="h-1.5 w-1.5 rounded-full"
-              :style="{ background: colorEstado((fila as Estudio).estado) }"
-              aria-hidden="true"
-            />
+          <span
+            class="tu-estado text-sm"
+            :style="{ '--tono': colorEstado((fila as Estudio).estado) }"
+          >
             {{ $t(`plataformaAdmin.estados.${(fila as Estudio).estado}`) }}
           </span>
           <span
@@ -993,8 +1102,32 @@ function borrar(): void {
               @change="cargarCobros"
             />
           </div>
+          <div
+            v-if="errorCobros"
+            class="mt-4 flex flex-wrap items-center gap-3 text-sm"
+            role="alert"
+            data-prueba="cobros-error"
+          >
+            <span style="color: var(--error)">{{ errorCobros }}</span>
+            <button
+              type="button"
+              class="tu-btn tu-btn-fantasma text-sm"
+              :disabled="cargandoCobros"
+              @click="cargarCobros"
+            >
+              {{ $t("comun.reintentar") }}
+            </button>
+          </div>
           <p
-            v-if="cargos.length === 0"
+            v-else-if="cargandoCobros"
+            class="mt-4 text-sm"
+            role="status"
+            :style="{ color: 'var(--texto-suave)' }"
+          >
+            {{ $t("comun.cargando") }}
+          </p>
+          <p
+            v-else-if="cargos.length === 0"
             class="mt-4 text-sm"
             :style="{ color: 'var(--texto-suave)' }"
           >
@@ -1041,14 +1174,9 @@ function borrar(): void {
                   dinero(c.monto_minor, c.moneda)
                 }}</span>
                 <span
-                  class="inline-flex items-center gap-1.5 text-xs font-medium"
-                  :style="{ color: colorCargo(c) }"
-                >
-                  <span
-                    class="h-1.5 w-1.5 rounded-full"
-                    :style="{ background: colorCargo(c) }"
-                    aria-hidden="true"
-                  />{{ estadoCargo(c) }}</span
+                  class="tu-estado text-xs font-medium"
+                  :style="{ '--tono': colorCargo(c) }"
+                  >{{ estadoCargo(c) }}</span
                 >
                 <template v-if="c.vencido && c.estudio_slug">
                   <span
@@ -1075,6 +1203,12 @@ function borrar(): void {
                   </button>
                 </template>
               </span>
+              <div v-if="c.condonable" class="pl-condonar">
+                <CondonarCargo
+                  :ocupado="condonando === c.id"
+                  @condonar="(m) => condonar(c, m, cargarCobros)"
+                />
+              </div>
             </li>
           </ul>
         </div>
@@ -1125,8 +1259,13 @@ function borrar(): void {
               </p>
             </div>
             <span
-              class="tu-badge shrink-0"
-              :class="facturapiConfigurada ? 'tu-badge-exito' : ''"
+              class="tu-estado text-sm shrink-0"
+              :style="{
+                '--tono': facturapiConfigurada
+                  ? 'var(--exito)'
+                  : 'var(--texto-suave)',
+              }"
+              data-prueba="facturapi-estado"
             >
               {{
                 facturapiConfigurada
@@ -1221,9 +1360,11 @@ function borrar(): void {
                 <h3 class="font-medium">
                   {{ $t(`pasarelas.proveedores.${p.proveedor}`) }}
                 </h3>
-                <span class="tu-badge">{{
-                  $t("pasarelasEstado.proximamente")
-                }}</span>
+                <span
+                  class="tu-estado text-xs shrink-0"
+                  :style="{ color: 'var(--texto-suave)' }"
+                  >{{ $t("pasarelasEstado.proximamente") }}</span
+                >
               </div>
               <p
                 v-if="p.disponible === false"
@@ -1290,6 +1431,27 @@ function borrar(): void {
                         : ''
                     "
                   />
+                </div>
+                <!-- A dónde manda sus avisos la pasarela (se registra en su panel). -->
+                <div class="mt-2">
+                  <label class="tu-label" :for="`${p.proveedor}-webhook-url`">{{
+                    $t("plataforma.pasarelas.webhookUrl")
+                  }}</label>
+                  <input
+                    :id="`${p.proveedor}-webhook-url`"
+                    class="tu-input text-xs"
+                    readonly
+                    :value="`${apiUrl}/api/v1/webhooks/plataforma/${p.proveedor}`"
+                    data-prueba="webhook-url"
+                    @focus="($event.target as HTMLInputElement).select()"
+                  />
+                  <p
+                    v-if="p.proveedor === 'stripe'"
+                    class="mt-1 text-xs"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    {{ $t("plataforma.pasarelas.webhookEventosStripe") }}
+                  </p>
                 </div>
                 <button
                   class="tu-btn tu-btn-primario w-full mt-3 text-sm"
@@ -1447,12 +1609,10 @@ function borrar(): void {
         </p>
         <div v-else class="space-y-6 p-5 text-sm">
           <div class="flex flex-wrap items-center gap-3">
-            <span class="inline-flex items-center gap-1.5 font-medium">
-              <span
-                class="h-1.5 w-1.5 rounded-full"
-                :style="{ background: colorEstado(ficha.estado) }"
-                aria-hidden="true"
-              />{{ $t(`plataformaAdmin.estados.${ficha.estado}`) }}</span
+            <span
+              class="tu-estado font-medium"
+              :style="{ '--tono': colorEstado(ficha.estado) }"
+              >{{ $t(`plataformaAdmin.estados.${ficha.estado}`) }}</span
             >
             <span
               v-if="ficha.suspendido_por === 'renta'"
@@ -1532,6 +1692,17 @@ function borrar(): void {
             @cambiada="recargarFicha"
           />
 
+          <!-- País: pasada la prueba, solo soporte lo cambia (ADR 0107) -->
+          <PaisPlataforma
+            :key="`pais-${ficha.slug}-${ficha.pais ?? 'MX'}`"
+            :api-url="apiUrl"
+            :token="token"
+            :slug="ficha.slug"
+            :nombre="ficha.nombre"
+            :pais="ficha.pais ?? 'MX'"
+            @cambiado="recargarFicha"
+          />
+
           <!-- Contacto -->
           <section>
             <h3
@@ -1558,10 +1729,13 @@ function borrar(): void {
               >
               <span
                 v-if="ficha.contacto.whatsapp_verificado"
-                class="pf-verificado text-xs"
+                class="tu-estado text-xs"
+                :style="{
+                  '--tono': 'var(--exito)',
+                  color: 'var(--texto-suave)',
+                }"
                 data-prueba="whatsapp-verificado"
               >
-                <span class="pf-punto" aria-hidden="true"></span>
                 {{ $t("plataformaAdmin.ficha.whatsappVerificado") }}
               </span>
             </div>
@@ -1620,11 +1794,17 @@ function borrar(): void {
                     dinero(c.monto_minor, c.moneda)
                   }}</span>
                   <span
-                    class="block text-xs"
-                    :style="{ color: colorCargo(c) }"
+                    class="tu-estado flex justify-end text-xs"
+                    :style="{ '--tono': colorCargo(c) }"
                     >{{ estadoCargo(c) }}</span
                   >
                 </dd>
+                <div v-if="c.condonable" class="pl-condonar">
+                  <CondonarCargo
+                    :ocupado="condonando === c.id"
+                    @condonar="(m) => condonar(c, m, recargarFicha)"
+                  />
+                </div>
               </div>
             </dl>
           </section>
@@ -1702,7 +1882,11 @@ function borrar(): void {
                 }}</label>
                 <select id="mc" v-model="edit.modo_cobro" class="tu-input">
                   <option value="activos">
-                    {{ $t(`cobro.modalidad.${ficha.modalidad}`) }}
+                    {{
+                      ficha.modalidad === "citas"
+                        ? $t("plataforma.estudios.modo.plan")
+                        : $t("plataforma.estudios.modo.activos")
+                    }}
                   </option>
                   <option value="fijo">
                     {{ $t("plataforma.estudios.modo.fijo") }}
@@ -1797,16 +1981,33 @@ function borrar(): void {
                 {{ $t("plataformaAdmin.ficha.extender") }}
               </button>
             </div>
-            <button
+            <div
               v-if="ficha.estado === 'trialing' || ficha.estado === 'active'"
-              class="tu-btn tu-btn-fantasma text-sm"
-              style="color: var(--error)"
-              type="button"
-              :disabled="accionando"
-              @click="suspender"
+              class="flex flex-wrap items-end gap-2"
+              data-prueba="suspender-negocio"
             >
-              {{ $t("plataformaAdmin.ficha.suspender") }}
-            </button>
+              <div class="min-w-0 flex-1 basis-48">
+                <label class="tu-label" for="motivo-suspension">{{
+                  $t("plataformaAdmin.ficha.motivo")
+                }}</label>
+                <input
+                  id="motivo-suspension"
+                  v-model="motivoSuspension"
+                  class="tu-input"
+                  maxlength="255"
+                  autocomplete="off"
+                />
+              </div>
+              <button
+                class="tu-btn tu-btn-fantasma text-sm"
+                style="color: var(--error)"
+                type="button"
+                :disabled="accionando"
+                @click="suspender"
+              >
+                {{ $t("plataformaAdmin.ficha.suspender") }}
+              </button>
+            </div>
             <button
               v-if="ficha.estado === 'suspended'"
               class="tu-btn tu-btn-primario text-sm"
@@ -1831,18 +2032,6 @@ function borrar(): void {
 </template>
 
 <style scoped>
-.pf-verificado {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--texto-suave);
-}
-.pf-punto {
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 999px;
-  background: var(--exito);
-}
 .pl-fila {
   display: flex;
   flex-wrap: wrap;
@@ -1857,6 +2046,7 @@ function borrar(): void {
 }
 .pl-dato {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
@@ -1867,5 +2057,11 @@ function borrar(): void {
 }
 .pl-dato dd {
   text-align: right;
+}
+/* «Condonar» en su propia línea, a la derecha, bajo el cargo. */
+.pl-condonar {
+  display: flex;
+  flex-basis: 100%;
+  justify-content: flex-end;
 }
 </style>

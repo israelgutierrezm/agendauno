@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconoNav from "@/components/IconoNav.vue";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
@@ -75,7 +76,8 @@ function fecha(iso: string | null): string {
 <template>
   <section class="tu-pagina">
     <RouterLink :to="regreso.destino.value" class="tu-enlace text-sm"
-      >← {{ regreso.etiqueta.value }}</RouterLink
+      ><IconoNav nombre="atras" :tam="14" class="inline align-[-0.15em]" />
+      {{ regreso.etiqueta.value }}</RouterLink
     >
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">

@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { useToastStore } from "@/stores/toast";
 
 /**
  * Cobro automático de la suscripción (domiciliación, ADR 0107): la tarjeta se guarda
@@ -27,10 +28,9 @@ const emit = defineEmits<{ cambio: [] }>();
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
+const toast = useToastStore();
 
 const ocupado = ref(false);
-const aviso = ref<string | null>(null);
-const error = ref<string | null>(null);
 
 function marca(m: string | null): string {
   if (m === null || m === "") {
@@ -41,7 +41,6 @@ function marca(m: string | null): string {
 
 async function guardar(): Promise<void> {
   ocupado.value = true;
-  error.value = null;
   try {
     const { data } = await api.post<{ data: { url: string } }>(
       `${props.base}/renta/tarjeta`,
@@ -49,7 +48,7 @@ async function guardar(): Promise<void> {
     );
     window.location.href = data.data.url;
   } catch (e) {
-    error.value = mensajeDeError(e);
+    toast.error(mensajeDeError(e));
     ocupado.value = false;
   }
 }
@@ -64,13 +63,12 @@ async function quitar(): Promise<void> {
     return;
   }
   ocupado.value = true;
-  error.value = null;
   try {
     await api.delete(`${props.base}/renta/tarjeta`);
-    aviso.value = t("suscripcion.tarjeta.quitada");
+    toast.exito(t("suscripcion.tarjeta.quitada"));
     emit("cambio");
   } catch (e) {
-    error.value = mensajeDeError(e);
+    toast.error(mensajeDeError(e));
   } finally {
     ocupado.value = false;
   }
@@ -88,7 +86,7 @@ onMounted(async () => {
   delete resto.sesion;
   void router.replace({ query: resto });
   if (resultado === "cancelado") {
-    error.value = t("suscripcion.tarjeta.cancelado");
+    toast.error(t("suscripcion.tarjeta.cancelado"));
     return;
   }
   if (typeof sesion !== "string" || sesion === "") {
@@ -97,10 +95,10 @@ onMounted(async () => {
   ocupado.value = true;
   try {
     await api.post(`${props.base}/renta/tarjeta/confirmar`, { sesion });
-    aviso.value = t("suscripcion.tarjeta.guardada");
+    toast.exito(t("suscripcion.tarjeta.guardada"));
     emit("cambio");
   } catch (e) {
-    error.value = mensajeDeError(e);
+    toast.error(mensajeDeError(e));
   } finally {
     ocupado.value = false;
   }
@@ -130,8 +128,7 @@ onMounted(async () => {
     <div v-else class="mt-4 flex gap-2 flex-wrap">
       <button
         type="button"
-        class="tu-btn"
-        :class="tarjeta ? 'tu-btn-fantasma' : 'tu-btn-primario'"
+        class="tu-btn tu-btn-fantasma"
         :disabled="ocupado"
         data-prueba="guardar-tarjeta"
         @click="guardar"
@@ -155,12 +152,6 @@ onMounted(async () => {
         {{ $t("suscripcion.tarjeta.quitar") }}
       </button>
     </div>
-    <p v-if="aviso" class="mt-3 text-sm" style="color: var(--exito)">
-      {{ aviso }}
-    </p>
-    <p v-if="error" class="mt-3 text-sm" style="color: var(--error)">
-      {{ error }}
-    </p>
   </div>
 </template>
 

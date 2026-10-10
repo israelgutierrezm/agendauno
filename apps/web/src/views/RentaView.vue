@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 
 import AvisosAgendaUno from "@/components/AvisosAgendaUno.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import EstadoVacio from "@/components/EstadoVacio.vue";
 import PlanCitasRenta from "@/components/PlanCitasRenta.vue";
 import TarjetaRenta from "@/components/TarjetaRenta.vue";
 import TimbresRenta from "@/components/TimbresRenta.vue";
@@ -12,7 +13,10 @@ import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
 import { useRetornoPago } from "@/lib/retornoPago";
 import type { PlanCitas, TipoCambio } from "@/lib/suscripcion";
+import { maxAlumnos } from "@/marketing/precios";
+import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
+import { useToastStore } from "@/stores/toast";
 
 interface LineaDesglose {
   concepto: string;
@@ -112,6 +116,7 @@ interface RespuestaPago {
 
 const { t } = useI18n();
 const sesion = useSesionTenantStore();
+const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 const renta = ref<Renta | null>(null);
@@ -120,8 +125,6 @@ const error = ref<string | null>(null);
 
 const pagando = ref<string | null>(null);
 const facturando = ref<string | null>(null);
-const avisoPago = ref<string | null>(null);
-const errorPago = ref<string | null>(null);
 
 const quien = ref<QuienCuenta | null>(null);
 const cargandoQuien = ref(false);
@@ -133,12 +136,30 @@ function dinero(minor: number, moneda: string): string {
     currency: moneda,
   }).format(minor / 100);
 }
-function fecha(iso: string): string {
+function fecha(iso: string, estilo: "long" | "medium" = "long"): string {
   const [a, m, d] = iso.slice(0, 10).split("-").map(Number);
-  return new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(
+  return new Intl.DateTimeFormat("es-MX", { dateStyle: estilo }).format(
     new Date(a, m - 1, d),
   );
 }
+// «2026-10» → «octubre de 2026».
+function mes(periodo: string): string {
+  const [a, m] = periodo.split("-").map(Number);
+  if (!a || !m) {
+    return periodo;
+  }
+  return new Intl.DateTimeFormat("es-MX", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(a, m - 1, 1));
+}
+
+// Desde cuántos alumnos se cotiza: el último rango de la tarifa publicada.
+const precios = usePreciosPublicos();
+const topeAlumnos = computed(() => {
+  const tope = maxAlumnos(precios.datos.clases.bandas);
+  return tope === null ? null : new Intl.NumberFormat("es-MX").format(tope);
+});
 
 // Sin factura posible (otra moneda u otro país, o la plataforma aún no factura) no se
 // ofrece «Facturar»: de cada cargo pagado se descarga un recibo sin valor fiscal.
@@ -176,21 +197,25 @@ const monedaActual = computed(
 const porPlan = computed(
   () => renta.value?.cobro === "plan" && renta.value.plan != null,
 );
-const avisoPlan = ref<string | null>(null);
+const conTarjeta = computed(
+  () =>
+    renta.value?.domiciliacion_posible === true || renta.value?.tarjeta != null,
+);
+const conTimbres = computed(() => sesion.estudio?.factura_posible === true);
 function planCambiado(mensaje: string): void {
-  avisoPlan.value = mensaje;
+  toast.exito(mensaje);
   void cargar();
 }
 
-// Qué cubre un cargo: su periodo o, si lo dice, del día tal al tal.
+// Qué cubre un cargo: su mes o, si lo dice, del día tal al tal.
 function cubre(c: Cargo): string {
   if (c.cubre_desde && c.cubre_hasta) {
     return t("suscripcion.cobro.cubre", {
-      desde: fecha(c.cubre_desde),
-      hasta: fecha(c.cubre_hasta),
+      desde: fecha(c.cubre_desde, "medium"),
+      hasta: fecha(c.cubre_hasta, "medium"),
     });
   }
-  return c.periodo;
+  return mes(c.periodo);
 }
 // Un cobro automático que no pasó: cuándo se reintenta o que hay que pagarlo.
 function notaCobro(c: Cargo): string | null {
@@ -230,7 +255,7 @@ async function alternarQuien(): Promise<void> {
     );
     quien.value = data.data;
   } catch (e) {
-    error.value = mensajeDeError(e);
+    toast.error(mensajeDeError(e));
   } finally {
     cargandoQuien.value = false;
   }
@@ -248,8 +273,6 @@ async function pagar(cargo: Cargo): Promise<void> {
     return;
   }
   pagando.value = cargo.id;
-  avisoPago.value = null;
-  errorPago.value = null;
   try {
     const { data } = await api.post<{ data: RespuestaPago }>(
       `${base.value}/renta/cargos/${cargo.id}/pagar`,
@@ -266,13 +289,14 @@ async function pagar(cargo: Cargo): Promise<void> {
       return;
     }
     // Cobro en línea iniciado (queda pendiente hasta que la pasarela confirme por webhook).
-    avisoPago.value =
+    toast.exito(
       data.data.estado === "pagado"
         ? t("renta.pago.confirmado")
-        : t("renta.pago.iniciado");
+        : t("renta.pago.iniciado"),
+    );
     await cargar();
   } catch (e) {
-    errorPago.value = mensajeDeError(e);
+    toast.error(mensajeDeError(e));
   } finally {
     pagando.value = null;
   }
@@ -287,11 +311,9 @@ async function facturar(cargo: Cargo): Promise<void> {
     return;
   }
   facturando.value = cargo.id;
-  avisoPago.value = null;
-  errorPago.value = null;
   try {
     await api.post(`${base.value}/renta/cargos/${cargo.id}/factura`, {});
-    avisoPago.value = t("renta.factura.timbrada");
+    toast.exito(t("renta.factura.timbrada"));
     await cargar();
   } catch (e) {
     // El rechazo del timbre llega como 422 con la factura en error + motivo.
@@ -300,10 +322,10 @@ async function facturar(cargo: Cargo): Promise<void> {
       e.response?.status === 422 &&
       e.response.data?.data?.estado === "error"
     ) {
-      errorPago.value = e.response.data.data.motivo_error ?? mensajeDeError(e);
+      toast.error(e.response.data.data.motivo_error ?? mensajeDeError(e));
       await cargar();
     } else {
-      errorPago.value = mensajeDeError(e);
+      toast.error(mensajeDeError(e));
     }
   } finally {
     facturando.value = null;
@@ -311,7 +333,6 @@ async function facturar(cargo: Cargo): Promise<void> {
 }
 
 async function descargar(ruta: string, nombre: string): Promise<void> {
-  errorPago.value = null;
   try {
     const { data } = await api.get<Blob>(`${base.value}${ruta}`, {
       responseType: "blob",
@@ -325,7 +346,7 @@ async function descargar(ruta: string, nombre: string): Promise<void> {
     enlace.remove();
     URL.revokeObjectURL(url);
   } catch (e) {
-    errorPago.value = mensajeDeError(e);
+    toast.error(mensajeDeError(e));
   }
 }
 
@@ -355,10 +376,10 @@ const retornoPago = useRetornoPago();
 onMounted(() => {
   void cargar();
   if (retornoPago.value === "exito") {
-    avisoPago.value = t("pagoEnLinea.rentaExito");
+    toast.exito(t("pagoEnLinea.rentaExito"));
     window.setTimeout(() => void cargar(), 4000);
   } else if (retornoPago.value === "cancelado") {
-    errorPago.value = t("pagoEnLinea.cancelado");
+    toast.error(t("pagoEnLinea.cancelado"));
   }
 });
 </script>
@@ -380,10 +401,13 @@ onMounted(() => {
 
     <p v-if="error" class="mt-4 text-sm" style="color: var(--error)">
       {{ error }}
+      <button type="button" class="tu-enlace ml-2" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
     </p>
     <p
-      v-if="cargando"
-      class="mt-6 text-sm"
+      v-if="cargando && !renta"
+      class="tu-card mt-6 p-6 text-sm"
       :style="{ color: 'var(--texto-suave)' }"
     >
       {{ $t("comun.cargando") }}
@@ -399,9 +423,6 @@ onMounted(() => {
         :ventas="renta.ventas ?? { correo: null, whatsapp: null }"
         @cambiado="planCambiado"
       />
-      <p v-if="avisoPlan" class="mt-3 text-sm" style="color: var(--exito)">
-        {{ avisoPlan }}
-      </p>
 
       <div class="mt-6 grid gap-4 lg:grid-cols-5">
         <!-- Cómo te cobramos (por uso, mes vencido) -->
@@ -437,31 +458,33 @@ onMounted(() => {
             v-if="
               renta.modo_cobro !== 'fijo' &&
               !sesion.esCitas &&
+              topeAlumnos !== null &&
               renta.ventas?.correo
             "
             class="mt-2 text-xs"
             :style="{ color: 'var(--texto-suave)' }"
           >
-            {{ $t("suscripcion.clases.masDe") }}
+            {{ $t("suscripcion.clases.masDe", { n: topeAlumnos ?? "" }) }}
             <a class="tu-enlace" :href="`mailto:${renta.ventas.correo}`">{{
               renta.ventas.correo
             }}</a>
           </p>
-          <p
-            v-if="enPrueba && renta.trial_termina_en"
-            class="mt-3 text-sm rounded-lg px-3 py-2 font-semibold"
-            :style="{ background: 'var(--exito-suave)', color: 'var(--exito)' }"
-          >
-            {{
-              $t("cobro.modo.pruebaHasta", {
-                fecha: fecha(renta.trial_termina_en),
-              })
-            }}
+          <p v-if="enPrueba && renta.trial_termina_en" class="mt-3">
+            <span class="tu-badge tu-badge-exito" data-prueba="en-prueba">
+              {{
+                $t("cobro.modo.pruebaHasta", {
+                  fecha: fecha(renta.trial_termina_en),
+                })
+              }}
+            </span>
           </p>
         </div>
 
         <!-- Mes en curso (o, con plan, el siguiente cobro) con su desglose -->
-        <div class="tu-card p-5 lg:col-span-3">
+        <div
+          class="tu-card p-5"
+          :class="porPlan ? 'lg:col-span-5' : 'lg:col-span-3'"
+        >
           <h2 class="font-medium">
             <template
               v-if="
@@ -477,7 +500,7 @@ onMounted(() => {
               }}
             </template>
             <template v-else>
-              {{ $t("cobro.actual.titulo") }} · {{ renta.actual.periodo }}
+              {{ $t("cobro.actual.titulo") }} · {{ mes(renta.actual.periodo) }}
             </template>
           </h2>
           <div class="mt-2 flex items-end justify-between gap-4 flex-wrap">
@@ -588,6 +611,7 @@ onMounted(() => {
             type="button"
             class="tu-enlace text-sm mt-4"
             :disabled="cargandoQuien"
+            :aria-expanded="quien !== null"
             @click="alternarQuien"
           >
             {{ quien ? $t("cobro.quien.ocultar") : $t("cobro.quien.ver") }}
@@ -628,16 +652,22 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Cobro automático y timbres para facturar (ADR 0107) -->
-      <div class="mt-4 grid gap-4 md:grid-cols-2">
+      <!-- Cobro automático y timbres para facturar (ADR 0107). Sin cobro automático
+           posible (ni tarjeta guardada) no se ofrece: no se promete lo que no hay. -->
+      <div
+        v-if="conTarjeta || conTimbres"
+        class="mt-4 grid gap-4"
+        :class="{ 'md:grid-cols-2': conTarjeta && conTimbres }"
+      >
         <TarjetaRenta
+          v-if="conTarjeta"
           :base="base"
           :tarjeta="renta.tarjeta ?? null"
           :posible="renta.domiciliacion_posible ?? false"
           @cambio="cargar"
         />
         <TimbresRenta
-          v-if="sesion.estudio?.factura_posible"
+          v-if="conTimbres"
           :base="base"
           :pagado="retornoPago === 'exito'"
         />
@@ -645,13 +675,13 @@ onMounted(() => {
 
       <!-- Historial de cargos -->
       <h2 class="mt-8 font-medium text-lg">{{ $t("renta.historial") }}</h2>
-      <p
+      <EstadoVacio
         v-if="renta.cargos.length === 0"
-        class="mt-3 text-sm"
-        :style="{ color: 'var(--texto-suave)' }"
-      >
-        {{ $t("renta.sinCargos") }}
-      </p>
+        class="tu-card mt-3"
+        icono="facturas"
+        compacto
+        :titulo="$t('renta.sinCargos')"
+      />
       <div v-else class="mt-3 tu-card overflow-x-auto">
         <table class="tu-tabla">
           <thead>
@@ -665,7 +695,9 @@ onMounted(() => {
               <th class="text-right">
                 {{ $t("renta.colMonto") }}
               </th>
-              <th>{{ $t("renta.colEstado") }}</th>
+              <th class="hidden sm:table-cell">
+                {{ $t("renta.colEstado") }}
+              </th>
               <th class="hidden sm:table-cell">
                 {{ $t("renta.colVence") }}
               </th>
@@ -687,7 +719,8 @@ onMounted(() => {
                   <button
                     v-if="c.desglose && c.desglose.lineas.length > 0"
                     type="button"
-                    class="tu-enlace text-xs ml-2 font-normal"
+                    class="tu-enlace text-xs font-normal block sm:inline sm:ml-2"
+                    :aria-expanded="expandido === c.id"
                     @click="expandido = expandido === c.id ? null : c.id"
                   >
                     {{
@@ -706,8 +739,26 @@ onMounted(() => {
                 </td>
                 <td class="text-right font-semibold">
                   {{ dinero(c.monto_minor, c.moneda) }}
+                  <!-- En el teléfono, el estado va bajo el monto (sin su columna). -->
+                  <span class="sm:hidden block font-normal">
+                    <span
+                      class="tu-badge"
+                      :class="{
+                        'tu-badge-exito': c.estado === 'pagado',
+                        'tu-badge-aviso': c.estado === 'pendiente',
+                      }"
+                    >
+                      {{ $t(`cobro.estados.${c.estado}`) }}
+                    </span>
+                    <span
+                      v-if="notaCobro(c)"
+                      class="block text-xs mt-1 text-left"
+                      style="color: var(--aviso)"
+                      >{{ notaCobro(c) }}</span
+                    >
+                  </span>
                 </td>
-                <td>
+                <td class="hidden sm:table-cell">
                   <span
                     class="tu-badge"
                     :class="{
@@ -730,9 +781,11 @@ onMounted(() => {
                   :style="{ color: 'var(--texto-suave)' }"
                 >
                   {{
-                    c.estado === "sin_cargo" || c.estado === "cancelado"
+                    c.estado === "sin_cargo" ||
+                    c.estado === "cancelado" ||
+                    !c.vence_en
                       ? "—"
-                      : (c.vence_en ?? "—")
+                      : fecha(c.vence_en, "medium")
                   }}
                 </td>
                 <td class="text-right">
@@ -854,12 +907,6 @@ onMounted(() => {
           </tbody>
         </table>
       </div>
-      <p v-if="avisoPago" class="mt-3 text-sm" style="color: var(--exito)">
-        {{ avisoPago }}
-      </p>
-      <p v-if="errorPago" class="mt-3 text-sm" style="color: var(--error)">
-        {{ errorPago }}
-      </p>
       <p class="mt-3 text-xs" :style="{ color: 'var(--texto-suave)' }">
         {{ facturaPosible ? $t("renta.pagoNota") : $t("renta.recibo.nota") }}
       </p>

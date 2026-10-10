@@ -429,6 +429,19 @@ describe("landing de una modalidad (/clases y /citas)", () => {
       expect(vista.get('[data-cta="final"]').classes()).not.toContain(
         "tu-btn-azul",
       );
+      // A media página también azul: el rosa es solo del menú y el cierre.
+      for (const cta of ["product_demo", "public_page"]) {
+        expect(vista.get(`[data-cta="${cta}"]`).classes()).toContain(
+          "tu-btn-azul",
+        );
+      }
+      // Las tarjetas de precio ya invitan a probar: sin un bloque repetido abajo.
+      expect(vista.find(".tu-precio-prueba").exists()).toBe(false);
+      // Flechas de los enlaces en SVG, no como texto.
+      for (const enlace of [".tu-modalidad-otra", ".tu-link-flecha"]) {
+        expect(vista.get(enlace).text()).not.toMatch(/[›→↗]/);
+        expect(vista.find(`${enlace} svg`).exists()).toBe(true);
+      }
       vista.unmount();
     },
   );

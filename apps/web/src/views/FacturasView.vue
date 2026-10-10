@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 
 import AvisoRegion from "@/components/AvisoRegion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import TablaDatos from "@/components/TablaDatos.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
@@ -322,7 +323,7 @@ onMounted(cargar);
                 :aria-label="$t('facturas.nueva.quitar')"
                 @click="quitarConcepto(i)"
               >
-                ✕
+                <IconoNav nombre="cerrar" :tam="16" />
               </button>
             </div>
             <button

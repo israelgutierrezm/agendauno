@@ -58,7 +58,8 @@ Así no hay CORS entre subdominios.
    configuración del superadmin). Sin ella, en producción la facturación queda
    apagada: los negocios no emiten CFDI ni reciben la factura de su renta, y la
    pantalla lo dice. Nunca se simula un timbre fuera de desarrollo y pruebas.
-   `agendauno:verificar-produccion` lo marca como aviso. Cada factura que un negocio
+   `agendauno:verificar-produccion` lo marca como aviso (FALTA con apertura comercial,
+   porque los timbres no se venden sin FacturAPI). Cada factura que un negocio
    emite a sus clientes gasta un timbre que compra en paquetes en «Mi suscripción»
    (ADR 0107); el precio de cada timbre es el parámetro `timbres.precio_centavos`.
    **Tipo de cambio**: la renta se publica en dólares y a los negocios de México se
@@ -80,6 +81,17 @@ Así no hay CORS entre subdominios.
    `VITE_GOOGLE_CLIENT_ID` (`web.env`); sin él, la web no ofrece Google. Para la app
    móvil, los Client ID de Android e iOS van en `GOOGLE_CLIENT_IDS_APP`, separados por
    coma (ver `docs/GOOGLE_APP.md`).
+9. **Stripe de la plataforma** (cobro de la renta, ADR 0107): en el panel **live** de
+   Stripe crea las llaves (`sk_live_…`, `pk_live_…`) y un webhook a
+   `https://DOMINIO/api/v1/webhooks/plataforma/stripe` con los eventos
+   `checkout.session.completed` (pagos y tarjetas guardadas, modo `setup`),
+   `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`,
+   `checkout.session.expired`, `payment_intent.succeeded`,
+   `payment_intent.payment_failed` y `payment_intent.canceled` (cobros a la tarjeta
+   domiciliada). Captura las llaves **y el secreto del webhook** (`whsec_…`) en el
+   superadmin → Pasarelas. Al pasar de llaves de prueba a live, el superadmin pide el
+   secreto nuevo y borra las tarjetas guardadas en modo prueba (no existen en live):
+   los dueños las vuelven a guardar en «Mi suscripción».
 
 ## Primera instalación
 
@@ -111,7 +123,8 @@ cp web.env.example web.env
 4. Comprueba (los comandos de `artisan` con `exec` van con `-u www-data`, ver
    «Operación»):
    - `docker compose --env-file web.env exec -u www-data api php artisan agendauno:verificar-produccion`
-     termina en «Lista para producción» (dice qué falta si no);
+     termina en «Lista para abrir y cobrar» (o, con `APERTURA_COMERCIAL=false`, «Lista
+     como instalación sin cobro real de la renta»); si no, dice qué falta;
    - `docker compose --env-file web.env exec -u www-data api php artisan agendauno:verificar-concurrencia`
      termina en «Todo cuadró». Crea un negocio temporal con su base
      (`tenant_verificacion_*`), pone a competir procesos a la vez (el último lugar, el
@@ -125,10 +138,12 @@ cp web.env.example web.env
    - `docker compose --env-file web.env exec -u www-data api php artisan agendauno:probar-correo tu@correo.com` llega;
    - `docker compose --env-file web.env logs -f worker scheduler` no muestra errores.
 5. En el superadmin (`/splataformadm1n`, con `PLATFORM_ADMIN_TOKEN`): tarifas del SaaS,
-   parámetros de plataforma, la pasarela con la que cobras la renta y **los documentos
-   legales**: llena los datos del responsable y publica el aviso de privacidad y los
-   términos. En producción el registro de negocios está cerrado hasta que ambos estén
-   publicados; cada negocio acepta la versión vigente y queda constancia.
+   parámetros de plataforma, la pasarela con la que cobras la renta (llaves y secreto
+   del webhook, ver «Stripe de la plataforma»), los datos comerciales (token de
+   Banxico, correo y WhatsApp de ventas) y **los documentos legales**: llena los datos
+   del responsable y publica el aviso de privacidad y los términos. En producción el
+   registro de negocios está cerrado hasta que ambos estén publicados; cada negocio
+   acepta la versión vigente y queda constancia.
 
 ## Actualizar
 

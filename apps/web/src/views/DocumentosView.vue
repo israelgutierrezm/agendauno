@@ -6,6 +6,7 @@ import { useRoute, useRouter } from "vue-router";
 import BuscarPersona from "@/components/BuscarPersona.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
@@ -187,23 +188,44 @@ async function subir(): Promise<void> {
 async function validar(
   doc: Doc,
   estado: "aprobado" | "rechazado",
-): Promise<void> {
+  motivo: string | null = null,
+): Promise<boolean> {
   accionando.value = true;
   error.value = null;
   try {
-    let motivo: string | null = null;
-    if (estado === "rechazado") {
-      motivo = window.prompt(t("documentos.docs.motivo")) ?? "";
-    }
     await api.post(`${base.value}/documentos/${doc.id}/validar`, {
       estado,
       motivo,
     });
     await cargar();
+    return true;
   } catch (e) {
     error.value = mensajeDeError(e);
+    return false;
   } finally {
     accionando.value = false;
+  }
+}
+
+// Rechazar pide el motivo en un diálogo (lo ve quien subió el documento).
+const rechazando = ref<Doc | null>(null);
+const motivoRechazo = ref("");
+function pedirRechazo(doc: Doc): void {
+  motivoRechazo.value = "";
+  rechazando.value = doc;
+}
+async function rechazar(): Promise<void> {
+  const doc = rechazando.value;
+  if (doc === null) {
+    return;
+  }
+  const listo = await validar(
+    doc,
+    "rechazado",
+    motivoRechazo.value.trim() || null,
+  );
+  if (listo) {
+    rechazando.value = null;
   }
 }
 
@@ -503,7 +525,7 @@ onMounted(cargar);
                     class="tu-enlace text-sm ml-3"
                     style="color: var(--error)"
                     :disabled="accionando"
-                    @click="validar(d, 'rechazado')"
+                    @click="pedirRechazo(d)"
                   >
                     {{ $t("documentos.docs.rechazar") }}
                   </button>
@@ -889,6 +911,68 @@ onMounted(cargar);
         </div>
       </template>
     </PanelLateral>
+
+    <!-- Rechazar un documento: el motivo lo ve quien lo subió. -->
+    <ModalDialogo
+      :abierto="rechazando !== null"
+      :titulo="$t('documentos.docs.rechazarTitulo')"
+      tam="md"
+      @cerrar="rechazando = null"
+    >
+      <form
+        id="form-rechazo"
+        class="space-y-3"
+        data-prueba="rechazo"
+        @submit.prevent="rechazar"
+      >
+        <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
+          {{
+            $t("documentos.docs.rechazarAyuda", {
+              documento: rechazando?.tipo ?? rechazando?.nombre ?? "",
+              persona: rechazando?.persona ?? "—",
+            })
+          }}
+        </p>
+        <div>
+          <label class="tu-label" for="motivo-rechazo">{{
+            $t("documentos.docs.motivo")
+          }}</label>
+          <textarea
+            id="motivo-rechazo"
+            v-model="motivoRechazo"
+            class="tu-input"
+            rows="3"
+            maxlength="500"
+          />
+        </div>
+        <p
+          v-if="error"
+          class="text-sm"
+          role="alert"
+          style="color: var(--error)"
+        >
+          {{ error }}
+        </p>
+      </form>
+      <template #pie>
+        <button
+          type="button"
+          class="tu-btn tu-btn-fantasma"
+          @click="rechazando = null"
+        >
+          {{ $t("comun.cancelar") }}
+        </button>
+        <button
+          type="submit"
+          form="form-rechazo"
+          class="tu-btn tu-btn-primario"
+          :style="{ background: 'var(--error)', borderColor: 'var(--error)' }"
+          :disabled="accionando"
+        >
+          {{ $t("documentos.docs.rechazar") }}
+        </button>
+      </template>
+    </ModalDialogo>
   </section>
 </template>
 

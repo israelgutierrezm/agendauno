@@ -539,6 +539,15 @@ export const plataformaAdmin = {
     cargando: "Revisando la operación…",
     version: "Versión",
     entorno: "Entorno",
+    // APP_ENV en palabras; uno que no esté aquí se muestra con `entornoOtro`.
+    entornos: {
+      production: "Producción",
+      staging: "Pruebas",
+      testing: "Pruebas automáticas",
+      local: "Local",
+      development: "Desarrollo",
+    },
+    entornoOtro: "Otro ({entorno})",
     servicio: "Servicio",
     abierto: "Abierto",
     mantenimiento: "En mantenimiento",
@@ -578,6 +587,8 @@ export const plataformaAdmin = {
     colAviso: "Correo",
     avisada: "Enviado",
     porAvisar: "Por enviar",
+    // Un tipo de alerta sin nombre aún (su mensaje la describe).
+    tipoOtro: "Otra alerta",
     tipos: {
       error: "Error",
       cobro_fallido: "Cobro",
@@ -688,6 +699,15 @@ export const plataformaAdmin = {
     timbrada: "Timbrada",
     error: "Con error",
   },
+  pais: {
+    etiqueta: "País",
+    cambiar: "Cambiar país",
+    ayuda:
+      "Define la moneda, el IVA y la factura de su suscripción. Pasada la prueba, el dueño ya no lo cambia.",
+    confirmar:
+      "¿Cambiar el país de {estudio} a {pais}? Sus siguientes cobros de la suscripción se calculan con la moneda y el IVA de ese país.",
+    cambiado: "País actualizado.",
+  },
   cobros: {
     porCobrar: "Por cobrar",
     vencido: "Vencido",
@@ -701,6 +721,11 @@ export const plataformaAdmin = {
     periodo: "Periodo",
     vacio: "No hay cargos con estos filtros.",
     colEstado: "Estado",
+    condonar: "Condonar",
+    motivoCondonar: "Motivo (queda en la bitácora)",
+    confirmarCondonar:
+      "¿Condonar el cargo de {monto} de {estudio}? Queda cancelado y ya no se le cobra; si no debe otro vencido, se reactiva.",
+    condonado: "Cargo condonado.",
   },
   llaves: {
     secret_key: "Llave secreta",

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconoNav from "@/components/IconoNav.vue";
 import { computed, useId } from "vue";
 import { RouterLink } from "vue-router";
 import {
@@ -55,7 +56,12 @@ const columnas = computed(() =>
         <li v-for="solucion in columna.soluciones" :key="solucion.slug">
           <RouterLink :to="rutaSolucion(solucion.slug)">
             <span>{{ solucion.nombre }}</span
-            ><span aria-hidden="true">↗</span>
+            ><span aria-hidden="true"
+              ><IconoNav
+                nombre="flecha"
+                :tam="14"
+                class="inline align-[-0.15em]"
+            /></span>
           </RouterLink>
         </li>
       </ul>
@@ -74,7 +80,9 @@ const columnas = computed(() =>
       :to="rutaSolucion(solucion.slug)"
     >
       <span>{{ solucion.nombre }}</span
-      ><span aria-hidden="true">↗</span>
+      ><span aria-hidden="true"
+        ><IconoNav nombre="flecha" :tam="14" class="inline align-[-0.15em]"
+      /></span>
     </RouterLink>
   </nav>
 </template>

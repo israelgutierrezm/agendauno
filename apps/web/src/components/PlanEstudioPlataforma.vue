@@ -3,18 +3,22 @@ import axios from "axios";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
 import {
   type NivelPlan,
   type PlanCitas,
   NIVELES_PLAN,
   precioPlan,
 } from "@/lib/suscripcion";
+import { useToastStore } from "@/stores/toast";
 
 /**
  * El plan de un negocio de citas desde su ficha en el superadmin (ADR 0107): verlo y
  * cambiarlo con las mismas reglas que su dueño (subir cobra la diferencia de los días
  * que faltan; bajar o pasar a anual, desde el siguiente periodo). Como cortesía, se
- * puede subir sin cobrar esa diferencia.
+ * puede subir sin cobrar esa diferencia. Subir cobrando se confirma antes. El
+ * resultado va en un aviso flotante: la ficha se recarga al cambiar.
  */
 const props = defineProps<{
   apiUrl: string;
@@ -25,14 +29,13 @@ const props = defineProps<{
 const emit = defineEmits<{ cambiado: [] }>();
 
 const { t } = useI18n();
+const toast = useToastStore();
 
 const nivel = ref<NivelPlan>(props.plan.nivel);
 const profesionales = ref(props.plan.profesionales);
 const periodicidad = ref<"mensual" | "anual">(props.plan.periodicidad);
 const cobrarDiferencia = ref(true);
 const guardando = ref(false);
-const aviso = ref<string | null>(null);
-const error = ref<string | null>(null);
 
 watch(
   () => props.plan,
@@ -61,6 +64,36 @@ const precio = computed(() => {
     : mensual;
 });
 
+/** Hoy en el calendario local (AAAA-MM-DD). */
+function hoyIso(): string {
+  const d = new Date();
+  const dos = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+}
+
+/**
+ * ¿El cambio cobra hoy? La misma regla del servidor: con un periodo pagado que cubre
+ * hoy, un plan que cuesta más al mes aplica ya y se cobra la diferencia (salvo que se
+ * quite «Cobrar la diferencia»).
+ */
+const cobraHoy = computed(() => {
+  const hasta = props.plan.cubierto_hasta;
+  if (
+    !cobrarDiferencia.value ||
+    hasta === null ||
+    hasta.slice(0, 10) < hoyIso()
+  ) {
+    return false;
+  }
+  const actual = precioPlan(
+    props.plan,
+    props.plan.nivel,
+    props.plan.profesionales,
+  );
+  const nuevo = precioPlan(props.plan, nivel.value, profesionales.value);
+  return nuevo !== null && nuevo > (actual ?? 0);
+});
+
 function dinero(minor: number, moneda: string): string {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
@@ -76,9 +109,25 @@ function fecha(iso: string): string {
 }
 
 async function guardar(): Promise<void> {
+  if (
+    cobraHoy.value &&
+    !(await confirmar(
+      t("suscripcion.plataforma.confirmarCobro", {
+        plan: t(
+          "suscripcion.plan.resumen",
+          {
+            nivel: t(`suscripcion.niveles.${nivel.value}`),
+            n: profesionales.value,
+          },
+          profesionales.value,
+        ),
+      }),
+      { aceptar: t("suscripcion.plataforma.confirmarCobroAceptar") },
+    ))
+  ) {
+    return;
+  }
   guardando.value = true;
-  aviso.value = null;
-  error.value = null;
   try {
     const { data } = await axios.put<{
       data: {
@@ -101,22 +150,18 @@ async function guardar(): Promise<void> {
       },
     );
     const { aplica, ajuste } = data.data;
-    aviso.value =
+    toast.exito(
       aplica === "siguiente"
         ? t("suscripcion.plan.aplicaSiguiente")
         : ajuste === null
           ? t("suscripcion.plan.aplicaAhora")
           : t("suscripcion.plan.aplicaAhoraCobro", {
               monto: dinero(ajuste.monto_minor, ajuste.moneda),
-            });
+            }),
+    );
     emit("cambiado");
   } catch (e) {
-    const datos = axios.isAxiosError(e) ? e.response?.data : null;
-    const errores = datos?.meta?.errors as Record<string, string[]> | undefined;
-    error.value =
-      (errores ? Object.values(errores)[0]?.[0] : null) ??
-      datos?.message ??
-      t("plataforma.tokenInvalido");
+    toast.error(mensajeDeError(e));
   } finally {
     guardando.value = false;
   }
@@ -173,7 +218,7 @@ async function guardar(): Promise<void> {
         }}
       </li>
     </ul>
-    <div class="grid gap-3 grid-cols-3">
+    <div class="grid gap-3 grid-cols-1 sm:grid-cols-3">
       <label class="block">
         <span class="tu-label">{{
           $t("suscripcion.plataforma.tarifas.nivel")
@@ -239,11 +284,5 @@ async function guardar(): Promise<void> {
     >
       {{ $t("suscripcion.plan.cambiar") }}
     </button>
-    <p v-if="aviso" class="text-sm" style="color: var(--exito)">
-      {{ aviso }}
-    </p>
-    <p v-if="error" class="text-sm" style="color: var(--error)">
-      {{ error }}
-    </p>
   </form>
 </template>

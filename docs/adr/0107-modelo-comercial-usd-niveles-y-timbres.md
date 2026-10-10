@@ -143,6 +143,43 @@ Nada del modelo comercial vive fijo en el código:
   funciones, días de prueba, ventas y timbres); lo de `precios.ts` es solo el respaldo
   del HTML pre-generado y de mientras llega la respuesta.
 
+### Ajustes de la revisión de la v1 (2026-10-09)
+
+- **Cargo mínimo**: Stripe no cobra menos de MXN 10 o USD 0.50. Un periodo o una renta
+  cuyo total (con IVA) queda bajo `renta.cargo_minimo_mxn_centavos` o
+  `renta.cargo_minimo_usd_centavos` se emite `sin_cargo` (el periodo queda cubierto), y
+  una subida de plan con una diferencia menor aplica sin ajuste.
+- **Vencimiento**: `vence_en` cuenta desde que se emite el cargo (el mayor entre el
+  inicio del periodo, o el fin del mes vencido, y hoy), no desde el inicio del
+  periodo: un negocio reactivado o un cargo emitido tarde no nace vencido.
+- **Prueba extendida**: el siguiente periodo empieza después de lo pagado y después de
+  la prueba. El anual que empieza un 29 de febrero cubre un año completo.
+- **Domiciliación**: un cobro en `processing` que termina rechazado o cancelado
+  (conciliación o `payment_intent.payment_failed`/`canceled`) cuenta como rechazo y
+  programa el siguiente intento con otra llave de idempotencia. Al guardar una tarjeta
+  nueva, los cargos pendientes rechazados se reintentan con ella. Un aviso de pago que
+  no encuentra su cargo por referencia lo busca por `metadata.cargo_renta` (si el
+  importe coincide).
+- **Prueba → live en Stripe**: al cambiar el modo de la llave secreta, el superadmin
+  debe capturar el secreto del webhook del modo nuevo (`whsec_…`), y se borran los
+  clientes y tarjetas de Stripe del otro modo y los pagos en curso de los cargos.
+- **Condonar**: el superadmin condona un cargo pendiente
+  (`POST /plataforma/cargos/{cargo}/condonar`, con motivo en la bitácora): queda
+  cancelado y, si no debe otro vencido, el negocio se reactiva.
+- **Funciones por plan, también fuera de las pantallas**: la API de integración
+  (`plan:integraciones`), los webhooks salientes, las automatizaciones (`mensajes`),
+  los puntos de lealtad y el cobro automático de membresías revisan el plan del
+  negocio. Dar un rol de equipo o reactivar a alguien del equipo exige `equipo`;
+  invitar a un cliente, no.
+- **Cupo de profesionales**: invitar, reactivar, cambiar roles e importar suman
+  profesionales con la fila del negocio bloqueada (`CupoProfesionales`): dos altas a la
+  vez no rebasan lo contratado.
+- **País**: define la moneda, el IVA y el CFDI de la renta. El dueño lo cambia solo
+  durante la prueba y sin cargos; después, soporte (`PUT /plataforma/estudios/{e}/pais`).
+- **Timbres**: sin FacturAPI no se venden. `agendauno:verificar-produccion` revisa
+  también el tipo de cambio, el secreto `whsec_` del webhook, el SMTP y, con apertura
+  comercial, FacturAPI.
+
 ## Consecuencias
 
 - Los cargos de citas dejan de ser mes vencido por medición: son por adelantado por lo

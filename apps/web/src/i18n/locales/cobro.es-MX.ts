@@ -11,7 +11,7 @@ export default {
     ayudaClases:
       "Cuenta a quien reservó una clase o compró algo en el mes. Quien no vino ni pagó, no cuenta.",
     ayudaCitas:
-      "Cuenta a cada profesional que atendió al menos una cita o clase en el mes. Incluye 10 personas en clases o talleres por profesional.",
+      "Cuenta a cada profesional que atendió al menos una cita en el mes.",
     ayudaFijo: "Monto acordado con AgendaUno: {monto} al mes, IVA incluido.",
     pruebaHasta: "Prueba gratis hasta el {fecha}: esos días no se cobran.",
     mesVencido: "Se cobra al cerrar el mes, con lo que realmente usaste.",
@@ -74,6 +74,8 @@ export default {
     publicar: "Publicar versión nueva",
     publicando: "Publicando…",
     publicada: "Se publicó la versión {n}.",
+    confirmarPublicar:
+      "¿Publicar una versión nueva de la tarifa de {modalidad}? No se puede editar ni deshacer: los cobros siguientes y la landing usarán estos precios.",
   },
   modalidad: {
     clases: "Clases",

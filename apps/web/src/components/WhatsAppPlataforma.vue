@@ -69,8 +69,11 @@ const error = ref<string | null>(null);
 
 const conexion = computed<{ texto: string; tono: string }>(() =>
   config.value?.conectado
-    ? { texto: t("plataformaAdmin.whatsapp.conectado"), tono: "wa-exito" }
-    : { texto: t("plataformaAdmin.whatsapp.sinConectar"), tono: "wa-gris" },
+    ? { texto: t("plataformaAdmin.whatsapp.conectado"), tono: "var(--exito)" }
+    : {
+        texto: t("plataformaAdmin.whatsapp.sinConectar"),
+        tono: "var(--texto-suave)",
+      },
 );
 
 function aplicar(c: Config): void {
@@ -151,10 +154,10 @@ onMounted(cargar);
       </div>
       <span
         v-if="config"
-        class="wa-estado text-sm shrink-0"
+        class="tu-estado text-sm shrink-0"
+        :style="{ '--tono': conexion.tono }"
         data-prueba="estado"
       >
-        <span class="wa-punto" :class="conexion.tono"></span>
         {{ conexion.texto }}
       </span>
     </div>
@@ -273,11 +276,15 @@ onMounted(cargar);
               {{ $t(`plataformaAdmin.whatsapp.${uso}Ayuda`) }}
             </p>
           </div>
-          <span class="wa-estado text-sm shrink-0">
-            <span
-              class="wa-punto"
-              :class="config[uso] && config.conectado ? 'wa-exito' : 'wa-gris'"
-            ></span>
+          <span
+            class="tu-estado text-sm shrink-0"
+            :style="{
+              '--tono':
+                config[uso] && config.conectado
+                  ? 'var(--exito)'
+                  : 'var(--texto-suave)',
+            }"
+          >
             {{
               config[uso] && config.conectado
                 ? $t("plataformaAdmin.whatsapp.encendido")
@@ -390,23 +397,6 @@ onMounted(cargar);
 </template>
 
 <style scoped>
-.wa-estado {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-.wa-punto {
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-.wa-gris {
-  background: var(--texto-suave);
-}
-.wa-exito {
-  background: var(--exito);
-}
 .wa-uso {
   padding-top: 1rem;
   border-top: 1px solid var(--borde);

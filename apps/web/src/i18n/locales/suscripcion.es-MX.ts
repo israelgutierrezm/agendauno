@@ -12,7 +12,10 @@ export default {
   periodicidad: {
     mensual: "Mensual",
     anual: "Anual",
-    anualAyuda: "Pagas 10 meses y te damos 2 de cortesía.",
+    // `meses_anual` lo fija el superadmin en la tarifa: {cortesia} = 12 − {meses}.
+    anualAyuda: "Pagas {meses} meses y te damos {cortesia} de cortesía.",
+    // Si el anual cuesta 12 meses (o más), no hay cortesía que anunciar.
+    anualSinCortesia: "El pago anual cubre 12 meses y cuesta {meses}.",
   },
   plan: {
     titulo: "Tu plan",
@@ -49,6 +52,12 @@ export default {
     aplicaAhoraPagado:
       "Listo, tu plan cambió. Cobramos {monto} a tu tarjeta por los días que faltan.",
     aplicaSiguiente: "Listo. El cambio aplica desde tu siguiente periodo.",
+    confirmarAhora: "¿Cambiar tu plan a {plan}?",
+    confirmarSubir:
+      "Tu plan pasa hoy a {plan}. Se cobra la diferencia de los días que faltan del periodo pagado (a tu tarjeta guardada, si tienes una).",
+    confirmarSiguiente: "Tu plan pasa a {plan} desde tu siguiente periodo.",
+    individualUno: "Individual es para un profesional y tienes {n}.",
+    formaPago: "Forma de pago",
     subir:
       "Subir se cobra al momento por los días que faltan; bajar aplica desde el siguiente periodo.",
   },
@@ -56,7 +65,8 @@ export default {
     titulo: "Por alumnos activos",
     ayuda:
       "Cuenta a quien reservó una clase o compró algo en el mes. Se cobra al cerrar el mes.",
-    masDe: "¿Más de 1,000 alumnos? Pide una cotización:",
+    // {n}: el tope de la última banda publicada, ya con separador de miles.
+    masDe: "¿Más de {n} alumnos? Pide una cotización:",
   },
   cobro: {
     concepto: {
@@ -95,6 +105,7 @@ export default {
       "Cada factura que emites a tus clientes usa un timbre. Cómpralos en paquetes; no caducan.",
     disponibles: "{n} timbre disponible | {n} timbres disponibles",
     paquete: "{n} timbres",
+    paqueteEtiqueta: "Paquete de timbres",
     precio: "{monto} + IVA",
     comprar: "Comprar",
     comprando: "Abriendo…",
@@ -144,6 +155,9 @@ export default {
     cobrarDiferencia: "Cobrar la diferencia de los días que faltan",
     cobrarDiferenciaAyuda:
       "Si lo quitas, sube hoy sin cobrar esos días (cortesía). Bajar o pasar a anual siempre aplica desde el siguiente periodo.",
+    confirmarCobro:
+      "¿Subir el plan de este negocio a {plan}? Hoy se cobra la diferencia de los días que faltan a la tarjeta guardada del negocio (si no tiene, queda como cargo por pagar).",
+    confirmarCobroAceptar: "Subir y cobrar",
     otraMoneda:
       "En {moneda}: por cobrar {porCobrar}, vencido {vencido}, cobrado este mes {cobrado}.",
     comercial: {
@@ -157,6 +171,9 @@ export default {
       banxicoAyuda:
         "Sin token, el tipo de cambio se captura a mano en Tarifas. Se pide gratis en banxico.org.mx.",
       quitar: "Quitar",
+      confirmarQuitar:
+        "¿Quitar el token del Banco de México? El tipo de cambio tendrá que capturarse a mano en Tarifas.",
+      banxicoQuitado: "Token del Banco de México quitado.",
       paquetes: "Paquetes de timbres",
       paquetesAyuda:
         "Cuántos timbres trae cada paquete, separados por comas. El precio por timbre está en Parámetros.",

@@ -24,6 +24,9 @@ interface Region {
   zona_horaria: string;
   monedas: { codigo: string; nombre: string }[];
   puede_cambiar_moneda: boolean;
+  /** El país define cómo se le cobra la suscripción: pasada la prueba, solo soporte. */
+  puede_cambiar_pais?: boolean;
+  motivo_pais?: string | null;
   pasarelas: { disponibles: boolean; motivo: string | null };
   facturacion: { disponible: boolean; motivo: string | null };
 }
@@ -152,9 +155,18 @@ onMounted(cargar);
           id="rg-pais"
           v-model="pais"
           :opciones="paises"
+          :deshabilitado="region.puede_cambiar_pais === false"
           data-prueba="pais-negocio"
         />
-        <p class="tu-hint mt-1">{{ $t("region.pais.ayuda") }}</p>
+        <p
+          v-if="region.puede_cambiar_pais === false"
+          class="tu-hint mt-1"
+          :style="{ color: 'var(--aviso)' }"
+          data-prueba="pais-bloqueado"
+        >
+          {{ region.motivo_pais ?? $t("region.pais.bloqueado") }}
+        </p>
+        <p v-else class="tu-hint mt-1">{{ $t("region.pais.ayuda") }}</p>
         <p
           v-if="pais !== 'MX'"
           class="tu-hint mt-2"

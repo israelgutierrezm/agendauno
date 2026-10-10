@@ -1,4 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
+import { createPinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "@/i18n";
@@ -77,7 +78,10 @@ async function montar(facturaRentaPosible: boolean) {
     data: { data: renta(facturaRentaPosible) },
   });
   const w = mount(RentaView, {
-    global: { plugins: [i18n], stubs: { AvisosAgendaUno: true } },
+    global: {
+      plugins: [i18n, createPinia()],
+      stubs: { AvisosAgendaUno: true },
+    },
   });
   await flushPromises();
   return w;

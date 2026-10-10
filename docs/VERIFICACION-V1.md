@@ -241,12 +241,34 @@ Sin plantilla por defecto (el negocio la crea si la quiere): «pago reembolsado�
 
 ### 10. Renta del SaaS (la plataforma cobra al negocio)
 
-- [ ] En `/splataformadm1n` (superadmin) activa Stripe con llaves de prueba y registra en Stripe el
-  webhook `APP_URL/api/v1/webhooks/plataforma/stripe` (la pantalla aún no lo
-  muestra). Hoy solo Stripe cobra la renta.
-- [ ] Con un negocio fuera de prueba y un mes cerrado,
+- [ ] En `/splataformadm1n` (superadmin) activa Stripe con llaves de prueba, captura el
+  secreto del webhook y registra en Stripe el webhook
+  `APP_URL/api/v1/webhooks/plataforma/stripe` con `checkout.session.completed`,
+  `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`,
+  `checkout.session.expired`, `payment_intent.succeeded`,
+  `payment_intent.payment_failed` y `payment_intent.canceled` (la pantalla de Pasarelas
+  muestra la URL). Hoy solo Stripe cobra la renta (Mercado Pago y OpenPay, pendientes).
+- [ ] Tipo de cambio: con el token de Banxico (Configuración → Datos comerciales) o un
+  tipo capturado en Tarifas, el siguiente cobro de un negocio de México sale en pesos
+  y su desglose dice «1 USD = … MXN».
+- [ ] **Clases (mes vencido)**: con un negocio fuera de prueba y un mes cerrado,
   `php artisan agendauno:generar-cargos-renta --periodo=AAAA-MM` crea su cargo. El
-  dueño lo paga en «Suscripción» (`/renta`) y el cargo pasa a `pagado`.
+  dueño lo paga en «Mi suscripción» (`/renta`) y el cargo pasa a `pagado`.
+- [ ] **Citas (por adelantado)**: al terminar la prueba, `agendauno:generar-cargos-renta`
+  emite el periodo del plan elegido (o el que quedó por omisión). Subir de plan cobra la
+  diferencia de los días que faltan (cargo «Cambio de plan»); bajar aplica desde el
+  siguiente periodo. Un negocio con más profesionales que los contratados no puede
+  invitar a otro.
+- [ ] **Cobro automático**: el dueño guarda una tarjeta de prueba de Stripe en «Mi
+  suscripción» (vuelve con «Tarjeta guardada»); `php artisan
+  agendauno:cobrar-renta-domiciliada` cobra sus cargos pendientes. Con la tarjeta
+  `4000 0000 0000 0341` el cobro se rechaza y se reintenta a los días de
+  `renta.reintento_1_dias` y `renta.reintento_2_dias`; con `4000 0027 6000 3184`
+  (pide autenticación) ya no se reintenta y el dueño paga a mano.
+- [ ] **Timbres**: con FacturAPI configurada, el dueño compra un paquete en «Mi
+  suscripción»; al pagarlo se suman sus timbres y cada factura a un cliente gasta uno.
+- [ ] **Aviso perdido**: borra el aviso en Stripe (o apaga el webhook), paga un cargo y
+  corre `php artisan agendauno:conciliar-renta`: el cargo queda pagado una sola vez.
 
 ### 11. Monitoreo de errores (ADR 0080)
 

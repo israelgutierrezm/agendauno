@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconoNav from "@/components/IconoNav.vue";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
@@ -420,8 +421,12 @@ function medirRegistro(): void {
             <p>{{ f.detalle }}</p>
             <RouterLink :to="registro" @click="medirRegistro"
               >Probar en mi negocio
-              <span aria-hidden="true">↗</span></RouterLink
-            >
+              <span aria-hidden="true"
+                ><IconoNav
+                  nombre="flecha"
+                  :tam="14"
+                  class="inline align-[-0.15em]" /></span
+            ></RouterLink>
           </div>
         </Transition>
       </article>

@@ -120,20 +120,31 @@ function hora(iso: string): string {
     new Date(iso),
   );
 }
+// Una alerta de un tipo nuevo, sin nombre todavía: genérica (su mensaje la explica).
 function tipoAlerta(tipo: string): string {
   const llave = `plataformaAdmin.operacion.tipos.${tipo}`;
-  return te(llave) ? t(llave) : tipo.replaceAll("_", " ");
+  return te(llave) ? t(llave) : t("plataformaAdmin.operacion.tipoOtro");
+}
+// APP_ENV en palabras (production → Producción); uno desconocido, tal cual.
+function entorno(valor: string): string {
+  const llave = `plataformaAdmin.operacion.entornos.${valor}`;
+  return te(llave)
+    ? t(llave)
+    : t("plataformaAdmin.operacion.entornoOtro", { entorno: valor });
 }
 // El nombre del archivo de un respaldo, sin la carpeta.
 function nombreRespaldo(ruta: string): string {
   return ruta.split("/").pop() ?? ruta;
 }
 // Punto de color solo para lo que pide atención; lo que está bien, en gris.
-function tonoProceso(e: EstadoProceso): string {
-  return e === "ok" ? "op-gris" : e === "atrasado" ? "op-aviso" : "op-error";
+const GRIS = { "--tono": "var(--texto-suave)" };
+const AVISO = { "--tono": "var(--aviso)" };
+const ERROR = { "--tono": "var(--error)" };
+function tonoProceso(e: EstadoProceso): Record<string, string> {
+  return e === "ok" ? GRIS : e === "atrasado" ? AVISO : ERROR;
 }
-function tonoPunto(e: Punto["estado"]): string {
-  return e === "ok" ? "op-gris" : e === "aviso" ? "op-aviso" : "op-error";
+function tonoPunto(e: Punto["estado"]): Record<string, string> {
+  return e === "ok" ? GRIS : e === "aviso" ? AVISO : ERROR;
 }
 
 onMounted(cargar);
@@ -190,17 +201,15 @@ onMounted(cargar);
           <p class="op-etiqueta">
             {{ $t("plataformaAdmin.operacion.entorno") }}
           </p>
-          <p class="mt-1 text-xl font-semibold">{{ datos.entorno }}</p>
+          <p class="mt-1 text-xl font-semibold" data-prueba="entorno">
+            {{ entorno(datos.entorno) }}
+          </p>
         </div>
         <div>
           <p class="op-etiqueta">
             {{ $t("plataformaAdmin.operacion.servicio") }}
           </p>
-          <p class="mt-1 op-estado">
-            <span
-              class="op-punto"
-              :class="datos.mantenimiento ? 'op-aviso' : 'op-gris'"
-            ></span>
+          <p class="mt-1 tu-estado" :style="datos.mantenimiento ? AVISO : GRIS">
             {{
               datos.mantenimiento
                 ? $t("plataformaAdmin.operacion.mantenimiento")
@@ -216,11 +225,10 @@ onMounted(cargar);
           <p class="op-etiqueta">
             {{ $t(`plataformaAdmin.operacion.${nombre}`) }}
           </p>
-          <p class="mt-1 op-estado">
-            <span
-              class="op-punto"
-              :class="tonoProceso(datos.procesos[nombre].estado)"
-            ></span>
+          <p
+            class="mt-1 tu-estado"
+            :style="tonoProceso(datos.procesos[nombre].estado)"
+          >
             {{
               $t(
                 `plataformaAdmin.operacion.procesos.${datos.procesos[nombre].estado}`,
@@ -240,7 +248,7 @@ onMounted(cargar);
       <!-- Verificación de producción -->
       <div class="tu-card p-5">
         <div class="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 class="font-semibold">
+          <h2 class="font-medium text-lg">
             {{ $t("plataformaAdmin.operacion.verificacion") }}
           </h2>
           <p class="text-sm" data-prueba="resumen-verificacion">
@@ -264,11 +272,10 @@ onMounted(cargar);
           class="mt-4 border-t pt-3"
           :style="{ borderColor: 'var(--borde)' }"
         >
-          <h3 class="text-sm font-semibold">{{ s.nombre }}</h3>
+          <h3 class="text-sm font-medium">{{ s.nombre }}</h3>
           <ul class="mt-2 space-y-1.5">
             <li v-for="p in s.puntos" :key="p.punto" class="text-sm">
-              <span class="op-estado">
-                <span class="op-punto" :class="tonoPunto(p.estado)"></span>
+              <span class="tu-estado" :style="tonoPunto(p.estado)">
                 {{ p.punto }}
               </span>
               <p
@@ -285,7 +292,7 @@ onMounted(cargar);
 
       <!-- Respaldos y simulacro -->
       <div class="tu-card p-5">
-        <h2 class="font-semibold">
+        <h2 class="font-medium text-lg">
           {{ $t("plataformaAdmin.operacion.respaldos") }}
         </h2>
         <dl class="mt-3 grid gap-3 sm:grid-cols-2 text-sm">
@@ -320,7 +327,7 @@ onMounted(cargar);
           :style="{ borderColor: 'var(--borde)' }"
           data-prueba="simulacro"
         >
-          <h3 class="text-sm font-semibold">
+          <h3 class="text-sm font-medium">
             {{ $t("plataformaAdmin.operacion.simulacro") }}
           </h3>
           <p
@@ -331,11 +338,10 @@ onMounted(cargar);
             {{ $t("plataformaAdmin.operacion.sinSimulacro") }}
           </p>
           <template v-else>
-            <p class="mt-1 text-sm op-estado">
-              <span
-                class="op-punto"
-                :class="datos.respaldos.simulacro.ok ? 'op-gris' : 'op-error'"
-              ></span>
+            <p
+              class="mt-1 text-sm tu-estado"
+              :style="datos.respaldos.simulacro.ok ? GRIS : ERROR"
+            >
               {{
                 datos.respaldos.simulacro.ok
                   ? $t("plataformaAdmin.operacion.simulacroOk")
@@ -350,11 +356,7 @@ onMounted(cargar);
                 :key="p.respaldo"
                 class="text-sm"
               >
-                <span class="op-estado">
-                  <span
-                    class="op-punto"
-                    :class="p.ok ? 'op-gris' : 'op-error'"
-                  ></span>
+                <span class="tu-estado" :style="p.ok ? GRIS : ERROR">
                   {{ nombreRespaldo(p.respaldo) }}
                 </span>
                 <p
@@ -381,7 +383,7 @@ onMounted(cargar);
 
       <!-- Alertas -->
       <div class="tu-card p-5">
-        <h2 class="font-semibold">
+        <h2 class="font-medium text-lg">
           {{ $t("plataformaAdmin.operacion.alertas") }}
         </h2>
         <p
@@ -426,8 +428,7 @@ onMounted(cargar);
                   {{ fechaHora(a.ultima_en) }}
                 </td>
                 <td class="whitespace-nowrap">
-                  <span v-if="!a.avisada" class="op-estado">
-                    <span class="op-punto op-aviso"></span>
+                  <span v-if="!a.avisada" class="tu-estado" :style="AVISO">
                     {{ $t("plataformaAdmin.operacion.porAvisar") }}
                   </span>
                   <span v-else :style="{ color: 'var(--texto-suave)' }">
@@ -447,25 +448,5 @@ onMounted(cargar);
 .op-etiqueta {
   font-size: 0.75rem;
   color: var(--texto-suave);
-}
-.op-estado {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-.op-punto {
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-.op-gris {
-  background: var(--texto-suave);
-}
-.op-aviso {
-  background: var(--aviso);
-}
-.op-error {
-  background: var(--error);
 }
 </style>

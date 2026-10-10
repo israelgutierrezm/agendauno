@@ -621,6 +621,21 @@
     border-radius: 999px;
     background: var(--tono, var(--texto-suave));
   }
+  /* Estado: punto de color + texto, sin caja ni fondo. El color va en --tono
+     (`:style="{ '--tono': 'var(--exito)' }"`); sin él, gris. */
+  .tu-estado {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .tu-estado::before {
+    content: "";
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+    background: var(--tono, var(--texto-suave));
+  }
   /* Listados (patrón de Inventario, Planes, Cobros…): tabla sobria con encabezados
      suaves y filas separadas por una línea; barra de filtros arriba, dentro de la
      misma tarjeta; buscador con su lupa. */

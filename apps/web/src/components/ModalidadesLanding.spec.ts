@@ -68,9 +68,11 @@ describe("rutas comerciales por forma de trabajo", () => {
       "/citas",
     ]);
     expect(enlaces.map((n) => n.text())).toEqual([
-      "Conocer AgendaUno para clases →",
-      "Conocer AgendaUno para citas →",
+      "Conocer AgendaUno para clases",
+      "Conocer AgendaUno para citas",
     ]);
+    // La flecha es un ícono, no un carácter.
+    enlaces.forEach((n) => expect(n.find("svg").exists()).toBe(true));
     await enlaces[1]!.trigger("click");
     await enlaces[0]!.trigger("click");
     expect(vista.emitted("elegir")).toEqual([["citas"], ["clases"]]);

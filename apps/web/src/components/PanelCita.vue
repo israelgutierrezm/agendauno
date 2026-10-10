@@ -501,8 +501,12 @@ watch(
               v-if="verFicha"
               :to="{ name: 'ficha-miembro', params: { id: cita?.cliente_id } }"
               class="pc-enlace"
-              >{{ $t("detalleCita.verPerfil") }} →</RouterLink
-            >
+              >{{ $t("detalleCita.verPerfil") }}
+              <IconoNav
+                nombre="flecha"
+                :tam="14"
+                class="inline align-[-0.15em]"
+            /></RouterLink>
           </div>
         </div>
         <div class="pc-cuando">

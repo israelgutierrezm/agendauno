@@ -44,10 +44,14 @@ describe("precios públicos (ADR 0107)", () => {
     );
     expect(vista.get(".precio-importe strong").text()).toBe("$21");
     expect(vista.get(".precio-importe").text()).toContain("USD / mes");
-    expect(vista.get(".precio-impuestos").text()).toBe("+ impuestos");
+    expect(vista.get(".precio-impuestos").text()).toBe("Más impuestos");
+    expect(vista.text()).toContain(
+      "Precios en dólares estadounidenses, más impuestos.",
+    );
     expect(vista.text()).toContain(
       "En México se cobran en pesos al tipo de cambio del día del cobro, más IVA.",
     );
+    expect(vista.text()).not.toContain("+ impuestos");
     expect(vista.get("article").text()).toContain("Probar 30 días gratis");
     expect(vista.get("article").text()).toContain("Sin tarjeta");
     expect(vista.findAll("tbody tr")).toHaveLength(9);
@@ -186,6 +190,35 @@ describe("precios públicos (ADR 0107)", () => {
     expect(anual.text()).toContain("1 mes de cortesía");
     await anual.trigger("click");
     expect(vista.get(".precio-importe strong").text()).toBe("$132");
+    // Los días de prueba publicados, no unos fijos.
+    expect(vista.get(".precio-cta").text()).toContain("Probar 15 días gratis");
+    vista.unmount();
+  });
+  it("la moneda de la tarifa publicada manda: en pesos no habla de dólares", async () => {
+    const vista = montarFijo("clases");
+    aplicarPreciosPublicos({
+      clases: {
+        ...PRECIOS_POR_OMISION.clases,
+        moneda: "MXN",
+        dias_prueba: 21,
+      },
+    });
+    await flushPromises();
+
+    expect(vista.text()).toContain(
+      "Precios en pesos mexicanos, más impuestos.",
+    );
+    expect(vista.text()).not.toContain("dólares");
+    expect(vista.text()).not.toContain("tipo de cambio");
+    expect(vista.get(".precio-importe").text()).toContain("MXN / mes");
+    expect(vista.get(".precio-cta").text()).toContain("Probar 21 días gratis");
+    vista.unmount();
+  });
+  it("el botón de cotizar va en azul, como las tarjetas (el rosa es del menú y el cierre)", () => {
+    const vista = montar();
+    expect(vista.get(".precios-contacto a[href^='mailto:']").classes()).toEqual(
+      expect.arrayContaining(["tu-btn-primario", "tu-btn-azul"]),
+    );
     vista.unmount();
   });
   it("nombra las modalidades igual que la portada y el registro, con la nota de México", () => {

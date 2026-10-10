@@ -1,5 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { i18n } from "@/i18n";
 import type { PlanCitas } from "@/lib/suscripcion";
@@ -12,7 +12,15 @@ import PlanCitasRenta from "./PlanCitasRenta.vue";
 */
 
 const api = vi.hoisted(() => ({ put: vi.fn() }));
+const confirmar = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", () => ({ api, mensajeDeError: () => "Error" }));
+vi.mock("@/lib/confirmar", () => ({ confirmar }));
+
+beforeEach(() => {
+  api.put.mockReset();
+  confirmar.mockReset();
+  confirmar.mockResolvedValue(true);
+});
 
 function plan(cambios: Partial<PlanCitas> = {}): PlanCitas {
   return {
@@ -101,12 +109,34 @@ describe("PlanCitasRenta", () => {
     await w.get("[data-prueba='nivel-pro'] button").trigger("click");
     await flushPromises();
 
+    // Antes de cobrar, se dice qué pasará: subir aplica hoy y cobra la diferencia.
+    expect(confirmar.mock.calls[0]?.[0]).toContain("Pro · 3 profesionales");
+    expect(confirmar.mock.calls[0]?.[0]).toContain("Se cobra la diferencia");
     expect(api.put).toHaveBeenCalledWith("/api/v1/app/demo/renta/plan", {
       nivel: "pro",
       profesionales: 3,
       periodicidad: "mensual",
     });
     expect(w.emitted("cambiado")?.[0]?.[0]).toContain("$298.58");
+  });
+
+  it("si no se confirma, no cambia el plan", async () => {
+    confirmar.mockResolvedValueOnce(false);
+    const w = montar();
+    await w.get("[data-prueba='cambiar-plan']").trigger("click");
+    await w.get("[data-prueba='nivel-pro'] button").trigger("click");
+    await flushPromises();
+
+    expect(api.put).not.toHaveBeenCalled();
+    expect(w.emitted("cambiado")).toBeUndefined();
+  });
+
+  it("dice por qué no se puede elegir Individual con más de un profesional", async () => {
+    const w = montar();
+    await w.get("[data-prueba='cambiar-plan']").trigger("click");
+    expect(w.get("[data-prueba='nivel-individual']").text()).toContain(
+      "Individual es para un profesional y tienes 2.",
+    );
   });
 
   it("no deja contratar menos profesionales de los que ya tiene", async () => {

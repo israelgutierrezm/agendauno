@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconoNav from "@/components/IconoNav.vue";
 import { onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 
@@ -38,7 +39,10 @@ onMounted(cargar);
 
 <template>
   <article class="terminos-pagina" aria-labelledby="terminos-titulo">
-    <RouterLink to="/" class="tu-enlace text-sm">← AgendaUno</RouterLink>
+    <RouterLink to="/" class="tu-enlace text-sm"
+      ><IconoNav nombre="atras" :tam="14" class="inline align-[-0.15em]" />
+      AgendaUno</RouterLink
+    >
     <header>
       <p class="terminos-etiqueta">Información legal</p>
       <h1 id="terminos-titulo">Términos y condiciones</h1>

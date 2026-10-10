@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import CargadorLogo from "@/components/CargadorLogo.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import GiroNegocio from "@/components/GiroNegocio.vue";
+import IconoNav from "@/components/IconoNav.vue";
 import PerfilPublicoNegocio from "@/components/PerfilPublicoNegocio.vue";
 import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
 import { api, mensajeDeError } from "@/lib/api";
@@ -243,7 +244,11 @@ onMounted(cargar);
               type="button"
               @click="copiar"
             >
-              {{ copiado ? "✓" : $t("configuracion.copiar") }}
+              <template v-if="copiado">
+                <IconoNav nombre="hecho" :tam="16" />
+                {{ $t("configuracion.copiado") }}
+              </template>
+              <template v-else>{{ $t("configuracion.copiar") }}</template>
             </button>
           </div>
         </div>

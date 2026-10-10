@@ -491,6 +491,7 @@ onMounted(() => {
           class="tu-enlace text-sm"
         >
           {{ $t("operacion.hoy.irRecepcion") }}
+          <IconoNav nombre="flecha" :tam="14" class="inline align-[-0.15em]" />
         </RouterLink>
       </div>
     </TarjetaPrincipal>
@@ -520,6 +521,11 @@ onMounted(() => {
             class="tu-enlace text-sm"
           >
             {{ $t("operacion.hoy.verAgenda") }}
+            <IconoNav
+              nombre="flecha"
+              :tam="14"
+              class="inline align-[-0.15em]"
+            />
           </RouterLink>
         </div>
         <div v-if="hoy.agenda.sesiones.length > 0" class="hoy-filtros">
@@ -710,6 +716,11 @@ onMounted(() => {
               class="tu-enlace text-sm"
             >
               {{ $t("operacion.hoy.citas.agendar") }}
+              <IconoNav
+                nombre="flecha"
+                :tam="14"
+                class="inline align-[-0.15em]"
+              />
             </RouterLink>
           </div>
           <p

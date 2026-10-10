@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconoNav from "@/components/IconoNav.vue";
 import {
   computed,
   nextTick,
@@ -214,7 +215,7 @@ onBeforeUnmount(() => {
         aria-label="Negocio anterior"
         @click="ir(activo - 1)"
       >
-        ←
+        <IconoNav nombre="atras" :tam="18" />
       </button>
       <span class="orbita-paginacion"
         ><strong>{{ String(activo + 1).padStart(2, "0") }}</strong> /
@@ -225,7 +226,7 @@ onBeforeUnmount(() => {
         aria-label="Negocio siguiente"
         @click="ir(activo + 1)"
       >
-        →
+        <IconoNav nombre="flecha" :tam="18" />
       </button>
       <button
         v-if="!reducido"

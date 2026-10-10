@@ -53,6 +53,16 @@ const funciones = computed(() =>
 );
 const monedaClases = computed(() => precios.datos.clases.moneda);
 const monedaCitas = computed(() => precios.datos.citas.moneda);
+// La moneda y los días de prueba de la modalidad que se ve (los de su tarifa).
+const moneda = computed(() => precios.datos[modo.value].moneda);
+const diasPrueba = computed(() => precios.datos[modo.value].dias_prueba);
+const NOMBRE_MONEDA: Record<string, string> = {
+  USD: "dólares estadounidenses",
+  MXN: "pesos mexicanos",
+};
+const nombreMoneda = computed(
+  () => NOMBRE_MONEDA[moneda.value] ?? moneda.value,
+);
 
 const beneficiosClases = [
   "Agenda de clases y control de cupos",
@@ -209,7 +219,7 @@ function elegirModo(valor: Modo) {
           ><span> {{ tarjeta.periodo }}</span>
         </p>
         <p class="precio-impuestos">
-          + impuestos<template v-if="tarjeta.nota">
+          Más impuestos<template v-if="tarjeta.nota">
             · {{ tarjeta.nota }}</template
           >
         </p>
@@ -241,17 +251,22 @@ function elegirModo(valor: Modo) {
               mode: modo,
             })
           "
-          >Probar 30 días gratis<span class="sr-only">
-            · {{ tarjeta.nombre }}</span
-          ></RouterLink
+          >{{
+            diasPrueba > 0
+              ? `Probar ${diasPrueba} días gratis`
+              : "Crear mi cuenta"
+          }}<span class="sr-only"> · {{ tarjeta.nombre }}</span></RouterLink
         >
         <p class="precio-sin-tarjeta">Sin tarjeta para empezar</p>
       </article>
     </div>
 
     <p class="precios-aclaracion">
-      Precios en dólares estadounidenses, más impuestos. En México se cobran en
-      pesos al tipo de cambio del día del cobro, más IVA.
+      Precios en {{ nombreMoneda }}, más impuestos.
+      <template v-if="moneda !== 'MXN'">
+        En México se cobran en pesos al tipo de cambio del día del cobro, más
+        IVA.
+      </template>
       <template v-if="modo === 'clases'">
         Todas las herramientas para clases, desde el primer plan; la tarifa
         mensual depende de los alumnos activos de tu negocio.
@@ -277,7 +292,7 @@ function elegirModo(valor: Modo) {
             {{
               monedaClases
             }}
-            + impuestos
+            más impuestos
           </caption>
           <thead>
             <tr>
@@ -311,7 +326,7 @@ function elegirModo(valor: Modo) {
             {{
               monedaCitas
             }}
-            + impuestos
+            más impuestos
           </caption>
           <thead>
             <tr>
@@ -366,8 +381,9 @@ function elegirModo(valor: Modo) {
           rel="noopener"
           >WhatsApp</a
         >
+        <!-- Azul, como las tarjetas: el rosa queda para el menú y el cierre. -->
         <a
-          class="tu-btn tu-btn-primario"
+          class="tu-btn tu-btn-primario tu-btn-azul"
           :href="`mailto:${ventasCorreo}?subject=Cotizaci%C3%B3n%20AgendaUno`"
           >Contáctanos</a
         >

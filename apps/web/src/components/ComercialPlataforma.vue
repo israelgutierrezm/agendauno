@@ -3,15 +3,23 @@ import axios from "axios";
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { mensajeDeError } from "@/lib/api";
+import { confirmar } from "@/lib/confirmar";
+import { useToastStore } from "@/stores/toast";
+
 /**
  * Datos comerciales de la plataforma (superadmin, ADR 0107): a dónde se manda a
  * quien pide cotización (correo y WhatsApp de ventas), el token del Banco de México
  * para el tipo de cambio (se escribe, nunca se muestra) y los paquetes de timbres que
  * se venden. Nada de esto vive fijo en el código.
+ *
+ * El formulario no se puede guardar hasta que cargó bien: guardarlo vacío borraría
+ * las ventas y los paquetes que ya había.
  */
 const props = defineProps<{ apiUrl: string; token: string }>();
 
 const { t } = useI18n();
+const toast = useToastStore();
 
 interface Comercial {
   ventas_correo: string | null;
@@ -20,14 +28,25 @@ interface Comercial {
   timbres_paquetes: number[];
 }
 
+const CAMPOS = [
+  "ventas_correo",
+  "ventas_whatsapp",
+  "banxico_token",
+  "timbres_paquetes",
+] as const;
+type Campo = (typeof CAMPOS)[number];
+
 const correo = ref("");
 const whatsapp = ref("");
 const tokenBanxico = ref("");
 const banxico = ref(false);
 const paquetes = ref("");
+const cargando = ref(true);
+const cargado = ref(false);
+const errorCarga = ref<string | null>(null);
 const guardando = ref(false);
-const aviso = ref<string | null>(null);
-const error = ref<string | null>(null);
+// Lo que la API rechazó de cada campo, debajo de ese campo.
+const errores = ref<Partial<Record<Campo, string>>>({});
 
 function cliente() {
   return axios.create({
@@ -47,20 +66,44 @@ function aplicar(datos: Comercial): void {
 }
 
 async function cargar(): Promise<void> {
+  cargando.value = true;
+  errorCarga.value = null;
   try {
     const { data } = await cliente().get<{ data: Comercial }>(
       "/api/v1/plataforma/configuracion",
     );
     aplicar(data.data);
-  } catch {
-    error.value = t("plataforma.tokenInvalido");
+    cargado.value = true;
+  } catch (e) {
+    errorCarga.value = mensajeDeError(e);
+  } finally {
+    cargando.value = false;
   }
 }
 
+/** Los errores de validación que son de un campo de este formulario. */
+function erroresDeCampo(e: unknown): Partial<Record<Campo, string>> {
+  const datos = axios.isAxiosError(e)
+    ? (e.response?.data as
+        { meta?: { errors?: Record<string, string[]> } } | undefined)
+    : undefined;
+  const propios: Partial<Record<Campo, string>> = {};
+  for (const [llave, mensajes] of Object.entries(datos?.meta?.errors ?? {})) {
+    // `timbres_paquetes.0` es del campo de paquetes.
+    const campo = llave.split(".")[0] as Campo;
+    if (CAMPOS.includes(campo) && propios[campo] === undefined && mensajes[0]) {
+      propios[campo] = mensajes[0];
+    }
+  }
+  return propios;
+}
+
 async function guardar(): Promise<void> {
+  if (!cargado.value) {
+    return;
+  }
   guardando.value = true;
-  aviso.value = null;
-  error.value = null;
+  errores.value = {};
   const cuerpo: Record<string, unknown> = {
     ventas_correo: correo.value.trim() || null,
     ventas_whatsapp: whatsapp.value.trim() || null,
@@ -80,27 +123,36 @@ async function guardar(): Promise<void> {
     );
     aplicar(data.data);
     tokenBanxico.value = "";
-    aviso.value = t("suscripcion.plataforma.comercial.guardado");
+    toast.exito(t("suscripcion.plataforma.comercial.guardado"));
   } catch (e) {
-    const datos = axios.isAxiosError(e) ? e.response?.data : null;
-    const errores = datos?.meta?.errors as Record<string, string[]> | undefined;
-    error.value =
-      (errores ? Object.values(errores)[0]?.[0] : null) ??
-      datos?.message ??
-      t("plataforma.tokenInvalido");
+    errores.value = erroresDeCampo(e);
+    if (Object.keys(errores.value).length === 0) {
+      toast.error(mensajeDeError(e));
+    }
   } finally {
     guardando.value = false;
   }
 }
 
 async function quitarToken(): Promise<void> {
+  if (
+    !(await confirmar(t("suscripcion.plataforma.comercial.confirmarQuitar"), {
+      aceptar: t("suscripcion.plataforma.comercial.quitar"),
+      peligro: true,
+    }))
+  ) {
+    return;
+  }
   guardando.value = true;
   try {
     const { data } = await cliente().put<{ data: Comercial }>(
       "/api/v1/plataforma/configuracion",
       { banxico_token: null },
     );
-    aplicar(data.data);
+    banxico.value = data.data.banxico_configurado;
+    toast.exito(t("suscripcion.plataforma.comercial.banxicoQuitado"));
+  } catch (e) {
+    toast.error(mensajeDeError(e));
   } finally {
     guardando.value = false;
   }
@@ -123,7 +175,32 @@ onMounted(cargar);
         {{ $t("suscripcion.plataforma.comercial.ayuda") }}
       </p>
     </div>
-    <div class="grid gap-3 sm:grid-cols-2">
+
+    <p
+      v-if="cargando"
+      class="text-sm"
+      role="status"
+      :style="{ color: 'var(--texto-suave)' }"
+    >
+      {{ $t("comun.cargando") }}
+    </p>
+    <div
+      v-else-if="errorCarga"
+      class="flex flex-wrap items-center gap-3 text-sm"
+      role="alert"
+      data-prueba="comercial-error"
+    >
+      <span style="color: var(--error)">{{ errorCarga }}</span>
+      <button type="button" class="tu-btn tu-btn-fantasma" @click="cargar">
+        {{ $t("comun.reintentar") }}
+      </button>
+    </div>
+
+    <fieldset
+      v-if="cargado"
+      class="grid gap-3 sm:grid-cols-2"
+      :disabled="guardando"
+    >
       <label class="block">
         <span class="tu-label">{{
           $t("suscripcion.plataforma.comercial.ventasCorreo")
@@ -133,7 +210,11 @@ onMounted(cargar);
           class="tu-input"
           type="email"
           autocomplete="off"
+          :aria-invalid="errores.ventas_correo ? 'true' : undefined"
         />
+        <span v-if="errores.ventas_correo" class="tu-hint tu-error-campo">{{
+          errores.ventas_correo
+        }}</span>
       </label>
       <label class="block">
         <span class="tu-label">{{
@@ -144,7 +225,11 @@ onMounted(cargar);
           class="tu-input"
           inputmode="tel"
           placeholder="52 55 1234 5678"
+          :aria-invalid="errores.ventas_whatsapp ? 'true' : undefined"
         />
+        <span v-if="errores.ventas_whatsapp" class="tu-hint tu-error-campo">{{
+          errores.ventas_whatsapp
+        }}</span>
       </label>
       <label class="block">
         <span class="tu-label">{{
@@ -155,12 +240,16 @@ onMounted(cargar);
           class="tu-input"
           type="password"
           autocomplete="off"
+          :aria-invalid="errores.banxico_token ? 'true' : undefined"
           :placeholder="
             banxico
               ? $t('suscripcion.plataforma.comercial.banxicoGuardado')
               : ''
           "
         />
+        <span v-if="errores.banxico_token" class="tu-hint tu-error-campo">{{
+          errores.banxico_token
+        }}</span>
         <span
           class="mt-1 block text-xs"
           :style="{ color: 'var(--texto-suave)' }"
@@ -174,7 +263,7 @@ onMounted(cargar);
             v-if="banxico"
             type="button"
             class="tu-enlace ml-1"
-            :disabled="guardando"
+            data-prueba="quitar-banxico"
             @click="quitarToken"
           >
             {{ $t("suscripcion.plataforma.comercial.quitar") }}
@@ -190,7 +279,11 @@ onMounted(cargar);
           class="tu-input"
           inputmode="numeric"
           placeholder="50, 100, 200, 350, 500"
+          :aria-invalid="errores.timbres_paquetes ? 'true' : undefined"
         />
+        <span v-if="errores.timbres_paquetes" class="tu-hint tu-error-campo">{{
+          errores.timbres_paquetes
+        }}</span>
         <span
           class="mt-1 block text-xs"
           :style="{ color: 'var(--texto-suave)' }"
@@ -198,11 +291,19 @@ onMounted(cargar);
           {{ $t("suscripcion.plataforma.comercial.paquetesAyuda") }}
         </span>
       </label>
-    </div>
-    <button class="tu-btn tu-btn-primario" type="submit" :disabled="guardando">
+    </fieldset>
+    <button
+      class="tu-btn tu-btn-primario"
+      type="submit"
+      :disabled="!cargado || guardando"
+    >
       {{ $t("suscripcion.plataforma.comercial.guardar") }}
     </button>
-    <p v-if="aviso" class="text-sm" style="color: var(--exito)">{{ aviso }}</p>
-    <p v-if="error" class="text-sm" style="color: var(--error)">{{ error }}</p>
   </form>
 </template>
+
+<style scoped>
+.tu-error-campo {
+  color: var(--error);
+}
+</style>

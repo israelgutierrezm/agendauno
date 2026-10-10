@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconoNav from "@/components/IconoNav.vue";
 import { computed, ref, watch } from "vue";
 
 import type { Modo } from "@/marketing/modalidades";
@@ -357,18 +358,23 @@ function cambiar(valor: Modo): void {
           </div>
         </div>
         <p class="demo-pista">
-          <span class="demo-pista-movil">{{
-            semana
-              ? "Desliza la agenda para ver toda la semana →"
-              : "Desliza la agenda para ver a todo tu equipo →"
-          }}</span>
+          <span class="demo-pista-movil"
+            >{{
+              semana
+                ? "Desliza la agenda para ver toda la semana"
+                : "Desliza la agenda para ver a todo tu equipo"
+            }}
+            <IconoNav nombre="flecha" :tam="14" class="inline align-[-0.15em]"
+          /></span>
           <template v-if="semana">
             Selecciona una clase para ver su cupo
           </template>
           <template v-else>
             Selecciona una {{ unidad }} para ver sus detalles
           </template>
-          <span aria-hidden="true">↗</span>
+          <span aria-hidden="true"
+            ><IconoNav nombre="flecha" :tam="14" class="inline align-[-0.15em]"
+          /></span>
         </p>
       </div>
       <aside class="demo-detalle" aria-live="polite" aria-atomic="true">

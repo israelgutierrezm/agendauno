@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconoNav from "@/components/IconoNav.vue";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
@@ -460,8 +461,9 @@ function cancelarVenta(): void {
           :to="{ name: 'ficha-miembro', params: { id: personaId } }"
           class="tu-enlace"
           @click="emit('cerrar')"
-          >{{ $t("recepcion.miembro.verFicha") }} →</RouterLink
-        >
+          >{{ $t("recepcion.miembro.verFicha") }}
+          <IconoNav nombre="flecha" :tam="14" class="inline align-[-0.15em]"
+        /></RouterLink>
         <RouterLink
           :to="{
             name: 'ficha-miembro',
@@ -470,8 +472,9 @@ function cancelarVenta(): void {
           }"
           class="tu-enlace"
           @click="emit('cerrar')"
-          >{{ $t("expediente.titulo") }} →</RouterLink
-        >
+          >{{ $t("expediente.titulo") }}
+          <IconoNav nombre="flecha" :tam="14" class="inline align-[-0.15em]"
+        /></RouterLink>
       </p>
 
       <!-- Entrada (control de acceso) -->

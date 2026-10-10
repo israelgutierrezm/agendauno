@@ -236,6 +236,8 @@ const RUTAS: Record<string, string[]> = {
   // Ordenar (sin orden aplicado): arriba y abajo.
   orden: ["M8 9.5l4-4 4 4", "M8 14.5l4 4 4-4"],
   flecha: ["M5 12h14", "M13 6l6 6-6 6"],
+  // Volver (la flecha de arriba, hacia la izquierda).
+  atras: ["M19 12H5", "M11 6l-6 6 6 6"],
   arriba: ["M12 19V5", "M6 11l6-6 6 6"],
   abajo: ["M12 5v14", "M6 13l6 6 6-6"],
   dinero: [

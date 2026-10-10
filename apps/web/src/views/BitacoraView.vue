@@ -342,7 +342,12 @@ onMounted(cargar);
               :disabled="pagina <= 1"
               @click="irPagina(pagina - 1)"
             >
-              ← {{ $t("bitacora.anterior") }}
+              <IconoNav
+                nombre="atras"
+                :tam="14"
+                class="inline align-[-0.15em]"
+              />
+              {{ $t("bitacora.anterior") }}
             </button>
             <span :style="{ color: 'var(--texto-suave)' }">{{
               $t("bitacora.pagina", { page: pagina, total: ultimaPagina })
@@ -353,7 +358,12 @@ onMounted(cargar);
               :disabled="pagina >= ultimaPagina"
               @click="irPagina(pagina + 1)"
             >
-              {{ $t("bitacora.siguiente") }} →
+              {{ $t("bitacora.siguiente") }}
+              <IconoNav
+                nombre="flecha"
+                :tam="14"
+                class="inline align-[-0.15em]"
+              />
             </button>
           </div>
         </template>

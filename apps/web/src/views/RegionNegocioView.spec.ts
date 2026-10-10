@@ -170,4 +170,23 @@ describe("país, moneda y zona horaria del negocio", () => {
       "Ya hay cobros registrados en MXN",
     );
   });
+
+  it("pasada la prueba, el país define el cobro: queda fijo y dice por qué", async () => {
+    api.get.mockResolvedValue({
+      data: {
+        data: region({
+          puede_cambiar_pais: false,
+          motivo_pais: "El país ya no se puede cambiar desde aquí.",
+        }),
+      },
+    });
+    const w = montar();
+    await flushPromises();
+
+    expect(w.get("#rg-pais").attributes("disabled")).toBeDefined();
+    expect(w.get('[data-prueba="pais-bloqueado"]').text()).toBe(
+      "El país ya no se puede cambiar desde aquí.",
+    );
+    w.unmount();
+  });
 });

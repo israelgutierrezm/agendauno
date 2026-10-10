@@ -219,9 +219,6 @@ export default {
       ejemplo: "Ejemplo",
       operacionEtiqueta: "Recepción y ventas",
       precioEtiqueta: "Tu suscripción a AgendaUno",
-      precioBadge: "{dias} días gratis · Sin tarjeta",
-      precioDetalle:
-        "Configura tu agenda y comprueba cómo encaja en tu operación antes de contratar.",
       faqTitulo: "Preguntas frecuentes",
     },
     // Landing de cada modalidad (/clases, /citas; ModalidadView). Las funciones son
@@ -310,7 +307,7 @@ export default {
             "Da de alta a tus alumnos, uno por uno o con un archivo, e invítalos a su cuenta. Con su membresía o sus créditos reservan su lugar desde tu página.",
           ejemplo: "Tu página de clases",
           linea: "tuestudio.agendauno.mx",
-          estado: "Ya soy alumno · Entrar →",
+          estado: "Ya soy alumno · Entrar",
         },
         operar: {
           titulo: "Pasa lista y cobra",
@@ -491,7 +488,7 @@ export default {
             "Pon tu página para agendar en Instagram, WhatsApp o un código QR. Tus clientes eligen servicio, profesional y hora, sin crear una cuenta.",
           ejemplo: "Tu página para agendar",
           linea: "tunegocio.agendauno.mx",
-          estado: "Elige servicio y hora →",
+          estado: "Elige servicio y hora",
         },
         operar: {
           titulo: "Atiende y cobra",
@@ -627,8 +624,9 @@ export default {
         clases: "Por alumnos activos",
         citas: "Por plan y profesionales",
         desde: "Desde",
-        porMes: "USD / mes",
-        iva: "+ impuestos",
+        // {moneda}: la de la tarifa publicada de esa modalidad.
+        porMes: "{moneda} / mes",
+        iva: "Más impuestos",
         verClases: "Ver precios de clases",
         verCitas: "Ver precios de citas",
         prueba: "Pruébalo {dias} días gratis, sin tarjeta, antes de contratar.",
@@ -705,7 +703,8 @@ export default {
     pieHero: "Cancela cuando quieras.",
     confianza: {
       titulo: "Condiciones de la prueba y operación",
-      prueba: "30 días gratis, sin tarjeta",
+      // {dias}: los de la tarifa publicada (SellosConfianza).
+      prueba: "{dias} días gratis, sin tarjeta",
       configuracion: "Configuración guiada para empezar",
       // Portada: los dos modelos (clases por alumnos, citas por profesionales).
       cobro: "Precio por alumnos activos o por profesionales",
@@ -1884,6 +1883,9 @@ export default {
       guardar: "Guardar",
       guardando: "Guardando…",
       guardado: "Pasarela actualizada.",
+      webhookUrl: "URL del webhook",
+      webhookEventosStripe:
+        "Regístrala en Stripe con los eventos checkout.session.completed, checkout.session.async_payment_succeeded, checkout.session.async_payment_failed, checkout.session.expired, payment_intent.succeeded, payment_intent.payment_failed y payment_intent.canceled.",
     },
     estudios: {
       titulo: "Estudios",
@@ -1899,6 +1901,8 @@ export default {
       guardar: "Guardar",
       modo: {
         activos: "Por alumnos activos",
+        // Un negocio de citas en modo «activos» paga su plan (ADR 0107).
+        plan: "Por plan y profesionales",
         fijo: "Cuota fija",
       },
     },
@@ -2096,7 +2100,7 @@ export default {
     },
   },
   renta: {
-    titulo: "Suscripción a AgendaUno",
+    titulo: "Mi suscripción",
     suspendidoTitulo: "Tu negocio está suspendido por una renta sin pagar",
     suspendidoAyuda:
       "Mientras tanto nadie puede agendar ni entrar al panel. Paga la renta pendiente aquí abajo y se reactiva solo en unos minutos; tu información está a salvo.",
@@ -2621,8 +2625,11 @@ export default {
       rechazado: "Rechazado",
       aprobar: "Aprobar",
       rechazar: "Rechazar",
+      rechazarTitulo: "Rechazar documento",
+      rechazarAyuda:
+        "{documento} de {persona}. Cuéntale qué corregir: verá el motivo en sus documentos.",
       ver: "Ver",
-      motivo: "Motivo del rechazo",
+      motivo: "Motivo del rechazo (opcional)",
       vacio: "Sin documentos.",
       elegir: "Elige…",
     },
@@ -2774,6 +2781,7 @@ export default {
       "Tu negocio no aparece en el directorio; sigue disponible mediante su enlace directo.",
     enlaceDirecto: "Enlace público para compartir",
     copiar: "Copiar",
+    copiado: "Copiado",
     guardado: "Guardado.",
   },
 };

@@ -170,18 +170,6 @@
   transform: scale(1.012);
 }
 
-/* Prueba gratis junto a los precios. */
-:where(.tu-landing) .tu-precio-prueba {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1.5rem;
-  padding: 1.5rem;
-  border: 1px solid var(--borde);
-  border-radius: var(--radio-tarjeta, 18px);
-}
-
 /* Nota de alcance para profesionales de la salud. */
 :where(.tu-landing) .tu-alcance-salud {
   padding: 1rem 1.15rem;
@@ -271,9 +259,5 @@
   }
   :where(.tu-landing) .tu-hero-proof {
     margin-top: 0.8rem;
-  }
-  :where(.tu-landing) .tu-precio-prueba .tu-btn {
-    width: 100%;
-    justify-content: center;
   }
 }
