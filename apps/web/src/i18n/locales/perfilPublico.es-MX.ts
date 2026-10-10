@@ -229,6 +229,8 @@ export default {
     agendarasComo: "Agendarás a tu nombre",
     usarOtrosDatos: "Agendar con otros datos",
     tienesCuenta: "¿Ya tienes cuenta?",
+    requiereCuenta:
+      "Este negocio agenda solo con cuenta: entra con la tuya o pídele una.",
     entrar: "Entra y no escribas tus datos",
     sesionEquipo:
       "Tienes la sesión abierta como {rol} de {negocio}: aquí la cita se agenda con los datos del cliente.",

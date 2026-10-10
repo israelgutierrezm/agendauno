@@ -123,6 +123,9 @@ class ResenasTenantController
                 'instructor_id' => $reserva->sesion->instructor_id,
                 'calificacion' => (int) $validado['calificacion'],
                 'comentario' => is_string($comentario) && trim($comentario) !== '' ? trim($comentario) : null,
+                // Sin revisión, se publica en su página; con revisión, espera a que el
+                // negocio la apruebe (parámetro del negocio).
+                'visible' => app(ParametrosTenant::class)->siNo('resenas.publicar_sin_revisar'),
             ]);
             // Para automatizaciones y webhooks (p. ej. atender una calificación baja).
             $this->eventos->registrar('resena.creada', 'resena', (string) $resena->ulid, [

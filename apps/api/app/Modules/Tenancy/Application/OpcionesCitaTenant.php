@@ -40,7 +40,7 @@ class OpcionesCitaTenant
     ) {}
 
     /**
-     * @return array{servicios: list<array<string, mixed>>, hay_con_plan: bool, sucursales: list<array<string, mixed>>, instructores: list<array<string, mixed>>, cobro: array{pago_obligatorio: bool, pago_en_linea: bool}, whatsapp: bool}
+     * @return array{servicios: list<array<string, mixed>>, hay_con_plan: bool, sucursales: list<array<string, mixed>>, instructores: list<array<string, mixed>>, cobro: array{pago_obligatorio: bool, pago_en_linea: bool}, whatsapp: bool, reglas: array{minutos_anticipacion_minima: int, dias_maximos_adelante: int, agendar_sin_cuenta: bool}}
      */
     public function listar(?PersonaTenant $persona = null): array
     {
@@ -82,6 +82,12 @@ class OpcionesCitaTenant
             'cobro' => $this->cobro->paraPantalla(),
             // Si se ofrece recibir los avisos de la cita por WhatsApp (ADR 0069).
             'whatsapp' => $this->whatsapp->enUso(),
+            // Lo que decide el negocio para agendar en línea: con cuánta anticipación,
+            // hasta cuándo y si se puede sin cuenta (la web y la app arman su calendario).
+            'reglas' => [
+                ...app(VentanaDeReservaTenant::class)->reglasDeCita(),
+                'agendar_sin_cuenta' => app(ParametrosTenant::class)->siNo('citas.agendar_sin_cuenta'),
+            ],
         ];
     }
 
@@ -126,6 +132,10 @@ class OpcionesCitaTenant
             $canjeables = $conPlan->filter(static fn (OfertaTenant $o): bool => in_array((int) $o->getKey(), $cubiertas, true));
         }
 
+        // Sin duración propia, la que el negocio fijó para sus citas: la pantalla agenda
+        // con ella (antes suponía 60 minutos).
+        $duracionDefecto = app(ParametrosTenant::class)->entero('citas.duracion_defecto');
+
         return $deCobro->concat($canjeables)
             ->sortBy('nombre')
             ->map(static fn (OfertaTenant $o): array => [
@@ -140,7 +150,7 @@ class OpcionesCitaTenant
                 'foto_url' => $o->fotoUrl(),
                 'precio_minor' => $o->precio_clase_minor,
                 'moneda' => app(ParametrosTenant::class)->moneda(),
-                'duracion_minutos' => $o->duracion_minutos,
+                'duracion_minutos' => $o->duracion_minutos !== null && $o->duracion_minutos > 0 ? (int) $o->duracion_minutos : $duracionDefecto,
                 // Se descuenta de su bono o membresía (no se paga al agendar).
                 'con_plan' => $o->politica_reserva !== PoliticaReservaTenant::Pago,
             ])->values()->all();

@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\ReprogramarTenant;
+use App\Modules\Tenancy\Application\VentanaDeReservaTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
@@ -66,7 +67,7 @@ class MiReprogramarTenantController
             $validado = $request->validate(['fecha' => ['required', 'date_format:Y-m-d']]);
             $sucursal = SucursalTenant::query()->findOrFail($sesion->sucursal_id);
             $duracion = (int) $sesion->inicia_en->diffInMinutes($sesion->termina_en, true);
-            $slots = $sesion->instructor_id === null ? [] : $this->disponibilidad->paraFecha(
+            $slots = $sesion->instructor_id === null ? [] : $this->disponibilidad->paraCliente()->paraFecha(
                 (int) $sesion->instructor_id,
                 $sucursal,
                 (string) $validado['fecha'],
@@ -141,6 +142,8 @@ class MiReprogramarTenantController
                 || ! $this->disponibilidad->cabeEnHorario((int) $sesion->instructor_id, $sucursal, $inicia, $termina)) {
                 throw new SesionNoReservable('Ese horario está fuera de la atención del profesional.');
             }
+            // Y dentro de la anticipación y el horizonte del negocio.
+            app(VentanaDeReservaTenant::class)->exigirParaCita($inicia);
             $movida = $this->reprogramar->moverCita($reserva, $inicia, null, $actor);
         } else {
             $validado = $request->validate([

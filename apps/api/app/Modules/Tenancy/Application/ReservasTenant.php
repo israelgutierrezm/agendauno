@@ -23,6 +23,7 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Pagos\EstadoPago;
 use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
+use App\Modules\Tenancy\Reservas\Exceptions\CancelacionCerrada;
 use App\Modules\Tenancy\Reservas\Exceptions\CupoLleno;
 use App\Modules\Tenancy\Reservas\Exceptions\FueraDeVentana;
 use App\Modules\Tenancy\Reservas\Exceptions\LugarNoDisponible;
@@ -515,6 +516,9 @@ class ReservasTenant
 
             // La misma decisión que se mostró en la vista previa.
             $efecto = $this->efecto($bloqueada, $sesion, $quien, $horasLimite);
+            if (! $efecto->cancelable) {
+                throw new CancelacionCerrada($efecto->mensaje);
+            }
             $estadoAnterior = $bloqueada->estado;
             $credito = '';
             $retencion = $bloqueada->retencion;
@@ -608,6 +612,10 @@ class ReservasTenant
 
         if ($quien !== QuienCancela::Cliente) {
             return new EfectoCancelacion(true, EfectoCancelacion::DEVUELVE, $unidades, $aTiempo, $limite, $devuelve.' Cancela el negocio: sin penalización.');
+        }
+        // Pasado el límite, el negocio decide si el cliente aún puede cancelar él mismo.
+        if (! $aTiempo && ! $this->parametros->siNo('cancelacion.cliente_cancela_tarde')) {
+            return EfectoCancelacion::noCancelable("Ya pasó el límite para cancelar sin costo ({$horas} h antes). Escríbele al negocio para cancelar.");
         }
         if ($aTiempo || ! ($reserva->penaliza_tarde ?? true)) {
             return new EfectoCancelacion(true, EfectoCancelacion::DEVUELVE, $unidades, $aTiempo, $limite, $devuelve);

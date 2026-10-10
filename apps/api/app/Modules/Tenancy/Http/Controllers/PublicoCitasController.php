@@ -28,6 +28,7 @@ use App\Modules\Tenancy\Pagos\MetodoPago;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
+use App\Modules\Tenancy\Reservas\Exceptions\CuentaRequerida;
 use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\TipoPersonaTenant;
 use Carbon\CarbonImmutable;
@@ -114,8 +115,8 @@ class PublicoCitasController
         $paso = isset($validado['paso_minutos']) ? (int) $validado['paso_minutos'] : null;
 
         $slots = $instructor instanceof Usuario
-            ? $this->disponibilidad->paraFecha((int) $instructor->getKey(), $sucursal, $validado['fecha'], $duracion, $paso, $margenes, $oferta)
-            : $this->disponibilidad->paraCualquiera($sucursal, $validado['fecha'], $duracion, $paso, $margenes, $oferta);
+            ? $this->disponibilidad->paraCliente()->paraFecha((int) $instructor->getKey(), $sucursal, $validado['fecha'], $duracion, $paso, $margenes, $oferta)
+            : $this->disponibilidad->paraCliente()->paraCualquiera($sucursal, $validado['fecha'], $duracion, $paso, $margenes, $oferta);
 
         return response()->json(['data' => ['fecha' => $validado['fecha'], 'slots' => $slots]]);
     }
@@ -138,7 +139,7 @@ class PublicoCitasController
         $sucursal = SucursalTenant::query()->where('ulid', $validado['sucursal_id'])->firstOrFail();
         $instructor = $this->profesionalElegido($validado);
 
-        return response()->json(['data' => $this->disponibilidad->diasConAtencion(
+        return response()->json(['data' => $this->disponibilidad->paraCliente()->diasConAtencion(
             $sucursal,
             $validado['desde'],
             (int) ($validado['dias'] ?? 14),
@@ -149,6 +150,10 @@ class PublicoCitasController
     public function agendar(Request $request): JsonResponse
     {
         $this->paginaDeCitas($request);
+        // El negocio decide si recibe citas sin cuenta (o solo de sus clientes con cuenta).
+        if (! $this->parametros->siNo('citas.agendar_sin_cuenta')) {
+            throw new CuentaRequerida('Para agendar, entra a tu cuenta o pídele una al negocio.');
+        }
 
         $validado = $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
