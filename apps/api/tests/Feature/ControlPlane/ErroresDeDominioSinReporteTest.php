@@ -38,8 +38,10 @@ afterEach(function (): void {
  */
 function trazaDeLoQueLanza(string $clase, Closure $accion): string
 {
-    // Como en un php.ini sin `zend.exception_ignore_args`: la traza lleva los argumentos.
+    // Como en un php.ini sin `zend.exception_ignore_args`: la traza lleva los argumentos,
+    // y los textos sin recortar (el php.ini de producción del CI los deja en `'...'`).
     $anterior = ini_set('zend.exception_ignore_args', '0');
+    $largo = ini_set('zend.exception_string_param_max_len', '15');
     try {
         $accion();
     } catch (Throwable $e) {
@@ -48,6 +50,7 @@ function trazaDeLoQueLanza(string $clase, Closure $accion): string
         return $e->getTraceAsString();
     } finally {
         ini_set('zend.exception_ignore_args', (string) $anterior);
+        ini_set('zend.exception_string_param_max_len', (string) $largo);
     }
 
     throw new RuntimeException("La acción no lanzó {$clase}.");

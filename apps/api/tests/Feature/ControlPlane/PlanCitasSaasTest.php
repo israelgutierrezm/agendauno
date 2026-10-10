@@ -59,7 +59,8 @@ it('al terminar la prueba sin elegir plan queda en Individual: el primer mes se 
     // 9 USD × 16/31 = 4.64 USD → 92.80 pesos + IVA.
     expect($octubre->cubre_desde?->toDateString())->toBe('2026-10-16')
         ->and($octubre->cubre_hasta?->toDateString())->toBe('2026-10-31')
-        ->and($octubre->desglose['prorrateo'])->toBe(['dias_cobrables' => 16, 'dias_periodo' => 31])
+        // toEqual: en MySQL la columna JSON reordena las llaves.
+        ->and($octubre->desglose['prorrateo'])->toEqual(['dias_cobrables' => 16, 'dias_periodo' => 31])
         ->and($octubre->desglose['lineas'][0]['concepto'])->toBe('Plan Individual · 1 profesional')
         ->and($octubre->monto_tarifa_minor)->toBe(464 + 74)
         ->and($octubre->monto_minor)->toBe(9280 + 1485)
@@ -298,7 +299,7 @@ it('extender la prueba de un negocio que ya pagó aplaza su siguiente cobro', fu
     emitirRentaEl('2026-11-11 09:00');
     expect(cargoDelPlan('2026-11')->cubre_desde?->toDateString())->toBe('2026-11-11')
         ->and(cargoDelPlan('2026-11')->cubre_hasta?->toDateString())->toBe('2026-11-30')
-        ->and(cargoDelPlan('2026-11')->desglose['prorrateo'])->toBe(['dias_cobrables' => 20, 'dias_periodo' => 30]);
+        ->and(cargoDelPlan('2026-11')->desglose['prorrateo'])->toEqual(['dias_cobrables' => 20, 'dias_periodo' => 30]);
 });
 
 it('un año que empieza el 29 de febrero cubre un año completo y el siguiente no se recorre', function (): void {
