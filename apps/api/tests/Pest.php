@@ -28,10 +28,13 @@ pest()->extend(TestCase::class)
         // La renta en dólares se cobra en pesos a los negocios de México (ADR 0107): un
         // tipo de cambio fijo (20 pesos por dólar) que vale para cualquier fecha, sin
         // consultar al Banco de México. Se prueba aparte.
+        // El registro de TurnoUno (citas) abre hasta su lanzamiento (ADR 0108); aquí
+        // va abierto para registrar negocios de citas. El cierre se prueba aparte.
         ConfiguracionPlataforma::establecer('parametros', (string) json_encode([
             'asistencia.minutos_antes' => 525600,
             'sesion.dias_inactividad' => 36500,
             'renta.tipo_cambio_dias_vigencia' => 36500,
+            'registro.abierto_turnouno' => 1,
         ]));
         Config::set('agendauno.banxico.token', null);
         TipoCambio::query()->create(['fecha' => '2020-01-01', 'de' => 'USD', 'a' => 'MXN', 'diezmilesimas' => 200000, 'fuente' => 'manual']);

@@ -197,6 +197,13 @@ final class CatalogoParametros
             new DefinicionParametro('limpieza.dias_errores', 'Limpieza de registros', 'Días que se guarda un error que dejó de pasar',
                 'Contados desde la última vez que pasó, esté abierto, resuelto o ignorado.', $e, 90, 7, 730, 'días', porNegocio: false),
 
+            // Registro de negocios por producto (ADR 0108, solo la plataforma). TurnoUno
+            // se lanza después: mientras esté cerrado, su landing junta interesados.
+            new DefinicionParametro('registro.abierto_agendauno', 'Registro de negocios', 'Registro abierto en AgendaUno',
+                'Negocios de clases. Si lo cierras, el registro avisa que por ahora no se reciben altas.', $sn, 1, porNegocio: false),
+            new DefinicionParametro('registro.abierto_turnouno', 'Registro de negocios', 'Registro abierto en TurnoUno',
+                'Negocios de citas. Cerrado, la landing de TurnoUno junta interesados en lugar de registrar negocios.', $sn, 0, porNegocio: false),
+
             // Monitoreo de errores (ADR 0080, solo la plataforma).
             new DefinicionParametro('errores.nuevos_clientes_por_dia', 'Monitoreo de errores', 'Errores nuevos de la web y la app al día',
                 'Protege el monitoreo si alguien manda errores falsos. Los errores ya conocidos se siguen contando; al llegar al tope, avisa al superadministrador.', $e, 200, 10, 10000, 'errores', porNegocio: false),

@@ -11,6 +11,10 @@ import 'sesion_revocada.dart';
 ///
 /// Every request carries an `X-Correlation-ID` header so a mobile action can be
 /// traced across the API and the server logs (see docs/ARCHITECTURE.md).
+///
+/// Y dice de qué app viene (ADR 0111): `X-App-Producto` (la API no abre en la app de
+/// TurnoUno un negocio de AgendaUno ni al revés) y, en una app de marca blanca,
+/// `X-App-Negocio` (solo abre ese negocio).
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(
     BaseOptions(
@@ -25,6 +29,13 @@ final dioProvider = Provider<Dio>((ref) {
     InterceptorsWrapper(
       onRequest: (options, handler) {
         options.headers['X-Correlation-ID'] = _correlationId();
+        options.headers.putIfAbsent(
+          'X-App-Producto',
+          () => AppConfig.producto.clave,
+        );
+        if (AppConfig.marcaBlanca) {
+          options.headers['X-App-Negocio'] = AppConfig.negocioFijo;
+        }
 
         // Autenticacion tenant-local por bearer (si hay sesion activa).
         final token = ref.read(authTokenProvider);

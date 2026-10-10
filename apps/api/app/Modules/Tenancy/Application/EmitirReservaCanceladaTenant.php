@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
+use App\Modules\Tenancy\Support\MarcaProducto;
 
 /**
  * Avisos al alumno cuando su lugar se cancela, con los datos de la clase o cita y qué
@@ -40,7 +41,7 @@ class EmitirReservaCanceladaTenant
     {
         $this->emitir('reserva.sesion_cancelada', $reserva, [
             'credito' => $creditoDevuelto ? self::CREDITO_DEVUELTO : '',
-            'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $this->gestor->actual()?->slug),
+            'enlace' => MarcaProducto::actual()->urlWeb().'/entrar?estudio='.rawurlencode((string) $this->gestor->actual()?->slug),
         ]);
     }
 

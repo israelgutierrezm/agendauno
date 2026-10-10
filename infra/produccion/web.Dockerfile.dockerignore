@@ -6,6 +6,7 @@
 !infra/produccion/nginx.conf.template
 !infra/produccion/nginx-comun.conf
 !infra/produccion/nginx-cabeceras.conf
+!infra/produccion/nginx-landing-proxy.conf
 !infra/produccion/web-mapas.sh
 
 apps/web/node_modules/

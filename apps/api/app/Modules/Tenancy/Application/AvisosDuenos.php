@@ -19,6 +19,7 @@ use App\Modules\Tenancy\Models\AvisoDueno;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\WhatsAppEnvio;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Facades\Mail;
@@ -210,7 +211,7 @@ class AvisosDuenos
             return;
         }
 
-        Mail::to($aviso->destinatario)->send(new MensajeMailable($aviso->asunto, $aviso->cuerpo, 'AgendaUno'));
+        Mail::to($aviso->destinatario)->send(new MensajeMailable($aviso->asunto, $aviso->cuerpo, ($marca = MarcaProducto::de($aviso->estudio))->nombre(), producto: $marca));
     }
 
     /**
@@ -276,7 +277,7 @@ class AvisosDuenos
         $contexto = [
             'nombre' => (string) ($estudio->contacto_nombre ?: $estudio->nombre),
             'negocio' => (string) $estudio->nombre,
-            'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $estudio->slug).'&volver='.rawurlencode('/renta'),
+            'enlace' => MarcaProducto::urlWeb($estudio).'/entrar?estudio='.rawurlencode((string) $estudio->slug).'&volver='.rawurlencode('/renta'),
             ...$datos,
         ];
 

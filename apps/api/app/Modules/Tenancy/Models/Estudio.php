@@ -10,6 +10,7 @@ use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\ModoCobroSaas;
 use App\Modules\Tenancy\PerfilNegocio;
+use App\Modules\Tenancy\ProductoComercial;
 use App\Modules\Tenancy\TerminologiaNegocio;
 use App\Support\Concerns\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
@@ -24,6 +25,7 @@ use Illuminate\Support\Carbon;
  *
  * @property string|null $descripcion
  * @property string|null $portada_url
+ * @property string|null $color_marca
  * @property array<string, string>|null $redes
  * @property bool $whatsapp_habilitado los avisos por WhatsApp a sus clientes; solo los activa el superadministrador (ADR 0083)
  * @property string|null $plan_nivel el nivel contratado de un negocio de citas (ADR 0107): individual, premium o pro
@@ -49,6 +51,7 @@ class Estudio extends Model
         'logo_url',
         'descripcion',
         'portada_url',
+        'color_marca',
         'redes',
         'estado',
         'paso_aprovisionamiento',
@@ -187,6 +190,15 @@ class Estudio extends Model
         return $guardada instanceof ModalidadServicio
             ? $guardada
             : ModalidadServicio::paraPerfil($this->perfil_negocio ?? PerfilNegocio::General);
+    }
+
+    /**
+     * Producto comercial del negocio (ADR 0108): AgendaUno si es de clases, TurnoUno si
+     * es de citas. Decide su dominio y la URL de los enlaces que se le mandan.
+     */
+    public function producto(): ProductoComercial
+    {
+        return ProductoComercial::deModalidad($this->modalidad());
     }
 
     /**

@@ -55,7 +55,8 @@ class _ActualizarAppScreenState extends ConsumerState<ActualizarAppScreen> {
       messenger.showSnackBar(
         const SnackBar(
           content: Text(
-            'No se pudo abrir la tienda. Búscanos como AgendaUno en ella.',
+            'No se pudo abrir la tienda. Búscanos como '
+            '${AppConfig.nombreApp} en ella.',
           ),
         ),
       );
@@ -73,7 +74,7 @@ class _ActualizarAppScreenState extends ConsumerState<ActualizarAppScreen> {
           padding: const EdgeInsets.fromLTRB(20, 32, 20, 20),
           children: [
             Text(
-              'Actualiza AgendaUno para continuar',
+              'Actualiza ${AppConfig.nombreApp} para continuar',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),

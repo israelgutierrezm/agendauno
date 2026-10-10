@@ -2,6 +2,7 @@
 import IconoNav from "@/components/IconoNav.vue";
 import { computed, ref, watch } from "vue";
 
+import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import type { Modo } from "@/marketing/modalidades";
 
 /*
@@ -12,6 +13,10 @@ import type { Modo } from "@/marketing/modalidades";
 |   día con una columna por profesional.
 */
 const props = defineProps<{ modo?: Modo }>();
+// La marca del producto de la modalidad (ADR 0108).
+const marca = computed(
+  () => PRODUCTOS[productoDeModalidad(props.modo ?? "clases")].nombre,
+);
 const modelo = defineModel<Modo>({ default: "clases" });
 
 const fijo = computed(() => props.modo !== undefined);
@@ -248,7 +253,7 @@ function cambiar(valor: Modo): void {
 <template>
   <div class="producto-demo" :data-modo="fijo ? modo : undefined">
     <div class="demo-contexto">
-      <span class="demo-marca">AgendaUno / Agenda</span>
+      <span class="demo-marca">{{ marca }} / Agenda</span>
       <span class="demo-ejemplo">Demo interactiva · Datos de ejemplo</span>
     </div>
     <div class="demo-cabecera">

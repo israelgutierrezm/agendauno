@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { PRODUCTOS, productoActual } from "@/lib/producto";
 import { trackEvent } from "@/lib/analytics";
 import { recordarNegocio } from "@/lib/negociosRecientes";
 import {
@@ -27,9 +28,12 @@ const perfil = ref("");
 const cargando = ref(true);
 const error = ref<string | null>(null);
 
-// Los giros del filtro, por modalidad: la misma lista que el registro y que acepta el
-// filtro del API (`PerfilNegocio`), para que no se desalineen.
-const GRUPOS_PERFILES = MODOS.map((modo) => ({
+// Los giros del filtro: los de la modalidad del producto (ADR 0108; el directorio de
+// cada dominio lista solo sus negocios), la misma lista que el registro y que acepta
+// el filtro del API (`PerfilNegocio`), para que no se desalineen.
+const GRUPOS_PERFILES = MODOS.filter(
+  (modo) => modo === PRODUCTOS[productoActual()].modalidad,
+).map((modo) => ({
   modo,
   perfiles: PERFILES_POR_MODO[modo],
 }));
@@ -88,10 +92,12 @@ async function cargar(): Promise<void> {
   try {
     const params: Record<string, string> = {};
     if (q.value.trim() !== "") params.q = q.value.trim();
+    // Cada producto lista sus negocios (ADR 0108); no se mide como filtro.
+    const producto = productoActual();
     if (perfil.value !== "") params.perfil = perfil.value;
     const { data } = await api.get<{ data: EstudioDirectorio[] }>(
       "/api/v1/directorio",
-      { params },
+      { params: { ...params, producto } },
     );
     estudios.value = data.data;
     if (Object.keys(params).length > 0) {

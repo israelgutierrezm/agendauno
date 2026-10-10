@@ -1,0 +1,49 @@
+# AgendaUno detrás del Traefik que ya corre en el servidor (ADR 0112): no instala otro.
+# Solo conecta `web` a la red de Traefik y le dice qué dominios atiende; los demás
+# servicios (api, worker, scheduler, redis, landings) siguen en la red interna, sin
+# exponerse. `web` sigue escuchando en 127.0.0.1:8080 (solo el servidor): ahí revisan
+# actualizar.sh y volver.sh que la versión nueva atiende.
+#
+# Se agrega en web.env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.traefik.yml
+#
+# Requisitos del Traefik existente (docs/DESPLIEGUE.md → «Traefik»): versión 3, un
+# punto de entrada HTTPS (TRAEFIK_ENTRADA) que redirija HTTP a HTTPS, y un resolvedor de
+# certificados por DNS-01 con Cloudflare (TRAEFIK_CERTRESOLVER): los comodines
+# (*.agendauno.mx, *.turnouno.mx) solo se validan por DNS.
+
+services:
+  web:
+    networks:
+      default: {}
+      traefik: {}
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${TRAEFIK_RED:-traefik}
+      traefik.http.services.agendauno-web.loadbalancer.server.port: "80"
+
+      # AgendaUno: el dominio, www y el subdominio de cada negocio, con un certificado
+      # comodín (DOMINIO y *.DOMINIO).
+      traefik.http.routers.agendauno-agendauno.rule: 'Host(`${DOMINIO:?Falta DOMINIO en web.env}`) || HostRegexp(`^[a-z0-9-]+\.${DOMINIO}$$`)'
+      traefik.http.routers.agendauno-agendauno.entrypoints: ${TRAEFIK_ENTRADA:-websecure}
+      traefik.http.routers.agendauno-agendauno.service: agendauno-web
+      traefik.http.routers.agendauno-agendauno.tls: "true"
+      traefik.http.routers.agendauno-agendauno.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-cloudflare}
+      traefik.http.routers.agendauno-agendauno.tls.domains[0].main: ${DOMINIO}
+      traefik.http.routers.agendauno-agendauno.tls.domains[0].sans: '*.${DOMINIO}'
+
+      # TurnoUno: igual, con su dominio.
+      traefik.http.routers.agendauno-turnouno.rule: 'Host(`${DOMINIO_TURNOUNO:-turnouno.mx}`) || HostRegexp(`^[a-z0-9-]+\.${DOMINIO_TURNOUNO:-turnouno.mx}$$`)'
+      traefik.http.routers.agendauno-turnouno.entrypoints: ${TRAEFIK_ENTRADA:-websecure}
+      traefik.http.routers.agendauno-turnouno.service: agendauno-web
+      traefik.http.routers.agendauno-turnouno.tls: "true"
+      traefik.http.routers.agendauno-turnouno.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-cloudflare}
+      traefik.http.routers.agendauno-turnouno.tls.domains[0].main: ${DOMINIO_TURNOUNO:-turnouno.mx}
+      traefik.http.routers.agendauno-turnouno.tls.domains[0].sans: '*.${DOMINIO_TURNOUNO:-turnouno.mx}'
+
+networks:
+  # La red del Traefik existente (`docker network ls`). PROXY_CONFIABLE (web.env) debe
+  # ser su subred: nginx solo cree las cabeceras de quien llega por ahí.
+  traefik:
+    external: true
+    name: ${TRAEFIK_RED:-traefik}
