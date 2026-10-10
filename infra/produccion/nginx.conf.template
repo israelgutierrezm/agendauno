@@ -1,18 +1,24 @@
 # nginx de la plataforma en producción (ADR 0108: AgendaUno y TurnoUno). Plantilla: al
 # arrancar, la imagen oficial de nginx sustituye ${DOMINIO} (AgendaUno),
-# ${DOMINIO_TURNOUNO} y ${PROXY_CONFIABLE} y deja el resultado en conf.d/.
+# ${DOMINIO_TURNOUNO}, ${PROXY_CONFIABLE} y ${CABECERA_IP_REAL} y deja el resultado en
+# conf.d/.
 #
 # Escucha HTTP detrás del proxy que termina TLS (Traefik, Cloudflare, el balanceador
 # del proveedor). Ese proxy debe ser lo único que lo alcanza: aquí se confía en sus
-# cabeceras X-Forwarded-*.
+# cabeceras.
 #
-# Tres sitios en /usr/share/nginx/html: app/ (la aplicación: panel, portal,
-# escaparate de cada negocio, registro, acceso, superadmin), agendauno/ y turnouno/
-# (la landing pre-generada de cada producto, con sus recursos en /assets-{producto}/).
+# Sirve la aplicación (/usr/share/nginx/html/app: panel, portal, escaparate de cada
+# negocio, registro, acceso, superadmin) y pasa la portada, las páginas por giro, el
+# sitemap, el robots y /assets-{producto}/ a la landing de cada producto, que es otro
+# contenedor (landing-agendauno, landing-turnouno; ADR 0112): cada landing se publica
+# sin tocar la aplicación ni la API.
 
-# IP real del cliente: los límites por IP de la API dependen de ella.
+# IP real del cliente: los límites por IP de la API dependen de ella. La cabecera es
+# X-Forwarded-For (el proxy pone la IP de quien se conectó) o, detrás del proxy de
+# Cloudflare, CF-Connecting-IP (docker-compose.cloudflare.yml, que además solo deja
+# entrar a Cloudflare: nadie más puede inventarla).
 set_real_ip_from ${PROXY_CONFIABLE};
-real_ip_header X-Forwarded-For;
+real_ip_header ${CABECERA_IP_REAL};
 real_ip_recursive on;
 
 # La API se entera de que la petición llegó por HTTPS (para armar sus URLs).
@@ -48,35 +54,38 @@ server {
     server_name ${DOMINIO};
     root /usr/share/nginx/html/app;
     include /etc/nginx/snippets/agendauno-comun.conf;
+    set $landing landing-agendauno:80;
 
-    # El HTML se revalida siempre (no-cache): tras publicar, el navegador no debe
-    # usar uno viejo que apunte a recursos que ya no existen. Al tener add_header
-    # propio, cada location repite las cabeceras de seguridad.
+    # La landing (otro contenedor; la caché del HTML la decide ella). Una página que
+    # no tenga, o si no responde, la aplicación.
     location = / {
-        root /usr/share/nginx/html/agendauno;
-        add_header Cache-Control "no-cache" always;
-        include /etc/nginx/snippets/agendauno-cabeceras.conf;
-        try_files /index.html =404;
+        include /etc/nginx/snippets/agendauno-landing-proxy.conf;
+        proxy_intercept_errors on;
+        error_page 404 502 503 504 = @aplicacion;
     }
-    location ~ ^/(software-para-[a-z0-9-]+)/?$ {
-        root /usr/share/nginx/html/agendauno;
-        add_header Cache-Control "no-cache" always;
-        include /etc/nginx/snippets/agendauno-cabeceras.conf;
-        try_files /$1/index.html /app.html;
+    location ~ ^/software-para-[a-z0-9-]+/?$ {
+        include /etc/nginx/snippets/agendauno-landing-proxy.conf;
+        proxy_intercept_errors on;
+        error_page 404 502 503 504 = @aplicacion;
     }
     # Exactos: ganan a la regla de archivos de nginx-comun.conf.
     location = /sitemap.xml {
-        root /usr/share/nginx/html/agendauno;
+        include /etc/nginx/snippets/agendauno-landing-proxy.conf;
     }
     location = /robots.txt {
-        root /usr/share/nginx/html/agendauno;
+        include /etc/nginx/snippets/agendauno-landing-proxy.conf;
     }
     location ^~ /assets-agendauno/ {
-        root /usr/share/nginx/html/agendauno;
-        try_files $uri =404;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
+        include /etc/nginx/snippets/agendauno-landing-proxy.conf;
+    }
+
+    # La aplicación. El HTML se revalida siempre (no-cache): tras publicar, el
+    # navegador no debe usar uno viejo que apunte a recursos que ya no existen. Al
+    # tener add_header propio, cada location repite las cabeceras de seguridad.
+    location @aplicacion {
+        add_header Cache-Control "no-cache" always;
         include /etc/nginx/snippets/agendauno-cabeceras.conf;
+        try_files /app.html =404;
     }
     location / {
         add_header Cache-Control "no-cache" always;
@@ -91,32 +100,32 @@ server {
     server_name ${DOMINIO_TURNOUNO};
     root /usr/share/nginx/html/app;
     include /etc/nginx/snippets/agendauno-comun.conf;
+    set $landing landing-turnouno:80;
 
     location = / {
-        root /usr/share/nginx/html/turnouno;
-        add_header Cache-Control "no-cache" always;
-        include /etc/nginx/snippets/agendauno-cabeceras.conf;
-        try_files /index.html =404;
+        include /etc/nginx/snippets/agendauno-landing-proxy.conf;
+        proxy_intercept_errors on;
+        error_page 404 502 503 504 = @aplicacion;
     }
-    location ~ ^/(software-para-[a-z0-9-]+)/?$ {
-        root /usr/share/nginx/html/turnouno;
-        add_header Cache-Control "no-cache" always;
-        include /etc/nginx/snippets/agendauno-cabeceras.conf;
-        try_files /$1/index.html /app.html;
+    location ~ ^/software-para-[a-z0-9-]+/?$ {
+        include /etc/nginx/snippets/agendauno-landing-proxy.conf;
+        proxy_intercept_errors on;
+        error_page 404 502 503 504 = @aplicacion;
     }
-    # Exactos: ganan a la regla de archivos de nginx-comun.conf.
     location = /sitemap.xml {
-        root /usr/share/nginx/html/turnouno;
+        include /etc/nginx/snippets/agendauno-landing-proxy.conf;
     }
     location = /robots.txt {
-        root /usr/share/nginx/html/turnouno;
+        include /etc/nginx/snippets/agendauno-landing-proxy.conf;
     }
     location ^~ /assets-turnouno/ {
-        root /usr/share/nginx/html/turnouno;
-        try_files $uri =404;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
+        include /etc/nginx/snippets/agendauno-landing-proxy.conf;
+    }
+
+    location @aplicacion {
+        add_header Cache-Control "no-cache" always;
         include /etc/nginx/snippets/agendauno-cabeceras.conf;
+        try_files /app.html =404;
     }
     location / {
         add_header Cache-Control "no-cache" always;

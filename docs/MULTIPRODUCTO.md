@@ -31,7 +31,8 @@ implementado** · **Requiere autorización**.
 | Landing TurnoUno de prelanzamiento (turnouno.mx) | Implementado, pendiente de despliegue | Portada de citas con «Quiero que me avisen» y lista de interesados; logotipo en texto (configurable) |
 | Aplicación con la marca del dominio | Implementado y probado | Textos, logo y enlaces con la marca del producto; registro solo con sus giros |
 | Superadmin: interesados | Implementado y probado | Pestaña «Interesados» |
-| Imágenes web separadas por build (publicar una landing sin la aplicación) | No implementado | Fase 5 (infraestructura) |
+| Imágenes web separadas (aplicación, landing AgendaUno, landing TurnoUno) | Implementado, pendiente de despliegue | ADR 0112: `landing.Dockerfile`; nginx de `web` pasa a cada landing sus rutas; enrutamiento probado con contenedores |
+| Publicar y volver por componente | Implementado, pendiente de despliegue | `./actualizar.sh --solo …`, `./volver.sh --solo …`, versión por componente |
 | PWA por negocio (AgendaUno y TurnoUno) | Implementado, pendiente de despliegue | ADR 0110: manifiesto dinámico en el subdominio, service worker que no guarda la API, invitación a instalar; probado en unidades y contra el API local |
 | Color de marca del negocio | Implementado y probado | Configuración → Perfil público; barra de la app instalada |
 | Íconos cuadrados del logo (192/512) | Preparado para futuro | Requiere GD en la imagen del API (cambio de imagen) |
@@ -43,8 +44,10 @@ implementado** · **Requiere autorización**.
 | La API no abre negocios del otro producto en cada app | Implementado y probado | `X-App-Producto`; la app dice qué app descargar |
 | Marca blanca (solo AgendaUno) | Preparado para futuro | Archivo por negocio, `X-App-Negocio`, Gradle la impide en TurnoUno; sin alta en superadmin |
 | Publicar las apps en tiendas | Requiere autorización | Cuentas de desarrollador, llaves de firma, fichas |
-| Traefik, dos dominios, certificados comodín | No implementado | Fase 5; DNS en Cloudflare |
-| CI/CD por aplicación | No implementado | Fase 5 |
+| Traefik existente, dos dominios, certificados comodín | Implementado, pendiente de despliegue | `docker-compose.traefik.yml`; el resolvedor DNS-01 de Cloudflare en el Traefik y el token requieren autorización |
+| IP real detrás de Cloudflare | Implementado, pendiente de despliegue | `docker-compose.cloudflare.yml`: solo IP de Cloudflare y `CF-Connecting-IP` |
+| DNS en Cloudflare (`@`, `www`, `*` de cada dominio) | Requiere autorización | Cambio en producción |
+| CI/CD por aplicación | No implementado | Fase de CI/CD |
 | Negocio con los dos productos | Preparado para futuro | Hoy un negocio es de una sola modalidad (ADR 0104) |
 | Documentos legales por producto | Preparado para futuro | Hoy son de la plataforma |
 | Autorregistro de clientes en los sitios | Requiere autorización | Se mantiene cerrado (ADR 0093, reafirmado 2026-10-10) |

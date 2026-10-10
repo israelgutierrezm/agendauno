@@ -32,8 +32,12 @@ flavors `agendauno` (default) and `turnouno`; `ProductoApp.actual` in Dart. Requ
 carry `X-App-Producto`; white-label apps (AgendaUno only) are built from
 `configuraciones/marca_blanca/<negocio>.json` and carry `X-App-Negocio`.
 
-Infrastructure: Docker (`infra/produccion`, `actualizar.sh` / `volver.sh`),
-GitHub Actions CI (API with MySQL, web, mobile).
+Infrastructure: Docker (`infra/produccion`, `actualizar.sh` / `volver.sh`, with
+`--solo web|landing-agendauno|landing-turnouno` for stateless components; `compose.sh`
+for any manual `up`), behind the server's existing Traefik
+(`docker-compose.traefik.yml`, Cloudflare DNS-01 wildcard certificates;
+`docker-compose.cloudflare.yml` for the Cloudflare proxy) — ADR 0112. GitHub Actions
+CI (API with MySQL, web, mobile, images).
 
 ## Architectural Style
 

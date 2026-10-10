@@ -3,11 +3,16 @@
 #   cd infra/produccion
 #   cp api.env.example api.env   # y llénalo
 #   cp web.env.example web.env   # y llénalo
-#   docker compose --env-file web.env up -d --build
+#   ./compose.sh up -d --build   # docker compose --env-file web.env, con COMPOSE_FILE y versiones
 #
-# Después: ./actualizar.sh y ./volver.sh. Para aplicar un cambio de api.env, el `up -d`
-# con la VERSION en marcha (docs/DESPLIEGUE.md → «Cambiar api.env»): sin ella, Compose
-# usaría la imagen `latest`, la de la primera instalación.
+# Después: ./actualizar.sh y ./volver.sh (todo, o un componente: --solo web,
+# --solo landing-agendauno, --solo landing-turnouno). Para cualquier otro `up`, usa
+# ./compose.sh: pone la versión en marcha de cada componente (docs/DESPLIEGUE.md →
+# «Cambiar api.env»); sin ella, Compose usaría las imágenes `latest`, las de la primera
+# instalación.
+#
+# Detrás del Traefik del servidor (ADR 0112), agrega docker-compose.traefik.yml (y,
+# con el proxy de Cloudflare, docker-compose.cloudflare.yml) en COMPOSE_FILE de web.env.
 #
 # MySQL va aparte (servicio administrado o un servidor propio): cada negocio tiene su
 # propia base, así que el usuario de la API necesita poder crear bases `tenant_%`.
@@ -15,6 +20,18 @@
 # Tunnel…) es lo único que lo alcanza.
 
 name: agendauno
+
+# Variables públicas de compilación de la web (la aplicación y las landings): quedan
+# dentro del HTML y el JavaScript; nada secreto.
+x-web-args: &web-args
+  VITE_DOMINIO_PUBLICO: ${DOMINIO:?Falta DOMINIO en web.env}
+  VITE_DOMINIO_TURNOUNO: ${DOMINIO_TURNOUNO:-turnouno.mx}
+  VITE_TURNOUNO_NOMBRE: ${VITE_TURNOUNO_NOMBRE:-}
+  VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+  VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY:-}
+  VITE_ANALYTICS_ENDPOINT: ${VITE_ANALYTICS_ENDPOINT:-}
+  VITE_VENTAS_WHATSAPP: ${VITE_VENTAS_WHATSAPP:-}
+  GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
 
 x-api: &api
   build:
@@ -75,29 +92,26 @@ services:
       retries: 3
       start_period: 3m
 
-  # Landings de AgendaUno y TurnoUno + aplicación + paso de /api a PHP + archivos
-  # públicos (ADR 0108).
+  # La entrada de los dos dominios: la aplicación, el paso de /api a PHP, los archivos
+  # públicos y, a su landing, la portada y las páginas por giro (ADR 0108 y 0112). Se
+  # publica con la plataforma o sola (./actualizar.sh --solo web).
   web:
     build:
       context: ../..
       dockerfile: infra/produccion/web.Dockerfile
       args:
-        VITE_DOMINIO_PUBLICO: ${DOMINIO:?Falta DOMINIO en web.env}
-        VITE_DOMINIO_TURNOUNO: ${DOMINIO_TURNOUNO:-turnouno.mx}
-        VITE_TURNOUNO_NOMBRE: ${VITE_TURNOUNO_NOMBRE:-}
-        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
-        VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY:-}
-        VITE_ANALYTICS_ENDPOINT: ${VITE_ANALYTICS_ENDPOINT:-}
-        VITE_VENTAS_WHATSAPP: ${VITE_VENTAS_WHATSAPP:-}
+        <<: *web-args
         # La versión viaja en los errores de la web (ADR 0080).
-        VITE_APP_VERSION: ${VERSION:-latest}
-        GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
-    image: agendauno-web:${VERSION:-latest}
+        VITE_APP_VERSION: ${VERSION_WEB:-latest}
+    image: agendauno-web:${VERSION_WEB:-latest}
     environment:
       DOMINIO: ${DOMINIO}
       DOMINIO_TURNOUNO: ${DOMINIO_TURNOUNO:-turnouno.mx}
       # Desde dónde llega el proxy TLS: por el puerto publicado, la red de Docker.
       PROXY_CONFIABLE: ${PROXY_CONFIABLE:-172.16.0.0/12}
+      # De qué cabecera sale la IP real del cliente (CF-Connecting-IP con
+      # docker-compose.cloudflare.yml).
+      CABECERA_IP_REAL: ${CABECERA_IP_REAL:-X-Forwarded-For}
     ports:
       - "127.0.0.1:8080:80"
     volumes:
@@ -109,6 +123,31 @@ services:
     # (nginx-comun.conf), así que si se recrea solo la API no hace falta reiniciarla.
     depends_on:
       - api
+    restart: unless-stopped
+
+  # La landing de cada producto (ADR 0112): su portada, sus páginas por giro, su sitemap
+  # y su robots, con HTML completo. Solo la alcanza `web` por la red interna; se publica
+  # sola (./actualizar.sh --solo landing-agendauno) sin tocar la aplicación ni la API.
+  landing-agendauno:
+    build:
+      context: ../..
+      dockerfile: infra/produccion/landing.Dockerfile
+      args:
+        <<: *web-args
+        PRODUCTO: agendauno
+        VITE_APP_VERSION: ${VERSION_LANDING_AGENDAUNO:-latest}
+    image: agendauno-landing-agendauno:${VERSION_LANDING_AGENDAUNO:-latest}
+    restart: unless-stopped
+
+  landing-turnouno:
+    build:
+      context: ../..
+      dockerfile: infra/produccion/landing.Dockerfile
+      args:
+        <<: *web-args
+        PRODUCTO: turnouno
+        VITE_APP_VERSION: ${VERSION_LANDING_TURNOUNO:-latest}
+    image: agendauno-landing-turnouno:${VERSION_LANDING_TURNOUNO:-latest}
     restart: unless-stopped
 
   redis:

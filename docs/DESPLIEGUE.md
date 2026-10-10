@@ -1,13 +1,14 @@
 # Despliegue a producción
 
 Cómo poner la plataforma (AgendaUno y TurnoUno, ADR 0108) en un servidor con Docker.
-Los archivos están en `infra/produccion/`; las decisiones, en los ADR 0048 y 0109.
+Los archivos están en `infra/produccion/`; las decisiones, en los ADR 0048, 0109 y 0112.
 
 ## Qué corre
 
 | Servicio | Qué hace |
 |---|---|
-| `web` | nginx: la landing de cada producto (HTML completo, `dist/agendauno` y `dist/turnouno`) en su dominio, la aplicación (`dist/app`, `app.html`) en lo demás, pasa `/api` y `/up` a PHP y sirve `/storage` (logos y fotos). Escucha solo en `127.0.0.1:8080`. Manda las cabeceras de seguridad (HSTS, `X-Frame-Options`, `frame-ancestors`) y el HTML con `Cache-Control: no-cache` (tras publicar nadie se queda con uno viejo; `/assets/` lleva hash y caché de un año). |
+| `web` | nginx, la entrada de los dos dominios: la aplicación (`dist/app`, `app.html`), pasa `/api` y `/up` a PHP, sirve `/storage` (logos y fotos) y pasa la portada, las páginas por giro, el sitemap, el robots y `/assets-{producto}/` a la landing de su dominio (si la landing no tiene la página o no responde, la aplicación). Escucha solo en `127.0.0.1:8080` y, con Traefik, en su red. Manda las cabeceras de seguridad (HSTS, `X-Frame-Options`, `frame-ancestors`) y el HTML con `Cache-Control: no-cache` (tras publicar nadie se queda con uno viejo; `/assets/` lleva hash y caché de un año). |
+| `landing-agendauno`, `landing-turnouno` | La landing de cada producto (HTML completo pre-generado), cada una en su imagen (ADR 0112): se publican solas, sin tocar la aplicación ni la API. Solo las alcanza `web`. |
 | `api` | Laravel en PHP-FPM, con pool propio (`infra/produccion/php-fpm.conf`): hasta 24 peticiones a la vez, pensado para el servidor de 4 GB. Con otra memoria, ajusta `pm.max_children` (el archivo explica la cuenta). |
 | `worker` | Cola en Redis: correos transaccionales. Chequeo de salud: su latido (`agendauno:latido --verificar=cola`). |
 | `scheduler` | Tareas programadas (`routes/console.php`): recordatorios, renovaciones, agenda recurrente, cobros, outbox, respaldos, alertas… Chequeo de salud: su latido. |
@@ -36,12 +37,15 @@ mismo. Así no hay CORS entre subdominios.
    guarda binlog, debe ser `binlog_format=ROW`, el valor por defecto de MySQL 8.
 
 3. **DNS** de los dos dominios (`DOMINIO` = agendauno.mx y `DOMINIO_TURNOUNO` =
-   turnouno.mx): cada uno, su `www.` y su comodín (`*.`) apuntando al servidor.
+   turnouno.mx), en Cloudflare: en cada zona, registros `A` (y `AAAA` si el servidor
+   tiene IPv6) de `@`, `www` y `*` apuntando al servidor.
 4. **HTTPS** delante de nginx, con certificado comodín para cada dominio (`*.DOMINIO`
    más `DOMINIO`, y lo mismo de `DOMINIO_TURNOUNO`). El comodín exige validación por
    DNS. Opciones:
-   - **Cloudflare**: DNS con proxy más Cloudflare Tunnel (`cloudflared`) hacia
-     `http://127.0.0.1:8080`. No abre puertos.
+   - **El Traefik del servidor** (el de producción; ver «Traefik» abajo): no se
+     instala otro.
+   - **Cloudflare Tunnel** (`cloudflared`) hacia `http://127.0.0.1:8080`. No abre
+     puertos.
    - **Caddy** en el servidor, compilado con el módulo DNS de tu proveedor, con
      `reverse_proxy 127.0.0.1:8080`.
 
@@ -55,6 +59,46 @@ mismo. Así no hay CORS entre subdominios.
    exige HTTPS en **todo** subdominio de `DOMINIO` durante un año: si otro servicio
    usa uno (por ejemplo, el seguimiento de clics del proveedor de correo), debe tener
    HTTPS.
+   #### Traefik
+
+   El VPS ya tiene un Traefik (versión 3) que atiende otros sitios. AgendaUno se le
+   conecta con `docker-compose.traefik.yml` (ADR 0112): solo `web` entra a la red de
+   Traefik, con un router por dominio que pide su certificado comodín. En `web.env`:
+
+   ```bash
+   COMPOSE_FILE=docker-compose.yml:docker-compose.traefik.yml
+   TRAEFIK_RED=traefik            # docker network ls: la red de Traefik
+   TRAEFIK_ENTRADA=websecure      # su punto de entrada HTTPS
+   TRAEFIK_CERTRESOLVER=cloudflare
+   PROXY_CONFIABLE=172.18.0.0/16  # la subred de esa red: docker network inspect traefik
+   ```
+
+   El Traefik necesita (si no lo tiene ya; cambiarlo requiere autorización):
+
+   - un punto de entrada HTTPS y la redirección de HTTP a HTTPS en el de HTTP;
+   - un resolvedor ACME por DNS-01 con Cloudflare, con el nombre de
+     `TRAEFIK_CERTRESOLVER`, y en su contenedor `CF_DNS_API_TOKEN`: un token de
+     Cloudflare con permiso **Zone → DNS → Edit** sobre las dos zonas:
+
+     ```yaml
+     certificatesResolvers:
+       cloudflare:
+         acme:
+           email: operacion@DOMINIO
+           storage: /letsencrypt/acme.json
+           dnsChallenge:
+             provider: cloudflare
+             resolvers: ["1.1.1.1:53", "1.0.0.1:53"]
+     ```
+
+   **Con el proxy de Cloudflare** (nube naranja, recomendado: oculta la IP del
+   servidor), agrega `docker-compose.cloudflare.yml` al final de `COMPOSE_FILE` y en
+   Cloudflare pon SSL/TLS en **Full (strict)**. Traefik solo deja entrar a las IP de
+   Cloudflare y nginx toma la IP del cliente de `CF-Connecting-IP`. Sin el proxy (nube
+   gris), no lo agregues: la IP llega en `X-Forwarded-For`.
+
+   Con Traefik 2, las reglas cambian: `HostRegexp(`{sub:[a-z0-9-]+}.DOMINIO`)` y el
+   middleware `ipwhitelist`; ajústalas en los dos archivos.
 5. **Correo**: cuenta SMTP (Resend, Postmark, Amazon SES, Brevo…) con el dominio del
    remitente verificado (SPF y DKIM).
 6. **Facturación (opcional)**: llave de FacturAPI (`FACTURAPI_LLAVE` o en la
@@ -111,8 +155,8 @@ cp web.env.example web.env
 2. Genera la llave de la aplicación **una sola vez** y pégala en `APP_KEY`:
 
    ```bash
-   docker compose --env-file web.env build
-   docker compose --env-file web.env run --rm --no-deps --entrypoint php api artisan key:generate --show
+   ./compose.sh build
+   ./compose.sh run --rm --no-deps --entrypoint php api artisan key:generate --show
    ```
 
    Guárdala también fuera del servidor. Si se pierde, las llaves de las pasarelas de
@@ -120,9 +164,12 @@ cp web.env.example web.env
 3. Crea el esquema y arranca:
 
    ```bash
-   docker compose --env-file web.env run --rm api php artisan migrate --force
-   docker compose --env-file web.env up -d
+   ./compose.sh run --rm api php artisan migrate --force
+   ./compose.sh up -d
    ```
+
+   (`./compose.sh` es `docker compose --env-file web.env` con los archivos de
+   `COMPOSE_FILE` y la versión en marcha de cada componente.)
 
 4. Comprueba (los comandos de `artisan` con `exec` van con `-u www-data`, ver
    «Operación»):
@@ -190,6 +237,25 @@ La primera vez que uses el script, la versión en marcha aún no tiene
 `agendauno:respaldar-plataforma`: respalda MySQL con la herramienta del proveedor y corre
 `SIN_RESPALDO_PLATAFORMA=1 ./actualizar.sh`.
 
+### Publicar un solo componente
+
+La aplicación web y la landing de cada producto se publican solas (ADR 0112): solo se
+construye y cambia ese contenedor, sin mantenimiento, respaldos ni migraciones (no
+tocan datos). Si la versión nueva no atiende en 2 minutos (una petición real por
+nginx), vuelve a levantar la anterior y sale con error.
+
+```bash
+./actualizar.sh --solo landing-turnouno           # lo último de main
+./actualizar.sh --solo landing-agendauno v1.4.1   # una etiqueta o commit
+./actualizar.sh --solo web                        # la aplicación (sin la API)
+```
+
+Cada componente guarda su versión (`.version-web`, `.version-landing-agendauno`,
+`.version-landing-turnouno`; la plataforma, `.version-actual`) y `.historial-versiones`
+anota el cambio con su nombre. `./actualizar.sh` sin `--solo` publica todo con la misma
+versión. Publica la aplicación sola solo si no depende de un cambio de la API que aún
+no está en marcha.
+
 ### Volver a una versión anterior
 
 ```bash
@@ -198,7 +264,14 @@ La primera vez que uses el script, la versión en marcha aún no tiene
 ```
 
 Vuelve sin reconstruir: las imágenes de cada versión quedan en el servidor (bórralas a
-mano cuando ya no las necesites: `docker image ls agendauno-*`). Igual que al actualizar,
+mano cuando ya no las necesites: `docker image ls agendauno-*`). Regresa la plataforma y
+la aplicación web; las landings se quedan como están. Para un solo componente:
+
+```bash
+./volver.sh --solo landing-turnouno           # a la versión de la que se vino
+./volver.sh --solo web 3f4b7c9                # a una versión concreta
+```
+ Igual que al actualizar,
 pone mantenimiento, deja terminar la cola y el programador, solo reabre si la versión
 atiende (con las mismas señales) y ya abierta confirma que la cola procesa; si no, sale
 con error.
@@ -210,12 +283,13 @@ que se tomó justo antes (ver «Datos y respaldos»).
 ### Cambiar `api.env`
 
 Tras editar `api.env` (correo, `ALERTAS_CORREO`, llaves…), recrea la API **con la
-versión en marcha**. Sin `VERSION`, Compose usaría la imagen `latest`, que es la de la
-primera instalación:
+versión en marcha** de cada componente: `./compose.sh` es `docker compose` con ellas y
+con los archivos de `COMPOSE_FILE`. Sin las versiones, Compose usaría las imágenes
+`latest`, las de la primera instalación:
 
 ```bash
 cd agendauno/infra/produccion
-VERSION="$(cat .version-actual 2>/dev/null || echo latest)" docker compose --env-file web.env up -d
+./compose.sh up -d
 ```
 
 Compose recrea `api`, `worker` y `scheduler`, que al arrancar vuelven a cachear la
