@@ -132,11 +132,16 @@ class CatalogoTenantController
     public function crearOferta(Request $request): JsonResponse
     {
         $actividad = ActividadTenant::query()->where('ulid', (string) $request->route('actividad'))->firstOrFail();
+        $estudio = $request->attributes->get('estudio');
+        $esCitas = $estudio instanceof Estudio && $estudio->modalidad() === ModalidadServicio::Citas;
+        // La forma la da la modalidad del negocio (ADR 0104): en uno de citas los
+        // servicios son individuales; en uno de clases, grupales.
+        $forma = $esCitas ? ModalidadOfertaTenant::Individual : ModalidadOfertaTenant::Grupal;
         $validado = $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
             // Lo que ve quien la elige en línea (página pública y agendar).
             'descripcion' => ['nullable', 'string', 'max:'.self::MAX_DESCRIPCION],
-            'modalidad' => ['required', Rule::enum(ModalidadOfertaTenant::class)],
+            'modalidad' => ['required', Rule::enum(ModalidadOfertaTenant::class), Rule::in([$forma->value])],
             'capacidad' => ['nullable', 'integer', 'min:1'],
             'lugares' => ['nullable', 'integer', 'min:0', 'max:1000'],
             // Política de reserva (citas): entitlement (default) o pago-para-reservar.
@@ -148,12 +153,14 @@ class CatalogoTenantController
             // ni se le comunican al cliente (2.3).
             'preparacion_min' => ['nullable', 'integer', 'min:0', 'max:240'],
             'limpieza_min' => ['nullable', 'integer', 'min:0', 'max:240'],
+        ], [
+            'modalidad.in' => $esCitas
+                ? 'En un negocio de citas cada servicio es individual.'
+                : 'En un negocio de clases cada clase es grupal.',
         ]);
 
         // Defaults por modalidad: en un negocio de citas el servicio se agenda y se paga
         // (pago-para-reservar, 30 min); en uno de clases se reserva con la membresía.
-        $estudio = $request->attributes->get('estudio');
-        $esCitas = $estudio instanceof Estudio && $estudio->modalidad() === ModalidadServicio::Citas;
 
         $oferta = $actividad->ofertas()->create([
             'nombre' => $validado['nombre'],

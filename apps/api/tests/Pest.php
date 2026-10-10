@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Tenancy\Application\TimbresTenant;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Integraciones\ResolvedorDns;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\TipoCambio;
@@ -204,9 +205,12 @@ function agendaSemilla(array $e): array
         ->assertCreated()->json('data.id');
     $actividad = (string) test()->postJson("/api/v1/app/{$e['slug']}/programas/{$programa}/actividades", ['nombre' => 'Pole Sport'], conBearer($e['bearer']))
         ->assertCreated()->json('data.id');
-    $oferta = (string) test()->postJson("/api/v1/app/{$e['slug']}/actividades/{$actividad}/ofertas", [
-        'nombre' => 'Nivel 1', 'modalidad' => 'grupal', 'capacidad' => 12,
-    ], conBearer($e['bearer']))->assertCreated()->json('data.id');
+    // La forma de la oferta es la de la modalidad del negocio (ADR 0104).
+    $citas = Estudio::query()->where('slug', $e['slug'])->firstOrFail()->modalidad() === ModalidadServicio::Citas;
+    $oferta = (string) test()->postJson("/api/v1/app/{$e['slug']}/actividades/{$actividad}/ofertas", $citas
+        ? ['nombre' => 'Nivel 1', 'modalidad' => 'individual']
+        : ['nombre' => 'Nivel 1', 'modalidad' => 'grupal', 'capacidad' => 12],
+        conBearer($e['bearer']))->assertCreated()->json('data.id');
 
     $org = (string) test()->postJson("/api/v1/app/{$e['slug']}/organizaciones", ['nombre' => 'Org'], conBearer($e['bearer']))
         ->assertCreated()->json('data.id');
