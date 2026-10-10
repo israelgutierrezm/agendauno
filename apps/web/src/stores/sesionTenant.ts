@@ -57,6 +57,8 @@ export interface UsuarioTenant {
   segundo_apellido?: string | null;
   nombre_corto?: string;
   foto_url?: string | null;
+  // Se ve en el equipo de la página del negocio (C03).
+  semblanza?: string | null;
   tiene_contrasena?: boolean;
   // Conectó Google para entrar con él (ADR 0093).
   google_conectado?: boolean;

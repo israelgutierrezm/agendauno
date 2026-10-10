@@ -109,5 +109,6 @@ y su documentación. El estado vive en la sección 5.
 | Bloque | Estado |
 |---|---|
 | 1 | Hecho: cupo único (ADR 0116) y planes archivados fuera de venta; PR #10 |
-| 2 | Hecho: Prospectos, captación activable y formularios embebibles (ADR 0117) |
-| 3–8 | Pendiente |
+| 2 | Hecho: Prospectos, captación activable y formularios embebibles (ADR 0117); PR #11 |
+| 3 | Hecho: calendario público por fecha; planes agrupados con destacado, fecha exacta y clase de prueba solo para quien nunca vino; clases para principiantes con qué saber y qué llevar; semblanza del equipo (ADR 0118) |
+| 4–8 | Pendiente |

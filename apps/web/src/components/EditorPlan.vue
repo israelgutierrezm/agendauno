@@ -69,6 +69,11 @@ const form = reactive({
   rolloverMax:
     p?.rollover_max != null ? String(p.rollover_max / UNIDADES_POR_CLASE) : "",
   archivado: p?.archivado ?? false,
+  // Para el público (M03/B03): qué incluye en una línea, el destacado y la clase de
+  // prueba (solo la compra quien nunca vino; lo valida el servidor).
+  descripcion: p?.descripcion ?? "",
+  destacado: p?.destacado ?? false,
+  primeraVez: p?.primera_vez ?? false,
 });
 const guardando = ref(false);
 const error = ref<string | null>(null);
@@ -104,6 +109,8 @@ const esSuelta = computed(() => form.tipo === "sesion_individual");
 const sinVigencia = computed(
   () => esExtra.value || esMembresia.value || form.vigencia === "ninguna",
 );
+// Una clase de prueba es un paquete o una clase suelta, no una cuota ni extras.
+const admitePrimeraVez = computed(() => !esMembresia.value && !esExtra.value);
 
 function numero(valor: string): number | null {
   const n = Number(String(valor).trim());
@@ -188,6 +195,9 @@ async function guardar(): Promise<void> {
     // Las extras sirven para lo mismo que el paquete al que se suman.
     ofertas: esExtra.value || form.todas ? [] : [...form.ofertas],
     sucursal_ids: form.cobertura === "todas" ? null : form.sucursalIds,
+    descripcion: form.descripcion.trim() || null,
+    destacado: form.destacado,
+    primera_vez: admitePrimeraVez.value && form.primeraVez,
   };
   try {
     if (p) {
@@ -299,6 +309,18 @@ onMounted(async () => {
           step="0.01"
           inputmode="decimal"
           required
+        />
+      </div>
+      <div class="sm:col-span-2">
+        <label class="tu-label" for="ep-descripcion">{{
+          $t("planes.editor.descripcion")
+        }}</label>
+        <input
+          id="ep-descripcion"
+          v-model="form.descripcion"
+          class="tu-input"
+          maxlength="300"
+          :placeholder="tx('descripcionPh')"
         />
       </div>
     </div>
@@ -514,6 +536,37 @@ onMounted(async () => {
         {{ $t("planes.editor.coberturaCompras") }}
       </p>
     </fieldset>
+    <!-- En la página del negocio -->
+    <fieldset class="space-y-2">
+      <legend class="tu-label">{{ $t("planes.editor.enTuPagina") }}</legend>
+      <label class="flex items-start gap-2 text-sm">
+        <input v-model="form.destacado" type="checkbox" class="mt-1" />
+        <span>
+          {{ $t("planes.editor.destacado") }}
+          <span
+            class="block text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+            >{{ $t("planes.editor.destacadoAyuda") }}</span
+          >
+        </span>
+      </label>
+      <label
+        v-if="admitePrimeraVez"
+        class="flex items-start gap-2 text-sm"
+        data-prueba="primera-vez"
+      >
+        <input v-model="form.primeraVez" type="checkbox" class="mt-1" />
+        <span>
+          {{ tx("primeraVez") }}
+          <span
+            class="block text-xs"
+            :style="{ color: 'var(--texto-suave)' }"
+            >{{ tx("primeraVezAyuda") }}</span
+          >
+        </span>
+      </label>
+    </fieldset>
+
     <!-- Más opciones -->
     <details class="text-sm">
       <summary class="cursor-pointer" :style="{ color: 'var(--texto-suave)' }">

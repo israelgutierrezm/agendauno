@@ -1003,6 +1003,11 @@ class ProductoComprable {
     this.vigenciaTipo,
     this.vigenciaCantidad,
     this.cobertura = const CoberturaSucursales(),
+    this.descripcion,
+    this.destacado = false,
+    this.primeraVez = false,
+    this.disponible = true,
+    this.venceSiCompraHoy,
   });
 
   factory ProductoComprable.desdeJson(
@@ -1019,6 +1024,11 @@ class ProductoComprable {
     vigenciaTipo: j['vigencia_tipo'] as String?,
     vigenciaCantidad: (j['vigencia_cantidad'] as num?)?.toInt(),
     cobertura: CoberturaSucursales.desdeJson(j),
+    descripcion: j['descripcion'] as String?,
+    destacado: (j['destacado'] ?? false) as bool,
+    primeraVez: (j['primera_vez'] ?? false) as bool,
+    disponible: (j['disponible'] ?? true) as bool,
+    venceSiCompraHoy: j['vence_si_compra_hoy'] as String?,
   );
 
   final String id;
@@ -1036,7 +1046,37 @@ class ProductoComprable {
   final String? vigenciaTipo;
   final int? vigenciaCantidad;
 
+  /// Qué incluye, en una línea (lo escribe el negocio).
+  final String? descripcion;
+
+  /// El que el negocio recomienda: va primero.
+  final bool destacado;
+
+  /// Clase de prueba: solo para quien nunca vino.
+  final bool primeraVez;
+
+  /// ¿Lo puede comprar? (la clase de prueba, solo la primera vez; lo valida el
+  /// servidor al crear la orden y al cobrarla).
+  final bool disponible;
+
+  /// Hasta cuándo se puede usar si se paga hoy (AAAA-MM-DD): la vigencia corre
+  /// desde el pago.
+  final String? venceSiCompraHoy;
+
   bool get esExtra => tipo == 'add_on';
+
+  /// "Si la pagas hoy, se puede usar hasta el 8 de octubre." o null.
+  String? get venceTexto => venceSiCompraHoy == null
+      ? null
+      : 'Si la pagas hoy, se puede usar hasta el '
+            '${Formato.fechaLarga(venceSiCompraHoy)}.';
+
+  /// "Paquete · Recomendado", "Sesión individual · Para tu primera vez"…
+  String get etiqueta => [
+    tipoTexto,
+    if (destacado) 'Recomendado',
+    if (primeraVez) 'Para tu primera vez',
+  ].join(' · ');
 
   /// "Paquete", "Membresía"… (como en la web).
   String get tipoTexto => switch (tipo) {
@@ -1086,13 +1126,21 @@ class ProductoComprable {
     };
   }
 
-  /// Las clases extra solo tienen sentido con un paquete de créditos vigente.
+  /// Las clases extra solo tienen sentido con un paquete de créditos vigente; la
+  /// clase de prueba, solo si todavía le toca. El recomendado va primero.
   static List<ProductoComprable> paraComprar(
     List<ProductoComprable> productos,
     List<DerechoMiembro> derechos,
   ) {
     final tienePaquete = derechos.any((d) => !d.ilimitado);
-    return productos.where((p) => !p.esExtra || tienePaquete).toList();
+    final lista = productos
+        .where((p) => (!p.esExtra || tienePaquete) && p.disponible)
+        .toList();
+    // Estable: los demás conservan su orden (del más barato).
+    return [
+      ...lista.where((p) => p.destacado),
+      ...lista.where((p) => !p.destacado),
+    ];
   }
 }
 

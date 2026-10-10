@@ -55,6 +55,14 @@ interface Producto {
   moneda: string;
   ilimitado: boolean;
   creditos_incluidos: number | null;
+  // Para comparar antes de comprar (M03/B03).
+  descripcion?: string | null;
+  destacado?: boolean;
+  primera_vez?: boolean;
+  actividad?: string | null;
+  unidades_por_ciclo?: number | null;
+  // La fecha exacta: la vigencia corre desde el pago.
+  vence_si_compra_hoy?: string | null;
 }
 type NombreRed = "instagram" | "facebook" | "tiktok" | "youtube" | "sitio_web";
 interface Red {
@@ -94,6 +102,10 @@ interface Servicio {
   moneda: string;
   agendable: boolean;
   niveles: string[];
+  // Para quien llega por primera vez (C03).
+  para_principiantes?: boolean;
+  requisitos?: string | null;
+  que_llevar?: string | null;
 }
 interface ClaseHorario {
   dia: number;
@@ -136,7 +148,11 @@ interface Escaparate {
     whatsapp: string | null;
   };
   sucursales: Sucursal[];
-  instructores: { nombre: string; foto_url: string | null }[];
+  instructores: {
+    nombre: string;
+    foto_url: string | null;
+    semblanza?: string | null;
+  }[];
   servicios?: Servicio[];
   horario_clases?: ClaseHorario[];
   productos: Producto[];
@@ -235,6 +251,11 @@ const descripcionLarga = computed(() => textoPortada.value.length > 280);
 const busqueda = ref("");
 const categoria = ref<string | null>(null);
 const servicios = computed(() => escaparate.value?.servicios ?? []);
+// Solo las clases para principiantes (si el negocio marcó alguna).
+const soloPrincipiantes = ref(false);
+const hayPrincipiantes = computed(
+  () => !usaCitas.value && servicios.value.some((x) => x.para_principiantes),
+);
 const categorias = computed(() => [
   ...new Set(
     servicios.value
@@ -247,6 +268,7 @@ const serviciosVisibles = computed(() => {
   return servicios.value.filter(
     (x) =>
       (categoria.value === null || x.categoria === categoria.value) &&
+      (!soloPrincipiantes.value || x.para_principiantes === true) &&
       (q === "" ||
         `${x.nombre} ${x.descripcion ?? ""}`
           .toLocaleLowerCase("es-MX")
@@ -280,6 +302,50 @@ function horarioDeSede(su: Sucursal): { dia: number; texto: string | null }[] {
     const d = (su.horario ?? []).find((h) => h.dia === dia);
     return { dia, texto: d ? `${d.abre} – ${d.cierra}` : null };
   });
+}
+// Precios: el destacado primero y luego la clase de prueba; el resto, por precio
+// (como llegan). Así se comparan sin buscar.
+const precios = computed(() => {
+  const lista = escaparate.value?.productos ?? [];
+  const orden = (p: Producto) => (p.destacado ? 0 : p.primera_vez ? 1 : 2);
+  return [...lista].sort((a, b) => orden(a) - orden(b));
+});
+// Agrupados para comparar (M03): primero lo de la primera vez, luego clase suelta,
+// paquetes, membresías y lo demás; con un solo grupo, sin títulos.
+const GRUPOS_PRECIO = [
+  "primera_vez",
+  "sesion_individual",
+  "paquete",
+  "membresia",
+  "otro",
+  "add_on",
+] as const;
+type GrupoPrecio = (typeof GRUPOS_PRECIO)[number];
+function grupoDe(p: Producto): GrupoPrecio {
+  if (p.primera_vez) {
+    return "primera_vez";
+  }
+  return (GRUPOS_PRECIO as readonly string[]).includes(p.tipo)
+    ? (p.tipo as GrupoPrecio)
+    : "otro";
+}
+const gruposPrecios = computed(() =>
+  GRUPOS_PRECIO.map((clave) => ({
+    clave,
+    lista: precios.value.filter((p) => grupoDe(p) === clave),
+  })).filter((g) => g.lista.length > 0),
+);
+// Con semblanzas, el equipo se presenta en tarjetas; si no, en una línea.
+const equipoConSemblanza = computed(
+  () => escaparate.value?.instructores.some((p) => p.semblanza) ?? false,
+);
+// «8 de octubre» de una fecha AAAA-MM-DD, sin que la zona horaria la mueva.
+function fechaDia(iso: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  }).format(new Date(`${iso}T12:00:00Z`));
 }
 const etiquetaProfesional = computed(
   () =>
@@ -881,14 +947,24 @@ onMounted(cargar);
                     : $t("perfilPublico.publico.clases"))
                 }}
               </h2>
-              <input
-                v-if="servicios.length > 5"
-                v-model="busqueda"
-                type="search"
-                class="tu-input w-full sm:w-64"
-                :placeholder="$t('perfilPublico.publico.buscar')"
-                :aria-label="$t('perfilPublico.publico.buscar')"
-              />
+              <div class="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+                <label
+                  v-if="hayPrincipiantes"
+                  class="flex items-center gap-2 text-sm"
+                  data-prueba="solo-principiantes"
+                >
+                  <input v-model="soloPrincipiantes" type="checkbox" />
+                  {{ $t("perfilPublico.publico.soloPrincipiantes") }}
+                </label>
+                <input
+                  v-if="servicios.length > 5"
+                  v-model="busqueda"
+                  type="search"
+                  class="tu-input w-full sm:w-64"
+                  :placeholder="$t('perfilPublico.publico.buscar')"
+                  :aria-label="$t('perfilPublico.publico.buscar')"
+                />
+              </div>
             </div>
             <div
               v-if="categorias.length > 1"
@@ -940,7 +1016,15 @@ onMounted(cargar);
                     class="h-16 w-16 shrink-0 rounded-xl object-cover"
                   />
                   <div class="min-w-0 flex-1">
-                    <p class="font-semibold">{{ x.nombre }}</p>
+                    <p class="flex flex-wrap items-center gap-2 font-semibold">
+                      {{ x.nombre }}
+                      <span
+                        v-if="x.para_principiantes && !usaCitas"
+                        class="tu-badge"
+                        data-prueba="principiantes"
+                        >{{ $t("perfilPublico.publico.principiantes") }}</span
+                      >
+                    </p>
                     <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
                       {{
                         [
@@ -962,6 +1046,20 @@ onMounted(cargar);
                     <p v-if="x.descripcion" class="mt-1 text-sm">
                       {{ x.descripcion }}
                     </p>
+                    <dl
+                      v-if="x.requisitos || x.que_llevar"
+                      class="ep-primera-vez mt-2 text-sm"
+                      data-prueba="primera-vez-clase"
+                    >
+                      <template v-if="x.requisitos">
+                        <dt>{{ $t("perfilPublico.publico.requisitos") }}</dt>
+                        <dd>{{ x.requisitos }}</dd>
+                      </template>
+                      <template v-if="x.que_llevar">
+                        <dt>{{ $t("perfilPublico.publico.queLlevar") }}</dt>
+                        <dd>{{ x.que_llevar }}</dd>
+                      </template>
+                    </dl>
                     <ServicioIncluye
                       class="mt-1"
                       :incluye="x.incluye"
@@ -1056,59 +1154,132 @@ onMounted(cargar);
               >
                 {{ $t("escaparate.sinPrecios") }}
               </p>
-              <ul v-else class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <li
-                  v-for="(p, i) in escaparate.productos"
-                  :key="i"
-                  class="tu-card flex flex-col p-5"
+              <template v-else>
+                <div
+                  v-for="g in gruposPrecios"
+                  :key="g.clave"
+                  class="mt-6"
+                  data-prueba="grupo-precios"
                 >
-                  <span class="tu-badge self-start">{{
-                    $t(`escaparate.registro.tipos.${p.tipo}`)
-                  }}</span>
-                  <p class="mt-2 font-light">{{ p.nombre }}</p>
-                  <p
-                    v-if="variasSedes && p.todas_sucursales !== undefined"
-                    class="mt-1 text-sm"
-                    style="color: var(--texto-suave)"
-                  >
-                    {{
-                      p.todas_sucursales
-                        ? $t("sucursalOperativa.todas")
-                        : p.sucursales?.map((s) => s.nombre).join(" · ")
-                    }}
-                  </p>
-                  <p class="mt-1 text-2xl font-extrabold">
-                    {{ dinero(p.precio_minor, p.moneda) }}
-                  </p>
-                  <p
-                    class="mt-1 text-sm"
+                  <h3
+                    v-if="gruposPrecios.length > 1"
+                    class="mb-3 text-sm font-semibold"
                     :style="{ color: 'var(--texto-suave)' }"
                   >
-                    <template v-if="p.ilimitado">{{
-                      $t("escaparate.ilimitado")
-                    }}</template>
-                    <template v-else-if="p.creditos_incluidos">{{
+                    {{
                       $t(
-                        "escaparate.creditos",
-                        { n: p.creditos_incluidos / 1000 },
-                        p.creditos_incluidos === 1000 ? 1 : 2,
+                        `escaparate.planes.${usaCitas ? "gruposCitas" : "grupos"}.${g.clave}`,
                       )
-                    }}</template>
-                  </p>
-                  <button
-                    type="button"
-                    class="tu-btn tu-btn-primario mt-4 w-full"
-                    @click="
-                      abrirAcceso('price_card', {
-                        producto: p.id ?? null,
-                        etiqueta: p.nombre,
-                      })
-                    "
-                  >
-                    {{ $t("escaparate.pedirAcceso") }}
-                  </button>
-                </li>
-              </ul>
+                    }}
+                  </h3>
+                  <ul class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <li
+                      v-for="(p, i) in g.lista"
+                      :key="p.id ?? i"
+                      class="tu-card flex flex-col p-5"
+                      :class="{ 'ep-precio-destacado': p.destacado }"
+                      data-prueba="precio"
+                    >
+                      <div class="flex flex-wrap gap-2">
+                        <span class="tu-badge">{{
+                          $t(`escaparate.registro.tipos.${p.tipo}`)
+                        }}</span>
+                        <span
+                          v-if="p.destacado"
+                          class="tu-badge ep-badge-marca"
+                          data-prueba="destacado"
+                          >{{ $t("escaparate.planes.destacado") }}</span
+                        >
+                        <span
+                          v-if="p.primera_vez && gruposPrecios.length === 1"
+                          class="tu-badge"
+                          data-prueba="primera-vez"
+                          >{{ $t("escaparate.planes.primeraVez") }}</span
+                        >
+                      </div>
+                      <p class="mt-2 font-light">{{ p.nombre }}</p>
+                      <p v-if="p.descripcion" class="mt-1 text-sm">
+                        {{ p.descripcion }}
+                      </p>
+                      <p
+                        v-if="variasSedes && p.todas_sucursales !== undefined"
+                        class="mt-1 text-sm"
+                        style="color: var(--texto-suave)"
+                      >
+                        {{
+                          p.todas_sucursales
+                            ? $t("sucursalOperativa.todas")
+                            : p.sucursales?.map((s) => s.nombre).join(" · ")
+                        }}
+                      </p>
+                      <p class="mt-1 text-2xl font-extrabold">
+                        {{ dinero(p.precio_minor, p.moneda) }}
+                      </p>
+                      <p
+                        class="mt-1 text-sm"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        <template v-if="p.ilimitado">{{
+                          $t("escaparate.ilimitado")
+                        }}</template>
+                        <template v-else-if="p.creditos_incluidos">{{
+                          $t(
+                            "escaparate.creditos",
+                            { n: p.creditos_incluidos / 1000 },
+                            p.creditos_incluidos === 1000 ? 1 : 2,
+                          )
+                        }}</template>
+                        <template v-else-if="p.unidades_por_ciclo">{{
+                          $t(
+                            "escaparate.planes.porMes",
+                            { n: p.unidades_por_ciclo / 1000 },
+                            p.unidades_por_ciclo === 1000 ? 1 : 2,
+                          )
+                        }}</template>
+                      </p>
+                      <!-- Qué cubre y hasta cuándo, sin letra chica (M03). -->
+                      <ul
+                        class="mt-3 mb-4 space-y-1 text-sm"
+                        :style="{ color: 'var(--texto-suave)' }"
+                      >
+                        <li v-if="p.actividad">
+                          {{
+                            $t("escaparate.planes.paraActividad", {
+                              actividad: p.actividad,
+                            })
+                          }}
+                        </li>
+                        <li v-if="p.vence_si_compra_hoy" data-prueba="vence">
+                          {{
+                            $t("escaparate.planes.vence", {
+                              fecha: fechaDia(p.vence_si_compra_hoy),
+                            })
+                          }}
+                        </li>
+                        <li v-else-if="p.tipo === 'membresia'">
+                          {{ $t("escaparate.planes.renueva") }}
+                        </li>
+                        <li v-if="p.primera_vez">
+                          {{ $t("escaparate.planes.primeraVezAyuda") }}
+                        </li>
+                      </ul>
+                      <button
+                        type="button"
+                        class="tu-btn tu-btn-primario mt-auto w-full"
+                        data-prueba="lo-quiero"
+                        @click="
+                          abrirAcceso('price_card', {
+                            producto: p.id ?? null,
+                            etiqueta: p.nombre,
+                          })
+                        "
+                      >
+                        {{ $t("escaparate.planes.loQuiero") }}
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </template>
             </div>
           </section>
         </template>
@@ -1139,11 +1310,20 @@ onMounted(cargar);
                 })
               }}
             </p>
-            <ul class="mt-6 flex flex-wrap gap-4">
+            <ul
+              class="mt-6"
+              :class="
+                equipoConSemblanza
+                  ? 'grid gap-4 sm:grid-cols-2'
+                  : 'flex flex-wrap gap-4'
+              "
+            >
               <li
                 v-for="(p, i) in escaparate.instructores"
                 :key="i"
-                class="flex items-center gap-3"
+                class="flex gap-3"
+                :class="equipoConSemblanza ? 'items-start' : 'items-center'"
+                data-prueba="integrante"
               >
                 <img
                   v-if="p.foto_url"
@@ -1161,7 +1341,16 @@ onMounted(cargar);
                   aria-hidden="true"
                   >{{ iniciales(p.nombre) }}</span
                 >
-                <span class="font-semibold">{{ p.nombre }}</span>
+                <div class="min-w-0">
+                  <span class="font-semibold">{{ p.nombre }}</span>
+                  <p
+                    v-if="p.semblanza"
+                    class="mt-1 text-sm"
+                    :style="{ color: 'var(--texto-suave)' }"
+                  >
+                    {{ p.semblanza }}
+                  </p>
+                </div>
               </li>
             </ul>
           </section>
@@ -1563,6 +1752,36 @@ onMounted(cargar);
   border-radius: 0.75rem;
   border-left: 3px solid var(--primario);
   background: color-mix(in srgb, var(--primario) 7%, var(--superficie));
+}
+/* El plan que el negocio recomienda: con el color de sus botones (su marca). */
+.ep-precio-destacado {
+  border-color: var(--marketing-cta, var(--primario));
+  box-shadow: inset 0 0 0 1px var(--marketing-cta, var(--primario));
+}
+.ep-badge-marca {
+  color: var(--marketing-cta, var(--primario));
+  border-color: color-mix(
+    in srgb,
+    var(--marketing-cta, var(--primario)) 40%,
+    transparent
+  );
+}
+/* Qué saber y qué llevar: etiqueta y texto, uno debajo del otro. */
+.ep-primera-vez {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.15rem 0.75rem;
+}
+.ep-primera-vez dt {
+  color: var(--texto-suave);
+}
+@media (max-width: 30rem) {
+  .ep-primera-vez {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ep-primera-vez dd {
+    margin-bottom: 0.35rem;
+  }
 }
 .tu-agenda-citas {
   background:

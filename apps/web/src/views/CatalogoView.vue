@@ -42,6 +42,10 @@ interface Oferta {
   incluye?: string[];
   // Foto que ve quien lo elige (ADR 0066).
   foto_url?: string | null;
+  // Para quien llega por primera vez (C03).
+  para_principiantes?: boolean;
+  requisitos?: string | null;
+  que_llevar?: string | null;
 }
 interface Recurso {
   id: string;
@@ -118,6 +122,9 @@ const form = ref<{
   limpieza: string;
   recursos: string[];
   incluye: string[];
+  principiantes: boolean;
+  requisitos: string;
+  queLlevar: string;
 }>({
   descripcion: "",
   politica: "entitlement",
@@ -128,6 +135,9 @@ const form = ref<{
   limpieza: "0",
   recursos: [],
   incluye: [],
+  principiantes: false,
+  requisitos: "",
+  queLlevar: "",
 });
 const guardando = ref(false);
 const guardadoId = ref<string | null>(null);
@@ -185,6 +195,9 @@ function configurar(o: Oferta): void {
     limpieza: String(o.limpieza_min ?? 0),
     recursos: [...(o.recursos ?? [])],
     incluye: [...(o.incluye ?? [])],
+    principiantes: o.para_principiantes ?? false,
+    requisitos: o.requisitos ?? "",
+    queLlevar: o.que_llevar ?? "",
   };
 }
 function cerrar(): void {
@@ -368,6 +381,11 @@ async function guardar(o: Oferta): Promise<void> {
       ...(recursos.value.length > 0 ? { recursos: form.value.recursos } : {}),
       // En el orden en que se marcaron.
       incluye: form.value.incluye,
+      ...(esCitas.value
+        ? {}
+        : { para_principiantes: form.value.principiantes }),
+      requisitos: form.value.requisitos.trim() || null,
+      que_llevar: form.value.queLlevar.trim() || null,
     });
     guardadoId.value = o.id;
     editandoId.value = null;
@@ -574,6 +592,48 @@ onMounted(cargar);
           maxlength="600"
           :placeholder="$t('perfilPublico.catalogo.descripcionPh')"
         />
+        <!-- Para quien llega por primera vez (C03). -->
+        <label
+          v-if="!esCitas"
+          class="mb-3 flex items-start gap-2 text-sm"
+          data-prueba="para-principiantes"
+        >
+          <input v-model="form.principiantes" type="checkbox" class="mt-1" />
+          <span>
+            {{ $t("perfilPublico.catalogo.principiantes") }}
+            <span
+              class="block text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              >{{ $t("perfilPublico.catalogo.principiantesAyuda") }}</span
+            >
+          </span>
+        </label>
+        <div class="mb-4 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label class="tu-label" :for="`c-req-${o.id}`">{{
+              $t("perfilPublico.catalogo.requisitos")
+            }}</label>
+            <input
+              :id="`c-req-${o.id}`"
+              v-model="form.requisitos"
+              class="tu-input"
+              maxlength="300"
+              :placeholder="$t('perfilPublico.catalogo.requisitosPh')"
+            />
+          </div>
+          <div>
+            <label class="tu-label" :for="`c-llevar-${o.id}`">{{
+              $t("perfilPublico.catalogo.queLlevar")
+            }}</label>
+            <input
+              :id="`c-llevar-${o.id}`"
+              v-model="form.queLlevar"
+              class="tu-input"
+              maxlength="300"
+              :placeholder="$t('perfilPublico.catalogo.queLlevarPh')"
+            />
+          </div>
+        </div>
         <label class="tu-label">{{ $t("catalogo.politica.etiqueta") }}</label>
         <div class="mt-1 space-y-2" data-prueba="politica-reserva">
           <label

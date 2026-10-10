@@ -33,6 +33,10 @@ export const miPerfil = {
   celular: "Celular",
   celularAyuda:
     "Para avisarte de tus clases (también por WhatsApp, si lo activas).",
+  // Quien da clases o atiende: se ve en el equipo de la página del negocio (C03).
+  semblanza: "Sobre ti",
+  semblanzaAyuda:
+    "Se muestra junto a tu foto en la página del negocio: tu experiencia, tu estilo o lo que te gusta enseñar.",
   // Zona de la foto: arrastrar y soltar o clic.
   fotoArrastra: "Arrastra tu foto aquí o haz clic para elegirla",
   fotoSuelta: "Suelta la imagen para subirla",

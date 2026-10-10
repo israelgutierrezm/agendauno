@@ -81,6 +81,29 @@ void main() {
     expect(lista[1].vigenciaTexto, 'Vencen con el paquete');
   });
 
+  test(
+    'el recomendado primero; la clase de prueba solo si todavía le toca',
+    () {
+      final lista = [
+        producto({'id': 'prueba', 'primera_vez': true, 'disponible': false}),
+        producto({'id': 'p4'}),
+        producto({
+          'id': 'p8',
+          'destacado': true,
+          'vence_si_compra_hoy': '2026-11-01',
+        }),
+      ];
+      final ofrecidos = ProductoComprable.paraComprar(lista, const []);
+      expect(ofrecidos.map((p) => p.id), ['p8', 'p4']);
+      expect(ofrecidos.first.etiqueta, 'Paquete · Recomendado');
+      expect(
+        ofrecidos.first.venceTexto,
+        'Si la pagas hoy, se puede usar hasta el 1 de noviembre.',
+      );
+      expect(lista.first.etiqueta, 'Paquete · Para tu primera vez');
+    },
+  );
+
   testWidgets('comprar crea la orden y avisa que falta pagarla', (
     tester,
   ) async {

@@ -25,6 +25,7 @@ vi.mock("@/stores/sesionTenant", () => ({
 beforeEach(() => {
   sesion.moneda = "MXN";
   sesion.pais = "MX";
+  sesion.esCitas = true;
 });
 
 const oferta = (extra: Record<string, unknown>) => ({
@@ -107,6 +108,39 @@ describe("catálogo", () => {
     expect(api.put).toHaveBeenCalledWith(
       "/api/v1/app/a/ofertas/o1",
       expect.objectContaining({ incluye: ["o3", "o2"] }),
+    );
+  });
+
+  it("una clase dice si es para principiantes, qué saber y qué llevar", async () => {
+    sesion.esCitas = false;
+    api.put.mockResolvedValue({ data: { data: {} } });
+    const w = await montar([
+      oferta({
+        nombre: "Pole Fit",
+        politica_reserva: "entitlement",
+        precio_clase_minor: null,
+        capacidad: 8,
+        requisitos: "Ninguno",
+      }),
+    ]);
+    await w.get('[data-prueba="configurar"]').trigger("click");
+    expect((w.get("#c-req-o1").element as HTMLInputElement).value).toBe(
+      "Ninguno",
+    );
+    await w.get('[data-prueba="para-principiantes"] input').setValue(true);
+    await w.get("#c-llevar-o1").setValue("  Short y top  ");
+    await w
+      .findAll("button")
+      .find((b) => b.text() === "catalogo.guardar")!
+      .trigger("click");
+    await flushPromises();
+    expect(api.put).toHaveBeenLastCalledWith(
+      "/api/v1/app/a/ofertas/o1",
+      expect.objectContaining({
+        para_principiantes: true,
+        requisitos: "Ninguno",
+        que_llevar: "Short y top",
+      }),
     );
   });
 

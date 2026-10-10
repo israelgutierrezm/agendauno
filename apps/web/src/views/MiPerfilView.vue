@@ -42,6 +42,13 @@ const toast = useToastStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const usuario = computed(() => sesion.usuario);
 const mostrarPrivacidad = computed(() => esMiembro(usuario.value));
+// Quien da clases o atiende aparece en el equipo de la página del negocio: ahí se ve
+// su semblanza (C03).
+const apareceEnEquipo = computed(
+  () =>
+    usuario.value?.roles_disponibles?.some((r) => r.faceta === "instructor") ??
+    false,
+);
 const rolVisible = computed(() =>
   nombreDeRol(
     usuario.value?.rol ?? "",
@@ -171,6 +178,7 @@ const datos = ref({
   celular: "",
   fecha_nacimiento: "",
   genero: "",
+  semblanza: "",
 });
 watch(
   usuario,
@@ -186,6 +194,7 @@ watch(
       celular: u.celular ?? "",
       fecha_nacimiento: u.fecha_nacimiento ?? "",
       genero: u.genero ?? "",
+      semblanza: u.semblanza ?? "",
     };
   },
   { immediate: true },
@@ -205,6 +214,9 @@ async function guardarDatos(): Promise<void> {
             fecha_nacimiento: datos.value.fecha_nacimiento || null,
             genero: datos.value.genero || null,
           }
+        : {}),
+      ...(apareceEnEquipo.value
+        ? { semblanza: datos.value.semblanza.trim() || null }
         : {}),
     });
     sesion.actualizarUsuario(data.data.usuario);
@@ -520,6 +532,19 @@ const aparienciaAbierta = ref(false);
               v-model:genero="datos.genero"
               ayuda
             />
+            <div v-if="apareceEnEquipo">
+              <label class="tu-label" for="mp-semblanza">{{
+                $t("miPerfil.semblanza")
+              }}</label>
+              <textarea
+                id="mp-semblanza"
+                v-model="datos.semblanza"
+                class="tu-input"
+                rows="3"
+                maxlength="600"
+              />
+              <p class="tu-hint mt-1">{{ $t("miPerfil.semblanzaAyuda") }}</p>
+            </div>
             <div class="mp-pie-formulario">
               <button
                 type="submit"

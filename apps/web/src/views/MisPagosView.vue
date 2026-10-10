@@ -73,11 +73,26 @@ const domiciliar = ref<Record<string, boolean>>({});
 const tienePaquete = computed(() =>
   cuenta.derechos.value.some((d) => !d.ilimitado),
 );
+// La clase de prueba solo la ve quien todavía puede comprarla (nunca vino; B03). El
+// destacado del negocio va primero.
 const comprables = computed(() =>
-  cuenta.productos.value.filter(
-    (p) => p.tipo !== "add_on" || tienePaquete.value,
-  ),
+  cuenta.productos.value
+    .filter(
+      (p) =>
+        (p.tipo !== "add_on" || tienePaquete.value) && p.disponible !== false,
+    )
+    .sort(
+      (a, b) => Number(b.destacado ?? false) - Number(a.destacado ?? false),
+    ),
 );
+// «8 de octubre» de una fecha AAAA-MM-DD, sin que la zona horaria la mueva.
+function fechaDia(iso: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  }).format(new Date(`${iso}T12:00:00Z`));
+}
 function vigencia(p: {
   tipo: string;
   vigencia_tipo?: string | null;
@@ -385,12 +400,24 @@ onMounted(() => void cuenta.asegurar());
             v-for="p in comprables"
             :key="p.id"
             class="mp-producto flex flex-col rounded-xl border p-4"
-            :style="{ borderColor: 'var(--borde)' }"
+            :style="{
+              borderColor: p.destacado ? 'var(--primario)' : 'var(--borde)',
+            }"
+            data-prueba="comprable"
           >
             <span class="text-xs" :style="{ color: 'var(--texto-suave)' }">{{
-              $t(`miCuenta.comprar.tipos.${p.tipo}`)
+              [
+                $t(`miCuenta.comprar.tipos.${p.tipo}`),
+                p.destacado ? $t("miCuenta.comprar.destacado") : null,
+                p.primera_vez ? $t("miCuenta.comprar.primeraVez") : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")
             }}</span>
             <p class="mt-1 font-semibold">{{ p.nombre }}</p>
+            <p v-if="p.descripcion" class="mt-1 text-sm">
+              {{ p.descripcion }}
+            </p>
             <p
               v-if="p.todas_sucursales !== undefined"
               class="mt-1 text-xs"
@@ -423,6 +450,19 @@ onMounted(() => void cuenta.asegurar());
               :style="{ color: 'var(--texto-suave)' }"
             >
               {{ vigencia(p) }}
+            </p>
+            <!-- La fecha exacta: la vigencia corre desde el pago (M03). -->
+            <p
+              v-if="p.vence_si_compra_hoy"
+              class="text-xs"
+              :style="{ color: 'var(--texto-suave)' }"
+              data-prueba="vence"
+            >
+              {{
+                $t("miCuenta.comprar.vence", {
+                  fecha: fechaDia(p.vence_si_compra_hoy),
+                })
+              }}
             </p>
             <button
               class="tu-btn tu-btn-primario mt-auto w-full"
