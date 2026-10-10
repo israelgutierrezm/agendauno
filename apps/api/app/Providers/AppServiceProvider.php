@@ -115,6 +115,13 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('negocio-publico', fn (Request $request): Limit => Limit::perMinute(120)
             ->by(self::negocioDe($request).'|'.$request->ip()));
 
+        // Formularios de captación (ADR 0117): pocos envíos por negocio e IP; el captcha
+        // filtra el resto.
+        RateLimiter::for('captacion', fn (Request $request): array => [
+            Limit::perMinute(5)->by('captacion|'.self::negocioDe($request).'|'.$request->ip()),
+            Limit::perHour(30)->by('captacion-hora|'.self::negocioDe($request).'|'.$request->ip()),
+        ]);
+
         // Calendario personal (iCal): lo consultan Google, Apple u Outlook desde pocas IP
         // para los clientes de todos los negocios, así que se cuenta por enlace.
         RateLimiter::for('calendario', fn (Request $request): Limit => Limit::perMinute(60)

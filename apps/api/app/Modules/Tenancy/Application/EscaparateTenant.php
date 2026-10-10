@@ -87,7 +87,22 @@ class EscaparateTenant
             'proximas_sesiones' => $this->proximasSesiones(),
             'resenas' => $this->resenas(),
             'sitio' => $sitio,
+            // Captación (ADR 0117): si recibe prospectos, el formulario de «Pedir acceso».
+            'captacion' => $this->captacion(),
         ];
+    }
+
+    /**
+     * @return array{activa: bool, formulario: string|null}
+     */
+    private function captacion(): array
+    {
+        $captacion = app(CaptacionTenant::class);
+        if (! $captacion->activa()) {
+            return ['activa' => false, 'formulario' => null];
+        }
+
+        return ['activa' => true, 'formulario' => app(FormulariosCaptacionTenant::class)->predeterminado()->ulid];
     }
 
     /**
@@ -228,6 +243,8 @@ class EscaparateTenant
             ->orderBy('precio_minor')
             ->get()
             ->map(static fn (ProductoTenant $p): array => [
+                // Público (ULID): para pedir acceso a ese plan (ADR 0117).
+                'id' => $p->ulid,
                 'nombre' => $p->nombre,
                 'tipo' => $p->tipo->value,
                 'precio_minor' => $p->precio_minor,
@@ -264,6 +281,8 @@ class EscaparateTenant
         $this->cupo->cargar($sesiones);
 
         return $sesiones->map(fn (SesionTenant $s): array => [
+            // Público (ULID): para pedir lugar en esa clase (ADR 0117).
+            'id' => $s->ulid,
             'clase' => $s->oferta?->nombre,
             'inicia_en' => $s->inicia_en->toIso8601String(),
             'zona_horaria' => $s->zona_horaria,

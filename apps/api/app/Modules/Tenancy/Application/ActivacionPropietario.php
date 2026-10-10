@@ -71,6 +71,10 @@ class ActivacionPropietario
             // después invita: al activar, la cuenta queda ligada a su ficha (así la
             // baja del cliente también le cierra la sesión).
             $persona = $this->personas->buscar($usuario);
+            // Si llegó como prospecto e invitado, ya es miembro (ADR 0117).
+            if ($persona !== null) {
+                app(ProspectosTenant::class)->alActivarCuenta($persona);
+            }
 
             // Un cliente que activa su cuenta recibe la bienvenida (plantilla
             // `cuenta.creada`) con el enlace para entrar.
