@@ -55,4 +55,22 @@ describe("ListaInteresados", () => {
     );
     expect(w.text()).toContain("Listo, te avisaremos");
   });
+
+  it("llega con el giro de la página (`?giro=`) ya elegido, si es de su producto", () => {
+    const conGiro = mount(ListaInteresados, {
+      props: { producto: "turnouno", giro: "salud" },
+      global: { plugins: [i18n] },
+    });
+    expect((conGiro.get("select").element as HTMLSelectElement).value).toBe(
+      "salud",
+    );
+    conGiro.unmount();
+    // Un giro de clases no aplica a TurnoUno: sin elegir.
+    const ajeno = mount(ListaInteresados, {
+      props: { producto: "turnouno", giro: "pilates" },
+      global: { plugins: [i18n] },
+    });
+    expect((ajeno.get("select").element as HTMLSelectElement).value).toBe("");
+    ajeno.unmount();
+  });
 });

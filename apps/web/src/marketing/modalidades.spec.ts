@@ -65,7 +65,8 @@ describe("modalidades comerciales", () => {
       expect(contenido.nombreRuta).toBe(NOMBRE_RUTA_MODALIDAD[modo]);
       expect(contenido.nombre).toBe(NOMBRE_MODALIDAD[modo]);
       expect(contenido.seo.description.length).toBeGreaterThan(70);
-      expect(contenido.seo.description).toContain("30 días");
+      // Sin la frase de cierre: la pone seoConfig según el registro del producto.
+      expect(contenido.seo.description).not.toMatch(/gratis|sin tarjeta|días/i);
     }
   });
 
@@ -231,10 +232,27 @@ describe("modalidades comerciales", () => {
     for (const modo of MODOS) {
       expect(MODALIDADES[modo].preguntas).toContain("modalidad");
       const { q, a } = es.landing[modo].faq.modalidad;
-      expect(a).toContain("Solo AgendaUno puede cambiar la modalidad");
+      // Dos productos (ADR 0108): cambiar la modalidad es pasar al otro producto, y
+      // solo lo hace el equipo, antes de operar (ADR 0104).
+      expect(a).toMatch(/tienen? su propio producto/);
+      expect(a).toContain("solo el equipo de AgendaUno puede pasarlo al otro");
       expect(a).toContain("antes de que empieces a operar");
-      const otra = modo === "clases" ? /\bcitas?\b/i : /\bclases?\b/i;
+      expect(a).toContain("registra un negocio en cada producto");
+      const otra =
+        modo === "clases"
+          ? /\bcitas?\b|profesional/i
+          : /\bclases?\b|\bcupos?\b/i;
       expect(`${q} ${a}`).not.toMatch(otra);
+      expect(`${q} ${a}`).not.toMatch(/TurnoUno/);
+    }
+  });
+
+  it("los títulos de las portadas caben en 60 caracteres con la marca de su producto", () => {
+    for (const modo of MODOS) {
+      const marca = modo === "citas" ? "TurnoUno" : "AgendaUno";
+      const titulo = MODALIDADES[modo].seo.title.replace("AgendaUno", marca);
+      expect(titulo.length, titulo).toBeLessThanOrEqual(60);
+      expect(MODALIDADES[modo].seo.imagenAlt.length).toBeGreaterThan(10);
     }
   });
 });

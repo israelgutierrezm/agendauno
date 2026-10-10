@@ -5,7 +5,8 @@ import { trackPageView } from "@/lib/analytics";
 import { puedeEntrar } from "@/lib/acceso";
 import { updateSeo } from "@/lib/seo";
 import { giroDeQuery, modoDeQuery } from "@/marketing/modalidades";
-import { seoParaRuta } from "@/marketing/seoConfig";
+import { preciosPublicos } from "@/marketing/preciosPublicos";
+import { PRODUCTO_COMERCIAL, seoParaRuta } from "@/marketing/seoConfig";
 import { rutasComerciales } from "@/router/comerciales";
 import {
   salirA,
@@ -588,7 +589,10 @@ router.beforeEach(async (to) => {
 
 router.afterEach((to, _from, failure) => {
   if (failure) return;
-  const seo = seoParaRuta(to.path);
+  // Con lo que publicó el superadmin, si ya llegó: si el producto recibe registros.
+  const seo = seoParaRuta(to.path, {
+    registroAbierto: preciosPublicos.datos.registro[PRODUCTO_COMERCIAL],
+  });
   updateSeo(seo);
   // No enviar slugs, IDs internos ni URLs de activación a la medición comercial.
   if (seo.index || to.name === "registro") trackPageView(to.path, seo.title);

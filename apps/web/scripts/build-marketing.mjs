@@ -44,7 +44,6 @@ await build({
 });
 const { render, rutasMarketing, seoParaRuta, renderSeoHead, SITE_URL } =
   await import(pathToFileURL(resolve(root, ssr, "entry-marketing.mjs")).href);
-const template = await readFile(resolve(root, salida, "index.html"), "utf8");
 const manifest = JSON.parse(
   await readFile(resolve(root, salida, ".vite/manifest.json"), "utf8"),
 );
@@ -54,6 +53,38 @@ if (verification && !/^[\w-]+$/.test(verification))
   throw new Error(
     "GOOGLE_SITE_VERIFICATION debe ser el token público, no una etiqueta HTML.",
   );
+
+/*
+| Íconos de la pestaña y de inicio (iOS) de cada landing. index.html trae los de
+| AgendaUno; TurnoUno aún no tiene logotipo: usa sus íconos provisionales de la PWA
+| (public/assets/pwa), los mismos de sus negocios sin logo.
+*/
+const ICONOS = {
+  turnouno: [
+    '<link rel="icon" type="image/png" sizes="192x192" href="/assets/pwa/turnouno-192.png" />',
+    '<link rel="icon" type="image/png" sizes="512x512" href="/assets/pwa/turnouno-512.png" />',
+    '<link rel="apple-touch-icon" href="/assets/pwa/turnouno-192.png" />',
+  ],
+};
+function iconos(html) {
+  const propios = ICONOS[producto];
+  if (!propios) return html;
+  const sinIconos = html.replace(
+    /\s*<link\b[^>]*\brel="(?:icon|apple-touch-icon)"[^>]*>/g,
+    "",
+  );
+  // Justo después del charset, que va primero.
+  const charset = /<meta charset="[^"]*"\s*\/?>/i;
+  if (!charset.test(sinIconos))
+    throw new Error("index.html sin <meta charset>: ¿dónde van los íconos?");
+  return sinIconos.replace(
+    charset,
+    (meta) => `${meta}\n    ${propios.join("\n    ")}`,
+  );
+}
+const template = iconos(
+  await readFile(resolve(root, salida, "index.html"), "utf8"),
+);
 
 function head(html, seo) {
   return html.replace(

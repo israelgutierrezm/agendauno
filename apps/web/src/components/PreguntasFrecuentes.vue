@@ -2,7 +2,7 @@
 /*
 | Preguntas frecuentes de las páginas comerciales (portada, /clases y /citas): un h2 y
 | cada pregunta en un `<details>` (se abre sin JavaScript). Los textos llegan ya
-| traducidos; lo que va debajo (p. ej. la nota «* Solo para clientes de México») entra
+| traducidos; lo que va debajo (p. ej. la nota de México, `landing.soloMexico`) entra
 | por el slot. Las tarjetas toman `--sobre-banda` (como `marketing/landing.css`).
 */
 export interface PreguntaFrecuente {

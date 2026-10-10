@@ -53,10 +53,11 @@ const destinoRegistro = computed(() => {
         : { modo: modo.value, giro: giro.value },
   };
 });
+// Sin registro abierto, el botón lleva a la lista de interesados: `waitlist`.
 function medirRegistro(): void {
   trackEvent("marketing_cta_clicked", {
     placement: "navigation",
-    destination: "register",
+    destination: registroAbierto.value ? "register" : "waitlist",
     ...(modo.value !== null ? { mode: modo.value } : {}),
     ...(giro.value !== null ? { business_profile: giro.value } : {}),
   });
@@ -239,8 +240,9 @@ defineEmits<{ alternarTema: [] }>();
           >
             {{ $t(acceso.largo) }}
           </RouterLink>
+          <!-- Un producto que aún no recibe registros no tiene negocios que buscar. -->
           <RouterLink
-            v-if="!esRutaPublicaDeNegocio"
+            v-if="!esRutaPublicaDeNegocio && registroAbierto"
             class="tu-public-footer-link"
             :to="{ name: 'directorio' }"
           >

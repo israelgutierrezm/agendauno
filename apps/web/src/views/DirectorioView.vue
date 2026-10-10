@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 
+import IconoNav from "@/components/IconoNav.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { PRODUCTOS, productoActual } from "@/lib/producto";
 import { trackEvent } from "@/lib/analytics";
@@ -11,6 +12,7 @@ import {
   PERFILES_POR_MODO,
   perfilVisibleAlPublico,
 } from "@/marketing/modalidades";
+import { useRegistroDelProducto } from "@/marketing/registroProducto";
 
 interface EstudioDirectorio {
   slug: string;
@@ -22,6 +24,9 @@ interface EstudioDirectorio {
 }
 
 const router = useRouter();
+// Si el producto aún no recibe registros (ADR 0108), quien administra un negocio deja
+// sus datos en la lista de interesados (el registro la muestra).
+const { abierto: registroAbierto } = useRegistroDelProducto();
 const estudios = ref<EstudioDirectorio[]>([]);
 const q = ref("");
 const perfil = ref("");
@@ -380,7 +385,9 @@ onMounted(cargar);
                 }}
               </span>
             </span>
-            <span class="tu-estudio-flecha" aria-hidden="true">→</span>
+            <span class="tu-estudio-flecha" aria-hidden="true"
+              ><IconoNav nombre="flecha" :tam="16"
+            /></span>
           </span>
           <span class="tu-estudio-cta">{{ $t("directorio.verEstudio") }}</span>
         </button>
@@ -394,20 +401,29 @@ onMounted(cargar);
       <div>
         <h2 class="text-2xl font-light">{{ $t("directorio.duenoTitulo") }}</h2>
         <p class="mt-2" :style="{ color: 'var(--texto-suave)' }">
-          {{ $t("directorio.duenoDesc") }}
+          {{
+            registroAbierto
+              ? $t("directorio.duenoDesc")
+              : $t("directorio.duenoDescPrelanzamiento")
+          }}
         </p>
       </div>
       <RouterLink
         class="tu-btn tu-btn-primario shrink-0 px-6"
         :to="{ name: 'registro' }"
+        data-prueba="registrar-negocio"
         @click="
           trackEvent('marketing_cta_clicked', {
             placement: 'directory',
-            destination: 'register',
+            destination: registroAbierto ? 'register' : 'waitlist',
           })
         "
       >
-        {{ $t("landing.ctaRegistrar") }}
+        {{
+          registroAbierto
+            ? $t("landing.ctaRegistrar")
+            : $t("landing.prelanzamiento.cta")
+        }}
       </RouterLink>
     </div>
   </section>

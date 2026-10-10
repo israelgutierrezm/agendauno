@@ -5,6 +5,8 @@ import { createI18n } from "vue-i18n";
 import es from "@/i18n/locales/es-MX";
 import PanelRoles from "@/components/PanelRoles.vue";
 import { recordarNegocio } from "@/lib/negociosRecientes";
+import { PRECIOS_POR_OMISION } from "@/marketing/precios";
+import { aplicarPreciosPublicos } from "@/marketing/preciosPublicos";
 import EntrarView from "./EntrarView.vue";
 
 const mocks = vi.hoisted(() => ({
@@ -349,6 +351,29 @@ describe("acceso por negocio", () => {
 
     expect(mocks.sesion.reintentarSesion).toHaveBeenCalled();
     expect(mocks.replace).toHaveBeenCalledWith("/recepcion?vista=hoy");
+  });
+
+  it("con el registro abierto ofrece probar gratis y buscar un negocio", async () => {
+    const wrapper = montar();
+    await flushPromises();
+    expect(wrapper.get('[data-prueba="registrar-negocio"]').text()).toContain(
+      es.entrar.registrar,
+    );
+    expect(wrapper.text()).toContain(es.entrar.buscarReserva);
+  });
+
+  it("si el producto aún no recibe registros, pide dejar los datos y no ofrece buscar negocios", async () => {
+    aplicarPreciosPublicos({ registro: { agendauno: false, turnouno: false } });
+    try {
+      const wrapper = montar();
+      await flushPromises();
+      const registrar = wrapper.get('[data-prueba="registrar-negocio"]');
+      expect(registrar.text()).toContain(es.landing.prelanzamiento.cta);
+      expect(registrar.text()).not.toMatch(/gratis|Prueba/);
+      expect(wrapper.text()).not.toContain(es.entrar.buscarReserva);
+    } finally {
+      aplicarPreciosPublicos(PRECIOS_POR_OMISION);
+    }
   });
 
   it("si al reintentar sigue sin confirmarse, se queda en Entrar", async () => {

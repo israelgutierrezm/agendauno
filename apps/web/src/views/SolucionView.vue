@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 import IconoNav from "@/components/IconoNav.vue";
 import SolucionesEnlaces from "@/components/SolucionesEnlaces.vue";
@@ -9,6 +10,8 @@ import { soluciones } from "@/marketing/soluciones";
 import { trackEvent } from "@/lib/analytics";
 import { conMarcaProfunda, productoDeModalidad } from "@/lib/producto";
 const props = defineProps<{ slug: string }>();
+// Lo fijo de la página, en `landing.solucion.*`; lo del giro, en soluciones.ts.
+const { t } = useI18n();
 // Sus textos con la marca de su producto (ADR 0108).
 const solucion = computed(() => {
   const s = soluciones.find((x) => x.slug === props.slug)!;
@@ -19,7 +22,6 @@ const solucion = computed(() => {
 // registro, también lo manda (`?giro=`) y el registro llega con él elegido.
 const modo = computed(() => solucion.value.modo);
 const giro = computed(() => perfilDeSolucion(props.slug));
-const esClases = computed(() => modo.value === "clases");
 // La página cuelga de la portada de su producto (ADR 0108), con su marca; si el
 // producto aún no recibe registros, sus botones llevan a dejar los datos.
 const {
@@ -34,10 +36,12 @@ const registro = computed(() => ({
       ? { modo: modo.value }
       : { modo: modo.value, giro: giro.value },
 }));
+// Sin registro abierto, el botón lleva a la lista de interesados (el registro la
+// muestra): se mide como `waitlist`.
 function medir(placement: string): void {
   trackEvent("marketing_cta_clicked", {
     placement,
-    destination: "register",
+    destination: registroAbierto.value ? "register" : "waitlist",
     solution: props.slug,
     mode: modo.value,
     ...(giro.value === null ? {} : { business_profile: giro.value }),
@@ -49,7 +53,7 @@ function medir(placement: string): void {
   <article class="solucion">
     <section class="solucion-hero">
       <div>
-        <nav class="solucion-miga" aria-label="Ruta de navegación">
+        <nav class="solucion-miga" :aria-label="t('landing.solucion.miga')">
           <ol>
             <li>
               <RouterLink
@@ -63,8 +67,11 @@ function medir(placement: string): void {
           </ol>
         </nav>
         <p class="solucion-etiqueta">
-          {{ esClases ? "Software de reservas para" : "Agenda de citas para" }}
-          {{ solucion.nombre }}
+          {{
+            t(`landing.solucion.etiqueta.${modo}`, {
+              nombre: solucion.nombreEnFrase,
+            })
+          }}
         </p>
         <h1>{{ solucion.encabezado }}</h1>
         <p class="solucion-resumen">{{ solucion.resumen }}</p>
@@ -74,19 +81,23 @@ function medir(placement: string): void {
           :to="registro"
           data-cta="hero"
           @click="medir('solution_hero')"
-          >{{ registroAbierto ? "Probar gratis" : "Quiero que me avisen" }}
+          >{{
+            registroAbierto
+              ? t("landing.solucion.probar")
+              : t("landing.prelanzamiento.cta")
+          }}
           <IconoNav nombre="flecha" :tam="16" class="inline align-[-0.15em]"
         /></RouterLink>
         <p class="solucion-confianza">
           {{
             registroAbierto
-              ? `${diasPrueba} días para probarlo · Sin tarjeta`
-              : "Próximamente"
+              ? t("landing.solucion.confianza", { dias: diasPrueba })
+              : t("landing.prelanzamiento.proximamente")
           }}
         </p>
-        <RouterLink class="tu-enlace text-sm" to="/#producto"
-          >Ver la agenda en acción</RouterLink
-        >
+        <RouterLink class="tu-enlace text-sm" to="/#producto">{{
+          t("landing.solucion.verAgenda")
+        }}</RouterLink>
       </div>
       <figure class="solucion-foto">
         <img
@@ -99,18 +110,19 @@ function medir(placement: string): void {
         <figcaption class="solucion-reserva">
           <span class="solucion-hora">10:30</span>
           <div>
-            <small>Ejemplo de {{ esClases ? "clase" : "cita" }}</small
+            <small>{{ t(`landing.solucion.ejemplo.${modo}`) }}</small
             ><strong>{{ solucion.ejemplo }}</strong
-            ><span>Tu día, a la vista.</span>
+            ><span>{{ t("landing.solucion.ejemploPie") }}</span>
           </div>
         </figcaption>
       </figure>
     </section>
     <section class="solucion-bloque" aria-labelledby="beneficios-titulo">
-      <p class="solucion-etiqueta">Menos pendientes, más claridad</p>
+      <p class="solucion-etiqueta">
+        {{ t("landing.solucion.beneficiosEtiqueta") }}
+      </p>
       <h2 id="beneficios-titulo">
-        Lo que tu {{ esClases ? "academia" : "negocio" }} necesita para
-        organizar su día.
+        {{ t("landing.solucion.beneficiosTitulo") }}
       </h2>
       <div class="solucion-beneficios">
         <div
@@ -123,42 +135,60 @@ function medir(placement: string): void {
         </div>
       </div>
     </section>
+    <!-- Sin registro abierto: cómo funcionará, sin prueba ni registro (ADR 0108). -->
     <section class="solucion-bloque solucion-empezar">
       <div>
-        <p class="solucion-etiqueta">Del registro a tu primera reserva</p>
-        <h2>Pruébalo con la forma en que trabajas.</h2>
+        <p class="solucion-etiqueta">
+          {{
+            registroAbierto
+              ? t("landing.solucion.empezar.etiqueta")
+              : t("landing.solucion.prelanzamiento.etiqueta")
+          }}
+        </p>
+        <h2>
+          {{
+            registroAbierto
+              ? t("landing.solucion.empezar.titulo")
+              : t("landing.solucion.prelanzamiento.titulo")
+          }}
+        </h2>
         <!-- Clases: registro cerrado (ADR 0093), las cuentas las da el negocio.
              Citas: el cliente agenda desde la página sin cuenta. -->
-        <p v-if="esClases">
-          Crea tu negocio, activa tu cuenta y configura una clase con horario,
-          instructor y cupo. Después da de alta a tus alumnos, invítalos a su
-          cuenta y comparte tu enlace con tus horarios.
-        </p>
-        <p v-else>
-          Crea tu negocio, activa tu cuenta y configura un servicio con
-          duración, profesional y disponibilidad. Después comparte tu enlace
-          para que tus clientes elijan servicio, profesional y horario.
+        <p>
+          {{
+            registroAbierto
+              ? t(`landing.solucion.empezar.${modo}`)
+              : t(`landing.solucion.prelanzamiento.${modo}`)
+          }}
         </p>
       </div>
       <div class="tu-card p-6" data-prueba="solucion-precio">
-        <h3>Una prueba con tu operación real</h3>
-        <p>
-          En {{ NOMBRE_MODALIDAD[modo] }}, la suscripción se cobra
+        <h3>
           {{
-            esClases
-              ? "por rango de alumnos activos al mes."
-              : "con el plan que elijas, por los profesionales que contratas."
+            registroAbierto
+              ? t("landing.solucion.precio.titulo")
+              : t("landing.solucion.prelanzamiento.precioTitulo", { marca })
           }}
-          Consulta las tarifas vigentes antes de contratar; los importes son en
-          dólares, más impuestos.
+        </h3>
+        <p>
+          {{
+            t(`landing.solucion.precio.${modo}`, {
+              modalidad: NOMBRE_MODALIDAD[modo],
+            })
+          }}
+          {{
+            registroAbierto
+              ? t("landing.solucion.precio.tarifas")
+              : t("landing.solucion.prelanzamiento.tarifas")
+          }}
         </p>
         <p class="solucion-enlaces">
           <RouterLink class="tu-enlace" to="/#precios"
-            >Conocer precios y condiciones
+            >{{ t("landing.solucion.precio.verPrecios") }}
             <IconoNav nombre="flecha" :tam="14" class="inline align-[-0.15em]"
           /></RouterLink>
           <RouterLink class="tu-enlace" to="/"
-            >Todo lo que incluye {{ marca }}
+            >{{ t("landing.solucion.precio.todo", { marca }) }}
             <IconoNav nombre="flecha" :tam="14" class="inline align-[-0.15em]"
           /></RouterLink>
         </p>
@@ -168,7 +198,7 @@ function medir(placement: string): void {
       class="solucion-bloque solucion-preguntas"
       aria-labelledby="preguntas-titulo"
     >
-      <h2 id="preguntas-titulo">Antes de empezar</h2>
+      <h2 id="preguntas-titulo">{{ t("landing.solucion.preguntas") }}</h2>
       <details
         v-for="pregunta in solucion.preguntas"
         :key="pregunta.pregunta"
@@ -179,23 +209,34 @@ function medir(placement: string): void {
       </details>
     </section>
     <section class="solucion-bloque solucion-cierre">
-      <h2>Tu próxima reserva empieza con una agenda más clara.</h2>
+      <h2>
+        {{
+          registroAbierto
+            ? t("landing.solucion.cierre.titulo")
+            : t("landing.solucion.prelanzamiento.cierreTitulo", { marca })
+        }}
+      </h2>
       <p>
-        Configura tu negocio y comprueba si {{ marca }} encaja con tu operación.
+        {{
+          registroAbierto
+            ? t("landing.solucion.cierre.texto", { marca })
+            : t("landing.solucion.prelanzamiento.cierreTexto")
+        }}
       </p>
       <RouterLink
         class="tu-btn tu-btn-primario px-7 py-3"
         :to="registro"
+        data-cta="final"
         @click="medir('solution_final')"
         >{{
           registroAbierto
-            ? `Probar gratis durante ${diasPrueba} días`
-            : "Quiero que me avisen"
+            ? t("landing.solucion.cierre.probar", { dias: diasPrueba })
+            : t("landing.prelanzamiento.cta")
         }}</RouterLink
       >
     </section>
     <section class="solucion-bloque">
-      <h2>Otras formas de trabajar con {{ marca }}</h2>
+      <h2>{{ t("landing.solucion.otras", { marca }) }}</h2>
       <!-- Cada giro es de una sola modalidad: los demás, en «Clases» y «Citas». -->
       <!-- Solo los giros de su producto (ADR 0108). -->
       <SolucionesEnlaces :modo="solucion.modo" :excluir="solucion.slug" />

@@ -1,6 +1,7 @@
 import {
   SITE_URL,
   DEFAULT_IMAGE,
+  altDeImagen,
   type SeoOptions,
 } from "@/marketing/seoConfig";
 
@@ -71,6 +72,12 @@ export function updateSeo(options: SeoOptions): void {
   upsertMeta('meta[property="og:url"]', "property", "og:url", canonical);
   upsertMeta('meta[property="og:image"]', "property", "og:image", image);
   upsertMeta(
+    'meta[property="og:image:alt"]',
+    "property",
+    "og:image:alt",
+    altDeImagen(options),
+  );
+  upsertMeta(
     'meta[name="twitter:card"]',
     "name",
     "twitter:card",
@@ -89,6 +96,12 @@ export function updateSeo(options: SeoOptions): void {
     options.description,
   );
   upsertMeta('meta[name="twitter:image"]', "name", "twitter:image", image);
+  upsertMeta(
+    'meta[name="twitter:image:alt"]',
+    "name",
+    "twitter:image:alt",
+    altDeImagen(options),
+  );
   if (options.index === false) {
     document.head.querySelector('link[rel="canonical"]')?.remove();
     document.head.querySelector('meta[property="og:url"]')?.remove();

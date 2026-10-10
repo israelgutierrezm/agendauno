@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { render, rutasMarketing } from "./entry-marketing";
+import { PRECIOS_POR_OMISION } from "@/marketing/precios";
+import { aplicarPreciosPublicos } from "@/marketing/preciosPublicos";
+import {
+  FRASES_SOLO_CON_REGISTRO,
+  FRASES_SOLO_EN_PRELANZAMIENTO,
+  frasesEncontradas,
+  render,
+  rutasMarketing,
+} from "./entry-marketing";
 
 /*
 | Las páginas comerciales se prerenderizan con su HTML completo (SEO). Si un
@@ -51,6 +59,43 @@ describe("prerender de marketing", () => {
       pagina.querySelector(".tu-public-register")?.getAttribute("href"),
     ).toBe("/registro?modo=clases");
     expect(pagina.getElementById("precios")).not.toBeNull();
+  });
+
+  it("con el registro abierto, ninguna página dice nada de la lista de interesados", async () => {
+    for (const path of rutasMarketing) {
+      const pagina = documento((await render(path)).html);
+      expect(
+        frasesEncontradas(
+          pagina.body.textContent ?? "",
+          FRASES_SOLO_EN_PRELANZAMIENTO,
+        ),
+        path,
+      ).toEqual([]);
+    }
+  });
+
+  it("con el registro cerrado (prelanzamiento), ninguna página ofrece probar, registrarse ni contratar", async () => {
+    aplicarPreciosPublicos({ registro: { agendauno: false, turnouno: false } });
+    try {
+      for (const path of rutasMarketing) {
+        const pagina = documento((await render(path)).html);
+        expect(
+          frasesEncontradas(
+            pagina.body.textContent ?? "",
+            FRASES_SOLO_CON_REGISTRO,
+          ),
+          path,
+        ).toEqual([]);
+        expect(
+          pagina.querySelector(".tu-public-register")?.textContent,
+          path,
+        ).toContain("Quiero que me avisen");
+        // Aún no hay negocios que buscar.
+        expect(pagina.querySelector('a[href="/negocios"]'), path).toBeNull();
+      }
+    } finally {
+      aplicarPreciosPublicos(PRECIOS_POR_OMISION);
+    }
   });
 
   it("en las páginas por giro, «Probar gratis» del menú lleva su giro si es uno solo", async () => {

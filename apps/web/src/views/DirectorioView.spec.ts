@@ -4,7 +4,10 @@ import { createI18n } from "vue-i18n";
 
 import es from "@/i18n/locales/es-MX";
 import modalidadNegocio from "@/i18n/locales/modalidad.es-MX";
+import { trackEvent } from "@/lib/analytics";
 import { PERFILES_POR_MODO } from "@/marketing/modalidades";
+import { PRECIOS_POR_OMISION } from "@/marketing/precios";
+import { aplicarPreciosPublicos } from "@/marketing/preciosPublicos";
 import DirectorioView from "./DirectorioView.vue";
 
 const mocks = vi.hoisted(() => ({ get: vi.fn() }));
@@ -71,6 +74,37 @@ describe("directorio de negocios", () => {
     expect(mocks.get).toHaveBeenLastCalledWith("/api/v1/directorio", {
       params: { perfil: "general", producto: "agendauno" },
     });
+  });
+
+  it("a quien administra un negocio le ofrece probar o, sin registro abierto, avisarle", async () => {
+    const abierto = montar();
+    await flushPromises();
+    const probar = abierto.get('[data-prueba="registrar-negocio"]');
+    expect(probar.text()).toBe(es.landing.ctaRegistrar);
+    await probar.trigger("click");
+    expect(trackEvent).toHaveBeenLastCalledWith("marketing_cta_clicked", {
+      placement: "directory",
+      destination: "register",
+    });
+    abierto.unmount();
+
+    aplicarPreciosPublicos({ registro: { agendauno: false, turnouno: false } });
+    try {
+      const cerrado = montar();
+      await flushPromises();
+      const avisar = cerrado.get('[data-prueba="registrar-negocio"]');
+      expect(avisar.text()).toBe(es.landing.prelanzamiento.cta);
+      expect(cerrado.text()).toContain(es.directorio.duenoDescPrelanzamiento);
+      expect(cerrado.text()).not.toMatch(/gratis|Crea tu cuenta/);
+      await avisar.trigger("click");
+      expect(trackEvent).toHaveBeenLastCalledWith("marketing_cta_clicked", {
+        placement: "directory",
+        destination: "waitlist",
+      });
+      cerrado.unmount();
+    } finally {
+      aplicarPreciosPublicos(PRECIOS_POR_OMISION);
+    }
   });
 
   it("los giros generales no llevan insignia y tienen foto de su modalidad", async () => {

@@ -2,8 +2,10 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
+import { productoDeModalidad } from "@/lib/producto";
 import type { Modo } from "@/marketing/modalidades";
 import { usePreciosPublicos } from "@/marketing/preciosPublicos";
+import { useRegistroDelProducto } from "@/marketing/registroProducto";
 
 /*
 | Sellos de confianza bajo el hero de las páginas comerciales (portada, /clases y
@@ -11,10 +13,16 @@ import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 | (`landing.{modo}.confianza.cobro`); sin él, el general (`landing.confianza.cobro`).
 | Los días de prueba son los publicados: los de su modalidad o, en la portada, los
 | de la prueba más corta (lo general no promete de más).
+| Si el producto aún no recibe registros (ADR 0108), ni prueba ni permanencia: un
+| sello de «Abre pronto».
 */
 const props = defineProps<{ modo?: Modo | null }>();
 const { t } = useI18n();
 const precios = usePreciosPublicos();
+// El producto de su modalidad o, sin ella, el de la página.
+const { abierto: registroAbierto } = useRegistroDelProducto(
+  props.modo ? productoDeModalidad(props.modo) : undefined,
+);
 const diasPrueba = computed(() =>
   props.modo
     ? precios.datos[props.modo].dias_prueba
@@ -24,9 +32,18 @@ const diasPrueba = computed(() =>
       ),
 );
 
-const SELLOS = ["prueba", "configuracion", "cobro", "cancelacion"] as const;
+type Sello =
+  "prueba" | "proximamente" | "configuracion" | "cobro" | "cancelacion";
+const sellos = computed<Sello[]>(() =>
+  registroAbierto.value
+    ? ["prueba", "configuracion", "cobro", "cancelacion"]
+    : ["proximamente", "configuracion", "cobro"],
+);
 
-function texto(sello: (typeof SELLOS)[number]): string {
+function texto(sello: Sello): string {
+  if (sello === "proximamente") {
+    return t("landing.prelanzamiento.sello");
+  }
   return sello === "cobro" && props.modo
     ? t(`landing.${props.modo}.confianza.cobro`)
     : t(`landing.confianza.${sello}`, { dias: diasPrueba.value });
@@ -34,10 +51,26 @@ function texto(sello: (typeof SELLOS)[number]): string {
 </script>
 
 <template>
-  <section class="tu-confianza" :aria-label="t('landing.confianza.titulo')">
+  <section
+    class="tu-confianza"
+    :aria-label="
+      registroAbierto
+        ? t('landing.confianza.titulo')
+        : t('landing.prelanzamiento.sellosTitulo')
+    "
+  >
     <div class="mx-auto max-w-6xl px-4 sm:px-6">
-      <ul class="tu-confianza-grid" role="list">
-        <li v-for="sello in SELLOS" :key="sello" class="tu-confianza-item">
+      <ul
+        class="tu-confianza-grid"
+        role="list"
+        :style="{ '--sellos': sellos.length }"
+      >
+        <li
+          v-for="sello in sellos"
+          :key="sello"
+          class="tu-confianza-item"
+          :data-sello="sello"
+        >
           <span class="tu-confianza-punto" aria-hidden="true"></span>
           <span>{{ texto(sello) }}</span>
         </li>
@@ -78,7 +111,7 @@ function texto(sello: (typeof SELLOS)[number]): string {
 }
 @media (min-width: 1024px) {
   .tu-confianza-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--sellos, 4), minmax(0, 1fr));
   }
 }
 @media (max-width: 1023px) and (min-width: 640px) {

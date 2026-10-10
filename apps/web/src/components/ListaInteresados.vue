@@ -10,13 +10,16 @@ import { tokenRecaptcha } from "@/lib/recaptcha";
 import { PERFILES_POR_MODO } from "@/marketing/modalidades";
 
 /**
- * Lista de interesados de un producto que aún no recibe registros (ADR 0108: TurnoUno
- * antes de su lanzamiento). Deja nombre, correo y, si quiere, su negocio, y el
+ * Lista de interesados de un producto que aún no recibe registros (ADR 0108: el
+ * superadmin cerró su registro). Deja nombre, correo y, si quiere, su negocio, y el
  * superadmin le avisa al abrir. Con captcha y aceptación del aviso de privacidad.
+ * `giro`: el tipo de negocio con que llegó (`/registro?giro=`, desde la página de un
+ * giro): ya viene elegido si es de los de su producto.
  */
-const props = withDefaults(defineProps<{ producto?: Producto }>(), {
-  producto: undefined,
-});
+const props = withDefaults(
+  defineProps<{ producto?: Producto; giro?: string | null }>(),
+  { producto: undefined, giro: null },
+);
 
 const { t } = useI18n();
 const producto = computed(() => props.producto ?? productoActual());
@@ -30,7 +33,8 @@ const datos = reactive({
   correo: "",
   telefono: "",
   negocio: "",
-  giro: "",
+  giro:
+    props.giro !== null && giros.value.includes(props.giro) ? props.giro : "",
   ciudad: "",
   acepta_aviso: false,
 });

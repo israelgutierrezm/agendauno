@@ -36,8 +36,15 @@ en desarrollo, de `?producto=turnouno`.
   el llamado final, que cierra con un enlace discreto al otro producto. El menú es
   Funciones · Precios · Preguntas.
 - **Prelanzamiento**: mientras un producto no recibe registros (`/precios` →
-  `registro`, lo decide el superadmin), sus botones dicen «Quiero que me avisen», el
-  cierre «abre pronto» y `/registro` muestra la lista de interesados.
+  `registro`, lo decide el superadmin; el HTML pre-generado usa el respaldo
+  `PRECIOS_POR_OMISION.registro`), nada ofrece prueba gratis, registrarse ni contratar:
+  todos sus botones (menú, hero, demo, carrusel, recepción, precios, funciones, página
+  pública, cierre, páginas por giro, Entrar y directorio) dicen «Quiero que me avisen»
+  y se miden con `destination: waitlist`; los sellos cambian la prueba y la permanencia
+  por «Abre pronto»; las páginas por giro dicen «Así funcionará»; el SEO cierra con
+  «… abre pronto: déjanos tus datos y te avisamos.»; no se ofrece «Encuentra tu
+  negocio», y `/registro` muestra la lista de interesados (con el `?giro=` de la página
+  ya elegido).
 - **Páginas por giro (`/software-para-*`, `SolucionView`)**: miga de pan
   «AgendaUno / Clases|Citas / giro», enlaces a `/{modo}#producto`, `/{modo}#precios`
   y `/registro?modo={modo}` (con `&giro={perfil}` si la página es de un solo giro del
@@ -51,13 +58,22 @@ en desarrollo, de `?producto=turnouno`.
   la asistencia se pasa en lista, con retardos); en clases no hay
   autorregistro de alumnos (la página pública termina en «Pedir acceso / Ya soy
   alumno», ADR 0093); los spas sí manejan cabinas y equipos como recursos. Donde se
-  mencionan cobros en línea o facturación va «*» y la nota «* Solo para clientes de
-  México» (`.tu-nota-mexico`, ADR 0099).
+  mencionan cobros en línea o facturación va «*» y la nota «* Solo para negocios en
+  México (cobros en pesos)» (`.tu-nota-mexico`, ADR 0099). Los planes de citas solo
+  listan lo que existe: recordatorios por correo, la página en
+  `tunegocio.{dominio del producto}` y mensajes masivos por correo (la app aún no está
+  publicada).
 
 ### SEO de cada página
 
-- Title, description, canonical y Open Graph propios (`og:image` es una foto que ya
-  existe en `public/`: Pilates en `/clases`, barbería en `/citas`).
+- Title (hasta 60 caracteres con la marca), description (hasta 160), canonical y Open
+  Graph propios. `og:image` es una foto que ya existe en `public/` (Pilates en la
+  portada de AgendaUno, barbería en la de TurnoUno y, en cada página por giro, la foto
+  de su giro), con `og:image:alt` y `twitter:image:alt`.
+- La descripción se declara sin la frase de cierre (`modalidades.ts`, `soluciones.ts`):
+  la pone `seoConfig` según el registro del producto, «Prueba {marca} gratis durante
+  {días} días, sin tarjeta.» o, en prelanzamiento, «{marca} abre pronto: déjanos tus
+  datos y te avisamos.» (también en el JSON-LD).
 - JSON-LD: `Organization`, `SoftwareApplication` y `WebPage` en las 11. `BreadcrumbList`
   en `/clases` y `/citas` (Inicio → Clases|Citas) y en cada página por giro
   (Inicio → Clases|Citas → giro). Sin `Offer`, `FAQPage` ni `hreflang`.
@@ -149,7 +165,7 @@ llamados finales siguen en rosa.
 - `/aviso-de-privacidad` está enlazado desde el footer y antes de los campos de registro. Comparte el documento editable de `/api/v1/legales` con el modal de registro. El borrador `src/marketing/aviso-privacidad.borrador.txt` solo se muestra en desarrollo si no existe documento publicado. No debe publicarse sin completar los datos del responsable y validar prácticas, proveedores y controles. La ruta legal queda fuera del sitemap y sin indexación; no altera el SEO comercial.
 - Cada página por giro tiene contenido propio, fotos existentes, CTA al registro con su modalidad, título, descripción y canonical. No se inventan testimonios, calificaciones ni precios.
 - `npm run build` genera la aplicación (`dist/app`) y el HTML completo de las páginas de cada producto (`dist/agendauno`, `dist/turnouno`) reutilizando los componentes Vue de marketing (`src/entry-marketing.ts`, con su propio router en memoria). La aplicación de gestión sigue siendo SPA; no se consultan cuentas ni datos de negocios durante la compilación. Las demos (agenda, página pública) son estáticas, sin API ni stores; `window`, `matchMedia` y `localStorage` solo se usan en `onMounted`.
-- Validar con `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` y `npm run test:marketing`. La CI de la web corre lint, build, `test:marketing` y test. `test:marketing` revisa en cada página: un h1 con texto, más de 1,000 caracteres sin JS, canonical, Open Graph, JSON-LD (con su miga de pan), el menú, `#precios`, el registro con `?modo=` (y `&giro=` en las páginas de un solo giro, también en el «Probar gratis» del menú), imágenes con alt y archivo, el CSS de su vista enlazado y el sitemap; y por HTTP, que `/clases` en el host de un negocio quede `noindex`. `npm run preview` sirve las rutas generadas y el fallback de acceso.
+- Validar con `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` y `npm run test:marketing`. La CI de la web corre lint, build, `test:marketing` y test. `test:marketing` revisa en cada página: un h1 con texto, más de 1,000 caracteres sin JS, canonical, Open Graph, JSON-LD (con su miga de pan), el menú, `#precios`, el registro con `?modo=` (y `&giro=` en las páginas de un solo giro, también en el «Probar gratis» del menú), imágenes con alt y archivo, el CSS de su vista enlazado, el sitemap, el largo del título y la descripción, `og:image:alt`, los íconos (en TurnoUno, los provisionales de su PWA: `public/assets/pwa/turnouno-*.png`, que `build-marketing.mjs` pone en lugar de los de AgendaUno) y la marca del otro producto ni en el texto ni en los atributos (`href`, `mailto:`, `content`…). Excepciones anotadas en el script: el id técnico `agendauno-route-jsonld`, el `mailto:` de cotizar (el buzón de ventas es uno para la plataforma) y el enlace discreto al otro producto. Según el registro con que se pre-generó la landing (hoy abierto en los dos productos): cerrado, falla con cualquier frase que ofrezca probar, registrarse o contratar («gratis», «Prueba…», «probar», «Crea tu negocio», «Empieza…», «sin tarjeta», «Cancela cuando quieras», «permanencia»…); abierto, con lo de la lista de interesados («Quiero que me avisen», «abre pronto», «Próximamente», «Así funcionará»…). Se busca en el texto, los metadatos, el JSON-LD y `alt`/`title`/`aria-label`; las listas están en `src/marketing/prelanzamiento.ts`, las mismas que usan las pruebas (que cubren también el modo cerrado). Y por HTTP, que `/clases` en el host de un negocio quede `noindex`. `npm run preview` sirve las rutas generadas y el fallback de acceso.
 - Las animaciones no ocultan el texto cuando JavaScript no está disponible. Se respeta movimiento reducido.
 
 ## Configuración necesaria al publicar (no se despliega desde este cambio)
@@ -178,7 +194,7 @@ La modalidad viaja siempre como `mode`, con solo dos valores: `clases` o `citas`
 | ----------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Visita comercial  | `page_view`                             | Navegación completada a una página comercial o al registro                                                   |
 | Elección          | `marketing_business_mode_selected`      | `mode`, `placement`: `hero`, `business_modes`, `business_types` (portada) o `mode_page_footer` (la otra modalidad) |
-| Interés           | `marketing_cta_clicked`                 | `placement`, `destination` (`register`, `pricing`, `product`), `mode` cuando la página tiene modalidad, `solution` en las páginas por giro y `business_profile` (la clave del giro) cuando el enlace lleva `?giro=` |
+| Interés           | `marketing_cta_clicked`                 | `placement`, `destination` (`register`, `waitlist` si el producto aún no recibe registros, `pricing`, `product`), `mode` cuando la página tiene modalidad, `solution` en las páginas por giro y `business_profile` (la clave del giro) cuando el enlace lleva `?giro=` |
 | Inicio            | `studio_registration_started`           | `mode_intent` si llegó con `?modo=` o `?giro=` (la modalidad del giro manda) y `business_profile_intent` si llegó con `?giro=` |
 | Avance            | `studio_registration_step_completed`    | `step`, `mode_intent`, `business_profile_intent`                                                             |
 | Error             | `studio_registration_failed`            | `step`, `mode_intent`, `business_profile_intent`                                                             |
