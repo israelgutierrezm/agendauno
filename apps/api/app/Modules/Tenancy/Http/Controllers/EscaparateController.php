@@ -63,6 +63,7 @@ class EscaparateController
                 'nombre' => $estudio->nombre,
                 'logo_url' => $estudio->logo_url,
                 'portada_url' => $estudio->portada_url,
+                'color_marca' => $estudio->color_marca,
                 'descripcion' => $estudio->descripcion,
                 'redes' => RedesSociales::publicas($estudio->redes),
                 'perfil' => $estudio->perfil_negocio->value,

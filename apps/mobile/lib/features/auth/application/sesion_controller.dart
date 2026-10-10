@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/app_config.dart';
+import '../../../core/config/producto_app.dart';
 import '../../../core/network/auth_token.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/sesion_revocada.dart';
@@ -150,6 +152,28 @@ class SesionController extends Notifier<Sesion?> {
     final usuario = (data['usuario'] ?? {}) as Map<String, dynamic>;
     state = actual.conUsuario(usuario, eligiendoRol: false);
     await ref.read(almacenSesionProvider).guardar(state!.aJson());
+  }
+
+  /// Un negocio que esta app no encontró, ¿está en la app del otro producto? (ADR
+  /// 0111): para decir «Este negocio usa TurnoUno» en lugar de «No lo encontramos».
+  /// Null si tampoco está allá, si no se pudo saber o en una app de marca blanca.
+  Future<ProductoApp?> enOtroProducto(String slug) async {
+    if (AppConfig.marcaBlanca || slug.isEmpty) {
+      return null;
+    }
+    final otro = AppConfig.producto.otro;
+    try {
+      await ref
+          .read(dioProvider)
+          .get<Map<String, dynamic>>(
+            '${AppConfig.apiBaseUrlDe(otro)}/api/v1/app/'
+            '${Uri.encodeComponent(slug)}/marca',
+            options: Options(headers: {'X-App-Producto': otro.clave}),
+          );
+      return otro;
+    } on DioException {
+      return null;
+    }
   }
 
   /// Pide el enlace para elegir una contraseña nueva (llega por correo y se abre en

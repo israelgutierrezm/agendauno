@@ -1,0 +1,13 @@
+# Solo entra lo que la imagen de una landing necesita (contexto = raíz del repo). Todo
+# archivo que landing.Dockerfile copie de infra/produccion debe estar admitido aquí (el
+# CI construye la imagen y lo comprueba).
+*
+!apps/web/
+!infra/produccion/nginx-landing.conf
+
+apps/web/node_modules/
+apps/web/dist/
+apps/web/dist-ssr/
+apps/web/.env
+apps/web/.env.*
+apps/web/coverage/

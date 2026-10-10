@@ -2,14 +2,28 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/google/google_auth.dart';
 import '../../../core/network/mensaje_error.dart';
 import '../application/sesion_controller.dart';
 
 /// Acceso tenant-local: el usuario escribe la direccion de su estudio (slug) y sus
 /// credenciales. No hay login global ni selector de tenant tras el login.
+///
+/// En una app de marca blanca (ADR 0111) el negocio ya es fijo: solo se piden las
+/// credenciales.
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({
+    super.key,
+    this.negocioFijo = AppConfig.negocioFijo,
+    this.nombreApp = AppConfig.nombreApp,
+  });
+
+  /// El negocio de la app de marca blanca; vacío en las apps oficiales.
+  final String negocioFijo;
+
+  /// El nombre que encabeza el acceso.
+  final String nombreApp;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -21,6 +35,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _password = TextEditingController();
   bool _cargando = false;
   String? _error;
+
+  bool get _fijo => widget.negocioFijo.isNotEmpty;
+
+  /// La dirección del negocio: la fija de la marca blanca o la escrita.
+  String get _negocio => _fijo ? widget.negocioFijo : _slug.text.trim();
 
   @override
   void initState() {
@@ -55,9 +74,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       await ref
           .read(sesionProvider.notifier)
-          .iniciar(_slug.text.trim(), _email.text.trim(), _password.text);
+          .iniciar(_negocio, _email.text.trim(), _password.text);
     } on DioException catch (e) {
-      setState(() => _error = _mensaje(e, 'No se pudo iniciar sesión.'));
+      // ¿Es de la app del otro producto? Entonces se dice cuál descargar.
+      final otro = e.response?.statusCode == 404
+          ? await ref.read(sesionProvider.notifier).enOtroProducto(_negocio)
+          : null;
+      if (!mounted) {
+        return;
+      }
+      setState(
+        () => _error = otro != null
+            ? 'Este negocio usa ${otro.nombre}. Descarga la app de '
+                  '${otro.nombre} para entrar.'
+            : _mensaje(e, 'No se pudo iniciar sesión.'),
+      );
     } catch (_) {
       setState(() => _error = 'Ocurrió un error inesperado.');
     } finally {
@@ -70,7 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// Entra con Google: solo a una cuenta de este negocio que ya lo conectó desde su
   /// perfil (ADR 0093).
   Future<void> _entrarConGoogle() async {
-    final slug = _slug.text.trim();
+    final slug = _negocio;
     if (slug.isEmpty) {
       setState(() => _error = 'Escribe primero la dirección del negocio.');
       return;
@@ -99,7 +130,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// Pide el enlace de recuperación con el negocio y el correo escritos (o los que
   /// se capturen en el diálogo). El enlace llega por correo y se abre en la web.
   Future<void> _recuperar() async {
-    final slug = TextEditingController(text: _slug.text.trim());
+    final slug = TextEditingController(text: _negocio);
     final email = TextEditingController(text: _email.text.trim());
     final enviar = await showDialog<bool>(
       context: context,
@@ -112,14 +143,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               'Te enviaremos un enlace para elegir una contraseña nueva.',
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: slug,
-              decoration: const InputDecoration(
-                labelText: 'Dirección del negocio',
+            if (!_fijo) ...[
+              TextField(
+                controller: slug,
+                decoration: const InputDecoration(
+                  labelText: 'Dirección del negocio',
+                ),
+                autocorrect: false,
               ),
-              autocorrect: false,
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             TextField(
               controller: email,
               decoration: const InputDecoration(labelText: 'Correo'),
@@ -188,13 +221,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'AgendaUno',
+                    widget.nombreApp,
                     style: Theme.of(context).textTheme.headlineMedium,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Entra a tu negocio',
+                    _fijo ? 'Entra con tu cuenta' : 'Entra a tu negocio',
                     style: Theme.of(context).textTheme.bodyMedium,
                     textAlign: TextAlign.center,
                   ),
@@ -219,15 +252,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 16),
                   ],
-                  TextField(
-                    controller: _slug,
-                    decoration: const InputDecoration(
-                      labelText: 'Dirección del negocio',
-                      hintText: 'mi-estudio',
+                  if (!_fijo) ...[
+                    TextField(
+                      key: const Key('direccion-negocio'),
+                      controller: _slug,
+                      decoration: const InputDecoration(
+                        labelText: 'Dirección del negocio',
+                        hintText: 'mi-negocio',
+                      ),
+                      autocorrect: false,
                     ),
-                    autocorrect: false,
-                  ),
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
+                  ],
                   TextField(
                     controller: _email,
                     decoration: const InputDecoration(labelText: 'Correo'),

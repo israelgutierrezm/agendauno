@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\PerfilNegocio;
+use App\Modules\Tenancy\ProductoComercial;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,6 +31,10 @@ class DirectorioController
         $pais = trim((string) $request->query('pais', ''));
         $perfil = trim((string) $request->query('perfil', ''));
         $perfil = in_array($perfil, PerfilNegocio::valores(), true) ? $perfil : '';
+        // Cada producto lista solo sus negocios (ADR 0108): el que se pide o el del
+        // dominio por el que se consulta; fuera de los dominios (local), todos.
+        $producto = ProductoComercial::tryFrom((string) $request->query('producto', ''))
+            ?? ProductoComercial::delHost($request->getHost());
 
         $estudios = Estudio::query()
             ->where('publicado', true)
@@ -49,6 +54,9 @@ class DirectorioController
             ->when($perfil !== '', function (Builder $consulta) use ($perfil): void {
                 $consulta->where('perfil_negocio', $perfil);
             })
+            ->when($producto !== null, function (Builder $consulta) use ($producto): void {
+                $consulta->where('modalidad', $producto->modalidad()->value);
+            })
             ->orderBy('nombre')
             ->limit(self::LIMITE)
             ->get()
@@ -65,6 +73,7 @@ class DirectorioController
                 'logo_url' => $estudio->logo_url,
                 'ciudad' => $estudio->ciudad,
                 'pais' => $estudio->pais,
+                'producto' => $estudio->producto()->value,
                 'url' => url('/app/'.$estudio->slug),
             ])->all(),
         ]);

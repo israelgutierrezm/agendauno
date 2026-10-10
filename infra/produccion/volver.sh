@@ -4,6 +4,11 @@
 #
 #   ./volver.sh                # la versión anterior a la actual
 #   ./volver.sh 3f4b7c9        # una versión concreta (ver .historial-versiones)
+#   ./volver.sh --solo landing-turnouno [VERSION]   # un componente sin estado (abajo)
+#
+# Sin --solo regresa la plataforma (api, worker, scheduler) y la aplicación web; las
+# landings se quedan como están. Con --solo (web, landing-agendauno o landing-turnouno;
+# ADR 0112) solo cambia ese contenedor, sin mantenimiento.
 #
 # Solo cambia el código en marcha. Las migraciones de AgendaUno se escriben para que
 # la versión anterior siga funcionando con el esquema nuevo (primero se agrega,
@@ -21,7 +26,20 @@ set -eu
 
 principal() {
   cd "$(dirname "$0")"
+  . ./versiones.sh
+  # La versión en marcha de cada componente y los archivos de compose de web.env.
+  cargar_versiones
   COMPOSE="docker compose --env-file web.env"
+
+  if [ "${1:-}" = "--solo" ]; then
+    if ! es_componente_solo "${2:-}"; then
+      echo "Con --solo se regresa uno de: $COMPONENTES_SOLOS."
+      exit 1
+    fi
+    volver_componente "$2" "${3:-}"
+    return
+  fi
+
   ACTUAL="$(cat .version-actual 2>/dev/null || echo latest)"
   DOMINIO="$(sed -n 's/^DOMINIO=//p' web.env | tr -d '\r' | head -n 1)"
   SECRETO="api/revision-$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n')"
@@ -39,11 +57,16 @@ principal() {
     exit 1
   fi
 
-  if ! docker image inspect "agendauno-api:$DESTINO" >/dev/null 2>&1; then
-    echo "La imagen agendauno-api:$DESTINO ya no está en este servidor."
-    echo "Reconstrúyela con: git checkout $DESTINO && VERSION=$DESTINO $COMPOSE build"
-    exit 1
-  fi
+  for imagen in "agendauno-api:$DESTINO" "agendauno-web:$DESTINO"; do
+    if ! docker image inspect "$imagen" >/dev/null 2>&1; then
+      echo "La imagen $imagen ya no está en este servidor."
+      echo "Reconstrúyela con: git checkout $DESTINO && VERSION=$DESTINO VERSION_WEB=$DESTINO ./compose.sh build api web"
+      exit 1
+    fi
+  done
+  # La aplicación web regresa con la plataforma; las landings, no.
+  VERSION_WEB="$DESTINO"
+  export VERSION_WEB
 
   echo "==> Volviendo de $ACTUAL a $DESTINO"
   echo "==> Mantenimiento y sin tareas en curso"
@@ -56,7 +79,7 @@ principal() {
   for llave in operacion:latido:programador operacion:latido:cola operacion:arranque:cola; do
     VERSION="$DESTINO" $COMPOSE run --rm api php artisan cache:forget "$llave" >/dev/null
   done
-  VERSION="$DESTINO" $COMPOSE up -d --remove-orphans
+  VERSION="$DESTINO" $COMPOSE up -d --remove-orphans --no-build api worker scheduler web
 
   echo "==> Comprobando que $DESTINO atiende antes de abrir"
   intentos=0
@@ -74,6 +97,7 @@ principal() {
 
   VERSION="$DESTINO" $COMPOSE exec -T -u www-data api php artisan up
   echo "$DESTINO" > .version-actual
+  echo "$DESTINO" > "$(archivo_version web)"
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $ACTUAL -> $DESTINO (volver)" >> .historial-versiones
 
   echo "==> Confirmando que la cola procesa"
@@ -89,6 +113,42 @@ principal() {
   done
   echo "==> Listo: $DESTINO en marcha y atendiendo. Revisa lo demás con:"
   echo "   VERSION=$DESTINO $COMPOSE exec -u www-data api php artisan agendauno:verificar-produccion"
+}
+
+# Regresa solo un componente sin estado (ADR 0112) a una versión ya construida: por
+# omisión, la de la que se vino a la actual según el historial.
+volver_componente() {
+  componente="$1"
+  variable="$(variable_version "$componente")"
+  actual="$(version_de "$componente")"
+  destino="$2"
+  if [ -z "$destino" ]; then
+    destino="$(awk -v c="$componente:" -v actual="$actual" \
+      '$2 == c && $5 == actual && $0 !~ /fallid/ { anterior = $3 } END { print anterior }' \
+      .historial-versiones 2>/dev/null || true)"
+  fi
+  if [ -z "$destino" ]; then
+    echo "No sé a qué versión volver $componente: indícala (./volver.sh --solo $componente VERSION). Historial:"
+    grep " $componente: " .historial-versiones 2>/dev/null || echo "  (vacío)"
+    exit 1
+  fi
+  if ! docker image inspect "agendauno-$componente:$destino" >/dev/null 2>&1; then
+    echo "La imagen agendauno-$componente:$destino ya no está en este servidor."
+    echo "Publícala de nuevo con: ./actualizar.sh --solo $componente $destino"
+    exit 1
+  fi
+
+  echo "==> Volviendo $componente de $actual a $destino"
+  export "$variable=$destino"
+  $COMPOSE up -d --no-deps --no-build "$componente"
+  if ! componente_atiende "$componente"; then
+    echo "!! $componente $destino no atendió en 2 minutos. Revisa: ./compose.sh logs --tail=100 $componente web"
+    anotar "$componente: $actual -> $destino (volver fallido)"
+    exit 1
+  fi
+  echo "$destino" > "$(archivo_version "$componente")"
+  anotar "$componente: $actual -> $destino (volver)"
+  echo "==> Listo: $componente $destino en marcha."
 }
 
 # Una petición real por nginx y PHP-FPM, con la galleta que deja pasar el

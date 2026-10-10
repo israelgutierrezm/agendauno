@@ -28,6 +28,9 @@ class MarcaEstudioController
             'slug' => $estudio->slug,
             'nombre' => $estudio->nombre,
             'logo_url' => $estudio->logo_url,
+            // De qué producto es (ADR 0108): la app de cada marca solo abre los suyos.
+            'modalidad' => $estudio->modalidad()->value,
+            'producto' => $estudio->producto()->value,
         ]]);
     }
 
