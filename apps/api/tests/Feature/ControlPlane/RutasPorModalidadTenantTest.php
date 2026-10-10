@@ -74,6 +74,9 @@ function rutasExclusivasPorModalidad(): array
         'calendario' => 'clases',
         // Antes de reservar una clase desde la cuenta (M05, ADR 0119).
         'mi.sesiones.antes-de-reservar' => 'clases',
+        // Lugares numerados desde la cuenta (B06).
+        'mi.sesiones.lugares' => 'clases',
+        'mi.reservas.lugar' => 'clases',
         // Citas: horarios de atención y disponibilidad del equipo, agendar desde el
         // panel, desde la cuenta y sin cuenta, y el historial de una cita.
         'horarios-atencion.index' => 'citas',

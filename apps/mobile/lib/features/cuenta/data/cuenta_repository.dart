@@ -339,10 +339,15 @@ class CuentaRepository {
   }
 
   /// Reserva un lugar, o se anota en la lista de espera si la clase está llena.
-  Future<void> reservar(String sesionId, {bool esperar = false}) =>
+  /// Con lugar numerado si lo eligió (B06); el servidor lo valida.
+  Future<void> reservar(String sesionId, {bool esperar = false, int? lugar}) =>
       _dio.post<Map<String, dynamic>>(
         '$_base/mi/reservas',
-        data: {'sesion_id': sesionId, 'esperar': esperar},
+        data: {
+          'sesion_id': sesionId,
+          'esperar': esperar,
+          'lugar': ?lugar,
+        },
       );
 
   Future<void> cancelar(String reservaId) =>

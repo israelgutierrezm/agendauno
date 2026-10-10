@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
+import ElegirLugar from "@/components/ElegirLugar.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { dinero } from "@/lib/miCuenta";
 
@@ -45,6 +46,8 @@ interface Antes {
     penaliza_tarde: boolean;
     cancela_tarde: boolean;
   };
+  // Si la clase numera lugares (B06): cuántos y cuáles están tomados.
+  lugares?: { total: number; ocupados: number[] } | null;
 }
 
 const props = defineProps<{
@@ -55,9 +58,11 @@ const props = defineProps<{
   llena?: boolean;
 }>();
 const emit = defineEmits<{
-  confirmar: [esperar: boolean];
+  confirmar: [esperar: boolean, lugar: number | null];
   accion: [accion: AccionAntes];
 }>();
+// El lugar numerado que elige (opcional; B06).
+const lugar = ref<number | null>(null);
 
 const { t, te } = useI18n();
 const antes = ref<Antes | null>(null);
@@ -69,6 +74,7 @@ async function cargar(): Promise<void> {
   const mio = ++pedido;
   antes.value = null;
   error.value = null;
+  lugar.value = null;
   try {
     const { data } = await api.get<{ data: Antes }>(
       `${props.base}/mi/sesiones/${props.sesionId}/antes-de-reservar`,
@@ -179,7 +185,7 @@ const motivo = computed(() => {
         class="tu-btn"
         :class="llena ? 'tu-btn-fantasma' : 'tu-btn-primario'"
         :disabled="ocupado"
-        @click="emit('confirmar', !!llena)"
+        @click="emit('confirmar', !!llena, null)"
       >
         {{ llena ? $t("miCuenta.listaEspera") : $t("miCuenta.reservar") }}
       </button>
@@ -227,6 +233,18 @@ const motivo = computed(() => {
         </template>
       </dl>
 
+      <div v-if="antes.lugares" class="space-y-2">
+        <p class="font-medium">{{ $t("portal.lugares.titulo") }}</p>
+        <p class="text-xs" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("portal.lugares.opcional") }}
+        </p>
+        <ElegirLugar
+          v-model="lugar"
+          :total="antes.lugares.total"
+          :ocupados="antes.lugares.ocupados"
+        />
+      </div>
+
       <div class="flex flex-wrap gap-2">
         <button
           v-if="antes.resultado !== 'no_disponible'"
@@ -234,7 +252,7 @@ const motivo = computed(() => {
           class="tu-btn tu-btn-primario"
           :disabled="ocupado"
           data-prueba="confirmar-reserva"
-          @click="emit('confirmar', antes.resultado === 'lista_espera')"
+          @click="emit('confirmar', antes.resultado === 'lista_espera', lugar)"
         >
           {{
             antes.resultado === "lista_espera"

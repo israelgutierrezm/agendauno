@@ -8,6 +8,7 @@ import AgregarCalendario from "@/components/AgregarCalendario.vue";
 import AntesDeReservar, {
   type AccionAntes,
 } from "@/components/AntesDeReservar.vue";
+import CambiarMiLugar from "@/components/CambiarMiLugar.vue";
 import CalendarioVistas, {
   type EventoPeriodo,
 } from "@/components/CalendarioVistas.vue";
@@ -233,7 +234,9 @@ function quitarFiltros(): void {
 }
 
 const abierto = ref<Evento | null>(null);
-const accion = ref<"reprogramar" | "cancelar" | null>(null);
+const accion = ref<"reprogramar" | "cancelar" | "lugar" | null>(null);
+// Si reservar falla (p. ej. alguien tomó ese lugar), la vista previa se vuelve a pedir.
+const intentoReserva = ref(0);
 const aviso = ref<string | null>(null);
 // Recién reservada (C05): su detalle abre con la confirmación de lo que quedó.
 const recienReservada = ref(false);
@@ -409,20 +412,27 @@ function estadoMia(e: Evento): { texto: string; tono: string } {
 // Tras reservar, cancelar o cambiar, el cupo del periodo cambió: se vuelve a pedir.
 // Reservada, se abre su detalle con lo que quedó (C05): lo de la reserva real, no lo
 // que se vio antes de confirmar.
-async function reservar(e: Evento, esperar: boolean): Promise<void> {
-  if (e.clase && (await cuenta.reservar(e.clase, esperar))) {
-    aviso.value = esperar
-      ? t("miCuenta.enListaEspera")
-      : t("miCuenta.reservado");
-    const nueva = mias.value.find((m) => m.reserva?.sesion_id === e.id);
-    if (nueva) {
-      abrir(nueva);
-      recienReservada.value = true;
-    } else {
-      cerrar();
-    }
-    void cargarClases();
+async function reservar(
+  e: Evento,
+  esperar: boolean,
+  lugar: number | null = null,
+): Promise<void> {
+  if (!e.clase) {
+    return;
   }
+  if (!(await cuenta.reservar(e.clase, esperar, lugar))) {
+    intentoReserva.value++;
+    return;
+  }
+  aviso.value = esperar ? t("miCuenta.enListaEspera") : t("miCuenta.reservado");
+  const nueva = mias.value.find((m) => m.reserva?.sesion_id === e.id);
+  if (nueva) {
+    abrir(nueva);
+    recienReservada.value = true;
+  } else {
+    cerrar();
+  }
+  void cargarClases();
 }
 // Lo que sirve cuando no puede reservar (M05).
 function alAccionAntes(a: AccionAntes, e: Evento): void {
@@ -485,6 +495,13 @@ function detallesMia(e: Evento): string[] {
   if (r.plan && r.estado !== "en_espera") {
     lineas.push(t("portal.miReserva.conPlan", { plan: r.plan }));
   }
+  if ((r.lugares ?? 0) > 0 && r.estado !== "en_espera") {
+    lineas.push(
+      r.lugar
+        ? t("portal.lugares.tuLugar", { n: r.lugar })
+        : t("portal.lugares.sinElegir"),
+    );
+  }
   if (r.cancelacion) {
     lineas.push(
       new Date(r.cancelacion.limite).getTime() > Date.now()
@@ -510,6 +527,19 @@ async function aceptar(e: Evento): Promise<void> {
     cerrar();
     void cargarClases();
   }
+}
+// Eligió o cambió su lugar (B06): se recarga su reserva y se queda en su detalle.
+async function lugarCambiado(n: number): Promise<void> {
+  const id = abierto.value?.id;
+  aviso.value = t("portal.lugares.cambiado", { n });
+  accion.value = null;
+  recienReservada.value = false;
+  await cuenta.cargar(true);
+  const actual = mias.value.find((m) => m.id === id);
+  if (actual) {
+    abierto.value = actual;
+  }
+  void cargarClases();
 }
 async function reprogramada(): Promise<void> {
   aviso.value = t("miReprogramar.hecho");
@@ -1067,6 +1097,23 @@ onMounted(() => void cuenta.asegurar());
             >
             <button
               v-if="
+                (abierto.reserva.lugares ?? 0) > 0 &&
+                (abierto.estado === 'confirmada' ||
+                  abierto.estado === 'pendiente_pago')
+              "
+              class="tu-btn tu-btn-fantasma"
+              :aria-expanded="accion === 'lugar'"
+              data-prueba="mi-lugar"
+              @click="accion = accion === 'lugar' ? null : 'lugar'"
+            >
+              {{
+                abierto.reserva.lugar
+                  ? $t("portal.lugares.cambiar")
+                  : $t("portal.lugares.elegir")
+              }}
+            </button>
+            <button
+              v-if="
                 abierto.estado === 'confirmada' ||
                 abierto.estado === 'pendiente_pago'
               "
@@ -1094,6 +1141,14 @@ onMounted(() => void cuenta.asegurar());
             @hecho="reprogramada"
             @cerrar="accion = null"
           />
+          <CambiarMiLugar
+            v-if="accion === 'lugar' && abierto.reserva.sesion_id"
+            :base="cuenta.base.value"
+            :reserva-id="abierto.id"
+            :sesion-id="abierto.reserva.sesion_id"
+            @hecho="lugarCambiado"
+            @cerrar="accion = null"
+          />
           <ConfirmarCancelacion
             v-if="accion === 'cancelar'"
             :url="`${cuenta.base.value}/mi/reservas/${abierto.id}/cancelacion`"
@@ -1108,11 +1163,12 @@ onMounted(() => void cuenta.asegurar());
         <div v-else class="mt-5">
           <AntesDeReservar
             v-if="reservable(abierto)"
+            :key="`${abierto.id}-${intentoReserva}`"
             :base="cuenta.base.value"
             :sesion-id="abierto.id"
             :ocupado="cuenta.accionando.value"
             :llena="llena(abierto)"
-            @confirmar="(esperar) => reservar(abierto!, esperar)"
+            @confirmar="(esperar, lugar) => reservar(abierto!, esperar, lugar)"
             @accion="(a) => alAccionAntes(a, abierto!)"
           />
           <RouterLink

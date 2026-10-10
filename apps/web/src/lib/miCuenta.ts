@@ -60,6 +60,9 @@ export interface Reserva {
     penaliza_tarde: boolean;
   } | null;
   que_llevar?: string | null;
+  // Su lugar numerado y cuántos tiene la clase (0 = no numera; B06).
+  lugar?: number | null;
+  lugares?: number;
 }
 // Qué partes de su cuenta le sirven (ADR 0091).
 export interface PortalCuenta {
@@ -391,9 +394,14 @@ export function useMiCuenta() {
     cargar,
     asegurar,
     cargarFormularios,
-    reservar: (c: Clase, esperar: boolean) =>
+    // Con lugar numerado si lo eligió (B06); el servidor lo valida.
+    reservar: (c: Clase, esperar: boolean, lugar: number | null = null) =>
       accion(() =>
-        api.post(`${base.value}/mi/reservas`, { sesion_id: c.id, esperar }),
+        api.post(`${base.value}/mi/reservas`, {
+          sesion_id: c.id,
+          esperar,
+          ...(lugar !== null ? { lugar } : {}),
+        }),
       ),
     cancelar: (r: Reserva) =>
       accion(() => api.post(`${base.value}/mi/reservas/${r.id}/cancelar`, {})),

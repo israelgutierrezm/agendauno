@@ -76,4 +76,18 @@ void main() {
     expect(a.motivoTexto, 'Tu plan no está vigente ese día.');
     expect(a.consumoTexto, isNull);
   });
+
+  test('con lugares numerados dice cuántos hay y cuáles están tomados', () {
+    final a = AntesDeReservar.desdeJson(
+      antes({
+        'lugares': {
+          'total': 6,
+          'ocupados': [2, 5],
+        },
+      }),
+    );
+    expect(a.lugaresTotal, 6);
+    expect(a.lugaresOcupados, [2, 5]);
+    expect(AntesDeReservar.desdeJson(antes({})).lugaresTotal, 0);
+  });
 }
