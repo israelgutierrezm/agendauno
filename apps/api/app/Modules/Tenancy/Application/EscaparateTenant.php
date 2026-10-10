@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Application;
 
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\TelefonoWhatsApp;
 use App\Modules\Tenancy\EstadoSesionTenant;
+use App\Modules\Tenancy\Membresias\VigenciaProducto;
 use App\Modules\Tenancy\ModalidadOfertaTenant;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
@@ -156,7 +157,7 @@ class EscaparateTenant
             ->profesionales()
             ->orderBy('name')
             ->get()
-            ->map(static fn (Usuario $u): array => ['nombre' => (string) $u->name, 'foto_url' => $u->fotoUrl()])
+            ->map(static fn (Usuario $u): array => ['nombre' => (string) $u->name, 'foto_url' => $u->fotoUrl(), 'semblanza' => $u->semblanza])
             ->values()
             ->all();
     }
@@ -192,6 +193,10 @@ class EscaparateTenant
                 'moneda' => $moneda,
                 'agendable' => $esCitas && $o->politica_reserva === PoliticaReservaTenant::Pago,
                 'niveles' => $o->actividad?->niveles->sortBy('orden')->pluck('nombre')->values()->all() ?? [],
+                // Para quien llega por primera vez (C03), lo que el negocio valida.
+                'para_principiantes' => $o->para_principiantes,
+                'requisitos' => $o->requisitos,
+                'que_llevar' => $o->que_llevar,
             ])->values()->all();
     }
 
@@ -238,7 +243,10 @@ class EscaparateTenant
      */
     private function productos(): array
     {
+        $hoy = app(FechasNegocioTenant::class)->hoy();
+
         return ProductoTenant::query()
+            ->with('actividad')
             ->where('archivado', false)
             ->orderBy('precio_minor')
             ->get()
@@ -247,6 +255,11 @@ class EscaparateTenant
                 'id' => $p->ulid,
                 'nombre' => $p->nombre,
                 'tipo' => $p->tipo->value,
+                // Para comparar antes de comprar (M03/B03).
+                'descripcion' => $p->descripcion,
+                'destacado' => $p->destacado,
+                'primera_vez' => $p->primera_vez,
+                'actividad' => $p->actividad?->nombre,
                 'precio_minor' => $p->precio_minor,
                 'moneda' => $p->moneda,
                 'ilimitado' => $p->ilimitado,
@@ -255,6 +268,9 @@ class EscaparateTenant
                 // Cuánto dura lo que se compra (p. ej. 1 mes, o hasta fin de mes).
                 'vigencia_tipo' => $p->vigencia_tipo?->value,
                 'vigencia_cantidad' => $p->vigencia_cantidad,
+                // La fecha exacta: la vigencia corre desde el pago (M03).
+                'vence_si_compra_hoy' => VigenciaProducto::de($p)?->hasta($hoy),
+                'unidades_por_ciclo' => $p->unidades_por_ciclo,
             ])->all();
     }
 

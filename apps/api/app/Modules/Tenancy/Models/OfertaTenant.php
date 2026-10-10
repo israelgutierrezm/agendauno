@@ -19,6 +19,9 @@ use Illuminate\Support\Facades\Storage;
  *
  * @property string|null $descripcion
  * @property string|null $foto_ruta
+ * @property bool $para_principiantes apta para quien empieza (C03)
+ * @property string|null $requisitos qué se necesita saber antes de tomarla
+ * @property string|null $que_llevar qué llevar a la clase
  */
 class OfertaTenant extends Model
 {
@@ -28,7 +31,7 @@ class OfertaTenant extends Model
 
     protected $table = 'ofertas';
 
-    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min', 'foto_ruta'];
+    protected $fillable = ['actividad_id', 'nombre', 'descripcion', 'modalidad', 'capacidad', 'lugares', 'precio_clase_minor', 'politica_reserva', 'duracion_minutos', 'preparacion_min', 'limpieza_min', 'foto_ruta', 'para_principiantes', 'requisitos', 'que_llevar'];
 
     /**
      * @var array<string, string>
@@ -42,6 +45,7 @@ class OfertaTenant extends Model
         'duracion_minutos' => 'integer',
         'preparacion_min' => 'integer',
         'limpieza_min' => 'integer',
+        'para_principiantes' => 'boolean',
     ];
 
     /**

@@ -23,6 +23,7 @@ use App\Modules\Tenancy\Application\PaseAccesoTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\PortalDelClienteTenant;
 use App\Modules\Tenancy\Application\PresentarMovimientosCreditoTenant;
+use App\Modules\Tenancy\Application\PrimeraVezTenant;
 use App\Modules\Tenancy\Application\ReservasTenant;
 use App\Modules\Tenancy\Application\ResolverDerechoTenant;
 use App\Modules\Tenancy\Application\VentanaDeReservaTenant;
@@ -30,6 +31,7 @@ use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Http\SesionTenantPresenter;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
+use App\Modules\Tenancy\Membresias\VigenciaProducto;
 use App\Modules\Tenancy\Models\DerechoTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
@@ -698,7 +700,12 @@ class MiTenantController
         if (! app(FuncionesPlan::class)->tiene($this->estudioDe($request), 'venta_en_linea')) {
             return response()->json(['data' => []]);
         }
-        $productos = ProductoTenant::query()->where('archivado', false)->orderBy('precio_minor')->get();
+        $productos = ProductoTenant::query()->with('actividad')->where('archivado', false)->orderBy('precio_minor')->get();
+        // La clase de prueba solo se ofrece a quien nunca vino (B03).
+        $persona = $this->persona($request);
+        $primeraVez = $persona instanceof PersonaTenant && app(PrimeraVezTenant::class)->elegible($persona);
+        // Las fechas exactas antes de pagar (la vigencia corre desde el pago; M03).
+        $hoy = app(FechasNegocioTenant::class)->hoy();
 
         return response()->json([
             'data' => $productos->map(static fn (ProductoTenant $p): array => [
@@ -713,6 +720,13 @@ class MiTenantController
                 // Cuánto dura lo que se compra (p. ej. 1 mes, o hasta fin de mes).
                 'vigencia_tipo' => $p->vigencia_tipo?->value,
                 'vigencia_cantidad' => $p->vigencia_cantidad,
+                'vence_si_compra_hoy' => VigenciaProducto::de($p)?->hasta($hoy),
+                'descripcion' => $p->descripcion,
+                'destacado' => $p->destacado,
+                'primera_vez' => $p->primera_vez,
+                'actividad' => $p->actividad?->nombre,
+                // ¿Lo puede comprar? (la clase de prueba, solo la primera vez).
+                'disponible' => ! $p->primera_vez || $primeraVez,
             ])->all(),
         ]);
     }

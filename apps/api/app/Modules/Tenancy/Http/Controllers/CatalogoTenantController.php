@@ -201,9 +201,21 @@ class CatalogoTenantController
             // Servicios que incluye (paquete, ADR 0063), en orden; [] = ninguno.
             'incluye' => ['sometimes', 'array', 'max:'.self::MAX_INCLUIDOS],
             'incluye.*' => ['string', 'distinct'],
+            // Para quien llega por primera vez (C03): lo que el negocio valida.
+            'para_principiantes' => ['sometimes', 'boolean'],
+            'requisitos' => ['sometimes', 'nullable', 'string', 'max:300'],
+            'que_llevar' => ['sometimes', 'nullable', 'string', 'max:300'],
         ]);
 
         $cambios = ['lugares' => (int) $validado['lugares']];
+        if ($request->has('para_principiantes')) {
+            $cambios['para_principiantes'] = (bool) $validado['para_principiantes'];
+        }
+        foreach (['requisitos', 'que_llevar'] as $campo) {
+            if ($request->has($campo)) {
+                $cambios[$campo] = $this->descripcion($validado[$campo] ?? null);
+            }
+        }
         if (array_key_exists('recursos', $validado)) {
             $ids = RecursoTenant::query()->whereIn('ulid', $validado['recursos'])->pluck('id')->all();
             if (count($ids) !== count(array_unique($validado['recursos']))) {
@@ -349,6 +361,9 @@ class CatalogoTenantController
             'id' => $oferta->ulid,
             'nombre' => $oferta->nombre,
             'descripcion' => $oferta->descripcion,
+            'para_principiantes' => $oferta->para_principiantes,
+            'requisitos' => $oferta->requisitos,
+            'que_llevar' => $oferta->que_llevar,
             'modalidad' => $oferta->modalidad->value,
             'capacidad' => $oferta->capacidad,
             'lugares' => $oferta->lugares,

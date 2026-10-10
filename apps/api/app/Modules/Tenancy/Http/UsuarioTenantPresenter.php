@@ -42,6 +42,7 @@ class UsuarioTenantPresenter
                 ? $usuario->email_nuevo
                 : null,
             'foto_url' => $usuario->fotoUrl(),
+            'semblanza' => $usuario->semblanza,
             // Su celular, para avisos y WhatsApp (lo edita en «Mi perfil»). Sin ficha
             // (personal que no es cliente) no hay celular que editar.
             'tiene_ficha' => $ficha instanceof PersonaTenant,
