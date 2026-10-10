@@ -1071,6 +1071,25 @@ export default {
     duenoDescPrelanzamiento:
       "AgendaUno abre pronto. Déjanos tus datos y te avisamos en cuanto puedas registrar tu negocio.",
   },
+  // Calendario público de clases (plan de mejoras M02).
+  calendarioPublico: {
+    dias: "Días de la semana",
+    semanaAnterior: "Semana anterior",
+    semanaSiguiente: "Semana siguiente",
+    sede: "Sede",
+    actividad: "Actividad",
+    instructor: "Instructor",
+    todasSedes: "Todas las sedes",
+    todasActividades: "Todas las clases",
+    todosInstructores: "Todos los instructores",
+    sinClasesDia: "No hay clases este día.",
+    verDia: "Ver el {fecha}",
+    siguiente: "Siguiente fecha con clases: {fecha}",
+    minutos: "{n} min",
+    lugares: "{libres} de {total} lugares",
+    llena: "Llena",
+    cupoAbierto: "Cupo abierto",
+  },
   escaparate: {
     cargando: "Cargando el negocio…",
     noDisponible: "Este negocio no está disponible por ahora.",

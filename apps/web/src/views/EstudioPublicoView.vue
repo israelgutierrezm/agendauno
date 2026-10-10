@@ -5,6 +5,7 @@ import { RouterLink, useRoute } from "vue-router";
 import IconoNav from "@/components/IconoNav.vue";
 import IconoRed from "@/components/IconoRed.vue";
 import InstalarApp from "@/components/InstalarApp.vue";
+import CalendarioPublico from "@/components/CalendarioPublico.vue";
 import FormularioCaptacion from "@/components/FormularioCaptacion.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api } from "@/lib/api";
@@ -319,6 +320,8 @@ function esEnlaceExterno(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
 
+// El calendario por fecha no cargó: se queda la lista de próximas clases.
+const calendarioFallo = ref(false);
 // Lo que tenía elegido al pedir acceso (una clase, un plan): viaja al prospecto.
 const interesAcceso = ref<{
   sesion?: string | null;
@@ -789,8 +792,18 @@ onMounted(cargar);
             <h2 class="text-2xl font-light">
               {{ sec.titulo ?? $t("escaparate.proximasClases") }}
             </h2>
+            <!-- Calendario por fecha (M02); sin él (p. ej. la vista previa con la
+                 página cerrada), la lista de próximas clases de siempre. -->
+            <CalendarioPublico
+              v-if="!props.vistaPrevia && !calendarioFallo"
+              class="mt-6"
+              :slug="slug"
+              :puede-pedir="!!formularioAcceso"
+              @pedir="(c) => abrirAcceso('calendar', c)"
+              @error="calendarioFallo = true"
+            />
             <p
-              v-if="escaparate.proximas_sesiones.length === 0"
+              v-else-if="escaparate.proximas_sesiones.length === 0"
               class="mt-4"
               :style="{ color: 'var(--texto-suave)' }"
             >
