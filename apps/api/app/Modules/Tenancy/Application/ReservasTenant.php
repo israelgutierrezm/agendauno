@@ -1217,11 +1217,76 @@ class ReservasTenant
     }
 
     /**
+     * Lugares numerados de la sesión (R4): cuántos hay y cuáles están tomados, sin decir
+     * por quién, para que el cliente elija el suyo (B06). Null si la clase no numera
+     * lugares.
+     *
+     * @return array{total: int, ocupados: list<int>}|null
+     */
+    public function lugaresDeSesion(SesionTenant $sesion): ?array
+    {
+        $total = $this->lugaresDe($sesion);
+        if ($total <= 0) {
+            return null;
+        }
+        $ocupados = ReservaTenant::query()
+            ->where('sesion_id', $sesion->getKey())
+            ->whereNotNull('lugar')
+            ->whereIn('estado', CupoDeSesionTenant::OCUPAN_LUGAR)
+            ->orderBy('lugar')
+            ->pluck('lugar')
+            ->map(static fn (mixed $l): int => (int) $l)
+            ->unique()
+            ->values()
+            ->all();
+
+        return ['total' => $total, 'ocupados' => $ocupados];
+    }
+
+    /**
+     * Elige o cambia el lugar numerado de una reserva confirmada (B06): bajo el candado
+     * de la sesión, para que dos personas no se queden con el mismo. Si el lugar ya se
+     * tomó, se rechaza (nunca se cambia a otro en silencio). Queda en la bitácora.
+     */
+    public function cambiarLugar(ReservaTenant $reserva, int $lugar, ?Usuario $actor = null): ReservaTenant
+    {
+        return DB::connection('tenant')->transaction(function () use ($reserva, $lugar, $actor): ReservaTenant {
+            $sesion = SesionTenant::query()->whereKey($reserva->sesion_id)->lockForUpdate()->firstOrFail();
+            $bloqueada = ReservaTenant::query()->whereKey($reserva->getKey())->lockForUpdate()->firstOrFail();
+
+            if (! in_array($bloqueada->estado, [EstadoReserva::Confirmada, EstadoReserva::PendientePago], true)) {
+                throw new LugarNoDisponible('Solo se elige lugar en una reserva confirmada.');
+            }
+            if ($sesion->estado !== EstadoSesionTenant::Programada || $sesion->inicia_en->isPast()) {
+                throw new LugarNoDisponible('La clase ya empezó.');
+            }
+            if ($this->lugaresDe($sesion) <= 0) {
+                throw new LugarNoDisponible('Esta clase no tiene lugares numerados.');
+            }
+            if ((int) $bloqueada->lugar === $lugar) {
+                return $bloqueada;
+            }
+            if (! $this->lugarDisponible($sesion, $lugar, (int) $bloqueada->getKey())) {
+                throw new LugarNoDisponible('El lugar elegido no esta disponible.');
+            }
+
+            $antes = ['lugar' => $bloqueada->lugar];
+            $bloqueada->update(['lugar' => $lugar]);
+            $this->auditoria->registrar($actor, 'reserva.lugar_cambiado', 'reserva', (string) $bloqueada->ulid, $antes, [
+                'lugar' => $lugar,
+                'sesion_id' => $sesion->ulid,
+            ]);
+
+            return $bloqueada->refresh();
+        });
+    }
+
+    /**
      * ¿El lugar elegido está disponible? null = no eligió (permitido). Si la oferta no
      * define lugares, se ignora (permitido). Si define, debe estar en rango [1..N] y no
      * estar tomado por otra reserva activa de la sesión (R4).
      */
-    private function lugarDisponible(SesionTenant $sesion, ?int $lugar): bool
+    private function lugarDisponible(SesionTenant $sesion, ?int $lugar, ?int $exceptoReserva = null): bool
     {
         if ($lugar === null) {
             return true;
@@ -1235,10 +1300,13 @@ class ReservasTenant
             return false;
         }
 
+        // Lo ocupan las mismas reservas que ocupan cupo (ADR 0116); al cambiarlo, la
+        // propia no cuenta.
         return ! ReservaTenant::query()
             ->where('sesion_id', $sesion->getKey())
             ->where('lugar', $lugar)
-            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::EnEspera->value])
+            ->whereIn('estado', CupoDeSesionTenant::OCUPAN_LUGAR)
+            ->when($exceptoReserva !== null, fn ($q) => $q->whereKeyNot($exceptoReserva))
             ->exists();
     }
 }
