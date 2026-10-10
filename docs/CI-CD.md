@@ -5,9 +5,9 @@ producción ni en las tiendas por sí solo.
 
 | Flujo | Cuándo | Qué hace |
 |---|---|---|
-| **CI** (`ci.yml`) | Cada PR y cada push a `main` | Revisa lo que cambió: API (Pint, PHPStan, Pest con MySQL, concurrencia), web (lint, compilación, landings, pruebas), app (analyze, pruebas y los APK de los dos sabores) e imágenes (las cuatro, nginx, compose y el enrutamiento web → landings). En un PR solo corre lo de las carpetas que tocó; en `main`, todo. |
+| **CI** (`ci.yml`) | Cada PR y cada push a `main` | Revisa lo que cambió: API (avisos de seguridad de las dependencias con `composer audit`, Pint, PHPStan, Pest con MySQL, concurrencia), web (`npm audit` alto/crítico, lint, compilación, landings, pruebas), app (analyze, pruebas y los APK de los dos sabores) e imágenes (las cuatro, nginx, compose y el enrutamiento web → landings). En un PR solo corre lo de las carpetas que tocó; en `main`, todo. |
 | **Imágenes** (`imagenes.yml`) | Push a `main`, etiquetas `v*` y a mano | Publica en GHCR `agendauno-api`, `agendauno-web`, `agendauno-landing-agendauno` y `agendauno-landing-turnouno` con la etiqueta del commit (y la `v*`). Inmutables: una etiqueta publicada no se reemplaza. |
-| **Desplegar** (`desplegar.yml`) | Solo a mano | Entra por SSH al servidor del entorno (`staging` o `produccion`) y corre `actualizar.sh` (todo o `--solo` un componente). |
+| **Desplegar** (`desplegar.yml`) | Solo a mano, con aprobación | Entra por SSH al servidor del entorno (`staging` o `produccion`) y corre `actualizar.sh` o `volver.sh` (todo o `--solo` un componente); después prueba desde fuera los dos dominios. |
 | **Apps móviles** (`apps-moviles.yml`) | Solo a mano | Compila el `.aab` firmado de AgendaUno o TurnoUno como artefacto. No lo sube a Play. |
 
 ## Detección de cambios
@@ -60,11 +60,17 @@ Cada servidor es un **entorno** de GitHub (Settings → Environments): `staging`
      un servidor desconocido).
    - `RUTA_PLATAFORMA`: la carpeta `infra/produccion` del clon en el servidor.
 
-Actions → Desplegar → Run workflow: entorno, componente (`todo`, `web`,
-`landing-agendauno`, `landing-turnouno`) y ref (por omisión `origin/main`). Sin los
-secretos el flujo se detiene antes de conectarse. Lo que hace en el servidor es
-exactamente `actualizar.sh` (docs/DESPLIEGUE.md); para volver atrás, `./volver.sh` en
-el servidor.
+4. Variables: `URL_AGENDAUNO` y `URL_TURNOUNO` (`https://…` de cada producto en ese
+   servidor), para las pruebas de después.
+
+Actions → Desplegar → Run workflow: entorno, acción (`actualizar` o `volver`),
+componente (`todo`, `web`, `landing-agendauno`, `landing-turnouno`) y ref (al
+publicar, por omisión `origin/main`; al volver, la versión, o vacío para la anterior).
+Sin los secretos el flujo se detiene antes de conectarse. Lo que hace en el servidor es
+exactamente `actualizar.sh` o `volver.sh` (docs/DESPLIEGUE.md), con su mantenimiento,
+respaldo, migraciones y revisiones; después pide desde fuera `/up`, `/robots.txt`, `/`
+y `/entrar` de cada dominio y la salud de la API. La app de Flutter no tiene auditoría
+automática de dependencias (`flutter pub outdated` a mano).
 
 ## Apps móviles
 

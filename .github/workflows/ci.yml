@@ -102,6 +102,10 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      # Avisos de seguridad de las dependencias de PHP (ADR 0113).
+      - name: Dependency audit
+        run: composer audit --no-interaction
+
       - name: Prepare environment
         run: |
           cp .env.example .env
@@ -147,6 +151,8 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
 
       - run: npm ci
+      # Avisos de seguridad altos o críticos de las dependencias (ADR 0113).
+      - run: npm audit --audit-level=high
       - run: npm run lint
       - run: npm run build
       # Las páginas comerciales prerenderizadas (HTML sin JS, SEO, menú, CSS) y su
