@@ -117,14 +117,14 @@ mismo. Así no hay CORS entre subdominios.
    último tiene más de `renta.tipo_cambio_dias_vigencia` días, los cargos esperan y
    llega una alerta.
 7. **reCAPTCHA v3** (obligatorio): crea un sitio en la consola de reCAPTCHA con
-   `DOMINIO` y pon su llave secreta en `RECAPTCHA_SECRET` (`api.env`) y la del sitio
+   `DOMINIO` y `DOMINIO_TURNOUNO` (la lista de interesados de TurnoUno también lo usa) y pon su llave secreta en `RECAPTCHA_SECRET` (`api.env`) y la del sitio
    en `VITE_RECAPTCHA_SITE_KEY` (`web.env`). Cada alta del registro público crea una
    base completa y manda un correo; sin captcha, `agendauno:verificar-produccion`
    marca FALTA. Las altas que nadie activa se borran solas (ver «Altas sin activar»).
 8. **Google** (opcional, para entrar con Google): en el cliente OAuth web, registra
-   como orígenes autorizados solo `https://DOMINIO` (y `https://www.DOMINIO` si se
-   sirve). Desde el subdominio de un negocio, la web manda a entrar con Google al
-   dominio principal. El mismo Client ID va en `GOOGLE_CLIENT_ID` (`api.env`) y en
+   como orígenes autorizados solo `https://DOMINIO` y `https://DOMINIO_TURNOUNO` (y sus
+   `www.` si se sirven). Desde el subdominio de un negocio, la web manda a entrar con
+   Google al dominio principal de su producto. El mismo Client ID va en `GOOGLE_CLIENT_ID` (`api.env`) y en
    `VITE_GOOGLE_CLIENT_ID` (`web.env`); sin él, la web no ofrece Google. Para la app
    móvil, los Client ID de Android e iOS van en `GOOGLE_CLIENT_IDS_APP`, separados por
    coma (ver `docs/GOOGLE_APP.md`).

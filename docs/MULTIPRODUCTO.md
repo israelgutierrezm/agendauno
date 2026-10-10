@@ -31,13 +31,14 @@ implementado** · **Requiere autorización**.
 | Landing TurnoUno de prelanzamiento (turnouno.mx) | Implementado, pendiente de despliegue | Portada de citas con «Quiero que me avisen» y lista de interesados; logotipo en texto (configurable) |
 | Aplicación con la marca del dominio | Implementado y probado | Textos, logo y enlaces con la marca del producto; registro solo con sus giros |
 | Superadmin: interesados | Implementado y probado | Pestaña «Interesados» |
-| Imágenes web separadas (aplicación, landing AgendaUno, landing TurnoUno) | Implementado, pendiente de despliegue | ADR 0112: `landing.Dockerfile`; nginx de `web` pasa a cada landing sus rutas; enrutamiento probado con contenedores |
+| Imágenes web separadas (aplicación, landing AgendaUno, landing TurnoUno) | Implementado, pendiente de despliegue | ADR 0112: `landing.Dockerfile`; nginx de `web` pasa a cada landing sus rutas. La prueba con contenedores (imágenes, `nginx -t`, enrutamiento) está en el CI y corre al abrir el PR: aquí no hubo Docker |
 | Publicar y volver por componente | Implementado, pendiente de despliegue | `./actualizar.sh --solo …`, `./volver.sh --solo …`, versión por componente |
 | PWA por negocio (AgendaUno y TurnoUno) | Implementado, pendiente de despliegue | ADR 0110: manifiesto dinámico en el subdominio, service worker que no guarda la API, invitación a instalar; probado en unidades y contra el API local |
 | Color de marca del negocio | Implementado y probado | Configuración → Perfil público; barra de la app instalada |
 | Íconos cuadrados del logo (192/512) | Preparado para futuro | Requiere GD en la imagen del API (cambio de imagen) |
 | Notificaciones push web | No implementado | La app oficial sí tiene push (FCM) |
 | Constructor del sitio (plantillas, secciones, banners) | No implementado | Hoy: escaparate con logo, portada, descripción, redes y color |
+| Dominios propios de los negocios | Preparado para futuro | Diseño documentado arriba (verificación por DNS, certificados, SEO); no habilitado |
 | App oficial AgendaUno (Android) | Implementado y probado | ADR 0111: sabor `agendauno`, `com.agendauno.app`; APK compilado y revisado |
 | App oficial TurnoUno (Android) | Implementado y probado | Sabor `turnouno`, `com.turnouno.app`, API `turnouno.mx`; APK compilado y revisado; ícono provisional |
 | Apps oficiales en iOS | Preparado para futuro | Producto en Dart listo; esquemas de Xcode en una Mac (docs/MOBILE.md) |
@@ -56,6 +57,41 @@ implementado** · **Requiere autorización**.
 | Documentos legales por producto | Preparado para futuro | Hoy son de la plataforma |
 | Autorregistro de clientes en los sitios | Requiere autorización | Se mantiene cerrado (ADR 0093, reafirmado 2026-10-10) |
 | Cambios en producción | Requiere autorización | |
+
+## Dominios propios de los negocios (diseño; no habilitado)
+
+Hoy cada negocio vive en el subdominio de su producto (`fluo.agendauno.mx`,
+`barberia.turnouno.mx`). La arquitectura admite después un dominio propio
+(`reservas.estudiopilates.mx`) sin otro proyecto ni otra instalación. **No está
+habilitado**: ningún host fuera de los dominios de los productos resuelve un negocio.
+Cuando se implemente:
+
+1. **Verificación de propiedad.** El dueño escribe el dominio en Configuración → Sitio;
+   la plataforma guarda un token y le pide dos registros: `TXT
+   _agendauno-verificacion.reservas.estudiopilates.mx` con el token y un `CNAME` de
+   `reservas.estudiopilates.mx` a `sitios.agendauno.mx` (o `sitios.turnouno.mx`). Un
+   trabajo en cola consulta el DNS; solo con los dos se marca verificado, y se vuelve a
+   revisar cada día (si deja de apuntar o desaparece el TXT, se desactiva). Nunca se
+   acepta un dominio sin verificar.
+2. **Datos.** Una tabla de la base central (`dominios_estudio`: host único, negocio,
+   token, verificado y revisado en, estado), no en la del negocio: el host se resuelve
+   antes de saber el negocio.
+3. **Resolución del negocio.** `ResolverEstudio` añade la búsqueda por host verificado
+   (como hoy por subdominio) y las rutas de la API se montan también sin slug para esos
+   hosts; el producto sigue saliendo del negocio (ADR 0108), y `X-App-*` no cambia.
+4. **Certificados.** El comodín de cada producto no los cubre. Opciones: (a) Traefik con
+   un router por dominio verificado y su certificado por HTTP-01 (un proveedor de
+   configuración de Traefik que lea los dominios verificados de un punto interno de la
+   API); (b) Cloudflare for SaaS (*custom hostnames*), si el tráfico pasa por el proxy
+   de Cloudflare. Se decide al implementarlo; ninguna emite certificados para un
+   dominio no verificado.
+5. **Seguridad.** CORS, los regresos de pago (`RetornoPago`) y los enlaces de correo
+   aceptan solo hosts verificados; entrar con Google sigue en el dominio del producto
+   (sus orígenes OAuth no se pueden registrar por cliente); las cabeceras de seguridad
+   son las mismas, sin `includeSubDomains` sobre un dominio ajeno.
+6. **SEO.** Con el dominio propio activo, la página del negocio declara su `canonical`
+   en él y el subdominio del producto redirige (301) o declara ese canonical; su
+   sitemap se sirve en su dominio. Así no hay contenido duplicado.
 
 ## Variables
 

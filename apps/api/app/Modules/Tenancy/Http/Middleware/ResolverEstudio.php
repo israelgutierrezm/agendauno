@@ -71,8 +71,9 @@ class ResolverEstudio
         $request->attributes->set('estudio', $estudio);
 
         // Aislamiento de logs: cada linea de esta request queda etiquetada con el
-        // estudio (junto al X-Correlation-ID) para trazabilidad por tenant.
-        Log::withContext(['estudio' => $estudio->slug]);
+        // estudio y su producto (junto al X-Correlation-ID) para trazabilidad por
+        // tenant y por producto (ADR 0108).
+        Log::withContext(['estudio' => $estudio->slug, 'producto' => $estudio->producto()->value]);
 
         try {
             return $next($request);
