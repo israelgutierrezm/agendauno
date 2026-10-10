@@ -69,7 +69,7 @@
   background: color-mix(in srgb, var(--marketing-rosa) 9%, transparent);
 }
 /* En oscuro, más tenues: que no compitan con el texto. */
-:global(.dark) .fondo-hero {
+.dark .fondo-hero {
   opacity: 0.55;
 }
 /* En el teléfono, el rosa queda arriba del texto y los demás se apartan. */

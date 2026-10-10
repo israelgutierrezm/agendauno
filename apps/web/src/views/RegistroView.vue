@@ -1512,7 +1512,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
     var(--superficie)
   );
 }
-:global(.dark) .registro-opcional::placeholder {
+.dark .registro-opcional::placeholder {
   color: #a4acb8;
 }
 @media (prefers-reduced-motion: reduce) {

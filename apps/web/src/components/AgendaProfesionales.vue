@@ -839,7 +839,7 @@ watch(() => props.fecha, enfocar);
   border-radius: 999px;
   background: #e5484d;
 }
-:global(.dark) .ag-tarjeta {
+.dark .ag-tarjeta {
   background: color-mix(in srgb, var(--tf) 18%, var(--superficie));
   border-left-color: var(--tf);
 }
