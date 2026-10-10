@@ -108,5 +108,6 @@ y su documentación. El estado vive en la sección 5.
 
 | Bloque | Estado |
 |---|---|
-| 1 | En curso |
-| 2–8 | Pendiente |
+| 1 | Hecho: cupo único (ADR 0116) y planes archivados fuera de venta; PR #10 |
+| 2 | Hecho: Prospectos, captación activable y formularios embebibles (ADR 0117) |
+| 3–8 | Pendiente |

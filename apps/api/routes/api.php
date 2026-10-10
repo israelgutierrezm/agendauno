@@ -16,6 +16,7 @@ use App\Modules\Tenancy\Http\Controllers\AvisosPlataformaTenantController;
 use App\Modules\Tenancy\Http\Controllers\BloqueosAgendaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CalendarioTenantController;
 use App\Modules\Tenancy\Http\Controllers\CapacidadCanalTenantController;
+use App\Modules\Tenancy\Http\Controllers\CaptacionPublicaController;
 use App\Modules\Tenancy\Http\Controllers\CatalogoTenantController;
 use App\Modules\Tenancy\Http\Controllers\CheckinsTenantController;
 use App\Modules\Tenancy\Http\Controllers\ClimaEquipoTenantController;
@@ -34,6 +35,7 @@ use App\Modules\Tenancy\Http\Controllers\FacturacionController;
 use App\Modules\Tenancy\Http\Controllers\FacturaRentaController;
 use App\Modules\Tenancy\Http\Controllers\FacturasTenantController;
 use App\Modules\Tenancy\Http\Controllers\FichaMiembroTenantController;
+use App\Modules\Tenancy\Http\Controllers\FormulariosCaptacionTenantController;
 use App\Modules\Tenancy\Http\Controllers\FormulariosController;
 use App\Modules\Tenancy\Http\Controllers\FrontDeskTenantController;
 use App\Modules\Tenancy\Http\Controllers\GruposTenantController;
@@ -84,6 +86,7 @@ use App\Modules\Tenancy\Http\Controllers\PoliticasCancelacionTenantController;
 use App\Modules\Tenancy\Http\Controllers\PorCobrarTenantController;
 use App\Modules\Tenancy\Http\Controllers\PreciosPublicosController;
 use App\Modules\Tenancy\Http\Controllers\PromocionesTenantController;
+use App\Modules\Tenancy\Http\Controllers\ProspectosTenantController;
 use App\Modules\Tenancy\Http\Controllers\PublicoCitasController;
 use App\Modules\Tenancy\Http\Controllers\PuntoDeVentaTenantController;
 use App\Modules\Tenancy\Http\Controllers\PwaNegocioController;
@@ -259,6 +262,12 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/escaparate', EscaparateController::class)->middleware('throttle:negocio-publico')->name('escaparate');
         // El aviso de privacidad del negocio para sus clientes (antes de dar sus datos).
         Route::get('/aviso-privacidad', AvisoPrivacidadNegocioController::class)->middleware('throttle:negocio-publico')->name('aviso-privacidad');
+        // Captación (ADR 0117): quien todavía no es cliente deja sus datos (la página
+        // del negocio, un enlace, un QR o un formulario embebido) y llega a Prospectos.
+        // Solo con la captación encendida; sin cuenta ni reserva.
+        Route::get('/captacion', [CaptacionPublicaController::class, 'predeterminado'])->middleware('throttle:negocio-publico')->name('captacion.predeterminado');
+        Route::get('/captacion/formularios/{formulario}', [CaptacionPublicaController::class, 'mostrar'])->middleware('throttle:negocio-publico')->name('captacion.formulario');
+        Route::post('/captacion/formularios/{formulario}/envios', [CaptacionPublicaController::class, 'enviar'])->middleware('throttle:captacion')->name('captacion.enviar');
 
         // Citas públicas (guest, sin cuenta): opciones (servicios/sucursales/barberos)
         // y disponibilidad para elegir hueco; luego agendar y pagar en línea (el
@@ -423,6 +432,21 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/importaciones/clases/plantilla', [ImportarClasesTenantController::class, 'plantilla'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('importaciones.clases.plantilla');
             Route::post('/importaciones/clases/preview', [ImportarClasesTenantController::class, 'preview'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('importaciones.clases.preview');
             Route::post('/importaciones/clases', [ImportarClasesTenantController::class, 'importar'])->middleware(['puede:agenda.gestionar', 'modalidad:clases'])->name('importaciones.clases.store');
+
+            // Prospectos (ADR 0117): quien todavía no es cliente, aparte de Miembros.
+            Route::get('/prospectos', [ProspectosTenantController::class, 'index'])->middleware('puede:prospectos.ver')->name('prospectos.index');
+            Route::post('/prospectos', [ProspectosTenantController::class, 'store'])->middleware('puede:prospectos.gestionar')->name('prospectos.store');
+            Route::get('/prospectos/{prospecto}', [ProspectosTenantController::class, 'show'])->middleware('puede:prospectos.ver')->name('prospectos.show');
+            Route::put('/prospectos/{prospecto}/estado', [ProspectosTenantController::class, 'estado'])->middleware('puede:prospectos.gestionar')->name('prospectos.estado');
+            Route::put('/prospectos/{prospecto}/responsable', [ProspectosTenantController::class, 'responsable'])->middleware('puede:prospectos.gestionar')->name('prospectos.responsable');
+            Route::put('/prospectos/{prospecto}/seguimiento', [ProspectosTenantController::class, 'seguimiento'])->middleware('puede:prospectos.gestionar')->name('prospectos.seguimiento');
+            Route::post('/prospectos/{prospecto}/notas', [ProspectosTenantController::class, 'nota'])->middleware('puede:prospectos.gestionar')->name('prospectos.notas');
+            Route::post('/prospectos/{prospecto}/convertir', [ProspectosTenantController::class, 'convertir'])->middleware('puede:prospectos.convertir')->name('prospectos.convertir');
+            Route::delete('/prospectos/{prospecto}', [ProspectosTenantController::class, 'destroy'])->middleware('puede:prospectos.eliminar')->name('prospectos.destroy');
+            // Sus formularios (el de «Pedir acceso» y los que se comparten o embeben).
+            Route::get('/captacion/formularios', [FormulariosCaptacionTenantController::class, 'index'])->middleware('puede:prospectos.ver')->name('captacion.formularios.index');
+            Route::post('/captacion/formularios', [FormulariosCaptacionTenantController::class, 'store'])->middleware('puede:prospectos.gestionar')->name('captacion.formularios.store');
+            Route::put('/captacion/formularios/{formulario}', [FormulariosCaptacionTenantController::class, 'update'])->middleware('puede:prospectos.gestionar')->name('captacion.formularios.update');
 
             // Tareas de seguimiento (R16): bandeja de pendientes del staff (manuales o automaticas).
             Route::get('/tareas', [TareasTenantController::class, 'index'])->middleware('puede:tareas.ver')->name('tareas.index');

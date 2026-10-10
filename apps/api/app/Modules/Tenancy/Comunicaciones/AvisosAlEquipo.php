@@ -28,6 +28,8 @@ final class AvisosAlEquipo
         'membresia.suspendida' => 'facturacion.ver',
         'pago.tardio' => 'facturacion.ver',
         'pago.duplicado' => 'facturacion.ver',
+        // Alguien dejó sus datos en un formulario de captación (ADR 0117).
+        'prospecto.creado' => 'prospectos.ver',
     ];
 
     /**

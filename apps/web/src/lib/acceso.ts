@@ -57,6 +57,9 @@ export const POLITICAS: Record<string, Politica> = {
     modalidad: "clases",
   },
   miembros: { permiso: "miembros.ver" },
+  // Captación (ADR 0117): aparte de Miembros.
+  prospectos: { permiso: "prospectos.ver" },
+  "captacion-formularios": { permiso: "prospectos.ver" },
   retencion: { permiso: "miembros.gestionar" },
   documentos: { permiso: "documentos.subir" },
   formularios: { permiso: "formularios.gestionar", funcion: "formularios" },

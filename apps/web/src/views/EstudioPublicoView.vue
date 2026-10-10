@@ -5,6 +5,7 @@ import { RouterLink, useRoute } from "vue-router";
 import IconoNav from "@/components/IconoNav.vue";
 import IconoRed from "@/components/IconoRed.vue";
 import InstalarApp from "@/components/InstalarApp.vue";
+import FormularioCaptacion from "@/components/FormularioCaptacion.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
@@ -33,6 +34,8 @@ import { perfilVisibleAlPublico } from "@/marketing/modalidades";
 const props = defineProps<{ vistaPrevia?: boolean }>();
 
 interface Sesion {
+  // Identificador público (para pedir lugar en esa clase).
+  id?: string;
   clase: string | null;
   inicia_en: string | null;
   zona_horaria: string | null;
@@ -42,6 +45,7 @@ interface Sesion {
   lugares_libres: number | null;
 }
 interface Producto {
+  id?: string;
   todas_sucursales?: boolean;
   sucursales?: { id: string; nombre: string }[];
   nombre: string;
@@ -140,6 +144,8 @@ interface Escaparate {
   resenas?: { promedio: number | null; total: number; recientes: Resena[] };
   // Su sitio publicado (o el borrador en la vista previa).
   sitio?: SitioPublico;
+  // Captación (ADR 0117): si recibe prospectos y con qué formulario.
+  captacion?: { activa: boolean; formulario: string | null };
 }
 
 const route = useRoute();
@@ -313,7 +319,28 @@ function esEnlaceExterno(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
 
-function abrirAcceso(origen: string): void {
+// Lo que tenía elegido al pedir acceso (una clase, un plan): viaja al prospecto.
+const interesAcceso = ref<{
+  sesion?: string | null;
+  producto?: string | null;
+  etiqueta?: string | null;
+} | null>(null);
+// Con la captación encendida, «Pedir acceso» deja sus datos en Prospectos (ADR 0117).
+const formularioAcceso = computed(() =>
+  escaparate.value?.captacion?.activa
+    ? (escaparate.value.captacion.formulario ?? null)
+    : null,
+);
+
+function abrirAcceso(
+  origen: string,
+  interes: {
+    sesion?: string | null;
+    producto?: string | null;
+    etiqueta?: string | null;
+  } | null = null,
+): void {
+  interesAcceso.value = interes;
   pidiendoAcceso.value = true;
   trackEvent("student_access_opened", {
     source: origen,
@@ -789,6 +816,20 @@ onMounted(cargar);
                 >
                   {{ [s.sucursal, s.instructor].filter(Boolean).join(" · ") }}
                 </p>
+                <button
+                  v-if="formularioAcceso && s.id && s.lugares_libres !== 0"
+                  type="button"
+                  class="tu-enlace mt-3 mr-3 text-sm"
+                  data-prueba="pedir-lugar"
+                  @click="
+                    abrirAcceso('session', {
+                      sesion: s.id,
+                      etiqueta: `${s.clase ?? ''} · ${fechaHora(s.inicia_en, s.zona_horaria)}`,
+                    })
+                  "
+                >
+                  {{ $t("escaparate.pedirLugar") }}
+                </button>
                 <span
                   class="tu-badge mt-3"
                   :class="
@@ -1044,7 +1085,12 @@ onMounted(cargar);
                   <button
                     type="button"
                     class="tu-btn tu-btn-primario mt-4 w-full"
-                    @click="abrirAcceso('price_card')"
+                    @click="
+                      abrirAcceso('price_card', {
+                        producto: p.id ?? null,
+                        etiqueta: p.nombre,
+                      })
+                    "
                   >
                     {{ $t("escaparate.pedirAcceso") }}
                   </button>
@@ -1323,7 +1369,7 @@ onMounted(cargar);
           @click="pidiendoAcceso = false"
         />
         <div
-          class="relative w-full max-w-md tu-card p-6"
+          class="relative w-full max-w-md tu-card p-6 max-h-[92vh] overflow-y-auto"
           :style="{ background: 'var(--superficie)' }"
           role="dialog"
           aria-modal="true"
@@ -1344,18 +1390,32 @@ onMounted(cargar);
           </div>
           <p class="mt-2 text-sm" :style="{ color: 'var(--texto-suave)' }">
             {{
-              $t("escaparate.acceso.explicacion", {
-                estudio: escaparate.estudio.nombre,
-              })
+              formularioAcceso
+                ? $t("captacion.publico.accesoCerrado")
+                : $t("escaparate.acceso.explicacion", {
+                    estudio: escaparate.estudio.nombre,
+                  })
             }}
           </p>
+          <FormularioCaptacion
+            v-if="formularioAcceso"
+            class="mt-4"
+            :slug="slug"
+            :formulario="formularioAcceso"
+            :interes="interesAcceso"
+            compacto
+            @enviado="
+              trackEvent('student_access_requested', { channel: 'formulario' })
+            "
+          />
           <div class="mt-5 grid gap-2">
             <a
               v-if="canalAcceso?.whatsapp"
               :href="canalAcceso.whatsapp"
               target="_blank"
               rel="noopener"
-              class="tu-btn tu-btn-primario w-full"
+              class="tu-btn w-full"
+              :class="formularioAcceso ? 'tu-btn-fantasma' : 'tu-btn-primario'"
               @click="
                 trackEvent('student_access_requested', { channel: 'whatsapp' })
               "

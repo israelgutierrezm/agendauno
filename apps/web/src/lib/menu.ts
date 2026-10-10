@@ -352,6 +352,20 @@ export const MENU_NEGOCIO: GrupoMenu[] = [
         ],
       },
       {
+        // Quien todavía no es cliente (ADR 0117): aparte de Miembros.
+        clave: "captacion",
+        etiqueta: "nav.areas.captacion",
+        icono: "captacion",
+        vistas: [
+          v("prospectos", "prospectos", "nav.vistas.prospectos"),
+          v(
+            "formularios-captacion",
+            "captacion-formularios",
+            "nav.vistas.formulariosCaptacion",
+          ),
+        ],
+      },
+      {
         clave: "cobros",
         etiqueta: "planes.nav.cobros",
         icono: "facturas",

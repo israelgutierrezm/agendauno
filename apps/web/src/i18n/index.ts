@@ -77,6 +77,7 @@ import region from "./locales/region.es-MX";
 import interesados from "./locales/interesados.es-MX";
 import pwa from "./locales/pwa.es-MX";
 import sitioWeb from "./locales/sitioWeb.es-MX";
+import captacion from "./locales/captacion.es-MX";
 import confirmaciones from "./locales/confirmaciones.es-MX";
 import corregirCobro from "./locales/corregirCobro.es-MX";
 import nominaVisual from "./locales/nominaVisual.es-MX";
@@ -116,6 +117,7 @@ const mensajesBase = {
   apariencia,
   cobro,
   suscripcion,
+  captacion,
   recepcionVisual,
   miPerfil,
   confirmarCorreo,

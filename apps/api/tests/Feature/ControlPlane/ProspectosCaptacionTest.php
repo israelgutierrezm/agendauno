@@ -1,0 +1,260 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\EventoOutboxTenant;
+use App\Modules\Tenancy\Models\ProspectoTenant;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
+
+/*
+| Captación del negocio (plan de mejoras B01 y C04, ADR 0117): quien todavía no es
+| cliente deja sus datos en un formulario (la página del negocio, un enlace, un QR o
+| embebido en su sitio) y llega a Prospectos, separado de Miembros. No crea cuenta ni
+| reserva; no cuenta como alumno. El negocio la enciende o la apaga, le da seguimiento y
+| lo convierte en miembro con la invitación de siempre (registro cerrado, ADR 0093).
+*/
+
+beforeEach(fn () => File::deleteDirectory(storage_path('tenants')));
+
+afterEach(function (): void {
+    app(GestorDeConexionTenant::class)->desconectar();
+    File::deleteDirectory(storage_path('tenants'));
+});
+
+/**
+ * Lo que manda quien llena el formulario.
+ *
+ * @param  array<string, mixed>  $extra
+ * @return array<string, mixed>
+ */
+function envioCaptacion(array $extra = []): array
+{
+    return ['nombre' => 'Lucía Prospecto', 'email' => 'Lucia@Correo.mx', 'telefono' => '55 1234 5678', 'acepta_aviso' => true, ...$extra];
+}
+
+/**
+ * El formulario predeterminado («Pedir acceso») del negocio.
+ *
+ * @param  array{slug: string, bearer: string}  $e
+ */
+function formularioPredeterminadoCaptacion(array $e): string
+{
+    return (string) test()->getJson("/api/v1/app/{$e['slug']}/captacion")->assertOk()->json('data.id');
+}
+
+/**
+ * @param  array{slug: string, bearer: string}  $e
+ * @return array<string, mixed>
+ */
+function prospectosDelNegocioCaptacion(array $e, string $filtros = ''): array
+{
+    return test()->getJson("/api/v1/app/{$e['slug']}/prospectos{$filtros}", conBearer($e['bearer']))->assertOk()->json();
+}
+
+it('quien deja sus datos llega a Prospectos, no a Miembros, con lo que le interesaba', function (): void {
+    $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
+    $sesion = crearSesionTenant($e, agendaSemilla($e), 10, '2026-10-02 10:00:00');
+
+    // La página del negocio dice que recibe prospectos y con qué formulario; sus clases
+    // traen su id público para pedir lugar.
+    $formulario = $this->getJson("/api/v1/app/{$e['slug']}/escaparate")->assertOk()
+        ->assertJsonPath('data.captacion.activa', true)
+        ->assertJsonPath('data.proximas_sesiones.0.id', $sesion)
+        ->json('data.captacion.formulario');
+    expect($formulario)->toBe(formularioPredeterminadoCaptacion($e));
+
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion([
+        'interes' => ['sesion' => $sesion], 'fuente' => 'instagram',
+    ]))->assertCreated()->assertJsonStructure(['data' => ['mensaje']]);
+
+    $lista = prospectosDelNegocioCaptacion($e);
+    expect($lista['data'])->toHaveCount(1)
+        ->and($lista['data'][0])->toMatchArray(['nombre' => 'Lucía Prospecto', 'email' => 'lucia@correo.mx', 'telefono' => '5512345678', 'estado' => 'nuevo', 'fuente' => 'instagram'])
+        ->and($lista['data'][0]['interes']['sesion']['id'])->toBe($sesion)
+        ->and($lista['meta']['resumen'])->toMatchArray(['nuevos' => 1, 'abiertos' => 1]);
+    // No es una ficha: ni en Miembros ni en el padrón que se cobra.
+    expect($this->getJson("/api/v1/app/{$e['slug']}/miembros?q=Lucía", conBearer($e['bearer']))->assertOk()->json('data'))->toBe([]);
+    $padron = $this->getJson("/api/v1/app/{$e['slug']}/miembros/padron", conBearer($e['bearer']))->assertOk()->json('data');
+    expect(collect($padron)->pluck('email'))->not->toContain('lucia@correo.mx');
+    // Y el equipo se entera (plantilla de aviso del negocio).
+    expect(app(GestorDeConexionTenant::class)->ejecutarEn(
+        Estudio::query()->where('slug', $e['slug'])->firstOrFail(),
+        fn (): int => EventoOutboxTenant::query()->where('tipo', 'prospecto.creado')->count(),
+    ))->toBe(1);
+});
+
+it('un envío repetido actualiza el mismo prospecto en lugar de abrir otro', function (): void {
+    $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
+    $formulario = formularioPredeterminadoCaptacion($e);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion())->assertCreated();
+    // Mismo teléfono con otro correo, y mismo correo en mayúsculas: el mismo prospecto.
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion(['email' => 'otro@correo.mx', 'telefono' => '5512345678']))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion(['email' => 'LUCIA@correo.mx', 'telefono' => null]))->assertCreated();
+
+    $lista = prospectosDelNegocioCaptacion($e);
+    expect($lista['data'])->toHaveCount(1);
+    $detalle = $this->getJson("/api/v1/app/{$e['slug']}/prospectos/{$lista['data'][0]['id']}", conBearer($e['bearer']))->assertOk()->json('data');
+    expect(collect($detalle['eventos'])->pluck('tipo')->all())->toBe(['reenvio', 'reenvio', 'creado']);
+});
+
+it('el negocio arma sus formularios con preguntas propias y los apaga', function (): void {
+    $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
+    $creado = $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios", [
+        'nombre' => 'Clase muestra', 'titulo' => 'Tu primera clase', 'pide_telefono' => true, 'telefono_obligatorio' => true,
+        'campos' => [
+            ['etiqueta' => '¿Has practicado pole?', 'tipo' => 'seleccion', 'obligatorio' => true, 'opciones' => ['Nunca', 'Un poco', 'Sí']],
+            ['etiqueta' => '¿Algo que debamos saber?', 'tipo' => 'textarea'],
+        ],
+    ], conBearer($e['bearer']))->assertCreated()->json('data');
+    $pregunta = $creado['campos'][0]['id'];
+    $url = "/api/v1/app/{$e['slug']}/captacion/formularios/{$creado['id']}/envios";
+
+    // Faltan el teléfono (lo pide obligatorio) y la respuesta obligatoria.
+    $this->postJson($url, envioCaptacion(['telefono' => null]))->assertUnprocessable()->assertJsonValidationErrors('telefono', 'meta.errors');
+    $this->postJson($url, envioCaptacion())->assertUnprocessable()->assertJsonValidationErrors("respuestas.{$pregunta}", 'meta.errors');
+    $this->postJson($url, envioCaptacion(['respuestas' => [$pregunta => 'Tal vez']]))->assertUnprocessable();
+    $this->postJson($url, envioCaptacion(['respuestas' => [$pregunta => 'Un poco']]))->assertCreated();
+
+    $id = prospectosDelNegocioCaptacion($e)['data'][0]['id'];
+    $this->getJson("/api/v1/app/{$e['slug']}/prospectos/{$id}", conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.formulario', 'Clase muestra')
+        ->assertJsonPath('data.respuestas.0.etiqueta', '¿Has practicado pole?')
+        ->assertJsonPath('data.respuestas.0.valor', 'Un poco');
+
+    // Una pregunta de opción necesita opciones.
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios", [
+        'nombre' => 'Mal', 'titulo' => 'Mal', 'campos' => [['etiqueta' => 'Elige', 'tipo' => 'seleccion', 'opciones' => ['Solo una']]],
+    ], conBearer($e['bearer']))->assertUnprocessable();
+
+    // Apagado, ese formulario ya no existe para el público.
+    $this->putJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$creado['id']}", [...$creado, 'activo' => false], conBearer($e['bearer']))->assertOk();
+    $this->getJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$creado['id']}")->assertNotFound();
+});
+
+it('con la captación apagada no hay formulario y la página vuelve a «Pedir acceso» por contacto', function (): void {
+    $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
+    $formulario = formularioPredeterminadoCaptacion($e);
+    $this->putJson("/api/v1/app/{$e['slug']}/parametros", ['valores' => ['captacion.activa' => 0]], conBearer($e['bearer']))->assertOk();
+
+    $this->getJson("/api/v1/app/{$e['slug']}/captacion")->assertNotFound();
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion())->assertNotFound();
+    $this->getJson("/api/v1/app/{$e['slug']}/escaparate")->assertOk()
+        ->assertJsonPath('data.captacion', ['activa' => false, 'formulario' => null]);
+});
+
+it('el equipo le da seguimiento: asigna, anota, programa y descarta con motivo', function (): void {
+    $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
+    $formulario = formularioPredeterminadoCaptacion($e);
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion())->assertCreated();
+    $id = prospectosDelNegocioCaptacion($e)['data'][0]['id'];
+    $base = "/api/v1/app/{$e['slug']}/prospectos/{$id}";
+    $yo = (string) $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))->json('data.usuario.ulid');
+
+    $this->putJson("{$base}/responsable", ['responsable_id' => $yo], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.responsable.id', $yo);
+    $this->postJson("{$base}/notas", ['texto' => 'Le escribí por WhatsApp.'], conBearer($e['bearer']))->assertCreated();
+    $this->putJson("{$base}/seguimiento", ['cuando' => '2026-10-03T10:00:00-06:00'], conBearer($e['bearer']))->assertOk();
+    $this->putJson("{$base}/estado", ['estado' => 'en_seguimiento'], conBearer($e['bearer']))->assertOk()->assertJsonPath('data.estado', 'en_seguimiento');
+    expect(prospectosDelNegocioCaptacion($e, '?responsable=yo')['data'])->toHaveCount(1);
+
+    // Descartar pide un motivo; descartado sale de los abiertos.
+    $this->putJson("{$base}/estado", ['estado' => 'descartado'], conBearer($e['bearer']))->assertUnprocessable();
+    $this->putJson("{$base}/estado", ['estado' => 'descartado', 'motivo_cierre' => 'sin_horario', 'comentario' => 'Solo puede en la noche.'], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.motivo_cierre', 'sin_horario');
+    expect(prospectosDelNegocioCaptacion($e)['data'])->toBe([])
+        ->and(prospectosDelNegocioCaptacion($e, '?estado=descartado')['data'])->toHaveCount(1);
+    // «Convertido» no se pone a mano.
+    $this->putJson("{$base}/estado", ['estado' => 'convertido'], conBearer($e['bearer']))->assertUnprocessable();
+});
+
+it('darle acceso crea su ficha e invitación; al activar su cuenta queda convertido', function (): void {
+    $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
+    $formulario = formularioPredeterminadoCaptacion($e);
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion())->assertCreated();
+    $id = prospectosDelNegocioCaptacion($e)['data'][0]['id'];
+
+    $convertido = $this->postJson("/api/v1/app/{$e['slug']}/prospectos/{$id}/convertir", ['invitar' => true], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.estado', 'invitacion_enviada')->json('data');
+    // Ya es una ficha de Miembros (sin cuenta todavía).
+    $ficha = $this->getJson("/api/v1/app/{$e['slug']}/miembros?q=Lucía", conBearer($e['bearer']))->assertOk()->json('data.0');
+    expect($ficha['id'])->toBe($convertido['persona']['id']);
+
+    $this->postJson("/api/v1/app/{$e['slug']}/activar", [
+        'email' => $convertido['activacion']['email'], 'token' => $convertido['activacion']['token'],
+        'password' => 'secreto123', 'password_confirmation' => 'secreto123',
+    ])->assertCreated();
+    $this->getJson("/api/v1/app/{$e['slug']}/prospectos/{$id}", conBearer($e['bearer']))->assertOk()
+        ->assertJsonPath('data.estado', 'convertido');
+    expect(collect($this->getJson("/api/v1/app/{$e['slug']}/prospectos/{$id}", conBearer($e['bearer']))->json('data.eventos'))->pluck('tipo')->first())
+        ->toBe('convertido');
+});
+
+it('sin invitación queda convertido con su ficha; con una ficha existente, se enlaza a esa', function (): void {
+    $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
+    $formulario = formularioPredeterminadoCaptacion($e);
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion())->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion(['nombre' => 'Beto', 'email' => 'beto@correo.mx', 'telefono' => null]))->assertCreated();
+    [$beto, $lucia] = collect(prospectosDelNegocioCaptacion($e)['data'])->sortBy('nombre')->pluck('id')->all();
+    $existente = crearMiembroTenant($e, 'Lucía Ya Miembro');
+
+    $this->postJson("/api/v1/app/{$e['slug']}/prospectos/{$beto}/convertir", ['invitar' => false], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.estado', 'convertido')->assertJsonPath('data.activacion', null);
+    $this->postJson("/api/v1/app/{$e['slug']}/prospectos/{$lucia}/convertir", ['invitar' => false, 'persona_id' => $existente], conBearer($e['bearer']))
+        ->assertOk()->assertJsonPath('data.persona.id', $existente);
+    // Sin abrir una ficha de más.
+    expect($this->getJson("/api/v1/app/{$e['slug']}/miembros?q=Lucía", conBearer($e['bearer']))->json('data'))->toHaveCount(1);
+});
+
+it('recepción da seguimiento pero no da acceso; un instructor no ve prospectos', function (): void {
+    $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
+    $formulario = formularioPredeterminadoCaptacion($e);
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion())->assertCreated();
+    $id = prospectosDelNegocioCaptacion($e)['data'][0]['id'];
+    $recepcion = personalConSesion($e['slug'], $e['bearer'], 'recepcion@correo.mx', 'recepcionista');
+    $instructor = personalConSesion($e['slug'], $e['bearer'], 'instructor@correo.mx', 'instructor');
+
+    $this->getJson("/api/v1/app/{$e['slug']}/prospectos", conBearer($recepcion))->assertOk();
+    $this->postJson("/api/v1/app/{$e['slug']}/prospectos/{$id}/notas", ['texto' => 'Pasó a preguntar.'], conBearer($recepcion))->assertCreated();
+    $this->postJson("/api/v1/app/{$e['slug']}/prospectos/{$id}/convertir", ['invitar' => true], conBearer($recepcion))->assertForbidden();
+    $this->deleteJson("/api/v1/app/{$e['slug']}/prospectos/{$id}", [], conBearer($recepcion))->assertForbidden();
+    $this->getJson("/api/v1/app/{$e['slug']}/prospectos", conBearer($instructor))->assertForbidden();
+});
+
+it('en producción no capta sin el aviso de privacidad del negocio ni sin captcha', function (): void {
+    $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
+    $formulario = formularioPredeterminadoCaptacion($e);
+    app()->detectEnvironment(fn (): string => 'production');
+    Config::set('agendauno.recaptcha.secret', 'secreto-de-prueba');
+    Http::fake(['www.google.com/*' => Http::response(['success' => true, 'score' => 0.9])]);
+    $url = "/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios";
+
+    $this->postJson($url, envioCaptacion(['recaptcha_token' => 't']))->assertUnprocessable()->assertJsonValidationErrors('acepta_aviso', 'meta.errors');
+    $this->postJson("/api/v1/app/{$e['slug']}/waivers", [
+        'clave' => 'aviso-privacidad', 'titulo' => 'Aviso de privacidad', 'contenido' => 'Tratamos tus datos para darte acceso.',
+    ], conBearer($e['bearer']))->assertCreated();
+    $this->postJson($url, envioCaptacion(['recaptcha_token' => 't', 'aviso_version' => 9]))->assertUnprocessable()->assertJsonValidationErrors('acepta_aviso', 'meta.errors');
+    $this->postJson($url, envioCaptacion(['recaptcha_token' => 't', 'aviso_version' => 1]))->assertCreated();
+    expect(app(GestorDeConexionTenant::class)->ejecutarEn(
+        Estudio::query()->where('slug', $e['slug'])->firstOrFail(),
+        fn (): ?int => ProspectoTenant::query()->sole()->aviso_version,
+    ))->toBe(1);
+
+    // Sin el token del captcha no pasa.
+    Config::set('agendauno.recaptcha.secret', null);
+    $this->postJson($url, envioCaptacion(['email' => 'otra@correo.mx', 'telefono' => null, 'aviso_version' => 1]))->assertUnprocessable()->assertJsonValidationErrors('recaptcha', 'meta.errors');
+});
+
+it('borrar un prospecto borra sus datos y su historial', function (): void {
+    $e = estudioConSesion('estudio-capta', 'capta@correo.mx');
+    $formulario = formularioPredeterminadoCaptacion($e);
+    $this->postJson("/api/v1/app/{$e['slug']}/captacion/formularios/{$formulario}/envios", envioCaptacion())->assertCreated();
+    $id = prospectosDelNegocioCaptacion($e)['data'][0]['id'];
+
+    $this->deleteJson("/api/v1/app/{$e['slug']}/prospectos/{$id}", [], conBearer($e['bearer']))->assertNoContent();
+    $this->getJson("/api/v1/app/{$e['slug']}/prospectos/{$id}", conBearer($e['bearer']))->assertNotFound();
+    expect(prospectosDelNegocioCaptacion($e, '?estado=todos')['data'])->toBe([]);
+});

@@ -131,6 +131,10 @@ final class CatalogoParametros
             new DefinicionParametro('resenas.publicar_sin_revisar', 'Reseñas', 'Publicar las reseñas sin revisarlas',
                 'Si lo apagas, cada reseña nueva queda oculta en tu página hasta que la apruebes en Reseñas.', $sn, 1),
 
+            // Captación (plan de mejoras B01, ADR 0117).
+            new DefinicionParametro('captacion.activa', 'Captación', 'Recibir prospectos',
+                'Quien todavía no es cliente puede dejar sus datos en tus formularios (tu página, un enlace, un QR o tu propio sitio) y llega a Prospectos. Apagado, «Pedir acceso» te contacta por WhatsApp o teléfono.', $sn, 1),
+
             // Inventario del mostrador.
             new DefinicionParametro('inventario.stock_bajo', 'Inventario', 'Stock bajo',
                 'Con esta cantidad o menos en una sucursal, el producto se marca con stock bajo.', $e, 3, 0, 1000, 'piezas'),

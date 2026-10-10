@@ -22,7 +22,7 @@ class VerificarRecaptcha
         $secret = config('agendauno.recaptcha.secret');
         if (! is_string($secret) || $secret === '') {
             if (app()->environment('production')) {
-                Log::error('recaptcha.sin_llave', ['detalle' => 'Falta RECAPTCHA_SECRET: se rechazan el registro y la lista de interesados.']);
+                Log::error('recaptcha.sin_llave', ['detalle' => 'Falta RECAPTCHA_SECRET: se rechazan los formularios públicos (registro, interesados y captación).']);
 
                 return false;
             }

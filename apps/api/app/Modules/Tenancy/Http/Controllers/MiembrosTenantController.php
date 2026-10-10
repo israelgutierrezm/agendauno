@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AlcanceClientesTenant;
+use App\Modules\Tenancy\Application\AltaDeMiembroTenant;
 use App\Modules\Tenancy\Application\BajasTenant;
 use App\Modules\Tenancy\Application\CelularesTenant;
 use App\Modules\Tenancy\Application\MedirUsoSaas;
@@ -15,7 +16,6 @@ use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\EstadoSesionTenant;
-use App\Modules\Tenancy\Exceptions\PersonaDadaDeBaja;
 use App\Modules\Tenancy\Http\Requests\CrearMiembroRequest;
 use App\Modules\Tenancy\Http\Requests\DatosPersonales;
 use App\Modules\Tenancy\Models\OfertaTenant;
@@ -56,6 +56,7 @@ class MiembrosTenantController
         private readonly WhatsAppTenant $whatsapp,
         private readonly AlcanceClientesTenant $alcance,
         private readonly CelularesTenant $celulares,
+        private readonly AltaDeMiembroTenant $altas,
     ) {}
 
     /**
@@ -377,47 +378,9 @@ class MiembrosTenantController
             $this->sucursalIdDe((string) $request->validated('sucursal_id', '')),
         );
 
-        // El correo es de la persona para siempre: si está dada de baja, se reactiva
-        // (con su historial) en lugar de crear otra.
-        $email = $request->validated('email');
-        $conCorreo = is_string($email) && $email !== ''
-            ? PersonaTenant::onlyTrashed()->where('email', $email)->first()
-            : null;
-        if ($conCorreo instanceof PersonaTenant) {
-            $this->bajas->reactivarPersona($conCorreo, $actor, 'Se dio de alta de nuevo con su correo.');
-            $conCorreo->update(array_filter([
-                'nombre' => (string) $request->validated('nombre'),
-                'segundo_nombre' => $request->validated('segundo_nombre'),
-                'primer_apellido' => $request->validated('primer_apellido'),
-                'segundo_apellido' => $request->validated('segundo_apellido'),
-                'celular' => $request->validated('celular'),
-                'fecha_nacimiento' => $request->validated('fecha_nacimiento'),
-                'genero' => $request->validated('genero'),
-            ], static fn (mixed $v): bool => $v !== null && $v !== '') + ['activo' => true, 'archivado' => false]);
-            if ($request->boolean('acepta_whatsapp')) {
-                $this->whatsapp->registrarPorEquipo($conCorreo, true, $actor);
-            }
-
-            return response()->json(['data' => [...$this->presentar($conCorreo->refresh()->load('sucursal')), 'reactivado' => true]], 201);
-        }
-
-        // Con el celular no se reactiva sola (los números cambian de dueño): el negocio
-        // decide si la reactiva o si es otra persona (entonces el número se le quita).
-        // Se compara como número: el «55 1234 5678» de antes es el «+52 5512345678» de hoy.
-        $celular = $request->validated('celular');
-        $conCelular = is_string($celular) && $celular !== ''
-            ? $this->celulares->dadaDeBaja($celular)
-            : null;
-        if ($conCelular instanceof PersonaTenant) {
-            if (! $request->boolean('liberar_celular')) {
-                throw new PersonaDadaDeBaja($conCelular);
-            }
-            $anterior = $conCelular->celular;
-            $conCelular->forceFill(['celular' => null])->save();
-            $this->auditoria->registrar($actor, 'miembro.celular_liberado', 'persona', (string) $conCelular->ulid, ['celular' => $anterior], ['celular' => null], 'El número es de otra persona.');
-        }
-
-        $persona = PersonaTenant::query()->create([
+        // El correo es de la persona para siempre (si está dada de baja, se reactiva con su
+        // historial); con el celular de una ficha dada de baja decide el negocio.
+        ['persona' => $persona, 'reactivado' => $reactivado] = $this->altas->alta([
             'nombre' => (string) $request->validated('nombre'),
             'segundo_nombre' => $request->validated('segundo_nombre'),
             'primer_apellido' => $request->validated('primer_apellido'),
@@ -427,16 +390,10 @@ class MiembrosTenantController
             'fecha_nacimiento' => $request->validated('fecha_nacimiento'),
             'genero' => $request->validated('genero'),
             'tipo' => (string) $request->validated('tipo', TipoPersonaTenant::Miembro->value),
-            'activo' => true,
             'es_facturable' => (bool) $request->validated('es_facturable', true),
-            'archivado' => false,
-            'sucursal_id' => $sucursalId,
-        ]);
-        if ($request->boolean('acepta_whatsapp')) {
-            $this->whatsapp->registrarPorEquipo($persona, true, $actor);
-        }
+        ], $actor, $sucursalId, $request->boolean('liberar_celular'), $request->boolean('acepta_whatsapp'));
 
-        return response()->json(['data' => [...$this->presentar($persona->load('sucursal')), 'reactivado' => false]], 201);
+        return response()->json(['data' => [...$this->presentar($persona->load('sucursal')), 'reactivado' => $reactivado]], 201);
     }
 
     /**

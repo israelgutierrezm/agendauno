@@ -36,6 +36,7 @@ class CatalogoDePermisosTenant
                 'promociones.gestionar', 'promociones.eliminar',
                 'lealtad.ver', 'lealtad.gestionar',
                 'inventario.ver', 'inventario.gestionar', 'pos.vender',
+                'prospectos.ver', 'prospectos.gestionar', 'prospectos.convertir', 'prospectos.eliminar',
             ],
             'recepcionista' => [
                 'miembros.gestionar', 'miembros.ver', 'documentos.subir', 'formularios.responder',
@@ -48,6 +49,8 @@ class CatalogoDePermisosTenant
                 'tareas.ver', 'tareas.gestionar', 'tareas.equipo',
                 'lealtad.ver', 'lealtad.gestionar',
                 'inventario.ver', 'inventario.gestionar', 'pos.vender',
+                // Atiende a quien pregunta; darle acceso (invitar) lo decide quien puede invitar.
+                'prospectos.ver', 'prospectos.gestionar',
             ],
             'instructor' => [
                 'miembros.ver', 'documentos.subir', 'formularios.responder', 'catalogo.ver',
@@ -72,6 +75,8 @@ class CatalogoDePermisosTenant
     {
         return [
             'agenda' => ['agenda.ver', 'agenda.gestionar', 'agenda.eliminar', 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar'],
+            // Quien todavía no es cliente (ADR 0117): aparte de Miembros.
+            'captacion' => ['prospectos.ver', 'prospectos.gestionar', 'prospectos.convertir', 'prospectos.eliminar'],
             'clientes' => ['miembros.ver', 'miembros.gestionar', 'miembros.eliminar', 'derechos.ver', 'documentos.subir', 'documentos.gestionar', 'formularios.responder', 'formularios.gestionar'],
             'membresias' => ['catalogo.ver', 'catalogo.gestionar', 'productos.ver', 'productos.gestionar', 'productos.eliminar', 'membresias.gestionar', 'creditos.gestionar', 'promociones.gestionar', 'promociones.eliminar'],
             'cobros' => ['ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'facturacion.ver'],
@@ -131,6 +136,10 @@ class CatalogoDePermisosTenant
             'organizaciones.gestionar' => ['organizaciones.ver'],
             'usuarios.gestionar' => ['usuarios.invitar', 'sucursales.ver', 'miembros.ver'],
             'usuarios.eliminar' => ['usuarios.gestionar', 'usuarios.invitar', 'sucursales.ver', 'miembros.ver'],
+            'prospectos.gestionar' => ['prospectos.ver'],
+            'prospectos.eliminar' => ['prospectos.gestionar', 'prospectos.ver'],
+            // Dar acceso crea o reactiva la ficha y envía la invitación.
+            'prospectos.convertir' => ['prospectos.gestionar', 'prospectos.ver', 'miembros.gestionar', 'miembros.ver', 'usuarios.invitar'],
             'tareas.gestionar' => ['tareas.ver'],
             'tareas.equipo' => ['tareas.ver', 'tareas.gestionar'],
         ];
