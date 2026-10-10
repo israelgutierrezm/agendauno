@@ -214,16 +214,23 @@ export default {
   landing: {
     // Los cobros en línea y la facturación (CFDI) solo operan en México (ADR 0099):
     // lo que los menciona lleva «*» y esta nota en su sección.
-    soloMexico: "* Solo para clientes de México.",
-    // Un producto que aún no abre registros (ADR 0108: TurnoUno antes de su
-    // lanzamiento). «AgendaUno» se lee con la marca del producto.
+    soloMexico: "* Solo para negocios en México (cobros en pesos).",
+    // Un producto cuyo registro cerró el superadmin (ADR 0108, prelanzamiento).
+    // «AgendaUno» se lee con la marca del producto. Mientras, nada
+    // ofrece prueba gratis, registrarse ni contratar: todo lleva a la lista de
+    // interesados.
     prelanzamiento: {
       cta: "Quiero que me avisen",
       proximamente: "Próximamente",
+      pieHero: "Te avisamos en cuanto abra.",
+      // SellosConfianza: sin prueba ni permanencia, «Abre pronto».
+      sello: "Abre pronto",
+      sellosTitulo: "Lanzamiento y operación",
       demoPie: "Abre pronto. Déjanos tus datos y te avisamos.",
+      pasosTitulo: "Así funcionará, en tres pasos",
       finalTitulo: "AgendaUno abre pronto.",
       finalSubtitulo:
-        "Déjanos tus datos y te avisamos en cuanto puedas registrar tu negocio. Tendrás {dias} días para probarlo, sin tarjeta.",
+        "Déjanos tus datos y te avisamos en cuanto puedas registrar tu negocio.",
     },
     // Lo que /clases y /citas (ModalidadView) dicen igual; lo propio de cada una va en
     // `landing.clases` y `landing.citas`.
@@ -237,6 +244,70 @@ export default {
       operacionEtiqueta: "Recepción y ventas",
       precioEtiqueta: "Tu suscripción a AgendaUno",
       faqTitulo: "Preguntas frecuentes",
+    },
+    // Página por giro (/software-para-*, SolucionView): lo fijo de la página; lo de
+    // cada giro va en marketing/soluciones.ts. La marca de su producto llega en
+    // {marca} (la página de un giro de citas habla con la de citas).
+    solucion: {
+      miga: "Ruta de navegación",
+      // {nombre}: el del giro a media frase (`nombreEnFrase`).
+      etiqueta: {
+        clases: "Software de reservas para {nombre}",
+        citas: "Agenda de citas para {nombre}",
+      },
+      probar: "Probar gratis",
+      confianza: "{dias} días para probarlo · Sin tarjeta",
+      verAgenda: "Ver la agenda en acción",
+      ejemplo: { clases: "Ejemplo de clase", citas: "Ejemplo de cita" },
+      ejemploPie: "Tu día, a la vista.",
+      beneficiosEtiqueta: "Menos pendientes, más claridad",
+      beneficiosTitulo: "Lo que tu negocio necesita para organizar su día.",
+      // Clases: sin autorregistro (ADR 0093), las cuentas las da el negocio. Citas: el
+      // cliente agenda desde la página sin cuenta.
+      empezar: {
+        etiqueta: "Del registro a tu primera reserva",
+        titulo: "Pruébalo con la forma en que trabajas.",
+        clases:
+          "Crea tu negocio, activa tu cuenta y configura una clase con horario, instructor y cupo. Después da de alta a tus alumnos, invítalos a su cuenta y comparte tu enlace con tus horarios.",
+        citas:
+          "Crea tu negocio, activa tu cuenta y configura un servicio con duración, profesional y disponibilidad. Después comparte tu enlace para que tus clientes elijan servicio, profesional y horario.",
+      },
+      precio: {
+        titulo: "Una prueba con tu operación real",
+        // {modalidad}: «Clases con cupo» o «Citas 1 a 1».
+        clases:
+          "En {modalidad}, la suscripción se cobra por rango de alumnos activos al mes.",
+        citas:
+          "En {modalidad}, la suscripción se cobra con el plan que elijas, por los profesionales que contratas.",
+        tarifas:
+          "Consulta las tarifas vigentes antes de contratar; los importes son en dólares, más impuestos.",
+        verPrecios: "Conocer precios y condiciones",
+        todo: "Todo lo que incluye {marca}",
+      },
+      preguntas: "Antes de empezar",
+      cierre: {
+        titulo: "Tu próxima reserva empieza con una agenda más clara.",
+        texto:
+          "Configura tu negocio y comprueba si {marca} encaja con tu operación.",
+        probar: "Probar gratis durante {dias} días",
+      },
+      otras: "Otras formas de trabajar con {marca}",
+      // Producto que aún no recibe registros (ADR 0108): cómo funcionará y la lista
+      // de interesados, sin prueba gratis ni registro.
+      prelanzamiento: {
+        etiqueta: "Así funcionará",
+        titulo: "Pensado para la forma en que trabajas.",
+        clases:
+          "Cuando abra, registras tu negocio y configuras una clase con horario, instructor y cupo. Después das de alta a tus alumnos, los invitas a su cuenta y compartes tu enlace con tus horarios.",
+        citas:
+          "Cuando abra, registras tu negocio y configuras un servicio con duración, profesional y disponibilidad. Después compartes tu enlace para que tus clientes elijan servicio, profesional y horario.",
+        precioTitulo: "Tu suscripción a {marca}",
+        tarifas:
+          "Consulta las tarifas vigentes; los importes son en dólares, más impuestos.",
+        cierreTitulo: "{marca} abre pronto.",
+        cierreTexto:
+          "Déjanos tus datos y te avisamos en cuanto puedas registrar tu negocio.",
+      },
     },
     // Landing de cada modalidad (/clases, /citas; ModalidadView). Las funciones son
     // las de MODALIDADES[modo].funciones (marketing/modalidades.ts), en ese orden, y
@@ -405,10 +476,12 @@ export default {
           q: "¿Sirve para varias sucursales?",
           a: "Sí. Cada sucursal tiene sus clases, sus horarios, sus salas y su equipo, y tú ves todo desde el mismo panel.",
         },
-        // Sin nombrar la otra modalidad: esta página habla solo de clases.
+        // Sin nombrar la otra modalidad ni el otro producto: esta página habla solo de
+        // clases. Cada modalidad es un producto (ADR 0108): cambiarla cambia el
+        // producto, y solo la cambia el superadmin antes de operar (ADR 0104).
         modalidad: {
           q: "¿Puedo cambiar de modalidad después?",
-          a: "Solo AgendaUno puede cambiar la modalidad de tu negocio, y solo antes de que empieces a operar: mientras no tengas clases ni reservas. Por eso la eliges con tu tipo de negocio al registrarte.",
+          a: "AgendaUno es para negocios que dan clases con cupo; la atención uno a uno tiene su propio producto. Si tu negocio quedó en el que no le corresponde, solo el equipo de AgendaUno puede pasarlo al otro, y solo antes de que empieces a operar: mientras no tengas clases ni reservas. Si haces las dos cosas, registra un negocio en cada producto, cada uno con su suscripción.",
         },
         precio: {
           q: "¿Cómo se calcula el precio de AgendaUno?",
@@ -428,10 +501,12 @@ export default {
       funciones: {
         agendaProfesional: {
           titulo: "Agenda por profesional",
+          // Varios profesionales (equipo) y los espacios (recursos) abren en Premium
+          // (FuncionesPlan, lib/suscripcion NIVEL_POR_OMISION).
           descripcion:
-            "Cada profesional con su horario de atención, sus servicios y sus citas, en una sola vista.",
+            "Cada profesional con su horario de atención, sus servicios y sus citas, en una sola vista. Con equipo, en los planes Premium y Pro.",
           detalle:
-            "Define la duración, el precio y los tiempos de preparación de cada servicio, y los espacios que usa, como cabinas o sillones. Solo se ofrecen horas con profesional y espacio libres.",
+            "Define la duración, el precio y los tiempos de preparación de cada servicio y, en Premium y Pro, los espacios que usa, como cabinas o sillones. Solo se ofrecen horas con profesional y espacio libres.",
         },
         cualquierProfesional: {
           titulo: "Cualquier profesional disponible",
@@ -495,7 +570,7 @@ export default {
         preparar: {
           titulo: "Configura servicios y horarios",
           texto:
-            "Agrega tus servicios con su duración y precio, y el horario de atención de cada profesional en cada sucursal.",
+            "Agrega tus servicios con su duración y precio, y el horario de atención de cada profesional. Con varias sucursales (Premium y Pro), el de cada una.",
           ejemplo: "Corte y barba",
           linea: "60 min · $350",
           estado: "Marco, Luis y Alex",
@@ -596,10 +671,11 @@ export default {
           q: "¿Sirve para consultorios o profesionales de la salud?",
           a: "Sí, para organizar citas, disponibilidad, recordatorios y cobros. AgendaUno no sustituye un expediente clínico ni un sistema médico especializado.",
         },
-        // Sin nombrar la otra modalidad: esta página habla solo de citas.
+        // Sin nombrar la otra modalidad ni el otro producto: esta página habla solo de
+        // citas (ADR 0104 y 0108, como en `landing.clases.faq.modalidad`).
         modalidad: {
           q: "¿Puedo cambiar de modalidad después?",
-          a: "Solo AgendaUno puede cambiar la modalidad de tu negocio, y solo antes de que empieces a operar: mientras no tengas citas ni reservas. Por eso la eliges con tu tipo de negocio al registrarte.",
+          a: "AgendaUno es para negocios que atienden con cita, uno a uno; los grupos con horario y lugares limitados tienen su propio producto. Si tu negocio quedó en el que no le corresponde, solo el equipo de AgendaUno puede pasarlo al otro, y solo antes de que empieces a operar: mientras no tengas citas ni reservas. Si haces las dos cosas, registra un negocio en cada producto, cada uno con su suscripción.",
         },
         precio: {
           q: "¿Cómo se calcula el precio de AgendaUno?",
@@ -697,7 +773,7 @@ export default {
         barberias: "barberías",
         esteticas: "estéticas",
         spas: "spas",
-        wellness: "centros de wellness",
+        wellness: "centros de bienestar",
         terapeutas: "terapeutas",
         dentistas: "consultorios dentales",
         psicologos: "psicólogos",
@@ -800,7 +876,7 @@ export default {
         },
         yoga: {
           nombre: "Yoga",
-          descripcion: "Pases, talleres y reservas sin fricción.",
+          descripcion: "Pases, talleres y reservas sin complicaciones.",
           alt: "Hombre practicando la postura del árbol en un estudio de yoga",
         },
         danza: {
@@ -814,7 +890,8 @@ export default {
           alt: "Instructora dirigiendo una clase de artes marciales para adultos",
         },
         acuaticas: {
-          nombre: "Acuáticas",
+          // El nombre del giro, como en el registro («Escuela de natación»).
+          nombre: "Natación",
           descripcion: "Clases de natación, cupos y horarios por grupo.",
           alt: "Nadadora entrenando en una alberca de carriles",
         },
@@ -985,6 +1062,10 @@ export default {
     duenoTitulo: "¿Administras un negocio con agenda?",
     duenoDesc:
       "Crea tu cuenta, publica servicios o clases y recibe reservas desde tu propia página.",
+    // Producto que aún no recibe registros (ADR 0108): el botón lleva a la lista de
+    // interesados.
+    duenoDescPrelanzamiento:
+      "AgendaUno abre pronto. Déjanos tus datos y te avisamos en cuanto puedas registrar tu negocio.",
   },
   escaparate: {
     cargando: "Cargando el negocio…",

@@ -566,13 +566,14 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
 </script>
 
 <template>
-  <!-- Producto que aún no recibe registros (TurnoUno antes de su lanzamiento). -->
+  <!-- Producto cuyo registro cerró el superadmin (prelanzamiento, ADR 0108). -->
   <section
     v-if="!registroAbierto"
     class="registro mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-10"
     data-prueba="registro-cerrado"
   >
-    <ListaInteresados :producto="producto" />
+    <!-- Con el giro con que llegó (`?giro=`), ya elegido. -->
+    <ListaInteresados :producto="producto" :giro="giroDeLlegada" />
   </section>
   <section v-else class="registro mx-auto max-w-7xl px-4 sm:px-6 py-8 sm:py-10">
     <div

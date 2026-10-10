@@ -49,8 +49,8 @@ const { t } = useI18n();
 // Los días de prueba de su modalidad: los que publica el superadmin (con respaldo).
 const precios = usePreciosPublicos();
 const DIAS_PRUEBA = computed(() => precios.datos[props.modo].dias_prueba);
-// Un producto que aún no abre registros (TurnoUno antes de su lanzamiento, ADR 0108):
-// sus botones llevan a dejar los datos.
+// Un producto cuyo registro cerró el superadmin (prelanzamiento, ADR 0108):
+// sus botones llevan a dejar los datos y nada ofrece prueba, registro ni contratar.
 const { abierto: registroAbierto } = useRegistroDelProducto(
   productoDeModalidad(props.modo),
 );
@@ -80,6 +80,9 @@ useRevelar(raiz);
 const contenido = computed(() => MODALIDADES[props.modo]);
 /** Clave de i18n de esta modalidad: `landing.{modo}.{resto}`. */
 const k = (resto: string): string => `landing.${props.modo}.${resto}`;
+/** Un botón al registro con su propio texto; sin registro abierto, el de la lista. */
+const alRegistro = (resto: string): string =>
+  registroAbierto.value ? t(k(resto)) : t("landing.prelanzamiento.cta");
 const registro = computed(() => ({
   name: "registro",
   query: { modo: props.modo },
@@ -159,7 +162,7 @@ const preguntas = computed(() =>
   })),
 );
 
-// «* Solo para clientes de México» solo donde algo lleva el asterisco.
+// La nota de México (`landing.soloMexico`) solo donde algo lleva el asterisco.
 const notas = computed(() => ({
   pasos: conAsterisco(pasos.value.map((p) => p.texto)),
   operacion: conAsterisco(beneficiosOperacion.value.map((b) => b.texto)),
@@ -173,10 +176,12 @@ const notas = computed(() => ({
   ),
 }));
 
+// Sin registro abierto, los botones llevan a la lista de interesados (el registro la
+// muestra): se miden como `waitlist`.
 function medirRegistro(placement: string, giro: string | null = null): void {
   trackEvent("marketing_cta_clicked", {
     placement,
-    destination: "register",
+    destination: registroAbierto.value ? "register" : "waitlist",
     mode: props.modo,
     ...(giro === null ? {} : { business_profile: giro }),
   });
@@ -249,7 +254,11 @@ function medirOtra(): void {
                 : t("landing.prelanzamiento.proximamente")
             }}
             <span aria-hidden="true">·</span>
-            {{ t("landing.pieHero") }}
+            {{
+              registroAbierto
+                ? t("landing.pieHero")
+                : t("landing.prelanzamiento.pieHero")
+            }}
           </p>
         </div>
         <HeroCollage
@@ -292,7 +301,7 @@ function medirOtra(): void {
             data-cta="product_demo"
             @click="medirRegistro('product_demo')"
           >
-            {{ t(k("producto.cta")) }}
+            {{ alRegistro("producto.cta") }}
           </RouterLink>
           <p class="mt-3 text-sm" :style="SUAVE">
             {{
@@ -330,7 +339,11 @@ function medirOtra(): void {
     >
       <div class="mx-auto max-w-5xl px-4 sm:px-6 py-20 sm:py-28">
         <h2 class="tu-titulo reveal">
-          {{ t("landing.modalidad.pasosTitulo") }}
+          {{
+            registroAbierto
+              ? t("landing.modalidad.pasosTitulo")
+              : t("landing.prelanzamiento.pasosTitulo")
+          }}
         </h2>
         <p class="mt-3 text-lg max-w-2xl reveal" :style="SUAVE">
           {{ t(k("comoFunciona.subtitulo")) }}
@@ -397,7 +410,7 @@ function medirOtra(): void {
               )
             "
           >
-            {{ t(k("giros.cta")) }}
+            {{ alRegistro("giros.cta") }}
             <IconoNav nombre="flecha" :tam="18" />
           </RouterLink>
           <p class="mt-3 text-sm" :style="SUAVE">{{ t(k("giros.pie")) }}</p>
@@ -466,7 +479,7 @@ function medirOtra(): void {
               :to="registro"
               @click="medirRegistro('operations')"
             >
-              {{ t(k("operacion.enlace")) }}
+              {{ alRegistro("operacion.enlace") }}
               <IconoNav nombre="chevron" :tam="16" />
             </RouterLink>
           </div>
@@ -591,9 +604,7 @@ function medirOtra(): void {
           {{
             registroAbierto
               ? t(k("final.subtitulo"), { dias: DIAS_PRUEBA })
-              : t("landing.prelanzamiento.finalSubtitulo", {
-                  dias: DIAS_PRUEBA,
-                })
+              : t("landing.prelanzamiento.finalSubtitulo")
           }}
         </p>
         <RouterLink

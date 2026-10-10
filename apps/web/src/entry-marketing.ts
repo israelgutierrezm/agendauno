@@ -14,7 +14,17 @@ export {
   seoParaRuta,
   renderSeoHead,
   SITE_URL,
+  PRODUCTO_COMERCIAL,
+  // Si el producto recibe registros (el respaldo con que se pre-generó la landing):
+  // scripts/check-marketing.mjs revisa el modo prelanzamiento con él.
+  REGISTRO_ABIERTO_POR_OMISION,
 } from "@/marketing/seoConfig";
+// Lo que la landing puede decir con el registro abierto o cerrado (check-marketing).
+export {
+  FRASES_SOLO_CON_REGISTRO,
+  FRASES_SOLO_EN_PRELANZAMIENTO,
+  frasesEncontradas,
+} from "@/marketing/prelanzamiento";
 
 /** Solo contenido comercial estático: nunca sesión, API ni datos de negocios. */
 export async function render(

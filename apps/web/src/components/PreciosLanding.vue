@@ -120,6 +120,15 @@ const ventasWhatsApp = computed(() => {
   return numero === "" ? null : `https://wa.me/${numero}`;
 });
 
+// Sin registro abierto, las tarjetas llevan a la lista de interesados: `waitlist`.
+function medirTarjeta(): void {
+  trackEvent("marketing_cta_clicked", {
+    placement: "pricing_card",
+    destination: registroAbierto.value ? "register" : "waitlist",
+    mode: modo.value,
+  });
+}
+
 function elegirModo(valor: Modo) {
   elegido.value = valor;
   trackEvent("marketing_business_mode_selected", {
@@ -152,7 +161,7 @@ function elegirModo(valor: Modo) {
         <span class="precios-modelo-titulo">{{ NOMBRE_MODALIDAD.clases }}</span>
         <strong>Por alumnos activos</strong>
         <span class="precios-modelo-negocios">
-          Pilates, Pole dance, yoga, acuáticas, baile y CrossFit / HYROX.
+          Pilates, Pole dance, yoga, natación, baile y CrossFit / HYROX.
         </span>
       </button>
       <button
@@ -205,6 +214,10 @@ function elegirModo(valor: Modo) {
             >
           </button>
         </div>
+        <p class="precios-periodo-nota" data-prueba="anual-adelantado">
+          El plan anual se paga completo por adelantado: {{ mesesAnual }} meses
+          por 12 de servicio.
+        </p>
       </template>
     </div>
 
@@ -250,13 +263,7 @@ function elegirModo(valor: Modo) {
         <RouterLink
           class="tu-btn tu-btn-primario tu-btn-azul precio-cta"
           :to="registro"
-          @click="
-            trackEvent('marketing_cta_clicked', {
-              placement: 'pricing_card',
-              destination: 'register',
-              mode: modo,
-            })
-          "
+          @click="medirTarjeta"
           >{{
             !registroAbierto
               ? "Quiero que me avisen"
@@ -282,8 +289,11 @@ function elegirModo(valor: Modo) {
         mensual depende de los alumnos activos de tu negocio.
       </template>
       <template v-else>
-        En la prueba gratis tienes todo lo de Pro. Subir de plan se cobra al
-        momento por los días que faltan; el anual cuesta {{ mesesAnual }} meses.
+        <template v-if="registroAbierto"
+          >En la prueba gratis tienes todo lo de Pro.</template
+        >
+        Subir de plan se cobra al momento por los días que faltan; el anual
+        cuesta {{ mesesAnual }} meses y se paga por adelantado.
       </template>
     </p>
 
@@ -325,8 +335,8 @@ function elegirModo(valor: Modo) {
         </p>
         <p>
           Se aplica una sola banda a todo el mes, no un precio por cada alumno.
-          Sin alumnos activos, la renta por uso es $0. Se cobra al cerrar el
-          mes.
+          Sin alumnos activos, la suscripción de ese mes es de
+          {{ dolares(0) }} {{ monedaClases }}. Se cobra al cerrar el mes.
         </p>
       </div>
       <div v-else class="precios-reglas">
@@ -411,7 +421,9 @@ function elegirModo(valor: Modo) {
       del proveedor de pagos en línea* no están incluidas en la suscripción.
     </p>
     <!-- «Pagos en línea*»: solo en México (ADR 0099), como landing.soloMexico. -->
-    <p class="tu-nota-mexico">* Solo para clientes de México.</p>
+    <p class="tu-nota-mexico">
+      * Solo para negocios en México (cobros en pesos).
+    </p>
   </div>
 </template>
 
@@ -449,6 +461,11 @@ function elegirModo(valor: Modo) {
 }
 .precios-periodo {
   margin-top: 1rem;
+}
+.precios-periodo-nota {
+  margin-top: 0.6rem;
+  color: var(--texto-suave);
+  font-size: 0.82rem;
 }
 .precio-capacidad {
   margin-top: 0.25rem;

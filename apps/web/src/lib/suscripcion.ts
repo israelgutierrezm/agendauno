@@ -1,3 +1,5 @@
+import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
+
 /**
  * Modelo comercial (ADR 0107): el plan de un negocio de citas y lo que la API manda
  * de él en `GET /renta`. Los precios vienen en minor y en la moneda de la tarifa
@@ -68,11 +70,15 @@ export type FuncionPlan =
   | "roles_propios"
   | "reportes_avanzados";
 
-/** Lo que todos los planes de citas incluyen (no depende del nivel). */
+/**
+ * Lo que todos los planes de citas incluyen (no depende del nivel). Solo lo que existe
+ * hoy: los recordatorios van por correo (la app aún no está publicada) y la página de
+ * cada negocio vive en el dominio de su producto (ADR 0108: citas → TurnoUno).
+ */
 export const FUNCIONES_BASE = [
-  "Agenda y citas, con la app",
-  "Recordatorios por correo y en la app",
-  "Tu página con dirección propia",
+  "Agenda y citas",
+  "Recordatorios por correo",
+  `Tu página en tunegocio.${PRODUCTOS[productoDeModalidad("citas")].dominio}`,
   "Cobro al agendar en línea* y en caja",
   "Clientes, reseñas y reportes básicos",
 ] as const;
@@ -95,7 +101,7 @@ export const ETIQUETAS_FUNCION: Record<FuncionPlan, string> = {
   venta_en_linea: "Venta en línea de paquetes*",
   formularios: "Formularios personalizables",
   lealtad: "Programa de lealtad",
-  mensajes: "Mensajes masivos y WhatsApp",
+  mensajes: "Mensajes masivos por correo",
   integraciones: "Integraciones y API",
   roles_propios: "Roles propios",
   reportes_avanzados: "Reportes avanzados",

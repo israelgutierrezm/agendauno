@@ -176,12 +176,31 @@ describe("encabezado público", () => {
   });
   it("si el producto aún no recibe registros, el botón ofrece avisar", async () => {
     aplicarPreciosPublicos({ registro: { agendauno: false, turnouno: false } });
+    try {
+      const vista = await montar({}, "/");
+      const boton = vista.get(".tu-public-register");
+      expect(boton.text()).toContain("Quiero que me avisen");
+      // Lleva a la lista de interesados: se mide como `waitlist`.
+      await boton.trigger("click");
+      expect(trackEvent).toHaveBeenLastCalledWith("marketing_cta_clicked", {
+        placement: "navigation",
+        destination: "waitlist",
+        mode: "clases",
+      });
+      // Aún no hay negocios que buscar: sin «¿Buscas reservar?».
+      expect(vista.find('footer a[href="/directorio"]').exists()).toBe(false);
+      expect(vista.get("footer").text()).not.toContain(es.nav.encontrarNegocio);
+      vista.unmount();
+    } finally {
+      aplicarPreciosPublicos(PRECIOS_POR_OMISION);
+    }
+  });
+  it("con el registro abierto, el footer ofrece encontrar un negocio", async () => {
     const vista = await montar({}, "/");
-    expect(vista.get(".tu-public-register").text()).toContain(
-      "Quiero que me avisen",
+    expect(vista.get('footer a[href="/directorio"]').text()).toBe(
+      es.nav.encontrarNegocio,
     );
     vista.unmount();
-    aplicarPreciosPublicos(PRECIOS_POR_OMISION);
   });
   it("enlaza el aviso de privacidad desde el footer comercial", async () => {
     const vista = await montar();

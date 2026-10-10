@@ -24,8 +24,8 @@ export interface PreciosPublicos {
   ventas: { correo: string | null; whatsapp: string | null };
   timbres: { moneda: string; precio_minor: number; paquetes: number[] };
   /**
-   * ¿Qué producto recibe registros de negocios? (ADR 0108). TurnoUno abre hasta su
-   * lanzamiento: mientras, su landing junta interesados.
+   * ¿Qué producto recibe registros de negocios? (ADR 0108). El superadmin puede cerrar
+   * el de un producto: mientras, su landing junta interesados (prelanzamiento).
    */
   registro: { agendauno: boolean; turnouno: boolean };
 }
@@ -75,7 +75,9 @@ export const PRECIOS_POR_OMISION: PreciosPublicos = {
     precio_minor: 180,
     paquetes: [50, 100, 200, 350, 500],
   },
-  registro: { agendauno: true, turnouno: false },
+  // Los dos productos reciben registros (TurnoUno se lanzó). Debe coincidir con
+  // `registro.abierto_*` del API: es lo que dice el HTML pre-generado.
+  registro: { agendauno: true, turnouno: true },
 };
 
 const numero = (n: number) => n.toLocaleString("es-MX");

@@ -4,6 +4,8 @@ import { createI18n } from "vue-i18n";
 import es from "@/i18n/locales/es-MX";
 import { trackEvent } from "@/lib/analytics";
 import { MODALIDADES, MODOS, type Modo } from "@/marketing/modalidades";
+import { PRECIOS_POR_OMISION } from "@/marketing/precios";
+import { aplicarPreciosPublicos } from "@/marketing/preciosPublicos";
 import FuncionesLanding from "./FuncionesLanding.vue";
 
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
@@ -72,7 +74,7 @@ describe("tarjetas de funcionalidades", () => {
   it("sin modo conserva la nota de México y el registro sin modalidad", () => {
     const vista = montar();
     expect(vista.get(".tu-nota-mexico").text()).toBe(
-      "* Solo para clientes de México.",
+      "* Solo para negocios en México (cobros en pesos).",
     );
     expect(
       JSON.parse(vista.get(".funcion-detalle a").attributes("data-to")!),
@@ -129,6 +131,23 @@ describe("tarjetas de funcionalidades", () => {
       });
       vista.unmount();
     }
+    // Si el superadmin cierra el registro, lleva a la lista (`waitlist`).
+    aplicarPreciosPublicos({ registro: { agendauno: true, turnouno: false } });
+    try {
+      const cerrado = montar("citas");
+      await cerrado.findAll(".funcion-abrir")[0]!.trigger("click");
+      const enlace = cerrado.get(".funcion-detalle a");
+      expect(enlace.text()).toBe(es.landing.prelanzamiento.cta);
+      await enlace.trigger("click");
+      expect(trackEvent).toHaveBeenLastCalledWith("marketing_cta_clicked", {
+        placement: "features",
+        destination: "waitlist",
+        mode: "citas",
+      });
+      cerrado.unmount();
+    } finally {
+      aplicarPreciosPublicos(PRECIOS_POR_OMISION);
+    }
     // Sin modalidad, sin `mode`.
     const vista = montar();
     await vista.get(".funcion-detalle a").trigger("click");
@@ -151,7 +170,7 @@ describe("tarjetas de funcionalidades", () => {
       /pilates|pole|yoga|cupo|lista de espera|alumno|anticipo|whatsapp/i,
     );
     expect(vista.get(".tu-nota-mexico").text()).toBe(
-      "* Solo para clientes de México.",
+      "* Solo para negocios en México (cobros en pesos).",
     );
     expect(vista.get(".visual-cualquierProfesional").text()).toContain(
       "Cualquier profesional",

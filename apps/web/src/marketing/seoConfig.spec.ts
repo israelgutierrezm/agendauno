@@ -6,6 +6,11 @@ import {
   renderSeoHead,
 } from "./seoConfig";
 import { MODALIDADES, perfilDeSolucion } from "./modalidades";
+import {
+  FRASES_SOLO_CON_REGISTRO,
+  FRASES_SOLO_EN_PRELANZAMIENTO,
+  frasesEncontradas,
+} from "./prelanzamiento";
 import { soluciones, rutaSolucion } from "./soluciones";
 import { updateSeo } from "@/lib/seo";
 
@@ -29,7 +34,62 @@ describe("SEO comercial de AgendaUno", () => {
     expect(seoParaRuta("/").description).toContain("30 días");
     for (const path of rutasMarketing) {
       expect(renderSeoHead(seoParaRuta(path))).not.toContain("14 días");
+      // La frase de cierre la pone el armado del SEO: con registro abierto, la prueba.
+      expect(seoParaRuta(path).description, path).toMatch(
+        /Prueba AgendaUno gratis durante 30 días, sin tarjeta\.$/,
+      );
     }
+  });
+  it("si el registro se cierra, cierra con la lista de interesados y sin prueba", () => {
+    for (const path of rutasMarketing) {
+      const seo = seoParaRuta(path, { registroAbierto: false });
+      expect(seo.description, path).toMatch(
+        /AgendaUno abre pronto: déjanos tus datos y te avisamos\.$/,
+      );
+      expect(
+        frasesEncontradas(renderSeoHead(seo), FRASES_SOLO_CON_REGISTRO),
+        path,
+      ).toEqual([]);
+    }
+    expect(seoParaRuta("/registro", { registroAbierto: false }).title).toBe(
+      "Quiero que me avisen | AgendaUno",
+    );
+    expect(seoParaRuta("/registro").title).toBe(
+      "Crea tu negocio gratis | AgendaUno",
+    );
+  });
+  it("títulos de hasta 60 caracteres y descripciones de hasta 160", () => {
+    for (const registroAbierto of [true, false]) {
+      for (const path of rutasMarketing) {
+        const seo = seoParaRuta(path, { registroAbierto });
+        expect(seo.title.length, seo.title).toBeLessThanOrEqual(60);
+        expect(seo.description.length, seo.description).toBeLessThanOrEqual(
+          160,
+        );
+      }
+    }
+  });
+  it("cada página por giro con su propia imagen Open Graph y su texto alternativo", () => {
+    for (const s of deClases) {
+      const seo = seoParaRuta(rutaSolucion(s.slug));
+      expect(seo.image).toBe(
+        `https://agendauno.mx/assets/landing/disciplinas/${s.imagen}`,
+      );
+      const html = renderSeoHead(seo);
+      expect(html).toContain(
+        `<meta property="og:image:alt" content="${s.alt}">`,
+      );
+      expect(html).toContain(
+        `<meta name="twitter:image:alt" content="${s.alt}">`,
+      );
+    }
+    // La portada, con la de su modalidad; lo que no se indexa, con la de la marca.
+    expect(renderSeoHead(seoParaRuta("/"))).toContain(
+      `og:image:alt" content="${MODALIDADES.clases.seo.imagenAlt}"`,
+    );
+    expect(renderSeoHead(seoParaRuta("/entrar"))).toContain(
+      'og:image:alt" content="Logotipo de AgendaUno"',
+    );
   });
   it("la portada y las páginas por giro de clases, con título, descripción y canonical propios", () => {
     expect(rutasMarketing).toEqual([
@@ -125,10 +185,11 @@ describe("SEO comercial de AgendaUno", () => {
     const resultado = seoParaRuta("/");
     expect(resultado).toMatchObject({
       title: seo.title,
-      description: seo.description,
+      description: `${seo.description} Prueba AgendaUno gratis durante 30 días, sin tarjeta.`,
       path: "/",
       index: true,
       image: `https://agendauno.mx${seo.imagen}`,
+      imageAlt: seo.imagenAlt,
     });
     expect(seo.imagen).toMatch(/^\/assets\/landing\//);
     const html = renderSeoHead(resultado);
@@ -211,7 +272,59 @@ describe("SEO comercial de TurnoUno", () => {
       expect(html).not.toContain("agendauno.mx");
     }
     expect(seo.seoParaRuta("/").title).toBe(
-      "Software de citas para barberías, estéticas y consultorios | TurnoUno",
+      "Agenda de citas: barberías, spas y consultorios | TurnoUno",
+    );
+  });
+
+  it("con su registro abierto ofrece la prueba, sin nada de la lista de interesados", async () => {
+    vi.stubEnv("VITE_PRODUCTO", "turnouno");
+    vi.resetModules();
+    const seo = await import("./seoConfig");
+
+    // TurnoUno recibe registros (el respaldo de precios.ts).
+    expect(seo.REGISTRO_ABIERTO_POR_OMISION).toBe(true);
+    for (const path of seo.rutasMarketing) {
+      const pagina = seo.seoParaRuta(path);
+      expect(pagina.description, path).toMatch(
+        /Prueba TurnoUno gratis durante 30 días, sin tarjeta\.$/,
+      );
+      expect(pagina.title.length, pagina.title).toBeLessThanOrEqual(60);
+      expect(pagina.description.length, path).toBeLessThanOrEqual(160);
+      const html = seo.renderSeoHead(pagina);
+      expect(
+        frasesEncontradas(html, FRASES_SOLO_EN_PRELANZAMIENTO),
+        path,
+      ).toEqual([]);
+      expect(html, path).toMatch(/og:image:alt" content="[^"]{10,}"/);
+    }
+    expect(seo.seoParaRuta("/registro").title).toBe(
+      "Crea tu negocio gratis | TurnoUno",
+    );
+    // La página de terapeutas no repite a los nutriólogos (tienen la suya).
+    expect(seo.seoParaRuta(rutaSolucion("terapeutas")).description).not.toMatch(
+      /nutri/i,
+    );
+  });
+
+  it("si el superadmin cierra su registro, no ofrece prueba gratis: cierra con la lista de interesados", async () => {
+    vi.stubEnv("VITE_PRODUCTO", "turnouno");
+    vi.resetModules();
+    const seo = await import("./seoConfig");
+
+    for (const path of seo.rutasMarketing) {
+      const pagina = seo.seoParaRuta(path, { registroAbierto: false });
+      expect(pagina.description, path).toMatch(
+        /TurnoUno abre pronto: déjanos tus datos y te avisamos\.$/,
+      );
+      expect(pagina.description.length, path).toBeLessThanOrEqual(160);
+      // Ni en la descripción, ni en Open Graph, ni en el JSON-LD.
+      expect(
+        frasesEncontradas(seo.renderSeoHead(pagina), FRASES_SOLO_CON_REGISTRO),
+        path,
+      ).toEqual([]);
+    }
+    expect(seo.seoParaRuta("/registro", { registroAbierto: false }).title).toBe(
+      "Quiero que me avisen | TurnoUno",
     );
   });
 });

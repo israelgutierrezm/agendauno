@@ -481,6 +481,20 @@ describe("producto que aún no recibe registros (ADR 0108)", () => {
     expect(vista.find("#nombre").exists()).toBe(false);
     aplicarPreciosPublicos(PRECIOS_POR_OMISION);
   });
+
+  it("la lista llega con el giro de la página (`?giro=`) ya elegido", async () => {
+    aplicarPreciosPublicos({ registro: { agendauno: false, turnouno: false } });
+    try {
+      const vista = montar({ modo: "clases", giro: "pilates" });
+      await flushPromises();
+      const lista = vista.get('[data-prueba="lista-interesados"]');
+      expect((lista.get("select").element as HTMLSelectElement).value).toBe(
+        "pilates",
+      );
+    } finally {
+      aplicarPreciosPublicos(PRECIOS_POR_OMISION);
+    }
+  });
 });
 
 describe("WhatsApp del dueño", () => {

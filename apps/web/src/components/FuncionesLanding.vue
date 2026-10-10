@@ -147,11 +147,12 @@ const registroAbierto = computed(
   () => precios.datos.registro[productoDeModalidad(props.modo ?? "clases")],
 );
 // «Probar en mi negocio» es otra entrada al registro: se mide como las demás, con la
-// modalidad de la página (`mode`) cuando la hay.
+// modalidad de la página (`mode`) cuando la hay; sin registro abierto lleva a la
+// lista de interesados (`waitlist`).
 function medirRegistro(): void {
   trackEvent("marketing_cta_clicked", {
     placement: "features",
-    destination: "register",
+    destination: registroAbierto.value ? "register" : "waitlist",
     ...(props.modo ? { mode: props.modo } : {}),
   });
 }

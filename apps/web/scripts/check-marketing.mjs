@@ -9,7 +9,11 @@ import { JSDOM } from "jsdom";
 | Revisa la landing pre-generada de un producto (ADR 0108):
 | `node scripts/check-marketing.mjs agendauno` (o `turnouno`). Cada página con HTML
 | completo, su SEO con el dominio y la marca del producto, sin la marca del otro
-| (salvo el enlace discreto que lo presenta), y la aplicación sin indexar.
+| (ni en el texto ni en los atributos, salvo el enlace discreto que lo presenta y las
+| excepciones de abajo), sus íconos, y la aplicación sin indexar. Si el producto aún
+| no recibe registros (el superadmin lo cerró: prelanzamiento), nada ofrece prueba
+| gratis, registrarse ni contratar: todo lleva a la lista de interesados; si los recibe,
+| no queda nada de la lista de interesados.
 */
 const producto = process.argv[2] ?? "agendauno";
 const OTRO = { agendauno: "TurnoUno", turnouno: "AgendaUno" }[producto];
@@ -18,10 +22,89 @@ assert.ok(OTRO, `producto desconocido: ${producto}`);
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const dist = resolve(root, "dist", producto);
-// La misma lista que prerenderizó el build (seoConfig.paginasMarketing).
-const { paginasMarketing, SITE_URL } = await import(
+// La misma lista que prerenderizó el build (seoConfig.paginasMarketing), y si el
+// producto recibía registros al pre-generarla (el respaldo de precios.ts).
+const {
+  paginasMarketing,
+  SITE_URL,
+  REGISTRO_ABIERTO_POR_OMISION: registroAbierto,
+  FRASES_SOLO_CON_REGISTRO,
+  FRASES_SOLO_EN_PRELANZAMIENTO,
+  frasesEncontradas,
+} = await import(
   pathToFileURL(resolve(root, "dist-ssr", producto, "entry-marketing.mjs")).href
 );
+assert.equal(typeof registroAbierto, "boolean", "registro del producto");
+
+/*
+| La marca del otro producto en un atributo (un enlace, un correo, un metadato, un
+| texto alternativo…) también falla. Excepciones justificadas:
+| - el id del JSON-LD de cada ruta (`agendauno-route-jsonld`): un nombre técnico común
+|   a los dos builds (lib/seo.ts lo reemplaza al navegar); no se ve ni se indexa;
+| - el `mailto:` de cotizar en Precios: el buzón de ventas es uno para la plataforma
+|   (lo configura el superadmin, ConfiguracionPlataforma::ventasCorreo; respaldo en
+|   precios.ts) y el texto del botón es «Contáctanos»;
+| - lo que va dentro del enlace discreto al otro producto (`.tu-modalidad-otra`).
+*/
+const OTRO_EN_ATRIBUTO = new RegExp(OTRO, "i");
+const EXCEPCIONES_MARCA = [
+  { selector: "script#agendauno-route-jsonld", atributo: "id" },
+  { selector: '.precios-contacto a[href^="mailto:"]', atributo: "href" },
+  { selector: ".tu-modalidad-otra, .tu-modalidad-otra *", atributo: "*" },
+];
+const esExcepcion = (elemento, atributo) =>
+  EXCEPCIONES_MARCA.some(
+    (e) =>
+      (e.atributo === "*" || e.atributo === atributo) &&
+      elemento.matches(e.selector),
+  );
+function marcaAjenaEnAtributos(document) {
+  const hallazgos = [];
+  for (const elemento of document.querySelectorAll("*")) {
+    for (const { name, value } of elemento.attributes) {
+      if (OTRO_EN_ATRIBUTO.test(value) && !esExcepcion(elemento, name)) {
+        hallazgos.push(
+          `<${elemento.tagName.toLowerCase()} ${name}="${value}">`,
+        );
+      }
+    }
+  }
+  return hallazgos;
+}
+
+/*
+| Según el registro del producto, frases que no pueden aparecer
+| (src/marketing/prelanzamiento.ts, las mismas que revisan las pruebas): cerrado, las
+| que ofrecen probar, registrarse o contratar; abierto, las de la lista de interesados.
+| Se buscan en el texto visible, el título, los metadatos, el JSON-LD y los atributos
+| que se leen (alt, title, aria-label).
+*/
+const frasesFuera = registroAbierto
+  ? FRASES_SOLO_EN_PRELANZAMIENTO
+  : FRASES_SOLO_CON_REGISTRO;
+function textosLegibles(document) {
+  const atributos = [
+    ...document.querySelectorAll(
+      'meta[name="description"], meta[property^="og:"], meta[name^="twitter:"]',
+    ),
+  ].map((m) => m.getAttribute("content") ?? "");
+  const accesibles = [
+    ...document.querySelectorAll("[alt], [title], [aria-label]"),
+  ].flatMap((e) =>
+    ["alt", "title", "aria-label"]
+      .map((a) => e.getAttribute(a))
+      .filter((v) => v !== null),
+  );
+  return [
+    document.title,
+    document.body.textContent,
+    ...atributos,
+    ...accesibles,
+    ...[...document.querySelectorAll('script[type="application/ld+json"]')].map(
+      (s) => s.textContent,
+    ),
+  ].join("\n");
+}
 const SITE = SITE_URL;
 const routes = paginasMarketing.map((p) => p.path);
 assert.equal(routes[0], "/", "la portada es la página del producto");
@@ -118,6 +201,92 @@ for (const { path: route, vista, modo, name, giro } of paginasMarketing) {
     `${route}: sin la marca ${OTRO}`,
   );
   assert.ok(!document.title.includes(OTRO), `${route}: título sin ${OTRO}`);
+  // Ni en los atributos (enlaces, correos, metadatos…), salvo las excepciones.
+  assert.deepEqual(
+    marcaAjenaEnAtributos(document),
+    [],
+    `${route}: atributos con la marca ${OTRO}`,
+  );
+  // Título y descripción a la medida de los buscadores.
+  assert.ok(
+    document.title.length <= 60,
+    `${route}: título de ${document.title.length} caracteres (máx. 60)`,
+  );
+  const descripcion = document
+    .querySelector('meta[name="description"]')
+    .getAttribute("content");
+  assert.ok(
+    descripcion.length <= 160,
+    `${route}: descripción de ${descripcion.length} caracteres (máx. 160)`,
+  );
+  // Imagen Open Graph con su texto alternativo.
+  assert.ok(
+    (document.querySelector('meta[property="og:image:alt"]')?.content ?? "")
+      .length > 5,
+    `${route}: og:image:alt`,
+  );
+  // Íconos de la pestaña: los del producto (TurnoUno, los provisionales de su PWA),
+  // y que existan.
+  const iconos = [
+    ...document.querySelectorAll(
+      'link[rel="icon"], link[rel="apple-touch-icon"]',
+    ),
+  ].map((l) => l.getAttribute("href"));
+  assert.ok(iconos.length >= 2, `${route}: íconos`);
+  for (const icono of iconos) {
+    if (producto === "turnouno") {
+      assert.match(icono, /^\/assets\/pwa\/turnouno-/, `${route}: ícono`);
+    }
+    await existe(icono.replace(/^\//, "").replace(/\?.*$/, ""));
+  }
+  // Lo que no puede decir según su registro (texto, metadatos, JSON-LD y atributos).
+  assert.deepEqual(
+    frasesEncontradas(textosLegibles(document), frasesFuera),
+    [],
+    registroAbierto
+      ? `${route}: con registro abierto, nada de la lista de interesados`
+      : `${route}: prelanzamiento sin ofrecer prueba ni registro`,
+  );
+  // Sin registro abierto: los botones piden avisar y no se ofrece buscar negocios
+  // (aún no los hay). Con él, la prueba y el registro, como siempre.
+  if (!registroAbierto) {
+    assert.match(
+      document.querySelector(".tu-public-register")?.textContent ?? "",
+      /Quiero que me avisen/,
+      `${route}: el botón del menú pide avisar`,
+    );
+    assert.ok(
+      !document.querySelector('a[href="/negocios"]'),
+      `${route}: sin «Encuentra tu negocio»`,
+    );
+    if (vista === "modalidad") {
+      assert.ok(
+        document.querySelector('[data-sello="proximamente"]') &&
+          !document.querySelector('[data-sello="prueba"]') &&
+          !document.querySelector('[data-sello="cancelacion"]'),
+        `${route}: sello «Abre pronto», sin prueba ni permanencia`,
+      );
+    }
+  } else {
+    assert.match(
+      document.querySelector(".tu-public-register")?.textContent ?? "",
+      /Probar gratis/,
+      `${route}: el botón del menú ofrece la prueba`,
+    );
+    assert.match(
+      document
+        .querySelector('meta[name="description"]')
+        .getAttribute("content"),
+      /gratis durante \d+ días, sin tarjeta\.$/,
+      `${route}: la descripción cierra con la prueba`,
+    );
+    if (vista === "modalidad") {
+      assert.ok(
+        document.querySelector('[data-sello="prueba"]'),
+        `${route}: sello de la prueba`,
+      );
+    }
+  }
   // Registro con su modalidad y, en la página de un solo giro, con su giro.
   const registro = giro
     ? `/registro?modo=${modo}&giro=${giro}`
@@ -173,5 +342,5 @@ assert.ok(!app.includes('rel="canonical"'), "app.html sin canonical");
 assert.ok(!app.includes("application/ld+json"), "app.html sin JSON-LD");
 assert.ok(!sitemap.includes("/registro"));
 console.log(
-  `SEO de ${producto} validado: ${routes.length} páginas, HTML sin JS, marca, menú, imágenes, CSS, canonical, Open Graph, JSON-LD y aplicación sin indexar.`,
+  `SEO de ${producto} validado: ${routes.length} páginas, HTML sin JS, marca (texto y atributos), íconos, menú, imágenes, CSS, canonical, Open Graph, JSON-LD, ${registroAbierto ? "registro abierto (prueba, sin lista de interesados)" : "prelanzamiento sin prueba ni registro"} y aplicación sin indexar.`,
 );

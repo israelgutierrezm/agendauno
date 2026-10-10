@@ -1,6 +1,8 @@
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createI18n } from "vue-i18n";
 import { createMemoryHistory, createRouter } from "vue-router";
+import es from "@/i18n/locales/es-MX";
 import { trackEvent } from "@/lib/analytics";
 import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import {
@@ -8,6 +10,13 @@ import {
   modoDeGiro,
   perfilDeSolucion,
 } from "@/marketing/modalidades";
+import { PRECIOS_POR_OMISION } from "@/marketing/precios";
+import { aplicarPreciosPublicos } from "@/marketing/preciosPublicos";
+import {
+  FRASES_SOLO_CON_REGISTRO,
+  FRASES_SOLO_EN_PRELANZAMIENTO,
+  frasesEncontradas,
+} from "@/marketing/prelanzamiento";
 import { rutaSolucion, soluciones } from "@/marketing/soluciones";
 import { rutasComerciales } from "@/router/comerciales";
 import SolucionView from "./SolucionView.vue";
@@ -45,7 +54,12 @@ async function montar(slug: string) {
   await router.isReady();
   return mount(SolucionView, {
     props: { slug },
-    global: { plugins: [router] },
+    global: {
+      plugins: [
+        router,
+        createI18n({ legacy: false, locale: "es", messages: { es } }),
+      ],
+    },
   });
 }
 const hrefs = (vista: Awaited<ReturnType<typeof montar>>) =>
@@ -179,6 +193,85 @@ describe("páginas por giro", () => {
       mode: "citas",
     });
     barberias.unmount();
+  });
+
+  it("con el registro abierto (los dos productos): la prueba, sin nada de la lista de interesados", async () => {
+    for (const solucion of soluciones) {
+      const vista = await montar(solucion.slug);
+      expect(vista.get('[data-cta="hero"]').text()).toBe(
+        es.landing.solucion.probar,
+      );
+      expect(vista.text()).toContain("30 días para probarlo · Sin tarjeta");
+      expect(vista.text()).toContain(es.landing.solucion.empezar.etiqueta);
+      expect(
+        frasesEncontradas(vista.text(), FRASES_SOLO_EN_PRELANZAMIENTO),
+        solucion.slug,
+      ).toEqual([]);
+      vista.unmount();
+    }
+  });
+
+  it("con el registro cerrado por el superadmin dice cómo funcionará y pide los datos, sin prueba ni registro", async () => {
+    aplicarPreciosPublicos({ registro: { agendauno: false, turnouno: false } });
+    try {
+      for (const solucion of soluciones) {
+        const vista = await montar(solucion.slug);
+        const texto = vista.text();
+        expect(vista.get('[data-cta="hero"]').text()).toBe(
+          es.landing.prelanzamiento.cta,
+        );
+        expect(vista.get('[data-cta="final"]').text()).toBe(
+          es.landing.prelanzamiento.cta,
+        );
+        expect(texto).toContain(es.landing.solucion.prelanzamiento.etiqueta);
+        expect(texto).toContain(
+          `${PRODUCTOS[productoDeModalidad(solucion.modo)].nombre} abre pronto.`,
+        );
+        expect(
+          frasesEncontradas(texto, FRASES_SOLO_CON_REGISTRO),
+          solucion.slug,
+        ).toEqual([]);
+        for (const frase of [
+          /Del registro a tu primera reserva/,
+          /Una prueba con tu operación real/,
+          /antes de contratar/,
+        ]) {
+          expect(texto, `${solucion.slug}: ${String(frase)}`).not.toMatch(
+            frase,
+          );
+        }
+        // Lleva a la lista de interesados: se mide como `waitlist`.
+        await vista.get('[data-cta="final"]').trigger("click");
+        expect(trackEvent).toHaveBeenLastCalledWith(
+          "marketing_cta_clicked",
+          expect.objectContaining({
+            placement: "solution_final",
+            destination: "waitlist",
+            solution: solucion.slug,
+          }),
+        );
+        vista.unmount();
+      }
+    } finally {
+      aplicarPreciosPublicos(PRECIOS_POR_OMISION);
+    }
+  });
+
+  it("nombra el giro a media frase en minúscula y sin «academia» en todos los giros", async () => {
+    const barberias = await montar("barberias");
+    expect(barberias.get(".solucion-etiqueta").text()).toBe(
+      "Agenda de citas para barberías y estéticas",
+    );
+    expect(barberias.get("#beneficios-titulo").text()).toBe(
+      es.landing.solucion.beneficiosTitulo,
+    );
+    barberias.unmount();
+    const crossfit = await montar("crossfit-hyrox");
+    expect(crossfit.get(".solucion-etiqueta").text()).toBe(
+      "Software de reservas para centros de CrossFit y HYROX",
+    );
+    expect(crossfit.get("#beneficios-titulo").text()).not.toMatch(/academia/);
+    crossfit.unmount();
   });
 
   it("el botón del hero va en azul y el del cierre se queda rosa", async () => {
