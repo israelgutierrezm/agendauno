@@ -19,6 +19,8 @@ import SellosConfianza from "@/components/SellosConfianza.vue";
 import SolucionesEnlaces from "@/components/SolucionesEnlaces.vue";
 import TextoDestacado from "@/components/TextoDestacado.vue";
 import { trackEvent } from "@/lib/analytics";
+import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
+import { useRegistroDelProducto } from "@/marketing/registroProducto";
 import { useRevelar } from "@/lib/revelar";
 import {
   MODALIDADES,
@@ -47,6 +49,16 @@ const { t } = useI18n();
 // Los días de prueba de su modalidad: los que publica el superadmin (con respaldo).
 const precios = usePreciosPublicos();
 const DIAS_PRUEBA = computed(() => precios.datos[props.modo].dias_prueba);
+// Un producto que aún no abre registros (TurnoUno antes de su lanzamiento, ADR 0108):
+// sus botones llevan a dejar los datos.
+const { abierto: registroAbierto } = useRegistroDelProducto(
+  productoDeModalidad(props.modo),
+);
+const textoRegistro = computed(() =>
+  registroAbierto.value
+    ? t("landing.modalidad.probar")
+    : t("landing.prelanzamiento.cta"),
+);
 const SUAVE = { color: "var(--texto-suave)" };
 // En una banda gris, las tarjetas y los círculos de la banda van en blanco.
 const BANDA_FONDO = {
@@ -81,6 +93,10 @@ function registroCon(giro: string | null) {
 const otra = computed(() => ({
   name: NOMBRE_RUTA_MODALIDAD[contenido.value.otra],
 }));
+// La otra modalidad es otro producto, en su propio dominio (ADR 0108).
+const nombreOtro = computed(
+  () => PRODUCTOS[productoDeModalidad(contenido.value.otra)].nombre,
+);
 const conAsterisco = (textos: readonly string[]): boolean =>
   textos.some((texto) => texto.includes("*"));
 
@@ -216,7 +232,7 @@ function medirOtra(): void {
               data-cta="hero"
               @click="medirRegistro('hero')"
             >
-              {{ t("landing.modalidad.probar") }}
+              {{ textoRegistro }}
             </RouterLink>
             <a
               class="tu-btn tu-btn-fantasma text-base px-7 py-3"
@@ -227,7 +243,11 @@ function medirOtra(): void {
             </a>
           </div>
           <p class="tu-hero-proof mt-4 text-sm" :style="SUAVE">
-            {{ t("landing.prueba", { dias: DIAS_PRUEBA }) }}
+            {{
+              registroAbierto
+                ? t("landing.prueba", { dias: DIAS_PRUEBA })
+                : t("landing.prelanzamiento.proximamente")
+            }}
             <span aria-hidden="true">·</span>
             {{ t("landing.pieHero") }}
           </p>
@@ -275,7 +295,11 @@ function medirOtra(): void {
             {{ t(k("producto.cta")) }}
           </RouterLink>
           <p class="mt-3 text-sm" :style="SUAVE">
-            {{ t("landing.modalidad.demoPie", { dias: DIAS_PRUEBA }) }}
+            {{
+              registroAbierto
+                ? t("landing.modalidad.demoPie", { dias: DIAS_PRUEBA })
+                : t("landing.prelanzamiento.demoPie")
+            }}
           </p>
         </div>
       </div>
@@ -526,7 +550,7 @@ function medirOtra(): void {
                 data-cta="public_page"
                 @click="medirRegistro('public_page')"
               >
-                {{ t("landing.modalidad.probar") }}
+                {{ textoRegistro }}
               </RouterLink>
             </div>
           </div>
@@ -556,9 +580,21 @@ function medirOtra(): void {
       <div
         class="mx-auto max-w-3xl px-4 sm:px-6 py-20 sm:py-28 text-center reveal"
       >
-        <h2 class="tu-titulo tu-titulo-final">{{ t(k("final.titulo")) }}</h2>
+        <h2 class="tu-titulo tu-titulo-final">
+          {{
+            registroAbierto
+              ? t(k("final.titulo"))
+              : t("landing.prelanzamiento.finalTitulo")
+          }}
+        </h2>
         <p class="mt-4 text-lg" :style="SUAVE">
-          {{ t(k("final.subtitulo"), { dias: DIAS_PRUEBA }) }}
+          {{
+            registroAbierto
+              ? t(k("final.subtitulo"), { dias: DIAS_PRUEBA })
+              : t("landing.prelanzamiento.finalSubtitulo", {
+                  dias: DIAS_PRUEBA,
+                })
+          }}
         </p>
         <RouterLink
           class="tu-btn tu-btn-primario text-base px-7 py-3 mt-8"
@@ -566,7 +602,7 @@ function medirOtra(): void {
           data-cta="final"
           @click="medirRegistro('final')"
         >
-          {{ t("landing.modalidad.probar") }}
+          {{ textoRegistro }}
         </RouterLink>
         <!-- Enlace discreto a la otra modalidad: cada negocio es de una sola. -->
         <p class="tu-modalidad-otra">
@@ -575,7 +611,8 @@ function medirOtra(): void {
             :to="otra"
             class="inline-flex items-center gap-1"
             @click="medirOtra"
-            >{{ t(k("final.otraEnlace")) }} <IconoNav nombre="flecha" :tam="16"
+            >{{ t(k("final.otraEnlace"), { otro: nombreOtro }) }}
+            <IconoNav nombre="flecha" :tam="16"
           /></RouterLink>
         </p>
       </div>

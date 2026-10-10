@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\ActivacionInvalida;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Support\Str;
 
 /**
@@ -76,7 +77,7 @@ class ActivacionPropietario
             if ($persona !== null && array_diff($usuario->rolesEfectivos(), ['miembro']) === []) {
                 $this->eventos->registrar('cuenta.creada', 'persona', (string) $persona->ulid, [
                     'persona_id' => (string) $persona->ulid,
-                    'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $estudio->slug),
+                    'enlace' => MarcaProducto::urlWeb($estudio).'/entrar?estudio='.rawurlencode((string) $estudio->slug),
                 ]);
             }
 

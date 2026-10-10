@@ -12,7 +12,7 @@ import {
 
 import CampoContrasena from "@/components/CampoContrasena.vue";
 import IconoNav from "@/components/IconoNav.vue";
-import LogoAgendaUno from "@/components/LogoAgendaUno.vue";
+import LogoProducto from "@/components/LogoProducto.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import {
   googleEnDominioRaiz,
@@ -375,7 +375,7 @@ onMounted(async () => {
             class="tu-login-logo-negocio"
             @error="logoFallido = true"
           />
-          <LogoAgendaUno v-else variante="isotipo" :ancho="64" />
+          <LogoProducto v-else variante="isotipo" :ancho="64" />
         </div>
 
         <!-- La sesión guardada no se pudo confirmar (sin red, en mantenimiento): sigue

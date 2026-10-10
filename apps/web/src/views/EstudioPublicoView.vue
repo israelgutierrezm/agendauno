@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from "vue-router";
 
 import IconoNav from "@/components/IconoNav.vue";
 import IconoRed from "@/components/IconoRed.vue";
+import InstalarApp from "@/components/InstalarApp.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
@@ -13,6 +14,8 @@ import {
   type ModalidadServicio,
 } from "@/lib/modalidad";
 import { recordarNegocio } from "@/lib/negociosRecientes";
+import { PRODUCTOS } from "@/lib/producto";
+import { marcarPwa } from "@/lib/pwa";
 import { updateSeo } from "@/lib/seo";
 import { urlCanonicaEstudio } from "@/lib/tenant";
 import { perfilVisibleAlPublico } from "@/marketing/modalidades";
@@ -99,6 +102,7 @@ interface Escaparate {
     aviso_privacidad?: boolean;
     logo_url: string | null;
     portada_url?: string | null;
+    color_marca?: string | null;
     descripcion?: string | null;
     redes?: Red[];
     whatsapp_url?: string | null;
@@ -270,6 +274,8 @@ async function cargar(): Promise<void> {
     );
     escaparate.value = data.data;
     const estudio = data.data.estudio;
+    // Su app instalable (en su subdominio): nombre, ícono y color.
+    marcarPwa(estudio);
     recordarNegocio({
       slug: estudio.slug,
       nombre: estudio.nombre,
@@ -280,7 +286,7 @@ async function cargar(): Promise<void> {
     const lugar = [estudio.ciudad, estudio.pais].filter(Boolean).join(", ");
     const esCitas = capacidadesDeNegocio(estudio).citas;
     updateSeo({
-      title: `${estudio.nombre} | ${esCitas ? "Servicios y citas" : "Horarios y clases"} en AgendaUno`,
+      title: `${estudio.nombre} | ${esCitas ? "Servicios y citas" : "Horarios y clases"} en ${PRODUCTOS[esCitas ? "turnouno" : "agendauno"].nombre}`,
       description: esCitas
         ? `Consulta servicios, profesionales y horarios disponibles de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}. Reserva tu cita en línea.`
         : `Consulta próximas clases, instructores y precios de ${estudio.nombre}${lugar ? ` en ${lugar}` : ""}.`,
@@ -334,6 +340,10 @@ onMounted(cargar);
     </section>
 
     <template v-else-if="escaparate">
+      <!-- Su app instalable (PWA), en su subdominio. -->
+      <div class="mx-auto max-w-3xl px-4 pt-4">
+        <InstalarApp :negocio="escaparate.estudio.nombre" />
+      </div>
       <!-- Hero -->
       <div
         v-if="escaparate.estudio.portada_url"

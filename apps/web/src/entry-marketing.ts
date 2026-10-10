@@ -3,10 +3,10 @@ import { createSSRApp, h } from "vue";
 import { renderToString } from "vue/server-renderer";
 import { createMemoryHistory, createRouter, RouterView } from "vue-router";
 import PublicShell from "@/components/PublicShell.vue";
-import LandingView from "@/views/LandingView.vue";
 import ModalidadView from "@/views/ModalidadView.vue";
 import SolucionView from "@/views/SolucionView.vue";
-import { i18n } from "@/i18n";
+import { aplicarMarca, i18n } from "@/i18n";
+import { PRODUCTO_COMERCIAL } from "@/marketing/seoConfig";
 import { rutasComerciales } from "@/router/comerciales";
 export {
   paginasMarketing,
@@ -25,7 +25,6 @@ export async function render(
     routes: [
       // Las mismas rutas comerciales (nombre, meta y props) que el router de la app.
       ...rutasComerciales({
-        landing: LandingView,
         modalidad: ModalidadView,
         solucion: SolucionView,
       }),
@@ -47,6 +46,8 @@ export async function render(
       })),
     ],
   });
+  // Los textos con la marca del producto de esta landing (ADR 0108).
+  aplicarMarca(PRODUCTO_COMERCIAL);
   const app = createSSRApp({
     render: () => h(PublicShell, {}, { default: () => h(RouterView) }),
   });
