@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Mail;
 
+use App\Modules\Tenancy\ProductoComercial;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -23,11 +26,19 @@ class CorreoCorreoCambiado extends Mailable implements ShouldQueue
     public function __construct(
         public readonly string $estudioNombre,
         public readonly string $correoNuevo,
-    ) {}
+        public ?ProductoComercial $producto = null,
+    ) {
+        $this->producto ??= MarcaProducto::actual();
+    }
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: "Tu correo de acceso a {$this->estudioNombre} cambió");
+        $producto = $this->producto ?? ProductoComercial::AgendaUno;
+
+        return new Envelope(
+            from: new Address(MarcaProducto::remitente($producto), $producto->nombre()),
+            subject: "Tu correo de acceso a {$this->estudioNombre} cambió",
+        );
     }
 
     public function content(): Content
@@ -35,6 +46,6 @@ class CorreoCorreoCambiado extends Mailable implements ShouldQueue
         $html = '<p>Desde ahora entras a '.e($this->estudioNombre).' con '.e($this->correoNuevo).'.</p>'
             .'<p>Si no hiciste este cambio, comunícate con el negocio cuanto antes.</p>';
 
-        return new Content(htmlString: DisenoCorreo::envolver($this->estudioNombre, $html));
+        return new Content(htmlString: DisenoCorreo::envolver($this->estudioNombre, $html, $this->producto));
     }
 }

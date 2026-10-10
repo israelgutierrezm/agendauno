@@ -1,5 +1,7 @@
 import { createI18n } from "vue-i18n";
 
+import { conMarcaProfunda, type Producto } from "@/lib/producto";
+
 import {
   adaptarMensajes,
   fijarTerminosActuales,
@@ -72,6 +74,7 @@ import zonaArchivo from "./locales/zonaArchivo.es-MX";
 import detalleMiembro from "./locales/detalleMiembro.es-MX";
 import datosPersonales from "./locales/datosPersonales.es-MX";
 import region from "./locales/region.es-MX";
+import interesados from "./locales/interesados.es-MX";
 import confirmaciones from "./locales/confirmaciones.es-MX";
 import corregirCobro from "./locales/corregirCobro.es-MX";
 import nominaVisual from "./locales/nominaVisual.es-MX";
@@ -170,6 +173,7 @@ const mensajesBase = {
   detalleMiembro,
   datosPersonales,
   region,
+  interesados,
   confirmaciones,
   corregirCobro,
   nominaVisual,
@@ -237,16 +241,31 @@ export function aplicarTerminologia(terminos: TerminosNegocio | null): void {
 // otro negocio no habla con las palabras del negocio en sesión.
 let terminosDeSesion: TerminosNegocio | null = null;
 let terminologiaEnPausa = false;
+let marca: Producto = "agendauno";
 
 function pintarTerminologia(): void {
   const terminos = terminologiaEnPausa ? null : terminosDeSesion;
   fijarTerminosActuales(terminos);
-  i18n.global.setLocaleMessage(
-    "es-MX",
+  const adaptados =
     terminos === null
       ? mensajesBase
-      : adaptarMensajes(mensajesBase, terminos, SIN_ADAPTAR),
-  );
+      : adaptarMensajes(mensajesBase, terminos, SIN_ADAPTAR);
+  i18n.global.setLocaleMessage("es-MX", conMarca(adaptados, marca));
+}
+
+/**
+ * Los textos hablan con la marca del producto (ADR 0108): en TurnoUno, «AgendaUno» se
+ * lee «TurnoUno» y «agendauno.mx», su dominio. Los textos base están en AgendaUno.
+ */
+export function aplicarMarca(producto: Producto): void {
+  if (producto !== marca) {
+    marca = producto;
+    pintarTerminologia();
+  }
+}
+
+export function conMarca<T>(mensajes: T, producto: Producto): T {
+  return conMarcaProfunda(mensajes, producto);
 }
 
 export function pausarTerminologia(pausa: boolean): void {

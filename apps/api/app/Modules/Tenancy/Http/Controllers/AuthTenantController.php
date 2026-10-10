@@ -282,6 +282,8 @@ class AuthTenantController
             // Solo clases o solo citas (ADR 0104): la web y la app preguntan por la
             // capacidad que manda el servidor, no la deducen del giro ni de las ofertas.
             'modalidad' => $estudio->modalidad()->value,
+            // Con qué marca se presenta (ADR 0108): AgendaUno o TurnoUno.
+            'producto' => $estudio->producto()->value,
             'capacidades' => $estudio->modalidad()->capacidades(),
             // Manda avisos por WhatsApp a sus clientes (ADR 0069).
             'whatsapp_clientes' => app(WhatsAppTenant::class)->enUso(),

@@ -4,15 +4,19 @@ import { createPinia } from "pinia";
 import "./style.css";
 import "./marketing/public-ui.css";
 import App from "./App.vue";
-import { i18n } from "./i18n";
+import { aplicarMarca, i18n } from "./i18n";
 import { alPerderSesion } from "./lib/api";
 import { instalarGuardaDeArrastre } from "./lib/archivos";
 import { instalarReporteDeErrores } from "./lib/errores";
 import { instalarRecargaPorVersion } from "./lib/recargaPorVersion";
+import { productoActual } from "./lib/producto";
 import { enSubdominioDeEstudio } from "./lib/tenant";
 import router from "./router";
 import { useSesionTenantStore } from "./stores/sesionTenant";
 import { useToastStore } from "./stores/toast";
+
+// Los textos hablan con la marca del dominio (AgendaUno o TurnoUno, ADR 0108).
+aplicarMarca(productoActual());
 
 const pinia = createPinia();
 const app = createApp(App).use(pinia).use(i18n).use(router);

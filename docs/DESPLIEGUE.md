@@ -1,21 +1,22 @@
 # Despliegue a producción
 
-Cómo poner AgendaUno en un servidor con Docker. Los archivos están en
-`infra/produccion/`; las decisiones, en el ADR 0048.
+Cómo poner la plataforma (AgendaUno y TurnoUno, ADR 0108) en un servidor con Docker.
+Los archivos están en `infra/produccion/`; las decisiones, en los ADR 0048 y 0109.
 
 ## Qué corre
 
 | Servicio | Qué hace |
 |---|---|
-| `web` | nginx: sitio comercial (HTML completo), la aplicación (`app.html`), pasa `/api` y `/up` a PHP y sirve `/storage` (logos y fotos). Escucha solo en `127.0.0.1:8080`. Manda las cabeceras de seguridad (HSTS, `X-Frame-Options`, `frame-ancestors`) y el HTML con `Cache-Control: no-cache` (tras publicar nadie se queda con uno viejo; `/assets/` lleva hash y caché de un año). |
+| `web` | nginx: la landing de cada producto (HTML completo, `dist/agendauno` y `dist/turnouno`) en su dominio, la aplicación (`dist/app`, `app.html`) en lo demás, pasa `/api` y `/up` a PHP y sirve `/storage` (logos y fotos). Escucha solo en `127.0.0.1:8080`. Manda las cabeceras de seguridad (HSTS, `X-Frame-Options`, `frame-ancestors`) y el HTML con `Cache-Control: no-cache` (tras publicar nadie se queda con uno viejo; `/assets/` lleva hash y caché de un año). |
 | `api` | Laravel en PHP-FPM, con pool propio (`infra/produccion/php-fpm.conf`): hasta 24 peticiones a la vez, pensado para el servidor de 4 GB. Con otra memoria, ajusta `pm.max_children` (el archivo explica la cuenta). |
 | `worker` | Cola en Redis: correos transaccionales. Chequeo de salud: su latido (`agendauno:latido --verificar=cola`). |
 | `scheduler` | Tareas programadas (`routes/console.php`): recordatorios, renovaciones, agenda recurrente, cobros, outbox, respaldos, alertas… Chequeo de salud: su latido. |
 | `redis` | Caché, colas y sesiones. |
 
 MySQL va aparte (servicio administrado o servidor propio). La web y la API comparten
-dominio: cada negocio usa `https://{slug}.DOMINIO` y la app llama a `/api` ahí mismo.
-Así no hay CORS entre subdominios.
+dominio: cada negocio usa el subdominio de su producto (`https://{slug}.DOMINIO` los de
+clases, `https://{slug}.DOMINIO_TURNOUNO` los de citas) y la app llama a `/api` ahí
+mismo. Así no hay CORS entre subdominios.
 
 ## Antes de empezar
 
@@ -34,9 +35,11 @@ Así no hay CORS entre subdominios.
    La aplicación trabaja en aislamiento `READ COMMITTED` (ADR 0052). Si el servidor
    guarda binlog, debe ser `binlog_format=ROW`, el valor por defecto de MySQL 8.
 
-3. **DNS**: `DOMINIO`, `www.DOMINIO` y el comodín `*.DOMINIO` apuntando al servidor.
-4. **HTTPS** delante de nginx, con certificado comodín (`*.DOMINIO` más `DOMINIO`). El
-   comodín exige validación por DNS. Opciones:
+3. **DNS** de los dos dominios (`DOMINIO` = agendauno.mx y `DOMINIO_TURNOUNO` =
+   turnouno.mx): cada uno, su `www.` y su comodín (`*.`) apuntando al servidor.
+4. **HTTPS** delante de nginx, con certificado comodín para cada dominio (`*.DOMINIO`
+   más `DOMINIO`, y lo mismo de `DOMINIO_TURNOUNO`). El comodín exige validación por
+   DNS. Opciones:
    - **Cloudflare**: DNS con proxy más Cloudflare Tunnel (`cloudflared`) hacia
      `http://127.0.0.1:8080`. No abre puertos.
    - **Caddy** en el servidor, compilado con el módulo DNS de tu proveedor, con
@@ -102,7 +105,8 @@ cp api.env.example api.env
 cp web.env.example web.env
 ```
 
-1. Llena `web.env` (`DOMINIO`, `VITE_RECAPTCHA_SITE_KEY`) y `api.env` (MySQL, correo,
+1. Llena `web.env` (`DOMINIO`, `DOMINIO_TURNOUNO`, `VITE_RECAPTCHA_SITE_KEY`) y
+   `api.env` (MySQL, correo, `TURNOUNO_DOMINIO` y `TURNOUNO_URL_WEB`,
    `APP_URL`, `APP_TENANT_DOMAIN`, `PLATFORM_ADMIN_TOKEN`, `RECAPTCHA_SECRET`…).
 2. Genera la llave de la aplicación **una sola vez** y pégala en `APP_KEY`:
 

@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { trackEvent } from "@/lib/analytics";
+import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { funcionesPorNivel } from "@/lib/suscripcion";
 import { NOMBRE_MODALIDAD, type Modo } from "@/marketing/modalidades";
 import {
@@ -33,6 +34,11 @@ const elegido = ref<Modo>("clases");
 const anual = ref(false);
 const fijo = computed(() => props.modo !== undefined);
 const modo = computed<Modo>(() => props.modo ?? elegido.value);
+// El producto de la modalidad que se ve aún puede no recibir registros (ADR 0108).
+const registroAbierto = computed(
+  () => precios.datos.registro[productoDeModalidad(modo.value)],
+);
+const marca = computed(() => PRODUCTOS[productoDeModalidad(modo.value)].nombre);
 const registro = computed(() =>
   fijo.value
     ? { name: "registro", query: { modo: modo.value } }
@@ -252,12 +258,16 @@ function elegirModo(valor: Modo) {
             })
           "
           >{{
-            diasPrueba > 0
-              ? `Probar ${diasPrueba} días gratis`
-              : "Crear mi cuenta"
+            !registroAbierto
+              ? "Quiero que me avisen"
+              : diasPrueba > 0
+                ? `Probar ${diasPrueba} días gratis`
+                : "Crear mi cuenta"
           }}<span class="sr-only"> · {{ tarjeta.nombre }}</span></RouterLink
         >
-        <p class="precio-sin-tarjeta">Sin tarjeta para empezar</p>
+        <p class="precio-sin-tarjeta">
+          {{ registroAbierto ? "Sin tarjeta para empezar" : "Próximamente" }}
+        </p>
       </article>
     </div>
 
@@ -384,7 +394,7 @@ function elegirModo(valor: Modo) {
         <!-- Azul, como las tarjetas: el rosa queda para el menú y el cierre. -->
         <a
           class="tu-btn tu-btn-primario tu-btn-azul"
-          :href="`mailto:${ventasCorreo}?subject=Cotizaci%C3%B3n%20AgendaUno`"
+          :href="`mailto:${ventasCorreo}?subject=${encodeURIComponent(`Cotización ${marca}`)}`"
           >Contáctanos</a
         >
       </div>
@@ -397,8 +407,8 @@ function elegirModo(valor: Modo) {
             ? "Tú pones el precio de tus clases, paquetes y membresías."
             : "Tú pones el precio de tus servicios y paquetes."
       }}
-      AgendaUno te ayuda a ofrecerlos y gestionar sus cobros. Las comisiones del
-      proveedor de pagos en línea* no están incluidas en la suscripción.
+      {{ marca }} te ayuda a ofrecerlos y gestionar sus cobros. Las comisiones
+      del proveedor de pagos en línea* no están incluidas en la suscripción.
     </p>
     <!-- «Pagos en línea*»: solo en México (ADR 0099), como landing.soloMexico. -->
     <p class="tu-nota-mexico">* Solo para clientes de México.</p>
