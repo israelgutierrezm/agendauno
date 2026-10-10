@@ -32,7 +32,11 @@ implementado** · **Requiere autorización**.
 | Aplicación con la marca del dominio | Implementado y probado | Textos, logo y enlaces con la marca del producto; registro solo con sus giros |
 | Superadmin: interesados | Implementado y probado | Pestaña «Interesados» |
 | Imágenes web separadas por build (publicar una landing sin la aplicación) | No implementado | Fase 5 (infraestructura) |
-| PWA por negocio (AgendaUno y TurnoUno) | No implementado | Fase 3 |
+| PWA por negocio (AgendaUno y TurnoUno) | Implementado, pendiente de despliegue | ADR 0110: manifiesto dinámico en el subdominio, service worker que no guarda la API, invitación a instalar; probado en unidades y contra el API local |
+| Color de marca del negocio | Implementado y probado | Configuración → Perfil público; barra de la app instalada |
+| Íconos cuadrados del logo (192/512) | Preparado para futuro | Requiere GD en la imagen del API (cambio de imagen) |
+| Notificaciones push web | No implementado | La app oficial sí tiene push (FCM) |
+| Constructor del sitio (plantillas, secciones, banners) | No implementado | Hoy: escaparate con logo, portada, descripción, redes y color |
 | App oficial AgendaUno (Android/iOS) | No implementado | Fase 4; la app actual es la base |
 | App oficial TurnoUno (Android/iOS) | No implementado | Fase 4 |
 | White-label (solo AgendaUno) | No implementado | Fase 4, preparado sin publicar |

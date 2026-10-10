@@ -25,6 +25,7 @@ use Illuminate\Support\Carbon;
  *
  * @property string|null $descripcion
  * @property string|null $portada_url
+ * @property string|null $color_marca
  * @property array<string, string>|null $redes
  * @property bool $whatsapp_habilitado los avisos por WhatsApp a sus clientes; solo los activa el superadministrador (ADR 0083)
  * @property string|null $plan_nivel el nivel contratado de un negocio de citas (ADR 0107): individual, premium o pro
@@ -50,6 +51,7 @@ class Estudio extends Model
         'logo_url',
         'descripcion',
         'portada_url',
+        'color_marca',
         'redes',
         'estado',
         'paso_aprovisionamiento',

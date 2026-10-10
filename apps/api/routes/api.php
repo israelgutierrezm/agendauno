@@ -86,6 +86,7 @@ use App\Modules\Tenancy\Http\Controllers\PreciosPublicosController;
 use App\Modules\Tenancy\Http\Controllers\PromocionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\PublicoCitasController;
 use App\Modules\Tenancy\Http\Controllers\PuntoDeVentaTenantController;
+use App\Modules\Tenancy\Http\Controllers\PwaNegocioController;
 use App\Modules\Tenancy\Http\Controllers\RecursosTenantController;
 use App\Modules\Tenancy\Http\Controllers\ReembolsosTenantController;
 use App\Modules\Tenancy\Http\Controllers\RegionNegocioTenantController;
@@ -247,6 +248,8 @@ Route::prefix('v1')->group(function (): void {
         // acceso (sin auth). Con límite por negocio e IP; un slug que no existe
         // responde 404 antes del límite (ADR 0102).
         Route::get('/marca', [MarcaEstudioController::class, 'mostrar'])->middleware('throttle:negocio-publico')->name('marca');
+        // La app instalable (PWA) del negocio: su manifiesto, en su subdominio (ADR 0110).
+        Route::get('/pwa/manifest.webmanifest', [PwaNegocioController::class, 'manifest'])->middleware('throttle:negocio-publico')->name('pwa.manifest');
 
         // Escaparate público (P0 #3): identidad, próximas clases, precios, instructores
         // y ubicación. Sin auth; solo con la página pública abierta. Con throttle.

@@ -75,6 +75,7 @@ import detalleMiembro from "./locales/detalleMiembro.es-MX";
 import datosPersonales from "./locales/datosPersonales.es-MX";
 import region from "./locales/region.es-MX";
 import interesados from "./locales/interesados.es-MX";
+import pwa from "./locales/pwa.es-MX";
 import confirmaciones from "./locales/confirmaciones.es-MX";
 import corregirCobro from "./locales/corregirCobro.es-MX";
 import nominaVisual from "./locales/nominaVisual.es-MX";
@@ -174,6 +175,7 @@ const mensajesBase = {
   datosPersonales,
   region,
   interesados,
+  pwa,
   confirmaciones,
   corregirCobro,
   nominaVisual,

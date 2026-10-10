@@ -94,6 +94,8 @@ export interface EstudioSesion {
   slug: string;
   nombre: string;
   logo_url?: string | null;
+  /** Color de su marca (#RRGGBB): la barra de su app instalada (ADR 0110). */
+  color_marca?: string | null;
   estado: string;
   estado_facturacion?: string;
   trial_termina_en?: string | null;

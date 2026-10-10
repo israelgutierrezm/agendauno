@@ -10,6 +10,7 @@ import { instalarGuardaDeArrastre } from "./lib/archivos";
 import { instalarReporteDeErrores } from "./lib/errores";
 import { instalarRecargaPorVersion } from "./lib/recargaPorVersion";
 import { productoActual } from "./lib/producto";
+import { instalarPwa } from "./lib/pwa";
 import { enSubdominioDeEstudio } from "./lib/tenant";
 import router from "./router";
 import { useSesionTenantStore } from "./stores/sesionTenant";
@@ -17,6 +18,8 @@ import { useToastStore } from "./stores/toast";
 
 // Los textos hablan con la marca del dominio (AgendaUno o TurnoUno, ADR 0108).
 aplicarMarca(productoActual());
+// En el subdominio de un negocio: su app instalable (PWA, ADR 0110).
+instalarPwa();
 
 const pinia = createPinia();
 const app = createApp(App).use(pinia).use(i18n).use(router);
