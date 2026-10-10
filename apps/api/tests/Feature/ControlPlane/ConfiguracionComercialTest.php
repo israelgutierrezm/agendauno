@@ -58,9 +58,43 @@ it('el superadmin carga ventas, el token del Banco de México y los paquetes de 
         ->assertJsonPath('data.ventas.whatsapp', '525512345678')
         ->assertJsonPath('data.timbres.paquetes', [25, 75]);
 
+    // Sin correo propio, las dos marcas cotizan con el general.
+    $this->getJson('/api/v1/precios')->assertJsonPath('data.ventas.correo_por_producto', [
+        'agendauno' => 'cotiza@agendauno.mx', 'turnouno' => 'cotiza@agendauno.mx',
+    ]);
+
     // Un paquete repetido o en cero no se acepta.
     $this->putJson('/api/v1/plataforma/configuracion', ['timbres_paquetes' => [25, 25]], conPlataforma())->assertStatus(422);
     $this->putJson('/api/v1/plataforma/configuracion', ['timbres_paquetes' => [0]], conPlataforma())->assertStatus(422);
+});
+
+it('TurnoUno cotiza con su propio correo de ventas si el superadmin lo captura', function (): void {
+    $this->putJson('/api/v1/plataforma/configuracion', [
+        'ventas_correo' => 'ventas@agendauno.mx', 'ventas_correo_turnouno' => 'ventas@turnouno.mx',
+    ], conPlataforma())
+        ->assertOk()
+        ->assertJsonPath('data.ventas_correo', 'ventas@agendauno.mx')
+        ->assertJsonPath('data.ventas_correo_turnouno', 'ventas@turnouno.mx');
+
+    $this->getJson('/api/v1/precios')
+        ->assertOk()
+        ->assertJsonPath('data.ventas.correo', 'ventas@agendauno.mx')
+        ->assertJsonPath('data.ventas.correo_por_producto.agendauno', 'ventas@agendauno.mx')
+        ->assertJsonPath('data.ventas.correo_por_producto.turnouno', 'ventas@turnouno.mx');
+
+    // Un negocio de citas lo ve en su suscripción; uno de clases, el general.
+    $barberia = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
+    $this->getJson("/api/v1/app/{$barberia['slug']}/renta", conBearer($barberia['bearer']))
+        ->assertOk()->assertJsonPath('data.ventas.correo', 'ventas@turnouno.mx');
+    $estudio = estudioConSesion('estudio-a', 'dueno@estudio.mx');
+    $this->getJson("/api/v1/app/{$estudio['slug']}/renta", conBearer($estudio['bearer']))
+        ->assertOk()->assertJsonPath('data.ventas.correo', 'ventas@agendauno.mx');
+
+    // Vacío, vuelve al general.
+    $this->putJson('/api/v1/plataforma/configuracion', ['ventas_correo_turnouno' => null], conPlataforma())
+        ->assertOk()->assertJsonPath('data.ventas_correo_turnouno', null);
+    $this->getJson('/api/v1/precios')->assertJsonPath('data.ventas.correo_por_producto.turnouno', 'ventas@agendauno.mx');
+    $this->putJson('/api/v1/plataforma/configuracion', ['ventas_correo_turnouno' => 'no-es-correo'], conPlataforma())->assertStatus(422);
 });
 
 it('el superadmin decide qué nivel abre cada función en la tarifa de citas', function (): void {

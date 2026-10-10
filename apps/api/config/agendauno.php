@@ -44,6 +44,8 @@ return [
             'dominio' => env('TURNOUNO_DOMINIO', 'turnouno.mx'),
             'url_web' => env('TURNOUNO_URL_WEB', env('APP_SPA_URL', 'http://localhost:5175')),
             'correo_remitente' => env('TURNOUNO_MAIL_FROM'),
+            // Cotizaciones de TurnoUno. Sin valor, el general (`ventas.correo`).
+            'ventas_correo' => env('TURNOUNO_VENTAS_CORREO'),
         ],
     ],
 

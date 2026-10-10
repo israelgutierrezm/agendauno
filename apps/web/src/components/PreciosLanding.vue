@@ -110,8 +110,14 @@ const tarjetas = computed(() =>
         funciones: funciones.value[n.nivel],
       })),
 );
+// Cada marca cotiza con su correo de ventas; sin uno propio, con el general.
 const ventasCorreo = computed(
-  () => precios.datos.ventas.correo ?? "ventas@agendauno.mx",
+  () =>
+    precios.datos.ventas.correo_por_producto?.[
+      productoDeModalidad(modo.value)
+    ] ??
+    precios.datos.ventas.correo ??
+    "ventas@agendauno.mx",
 );
 const ventasWhatsApp = computed(() => {
   const numero = String(

@@ -175,7 +175,12 @@ describe("precios públicos (ADR 0107)", () => {
         },
         funciones: { lealtad: "premium", equipo: "individual" },
       },
-      ventas: { correo: "cotiza@agendauno.mx", whatsapp: "525512345678" },
+      ventas: {
+        correo: "cotiza@agendauno.mx",
+        whatsapp: "525512345678",
+        // TurnoUno cotiza con su propio correo (ADR 0108).
+        correo_por_producto: { turnouno: "cotiza@turnouno.mx" },
+      },
       // TurnoUno ya recibe registros (lo abre el superadmin, ADR 0108).
       registro: { agendauno: true, turnouno: true },
     });
@@ -192,7 +197,7 @@ describe("precios públicos (ADR 0107)", () => {
     );
     expect(
       vista.get(".precios-contacto a[href^='mailto:']").attributes("href"),
-    ).toContain("mailto:cotiza@agendauno.mx");
+    ).toContain("mailto:cotiza@turnouno.mx");
     expect(
       vista
         .get(".precios-contacto a[href^='https://wa.me/']")

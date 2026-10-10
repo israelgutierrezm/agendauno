@@ -183,6 +183,7 @@ de Gradle. Falta: alta y estado de las marcas blancas en el superadmin, y su pre
 | `api.env` | dominio | `APP_TENANT_DOMAIN` | `TURNOUNO_DOMINIO` |
 | `api.env` | web | `APP_SPA_URL` | `TURNOUNO_URL_WEB` |
 | `api.env` | remitente (opcional) | `AGENDAUNO_MAIL_FROM` | `TURNOUNO_MAIL_FROM` |
+| `api.env` | correo de ventas (opcional) | `VENTAS_CORREO` | `TURNOUNO_VENTAS_CORREO` |
 | `web.env` | dominio | `DOMINIO` | `DOMINIO_TURNOUNO` |
 | `web.env` | nombre (opcional) | — | `VITE_TURNOUNO_NOMBRE` |
 

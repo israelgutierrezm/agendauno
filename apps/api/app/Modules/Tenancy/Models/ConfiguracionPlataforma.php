@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\ProductoComercial;
 use Illuminate\Database\Eloquent\Model;
 use Throwable;
 
@@ -101,11 +102,30 @@ class ConfiguracionPlataforma extends Model
 
     /**
      * Correo de ventas para cotizaciones (más de 20 profesionales o de 1,000 alumnos,
-     * ADR 0107): el que capturó el superadmin; si no, el de VENTAS_CORREO.
+     * ADR 0107): el que capturó el superadmin; si no, el de VENTAS_CORREO. Con un
+     * producto (ADR 0108), el propio de esa marca si lo tiene; si no, el general.
      */
-    public static function ventasCorreo(): ?string
+    public static function ventasCorreo(?ProductoComercial $producto = null): ?string
     {
+        $propio = $producto !== null ? self::ventasCorreoPropio($producto) : null;
+        if ($propio !== null) {
+            return $propio;
+        }
         $valor = self::leer('ventas_correo') ?? config('agendauno.ventas.correo');
+
+        return is_string($valor) && filter_var($valor, FILTER_VALIDATE_EMAIL) !== false ? $valor : null;
+    }
+
+    /**
+     * El correo de ventas propio de una marca (`ventas_correo_{producto}` del superadmin
+     * o `productos.{producto}.ventas_correo`), sin el general. AgendaUno usa el general.
+     */
+    public static function ventasCorreoPropio(ProductoComercial $producto): ?string
+    {
+        if ($producto === ProductoComercial::AgendaUno) {
+            return null;
+        }
+        $valor = self::leer("ventas_correo_{$producto->value}") ?? config("agendauno.productos.{$producto->value}.ventas_correo");
 
         return is_string($valor) && filter_var($valor, FILTER_VALIDATE_EMAIL) !== false ? $valor : null;
     }

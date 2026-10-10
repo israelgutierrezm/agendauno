@@ -5,11 +5,13 @@ import { useI18n } from "vue-i18n";
 
 import { mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { PRODUCTOS } from "@/lib/producto";
 import { useToastStore } from "@/stores/toast";
 
 /**
  * Datos comerciales de la plataforma (superadmin, ADR 0107): a dónde se manda a
- * quien pide cotización (correo y WhatsApp de ventas), el token del Banco de México
+ * quien pide cotización (correo y WhatsApp de ventas; TurnoUno puede tener su propio
+ * correo, ADR 0108), el token del Banco de México
  * para el tipo de cambio (se escribe, nunca se muestra) y los paquetes de timbres que
  * se venden. Nada de esto vive fijo en el código.
  *
@@ -23,6 +25,7 @@ const toast = useToastStore();
 
 interface Comercial {
   ventas_correo: string | null;
+  ventas_correo_turnouno: string | null;
   ventas_whatsapp: string | null;
   banxico_configurado: boolean;
   timbres_paquetes: number[];
@@ -30,6 +33,7 @@ interface Comercial {
 
 const CAMPOS = [
   "ventas_correo",
+  "ventas_correo_turnouno",
   "ventas_whatsapp",
   "banxico_token",
   "timbres_paquetes",
@@ -37,6 +41,7 @@ const CAMPOS = [
 type Campo = (typeof CAMPOS)[number];
 
 const correo = ref("");
+const correoTurnoUno = ref("");
 const whatsapp = ref("");
 const tokenBanxico = ref("");
 const banxico = ref(false);
@@ -60,6 +65,7 @@ function cliente() {
 
 function aplicar(datos: Comercial): void {
   correo.value = datos.ventas_correo ?? "";
+  correoTurnoUno.value = datos.ventas_correo_turnouno ?? "";
   whatsapp.value = datos.ventas_whatsapp ?? "";
   banxico.value = datos.banxico_configurado;
   paquetes.value = datos.timbres_paquetes.join(", ");
@@ -106,6 +112,7 @@ async function guardar(): Promise<void> {
   errores.value = {};
   const cuerpo: Record<string, unknown> = {
     ventas_correo: correo.value.trim() || null,
+    ventas_correo_turnouno: correoTurnoUno.value.trim() || null,
     ventas_whatsapp: whatsapp.value.trim() || null,
     timbres_paquetes: paquetes.value
       .split(/[,\s]+/)
@@ -214,6 +221,28 @@ onMounted(cargar);
         />
         <span v-if="errores.ventas_correo" class="tu-hint tu-error-campo">{{
           errores.ventas_correo
+        }}</span>
+      </label>
+      <label class="block">
+        <span class="tu-label">{{
+          $t("suscripcion.plataforma.comercial.ventasCorreoDe", {
+            marca: PRODUCTOS.turnouno.nombre,
+          })
+        }}</span>
+        <input
+          v-model="correoTurnoUno"
+          class="tu-input"
+          type="email"
+          autocomplete="off"
+          :aria-invalid="errores.ventas_correo_turnouno ? 'true' : undefined"
+        />
+        <span
+          v-if="errores.ventas_correo_turnouno"
+          class="tu-hint tu-error-campo"
+          >{{ errores.ventas_correo_turnouno }}</span
+        >
+        <span v-else class="tu-hint">{{
+          $t("suscripcion.plataforma.comercial.ventasCorreoDeAyuda")
         }}</span>
       </label>
       <label class="block">

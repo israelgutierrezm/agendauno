@@ -23,6 +23,7 @@ implementado** · **Requiere autorización**.
 | Producto derivado de la modalidad (`ProductoComercial`) | Implementado y probado | `Estudio::producto()`, `/yo` y `/marca` lo dicen |
 | Dominios por producto en la API (rutas, CORS, regreso de pagos) | Implementado y probado | `{slug}.agendauno.mx` y `{slug}.turnouno.mx`; cada negocio solo en el suyo |
 | Enlaces y marca de correos y avisos por producto | Implementado y probado | Remitente por producto opcional (`AGENDAUNO_MAIL_FROM`, `TURNOUNO_MAIL_FROM`) |
+| Correo de ventas por producto | Implementado y probado | TurnoUno puede tener el suyo (superadmin o `TURNOUNO_VENTAS_CORREO`); sin él, el general |
 | Registro por producto (abrir o cerrar cada uno) | Implementado y probado | Parámetros `registro.abierto_agendauno` / `registro.abierto_turnouno`, los dos abiertos por omisión |
 | Lista de interesados (API) | Implementado y probado | `POST /api/v1/interesados`, superadmin `GET /plataforma/interesados` |
 | Directorio por producto, slugs reservados | Implementado y probado | |
@@ -100,6 +101,8 @@ API (`infra/produccion/api.env.example`):
 - `APP_TENANT_DOMAIN`, `APP_SPA_URL`: dominio y web de AgendaUno (como siempre).
 - `TURNOUNO_DOMINIO`, `TURNOUNO_URL_WEB`: dominio y web de TurnoUno.
 - `AGENDAUNO_MAIL_FROM`, `TURNOUNO_MAIL_FROM`: remitente de cada producto (opcional).
+- `TURNOUNO_VENTAS_CORREO`: correo de cotizaciones de TurnoUno (opcional; sin él, el
+  general `VENTAS_CORREO`). El superadmin también lo captura en Datos comerciales.
 - `FRONTEND_URL`: orígenes extra para CORS (los dos dominios y sus subdominios ya se
   admiten).
 

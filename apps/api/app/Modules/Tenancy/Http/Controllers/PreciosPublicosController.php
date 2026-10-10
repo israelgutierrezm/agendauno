@@ -46,6 +46,10 @@ class PreciosPublicosController
             'ventas' => [
                 'correo' => ConfiguracionPlataforma::ventasCorreo(),
                 'whatsapp' => ConfiguracionPlataforma::ventasWhatsApp(),
+                // Cada landing cotiza con el de su marca (ADR 0108).
+                'correo_por_producto' => collect(ProductoComercial::cases())
+                    ->mapWithKeys(fn (ProductoComercial $p): array => [$p->value => ConfiguracionPlataforma::ventasCorreo($p)])
+                    ->all(),
             ],
             'timbres' => [
                 'moneda' => 'MXN',
