@@ -303,7 +303,7 @@ jobs:
           test "$(pedir agendauno.test /entrar)" = 200 && ! grep -q 'assets-agendauno' /tmp/cuerpo
           test "$(pedir fluo.agendauno.test /)" = 200 && ! grep -q 'assets-agendauno' /tmp/cuerpo
           # Nadie enmarca la plataforma, salvo la vista previa del sitio en su panel (ADR 0114).
-          cabeceras() { curl -sS -D - -o /dev/null -H "Host: $1" "http://127.0.0.1:8080$2" | tr -d ''; }
+          cabeceras() { curl -sS -D - -o /dev/null -H "Host: $1" "http://127.0.0.1:8080$2" | tr -d '\r'; }
           grep -qi "^x-frame-options: DENY$" <<<"$(cabeceras fluo.agendauno.test /entrar)"
           grep -qi "^content-security-policy: frame-ancestors 'none'$" <<<"$(cabeceras agendauno.test /)"
           grep -qi "^x-frame-options: DENY$" <<<"$(cabeceras fluo.agendauno.test /estudio/otro/vista-previa-falsa)"
