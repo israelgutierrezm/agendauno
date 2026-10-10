@@ -179,7 +179,7 @@ void main() {
 
       expect(c.read(sesionProvider), isNull);
       expect(c.read(authTokenProvider), isNull);
-      expect(c.read(sesionTerminadaProvider), 'demo');
+      expect(c.read(sesionTerminadaProvider)?.slug, 'demo');
       expect(await AlmacenSesion().leer(), isNull);
       expect(api.peticiones.where((p) => p.path.endsWith('/logout')), isEmpty);
     },
@@ -203,7 +203,7 @@ void main() {
     api.revocado = true;
     await c.read(sesionProvider.notifier).revisar();
     expect(c.read(sesionProvider), isNull);
-    expect(c.read(sesionTerminadaProvider), 'demo');
+    expect(c.read(sesionTerminadaProvider)?.slug, 'demo');
   });
 
   test('al volver a entrar se olvida el aviso', () async {
@@ -211,7 +211,7 @@ void main() {
     addTearDown(c.dispose);
     api.revocado = true;
     await c.read(sesionProvider.notifier).revisar();
-    expect(c.read(sesionTerminadaProvider), 'demo');
+    expect(c.read(sesionTerminadaProvider)?.slug, 'demo');
 
     await c
         .read(sesionProvider.notifier)

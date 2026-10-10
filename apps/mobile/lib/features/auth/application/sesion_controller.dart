@@ -13,18 +13,32 @@ import '../data/sesion.dart';
 /// Sesión restaurada del almacén cifrado al abrir la app (la fija `main`).
 final sesionInicialProvider = Provider<Sesion?>((ref) => null);
 
-/// Negocio (slug) de la sesión que el servidor dio por terminada, o null. El login
-/// avisa que la sesión terminó y deja escrita la dirección del negocio.
-class SesionTerminada extends Notifier<String?> {
-  @override
-  String? build() => null;
+/// Por qué el servidor terminó la sesión: el token ya no vale (401) o el negocio
+/// ya no está disponible (cancelado o dado de baja: /yo responde 404).
+enum MotivoFin { sesion, negocio }
 
-  void avisar(String slug) => state = slug;
+/// La sesión que el servidor dio por terminada: de qué negocio (slug) y por qué.
+class FinDeSesion {
+  const FinDeSesion(this.slug, [this.motivo = MotivoFin.sesion]);
+
+  final String slug;
+  final MotivoFin motivo;
+}
+
+/// La sesión que el servidor dio por terminada, o null. El login avisa que la
+/// sesión terminó (y deja escrita la dirección del negocio) o que el negocio ya no
+/// está disponible.
+class SesionTerminada extends Notifier<FinDeSesion?> {
+  @override
+  FinDeSesion? build() => null;
+
+  void avisar(String slug, [MotivoFin motivo = MotivoFin.sesion]) =>
+      state = FinDeSesion(slug, motivo);
 
   void olvidar() => state = null;
 }
 
-final sesionTerminadaProvider = NotifierProvider<SesionTerminada, String?>(
+final sesionTerminadaProvider = NotifierProvider<SesionTerminada, FinDeSesion?>(
   SesionTerminada.new,
 );
 
@@ -149,10 +163,21 @@ class SesionController extends Notifier<Sesion?> {
         );
   }
 
-  /// Revalida la sesión restaurada: si el servidor ya no reconoce el token (401),
-  /// se cierra; si sí, se actualizan el usuario y el perfil del negocio. Sin red se
-  /// conserva la sesión (se reintenta en la siguiente apertura).
-  Future<void> refrescar() async {
+  /// Revalida la sesión restaurada: si el servidor ya no reconoce el token (401) o
+  /// el negocio ya no existe (404), se cierra; si sí, se actualizan el usuario y el
+  /// perfil del negocio. Sin red se conserva la sesión (se reintenta en la
+  /// siguiente apertura).
+  Future<void> refrescar() => _desdeYo();
+
+  /// Al volver a la app (y al entrar): confirma con el servidor que la sesión sigue
+  /// viva (pudo cerrarse en la web u otro teléfono mientras estaba en segundo
+  /// plano) y, como [refrescar], toma de /yo lo que pudo cambiar mientras tanto: sus
+  /// permisos, el plan, la modalidad, la terminología, el estado del negocio y la
+  /// versión mínima de la app. Sin red (o con un error pasajero) no pasa nada; con
+  /// 401 vuelve al login con el aviso.
+  Future<void> revisar() => _desdeYo();
+
+  Future<void> _desdeYo() async {
     final actual = state;
     if (actual == null) {
       return;
@@ -161,8 +186,9 @@ class SesionController extends Notifier<Sesion?> {
       final res = await ref
           .read(dioProvider)
           .get<Map<String, dynamic>>('/api/v1/app/${actual.slug}/yo');
-      // Si mientras tanto se cerró o cambió la sesión, la respuesta ya no aplica.
-      if (state?.bearer != actual.bearer) {
+      // Si mientras tanto se cerró o cambió la sesión (otra sesión, otro rol, su
+      // perfil), la respuesta ya no aplica: se toma en la siguiente revisión.
+      if (!identical(state, actual)) {
         return;
       }
       final data = (res.data?['data'] ?? {}) as Map<String, dynamic>;
@@ -173,60 +199,41 @@ class SesionController extends Notifier<Sesion?> {
         usuario,
         data['estudio'] as Map<String, dynamic>?,
         data['app'] as Map<String, dynamic>?,
-      );
+        // Recién entró con varios roles: sigue eligiendo con cuál.
+      ).conUsuario(const {}, eligiendoRol: actual.eligiendoRol);
       await ref.read(almacenSesionProvider).guardar(state!.aJson());
     } on DioException catch (e) {
-      _siRevocada(e, actual);
+      _siTerminada(e, actual);
     }
   }
 
-  /// Al volver a la app (y al entrar): confirma con el servidor que la sesión sigue
-  /// viva (pudo cerrarse en la web u otro teléfono mientras estaba en segundo
-  /// plano) y toma la versión mínima de la app que acepta. Sin red no pasa nada;
-  /// con 401 vuelve al login con el aviso.
-  Future<void> revisar() async {
-    final actual = state;
-    if (actual == null) {
+  /// Respaldo del interceptor de la red: un 401 de la misma sesión la termina. Un
+  /// 404 de /yo es que el negocio ya no está (cancelado o dado de baja; suspendido
+  /// por renta, /yo sigue abierto): también se cierra, con su aviso. Lo demás (sin
+  /// red, un error del servidor) no cierra nada.
+  void _siTerminada(DioException e, Sesion actual) {
+    if (state?.bearer != actual.bearer) {
       return;
     }
-    try {
-      final res = await ref
-          .read(dioProvider)
-          .get<Map<String, dynamic>>('/api/v1/app/${actual.slug}/yo');
-      final app = (res.data?['data'] as Map<String, dynamic>?)?['app'];
-      final minima = app is Map<String, dynamic> ? app['version_minima'] : null;
-      // Si mientras tanto se cerró o cambió la sesión, la respuesta ya no aplica.
-      final vigente = state;
-      if (minima is String &&
-          vigente != null &&
-          vigente.bearer == actual.bearer &&
-          minima != vigente.versionMinima) {
-        state = vigente.conUsuario(const {}, versionMinima: minima);
-        await ref.read(almacenSesionProvider).guardar(state!.aJson());
-      }
-    } on DioException catch (e) {
-      _siRevocada(e, actual);
-    }
-  }
-
-  /// Respaldo del interceptor de la red: un 401 de la misma sesión la termina.
-  void _siRevocada(DioException e, Sesion actual) {
-    if (e.response?.statusCode == 401 && state?.bearer == actual.bearer) {
-      _terminadaEnElServidor();
+    switch (e.response?.statusCode) {
+      case 401:
+        _terminadaEnElServidor();
+      case 404:
+        _terminadaEnElServidor(MotivoFin.negocio);
     }
   }
 
   /// El servidor ya no reconoce el token (se cerró sesión en otro lado, cambió la
-  /// contraseña o dieron de baja la cuenta): se borra del teléfono SIN llamar a
-  /// /logout (ya no serviría) y el login dice que la sesión terminó.
-  void _terminadaEnElServidor() {
+  /// contraseña o dieron de baja la cuenta) o el negocio ya no existe: se borra del
+  /// teléfono SIN llamar a /logout (ya no serviría) y el login dice por qué.
+  void _terminadaEnElServidor([MotivoFin motivo = MotivoFin.sesion]) {
     final actual = state;
     if (actual == null) {
       return;
     }
     ref.read(pushProvider).soltar();
     ref.read(authTokenProvider.notifier).establecer(null);
-    ref.read(sesionTerminadaProvider.notifier).avisar(actual.slug);
+    ref.read(sesionTerminadaProvider.notifier).avisar(actual.slug, motivo);
     state = null;
     unawaited(ref.read(almacenSesionProvider).borrar());
   }

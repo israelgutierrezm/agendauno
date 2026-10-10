@@ -5,6 +5,7 @@ import '../../../core/aviso_sin_sucursal.dart';
 import '../../../core/calendario/agregar_calendario.dart';
 import '../../../core/calendario/calendario.dart';
 import '../../../core/calendario/calendario_vistas.dart';
+import '../../../core/error_de_carga.dart';
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../agenda/data/agenda_models.dart';
@@ -135,11 +136,9 @@ class _Inicio extends ConsumerWidget {
 
     return estado.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: TextButton(
-          onPressed: () => ref.invalidate(proximasMisClasesProvider),
-          child: const Text('No se pudo cargar. Reintentar'),
-        ),
+      error: (e, _) => ErrorDeCarga(
+        mensaje: 'No se pudo cargar tu agenda.',
+        onReintentar: () => ref.invalidate(proximasMisClasesProvider),
       ),
       data: (sesiones) {
         final ahora = DateTime.now();

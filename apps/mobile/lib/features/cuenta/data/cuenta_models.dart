@@ -6,6 +6,35 @@ import '../../../core/theme/tema_agendauno.dart';
 
 export '../../../core/agenda/contrato_agenda.dart';
 
+/// En qué sucursales vale un plan (`todas_sucursales` y `sucursales` del API, en
+/// /mi/productos, /mi/perfil y /mi/planes). Sin el dato, en todas.
+class CoberturaSucursales {
+  const CoberturaSucursales({this.todas = true, this.sucursales = const []});
+
+  final bool todas;
+
+  /// Los nombres de sus sucursales, si no vale en todas.
+  final List<String> sucursales;
+
+  /// "Solo en Roma Norte, Condesa"; null si vale en todas (no se dice nada).
+  String? get texto =>
+      todas || sucursales.isEmpty ? null : 'Solo en ${sucursales.join(', ')}';
+
+  factory CoberturaSucursales.desdeJson(Map<String, dynamic> j) {
+    final sucursales = j['sucursales'];
+    return CoberturaSucursales(
+      todas: j['todas_sucursales'] != false,
+      sucursales: sucursales is List
+          ? sucursales
+                .whereType<Map<String, dynamic>>()
+                .map((s) => (s['nombre'] ?? '') as String)
+                .where((n) => n.isNotEmpty)
+                .toList()
+          : const [],
+    );
+  }
+}
+
 /// Modelos del autoservicio del miembro (Mi cuenta).
 class DerechoMiembro {
   const DerechoMiembro({
@@ -18,6 +47,7 @@ class DerechoMiembro {
     this.vence,
     this.desde,
     this.estado = 'vigente',
+    this.cobertura = const CoberturaSucursales(),
   });
 
   final bool ilimitado;
@@ -25,6 +55,9 @@ class DerechoMiembro {
   final int? saldo;
   final int? disponible;
   final String? producto;
+
+  /// En qué sucursales vale.
+  final CoberturaSucursales cobertura;
 
   /// Último día en pausa (AAAA-MM-DD) si la membresía está congelada.
   final String? pausaHasta;
@@ -55,6 +88,7 @@ class DerechoMiembro {
     vence: j['vence'] as String?,
     desde: j['desde'] as String?,
     estado: (j['estado'] ?? 'vigente') as String,
+    cobertura: CoberturaSucursales.desdeJson(j),
   );
 }
 
@@ -502,6 +536,7 @@ class OpcionCita {
     this.incluye = const [],
     this.fotoUrl,
     this.conPlan = false,
+    this.sucursales,
   });
 
   final String id;
@@ -518,6 +553,16 @@ class OpcionCita {
   /// Se toma con su bono o membresía: no se paga al agendar (ADR 0091).
   final bool conPlan;
 
+  /// Profesional: las sedes (ids) donde atiende, las de su horario. null si el API
+  /// no lo dice (atiende en todas, como en la web).
+  final List<String>? sucursales;
+
+  /// ¿Atiende en esa sede? (sin sede elegida, sí).
+  bool atiendeEn(String? sucursalId) =>
+      sucursales == null ||
+      sucursalId == null ||
+      sucursales!.contains(sucursalId);
+
   factory OpcionCita.desdeJson(Map<String, dynamic> j) => OpcionCita(
     id: (j['id'] ?? '') as String,
     nombre: (j['nombre'] ?? '') as String,
@@ -526,6 +571,9 @@ class OpcionCita {
     incluye: ((j['incluye'] ?? const []) as List).whereType<String>().toList(),
     fotoUrl: j['foto_url'] as String?,
     conPlan: j['con_plan'] == true,
+    sucursales: j['sucursales'] is List
+        ? (j['sucursales'] as List).whereType<String>().toList()
+        : null,
   );
 }
 
@@ -539,6 +587,11 @@ class OpcionesCita {
   final List<OpcionCita> servicios;
   final List<OpcionCita> sucursales;
   final List<OpcionCita> profesionales;
+
+  /// Solo quienes atienden en la sede elegida: con alguien de otra sede no habría
+  /// horarios (como en la web).
+  List<OpcionCita> profesionalesEn(String? sucursalId) =>
+      profesionales.where((p) => p.atiendeEn(sucursalId)).toList();
 }
 
 /// Lo que el alumno tiene por pagar: p. ej. la renovación de su membresía, que se
@@ -949,6 +1002,7 @@ class ProductoComprable {
     this.creditosIncluidos,
     this.vigenciaTipo,
     this.vigenciaCantidad,
+    this.cobertura = const CoberturaSucursales(),
   });
 
   factory ProductoComprable.desdeJson(
@@ -964,12 +1018,16 @@ class ProductoComprable {
     creditosIncluidos: (j['creditos_incluidos'] as num?)?.toInt(),
     vigenciaTipo: j['vigencia_tipo'] as String?,
     vigenciaCantidad: (j['vigencia_cantidad'] as num?)?.toInt(),
+    cobertura: CoberturaSucursales.desdeJson(j),
   );
 
   final String id;
   final String nombre;
   final String tipo;
   final int precioMinor;
+
+  /// En qué sucursales vale (se dice solo si no es en todas).
+  final CoberturaSucursales cobertura;
 
   /// La del plan (la del negocio si no la trae).
   final String moneda;

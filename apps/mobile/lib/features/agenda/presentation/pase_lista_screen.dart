@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/error_de_carga.dart';
+import '../../../core/network/mensaje_error.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../../auth/data/sesion.dart';
 import '../application/agenda_controller.dart';
@@ -56,11 +58,13 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
         ),
       );
     } on DioException catch (e) {
-      final data = e.response?.data;
-      final msg = data is Map<String, dynamic>
-          ? (data['message'] ?? 'No se pudo terminar la lista.')
-          : 'No se pudo terminar la lista.';
-      mensajero.showSnackBar(SnackBar(content: Text('$msg')));
+      mensajero.showSnackBar(
+        SnackBar(
+          content: Text(
+            mensajeDeError(e, porDefecto: 'No se pudo terminar la lista.'),
+          ),
+        ),
+      );
     }
   }
 
@@ -104,11 +108,11 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
       ref.invalidate(rosterProvider(widget.sesion.id));
       ref.invalidate(agendaProvider);
     } on DioException catch (e) {
-      final data = e.response?.data;
-      final msg = data is Map<String, dynamic>
-          ? (data['message'] ?? 'No se pudo marcar.')
-          : 'No se pudo marcar.';
-      mensajero.showSnackBar(SnackBar(content: Text('$msg')));
+      mensajero.showSnackBar(
+        SnackBar(
+          content: Text(mensajeDeError(e, porDefecto: 'No se pudo marcar.')),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _marcando.remove(a.reservaId));
@@ -132,11 +136,9 @@ class _PaseListaScreenState extends ConsumerState<PaseListaScreen> {
       ),
       body: roster.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: TextButton(
-            onPressed: () => ref.invalidate(rosterProvider(s.id)),
-            child: const Text('No se pudo cargar la lista. Reintentar'),
-          ),
+        error: (e, _) => ErrorDeCarga(
+          mensaje: 'No se pudo cargar la lista.',
+          onReintentar: () => ref.invalidate(rosterProvider(s.id)),
         ),
         data: (lista) {
           final enSala = lista.asistentes.where((a) => a.enSala).toList();

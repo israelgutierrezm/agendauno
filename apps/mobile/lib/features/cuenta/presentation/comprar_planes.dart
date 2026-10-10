@@ -73,7 +73,12 @@ class _ComprarPlanesSeccionState extends ConsumerState<ComprarPlanesSeccion> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        for (final dato in [p.creditosTexto, p.vigenciaTexto])
+                        // Si no vale en todas las sucursales, en cuáles.
+                        for (final dato in [
+                          p.creditosTexto,
+                          p.vigenciaTexto,
+                          p.cobertura.texto,
+                        ])
                           if (dato != null)
                             Text(
                               dato,

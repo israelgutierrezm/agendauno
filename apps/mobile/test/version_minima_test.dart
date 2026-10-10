@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:agendauno/core/config/app_config.dart';
 import 'package:agendauno/core/network/auth_token.dart';
 import 'package:agendauno/core/network/dio_client.dart';
 import 'package:agendauno/core/storage/almacen_sesion.dart';
@@ -176,6 +177,26 @@ void main() {
     expect(find.text('Actualiza AgendaUno para continuar'), findsOneWidget);
     expect(find.textContaining('se necesita la 99.0.0'), findsOneWidget);
     expect(find.byType(CuentaScreen), findsNothing);
+    // En Android (el de las pruebas) lleva a su página en Google Play.
+    expect(find.byKey(const Key('abrir-tienda')), findsOneWidget);
+  });
+
+  test('la tienda: Google Play en Android; el App Store solo con su id', () {
+    expect(
+      urlTienda(TargetPlatform.android).toString(),
+      'https://play.google.com/store/apps/details?id=com.agendauno.app',
+    );
+    expect(urlTienda(TargetPlatform.iOS, appStoreId: ''), isNull);
+    expect(
+      urlTienda(TargetPlatform.iOS, appStoreId: '1234567890').toString(),
+      'https://apps.apple.com/app/id1234567890',
+    );
+    expect(urlTienda(TargetPlatform.macOS), isNull);
+  });
+
+  test('el id de Google Play es el applicationId de Android', () {
+    final gradle = File('android/app/build.gradle.kts').readAsStringSync();
+    expect(gradle, contains('applicationId = "${AppConfig.idAndroid}"'));
   });
 
   testWidgets('con una versión aceptada entra como siempre', (tester) async {

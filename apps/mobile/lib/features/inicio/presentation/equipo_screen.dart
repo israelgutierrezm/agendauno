@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/aviso_sin_sucursal.dart';
+import '../../../core/error_de_carga.dart';
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../agenda/presentation/agenda_screen.dart';
@@ -101,11 +102,9 @@ class _InicioNegocio extends ConsumerWidget {
 
     return estado.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: TextButton(
-          onPressed: () => ref.invalidate(resumenHoyProvider),
-          child: const Text('No se pudo cargar. Reintentar'),
-        ),
+      error: (e, _) => ErrorDeCarga(
+        mensaje: 'No se pudo cargar el resumen de hoy.',
+        onReintentar: () => ref.invalidate(resumenHoyProvider),
       ),
       data: (hoy) {
         final agenda = hoy?.agenda;

@@ -113,8 +113,15 @@ keytool -genkey -v -keystore agendauno-subida.jks -keyalg RSA -keysize 2048 -val
 
 Copia `android/key.properties.example` a `android/key.properties` (ignorado por git) y
 llénalo con la ruta del `.jks`, el alias y las contraseñas. Con ese archivo,
-`flutter build appbundle` firma para Play; sin él, la versión de release se firma con
-la llave de depuración (sirve para probar en un teléfono, Play la rechaza).
+`flutter build appbundle` firma para Play; sin él, la versión de release no se compila
+(el error dice qué falta), para no subir por descuido una firmada con la llave de
+depuración. Para probar en un teléfono sin la llave, usa `flutter run` o
+`flutter build apk --debug`.
+
+En iOS la v1 no ofrece entrar con Google (pediría registrar su esquema de URL y, por la
+regla 4.8 de Apple, ofrecer también «Iniciar sesión con Apple»); en Android sí. La
+pantalla «Actualiza la app» abre Play y, en iOS, la App Store si se compila con
+`--dart-define=APP_STORE_ID=…`.
 
 ## Pendiente para publicar
 

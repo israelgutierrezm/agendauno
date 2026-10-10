@@ -11,6 +11,7 @@ import 'features/auth/data/sesion.dart';
 import 'features/auth/presentation/actualizar_app_screen.dart';
 import 'features/auth/presentation/elegir_rol_screen.dart';
 import 'features/auth/presentation/login_screen.dart';
+import 'features/auth/presentation/negocio_suspendido_screen.dart';
 import 'features/cuenta/presentation/cuenta_screen.dart';
 import 'features/inicio/presentation/equipo_screen.dart';
 import 'features/instructor/presentation/instructor_screen.dart';
@@ -75,8 +76,8 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
     super.dispose();
   }
 
-  /// Sin sesión no queda ninguna pantalla encima del login (detalle, hojas,
-  /// diálogos). Si la terminó el servidor, el login ya lo dice: se quitan los
+  /// Sin sesión (o con el negocio suspendido) no queda ninguna pantalla encima del
+  /// login o del aviso (detalle, hojas, diálogos). Si la terminó el servidor, el login ya lo dice: se quitan los
   /// «No autenticado.» que dejaron las peticiones que fallaron.
   void _alSalir() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -120,13 +121,21 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
       if (nueva == null && anterior != null) {
         _alSalir();
       }
+      // Se suspendió con la app abierta: no queda nada encima del aviso.
+      if ((nueva?.negocioSuspendido ?? false) &&
+          !(anterior?.negocioSuspendido ?? false)) {
+        _alSalir();
+      }
     });
     // Con varios roles, al entrar elige con cuál; luego, la pantalla de ese rol. Si
-    // el servidor ya no acepta esta versión de la app, primero hay que actualizarla.
+    // el servidor ya no acepta esta versión de la app, primero hay que actualizarla;
+    // con el negocio suspendido por falta de pago, solo se dice eso.
     final Widget inicio = sesion == null
         ? const LoginScreen()
         : sesion.debeActualizar
         ? const ActualizarAppScreen()
+        : sesion.negocioSuspendido
+        ? const NegocioSuspendidoScreen()
         : sesion.eligiendoRol
         ? const ElegirRolScreen()
         : sesion.esMiembro

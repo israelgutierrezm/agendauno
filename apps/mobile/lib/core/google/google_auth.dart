@@ -8,9 +8,10 @@ import 'package:google_sign_in/google_sign_in.dart';
 ///     [--dart-define=GOOGLE_IOS_CLIENT_ID=CLIENTE_IOS]
 ///
 /// El cliente web es el mismo que `GOOGLE_CLIENT_ID` del API: en Android hace que
-/// el ID token salga para él. En iOS además va el cliente de iOS (y su URL scheme
-/// en Info.plist). Los IDs de Android e iOS se agregan a `GOOGLE_CLIENT_IDS_APP`
-/// del API. Sin el cliente web, la app no ofrece Google.
+/// el ID token salga para él. En iOS haría falta además el cliente de iOS (y su URL
+/// scheme en Info.plist), pero por ahora iOS no ofrece Google (ver `disponible`).
+/// Los IDs de Android e iOS se agregan a `GOOGLE_CLIENT_IDS_APP` del API. Sin el
+/// cliente web, la app no ofrece Google.
 class GoogleConfig {
   const GoogleConfig._();
 
@@ -37,8 +38,15 @@ abstract class GoogleAuth {
 class GoogleAuthNativo implements GoogleAuth {
   bool _iniciado = false;
 
+  // En iOS no se ofrece en la v1: Info.plist no trae el URL scheme del cliente de
+  // iOS (CFBundleURLTypes con el id invertido), sin el cual el SDK nativo truena, y
+  // ofrecer Google sin «Iniciar sesión con Apple» choca con la regla 4.8 del App
+  // Store. Ahí se entra con correo y contraseña.
   @override
-  bool get disponible => GoogleConfig.configurado && !kIsWeb;
+  bool get disponible =>
+      GoogleConfig.configurado &&
+      !kIsWeb &&
+      defaultTargetPlatform != TargetPlatform.iOS;
 
   @override
   Future<String?> idToken() async {

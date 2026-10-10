@@ -1,3 +1,5 @@
+import 'cuenta_models.dart';
+
 /// Corte de planes (ADR 0050): por cada paquete o membresía, qué incluía, sus
 /// clases extra, en qué clases se usó y lo que le queda. Viene de `GET /mi/planes`.
 class UsoPlan {
@@ -69,6 +71,7 @@ class PlanCorte {
     this.aplicaA = const [],
     this.extras = const [],
     this.usos = const [],
+    this.cobertura = const CoberturaSucursales(),
   });
 
   final String id;
@@ -76,6 +79,9 @@ class PlanCorte {
   final String? producto;
   final String? desde;
   final String? hasta;
+
+  /// En qué sucursales vale (se dice solo si no es en todas).
+  final CoberturaSucursales cobertura;
 
   /// vigente | por_empezar | vencido | agotado | pausado | suspendido | cancelado.
   final String estado;
@@ -136,6 +142,7 @@ class PlanCorte {
     producto: j['producto'] as String?,
     desde: j['desde'] as String?,
     hasta: j['hasta'] as String?,
+    cobertura: CoberturaSucursales.desdeJson(j),
     estado: (j['estado'] ?? 'vigente') as String,
     ilimitado: (j['ilimitado'] ?? false) as bool,
     aplicaA: ((j['aplica_a'] ?? []) as List).whereType<String>().toList(),

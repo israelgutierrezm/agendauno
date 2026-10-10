@@ -155,7 +155,9 @@ class InicioTab extends ConsumerWidget {
                   const SizedBox(height: 14),
                   FilledButton(
                     onPressed: () => onIr(PestanaCuenta.reservas),
-                    child: Text(esCitas ? 'Agendar una $clase' : 'Reservar'),
+                    // Sin artículo: el término del negocio puede ser masculino
+                    // («Agendar turno»).
+                    child: Text(esCitas ? 'Agendar $clase' : 'Reservar'),
                   ),
                 ],
         ),

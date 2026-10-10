@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/google/google_auth.dart';
+import '../../../core/network/mensaje_error.dart';
 import '../application/sesion_controller.dart';
 
 /// Acceso tenant-local: el usuario escribe la direccion de su estudio (slug) y sus
@@ -26,10 +27,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.initState();
     // Si el servidor terminó la sesión, ya queda escrita la dirección del negocio.
     final terminada = ref.read(sesionTerminadaProvider);
-    if (terminada != null) {
-      _slug.text = terminada;
+    if (terminada != null && terminada.motivo == MotivoFin.sesion) {
+      _slug.text = terminada.slug;
     }
   }
+
+  /// Lo que se dice si falla: un 404 aquí es que el negocio no existe (o ya no
+  /// opera); si no, la razón del servidor.
+  static String _mensaje(Object error, String porDefecto) =>
+      error is DioException && error.response?.statusCode == 404
+      ? 'No encontramos ese negocio. Revisa la dirección.'
+      : mensajeDeError(error, porDefecto: porDefecto);
 
   @override
   void dispose() {
@@ -49,12 +57,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           .read(sesionProvider.notifier)
           .iniciar(_slug.text.trim(), _email.text.trim(), _password.text);
     } on DioException catch (e) {
-      final data = e.response?.data;
-      setState(() {
-        _error = (data is Map && data['message'] is String)
-            ? data['message'] as String
-            : 'No se pudo iniciar sesión.';
-      });
+      setState(() => _error = _mensaje(e, 'No se pudo iniciar sesión.'));
     } catch (_) {
       setState(() => _error = 'Ocurrió un error inesperado.');
     } finally {
@@ -83,12 +86,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
       await ref.read(sesionProvider.notifier).iniciarConGoogle(slug, token);
     } on DioException catch (e) {
-      final data = e.response?.data;
-      setState(() {
-        _error = (data is Map && data['message'] is String)
-            ? data['message'] as String
-            : 'No se pudo entrar con Google.';
-      });
+      setState(() => _error = _mensaje(e, 'No se pudo entrar con Google.'));
     } catch (_) {
       setState(() => _error = 'No se pudo entrar con Google.');
     } finally {
@@ -162,13 +160,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       );
     } on DioException catch (e) {
-      final data = e.response?.data;
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            (data is Map && data['message'] is String)
-                ? data['message'] as String
-                : 'No se pudo enviar el enlace. Revisa la dirección del negocio.',
+            _mensaje(
+              e,
+              'No se pudo enviar el enlace. Revisa la dirección del negocio.',
+            ),
           ),
         ),
       );
@@ -177,6 +175,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final terminada = ref.watch(sesionTerminadaProvider);
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -200,7 +199,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
-                  if (ref.watch(sesionTerminadaProvider) != null) ...[
+                  if (terminada != null) ...[
                     Container(
                       key: const Key('sesion-terminada'),
                       padding: const EdgeInsets.all(12),
@@ -210,8 +209,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text(
-                        'Tu sesión terminó. Vuelve a iniciar sesión para continuar.',
+                      child: Text(
+                        terminada.motivo == MotivoFin.negocio
+                            ? 'Este negocio ya no está disponible, así que tu '
+                                  'sesión se cerró.'
+                            : 'Tu sesión terminó. Vuelve a iniciar sesión para '
+                                  'continuar.',
                       ),
                     ),
                     const SizedBox(height: 16),

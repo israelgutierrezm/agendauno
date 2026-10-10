@@ -114,6 +114,8 @@ class _PlanCardState extends State<_PlanCard> {
             Text(
               [
                 vigencia,
+                // Si no vale en todas las sucursales, en cuáles.
+                ?p.cobertura.texto,
                 if (p.aplicaA.isNotEmpty) 'Sirve para: ${p.aplicaA.join(', ')}',
               ].join(' · '),
               style: const TextStyle(color: TemaAgendaUno.textoSuave),

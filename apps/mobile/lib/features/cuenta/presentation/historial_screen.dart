@@ -175,12 +175,37 @@ class _Fila extends StatelessWidget {
           if (i.calificacion != null)
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                [
-                  '★' * i.calificacion!,
-                  if (i.comentario != null) i.comentario!,
-                ].join('  '),
-                style: const TextStyle(color: TemaAgendaUno.textoSuave),
+              child: Wrap(
+                spacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  // Sus estrellas, como al calificar (1 a 5).
+                  Semantics(
+                    label: 'Calificación: ${i.calificacion} de 5',
+                    child: ExcludeSemantics(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (var n = 1; n <= 5; n++)
+                            Icon(
+                              n <= i.calificacion!
+                                  ? Icons.star
+                                  : Icons.star_border,
+                              size: 16,
+                              color: n <= i.calificacion!
+                                  ? TemaAgendaUno.aviso
+                                  : TemaAgendaUno.textoSuave,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (i.comentario != null)
+                    Text(
+                      i.comentario!,
+                      style: const TextStyle(color: TemaAgendaUno.textoSuave),
+                    ),
+                ],
               ),
             )
           else if (i.calificable)

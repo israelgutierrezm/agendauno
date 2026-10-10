@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/formato.dart';
+import '../../../core/network/mensaje_error.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../application/cuenta_controller.dart';
 import '../data/cuenta_models.dart';
@@ -81,7 +82,10 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     } on DioException catch (e) {
       if (mounted) {
         setState(() {
-          _errorCarga = _mensaje(e, 'No se pudieron cargar los servicios.');
+          _errorCarga = mensajeDeError(
+            e,
+            porDefecto: 'No se pudieron cargar los servicios.',
+          );
           _cargando = false;
         });
       }
@@ -101,21 +105,28 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
       _sede = opciones.sucursales.length == 1
           ? opciones.sucursales.first
           : null;
-      // Con varios, se parte de todo el equipo; con uno, es esa persona.
-      _profesional = opciones.profesionales.length > 1
-          ? _cualquiera
-          : opciones.profesionales.firstOrNull;
+      _profesional = null;
+      _ajustarProfesional();
       _ofrecerWhatsapp = ofrecerWhatsapp;
       _cargando = false;
     });
   }
 
-  /// El mensaje del servidor, o uno en español si no lo hay (sin red).
-  String _mensaje(DioException e, String porDefecto) {
-    final data = e.response?.data;
-    return data is Map && data['message'] is String
-        ? data['message'] as String
-        : porDefecto;
+  /// Quienes atienden en la sede elegida (sin sede, todo el equipo).
+  List<OpcionCita> get _profesionalesSede =>
+      _opciones?.profesionalesEn(_sede?.id) ?? const [];
+
+  /// Al elegir sede, si quien estaba elegido no atiende ahí, se parte de nuevo:
+  /// con varios, todo el equipo de la sede; con uno, esa persona (como en la web).
+  void _ajustarProfesional() {
+    final lista = _profesionalesSede;
+    final elegido = _profesional;
+    if (elegido != null &&
+        !identical(elegido, _cualquiera) &&
+        lista.any((p) => p.id == elegido.id)) {
+      return;
+    }
+    _profesional = lista.length > 1 ? _cualquiera : lista.firstOrNull;
   }
 
   String? get _idProfesional =>
@@ -152,7 +163,10 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
     } on DioException catch (e) {
       if (mounted) {
         setState(() {
-          _errorHorarios = _mensaje(e, 'No se pudieron cargar los horarios.');
+          _errorHorarios = mensajeDeError(
+            e,
+            porDefecto: 'No se pudieron cargar los horarios.',
+          );
           _buscando = false;
         });
       }
@@ -333,18 +347,30 @@ class _AgendarCitaSheetState extends ConsumerState<AgendarCitaSheet> {
                     ),
                   if (opciones.sucursales.length > 1)
                     _selector('Sede', opciones.sucursales, _sede, (v) {
-                      setState(() => _sede = v);
+                      setState(() {
+                        _sede = v;
+                        _ajustarProfesional();
+                      });
                       _buscarHorarios();
                     }),
-                  if (opciones.profesionales.length > 1) ...[
+                  if (_profesionalesSede.isEmpty)
+                    const Padding(
+                      key: Key('sede-sin-profesionales'),
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'Por ahora nadie atiende en esta sede.',
+                        style: TextStyle(color: TemaAgendaUno.textoSuave),
+                      ),
+                    )
+                  else if (_profesionalesSede.length > 1) ...[
                     ElegirProfesional(
-                      profesionales: opciones.profesionales,
+                      profesionales: _profesionalesSede,
                       seleccionado: _idProfesional,
                       alCambiar: (id) {
                         setState(
                           () => _profesional = id == null
                               ? _cualquiera
-                              : opciones.profesionales.firstWhere(
+                              : _profesionalesSede.firstWhere(
                                   (p) => p.id == id,
                                 ),
                         );

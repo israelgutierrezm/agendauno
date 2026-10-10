@@ -2,8 +2,9 @@ import java.io.FileInputStream
 import java.util.Properties
 
 // Firma de release: android/key.properties (no se sube al repositorio; ver
-// android/key.properties.example y docs/MOBILE.md). Sin él, la versión de release se
-// firma con la llave de depuración: sirve para probar, no para Google Play.
+// android/key.properties.example y docs/MOBILE.md). Sin él, la versión de release NO
+// se compila (antes se firmaba en silencio con la llave de depuración, que Google Play
+// rechaza); debug, `flutter test` y `flutter analyze` no lo necesitan.
 val archivoFirma = rootProject.file("key.properties")
 val firma = Properties().apply {
     if (archivoFirma.exists()) {
@@ -48,8 +49,24 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName(if (archivoFirma.exists()) "release" else "debug")
+            if (archivoFirma.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
+    }
+}
+
+// Solo al compilar la versión de release (assembleRelease, bundleRelease…): sin la
+// llave de subida se detiene con un mensaje claro en lugar de firmar con la de
+// depuración.
+gradle.taskGraph.whenReady {
+    if (!archivoFirma.exists() && allTasks.any { it.name.contains("Release") }) {
+        throw GradleException(
+            "Falta android/key.properties: la versión de release no se firma con la " +
+                "llave de depuración. Cópialo de android/key.properties.example con los " +
+                "datos de la llave de subida de Google Play (docs/MOBILE.md, «Firma de " +
+                "release»).",
+        )
     }
 }
 

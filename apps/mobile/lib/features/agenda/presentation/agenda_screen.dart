@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/error_de_carga.dart';
 import '../../../core/formato.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
@@ -92,11 +93,9 @@ class AgendaScreen extends ConsumerWidget {
           Expanded(
             child: estado.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: TextButton(
-                  onPressed: () => ref.invalidate(agendaProvider),
-                  child: const Text('No se pudo cargar la agenda. Reintentar'),
-                ),
+              error: (e, _) => ErrorDeCarga(
+                mensaje: 'No se pudo cargar la agenda.',
+                onReintentar: () => ref.invalidate(agendaProvider),
               ),
               data: (agenda) => (sesion?.esCitas ?? false)
                   ? _AgendaCitas(

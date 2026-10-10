@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/formato.dart';
+import '../../../core/network/mensaje_error.dart';
+import '../../../core/theme/tema_agendauno.dart';
 import '../../auth/application/sesion_controller.dart';
 import '../application/agenda_controller.dart';
 import '../data/agenda_models.dart';
@@ -32,21 +34,28 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
   var _ocupado = false;
   var _metodo = 'efectivo';
 
+  /// Ejecuta la acción (la agenda se recarga al terminar). Con [cerrar], la hoja se
+  /// cierra si salió bien: una cita cancelada ya no vuelve en la agenda.
   Future<void> _hacer(
     Future<void> Function(AgendaController c) accion,
-    String ok,
-  ) async {
+    String ok, {
+    bool cerrar = false,
+  }) async {
     setState(() => _ocupado = true);
     final mensajero = ScaffoldMessenger.of(context);
+    final navegador = Navigator.of(context);
     try {
       await accion(ref.read(agendaProvider.notifier));
       mensajero.showSnackBar(SnackBar(content: Text(ok)));
+      if (cerrar && mounted) {
+        navegador.pop();
+      }
     } on DioException catch (e) {
-      final data = e.response?.data;
-      final msg = data is Map<String, dynamic>
-          ? (data['message'] ?? 'No se pudo completar.')
-          : 'No se pudo completar.';
-      mensajero.showSnackBar(SnackBar(content: Text('$msg')));
+      mensajero.showSnackBar(
+        SnackBar(
+          content: Text(mensajeDeError(e, porDefecto: 'No se pudo completar.')),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _ocupado = false);
@@ -54,9 +63,47 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
     }
   }
 
+  /// Cancelar libera el horario y no se deshace: se confirma antes, como en la
+  /// cuenta del cliente.
+  Future<void> _cancelar(SesionAgenda s, String hora) async {
+    final cliente = s.cita?.cliente;
+    final confirmada = await showDialog<bool>(
+      context: context,
+      builder: (contexto) => AlertDialog(
+        title: const Text('Cancelar cita'),
+        content: Text(
+          cliente == null
+              ? '¿Cancelar esta cita de las $hora? El horario quedará libre.'
+              : '¿Cancelar la cita de $cliente de las $hora? El horario '
+                    'quedará libre.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(contexto).pop(false),
+            child: const Text('Volver'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: TemaAgendaUno.error),
+            onPressed: () => Navigator.of(contexto).pop(true),
+            child: const Text('Sí, cancelar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmada != true || !mounted) {
+      return;
+    }
+    await _hacer(
+      (c) => c.cancelar(s),
+      'Cita cancelada; el horario quedó libre.',
+      cerrar: true,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final agenda = ref.watch(agendaProvider).value;
+    final estadoAgenda = ref.watch(agendaProvider);
+    final agenda = estadoAgenda.value;
     // Solo se ofrece lo que el servidor permitiría (un instructor no cobra ni cancela).
     final sesion = ref.watch(sesionProvider);
     final puedeCobrar = sesion?.puede('ordenes.gestionar') ?? false;
@@ -66,9 +113,16 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
         .where((x) => x.id == widget.sesionId)
         .firstOrNull;
     if (s == null || s.cita == null) {
-      return const SizedBox(
+      // Cargada la agenda sin esta cita (la cancelaron o la movieron desde otro
+      // lado), se dice: nunca un indicador girando para siempre.
+      final cargando = agenda == null || estadoAgenda.isLoading;
+      return SizedBox(
         height: 120,
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(
+          child: cargando
+              ? const CircularProgressIndicator()
+              : const Text('Esta cita ya no está en la agenda.'),
+        ),
       );
     }
     final estado = s.estadoCita;
@@ -256,10 +310,7 @@ class _HojaCitaState extends ConsumerState<_HojaCita> {
                 TextButton(
                   onPressed: _ocupado
                       ? null
-                      : () => _hacer(
-                          (c) => c.cancelar(s),
-                          'Cita cancelada; el horario quedó libre.',
-                        ),
+                      : () => _cancelar(s, hhmm(s.iniciaEn)),
                   style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFFB42318),
                   ),

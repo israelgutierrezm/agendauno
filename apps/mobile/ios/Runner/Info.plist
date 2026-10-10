@@ -13,9 +13,11 @@
 		<string>es</string>
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Para elegir tu foto de perfil.</string>
+	<string>Para elegir tu foto de perfil y para subir documentos que te pida el negocio.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Para tomarte una foto de perfil.</string>
+	<string>Para tomarte una foto de perfil y para fotografiar documentos que te pida el negocio.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

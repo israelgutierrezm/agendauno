@@ -35,4 +35,13 @@ class AppConfig {
     'APP_VERSION',
     defaultValue: versionApp,
   );
+
+  /// Id de la app en Google Play: el `applicationId` de
+  /// android/app/build.gradle.kts (si cambia allá, cambia aquí).
+  static const String idAndroid = 'com.agendauno.app';
+
+  /// Id numérico de la app en el App Store. Se pasa al compilar para iOS; sin él,
+  /// la pantalla de actualizar no ofrece abrir la tienda:
+  ///   flutter build ipa --dart-define=APP_STORE_ID=1234567890
+  static const String appStoreId = String.fromEnvironment('APP_STORE_ID');
 }

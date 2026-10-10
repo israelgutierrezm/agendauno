@@ -181,6 +181,7 @@ class Sesion {
     this.sinSucursal = false,
     this.nivelPlan,
     this.funcionesSin = const [],
+    this.estadoNegocio,
   });
 
   final String slug;
@@ -232,6 +233,14 @@ class Sesion {
 
   /// ¿El plan del negocio incluye esta función (p. ej. `venta_en_linea`)?
   bool tieneFuncion(String funcion) => !funcionesSin.contains(funcion);
+
+  /// Estado del negocio en la plataforma (`estudio.estado`: trialing, active,
+  /// suspended…; null si el API no lo mandó).
+  final String? estadoNegocio;
+
+  /// Suspendido por renta vencida (ADR 0073): el servidor solo deja abiertos /yo y
+  /// el acceso; todo lo demás responde 404. La app no muestra sus pestañas.
+  bool get negocioSuspendido => estadoNegocio == 'suspended';
 
   /// La versión más antigua de la app que el servidor aún acepta (de /yo). Con una
   /// más vieja se pide actualizar en lugar de leer respuestas que ya no entiende.
@@ -316,6 +325,7 @@ class Sesion {
     'perfil': perfil,
     'nivel_plan': nivelPlan,
     'funciones_sin': funcionesSin,
+    'estado_negocio': estadoNegocio,
   };
 
   /// Restaura una sesión guardada (null si le falta lo esencial).
@@ -362,6 +372,7 @@ class Sesion {
       perfil: datos['perfil'] as String?,
       nivelPlan: datos['nivel_plan'] as String?,
       funcionesSin: _textos(datos['funciones_sin']),
+      estadoNegocio: datos['estado_negocio'] as String?,
     );
   }
 
@@ -412,6 +423,7 @@ class Sesion {
       // Su plan (ADR 0107): un API anterior no lo manda y entonces tiene todo.
       nivelPlan: plan?['nivel'] as String?,
       funcionesSin: _textos(plan?['sin']),
+      estadoNegocio: estudio?['estado'] as String?,
     );
   }
 
@@ -475,6 +487,7 @@ class Sesion {
     perfil: perfil,
     nivelPlan: nivelPlan,
     funcionesSin: funcionesSin,
+    estadoNegocio: estadoNegocio,
   );
 
   /// La versión mínima tal como vino; sin ella, no se exige ninguna.

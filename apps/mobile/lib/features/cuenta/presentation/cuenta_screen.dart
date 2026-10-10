@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/error_de_carga.dart';
+import '../../../core/network/mensaje_error.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../../perfil/presentation/boton_mi_perfil.dart';
 import '../application/cuenta_controller.dart';
@@ -66,8 +68,10 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
       ),
       body: estado.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) =>
-            _Error(onReintentar: () => ref.invalidate(cuentaProvider)),
+        error: (e, _) => ErrorDeCarga(
+          mensaje: 'No se pudo cargar tu cuenta.',
+          onReintentar: () => ref.invalidate(cuentaProvider),
+        ),
         data: (cuenta) => switch (_pestana) {
           PestanaCuenta.inicio => RefreshIndicator(
             onRefresh: () => ref.refresh(cuentaProvider.future),
@@ -122,7 +126,7 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
   }
 }
 
-/// Ejecuta una acción y muestra el mensaje del servidor si falla.
+/// Ejecuta una acción y, si falla, dice por qué (la razón del servidor).
 Future<void> hacerConAviso(
   BuildContext context,
   Future<void> Function() accion, {
@@ -135,11 +139,7 @@ Future<void> hacerConAviso(
       messenger.showSnackBar(SnackBar(content: Text(exito)));
     }
   } on DioException catch (e) {
-    final data = e.response?.data;
-    final msg = (data is Map && data['message'] is String)
-        ? data['message'] as String
-        : 'No se pudo completar la acción.';
-    messenger.showSnackBar(SnackBar(content: Text(msg)));
+    messenger.showSnackBar(SnackBar(content: Text(mensajeDeError(e))));
   }
 }
 
@@ -228,25 +228,4 @@ Future<void> pagarEnLinea(
       ),
     );
   });
-}
-
-class _Error extends StatelessWidget {
-  const _Error({required this.onReintentar});
-
-  final VoidCallback onReintentar;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Text('No se pudo cargar tu cuenta.'),
-        const SizedBox(height: 8),
-        OutlinedButton(
-          onPressed: onReintentar,
-          child: const Text('Reintentar'),
-        ),
-      ],
-    ),
-  );
 }
