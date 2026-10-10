@@ -27,6 +27,18 @@ map $http_x_forwarded_proto $https_cliente {
     default "";
 }
 
+# Marcos (cabeceras de nginx-cabeceras.conf): DENY en todo, salvo la vista previa del
+# sitio de un negocio (/estudio/{slug}/vista-previa), que el panel muestra en un iframe
+# del mismo origen (ADR 0114). Con $request_uri: tras try_files, $uri ya es /app.html.
+map $request_uri $marco {
+    ~^/estudio/[a-z0-9-]+/vista-previa/?(\?.*)?$ SAMEORIGIN;
+    default DENY;
+}
+map $request_uri $marco_csp {
+    ~^/estudio/[a-z0-9-]+/vista-previa/?(\?.*)?$ "frame-ancestors 'self'";
+    default "frame-ancestors 'none'";
+}
+
 # PHP-FPM (servicio api): ver nginx-comun.conf (se resuelve con el DNS de Docker en
 # cada petición, no una sola vez al arrancar).
 

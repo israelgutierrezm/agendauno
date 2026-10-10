@@ -54,7 +54,9 @@ mismo. Así no hay CORS entre subdominios.
    `X-Forwarded-For`: los límites por IP de la API dependen de ella.
 
    nginx ya manda `Strict-Transport-Security: max-age=31536000; includeSubDomains`,
-   `X-Frame-Options: DENY` y `Content-Security-Policy: frame-ancestors 'none'`. El
+   `X-Frame-Options: DENY` y `Content-Security-Policy: frame-ancestors 'none'` (salvo
+   en la vista previa del sitio, `/estudio/{slug}/vista-previa`: `SAMEORIGIN` y
+   `frame-ancestors 'self'`, porque el panel la muestra en un iframe propio). El
    proxy no debe quitarlas ni reemplazarlas. Por `includeSubDomains`, el navegador
    exige HTTPS en **todo** subdominio de `DOMINIO` durante un año: si otro servicio
    usa uno (por ejemplo, el seguimiento de clics del proveedor de correo), debe tener
@@ -119,8 +121,9 @@ mismo. Así no hay CORS entre subdominios.
 7. **reCAPTCHA v3** (obligatorio): crea un sitio en la consola de reCAPTCHA con
    `DOMINIO` y `DOMINIO_TURNOUNO` (la lista de interesados de TurnoUno también lo usa) y pon su llave secreta en `RECAPTCHA_SECRET` (`api.env`) y la del sitio
    en `VITE_RECAPTCHA_SITE_KEY` (`web.env`). Cada alta del registro público crea una
-   base completa y manda un correo; sin captcha, `agendauno:verificar-produccion`
-   marca FALTA. Las altas que nadie activa se borran solas (ver «Altas sin activar»).
+   base completa y manda un correo; sin captcha, en producción la API rechaza el
+   registro y la lista de interesados (no los deja pasar sin filtro) y
+   `agendauno:verificar-produccion` marca FALTA. Las altas que nadie activa se borran solas (ver «Altas sin activar»).
 8. **Google** (opcional, para entrar con Google): en el cliente OAuth web, registra
    como orígenes autorizados solo `https://DOMINIO` y `https://DOMINIO_TURNOUNO` (y sus
    `www.` si se sirven). Desde el subdominio de un negocio, la web manda a entrar con

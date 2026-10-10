@@ -37,7 +37,10 @@ saliendo del sistema, nunca copiarse al sitio.
 - **Vista previa.** `GET /sitio/vista-previa` da los mismos datos que el escaparate con
   el borrador, aunque la página aún no esté abierta al público. La web la muestra en
   `/estudio/{slug}/vista-previa` (mismo origen que el panel, con su sesión) dentro del
-  editor, en un marco con ancho de teléfono o de computadora, o en otra pestaña.
+  editor, en un marco con ancho de teléfono o de computadora, o en otra pestaña. Como
+  nginx prohíbe los marcos en todo lo demás (`X-Frame-Options: DENY`), en esa ruta manda
+  `SAMEORIGIN` y `frame-ancestors 'self'`: sin eso, el marco quedaba en blanco en el
+  servidor aunque en local funcionara.
 - **Banners** vigentes según el día del negocio (su zona horaria); su enlace solo puede
   ser una página `https://`, una ruta del sitio (`/…`) o una sección (`#…`), nunca
   `javascript:` ni otra cosa. Cuántos banners y cuántas fotos admite cada sitio son
