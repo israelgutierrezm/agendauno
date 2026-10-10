@@ -18,7 +18,10 @@
         </include>
     </source>
     <php>
-        <ini name="memory_limit" value="512M"/>
+        <!-- La suite corre en un solo proceso en el CI (más de 1,700 pruebas que crean
+             negocios con su base): con 512M se quedaba sin memoria. Este valor manda sobre
+             `php -d` y php.ini (PHPUnit lo aplica con ini_set). -->
+        <ini name="memory_limit" value="2G"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>

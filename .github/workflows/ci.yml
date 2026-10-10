@@ -98,9 +98,6 @@ jobs:
           extensions: pdo_mysql, pdo_sqlite, sqlite3, bcmath, intl, mbstring, zip
           coverage: none
           tools: composer:v2
-          # Para todo proceso de PHP: `artisan test` corre Pest en un proceso hijo que no
-          # hereda un `php -d memory_limit=...` (con 512 MB la suite se quedaba sin memoria).
-          ini-values: memory_limit=2G
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
