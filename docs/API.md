@@ -221,6 +221,14 @@ viene vacía): cada una lleva `tipo: "clase"`, `clase`, `cita: null` y `ocupacio
 junto a sus campos de siempre (`cobertura` incluida). `POST /mi/reservas` reserva solo
 clases; en un negocio de citas responde 422 `SESSION_NOT_BOOKABLE`.
 
+`GET /mi/sesiones/{sesion}/antes-de-reservar` (solo clases) dice, sin apartar nada, lo que
+pasará al reservar (ADR 0119): `resultado` (`reserva`, `lista_espera` o `no_disponible`),
+`codigo`, `motivo` y `accion` si no se puede, `plan` (`nombre`, `ilimitado`, `vence`,
+`disponible_despues`), `unidades`, `de_pago`, `cancelacion` (`limite`, `horas_limite`,
+`penaliza_tarde`, `cancela_tarde`), `sucursal` (`nombre`, `mapa_url`), `requisitos` y
+`que_llevar`. Las reservas suman `plan`, `unidades`, `cancelacion` (null en lista de
+espera) y `que_llevar`; la vista previa de cancelar suma `plan_vencio`.
+
 Sus reservas (`GET /mi/perfil` → `reservas[]`, y la reserva que responden
 `POST /mi/reservas`, `POST /mi/citas`, `POST /mi/reservas/{reserva}/cancelar` y
 `/aceptar`) suman `clase` (el bloque de su clase), `cita` y `ocupacion`. Su cita:

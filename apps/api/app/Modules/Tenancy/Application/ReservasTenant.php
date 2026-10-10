@@ -16,6 +16,7 @@ use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
+use App\Modules\Tenancy\Models\RetencionCreditoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
@@ -35,6 +36,7 @@ use App\Modules\Tenancy\Reservas\Exceptions\TransferenciaInvalida;
 use App\Modules\Tenancy\Reservas\Exceptions\YaReservado;
 use App\Modules\Tenancy\Reservas\QuienCancela;
 use App\Modules\Tenancy\Support\MarcaProducto;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -599,9 +601,14 @@ class ReservasTenant
 
         $unidades = (int) $retencion->unidades;
         $devuelve = 'Se devolverá '.EfectoCancelacion::creditos($unidades).'.';
+        // Un reintegro no le devuelve la vigencia a un plan vencido (M05): se dice.
+        $vencio = $this->vencioElPlan($retencion);
+        if ($vencio !== null) {
+            $devuelve .= ' Tu plan venció el '.CarbonImmutable::parse($vencio)->format('d/m/Y').': el crédito vuelve a él, pero ya no podrás usarlo.';
+        }
         // Rechazar un lugar ofrecido de la lista de espera nunca penaliza.
         if ($reserva->estado === EstadoReserva::Ofrecida) {
-            return new EfectoCancelacion(true, EfectoCancelacion::DEVUELVE, $unidades, null, null, $devuelve);
+            return new EfectoCancelacion(true, EfectoCancelacion::DEVUELVE, $unidades, null, null, $devuelve, $vencio);
         }
 
         // Política congelada en la reserva (R8); `$horasLimite` es solo el respaldo
@@ -611,18 +618,29 @@ class ReservasTenant
         $aTiempo = now()->lessThanOrEqualTo($limite);
 
         if ($quien !== QuienCancela::Cliente) {
-            return new EfectoCancelacion(true, EfectoCancelacion::DEVUELVE, $unidades, $aTiempo, $limite, $devuelve.' Cancela el negocio: sin penalización.');
+            return new EfectoCancelacion(true, EfectoCancelacion::DEVUELVE, $unidades, $aTiempo, $limite, $devuelve.' Cancela el negocio: sin penalización.', $vencio);
         }
         // Pasado el límite, el negocio decide si el cliente aún puede cancelar él mismo.
         if (! $aTiempo && ! $this->parametros->siNo('cancelacion.cliente_cancela_tarde')) {
             return EfectoCancelacion::noCancelable("Ya pasó el límite para cancelar sin costo ({$horas} h antes). Escríbele al negocio para cancelar.");
         }
         if ($aTiempo || ! ($reserva->penaliza_tarde ?? true)) {
-            return new EfectoCancelacion(true, EfectoCancelacion::DEVUELVE, $unidades, $aTiempo, $limite, $devuelve);
+            return new EfectoCancelacion(true, EfectoCancelacion::DEVUELVE, $unidades, $aTiempo, $limite, $devuelve, $vencio);
         }
 
         return new EfectoCancelacion(true, EfectoCancelacion::COBRA, $unidades, false, $limite,
             'Se cobrará '.EfectoCancelacion::creditos($unidades).": se cancela con menos de {$horas} h de anticipación.");
+    }
+
+    /**
+     * La fecha (AAAA-MM-DD) en que venció el plan del crédito apartado, si ya venció en
+     * la fecha del negocio; null si sigue vigente o no vence.
+     */
+    private function vencioElPlan(RetencionCreditoTenant $retencion): ?string
+    {
+        $hasta = $retencion->derecho?->valido_hasta?->toDateString();
+
+        return $hasta !== null && $hasta < app(FechasNegocioTenant::class)->hoy() ? $hasta : null;
     }
 
     /**

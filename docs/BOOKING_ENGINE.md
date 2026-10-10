@@ -39,6 +39,12 @@ Return stable error codes such as:
 - OUTSTANDING_BALANCE_BLOCK
 - ALREADY_BOOKED
 
+The member sees the same decision before confirming:
+`GET /mi/sesiones/{sesion}/antes-de-reservar` (`AntesDeReservarTenant`, ADR 0119) runs the
+booking window, `evaluar()`, plan coverage and the cancellation policy that would be frozen
+in the booking, and answers `reserva`, `lista_espera` or `no_disponible` with the main reason
+and the action that helps. It reads only; booking revalidates under the session lock.
+
 ## Booking windows
 
 Example:

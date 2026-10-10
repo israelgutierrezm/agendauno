@@ -321,6 +321,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/pase', [MiTenantController::class, 'pase'])->name('mi.pase');
             Route::get('/mi/agenda', [MiTenantController::class, 'agenda'])->name('mi.agenda');
             Route::post('/mi/reservas', [MiTenantController::class, 'reservar'])->name('mi.reservas.store');
+            // Antes de reservar una clase: qué pasará, con qué plan y hasta cuándo cancela (M05).
+            Route::get('/mi/sesiones/{sesion}/antes-de-reservar', [MiTenantController::class, 'antesDeReservar'])->middleware('modalidad:clases')->name('mi.sesiones.antes-de-reservar');
             // Agenda una cita desde un hueco de disponibilidad (F-08): crea la sesión + reserva/pago.
             Route::get('/mi/citas/opciones', [MiTenantController::class, 'opcionesCita'])->middleware('modalidad:citas')->name('mi.citas.opciones');
             Route::get('/mi/citas/disponibilidad', [MiTenantController::class, 'disponibilidadCita'])->middleware('modalidad:citas')->name('mi.citas.disponibilidad');

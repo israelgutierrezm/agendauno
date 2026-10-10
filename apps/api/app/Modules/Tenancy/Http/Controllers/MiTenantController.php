@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
+use App\Modules\Tenancy\Application\AntesDeReservarTenant;
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\ClimaTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
@@ -21,6 +22,7 @@ use App\Modules\Tenancy\Application\OrdenesTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\PaseAccesoTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
+use App\Modules\Tenancy\Application\PoliticaCancelacion;
 use App\Modules\Tenancy\Application\PortalDelClienteTenant;
 use App\Modules\Tenancy\Application\PresentarMovimientosCreditoTenant;
 use App\Modules\Tenancy\Application\PrimeraVezTenant;
@@ -191,6 +193,7 @@ class MiTenantController
             ->with([
                 'sesion' => fn ($q) => $q->withCount(SesionTenantPresenter::conteos()),
                 'sesion.oferta', 'sesion.sucursal', 'sesion.instructor', 'orden', 'asistencia',
+                'derecho.acuerdo.producto',
             ])
             ->get()
             ->filter(fn (ReservaTenant $r): bool => $r->sesion !== null && ! $r->sesion->inicia_en->isPast())
@@ -213,11 +216,12 @@ class MiTenantController
             // Qué partes de su cuenta le sirven y su asistencia reciente (ADR 0091).
             'portal' => $this->portal->capacidades($this->estudioDe($request), $persona),
             'asistencias_30_dias' => $this->portal->asistencias($persona),
+            // La global o, si el negocio no configuró una, la de la plataforma (M05).
             'politica_cancelacion' => $politica instanceof PoliticaCancelacionTenant ? [
                 'horas_limite' => $politica->horas_limite,
                 'penaliza_tarde' => (bool) $politica->penaliza_tarde,
                 'penaliza_no_show' => (bool) $politica->penaliza_no_show,
-            ] : null,
+            ] : $this->politicaPorDefecto(),
         ]]);
     }
 
@@ -356,6 +360,24 @@ class MiTenantController
         }
 
         return $cobertura[(int) $sesion->getKey()] ?? null;
+    }
+
+    /**
+     * Antes de reservar una clase (M05): si queda reservado, en lista de espera o no se
+     * puede (motivo y acción), el plan que usa y lo que consume, y hasta cuándo cancela
+     * sin costo. Misma regla que reservar; no aparta nada.
+     */
+    public function antesDeReservar(Request $request, AntesDeReservarTenant $antes): JsonResponse
+    {
+        $persona = $this->persona($request);
+        abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
+
+        $sesion = SesionTenant::query()->where('ulid', (string) $request->route('sesion'))->with(['oferta', 'sucursal'])->firstOrFail();
+        if ($sesion->esCita()) {
+            throw new SesionNoReservable('Esta cita es privada.');
+        }
+
+        return response()->json(['data' => $antes->deClase($sesion, $persona)]);
     }
 
     public function reservar(Request $request): JsonResponse
@@ -660,6 +682,13 @@ class MiTenantController
             'zona_horaria' => $reserva->sesion?->zona_horaria,
             // Vencimiento de la oferta de lista de espera (si la reserva está ofrecida).
             'oferta_expira_en' => $reserva->oferta_expira_en?->toIso8601String(),
+            // Lo que consume y de qué plan; hasta cuándo cancela sin costo, con la política
+            // que se congeló al reservar (M05).
+            'plan' => $reserva->derecho?->acuerdo?->producto?->nombre,
+            'unidades' => (int) $reserva->unidades,
+            'cancelacion' => $this->cancelacionDeReserva($reserva),
+            // Para llegar preparado (ADR 0118).
+            'que_llevar' => $reserva->sesion?->oferta?->que_llevar,
             // Orden a pagar para confirmar (cita o clase de pago por clase), si aplica.
             'orden_id' => $reserva->orden?->ulid,
             // Lo de su clase (cupo, lista de espera, pago por clase); null si es cita.
@@ -668,6 +697,44 @@ class MiTenantController
             'cita' => $sesion instanceof SesionTenant && $sesion->esCita() ? $this->citaDeReserva($reserva, $sesion) : null,
             // La ocupación de su clase que se muestra (0–100); null en citas.
             'ocupacion' => $sesion instanceof SesionTenant ? SesionTenantPresenter::ocupacion($sesion) : null,
+        ];
+    }
+
+    /**
+     * Hasta cuándo cancela sin costo y qué pasa después, con la política congelada en la
+     * reserva (R8; las anteriores al snapshot usan el parámetro). Null en lista de espera
+     * (no consume) o sin clase.
+     *
+     * @return array{limite: string, horas_limite: int, penaliza_tarde: bool}|null
+     */
+    private function cancelacionDeReserva(ReservaTenant $reserva): ?array
+    {
+        $sesion = $reserva->sesion;
+        if (! $sesion instanceof SesionTenant || $reserva->estado === EstadoReserva::EnEspera) {
+            return null;
+        }
+        $horas = (int) ($reserva->horas_limite ?? app(ParametrosTenant::class)->entero('cancelacion.horas_limite'));
+
+        return [
+            'limite' => $sesion->inicia_en->copy()->subHours($horas)->toIso8601String(),
+            'horas_limite' => $horas,
+            'penaliza_tarde' => (bool) ($reserva->penaliza_tarde ?? true),
+        ];
+    }
+
+    /**
+     * La política de la plataforma cuando el negocio no configuró una (ADR 0042).
+     *
+     * @return array{horas_limite: int, penaliza_tarde: bool, penaliza_no_show: bool}
+     */
+    private function politicaPorDefecto(): array
+    {
+        $politica = PoliticaCancelacion::porDefecto(app(ParametrosTenant::class));
+
+        return [
+            'horas_limite' => $politica->horasLimite,
+            'penaliza_tarde' => $politica->penalizaTarde,
+            'penaliza_no_show' => $politica->penalizaNoShow,
         ];
     }
 
