@@ -56,6 +56,24 @@ export interface SesionAgenda {
   marcadas?: number;
   estado: string;
   cita?: CitaTitular | null;
+  /**
+   * Lo propio de una clase según el servidor. `libres` es lo que aún se puede reservar
+   * con la regla única de cupo (descuenta lo apartado para otros canales).
+   */
+  clase?: { libres: number | null } | null;
+}
+
+/**
+ * Lugares que aún se pueden reservar en la sesión: los del servidor (la misma regla del
+ * motor, B02) o, si no los trae, el cupo menos lo ocupado. Null si no tiene tope.
+ */
+export function libresDeSesion(
+  s: Pick<SesionAgenda, "capacidad" | "ocupados" | "clase">,
+): number | null {
+  if (s.clase && s.clase.libres !== undefined) {
+    return s.clase.libres;
+  }
+  return s.capacidad !== null ? Math.max(0, s.capacidad - s.ocupados) : null;
 }
 
 /** Bloqueo de agenda (2.2) tal como lo dibuja la agenda. */
@@ -439,7 +457,7 @@ export function kpisClases(
     if (s.capacidad !== null) {
       capacidad += s.capacidad;
       if (new Date(s.inicia_en).getTime() > ahora.getTime()) {
-        libres += Math.max(0, s.capacidad - s.ocupados);
+        libres += libresDeSesion(s) ?? 0;
       }
     }
   }

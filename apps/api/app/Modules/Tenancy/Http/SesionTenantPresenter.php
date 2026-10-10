@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http;
 
+use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
 use App\Modules\Tenancy\Reservas\EstadoAtencionCita;
 use App\Modules\Tenancy\Reservas\EstadoPagoCita;
-use App\Modules\Tenancy\Reservas\EstadoReserva;
 use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,30 +24,20 @@ use Illuminate\Database\Eloquent\Builder;
 class SesionTenantPresenter
 {
     /**
-     * Estados de reserva que ocupan un lugar en la sesión (las pendientes de pago
-     * retienen el cupo mientras se pagan).
+     * Estados de reserva que ocupan un lugar en la sesión: la regla única de
+     * {@see CupoDeSesionTenant} (las pendientes de pago retienen el cupo mientras se pagan).
      */
-    public const OCUPAN_LUGAR = [
-        EstadoReserva::Confirmada->value,
-        EstadoReserva::Ofrecida->value,
-        EstadoReserva::PendientePago->value,
-    ];
+    public const OCUPAN_LUGAR = CupoDeSesionTenant::OCUPAN_LUGAR;
 
     /**
-     * Los conteos que usan `clase` y `ocupacion` (para `withCount` o `loadCount`).
+     * Los conteos que usan `clase` y `ocupacion` (para `withCount` o `loadCount`): los de
+     * la regla única de cupo.
      *
      * @return array<string, Closure(Builder<ReservaTenant>): void>
      */
     public static function conteos(): array
     {
-        return [
-            'reservas as ocupados' => static function (Builder $q): void {
-                $q->whereIn('estado', self::OCUPAN_LUGAR);
-            },
-            'reservas as en_espera' => static function (Builder $q): void {
-                $q->where('estado', EstadoReserva::EnEspera->value);
-            },
-        ];
+        return CupoDeSesionTenant::conteos();
     }
 
     /**
@@ -63,7 +53,10 @@ class SesionTenantPresenter
     }
 
     /**
-     * Lo propio de una clase; null si la sesión es una cita.
+     * Lo propio de una clase; null si la sesión es una cita. `libres` es lo que el canal
+     * directo aún puede reservar: el cupo menos lo ocupado y lo que otros canales tienen
+     * apartados (la misma cuenta del motor). En una lista, {@see CupoDeSesionTenant::cargar()}
+     * trae lo apartado de todo el lote; si no, se consulta para esta sesión.
      *
      * @return array{capacidad: int|null, ocupados: int, libres: int|null, en_espera: int, lugares: int, de_pago: bool, precio_minor: int|null}|null
      */
@@ -82,7 +75,7 @@ class SesionTenantPresenter
         return [
             'capacidad' => $capacidad,
             'ocupados' => $ocupados,
-            'libres' => $capacidad !== null ? max(0, $capacidad - $ocupados) : null,
+            'libres' => app(CupoDeSesionTenant::class)->libres($sesion),
             'en_espera' => (int) $sesion->getAttribute('en_espera'),
             // Lugares numerados de la oferta (0 = sin mapa de lugares).
             'lugares' => (int) ($sesion->oferta->lugares ?? 0),

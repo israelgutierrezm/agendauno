@@ -15,7 +15,6 @@ use App\Modules\Tenancy\Models\OfertaTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
-use App\Modules\Tenancy\Models\ReglaCapacidadCanalTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
@@ -37,7 +36,6 @@ use App\Modules\Tenancy\Reservas\Exceptions\YaReservado;
 use App\Modules\Tenancy\Reservas\QuienCancela;
 use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -75,6 +73,8 @@ class ReservasTenant
         // Ventanas de pago y de oferta, y horas de cancelación (configurables, ADR 0042).
         private readonly ParametrosTenant $parametros,
         private readonly RegistrarAuditoria $auditoria,
+        // La regla única de cupo (B02): la misma que la página pública y las agendas.
+        private readonly CupoDeSesionTenant $cupo,
     ) {}
 
     /**
@@ -1170,77 +1170,24 @@ class ReservasTenant
     }
 
     /**
-     * Cupos OCUPADOS de una sesion: confirmadas MAS ofrecidas (una oferta vigente
-     * reserva el lugar mientras el ofrecido decide), para no ofrecer/confirmar de mas.
+     * Cupos OCUPADOS de una sesion: la regla única de {@see CupoDeSesionTenant}
+     * (confirmadas, ofrecidas y pendientes de pago), para no ofrecer/confirmar de mas.
      */
     private function ocupadas(SesionTenant $sesion): int
     {
-        return ReservaTenant::query()
-            ->where('sesion_id', $sesion->getKey())
-            // Una reserva pendiente de pago (citas) RETIENE el cupo mientras se paga,
-            // igual que una confirmada/ofrecida (no-sobreventa).
-            ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::PendientePago->value])
-            ->count();
+        return $this->cupo->ocupadas($sesion);
     }
 
     /**
      * Cupos disponibles de una sesion PARA UN CANAL (R20): los libres del pool general
-     * menos los que otras reglas de canal aun tienen reservados y sin usar. El canal
-     * solicitante nunca se descuenta a si mismo (su reserva de cupos es un piso
-     * garantizado, no un tope). Sin cupo definido = ilimitado. El resultado nunca supera
-     * `capacidad - ocupadas`, de modo que el invariante de no-sobreventa se mantiene.
+     * menos los que otras reglas de canal aun tienen apartados y sin usar
+     * ({@see CupoDeSesionTenant::disponibles()}, la misma cuenta que ve la página
+     * pública). Sin cupo definido = ilimitado. Nunca supera `capacidad - ocupadas`: el
+     * invariante de no-sobreventa se mantiene.
      */
     private function disponiblesParaCanal(SesionTenant $sesion, string $canal): int
     {
-        if ($sesion->capacidad === null) {
-            return PHP_INT_MAX;
-        }
-
-        $libres = $sesion->capacidad - $this->ocupadas($sesion);
-        if ($libres <= 0) {
-            return 0;
-        }
-
-        return max(0, $libres - $this->cuposReservadosOtrosCanales($sesion, $canal));
-    }
-
-    /**
-     * Suma de cupos que OTROS canales (distintos de `$canal`) tienen reservados por regla
-     * activa y aun no han usado, siempre que la regla siga vigente (aun no llega su
-     * ventana de liberacion `liberar_horas_antes` antes del inicio). Liberacion
-     * progresiva (R20): pasada esa ventana, esos cupos vuelven al pool general.
-     */
-    private function cuposReservadosOtrosCanales(SesionTenant $sesion, string $canal): int
-    {
-        $reglas = ReglaCapacidadCanalTenant::query()
-            ->where('oferta_id', $sesion->oferta_id)
-            ->where('activa', true)
-            ->where('canal', '!=', $canal)
-            ->get();
-
-        if ($reglas->isEmpty()) {
-            return 0;
-        }
-
-        $ahora = Carbon::now();
-        $total = 0;
-
-        foreach ($reglas as $regla) {
-            $liberaEn = $sesion->inicia_en->copy()->subHours($regla->liberar_horas_antes);
-            if ($ahora->greaterThanOrEqualTo($liberaEn)) {
-                continue; // ya se liberaron esos cupos al pool general
-            }
-
-            $usados = ReservaTenant::query()
-                ->where('sesion_id', $sesion->getKey())
-                ->where('canal', $regla->canal->value)
-                ->whereIn('estado', [EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value])
-                ->count();
-
-            $total += max(0, $regla->cupos - $usados);
-        }
-
-        return $total;
+        return $this->cupo->disponibles($sesion, $canal) ?? PHP_INT_MAX;
     }
 
     /**

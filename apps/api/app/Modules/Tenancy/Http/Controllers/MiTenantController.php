@@ -9,6 +9,7 @@ use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\ClimaTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\CorteDePlanesTenant;
+use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\FormulariosDePersonaTenant;
@@ -289,6 +290,8 @@ class MiTenantController
             ->limit(self::LIMITE_AGENDA + 1)
             ->get();
         $truncado = $sesiones->count() > self::LIMITE_AGENDA;
+        // Lo que otros canales apartan, para todo el lote: los libres son los del motor.
+        app(CupoDeSesionTenant::class)->cargar($sesiones);
 
         $enPeriodo = $sesiones->take(self::LIMITE_AGENDA)->filter(function (SesionTenant $s) use ($desde, $hasta): bool {
             $dia = $s->inicia_en->copy()->setTimezone((string) $s->zona_horaria)->toDateString();

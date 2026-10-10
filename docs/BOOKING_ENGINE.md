@@ -59,6 +59,22 @@ without transactional protection.
 
 Use idempotency keys for booking creation.
 
+## Spots (one rule, ADR 0116)
+
+`CupoDeSesionTenant` is the only place that decides how many spots a class has left:
+
+- Reservations that hold a spot: `confirmada`, `ofrecida` (a waitlist offer holds the spot
+  while the person decides) and `pendiente_pago` (until it is paid or the per-minute job
+  cancels it). `en_espera` does not hold a spot.
+- Channel rules (R20) set aside their unused spots for their channel until
+  `liberar_horas_antes` before the start; other channels don't see those spots.
+- No capacity means no limit (`null`).
+
+The booking engine (under the session lock), the public page, the member agenda, the staff
+agenda, reception, rescheduling and onboarding all use it. Lists load the counts in batch
+(`withCount(CupoDeSesionTenant::conteos())` + `cargar()`), never one query per class.
+Reading the public count never books anything: the engine revalidates on confirm.
+
 ## Cancellation
 
 Policies may vary by:

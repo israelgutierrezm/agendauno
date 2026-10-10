@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
@@ -117,6 +118,8 @@ class FrontDeskTenantController
             'pendientes_pago' => $porEstado(EstadoReserva::PendientePago),
             'ofrecidas' => $porEstado(EstadoReserva::Ofrecida),
             'en_espera' => $porEstado(EstadoReserva::EnEspera),
+            // Lugares tomados según la regla única de cupo (B02).
+            'ocupados' => $reservas->filter(fn (ReservaTenant $r): bool => in_array($r->estado->value, CupoDeSesionTenant::OCUPAN_LUGAR, true))->count(),
             'presentes' => $asistencia(EstadoAsistencia::Presente),
             'ausentes' => $asistencia(EstadoAsistencia::Ausente),
         ];
@@ -135,6 +138,7 @@ class FrontDeskTenantController
         $filas = $filas->reject(fn (array $f): bool => $f['estado'] === EstadoSesionTenant::Cancelada->value);
         $capacidad = (int) $filas->sum(fn (array $f): int => (int) ($f['capacidad'] ?? 0));
         $confirmadas = (int) $filas->sum('confirmadas');
+        $ocupados = (int) $filas->sum('ocupados');
 
         return [
             'sesiones' => $filas->count(),
@@ -144,7 +148,8 @@ class FrontDeskTenantController
             'en_espera' => (int) $filas->sum('en_espera'),
             'presentes' => (int) $filas->sum('presentes'),
             'ausentes' => (int) $filas->sum('ausentes'),
-            'ocupacion_pct' => $capacidad > 0 ? (int) round($confirmadas / $capacidad * 100) : null,
+            'ocupados' => $ocupados,
+            'ocupacion_pct' => $capacidad > 0 ? (int) round($ocupados / $capacidad * 100) : null,
         ];
     }
 }

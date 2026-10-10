@@ -14,7 +14,6 @@ use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\PoliticaReservaTenant;
-use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
 
@@ -180,16 +179,19 @@ class PuestaEnMarchaTenant
     private function primeraClase(): array
     {
         $ahora = CarbonImmutable::now();
-        $clase = SesionTenant::query()
+        $candidatas = SesionTenant::query()
             ->where('estado', EstadoSesionTenant::Programada->value)
             ->where('tipo', TipoSesionTenant::Clase->value)
             ->whereBetween('inicia_en', [$ahora, $ahora->addDays(self::DIAS_A_REVISAR)])
-            ->withCount(['reservas as confirmadas' => fn ($q) => $q->where('estado', EstadoReserva::Confirmada->value)])
+            // Con lugar según la regla única de cupo (B02).
+            ->withCount(CupoDeSesionTenant::conteos())
             ->with(['oferta', 'sucursal'])
             ->orderBy('inicia_en')
             ->limit(200)
-            ->get()
-            ->first(static fn (SesionTenant $s): bool => $s->capacidad === null || (int) $s->getAttribute('confirmadas') < $s->capacidad);
+            ->get();
+        $cupo = app(CupoDeSesionTenant::class);
+        $cupo->cargar($candidatas);
+        $clase = $candidatas->first(static fn (SesionTenant $s): bool => $cupo->libres($s) !== 0);
         if (! $clase instanceof SesionTenant) {
             return [null, 'sin_clases'];
         }
