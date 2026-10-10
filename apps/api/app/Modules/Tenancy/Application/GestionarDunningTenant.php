@@ -9,6 +9,7 @@ use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\Membresias\EstadoAcuerdo;
 use App\Modules\Tenancy\Models\AcuerdoTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -194,7 +195,7 @@ class GestionarDunningTenant
             // Para el aviso al cliente: qué debe y dónde pagarlo (su cuenta).
             'producto' => (string) $acuerdo->producto?->nombre,
             'motivo' => (string) $proceso->ultimo_motivo,
-            'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/entrar?estudio='.rawurlencode($slug),
+            'enlace' => MarcaProducto::actual()->urlWeb().'/entrar?estudio='.rawurlencode($slug),
         ]);
     }
 }

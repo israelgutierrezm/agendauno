@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Str;
@@ -45,7 +46,7 @@ class CalendarioPersonalTenant
             ])->save();
         }
 
-        return rtrim((string) config('app.url'), '/').'/api/v1/app/'.$estudio->slug.'/calendario/'.$token.'.ics';
+        return MarcaProducto::urlApi($estudio).'/api/v1/app/'.$estudio->slug.'/calendario/'.$token.'.ics';
     }
 
     public function usuarioDe(#[\SensitiveParameter] string $token): ?Usuario

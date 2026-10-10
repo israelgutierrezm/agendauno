@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/auth/application/sesion_controller.dart';
+import 'core/config/app_config.dart';
 import 'core/errores/reporte_errores.dart';
 import 'core/network/auth_token.dart';
 import 'core/storage/almacen_sesion.dart';
@@ -145,11 +146,13 @@ class _AgendaUnoAppState extends ConsumerState<AgendaUnoApp> {
         : const EquipoScreen();
 
     return MaterialApp(
-      title: 'AgendaUno',
+      // El nombre de esta app: AgendaUno, TurnoUno o el de la marca blanca.
+      title: AppConfig.nombreApp,
       debugShowCheckedModeBanner: false,
       scaffoldMessengerKey: _avisos,
       navigatorKey: _navegador,
-      // El mismo tema claro de la web (tokens de AgendaUno).
+      // El mismo tema claro de la web (los tokens son los mismos en los dos
+      // productos).
       theme: TemaAgendaUno.claro(),
       // En español: los selectores de fecha y hora, sus botones y los textos del
       // sistema (sin esto salen en inglés).

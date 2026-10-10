@@ -169,7 +169,13 @@ describe("landing de una modalidad (/clases y /citas)", () => {
       await flushPromises();
       const enlace = vista.get(".tu-modalidad-otra a");
       expect(enlace.attributes("href")).toBe(ruta);
-      expect(enlace.text()).toContain(es.landing[modo].final.otraEnlace);
+      // El otro producto, con su nombre (ADR 0108).
+      expect(enlace.text()).toContain(
+        es.landing[modo].final.otraEnlace.replace(
+          "{otro}",
+          modo === "clases" ? "TurnoUno" : "AgendaUno",
+        ),
+      );
       await enlace.trigger("click");
       expect(trackEvent).toHaveBeenCalledWith(
         "marketing_business_mode_selected",

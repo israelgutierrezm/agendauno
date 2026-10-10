@@ -9,6 +9,11 @@ export default {
     ayuda:
       "Lo que ven tus clientes en tu página y en tu página de enlaces para redes.",
     descripcion: "Descripción",
+    color: "Color de tu marca",
+    colorSin: "El de la plataforma",
+    colorQuitar: "Usar el de la plataforma",
+    colorAyuda:
+      "Lo usa la app de tu negocio cuando tus clientes la instalan en su teléfono.",
     descripcionPh:
       "Cuéntales quiénes son, qué ofrecen y qué los hace distintos.",
     portada: "Portada",

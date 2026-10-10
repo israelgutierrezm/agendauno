@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Mail;
 
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -28,12 +30,18 @@ class CorreoConfirmarCorreo extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: "Confirma tu correo nuevo en {$this->estudioNombre}");
+        $producto = MarcaProducto::deSlug($this->slug);
+
+        return new Envelope(
+            from: new Address(MarcaProducto::remitente($producto), $producto->nombre()),
+            subject: "Confirma tu correo nuevo en {$this->estudioNombre}",
+        );
     }
 
     public function content(): Content
     {
-        $url = rtrim((string) config('agendauno.url_app'), '/').'/confirmar-correo/'.$this->slug
+        $producto = MarcaProducto::deSlug($this->slug);
+        $url = $producto->urlWeb().'/confirmar-correo/'.$this->slug
             .'?token='.rawurlencode($this->token);
 
         $html = '<p>Pediste usar este correo para entrar a '.e($this->estudioNombre).'.</p>'
@@ -41,6 +49,6 @@ class CorreoConfirmarCorreo extends Mailable implements ShouldQueue
             .'<p>El enlace vence en 24 horas. Si no lo pediste, ignora este correo: no cambia nada.</p>'
             .'<p>Si el botón no funciona, copia y pega este enlace en tu navegador:<br>'.e($url).'</p>';
 
-        return new Content(htmlString: DisenoCorreo::envolver($this->estudioNombre, $html));
+        return new Content(htmlString: DisenoCorreo::envolver($this->estudioNombre, $html, $producto));
     }
 }

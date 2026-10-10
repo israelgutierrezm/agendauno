@@ -486,6 +486,7 @@ export const plataformaAdmin = {
     configuracion: "Configuración",
     operacion: "Operación",
     errores: "Errores",
+    interesados: "Interesados",
   },
   // Monitoreo de errores (ADR 0080).
   errores: {

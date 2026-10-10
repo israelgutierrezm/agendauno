@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\MensajeTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\WhatsAppEnvio;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -140,13 +141,13 @@ class RespuestasWhatsApp
     {
         $estudio = $ultimo instanceof WhatsAppEnvio ? Estudio::query()->find($ultimo->estudio_id) : null;
         if (! $estudio instanceof Estudio) {
-            return 'Hola. Este WhatsApp solo envía avisos de AgendaUno y no recibe mensajes. '
+            return 'Hola. Este WhatsApp solo envía avisos de '.MarcaProducto::de(null)->nombre().' y no recibe mensajes. '
                 .'Si tienes una cita, comunícate directamente con el negocio.';
         }
 
-        $base = rtrim((string) config('agendauno.url_app'), '/').'/entrar?estudio='.rawurlencode((string) $estudio->slug);
+        $base = MarcaProducto::urlWeb($estudio).'/entrar?estudio='.rawurlencode((string) $estudio->slug);
         if ($ultimo->origen === WhatsAppEnvio::ORIGEN_AVISO_DUENO) {
-            return 'Hola. Este WhatsApp solo envía los avisos de AgendaUno y no recibe mensajes. '
+            return 'Hola. Este WhatsApp solo envía los avisos de '.$estudio->producto()->nombre().' y no recibe mensajes. '
                 .'Tu renta y tus avisos están en tu panel: '.$base.'&volver='.rawurlencode('/renta')
                 .' Si ya no quieres estos avisos por WhatsApp, responde BAJA; el correo te seguirá llegando.';
         }
@@ -176,7 +177,8 @@ class RespuestasWhatsApp
             }
             if ($delNegocio->contains('origen', WhatsAppEnvio::ORIGEN_AVISO_DUENO)) {
                 $this->bajaDelDueno($estudio);
-                $de['AgendaUno'] = 'AgendaUno';
+                $marca = $estudio->producto()->nombre();
+                $de[$marca] = $marca;
             }
             $mensajes = $delNegocio->where('origen', WhatsAppEnvio::ORIGEN_MENSAJE)->pluck('referencia_id')->all();
             if ($mensajes !== [] && $this->gestor->baseDeDatosExiste($estudio)) {

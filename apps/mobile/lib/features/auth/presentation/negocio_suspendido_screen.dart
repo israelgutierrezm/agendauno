@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/tema_agendauno.dart';
 import '../application/sesion_controller.dart';
 
@@ -44,14 +45,17 @@ class _NegocioSuspendidoScreenState
           padding: const EdgeInsets.fromLTRB(20, 32, 20, 20),
           children: [
             Text(
-              negocio == null || negocio.isEmpty ? 'AgendaUno' : negocio,
+              negocio == null || negocio.isEmpty
+                  ? AppConfig.nombreApp
+                  : negocio,
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
             Text(
               puedePagar
                   ? 'Tu negocio está suspendido por falta de pago. Paga tu '
-                        'suscripción en agendauno.mx para reactivarlo.'
+                        'suscripción en ${AppConfig.producto.dominio} para '
+                        'reactivarlo.'
                   : 'Este negocio no está disponible por ahora.',
               style: const TextStyle(color: TemaAgendaUno.textoSuave),
             ),

@@ -18,6 +18,7 @@ import DialogoConfirmar from "@/components/DialogoConfirmar.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
 import PanelRoles from "@/components/PanelRoles.vue";
 import { ISOTIPO_AGENDAUNO } from "@/lib/marca";
+import { productoActual } from "@/lib/producto";
 import { ubicacion } from "@/lib/menu";
 import { useUbicacionActual } from "@/lib/ubicacionActual";
 import { identidadDeSesion, reiniciarMiCuenta } from "@/lib/miCuenta";
@@ -184,13 +185,21 @@ onMounted(() => {
           :alt="sesion.estudio?.nombre"
           class="h-9 w-9 rounded-xl object-cover shrink-0"
         />
-        <!-- Sin logo propio: el isotipo de AgendaUno. -->
+        <!-- Sin logo propio: el isotipo de AgendaUno; en TurnoUno (sin logotipo
+             definitivo, ADR 0108), la inicial del negocio. -->
         <img
-          v-else
+          v-else-if="productoActual() === 'agendauno'"
           :src="ISOTIPO_AGENDAUNO"
           alt=""
           class="h-9 w-9 object-contain shrink-0"
         />
+        <span
+          v-else
+          class="h-9 w-9 shrink-0 rounded-xl grid place-items-center text-sm font-semibold"
+          :style="{ background: 'var(--acento)', color: '#ffffff' }"
+          aria-hidden="true"
+          >{{ (sesion.estudio?.nombre ?? "T").charAt(0).toUpperCase() }}</span
+        >
         <span v-show="!compactoEfectivo" class="min-w-0">
           <span
             class="block text-sm font-semibold truncate"
