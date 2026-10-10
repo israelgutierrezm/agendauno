@@ -178,6 +178,23 @@ it('el superadmin cambia la modalidad antes de operar y queda en la bitácora de
         ->assertOk()->assertJsonPath('data.modalidad', 'clases')->assertJsonPath('data.perfil', 'pilates');
 });
 
+it('al cambiar de modalidad se descarta la terminología propia; al cambiar de giro, no', function (): void {
+    $e = estudioConSesion('estudio-sur', 'dueno@estudio-sur.mx');
+    $this->putJson("/api/v1/app/{$e['slug']}/terminologia", ['valores' => ['sesion' => 'Lección']], conBearer($e['bearer']))->assertOk();
+
+    // Dentro de su modalidad, la conserva.
+    $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}/modalidad", ['modalidad' => 'clases', 'perfil_negocio' => 'yoga'], conPlataforma())->assertOk();
+    $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
+        ->assertJsonPath('data.estudio.perfil_config.terminologia.sesion', 'Lección');
+
+    // A citas: la de clases ya no aplica; queda la del giro y en la bitácora la que tenía.
+    $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}/modalidad", ['modalidad' => 'citas', 'perfil_negocio' => 'barberia'], conPlataforma())->assertOk();
+    $this->getJson("/api/v1/app/{$e['slug']}/yo", conBearer($e['bearer']))
+        ->assertJsonPath('data.estudio.perfil_config.terminologia.sesion', 'Cita');
+    expect($this->getJson("/api/v1/app/{$e['slug']}/auditorias?accion=estudio.modalidad", conBearer($e['bearer']))->json('data.0.antes.terminologia'))
+        ->toBe(['sesion' => 'Lección']);
+});
+
 it('con sesiones o reservas, la modalidad ya no cambia', function (): void {
     $e = estudioConSesion('estudio-oeste', 'dueno@estudio-oeste.mx');
     crearSesionTenant($e, agendaSemilla($e));

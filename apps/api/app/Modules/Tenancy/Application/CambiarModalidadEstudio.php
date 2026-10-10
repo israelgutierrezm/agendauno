@@ -19,8 +19,9 @@ use Illuminate\Validation\ValidationException;
  * Cambia la modalidad de un negocio (ADR 0104): solo el superadmin, y solo mientras
  * su base no tenga sesiones ni reservas (como la moneda, que solo cambia antes de
  * cobrar): lo que ya existe es de la modalidad con que se creó. Con la modalidad
- * cambia su giro (el elegido o el predeterminado de la nueva) y su métrica de cobro.
- * Queda en el log de la plataforma y en la bitácora del negocio.
+ * cambia su giro (el elegido o el predeterminado de la nueva) y su métrica de cobro, y
+ * se descarta su terminología propia: nombraba lo de la otra modalidad («Clase» en un
+ * negocio de citas). Queda en el log de la plataforma y en la bitácora del negocio.
  */
 class CambiarModalidadEstudio
 {
@@ -68,11 +69,18 @@ class CambiarModalidadEstudio
             return $estudio;
         }
         // Un cambio de giro dentro de la misma modalidad solo cambia la terminología.
-        if ($antes['modalidad'] !== $despues['modalidad'] && ! $this->cambiable($estudio)) {
+        $otraModalidad = $antes['modalidad'] !== $despues['modalidad'];
+        if ($otraModalidad && ! $this->cambiable($estudio)) {
             throw new ModalidadEnUso('Este negocio ya tiene sesiones o reservas: su modalidad ya no se puede cambiar.');
         }
 
-        $estudio->forceFill(['modalidad' => $modalidad, 'perfil_negocio' => $perfil])->save();
+        $cambios = ['modalidad' => $modalidad, 'perfil_negocio' => $perfil];
+        $propia = (array) ($estudio->terminologia ?? []);
+        if ($otraModalidad && $propia !== []) {
+            $cambios['terminologia'] = null;
+            $antes['terminologia'] = $propia;
+        }
+        $estudio->forceFill($cambios)->save();
 
         Log::info('plataforma.estudio.modalidad', ['estudio' => $estudio->slug, 'antes' => $antes, 'despues' => $despues]);
         if ($this->gestor->baseDeDatosExiste($estudio)) {
