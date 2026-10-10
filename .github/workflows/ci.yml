@@ -117,8 +117,9 @@ jobs:
       - name: Static analysis (PHPStan)
         run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
 
+      # Toda la suite en un proceso: con más de mil pruebas, 512 MB ya no alcanzan.
       - name: Tests (Pest)
-        run: php artisan test
+        run: php -d memory_limit=2G artisan test
 
       # Las pruebas usan SQLite para los negocios, que no tiene candados de fila ni
       # escrituras simultáneas: aquí se comprueba en MySQL con procesos a la vez
