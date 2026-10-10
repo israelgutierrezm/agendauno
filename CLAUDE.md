@@ -27,7 +27,10 @@ v4, Pinia, Vue Router, vue-i18n. It serves the marketing site, business
 registration, the business panel, the member portal and the superadmin.
 
 Mobile (`apps/mobile`): Flutter, Riverpod, Dio; feature-first (`lib/features/*`),
-repository + service data layer.
+repository + service data layer. One codebase, two official apps (ADR 0111): Android
+flavors `agendauno` (default) and `turnouno`; `ProductoApp.actual` in Dart. Requests
+carry `X-App-Producto`; white-label apps (AgendaUno only) are built from
+`configuraciones/marca_blanca/<negocio>.json` and carry `X-App-Negocio`.
 
 Infrastructure: Docker (`infra/produccion`, `actualizar.sh` / `volver.sh`),
 GitHub Actions CI (API with MySQL, web, mobile).

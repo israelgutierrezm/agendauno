@@ -37,15 +37,17 @@ implementado** · **Requiere autorización**.
 | Íconos cuadrados del logo (192/512) | Preparado para futuro | Requiere GD en la imagen del API (cambio de imagen) |
 | Notificaciones push web | No implementado | La app oficial sí tiene push (FCM) |
 | Constructor del sitio (plantillas, secciones, banners) | No implementado | Hoy: escaparate con logo, portada, descripción, redes y color |
-| App oficial AgendaUno (Android/iOS) | No implementado | Fase 4; la app actual es la base |
-| App oficial TurnoUno (Android/iOS) | No implementado | Fase 4 |
-| White-label (solo AgendaUno) | No implementado | Fase 4, preparado sin publicar |
+| App oficial AgendaUno (Android) | Implementado y probado | ADR 0111: sabor `agendauno`, `com.agendauno.app`; APK compilado y revisado |
+| App oficial TurnoUno (Android) | Implementado y probado | Sabor `turnouno`, `com.turnouno.app`, API `turnouno.mx`; APK compilado y revisado; ícono provisional |
+| Apps oficiales en iOS | Preparado para futuro | Producto en Dart listo; esquemas de Xcode en una Mac (docs/MOBILE.md) |
+| La API no abre negocios del otro producto en cada app | Implementado y probado | `X-App-Producto`; la app dice qué app descargar |
+| Marca blanca (solo AgendaUno) | Preparado para futuro | Archivo por negocio, `X-App-Negocio`, Gradle la impide en TurnoUno; sin alta en superadmin |
+| Publicar las apps en tiendas | Requiere autorización | Cuentas de desarrollador, llaves de firma, fichas |
 | Traefik, dos dominios, certificados comodín | No implementado | Fase 5; DNS en Cloudflare |
 | CI/CD por aplicación | No implementado | Fase 5 |
 | Negocio con los dos productos | Preparado para futuro | Hoy un negocio es de una sola modalidad (ADR 0104) |
 | Documentos legales por producto | Preparado para futuro | Hoy son de la plataforma |
 | Autorregistro de clientes en los sitios | Requiere autorización | Se mantiene cerrado (ADR 0093, reafirmado 2026-10-10) |
-| Publicar apps en tiendas | Requiere autorización | |
 | Cambios en producción | Requiere autorización | |
 
 ## Variables

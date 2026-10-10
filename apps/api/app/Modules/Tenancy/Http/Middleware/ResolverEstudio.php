@@ -26,6 +26,10 @@ use Symfony\Component\HttpFoundation\Response;
  * (TurnoUno) no responde en agendauno.mx ni en `barberia.agendauno.mx`, ni un estudio
  * de clases en turnouno.mx. Fuera de los dominios de los productos (localhost, la IP
  * del servidor) no se revisa; los avisos de las pasarelas llegan por cualquiera.
+ *
+ * Las apps móviles dicen de cuál son (ADR 0111): `X-App-Producto` (la de TurnoUno no
+ * abre un negocio de AgendaUno ni al revés, también fuera de los dominios) y, una app
+ * de marca blanca, `X-App-Negocio`: solo abre ese negocio, y solo si es de AgendaUno.
  */
 class ResolverEstudio
 {
@@ -58,6 +62,7 @@ class ResolverEstudio
                 // dinero ya se movió y hay que registrarlo.
                 || ($estudio->estado === EstadoEstudio::Suspended && self::esAvisoDePago($request)))
             || ! self::enSuProducto($request, $estudio)
+            || ! self::desdeSuApp($request, $estudio)
             || ! $this->gestor->baseDeDatosExiste($estudio)) {
             abort(404, 'Estudio no encontrado.');
         }
@@ -85,6 +90,25 @@ class ResolverEstudio
         $delHost = ProductoComercial::delHost($request->getHost());
 
         return $delHost === null || $delHost === $estudio->producto() || self::esAvisoDePago($request);
+    }
+
+    /** ¿La app que pide (si lo dice) es la de este negocio? */
+    private static function desdeSuApp(Request $request, Estudio $estudio): bool
+    {
+        if (self::esAvisoDePago($request)) {
+            return true;
+        }
+
+        $producto = (string) $request->header('X-App-Producto', '');
+        if ($producto !== '' && ProductoComercial::tryFrom($producto) !== $estudio->producto()) {
+            return false;
+        }
+
+        // Marca blanca: solo de AgendaUno (TurnoUno aún no la tiene).
+        $negocio = (string) $request->header('X-App-Negocio', '');
+
+        return $negocio === ''
+            || ($negocio === $estudio->slug && $estudio->producto() === ProductoComercial::AgendaUno);
     }
 
     private static function esAvisoDePago(Request $request): bool

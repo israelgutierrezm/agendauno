@@ -34,7 +34,7 @@ class TipoSesionDesconocido implements Exception {
       ? 'Se esperaba una ${esperado!.name} y llegó «$valor».'
       : valor == null
       ? 'La sesión no dice si es clase o cita.'
-      : 'Tipo de sesión desconocido: «$valor». Actualiza AgendaUno.';
+      : 'Tipo de sesión desconocido: «$valor». Actualiza la app.';
 }
 
 /// La ocupación de una clase que se muestra, de 0 a 100 (con sobrecupo se queda en
