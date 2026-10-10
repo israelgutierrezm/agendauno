@@ -1,16 +1,16 @@
-AVISO DE PRIVACIDAD INTEGRAL DE AGENDAUNO
+AVISO DE PRIVACIDAD INTEGRAL DE AGENDAUNO Y TURNOUNO
 
 1. Quiénes somos y cómo contactarnos
 
-{responsable} (en adelante, «AgendaUno»), con domicilio en {domicilio}, es responsable del tratamiento de los datos personales que se describen en este aviso, de acuerdo con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares y demás normativa aplicable.
+{responsable} (en adelante, «la Plataforma» o «nosotros»), con domicilio en {domicilio}, opera las marcas AgendaUno (agendauno.mx, para negocios de clases) y TurnoUno (turnouno.mx, para negocios de citas) y es responsable del tratamiento de los datos personales que se describen en este aviso, de acuerdo con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares y demás normativa aplicable. Las dos marcas son el mismo servicio y comparten este aviso.
 
 Para cualquier asunto de privacidad, incluido el ejercicio de tus derechos, escríbenos a {contacto}. Área que atiende las solicitudes: {area}.
 
-Este aviso aplica al sitio agendauno.mx, al directorio de negocios, a la página pública de cada negocio, al registro y a la cuenta de cada negocio, a su panel web, al portal de sus clientes y a la aplicación móvil de AgendaUno.
+Este aviso aplica a los sitios agendauno.mx y turnouno.mx, al directorio de negocios, a la página pública de cada negocio (en su subdominio de agendauno.mx o de turnouno.mx) y a la aplicación que se instala desde ella, al registro y a la cuenta de cada negocio, a su panel web, al portal de sus clientes, a las aplicaciones móviles AgendaUno y TurnoUno, a las aplicaciones propias que un Negocio publique con nuestra tecnología y a la lista de interesados en nuestros productos.
 
 2. Definiciones
 
-• «Negocio»: el estudio, gimnasio, academia, barbería, salón, spa, consultorio u otro establecimiento que usa AgendaUno para administrar su operación.
+• «Negocio»: el estudio, gimnasio, academia, barbería, salón, spa, consultorio u otro establecimiento que usa AgendaUno o TurnoUno para administrar su operación.
 • «Equipo»: las personas a las que el Negocio da acceso (dueños, administradores, recepción, instructores y profesionales).
 • «Clientes del negocio»: los alumnos, miembros, clientes o pacientes de un Negocio que reservan, agendan, compran o usan su portal, su página pública o la aplicación.
 • «Datos personales»: cualquier información que identifique a una persona o la haga identificable.
@@ -20,7 +20,7 @@ Este aviso aplica al sitio agendauno.mx, al directorio de negocios, a la página
 
 Somos responsables de los datos de las personas que registran un Negocio y de su Equipo, así como de quienes visitan nuestro sitio o nos escriben.
 
-Cada Negocio es responsable de los datos de sus clientes. Sobre esos datos, AgendaUno actúa como encargado y se obliga a:
+Cada Negocio es responsable de los datos de sus clientes. Sobre esos datos, la Plataforma actúa como encargado y se obliga a:
 • Tratarlos solo para prestar el servicio al Negocio y conforme a sus instrucciones, nunca para fines propios.
 • Guardar confidencialidad y aplicar las medidas de seguridad de este aviso.
 • Apoyarse solo en proveedores con obligaciones equivalentes.
@@ -47,9 +47,11 @@ De los clientes del Negocio (como encargado), según lo que cada Negocio active 
 • Preferencias de comunicación y dispositivos para notificaciones.
 • Quien agenda sin cuenta en la página de un Negocio: los datos que captura para su cita (nombre, correo, celular y lo que quiera comentar).
 
-Algunos negocios (por ejemplo, consultorios, fisioterapia o estética) pueden registrar datos de salud en sus formularios o expedientes. Son datos sensibles: el Negocio debe obtener el consentimiento expreso y por escrito de su titular. AgendaUno no solicita datos sensibles para registrar un Negocio; no los incluyas en campos de contacto o de soporte.
+Algunos negocios (por ejemplo, consultorios, fisioterapia o estética) pueden registrar datos de salud en sus formularios o expedientes. Son datos sensibles: el Negocio debe obtener el consentimiento expreso y por escrito de su titular. La Plataforma no solicita datos sensibles para registrar un Negocio; no los incluyas en campos de contacto o de soporte.
 
-De quienes visitan el sitio: datos técnicos (dirección IP, navegador y páginas visitadas) y los que nos des al contactarnos.
+De quienes visitan nuestros sitios: datos técnicos (dirección IP, navegador y páginas visitadas) y los que nos des al contactarnos.
+
+De quienes se inscriben en la lista de interesados de un producto: nombre, correo, teléfono (si lo das), el giro de su negocio y el producto que le interesa.
 
 No guardamos números completos de tarjeta: los pagos se capturan en la página segura de la pasarela de pago.
 
@@ -62,13 +64,14 @@ Finalidades necesarias (sin ellas no podemos prestar el servicio):
 • Procesar los cobros que el Negocio hace a sus clientes con la pasarela que el propio Negocio conecta y emitir facturas electrónicas cuando el Negocio lo solicite (solo en México).
 • Medir el uso para calcular y cobrar la suscripción, emitir comprobantes y atender adeudos.
 • Dar soporte; avisar de cambios, mantenimientos e incidentes de seguridad; hacer respaldos y prevenir fraudes y abusos.
+• Avisar a quien se inscribió en la lista de interesados cuando el producto que le interesa abra su registro o tenga novedades sobre su lanzamiento.
 • Cumplir obligaciones legales y fiscales y atender requerimientos de autoridad.
 
 Finalidades secundarias (no son necesarias para el servicio):
-• Enviarte novedades, encuestas y ofertas de AgendaUno.
+• Enviarte novedades, encuestas y ofertas de AgendaUno y de TurnoUno.
 • Analizar de forma agregada el uso del sitio y del servicio para mejorarlo.
 
-Si no quieres que usemos tus datos para las finalidades secundarias, escríbenos a {contacto} en cualquier momento; tu negativa no afecta el servicio. Los datos de los clientes del Negocio nunca se usan para finalidades secundarias de AgendaUno ni para enviarles publicidad de AgendaUno.
+Si no quieres que usemos tus datos para las finalidades secundarias, escríbenos a {contacto} en cualquier momento; tu negativa no afecta el servicio. Los datos de los clientes del Negocio nunca se usan para finalidades secundarias de la Plataforma ni para enviarles publicidad de AgendaUno o de TurnoUno.
 
 No tomamos decisiones que te afecten jurídicamente basadas solo en un tratamiento automatizado ni elaboramos perfiles con fines publicitarios. La medición de uso para el cobro es un conteo de actividad del Negocio.
 
@@ -84,7 +87,7 @@ No vendemos ni rentamos datos personales. Para prestar el servicio nos apoyamos 
 • WhatsApp Business (Meta), para los mensajes que se aceptaron recibir.
 • Firebase Cloud Messaging (Google), para las notificaciones de la aplicación.
 • Google, para iniciar sesión con Google y para la verificación contra registros automatizados (reCAPTCHA).
-• Pasarelas de pago (Stripe, Mercado Pago y OpenPay), con las que el Negocio cobra a sus clientes y AgendaUno cobra la suscripción.
+• Pasarelas de pago (Stripe, Mercado Pago y OpenPay), con las que el Negocio cobra a sus clientes y la Plataforma cobra la suscripción.
 • FacturAPI, para timbrar facturas electrónicas.
 • Wellhub y TotalPass, solo si el Negocio activa esa integración (en México), para validar la visita de sus usuarios.
 
@@ -108,7 +111,7 @@ Puedes revocar tu consentimiento o limitar el uso de tus datos con el mismo proc
 
 10. Cookies, almacenamiento local y tecnologías similares
 
-Usamos el almacenamiento local de tu navegador para mantener tu sesión iniciada y recordar tus preferencias (tema, negocio y sucursal). El registro de negocios usa reCAPTCHA de Google, que puede usar sus propias cookies. No usamos cookies de publicidad. Si habilitamos herramientas de medición del sitio, lo indicaremos en este aviso. Puedes borrar las cookies y el almacenamiento desde tu navegador; si lo haces, tendrás que volver a iniciar sesión.
+Usamos el almacenamiento local de tu navegador para mantener tu sesión iniciada y recordar tus preferencias (tema, negocio y sucursal). El registro de negocios y la lista de interesados usan reCAPTCHA de Google, que puede usar sus propias cookies. No usamos cookies de publicidad. Si habilitamos herramientas de medición del sitio, lo indicaremos en este aviso. Puedes borrar las cookies y el almacenamiento desde tu navegador; si lo haces, tendrás que volver a iniciar sesión.
 
 11. Cómo protegemos tus datos
 
@@ -120,6 +123,7 @@ Si ocurre una vulneración de seguridad que afecte de forma significativa tus de
 
 Los conservamos mientras la cuenta esté activa y, después, el tiempo necesario para cumplir obligaciones legales y fiscales o atender aclaraciones; luego los bloqueamos y los suprimimos. En particular:
 • Un Negocio que se registra y no se activa en el plazo indicado al registrarse se borra junto con sus datos.
+• Los datos de la lista de interesados se conservan hasta que el producto abra su registro y te avisemos, o hasta que pidas que los borremos.
 • Las sesiones que no se usan vencen y se borran.
 • Los registros técnicos (envíos de mensajes, códigos de verificación y errores) se borran periódicamente.
 • La información fiscal y contable de la suscripción se conserva por el plazo que exigen las leyes fiscales (cinco años).
@@ -130,7 +134,7 @@ Para registrar un Negocio o formar parte de su Equipo se requiere ser mayor de e
 
 14. Cambios a este aviso
 
-Publicaremos cualquier cambio en agendauno.mx/aviso-de-privacidad, con su número de versión y su fecha. Si el cambio es relevante, también te avisaremos por correo o dentro de la plataforma.
+Publicaremos cualquier cambio en agendauno.mx/aviso-de-privacidad y en turnouno.mx/aviso-de-privacidad, con su número de versión y su fecha. Si el cambio es relevante, también te avisaremos por correo o dentro de la plataforma.
 
 15. Autoridad
 

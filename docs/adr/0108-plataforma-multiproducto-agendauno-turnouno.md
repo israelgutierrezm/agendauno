@@ -72,8 +72,10 @@ negocio.
 - El registro de negocios recibe el producto desde el que se registra; el giro debe
   ser de ese producto.
 - Cada producto abre o cierra su registro con un parámetro de plataforma
-  (`registro.abierto_agendauno`, abierto; `registro.abierto_turnouno`, **cerrado**).
-  Cerrado, el registro responde 422 y la landing ofrece dejar los datos.
+  (`registro.abierto_agendauno` y `registro.abierto_turnouno`). Cerrado, el registro
+  responde 422 y la landing ofrece dejar los datos. **Actualización (2026-10-10):**
+  TurnoUno se lanza junto con AgendaUno: los dos registros abren por omisión; la lista
+  de interesados queda para cuando el superadmin cierre el registro de un producto.
 - `interesados` (base central): quienes quieren usar un producto que aún no abre; una
   fila por correo y producto (`POST /api/v1/interesados`, con captcha y aceptación del
   aviso de privacidad). El superadmin los consulta en `GET /plataforma/interesados`.

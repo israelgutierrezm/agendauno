@@ -7,7 +7,7 @@ vende dos productos (ADR 0108):
 |---|---|---|
 | Negocios | De clases: estudios boutique (pilates, yoga, pole, danza, fitness), gimnasios, academias, natación | De citas: barberías, salones, uñas, pestañas, spas, estética, profesionales independientes |
 | Dominio | agendauno.mx (`{slug}.agendauno.mx`) | turnouno.mx (`{slug}.turnouno.mx`) |
-| Estado comercial | Se lanza primero: registro abierto | Prelanzamiento: registro cerrado, lista de interesados |
+| Estado comercial | Lanzamiento: registro abierto | Lanzamiento (decidido el 2026-10-10): registro abierto |
 | Cobro SaaS | Por alumnos activos, mes vencido (ADR 0107) | Por plan (nivel y profesionales), por adelantado (ADR 0107) |
 
 El producto de un negocio sale de su modalidad (clases → AgendaUno, citas → TurnoUno).
@@ -23,12 +23,12 @@ implementado** · **Requiere autorización**.
 | Producto derivado de la modalidad (`ProductoComercial`) | Implementado y probado | `Estudio::producto()`, `/yo` y `/marca` lo dicen |
 | Dominios por producto en la API (rutas, CORS, regreso de pagos) | Implementado y probado | `{slug}.agendauno.mx` y `{slug}.turnouno.mx`; cada negocio solo en el suyo |
 | Enlaces y marca de correos y avisos por producto | Implementado y probado | Remitente por producto opcional (`AGENDAUNO_MAIL_FROM`, `TURNOUNO_MAIL_FROM`) |
-| Registro por producto y cierre de TurnoUno | Implementado y probado | Parámetros `registro.abierto_agendauno` / `registro.abierto_turnouno` |
+| Registro por producto (abrir o cerrar cada uno) | Implementado y probado | Parámetros `registro.abierto_agendauno` / `registro.abierto_turnouno`, los dos abiertos por omisión |
 | Lista de interesados (API) | Implementado y probado | `POST /api/v1/interesados`, superadmin `GET /plataforma/interesados` |
 | Directorio por producto, slugs reservados | Implementado y probado | |
 | Web: un código, tres builds (aplicación, landing AgendaUno, landing TurnoUno) | Implementado y probado | ADR 0109; `npm run build`, revisión por producto y por HTTP |
 | Landing AgendaUno (agendauno.mx) | Implementado, pendiente de despliegue | Portada de clases, páginas por giro de clases, su SEO, sitemap y robots |
-| Landing TurnoUno de prelanzamiento (turnouno.mx) | Implementado, pendiente de despliegue | Portada de citas con «Quiero que me avisen» y lista de interesados; logotipo en texto (configurable) |
+| Landing TurnoUno (turnouno.mx) | Implementado, pendiente de despliegue | Portada de citas con prueba gratis y registro; si el superadmin cierra su registro, la misma landing ofrece la lista de interesados. Logotipo en texto (configurable) |
 | Aplicación con la marca del dominio | Implementado y probado | Textos, logo y enlaces con la marca del producto; registro solo con sus giros |
 | Superadmin: interesados | Implementado y probado | Pestaña «Interesados» |
 | Imágenes web separadas (aplicación, landing AgendaUno, landing TurnoUno) | Implementado, pendiente de despliegue | ADR 0112: `landing.Dockerfile`; nginx de `web` pasa a cada landing sus rutas. La prueba con contenedores (imágenes, `nginx -t`, enrutamiento) está en el CI y corre al abrir el PR: aquí no hubo Docker |

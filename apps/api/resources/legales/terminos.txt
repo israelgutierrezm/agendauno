@@ -2,7 +2,7 @@ TÉRMINOS Y CONDICIONES DE USO DE AGENDAUNO
 
 1. Aceptación y partes
 
-Estos términos regulan el uso de AgendaUno, el software para negocios que trabajan con clases o con citas, operado por {responsable} (en adelante, «AgendaUno»). Tienen dos partes: la primera (apartados 2 a 24) aplica a los negocios que contratan AgendaUno y a su equipo; la segunda (apartados 25 a 32), a los clientes de esos negocios que usan el directorio, la página pública, el portal o la aplicación.
+Estos términos regulan el uso de AgendaUno (para negocios que trabajan con clases) y de TurnoUno (para negocios que trabajan con citas), el mismo software operado por {responsable} (en adelante, «la Plataforma»). Tienen dos partes: la primera (apartados 2 a 24) aplica a los negocios que contratan AgendaUno o TurnoUno y a su equipo; la segunda (apartados 25 a 32), a los clientes de esos negocios que usan el directorio, la página pública, el portal o la aplicación.
 
 Al registrar un negocio, activar una cuenta, agendar o usar la plataforma, aceptas estos términos y el aviso de privacidad publicado en agendauno.mx/aviso-de-privacidad. La aceptación por medios electrónicos tiene plena validez.
 
@@ -14,9 +14,9 @@ PRIMERA PARTE: PARA LOS NEGOCIOS
 
 2. El servicio
 
-AgendaUno es un software como servicio para administrar la operación de un negocio en una de dos modalidades, que se elige al registrarse: clases con cupo o citas 1 a 1. Según la modalidad, incluye agenda, reservas y citas, membresías, paquetes y créditos, pase de lista, ventas y cobros, recordatorios, página pública del negocio, directorio de negocios, portal y aplicación para sus clientes, reportes e integraciones.
+La Plataforma es un software como servicio para administrar la operación de un negocio en una de dos modalidades: clases con cupo (AgendaUno) o citas 1 a 1 (TurnoUno). La modalidad, y con ella la marca, se elige al registrarse. Según la modalidad, incluye agenda, reservas y citas, membresías, paquetes y créditos, pase de lista, ventas y cobros, recordatorios, página pública del negocio, directorio de negocios, portal y aplicación para sus clientes, reportes e integraciones.
 
-AgendaUno solo provee la tecnología. Los servicios que el Negocio ofrece (clases, citas, tratamientos, membresías) y su relación con sus clientes son responsabilidad exclusiva del Negocio.
+La Plataforma solo provee la tecnología. Los servicios que el Negocio ofrece (clases, citas, tratamientos, membresías) y su relación con sus clientes son responsabilidad exclusiva del Negocio.
 
 Algunas funciones dependen de terceros y del país: los cobros en línea con pasarelas de pago, la facturación electrónica (CFDI) y las integraciones con Wellhub y TotalPass solo están disponibles para negocios en México.
 
@@ -29,7 +29,7 @@ Algunas funciones dependen de terceros y del país: los cobros en línea con pas
 
 4. Prueba gratuita
 
-Cada negocio nuevo cuenta con una prueba gratuita, sin tarjeta, por el plazo publicado en agendauno.mx al momento de registrarse. Al terminar la prueba, para seguir usando AgendaUno se paga la suscripción.
+Cada negocio nuevo cuenta con una prueba gratuita, sin tarjeta, por el plazo publicado en el sitio de su marca (agendauno.mx o turnouno.mx) al momento de registrarse. Al terminar la prueba, para seguir usando la Plataforma se paga la suscripción.
 
 5. Suscripción, precios, impuestos y pagos
 
@@ -37,9 +37,9 @@ Cada negocio nuevo cuenta con una prueba gratuita, sin tarjeta, por el plazo pub
 • En citas, el Negocio elige un plan (Individual, Premium o Pro) y los profesionales que contrata, con pago mensual o anual, y se cobra por adelantado al inicio de cada periodo. El pago anual equivale a 10 meses. Si sube de plan o de profesionales, se cobra al momento la diferencia de los días que faltan del periodo pagado; si baja, el cambio aplica desde el siguiente periodo. No puede tener más profesionales de los contratados. Las funciones de cada plan se publican en agendauno.mx.
 • Los precios se publican en agendauno.mx en dólares de los Estados Unidos, más impuestos. A los negocios en México se les cobra en pesos mexicanos, al tipo de cambio FIX publicado por el Banco de México vigente el día en que se emite el cargo, más IVA; a los demás, en dólares. Cada parte paga los impuestos que le correspondan. Si lo solicitas, emitimos la factura de los cargos en pesos.
 • Los cargos se pagan en línea con tarjeta desde «Mi suscripción». El Negocio puede guardar su tarjeta para que cada cargo se cobre automáticamente; si un cobro automático no pasa, se reintenta a los 3 y a los 7 días, y el Negocio puede quitar su tarjeta en cualquier momento.
-• Los negocios que superan 20 profesionales o 1,000 alumnos activos pueden acordar con AgendaUno una cuota a la medida.
+• Los negocios que superan 20 profesionales o 1,000 alumnos activos pueden acordar con la Plataforma una cuota a la medida.
 • Podemos actualizar los precios. Los cambios no afectan los cargos ya emitidos ni el periodo ya pagado, y se avisan con al menos 30 días naturales de anticipación.
-• Los pagos de la suscripción no son reembolsables, salvo un cobro indebido atribuible a AgendaUno.
+• Los pagos de la suscripción no son reembolsables, salvo un cobro indebido atribuible a la Plataforma.
 
 6. Falta de pago y suspensión
 
@@ -47,7 +47,7 @@ Si un cargo no se paga, el Negocio cuenta con un plazo de gracia (actualmente, 1
 
 7. Cobros del Negocio a sus clientes
 
-• El Negocio conecta su propia cuenta de pasarela de pago (Stripe, Mercado Pago u OpenPay) con sus llaves, y el dinero llega directamente a esa cuenta. AgendaUno no recibe ni retiene esos fondos ni cobra comisión sobre ellos; las comisiones de la pasarela son a cargo del Negocio según su contrato con ella.
+• El Negocio conecta su propia cuenta de pasarela de pago (Stripe, Mercado Pago u OpenPay) con sus llaves, y el dinero llega directamente a esa cuenta. La Plataforma no recibe ni retiene esos fondos ni cobra comisión sobre ellos; las comisiones de la pasarela son a cargo del Negocio según su contrato con ella.
 • El Negocio también puede registrar pagos en efectivo, por transferencia u otros medios.
 • Los precios, promociones, políticas de cancelación, devoluciones, aclaraciones y contracargos frente a sus clientes son responsabilidad del Negocio, así como cumplir las leyes de protección al consumidor.
 
@@ -57,7 +57,7 @@ Disponible para negocios en México mediante un proveedor autorizado de certific
 
 9. Servicios de terceros
 
-Algunas funciones usan servicios de terceros: pasarelas de pago, WhatsApp Business (Meta), Google, Firebase, FacturAPI, Wellhub y TotalPass. Su uso queda sujeto también a los términos de cada proveedor. AgendaUno no responde por sus fallas, cambios o suspensiones, ni por las decisiones que tomen sobre la cuenta del Negocio con ellos.
+Algunas funciones usan servicios de terceros: pasarelas de pago, WhatsApp Business (Meta), Google, Firebase, FacturAPI, Wellhub y TotalPass. Su uso queda sujeto también a los términos de cada proveedor. La Plataforma no responde por sus fallas, cambios o suspensiones, ni por las decisiones que tomen sobre la cuenta del Negocio con ellos.
 
 10. Mensajes a los clientes
 
@@ -76,27 +76,27 @@ No se permite intentar acceder a cuentas o a información de otros negocios; vul
 
 13. Información del Negocio y privacidad
 
-La información que el Negocio y su equipo cargan (sus clientes, su agenda, sus ventas) pertenece al Negocio. Sobre los datos de sus clientes, el Negocio es el responsable y AgendaUno el encargado: los trata solo para prestar el servicio, conforme al aviso de privacidad y con las obligaciones que ahí se describen. El Negocio puede exportar su directorio de clientes desde el panel y solicitar una copia de su información a {contacto}. Al terminar la relación, puede pedir esa copia dentro de los 30 días naturales siguientes; después la suprimiremos, salvo lo que debamos conservar por obligación legal.
+La información que el Negocio y su equipo cargan (sus clientes, su agenda, sus ventas) pertenece al Negocio. Sobre los datos de sus clientes, el Negocio es el responsable y la Plataforma el encargado: los trata solo para prestar el servicio, conforme al aviso de privacidad y con las obligaciones que ahí se describen. El Negocio puede exportar su directorio de clientes desde el panel y solicitar una copia de su información a {contacto}. Al terminar la relación, puede pedir esa copia dentro de los 30 días naturales siguientes; después la suprimiremos, salvo lo que debamos conservar por obligación legal.
 
 14. Confidencialidad
 
-AgendaUno y el Negocio guardan reserva sobre la información no pública que conozcan uno del otro con motivo del servicio y solo la usan para cumplir estos términos, salvo que la ley o una autoridad obliguen a revelarla.
+La Plataforma y el Negocio guardan reserva sobre la información no pública que conozcan uno del otro con motivo del servicio y solo la usan para cumplir estos términos, salvo que la ley o una autoridad obliguen a revelarla.
 
 15. Disponibilidad y soporte
 
-Procuramos que AgendaUno esté disponible en todo momento y hacemos respaldos periódicos, pero puede haber interrupciones por mantenimiento, por fallas de proveedores o por causas fuera de nuestro control. Avisaremos con anticipación los mantenimientos programados cuando sea posible. Soporte: {contacto}.
+Procuramos que la Plataforma esté disponible en todo momento y hacemos respaldos periódicos, pero puede haber interrupciones por mantenimiento, por fallas de proveedores o por causas fuera de nuestro control. Avisaremos con anticipación los mantenimientos programados cuando sea posible. Soporte: {contacto}.
 
 16. Propiedad intelectual
 
-AgendaUno, su software, diseño, marca y contenidos pertenecen a su titular. La suscripción otorga al Negocio una licencia de uso no exclusiva e intransferible por el tiempo contratado. El Negocio conserva los derechos sobre su marca, su logotipo y sus imágenes, y autoriza que se muestren en su página pública y en el directorio de negocios de AgendaUno para prestar el servicio. Las sugerencias que nos compartas podremos usarlas para mejorar AgendaUno sin obligación de pago.
+AgendaUno y TurnoUno, su software, diseño, marcas y contenidos pertenecen a su titular. La suscripción otorga al Negocio una licencia de uso no exclusiva e intransferible por el tiempo contratado. El Negocio conserva los derechos sobre su marca, su logotipo y sus imágenes, y autoriza que se muestren en su página pública y en el directorio de negocios de la Plataforma para prestar el servicio. Las sugerencias que nos compartas podremos usarlas para mejorar la Plataforma sin obligación de pago.
 
 17. Limitación de responsabilidad
 
-AgendaUno no responde por los servicios que el Negocio presta a sus clientes, por las decisiones del Negocio, por fallas de servicios de terceros o de la conexión a internet, ni por daños indirectos, lucro cesante o pérdida de ingresos. Salvo dolo o negligencia grave, la responsabilidad total de AgendaUno se limita al monto pagado por el Negocio en los tres meses anteriores al hecho que la origine.
+La Plataforma no responde por los servicios que el Negocio presta a sus clientes, por las decisiones del Negocio, por fallas de servicios de terceros o de la conexión a internet, ni por daños indirectos, lucro cesante o pérdida de ingresos. Salvo dolo o negligencia grave, la responsabilidad total de la Plataforma se limita al monto pagado por el Negocio en los tres meses anteriores al hecho que la origine.
 
 18. Indemnización
 
-El Negocio sacará en paz y a salvo a AgendaUno de las reclamaciones de sus clientes o de terceros que se originen en los servicios que presta, en el contenido que carga, en el tratamiento de los datos de sus clientes como responsable o en el incumplimiento de estos términos, y le reembolsará los gastos razonables que le causen.
+El Negocio sacará en paz y a salvo a la Plataforma de las reclamaciones de sus clientes o de terceros que se originen en los servicios que presta, en el contenido que carga, en el tratamiento de los datos de sus clientes como responsable o en el incumplimiento de estos términos, y le reembolsará los gastos razonables que le causen.
 
 19. Caso fortuito y fuerza mayor
 
@@ -104,15 +104,15 @@ Ninguna parte responde por incumplimientos causados por hechos fuera de su contr
 
 20. Terminación
 
-El Negocio puede dejar de usar AgendaUno en cualquier momento avisándonos a {contacto}; pagará el uso del mes en curso, que se cobra al cierre de ese mes. AgendaUno puede suspender o terminar el servicio por falta de pago, por uso prohibido o por un incumplimiento grave de estos términos. Los apartados de pagos pendientes, confidencialidad, propiedad intelectual, limitación de responsabilidad e indemnización siguen vigentes después de terminar.
+El Negocio puede dejar de usar la Plataforma en cualquier momento avisándonos a {contacto}; pagará el uso del mes en curso, que se cobra al cierre de ese mes. La Plataforma puede suspender o terminar el servicio por falta de pago, por uso prohibido o por un incumplimiento grave de estos términos. Los apartados de pagos pendientes, confidencialidad, propiedad intelectual, limitación de responsabilidad e indemnización siguen vigentes después de terminar.
 
 21. Avisos
 
-Los avisos se envían al correo registrado del Negocio o dentro de la plataforma, y a AgendaUno a {contacto}.
+Los avisos se envían al correo registrado del Negocio o dentro de la plataforma, y a la Plataforma a {contacto}.
 
 22. Cambios a estos términos
 
-Publicaremos cada versión, con su número y su fecha, en agendauno.mx/terminos y avisaremos los cambios relevantes. Si sigues usando AgendaUno después de que entren en vigor, se entienden aceptados; si no estás de acuerdo, puedes cancelar.
+Publicaremos cada versión, con su número y su fecha, en agendauno.mx/terminos y en turnouno.mx/terminos y avisaremos los cambios relevantes. Si sigues usando la Plataforma después de que entren en vigor, se entienden aceptados; si no estás de acuerdo, puedes cancelar.
 
 23. Disposiciones generales
 
@@ -120,13 +120,13 @@ El Negocio no puede ceder sus derechos u obligaciones sin nuestro consentimiento
 
 24. Ley aplicable y jurisdicción
 
-Estos términos se rigen por las leyes de los Estados Unidos Mexicanos. Para su interpretación y cumplimiento, las partes se someten a los tribunales competentes del domicilio de AgendaUno ({domicilio}) y renuncian a cualquier otro fuero, salvo cuando la ley disponga otra cosa.
+Estos términos se rigen por las leyes de los Estados Unidos Mexicanos. Para su interpretación y cumplimiento, las partes se someten a los tribunales competentes del domicilio de la Plataforma ({domicilio}) y renuncian a cualquier otro fuero, salvo cuando la ley disponga otra cosa.
 
 SEGUNDA PARTE: PARA LOS CLIENTES DE LOS NEGOCIOS
 
-25. Qué es AgendaUno para ti
+25. Qué es la Plataforma para ti
 
-AgendaUno es la herramienta con la que cada negocio publica su página, su agenda y sus planes. Al reservar, agendar, comprar o usar el portal o la aplicación de un negocio, contratas sus servicios con ese negocio, no con AgendaUno. Usar el directorio, las páginas públicas, el portal y la aplicación no tiene costo para ti.
+AgendaUno y TurnoUno son las herramientas con las que cada negocio publica su página, su agenda y sus planes. Al reservar, agendar, comprar o usar el portal o la aplicación de un negocio, contratas sus servicios con ese negocio, no con la Plataforma. Usar el directorio, las páginas públicas, el portal y la aplicación no tiene costo para ti.
 
 26. Tu cuenta
 
@@ -142,7 +142,7 @@ Recibirás confirmaciones, recordatorios y avisos sobre tus reservas y citas por
 
 29. Reseñas
 
-Puedes calificar las clases o citas que tomaste. Tu reseña debe ser honesta y respetuosa, sin datos personales de terceros ni contenido ofensivo o ilícito. El negocio y AgendaUno pueden mostrarla en la página del negocio y retirar las que no cumplan estas reglas.
+Puedes calificar las clases o citas que tomaste. Tu reseña debe ser honesta y respetuosa, sin datos personales de terceros ni contenido ofensivo o ilícito. El negocio y la Plataforma pueden mostrarla en la página del negocio y retirar las que no cumplan estas reglas.
 
 30. Uso adecuado
 
@@ -150,8 +150,8 @@ No uses la plataforma para fines ilícitos, para suplantar a otra persona, para 
 
 31. Responsabilidad
 
-El negocio responde por los servicios que te presta, su calidad y su seguridad, y por sus políticas. AgendaUno responde por el funcionamiento de la plataforma en los términos de la primera parte, pero no por los servicios del negocio, por fallas de servicios de terceros ni por daños indirectos. Si tienes una queja sobre un negocio, dirígete a él; como consumidor, también puedes acudir a la Procuraduría Federal del Consumidor.
+El negocio responde por los servicios que te presta, su calidad y su seguridad, y por sus políticas. La Plataforma responde por el funcionamiento de la plataforma en los términos de la primera parte, pero no por los servicios del negocio, por fallas de servicios de terceros ni por daños indirectos. Si tienes una queja sobre un negocio, dirígete a él; como consumidor, también puedes acudir a la Procuraduría Federal del Consumidor.
 
 32. Privacidad, cambios y jurisdicción
 
-Cada negocio es responsable de tus datos y AgendaUno los trata por su cuenta, como se explica en el aviso de privacidad. Publicaremos los cambios a estos términos en agendauno.mx/terminos. Se rigen por las leyes de los Estados Unidos Mexicanos y, como consumidor, puedes acudir a los tribunales de tu domicilio. Contacto: {contacto}.
+Cada negocio es responsable de tus datos y la Plataforma los trata por su cuenta, como se explica en el aviso de privacidad. Publicaremos los cambios a estos términos en agendauno.mx/terminos y en turnouno.mx/terminos. Se rigen por las leyes de los Estados Unidos Mexicanos y, como consumidor, puedes acudir a los tribunales de tu domicilio. Contacto: {contacto}.

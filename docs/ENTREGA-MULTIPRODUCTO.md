@@ -96,9 +96,10 @@ colores y lema. Pendiente de despliegue.
 
 ## 7. Landing TurnoUno
 
-`turnouno.mx`: solo la propuesta de citas, en **prelanzamiento**: «Quiero que me
-avisen» guarda interesados (con reCAPTCHA) y el superadmin los ve en «Interesados»; el
-registro de negocios está cerrado (`registro.abierto_turnouno = 0`) y la API lo rechaza.
+`turnouno.mx`: solo la propuesta de citas, **lanzada** junto con AgendaUno (decisión
+del 2026-10-10): prueba gratis y registro abiertos (`registro.abierto_turnouno = 1`). Si
+el superadmin cierra el registro de un producto, su landing cambia sola a «Quiero que
+me avisen» (lista de interesados con reCAPTCHA, visible en el superadmin).
 Su identidad es configurable (`VITE_TURNOUNO_NOMBRE`, logotipo en texto; no se inventó
 un logotipo). SEO propio, sin contenido duplicado con AgendaUno. Pendiente de despliegue.
 
@@ -317,10 +318,11 @@ Cloudflare. Nada se emitió todavía.
 Es la misma instalación: con el paso anterior ya queda desplegada. Además:
 
 1. DNS de `turnouno.mx` (punto 24); reCAPTCHA y Google con `turnouno.mx`.
-2. Confirmar `registro.abierto_turnouno = 0` (prelanzamiento) y que la landing muestra
-   «Quiero que me avisen».
+2. Confirmar en el superadmin que `registro.abierto_turnouno = 1` (abierto) y que la
+   landing ofrece la prueba gratis y el registro.
 3. Cambios solo de su landing: `./actualizar.sh --solo landing-turnouno`.
-4. Al lanzar: abrir su registro en el superadmin (no requiere desplegar).
+4. Para pausar el alta de negocios: cerrar su registro en el superadmin (sin
+   desplegar); la landing pasa a la lista de interesados.
 
 ## 28. Publicar AgendaUno Android/iOS y 29. Publicar TurnoUno Android/iOS
 
@@ -368,10 +370,9 @@ TurnoUno necesita antes su logotipo e íconos definitivos.
 - **AgendaUno**: listo para lanzar en cuanto se despliegue y se configuren DNS,
   certificados y credenciales: landing, registro abierto, consola, PWA y app Android
   (por publicar).
-- **TurnoUno**: en prelanzamiento: landing con lista de interesados, registro cerrado;
-  el producto (citas, consola, PWA, app Android) funciona igual que hoy para los
-  negocios de citas. Falta su identidad definitiva, publicar su app y abrir el registro
-  cuando se decida.
+- **TurnoUno**: se lanza junto con AgendaUno (2026-10-10): landing, registro abierto,
+  consola, PWA y app Android (por publicar). Falta su logotipo definitivo (hoy en texto
+  e íconos provisionales) y publicar su app en las tiendas.
 
 ## Matriz de estado
 
