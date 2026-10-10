@@ -26,7 +26,12 @@ implementado** · **Requiere autorización**.
 | Registro por producto y cierre de TurnoUno | Implementado y probado | Parámetros `registro.abierto_agendauno` / `registro.abierto_turnouno` |
 | Lista de interesados (API) | Implementado y probado | `POST /api/v1/interesados`, superadmin `GET /plataforma/interesados` |
 | Directorio por producto, slugs reservados | Implementado y probado | |
-| Web: landings separadas, builds por producto | No implementado | Fase 2 |
+| Web: un código, tres builds (aplicación, landing AgendaUno, landing TurnoUno) | Implementado y probado | ADR 0109; `npm run build`, revisión por producto y por HTTP |
+| Landing AgendaUno (agendauno.mx) | Implementado, pendiente de despliegue | Portada de clases, páginas por giro de clases, su SEO, sitemap y robots |
+| Landing TurnoUno de prelanzamiento (turnouno.mx) | Implementado, pendiente de despliegue | Portada de citas con «Quiero que me avisen» y lista de interesados; logotipo en texto (configurable) |
+| Aplicación con la marca del dominio | Implementado y probado | Textos, logo y enlaces con la marca del producto; registro solo con sus giros |
+| Superadmin: interesados | Implementado y probado | Pestaña «Interesados» |
+| Imágenes web separadas por build (publicar una landing sin la aplicación) | No implementado | Fase 5 (infraestructura) |
 | PWA por negocio (AgendaUno y TurnoUno) | No implementado | Fase 3 |
 | App oficial AgendaUno (Android/iOS) | No implementado | Fase 4; la app actual es la base |
 | App oficial TurnoUno (Android/iOS) | No implementado | Fase 4 |

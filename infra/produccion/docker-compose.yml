@@ -75,13 +75,16 @@ services:
       retries: 3
       start_period: 3m
 
-  # Sitio comercial + aplicación + paso de /api a PHP + archivos públicos.
+  # Landings de AgendaUno y TurnoUno + aplicación + paso de /api a PHP + archivos
+  # públicos (ADR 0108).
   web:
     build:
       context: ../..
       dockerfile: infra/produccion/web.Dockerfile
       args:
         VITE_DOMINIO_PUBLICO: ${DOMINIO:?Falta DOMINIO en web.env}
+        VITE_DOMINIO_TURNOUNO: ${DOMINIO_TURNOUNO:-turnouno.mx}
+        VITE_TURNOUNO_NOMBRE: ${VITE_TURNOUNO_NOMBRE:-}
         VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
         VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY:-}
         VITE_ANALYTICS_ENDPOINT: ${VITE_ANALYTICS_ENDPOINT:-}
@@ -92,6 +95,7 @@ services:
     image: agendauno-web:${VERSION:-latest}
     environment:
       DOMINIO: ${DOMINIO}
+      DOMINIO_TURNOUNO: ${DOMINIO_TURNOUNO:-turnouno.mx}
       # Desde dónde llega el proxy TLS: por el puerto publicado, la red de Docker.
       PROXY_CONFIABLE: ${PROXY_CONFIABLE:-172.16.0.0/12}
     ports:

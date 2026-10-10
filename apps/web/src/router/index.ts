@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-import LandingView from "@/views/LandingView.vue";
+import ModalidadView from "@/views/ModalidadView.vue";
 import { trackPageView } from "@/lib/analytics";
 import { puedeEntrar } from "@/lib/acceso";
 import { updateSeo } from "@/lib/seo";
@@ -37,10 +37,10 @@ const router = createRouter({
     return { top: 0 };
   },
   routes: [
-    // Portada, /clases, /citas y /software-para-*: la misma lista que el prerender.
+    // Portada del producto, /clases, /citas y /software-para-*: la misma lista que el
+    // prerender (ADR 0108: cada dominio, las de su producto).
     ...rutasComerciales({
-      landing: LandingView,
-      modalidad: () => import("@/views/ModalidadView.vue"),
+      modalidad: ModalidadView,
       solucion: () => import("@/views/SolucionView.vue"),
     }),
     {

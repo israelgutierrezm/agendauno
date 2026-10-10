@@ -115,6 +115,10 @@ it('el pago vuelve a la web del producto del negocio o al subdominio desde el qu
 
 it('TurnoUno no recibe registros hasta abrirlo y el giro debe ser del producto', function (): void {
     $this->putJson('/api/v1/plataforma/parametros', ['valores' => ['registro.abierto_turnouno' => 0]], conPlataforma())->assertOk();
+    // La landing sabe cuál recibe registros.
+    $this->getJson('/api/v1/precios')->assertOk()
+        ->assertJsonPath('data.registro.agendauno', true)
+        ->assertJsonPath('data.registro.turnouno', false);
 
     $this->postJson('/api/v1/registro', registroMultiproducto('barberia-cerrada', 'barberia'))
         ->assertUnprocessable()->assertJsonValidationErrors('producto', 'meta.errors');

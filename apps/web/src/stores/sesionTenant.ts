@@ -1,7 +1,12 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 
-import { aplicarTerminologia, i18n } from "@/i18n";
+import { aplicarMarca, aplicarTerminologia, i18n } from "@/i18n";
+import {
+  fijarProductoDeSesion,
+  productoActual,
+  productoDeModalidad,
+} from "@/lib/producto";
 import {
   api,
   fallaPasajera,
@@ -280,6 +285,16 @@ export const useSesionTenantStore = defineStore("sesionTenant", () => {
     () => estudio.value?.perfil_config?.terminologia ?? null,
     (terminos) => aplicarTerminologia(terminos),
     { immediate: true, deep: true },
+  );
+  // Y con la marca de su producto (ADR 0108): en producción la del dominio; en
+  // desarrollo, la del negocio en sesión.
+  watch(
+    () => (estudio.value ? productoDeModalidad(modalidad.value) : null),
+    (producto) => {
+      fijarProductoDeSesion(producto);
+      aplicarMarca(productoActual());
+    },
+    { immediate: true },
   );
 
   // El bearer va solo a las rutas de su negocio (lib/api); se mantiene al día con

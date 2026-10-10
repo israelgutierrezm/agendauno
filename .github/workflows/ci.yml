@@ -173,7 +173,8 @@ jobs:
 
       - name: Check nginx config
         run: >-
-          docker run --rm -e DOMINIO=agendauno.test -e PROXY_CONFIABLE=172.16.0.0/12
+          docker run --rm -e DOMINIO=agendauno.test -e DOMINIO_TURNOUNO=turnouno.test
+          -e PROXY_CONFIABLE=172.16.0.0/12
           agendauno-web:ci nginx -t
 
       # Los respaldos usan el cliente de la imagen (MariaDB) contra MySQL 8.4: su usuario

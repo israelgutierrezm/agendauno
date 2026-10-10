@@ -11,14 +11,18 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRouter } from "vue-router";
 
 import { api, camposConError, mensajeDeError } from "@/lib/api";
+import { PRODUCTOS, productoActual } from "@/lib/producto";
+import { tokenRecaptcha } from "@/lib/recaptcha";
 import { ladaDe, separarTelefono, unirTelefono } from "@/lib/ladas";
 import { girosDe } from "@/lib/modalidad";
 import { opcionesPais, paisSugerido, zonaSugerida } from "@/lib/region";
 import { trackEvent, type AnalyticsProperties } from "@/lib/analytics";
-import { MODOS, modoDePerfil, type Modo } from "@/marketing/modalidades";
+import { modoDePerfil, type Modo } from "@/marketing/modalidades";
+import { usePreciosPublicos } from "@/marketing/preciosPublicos";
 import DocumentoLegalContenido from "@/components/DocumentoLegalContenido.vue";
 import CampoCelular from "@/components/CampoCelular.vue";
 import IconoNav from "@/components/IconoNav.vue";
+import ListaInteresados from "@/components/ListaInteresados.vue";
 import SelectorBuscable from "@/components/SelectorBuscable.vue";
 
 // Alta del negocio: crea su base completa (ver el comentario en la petición).
@@ -39,6 +43,14 @@ const props = withDefaults(
 const router = useRouter();
 const { t } = useI18n();
 
+// Cada dominio registra negocios de su producto (ADR 0108): AgendaUno los de clases y
+// TurnoUno los de citas; si aún no recibe registros, se muestra la lista de
+// interesados.
+const producto = productoActual();
+const modoDelProducto: Modo = PRODUCTOS[producto].modalidad;
+const precios = usePreciosPublicos();
+const registroAbierto = computed(() => precios.datos.registro[producto]);
+
 // Alta por pasos: filtra interesados reales y captura datos de contacto útiles.
 const paso = ref(1);
 const pasosRegistro = [
@@ -50,10 +62,16 @@ const pasosRegistro = [
 // El giro con que llegó, si es un giro del registro, y la modalidad de llegada: la
 // de ese giro (manda sobre `?modo=`) o la de `?modo=`.
 const giroDeLlegada = computed(() =>
-  props.giro !== null && modoDePerfil(props.giro) !== null ? props.giro : null,
+  props.giro !== null && modoDePerfil(props.giro) === modoDelProducto
+    ? props.giro
+    : null,
 );
+// La modalidad de llegada (para medir la intención): la del producto si llegó con su
+// giro o con su `?modo=`; un `?modo=` de la otra no aplica aquí.
 const modoDeLlegada = computed<Modo | null>(() =>
-  giroDeLlegada.value !== null ? modoDePerfil(giroDeLlegada.value) : props.modo,
+  giroDeLlegada.value !== null || props.modo === modoDelProducto
+    ? modoDelProducto
+    : null,
 );
 
 // Paso 1: el lugar.
@@ -69,15 +87,10 @@ const paises = opcionesPais();
 // El giro da la modalidad del negocio, solo clases o solo citas (ADR 0104): se
 // agrupan para que se vea con cuál va a trabajar. Con una modalidad de llegada solo
 // se ven sus giros, y un enlace muestra los de la otra; sin ella, los dos grupos.
-const modoVisible = ref<Modo | null>(modoDeLlegada.value);
-const modalidades = computed<readonly Modo[]>(() =>
-  modoVisible.value === null ? MODOS : [modoVisible.value],
-);
-const otroModo = computed<Modo | null>(() =>
-  modoVisible.value === null
-    ? null
-    : (MODOS.find((m) => m !== modoVisible.value) ?? null),
-);
+const modoVisible = ref<Modo | null>(modoDelProducto);
+const modalidades = computed<readonly Modo[]>(() => [modoDelProducto]);
+// La otra modalidad es otro producto, en su propio dominio: aquí no se ofrece.
+const otroModo = computed<Modo | null>(() => null);
 // Con su giro (`?giro=`), el selector se oculta tras un resumen con «Cambiar».
 const selectorVisible = ref(giroDeLlegada.value === null);
 const selectorPerfil = ref<HTMLSelectElement | null>(null);
@@ -110,17 +123,10 @@ function verOtraModalidad(): void {
   void enfocarSelector();
 }
 // Otro `?modo=` o `?giro=` con la vista abierta (la ruta la reutiliza).
-watch([giroDeLlegada, modoDeLlegada], ([giro, modo]) => {
-  modoVisible.value = modo;
+watch(giroDeLlegada, (giro) => {
   selectorVisible.value = giro === null;
   if (giro !== null) {
     perfilNegocio.value = giro;
-  } else if (
-    modo !== null &&
-    modoDelGiro.value !== null &&
-    modoDelGiro.value !== modo
-  ) {
-    perfilNegocio.value = "";
   }
 });
 // «Barbería · Citas 1 a 1»: lo que se va a crear, en el paso 1 cuando el giro llegó
@@ -207,7 +213,7 @@ async function enviarCodigo(): Promise<void> {
     await api.post("/api/v1/registro/whatsapp/codigo", {
       contacto_whatsapp_pais: whatsappPais.value,
       contacto_telefono: whatsappNumero.value,
-      recaptcha_token: await tokenRecaptcha(),
+      recaptcha_token: await tokenRecaptcha("registro"),
     });
     codigoEnviado.value = true;
     codigo.value = "";
@@ -285,46 +291,6 @@ const personalizarSlug = ref(false);
 
 // Anti-bots: campo trampa (honeypot, oculto) + token de reCAPTCHA v3 si hay site key.
 const honeypot = ref("");
-const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as
-  string | undefined;
-
-let recaptchaCarga: Promise<void> | null = null;
-function cargarRecaptcha(siteKey: string): Promise<void> {
-  recaptchaCarga ??= new Promise<void>((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error("recaptcha"));
-    document.head.appendChild(s);
-  });
-  return recaptchaCarga;
-}
-
-interface Grecaptcha {
-  ready: (cb: () => void) => void;
-  execute: (key: string, opts: { action: string }) => Promise<string>;
-}
-async function tokenRecaptcha(): Promise<string | null> {
-  if (RECAPTCHA_SITE_KEY === undefined || RECAPTCHA_SITE_KEY === "") {
-    return null; // Sin site key no se exige captcha (dev).
-  }
-  try {
-    await cargarRecaptcha(RECAPTCHA_SITE_KEY);
-    const grecaptcha = (window as unknown as { grecaptcha: Grecaptcha })
-      .grecaptcha;
-    return await new Promise<string>((resolve, reject) => {
-      grecaptcha.ready(() => {
-        grecaptcha
-          .execute(RECAPTCHA_SITE_KEY, { action: "registro" })
-          .then(resolve, reject);
-      });
-    });
-  } catch {
-    return null;
-  }
-}
-
 const slugDisponible = ref<boolean | null>(null);
 const verificandoSlug = ref(false);
 const enviando = ref(false);
@@ -448,7 +414,7 @@ async function enviar(): Promise<void> {
   enviando.value = true;
   error.value = null;
   try {
-    const recaptchaToken = await tokenRecaptcha();
+    const recaptchaToken = await tokenRecaptcha("registro");
     const { data } = await api.post<{
       data: {
         estudio: { slug: string; nombre: string };
@@ -464,6 +430,7 @@ async function enviar(): Promise<void> {
         recaptcha_token: recaptchaToken,
         sitio_web: honeypot.value,
         perfil_negocio: perfilNegocio.value,
+        producto,
         // El país y la zona horaria con que nace (la zona, la del navegador si es de
         // ese país); se corrigen después en «País, moneda y zona horaria».
         pais: pais.value,
@@ -599,7 +566,15 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
 </script>
 
 <template>
-  <section class="registro mx-auto max-w-7xl px-4 sm:px-6 py-8 sm:py-10">
+  <!-- Producto que aún no recibe registros (TurnoUno antes de su lanzamiento). -->
+  <section
+    v-if="!registroAbierto"
+    class="registro mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-10"
+    data-prueba="registro-cerrado"
+  >
+    <ListaInteresados :producto="producto" />
+  </section>
+  <section v-else class="registro mx-auto max-w-7xl px-4 sm:px-6 py-8 sm:py-10">
     <div
       class="registro-layout"
       :class="{ 'registro-layout--creado': creado !== null }"
@@ -775,7 +750,6 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                   :style="{ color: 'var(--texto-suave)' }"
                 >
                   {{ $t("registro.perfilAyuda") }}
-                  {{ $t("modalidadNegocio.registro") }}
                 </p>
                 <!-- Solo se ven los giros de una modalidad: este enlace muestra los
                      de la otra, sin perder lo escrito. -->
@@ -831,7 +805,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
                   >
                     <span>{{ slug || "tu-negocio" }}</span>
                     <span :style="{ color: 'var(--texto-suave)' }"
-                      >.agendauno.mx</span
+                      >.{{ PRODUCTOS[producto].dominio }}</span
                     >
                   </div>
                   <button
