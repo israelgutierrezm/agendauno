@@ -96,7 +96,27 @@ describe("directorio de negocios", () => {
     }
     const foto = (i: number) =>
       tarjetas[i]!.get(".tu-estudio-portada img").attributes("src");
-    expect(foto(1)).toBe("/assets/landing/disciplinas/academias-v1.jpg");
+    // La misma foto por giro que en el resto de la aplicación (lib/fotoNegocio).
+    expect(foto(1)).toBe("/assets/landing/disciplinas/wellness-v1.webp");
     expect(foto(2)).toBe("/assets/landing/disciplinas/wellness-v1.webp");
+  });
+
+  it("las categorías rápidas son giros del producto del dominio (ADR 0108)", async () => {
+    const w = montar();
+    await flushPromises();
+    const claves = w
+      .findAll(".tu-categoria")
+      .map((b) => b.text())
+      .map(
+        (texto) =>
+          Object.entries(es.registro.perfiles).find(
+            ([, v]) => v === texto,
+          )?.[0],
+      );
+    expect(claves).toHaveLength(4);
+    // Sin dominio de producto (pruebas), AgendaUno: solo giros de clases.
+    for (const clave of claves) {
+      expect(PERFILES_POR_MODO.clases).toContain(clave);
+    }
   });
 });

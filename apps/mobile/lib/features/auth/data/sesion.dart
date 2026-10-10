@@ -65,9 +65,22 @@ class Terminologia {
     if (p.isEmpty) {
       return p;
     }
-    return 'aeiouáéó'.contains(p[p.length - 1].toLowerCase())
-        ? '${p}s'
-        : '${p}es';
+    if ('aeiouáéó'.contains(p[p.length - 1].toLowerCase())) {
+      return '${p}s';
+    }
+    // Agudas en n o s pierden el acento: Sesión → Sesiones, Lección → Lecciones.
+    const sinAcento = {'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u'};
+    final penultima = p.length > 1 ? p[p.length - 2] : '';
+    final ultima = p[p.length - 1].toLowerCase();
+    if ((ultima == 'n' || ultima == 's') &&
+        sinAcento.containsKey(penultima.toLowerCase())) {
+      final vocal = sinAcento[penultima.toLowerCase()]!;
+      final conCaso = penultima == penultima.toUpperCase()
+          ? vocal.toUpperCase()
+          : vocal;
+      return '${p.substring(0, p.length - 2)}$conCaso${p[p.length - 1]}es';
+    }
+    return '${p}es';
   }
 
   Map<String, dynamic> aJson() => {

@@ -1,3 +1,4 @@
+import '../../auth/data/sesion.dart';
 import 'cuenta_models.dart';
 
 /// Corte de planes (ADR 0050): por cada paquete o membresía, qué incluía, sus
@@ -104,11 +105,15 @@ class PlanCorte {
     'suspendido',
   ].contains(estado);
 
-  String get estadoTexto => switch (estado) {
+  String get estadoTexto => estadoTextoCon(const Terminologia());
+
+  /// El estado con la terminología del negocio: agotado es «Sin citas» en una
+  /// barbería y «Sin lecciones» en una escuela de natación.
+  String estadoTextoCon(Terminologia t) => switch (estado) {
     'vigente' => 'Vigente',
     'por_empezar' => 'Por empezar',
     'vencido' => 'Vencido',
-    'agotado' => 'Sin clases',
+    'agotado' => 'Sin ${t.sesiones.toLowerCase()}',
     'pausado' => 'En pausa',
     'suspendido' => 'Suspendido',
     'cancelado' => 'Cancelado',

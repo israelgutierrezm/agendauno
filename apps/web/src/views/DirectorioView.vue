@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { fotoNegocio } from "@/lib/fotoNegocio";
 import { PRODUCTOS, productoActual } from "@/lib/producto";
 import { trackEvent } from "@/lib/analytics";
 import { recordarNegocio } from "@/lib/negociosRecientes";
@@ -38,52 +39,71 @@ const GRUPOS_PERFILES = MODOS.filter(
   perfiles: PERFILES_POR_MODO[modo],
 }));
 
-const CATEGORIAS_DESTACADAS = [
-  {
-    clave: "pilates",
-    trazos: ["M5 18c3-5 11-5 14 0", "M8 12a4 4 0 1 1 8 0", "M4 21h16"],
-  },
-  {
-    clave: "pole",
-    trazos: ["M12 3v18", "M7 7c3 0 5 2 5 5", "M17 17c-3 0-5-2-5-5"],
-  },
-  {
-    clave: "academia",
-    trazos: ["M4 20h16", "M6 18V9l6-5 6 5v9", "M9 12h6", "M9 15h6"],
-  },
-  {
-    clave: "barberia",
-    trazos: [
-      "M7 7l10 10",
-      "M17 7 7 17",
-      "M6 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
-      "M18 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
-    ],
-  },
-] as const;
-
-const IMAGENES_PERFIL: Record<string, string> = {
-  barberia: "barberia-v1.jpg",
-  estetica: "estetica-v1.jpg",
-  salon: "estetica-v1.jpg",
-  spa: "estetica-v1.jpg",
-  salud: "consultorios-v1.webp",
-  pilates: "pilates-v1.jpg",
-  pole: "pole-v1.jpg",
-  yoga: "yoga-v1.jpg",
-  danza: "danza-v1.jpg",
-  gimnasio: "gimnasio-v1.jpg",
-  crossfit: "crossfit-v1.webp",
-  hyrox: "crossfit-hyrox-v1.webp",
-  natacion: "natacion-v1.jpg",
-  academia: "academias-v1.jpg",
-  general: "academias-v1.jpg",
-  general_citas: "wellness-v1.webp",
+// Las categorías de acceso rápido: cuatro giros de la modalidad del producto (ADR
+// 0108): en turnouno.mx no se ofrecen giros de clases (darían cero resultados).
+const CATEGORIAS_POR_MODO: Record<
+  (typeof MODOS)[number],
+  readonly { clave: string; trazos: readonly string[] }[]
+> = {
+  clases: [
+    {
+      clave: "pilates",
+      trazos: ["M5 18c3-5 11-5 14 0", "M8 12a4 4 0 1 1 8 0", "M4 21h16"],
+    },
+    {
+      clave: "pole",
+      trazos: ["M12 3v18", "M7 7c3 0 5 2 5 5", "M17 17c-3 0-5-2-5-5"],
+    },
+    {
+      clave: "yoga",
+      trazos: [
+        "M12 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
+        "M5 20l7-9 7 9",
+        "M4 12h16",
+      ],
+    },
+    {
+      clave: "academia",
+      trazos: ["M4 20h16", "M6 18V9l6-5 6 5v9", "M9 12h6", "M9 15h6"],
+    },
+  ],
+  citas: [
+    {
+      clave: "barberia",
+      trazos: [
+        "M7 7l10 10",
+        "M17 7 7 17",
+        "M6 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
+        "M18 14a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
+      ],
+    },
+    {
+      clave: "estetica",
+      trazos: [
+        "M12 3v4",
+        "M12 17v4",
+        "M3 12h4",
+        "M17 12h4",
+        "M8 8l2 2",
+        "M14 14l2 2",
+      ],
+    },
+    {
+      clave: "spa",
+      trazos: ["M12 3c4 4 6 7 6 10a6 6 0 0 1-12 0c0-3 2-6 6-10z"],
+    },
+    {
+      clave: "salud",
+      trazos: ["M12 5v14", "M5 12h14", "M4 4h16v16H4z"],
+    },
+  ],
 };
+const CATEGORIAS_DESTACADAS =
+  CATEGORIAS_POR_MODO[PRODUCTOS[productoActual()].modalidad];
 
+// La foto de cada giro: la misma de toda la aplicación (lib/fotoNegocio).
 function imagenPerfil(valor: string): string {
-  const archivo = IMAGENES_PERFIL[valor] ?? IMAGENES_PERFIL.general;
-  return `/assets/landing/disciplinas/${archivo}`;
+  return fotoNegocio(valor);
 }
 
 async function cargar(): Promise<void> {

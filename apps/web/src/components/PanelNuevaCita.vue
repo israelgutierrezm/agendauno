@@ -151,7 +151,7 @@ const avisoHorario = computed<{ texto: string; grave: boolean } | null>(() => {
   }
   const ini = aMinutos(f.hora);
   const fin = ini + Math.max(Number(f.duracion) || 0, 1);
-  const zona = props.zona ?? "America/Mexico_City";
+  const zona = props.zona ?? useSesionTenantStore().zonaHoraria;
   const bloqueo = (props.bloqueos ?? []).find((b) => {
     const aplica =
       (b.ambito === "profesional" && b.instructor_id === f.instructorId) ||

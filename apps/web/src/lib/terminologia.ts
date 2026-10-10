@@ -15,6 +15,14 @@ export function plural(palabra: string): string {
   if (ultima === "z") {
     return `${p.slice(0, -1)}ces`;
   }
+  // Agudas en n o s pierden el acento: Sesión → Sesiones, Lección → Lecciones.
+  const acentuada = /[áéíóú][ns]$/i.exec(p);
+  if (acentuada) {
+    const sinAcento = acentuada[0][0]
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "");
+    return `${p.slice(0, -2)}${sinAcento}${p.slice(-1)}es`;
+  }
   return `${p}es`;
 }
 
@@ -34,18 +42,28 @@ export interface TerminosNegocio {
 
 export type TerminoEditable = "sesion" | "miembro" | "instructor";
 
+// Términos con «o» o «a» al final que valen igual para mujeres y hombres.
+const INVARIABLES = new Set(["miembro", "guía", "atleta"]);
+
 /**
  * El término del negocio para UNA persona, en su género si se sabe: con «Alumno» y una
  * mujer, «Alumna»; con «Socia» y un hombre, «Socio». Los términos que no cambian
- * (Cliente, Paciente, Miembro) y las personas sin género quedan como el negocio.
+ * (Cliente, Paciente, Miembro, Terapeuta, Especialista, Estilista) y las personas sin
+ * género quedan como el negocio.
  */
 export function terminoParaPersona(
   termino: string,
   genero: string | null | undefined,
 ): string {
   const t = termino.trim();
-  const ultima = t.slice(-1).toLowerCase();
-  if (ultima !== "o" && ultima !== "a") {
+  const minusculas = t.toLowerCase();
+  const ultima = minusculas.slice(-1);
+  if (
+    (ultima !== "o" && ultima !== "a") ||
+    INVARIABLES.has(minusculas) ||
+    // -ista, -eta y -euta valen para ambos: la terapeuta, el especialista.
+    /(?:ista|eta|euta)$/.test(minusculas)
+  ) {
     return t;
   }
   const base = t.slice(0, -1);
