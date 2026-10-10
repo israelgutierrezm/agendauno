@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
+use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
@@ -90,12 +91,13 @@ class MiReprogramarTenantController
             ->where('estado', EstadoSesionTenant::Programada->value)
             ->where('id', '!=', $sesion->getKey())
             ->where('inicia_en', '>', now())
-            ->withCount(['reservas as ocupados' => fn ($q) => $q->whereIn('estado', [
-                EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::PendientePago->value,
-            ])])
+            // Con lugar según la regla única de cupo (lo que el motor dejará reservar).
+            ->withCount(CupoDeSesionTenant::conteos())
             ->orderBy('inicia_en')
-            ->get()
-            ->filter(fn (SesionTenant $s): bool => $s->capacidad === null || (int) $s->getAttribute('ocupados') < $s->capacidad)
+            ->get();
+        app(CupoDeSesionTenant::class)->cargar($sesiones);
+        $sesiones = $sesiones
+            ->filter(fn (SesionTenant $s): bool => app(CupoDeSesionTenant::class)->libres($s) !== 0)
             ->map(fn (SesionTenant $s): array => [
                 'id' => $s->ulid,
                 'inicia_en' => $s->inicia_en->toIso8601String(),

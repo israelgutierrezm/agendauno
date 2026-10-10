@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 use App\Modules\Tenancy\Application\AgendarCitaTenant;
 use App\Modules\Tenancy\Application\AnularCobroTenant;
 use App\Modules\Tenancy\Application\CorregirMetodoPagoTenant;
+use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\ModalidadNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
@@ -295,6 +296,8 @@ class AgendaTenantController
         }
 
         $sesiones = $consulta->limit(self::LIMITE)->get();
+        // Lo que otros canales apartan, para todo el lote (los libres de la regla única).
+        app(CupoDeSesionTenant::class)->cargar($sesiones);
         $titulares = $this->titularesDeCitas($sesiones);
         // El teléfono y el correo del cliente, solo para quien puede ver miembros.
         $verContacto = $usuario?->puede('miembros.ver') ?? false;

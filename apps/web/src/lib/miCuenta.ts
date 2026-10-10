@@ -130,6 +130,8 @@ export interface Clase {
   capacidad: number | null;
   ocupados: number;
   cobertura?: Cobertura | null;
+  /** Lo propio de la clase según el servidor; `libres`, con la regla única de cupo (B02). */
+  clase?: { libres: number | null } | null;
 }
 export interface Waiver {
   id: string;

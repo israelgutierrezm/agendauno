@@ -16,6 +16,7 @@ import HistorialReservas, {
 } from "@/components/HistorialReservas.vue";
 import PanelLateral from "@/components/PanelLateral.vue";
 import ReprogramarMiReserva from "@/components/ReprogramarMiReserva.vue";
+import { libresDeSesion } from "@/lib/agenda";
 import { api, mensajeDeError } from "@/lib/api";
 import {
   cuandoCorto,
@@ -359,16 +360,18 @@ function lugares(e: Evento): string {
   if (!c || c.capacidad === null) {
     return "";
   }
-  return c.ocupados >= c.capacidad
+  const disponibles = libresDeSesion(c) ?? 0;
+  return disponibles <= 0
     ? t("portal.reservas.llena")
     : t("portal.reservas.lugares", {
-        libres: c.capacidad - c.ocupados,
+        libres: disponibles,
         total: c.capacidad,
       });
 }
+// Llena según el servidor (la misma regla del motor): incluye lo apartado para otros canales.
 function llena(e: Evento): boolean {
   const c = e.clase;
-  return !!c && c.capacidad !== null && c.ocupados >= c.capacidad;
+  return !!c && c.capacidad !== null && (libresDeSesion(c) ?? 1) <= 0;
 }
 function cobertura(e: Evento) {
   return presentarCobertura(e.clase?.cobertura, t);

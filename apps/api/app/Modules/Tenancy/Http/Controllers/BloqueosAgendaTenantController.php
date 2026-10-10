@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\EliminacionesTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
@@ -14,7 +15,6 @@ use App\Modules\Tenancy\Models\RecursoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
-use App\Modules\Tenancy\Reservas\EstadoReserva;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -175,9 +175,7 @@ class BloqueosAgendaTenantController
             ->when($bloqueo->instructor_id !== null, fn (Builder $q) => $q->where('instructor_id', $bloqueo->instructor_id))
             ->when($bloqueo->sucursal_id !== null, fn (Builder $q) => $q->where('sucursal_id', $bloqueo->sucursal_id))
             ->when($bloqueo->recurso_id !== null, fn (Builder $q) => $q->where('recurso_id', $bloqueo->recurso_id))
-            ->withCount(['reservas' => fn (Builder $q) => $q->whereIn('estado', [
-                EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value, EstadoReserva::PendientePago->value,
-            ])])
+            ->withCount(['reservas' => fn (Builder $q) => $q->whereIn('estado', CupoDeSesionTenant::OCUPAN_LUGAR)])
             ->with('oferta')
             ->orderBy('inicia_en')
             ->limit(self::LIMITE)

@@ -17,7 +17,6 @@ use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\SucursalTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\PoliticaReservaTenant;
-use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Support\HorarioSucursal;
 use App\Modules\Tenancy\Support\RedesSociales;
 use App\Modules\Tenancy\TipoSesionTenant;
@@ -41,6 +40,8 @@ class EscaparateTenant
 {
     // Cuántas próximas clases mostrar en el escaparate.
     private const PROXIMAS = 12;
+
+    public function __construct(private readonly CupoDeSesionTenant $cupo) {}
 
     /**
      * @param  array<string, mixed>  $sitio  la configuración del sitio ya lista para mostrarse
@@ -241,7 +242,10 @@ class EscaparateTenant
     }
 
     /**
-     * Próximas clases programadas con cupo libre estimado (capacidad − confirmadas).
+     * Próximas clases programadas con sus lugares libres: la misma regla de cupo que el
+     * motor de reservas ({@see CupoDeSesionTenant}: confirmadas, ofrecidas y pendientes
+     * de pago ocupan lugar, y se descuenta lo apartado para otros canales). Es una
+     * lectura: al reservar, el motor vuelve a validar.
      *
      * @return list<array<string, mixed>>
      */
@@ -252,26 +256,22 @@ class EscaparateTenant
             // Las citas son privadas: el escaparate solo muestra clases abiertas.
             ->where('tipo', TipoSesionTenant::Clase->value)
             ->where('inicia_en', '>=', CarbonImmutable::now())
-            ->withCount(['reservas as confirmadas' => fn ($q) => $q->where('estado', EstadoReserva::Confirmada->value)])
+            ->withCount(CupoDeSesionTenant::conteos())
             ->with(['oferta', 'sucursal', 'instructor'])
             ->orderBy('inicia_en')
             ->limit(self::PROXIMAS)
             ->get();
+        $this->cupo->cargar($sesiones);
 
-        return $sesiones->map(static function (SesionTenant $s): array {
-            $confirmadas = (int) ($s->getAttribute('confirmadas') ?? 0);
-            $capacidad = $s->capacidad;
-
-            return [
-                'clase' => $s->oferta?->nombre,
-                'inicia_en' => $s->inicia_en->toIso8601String(),
-                'zona_horaria' => $s->zona_horaria,
-                'sucursal' => $s->sucursal?->nombre,
-                'instructor' => $s->instructor?->name,
-                'capacidad' => $capacidad,
-                'lugares_libres' => $capacidad !== null ? max(0, $capacidad - $confirmadas) : null,
-            ];
-        })->all();
+        return $sesiones->map(fn (SesionTenant $s): array => [
+            'clase' => $s->oferta?->nombre,
+            'inicia_en' => $s->inicia_en->toIso8601String(),
+            'zona_horaria' => $s->zona_horaria,
+            'sucursal' => $s->sucursal?->nombre,
+            'instructor' => $s->instructor?->name,
+            'capacidad' => $s->capacidad,
+            'lugares_libres' => $this->cupo->libres($s),
+        ])->all();
     }
 
     /**

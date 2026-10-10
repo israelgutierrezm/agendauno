@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Ordenes\Exceptions\ExtraSinPaquete;
 use App\Modules\Tenancy\Ordenes\Exceptions\MonedaMixta;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
+use App\Modules\Tenancy\Ordenes\Exceptions\ProductoArchivado;
 use App\Modules\Tenancy\Pagos\MetodoPago;
 use Illuminate\Support\Facades\DB;
 
@@ -34,13 +35,20 @@ class OrdenesTenant
     ) {}
 
     /**
+     * Un producto archivado no se vende; `$renovacion` es la excepción: cobrar la
+     * renovación de lo que la persona ya tiene (su acuerdo sigue aunque el producto ya
+     * no se ofrezca).
+     *
      * @param  list<array{producto: ProductoTenant, cantidad: int, beneficiario?: PersonaTenant|null}>  $items
      */
-    public function crear(PersonaTenant $comprador, array $items, ?string $codigoPromo = null, ?int $sucursalId = null): OrdenTenant
+    public function crear(PersonaTenant $comprador, array $items, ?string $codigoPromo = null, ?int $sucursalId = null, bool $renovacion = false): OrdenTenant
     {
         $moneda = $items[0]['producto']->moneda; // Una sola moneda por orden.
 
         foreach ($items as $item) {
+            if (! $renovacion && $item['producto']->archivado) {
+                throw new ProductoArchivado("«{$item['producto']->nombre}» ya no está a la venta.");
+            }
             if ($item['producto']->moneda !== $moneda) {
                 throw new MonedaMixta('Una orden no puede mezclar monedas.');
             }

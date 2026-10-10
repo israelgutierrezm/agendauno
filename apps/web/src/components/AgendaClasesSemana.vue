@@ -7,6 +7,7 @@ import IconoNav from "@/components/IconoNav.vue";
 import {
   duracionMin,
   fechaLocal,
+  libresDeSesion,
   minutosLocal,
   pctCupo,
   tonoServicio,
@@ -70,8 +71,7 @@ function tarjeta(s: SesionAgenda): Tarjeta {
   const pasada = fin <= t0;
   const enCurso = !cancelada && ini <= t0 && t0 < fin;
   const pct = pctCupo(s) ?? 0;
-  const libres =
-    s.capacidad !== null ? Math.max(0, s.capacidad - s.ocupados) : null;
+  const libres = libresDeSesion(s);
 
   let aviso: Tarjeta["aviso"] = null;
   if (cancelada) {

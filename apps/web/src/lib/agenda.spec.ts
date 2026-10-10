@@ -9,6 +9,7 @@ import {
   iniciales,
   kpisCitas,
   kpisClases,
+  libresDeSesion,
   minutosLocal,
   pagoCita,
   PALETA_SERVICIO,
@@ -102,6 +103,16 @@ describe("agenda / colores y cupo", () => {
   it("toma las iniciales de nombre y apellido", () => {
     expect(iniciales("Beto Ramírez Soto")).toBe("BR");
     expect(iniciales(null)).toBe("");
+  });
+
+  it("los lugares libres son los del servidor (descuenta lo apartado para otros canales)", () => {
+    // 6 de cupo, 3 ocupados y 1 apartado para Wellhub: el servidor dice 2.
+    expect(
+      libresDeSesion({ capacidad: 6, ocupados: 3, clase: { libres: 2 } }),
+    ).toBe(2);
+    // Sin el dato del servidor, el cupo menos lo ocupado; sin tope, null.
+    expect(libresDeSesion({ capacidad: 6, ocupados: 3 })).toBe(3);
+    expect(libresDeSesion({ capacidad: null, ocupados: 3 })).toBeNull();
   });
 });
 

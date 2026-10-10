@@ -42,7 +42,8 @@ class DeudaDeRenovacionTenant
             return $pendiente;
         }
 
-        $orden = $this->ordenes->crear($persona, [['producto' => $producto, 'cantidad' => 1, 'beneficiario' => null]]);
+        // Renovación de lo que ya tiene: aunque el producto se haya archivado.
+        $orden = $this->ordenes->crear($persona, [['producto' => $producto, 'cantidad' => 1, 'beneficiario' => null]], renovacion: true);
         $orden->update(['renueva_acuerdo_id' => $acuerdo->getKey()]);
 
         return $orden;
