@@ -5,6 +5,9 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 
 import AgendarCitaCuenta from "@/components/AgendarCitaCuenta.vue";
 import AgregarCalendario from "@/components/AgregarCalendario.vue";
+import AntesDeReservar, {
+  type AccionAntes,
+} from "@/components/AntesDeReservar.vue";
 import CalendarioVistas, {
   type EventoPeriodo,
 } from "@/components/CalendarioVistas.vue";
@@ -93,7 +96,8 @@ const normalizar = (s: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase();
-const soloIncluidas = ref(false);
+// Tras pagar un plan se llega con `?incluidas=1`: las clases que cubre (C05).
+const soloIncluidas = ref(route.query.incluidas === "1");
 // «Reservar de nuevo» desde el historial: esa clase.
 const ofertaElegida = ref<{ id: string; nombre: string } | null>(null);
 const sedes = ref<Sede[]>([]);
@@ -231,6 +235,8 @@ function quitarFiltros(): void {
 const abierto = ref<Evento | null>(null);
 const accion = ref<"reprogramar" | "cancelar" | null>(null);
 const aviso = ref<string | null>(null);
+// Recién reservada (C05): su detalle abre con la confirmación de lo que quedó.
+const recienReservada = ref(false);
 // «Agendar de nuevo» una cita: el mismo servicio, sede y profesional.
 const citaInicial = ref<{
   servicio: string | null;
@@ -313,8 +319,19 @@ const enCalendario = computed<EventoPeriodo[]>(() =>
       termina: e.termina,
       zona: e.zona,
       detalle: [e.sucursal, e.instructor].filter(Boolean).join(" · "),
-      estado: e.mia ? t("portal.reservas.reservada") : lugares(e),
-      tono: e.mia ? "primario" : llena(e) ? "aviso" : "suave",
+      // Su estado con palabras: en espera, ofrecida o por pagar no parecen confirmadas.
+      estado: e.mia
+        ? e.estado === "confirmada"
+          ? t("portal.reservas.reservada")
+          : t(`miCuenta.${e.estado}`)
+        : lugares(e),
+      tono: e.mia
+        ? e.estado === "confirmada"
+          ? "primario"
+          : "aviso"
+        : llena(e)
+          ? "aviso"
+          : "suave",
       destacado: e.mia,
     })),
 );
@@ -322,6 +339,7 @@ const enCalendario = computed<EventoPeriodo[]>(() =>
 function abrir(e: Evento): void {
   abierto.value = e;
   accion.value = null;
+  recienReservada.value = false;
 }
 function abrirPorId(id: string): void {
   const e = [...mias.value, ...libres.value].find((x) => x.id === id);
@@ -332,6 +350,7 @@ function abrirPorId(id: string): void {
 function cerrar(): void {
   abierto.value = null;
   accion.value = null;
+  recienReservada.value = false;
 }
 
 /** «18:30» en la hora de la sede (la lista ya va por día). */
@@ -388,14 +407,97 @@ function estadoMia(e: Evento): { texto: string; tono: string } {
 }
 
 // Tras reservar, cancelar o cambiar, el cupo del periodo cambió: se vuelve a pedir.
+// Reservada, se abre su detalle con lo que quedó (C05): lo de la reserva real, no lo
+// que se vio antes de confirmar.
 async function reservar(e: Evento, esperar: boolean): Promise<void> {
   if (e.clase && (await cuenta.reservar(e.clase, esperar))) {
     aviso.value = esperar
       ? t("miCuenta.enListaEspera")
       : t("miCuenta.reservado");
-    cerrar();
+    const nueva = mias.value.find((m) => m.reserva?.sesion_id === e.id);
+    if (nueva) {
+      abrir(nueva);
+      recienReservada.value = true;
+    } else {
+      cerrar();
+    }
     void cargarClases();
   }
+}
+// Lo que sirve cuando no puede reservar (M05).
+function alAccionAntes(a: AccionAntes, e: Evento): void {
+  if (a === "ver_reserva") {
+    const suya = mias.value.find((m) => m.reserva?.sesion_id === e.id);
+    if (suya) {
+      abrir(suya);
+    }
+    return;
+  }
+  if (a === "cambiar_sucursal") {
+    sucursalId.value = "";
+    soloIncluidas.value = true;
+  } else if (a === "otras_clases" && e.clase?.oferta_id) {
+    ofertaElegida.value = { id: e.clase.oferta_id, nombre: e.titulo };
+  }
+  cerrar();
+}
+/** «Martes 5 de octubre, 02:00» en la hora de la sede. */
+function cuandoLargo(iso: string, zona: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: zona,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+function horaDe(iso: string, zona: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: zona,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+// Lo de su reserva que importa antes de ir (M05, C05): plan, hasta cuándo cancela,
+// qué llevar, o qué falta (aceptar el lugar, pagar).
+function detallesMia(e: Evento): string[] {
+  const r = e.reserva;
+  if (!r) {
+    return [];
+  }
+  const lineas: string[] = [];
+  if (r.estado === "en_espera") {
+    lineas.push(t("portal.miReserva.esperaNoConsume"));
+  }
+  if (r.estado === "ofrecida" && r.oferta_expira_en) {
+    lineas.push(
+      t("portal.miReserva.aceptaAntes", {
+        hora: horaDe(r.oferta_expira_en, e.zona),
+      }),
+    );
+  }
+  if (r.estado === "pendiente_pago") {
+    lineas.push(t("portal.miReserva.pagaParaConfirmar"));
+  }
+  if (r.plan && r.estado !== "en_espera") {
+    lineas.push(t("portal.miReserva.conPlan", { plan: r.plan }));
+  }
+  if (r.cancelacion) {
+    lineas.push(
+      new Date(r.cancelacion.limite).getTime() > Date.now()
+        ? t("portal.miReserva.cancelaHasta", {
+            cuando: cuandoLargo(r.cancelacion.limite, e.zona),
+          })
+        : t("portal.miReserva.cancelaPasado"),
+    );
+  }
+  if (r.que_llevar) {
+    lineas.push(t("portal.miReserva.queLlevar", { texto: r.que_llevar }));
+  }
+  return lineas;
 }
 async function cancelar(e: Evento): Promise<void> {
   if (e.reserva && (await cuenta.cancelar(e.reserva))) {
@@ -716,7 +818,8 @@ onMounted(() => void cuenta.asegurar());
                           llena(e) ? 'tu-btn-fantasma' : 'tu-btn-primario'
                         "
                         :disabled="cuenta.accionando.value"
-                        @click="reservar(e, llena(e))"
+                        data-prueba="reservar-clase"
+                        @click="abrir(e)"
                       >
                         {{
                           llena(e)
@@ -786,6 +889,16 @@ onMounted(() => void cuenta.asegurar());
                 class="tu-pildora"
                 :style="{ '--tono': estadoMia(e).tono }"
                 >{{ estadoMia(e).texto }}</span
+              >
+              <span
+                v-if="e.estado === 'ofrecida' && e.reserva?.oferta_expira_en"
+                class="text-xs"
+                :style="{ color: 'var(--aviso)' }"
+                >{{
+                  $t("portal.miReserva.aceptaAntes", {
+                    hora: horaDe(e.reserva.oferta_expira_en, e.zona),
+                  })
+                }}</span
               >
             </span>
             <span class="mr-ver-detalle"
@@ -894,6 +1007,35 @@ onMounted(() => void cuenta.asegurar());
 
         <!-- Suya -->
         <div v-if="abierto.mia && abierto.reserva" class="mt-5 space-y-3">
+          <p
+            v-if="recienReservada"
+            class="mr-confirmada"
+            role="status"
+            data-prueba="reserva-confirmada"
+          >
+            {{
+              abierto.estado === "en_espera"
+                ? $t("portal.miReserva.enEspera")
+                : $t("portal.miReserva.lista")
+            }}
+          </p>
+          <ul
+            v-if="detallesMia(abierto).length > 0"
+            class="space-y-1 text-sm"
+            data-prueba="detalles-reserva"
+          >
+            <li v-for="(linea, i) in detallesMia(abierto)" :key="i">
+              {{ linea }}
+            </li>
+          </ul>
+          <a
+            v-if="abierto.reserva.mapa_url"
+            :href="abierto.reserva.mapa_url"
+            target="_blank"
+            rel="noopener"
+            class="tu-enlace inline-block text-sm"
+            >{{ $t("portal.miReserva.comoLlegar") }}</a
+          >
           <AgregarCalendario
             :evento="{
               uid: `reserva-${abierto.id}`,
@@ -961,21 +1103,18 @@ onMounted(() => void cuenta.asegurar());
           />
         </div>
 
-        <!-- Disponible: reservar, o ver los planes que la incluyen -->
+        <!-- Disponible: lo que pasará al reservar (M05) y confirmar, o ver los
+             planes que la incluyen -->
         <div v-else class="mt-5">
-          <button
+          <AntesDeReservar
             v-if="reservable(abierto)"
-            class="tu-btn"
-            :class="llena(abierto) ? 'tu-btn-fantasma' : 'tu-btn-primario'"
-            :disabled="cuenta.accionando.value"
-            @click="reservar(abierto, llena(abierto))"
-          >
-            {{
-              llena(abierto)
-                ? $t("miCuenta.listaEspera")
-                : $t("miCuenta.reservar")
-            }}
-          </button>
+            :base="cuenta.base.value"
+            :sesion-id="abierto.id"
+            :ocupado="cuenta.accionando.value"
+            :llena="llena(abierto)"
+            @confirmar="(esperar) => reservar(abierto!, esperar)"
+            @accion="(a) => alAccionAntes(a, abierto!)"
+          />
           <RouterLink
             v-else
             :to="{ name: 'mis-pagos' }"
@@ -1044,6 +1183,13 @@ onMounted(() => void cuenta.asegurar());
   gap: 0.25rem 0.75rem;
   margin-top: 0.3rem;
   font-size: 0.8rem;
+}
+/* Recién reservada: lo que quedó, a la vista (C05). */
+.mr-confirmada {
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.6rem;
+  font-weight: 500;
+  background: color-mix(in srgb, var(--exito) 10%, var(--superficie));
 }
 .mr-cita {
   width: 100%;

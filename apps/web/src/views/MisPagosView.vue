@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { RouterLink } from "vue-router";
 
 import CortePlanes from "@/components/CortePlanes.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
@@ -248,6 +249,17 @@ onMounted(() => void cuenta.asegurar());
       }"
     >
       {{ $t(`pagoEnLinea.${retornoPago}`) }}
+      <!-- Pagó: el siguiente paso es reservar con su plan (C05). -->
+      <RouterLink
+        v-if="retornoPago === 'exito' && !sesion.esCitas"
+        :to="{
+          name: 'mis-reservas',
+          query: { vista: 'reservar', incluidas: '1' },
+        }"
+        class="tu-enlace ml-1"
+        data-prueba="reservar-tras-pago"
+        >{{ $t("portal.miReserva.reservarConPlan") }}</RouterLink
+      >
     </p>
     <p
       v-if="mensaje === 'pago'"

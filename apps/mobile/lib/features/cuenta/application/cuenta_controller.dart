@@ -135,6 +135,13 @@ final clasesPeriodoProvider = FutureProvider.autoDispose<AgendaPeriodo>((
   );
 });
 
+/// Lo que pasará si reserva una clase (M05), por sesión.
+final antesDeReservarProvider = FutureProvider.autoDispose
+    .family<AntesDeReservar?, String>((ref, sesionId) async {
+      final repo = ref.watch(cuentaRepositoryProvider);
+      return repo?.antesDeReservar(sesionId);
+    });
+
 /// Los planes que puede comprar (se filtran las clases extra si no tiene paquete).
 /// Si el plan del negocio no incluye la venta en línea (ADR 0107), ninguno.
 final productosProvider = FutureProvider.autoDispose<List<ProductoComprable>>((

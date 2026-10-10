@@ -1144,6 +1144,147 @@ class ProductoComprable {
   }
 }
 
+/// Antes de reservar una clase (GET /mi/sesiones/{id}/antes-de-reservar, M05): si
+/// queda reservada, en lista de espera o no se puede (motivo), con qué plan y cuánto
+/// consume, y hasta cuándo se cancela sin costo. Lo dice el servidor con la misma regla
+/// que al reservar; aquí no se aparta nada.
+class AntesDeReservar {
+  const AntesDeReservar({
+    required this.resultado,
+    this.motivo,
+    this.mensaje,
+    this.unidades = 0,
+    this.plan,
+    this.planIlimitado = false,
+    this.disponibleDespues,
+    this.precioMinor,
+    this.moneda = 'MXN',
+    this.limiteCancelacion,
+    this.penalizaTarde = true,
+    this.cancelaTarde = true,
+    this.queLlevar,
+  });
+
+  factory AntesDeReservar.desdeJson(Map<String, dynamic> j) {
+    final plan = j['plan'];
+    final dePago = j['de_pago'];
+    final cancelacion = j['cancelacion'];
+    return AntesDeReservar(
+      resultado: (j['resultado'] ?? 'reserva') as String,
+      motivo: j['motivo'] as String?,
+      mensaje: j['mensaje'] as String?,
+      unidades: (j['unidades'] as num? ?? 0).toInt(),
+      plan: plan is Map<String, dynamic> ? plan['nombre'] as String? : null,
+      planIlimitado:
+          plan is Map<String, dynamic> && (plan['ilimitado'] ?? false) as bool,
+      disponibleDespues: plan is Map<String, dynamic>
+          ? (plan['disponible_despues'] as num?)?.toInt()
+          : null,
+      precioMinor: dePago is Map<String, dynamic>
+          ? (dePago['precio_minor'] as num?)?.toInt()
+          : null,
+      moneda: dePago is Map<String, dynamic>
+          ? Formato.moneda(dePago['moneda'], 'MXN')
+          : 'MXN',
+      limiteCancelacion: cancelacion is Map<String, dynamic>
+          ? cancelacion['limite'] as String?
+          : null,
+      penalizaTarde: cancelacion is Map<String, dynamic>
+          ? (cancelacion['penaliza_tarde'] ?? true) as bool
+          : true,
+      cancelaTarde: cancelacion is Map<String, dynamic>
+          ? (cancelacion['cancela_tarde'] ?? true) as bool
+          : true,
+      queLlevar: j['que_llevar'] as String?,
+    );
+  }
+
+  /// `reserva`, `lista_espera` o `no_disponible`.
+  final String resultado;
+  final String? motivo;
+  final String? mensaje;
+  final int unidades;
+  final String? plan;
+  final bool planIlimitado;
+  final int? disponibleDespues;
+  final int? precioMinor;
+  final String moneda;
+  final String? limiteCancelacion;
+  final bool penalizaTarde;
+  final bool cancelaTarde;
+  final String? queLlevar;
+
+  bool get puedeReservar => resultado != 'no_disponible';
+  bool get esListaEspera => resultado == 'lista_espera';
+
+  static String _creditos(int unidades) {
+    final c = unidades / 1000;
+    final texto = c == c.roundToDouble() ? c.toInt().toString() : c.toString();
+    return c == 1 ? '1 crédito' : '$texto créditos';
+  }
+
+  /// Qué pasa con su plan (o el pago) si reserva.
+  String? get consumoTexto {
+    if (!puedeReservar) {
+      return null;
+    }
+    if (precioMinor != null) {
+      return 'Se paga al reservar: ${Formato.dinero(precioMinor!, moneda)}. '
+          'Tu lugar queda apartado mientras pagas.';
+    }
+    if (esListaEspera) {
+      return 'La clase está llena: te anotas en la lista de espera. No se '
+          'descuenta nada hasta que te toque un lugar; te avisamos para que lo '
+          'aceptes.';
+    }
+    final nombre = plan ?? 'tu plan';
+    if (planIlimitado || unidades == 0) {
+      return 'Usa $nombre: no se descuentan créditos.';
+    }
+    return 'Usa $nombre: se descuenta ${_creditos(unidades)} y te quedan '
+        '${_creditos(disponibleDespues ?? 0)}.';
+  }
+
+  /// Hasta cuándo cancela sin costo y qué pasa después (la política que se congela).
+  String? cancelacionTexto(DateTime ahora) {
+    final limite = limiteCancelacion == null
+        ? null
+        : DateTime.tryParse(limiteCancelacion!);
+    if (resultado != 'reserva' || limite == null) {
+      return null;
+    }
+    final despues = !cancelaTarde
+        ? 'Después, solo el negocio puede cancelarla.'
+        : penalizaTarde
+        ? 'Después, cancelar descuenta la clase.'
+        : 'Después también se devuelve el crédito.';
+    return limite.isAfter(ahora)
+        ? 'Cancela sin costo hasta el ${Formato.fechaHora(limiteCancelacion)}. '
+              '$despues'
+        : 'Ya pasó el límite para cancelar sin costo. $despues';
+  }
+
+  /// Por qué no la puede reservar (o el mensaje del servidor).
+  String? get motivoTexto {
+    if (puedeReservar) {
+      return null;
+    }
+    return switch (motivo) {
+          'sin_plan' => 'Necesitas un plan para reservarla.',
+          'clase' => 'Tu plan no incluye esta clase.',
+          'pausa' => 'Tu plan está en pausa.',
+          'suspendido' => 'Tu plan está suspendido por falta de pago.',
+          'vigencia' => 'Tu plan no está vigente ese día.',
+          'sucursal' => 'Tu plan no vale en esta sucursal.',
+          'saldo' => 'Ya no te quedan clases en tu plan.',
+          'ya_reservada' => 'Ya tienes esta clase.',
+          'llena' => 'La clase está llena.',
+          _ => null,
+        } ??
+        mensaje;
+  }
+}
+
 /// Una sede para elegir en el calendario de Reservas.
 class SedeAgenda {
   const SedeAgenda({required this.id, required this.nombre});
