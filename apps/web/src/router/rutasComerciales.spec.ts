@@ -33,8 +33,21 @@ vi.mock("@/lib/api", async (original) => {
   return { ...real, api: { ...real.api, get: vi.fn() } };
 });
 
-// Importar el router completo (con todas sus pantallas) tarda.
-vi.setConfig({ testTimeout: 20_000 });
+// Aquí solo importa a dónde lleva el router, no las pantallas: cargar las reales
+// (compilar cada una con todos sus componentes) hacía que la primera navegación
+// pasara del tiempo de una prueba.
+const pantallaVacia = vi.hoisted(() => () => ({
+  default: { name: "PantallaVacia", render: () => null },
+}));
+vi.mock("@/views/ModalidadView.vue", pantallaVacia);
+vi.mock("@/views/SolucionView.vue", pantallaVacia);
+vi.mock("@/views/PanelView.vue", pantallaVacia);
+vi.mock("@/views/EntrarView.vue", pantallaVacia);
+vi.mock("@/views/EstudioPublicoView.vue", pantallaVacia);
+vi.mock("@/views/ReservarCitaView.vue", pantallaVacia);
+vi.mock("@/views/SucursalesEstudioView.vue", pantallaVacia);
+vi.mock("@/views/EnlacesEstudioView.vue", pantallaVacia);
+vi.mock("@/views/DirectorioView.vue", pantallaVacia);
 
 beforeEach(() => {
   vi.resetModules();
