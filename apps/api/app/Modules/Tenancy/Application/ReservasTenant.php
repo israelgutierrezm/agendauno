@@ -34,6 +34,7 @@ use App\Modules\Tenancy\Reservas\Exceptions\SinDerechoDisponible;
 use App\Modules\Tenancy\Reservas\Exceptions\TransferenciaInvalida;
 use App\Modules\Tenancy\Reservas\Exceptions\YaReservado;
 use App\Modules\Tenancy\Reservas\QuienCancela;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -176,7 +177,7 @@ class ReservasTenant
             ...$datos,
             'total' => DatosDeOrden::dinero($orden->total_minor, $moneda),
             'vence' => $vence->format('H:i'),
-            'enlace' => rtrim((string) config('agendauno.url_app'), '/').'/agendar/'.rawurlencode($slug).'?pagar='.rawurlencode((string) $orden->ulid),
+            'enlace' => MarcaProducto::actual()->urlWeb().'/agendar/'.rawurlencode($slug).'?pagar='.rawurlencode((string) $orden->ulid),
         ]);
     }
 

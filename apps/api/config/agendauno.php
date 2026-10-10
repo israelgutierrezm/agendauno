@@ -26,6 +26,28 @@ return [
     'url_app' => env('APP_SPA_URL', 'http://localhost:5175'),
 
     /*
+    | Productos comerciales (ADR 0108): una API, dos marcas. El de un negocio sale de
+    | su modalidad (`ProductoComercial`): clases → AgendaUno, citas → TurnoUno. Cada uno
+    | tiene su dominio (sus negocios viven en `{slug}.{dominio}`) y la URL de su web
+    | (base de los enlaces de correos y avisos). AgendaUno usa `dominio_base` y
+    | `url_app` (APP_TENANT_DOMAIN, APP_SPA_URL), como siempre. En desarrollo, sin
+    | TURNOUNO_URL_WEB, los dos usan la misma web local.
+    */
+    'productos' => [
+        'agendauno' => [
+            'nombre' => env('AGENDAUNO_NOMBRE', 'AgendaUno'),
+            // Sin valor, sale de MAIL_FROM_ADDRESS.
+            'correo_remitente' => env('AGENDAUNO_MAIL_FROM'),
+        ],
+        'turnouno' => [
+            'nombre' => env('TURNOUNO_NOMBRE', 'TurnoUno'),
+            'dominio' => env('TURNOUNO_DOMINIO', 'turnouno.mx'),
+            'url_web' => env('TURNOUNO_URL_WEB', env('APP_SPA_URL', 'http://localhost:5175')),
+            'correo_remitente' => env('TURNOUNO_MAIL_FROM'),
+        ],
+    ],
+
+    /*
     | App móvil (ADR 0104). `version_minima`: la versión más antigua de la app que aún
     | se acepta; viaja en /yo y una instalada más vieja pide actualizarse. Se sube
     | cuando cambia un contrato que las versiones anteriores no entienden.

@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Http\Middleware;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\ProductoComercial;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -20,12 +21,17 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * Suspendido por renta vencida (ADR 0073), solo queda abierto lo necesario para
  * entrar y pagarla; todo lo demás (página pública, clientes, equipo) responde 404.
+ *
+ * Un negocio solo se abre en el dominio de su producto (ADR 0108): una barbería
+ * (TurnoUno) no responde en agendauno.mx ni en `barberia.agendauno.mx`, ni un estudio
+ * de clases en turnouno.mx. Fuera de los dominios de los productos (localhost, la IP
+ * del servidor) no se revisa; los avisos de las pasarelas llegan por cualquiera.
  */
 class ResolverEstudio
 {
     /**
-     * Rutas (sin el prefijo `api.v1.app.` o `api.v1.sub.`) que siguen abiertas con el
-     * negocio suspendido por renta.
+     * Rutas (sin el prefijo `api.v1.app.`, `api.v1.sub.` o `api.v1.sub-{producto}.`) que
+     * siguen abiertas con el negocio suspendido por renta.
      */
     private const ABIERTAS_SUSPENDIDO_POR_RENTA = [
         'login', 'auth.google', 'logout', 'marca', 'recuperar-contrasena', 'restablecer-contrasena',
@@ -51,6 +57,7 @@ class ResolverEstudio
                 // El aviso de una pasarela llega aunque el negocio esté suspendido: el
                 // dinero ya se movió y hay que registrarlo.
                 || ($estudio->estado === EstadoEstudio::Suspended && self::esAvisoDePago($request)))
+            || ! self::enSuProducto($request, $estudio)
             || ! $this->gestor->baseDeDatosExiste($estudio)) {
             abort(404, 'Estudio no encontrado.');
         }
@@ -69,6 +76,17 @@ class ResolverEstudio
         }
     }
 
+    /**
+     * ¿La petición llega por el dominio del producto del negocio (o por uno que no es
+     * de ningún producto)? Los avisos de pago no dependen del dominio.
+     */
+    private static function enSuProducto(Request $request, Estudio $estudio): bool
+    {
+        $delHost = ProductoComercial::delHost($request->getHost());
+
+        return $delHost === null || $delHost === $estudio->producto() || self::esAvisoDePago($request);
+    }
+
     private static function esAvisoDePago(Request $request): bool
     {
         return $request->route()?->getName() === 'api.v1.webhooks.tenant';
@@ -77,7 +95,7 @@ class ResolverEstudio
     private static function abiertaSuspendido(Request $request): bool
     {
         $nombre = (string) $request->route()?->getName();
-        $ruta = (string) preg_replace('/^api\.v1\.(app|sub)\./', '', $nombre);
+        $ruta = (string) preg_replace('/^api\.v1\.(app|sub|sub-[a-z]+)\./', '', $nombre);
 
         return in_array($ruta, self::ABIERTAS_SUSPENDIDO_POR_RENTA, true);
     }
