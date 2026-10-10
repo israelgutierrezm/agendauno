@@ -98,6 +98,9 @@ jobs:
           extensions: pdo_mysql, pdo_sqlite, sqlite3, bcmath, intl, mbstring, zip
           coverage: none
           tools: composer:v2
+          # Para todo proceso de PHP: `artisan test` corre Pest en un proceso hijo que no
+          # hereda un `php -d memory_limit=...` (con 512 MB la suite se quedaba sin memoria).
+          ini-values: memory_limit=2G
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
@@ -119,7 +122,7 @@ jobs:
 
       # Toda la suite en un proceso: con más de mil pruebas, 512 MB ya no alcanzan.
       - name: Tests (Pest)
-        run: php -d memory_limit=2G artisan test
+        run: php artisan test
 
       # Las pruebas usan SQLite para los negocios, que no tiene candados de fila ni
       # escrituras simultáneas: aquí se comprueba en MySQL con procesos a la vez
