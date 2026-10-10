@@ -51,6 +51,7 @@ const route = useRoute();
 const esAcceso = computed(() => route.name === "entrar");
 
 const RUTAS_PUBLICAS_DE_NEGOCIO = new Set([
+  "formulario-captacion",
   "estudio-publico",
   "estudio-corto",
   "agendar-cita",
@@ -58,6 +59,10 @@ const RUTAS_PUBLICAS_DE_NEGOCIO = new Set([
   "enlaces-estudio",
   "enlaces-subdominio",
 ]);
+// Un formulario de captación dentro del sitio del negocio: solo el formulario.
+const esEmbebido = computed(
+  () => route.name === "formulario-captacion" && route.query.embed === "1",
+);
 const esRutaPublicaDeNegocio = computed(
   () =>
     RUTAS_PUBLICAS_DE_NEGOCIO.has(String(route.name)) ||
@@ -445,6 +450,15 @@ onMounted(() => {
     :style="{ background: 'var(--fondo)' }"
     aria-busy="true"
   />
+
+  <!-- Formulario de captación embebido en otro sitio (ADR 0117): sin encabezado ni pie. -->
+  <main
+    v-else-if="esEmbebido"
+    class="min-h-0"
+    :style="{ background: 'var(--fondo)' }"
+  >
+    <RouterView />
+  </main>
 
   <!-- ===================== APP PÚBLICA ===================== -->
   <PublicShell

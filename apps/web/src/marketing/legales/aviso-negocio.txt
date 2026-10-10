@@ -9,6 +9,7 @@ AVISO DE PRIVACIDAD DE {negocio}
 • Identificación y contacto: nombre, correo, celular, fecha de nacimiento y, si la compartes, fotografía.
 • Tus {servicios}, reservas y asistencia; tus membresías, paquetes, compras y pagos.
 • Los documentos, consentimientos y formularios que nos entregues.
+• Si nos pides información o acceso antes de ser cliente: tu nombre, correo, teléfono, lo que te interesa y lo que respondas en nuestro formulario.
 
 Si para darte el servicio necesitamos datos de salud (por ejemplo, lesiones o padecimientos), son datos sensibles y solo los trataremos con tu consentimiento expreso y por escrito. Si eres menor de edad, necesitamos la autorización de quien ejerce la patria potestad o la tutela.
 
@@ -17,7 +18,7 @@ Si para darte el servicio necesitamos datos de salud (por ejemplo, lesiones o pa
 Finalidades necesarias:
 • Agendar y administrar tus {servicios}, tu membresía y tus pagos, y emitir tus facturas si las pides.
 • Enviarte confirmaciones, recordatorios y avisos sobre tus {servicios}.
-• Atender tus dudas, quejas y solicitudes.
+• Atender tus dudas, quejas y solicitudes, incluida la de información o acceso antes de ser cliente. Si no llegas a ser cliente, puedes pedirnos borrar esos datos.
 
 Finalidades secundarias: enviarte promociones y encuestas. Puedes oponerte desde tu cuenta o escribiéndonos, sin que eso afecte el servicio.
 

@@ -55,6 +55,13 @@ const router = createRouter({
       component: () => import("@/views/TerminosView.vue"),
     },
     {
+      // Un formulario de captación por enlace, QR o embebido (`?embed=1`) (ADR 0117).
+      path: "/f/:slug/:formulario",
+      name: "formulario-captacion",
+      component: () => import("@/views/FormularioCaptacionPublicoView.vue"),
+      props: true,
+    },
+    {
       // El aviso de privacidad de un negocio para sus clientes (público).
       path: "/estudio/:slug/aviso-de-privacidad",
       name: "aviso-negocio",
@@ -290,6 +297,19 @@ const router = createRouter({
       path: "/oportunidades",
       name: "oportunidades",
       component: () => import("@/views/OportunidadesView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      // Captación (ADR 0117): quien todavía no es cliente, aparte de Miembros.
+      path: "/prospectos",
+      name: "prospectos",
+      component: () => import("@/views/ProspectosView.vue"),
+      meta: { requiereSesion: true },
+    },
+    {
+      path: "/captacion/formularios",
+      name: "captacion-formularios",
+      component: () => import("@/views/FormulariosCaptacionView.vue"),
       meta: { requiereSesion: true },
     },
     {

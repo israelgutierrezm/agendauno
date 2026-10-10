@@ -137,6 +137,8 @@ export default {
     areas: {
       inicio: "Inicio",
       configuracion: "Configuración del negocio",
+      // Quien todavía no es cliente (ADR 0117), aparte de Miembros.
+      captacion: "Captación",
     },
     vistas: {
       resumen: "Resumen",
@@ -153,6 +155,8 @@ export default {
       paquetesCitas: "Bonos y membresías",
       suscripcion: "Suscripción y pagos",
       usoFacturable: "Uso facturable",
+      prospectos: "Prospectos",
+      formulariosCaptacion: "Formularios de captación",
     },
   },
   // Configuración del negocio: portada, categorías y opciones.
@@ -1082,6 +1086,8 @@ export default {
     agendaPaso2: "Elige profesional",
     agendaPaso3: "Elige horario",
     pedirAcceso: "Pedir acceso",
+    // Pedir lugar en una clase concreta: llega a Prospectos con esa clase (ADR 0117).
+    pedirLugar: "Quiero este lugar",
     // Registro cerrado (ADR 0093): el negocio da de alta a sus clientes.
     acceso: {
       titulo: "Pide tu acceso",

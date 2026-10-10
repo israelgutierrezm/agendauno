@@ -146,7 +146,7 @@ describe("menú del negocio", () => {
       "configuracion",
     ]);
     expect(MENU_NEGOCIO.map((g) => g.areas.map((a) => a.clave))).toEqual([
-      ["inicio", "agenda", "clientes", "cobros", "equipo"],
+      ["inicio", "agenda", "clientes", "captacion", "cobros", "equipo"],
       ["ventas", "marketing", "reportes"],
       ["configuracion", "suscripcion"],
     ]);
@@ -164,6 +164,7 @@ describe("menú del negocio", () => {
       "inicio",
       "agenda",
       "clientes",
+      "captacion",
       "cobros",
       "equipo",
       "ventas",
@@ -174,6 +175,14 @@ describe("menú del negocio", () => {
     ]);
     expect(destino(s, "inicio")).toBe("panel");
     expect(destino(s, "configuracion")).toBe("ajustes");
+  });
+
+  it("Captación (prospectos) va aparte de Miembros y solo con su permiso", () => {
+    const conProspectos = sesion(["miembros.ver", "prospectos.ver"]);
+    const sinProspectos = sesion(["miembros.ver", "agenda.ver"]);
+    expect(areas(conProspectos)).toContain("captacion");
+    expect(destino(conProspectos, "captacion")).toBe("prospectos");
+    expect(areas(sinProspectos)).not.toContain("captacion");
   });
 
   it("las vistas respetan la modalidad: Horarios en citas, Lugares disponibles en clases", () => {
