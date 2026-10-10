@@ -101,7 +101,10 @@ it('agotar la página pública de un negocio no bloquea la de otro, el calendari
         $this->getJson("/api/v1/app/{$a['slug']}/marca");
     }
 
-    $this->getJson("/api/v1/app/{$a['slug']}/marca")->assertTooManyRequests();
+    $this->getJson("/api/v1/app/{$a['slug']}/marca")
+        ->assertTooManyRequests()
+        ->assertJsonPath('code', 'TOO_MANY_REQUESTS')
+        ->assertJsonPath('message', 'Demasiados intentos. Espera un momento y vuelve a intentar.');
     // La reserva sin cuenta es de la misma familia: comparte el contador.
     $this->getJson("/api/v1/app/{$a['slug']}/citas/opciones")->assertTooManyRequests();
     $this->getJson("/api/v1/app/{$b['slug']}/marca")->assertOk();

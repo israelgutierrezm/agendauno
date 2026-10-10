@@ -7,6 +7,8 @@ use App\Modules\Platform\Operacion\LatidoOperacion;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\TipoCambio;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\MaintenanceMode;
 use Illuminate\Foundation\CacheBasedMaintenanceMode;
@@ -207,4 +209,59 @@ it('ya abierta, la cola cuenta solo si procesó el latido con esta versión', fu
 
     app(LatidoOperacion::class)->marcar(LatidoOperacion::COLA);
     $this->artisan('agendauno:latido --verificar=cola')->assertSuccessful();
+});
+
+it('exige tipo de cambio para la renta en pesos, el secreto whsec_ del webhook, el servidor SMTP y, para abrir, FacturAPI', function (): void {
+    TipoCambio::query()->delete();
+    config([
+        'mail.default' => 'smtp', 'mail.mailers.smtp.host' => '127.0.0.1', 'mail.mailers.smtp.url' => null,
+        'agendauno.facturapi.llave' => null,
+    ]);
+    // La llave secreta pegada donde va el secreto del webhook.
+    ConfiguracionPasarelaPlataforma::query()->create([
+        'proveedor' => 'stripe', 'activa' => true, 'modo' => 'test',
+        'credenciales' => ['secret_key' => 'sk_test_x', 'webhook_secret' => 'sk_test_x'],
+    ]);
+
+    $this->artisan('agendauno:verificar-produccion')
+        ->expectsOutputToContain('FALTA Tipo de cambio para cobrar en pesos — No hay ninguno capturado.')
+        ->expectsOutputToContain('FALTA Secreto del webhook de Stripe — No empieza con whsec_')
+        ->expectsOutputToContain('FALTA Servidor SMTP configurado — Ahora: 127.0.0.1.')
+        ->expectsOutputToContain('AVISO Llave de FacturAPI (CFDI)')
+        ->assertFailed();
+    $this->artisan('agendauno:verificar-produccion --apertura')
+        ->expectsOutputToContain('FALTA Llave de FacturAPI (CFDI)')
+        ->assertFailed();
+
+    config([
+        'agendauno.banxico.token' => 'token-banxico',
+        'mail.mailers.smtp.host' => 'smtp.proveedor.mx',
+        'agendauno.facturapi.llave' => 'sk_live_facturapi',
+    ]);
+    ConfiguracionPasarelaPlataforma::query()->where('proveedor', 'stripe')->firstOrFail()
+        ->update(['credenciales' => ['secret_key' => 'sk_test_x', 'webhook_secret' => 'whsec_x']]);
+    $this->artisan('agendauno:verificar-produccion --apertura')
+        ->expectsOutputToContain('OK    Tipo de cambio para cobrar en pesos')
+        ->expectsOutputToContain('OK    Secreto del webhook de Stripe')
+        ->expectsOutputToContain('OK    Servidor SMTP configurado')
+        ->expectsOutputToContain('OK    Llave de FacturAPI (CFDI)');
+});
+
+it('los respaldos, el simulacro, la agenda y la mora corren de madrugada en la Ciudad de México', function (): void {
+    $eventos = collect(app(Schedule::class)->events());
+    $hora = function (string $comando) use ($eventos): array {
+        $evento = $eventos->first(fn ($e): bool => str_ends_with((string) $e->command, $comando));
+        $siguiente = CarbonImmutable::instance($evento->nextRunDate(now()))->setTimezone('America/Mexico_City');
+
+        return [$siguiente->dayOfWeek, $siguiente->format('H:i')];
+    };
+
+    expect($hora('agendauno:respaldar-plataforma')[1])->toBe('03:05')
+        ->and($hora('agendauno:respaldar-estudios')[1])->toBe('03:15')
+        // Los domingos, después de los respaldos de ese día.
+        ->and($hora('agendauno:simulacro-restauracion'))->toBe([0, '04:30'])
+        ->and($hora('agendauno:generar-agenda')[1])->toBe('00:30')
+        // Después del cobro de renovaciones (00:45).
+        ->and($hora('agendauno:escalar-dunning')[1])->toBe('01:15')
+        ->and($hora('agendauno:cobrar-suscripciones')[1])->toBe('00:45');
 });

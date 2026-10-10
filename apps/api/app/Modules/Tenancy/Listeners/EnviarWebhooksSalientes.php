@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Listeners;
 
 use App\Modules\Tenancy\Application\EntregarWebhookTenant;
+use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Models\WebhookSalienteTenant;
 
@@ -15,10 +16,14 @@ use App\Modules\Tenancy\Models\WebhookSalienteTenant;
  * (los deja como `fallido` para reintento) para no afectar la publicación del outbox.
  * Si el evento se reintenta (otro consumidor falló), no vuelve a crear ni a mandar la
  * entrega que ya existe para ese endpoint: sus reintentos van por su propio relay.
+ * Si el plan del negocio ya no incluye integraciones (ADR 0107), no entrega nada.
  */
 class EnviarWebhooksSalientes
 {
-    public function __construct(private readonly EntregarWebhookTenant $entregador) {}
+    public function __construct(
+        private readonly EntregarWebhookTenant $entregador,
+        private readonly FuncionesPlan $funciones,
+    ) {}
 
     public function handle(EventoDeDominioTenant $evento): void
     {
@@ -27,7 +32,7 @@ class EnviarWebhooksSalientes
             ->get()
             ->filter(fn (WebhookSalienteTenant $w): bool => $w->suscritoA($evento->tipo));
 
-        if ($endpoints->isEmpty()) {
+        if ($endpoints->isEmpty() || ! $this->funciones->tieneElNegocioActual('integraciones')) {
             return;
         }
 

@@ -81,13 +81,30 @@ class WebhookPlataformaController
             || $tipo === 'checkout.session.async_payment_succeeded';
 
         if (($sesionPagada || $tipo === 'payment_intent.succeeded') && $referencia !== '') {
-            $this->confirmar->porReferencia($referencia, 'stripe');
+            // Si el cargo no tiene esa referencia (Stripe cobró pero no se alcanzó a
+            // guardar), se busca por el cargo que va en `metadata.cargo_renta`.
+            $metadata = is_array($objeto['metadata'] ?? null) ? $objeto['metadata'] : [];
+            $monto = $objeto['amount_received'] ?? $objeto['amount_total'] ?? $objeto['amount'] ?? null;
+            $this->confirmar->porReferencia(
+                $referencia,
+                'stripe',
+                is_string($metadata['cargo_renta'] ?? null) ? $metadata['cargo_renta'] : null,
+                is_numeric($monto) ? (int) $monto : null,
+            );
         }
 
         // El intento ya no se puede pagar: la sesión venció o el pago en tienda (OXXO)
         // no se completó. Queda cerrado y se puede reintentar.
         if (in_array($tipo, ['checkout.session.expired', 'checkout.session.async_payment_failed'], true) && $referencia !== '') {
             $this->confirmar->intentoTerminado($referencia);
+        }
+
+        // Un cobro a la tarjeta domiciliada que quedó en proceso y después falló (o se
+        // anuló): cuenta como un rechazo y se programa el siguiente intento.
+        if (in_array($tipo, ['payment_intent.payment_failed', 'payment_intent.canceled'], true) && $referencia !== '') {
+            $error = is_array($objeto['last_payment_error'] ?? null) ? $objeto['last_payment_error'] : [];
+            $codigo = $error['decline_code'] ?? $error['code'] ?? null;
+            $this->confirmar->intentoTerminado($referencia, is_string($codigo) && $codigo !== '' ? $codigo : null);
         }
 
         return response()->json(['data' => ['ok' => true]]);

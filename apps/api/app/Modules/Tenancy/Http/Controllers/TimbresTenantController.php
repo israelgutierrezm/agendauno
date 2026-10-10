@@ -9,6 +9,8 @@ use App\Modules\Tenancy\Application\ComprarTimbres;
 use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\TimbresTenant;
+use App\Modules\Tenancy\Facturacion\FacturacionNoConfigurada;
+use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\TarifaSaas;
 use Illuminate\Http\JsonResponse;
@@ -68,6 +70,10 @@ class TimbresTenantController
     /** Por qué no puede comprar timbres (null si puede). */
     private function motivo(Estudio $estudio): ?string
     {
+        // Sin FacturAPI en la plataforma no se timbra: no se venden timbres que no sirven.
+        if (! ConfiguracionPlataforma::facturacionDisponible()) {
+            return FacturacionNoConfigurada::MOTIVO;
+        }
         if (! $this->region->factura()) {
             return RegionNegocioTenant::MOTIVO_FACTURACION;
         }

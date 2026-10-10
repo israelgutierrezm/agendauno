@@ -61,6 +61,7 @@ class CobroRecurrenteTenant
         private readonly ConciliarSuscripcionTenant $suscripciones,
         private readonly RegistroDePasarelasTenant $registro,
         private readonly ParametrosTenant $parametros,
+        private readonly FuncionesPlan $funciones,
     ) {}
 
     /**
@@ -83,7 +84,9 @@ class CobroRecurrenteTenant
             return 'omitido';
         }
 
-        if ($domiciliacion instanceof DomiciliacionTenant) {
+        // Sin pago automático en el plan del negocio (ADR 0107) no se cobra a la tarjeta:
+        // se le avisa para pagar a mano, como a quien no lo activó.
+        if ($domiciliacion instanceof DomiciliacionTenant && $this->funciones->tieneElNegocioActual('cobro_automatico')) {
             return $this->cargoAutomatico($acuerdo, $orden, $domiciliacion);
         }
 

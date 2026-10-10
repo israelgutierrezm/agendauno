@@ -61,3 +61,17 @@ it('la verificación de producción avisa que sin llave de FacturAPI no hay fact
     $this->artisan('agendauno:verificar-produccion')
         ->expectsOutputToContain('AVISO Llave de FacturAPI (CFDI)');
 });
+
+it('en producción sin llave de FacturAPI no se venden timbres', function (): void {
+    config(['agendauno.facturapi.llave' => null]);
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    app()->detectEnvironment(fn (): string => 'production');
+
+    test()->getJson("/api/v1/app/{$e['slug']}/timbres", conBearer($e['bearer']))
+        ->assertOk()
+        ->assertJsonPath('data.posible', false)
+        ->assertJsonPath('data.motivo', FacturacionNoConfigurada::MOTIVO);
+    test()->postJson("/api/v1/app/{$e['slug']}/timbres/comprar", ['cantidad' => 50], conBearer($e['bearer']))
+        ->assertUnprocessable()
+        ->assertJsonPath('meta.errors.cantidad.0', FacturacionNoConfigurada::MOTIVO);
+});

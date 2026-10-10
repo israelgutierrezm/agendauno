@@ -6,7 +6,9 @@ namespace App\Modules\Platform\Operacion;
 
 use App\Modules\Platform\Legales\DocumentoLegal;
 use App\Modules\Platform\Legales\DocumentosLegales;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RespaldosEstudio;
+use App\Modules\Tenancy\Application\TiposDeCambio;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
 use App\Modules\Tenancy\Models\ConfiguracionPlataforma;
@@ -32,8 +34,8 @@ use Throwable;
  *   caché, cola, programador y esquema al día). Lo usa actualizar.sh antes de quitar
  *   el mantenimiento.
  * - Apertura comercial (`APERTURA_COMERCIAL=true` o `$apertura`): además exige Stripe
- *   en producción para la renta del SaaS. Sin ella, una instalación de prueba puede
- *   quedar lista con Stripe en modo de prueba, y así lo dice.
+ *   en producción para la renta del SaaS y la llave de FacturAPI. Sin ella, una
+ *   instalación de prueba puede quedar lista con Stripe en modo de prueba, y así lo dice.
  */
 class VerificacionProduccion
 {
@@ -48,6 +50,8 @@ class VerificacionProduccion
         private readonly RespaldosEstudio $respaldos,
         private readonly RespaldosPlataforma $plataforma,
         private readonly DocumentosLegales $legales,
+        private readonly TiposDeCambio $tipos,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     /**
@@ -64,7 +68,7 @@ class VerificacionProduccion
             ...$this->respaldos(),
             ...$this->alertas(),
             ...$this->legales(),
-            ...$this->facturacion(),
+            ...$this->facturacion($apertura || $this->aperturaComercial()),
             ...$this->pagos($apertura || $this->aperturaComercial()),
         ];
     }
@@ -216,9 +220,16 @@ class VerificacionProduccion
     {
         $mailer = (string) config('mail.default');
         $remitente = (string) config('mail.from.address');
+        // Con SMTP, el servidor: sin MAIL_HOST queda el de omisión (127.0.0.1) y ningún
+        // correo sale (invitaciones, recuperar contraseña, avisos).
+        $host = (string) config('mail.mailers.smtp.host');
+        $servidor = (string) config('mail.mailers.smtp.url') !== '' || ! in_array($host, ['', '127.0.0.1', 'localhost'], true);
 
         return [
             $this->punto('Correo', 'Proveedor de correo real', ! in_array($mailer, ['log', 'array'], true), "Ahora: {$mailer}. Configura MAIL_MAILER=smtp y sus credenciales."),
+            ...($mailer === 'smtp' ? [
+                $this->punto('Correo', 'Servidor SMTP configurado', $servidor, "Ahora: {$host}. Define MAIL_HOST, MAIL_PORT y las credenciales de tu proveedor."),
+            ] : []),
             $this->punto('Correo', 'Remitente propio', $remitente !== '' && ! str_ends_with($remitente, '@example.com'), "Ahora: {$remitente}. Usa un dominio con SPF y DKIM."),
         ];
     }
@@ -281,15 +292,16 @@ class VerificacionProduccion
     }
 
     /**
-     * Sin llave de FacturAPI se puede abrir, pero sin facturas: los negocios no emiten
-     * CFDI a sus clientes ni reciben el de su renta.
+     * Sin llave de FacturAPI una instalación de prueba puede abrir, pero sin facturas:
+     * los negocios no emiten CFDI a sus clientes ni reciben el de su renta. Para abrir y
+     * cobrar (apertura comercial) bloquea: la renta en México se factura.
      *
      * @return list<array{seccion: string, punto: string, estado: string, detalle: string}>
      */
-    private function facturacion(): array
+    private function facturacion(bool $apertura): array
     {
         return [
-            $this->punto('Facturación', 'Llave de FacturAPI (CFDI)', ConfiguracionPlataforma::llaveFacturapi() !== null, 'Sin ella la facturación queda apagada: los negocios no emiten facturas a sus clientes ni reciben la de su renta. Captúrala en Configuración del superadmin o define FACTURAPI_LLAVE.', critico: false),
+            $this->punto('Facturación', 'Llave de FacturAPI (CFDI)', ConfiguracionPlataforma::llaveFacturapi() !== null, 'Sin ella la facturación queda apagada: los negocios no emiten facturas a sus clientes ni reciben la de su renta. Captúrala en Configuración del superadmin o define FACTURAPI_LLAVE.', critico: $apertura),
         ];
     }
 
@@ -330,6 +342,7 @@ class VerificacionProduccion
             $stripe = null;
         }
         $llaves = $stripe?->llaves() ?? [];
+        $secretoWebhook = (string) ($llaves['webhook_secret'] ?? '');
 
         return [
             $this->punto('Pagos', 'Stripe de la plataforma activo (renta del SaaS)', $stripe !== null && $stripe->activa, 'Configúralo en Plataforma → Pasarelas.'),
@@ -341,8 +354,41 @@ class VerificacionProduccion
                 $apertura ? 'Usa llaves sk_live_ y modo live: sin ellas la renta no cobra dinero real.' : 'Modo de prueba: la renta del SaaS no cobra dinero real. Para abrir y cobrar, usa llaves sk_live_ y APERTURA_COMERCIAL=true.',
                 critico: $apertura,
             ),
-            $this->punto('Pagos', 'Secreto del webhook de Stripe', (string) ($llaves['webhook_secret'] ?? '') !== '', 'Sin él no se confirman los pagos de la renta.'),
+            // El que da Stripe al crear el endpoint empieza con whsec_; otro valor (p. ej. la
+            // llave secreta pegada ahí) no valida ningún aviso.
+            $this->punto('Pagos', 'Secreto del webhook de Stripe', str_starts_with($secretoWebhook, 'whsec_'), $secretoWebhook === '' ? 'Sin él no se confirman los pagos de la renta.' : 'No empieza con whsec_: copia el «Signing secret» del endpoint en Stripe. Con otro valor no se confirman los pagos de la renta.'),
+            $this->tipoDeCambio(),
         ];
+    }
+
+    /**
+     * La renta en dólares se cobra en pesos a los negocios de México (ADR 0107): hace
+     * falta el token del Banco de México o un tipo de cambio capturado hace menos de
+     * `renta.tipo_cambio_dias_vigencia` días. Sin él, esos cargos no se emiten.
+     *
+     * @return array{seccion: string, punto: string, estado: string, detalle: string}
+     */
+    private function tipoDeCambio(): array
+    {
+        try {
+            $vigencia = max(1, $this->parametros->entero('renta.tipo_cambio_dias_vigencia'));
+            $ultimo = $this->tipos->ultimo();
+            $banxico = $this->tipos->banxicoConfigurado();
+        } catch (Throwable) {
+            $vigencia = 1;
+            $ultimo = null;
+            $banxico = false;
+        }
+        $reciente = $ultimo !== null
+            && CarbonImmutable::parse($ultimo['fecha'])->greaterThanOrEqualTo(CarbonImmutable::today()->subDays($vigencia));
+
+        return $this->punto(
+            'Pagos',
+            'Tipo de cambio para cobrar en pesos',
+            $banxico || $reciente,
+            ($ultimo === null ? 'No hay ninguno capturado. ' : "El último es del {$ultimo['fecha']}. ")
+                ."Captura el token del Banco de México en Configuración del superadmin (o BANXICO_TOKEN), o un tipo de cambio de los últimos {$vigencia} días en Tarifas: sin él no se emiten los cargos en pesos.",
+        );
     }
 
     /** Fecha del respaldo por su nombre ({slug}-AAAAMMDD-HHMMSS.ext). */

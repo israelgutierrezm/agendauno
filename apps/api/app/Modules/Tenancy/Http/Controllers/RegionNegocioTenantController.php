@@ -57,6 +57,7 @@ class RegionNegocioTenantController
     private function presentar(): array
     {
         $hayCobros = $this->region->hayCobros();
+        $paisEditable = $this->region->paisEditable();
 
         return [
             'pais' => $this->region->pais(),
@@ -67,6 +68,10 @@ class RegionNegocioTenantController
             'monedas' => CatalogoMonedas::lista(),
             // La moneda solo se cambia antes de cobrar (luego todo su dinero está en ella).
             'puede_cambiar_moneda' => ! $hayCobros,
+            // El país define cómo se le cobra la renta (ADR 0107): el dueño lo cambia solo
+            // en la prueba y antes de su primer cargo; después, el superadmin.
+            'puede_cambiar_pais' => $paisEditable,
+            'motivo_pais' => $paisEditable ? null : RegionNegocioTenant::MOTIVO_PAIS,
             'pasarelas' => [
                 'disponibles' => $this->region->enPesos(),
                 'motivo' => $this->region->enPesos() ? null : RegionNegocioTenant::MOTIVO_PASARELAS,

@@ -32,8 +32,10 @@ Schedule::command('agendauno:reintentar-webhooks')->everyFiveMinutes()->withoutO
 // Envia los mensajes encolados (y reintenta los fallidos) de cada estudio (R28).
 Schedule::command('agendauno:enviar-mensajes')->everyMinute()->withoutOverlapping();
 
-// Materializa la agenda recurrente de cada estudio (R5): ventana deslizante diaria.
-Schedule::command('agendauno:generar-agenda')->dailyAt('00:30')->withoutOverlapping();
+// Materializa la agenda recurrente de cada estudio (R5): ventana deslizante diaria, a
+// las 00:30 de CDMX (fuera del horario de los negocios). Los recordatorios toman lo
+// materializado en sus siguientes vueltas.
+Schedule::command('agendauno:generar-agenda')->dailyAt('06:30')->withoutOverlapping();
 
 // Expira las ofertas de lista de espera vencidas y re-ofrece el cupo (R7).
 Schedule::command('agendauno:expirar-ofertas')->everyMinute()->withoutOverlapping();
@@ -88,11 +90,12 @@ Schedule::command('agendauno:suspender-por-renta')->dailyAt('15:30')->withoutOve
 // CDMX; no repite ninguno.
 Schedule::command('agendauno:avisar-duenos')->hourlyAt(20)->between('15:00', '02:00')->withoutOverlapping();
 
-// Respalda la base central y los archivos subidos (03:05) y la base de cada negocio
-// (03:15), en el disco de respaldos (en producción, fuera del servidor), y borra los
-// viejos (retención).
-Schedule::command('agendauno:respaldar-plataforma')->dailyAt('03:05')->withoutOverlapping();
-Schedule::command('agendauno:respaldar-estudios')->dailyAt('03:15')->withoutOverlapping();
+// Respalda la base central y los archivos subidos (03:05 de CDMX) y la base de cada
+// negocio (03:15 de CDMX), en el disco de respaldos (en producción, fuera del
+// servidor), y borra los viejos (retención). De madrugada, fuera del horario de los
+// negocios y antes de las limpiezas de las 03:40 y 03:50.
+Schedule::command('agendauno:respaldar-plataforma')->dailyAt('09:05')->withoutOverlapping();
+Schedule::command('agendauno:respaldar-estudios')->dailyAt('09:15')->withoutOverlapping();
 
 // Borra los registros técnicos vencidos (envíos y códigos de WhatsApp, sesiones de
 // tarjeta), con los plazos de los parámetros de plataforma (ADR 0079). 03:40 de CDMX.
@@ -103,8 +106,10 @@ Schedule::command('agendauno:limpiar-registros')->dailyAt('09:40')->withoutOverl
 // registro. Nunca uno activado, con pagos o con más usuarios. 03:50 de CDMX.
 Schedule::command('agendauno:limpiar-altas-sin-activar')->dailyAt('09:50')->withoutOverlapping();
 
-// Simulacro de restauración (domingos): prueba que los respaldos se pueden restaurar.
-Schedule::command('agendauno:simulacro-restauracion')->weeklyOn(0, '04:30')->withoutOverlapping();
+// Simulacro de restauración (domingos a las 04:30 de CDMX, después de los respaldos de
+// ese día): prueba que los respaldos se pueden restaurar.
+Schedule::command('agendauno:simulacro-restauracion')->weeklyOn(0, '10:30')->withoutOverlapping();
 
-// Escala el dunning: suspende las membresias morosas cuya gracia vencio (R10).
-Schedule::command('agendauno:escalar-dunning')->dailyAt('01:00')->withoutOverlapping();
+// Escala el dunning: suspende las membresias morosas cuya gracia vencio (R10). A las
+// 01:15 de CDMX, después del cobro de renovaciones y sus reintentos (00:45).
+Schedule::command('agendauno:escalar-dunning')->dailyAt('07:15')->withoutOverlapping();

@@ -146,3 +146,27 @@ it('con 0 días de gracia nunca se suspende solo', function (): void {
     expect(estadoDelNegocio())->not->toBe('suspended')
         ->and(collect(asuntosAlDueno())->filter(fn (string $a): bool => str_contains($a, 'suspender')))->toBeEmpty();
 });
+
+it('el superadmin condona una renta pendiente: queda cancelada y el negocio suspendido por ella se reactiva', function (): void {
+    $n = negocioConRentaPorPagar();
+    $this->travelTo($n['cargo']->vence_en->copy()->addDays(15)->setTime(18, 0));
+    $this->artisan('agendauno:suspender-por-renta')->assertSuccessful();
+    expect(estadoDelNegocio())->toBe('suspended');
+    $url = "/api/v1/plataforma/cargos/{$n['cargo']->ulid}/condonar";
+
+    $this->postJson($url, ['motivo' => 'Cortesía'], ['Accept' => 'application/json'])->assertUnauthorized();
+    $this->postJson($url, [], conPlataforma())->assertStatus(422);
+    $this->getJson('/api/v1/plataforma/cobros', conPlataforma())->assertOk()->assertJsonPath('data.0.condonable', true);
+
+    $this->postJson($url, ['motivo' => 'Cortesía por la falla del servicio'], conPlataforma())
+        ->assertOk()
+        ->assertJsonPath('data.estado', 'cancelado')
+        ->assertJsonPath('data.estudio_estado', 'active');
+    expect($n['cargo']->refresh()->estado->value)->toBe('cancelado')->and(estadoDelNegocio())->toBe('active');
+
+    // Ya no está pendiente: no se condona otra vez, no se cobra ni vuelve a suspender.
+    $this->postJson($url, ['motivo' => 'Otra vez'], conPlataforma())->assertStatus(422);
+    $this->getJson('/api/v1/plataforma/cobros', conPlataforma())->assertOk()->assertJsonPath('data.0.condonable', false);
+    $this->artisan('agendauno:suspender-por-renta')->assertSuccessful();
+    expect(estadoDelNegocio())->toBe('active');
+});

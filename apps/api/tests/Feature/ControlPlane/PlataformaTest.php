@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\Models\ConfiguracionPasarelaPlataforma;
+use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 
@@ -227,4 +229,38 @@ it('los cobros resumen lo pendiente y filtran por estado; exigen token de plataf
 
     test()->getJson('/api/v1/plataforma/cobros?estado=pagado', conTokenPlataforma())->assertOk()->assertJsonCount(0, 'data');
     test()->getJson('/api/v1/plataforma/cobros', conTokenPlataforma('otro'))->assertUnauthorized();
+});
+
+it('al pasar Stripe de prueba a producción exige el secreto del webhook nuevo y quita las tarjetas guardadas', function (): void {
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
+    estudioConSesion('estudio-a', 'a@correo.mx');
+    $guardar = fn (array $credenciales) => test()->putJson('/api/v1/plataforma/pasarelas/stripe', [
+        'activa' => true, 'modo' => 'live', 'credenciales' => $credenciales,
+    ], conTokenPlataforma());
+    $guardar(['secret_key' => 'sk_test_plataforma', 'webhook_secret' => 'whsec_prueba'])->assertOk();
+    Estudio::query()->update([
+        'stripe_cliente_id' => 'cus_prueba', 'domiciliacion_metodo' => 'pm_prueba', 'tarjeta_marca' => 'visa',
+        'tarjeta_ultimos4' => '4242', 'tarjeta_vence' => '09/2031', 'domiciliada_en' => now(),
+    ]);
+
+    // Un secreto que no es de Stripe no se acepta.
+    expect($guardar(['webhook_secret' => 'secreto'])->assertStatus(422)->json('meta.errors'))->toHaveKey('credenciales.webhook_secret');
+    // Llave de producción sin el secreto del webhook de producción: no se guarda nada.
+    expect($guardar(['secret_key' => 'sk_live_plataforma'])->assertStatus(422)->json('meta.errors'))->toHaveKey('credenciales.webhook_secret');
+    expect(ConfiguracionPasarelaPlataforma::query()->where('proveedor', 'stripe')->sole()->llaves()['secret_key'])->toBe('sk_test_plataforma')
+        ->and(Estudio::query()->sole()->stripe_cliente_id)->toBe('cus_prueba');
+
+    // Con su secreto: se guarda y los clientes y tarjetas de prueba se quitan.
+    $guardar(['secret_key' => 'sk_live_plataforma', 'webhook_secret' => 'whsec_produccion'])->assertOk();
+    $estudio = Estudio::query()->sole();
+    expect(ConfiguracionPasarelaPlataforma::query()->where('proveedor', 'stripe')->sole()->llaves()['webhook_secret'])->toBe('whsec_produccion')
+        ->and($estudio->stripe_cliente_id)->toBeNull()
+        ->and($estudio->domiciliacion_metodo)->toBeNull()
+        ->and($estudio->tarjeta_ultimos4)->toBeNull()
+        ->and($estudio->domiciliada_en)->toBeNull();
+
+    // Otra llave del mismo modo no pide el secreto ni toca lo guardado.
+    Estudio::query()->update(['stripe_cliente_id' => 'cus_produccion']);
+    $guardar(['secret_key' => 'rk_live_restringida'])->assertOk();
+    expect(Estudio::query()->sole()->stripe_cliente_id)->toBe('cus_produccion');
 });

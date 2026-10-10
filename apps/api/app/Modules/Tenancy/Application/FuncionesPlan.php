@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Exceptions\FuncionNoIncluida;
 use App\Modules\Tenancy\Models\Estudio;
 
@@ -51,7 +52,10 @@ class FuncionesPlan
 
     public const ORDEN = ['individual' => 1, 'premium' => 2, 'pro' => 3];
 
-    public function __construct(private readonly PlanCitasSaas $planes) {}
+    public function __construct(
+        private readonly PlanCitasSaas $planes,
+        private readonly GestorDeConexionTenant $gestor,
+    ) {}
 
     /**
      * El nivel con que se deciden sus funciones; null si las tiene todas.
@@ -96,19 +100,46 @@ class FuncionesPlan
         if ($nivel === null) {
             return true;
         }
-        $minimo = self::mapa($this->planes->tarifa()?->definicion)[$funcion] ?? null;
 
-        return $minimo === null || self::ORDEN[$nivel] >= self::ORDEN[$minimo];
+        return self::incluye($nivel, self::mapa($this->planes->tarifa()?->definicion), $funcion);
     }
 
     /**
-     * Las funciones que NO tiene (para que la web y la app las oculten).
+     * En segundo plano (relay del outbox, cobros programados): ¿el negocio conectado
+     * tiene la función? Sin negocio conectado no se niega nada.
+     */
+    public function tieneElNegocioActual(string $funcion): bool
+    {
+        $estudio = $this->gestor->actual();
+
+        return ! $estudio instanceof Estudio || $this->tiene($estudio, $funcion);
+    }
+
+    /**
+     * Las funciones que NO tiene (para que la web y la app las oculten). El nivel y la
+     * tarifa se leen una sola vez para todas.
      *
      * @return list<string>
      */
     public function faltantes(Estudio $estudio): array
     {
-        return array_values(array_filter(array_keys(self::NIVEL_MINIMO), fn (string $f): bool => ! $this->tiene($estudio, $f)));
+        $nivel = $this->nivel($estudio);
+        if ($nivel === null) {
+            return [];
+        }
+        $mapa = self::mapa($this->planes->tarifa()?->definicion);
+
+        return array_values(array_filter(array_keys(self::NIVEL_MINIMO), static fn (string $f): bool => ! self::incluye($nivel, $mapa, $f)));
+    }
+
+    /**
+     * @param  array<string, string>  $mapa  el nivel que abre cada función
+     */
+    private static function incluye(string $nivel, array $mapa, string $funcion): bool
+    {
+        $minimo = $mapa[$funcion] ?? null;
+
+        return $minimo === null || self::ORDEN[$nivel] >= self::ORDEN[$minimo];
     }
 
     /**

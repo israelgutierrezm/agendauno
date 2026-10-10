@@ -6,10 +6,10 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\BajasTenant;
 use App\Modules\Tenancy\Application\CatalogoDePermisosTenant;
+use App\Modules\Tenancy\Application\CupoProfesionales;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
 use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
-use App\Modules\Tenancy\Application\PlanCitasSaas;
 use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Application\RolesTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
@@ -49,7 +49,7 @@ class UsuariosTenantController
         private readonly BajasTenant $bajas,
         private readonly RegistrarAuditoria $auditoria,
         private readonly RolesTenant $roles,
-        private readonly PlanCitasSaas $planes,
+        private readonly CupoProfesionales $cupo,
     ) {}
 
     /**
@@ -259,14 +259,17 @@ class UsuariosTenantController
         $usuario = Usuario::withTrashed()->where('ulid', (string) $request->route('usuario'))->firstOrFail();
 
         $actor = $this->actor($request);
+        $profesional = false;
         if ($usuario->trashed()) {
             $this->bajas->exigirQueLeAlcance($usuario, $actor);
-            // Vuelve un profesional: debe caber en el plan del negocio (ADR 0107).
-            if ($this->esProfesional($usuario->rolesEfectivos())) {
-                $this->planes->exigirCupo($this->estudioDe($request));
-            }
+            // Vuelve alguien del equipo que no atiende: es de Premium; un profesional debe
+            // caber en el plan del negocio (ADR 0107).
+            $this->exigirEquipo($request, $usuario->rolesEfectivos());
+            $profesional = $this->esProfesional($usuario->rolesEfectivos());
         }
-        $this->bajas->reactivarUsuario($usuario, $actor);
+        $this->cupo->sumar($this->estudioDe($request), $profesional ? 1 : 0, function () use ($usuario, $actor): void {
+            $this->bajas->reactivarUsuario($usuario, $actor);
+        });
 
         return response()->json(['data' => $this->presentar($usuario->refresh())]);
     }
@@ -281,13 +284,11 @@ class UsuariosTenantController
             'sucursal_id' => ['nullable', 'string'],
         ]);
         $this->exigirQuePuedaDar($this->actor($request), [(string) $validado['rol']]);
-        // Un profesional más debe caber en el plan del negocio; el resto del equipo
-        // (recepción, administración) es de Premium (ADR 0107).
-        if ($this->esProfesional([(string) $validado['rol']])) {
-            $this->planes->exigirCupo($this->estudioDe($request));
-        } else {
-            app(FuncionesPlan::class)->exigir($this->estudioDe($request), 'equipo');
-        }
+        // El equipo que no atiende (recepción, administración, roles propios) es de
+        // Premium; un cliente no es equipo. Un profesional más debe caber en el plan del
+        // negocio (ADR 0107).
+        $this->exigirEquipo($request, [(string) $validado['rol']]);
+        $profesional = $this->esProfesional([(string) $validado['rol']]);
 
         // Email único dentro de la BD del tenant (también el de alguien dado de baja:
         // ese correo es suyo y se reactiva su cuenta).
@@ -310,15 +311,18 @@ class UsuariosTenantController
             'password' => null,
         ];
         $reactivado = $existente instanceof Usuario;
-        if ($existente instanceof Usuario) {
-            // Vuelve al equipo: misma cuenta (su historial), con el rol de ahora y una
-            // invitación nueva para definir su contraseña.
-            $this->bajas->reactivarUsuario($existente, $this->actor($request), 'Invitado de nuevo al equipo.');
-            $existente->forceFill($datos)->save();
-            $usuario = $existente;
-        } else {
-            $usuario = Usuario::query()->create($datos);
-        }
+        $usuario = $this->cupo->sumar($this->estudioDe($request), $profesional ? 1 : 0, function () use ($existente, $datos, $request): Usuario {
+            if ($existente instanceof Usuario) {
+                // Vuelve al equipo: misma cuenta (su historial), con el rol de ahora y una
+                // invitación nueva para definir su contraseña.
+                $this->bajas->reactivarUsuario($existente, $this->actor($request), 'Invitado de nuevo al equipo.');
+                $existente->forceFill($datos)->save();
+
+                return $existente;
+            }
+
+            return Usuario::query()->create($datos);
+        });
 
         // Asignación de sede (acota al usuario a esa sucursal con su rol).
         if ($sucursal instanceof SucursalTenant) {
@@ -376,6 +380,20 @@ class UsuariosTenantController
         return $this->roles->tieneFaceta($roles, 'instructor');
     }
 
+    /**
+     * Con alguno de esos roles del equipo que no atiende (dueño, administración,
+     * recepción o uno propio), el plan debe incluir equipo (ADR 0107). Un cliente o un
+     * profesional no lo piden.
+     *
+     * @param  list<string>  $roles
+     */
+    private function exigirEquipo(Request $request, array $roles): void
+    {
+        if ($this->roles->tieneFaceta($roles, 'equipo')) {
+            app(FuncionesPlan::class)->exigir($this->estudioDe($request), 'equipo');
+        }
+    }
+
     private function estudioDe(Request $request): Estudio
     {
         $estudio = $request->attributes->get('estudio');
@@ -404,15 +422,15 @@ class UsuariosTenantController
         // Lo que se da o se quita (el de dueño tiene su propia regla, arriba).
         $cambios = array_diff([...array_diff($rolesNuevos, $antes), ...array_diff($antes, $rolesNuevos)], ['propietario']);
         $this->exigirQuePuedaDar($this->actor($request), array_values($cambios));
-        // Si pasa a atender (profesional), debe caber en el plan del negocio (ADR 0107).
-        if (! $this->esProfesional($antes) && $this->esProfesional($rolesNuevos)) {
-            $this->planes->exigirCupo($this->estudioDe($request));
-        }
+        // Un rol nuevo del equipo que no atiende es de Premium; si pasa a atender
+        // (profesional), debe caber en el plan del negocio (ADR 0107).
+        $this->exigirEquipo($request, array_values(array_diff($rolesNuevos, $antes)));
+        $profesional = ! $this->esProfesional($antes) && $this->esProfesional($rolesNuevos);
 
-        $usuario->update([
+        $this->cupo->sumar($this->estudioDe($request), $profesional ? 1 : 0, fn () => $usuario->update([
             'roles' => $rolesNuevos,
             'rol' => $this->roles->principal($rolesNuevos),
-        ]);
+        ]));
         if ($antes !== $rolesNuevos) {
             $this->auditoria->registrar($this->actor($request), 'usuario.roles', 'usuario', (string) $usuario->ulid,
                 ['nombre' => $usuario->name, 'roles' => $antes],

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Listeners;
 
+use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\GestionarTareasTenant;
 use App\Modules\Tenancy\Automatizacion\AccionAutomatizacion;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
@@ -18,11 +19,15 @@ use Illuminate\Support\Carbon;
  * ejecuta la acción tras el retraso configurado. La acción v1 crea una tarea de
  * seguimiento (el envío de mensajes lo cubre Comunicaciones/R28). Idempotente por
  * (regla, evento): un reintento del relay no duplica la tarea. Corre dentro de la
- * conexión del tenant activa.
+ * conexión del tenant activa. Si el plan del negocio ya no incluye automatizaciones
+ * (`mensajes`, ADR 0107), sus reglas no corren.
  */
 class EjecutarAutomatizaciones
 {
-    public function __construct(private readonly GestionarTareasTenant $tareas) {}
+    public function __construct(
+        private readonly GestionarTareasTenant $tareas,
+        private readonly FuncionesPlan $funciones,
+    ) {}
 
     public function handle(EventoDeDominioTenant $evento): void
     {
@@ -31,7 +36,7 @@ class EjecutarAutomatizaciones
             ->where('activa', true)
             ->get();
 
-        if ($reglas->isEmpty()) {
+        if ($reglas->isEmpty() || ! $this->funciones->tieneElNegocioActual('mensajes')) {
             return;
         }
 

@@ -24,7 +24,8 @@ use DomainException;
  * - guarda con qué se calculó (medición, regla, tarifa) y cuándo se emitió;
  * - una vez emitido NO se recalcula: volver a correr el proceso no lo cambia aunque
  *   después cambien la tarifa, la prueba o la medición. Idempotente por (estudio,
- *   periodo). Un periodo sin nada que cobrar queda `sin_cargo`.
+ *   periodo). Un periodo sin nada que cobrar (o con menos del cargo mínimo que se
+ *   cobra, `renta.cargo_minimo_*`) queda `sin_cargo`.
  * - en la moneda de cobro del negocio: la tarifa en dólares se cobra en pesos en
  *   México, al tipo de cambio del día en que se emite (ADR 0107).
  *
@@ -82,6 +83,11 @@ class GenerarCargoRenta
         [$desglose, $version, $monedaTarifa] = $this->cotizar($estudio, $medicion->metrica, $medicion->cantidad, $medicion->detalle ?? [], $periodo, $this->finDelPeriodo($estudio, $periodo));
         $final = $this->moneda->aplicar($estudio, $desglose, $monedaTarifa, CarbonImmutable::now());
         $desglose = $final['desglose'];
+        // Vence a los días para pagar desde el fin del mes o, si se emite después (p. ej.
+        // esperó el tipo de cambio), desde que se emite: no nace vencido.
+        $hoy = CarbonImmutable::parse(CarbonImmutable::now(self::zona($estudio))->toDateString());
+        $finDelMes = CarbonImmutable::createFromFormat('Y-m-d', $periodo.'-01')?->endOfMonth()->startOfDay() ?? $hoy;
+        $vence = ($finDelMes->greaterThan($hoy) ? $finDelMes : $hoy)->addDays(max(1, $this->parametros->entero('renta.dias_para_pagar')));
 
         return CargoRenta::query()->firstOrCreate(
             ['estudio_id' => $estudio->getKey(), 'periodo' => $periodo, 'clave' => 'periodo'],
@@ -96,8 +102,11 @@ class GenerarCargoRenta
                 'tarifa_version' => $version,
                 'desglose' => $desglose,
                 'monto_minor' => $desglose['total_minor'],
-                'estado' => $desglose['total_minor'] > 0 ? EstadoCargoRenta::Pendiente->value : EstadoCargoRenta::SinCargo->value,
-                'vence_en' => CarbonImmutable::createFromFormat('Y-m-d', $periodo.'-01')?->endOfMonth()->addDays(max(1, $this->parametros->entero('renta.dias_para_pagar')))->toDateString(),
+                // Menos del cargo mínimo (Stripe no lo cobra): queda sin cargo.
+                'estado' => $this->moneda->cobrable($desglose['total_minor'], $final['columnas']['moneda'])
+                    ? EstadoCargoRenta::Pendiente->value
+                    : EstadoCargoRenta::SinCargo->value,
+                'vence_en' => $vence->toDateString(),
                 'emitido_en' => now(),
             ],
         );

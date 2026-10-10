@@ -182,10 +182,14 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/estudios/{estudio}/whatsapp', [PlataformaEstudiosController::class, 'whatsapp'])->name('estudios.whatsapp');
         // Clases o citas (excluyente): solo la plataforma la cambia, antes de operar (ADR 0104).
         Route::put('/estudios/{estudio}/modalidad', [PlataformaEstudiosController::class, 'modalidad'])->name('estudios.modalidad');
+        // País del negocio (define cómo se le cobra la renta, ADR 0107): pasada la prueba, solo soporte.
+        Route::put('/estudios/{estudio}/pais', [PlataformaEstudiosController::class, 'pais'])->name('estudios.pais');
         // Cómo se llaman las cosas en el negocio (ADR 0049).
         Route::get('/estudios/{estudio}/terminologia', [PlataformaEstudiosController::class, 'terminologia'])->name('estudios.terminologia');
         Route::put('/estudios/{estudio}/terminologia', [PlataformaEstudiosController::class, 'guardarTerminologia'])->name('estudios.terminologia.guardar');
         Route::get('/cobros', PlataformaCobrosController::class)->name('cobros');
+        // Condonar un cargo de renta pendiente (queda cancelado; reactiva si ya no debe).
+        Route::post('/cargos/{cargo}/condonar', [PlataformaCobrosController::class, 'condonar'])->name('cargos.condonar');
         // Estado de la operación: versión, procesos, verificación, respaldos y alertas.
         Route::get('/operacion', PlataformaOperacionController::class)->name('operacion');
         // Monitoreo de errores de la API, la web y la app (ADR 0080).
@@ -751,7 +755,7 @@ Route::prefix('v1')->group(function (): void {
             // Suscripciones recurrentes: próximas renovaciones que cobrará el scheduler (Etapa 2).
             Route::get('/suscripciones', [SuscripcionesTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('suscripciones.index');
             // Pago automático: invitar al alumno a activarlo (correo) o quitarlo a petición suya.
-            Route::post('/suscripciones/{acuerdo}/pago-automatico/solicitar', [SuscripcionesTenantController::class, 'solicitarPagoAutomatico'])->middleware(['puede:ordenes.gestionar', 'throttle:login'])->name('suscripciones.pago-automatico.solicitar');
+            Route::post('/suscripciones/{acuerdo}/pago-automatico/solicitar', [SuscripcionesTenantController::class, 'solicitarPagoAutomatico'])->middleware(['puede:ordenes.gestionar', 'throttle:login', 'plan:cobro_automatico'])->name('suscripciones.pago-automatico.solicitar');
             Route::delete('/suscripciones/{acuerdo}/pago-automatico', [SuscripcionesTenantController::class, 'quitarPagoAutomatico'])->middleware('puede:ordenes.gestionar')->name('suscripciones.pago-automatico.quitar');
             // Corregir la forma de pago de un cobro en caja (ADR 0086): quien cobra en caja.
             Route::put('/pagos/{pago}/metodo', [PagosTenantController::class, 'corregirMetodo'])->middleware('puede:ordenes.gestionar')->name('pagos.metodo.update');
@@ -819,8 +823,9 @@ Route::prefix('v1')->group(function (): void {
         });
 
         // API de integracion de terceros (R40): autenticada por LLAVE DE API (no por
-        // sesion de usuario) y acotada por scopes. Solo lectura.
-        Route::middleware(['estudio.llave', 'throttle:tenant'])->prefix('integracion')->name('integracion.')->group(function (): void {
+        // sesion de usuario) y acotada por scopes. Solo lectura. Una llave creada en la
+        // prueba deja de servir si el plan ya no incluye integraciones (ADR 0107).
+        Route::middleware(['estudio.llave', 'throttle:tenant', 'plan:integraciones'])->prefix('integracion')->name('integracion.')->group(function (): void {
             Route::get('/miembros', [IntegracionApiTenantController::class, 'miembros'])->middleware('alcance:miembros.ver')->name('miembros');
             Route::get('/sesiones', [IntegracionApiTenantController::class, 'sesiones'])->middleware('alcance:agenda.ver')->name('sesiones');
         });

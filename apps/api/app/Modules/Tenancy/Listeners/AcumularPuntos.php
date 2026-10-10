@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Listeners;
 
+use App\Modules\Tenancy\Application\FuncionesPlan;
 use App\Modules\Tenancy\Application\PuntosTenant;
 use App\Modules\Tenancy\Events\EventoDeDominioTenant;
 use App\Modules\Tenancy\Lealtad\OrigenPuntos;
@@ -15,12 +16,16 @@ use App\Modules\Tenancy\Ordenes\EstadoOrden;
 /**
  * Acumula puntos de lealtad cuando ocurre un evento que los otorga: asistir a una clase
  * (`asistencia.marcada` con estado presente) o pagar una orden (`orden.pagada`). Sólo si
- * el programa está activo. Idempotente por el ulid del evento (el relay es at-least-once).
+ * el programa está activo y el plan del negocio incluye lealtad (ADR 0107). Idempotente
+ * por el ulid del evento (el relay es at-least-once).
  * Se registra sobre {@see EventoDeDominioTenant} en AppServiceProvider.
  */
 class AcumularPuntos
 {
-    public function __construct(private readonly PuntosTenant $puntos) {}
+    public function __construct(
+        private readonly PuntosTenant $puntos,
+        private readonly FuncionesPlan $funciones,
+    ) {}
 
     public function handle(EventoDeDominioTenant $evento): void
     {
@@ -36,7 +41,7 @@ class AcumularPuntos
         }
 
         $programa = ProgramaLealtadTenant::query()->first();
-        if (! $programa instanceof ProgramaLealtadTenant || ! $programa->activa) {
+        if (! $programa instanceof ProgramaLealtadTenant || ! $programa->activa || ! $this->funciones->tieneElNegocioActual('lealtad')) {
             return;
         }
 

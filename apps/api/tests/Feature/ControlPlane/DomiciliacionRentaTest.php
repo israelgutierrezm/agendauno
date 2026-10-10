@@ -182,3 +182,96 @@ it('el dueño quita su tarjeta: se desliga en Stripe y ya no se cobra sola', fun
     expect($cargo->refresh()->estado->value)->toBe('pendiente');
     Http::assertNotSent(fn (PeticionHttp $r): bool => str_contains($r->url(), '/payment_intents'));
 });
+
+it('un cobro que quedó en proceso y después falló cuenta como rechazo: el reintento va con otra llave', function (): void {
+    ['cargo' => $cargo] = rentaConTarjeta();
+    Http::fake([
+        'api.stripe.com/v1/payment_intents/pi_lento*' => Http::response(['id' => 'pi_lento', 'status' => 'requires_payment_method']),
+        'api.stripe.com/v1/payment_intents' => Http::sequence()
+            ->push(['id' => 'pi_lento', 'status' => 'processing'])
+            ->push(['id' => 'pi_nuevo', 'status' => 'succeeded']),
+    ]);
+    $emitido = $cargo->emitido_en;
+
+    $this->artisan('agendauno:cobrar-renta-domiciliada')->assertSuccessful();
+    expect($cargo->refresh())->referencia_pago->toBe('pi_lento')->intentos_automaticos->toBe(0);
+
+    // La conciliación encuentra que falló: cuenta como un rechazo, con su reintento.
+    $this->travel(15)->minutes();
+    $this->artisan('agendauno:conciliar-renta')->assertSuccessful();
+    expect($cargo->refresh())
+        ->referencia_pago->toBeNull()
+        ->intentos_automaticos->toBe(1)
+        ->error_cobro->toBe('rechazado')
+        ->and($cargo->proximo_intento_en?->toDateString())->toBe($emitido?->copy()->addDays(3)->toDateString());
+
+    // Antes del reintento no se insiste; al llegar, va con otra llave (Stripe no repite la respuesta anterior).
+    $this->artisan('agendauno:cobrar-renta-domiciliada')->assertSuccessful();
+    $this->travelTo($emitido?->copy()->addDays(3)->addHour());
+    $this->artisan('agendauno:cobrar-renta-domiciliada')->assertSuccessful();
+    expect($cargo->refresh())->estado->value->toBe('pagado')->referencia_pago->toBe('pi_nuevo');
+    $llaves = Http::recorded(fn (PeticionHttp $r): bool => $r->method() === 'POST' && str_ends_with($r->url(), '/payment_intents'))
+        ->map(fn (array $par): string => $par[0]->header('Idempotency-Key')[0])->values()->all();
+    expect($llaves)->toBe(["agendauno-renta-{$cargo->ulid}-0", "agendauno-renta-{$cargo->ulid}-1"]);
+});
+
+it('el aviso de Stripe de un cobro en proceso que falló también lo cuenta como rechazo', function (): void {
+    ['cargo' => $cargo] = rentaConTarjeta();
+    $cargo->update(['metodo_pago' => 'stripe', 'referencia_pago' => 'pi_lento']);
+
+    $this->postJson('/api/v1/webhooks/plataforma/stripe', [
+        'type' => 'payment_intent.payment_failed',
+        'data' => ['object' => ['id' => 'pi_lento', 'last_payment_error' => ['code' => 'card_declined', 'decline_code' => 'insufficient_funds']]],
+    ])->assertOk();
+
+    expect($cargo->refresh())
+        ->referencia_pago->toBeNull()
+        ->intentos_automaticos->toBe(1)
+        ->error_cobro->toBe('insufficient_funds')
+        ->estado->value->toBe('pendiente');
+});
+
+it('al guardar otra tarjeta, lo que la anterior no pagó se vuelve a intentar con ella', function (): void {
+    ['e' => $e, 'cargo' => $cargo] = rentaConTarjeta();
+    $sesion = sesionTarjetaGuardada((string) Estudio::query()->where('slug', $e['slug'])->value('ulid'));
+    $sesion['setup_intent']['payment_method']['id'] = 'pm_master';
+    Http::fake([
+        'api.stripe.com/v1/payment_intents' => Http::sequence()
+            ->push(['error' => ['code' => 'authentication_required', 'payment_intent' => ['id' => 'pi_3ds']]], 402)
+            ->push(['id' => 'pi_master', 'status' => 'succeeded']),
+        'api.stripe.com/v1/checkout/sessions/cs_setup_1*' => Http::response($sesion),
+        'api.stripe.com/*' => Http::response([]),
+    ]);
+
+    // La tarjeta guardada pide autenticación: ya no se reintenta sola.
+    $this->artisan('agendauno:cobrar-renta-domiciliada')->assertSuccessful();
+    expect($cargo->refresh())->error_cobro->toBe('authentication_required')->proximo_intento_en->toBeNull();
+
+    $this->postJson("/api/v1/app/{$e['slug']}/renta/tarjeta/confirmar", ['sesion' => 'cs_setup_1'], conBearer($e['bearer']))->assertOk();
+    expect($cargo->refresh())->error_cobro->toBeNull()->proximo_intento_en->not->toBeNull();
+
+    $this->artisan('agendauno:cobrar-renta-domiciliada')->assertSuccessful();
+    expect($cargo->refresh()->estado->value)->toBe('pagado');
+    Http::assertSent(fn (PeticionHttp $r): bool => str_ends_with($r->url(), '/payment_intents')
+        && $r['payment_method'] === 'pm_master' && $r->header('Idempotency-Key')[0] === "agendauno-renta-{$cargo->ulid}-1");
+});
+
+it('si Stripe cobró pero el cargo no guardó la referencia, el aviso lo confirma por su metadata, una sola vez', function (): void {
+    ['cargo' => $cargo] = rentaConTarjeta();
+    $aviso = fn (int $monto) => $this->postJson('/api/v1/webhooks/plataforma/stripe', [
+        'type' => 'payment_intent.succeeded',
+        'data' => ['object' => ['id' => 'pi_huerfano', 'amount_received' => $monto, 'metadata' => ['cargo_renta' => $cargo->ulid]]],
+    ])->assertOk();
+
+    // Con otro importe no se aplica.
+    $aviso(100);
+    expect($cargo->refresh()->estado->value)->toBe('pendiente');
+
+    $aviso($cargo->monto_minor);
+    expect($cargo->refresh())->estado->value->toBe('pagado')->referencia_pago->toBe('pi_huerfano');
+    $pagadoEn = $cargo->pagado_en?->toIso8601String();
+
+    $this->travel(1)->hours();
+    $aviso($cargo->monto_minor);
+    expect($cargo->refresh()->pagado_en?->toIso8601String())->toBe($pagadoEn);
+});

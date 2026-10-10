@@ -22,7 +22,27 @@ class MonedaDeCobroSaas
     public function __construct(
         private readonly CalcularRentaSaas $calcular,
         private readonly TiposDeCambio $tipos,
+        private readonly ParametrosTenant $parametros,
     ) {}
+
+    /**
+     * El cargo mínimo (total con IVA) que se cobra en esa moneda: Stripe no acepta
+     * cobros menores (10 pesos, 50 centavos de dólar). Lo fija la plataforma.
+     */
+    public function cargoMinimo(string $moneda): int
+    {
+        return match (strtoupper($moneda)) {
+            'MXN' => max(1, $this->parametros->entero('renta.cargo_minimo_mxn_centavos')),
+            'USD' => max(1, $this->parametros->entero('renta.cargo_minimo_usd_centavos')),
+            default => 1,
+        };
+    }
+
+    /** ¿Ese total (en la moneda de cobro) llega al mínimo que se cobra? */
+    public function cobrable(int $totalMinor, string $moneda): bool
+    {
+        return $totalMinor > 0 && $totalMinor >= $this->cargoMinimo($moneda);
+    }
 
     /**
      * La moneda de una tarifa: las anteriores al ADR 0107 están en pesos.

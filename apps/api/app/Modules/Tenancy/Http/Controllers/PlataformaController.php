@@ -19,6 +19,8 @@ use App\Modules\Tenancy\Pagos\ProveedorPasarela;
 use App\Modules\Tenancy\Pasarelas\RegistroDePasarelasPlataforma;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -132,6 +134,11 @@ class PlataformaController
     /**
      * Activa/configura una pasarela de la plataforma. Las llaves se combinan (solo se
      * actualizan las provistas con valor); nunca se devuelven.
+     *
+     * Stripe: si la llave secreta cambia de modo (prueba ↔ producción), el secreto del
+     * webhook guardado es del otro modo y se exige el nuevo en la misma petición; los
+     * clientes y tarjetas guardados de los negocios (domiciliación) eran del otro modo:
+     * se quitan, y cada dueño vuelve a guardar su tarjeta.
      */
     public function guardarPasarela(Request $request, string $proveedor): JsonResponse
     {
@@ -154,6 +161,7 @@ class PlataformaController
 
         // Merge: solo actualiza las llaves con valor; conserva las demás.
         $credenciales = $validado['credenciales'] ?? null;
+        $cambioDeModo = null;
         if (is_array($credenciales)) {
             $nuevas = [];
             foreach ($credenciales as $nombre => $valor) {
@@ -161,9 +169,18 @@ class PlataformaController
                     $nuevas[(string) $nombre] = $valor;
                 }
             }
+            if ($proveedor === 'stripe') {
+                $cambioDeModo = $this->validarLlavesStripe($config->llaves(), $nuevas);
+            }
             $config->credenciales = array_merge($config->llaves(), $nuevas);
         }
-        $config->save();
+
+        DB::transaction(function () use ($config, $cambioDeModo): void {
+            $config->save();
+            if ($cambioDeModo !== null) {
+                $this->olvidarDatosDeStripe($cambioDeModo);
+            }
+        });
 
         return response()->json(['data' => [
             'proveedor' => $proveedor,
@@ -173,6 +190,73 @@ class PlataformaController
             'disponible' => true,
             'lista' => app(RegistroDePasarelasPlataforma::class)->activa($proveedor),
         ]]);
+    }
+
+    /**
+     * El secreto del webhook es de Stripe (`whsec_…`) y, si la llave secreta cambia de
+     * modo, viene el del modo nuevo. Devuelve el cambio de modo (`['de' => …, 'a' => …]`)
+     * o null.
+     *
+     * @param  array<string, string>  $guardadas
+     * @param  array<string, string>  $nuevas
+     * @return array{de: string, a: string}|null
+     *
+     * @throws ValidationException
+     */
+    private function validarLlavesStripe(array $guardadas, array $nuevas): ?array
+    {
+        $webhook = $nuevas['webhook_secret'] ?? null;
+        if ($webhook !== null && ! str_starts_with($webhook, 'whsec_')) {
+            throw ValidationException::withMessages(['credenciales.webhook_secret' => ['El secreto del webhook de Stripe empieza con whsec_.']]);
+        }
+
+        $de = self::modoDeLlaveStripe($guardadas['secret_key'] ?? '');
+        $a = self::modoDeLlaveStripe($nuevas['secret_key'] ?? '');
+        if ($de === null || $a === null || $de === $a) {
+            return null;
+        }
+        if ($webhook === null) {
+            throw ValidationException::withMessages(['credenciales.webhook_secret' => [
+                'La llave nueva es de '.($a === 'live' ? 'producción' : 'prueba').': escribe también el secreto del webhook (whsec_…) de ese modo; el guardado es del otro.',
+            ]]);
+        }
+
+        return ['de' => $de, 'a' => $a];
+    }
+
+    /** `test` o `live` según el prefijo de la llave secreta (o restringida) de Stripe. */
+    private static function modoDeLlaveStripe(string $llave): ?string
+    {
+        return match (true) {
+            str_starts_with($llave, 'sk_test_'), str_starts_with($llave, 'rk_test_') => 'test',
+            str_starts_with($llave, 'sk_live_'), str_starts_with($llave, 'rk_live_') => 'live',
+            default => null,
+        };
+    }
+
+    /**
+     * Al cambiar Stripe de modo: los clientes y tarjetas guardados (y los pagos de la
+     * renta en curso) son del otro modo y ya no sirven.
+     *
+     * @param  array{de: string, a: string}  $cambio
+     */
+    private function olvidarDatosDeStripe(array $cambio): void
+    {
+        $estudios = Estudio::query()
+            ->where(fn ($q) => $q->whereNotNull('stripe_cliente_id')->orWhereNotNull('domiciliacion_metodo'))
+            ->update([
+                'stripe_cliente_id' => null, 'domiciliacion_metodo' => null, 'tarjeta_marca' => null,
+                'tarjeta_ultimos4' => null, 'tarjeta_vence' => null, 'domiciliada_en' => null,
+            ]);
+        // Un pago en curso del otro modo no se puede confirmar ni cancelar con la llave nueva.
+        $intentos = CargoRenta::query()
+            ->where('estado', EstadoCargoRenta::Pendiente->value)
+            ->where('metodo_pago', 'stripe')
+            ->whereNotNull('referencia_pago')
+            ->update(['referencia_pago' => null]);
+        Log::warning('plataforma.pasarela.stripe.cambio_de_modo', [
+            ...$cambio, 'estudios_sin_tarjeta' => $estudios, 'pagos_en_curso_descartados' => $intentos,
+        ]);
     }
 
     public function configuracion(): JsonResponse

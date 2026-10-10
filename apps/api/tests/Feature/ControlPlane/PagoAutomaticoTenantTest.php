@@ -379,3 +379,28 @@ it('con el aviso de Stripe la sesión queda resuelta y una que venció se deja d
     expect(enEstudioPago($m, fn () => SesionTarjetaTenant::query()->orderBy('id')->pluck('estado')->all()))
         ->toBe(['completada', 'expirada']);
 });
+
+it('sin pago automático en el plan (citas en Premium) no se ofrece, no se activa al pagar y la renovación no va a la tarjeta', function (): void {
+    $m = alumnoConMembresia();
+    autorizarTarjeta($m);
+    $orden = (string) $this->postJson("/api/v1/app/{$m['slug']}/mi/ordenes", [
+        'items' => [['producto_id' => $m['producto'], 'cantidad' => 1]],
+    ], conBearer($m['alumno']))->assertCreated()->json('data.id');
+    // El negocio es de citas y quedó en Premium (ADR 0107): el pago automático es de Pro.
+    pasarNegocioACitas($m);
+    terminarPrueba($m);
+    Estudio::query()->where('slug', $m['slug'])->update(['plan_nivel' => 'premium', 'plan_profesionales' => 2]);
+
+    $this->postJson("/api/v1/app/{$m['slug']}/suscripciones/{$m['acuerdo']}/pago-automatico/solicitar", [], conBearer($m['bearer']))
+        ->assertStatus(403)->assertJsonPath('meta.funcion', 'cobro_automatico');
+    $this->postJson("/api/v1/app/{$m['slug']}/mi/ordenes/{$orden}/cobrar", ['domiciliar' => true], conBearer($m['alumno']))
+        ->assertStatus(403)->assertJsonPath('code', 'PLAN_FEATURE_NOT_INCLUDED')->assertJsonPath('meta.funcion', 'cobro_automatico');
+    // Pagar sin él, sí.
+    $this->postJson("/api/v1/app/{$m['slug']}/mi/ordenes/{$orden}/cobrar", [], conBearer($m['alumno']))
+        ->assertSuccessful()->assertJsonPath('data.estado', 'pendiente');
+
+    // La tarjeta que autorizó en la prueba ya no se cobra sola: se le avisa para pagar.
+    expect(renovarHoy($m))->toBe('pendiente')
+        ->and($this->stripe->cargos)->toBe(0);
+    Http::assertNotSent(fn (Request $r): bool => str_ends_with($r->url(), '/payment_intents'));
+});

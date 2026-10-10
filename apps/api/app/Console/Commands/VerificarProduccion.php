@@ -14,7 +14,8 @@ use Illuminate\Console\Command;
  *
  * Con --disponibilidad revisa solo lo que la versión necesita para atender
  * (actualizar.sh no quita el mantenimiento sin ello). Con --apertura (o
- * APERTURA_COMERCIAL=true) exige además Stripe en producción para la renta.
+ * APERTURA_COMERCIAL=true) exige además Stripe en producción para la renta y la llave
+ * de FacturAPI.
  */
 class VerificarProduccion extends Command
 {

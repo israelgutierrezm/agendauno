@@ -7,6 +7,7 @@ namespace App\Modules\Tenancy\Application;
 use App\Modules\Tenancy\CatalogoPaises;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\ArticuloTenant;
+use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\EsquemaPagoTenant;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -38,6 +39,8 @@ class RegionNegocioTenant
     public const MOTIVO_PASARELAS = 'Las pasarelas de pago en línea solo funcionan con pesos mexicanos (MXN).';
 
     public const MOTIVO_FACTURACION = 'La facturación a tus clientes solo funciona en pesos mexicanos (MXN) y para negocios en México.';
+
+    public const MOTIVO_PAIS = 'El país ya no se puede cambiar desde aquí porque define cómo se te cobra; escríbenos para cambiarlo.';
 
     public function __construct(
         private readonly GestorDeConexionTenant $gestor,
@@ -105,6 +108,23 @@ class RegionNegocioTenant
         return PagoTenant::query()->exists()
             || VentaPosTenant::query()->exists()
             || OrdenTenant::query()->where('estado', EstadoOrden::Pagada->value)->exists();
+    }
+
+    /**
+     * ¿Puede el dueño cambiar el país? Del país salen la moneda, el IVA y la factura de
+     * su renta (ADR 0107): solo durante la prueba y antes de su primer cargo. Después lo
+     * cambia el superadmin.
+     */
+    public function paisEditable(): bool
+    {
+        $estudio = $this->gestor->actual();
+        if ($estudio === null) {
+            return true;
+        }
+        $enPrueba = $estudio->trial_termina_en !== null
+            && $estudio->trial_termina_en->toDateString() >= $this->fechas->hoy();
+
+        return $enPrueba && ! CargoRenta::query()->where('estudio_id', $estudio->getKey())->exists();
     }
 
     /**
@@ -218,9 +238,14 @@ class RegionNegocioTenant
         $this->auditoria->registrar($actor, 'negocio.zona_horaria', 'estudio', null, ['zona_horaria' => $antes], ['zona_horaria' => $zona]);
     }
 
+    /** El país debe ser del catálogo y, si es otro, aún debe poder cambiarlo el dueño. */
     private function errorPais(string $codigo): ?string
     {
-        return CatalogoPaises::existe($codigo) ? null : 'Elige un país de la lista.';
+        if (! CatalogoPaises::existe($codigo)) {
+            return 'Elige un país de la lista.';
+        }
+
+        return CatalogoPaises::codigo($codigo) !== $this->pais() && ! $this->paisEditable() ? self::MOTIVO_PAIS : null;
     }
 
     /** La moneda debe ser del catálogo y, si es otra, el negocio aún no debe haber cobrado. */

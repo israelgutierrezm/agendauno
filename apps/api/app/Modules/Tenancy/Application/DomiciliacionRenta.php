@@ -23,9 +23,11 @@ use Throwable;
  * cobra solo (`off_session`).
  *
  * - Si el banco rechaza, se reintenta a los días de emitido el cargo que fija la
- *   plataforma (`renta.reintento_1_dias` y `renta.reintento_2_dias`; 3 y 7).
+ *   plataforma (`renta.reintento_1_dias` y `renta.reintento_2_dias`; 3 y 7). Un cobro
+ *   que quedó en proceso y después falló cuenta igual que un rechazo.
  * - Si la tarjeta pide autenticación, ya no se reintenta: el dueño paga en «Mi
  *   suscripción» como siempre.
+ * - Al guardar otra tarjeta, lo pendiente se vuelve a intentar con ella.
  * - Un cargo con un pago en línea en curso (Checkout) no se cobra a la tarjeta.
  * - Sigue aplicando la suspensión por renta vencida (ADR 0073).
  *
@@ -110,6 +112,17 @@ class DomiciliacionRenta
             'tarjeta_vence' => $vence,
             'domiciliada_en' => $anterior === $tarjeta['metodo'] ? $estudio->domiciliada_en : Carbon::now(),
         ]);
+        if ($anterior !== $tarjeta['metodo']) {
+            // Con otra tarjeta, lo que la anterior no pagó (rechazo, autenticación o
+            // reintentos agotados) se vuelve a intentar en la siguiente vuelta. Cada
+            // intento lleva su número en la llave de idempotencia: no se repite una.
+            CargoRenta::query()
+                ->where('estudio_id', $estudio->getKey())
+                ->where('estado', EstadoCargoRenta::Pendiente->value)
+                ->whereNull('referencia_pago')
+                ->where(fn ($q) => $q->whereNotNull('error_cobro')->orWhere('intentos_automaticos', '>', 0))
+                ->update(['error_cobro' => null, 'proximo_intento_en' => Carbon::now()]);
+        }
         // La tarjeta anterior ya no se usa.
         if ($anterior !== '' && $anterior !== $tarjeta['metodo']) {
             $this->desligar($anterior);
@@ -204,17 +217,10 @@ class DomiciliacionRenta
                 return 'en_proceso';
             }
 
-            $intentos = $bloqueado->intentos_automaticos + 1;
-            $autenticacion = $cobro['status'] === 'requires_action' || $cobro['codigo'] === 'authentication_required';
-            $dias = $this->diasDeReintento()[$intentos - 1] ?? null;
-            $emitido = $bloqueado->emitido_en ?? Carbon::now();
-            $bloqueado->update([
-                'intentos_automaticos' => $intentos,
-                'error_cobro' => $autenticacion ? 'authentication_required' : (string) ($cobro['codigo'] ?? 'rechazado'),
-                'proximo_intento_en' => $autenticacion || $dias === null ? null : Carbon::parse($emitido)->addDays($dias),
-            ]);
-
-            return $autenticacion ? 'autenticacion' : 'rechazado';
+            return $this->registrarRechazo(
+                $bloqueado,
+                $cobro['status'] === 'requires_action' ? 'authentication_required' : (string) ($cobro['codigo'] ?? 'rechazado'),
+            );
         });
 
         if ($resultado === 'pagado') {
@@ -225,8 +231,33 @@ class DomiciliacionRenta
     }
 
     /**
+     * Registra un intento fallido de cobrar a la tarjeta (rechazo al momento, o un
+     * cobro que quedó en proceso y después falló) y programa el siguiente: a los días
+     * de emitido el cargo; si la tarjeta pide autenticación o ya no quedan reintentos,
+     * ninguno. El siguiente intento lleva otra llave de idempotencia (otro número).
+     * Se llama con el cargo bloqueado.
+     *
+     * @return 'autenticacion'|'rechazado'
+     */
+    public function registrarRechazo(CargoRenta $cargo, string $codigo): string
+    {
+        $intentos = $cargo->intentos_automaticos + 1;
+        $autenticacion = $codigo === 'authentication_required';
+        $dias = $this->diasDeReintento()[$intentos - 1] ?? null;
+        $emitido = $cargo->emitido_en ?? Carbon::now();
+        $cargo->update([
+            'intentos_automaticos' => $intentos,
+            'error_cobro' => $codigo !== '' ? $codigo : 'rechazado',
+            'proximo_intento_en' => $autenticacion || $dias === null ? null : Carbon::parse($emitido)->addDays($dias),
+        ]);
+
+        return $autenticacion ? 'autenticacion' : 'rechazado';
+    }
+
+    /**
      * Los cargos pendientes que toca cobrar a la tarjeta: recién emitidos o con un
-     * reintento ya vencido.
+     * reintento ya vencido (uno sin reintentos que quedan, o que pidió autenticación,
+     * no tiene `proximo_intento_en` hasta que se guarde otra tarjeta).
      *
      * @return int cuántos se pagaron
      */
@@ -243,7 +274,6 @@ class DomiciliacionRenta
             ->whereNull('referencia_pago')
             // Una compra de timbres se paga al comprarla, no a la tarjeta.
             ->where(fn ($q) => $q->whereNull('concepto')->orWhere('concepto', '!=', 'timbres'))
-            ->where('intentos_automaticos', '<=', count($this->diasDeReintento()))
             ->where(fn ($q) => $q->whereNull('error_cobro')->orWhere('error_cobro', '!=', 'authentication_required'))
             ->where(fn ($q) => $q->where(fn ($q) => $q->where('intentos_automaticos', 0)->whereNull('proximo_intento_en'))
                 ->orWhere('proximo_intento_en', '<=', $ahora))

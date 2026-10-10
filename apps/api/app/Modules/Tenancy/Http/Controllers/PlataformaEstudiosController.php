@@ -9,8 +9,10 @@ use App\Modules\Tenancy\Application\DomiciliacionRenta;
 use App\Modules\Tenancy\Application\PlanCitasSaas;
 use App\Modules\Tenancy\Application\SuspensionPorRenta;
 use App\Modules\Tenancy\Application\TerminologiaEstudio;
+use App\Modules\Tenancy\CatalogoPaises;
 use App\Modules\Tenancy\Comunicaciones\WhatsApp\ClienteWhatsApp;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
+use App\Modules\Tenancy\EstadoCargoRenta;
 use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\ModalidadServicio;
@@ -20,6 +22,7 @@ use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FacturaPlataforma;
 use App\Modules\Tenancy\Models\MedicionUso;
 use App\Modules\Tenancy\PerfilNegocio;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -78,6 +81,8 @@ class PlataformaEstudiosController
                 'vence_en' => $c->vence_en?->toDateString(),
                 'pagado_en' => $c->pagado_en?->toIso8601String(),
                 'factura' => $facturas->get($c->getKey())?->estado->value,
+                // Solo un cargo pendiente se puede condonar (`POST /plataforma/cargos/{cargo}/condonar`).
+                'condonable' => $c->estado === EstadoCargoRenta::Pendiente,
             ])->values()->all();
 
         return response()->json(['data' => [
@@ -284,6 +289,32 @@ class PlataformaEstudiosController
             ...self::resumen($modelo),
             'modalidad_cambiable' => $cambio->cambiable($modelo),
         ]]);
+    }
+
+    /**
+     * Cambia el país del negocio. De él salen la moneda, el IVA y la factura de su renta
+     * (ADR 0107): pasada su prueba o con un cargo emitido, el dueño ya no lo cambia; lo
+     * hace soporte. Los cargos ya emitidos no cambian.
+     */
+    public function pais(Request $request, string $estudio): JsonResponse
+    {
+        $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
+        $validado = $request->validate([
+            'pais' => ['required', 'string', 'size:2', static function (string $atributo, mixed $valor, Closure $falla): void {
+                if (! CatalogoPaises::existe((string) $valor)) {
+                    $falla('Elige un país de la lista.');
+                }
+            }],
+        ]);
+
+        $pais = CatalogoPaises::codigo((string) $validado['pais']);
+        $antes = CatalogoPaises::codigo($modelo->pais);
+        if ($pais !== $antes) {
+            $modelo->forceFill(['pais' => $pais])->save();
+            Log::info('plataforma.estudio.pais', ['estudio' => $modelo->slug, 'antes' => $antes, 'pais' => $pais]);
+        }
+
+        return response()->json(['data' => self::resumen($modelo->refresh())]);
     }
 
     /**

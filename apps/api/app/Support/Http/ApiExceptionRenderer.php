@@ -117,9 +117,12 @@ class ApiExceptionRenderer
 
         return $this->make(
             $codes[$status] ?? ($esErrorServidor ? 'SERVER_ERROR' : 'HTTP_ERROR'),
-            $esErrorServidor && ! $debug
-                ? 'Ocurrió un error inesperado.'
-                : ($e->getMessage() !== '' ? $e->getMessage() : 'No se pudo completar la solicitud.'),
+            match (true) {
+                $esErrorServidor && ! $debug => 'Ocurrió un error inesperado.',
+                // El límite de peticiones de Laravel trae su mensaje en inglés.
+                $status === 429 => 'Demasiados intentos. Espera un momento y vuelve a intentar.',
+                default => $e->getMessage() !== '' ? $e->getMessage() : 'No se pudo completar la solicitud.',
+            },
             $status,
             $esErrorServidor && $debug ? ['exception' => class_basename($e)] : [],
         );

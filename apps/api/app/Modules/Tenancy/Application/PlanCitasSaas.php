@@ -184,7 +184,8 @@ class PlanCitasSaas
 
     /**
      * El siguiente periodo por cobrar: desde el día siguiente a lo ya cubierto (o al
-     * fin de la prueba) hasta el fin de ese mes (mensual) o un año después (anual).
+     * fin de la prueba, si termina después: una prueba extendida también aplaza lo
+     * siguiente) hasta el fin de ese mes (mensual) o un año después (anual).
      *
      * @return array{desde: CarbonImmutable, hasta: CarbonImmutable}
      */
@@ -195,22 +196,30 @@ class PlanCitasSaas
             // Un periodo que pasó completo sin cobrarse (el negocio estaba suspendido) no
             // se cobra: se sigue desde el mes en curso.
             $hoy = $this->hoy($estudio);
-            $fin = $periodicidad === 'anual' ? $desde->addYearNoOverflow()->subDay() : $desde->endOfMonth()->startOfDay();
-            if ($fin->lessThan($hoy)) {
+            if (self::finDelPeriodo($desde, $periodicidad)->lessThan($hoy)) {
                 $desde = $hoy->startOfMonth();
             }
         } else {
             $desde = $this->hoy($estudio)->startOfMonth();
-            if ($estudio->trial_termina_en !== null) {
-                $finPrueba = CarbonImmutable::parse($estudio->trial_termina_en->toDateString())->addDay();
-                $desde = $finPrueba->greaterThan($desde) ? $finPrueba : $desde;
-            }
         }
-        $hasta = $periodicidad === 'anual'
-            ? $desde->addYearNoOverflow()->subDay()
-            : $desde->endOfMonth()->startOfDay();
+        if ($estudio->trial_termina_en !== null) {
+            $finPrueba = CarbonImmutable::parse($estudio->trial_termina_en->toDateString())->addDay();
+            $desde = $finPrueba->greaterThan($desde) ? $finPrueba : $desde;
+        }
 
-        return ['desde' => $desde, 'hasta' => $hasta];
+        return ['desde' => $desde, 'hasta' => self::finDelPeriodo($desde, $periodicidad)];
+    }
+
+    /**
+     * El último día de un periodo: el fin de ese mes (mensual) o la víspera del mismo
+     * día un año después (anual). Un año que empieza el 29 de febrero cubre hasta el 28
+     * de febrero siguiente (un año completo) y el siguiente empieza el 1 de marzo.
+     */
+    private static function finDelPeriodo(CarbonImmutable $desde, string $periodicidad): CarbonImmutable
+    {
+        return $periodicidad === 'anual'
+            ? $desde->addYearsWithOverflow(1)->subDay()
+            : $desde->endOfMonth()->startOfDay();
     }
 
     /**
@@ -416,6 +425,10 @@ class PlanCitasSaas
         ]], MonedaDeCobroSaas::conIvaDelPais($definicion, $e));
         $desglose['cubre'] = ['desde' => $hoy->toDateString(), 'hasta' => $hasta->toDateString()];
         $final = $this->moneda->aplicar($e, $desglose, MonedaDeCobroSaas::deTarifa($definicion), CarbonImmutable::now());
+        // Menos del cargo mínimo (Stripe no lo cobra): el cambio aplica sin cobrar la diferencia.
+        if (! $this->moneda->cobrable($final['desglose']['total_minor'], $final['columnas']['moneda'])) {
+            return null;
+        }
 
         return CargoRenta::query()->create([
             'estudio_id' => $e->getKey(),
@@ -468,6 +481,10 @@ class PlanCitasSaas
             $desglose = $this->desglosePeriodo($e, $definicion, $plan, $periodo['desde'], $periodo['hasta']);
             $final = $this->moneda->aplicar($e, $desglose, MonedaDeCobroSaas::deTarifa($definicion), CarbonImmutable::now());
             $total = $final['desglose']['total_minor'];
+            // Vence a los días para pagar desde que se emite, no desde que empezó el periodo:
+            // uno emitido tarde (o al reactivar) no nace vencido.
+            $hoy = $this->hoy($e);
+            $vence = ($periodo['desde']->greaterThan($hoy) ? $periodo['desde'] : $hoy)->addDays($this->diasParaPagar());
 
             $cargo = CargoRenta::query()->firstOrCreate(
                 ['estudio_id' => $e->getKey(), 'periodo' => $periodo['desde']->format('Y-m'), 'clave' => 'periodo'],
@@ -482,8 +499,11 @@ class PlanCitasSaas
                     'desglose' => $final['desglose'],
                     'monto_minor' => $total,
                     ...$final['columnas'],
-                    'estado' => $total > 0 ? EstadoCargoRenta::Pendiente->value : EstadoCargoRenta::SinCargo->value,
-                    'vence_en' => $periodo['desde']->addDays($this->diasParaPagar())->toDateString(),
+                    // Menos del cargo mínimo (Stripe no lo cobra): el periodo queda cubierto sin cargo.
+                    'estado' => $this->moneda->cobrable($total, $final['columnas']['moneda'])
+                        ? EstadoCargoRenta::Pendiente->value
+                        : EstadoCargoRenta::SinCargo->value,
+                    'vence_en' => $vence->toDateString(),
                     'emitido_en' => now(),
                 ],
             );

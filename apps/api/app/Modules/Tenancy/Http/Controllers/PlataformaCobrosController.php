@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CondonarCargoRenta;
 use App\Modules\Tenancy\EstadoCargoRenta;
+use App\Modules\Tenancy\Exceptions\CargoRentaNoPagable;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\FacturaPlataforma;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Cobro de la renta del SaaS visto por el operador: lo que se debe, lo vencido y lo
  * cobrado en el mes, y los cargos de todos los estudios (filtrables por estado y
- * periodo) con su factura.
+ * periodo) con su factura. El operador puede condonar un cargo pendiente.
  */
 class PlataformaCobrosController
 {
@@ -96,7 +99,36 @@ class PlataformaCobrosController
                 'vencido' => $c->estado === EstadoCargoRenta::Pendiente && $c->vence_en !== null && $c->vence_en->lt($hoy),
                 'pagado_en' => $c->pagado_en?->toIso8601String(),
                 'factura' => $facturas->get($c->getKey())?->estado->value,
+                // Solo un cargo pendiente se puede condonar.
+                'condonable' => $c->estado === EstadoCargoRenta::Pendiente,
             ])->values()->all(),
         ]);
+    }
+
+    /**
+     * Condona un cargo pendiente (queda `cancelado`): ya no se cobra ni cuenta para
+     * suspender; si el negocio estaba suspendido por renta y no debe otra vencida, se
+     * reactiva.
+     */
+    public function condonar(Request $request, string $cargo, CondonarCargoRenta $condonar): JsonResponse
+    {
+        $modelo = CargoRenta::query()->where('ulid', $cargo)->firstOrFail();
+        $validado = $request->validate(['motivo' => ['required', 'string', 'max:255']]);
+
+        try {
+            $condonado = $condonar->ejecutar($modelo, (string) $validado['motivo']);
+        } catch (CargoRentaNoPagable $e) {
+            throw ValidationException::withMessages(['cargo' => [$e->getMessage()]]);
+        }
+        $estudio = $condonado->estudio?->refresh();
+
+        return response()->json(['data' => [
+            'id' => $condonado->ulid,
+            'estado' => $condonado->estado->value,
+            'condonable' => false,
+            'estudio_slug' => $estudio?->slug,
+            'estudio_estado' => $estudio?->estado->value,
+            'estudio_suspendido_por' => $estudio?->suspendido_por,
+        ]]);
     }
 }

@@ -154,7 +154,13 @@ final class CatalogoParametros
                 'Por correo y, si lo aceptó, por WhatsApp.', $e, 3, 1, 14, 'días', porNegocio: false),
             // Renta en dólares cobrada en pesos (ADR 0107, solo la plataforma).
             new DefinicionParametro('renta.dias_para_pagar', 'Renta', 'Días para pagar cada cargo de la suscripción',
-                'Desde que se emite (o desde el fin del mes, en lo que se cobra mes vencido) hasta que vence.', $e, 10, 1, 60, 'días', porNegocio: false),
+                'Desde que se emite cada cargo (lo que se cobra mes vencido, nunca antes del fin del mes) hasta que vence.', $e, 10, 1, 60, 'días', porNegocio: false),
+            // Stripe no cobra menos de 10 pesos ni de 50 centavos de dólar: lo que no llega
+            // al mínimo no se cobra (el periodo queda cubierto, sin cargo).
+            new DefinicionParametro('renta.cargo_minimo_mxn_centavos', 'Renta', 'Cargo mínimo en pesos',
+                'Total con IVA, en centavos. Un periodo (o la diferencia de un cambio de plan) que cueste menos no se cobra.', $e, 1000, 1, 100000, '¢', porNegocio: false),
+            new DefinicionParametro('renta.cargo_minimo_usd_centavos', 'Renta', 'Cargo mínimo en dólares',
+                'Total con IVA, en centavos de dólar. Un periodo (o la diferencia de un cambio de plan) que cueste menos no se cobra.', $e, 50, 1, 10000, '¢', porNegocio: false),
             new DefinicionParametro('renta.reintento_1_dias', 'Renta', 'Primer reintento del cobro automático',
                 'Días después de emitido el cargo, si la tarjeta lo rechazó. 0 = no se reintenta.', $e, 3, 0, 30, 'días', porNegocio: false),
             new DefinicionParametro('renta.reintento_2_dias', 'Renta', 'Segundo reintento del cobro automático',

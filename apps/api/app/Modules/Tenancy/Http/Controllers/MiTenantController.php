@@ -835,6 +835,10 @@ class MiTenantController
         // Pago automático: al pagar se autoriza la tarjeta para cobrar sola la membresía
         // cada periodo. Solo para lo que se renueva y con una pasarela que lo admite.
         $domiciliar = $request->boolean('domiciliar');
+        if ($domiciliar) {
+            // Es del plan Pro (ADR 0107); pagar sin él sigue igual.
+            app(FuncionesPlan::class)->exigir($this->estudioDe($request), 'cobro_automatico');
+        }
         if ($domiciliar && ($this->domiciliaciones->proveedor() !== $validado['proveedor'] || ! self::seRenueva($orden))) {
             throw ValidationException::withMessages([
                 'domiciliar' => ['Esta compra no admite pago automático.'],

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\CargoRenta;
+use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -214,4 +215,30 @@ it('el pago de la renta exige permiso de facturación', function (): void {
     $this->postJson("/api/v1/app/{$e['slug']}/renta/cargos/{$cargo}/pagar", [
         'proveedor' => 'stripe',
     ], conBearer($coach))->assertStatus(403);
+});
+
+it('un negocio con un error no detiene la renta de los demás: se avisa al superadmin', function (): void {
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
+    foreach ([estudioConSesion('estudio-a', 'a@correo.mx'), estudioConSesion('estudio-b', 'b@correo.mx')] as $e) {
+        terminarPrueba($e);
+        $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}", ['modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900], conPlataforma())->assertOk();
+    }
+    // Un dato roto en el primero que se procesa.
+    Estudio::query()->where('slug', 'estudio-a')->update(['zona_horaria' => 'Zona/Inexistente']);
+
+    $periodo = emitirCargoDelMesEnCurso();
+
+    expect(CargoRenta::query()->where('periodo', $periodo)->with('estudio')->get()->pluck('estudio.slug')->all())->toBe(['estudio-b']);
+    $this->assertDatabaseHas('alertas_plataforma', ['tipo' => 'renta', 'clave' => 'emitir-estudio-a', 'estudio' => 'estudio-a']);
+});
+
+it('una renta mes vencido por debajo del cargo mínimo queda sin cargo', function (): void {
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
+    $e = estudioConSesion('estudio-a', 'a@correo.mx');
+    terminarPrueba($e);
+    $this->putJson('/api/v1/plataforma/estudios/estudio-a', ['modo_cobro' => 'fijo', 'cuota_fija_minor' => 900], conPlataforma())->assertOk();
+
+    emitirCargoDelMesEnCurso();
+
+    expect(CargoRenta::query()->sole())->estado->value->toBe('sin_cargo')->monto_minor->toBe(900);
 });

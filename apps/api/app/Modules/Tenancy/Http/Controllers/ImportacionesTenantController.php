@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CupoProfesionales;
 use App\Modules\Tenancy\Application\ImportarInstructoresTenant;
 use App\Modules\Tenancy\Application\ImportarMiembrosTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
-use App\Modules\Tenancy\Application\PlanCitasSaas;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -56,10 +56,10 @@ class ImportacionesTenantController
     public function importarInstructores(Request $request): JsonResponse
     {
         $filas = $this->parsear($request, ['nombre', 'email'], $this->parametros->entero('importaciones.max_filas'));
-        // Todos deben caber en el plan del negocio (ADR 0107).
-        app(PlanCitasSaas::class)->exigirCupo($this->estudioDe($request), count($filas));
-
-        $resultado = $this->instructores->importar($filas, $this->estudioDe($request));
+        // Todos deben caber en el plan del negocio (ADR 0107), aunque al mismo tiempo se
+        // invite a alguien más.
+        $estudio = $this->estudioDe($request);
+        $resultado = app(CupoProfesionales::class)->sumar($estudio, count($filas), fn (): array => $this->instructores->importar($filas, $estudio));
 
         // Todo-o-nada: si hubo filas inválidas no se creó ninguna cuenta -> 422.
         return response()->json(['data' => $resultado], $resultado['ok'] ? 201 : 422);

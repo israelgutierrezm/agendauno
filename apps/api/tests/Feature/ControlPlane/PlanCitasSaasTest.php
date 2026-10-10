@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Tenancy\Application\PlanCitasSaas;
 use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
@@ -230,4 +231,86 @@ it('el superadmin ve el plan del negocio en su ficha y lo cambia, cobrando o no 
     ], conPlataforma())->assertStatus(422)->assertJsonPath('code', 'PLAN_NOT_ALLOWED');
     $this->getJson("/api/v1/plataforma/estudios/{$clases['slug']}", conPlataforma())->assertOk()->assertJsonPath('data.plan_citas', null);
     $this->putJson("/api/v1/plataforma/estudios/{$e['slug']}/plan", ['nivel' => 'pro'], ['Accept' => 'application/json'])->assertUnauthorized();
+});
+
+it('lo que no llega al cargo mínimo no se cobra: el periodo queda cubierto sin cargo y la subida aplica sin ajuste', function (): void {
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
+    // La prueba termina un día antes del fin de mes: 9 USD × 1/31 = 0.29 USD → 5.80 pesos + IVA (< 10 pesos).
+    Estudio::query()->where('slug', $e['slug'])->update(['trial_termina_en' => '2026-10-30']);
+
+    emitirRentaEl('2026-10-31 09:00');
+    expect(cargoDelPlan('2026-10')->estado->value)->toBe('sin_cargo')
+        ->and(cargoDelPlan('2026-10')->monto_minor)->toBeLessThan(1000)
+        ->and(Estudio::query()->where('slug', $e['slug'])->sole()->plan_cubierto_hasta?->toDateString())->toBe('2026-10-31');
+    // No cuenta para suspender.
+    $this->travelTo(CarbonImmutable::parse('2026-10-31 20:00', 'America/Mexico_City')->addDays(40));
+    $this->artisan('agendauno:suspender-por-renta')->assertSuccessful();
+    expect(Estudio::query()->where('slug', $e['slug'])->sole()->estado->value)->not->toBe('suspended');
+
+    // Noviembre se cobra completo; el último día sube a Premium con 2: (24 − 9) USD × 1/30 = 0.50 USD
+    // → 11.60 pesos con IVA, debajo del mínimo que fijó la plataforma (20 pesos).
+    emitirRentaEl('2026-11-01 09:00');
+    expect(cargoDelPlan('2026-11')->estado->value)->toBe('pendiente');
+    $this->putJson('/api/v1/plataforma/parametros', ['valores' => ['renta.cargo_minimo_mxn_centavos' => 2000]], conPlataforma())->assertOk();
+    $this->travelTo(CarbonImmutable::parse('2026-11-30 10:00', 'America/Mexico_City'));
+    cambiarPlanCitas($e, 'premium', 2)
+        ->assertOk()
+        ->assertJsonPath('data.aplica', 'ahora')
+        ->assertJsonPath('data.ajuste', null)
+        ->assertJsonPath('data.plan.nivel', 'premium');
+    expect(CargoRenta::query()->where('concepto', 'ajuste')->count())->toBe(0);
+});
+
+it('un cargo emitido tarde vence a los días para pagar desde que se emite, no nace vencido', function (): void {
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
+    $citas = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
+    Estudio::query()->where('slug', $citas['slug'])->update(['trial_termina_en' => '2026-09-30']);
+    $clases = estudioConSesion('pilates-a', 'dueno@pilates.mx');
+    terminarPrueba($clases);
+    $this->putJson("/api/v1/plataforma/estudios/{$clases['slug']}", ['modo_cobro' => 'fijo', 'cuota_fija_minor' => 149900], conPlataforma())->assertOk();
+
+    // El emisor no corrió hasta el 20 (p. ej. esperó el tipo de cambio).
+    emitirRentaEl('2026-10-20 09:00');
+
+    expect(cargoDelPlan('2026-10')->cubre_desde?->toDateString())->toBe('2026-10-01')
+        ->and(cargoDelPlan('2026-10')->vence_en?->toDateString())->toBe('2026-10-30')
+        // Mes vencido (septiembre): tampoco vence antes de emitirse.
+        ->and(CargoRenta::query()->whereHas('estudio', fn ($q) => $q->where('slug', $clases['slug']))
+            ->where('periodo', '2026-09')->sole()->vence_en?->toDateString())->toBe('2026-10-30');
+    $this->artisan('agendauno:suspender-por-renta')->assertSuccessful();
+    expect(Estudio::query()->where('estado', 'suspended')->count())->toBe(0);
+});
+
+it('extender la prueba de un negocio que ya pagó aplaza su siguiente cobro', function (): void {
+    Config::set('agendauno.plataforma.token', 'token-plataforma');
+    $e = estudioConSesion('barberia-a', 'dueno@barberia.mx', 'barberia');
+    terminarPrueba($e);
+    emitirRentaEl('2026-10-01 09:00'); // octubre cubierto
+
+    $this->travelTo(CarbonImmutable::parse('2026-10-11 10:00', 'America/Mexico_City'));
+    $this->postJson("/api/v1/plataforma/estudios/{$e['slug']}/extender-prueba", ['dias' => 30], conPlataforma())->assertOk();
+    expect(Estudio::query()->where('slug', $e['slug'])->sole()->trial_termina_en?->toDateString())->toBe('2026-11-10');
+
+    // Noviembre no se cobra mientras dura la prueba; al terminar, se cobra lo que falta del mes.
+    emitirRentaEl('2026-11-01 09:00');
+    expect(CargoRenta::query()->where('concepto', 'plan')->count())->toBe(1);
+    emitirRentaEl('2026-11-11 09:00');
+    expect(cargoDelPlan('2026-11')->cubre_desde?->toDateString())->toBe('2026-11-11')
+        ->and(cargoDelPlan('2026-11')->cubre_hasta?->toDateString())->toBe('2026-11-30')
+        ->and(cargoDelPlan('2026-11')->desglose['prorrateo'])->toBe(['dias_cobrables' => 20, 'dias_periodo' => 30]);
+});
+
+it('un año que empieza el 29 de febrero cubre un año completo y el siguiente no se recorre', function (): void {
+    $planes = app(PlanCitasSaas::class);
+    $estudio = (new Estudio)->forceFill(['zona_horaria' => 'America/Mexico_City', 'plan_cubierto_hasta' => '2028-02-28']);
+
+    $this->travelTo(CarbonImmutable::parse('2028-02-29 09:00', 'America/Mexico_City'));
+    $primero = $planes->siguientePeriodo($estudio, 'anual');
+    expect([$primero['desde']->toDateString(), $primero['hasta']->toDateString()])->toBe(['2028-02-29', '2029-02-28']);
+
+    $estudio->forceFill(['plan_cubierto_hasta' => '2029-02-28']);
+    $this->travelTo(CarbonImmutable::parse('2029-03-01 09:00', 'America/Mexico_City'));
+    $segundo = $planes->siguientePeriodo($estudio, 'anual');
+    expect([$segundo['desde']->toDateString(), $segundo['hasta']->toDateString()])->toBe(['2029-03-01', '2030-02-28']);
 });
