@@ -139,7 +139,7 @@ it('el escaparate trae el perfil del negocio y de cada sede, servicios con descr
         ->toBe(['1 19:00 Nivel 1', '3 19:00 Nivel 1'])
         ->and($data['horario_clases'][0]['instructor'])->toBe('Personal');
     // Profesionales con nombre y foto (sin correo).
-    expect($data['instructores'][0])->toBe(['nombre' => 'Personal', 'foto_url' => null])
+    expect($data['instructores'][0])->toBe(['nombre' => 'Personal', 'foto_url' => null, 'semblanza' => null])
         ->and($instructora)->not->toBeEmpty();
 });
 

@@ -70,6 +70,8 @@ function rutasExclusivasPorModalidad(): array
         'integraciones.index' => 'clases',
         'integraciones.upsert' => 'clases',
         'miembros.padron' => 'clases',
+        // Calendario público por fecha (M02, ADR 0118).
+        'calendario' => 'clases',
         // Citas: horarios de atención y disponibilidad del equipo, agendar desde el
         // panel, desde la cuenta y sin cuenta, y el historial de una cita.
         'horarios-atencion.index' => 'citas',
