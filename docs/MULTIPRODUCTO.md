@@ -47,7 +47,11 @@ implementado** · **Requiere autorización**.
 | Traefik existente, dos dominios, certificados comodín | Implementado, pendiente de despliegue | `docker-compose.traefik.yml`; el resolvedor DNS-01 de Cloudflare en el Traefik y el token requieren autorización |
 | IP real detrás de Cloudflare | Implementado, pendiente de despliegue | `docker-compose.cloudflare.yml`: solo IP de Cloudflare y `CF-Connecting-IP` |
 | DNS en Cloudflare (`@`, `www`, `*` de cada dominio) | Requiere autorización | Cambio en producción |
-| CI/CD por aplicación | No implementado | Fase de CI/CD |
+| CI por áreas (solo lo que cambió en cada PR) | Implementado, pendiente de despliegue | ADR 0113; corre al abrir el PR |
+| Imágenes inmutables en GHCR por componente | Implementado, pendiente de credenciales | `imagenes.yml`; faltan las variables públicas del repositorio y el token de lectura en el servidor |
+| Despliegue desde GitHub (staging y producción) con aprobación | Implementado, pendiente de credenciales | `desplegar.yml`; entornos con revisores y secretos SSH; servidor de staging por definir |
+| Compilación firmada de las apps Android | Implementado, pendiente de credenciales | `apps-moviles.yml`; llaves de subida y Firebase por app |
+| iOS en el CI | Preparado para futuro | Runner macOS cuando existan los esquemas de Xcode |
 | Negocio con los dos productos | Preparado para futuro | Hoy un negocio es de una sola modalidad (ADR 0104) |
 | Documentos legales por producto | Preparado para futuro | Hoy son de la plataforma |
 | Autorregistro de clientes en los sitios | Requiere autorización | Se mantiene cerrado (ADR 0093, reafirmado 2026-10-10) |

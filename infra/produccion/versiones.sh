@@ -68,3 +68,23 @@ componente_atiende() {
     sleep 10
   done
 }
+
+# Las imágenes de los servicios dados (todos los que se construyen, si no se dan), con la
+# versión exportada de cada uno: del registro que publica el CI (REGISTRO en web.env,
+# p. ej. ghcr.io/dueno; ADR 0113), etiquetadas como las nombra docker-compose.yml, o
+# construidas aquí si no hay registro.
+obtener_imagenes() {
+  registro="$(sed -n 's/^REGISTRO=//p' web.env 2>/dev/null | tr -d '\r' | head -n 1)"
+  if [ -z "$registro" ]; then
+    $COMPOSE build "$@"
+    return
+  fi
+  for servicio in ${*:-api web landing-agendauno landing-turnouno}; do
+    case "$servicio" in worker | scheduler) servicio=api ;; esac
+    variable="$(variable_version "$servicio")"
+    eval "etiqueta=\${$variable}"
+    echo "    $registro/agendauno-$servicio:$etiqueta"
+    docker pull --quiet "$registro/agendauno-$servicio:$etiqueta" >/dev/null || return 1
+    docker tag "$registro/agendauno-$servicio:$etiqueta" "agendauno-$servicio:$etiqueta" || return 1
+  done
+}

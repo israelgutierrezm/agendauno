@@ -73,8 +73,11 @@ principal() {
   export VERSION VERSION_WEB VERSION_LANDING_AGENDAUNO VERSION_LANDING_TURNOUNO
   echo "    versión nueva: $VERSION (actual: $ANTERIOR)"
 
-  echo "==> Construyendo imágenes $VERSION"
-  $COMPOSE build
+  echo "==> Imágenes $VERSION (del registro del CI si web.env tiene REGISTRO; si no, se construyen)"
+  if ! obtener_imagenes; then
+    echo "!! No están las imágenes $VERSION en el registro (¿ya terminó el flujo «Imágenes» de ese commit?)."
+    exit 1
+  fi
 
   EN_MARCHA="$(VERSION="$ANTERIOR" $COMPOSE ps -q api 2>/dev/null || true)"
   if [ -n "$EN_MARCHA" ]; then
@@ -174,8 +177,11 @@ actualizar_componente() {
   echo "    $componente: versión nueva $nueva (actual: $anterior)"
   export "$variable=$nueva"
 
-  echo "==> Construyendo $componente $nueva"
-  $COMPOSE build "$componente"
+  echo "==> Imagen de $componente $nueva"
+  if ! obtener_imagenes "$componente"; then
+    echo "!! No está la imagen de $componente $nueva en el registro."
+    exit 1
+  fi
   echo "==> Levantando $componente $nueva"
   $COMPOSE up -d --no-deps --no-build "$componente"
 

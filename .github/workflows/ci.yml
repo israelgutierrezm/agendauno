@@ -10,8 +10,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Qué tocó el cambio (ADR 0113): en un PR solo corren los trabajos de lo que cambió
+  # (un PR de documentación no levanta MySQL ni compila apps); en main, todo. Si cambia
+  # el propio CI, también todo. Con git diff contra la base, sin acciones de terceros.
+  cambios:
+    name: Cambios
+    runs-on: ubuntu-24.04
+    outputs:
+      api: ${{ steps.detectar.outputs.api }}
+      web: ${{ steps.detectar.outputs.web }}
+      mobile: ${{ steps.detectar.outputs.mobile }}
+      imagenes: ${{ steps.detectar.outputs.imagenes }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: detectar
+        env:
+          EVENTO: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENTO" != "pull_request" ]; then
+            printf 'api=true\nweb=true\nmobile=true\nimagenes=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          archivos="$(git diff --name-only "$BASE"...HEAD)"
+          printf 'Archivos cambiados:\n%s\n' "$archivos"
+          toca() {
+            if printf '%s\n' "$archivos" | grep -Eq "^\.github/workflows/|$1"; then echo true; else echo false; fi
+          }
+          {
+            echo "api=$(toca '^apps/api/')"
+            echo "web=$(toca '^apps/web/')"
+            echo "mobile=$(toca '^apps/mobile/')"
+            echo "imagenes=$(toca '^(apps/api/|apps/web/|infra/produccion/)')"
+          } >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
   api:
     name: API · Laravel
+    needs: cambios
+    if: needs.cambios.outputs.api == 'true'
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -89,6 +130,8 @@ jobs:
 
   web:
     name: Web · Vue
+    needs: cambios
+    if: needs.cambios.outputs.web == 'true'
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -113,6 +156,8 @@ jobs:
 
   mobile:
     name: Mobile · Flutter
+    needs: cambios
+    if: needs.cambios.outputs.mobile == 'true'
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -163,6 +208,8 @@ jobs:
 
   imagenes:
     name: Docker · production images
+    needs: cambios
+    if: needs.cambios.outputs.imagenes == 'true'
     runs-on: ubuntu-24.04
     env:
       # Igual que docker compose build en el servidor: cada Dockerfile con su

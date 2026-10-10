@@ -237,6 +237,13 @@ La primera vez que uses el script, la versión en marcha aún no tiene
 `agendauno:respaldar-plataforma`: respalda MySQL con la herramienta del proveedor y corre
 `SIN_RESPALDO_PLATAFORMA=1 ./actualizar.sh`.
 
+### Imágenes del CI y despliegue desde GitHub
+
+Con `REGISTRO=ghcr.io/<dueño>` en `web.env` (y `docker login ghcr.io` con un token de
+solo lectura), `actualizar.sh` baja las imágenes que publicó el flujo «Imágenes» para
+ese commit en lugar de construirlas aquí. El flujo «Desplegar» de GitHub corre este
+mismo script por SSH, con aprobación. Ver `docs/CI-CD.md` (ADR 0113).
+
 ### Publicar un solo componente
 
 La aplicación web y la landing de cada producto se publican solas (ADR 0112): solo se

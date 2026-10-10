@@ -37,7 +37,10 @@ Infrastructure: Docker (`infra/produccion`, `actualizar.sh` / `volver.sh`, with
 for any manual `up`), behind the server's existing Traefik
 (`docker-compose.traefik.yml`, Cloudflare DNS-01 wildcard certificates;
 `docker-compose.cloudflare.yml` for the Cloudflare proxy) — ADR 0112. GitHub Actions
-CI (API with MySQL, web, mobile, images).
+(ADR 0113, `docs/CI-CD.md`): CI by changed area (API with MySQL, web, mobile with both
+APK flavors, images); `imagenes.yml` publishes immutable per-commit images to GHCR;
+`desplegar.yml` (manual, environment approval, SSH → `actualizar.sh`);
+`apps-moviles.yml` (manual signed AAB, never uploaded to stores).
 
 ## Architectural Style
 
