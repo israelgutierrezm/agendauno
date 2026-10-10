@@ -6,6 +6,7 @@ use App\Modules\Tenancy\Database\GestorDeConexionTenant;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
 
 /*
@@ -123,9 +124,12 @@ it('el registro deja constancia de las versiones aceptadas y pide revisarlas si 
 
 it('en producción no se registra nadie sin aviso y términos publicados', function (): void {
     app()->detectEnvironment(fn (): string => 'production');
+    Config::set('agendauno.recaptcha.secret', 'secreto-de-prueba');
+    Http::fake(['www.google.com/*' => Http::response(['success' => true, 'score' => 0.9])]);
 
     $this->postJson('/api/v1/registro', [
         'nombre' => 'Estudio A', 'slug' => 'estudio-a', 'contacto_nombre' => 'Ana', 'contacto_primer_apellido' => 'Ruiz',
         'contacto_email' => 'ana@correo.mx', 'contacto_telefono' => '5512345678', 'pais' => 'MX', 'acepta_terminos' => true,
+        'recaptcha_token' => 'token-cliente',
     ])->assertUnprocessable()->assertJsonValidationErrors(['acepta_terminos'], 'meta.errors');
 });
