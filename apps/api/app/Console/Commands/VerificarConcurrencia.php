@@ -270,7 +270,9 @@ class VerificarConcurrencia extends Command
         $fallas = [];
         $e->abrirAtencion($this->base['sucursal'], $this->base['profesionales']);
         for ($r = 0; $r < $rondas; $r++) {
-            $hueco = $e->hueco(60 + $r, 10);
+            // Dentro del horizonte con que el cliente agenda (citas.dias_maximos_adelante,
+            // 60 días por omisión; ADR 0115) y lejos de los días del caso anterior (20+).
+            $hueco = $e->hueco(40 + $r, 10);
             $res = $this->competir(collect(range(1, $procesos))->map(fn (): array => [
                 'accion' => 'agendar-cualquiera', 'servicio' => $this->base['servicio'], 'sucursal' => $this->base['sucursal'],
                 'persona' => $e->alumno(0)->getKey(), 'inicia' => $hueco->toIso8601String(),
