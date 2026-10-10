@@ -2,41 +2,42 @@
 
 ## Páginas y jerarquía
 
-Una sola marca, un solo dominio y un solo build. Cada negocio trabaja con una sola
-modalidad, clases o citas (ADR 0104), así que la parte comercial se divide en tres
-niveles:
+Dos productos, un solo código (ADR 0108 y 0109): **AgendaUno** (clases, agendauno.mx)
+y **TurnoUno** (citas, turnouno.mx). Cada dominio publica solo las páginas de su
+producto, con su propio build de landing (`npm run build:agendauno`,
+`build:turnouno`), su SEO, su sitemap y su robots:
 
 ```
-/                         portada corta: elegir «Doy clases» o «Atiendo con cita»
-├── /clases               landing completa de Clases con cupo
-│   └── /software-para-{pilates, pole-dance, academias, crossfit-hyrox}
-└── /citas                landing completa de Citas 1 a 1
-    └── /software-para-{barberias, spas, terapeutas, nutriologos}
+agendauno.mx/                  portada de Clases con cupo (ModalidadView, modo clases)
+└── /software-para-{pilates, pole-dance, academias, crossfit-hyrox}
+turnouno.mx/                   portada de Citas 1 a 1 (ModalidadView, modo citas)
+└── /software-para-{barberias, spas, terapeutas, nutriologos}
 ```
 
-Son **11 páginas comerciales**. Todas salen de `paginasMarketing`
+`/clases` en agendauno.mx lleva a `/`; `/citas` y las páginas por giro de citas, a
+turnouno.mx (y al revés). Las páginas salen de `paginasMarketing`
 (`src/marketing/seoConfig.ts`), la lista única de la que se arman el router de la app
 y el del prerender (`src/router/comerciales.ts`, con el mismo nombre, `meta` y props),
-el SEO, el sitemap, la analítica y las revisiones de `scripts/check-marketing*.mjs`.
-`seoConfig.ts`, `soluciones.ts` y `modalidades.ts` los importa `vite.config`: no
-pueden usar el alias `@/`, vue-i18n ni el i18n del proyecto (su SEO va en texto plano).
+el SEO, el sitemap, la analítica y las revisiones de `scripts/check-marketing*.mjs`
+(una por producto). `seoConfig.ts`, `soluciones.ts`, `modalidades.ts` y
+`lib/producto.ts` los importa `vite.config`: no pueden usar el alias `@/`, vue-i18n ni
+el i18n del proyecto (su SEO va en texto plano).
 
-- **Portada (`/`, `LandingView`)**: hero con un solo h1 y los dos botones grandes
-  «Doy clases» → `/clases` y «Atiendo con cita» → `/citas`; sellos de confianza; las
-  dos modalidades (`#producto`); dos tarjetas de precio «desde…» (`#precios`) que
-  llevan a `/clases#precios` y `/citas#precios`; los giros en dos columnas
-  (`#soluciones`); cuatro preguntas generales (prueba, cancelación, datos y «clases y
-  citas son dos negocios»), y el cierre con `/registro?modo=clases` y
-  `/registro?modo=citas`.
-- **/clases y /citas (`ModalidadView`, prop `modo`)**: una sola vista en dos rutas. El
+Los textos base están en AgendaUno; en TurnoUno se leen con su marca y su dominio
+(`conMarca`). El producto de la página sale del build (`VITE_PRODUCTO`), del host o,
+en desarrollo, de `?producto=turnouno`.
+
+- **Portada (`/`, `ModalidadView`, prop `modo` = la modalidad del producto)**: el
   contenido se declara en `src/marketing/modalidades.ts` (`MODALIDADES[modo]`, como
   claves) y los textos van en `landing.clases.*` y `landing.citas.*`. Secciones y
   anclas: hero, sellos, `#producto` (demo fija por modo), `#soluciones` (funciones),
   `#como-funciona`, `#para-quien` (carrusel y páginas por giro de su modalidad),
   `#operacion` (recepción y ventas), `#precios`, `#pagina-publica`, `#preguntas` y
-  el llamado final, que cierra con un enlace discreto a la otra modalidad. Cada una
-  habla solo de su modalidad. La vista se vuelve a montar al cambiar de ruta (`:key`
-  en `App.vue` y en su raíz): no arrastra estado de `/clases` a `/citas`.
+  el llamado final, que cierra con un enlace discreto al otro producto. El menú es
+  Funciones · Precios · Preguntas.
+- **Prelanzamiento**: mientras un producto no recibe registros (`/precios` →
+  `registro`, lo decide el superadmin), sus botones dicen «Quiero que me avisen», el
+  cierre «abre pronto» y `/registro` muestra la lista de interesados.
 - **Páginas por giro (`/software-para-*`, `SolucionView`)**: miga de pan
   «AgendaUno / Clases|Citas / giro», enlaces a `/{modo}#producto`, `/{modo}#precios`
   y `/registro?modo={modo}` (con `&giro={perfil}` si la página es de un solo giro del
@@ -147,7 +148,7 @@ llamados finales siguen en rosa.
 - Las secciones alternan el fondo del hero y la superficie, sin bloques consecutivos del mismo fondo. Un solo h1 por página; títulos de tarjeta con peso 500; estados como punto + texto; marcas de verificación y flechas en SVG, sin íconos teñidos ni emojis. Acceso mantiene recientes y búsquedas, pero sin duplicar el logo ni mostrar resultados vacíos antes de una búsqueda explícita.
 - `/aviso-de-privacidad` está enlazado desde el footer y antes de los campos de registro. Comparte el documento editable de `/api/v1/legales` con el modal de registro. El borrador `src/marketing/aviso-privacidad.borrador.txt` solo se muestra en desarrollo si no existe documento publicado. No debe publicarse sin completar los datos del responsable y validar prácticas, proveedores y controles. La ruta legal queda fuera del sitemap y sin indexación; no altera el SEO comercial.
 - Cada página por giro tiene contenido propio, fotos existentes, CTA al registro con su modalidad, título, descripción y canonical. No se inventan testimonios, calificaciones ni precios.
-- `npm run build` genera HTML completo de las 11 páginas reutilizando los componentes Vue de marketing (`src/entry-marketing.ts`, con su propio router en memoria). La aplicación de gestión sigue siendo SPA; no se consultan cuentas ni datos de negocios durante la compilación. Las demos (agenda, página pública) son estáticas, sin API ni stores; `window`, `matchMedia` y `localStorage` solo se usan en `onMounted`.
+- `npm run build` genera la aplicación (`dist/app`) y el HTML completo de las páginas de cada producto (`dist/agendauno`, `dist/turnouno`) reutilizando los componentes Vue de marketing (`src/entry-marketing.ts`, con su propio router en memoria). La aplicación de gestión sigue siendo SPA; no se consultan cuentas ni datos de negocios durante la compilación. Las demos (agenda, página pública) son estáticas, sin API ni stores; `window`, `matchMedia` y `localStorage` solo se usan en `onMounted`.
 - Validar con `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` y `npm run test:marketing`. La CI de la web corre lint, build, `test:marketing` y test. `test:marketing` revisa en cada página: un h1 con texto, más de 1,000 caracteres sin JS, canonical, Open Graph, JSON-LD (con su miga de pan), el menú, `#precios`, el registro con `?modo=` (y `&giro=` en las páginas de un solo giro, también en el «Probar gratis» del menú), imágenes con alt y archivo, el CSS de su vista enlazado y el sitemap; y por HTTP, que `/clases` en el host de un negocio quede `noindex`. `npm run preview` sirve las rutas generadas y el fallback de acceso.
 - Las animaciones no ocultan el texto cuando JavaScript no está disponible. Se respeta movimiento reducido.
 

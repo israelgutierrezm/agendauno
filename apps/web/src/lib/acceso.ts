@@ -83,6 +83,7 @@ export const POLITICAS: Record<string, Politica> = {
 
   // ---- Configuración del negocio ----
   configuracion: { permiso: "estudio.gestionar" },
+  "sitio-web": { permiso: "estudio.gestionar" },
   sedes: { permiso: "sucursales.gestionar" },
   "datos-fiscales": { permiso: "estudio.gestionar" },
   region: { permiso: "estudio.gestionar" },
@@ -103,6 +104,7 @@ export const POLITICAS: Record<string, Politica> = {
   ajustes: {
     algunaDe: [
       "configuracion",
+      "sitio-web",
       "sedes",
       "region",
       "datos-fiscales",

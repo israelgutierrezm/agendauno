@@ -102,6 +102,17 @@ export const CATEGORIAS_CONFIGURACION: CategoriaConfiguracion[] = [
         ["página pública", "portada", "directorio", "redes", "enlace"],
         { hash: "#pagina-publica" },
       ),
+      // El constructor del sitio (ADR 0114).
+      o("sitio", "sitio-web", "configNegocio.opciones.sitio", [
+        "sitio",
+        "plantilla",
+        "secciones",
+        "banners",
+        "promociones",
+        "nosotros",
+        "vista previa",
+        "publicar",
+      ]),
       o("sedes", "sedes", "configNegocio.opciones.sucursales", [
         "sede",
         "sucursal",

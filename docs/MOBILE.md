@@ -1,6 +1,8 @@
 # App móvil (Flutter)
 
-`apps/mobile` — una sola app (`com.agendauno.app`) para todos los negocios y roles.
+`apps/mobile` — un solo código para las dos apps oficiales (ADR 0111): **AgendaUno**
+(`com.agendauno.app`, negocios de clases) y **TurnoUno** (`com.turnouno.app`, negocios
+de citas), para todos los roles. AgendaUno además queda lista para apps de marca blanca.
 
 ## Quién la usa
 
@@ -59,6 +61,60 @@ muestra el motivo cuando se niega (`code` del error).
   muestra «Actualiza AgendaUno para continuar». Se revisa al abrir, al entrar y al
   volver a la app.
 
+## Dos apps oficiales (ADR 0111)
+
+Cada app es un sabor de Android (`productFlavors`, dimensión `producto`). Sin
+`--flavor` se compila AgendaUno (`default-flavor` en `pubspec.yaml`).
+
+| | AgendaUno | TurnoUno |
+|---|---|---|
+| Sabor | `agendauno` | `turnouno` |
+| `applicationId` | `com.agendauno.app` | `com.turnouno.app` |
+| Nombre en el teléfono | AgendaUno | TurnoUno |
+| API en release | `https://agendauno.mx` | `https://turnouno.mx` |
+| Ícono | isotipo (`android/app/src/main/res`) | provisional, su inicial (`android/app/src/turnouno/res`) |
+
+```bash
+flutter run --flavor turnouno --dart-define=API_BASE_URL=http://10.0.2.2:8000
+flutter build appbundle --flavor agendauno
+flutter build appbundle --flavor turnouno
+```
+
+La app manda `X-App-Producto` en cada petición: la API no le abre negocios del otro
+producto. Si alguien escribe la dirección de un negocio del otro producto, la app le
+dice cuál descargar.
+
+**iOS** (en una Mac, antes de publicar TurnoUno): en Xcode, duplicar las
+configuraciones `Debug`, `Release` y `Profile` como `Debug-turnouno`,
+`Release-turnouno` y `Profile-turnouno` (y las de AgendaUno como `*-agendauno`), crear
+los esquemas `agendauno` y `turnouno` (compartidos) y, en las de TurnoUno, poner
+`PRODUCT_BUNDLE_IDENTIFIER = com.turnouno.app` y el nombre `TurnoUno` en
+`CFBundleDisplayName`. Así `flutter build ipa --flavor turnouno` funciona igual que
+en Android. Mientras tanto, `--dart-define=PRODUCTO=turnouno` elige el producto en
+Dart (no cambia el bundle id).
+
+## Marca blanca (solo AgendaUno, preparada, sin publicar)
+
+La app propia de un negocio de AgendaUno es el sabor `agendauno` con el archivo de ese
+negocio (ejemplo: `configuraciones/marca_blanca/ejemplo.json`):
+
+```bash
+flutter build appbundle --flavor agendauno \
+  --dart-define-from-file=configuraciones/marca_blanca/<negocio>.json
+```
+
+- `NEGOCIO` — el slug: la app abre directo en él (el acceso solo pide correo y
+  contraseña) y manda `X-App-Negocio`; la API solo le abre ese negocio.
+- `APP_NOMBRE` — su nombre en el teléfono y en la app.
+- `ANDROID_ID` — su `applicationId` propio (obligatorio: Gradle no compila una marca
+  blanca con el id de una app oficial ni con el sabor de TurnoUno).
+- `APP_STORE_ID`, `FIREBASE_*` — los de su ficha en el App Store y su app en Firebase.
+- Íconos: `configuraciones/marca_blanca/<negocio>/android/res` (mismos nombres que
+  `android/app/src/main/res`) reemplazan a los de AgendaUno.
+
+Publicar una marca blanca requiere autorización (y la cuenta de desarrollador que
+corresponda).
+
 ## Configuración al compilar
 
 ```bash
@@ -67,8 +123,9 @@ flutter build appbundle --dart-define=API_BASE_URL=https://DOMINIO \
   --dart-define=WEB_BASE_URL=https://DOMINIO
 ```
 
-- `API_BASE_URL` — la API. Por defecto `http://localhost:8000` en desarrollo y
-  `https://agendauno.mx` en una compilación de release (nunca localhost por olvido).
+- `API_BASE_URL` — la API. Por defecto `http://localhost:8000` en desarrollo y, en una
+  compilación de release, la de su producto (`https://agendauno.mx` o
+  `https://turnouno.mx`; nunca localhost por olvido).
 - `WEB_BASE_URL` — el sitio (fotos del inicio); por defecto, la misma que la API.
 - `APP_VERSION` — la versión que viaja en los errores de la app al monitoreo de la
   plataforma (ADR 0080); por defecto, la de `pubspec.yaml` (`versionApp`).
@@ -82,8 +139,10 @@ flutter build appbundle --dart-define=API_BASE_URL=https://DOMINIO \
 
 La app funciona sin Firebase; solo no recibe push. Para activarlas (ADR 0025):
 
-1. Crear un proyecto en la consola de Firebase y registrar la app Android
-   (`com.agendauno.app`) y, si aplica, la de iOS.
+1. Crear un proyecto en la consola de Firebase y registrar en él las apps Android
+   (`com.agendauno.app` y `com.turnouno.app`; después, las de marca blanca) y, si
+   aplica, las de iOS. Un solo proyecto: el servidor envía a todas con la misma
+   cuenta de servicio, y cada compilación lleva el `FIREBASE_APP_ID` de su app.
 2. Compilar la app con los datos del proyecto:
 
    ```bash
@@ -129,11 +188,13 @@ pantalla «Actualiza la app» abre Play y, en iOS, la App Store si se compila co
   Xcode). iOS mínimo: 15. En Xcode, la capacidad **Push Notifications** (ya está
   `Runner.entitlements` con `aps-environment`) y, en Firebase, la llave APNs del
   equipo de Apple; sin ella las notificaciones no llegan a iPhone.
-- Compilar y probar la versión de iOS en una Mac (aquí solo se compila Android).
+- Compilar y probar la versión de iOS en una Mac (aquí solo se compila Android),
+  con los esquemas de las dos apps (arriba).
+- Logotipo e íconos definitivos de TurnoUno (hoy son provisionales: su inicial).
 - Íconos de las tiendas: hoy salen del isotipo de 192 px ampliado (el de 1024 px se
   ve suave y con el trazo cortado). Antes de publicar, generarlos desde el isotipo
   en vector o a 1024 px.
-- Publicar en Google Play y App Store.
+- Publicar las dos apps en Google Play y App Store (requiere autorización).
 
 ## Pruebas
 

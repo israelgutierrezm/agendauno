@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
-import LogoAgendaUno from "@/components/LogoAgendaUno.vue";
+import LogoProducto from "@/components/LogoProducto.vue";
 import { trackEvent } from "@/lib/analytics";
-import {
-  MODOS,
-  NOMBRE_RUTA_MODALIDAD,
-  rutaModalidad,
-} from "@/marketing/modalidades";
+import { PRODUCTOS, productoActual } from "@/lib/producto";
+import { useRegistroDelProducto } from "@/marketing/registroProducto";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
 const props = defineProps<{
@@ -28,18 +25,21 @@ const comercial = computed(
 );
 const modo = computed(() => route.meta.modo ?? null);
 const giro = computed(() => route.meta.giro ?? null);
-// «Precios»: en /clases y /citas, la sección de la misma página; en las demás, la
-// de la portada.
-const destinoPrecios = computed(() =>
-  modo.value !== null && route.name === NOMBRE_RUTA_MODALIDAD[modo.value]
-    ? { path: rutaModalidad(modo.value), hash: "#precios" }
-    : { name: "inicio", hash: "#precios" },
+// Cada dominio es de un producto (ADR 0108): su marca, su menú y su registro.
+const producto = productoActual();
+const marca = PRODUCTOS[producto].nombre;
+const { abierto: registroAbierto } = useRegistroDelProducto(producto);
+// Funciones · Precios · Preguntas: secciones de la portada del producto
+// (`nav.funciones`, `nav.precios`, `nav.preguntas`).
+const secciones = computed(() =>
+  (["funciones", "precios", "preguntas"] as const).map((clave) => ({
+    clave,
+    to: {
+      name: "inicio",
+      hash: clave === "funciones" ? "#soluciones" : `#${clave}`,
+    },
+  })),
 );
-// Clases · Citas · Precios (`nav.clases`, `nav.citas`, `nav.precios`).
-const secciones = computed(() => [
-  ...MODOS.map((m) => ({ clave: m, to: { name: NOMBRE_RUTA_MODALIDAD[m] } })),
-  { clave: "precios", to: destinoPrecios.value },
-]);
 // «Probar gratis» desde una página de una modalidad (o de uno de sus giros) llega al
 // registro con esa modalidad; desde la página de un solo giro, también con el giro
 // (`?giro=`), como los demás «Probar gratis» de esa página.
@@ -94,7 +94,11 @@ defineEmits<{ alternarTema: [] }>();
           :to="{ name: 'inicio' }"
           class="tu-public-brand flex items-center shrink-0"
         >
-          <LogoAgendaUno variante="horizontal" :ancho="192" />
+          <LogoProducto
+            :producto="producto"
+            variante="horizontal"
+            :ancho="192"
+          />
         </RouterLink>
 
         <nav
@@ -102,28 +106,21 @@ defineEmits<{ alternarTema: [] }>();
           class="tu-public-sections"
           :aria-label="$t('nav.marketing')"
         >
-          <!-- «Precios» sin aria-current: en /clases apunta a la misma página. -->
+          <!-- Secciones de la portada: anclas, sin aria-current. -->
           <RouterLink
             v-for="s in secciones"
             :key="s.clave"
-            v-slot="{ href, navigate, isExactActive }"
+            v-slot="{ href, navigate }"
             :to="s.to"
             custom
           >
-            <a
-              :href="href"
-              :aria-current="
-                isExactActive && s.clave !== 'precios' ? 'page' : undefined
-              "
-              @click="navigate"
-              >{{ $t(`nav.${s.clave}`) }}</a
-            >
+            <a :href="href" @click="navigate">{{ $t(`nav.${s.clave}`) }}</a>
           </RouterLink>
         </nav>
 
         <nav
           class="tu-public-actions flex items-center gap-1 sm:gap-2 shrink-0"
-          aria-label="Acceso a AgendaUno"
+          :aria-label="`Acceso a ${marca}`"
         >
           <RouterLink
             v-if="!comercial"
@@ -146,9 +143,11 @@ defineEmits<{ alternarTema: [] }>();
             :to="destinoRegistro"
             @click="medirRegistro"
           >
-            <span class="tu-public-register-full">{{ $t("nav.probar") }}</span>
+            <span class="tu-public-register-full">{{
+              registroAbierto ? $t("nav.probar") : $t("nav.avisarme")
+            }}</span>
             <span class="tu-public-register-short">{{
-              $t("nav.probarCorto")
+              registroAbierto ? $t("nav.probarCorto") : $t("nav.avisarmeCorto")
             }}</span>
           </RouterLink>
         </nav>
@@ -193,18 +192,11 @@ defineEmits<{ alternarTema: [] }>();
       <RouterLink
         v-for="s in secciones"
         :key="s.clave"
-        v-slot="{ href, navigate, isExactActive }"
+        v-slot="{ href, navigate }"
         :to="s.to"
         custom
       >
-        <a
-          :href="href"
-          :aria-current="
-            isExactActive && s.clave !== 'precios' ? 'page' : undefined
-          "
-          @click="navigate"
-          >{{ $t(`nav.${s.clave}`) }}</a
-        >
+        <a :href="href" @click="navigate">{{ $t(`nav.${s.clave}`) }}</a>
       </RouterLink>
     </nav>
 
@@ -218,11 +210,15 @@ defineEmits<{ alternarTema: [] }>();
           <span>{{
             esRutaPublicaDeNegocio
               ? $t("nav.reservasPor")
-              : "© " + new Date().getFullYear() + " AgendaUno"
+              : "© " + new Date().getFullYear() + " " + marca
           }}</span>
           <p v-if="!esRutaPublicaDeNegocio" class="tu-public-footer-note">
-            Software para organizar clases y citas. Cada negocio presta y
-            administra sus propios servicios.
+            {{
+              PRODUCTOS[producto].modalidad === "citas"
+                ? "Software para organizar citas."
+                : "Software para organizar clases."
+            }}
+            Cada negocio presta y administra sus propios servicios.
           </p>
         </div>
         <nav

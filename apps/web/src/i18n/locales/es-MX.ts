@@ -76,6 +76,9 @@ export default {
     menu: "Menu",
     probar: "Probar gratis",
     probarCorto: "Probar",
+    // Producto que aún no recibe registros (ADR 0108).
+    avisarme: "Quiero que me avisen",
+    avisarmeCorto: "Avísenme",
     entrar: "Iniciar sesión",
     entrarCorto: "Entrar",
     irAMiPanel: "Ir a mi panel",
@@ -85,6 +88,9 @@ export default {
     clases: "Clases",
     citas: "Citas",
     precios: "Precios",
+    // Menú de la portada de cada producto (ADR 0108).
+    funciones: "Funciones",
+    preguntas: "Preguntas",
     encontrarNegocio: "¿Buscas reservar? Encuentra tu negocio",
     reservasPor: "Reservas en línea con AgendaUno",
     panel: "Panel",
@@ -183,6 +189,7 @@ export default {
     opciones: {
       datos: "Datos e imagen del negocio",
       pagina: "Página pública",
+      sitio: "Sitio web",
       sucursales: "Sucursales",
       region: "País, moneda y zona horaria",
       fiscales: "Datos fiscales",
@@ -208,6 +215,16 @@ export default {
     // Los cobros en línea y la facturación (CFDI) solo operan en México (ADR 0099):
     // lo que los menciona lleva «*» y esta nota en su sección.
     soloMexico: "* Solo para clientes de México.",
+    // Un producto que aún no abre registros (ADR 0108: TurnoUno antes de su
+    // lanzamiento). «AgendaUno» se lee con la marca del producto.
+    prelanzamiento: {
+      cta: "Quiero que me avisen",
+      proximamente: "Próximamente",
+      demoPie: "Abre pronto. Déjanos tus datos y te avisamos.",
+      finalTitulo: "AgendaUno abre pronto.",
+      finalSubtitulo:
+        "Déjanos tus datos y te avisamos en cuanto puedas registrar tu negocio. Tendrás {dias} días para probarlo, sin tarjeta.",
+    },
     // Lo que /clases y /citas (ModalidadView) dicen igual; lo propio de cada una va en
     // `landing.clases` y `landing.citas`.
     modalidad: {
@@ -403,7 +420,8 @@ export default {
         subtitulo:
           "Crea una clase, invita a tus alumnos y recibe tu primera reserva. Tienes {dias} días para probarlo, sin tarjeta.",
         otra: "¿Atiendes con cita?",
-        otraEnlace: "Conoce AgendaUno para citas",
+        // El otro producto (ADR 0108): su nombre llega en {otro}.
+        otraEnlace: "Conoce {otro}, para negocios con citas",
       },
     },
     citas: {
@@ -593,7 +611,7 @@ export default {
         subtitulo:
           "Agrega un servicio, comparte tu página y recibe tu primera cita. Tienes {dias} días para probarlo, sin tarjeta.",
         otra: "¿Das clases con cupo?",
-        otraEnlace: "Conoce AgendaUno para clases",
+        otraEnlace: "Conoce {otro}, para negocios con clases",
       },
     },
     // Portada «/» (LandingView): corta, para elegir modalidad. Cada negocio es solo de

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   seoParaRuta,
   paginasMarketing,
@@ -9,22 +9,36 @@ import { MODALIDADES, perfilDeSolucion } from "./modalidades";
 import { soluciones, rutaSolucion } from "./soluciones";
 import { updateSeo } from "@/lib/seo";
 
+/*
+| SEO de las landings (ADR 0108): cada dominio publica las páginas de su producto. Sin
+| `VITE_PRODUCTO` (y en localhost) rige AgendaUno: clases en agendauno.mx. TurnoUno
+| (citas, turnouno.mx) se prueba con su build.
+*/
+
 afterEach(() => {
   document.head.innerHTML = "";
+  vi.unstubAllEnvs();
+  vi.resetModules();
 });
-describe("SEO comercial", () => {
+
+const deClases = soluciones.filter((s) => s.modo === "clases");
+const deCitas = soluciones.filter((s) => s.modo === "citas");
+
+describe("SEO comercial de AgendaUno", () => {
   it("anuncia la prueba de 30 días sin conservar la oferta anterior", () => {
     expect(seoParaRuta("/").description).toContain("30 días");
     for (const path of rutasMarketing) {
       expect(renderSeoHead(seoParaRuta(path))).not.toContain("14 días");
     }
   });
-  it("tiene once páginas con título, descripción y canonical propios", () => {
-    expect(rutasMarketing).toHaveLength(11);
-    expect(rutasMarketing.slice(0, 3)).toEqual(["/", "/clases", "/citas"]);
+  it("la portada y las páginas por giro de clases, con título, descripción y canonical propios", () => {
+    expect(rutasMarketing).toEqual([
+      "/",
+      ...deClases.map((s) => rutaSolucion(s.slug)),
+    ]);
     expect(
       new Set(rutasMarketing.map((path) => seoParaRuta(path).title)).size,
-    ).toBe(11);
+    ).toBe(rutasMarketing.length);
     for (const path of rutasMarketing) {
       const seo = seoParaRuta(path);
       expect(seo.index).toBe(true);
@@ -32,7 +46,9 @@ describe("SEO comercial", () => {
       const html = renderSeoHead(seo);
       expect(html).toContain(`href="https://agendauno.mx${path}"`);
       expect(html).toContain('type="application/ld+json"');
+      expect(html).toContain('og:site_name" content="AgendaUno"');
       expect(html).not.toContain("aggregateRating");
+      expect(html).not.toContain("TurnoUno");
     }
   });
   it("excluye acceso, activación, directorio y operación de la indexación comercial", () => {
@@ -45,6 +61,8 @@ describe("SEO comercial", () => {
       "/panel",
       "/miembros/123",
       "/splataformadm1n",
+      "/clases",
+      "/citas",
     ]) {
       const html = renderSeoHead(seoParaRuta(path));
       expect(html).toContain('content="noindex,follow"');
@@ -84,81 +102,52 @@ describe("SEO comercial", () => {
     expect(html).toContain("A &amp; B");
     expect(html).toContain("\\u003c/script>");
   });
-  it("solo /clases y /citas usan una dirección de un segmento; los negocios, su subdominio", () => {
-    // Las páginas por giro conservan su prefijo; /clases y /citas son las únicas
-    // comerciales de un segmento. El enlace corto de un negocio (`/{slug}`) en el
-    // dominio principal lleva a su subdominio (lib/tenant) y no se indexa.
+  it("solo la portada es comercial de un segmento; los negocios, su subdominio", () => {
+    // Las páginas por giro conservan su prefijo. El enlace corto de un negocio
+    // (`/{slug}`) en el dominio principal lleva a su subdominio (lib/tenant).
     expect(
       soluciones.every((s) =>
         rutaSolucion(s.slug).startsWith("/software-para-"),
       ),
     ).toBe(true);
     expect(
-      rutasMarketing
-        .filter(
-          (path) =>
-            /^\/[^/]+$/.test(path) && !path.startsWith("/software-para-"),
-        )
-        .sort(),
-    ).toEqual(["/citas", "/clases"]);
+      rutasMarketing.filter(
+        (path) => /^\/[^/]+$/.test(path) && !path.startsWith("/software-para-"),
+      ),
+    ).toEqual([]);
     expect(seoParaRuta("/mi-estudio").index).toBe(false);
     expect(renderSeoHead(seoParaRuta("/estudio/mi-estudio"))).toContain(
       'content="noindex,follow"',
     );
   });
-  it("/clases y /citas: SEO propio, imagen existente y miga de pan", () => {
-    for (const modo of ["clases", "citas"] as const) {
-      const { seo } = MODALIDADES[modo];
-      const resultado = seoParaRuta(`/${modo}/`);
-      expect(resultado).toMatchObject({
-        title: seo.title,
-        description: seo.description,
-        path: `/${modo}`,
-        index: true,
-        image: `https://agendauno.mx${seo.imagen}`,
-      });
-      expect(seo.imagen).toMatch(/^\/assets\/landing\//);
-      const html = renderSeoHead(resultado);
-      expect(html).toContain(
-        `<link rel="canonical" href="https://agendauno.mx/${modo}">`,
-      );
-      expect(html).toContain(
-        `<meta property="og:image" content="https://agendauno.mx${seo.imagen}">`,
-      );
-      expect(html).not.toContain("hreflang");
-      const grafo = (resultado.jsonLd?.["@graph"] ?? []) as {
-        "@type": string;
-        itemListElement?: { name: string; item: string }[];
-      }[];
-      const tipos = grafo.map((nodo) => nodo["@type"]);
-      expect(tipos).toContain("WebPage");
-      expect(tipos).not.toContain("Offer");
-      expect(tipos).not.toContain("FAQPage");
-      expect(
-        grafo.find((nodo) => nodo["@type"] === "BreadcrumbList")
-          ?.itemListElement,
-      ).toEqual([
-        expect.objectContaining({
-          name: "Inicio",
-          item: "https://agendauno.mx/",
-        }),
-        expect.objectContaining({
-          name: modo === "clases" ? "Clases" : "Citas",
-          item: `https://agendauno.mx/${modo}`,
-        }),
-      ]);
-    }
-    expect(seoParaRuta("/citas").title).toBe(
-      "Software de citas para barberías, estéticas y consultorios | AgendaUno",
+  it("la portada: el SEO de clases, imagen existente y sin miga de pan", () => {
+    const { seo } = MODALIDADES.clases;
+    const resultado = seoParaRuta("/");
+    expect(resultado).toMatchObject({
+      title: seo.title,
+      description: seo.description,
+      path: "/",
+      index: true,
+      image: `https://agendauno.mx${seo.imagen}`,
+    });
+    expect(seo.imagen).toMatch(/^\/assets\/landing\//);
+    const html = renderSeoHead(resultado);
+    expect(html).toContain(
+      '<link rel="canonical" href="https://agendauno.mx/">',
     );
+    expect(html).not.toContain("hreflang");
+    const tipos = (
+      (resultado.jsonLd?.["@graph"] ?? []) as { "@type": string }[]
+    ).map((nodo) => nodo["@type"]);
+    expect(tipos).toContain("WebPage");
+    expect(tipos).not.toContain("Offer");
+    expect(tipos).not.toContain("FAQPage");
+    expect(tipos).not.toContain("BreadcrumbList");
     // Lo que no existe no se anuncia en el buscador.
-    for (const path of ["/clases", "/citas"]) {
-      const { description } = seoParaRuta(path);
-      expect(description).not.toMatch(/anticipo|WhatsApp|push/i);
-    }
+    expect(resultado.description).not.toMatch(/anticipo|WhatsApp|push/i);
   });
-  it("cada página por giro cuelga de su modalidad en la miga de pan (Inicio → Clases|Citas → giro)", () => {
-    for (const s of soluciones) {
+  it("cada página por giro cuelga de la portada en la miga de pan (Inicio → giro)", () => {
+    for (const s of deClases) {
       const url = `https://agendauno.mx${rutaSolucion(s.slug)}`;
       const grafo = (seoParaRuta(rutaSolucion(s.slug)).jsonLd?.["@graph"] ??
         []) as Record<string, unknown>[];
@@ -173,41 +162,21 @@ describe("SEO comercial", () => {
           name: "Inicio",
           item: "https://agendauno.mx/",
         },
-        {
-          "@type": "ListItem",
-          position: 2,
-          name: s.modo === "clases" ? "Clases" : "Citas",
-          item: `https://agendauno.mx/${s.modo}`,
-        },
-        { "@type": "ListItem", position: 3, name: s.nombre, item: url },
+        { "@type": "ListItem", position: 2, name: s.nombre, item: url },
       ]);
     }
-    // La portada no lleva miga de pan.
-    const portada = (seoParaRuta("/").jsonLd?.["@graph"] ?? []) as Record<
-      string,
-      unknown
-    >[];
-    expect(portada.map((n) => n["@type"])).not.toContain("BreadcrumbList");
+    // Una página de citas no existe en agendauno.mx.
+    expect(seoParaRuta(rutaSolucion(deCitas[0]!.slug)).index).toBe(false);
   });
   it("cada página comercial declara su nombre de ruta, su vista y su modalidad", () => {
     expect(paginasMarketing.map((p) => p.path)).toEqual(rutasMarketing);
-    expect(new Set(paginasMarketing.map((p) => p.name)).size).toBe(11);
-    expect(paginasMarketing.slice(0, 3)).toEqual([
-      { path: "/", name: "inicio", vista: "landing", modo: null },
-      {
-        path: "/clases",
-        name: "modalidad-clases",
-        vista: "modalidad",
-        modo: "clases",
-      },
-      {
-        path: "/citas",
-        name: "modalidad-citas",
-        vista: "modalidad",
-        modo: "citas",
-      },
-    ]);
-    for (const s of soluciones) {
+    expect(paginasMarketing[0]).toEqual({
+      path: "/",
+      name: "inicio",
+      vista: "modalidad",
+      modo: "clases",
+    });
+    for (const s of deClases) {
       expect(
         paginasMarketing.find((p) => p.path === rutaSolucion(s.slug)),
       ).toEqual({
@@ -219,5 +188,30 @@ describe("SEO comercial", () => {
         giro: perfilDeSolucion(s.slug),
       });
     }
+  });
+});
+
+describe("SEO comercial de TurnoUno", () => {
+  it("su build publica la portada y las páginas de citas en turnouno.mx, con su marca", async () => {
+    vi.stubEnv("VITE_PRODUCTO", "turnouno");
+    vi.resetModules();
+    const seo = await import("./seoConfig");
+
+    expect(seo.SITE_URL).toBe("https://turnouno.mx");
+    expect(seo.rutasMarketing).toEqual([
+      "/",
+      ...deCitas.map((s) => rutaSolucion(s.slug)),
+    ]);
+    expect(seo.paginasMarketing[0]).toMatchObject({ path: "/", modo: "citas" });
+    for (const path of seo.rutasMarketing) {
+      const html = seo.renderSeoHead(seo.seoParaRuta(path));
+      expect(html).toContain(`href="https://turnouno.mx${path}"`);
+      expect(html).toContain('og:site_name" content="TurnoUno"');
+      expect(html).not.toContain("AgendaUno");
+      expect(html).not.toContain("agendauno.mx");
+    }
+    expect(seo.seoParaRuta("/").title).toBe(
+      "Software de citas para barberías, estéticas y consultorios | TurnoUno",
+    );
   });
 });

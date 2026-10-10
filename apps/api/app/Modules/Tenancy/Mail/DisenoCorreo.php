@@ -4,16 +4,22 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Mail;
 
+use App\Modules\Tenancy\ProductoComercial;
+
 /**
  * Marco HTML de los correos que envía un negocio: su nombre arriba, el contenido en
- * una tarjeta blanca y un pie discreto. Estilos en línea (los clientes de correo
- * ignoran las hojas de estilo). El contenido llega ya escapado.
+ * una tarjeta blanca y un pie discreto con la marca del producto del negocio
+ * (AgendaUno o TurnoUno, ADR 0108). Estilos en línea (los clientes de correo ignoran
+ * las hojas de estilo). El contenido llega ya escapado.
  */
 final class DisenoCorreo
 {
-    public static function envolver(string $negocio, string $contenidoHtml): string
+    public static function envolver(string $negocio, string $contenidoHtml, ?ProductoComercial $producto = null): string
     {
         $nombre = e($negocio !== '' ? $negocio : (string) config('app.name'));
+        $marca = e(($producto ?? ProductoComercial::AgendaUno)->nombre());
+        // Un aviso de la plataforma ya lleva la marca como remitente: no se repite.
+        $pie = $nombre === $marca ? 'Enviado por '.$marca.'.' : 'Enviado por '.$nombre.' con '.$marca.'.';
 
         return '<!doctype html><html lang="es"><head><meta charset="utf-8">'
             .'<meta name="viewport" content="width=device-width,initial-scale=1"></head>'
@@ -27,7 +33,7 @@ final class DisenoCorreo
             .$contenidoHtml
             .'</td></tr>'
             .'<tr><td style="padding:16px 4px 0;font:12px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#6b7280;">'
-            .'Enviado por '.$nombre.' con AgendaUno.'
+            .$pie
             .'</td></tr>'
             .'</table></td></tr></table></body></html>';
     }

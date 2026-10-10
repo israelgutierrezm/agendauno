@@ -8,11 +8,15 @@ use App\Modules\Platform\Legales\DocumentoLegal;
 use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\AprovisionarEstudio;
 use App\Modules\Tenancy\Application\EnviarActivacionTenant;
+use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\RegistrarEstudio;
 use App\Modules\Tenancy\Application\VerificacionWhatsAppDueno;
 use App\Modules\Tenancy\Application\VerificarRecaptcha;
 use App\Modules\Tenancy\Http\Requests\RegistrarEstudioRequest;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\PerfilNegocio;
+use App\Modules\Tenancy\ProductoComercial;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -33,6 +37,7 @@ class RegistroEstudioController
         private readonly VerificarRecaptcha $recaptcha,
         private readonly DocumentosLegales $legales,
         private readonly VerificacionWhatsAppDueno $whatsapp,
+        private readonly ParametrosTenant $parametros,
     ) {}
 
     public function disponibilidad(Request $request): JsonResponse
@@ -40,6 +45,7 @@ class RegistroEstudioController
         $slug = Str::slug((string) $request->query('slug', ''));
         // Uno más largo de lo que acepta el registro tampoco está disponible.
         $disponible = $slug !== '' && strlen($slug) <= RegistrarEstudio::LARGO_MAXIMO_SLUG
+            && ! RegistrarEstudio::reservado($slug)
             && ! Estudio::query()->where('slug', $slug)->exists();
 
         return response()->json(['data' => ['slug' => $slug, 'disponible' => $disponible]]);
@@ -53,6 +59,8 @@ class RegistroEstudioController
                 'recaptcha' => ['No pudimos verificar que no eres un robot. Recarga e inténtalo de nuevo.'],
             ]);
         }
+
+        $this->exigirProductoAbierto($request);
 
         // En producción no se registra nadie sin un aviso de privacidad y unos
         // términos publicados; y lo que se acepta es lo que se leyó.
@@ -125,6 +133,7 @@ class RegistroEstudioController
                     // Queda guardada desde su giro (ADR 0104).
                     'modalidad' => $estudio->modalidad()->value,
                     'estado' => $estudio->estado->value,
+                    'producto' => $estudio->producto()->value,
                     'url' => url('/app/'.$estudio->slug),
                 ],
                 'activacion' => app()->environment('production') ? null : [
@@ -133,5 +142,32 @@ class RegistroEstudioController
                 ],
             ],
         ], 201);
+    }
+
+    /**
+     * El giro decide el producto (clases → AgendaUno, citas → TurnoUno, ADR 0108): debe
+     * ser el de la web desde la que se registra y ese producto debe tener el registro
+     * abierto (TurnoUno abre hasta su lanzamiento; mientras, su landing junta
+     * interesados).
+     *
+     * @throws ValidationException
+     */
+    private function exigirProductoAbierto(RegistrarEstudioRequest $request): void
+    {
+        $perfil = PerfilNegocio::tryFrom((string) $request->validated('perfil_negocio')) ?? PerfilNegocio::General;
+        $producto = ProductoComercial::deModalidad(ModalidadServicio::paraPerfil($perfil));
+
+        $pedido = ProductoComercial::tryFrom((string) $request->validated('producto'));
+        if ($pedido !== null && $pedido !== $producto) {
+            throw ValidationException::withMessages([
+                'perfil_negocio' => ["Ese giro se registra en {$producto->nombre()}, no en {$pedido->nombre()}."],
+            ]);
+        }
+
+        if (! $this->parametros->siNo('registro.abierto_'.$producto->value)) {
+            throw ValidationException::withMessages([
+                'producto' => ["{$producto->nombre()} aún no recibe registros. Déjanos tus datos y te avisamos cuando abra."],
+            ]);
+        }
     }
 }

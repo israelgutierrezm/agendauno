@@ -162,6 +162,8 @@ describe("precios públicos (ADR 0107)", () => {
         funciones: { lealtad: "premium", equipo: "individual" },
       },
       ventas: { correo: "cotiza@agendauno.mx", whatsapp: "525512345678" },
+      // TurnoUno ya recibe registros (lo abre el superadmin, ADR 0108).
+      registro: { agendauno: true, turnouno: true },
     });
     await flushPromises();
 
@@ -192,6 +194,15 @@ describe("precios públicos (ADR 0107)", () => {
     expect(vista.get(".precio-importe strong").text()).toBe("$132");
     // Los días de prueba publicados, no unos fijos.
     expect(vista.get(".precio-cta").text()).toContain("Probar 15 días gratis");
+    vista.unmount();
+  });
+  it("mientras TurnoUno no recibe registros, sus tarjetas ofrecen avisar", () => {
+    const vista = montarFijo("citas");
+    for (const cta of vista.findAll(".precio-cta")) {
+      expect(cta.text()).toContain("Quiero que me avisen");
+    }
+    expect(vista.text()).toContain("Próximamente");
+    expect(vista.text()).not.toContain("Sin tarjeta para empezar");
     vista.unmount();
   });
   it("la moneda de la tarifa publicada manda: en pesos no habla de dólares", async () => {

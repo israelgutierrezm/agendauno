@@ -275,3 +275,28 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
 - El concepto de cobro de una orden por una sesión (página de pago de la pasarela,
   movimientos de caja) es «Cita» solo si la sesión es una cita; la clase de pago suelto
   es «Clase».
+
+## Sitio del negocio (ADR 0114)
+
+Para quien configura el negocio (`estudio.gestionar`), bajo `/api/v1/app/{slug}` (o el
+subdominio del negocio):
+
+- `GET /sitio`: `borrador` (`plantilla`, `secciones[]` con `tipo`, `visible`, `titulo`,
+  `texto`, `foto_url`; `banners[]` con `id`, `titulo`, `texto`, `enlace_texto`,
+  `enlace_url`, `desde`, `hasta`, `foto_url`), `cambios_sin_publicar`, `publicado_en`,
+  `pagina_publica`, `tiene_portada` y `catalogo` (plantillas con su orden, qué secciones
+  llevan texto y foto, largos y `banners_maximos`).
+- `PUT /sitio`: guarda el borrador (422 `VALIDATION_FAILED` con `meta.errors`: tipos de
+  otra modalidad o repetidos, enlaces que no son `https://`, `/…` ni `#…`, fotos que no
+  se subieron aquí, fechas al revés, más banners que el parámetro). Inicio y contacto
+  quedan siempre al principio y al final; una sección que falte se agrega visible.
+- `POST /sitio/publicar`, `POST /sitio/descartar`.
+- `GET /sitio/vista-previa`: lo mismo que `GET /escaparate`, con el borrador y aunque la
+  página aún no esté abierta.
+- `POST /sitio/imagenes` (multipart `imagen`: JPG, PNG o WebP de hasta 4 MB): 201 con
+  `url`; 422 si el sitio llegó a `sitio.imagenes_maximas`.
+
+`GET /escaparate` suma `sitio`: la versión publicada (o la plantilla esencial con todo
+visible si no hay ninguna), con solo las secciones visibles y los banners vigentes hoy
+en el negocio.
+

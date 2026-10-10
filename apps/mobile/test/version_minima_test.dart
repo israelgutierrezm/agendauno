@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:agendauno/core/config/app_config.dart';
+import 'package:agendauno/core/config/producto_app.dart';
 import 'package:agendauno/core/network/auth_token.dart';
 import 'package:agendauno/core/network/dio_client.dart';
 import 'package:agendauno/core/storage/almacen_sesion.dart';
@@ -194,9 +195,19 @@ void main() {
     expect(urlTienda(TargetPlatform.macOS), isNull);
   });
 
-  test('el id de Google Play es el applicationId de Android', () {
+  test('los ids de Google Play son los applicationId de Android', () {
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
-    expect(gradle, contains('applicationId = "${AppConfig.idAndroid}"'));
+    // Uno por app oficial (ADR 0111), cada uno en el applicationId de su sabor.
+    for (final producto in ProductoApp.todos) {
+      expect(
+        RegExp(
+          'applicationId = .*"${RegExp.escape(producto.idAndroid)}"',
+        ).hasMatch(gradle),
+        isTrue,
+        reason: producto.nombre,
+      );
+    }
+    expect(AppConfig.idAndroid, ProductoApp.agendaUno.idAndroid);
   });
 
   testWidgets('con una versión aceptada entra como siempre', (tester) async {

@@ -58,6 +58,12 @@ final class CatalogoParametros
             new DefinicionParametro('asistencia.no_asistio_al_terminar', 'Asistencia', 'Al terminar, quien no tiene registro «no se presentó»',
                 'Si nadie registró la asistencia de alguien, al terminar la clase o cita queda como que no se presentó, con la política de inasistencias del negocio.', $sn, 1),
 
+            // Sitio del negocio (ADR 0114).
+            new DefinicionParametro('sitio.banners_maximos', 'Sitio del negocio', 'Banners en el sitio',
+                'Cuántos banners (promociones, avisos) puede tener la página del negocio.', $e, 5, 1, 20, 'banners'),
+            new DefinicionParametro('sitio.imagenes_maximas', 'Sitio del negocio', 'Imágenes del sitio',
+                'Cuántas fotos propias puede tener la página del negocio (las de «Nosotros» y los banners).', $e, 30, 5, 200, 'imágenes'),
+
             // Acceso.
             new DefinicionParametro('acceso.minutos_antes', 'Acceso', 'Se puede entrar desde',
                 'Minutos antes de que empiece su clase o cita.', $e, 30, 0, 240, 'min'),
@@ -196,6 +202,13 @@ final class CatalogoParametros
                 'Sirven para registrar la tarjeta del pago automático si el aviso de Stripe no llega; se revisan hasta 48 horas.', $e, 30, 3, 365, 'días', porNegocio: false),
             new DefinicionParametro('limpieza.dias_errores', 'Limpieza de registros', 'Días que se guarda un error que dejó de pasar',
                 'Contados desde la última vez que pasó, esté abierto, resuelto o ignorado.', $e, 90, 7, 730, 'días', porNegocio: false),
+
+            // Registro de negocios por producto (ADR 0108, solo la plataforma). TurnoUno
+            // se lanza después: mientras esté cerrado, su landing junta interesados.
+            new DefinicionParametro('registro.abierto_agendauno', 'Registro de negocios', 'Registro abierto en AgendaUno',
+                'Negocios de clases. Si lo cierras, el registro avisa que por ahora no se reciben altas.', $sn, 1, porNegocio: false),
+            new DefinicionParametro('registro.abierto_turnouno', 'Registro de negocios', 'Registro abierto en TurnoUno',
+                'Negocios de citas. Cerrado, la landing de TurnoUno junta interesados en lugar de registrar negocios.', $sn, 0, porNegocio: false),
 
             // Monitoreo de errores (ADR 0080, solo la plataforma).
             new DefinicionParametro('errores.nuevos_clientes_por_dia', 'Monitoreo de errores', 'Errores nuevos de la web y la app al día',
