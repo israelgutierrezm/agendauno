@@ -221,7 +221,7 @@ saldos. Aplicadas en la base de desarrollo.
 | Qué | Cómo | Resultado |
 |---|---|---|
 | API: multiproducto, PWA, apps y marca blanca | Pest (`MultiproductoTest`, `PwaNegocioTest`, `AppsMovilesTest`) | 13 pruebas, 165 aserciones, verdes |
-| API completa | Pest en paralelo (SQLite), commit `e99f83a` | En curso al escribir esto (473 de 1486, sin fallos); el resultado final se anota al terminar |
+| API completa | Pest en paralelo (SQLite), commit `e99f83a` | Verde: 1167 pruebas, 19 582 aserciones, sin fallos (104 min, compartiendo la máquina con las compilaciones) |
 | API: estilo y tipos de lo cambiado | Pint y PHPStan | Sin errores |
 | Web | `npm run lint`, `npm run build` (con vue-tsc), `npm run test:marketing` (dos landings y por HTTP), vitest | Todo verde: lint, build, las dos landings (5 páginas cada una: HTML sin JS, canonical, Open Graph, JSON-LD) y 10 páginas por HTTP; vitest 876 pruebas en 161 archivos |
 | Flutter | `flutter analyze`, `flutter test` | Sin avisos; 209 pruebas verdes |
