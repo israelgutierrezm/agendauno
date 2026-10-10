@@ -14,6 +14,7 @@ use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ResenaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -130,7 +131,7 @@ class ResenasTenantController
                 'comentario' => (string) $resena->comentario,
                 // Para el aviso al equipo: qué se calificó y dónde verlo.
                 'actividad' => (string) $reserva->sesion->oferta?->nombre,
-                'enlace_panel' => rtrim((string) config('agendauno.url_app'), '/').'/resenas',
+                'enlace_panel' => MarcaProducto::actual()->urlWeb().'/resenas',
             ]);
 
             return $resena;

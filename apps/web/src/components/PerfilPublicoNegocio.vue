@@ -29,6 +29,9 @@ const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 
 const descripcion = ref("");
+// El color de su marca (#rrggbb): la barra de su app instalada (ADR 0110). Vacío, el
+// del producto.
+const colorMarca = ref<string | null>(null);
 const redes = ref<Record<Red, string>>({
   instagram: "",
   facebook: "",
@@ -39,6 +42,7 @@ const redes = ref<Record<Red, string>>({
 // Cambios sin guardar: descripción o redes distintas de lo guardado.
 const fotoPerfil = instantanea(() => ({
   descripcion: descripcion.value,
+  colorMarca: colorMarca.value,
   redes: redes.value,
 }));
 useCambiosPendientes(() => fotoPerfil.cambio());
@@ -58,9 +62,11 @@ const enlaces = computed(() => {
 function aplicar(datos: {
   descripcion: string | null;
   portada_url: string | null;
+  color_marca?: string | null;
   redes: Partial<Record<Red, string>>;
 }): void {
   descripcion.value = datos.descripcion ?? "";
+  colorMarca.value = datos.color_marca ?? null;
   portadaUrl.value = datos.portada_url;
   for (const r of REDES) {
     redes.value[r] = datos.redes[r] ?? "";
@@ -88,6 +94,7 @@ async function guardar(): Promise<void> {
   try {
     const { data } = await api.put(`${base.value}/perfil-publico`, {
       descripcion: descripcion.value,
+      color_marca: colorMarca.value,
       redes: redes.value,
     });
     aplicar(data.data);
@@ -158,6 +165,37 @@ onMounted(cargar);
           :disabled="!puedeGestionar"
           :placeholder="$t('perfilPublico.config.descripcionPh')"
         />
+      </div>
+
+      <div>
+        <label class="tu-label" for="pp-color">{{
+          $t("perfilPublico.config.color")
+        }}</label>
+        <div class="flex items-center gap-3">
+          <input
+            id="pp-color"
+            type="color"
+            class="h-10 w-14 cursor-pointer rounded-lg border"
+            :style="{ borderColor: 'var(--borde)' }"
+            :value="colorMarca ?? '#031b4e'"
+            :disabled="!puedeGestionar"
+            @input="colorMarca = ($event.target as HTMLInputElement).value"
+          />
+          <span class="text-sm tabular-nums">{{
+            colorMarca ?? $t("perfilPublico.config.colorSin")
+          }}</span>
+          <button
+            v-if="colorMarca && puedeGestionar"
+            type="button"
+            class="tu-enlace text-sm"
+            @click="colorMarca = null"
+          >
+            {{ $t("perfilPublico.config.colorQuitar") }}
+          </button>
+        </div>
+        <p class="mt-1 text-xs" :style="{ color: 'var(--texto-suave)' }">
+          {{ $t("perfilPublico.config.colorAyuda") }}
+        </p>
       </div>
 
       <fieldset>

@@ -2,8 +2,8 @@ import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { trackEvent } from "@/lib/analytics";
+import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import {
-  ETIQUETA_MENU,
   NOMBRE_MODALIDAD,
   modoDeGiro,
   perfilDeSolucion,
@@ -13,10 +13,11 @@ import { rutasComerciales } from "@/router/comerciales";
 import SolucionView from "./SolucionView.vue";
 
 /*
-| Páginas por giro (/software-para-*): cada giro es de una sola modalidad (ADR 0104),
-| así que enlazan a su página (/clases o /citas), a sus anclas y al registro con su
-| `?modo=` (y su `?giro=` si la página es de un solo giro del registro), y no anuncian
-| nada «en preparación».
+| Páginas por giro (/software-para-*): cada giro es de una sola modalidad (ADR 0104) y
+| su página vive en el dominio de su producto (ADR 0108): enlazan a la portada de su
+| producto, a sus anclas y al registro con su `?modo=` (y su `?giro=` si la página es
+| de un solo giro del registro), hablan con su marca y no anuncian nada «en
+| preparación».
 */
 
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn() }));
@@ -29,7 +30,6 @@ function routerComercial() {
     history: createMemoryHistory(),
     routes: [
       ...rutasComerciales({
-        landing: vacia,
         modalidad: vacia,
         solucion: vacia,
       }),
@@ -37,9 +37,11 @@ function routerComercial() {
     ],
   });
 }
+// Desde la portada: en localhost rige AgendaUno, y las páginas de citas viven en el
+// dominio de TurnoUno (su ruta aquí sale a él).
 async function montar(slug: string) {
   const router = routerComercial();
-  await router.push(rutaSolucion(slug));
+  await router.push("/");
   await router.isReady();
   return mount(SolucionView, {
     props: { slug },
@@ -57,16 +59,18 @@ describe("páginas por giro", () => {
       expect(modoDeGiro(solucion.slug), solucion.slug).toBe(modo);
       expect(vista.findAll("h1")).toHaveLength(1);
 
-      // Miga de pan: AgendaUno / Clases|Citas / giro.
+      // Miga de pan: su marca / giro.
       const miga = vista.get(".solucion-miga");
-      expect(miga.findAll("a").map((a) => a.attributes("href"))).toEqual([
-        "/",
-        `/${modo}`,
-      ]);
+      expect(miga.findAll("a").map((a) => a.attributes("href"))).toEqual(["/"]);
       expect(vista.get('[data-prueba="enlace-modalidad"]').text()).toBe(
-        ETIQUETA_MENU[modo],
+        PRODUCTOS[productoDeModalidad(modo)].nombre,
       );
-      expect(miga.get('[aria-current="page"]').text()).toBe(solucion.nombre);
+      // Ni la marca del otro producto.
+      const otra =
+        PRODUCTOS[productoDeModalidad(modo === "clases" ? "citas" : "clases")]
+          .nombre;
+      expect(vista.text(), solucion.slug).not.toContain(otra);
+      expect(miga.get('li[aria-current="page"]').text()).toBe(solucion.nombre);
 
       const enlaces = hrefs(vista);
       // «Probar gratis» (arriba y al cierre) llega al registro con su modalidad y,
@@ -80,11 +84,9 @@ describe("páginas por giro", () => {
         enlaces.filter((h) => h?.startsWith("/registro")),
         solucion.slug,
       ).toEqual([destino, destino]);
-      expect(enlaces).toContain(`/${modo}#producto`);
-      expect(enlaces).toContain(`/${modo}#precios`);
-      // Ya no apunta a anclas de la portada.
-      expect(enlaces).not.toContain("/#producto");
-      expect(enlaces).not.toContain("/#precios");
+      // Las anclas de la portada de su producto.
+      expect(enlaces).toContain("/#producto");
+      expect(enlaces).toContain("/#precios");
       vista.unmount();
     }
   });
@@ -100,7 +102,7 @@ describe("páginas por giro", () => {
           : "con el plan que elijas, por los profesionales que contratas",
       );
       expect(precio).toContain(
-        `Todo lo que incluye ${NOMBRE_MODALIDAD[solucion.modo]}`,
+        `Todo lo que incluye ${PRODUCTOS[productoDeModalidad(solucion.modo)].nombre}`,
       );
       expect(vista.text()).not.toMatch(/en preparaci[oó]n/i);
       vista.unmount();
@@ -120,23 +122,16 @@ describe("páginas por giro", () => {
     citas.unmount();
   });
 
-  it("los demás giros van en dos columnas, «Clases» y «Citas», sin la página actual", async () => {
+  it("los demás giros son los de su producto, sin la página actual", async () => {
     const vista = await montar("barberias");
-    const columnas = vista.findAll(".soluciones-columna");
-    expect(columnas.map((c) => c.attributes("data-modo"))).toEqual([
-      "clases",
-      "citas",
-    ]);
-    expect(columnas.map((c) => c.get("h3").text())).toEqual([
-      ETIQUETA_MENU.clases,
-      ETIQUETA_MENU.citas,
-    ]);
-    const citas = columnas[1]!
+    const enlaces = vista
       .findAll(".soluciones-enlaces a")
       .map((a) => a.attributes("href"));
-    expect(citas).not.toContain(rutaSolucion("barberias"));
-    expect(citas.length).toBe(
-      soluciones.filter((s) => s.modo === "citas").length - 1,
+    expect(enlaces).not.toContain(rutaSolucion("barberias"));
+    expect(enlaces).toEqual(
+      soluciones
+        .filter((s) => s.modo === "citas" && s.slug !== "barberias")
+        .map((s) => rutaSolucion(s.slug)),
     );
     vista.unmount();
   });

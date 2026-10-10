@@ -48,28 +48,28 @@ describe("directorio de negocios", () => {
     mocks.get.mockResolvedValue({ data: { data: [] } });
   });
 
-  it("filtra por todos los giros del registro, agrupados por modalidad", async () => {
+  it("filtra por los giros de su producto y lista solo sus negocios (ADR 0108)", async () => {
     const vista = montar();
     await flushPromises();
+    // En AgendaUno (localhost), los de clases.
     const grupos = vista.findAll("select optgroup");
     expect(grupos.map((g) => g.attributes("label"))).toEqual([
       "Clases con cupo",
-      "Citas 1 a 1",
     ]);
-    // La misma lista que el registro (y que acepta el filtro del API): incluye los
-    // dos giros generales.
+    // La misma lista que el registro (y que acepta el filtro del API): incluye el
+    // giro general.
     expect(
       grupos.map((g) => g.findAll("option").map((o) => o.attributes("value"))),
-    ).toEqual([PERFILES_POR_MODO.clases, PERFILES_POR_MODO.citas]);
-    expect(grupos[1]!.get('option[value="general_citas"]').text()).toBe(
-      "Otro negocio de citas",
+    ).toEqual([PERFILES_POR_MODO.clases]);
+    expect(grupos[0]!.get('option[value="general"]').text()).toBe(
+      "Otro negocio con clases",
     );
 
-    await vista.get("select").setValue("general_citas");
+    await vista.get("select").setValue("general");
     await vista.get("form").trigger("submit");
     await flushPromises();
     expect(mocks.get).toHaveBeenLastCalledWith("/api/v1/directorio", {
-      params: { perfil: "general_citas" },
+      params: { perfil: "general", producto: "agendauno" },
     });
   });
 

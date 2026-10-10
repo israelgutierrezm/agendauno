@@ -1,20 +1,37 @@
+import {
+  PRODUCTOS,
+  PRODUCTOS_LISTA,
+  type Producto,
+  productoActual,
+  productoDelHost,
+} from "@/lib/producto";
+
 /**
  * Resolución del estudio (tenant) a partir del DOMINIO. En producción cada estudio
- * vive en su subdominio `{slug}.agendauno.mx`; el backend ya resuelve el tenant por
- * subdominio, así que aquí solo derivamos el slug del host para adaptar la SPA
- * (aterrizaje directo al estudio, login pre-fijado, QR con la URL corta).
+ * vive en el subdominio de su producto (ADR 0108): `{slug}.agendauno.mx` (clases) o
+ * `{slug}.turnouno.mx` (citas); el backend ya resuelve el tenant por subdominio, así
+ * que aquí solo derivamos el slug del host para adaptar la SPA (aterrizaje directo al
+ * estudio, login pre-fijado, QR con la URL corta).
  *
  * En desarrollo (localhost) se admiten dos formas equivalentes: `{slug}.localhost`
  * y el parámetro `?estudio={slug}` (fallback cómodo cuando no hay subdominios).
  */
 
-// Dominio público de la app; el mismo que usa el QR/enlace del estudio.
-export const DOMINIO_PUBLICO =
-  (import.meta.env.VITE_DOMINIO_PUBLICO as string | undefined) ??
-  "agendauno.mx";
+// Dominio de AgendaUno (el de siempre). El de cada negocio es el de su producto.
+export const DOMINIO_PUBLICO = PRODUCTOS.agendauno.dominio;
 
-// Subdominios que NO son un estudio (marketing/infra).
-const RESERVADOS = new Set(["", "www", "app", "api", "admin", "staging"]);
+// Subdominios que NO son un estudio (marketing/infra); el API reserva los mismos.
+const RESERVADOS = new Set([
+  "",
+  "www",
+  "app",
+  "api",
+  "admin",
+  "panel",
+  "consola",
+  "staging",
+  "pruebas",
+]);
 
 /**
  * Slug del estudio derivado del subdominio (`{slug}.agendauno.mx` en prod o
@@ -26,7 +43,10 @@ export function slugDeSubdominio(
 ): string | null {
   const h = host.toLowerCase().split(":")[0];
 
-  const sufijos = [".localhost", `.${DOMINIO_PUBLICO.toLowerCase()}`];
+  const sufijos = [
+    ".localhost",
+    ...PRODUCTOS_LISTA.map((id) => `.${PRODUCTOS[id].dominio}`),
+  ];
   for (const sufijo of sufijos) {
     if (h.endsWith(sufijo)) {
       const sub = h.slice(0, -sufijo.length);
@@ -60,29 +80,41 @@ export function enSubdominioDeEstudio(host?: string): boolean {
   return slugDeSubdominio(host) !== null;
 }
 
-/** URL pública corta del estudio en forma de subdominio: `{slug}.agendauno.mx`. */
-export function urlPublicaEstudio(slug: string): string {
-  return `${slug}.${DOMINIO_PUBLICO}`;
+/**
+ * URL pública corta del estudio en forma de subdominio de su producto:
+ * `{slug}.agendauno.mx` o `{slug}.turnouno.mx`. Sin producto, el de la página.
+ */
+export function urlPublicaEstudio(
+  slug: string,
+  producto: Producto = productoActual(),
+): string {
+  return `${slug}.${PRODUCTOS[producto].dominio}`;
 }
 
 /**
  * Dirección canónica de una página del negocio: vive en su subdominio (en el dominio
  * principal, esas rutas redirigen ahí). `ruta` es la de dentro del subdominio.
  */
-export function urlCanonicaEstudio(slug: string, ruta = "/"): string {
-  return `https://${urlPublicaEstudio(slug)}${ruta}`;
+export function urlCanonicaEstudio(
+  slug: string,
+  ruta = "/",
+  producto: Producto = productoActual(),
+): string {
+  return `https://${urlPublicaEstudio(slug, producto)}${ruta}`;
 }
 
 /**
- * ¿Es el dominio principal de producción (`agendauno.mx` o `www.agendauno.mx`)? En
- * desarrollo (localhost) y en el subdominio de un negocio, no.
+ * ¿Es el dominio principal de un producto en producción (`agendauno.mx`,
+ * `www.turnouno.mx`…)? En desarrollo (localhost) y en el subdominio de un negocio, no.
  */
 export function esDominioPrincipal(
   host: string = window.location.hostname,
 ): boolean {
   const h = host.toLowerCase().split(":")[0];
-  const dominio = DOMINIO_PUBLICO.toLowerCase();
-  return h === dominio || h === `www.${dominio}`;
+  return PRODUCTOS_LISTA.some((id) => {
+    const dominio = PRODUCTOS[id].dominio;
+    return h === dominio || h === `www.${dominio}`;
+  });
 }
 
 /**
@@ -117,7 +149,8 @@ export function urlEnSubdominioDelNegocio(
   host: string = window.location.hostname,
 ): string | null {
   const resto = RUTAS_CON_SLUG_EN_SUBDOMINIO[String(ruta.name ?? "")];
-  if (resto === undefined || !esDominioPrincipal(host)) {
+  const producto = productoDelHost(host);
+  if (resto === undefined || !esDominioPrincipal(host) || producto === null) {
     return null;
   }
   const slug = String(ruta.params.slug ?? "").toLowerCase();
@@ -125,7 +158,7 @@ export function urlEnSubdominioDelNegocio(
     return null;
   }
   const queryYAncla = ruta.fullPath.replace(/^[^?#]*/, "");
-  return `https://${slug}.${DOMINIO_PUBLICO}${resto(slug)}${queryYAncla}`;
+  return `https://${slug}.${PRODUCTOS[producto].dominio}${resto(slug)}${queryYAncla}`;
 }
 
 /** Sale de la SPA a otra dirección (p. ej. el subdominio del negocio). */

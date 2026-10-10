@@ -72,8 +72,9 @@ jobs:
       - name: Static analysis (PHPStan)
         run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
 
+      # Toda la suite en un proceso: con más de mil pruebas, 512 MB ya no alcanzan.
       - name: Tests (Pest)
-        run: php artisan test
+        run: php -d memory_limit=2G artisan test
 
       # Las pruebas usan SQLite para los negocios, que no tiene candados de fila ni
       # escrituras simultáneas: aquí se comprueba en MySQL con procesos a la vez
@@ -131,6 +132,36 @@ jobs:
       - run: flutter analyze
       - run: flutter test
 
+  # Las dos apps oficiales (ADR 0111) compilan con su sabor: cada una es otra app en
+  # las tiendas (id, nombre, ícono). Sin firma de release: debug basta para probarlo.
+  mobile-android:
+    name: Mobile · APK ${{ matrix.sabor }}
+    runs-on: ubuntu-24.04
+    needs: mobile
+    strategy:
+      matrix:
+        sabor: [agendauno, turnouno]
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.0'
+          cache: true
+
+      - run: flutter pub get
+      - run: flutter build apk --debug --flavor ${{ matrix.sabor }}
+
   imagenes:
     name: Docker · production images
     runs-on: ubuntu-24.04
@@ -173,7 +204,8 @@ jobs:
 
       - name: Check nginx config
         run: >-
-          docker run --rm -e DOMINIO=agendauno.test -e PROXY_CONFIABLE=172.16.0.0/12
+          docker run --rm -e DOMINIO=agendauno.test -e DOMINIO_TURNOUNO=turnouno.test
+          -e PROXY_CONFIABLE=172.16.0.0/12
           agendauno-web:ci nginx -t
 
       # Los respaldos usan el cliente de la imagen (MariaDB) contra MySQL 8.4: su usuario

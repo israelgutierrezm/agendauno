@@ -17,6 +17,7 @@ use App\Modules\Tenancy\Models\SolicitudPrivacidadTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\QuienCancela;
+use App\Modules\Tenancy\Support\MarcaProducto;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -66,7 +67,7 @@ class BajaDePersonaTenant
                 'persona_id' => (string) $persona->ulid,
                 'solicitud' => (string) $solicitud->ulid,
                 // Para el aviso al equipo: dónde atenderla en el panel.
-                'enlace_panel' => rtrim((string) config('agendauno.url_app'), '/').'/privacidad',
+                'enlace_panel' => MarcaProducto::actual()->urlWeb().'/privacidad',
             ]);
 
             return $solicitud;

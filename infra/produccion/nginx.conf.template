@@ -1,9 +1,14 @@
-# nginx de AgendaUno en producción. Plantilla: al arrancar, la imagen oficial de nginx
-# sustituye ${DOMINIO} y ${PROXY_CONFIABLE} y deja el resultado en conf.d/.
+# nginx de la plataforma en producción (ADR 0108: AgendaUno y TurnoUno). Plantilla: al
+# arrancar, la imagen oficial de nginx sustituye ${DOMINIO} (AgendaUno),
+# ${DOMINIO_TURNOUNO} y ${PROXY_CONFIABLE} y deja el resultado en conf.d/.
 #
-# Escucha HTTP detrás del proxy que termina TLS (Caddy, Cloudflare, el balanceador
+# Escucha HTTP detrás del proxy que termina TLS (Traefik, Cloudflare, el balanceador
 # del proveedor). Ese proxy debe ser lo único que lo alcanza: aquí se confía en sus
 # cabeceras X-Forwarded-*.
+#
+# Tres sitios en /usr/share/nginx/html: app/ (la aplicación: panel, portal,
+# escaparate de cada negocio, registro, acceso, superadmin), agendauno/ y turnouno/
+# (la landing pre-generada de cada producto, con sus recursos en /assets-{producto}/).
 
 # IP real del cliente: los límites por IP de la API dependen de ella.
 set_real_ip_from ${PROXY_CONFIABLE};
@@ -22,47 +27,114 @@ map $http_x_forwarded_proto $https_cliente {
 server_tokens off;
 client_max_body_size 22m;
 
-# www → dominio canónico.
+# www → dominio canónico de cada producto.
 server {
     listen 80;
     server_name www.${DOMINIO};
     include /etc/nginx/snippets/agendauno-cabeceras.conf;
     return 301 https://${DOMINIO}$request_uri;
 }
+server {
+    listen 80;
+    server_name www.${DOMINIO_TURNOUNO};
+    include /etc/nginx/snippets/agendauno-cabeceras.conf;
+    return 301 https://${DOMINIO_TURNOUNO}$request_uri;
+}
 
-# Dominio comercial: la portada y cada página con HTML propio (por giro, registro,
-# acceso…) se sirven tal cual; lo demás es la aplicación (app.html), nunca la
-# portada como respaldo universal.
+# Dominio de AgendaUno: su landing (portada, páginas por giro, sitemap, robots) y lo
+# demás (registro, entrar, panel…) la aplicación, nunca la portada como respaldo.
 server {
     listen 80;
     server_name ${DOMINIO};
-    root /usr/share/nginx/html;
+    root /usr/share/nginx/html/app;
     include /etc/nginx/snippets/agendauno-comun.conf;
 
     # El HTML se revalida siempre (no-cache): tras publicar, el navegador no debe
-    # usar uno viejo que apunte a /assets/ que ya no existen. Al tener add_header
+    # usar uno viejo que apunte a recursos que ya no existen. Al tener add_header
     # propio, cada location repite las cabeceras de seguridad.
     location = / {
+        root /usr/share/nginx/html/agendauno;
         add_header Cache-Control "no-cache" always;
         include /etc/nginx/snippets/agendauno-cabeceras.conf;
         try_files /index.html =404;
     }
+    location ~ ^/(software-para-[a-z0-9-]+)/?$ {
+        root /usr/share/nginx/html/agendauno;
+        add_header Cache-Control "no-cache" always;
+        include /etc/nginx/snippets/agendauno-cabeceras.conf;
+        try_files /$1/index.html /app.html;
+    }
+    # Exactos: ganan a la regla de archivos de nginx-comun.conf.
+    location = /sitemap.xml {
+        root /usr/share/nginx/html/agendauno;
+    }
+    location = /robots.txt {
+        root /usr/share/nginx/html/agendauno;
+    }
+    location ^~ /assets-agendauno/ {
+        root /usr/share/nginx/html/agendauno;
+        try_files $uri =404;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        include /etc/nginx/snippets/agendauno-cabeceras.conf;
+    }
     location / {
         add_header Cache-Control "no-cache" always;
         include /etc/nginx/snippets/agendauno-cabeceras.conf;
-        try_files $uri/index.html $uri /app.html;
+        try_files $uri /app.html;
     }
 }
 
-# Subdominio de cada negocio ({slug}.dominio) y cualquier otro host: siempre la
-# aplicación, también en "/". La API resuelve el negocio por el subdominio.
+# Dominio de TurnoUno: igual, con su landing.
 server {
-    listen 80 default_server;
-    server_name *.${DOMINIO} _;
-    root /usr/share/nginx/html;
+    listen 80;
+    server_name ${DOMINIO_TURNOUNO};
+    root /usr/share/nginx/html/app;
     include /etc/nginx/snippets/agendauno-comun.conf;
 
-    # El HTML se revalida siempre (ver el server de arriba).
+    location = / {
+        root /usr/share/nginx/html/turnouno;
+        add_header Cache-Control "no-cache" always;
+        include /etc/nginx/snippets/agendauno-cabeceras.conf;
+        try_files /index.html =404;
+    }
+    location ~ ^/(software-para-[a-z0-9-]+)/?$ {
+        root /usr/share/nginx/html/turnouno;
+        add_header Cache-Control "no-cache" always;
+        include /etc/nginx/snippets/agendauno-cabeceras.conf;
+        try_files /$1/index.html /app.html;
+    }
+    # Exactos: ganan a la regla de archivos de nginx-comun.conf.
+    location = /sitemap.xml {
+        root /usr/share/nginx/html/turnouno;
+    }
+    location = /robots.txt {
+        root /usr/share/nginx/html/turnouno;
+    }
+    location ^~ /assets-turnouno/ {
+        root /usr/share/nginx/html/turnouno;
+        try_files $uri =404;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        include /etc/nginx/snippets/agendauno-cabeceras.conf;
+    }
+    location / {
+        add_header Cache-Control "no-cache" always;
+        include /etc/nginx/snippets/agendauno-cabeceras.conf;
+        try_files $uri /app.html;
+    }
+}
+
+# Subdominio de cada negocio ({slug}.agendauno.mx, {slug}.turnouno.mx) y cualquier otro
+# host: siempre la aplicación, también en "/". La API resuelve el negocio por el
+# subdominio y solo lo abre en el dominio de su producto.
+server {
+    listen 80 default_server;
+    server_name *.${DOMINIO} *.${DOMINIO_TURNOUNO} _;
+    root /usr/share/nginx/html/app;
+    include /etc/nginx/snippets/agendauno-comun.conf;
+
+    # El HTML se revalida siempre (ver arriba).
     location / {
         add_header Cache-Control "no-cache" always;
         include /etc/nginx/snippets/agendauno-cabeceras.conf;
