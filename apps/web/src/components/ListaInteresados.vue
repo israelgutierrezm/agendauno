@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 
@@ -12,7 +12,8 @@ import { PERFILES_POR_MODO } from "@/marketing/modalidades";
 /**
  * Lista de interesados de un producto que aún no recibe registros (ADR 0108: el
  * superadmin cerró su registro). Deja nombre, correo y, si quiere, su negocio, y el
- * superadmin le avisa al abrir. Con captcha y aceptación del aviso de privacidad.
+ * superadmin le avisa al abrir. Con captcha y aceptación del aviso de privacidad: se
+ * manda la versión que se leyó (si cambió mientras tanto, la API pide revisarlo).
  * `giro`: el tipo de negocio con que llegó (`/registro?giro=`, desde la página de un
  * giro): ya viene elegido si es de los de su producto.
  */
@@ -38,6 +39,21 @@ const datos = reactive({
   ciudad: "",
   acepta_aviso: false,
 });
+// La versión publicada del aviso de privacidad, para decir cuál se aceptó.
+const avisoVersion = ref<number | null>(null);
+onMounted(() => {
+  void api
+    .get<{
+      data: { versiones?: { aviso_privacidad: { version: number } | null } };
+    }>("/api/v1/legales")
+    .then(({ data }) => {
+      avisoVersion.value =
+        data.data.versiones?.aviso_privacidad?.version ?? null;
+    })
+    .catch(() => {
+      // Sin aviso publicado: en producción la API no recibe los datos y lo dice.
+    });
+});
 const enviando = ref(false);
 const listo = ref(false);
 const error = ref<string | null>(null);
@@ -58,6 +74,7 @@ async function enviar(): Promise<void> {
       giro: datos.giro || null,
       ciudad: datos.ciudad || null,
       acepta_aviso: datos.acepta_aviso,
+      aviso_version: avisoVersion.value,
       recaptcha_token: await tokenRecaptcha("interesados"),
     });
     listo.value = true;

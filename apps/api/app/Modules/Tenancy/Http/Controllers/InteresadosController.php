@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Platform\Legales\DocumentoLegal;
+use App\Modules\Platform\Legales\DocumentosLegales;
 use App\Modules\Tenancy\Application\VerificarRecaptcha;
+use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\Models\Interesado;
 use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\ProductoComercial;
@@ -21,7 +24,10 @@ use Illuminate\Validation\ValidationException;
  */
 class InteresadosController
 {
-    public function __construct(private readonly VerificarRecaptcha $recaptcha) {}
+    public function __construct(
+        private readonly VerificarRecaptcha $recaptcha,
+        private readonly DocumentosLegales $legales,
+    ) {}
 
     public function store(Request $request): JsonResponse
     {
@@ -35,6 +41,8 @@ class InteresadosController
             'ciudad' => ['nullable', 'string', 'max:120'],
             'mensaje' => ['nullable', 'string', 'max:500'],
             'acepta_aviso' => ['accepted'],
+            // La versión del aviso que se leyó: si cambió mientras tanto, se pide revisarlo.
+            'aviso_version' => ['nullable', 'integer', 'min:1'],
             'recaptcha_token' => ['nullable', 'string', 'max:4000'],
         ]);
 
@@ -44,7 +52,30 @@ class InteresadosController
             ]);
         }
 
+        // Como el registro: en producción nadie deja sus datos sin un aviso de privacidad
+        // publicado, y lo que se acepta es la versión que se leyó.
+        $aviso = $this->legales->vigente(DocumentoLegal::AVISO);
+        if ($aviso === null && app()->environment('production')) {
+            throw ValidationException::withMessages([
+                'acepta_aviso' => ['La lista abrirá cuando el aviso de privacidad esté publicado.'],
+            ]);
+        }
+        $leida = $validado['aviso_version'] ?? null;
+        if ($leida !== null && $aviso !== null && (int) $leida !== $aviso->version) {
+            throw ValidationException::withMessages([
+                'acepta_aviso' => ['El aviso de privacidad cambió mientras llenabas tus datos: revísalo y vuelve a aceptarlo.'],
+            ]);
+        }
+
         $producto = ProductoComercial::from((string) $validado['producto']);
+        // El giro es de la modalidad de su producto: pilates no espera a TurnoUno.
+        $giro = PerfilNegocio::tryFrom((string) ($validado['giro'] ?? ''));
+        $suyo = $giro !== null ? ProductoComercial::deModalidad(ModalidadServicio::paraPerfil($giro)) : $producto;
+        if ($suyo !== $producto) {
+            throw ValidationException::withMessages([
+                'giro' => ["Ese giro es de {$suyo->nombre()}, no de {$producto->nombre()}."],
+            ]);
+        }
         $correo = mb_strtolower(trim((string) $validado['correo']));
         $datos = [
             'nombre' => trim((string) $validado['nombre']),
@@ -54,6 +85,7 @@ class InteresadosController
             'ciudad' => self::texto($validado['ciudad'] ?? null),
             'mensaje' => self::texto($validado['mensaje'] ?? null),
             'acepto_aviso_en' => now(),
+            'aviso_version' => $aviso?->version,
         ];
 
         $interesado = Interesado::query()->updateOrCreate(
@@ -92,6 +124,7 @@ class InteresadosController
                 'giro' => $i->giro,
                 'ciudad' => $i->ciudad,
                 'mensaje' => $i->mensaje,
+                'aviso_version' => $i->aviso_version,
                 'registrado_en' => $i->created_at->toIso8601String(),
                 'actualizado_en' => $i->updated_at->toIso8601String(),
             ])->all(),

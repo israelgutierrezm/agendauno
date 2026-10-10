@@ -11,6 +11,7 @@ use App\Modules\Tenancy\ProductoComercial;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 
 /*
@@ -151,6 +152,9 @@ it('la landing de TurnoUno junta interesados y el superadmin los ve', function (
     $this->postJson('/api/v1/interesados', [...$datos, 'ciudad' => 'Zapopan'])->assertCreated();
     $this->postJson('/api/v1/interesados', [...$datos, 'acepta_aviso' => false])
         ->assertUnprocessable()->assertJsonValidationErrors('acepta_aviso', 'meta.errors');
+    // Un giro de clases no espera a TurnoUno.
+    $this->postJson('/api/v1/interesados', [...$datos, 'correo' => 'otra@correo.mx', 'giro' => 'pilates'])
+        ->assertUnprocessable()->assertJsonValidationErrors('giro', 'meta.errors');
 
     expect(Interesado::query()->count())->toBe(1)
         ->and(Interesado::query()->firstOrFail()->correo)->toBe('ana@barberia.mx');
@@ -158,6 +162,33 @@ it('la landing de TurnoUno junta interesados y el superadmin los ve', function (
     $this->getJson('/api/v1/plataforma/interesados?producto=turnouno', conPlataforma())
         ->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.ciudad', 'Zapopan');
     $this->getJson('/api/v1/plataforma/interesados')->assertUnauthorized();
+});
+
+it('en producción la lista de interesados exige el aviso publicado y guarda la versión aceptada', function (): void {
+    app()->detectEnvironment(fn (): string => 'production');
+    Config::set('agendauno.recaptcha.secret', 'secreto-de-prueba');
+    Http::fake(['www.google.com/*' => Http::response(['success' => true, 'score' => 0.9])]);
+    $datos = [
+        'producto' => 'turnouno', 'nombre' => 'Ana', 'correo' => 'ana@barberia.mx', 'acepta_aviso' => true,
+        'recaptcha_token' => 'token-cliente',
+    ];
+
+    // Sin aviso publicado, como el registro: no capta datos.
+    $this->postJson('/api/v1/interesados', $datos)
+        ->assertUnprocessable()->assertJsonValidationErrors('acepta_aviso', 'meta.errors');
+    expect(Interesado::query()->count())->toBe(0);
+
+    $this->putJson('/api/v1/plataforma/legales', [
+        'responsable' => ['nombre' => 'Plataforma S.A. de C.V.', 'domicilio' => 'Calle 1, Puebla, México', 'contacto' => 'privacidad@agendauno.mx'],
+    ], conPlataforma())->assertOk();
+    $this->postJson('/api/v1/plataforma/legales/aviso_privacidad/publicar', [], conPlataforma())->assertCreated();
+
+    // Si el aviso cambió mientras llenaba sus datos, lo vuelve a revisar.
+    $this->postJson('/api/v1/interesados', [...$datos, 'aviso_version' => 7])
+        ->assertUnprocessable()->assertJsonValidationErrors('acepta_aviso', 'meta.errors');
+    $this->postJson('/api/v1/interesados', [...$datos, 'aviso_version' => 1])->assertCreated();
+    expect(Interesado::query()->sole()->aviso_version)->toBe(1);
+    $this->getJson('/api/v1/plataforma/interesados', conPlataforma())->assertJsonPath('data.0.aviso_version', 1);
 });
 
 it('el directorio de cada producto lista solo sus negocios', function (): void {

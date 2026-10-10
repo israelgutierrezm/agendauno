@@ -9,7 +9,12 @@ import ListaInteresados from "./ListaInteresados.vue";
 | con el producto y agradece; sin aceptar el aviso de privacidad no se puede enviar.
 */
 
-const api = vi.hoisted(() => ({ post: vi.fn() }));
+const api = vi.hoisted(() => ({
+  post: vi.fn(),
+  get: vi.fn(async () => ({
+    data: { data: { versiones: { aviso_privacidad: { version: 3 } } } },
+  })),
+}));
 vi.mock("@/lib/api", () => ({
   api,
   camposConError: () => [],
@@ -36,6 +41,7 @@ describe("ListaInteresados", () => {
     const enviar = w.get('button[type="submit"]');
     expect(enviar.attributes("disabled")).toBeDefined();
 
+    await flushPromises();
     await w.findAll("input")[0]!.setValue("Ana");
     await w.get('input[type="email"]').setValue("ana@barberia.mx");
     await w.get("select").setValue("barberia");
@@ -51,6 +57,8 @@ describe("ListaInteresados", () => {
         correo: "ana@barberia.mx",
         giro: "barberia",
         acepta_aviso: true,
+        // La versión del aviso que se leyó.
+        aviso_version: 3,
       }),
     );
     expect(w.text()).toContain("Listo, te avisaremos");

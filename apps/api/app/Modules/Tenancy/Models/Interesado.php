@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $ciudad
  * @property string|null $mensaje
  * @property Carbon $acepto_aviso_en
+ * @property int|null $aviso_version
  * @property Carbon|null $avisado_en
  * @property Carbon $created_at
  * @property Carbon $updated_at
@@ -34,7 +35,7 @@ class Interesado extends Model
     protected $table = 'interesados';
 
     protected $fillable = [
-        'producto', 'nombre', 'correo', 'telefono', 'negocio', 'giro', 'ciudad', 'mensaje', 'acepto_aviso_en',
+        'producto', 'nombre', 'correo', 'telefono', 'negocio', 'giro', 'ciudad', 'mensaje', 'acepto_aviso_en', 'aviso_version',
     ];
 
     /**
