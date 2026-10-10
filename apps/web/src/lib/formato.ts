@@ -76,8 +76,13 @@ export function dinero(
   opciones: Intl.NumberFormatOptions = {},
 ): string {
   const locale = localeDe(pais);
+  // Toda moneda de la plataforma lleva dos decimales (los montos van en centavos):
+  // sin fijarlos, cada versión de los datos de Intl decide (p. ej. COP sin centavos).
+  const maximo = opciones.maximumFractionDigits ?? 2;
   try {
     return formato(locale, {
+      minimumFractionDigits: Math.min(2, maximo),
+      maximumFractionDigits: maximo,
       ...opciones,
       style: "currency",
       currency: moneda,
