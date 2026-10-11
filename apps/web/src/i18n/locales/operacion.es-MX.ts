@@ -103,7 +103,10 @@ export default {
         gestionar: "Reservar, cancelar y mover reservas",
       },
       asistencia: { marcar: "Pasar asistencia" },
-      checkins: { registrar: "Registrar entradas" },
+      checkins: {
+        registrar: "Registrar entradas",
+        excepcion: "Autorizar entradas que la plataforma no pudo verificar",
+      },
       miembros: {
         ver: "Ver alumnos y su ficha",
         gestionar: "Dar de alta y editar alumnos",
