@@ -59,7 +59,7 @@ it('el import es todo-o-nada: una fila inválida no crea ninguna cuenta (rollbac
 
     $csv = "nombre,email\nAna,ana@correo.mx\nBeto,\n"; // 2a fila sin correo
 
-    test()->post("/api/v1/app/{$e['slug']}/importaciones/instructores", ['archivo' => csvInstructores($csv)], cabecerasImportInstr($e))
+    test()->post("/api/v1/app/{$e['slug']}/importaciones/instructores", ['archivo' => csvInstructores($csv), 'invitar' => '1'], cabecerasImportInstr($e))
         ->assertStatus(422)
         ->assertJsonPath('data.ok', false)
         ->assertJsonPath('data.resumen.invalidas', 1);
@@ -76,7 +76,7 @@ it('el import crea instructores y les envía la activación cuando todo es váli
 
     $csv = "nombre,email\nAna Coach,ana@correo.mx\nBeto Coach,beto@correo.mx\n";
 
-    test()->post("/api/v1/app/{$e['slug']}/importaciones/instructores", ['archivo' => csvInstructores($csv)], cabecerasImportInstr($e))
+    test()->post("/api/v1/app/{$e['slug']}/importaciones/instructores", ['archivo' => csvInstructores($csv), 'invitar' => '1'], cabecerasImportInstr($e))
         ->assertStatus(201)
         ->assertJsonPath('data.ok', true)
         ->assertJsonPath('data.creados', 2);

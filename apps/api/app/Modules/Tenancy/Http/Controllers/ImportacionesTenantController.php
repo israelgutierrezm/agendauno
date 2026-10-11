@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CargarSaldosAperturaTenant;
 use App\Modules\Tenancy\Application\CupoProfesionales;
 use App\Modules\Tenancy\Application\ImportarInstructoresTenant;
 use App\Modules\Tenancy\Application\ImportarMiembrosTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
+use App\Modules\Tenancy\Application\RegistrarAuditoria;
 use App\Modules\Tenancy\Models\Estudio;
+use App\Modules\Tenancy\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -16,8 +19,10 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Importación masiva por CSV (R37), tenant-local. Ofrece PREVIEW (valida sin
- * escribir, con errores por fila) e IMPORT (todo-o-nada con rollback). Recursos:
- * miembros (personas) e instructores (usuarios con rol instructor). Opera sobre la
+ * escribir, con errores por fila) e IMPORT (todo-o-nada con rollback, o solo las
+ * válidas con `parcial`). Recursos: miembros (personas), instructores (usuarios con rol
+ * instructor) y saldos de apertura al migrar (C07). Cada carga queda en la bitácora
+ * con su resumen y su duración, para medir la incorporación. Opera sobre la
  * BD del estudio resuelto.
  */
 class ImportacionesTenantController
@@ -27,6 +32,8 @@ class ImportacionesTenantController
         private readonly ImportarInstructoresTenant $instructores,
         // Tope de filas por archivo: lo fija el superadmin (ADR 0047).
         private readonly ParametrosTenant $parametros,
+        private readonly CargarSaldosAperturaTenant $saldos,
+        private readonly RegistrarAuditoria $auditoria,
     ) {}
 
     public function previewMiembros(Request $request): JsonResponse
@@ -38,9 +45,12 @@ class ImportacionesTenantController
 
     public function importarMiembros(Request $request): JsonResponse
     {
+        $inicio = hrtime(true);
         $filas = $this->parsear($request, ['nombre'], $this->parametros->entero('importaciones.max_filas'));
+        $parcial = $request->boolean('parcial');
 
-        $resultado = $this->miembros->importar($filas);
+        $resultado = $this->miembros->importar($filas, $parcial);
+        $this->anotar($request, 'importacion.miembros', $resultado, $inicio, ['parcial' => $parcial, 'creados' => $resultado['creados'] ?? 0]);
 
         // Todo-o-nada: si hubo filas inválidas no se escribió nada (rollback) -> 422.
         return response()->json(['data' => $resultado], $resultado['ok'] ? 201 : 422);
@@ -55,14 +65,113 @@ class ImportacionesTenantController
 
     public function importarInstructores(Request $request): JsonResponse
     {
+        $inicio = hrtime(true);
+        // Las invitaciones por correo salen solo si quien importa lo confirma (C07).
+        $request->validate(['invitar' => ['required', 'boolean']]);
+        $invitar = $request->boolean('invitar');
+        $parcial = $request->boolean('parcial');
         $filas = $this->parsear($request, ['nombre', 'email'], $this->parametros->entero('importaciones.max_filas'));
-        // Todos deben caber en el plan del negocio (ADR 0107), aunque al mismo tiempo se
-        // invite a alguien más.
+        // Los nuevos deben caber en el plan del negocio (ADR 0107), aunque al mismo tiempo
+        // se invite a alguien más.
         $estudio = $this->estudioDe($request);
-        $resultado = app(CupoProfesionales::class)->sumar($estudio, count($filas), fn (): array => $this->instructores->importar($filas, $estudio));
+        $nuevos = $this->instructores->analizar($filas)['resumen']['validas'];
+        $resultado = app(CupoProfesionales::class)->sumar($estudio, $nuevos, fn (): array => $this->instructores->importar($filas, $estudio, $invitar, $parcial));
+        $this->anotar($request, 'importacion.instructores', $resultado, $inicio, [
+            'parcial' => $parcial, 'creados' => $resultado['creados'] ?? 0, 'invitados' => $resultado['invitados'] ?? 0,
+        ]);
 
         // Todo-o-nada: si hubo filas inválidas no se creó ninguna cuenta -> 422.
         return response()->json(['data' => $resultado], $resultado['ok'] ? 201 : 422);
+    }
+
+    /**
+     * Saldos de apertura (C07): lo que cada alumno traía de otro sistema al corte
+     * acordado. Valida sin escribir.
+     */
+    public function previewSaldos(Request $request): JsonResponse
+    {
+        $this->exigirCreditos($request);
+        $datos = $this->datosDeApertura($request);
+        $filas = $this->parsear($request, ['email', 'plan'], $this->parametros->entero('importaciones.max_filas'));
+
+        return response()->json(['data' => $this->saldos->analizar($filas, $datos['corte'])]);
+    }
+
+    /**
+     * Carga los saldos de apertura: sin venta ni pago, con el corte y la evidencia en el
+     * libro de créditos y en la bitácora.
+     */
+    public function importarSaldos(Request $request): JsonResponse
+    {
+        $inicio = hrtime(true);
+        $this->exigirCreditos($request);
+        $datos = $this->datosDeApertura($request);
+        $parcial = $request->boolean('parcial');
+        $filas = $this->parsear($request, ['email', 'plan'], $this->parametros->entero('importaciones.max_filas'));
+
+        $resultado = $this->saldos->importar($filas, $datos['corte'], $datos['evidencia'], $this->usuario($request), $parcial);
+        $this->anotar($request, 'importacion.saldos', $resultado, $inicio, [
+            'parcial' => $parcial, 'cargados' => $resultado['cargados'] ?? 0, 'corte' => $datos['corte'],
+        ], $datos['evidencia']);
+
+        return response()->json(['data' => $resultado], $resultado['ok'] ? 201 : 422);
+    }
+
+    /**
+     * @return array{corte: string, evidencia: string}
+     */
+    private function datosDeApertura(Request $request): array
+    {
+        $validado = $request->validate([
+            // El momento acordado para dejar de operar saldos en el otro sistema.
+            'corte' => ['required', 'date_format:Y-m-d'],
+            // De dónde salen los saldos (p. ej. «reporte de saldos exportado el 30/09»).
+            'evidencia' => ['required', 'string', 'min:5', 'max:500'],
+        ], [
+            'corte.required' => 'Indica la fecha de corte acordada.',
+            'corte.date_format' => 'Escribe la fecha de corte como AAAA-MM-DD.',
+            'evidencia.required' => 'Indica de dónde salen los saldos (el reporte del otro sistema).',
+        ]);
+
+        return ['corte' => (string) $validado['corte'], 'evidencia' => trim((string) $validado['evidencia'])];
+    }
+
+    /** Cargar saldos concede créditos: además de gestionar planes, exige gestionar créditos. */
+    private function exigirCreditos(Request $request): void
+    {
+        abort_unless($this->usuario($request)?->puede('creditos.gestionar') === true, 403);
+    }
+
+    private function usuario(Request $request): ?Usuario
+    {
+        $usuario = $request->attributes->get('usuario_tenant');
+
+        return $usuario instanceof Usuario ? $usuario : null;
+    }
+
+    /**
+     * Deja la carga en la bitácora con su resumen y cuánto tardó (para medir la
+     * incorporación: aceptadas, rechazadas, conflictos, ya cargadas).
+     *
+     * @param  array<string, mixed>  $resultado
+     * @param  array<string, mixed>  $extra
+     */
+    private function anotar(Request $request, string $accion, array $resultado, int|float $inicio, array $extra, ?string $motivo = null): void
+    {
+        $this->auditoria->registrar(
+            $this->usuario($request),
+            $accion,
+            'importacion',
+            null,
+            null,
+            [
+                'ok' => (bool) ($resultado['ok'] ?? false),
+                'resumen' => $resultado['resumen'] ?? null,
+                'duracion_ms' => (int) round((hrtime(true) - $inicio) / 1_000_000),
+                ...$extra,
+            ],
+            $motivo,
+        );
     }
 
     private function estudioDe(Request $request): Estudio

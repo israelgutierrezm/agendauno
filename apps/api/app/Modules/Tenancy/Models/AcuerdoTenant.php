@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  *
  * Con permanencia (B04) congela lo pactado: hasta cuándo, qué paga si da de baja antes
  * y las condiciones que aceptó. `baja_efectiva_el`: su último día, si se dio de baja.
+ * `origen` = `apertura`: lo traía de otro sistema al migrar (C07), sin venta ni pago aquí.
  *
  * @property array<string, mixed>|null $condiciones
  */
@@ -31,7 +32,11 @@ class AcuerdoTenant extends Model
     protected $fillable = [
         'persona_id', 'producto_comercial_id', 'linea_orden_id', 'fecha_inicio', 'proxima_cobro_en', 'dia_ancla', 'estado',
         'permanencia_hasta', 'baja_anticipada', 'penalizacion_minor', 'condiciones', 'baja_efectiva_el',
+        'origen', 'referencia_apertura',
     ];
+
+    /** Saldo de apertura: cargado al migrar, no vendido aquí (C07). */
+    public const ORIGEN_APERTURA = 'apertura';
 
     /**
      * @var array<string, string>

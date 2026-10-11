@@ -56,7 +56,11 @@ class PresentarMovimientosCreditoTenant
         }
 
         return match ($movimiento->tipo) {
-            TipoMovimiento::Concesion => $movimiento->origen === OrigenMovimiento::Ciclo->value ? 'Renovación del plan' : 'Créditos del plan',
+            TipoMovimiento::Concesion => match ($movimiento->origen) {
+                OrigenMovimiento::Ciclo->value => 'Renovación del plan',
+                OrigenMovimiento::Apertura->value => 'Saldo de apertura',
+                default => 'Créditos del plan',
+            },
             TipoMovimiento::AddOn => 'Créditos adicionales',
             TipoMovimiento::Ajuste => 'Ajuste del negocio',
             TipoMovimiento::Expiracion => 'Créditos vencidos',
