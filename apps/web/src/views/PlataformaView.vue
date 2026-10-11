@@ -16,6 +16,9 @@ import TerminologiaNegocio from "@/components/TerminologiaNegocio.vue";
 import WhatsAppNegocio, {
   type EstadoWhatsAppNegocio,
 } from "@/components/WhatsAppNegocio.vue";
+import ModulosNegocio, {
+  type ModuloDelNegocio,
+} from "@/components/ModulosNegocio.vue";
 import ComercialPlataforma from "@/components/ComercialPlataforma.vue";
 import CondonarCargo from "@/components/CondonarCargo.vue";
 import type { PlanCitas } from "@/lib/suscripcion";
@@ -99,6 +102,8 @@ interface FichaApi extends Omit<Estudio, "uso"> {
   modalidad_cambiable?: boolean;
   // Sus avisos por WhatsApp a clientes: solo los activa el superadmin (ADR 0083).
   whatsapp_clientes?: EstadoWhatsAppNegocio;
+  // Módulos que se encienden por negocio (ADR 0123): apagados por omisión.
+  modulos?: ModuloDelNegocio[];
   uso: { periodo: string; metrica: string; cantidad: number }[];
   cargos: Cargo[];
   // Su plan de citas (ADR 0107): se ve y se cambia desde aquí.
@@ -1876,6 +1881,17 @@ function borrar(): void {
             :slug="ficha.slug"
             :nombre="ficha.nombre"
             :inicial="ficha.whatsapp_clientes"
+          />
+
+          <!-- Módulos por negocio (ADR 0123) -->
+          <ModulosNegocio
+            v-if="ficha.modulos && ficha.modulos.length > 0"
+            :key="`mod-${ficha.slug}`"
+            :api-url="apiUrl"
+            :token="token"
+            :slug="ficha.slug"
+            :nombre="ficha.nombre"
+            :inicial="ficha.modulos"
           />
 
           <!-- Facturación -->

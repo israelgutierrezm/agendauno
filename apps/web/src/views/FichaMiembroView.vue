@@ -7,6 +7,7 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
 import CortePlanes from "@/components/CortePlanes.vue";
 import DarDeBajaMembresia from "@/components/DarDeBajaMembresia.vue";
+import FamiliaMiembro from "@/components/FamiliaMiembro.vue";
 import ExpedientePersona from "@/components/ExpedientePersona.vue";
 import PanelEditarMiembro, {
   type MiembroEditable,
@@ -1429,6 +1430,15 @@ const regreso = useRegreso({
           </aside>
         </div>
       </div>
+
+      <!-- Familia: a quién tiene a su cargo y quién es su responsable (ADR 0123). -->
+      <FamiliaMiembro
+        v-if="sesion.estudio?.modulos?.includes('familias')"
+        :key="personaId"
+        class="mt-4"
+        :persona-id="personaId"
+        :nombre="ficha.persona.nombre_completo"
+      />
     </template>
 
     <PanelEditarMiembro

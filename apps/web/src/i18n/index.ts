@@ -76,6 +76,7 @@ import detalleMiembro from "./locales/detalleMiembro.es-MX";
 import datosPersonales from "./locales/datosPersonales.es-MX";
 import region from "./locales/region.es-MX";
 import interesados from "./locales/interesados.es-MX";
+import familias from "./locales/familias.es-MX";
 import pwa from "./locales/pwa.es-MX";
 import sitioWeb from "./locales/sitioWeb.es-MX";
 import captacion from "./locales/captacion.es-MX";
@@ -180,6 +181,7 @@ const mensajesBase = {
   datosPersonales,
   region,
   interesados,
+  familias,
   pwa,
   sitioWeb,
   confirmaciones,

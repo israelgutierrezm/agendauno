@@ -111,6 +111,9 @@ export interface EstudioSesion {
   capacidades?: Capacidades;
   // El negocio manda avisos por WhatsApp a sus clientes (ADR 0069).
   whatsapp_clientes?: boolean;
+  // Los módulos que el superadmin encendió en el negocio (ADR 0123): solo estos se
+  // muestran; el servidor niega los demás.
+  modulos?: string[];
   // Su moneda y su zona horaria (ADR 0099): una sola moneda para todo el negocio.
   moneda?: string;
   zona_horaria?: string;

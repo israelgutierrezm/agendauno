@@ -13,6 +13,7 @@ import NavLateral from "@/components/NavLateral.vue";
 import PestanasArea from "@/components/PestanasArea.vue";
 import AppToaster from "@/components/AppToaster.vue";
 import AvisoSinSucursal from "@/components/AvisoSinSucursal.vue";
+import BarraParticipante from "@/components/BarraParticipante.vue";
 import CuentaLateral from "@/components/CuentaLateral.vue";
 import DialogoConfirmar from "@/components/DialogoConfirmar.vue";
 import PanelApariencia from "@/components/PanelApariencia.vue";
@@ -26,20 +27,35 @@ import { esMiembro } from "@/lib/roles";
 import { useSucursales } from "@/lib/sucursalOperativa";
 import { slugDeContexto } from "@/lib/tenant";
 import { pausarTerminologia } from "@/i18n";
+import { useParticipantes } from "@/lib/participantes";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useAparienciaStore } from "@/stores/apariencia";
 import { useTemaStore } from "@/stores/tema";
 
 const tema = useTemaStore();
 const sesion = useSesionTenantStore();
+const participantes = useParticipantes();
 
 // Al cambiar de cuenta o de negocio (o al salir), el portal del alumno se vacía en
 // ese mismo instante: en un equipo compartido no queda en memoria nada de la
-// sesión anterior, aunque la carga de la nueva falle.
+// sesión anterior, aunque la carga de la nueva falle. Tampoco la persona a cargo
+// que se estaba viendo (ADR 0123).
 watch(
   () => identidadDeSesion(sesion.slug, sesion.bearer),
   (nueva, anterior) => {
     if (nueva !== anterior) {
+      reiniciarMiCuenta();
+      participantes.reiniciar();
+    }
+  },
+  { flush: "sync" },
+);
+// Al pasar a la cuenta de otra persona (o volver a la suya), nada de la anterior se
+// queda a la vista: el portal se vacía y sus pantallas se montan de nuevo.
+watch(
+  () => participantes.actual,
+  (nuevo, anterior) => {
+    if (nuevo !== anterior) {
       reiniciarMiCuenta();
     }
   },
@@ -424,10 +440,19 @@ onMounted(() => {
         >
           <!-- Personal sin sucursal (con varias en el negocio): no ve nada aún. -->
           <AvisoSinSucursal v-if="sesion.usuario?.sin_sucursal" />
+          <!-- Clientes con personas a su cargo: de quién es la cuenta (ADR 0123). -->
+          <BarraParticipante
+            v-if="
+              esMiembro(sesion.usuario) &&
+              sesion.estudio?.modulos?.includes('familias')
+            "
+          />
           <LayoutConfiguracion v-if="enConfiguracion">
             <RouterView />
           </LayoutConfiguracion>
-          <RouterView v-else />
+          <RouterView v-else v-slot="{ Component }">
+            <component :is="Component" :key="participantes.actual ?? ''" />
+          </RouterView>
         </div>
       </main>
     </div>

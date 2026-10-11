@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
+use App\Modules\Tenancy\Application\CuentaEnUsoTenant;
 use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\MargenesServicio;
 use App\Modules\Tenancy\Application\ParametrosTenant;
-use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\ReprogramarTenant;
 use App\Modules\Tenancy\Application\VentanaDeReservaTenant;
 use App\Modules\Tenancy\EstadoSesionTenant;
@@ -38,7 +38,7 @@ class MiReprogramarTenantController
 {
     public function __construct(
         private readonly ParametrosTenant $parametros,
-        private readonly PersonaDeUsuarioTenant $personas,
+        private readonly CuentaEnUsoTenant $cuenta,
         private readonly ReprogramarTenant $reprogramar,
         private readonly CalcularDisponibilidadTenant $disponibilidad,
     ) {}
@@ -174,8 +174,8 @@ class MiReprogramarTenantController
 
     private function reservaPropia(Request $request): ReservaTenant
     {
-        $usuario = $request->attributes->get('usuario_tenant');
-        $persona = $usuario instanceof Usuario ? $this->personas->buscar($usuario) : null;
+        // La suya o la de una persona a su cargo (B05).
+        $persona = $this->cuenta->persona($request);
         abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
         $reserva = ReservaTenant::query()->where('ulid', (string) $request->route('reserva'))->with('sesion.oferta')->firstOrFail();
         abort_unless((int) $reserva->persona_id === (int) $persona->getKey(), 403, 'Esta reserva no es tuya.');

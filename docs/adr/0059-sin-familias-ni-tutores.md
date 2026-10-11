@@ -1,7 +1,7 @@
 # ADR 0059 — Sin familias ni tutores en la V1
 
-Estado: Aceptado. Registra la decisión del 2026-09-20 (migración tenant
-`2026_09_16_000040_drop_familias`).
+Estado: Reemplazado por el ADR 0123 (2026-10-10). Registra la decisión del 2026-09-20
+(migración tenant `2026_09_16_000040_drop_familias`).
 
 ## Contexto
 

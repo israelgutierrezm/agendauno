@@ -2,6 +2,7 @@ import axios, { type InternalAxiosRequestConfig } from "axios";
 
 import { i18n } from "@/i18n";
 import { getCorrelationId } from "@/lib/correlationId";
+import { fijarParticipante, participanteEnUso } from "@/lib/participanteEnUso";
 import { ERRORES_MODALIDAD } from "@/lib/modalidad";
 import { conTerminosActuales } from "@/lib/terminologia";
 
@@ -42,6 +43,16 @@ export function fijarBearer(
   negocioDelBearer = token === null ? null : slug;
 }
 
+// La persona a cargo por la que actúa la cuenta (ADR 0123): viaja como
+// `X-Participante` solo a la cuenta del alumno de este negocio (`/mi/…`).
+export { fijarParticipante, participanteEnUso };
+
+/** ¿La petición va a la cuenta del alumno (`/mi/…`) de este negocio? */
+export function esDeLaCuenta(url: string | undefined, slug: string): boolean {
+  const ruta = (url ?? "").replace(/^https?:\/\/[^/]+/, "");
+  return ruta.startsWith(`/api/v1/app/${slug}/mi/`);
+}
+
 /** ¿La petición va a las rutas de este negocio? */
 export function esDelNegocio(url: string | undefined, slug: string): boolean {
   const ruta = (url ?? "").replace(/^https?:\/\/[^/]+/, "");
@@ -61,6 +72,14 @@ api.interceptors.request.use((config) => {
     esDelNegocio(config.url, negocioDelBearer)
   ) {
     config.headers.set("Authorization", `Bearer ${bearer}`);
+  }
+  const participante = participanteEnUso();
+  if (
+    participante !== null &&
+    negocioDelBearer !== null &&
+    esDeLaCuenta(config.url, negocioDelBearer)
+  ) {
+    config.headers.set("X-Participante", participante);
   }
 
   // Una foto, un documento o un reporte por una red lenta tarda más que 30 s.
@@ -128,6 +147,18 @@ api.interceptors.response.use(undefined, (error: unknown) => {
     usoLaSesion(error.config)
   ) {
     alPerder?.();
+  }
+  // Ya no puede actuar por esa persona (retiraron la autorización o el negocio apagó
+  // las familias): vuelve a su propia cuenta y se avisa a quien muestra la selección.
+  if (
+    axios.isAxiosError(error) &&
+    error.response?.status === 403 &&
+    (error.response.data as { code?: string } | undefined)?.code ===
+      "GUARDIAN_NOT_AUTHORIZED" &&
+    participanteEnUso() !== null
+  ) {
+    fijarParticipante(null);
+    window.dispatchEvent(new CustomEvent("agendauno:participante-invalido"));
   }
   return Promise.reject(error);
 });

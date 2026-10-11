@@ -287,6 +287,9 @@ class AuthTenantController
             // Con qué marca se presenta (ADR 0108): AgendaUno o TurnoUno.
             'producto' => $estudio->producto()->value,
             'capacidades' => $estudio->modalidad()->capacidades(),
+            // Los módulos que el superadministrador encendió (ADR 0123): la web y la app
+            // solo muestran estos; el servidor niega los demás.
+            'modulos' => $estudio->modulosHabilitados(),
             // Manda avisos por WhatsApp a sus clientes (ADR 0069).
             'whatsapp_clientes' => app(WhatsAppTenant::class)->enUso(),
             // Su moneda y su zona horaria (ADR 0099); con pesos mexicanos cobra en

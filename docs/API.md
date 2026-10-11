@@ -316,6 +316,29 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   `mediana_horas`}.
 - `GET /escaparate` cuenta la visita del día (una por visitante, sin guardar quién).
 
+## Familias y módulos por negocio (ADR 0123)
+
+Módulo `familias`: lo enciende el superadministrador por negocio, apagado por omisión
+(`PUT /plataforma/estudios/{estudio}/modulos` `{modulo, habilitado}`; la ficha del negocio
+trae `modulos[]`). Apagado, sus rutas responden 403 `MODULE_NOT_ENABLED`. La sesión trae
+`estudio.modulos` con los encendidos.
+
+- `GET/PUT /familias` (`miembros.ver` / `estudio.gestionar`): `activo`, `version`,
+  `texto_autorizacion` (null = el base) y `texto_vigente`.
+- `GET /miembros/{persona}/familia`: `a_su_cargo[]` y `responsables[]` (vínculo con
+  `persona`, `parentesco`, `estado` pendiente|activa|retirada y `autorizacion`).
+- `POST /miembros/{persona}/participantes` `{participante_id, parentesco}`: 422
+  `FAMILY_NOT_ALLOWED` con `meta.motivo` (desactivado, sin_cuenta, participante_invalido,
+  ciclo, limite, estado).
+- `POST /tutelas/{tutela}/autorizar` `{version}` (en el mostrador) y
+  `POST /tutelas/{tutela}/retirar` `{motivo?}`.
+- Cuenta: `GET /mi/participantes` (con `meta.version` y `meta.texto`),
+  `POST /mi/participantes/{tutela}/autorizar` `{acepto, version}` (409
+  `AUTHORIZATION_TEXT_CHANGED` si el texto cambió) y `POST /mi/participantes/{tutela}/retirar`.
+- `X-Participante: <ulid>` en `/mi/*` (reservas, planes, pagos y documentos): actúa por
+  esa persona; 403 `GUARDIAN_NOT_AUTHORIZED` si no hay autorización vigente. Las líneas de
+  orden traen `para` (el participante, si no es quien compró).
+
 ## Sitio del negocio (ADR 0114)
 
 Para quien configura el negocio (`estudio.gestionar`), bajo `/api/v1/app/{slug}` (o el

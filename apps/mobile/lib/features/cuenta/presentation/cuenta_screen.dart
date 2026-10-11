@@ -14,6 +14,7 @@ import 'configuracion_tab.dart';
 import 'expediente_tab.dart';
 import 'inicio_tab.dart';
 import 'pagos_tab.dart';
+import 'personas_a_cargo.dart';
 import 'reservas_tab.dart';
 
 /// Portal del alumno o cliente: Inicio (atención, próxima reserva y accesos
@@ -66,22 +67,30 @@ class _CuentaScreenState extends ConsumerState<CuentaScreen> {
         title: Text(_titulos[_pestana]!),
         actions: [const BotonMiPerfil()],
       ),
-      body: estado.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => ErrorDeCarga(
-          mensaje: 'No se pudo cargar tu cuenta.',
-          onReintentar: () => ref.invalidate(cuentaProvider),
-        ),
-        data: (cuenta) => switch (_pestana) {
-          PestanaCuenta.inicio => RefreshIndicator(
-            onRefresh: () => ref.refresh(cuentaProvider.future),
-            child: InicioTab(cuenta: cuenta, onIr: _ir),
+      body: Column(
+        children: [
+          // De quién es la cuenta: la suya o la de una persona a su cargo (ADR 0123).
+          const SelectorParticipante(),
+          Expanded(
+            child: estado.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => ErrorDeCarga(
+                mensaje: 'No se pudo cargar tu cuenta.',
+                onReintentar: () => ref.invalidate(cuentaProvider),
+              ),
+              data: (cuenta) => switch (_pestana) {
+                PestanaCuenta.inicio => RefreshIndicator(
+                  onRefresh: () => ref.refresh(cuentaProvider.future),
+                  child: InicioTab(cuenta: cuenta, onIr: _ir),
+                ),
+                PestanaCuenta.reservas => ReservasTab(cuenta: cuenta),
+                PestanaCuenta.pagos => PagosTab(cuenta: cuenta),
+                PestanaCuenta.expediente => ExpedienteTab(cuenta: cuenta),
+                PestanaCuenta.cuenta => const ConfiguracionTab(),
+              },
+            ),
           ),
-          PestanaCuenta.reservas => ReservasTab(cuenta: cuenta),
-          PestanaCuenta.pagos => PagosTab(cuenta: cuenta),
-          PestanaCuenta.expediente => ExpedienteTab(cuenta: cuenta),
-          PestanaCuenta.cuenta => const ConfiguracionTab(),
-        },
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _pestana.index,

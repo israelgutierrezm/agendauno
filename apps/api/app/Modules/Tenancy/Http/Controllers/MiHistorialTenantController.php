@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
+use App\Modules\Tenancy\Application\CuentaEnUsoTenant;
 use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
-use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\Models\AuditoriaTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ResenaTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
-use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -29,14 +28,14 @@ use Illuminate\Http\Request;
 class MiHistorialTenantController
 {
     public function __construct(
-        private readonly PersonaDeUsuarioTenant $personas,
+        private readonly CuentaEnUsoTenant $cuenta,
         private readonly ParametrosTenant $parametros,
     ) {}
 
     public function __invoke(Request $request): JsonResponse
     {
-        $usuario = $request->attributes->get('usuario_tenant');
-        $persona = $usuario instanceof Usuario ? $this->personas->buscar($usuario) : null;
+        // La suya o la de una persona a su cargo (B05).
+        $persona = $this->cuenta->persona($request);
         abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
 
         $filtros = $request->validate([

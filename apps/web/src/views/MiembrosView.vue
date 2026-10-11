@@ -12,6 +12,8 @@ import CampoCelular from "@/components/CampoCelular.vue";
 import CamposDatosPersonales from "@/components/CamposDatosPersonales.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import EstadoVacio from "@/components/EstadoVacio.vue";
+import FamiliasNegocio from "@/components/FamiliasNegocio.vue";
+import ModalDialogo from "@/components/ModalDialogo.vue";
 import PaginacionListado from "@/components/PaginacionListado.vue";
 import TarjetasIndicadores, {
   type Indicador,
@@ -82,6 +84,14 @@ interface Meta {
 const sesion = useSesionTenantStore();
 const base = computed(() => `/api/v1/app/${sesion.slug}`);
 const puedeGestionar = computed(() => sesion.puede("miembros.gestionar"));
+// Familias y responsables (ADR 0123): con el módulo encendido por el superadmin, las
+// configura quien administra el negocio.
+const puedeFamilias = computed(
+  () =>
+    sesion.puede("estudio.gestionar") &&
+    sesion.estudio?.modulos?.includes("familias") === true,
+);
+const familiasAbiertas = ref(false);
 const puedeInvitar = computed(() => sesion.puede("usuarios.invitar"));
 
 const tipo = ref<"miembro" | "instructor">("miembro");
@@ -738,11 +748,22 @@ onMounted(() => {
           )
         "
       />
-      <BotonImportar
-        v-if="puedeGestionar"
-        ruta="importar"
-        :texto="$t('nav.importar')"
-      />
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          v-if="puedeFamilias && tipo === 'miembro'"
+          type="button"
+          class="tu-btn tu-btn-fantasma text-sm"
+          data-prueba="abrir-familias"
+          @click="familiasAbiertas = true"
+        >
+          {{ $t("familias.config.titulo") }}
+        </button>
+        <BotonImportar
+          v-if="puedeGestionar"
+          ruta="importar"
+          :texto="$t('nav.importar')"
+        />
+      </div>
     </div>
 
     <!-- Cuántos hay y qué pide atención -->
@@ -1432,6 +1453,18 @@ onMounted(() => {
       venta
       @cerrar="alCerrarCobro"
     />
+    <ModalDialogo
+      :abierto="familiasAbiertas"
+      :titulo="$t('familias.config.titulo')"
+      tam="md"
+      @cerrar="familiasAbiertas = false"
+    >
+      <FamiliasNegocio
+        v-if="familiasAbiertas"
+        @guardado="familiasAbiertas = false"
+        @cerrar="familiasAbiertas = false"
+      />
+    </ModalDialogo>
   </section>
 </template>
 

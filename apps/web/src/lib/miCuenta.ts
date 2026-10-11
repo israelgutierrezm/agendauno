@@ -1,6 +1,7 @@
 import { computed, ref } from "vue";
 
 import { api, mensajeDeError } from "@/lib/api";
+import { participanteEnUso } from "@/lib/participanteEnUso";
 import type { FormularioPersona } from "@/lib/formularios";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -232,18 +233,28 @@ export function reiniciarMiCuenta(): void {
   accionando.value = false;
 }
 
-/** La sesión del portal: negocio + token (cambia con cada inicio de sesión). */
+/**
+ * La sesión del portal: negocio + token (cambia con cada inicio de sesión) y, si la
+ * cuenta actúa por una persona a su cargo (ADR 0123), cuál.
+ */
 export function identidadDeSesion(
   slug: string | null,
   bearer: string | null,
+  participante: string | null = null,
 ): string | null {
-  return slug !== null && bearer !== null ? `${slug}|${bearer}` : null;
+  if (slug === null || bearer === null) {
+    return null;
+  }
+  return participante !== null
+    ? `${slug}|${bearer}|${participante}`
+    : `${slug}|${bearer}`;
 }
 
 export function useMiCuenta() {
   const sesion = useSesionTenantStore();
   const base = computed(() => `/api/v1/app/${sesion.slug}`);
-  const identidad = () => identidadDeSesion(sesion.slug, sesion.bearer);
+  const identidad = () =>
+    identidadDeSesion(sesion.slug, sesion.bearer, participanteEnUso());
 
   // Lo que hay en memoria es de otra sesión: se vacía antes de que la pantalla lo
   // pinte (esto corre en el setup, antes del primer render).
