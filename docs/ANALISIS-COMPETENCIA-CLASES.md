@@ -116,3 +116,22 @@ y su documentación. El estado vive en la sección 5.
 | 6 | Hecho: inscripción (alta y reingreso) y anualidad (aniversario o fecha fija) como cuotas que no dan clases; permanencia con condiciones aceptadas y congeladas; baja con simulación, penalización pactada y adeudo aparte; exentar con permiso (ADR 0121). La redacción legal requiere revisión profesional |
 | 7 | Hecho: familias y responsables como módulo que enciende el superadministrador (apagado por omisión): el responsable con cuenta paga y reserva por sus participantes sin mezclar créditos, con autorización versionada que se puede retirar; avisos con el nombre del participante (ADR 0123, reemplaza al 0059). La redacción legal requiere revisión profesional |
 | 8 | Hecho: seguimiento diario por señales (primera visita, plan por vencer o vencido, días sin asistir, compró y no reservó) sin repetir ni insistir, con mensaje sugerido, WhatsApp y resultado; «no desea contacto» lo saca de los comerciales; visitas a la página sin datos personales y embudo del negocio con cantidad y denominador (ADR 0122). El embudo de la plataforma (C08) queda pendiente |
+
+## 6 Segunda fase: lo que quedaba del plan (11 de octubre de 2026)
+
+Después de los 8 bloques, el dueño pidió continuar con todo lo pendiente. Siete revisiones
+del código contra cada punto (M06, M07, M08, M10, M11/M12, C01/C02, C07/B08) dieron este
+orden, del riesgo al alcance. Una rama y un PR por bloque, como antes.
+
+| Bloque | Contenido | Estado |
+|---|---|---|
+| 9 | M06 sucursales y cobertura: reprogramar no lleva un plan a otra sede ni fuera de su vigencia; el motivo nombra las sedes; «Todas las sedes incluidas» / «Solo en …»; tarjetas de sede con zona, dirección, foto y cómo llegar; la sede elegida en el calendario filtra los planes; la app dice dónde será la cita | Hecho |
+| 10 | M08 acciones del equipo: los indicadores del inicio abren el listado filtrado; cobrar y sustituir desde la sesión; un solo profesional sin filtros de equipo | Pendiente |
+| 11 | M07 cobros comprensibles: intentos de pago visibles, modo de prueba, pasarela lista solo con su confirmación de pagos, auditoría de reembolsos | Pendiente |
+| 12 | C02 y C08: primera operación real registrada, aviso del primer cobro y embudo de la plataforma | Pendiente |
+| 13 | B08 campañas: pausar, no duplicar, baja al enviar y fin del seguimiento al renovar | Pendiente |
+| 14 | M10 Wellhub y TotalPass: «no verificable», excepción manual con evidencia | Pendiente |
+| 15 | C07 migración guiada: saldos de apertura con evidencia e invitaciones confirmadas | Pendiente |
+| 16 | M11 y M12: página del negocio legible para buscadores y al compartir, enlaces que conservan su destino | Pendiente |
+| 17 | C01 landings: preguntas de migración, preparación y soporte; demos marcadas | Pendiente |
+
