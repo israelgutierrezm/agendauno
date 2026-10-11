@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { RouterLink, useRoute } from "vue-router";
 
 import IconoNav from "@/components/IconoNav.vue";
@@ -9,6 +10,7 @@ import CalendarioPublico from "@/components/CalendarioPublico.vue";
 import FormularioCaptacion from "@/components/FormularioCaptacion.vue";
 import ServicioIncluye from "@/components/ServicioIncluye.vue";
 import { api } from "@/lib/api";
+import { adaptarTexto, type TerminosNegocio } from "@/lib/terminologia";
 import { textoCobertura } from "@/lib/cobertura";
 import { trackEvent } from "@/lib/analytics";
 import {
@@ -368,6 +370,40 @@ function fechaDia(iso: string): string {
     timeZone: "UTC",
   }).format(new Date(`${iso}T12:00:00Z`));
 }
+// La página habla con las palabras del negocio, no con las de quien la visita (ADR
+// 0131): los pacientes de un consultorio, los coaches de un estudio de pole, las
+// lecciones de una escuela de natación.
+const { t } = useI18n();
+const terminosPagina = computed<TerminosNegocio | null>(() => {
+  const terminos = escaparate.value?.estudio.perfil_config.terminologia;
+  return terminos?.sesion && terminos.miembro && terminos.instructor
+    ? {
+        sesion: terminos.sesion,
+        sesiones: terminos.sesiones,
+        miembro: terminos.miembro,
+        miembros: terminos.miembros,
+        instructor: terminos.instructor,
+        instructores: terminos.instructores,
+      }
+    : null;
+});
+function tn(
+  clave: string,
+  valores?: Record<string, unknown> | number,
+  cuantos?: number,
+): string {
+  const texto =
+    cuantos !== undefined
+      ? t(clave, valores as Record<string, unknown>, cuantos)
+      : typeof valores === "number"
+        ? t(clave, valores)
+        : valores !== undefined
+          ? t(clave, valores)
+          : t(clave);
+  return terminosPagina.value
+    ? adaptarTexto(texto, terminosPagina.value)
+    : texto;
+}
 const etiquetaProfesional = computed(
   () =>
     escaparate.value?.estudio.perfil_config.terminologia?.instructor ??
@@ -505,18 +541,18 @@ onMounted(cargar);
       class="mx-auto max-w-5xl px-4 py-16 text-center"
       :style="{ color: 'var(--texto-suave)' }"
     >
-      {{ $t("escaparate.cargando") }}
+      {{ tn("escaparate.cargando") }}
     </p>
 
     <section
       v-else-if="noDisponible"
       class="mx-auto max-w-md px-4 py-20 text-center"
     >
-      <p class="text-lg font-semibold">{{ $t("escaparate.noDisponible") }}</p>
+      <p class="text-lg font-semibold">{{ tn("escaparate.noDisponible") }}</p>
       <RouterLink
         :to="{ name: 'directorio' }"
         class="tu-enlace mt-4 inline-block"
-        >{{ $t("escaparate.volverDirectorio") }}</RouterLink
+        >{{ tn("escaparate.volverDirectorio") }}</RouterLink
       >
     </section>
 
@@ -722,7 +758,7 @@ onMounted(cargar);
                     trackEvent('book_appointment_clicked', { source: 'hero' })
                   "
                 >
-                  {{ $t("escaparate.agendarCita") }}
+                  {{ tn("escaparate.agendarCita") }}
                 </RouterLink>
                 <button
                   v-if="!usaCitas"
@@ -730,7 +766,7 @@ onMounted(cargar);
                   class="tu-btn tu-btn-primario px-6"
                   @click="abrirAcceso('hero')"
                 >
-                  {{ $t("escaparate.reservar") }}
+                  {{ tn("escaparate.reservar") }}
                 </button>
                 <RouterLink
                   :to="{ name: 'entrar', query: { estudio: slug } }"
@@ -741,11 +777,7 @@ onMounted(cargar);
                     })
                   "
                 >
-                  {{
-                    usaCitas
-                      ? $t("escaparate.yaSoyCliente")
-                      : $t("escaparate.yaSoyAlumno")
-                  }}
+                  {{ tn("escaparate.yaSoyAlumno") }}
                 </RouterLink>
               </div>
             </div>
@@ -840,16 +872,16 @@ onMounted(cargar);
               <div class="tu-agenda-citas-cabecera">
                 <div>
                   <p class="tu-agenda-citas-etiqueta">
-                    {{ $t("escaparate.agendaEnLinea") }}
+                    {{ tn("escaparate.agendaEnLinea") }}
                   </p>
                   <h2 class="text-3xl font-light tracking-tight">
-                    {{ sec.titulo ?? $t("escaparate.agendaCitasTitulo") }}
+                    {{ sec.titulo ?? tn("escaparate.agendaCitasTitulo") }}
                   </h2>
                   <p
                     class="mt-3 max-w-2xl"
                     :style="{ color: 'var(--texto-suave)' }"
                   >
-                    {{ $t("escaparate.agendaCitasDesc") }}
+                    {{ tn("escaparate.agendaCitasDesc") }}
                   </p>
                 </div>
                 <RouterLink
@@ -859,13 +891,13 @@ onMounted(cargar);
                     trackEvent('book_appointment_clicked', { source: 'steps' })
                   "
                 >
-                  {{ $t("escaparate.agendarCita") }}
+                  {{ tn("escaparate.agendarCita") }}
                 </RouterLink>
               </div>
               <ol class="tu-agenda-pasos mt-9">
                 <li v-for="n in 3" :key="n">
                   <span class="tu-agenda-paso-num">0{{ n }}</span>
-                  <strong>{{ $t(`escaparate.agendaPaso${n}`) }}</strong>
+                  <strong>{{ tn(`escaparate.agendaPaso${n}`) }}</strong>
                   <span
                     v-if="n < 3"
                     class="tu-agenda-paso-linea"
@@ -879,7 +911,7 @@ onMounted(cargar);
           <!-- Próximas clases -->
           <section v-else id="agenda" class="mx-auto max-w-5xl px-4 py-12">
             <h2 class="text-2xl font-light">
-              {{ sec.titulo ?? $t("escaparate.proximasClases") }}
+              {{ sec.titulo ?? tn("escaparate.proximasClases") }}
             </h2>
             <!-- Calendario por fecha (M02); sin él (p. ej. la vista previa con la
                  página cerrada), la lista de próximas clases de siempre. -->
@@ -897,7 +929,7 @@ onMounted(cargar);
               class="mt-4"
               :style="{ color: 'var(--texto-suave)' }"
             >
-              {{ $t("escaparate.sinClases") }}
+              {{ tn("escaparate.sinClases") }}
             </p>
             <ul v-else class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <li
@@ -931,7 +963,7 @@ onMounted(cargar);
                     })
                   "
                 >
-                  {{ $t("escaparate.pedirLugar") }}
+                  {{ tn("escaparate.pedirLugar") }}
                 </button>
                 <span
                   class="tu-badge mt-3"
@@ -940,13 +972,13 @@ onMounted(cargar);
                   "
                 >
                   <template v-if="s.lugares_libres === null">{{
-                    $t("escaparate.cupoAbierto")
+                    tn("escaparate.cupoAbierto")
                   }}</template>
                   <template v-else-if="s.lugares_libres === 0">{{
-                    $t("escaparate.lleno")
+                    tn("escaparate.lleno")
                   }}</template>
                   <template v-else>{{
-                    $t("escaparate.lugaresLibres", { n: s.lugares_libres })
+                    tn("escaparate.lugaresLibres", { n: s.lugares_libres })
                   }}</template>
                 </span>
               </li>
@@ -1169,14 +1201,14 @@ onMounted(cargar);
           >
             <div class="mx-auto max-w-5xl px-4">
               <h2 class="text-2xl font-light">
-                {{ sec.titulo ?? $t("escaparate.precios") }}
+                {{ sec.titulo ?? tn("escaparate.precios") }}
               </h2>
               <p
                 v-if="escaparate.productos.length === 0"
                 class="mt-4"
                 :style="{ color: 'var(--texto-suave)' }"
               >
-                {{ $t("escaparate.sinPrecios") }}
+                {{ tn("escaparate.sinPrecios") }}
               </p>
               <template v-else>
                 <p
@@ -1186,7 +1218,7 @@ onMounted(cargar);
                   data-prueba="planes-de-sede"
                 >
                   {{
-                    $t("escaparate.planes.deSede", {
+                    tn("escaparate.planes.deSede", {
                       sede: nombreSedeElegida,
                     })
                   }}
@@ -1195,7 +1227,7 @@ onMounted(cargar);
                     class="tu-enlace ml-1"
                     @click="sedeElegida = ''"
                   >
-                    {{ $t("escaparate.planes.verTodos") }}
+                    {{ tn("escaparate.planes.verTodos") }}
                   </button>
                 </p>
                 <div
@@ -1225,19 +1257,19 @@ onMounted(cargar);
                     >
                       <div class="flex flex-wrap gap-2">
                         <span class="tu-badge">{{
-                          $t(`escaparate.registro.tipos.${p.tipo}`)
+                          tn(`escaparate.registro.tipos.${p.tipo}`)
                         }}</span>
                         <span
                           v-if="p.destacado"
                           class="tu-badge ep-badge-marca"
                           data-prueba="destacado"
-                          >{{ $t("escaparate.planes.destacado") }}</span
+                          >{{ tn("escaparate.planes.destacado") }}</span
                         >
                         <span
                           v-if="p.primera_vez && gruposPrecios.length === 1"
                           class="tu-badge"
                           data-prueba="primera-vez"
-                          >{{ $t("escaparate.planes.primeraVez") }}</span
+                          >{{ tn("escaparate.planes.primeraVez") }}</span
                         >
                       </div>
                       <p class="mt-2 font-light">{{ p.nombre }}</p>
@@ -1259,7 +1291,7 @@ onMounted(cargar);
                         :style="{ color: 'var(--texto-suave)' }"
                       >
                         <template v-if="p.ilimitado">{{
-                          $t("escaparate.ilimitado")
+                          tn("escaparate.ilimitado")
                         }}</template>
                         <template v-else-if="p.creditos_incluidos">{{
                           $t(
@@ -1283,23 +1315,23 @@ onMounted(cargar);
                       >
                         <li v-if="p.actividad">
                           {{
-                            $t("escaparate.planes.paraActividad", {
+                            tn("escaparate.planes.paraActividad", {
                               actividad: p.actividad,
                             })
                           }}
                         </li>
                         <li v-if="p.vence_si_compra_hoy" data-prueba="vence">
                           {{
-                            $t("escaparate.planes.vence", {
+                            tn("escaparate.planes.vence", {
                               fecha: fechaDia(p.vence_si_compra_hoy),
                             })
                           }}
                         </li>
                         <li v-else-if="p.tipo === 'membresia'">
-                          {{ $t("escaparate.planes.renueva") }}
+                          {{ tn("escaparate.planes.renueva") }}
                         </li>
                         <li v-if="p.primera_vez">
-                          {{ $t("escaparate.planes.primeraVezAyuda") }}
+                          {{ tn("escaparate.planes.primeraVezAyuda") }}
                         </li>
                         <li
                           v-if="(p.permanencia_meses ?? 0) > 0"
@@ -1325,7 +1357,7 @@ onMounted(cargar);
                           })
                         "
                       >
-                        {{ $t("escaparate.planes.loQuiero") }}
+                        {{ tn("escaparate.planes.loQuiero") }}
                       </button>
                     </li>
                   </ul>
@@ -1346,8 +1378,8 @@ onMounted(cargar);
               {{
                 sec.titulo ??
                 (usaCitas
-                  ? $t("escaparate.profesionales")
-                  : $t("escaparate.instructores"))
+                  ? tn("escaparate.profesionales")
+                  : tn("escaparate.instructores"))
               }}
             </h2>
             <p
@@ -1356,7 +1388,7 @@ onMounted(cargar);
               :style="{ color: 'var(--texto-suave)' }"
             >
               {{
-                $t("escaparate.profesionalesDesc", {
+                tn("escaparate.profesionalesDesc", {
                   profesional: etiquetaProfesional,
                 })
               }}
@@ -1415,16 +1447,16 @@ onMounted(cargar);
             class="mx-auto max-w-5xl px-4 py-12"
           >
             <h2 class="text-2xl font-light">
-              {{ sec.titulo ?? $t("escaparate.resenas") }}
+              {{ sec.titulo ?? tn("escaparate.resenas") }}
             </h2>
             <p class="mt-2 flex items-baseline gap-2">
               <span class="text-3xl font-light">{{
-                $t("escaparate.promedio", {
+                tn("escaparate.promedio", {
                   promedio: escaparate.resenas?.promedio?.toFixed(1),
                 })
               }}</span>
               <span class="text-sm" :style="{ color: 'var(--texto-suave)' }">{{
-                $t("escaparate.totalResenas", escaparate.resenas?.total ?? 0)
+                tn("escaparate.totalResenas", escaparate.resenas?.total ?? 0)
               }}</span>
             </p>
             <ul
@@ -1441,7 +1473,7 @@ onMounted(cargar);
                   class="text-sm tracking-widest"
                   :style="{ color: 'var(--aviso)' }"
                   :aria-label="
-                    $t('escaparate.estrellas', { n: r.calificacion })
+                    tn('escaparate.estrellas', { n: r.calificacion })
                   "
                   role="img"
                 >
@@ -1472,7 +1504,7 @@ onMounted(cargar);
           >
             <div class="mx-auto max-w-5xl px-4">
               <h2 class="text-2xl font-light">
-                {{ sec.titulo ?? $t("escaparate.ubicacion") }}
+                {{ sec.titulo ?? tn("escaparate.ubicacion") }}
               </h2>
               <p
                 v-if="ubicacion"
@@ -1596,7 +1628,7 @@ onMounted(cargar);
                 trackEvent('book_appointment_clicked', { source: 'final' })
               "
             >
-              {{ $t("escaparate.agendarCita") }}
+              {{ tn("escaparate.agendarCita") }}
             </RouterLink>
             <button
               v-else
@@ -1604,14 +1636,14 @@ onMounted(cargar);
               class="tu-btn tu-btn-primario mt-5 px-8"
               @click="abrirAcceso('final')"
             >
-              {{ $t("escaparate.reservar") }}
+              {{ tn("escaparate.reservar") }}
             </button>
             <p v-if="escaparate.estudio.aviso_privacidad" class="mt-8 text-sm">
               <RouterLink
                 :to="{ name: 'aviso-negocio', params: { slug } }"
                 class="tu-enlace"
                 data-prueba="aviso-negocio"
-                >{{ $t("escaparate.avisoPrivacidad") }}</RouterLink
+                >{{ tn("escaparate.avisoPrivacidad") }}</RouterLink
               >
             </p>
           </section>
@@ -1633,11 +1665,11 @@ onMounted(cargar);
           :style="{ background: 'var(--superficie)' }"
           role="dialog"
           aria-modal="true"
-          :aria-label="$t('escaparate.acceso.titulo')"
+          :aria-label="tn('escaparate.acceso.titulo')"
         >
           <div class="flex items-start justify-between gap-3">
             <h3 class="text-xl font-medium">
-              {{ $t("escaparate.acceso.titulo") }}
+              {{ tn("escaparate.acceso.titulo") }}
             </h3>
             <button
               type="button"
@@ -1652,7 +1684,7 @@ onMounted(cargar);
             {{
               formularioAcceso
                 ? $t("captacion.publico.accesoCerrado")
-                : $t("escaparate.acceso.explicacion", {
+                : tn("escaparate.acceso.explicacion", {
                     estudio: escaparate.estudio.nombre,
                   })
             }}
@@ -1680,7 +1712,7 @@ onMounted(cargar);
                 trackEvent('student_access_requested', { channel: 'whatsapp' })
               "
             >
-              {{ $t("escaparate.acceso.whatsapp") }}
+              {{ tn("escaparate.acceso.whatsapp") }}
             </a>
             <a
               v-else-if="canalAcceso?.telefono"
@@ -1691,7 +1723,7 @@ onMounted(cargar);
               "
             >
               {{
-                $t("escaparate.acceso.llamar", {
+                tn("escaparate.acceso.llamar", {
                   telefono: canalAcceso.telefono,
                 })
               }}
@@ -1700,7 +1732,7 @@ onMounted(cargar);
               :to="{ name: 'entrar', query: { estudio: slug } }"
               class="tu-btn tu-btn-fantasma w-full"
             >
-              {{ $t("escaparate.acceso.yaTengo") }}
+              {{ tn("escaparate.acceso.yaTengo") }}
             </RouterLink>
           </div>
         </div>

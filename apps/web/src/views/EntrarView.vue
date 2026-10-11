@@ -31,6 +31,7 @@ import {
   slugDeContexto,
   urlEntrarEnDominioRaiz,
 } from "@/lib/tenant";
+import { productoActual } from "@/lib/producto";
 import { useRegistroDelProducto } from "@/marketing/registroProducto";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 
@@ -55,6 +56,21 @@ const sesion = useSesionTenantStore();
 // Si el producto aún no recibe registros (ADR 0108), quien administra un negocio deja
 // sus datos en la lista de interesados y no se ofrece buscar negocios.
 const { abierto: registroAbierto } = useRegistroDelProducto();
+// El collage habla del producto del dominio (ADR 0131): clases en AgendaUno, citas en
+// TurnoUno.
+const esTurnoUno = productoActual() === "turnouno";
+const fotosCollage = esTurnoUno
+  ? [
+      "/assets/landing/disciplinas/barberia-v1.jpg",
+      "/assets/landing/disciplinas/spa-v1.webp",
+      "/assets/landing/disciplinas/nutriologos-v1.webp",
+    ]
+  : [
+      "/assets/landing/disciplinas/pilates-v1.jpg",
+      "/assets/landing/disciplinas/pole-v1.jpg",
+      "/assets/landing/disciplinas/yoga-v1.jpg",
+    ];
+const collage = esTurnoUno ? "entrar.collageCitas" : "entrar.collageClases";
 
 // Un enlace directo o subdominio fija el tenant. En el dominio raíz primero se
 // elige un negocio: el usuario ya no tiene que recordar ni escribir su slug.
@@ -308,20 +324,10 @@ onMounted(async () => {
       </div>
 
       <div class="tu-login-collage" aria-hidden="true">
+        <img :src="fotosCollage[0]" alt="" width="1122" height="1402" />
+        <img :src="fotosCollage[1]" alt="" width="1122" height="1402" />
         <img
-          :src="'/assets/landing/disciplinas/pilates-v1.jpg'"
-          alt=""
-          width="1122"
-          height="1402"
-        />
-        <img
-          :src="'/assets/landing/disciplinas/pole-v1.jpg'"
-          alt=""
-          width="1122"
-          height="1402"
-        />
-        <img
-          :src="'/assets/landing/disciplinas/barberia-v1.jpg'"
+          :src="fotosCollage[2]"
           alt=""
           width="1122"
           height="1402"
@@ -332,15 +338,20 @@ onMounted(async () => {
             ><IconoNav nombre="hecho" :tam="14"
           /></span>
           <span>
-            <strong>{{ $t("entrar.panelCita") }}</strong>
-            <small>{{ $t("entrar.panelCitaDetalle") }}</small>
+            <strong>{{ $t(`${collage}.uno`) }}</strong>
+            <small>{{ $t(`${collage}.unoDetalle`) }}</small>
           </span>
         </div>
         <div class="tu-login-actividad tu-login-actividad--clase">
-          <span class="tu-login-icono tu-login-icono--clase">7</span>
+          <span class="tu-login-icono tu-login-icono--clase"
+            ><IconoNav v-if="esTurnoUno" nombre="hecho" :tam="14" /><template
+              v-else
+              >7</template
+            ></span
+          >
           <span>
-            <strong>{{ $t("entrar.panelClase") }}</strong>
-            <small>{{ $t("entrar.panelClaseDetalle") }}</small>
+            <strong>{{ $t(`${collage}.dos`) }}</strong>
+            <small>{{ $t(`${collage}.dosDetalle`) }}</small>
           </span>
         </div>
         <div class="tu-login-actividad tu-login-actividad--barberia">
@@ -356,8 +367,8 @@ onMounted(async () => {
             </svg>
           </span>
           <span>
-            <strong>{{ $t("entrar.panelBarberia") }}</strong>
-            <small>{{ $t("entrar.panelBarberiaDetalle") }}</small>
+            <strong>{{ $t(`${collage}.tres`) }}</strong>
+            <small>{{ $t(`${collage}.tresDetalle`) }}</small>
           </span>
         </div>
       </div>
@@ -411,7 +422,11 @@ onMounted(async () => {
             {{
               recientes.length
                 ? $t("entrar.selectorSubtitulo")
-                : "Escribe el nombre de tu estudio, academia o negocio para acceder."
+                : $t(
+                    esTurnoUno
+                      ? "entrar.selectorVacioCitas"
+                      : "entrar.selectorVacioClases",
+                  )
             }}
           </p>
 
@@ -470,14 +485,24 @@ onMounted(async () => {
               @submit.prevent="buscarNegocios()"
             >
               <label class="sr-only" for="buscar-negocio">{{
-                $t("entrar.buscarPlaceholder")
+                $t(
+                  esTurnoUno
+                    ? "entrar.buscarPlaceholderCitas"
+                    : "entrar.buscarPlaceholder",
+                )
               }}</label>
               <input
                 id="buscar-negocio"
                 v-model="busqueda"
                 class="tu-input"
                 type="search"
-                :placeholder="$t('entrar.buscarPlaceholder')"
+                :placeholder="
+                  $t(
+                    esTurnoUno
+                      ? 'entrar.buscarPlaceholderCitas'
+                      : 'entrar.buscarPlaceholder',
+                  )
+                "
                 autocomplete="organization"
               />
               <button

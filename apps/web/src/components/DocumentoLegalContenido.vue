@@ -2,6 +2,7 @@
 import { computed } from "vue";
 
 import { bloquesLegales } from "@/lib/documentoLegal";
+import { PRODUCTOS, productoActual } from "@/lib/producto";
 import borradorAviso from "@/marketing/legales/aviso-privacidad.txt?raw";
 import borradorTerminos from "@/marketing/legales/terminos.txt?raw";
 
@@ -23,6 +24,8 @@ const publicado = computed(() => Boolean(props.contenido?.trim()));
 const bloques = computed(() =>
   bloquesLegales(publicado.value ? props.contenido! : (vistaPrevia ?? "")),
 );
+// El soporte del producto del dominio (ADR 0131).
+const soporte = PRODUCTOS[productoActual()].soporte.correo;
 </script>
 
 <template>
@@ -55,7 +58,7 @@ const bloques = computed(() =>
           : "Los términos y condiciones aún no están publicados."
       }}
       Si tienes dudas, escríbenos a
-      <a class="tu-enlace" href="mailto:hola@agendauno.mx">hola@agendauno.mx</a
+      <a class="tu-enlace" :href="`mailto:${soporte}`">{{ soporte }}</a
       >.
     </p>
   </div>

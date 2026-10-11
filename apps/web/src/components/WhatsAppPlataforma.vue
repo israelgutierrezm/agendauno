@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { mensajeDeError } from "@/lib/api";
+import { PRODUCTOS, productoDeModalidad } from "@/lib/producto";
 import { useToastStore } from "@/stores/toast";
 
 /**
@@ -19,6 +20,8 @@ const props = defineProps<{ apiUrl: string; token: string }>();
 
 interface Plantilla {
   evento: string;
+  // Las de los negocios: de clases (AgendaUno) o de citas (TurnoUno), ADR 0131.
+  modalidad?: "clases" | "citas";
   nombre: string;
   titulo: string;
   texto: string;
@@ -332,7 +335,16 @@ onMounted(cargar);
               :key="p.nombre"
               class="wa-fila"
             >
-              <p class="text-sm font-medium">{{ p.titulo }}</p>
+              <p class="text-sm font-medium">
+                {{ p.titulo
+                }}<span
+                  v-if="p.modalidad"
+                  :style="{ color: 'var(--texto-suave)' }"
+                >
+                  ·
+                  {{ PRODUCTOS[productoDeModalidad(p.modalidad)].nombre }}</span
+                >
+              </p>
               <p class="mt-0.5 font-mono text-xs select-all">{{ p.nombre }}</p>
               <p
                 class="mt-1 text-xs select-all"

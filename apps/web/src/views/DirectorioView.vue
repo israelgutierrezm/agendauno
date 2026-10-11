@@ -175,6 +175,8 @@ function iniciales(nombre: string): string {
 }
 
 onMounted(cargar);
+// Cada producto habla de sus negocios: clases o citas (ADR 0131).
+const esTurnoUno = productoActual() === "turnouno";
 </script>
 
 <template>
@@ -193,7 +195,9 @@ onMounted(cargar);
         class="mt-4 mx-auto max-w-2xl text-lg"
         :style="{ color: 'var(--texto-suave)' }"
       >
-        {{ $t("directorio.subtitulo") }}
+        {{
+          $t(esTurnoUno ? "directorio.subtituloCitas" : "directorio.subtitulo")
+        }}
       </p>
 
       <form
@@ -423,7 +427,11 @@ onMounted(cargar);
         <p class="mt-2" :style="{ color: 'var(--texto-suave)' }">
           {{
             registroAbierto
-              ? $t("directorio.duenoDesc")
+              ? $t(
+                  esTurnoUno
+                    ? "directorio.duenoDescCitas"
+                    : "directorio.duenoDesc",
+                )
               : $t("directorio.duenoDescPrelanzamiento")
           }}
         </p>

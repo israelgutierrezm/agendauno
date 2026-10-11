@@ -17,7 +17,8 @@ const FOTOS: Record<string, string> = {
   hyrox: "crossfit-hyrox-v1.webp",
   natacion: "natacion-v1.jpg",
   academia: "academias-v1.jpg",
-  general: "wellness-v1.webp",
+  // Otro negocio de clases: una clase, no una sesión 1 a 1 (ADR 0131).
+  general: "yoga-v2.webp",
   general_citas: "wellness-v1.webp",
 };
 

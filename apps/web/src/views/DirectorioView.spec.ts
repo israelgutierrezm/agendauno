@@ -130,8 +130,9 @@ describe("directorio de negocios", () => {
     }
     const foto = (i: number) =>
       tarjetas[i]!.get(".tu-estudio-portada img").attributes("src");
-    // La misma foto por giro que en el resto de la aplicación (lib/fotoNegocio).
-    expect(foto(1)).toBe("/assets/landing/disciplinas/wellness-v1.webp");
+    // La misma foto por giro que en el resto de la aplicación (lib/fotoNegocio): una
+    // clase para el general de clases, una sesión 1 a 1 para el de citas (ADR 0131).
+    expect(foto(1)).toBe("/assets/landing/disciplinas/yoga-v2.webp");
     expect(foto(2)).toBe("/assets/landing/disciplinas/wellness-v1.webp");
   });
 

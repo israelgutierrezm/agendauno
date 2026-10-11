@@ -12,6 +12,7 @@ import PanelLateral from "@/components/PanelLateral.vue";
 import ZonaArchivo from "@/components/ZonaArchivo.vue";
 import { api, mensajeDeError } from "@/lib/api";
 import { confirmar } from "@/lib/confirmar";
+import { conMarca, productoDeModalidad } from "@/lib/producto";
 import plantillaAvisoNegocio from "@/marketing/legales/aviso-negocio.txt?raw";
 import { useSesionTenantStore } from "@/stores/sesionTenant";
 import { useToastStore } from "@/stores/toast";
@@ -326,9 +327,17 @@ const tieneAviso = computed(() =>
 function usarPlantillaAviso(): void {
   borrador.value = {
     titulo: t("consentimientos.plantillaAviso.tituloDocumento"),
-    contenido: plantillaAvisoNegocio
-      .replaceAll("{negocio}", sesion.estudio?.nombre ?? "")
-      .replaceAll("{servicios}", sesion.esCitas ? "citas" : "clases"),
+    // Con la marca y el vocabulario del negocio: TurnoUno y bonos en citas (ADR 0131).
+    contenido: conMarca(
+      plantillaAvisoNegocio
+        .replaceAll("{negocio}", sesion.estudio?.nombre ?? "")
+        .replaceAll("{servicios}", sesion.esCitas ? "citas" : "clases")
+        .replaceAll(
+          "{planes}",
+          sesion.esCitas ? "bonos" : "membresías, paquetes",
+        ),
+      productoDeModalidad(sesion.esCitas ? "citas" : "clases"),
+    ),
   };
   editor.value = { abierto: true, clave: CLAVE_AVISO };
 }

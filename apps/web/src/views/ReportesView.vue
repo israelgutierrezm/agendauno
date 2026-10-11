@@ -1359,14 +1359,26 @@ onMounted(cargar);
       <!-- Rentabilidad por clase (R30) -->
       <template v-if="pestana === 'ingresos'">
         <h2 class="mt-8 font-medium text-lg">
-          {{ $t("reportes.rentabilidad.titulo") }}
+          {{
+            $t(
+              sesion.esCitas
+                ? "reportes.rentabilidad.tituloCitas"
+                : "reportes.rentabilidad.titulo",
+            )
+          }}
         </h2>
         <p
           v-if="!rentabilidad || rentabilidad.ofertas.length === 0"
           class="mt-3 text-sm"
           :style="{ color: 'var(--texto-suave)' }"
         >
-          {{ $t("reportes.rentabilidad.vacio") }}
+          {{
+            $t(
+              sesion.esCitas
+                ? "reportes.rentabilidad.vacioCitas"
+                : "reportes.rentabilidad.vacio",
+            )
+          }}
         </p>
         <template v-else>
           <div class="mt-3 tu-card overflow-x-auto">
@@ -1374,13 +1386,25 @@ onMounted(cargar);
               <thead>
                 <tr>
                   <th>
-                    {{ $t("reportes.rentabilidad.colClase") }}
+                    {{
+                      $t(
+                        sesion.esCitas
+                          ? "reportes.rentabilidad.colClaseCitas"
+                          : "reportes.rentabilidad.colClase",
+                      )
+                    }}
                   </th>
                   <th class="text-right hidden sm:table-cell">
                     {{ $t("reportes.rentabilidad.colSesiones") }}
                   </th>
                   <th class="text-right">
-                    {{ $t("reportes.rentabilidad.colAsistentes") }}
+                    {{
+                      $t(
+                        sesion.esCitas
+                          ? "reportes.rentabilidad.colAsistentesCitas"
+                          : "reportes.rentabilidad.colAsistentes",
+                      )
+                    }}
                   </th>
                   <th class="text-right">
                     {{ $t("reportes.rentabilidad.colIngreso") }}

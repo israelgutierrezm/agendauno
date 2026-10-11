@@ -123,17 +123,19 @@ describe("acceso por negocio", () => {
     ).toEqual([
       "/assets/landing/disciplinas/pilates-v1.jpg",
       "/assets/landing/disciplinas/pole-v1.jpg",
-      "/assets/landing/disciplinas/barberia-v1.jpg",
+      // Clases en AgendaUno (ADR 0131).
+      "/assets/landing/disciplinas/yoga-v1.jpg",
     ]);
     expect(wrapper.get(".tu-login-collage").attributes("aria-hidden")).toBe(
       "true",
     );
     expect(wrapper.findAll(".tu-login-actividad")).toHaveLength(3);
+    // En AgendaUno, el collage es de clases (ADR 0131).
     expect(wrapper.get(".tu-login-actividad--barberia").text()).toContain(
-      "Corte y barba",
+      "Yoga matutino",
     );
-    expect(wrapper.get(".tu-login-actividad--barberia").text()).toContain(
-      "12:30 · Marco · Confirmada",
+    expect(wrapper.get(".tu-login-collage").text()).not.toContain(
+      "Corte y barba",
     );
     expect(wrapper.find(".tu-login-visual").exists()).toBe(true);
     expect(wrapper.find(".tu-login-visual .agendauno-logo").exists()).toBe(

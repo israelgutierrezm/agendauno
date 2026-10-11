@@ -644,7 +644,16 @@ onMounted(() => {
               >
                 {{ p.nombre }}
                 <span v-if="p.sesiones !== undefined" class="rt-suave">
-                  · {{ $t("cobro.quien.sesiones", { n: p.sesiones }) }}</span
+                  ·
+                  {{
+                    $t(
+                      sesion.esCitas
+                        ? "cobro.quien.sesionesCitas"
+                        : "cobro.quien.sesionesClases",
+                      { n: p.sesiones },
+                      p.sesiones,
+                    )
+                  }}</span
                 >
               </li>
             </ul>

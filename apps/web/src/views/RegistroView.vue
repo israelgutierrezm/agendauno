@@ -47,6 +47,20 @@ const { t } = useI18n();
 // TurnoUno los de citas; si aún no recibe registros, se muestra la lista de
 // interesados.
 const producto = productoActual();
+// El collage del producto (ADR 0131): una clase en AgendaUno, una cita en TurnoUno.
+const esTurnoUno = producto === "turnouno";
+const fotosRegistro = esTurnoUno
+  ? [
+      "/assets/landing/disciplinas/terapeutas-v1.webp",
+      "/assets/landing/disciplinas/barberia-v1.jpg",
+    ]
+  : [
+      "/assets/landing/disciplinas/pilates-v1.jpg",
+      "/assets/landing/disciplinas/yoga-v1.jpg",
+    ];
+const ejemploRegistro = esTurnoUno
+  ? "registro.ejemploCita"
+  : "registro.ejemploClase";
 const modoDelProducto: Modo = PRODUCTOS[producto].modalidad;
 const precios = usePreciosPublicos();
 const registroAbierto = computed(() => precios.datos.registro[producto]);
@@ -586,7 +600,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
         <div class="registro-collage">
           <img
             class="registro-foto registro-foto--terapia"
-            :src="'/assets/landing/disciplinas/terapeutas-v1.webp'"
+            :src="fotosRegistro[0]"
             alt=""
             width="1122"
             height="1402"
@@ -594,7 +608,7 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
           />
           <img
             class="registro-foto registro-foto--yoga"
-            :src="'/assets/landing/disciplinas/yoga-v1.jpg'"
+            :src="fotosRegistro[1]"
             alt=""
             width="1122"
             height="1402"
@@ -605,9 +619,9 @@ onBeforeUnmount(() => clearInterval(cuentaRegresiva));
               ><IconoNav nombre="hecho" :tam="20"
             /></span>
             <span>
-              <small>{{ $t("registro.citaEjemplo") }}</small>
-              <strong>{{ $t("registro.citaTitulo") }}</strong>
-              <span>{{ $t("registro.citaDetalle") }}</span>
+              <small>{{ $t(`${ejemploRegistro}.etiqueta`) }}</small>
+              <strong>{{ $t(`${ejemploRegistro}.titulo`) }}</strong>
+              <span>{{ $t(`${ejemploRegistro}.detalle`) }}</span>
             </span>
           </div>
         </div>

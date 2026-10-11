@@ -241,6 +241,9 @@ export const reglasAgenda = {
   cerrados: "Días de cierre",
   cerradosAyuda:
     "Feriados y cierres: esos días no se generan clases ni se ofrecen citas.",
+  // Cada modalidad lo dice a su modo (ADR 0131).
+  cerradosAyudaClases: "Feriados y cierres: esos días no se generan clases.",
+  cerradosAyudaCitas: "Feriados y cierres: esos días no se ofrecen citas.",
   fecha: "Fecha",
   motivo: "Motivo (opcional)",
   motivoPh: "Día festivo",
@@ -373,8 +376,7 @@ export const bitacora = {
 export const citaCuenta = {
   // Servicio que se toma con su bono (ADR 0091, 0130).
   conTuBono: "con tu bono",
-  conTuBonoAyuda:
-    "Se descuenta una sesión de tu bono; no pagas al agendar.",
+  conTuBonoAyuda: "Se descuenta una sesión de tu bono; no pagas al agendar.",
   servicio: "Servicio",
   profesional: "Profesional",
   sede: "Sede",

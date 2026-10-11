@@ -43,6 +43,9 @@ export default {
     titulo: "Quién cuenta este mes",
     nadie: "Nadie cuenta todavía este mes.",
     sesiones: "{n} citas o clases",
+    // Cada negocio cuenta lo suyo (ADR 0131).
+    sesionesCitas: "1 cita | {n} citas",
+    sesionesClases: "1 clase | {n} clases",
   },
   historial: {
     uso: "Uso",
