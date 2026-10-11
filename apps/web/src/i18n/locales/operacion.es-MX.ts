@@ -387,8 +387,79 @@ export default {
       ingresos: "Ingresos",
       ocupacion: "Ocupación",
       clientes: "Clientes",
+      embudo: "Embudo",
       equipo: "Equipo y sucursales",
     },
+    // El embudo del negocio (plan de mejoras C08): cantidad y denominador.
+    embudo: {
+      titulo: "Del interés a la renovación",
+      subtitulo:
+        "Cada paso con su cantidad y de cuántos sale. Las visitas a tu página se cuentan una por persona al día, sin guardar quién.",
+      minutos: "{n} min",
+      horas: "{n} h",
+      pasos: {
+        sitio: {
+          titulo: "Visitas → solicitudes",
+          cifra: "{n} de {de}",
+          ayuda:
+            "Quienes llenaron un formulario de interés del total de visitas a tu página.",
+          ayudaCitas:
+            "Quienes llenaron un formulario de interés del total de visitas a tu página.",
+        },
+        compra: {
+          titulo: "Solicitud → primera compra",
+          cifra: "{n} de {de}",
+          ayuda: "Solicitudes del periodo que ya pagaron un plan.",
+          ayudaCitas: "Solicitudes del periodo que ya pagaron un plan.",
+        },
+        asistencia: {
+          titulo: "Compra → primera asistencia",
+          cifra: "{n} de {de}",
+          ayuda: "Quienes compraron por primera vez y ya vinieron a clase.",
+          ayudaCitas:
+            "Quienes compraron por primera vez y ya vinieron a su cita.",
+        },
+        renovacion: {
+          titulo: "Renovación",
+          cifra: "{n} de {de}",
+          ayuda: "Renovaciones que tocaron en el periodo y se pagaron.",
+          ayudaCitas: "Renovaciones que tocaron en el periodo y se pagaron.",
+        },
+      },
+      respuesta: {
+        titulo: "Tiempo de respuesta",
+        mediana: "Mediana de la solicitud al primer contacto",
+        sinAtender: "Solicitudes sin atender, de {de}",
+      },
+      leyenda:
+        "Sin base para comparar, el porcentaje se muestra como «—». Cada persona cuenta una vez por paso. Las visitas se cuentan desde que se activó esta medición.",
+    },
+  },
+  // Seguimiento útil en Tareas (plan de mejoras M09).
+  seguimiento: {
+    soloSeguimiento: "Ver solo seguimiento",
+    todas: "Ver todas las tareas",
+    etiqueta: "Seguimiento",
+    registrar: "Registrar resultado",
+    panelTitulo: "¿Cómo terminó el seguimiento?",
+    resultado: "Resultado",
+    nota: "Nota (opcional)",
+    guardar: "Guardar resultado",
+    registrado: "Resultado guardado",
+    copiar: "Copiar mensaje",
+    copiado: "Mensaje copiado",
+    noSeCopio: "No se pudo copiar; selecciona el texto y cópialo.",
+    whatsapp: "Escribir por WhatsApp",
+    verFicha: "Ver ficha",
+    resultados: {
+      contactado: "Contactado",
+      renovo: "Renovó",
+      no_respondio: "No respondió",
+      no_desea_contacto: "No desea contacto",
+      requiere_atencion: "Requiere atención",
+    },
+    ayudaNoDesea:
+      "Deja de recibir promociones y seguimientos comerciales. Puedes cambiarlo en su ficha.",
   },
   horarios: {
     noSeCargo:
