@@ -2935,6 +2935,9 @@ export default {
         "Valida la visita con el token del día que la persona muestra en su app de TotalPass.",
     },
     soloMexico: "Disponible para negocios en México.",
+    // Lo que hace y lo que no (M10): validar la visita, no sincronizar todo.
+    alcance:
+      "Lo que hace: valida el check-in de cada visita en la clase. No sincroniza reservas, membresías ni pagos con estas plataformas. Si la plataforma no responde, la visita queda «sin verificar»: se reintenta con el mismo código o quien tiene permiso la registra como excepción, con su motivo y quién la autorizó.",
     proveedores: {
       wellhub: "Wellhub",
       totalpass: "TotalPass",
@@ -2949,6 +2952,26 @@ export default {
     vacio: "Sin check-ins de bienestar.",
     ok: "Check-in registrado.",
     validado: "Validado",
+    alcance:
+      "Valida la visita con la plataforma. No sincroniza reservas, membresías ni pagos.",
+    estados: {
+      validado: "Validada por {proveedor}",
+      no_verificable: "Sin verificar",
+      excepcion: "Excepción manual",
+      excepcionPor: "Excepción · autorizó {nombre}",
+    },
+    sinVerificarConPermiso:
+      "No cuenta como validada: intenta de nuevo con el mismo código en unos minutos o regístrala como excepción.",
+    sinVerificarSinPermiso:
+      "No cuenta como validada: intenta de nuevo con el mismo código en unos minutos o pide a quien puede autorizarlo que la registre como excepción.",
+    registrarExcepcion: "Registrar como excepción",
+    excepcionAyuda:
+      "Solo cuando la plataforma no respondió. Queda quién la autorizó y lo que se comprobó; la plataforma puede no reconocerla.",
+    motivoExcepcion: "Motivo",
+    evidencia: "Qué se comprobó",
+    evidenciaEjemplo:
+      "Ej.: vi su check-in activo en la app de la persona a las 7:58",
+    autorizar: "Autorizar excepción",
   },
   configuracion: {
     titulo: "Configuración",

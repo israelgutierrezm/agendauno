@@ -28,7 +28,7 @@ class CatalogoDePermisosTenant
                 'agenda.ver', 'agenda.gestionar', 'agenda.eliminar',
                 'productos.ver', 'productos.gestionar', 'productos.eliminar',
                 'membresias.gestionar', 'creditos.gestionar', 'derechos.ver',
-                'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar',
+                'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar', 'checkins.excepcion',
                 'ordenes.ver', 'ordenes.gestionar', 'pagos.reembolsar', 'cuotas.exentar',
                 'facturacion.ver', 'usuarios.invitar', 'usuarios.gestionar', 'usuarios.eliminar', 'auditoria.ver',
                 'comunicaciones.gestionar', 'comunicaciones.ver', 'comunicaciones.eliminar',
@@ -74,7 +74,9 @@ class CatalogoDePermisosTenant
     public static function catalogo(): array
     {
         return [
-            'agenda' => ['agenda.ver', 'agenda.gestionar', 'agenda.eliminar', 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar'],
+            // Registrar como excepción una visita que Wellhub/TotalPass no pudo verificar
+            // va aparte de registrar entradas (M10).
+            'agenda' => ['agenda.ver', 'agenda.gestionar', 'agenda.eliminar', 'reservas.ver', 'reservas.gestionar', 'asistencia.marcar', 'checkins.registrar', 'checkins.excepcion'],
             // Quien todavía no es cliente (ADR 0117): aparte de Miembros.
             'captacion' => ['prospectos.ver', 'prospectos.gestionar', 'prospectos.convertir', 'prospectos.eliminar'],
             'clientes' => ['miembros.ver', 'miembros.gestionar', 'miembros.eliminar', 'derechos.ver', 'documentos.subir', 'documentos.gestionar', 'formularios.responder', 'formularios.gestionar'],
@@ -113,6 +115,7 @@ class CatalogoDePermisosTenant
             'reservas.gestionar' => ['agenda.ver', 'reservas.ver', 'miembros.ver', 'catalogo.ver', 'sucursales.ver'],
             'asistencia.marcar' => ['agenda.ver', 'reservas.ver'],
             'checkins.registrar' => ['miembros.ver'],
+            'checkins.excepcion' => ['checkins.registrar', 'miembros.ver'],
             'miembros.gestionar' => ['miembros.ver'],
             'miembros.eliminar' => ['miembros.gestionar', 'miembros.ver'],
             'derechos.ver' => ['miembros.ver'],

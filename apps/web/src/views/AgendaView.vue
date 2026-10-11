@@ -16,6 +16,7 @@ import AgendaMes from "@/components/AgendaMes.vue";
 import AgendaProfesionales from "@/components/AgendaProfesionales.vue";
 import CambiarHorario from "@/components/CambiarHorario.vue";
 import CambiarSerie from "@/components/CambiarSerie.vue";
+import CheckinsClase from "@/components/CheckinsClase.vue";
 import ConfirmarCancelacion from "@/components/ConfirmarCancelacion.vue";
 import EncabezadoSeccion from "@/components/EncabezadoSeccion.vue";
 import AvatarIniciales from "@/components/AvatarIniciales.vue";
@@ -130,13 +131,6 @@ interface ReglaCanal {
   cupos: number;
   liberar_horas_antes: number;
   activa: boolean;
-}
-interface Checkin {
-  id: string;
-  proveedor: string;
-  usuario: string | null;
-  estado: string;
-  registrado_en: string;
 }
 
 const sesion = useSesionTenantStore();
@@ -1064,10 +1058,6 @@ const reglaCanalModel = ref({
 });
 const guardandoCanal = ref(false);
 const accionando = ref(false);
-const checkins = ref<Checkin[]>([]);
-const checkinModel = ref({ proveedor: "wellhub", codigo: "" });
-const registrandoCheckin = ref(false);
-const okCheckin = ref(false);
 
 // Staff de la sesión (R17): asignación con rol y sustitución.
 interface StaffSesion {
@@ -1139,7 +1129,6 @@ async function abrirDetalle(s: Sesion): Promise<void> {
   cambiandoSerie.value = false;
   cancelandoSesion.value = false;
   roster.value = [];
-  checkins.value = [];
   staffSesion.value = [];
   reservarModel.value = {
     miembroId: "",
@@ -1158,13 +1147,8 @@ async function abrirDetalle(s: Sesion): Promise<void> {
     cupos: 0,
     liberar_horas_antes: 0,
   };
-  checkinModel.value = { proveedor: "wellhub", codigo: "" };
   staffModel.value = { usuarioId: "", rol: "instructor", sustituyeA: "" };
-  okCheckin.value = false;
   await cargarRoster(s.id);
-  if (puedeCheckin.value) {
-    await cargarCheckins(s.id);
-  }
   if (puedeGestionar.value) {
     await cargarStaffSesion(s.id);
     if (s.oferta_id !== null) {
@@ -1381,16 +1365,6 @@ async function cargarRoster(id: string): Promise<void> {
     cargandoRoster.value = false;
   }
 }
-async function cargarCheckins(id: string): Promise<void> {
-  try {
-    const { data } = await api.get<{ data: Checkin[] }>(
-      `${base.value}/sesiones/${id}/checkins`,
-    );
-    checkins.value = data.data;
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  }
-}
 
 async function refrescarTras(sesionId: string): Promise<void> {
   await Promise.all([cargarRoster(sesionId), cargarSesiones()]);
@@ -1546,26 +1520,6 @@ async function cancelarSesion(id: string): Promise<void> {
     accionando.value = false;
   }
 }
-async function registrarCheckin(id: string): Promise<void> {
-  registrandoCheckin.value = true;
-  okCheckin.value = false;
-  error.value = null;
-  try {
-    await api.post(`${base.value}/checkins`, {
-      proveedor: checkinModel.value.proveedor,
-      sesion_id: id,
-      codigo: checkinModel.value.codigo,
-    });
-    checkinModel.value.codigo = "";
-    okCheckin.value = true;
-    await cargarCheckins(id);
-  } catch (e) {
-    error.value = mensajeDeError(e);
-  } finally {
-    registrandoCheckin.value = false;
-  }
-}
-
 // ---- Nueva clase (modal) ----
 const mostrarNueva = ref(false);
 // Tres formas de cargar: una sola clase; la misma hora en varios días; o cada día
@@ -3183,77 +3137,11 @@ onMounted(async () => {
             </section>
           </template>
 
-          <!-- Check-ins de bienestar -->
-          <section
+          <!-- Check-ins de bienestar: aprobada, sin verificar o excepción (M10) -->
+          <CheckinsClase
             v-else-if="pestanaClase === 'checkins'"
-            class="tu-detalle-seccion"
-          >
-            <h3>{{ $t("checkins.titulo") }}</h3>
-            <form
-              class="mt-2 flex flex-wrap items-end gap-2"
-              @submit.prevent="registrarCheckin(detalle.id)"
-            >
-              <div class="min-w-[130px]">
-                <label class="tu-label" for="cp">{{
-                  $t("checkins.proveedor")
-                }}</label>
-                <select
-                  id="cp"
-                  v-model="checkinModel.proveedor"
-                  class="tu-input"
-                >
-                  <option value="wellhub">
-                    {{ $t("integraciones.proveedores.wellhub") }}
-                  </option>
-                  <option value="totalpass">
-                    {{ $t("integraciones.proveedores.totalpass") }}
-                  </option>
-                </select>
-              </div>
-              <div class="flex-1 min-w-[150px]">
-                <label class="tu-label" for="cc">{{
-                  $t("checkins.codigo")
-                }}</label>
-                <input
-                  id="cc"
-                  v-model="checkinModel.codigo"
-                  class="tu-input"
-                  autocomplete="off"
-                  required
-                />
-              </div>
-              <button
-                class="tu-btn tu-btn-primario"
-                type="submit"
-                :disabled="registrandoCheckin || checkinModel.codigo === ''"
-              >
-                {{
-                  registrandoCheckin
-                    ? $t("checkins.registrando")
-                    : $t("checkins.registrar")
-                }}
-              </button>
-            </form>
-            <p
-              v-if="okCheckin"
-              class="mt-2 text-sm"
-              :style="{ color: 'var(--exito)' }"
-            >
-              {{ $t("checkins.ok") }}
-            </p>
-            <ul v-if="checkins.length > 0" class="mt-3 space-y-2">
-              <li
-                v-for="c in checkins"
-                :key="c.id"
-                class="flex items-center justify-between gap-2 text-sm"
-              >
-                <span class="truncate">{{ c.usuario ?? "—" }}</span>
-                <span class="tu-badge tu-badge-exito shrink-0">{{
-                  $t(`checkins.${c.estado}`)
-                }}</span>
-              </li>
-            </ul>
-          </section>
+            :sesion-id="detalle.id"
+          />
 
           <!-- Equipo: quién la da y sustituciones (R17) -->
           <section v-else class="tu-detalle-seccion">

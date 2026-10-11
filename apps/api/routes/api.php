@@ -909,6 +909,8 @@ Route::prefix('v1')->group(function (): void {
             // Check-ins de Wellhub / TotalPass en las clases.
             Route::post('/checkins', [CheckinsTenantController::class, 'registrar'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('checkins.store');
             Route::get('/sesiones/{sesion}/checkins', [CheckinsTenantController::class, 'index'])->middleware(['puede:checkins.registrar', 'modalidad:clases'])->name('sesiones.checkins.index');
+            // La que la plataforma no pudo verificar, como excepción con evidencia (M10).
+            Route::post('/checkins/{checkin}/excepcion', [CheckinsTenantController::class, 'excepcion'])->middleware(['puede:checkins.excepcion', 'modalidad:clases'])->name('checkins.excepcion');
 
             // Control de acceso (R12): la puerta registra un intento y el motor decide
             // (reserva vigente u OPEN_ACCESS por membresia ilimitada); deja bitacora.

@@ -328,6 +328,13 @@ onMounted(cargar);
       <p class="text-sm" :style="{ color: 'var(--texto-suave)' }">
         {{ $t("integraciones.soloMexico") }}
       </p>
+      <p
+        class="text-sm"
+        :style="{ color: 'var(--texto-suave)' }"
+        data-prueba="alcance-bienestar"
+      >
+        {{ $t("integraciones.alcance") }}
+      </p>
       <div v-for="i in integraciones" :key="i.proveedor" class="tu-card p-5">
         <div class="flex items-center justify-between gap-3">
           <h2 class="font-medium">
