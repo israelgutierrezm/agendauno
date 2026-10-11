@@ -126,6 +126,59 @@ export default {
     irAgendar: "Agendar una cita",
     verPlanes: "Ver planes",
   },
+  // Antes de reservar una clase (M05): lo que va a pasar, dicho por el servidor.
+  antesDeReservar: {
+    calculando: "Revisando tu plan…",
+    plan: "Tu plan",
+    donde: "Dónde",
+    comoLlegar: "Cómo llegar",
+    cancelar: "Cancelar",
+    requisitos: "Qué necesitas saber",
+    queLlevar: "Qué llevar",
+    tuPlan: "tu plan",
+    creditos: "1 crédito | {n} créditos",
+    conPlan: "Usa {plan}: se descuenta {consume} y te quedan {quedan}.",
+    conPlanIlimitado: "Usa {plan}: no se descuentan créditos.",
+    dePago:
+      "Se paga al reservar: {precio}. Tu lugar queda apartado mientras pagas.",
+    listaEspera:
+      "La clase está llena: te anotas en la lista de espera. No se descuenta nada hasta que te toque un lugar; te avisamos para que lo aceptes.",
+    cancelaHasta: "Sin costo hasta el {cuando}.",
+    yaPasoLimite: "Ya pasó el límite para cancelar sin costo.",
+    despuesSeDescuenta: "Después, cancelar descuenta la clase.",
+    despuesSeDevuelve: "Después también se devuelve el crédito.",
+    despuesSoloNegocio: "Después, solo el negocio puede cancelarla.",
+    confirmar: "Confirmar reserva",
+    confirmarEspera: "Anotarme en la lista de espera",
+    confirmarPago: "Reservar y pagar",
+    motivos: {
+      ya_reservada: "Ya tienes esta clase.",
+      llena: "La clase está llena.",
+      no_reservable: "Esta clase ya no admite reservas.",
+    },
+    acciones: {
+      ver_planes: "Ver planes",
+      revisar_vigencia: "Revisar mi plan",
+      cambiar_sucursal: "Ver clases que incluye mi plan",
+      ver_reserva: "Ver mi reserva",
+      otras_clases: "Ver otras fechas de esta clase",
+    },
+  },
+  // Su reserva, después de reservar (C05) y en su detalle.
+  miReserva: {
+    lista: "Listo: tu clase está reservada.",
+    enEspera: "Estás en la lista de espera. Te avisamos si se libera un lugar.",
+    conPlan: "Con {plan}",
+    cancelaHasta: "Cancela sin costo hasta el {cuando}.",
+    cancelaPasado: "Ya pasó el límite para cancelar sin costo.",
+    esperaNoConsume:
+      "En la lista de espera no se descuenta nada hasta que te toque un lugar.",
+    aceptaAntes: "Tienes un lugar: acéptalo antes de las {hora}.",
+    pagaParaConfirmar: "Paga para confirmar tu lugar.",
+    queLlevar: "Qué llevar: {texto}",
+    comoLlegar: "Cómo llegar",
+    reservarConPlan: "Reserva una clase de tu plan →",
+  },
   // Si su plan cubre una clase, antes de reservarla (lo dice el servidor).
   cobertura: {
     incluida: "Incluida en tu plan",

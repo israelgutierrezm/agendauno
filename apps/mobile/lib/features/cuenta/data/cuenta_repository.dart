@@ -328,6 +328,16 @@ class CuentaRepository {
         '';
   }
 
+  /// Lo que pasará si reserva esa clase (M05); no aparta nada.
+  Future<AntesDeReservar> antesDeReservar(String sesionId) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '$_base/mi/sesiones/$sesionId/antes-de-reservar',
+    );
+    return AntesDeReservar.desdeJson(
+      (res.data?['data'] ?? <String, dynamic>{}) as Map<String, dynamic>,
+    );
+  }
+
   /// Reserva un lugar, o se anota en la lista de espera si la clase está llena.
   Future<void> reservar(String sesionId, {bool esperar = false}) =>
       _dio.post<Map<String, dynamic>>(

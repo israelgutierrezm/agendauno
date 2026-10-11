@@ -50,6 +50,16 @@ export interface Reserva {
   orden_id: string | null;
   // Cómo llegar a la sucursal.
   mapa_url?: string | null;
+  // Lo que consume y de qué plan; hasta cuándo cancela sin costo con la política que
+  // se congeló al reservar (null en lista de espera); qué llevar (M05, C05).
+  plan?: string | null;
+  unidades?: number;
+  cancelacion?: {
+    limite: string;
+    horas_limite: number;
+    penaliza_tarde: boolean;
+  } | null;
+  que_llevar?: string | null;
 }
 // Qué partes de su cuenta le sirven (ADR 0091).
 export interface PortalCuenta {

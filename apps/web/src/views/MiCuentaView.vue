@@ -386,6 +386,17 @@ onMounted(() => {
       }"
     >
       {{ $t(`pagoEnLinea.${retornoPago}`) }}
+      <!-- Pagó: el siguiente paso es reservar con su plan (C05). -->
+      <RouterLink
+        v-if="retornoPago === 'exito' && !sesion.esCitas"
+        :to="{
+          name: 'mis-reservas',
+          query: { vista: 'reservar', incluidas: '1' },
+        }"
+        class="tu-enlace ml-1"
+        data-prueba="reservar-tras-pago"
+        >{{ $t("portal.miReserva.reservarConPlan") }}</RouterLink
+      >
     </p>
 
     <!-- La tarjeta principal: siempre, con o sin reserva. -->

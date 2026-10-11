@@ -30,9 +30,10 @@ vi.mock("@/stores/sesionTenant", () => ({
 vi.mock("@/stores/toast", () => ({
   useToastStore: () => ({ exito: vi.fn(), error: vi.fn() }),
 }));
+const retorno = vi.hoisted(() => ({ valor: null as "exito" | null }));
 vi.mock("@/lib/retornoPago", async () => {
   const { ref } = await import("vue");
-  return { useRetornoPago: () => ref(null) };
+  return { useRetornoPago: () => ref(retorno.valor) };
 });
 const ruta = vi.hoisted(() => ({ query: {} as Record<string, string> }));
 const router = vi.hoisted(() => ({ replace: vi.fn() }));
@@ -177,6 +178,7 @@ describe("portal del alumno", () => {
     reiniciarMiCuenta();
     localStorage.clear();
     sesion.esCitas = false;
+    retorno.valor = null;
     ruta.query = {};
     api.get.mockImplementation((url: string) =>
       Promise.resolve({
@@ -516,6 +518,129 @@ describe("portal del alumno", () => {
     ).not.toContain("Open Training");
   });
 
+  it("reservas: antes de reservar dice lo que pasará; al confirmar, su reserva real", async () => {
+    let anotada = false;
+    api.post.mockImplementation(() => {
+      anotada = true;
+      return Promise.resolve({ data: { data: {} } });
+    });
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      if (ruta === "/mi/sesiones/s2/antes-de-reservar") {
+        return Promise.resolve({
+          data: {
+            data: {
+              resultado: "lista_espera",
+              codigo: null,
+              motivo: null,
+              accion: null,
+              mensaje: null,
+              unidades: 0,
+              inicia_en: futuro(3),
+              zona_horaria: "America/Mexico_City",
+              sucursal: { nombre: "Roma Norte", mapa_url: null },
+              requisitos: null,
+              que_llevar: "Ropa cómoda",
+              plan: {
+                nombre: "Pack 8 clases",
+                ilimitado: false,
+                vence: null,
+                disponible_despues: 6000,
+              },
+              de_pago: null,
+              cancelacion: {
+                limite: futuro(3, 9),
+                horas_limite: 6,
+                penaliza_tarde: true,
+                cancela_tarde: true,
+              },
+            },
+          },
+        });
+      }
+      if (ruta === "/mi/perfil" && anotada) {
+        const perfil = datos["/mi/perfil"] as { reservas: unknown[] };
+        return Promise.resolve({
+          data: {
+            data: {
+              ...perfil,
+              reservas: [
+                ...perfil.reservas,
+                {
+                  id: "r2",
+                  sesion_id: "s2",
+                  estado: "en_espera",
+                  oferta: "Flexibilidad",
+                  sucursal: "Roma Norte",
+                  inicia_en: futuro(3),
+                  zona_horaria: "America/Mexico_City",
+                  oferta_expira_en: null,
+                  orden_id: null,
+                  cancelacion: null,
+                },
+              ],
+            },
+          },
+        });
+      }
+      return Promise.resolve({ data: { data: datos[ruta] ?? [] } });
+    });
+    const w = montar(MisReservasView);
+    await flushPromises();
+
+    // «Lista de espera» no anota de inmediato: abre lo que va a pasar.
+    const flexi = w
+      .findAll('[data-prueba="clase-disponible"]')
+      .find((f) => f.text().includes("Flexibilidad"))!;
+    await flexi.get('[data-prueba="reservar-clase"]').trigger("click");
+    await flushPromises();
+    expect(api.post).not.toHaveBeenCalled();
+    const antes = w.get('[data-prueba="antes-de-reservar"]');
+    expect(antes.text()).toContain("No se descuenta nada hasta que te toque");
+    expect(antes.text()).toContain("Ropa cómoda");
+
+    await antes.get('[data-prueba="confirmar-reserva"]').trigger("click");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith("/api/v1/app/demo/mi/reservas", {
+      sesion_id: "s2",
+      esperar: true,
+    });
+    // Lo que quedó, de la reserva real: en espera, sin consumo.
+    expect(w.get('[data-prueba="reserva-confirmada"]').text()).toBe(
+      portal.miReserva.enEspera,
+    );
+    expect(w.get('[data-prueba="detalles-reserva"]').text()).toContain(
+      portal.miReserva.esperaNoConsume,
+    );
+  });
+
+  it("reservas: en el calendario, la que está en espera no parece confirmada", async () => {
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      if (ruta === "/mi/perfil") {
+        const perfil = datos["/mi/perfil"] as { reservas: object[] };
+        return Promise.resolve({
+          data: {
+            data: {
+              ...perfil,
+              reservas: [{ ...perfil.reservas[0], estado: "en_espera" }],
+            },
+          },
+        });
+      }
+      return Promise.resolve({ data: { data: datos[ruta] ?? [] } });
+    });
+    const w = montar(MisReservasView);
+    await flushPromises();
+    await w
+      .findAll(".tu-segmentado button")
+      .find((b) => b.text() === "Semana")!
+      .trigger("click");
+    const propia = w.get(".cv-chip-propio");
+    expect(propia.text()).toContain(esMX.miCuenta.en_espera);
+    expect(propia.text()).not.toContain(portal.reservas.reservada);
+  });
+
   it("reservas: Próximas muestra las suyas e Historial vuelve a reservar la misma clase", async () => {
     api.get.mockImplementation((url: string) => {
       const ruta = url.replace("/api/v1/app/demo", "");
@@ -666,6 +791,16 @@ describe("portal del alumno", () => {
     expect(tarjetas[0]!.text()).toContain("8 clases en un mes.");
     expect(tarjetas[0]!.get('[data-prueba="vence"]').text()).toBe(
       "Si la pagas hoy, se puede usar hasta el 1 de noviembre.",
+    );
+    w.unmount();
+  });
+
+  it("al volver de pagar, el siguiente paso es reservar con su plan", async () => {
+    retorno.valor = "exito";
+    const w = montar(MisPagosView);
+    await flushPromises();
+    expect(w.get('[data-prueba="reservar-tras-pago"]').text()).toBe(
+      portal.miReserva.reservarConPlan,
     );
     w.unmount();
   });

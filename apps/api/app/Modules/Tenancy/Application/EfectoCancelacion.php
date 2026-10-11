@@ -26,6 +26,9 @@ final readonly class EfectoCancelacion
         public ?bool $aTiempo,
         public ?CarbonInterface $limite,
         public string $mensaje,
+        // Si el crédito vuelve a un plan ya vencido: la fecha en que venció (no recupera
+        // vigencia; M05).
+        public ?string $planVencio = null,
     ) {}
 
     public static function noCancelable(string $mensaje): self
@@ -44,7 +47,7 @@ final readonly class EfectoCancelacion
     }
 
     /**
-     * @return array{cancelable: bool, credito: string, unidades: int, a_tiempo: bool|null, limite: string|null, mensaje: string}
+     * @return array{cancelable: bool, credito: string, unidades: int, a_tiempo: bool|null, limite: string|null, mensaje: string, plan_vencio: string|null}
      */
     public function toArray(): array
     {
@@ -55,6 +58,7 @@ final readonly class EfectoCancelacion
             'a_tiempo' => $this->aTiempo,
             'limite' => $this->limite?->toIso8601String(),
             'mensaje' => $this->mensaje,
+            'plan_vencio' => $this->planVencio,
         ];
     }
 }

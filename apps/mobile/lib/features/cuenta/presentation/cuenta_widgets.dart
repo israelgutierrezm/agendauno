@@ -308,6 +308,16 @@ class _DetalleReserva extends ConsumerWidget {
                 color: aviso ? TemaAgendaUno.aviso : TemaAgendaUno.exito,
               ),
             ),
+            // Un lugar ofrecido se acepta a tiempo o pasa al siguiente.
+            if (r.estado == 'ofrecida' && r.ofertaExpiraEn != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Acéptalo antes de las '
+                  '${Formato.hora(DateTime.parse(r.ofertaExpiraEn!).toLocal())}.',
+                  style: const TextStyle(color: TemaAgendaUno.aviso),
+                ),
+              ),
             if (r.estado == 'pendiente_pago' && !_sePagaAqui)
               const Padding(
                 padding: EdgeInsets.only(top: 4),
@@ -398,6 +408,8 @@ class _DetalleClase extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notifier = ref.read(cuentaProvider.notifier);
+    // Lo que pasará al reservar (M05); sin respuesta, se puede intentar igual.
+    final antes = ref.watch(antesDeReservarProvider(c.id)).value;
     Future<void> reservar({bool esperar = false}) async {
       final nav = Navigator.of(context);
       await hacerConAviso(
@@ -457,8 +469,36 @@ class _DetalleClase extends ConsumerWidget {
                   ),
                 ),
               ),
+            if (antes != null)
+              for (final dato in [
+                antes.motivoTexto,
+                antes.consumoTexto,
+                antes.cancelacionTexto(DateTime.now()),
+                if (antes.queLlevar != null) 'Qué llevar: ${antes.queLlevar}',
+              ])
+                if (dato != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(dato),
+                  ),
             const SizedBox(height: 16),
-            if (c.reservable)
+            if (antes != null && !antes.puedeReservar)
+              const SizedBox.shrink()
+            else if (antes != null)
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => reservar(esperar: antes.esListaEspera),
+                  child: Text(
+                    antes.esListaEspera
+                        ? 'Anotarme en la lista de espera'
+                        : antes.precioMinor != null
+                        ? 'Reservar y pagar'
+                        : 'Confirmar reserva',
+                  ),
+                ),
+              )
+            else if (c.reservable)
               SizedBox(
                 width: double.infinity,
                 child: c.llena
