@@ -96,11 +96,19 @@ return [
     /*
     | Administración de plataforma (PlatformAdmin): el operador de AgendaUno ve
     | todos los estudios y carga credenciales globales (p. ej. la cuenta
-    | FacturAPI). Se autentica con un token dedicado (env). Sin token, el apartado
-    | queda deshabilitado (todas sus rutas responden 401).
+    | FacturAPI). Entra cada operador con su correo, su contraseña, el token dedicado
+    | (env) y un código por correo (ADR 0126). Sin token, el apartado queda
+    | deshabilitado (todas sus rutas responden 401).
     */
     'plataforma' => [
         'token' => env('PLATFORM_ADMIN_TOKEN'),
+        // ¿El token solo abre la API (scripts, pruebas)? En producción, no.
+        'token_directo' => (bool) env('PLATFORM_ADMIN_TOKEN_DIRECTO', env('APP_ENV', 'production') !== 'production'),
+        // El código por correo: minutos que vale e intentos antes de pedir otro.
+        'minutos_codigo' => (int) env('PLATFORM_CODIGO_MINUTOS', 10),
+        'intentos_codigo' => (int) env('PLATFORM_CODIGO_INTENTOS', 5),
+        // Cuánto dura una sesión del superadmin.
+        'horas_sesion' => (int) env('PLATFORM_SESION_HORAS', 12),
     ],
 
     /*

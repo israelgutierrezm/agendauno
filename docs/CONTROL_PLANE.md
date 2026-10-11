@@ -88,7 +88,8 @@ php artisan agendauno:restaurar-estudio slug --force      # vuelve al más recie
 - `POST /api/v1/app/{estudio}/auth/google` — entrada con Google del negocio.
 - `GET  /api/v1/app/{estudio}/yo` · `PUT /yo/rol-activo` · `POST /logout` — sesión
   tenant-local.
-- `/api/v1/plataforma/*` — superadmin (token `PLATFORM_ADMIN_TOKEN`).
+- `/api/v1/plataforma/*` — superadmin: sesión de un operador que entró con correo,
+  contraseña, `PLATFORM_ADMIN_TOKEN` y un código por correo (ADR 0126).
 
 Las mismas rutas del negocio responden también por subdominio
 (`{slug}.agendauno.mx/api/v1/…`).

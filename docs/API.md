@@ -12,7 +12,8 @@ Scramble en `/docs/api`. Rutas en `apps/api/routes/api.php`.
 | `/api/v1/errores` | Errores de la web y la app para el monitoreo (ADR 0080) | — (tope por IP y diario) |
 | `/api/v1/webhooks/tenant/{slug}/{proveedor}` | Pasarelas de cada negocio | Verificación con la pasarela |
 | `/api/v1/webhooks/plataforma/{proveedor}` | Pasarela de la plataforma (renta) | Verificación con la pasarela |
-| `/api/v1/plataforma/*` | Superadmin | `PLATFORM_ADMIN_TOKEN` |
+| `/api/v1/plataforma/entrar`, `/entrar/verificar` | Entrada del superadmin (ADR 0126) | Correo, contraseña y `PLATFORM_ADMIN_TOKEN`; luego el código por correo |
+| `/api/v1/plataforma/*` | Superadmin | Sesión del operador (en producción el token solo no basta) |
 | `/api/v1/app/{slug}/*` | Un negocio: equipo, profesionales y alumnos | Bearer del negocio |
 | `{slug}.agendauno.mx/api/v1/*` | Lo mismo por subdominio | Bearer del negocio |
 | `/api/v1/app/{slug}/integracion/*` | Terceros (solo lectura) | Llave de API con alcances |

@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Console\Commands\Demos\DemoBarberia;
 use App\Console\Commands\Demos\DemoBase;
 use App\Console\Commands\Demos\DemoGrecon;
+use App\Modules\Platform\Acceso\AdministradorPlataforma;
 use Illuminate\Console\Command;
 use RuntimeException;
 
@@ -24,6 +25,8 @@ class SembrarDemos extends Command
         {--dias=120 : Días de historia}
         {--password=password : Contraseña de todas las cuentas}
         {--rehacer : Si ya existe, borra su BD y lo siembra desde cero}';
+
+    private const SUPERADMIN = 'superadmin@agendauno.test';
 
     protected $description = 'Siembra los demos de Grecon (clases) y la barbería (citas) con historia (solo desarrollo)';
 
@@ -62,6 +65,15 @@ class SembrarDemos extends Command
                 $this->line("    {$correo}  {$que}");
             }
         }
+
+        // El superadmin de desarrollo (ADR 0126): entra a /plataforma con la contraseña de
+        // los demos, el token PLATFORM_ADMIN_TOKEN y el código (fuera de producción se ve
+        // en pantalla).
+        AdministradorPlataforma::query()->updateOrCreate(
+            ['email' => self::SUPERADMIN],
+            ['nombre' => 'Superadmin demo', 'password' => (string) $this->option('password'), 'activo' => true],
+        );
+        $this->line('Superadmin (/plataforma): '.self::SUPERADMIN.' con la contraseña del demo y el token de la plataforma.');
 
         return self::SUCCESS;
     }

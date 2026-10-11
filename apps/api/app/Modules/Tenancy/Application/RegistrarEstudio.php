@@ -41,6 +41,8 @@ class RegistrarEstudio
         'www', 'app', 'api', 'admin', 'panel', 'consola', 'staging', 'pruebas', 'mail', 'correo',
         'soporte', 'ayuda', 'status', 'estado', 'cdn', 'static', 'assets', 'blog', 'docs',
         'agendauno', 'turnouno', 'clases', 'citas', 'registro', 'entrar', 'negocios',
+        // El superadmin vive en /plataforma (ADR 0126).
+        'plataforma',
     ];
 
     public static function reservado(string $slug): bool

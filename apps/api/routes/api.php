@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\HealthController;
+use App\Modules\Tenancy\Http\Controllers\AccesoPlataformaController;
 use App\Modules\Tenancy\Http\Controllers\AccesosTenantController;
 use App\Modules\Tenancy\Http\Controllers\AgendaTenantController;
 use App\Modules\Tenancy\Http\Controllers\AparienciaTenantController;
@@ -187,9 +188,15 @@ Route::prefix('v1')->group(function (): void {
     // Errores de la web y la app para el monitoreo (ADR 0080): sin sesión, con tope por IP.
     Route::post('/errores', ErroresClienteController::class)->middleware('throttle:30,1,errores-cliente')->name('api.v1.errores');
 
-    // Administracion de plataforma (PlatformAdmin): token global, sin tenant. Ve todos
-    // los estudios y gestiona credenciales globales (cuenta FacturAPI).
+    // Entrar al superadmin (ADR 0126): correo, contraseña y token; luego el código por correo.
+    Route::post('/plataforma/entrar', [AccesoPlataformaController::class, 'entrar'])->middleware('throttle:plataforma-acceso')->name('api.v1.plataforma.entrar');
+    Route::post('/plataforma/entrar/verificar', [AccesoPlataformaController::class, 'verificar'])->middleware('throttle:plataforma-acceso')->name('api.v1.plataforma.entrar.verificar');
+
+    // Administracion de plataforma (PlatformAdmin): sesión de operador, sin tenant. Ve
+    // todos los estudios y gestiona credenciales globales (cuenta FacturAPI).
     Route::prefix('plataforma')->middleware(['plataforma.auth', 'throttle:plataforma'])->name('api.v1.plataforma.')->group(function (): void {
+        Route::get('/yo', [AccesoPlataformaController::class, 'yo'])->name('yo');
+        Route::post('/salir', [AccesoPlataformaController::class, 'salir'])->name('salir');
         Route::get('/estudios', [PlataformaController::class, 'estudios'])->name('estudios');
         Route::get('/estudios/{estudio}', [PlataformaEstudiosController::class, 'show'])->name('estudios.show');
         Route::post('/estudios/{estudio}/suspender', [PlataformaEstudiosController::class, 'suspender'])->name('estudios.suspender');
