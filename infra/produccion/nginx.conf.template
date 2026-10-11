@@ -162,10 +162,46 @@ server {
     root /usr/share/nginx/html/app;
     include /etc/nginx/snippets/agendauno-comun.conf;
 
-    # El HTML se revalida siempre (ver arriba).
+    # El HTML se revalida siempre (ver arriba). La página pública del negocio llega con
+    # SU cabecera (título, descripción, imagen para compartir, canonical; ADR 0128):
+    # app.html la pide con SSI a /_cabeza-negocio. Si no es una página pública o la API
+    # no responde, queda la genérica sin indexar que trae app.html.
     location / {
+        ssi on;
+        ssi_silent_errors on;
         add_header Cache-Control "no-cache" always;
         include /etc/nginx/snippets/agendauno-cabeceras.conf;
         try_files /app.html =404;
+    }
+    # Solo la subpetición SSI: la API recibe en X-Pagina la dirección que pidió el
+    # navegador. Un error (404, 429, 5xx, API caída) es una respuesta vacía, nunca un
+    # cuerpo de error dentro del <head>.
+    location = /_cabeza-negocio {
+        internal;
+        set $api_ruta /api/v1/pagina-negocio/cabeza;
+        include /etc/nginx/snippets/agendauno-api-interna.conf;
+        fastcgi_param HTTP_X_PAGINA $request_uri;
+        fastcgi_intercept_errors on;
+        error_page 400 403 404 405 429 500 502 503 504 = @sin_cabeza;
+    }
+    location @sin_cabeza {
+        return 204;
+    }
+
+    # Su sitemap y su robots (los de la landing son los del dominio principal). Sin la
+    # API, el robots deja rastrear todo, como antes.
+    location = /sitemap.xml {
+        set $api_ruta /api/v1/pagina-negocio/sitemap.xml;
+        include /etc/nginx/snippets/agendauno-api-interna.conf;
+    }
+    location = /robots.txt {
+        set $api_ruta /api/v1/pagina-negocio/robots.txt;
+        include /etc/nginx/snippets/agendauno-api-interna.conf;
+        fastcgi_intercept_errors on;
+        error_page 404 429 500 502 503 504 = @robots;
+    }
+    location @robots {
+        default_type text/plain;
+        return 200 "User-agent: *\nAllow: /\n";
     }
 }

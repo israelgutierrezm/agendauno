@@ -47,3 +47,4 @@ COPY infra/produccion/nginx.conf.template /etc/nginx/templates/default.conf.temp
 COPY infra/produccion/nginx-comun.conf /etc/nginx/snippets/agendauno-comun.conf
 COPY infra/produccion/nginx-cabeceras.conf /etc/nginx/snippets/agendauno-cabeceras.conf
 COPY infra/produccion/nginx-landing-proxy.conf /etc/nginx/snippets/agendauno-landing-proxy.conf
+COPY infra/produccion/nginx-api-interna.conf /etc/nginx/snippets/agendauno-api-interna.conf

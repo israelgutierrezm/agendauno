@@ -302,6 +302,15 @@ jobs:
           test "$(pedir agendauno.test /software-para-no-existe)" = 200 && ! grep -q 'assets-agendauno' /tmp/cuerpo
           test "$(pedir agendauno.test /entrar)" = 200 && ! grep -q 'assets-agendauno' /tmp/cuerpo
           test "$(pedir fluo.agendauno.test /)" = 200 && ! grep -q 'assets-agendauno' /tmp/cuerpo
+          # La página de un negocio pide su cabecera a la API con SSI (ADR 0128). Sin API, la
+          # genérica sin indexar (nada de SSI ni de errores en el HTML) y el robots de respaldo;
+          # en el dominio principal no hay SSI.
+          test "$(pedir fluo.agendauno.test /agendar/fluo)" = 200 && grep -q 'content="noindex,follow"' /tmp/cuerpo
+          if grep -q -e '<!--#' -e 'an error occurred' /tmp/cuerpo; then exit 1; fi
+          test "$(pedir fluo.turnouno.test /robots.txt)" = 200 && grep -q '^Allow: /$' /tmp/cuerpo
+          test "$(pedir agendauno.test /entrar)" = 200 && grep -q '<!--# include virtual="/_cabeza-negocio"' /tmp/cuerpo
+          # La subpetición es solo interna.
+          test "$(pedir fluo.agendauno.test /_cabeza-negocio)" != 200
           # Nadie enmarca la plataforma, salvo la vista previa del sitio en su panel (ADR 0114).
           cabeceras() { curl -sS -D - -o /dev/null -H "Host: $1" "http://127.0.0.1:8080$2" | tr -d '\r'; }
           grep -qi "^x-frame-options: DENY$" <<<"$(cabeceras fluo.agendauno.test /entrar)"

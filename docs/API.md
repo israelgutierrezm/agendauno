@@ -364,6 +364,18 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
 - Errores: `QUOTE_NOT_ALLOWED` con `meta.motivo` (`respondido`, `vencido`,
   `no_aceptado`, `no_borrador`, `sin_correo`, `sin_cliente`, `sin_conceptos`…).
 
+## Página de cada negocio para buscadores (ADR 0128)
+
+Las pide nginx en el subdominio del negocio, no la web. El negocio sale del host y no se
+abre su base de datos.
+- `GET /pagina-negocio/cabeza` con `X-Pagina: {dirección}`: las etiquetas del `<head>`
+  de esa página (título, descripción, Open Graph, canonical y `LocalBusiness`). Responde
+  204 si no es una página pública del negocio.
+- `GET /pagina-negocio/sitemap.xml`: 404 si el negocio no se indexa.
+- `GET /pagina-negocio/robots.txt`.
+- El escaparate y `GET /citas/opciones` traen `estudio.en_directorio`: «solo con enlace»
+  no se indexa.
+
 ## Respuestas privadas (M11)
 
 - Toda respuesta de la API a una petición con credenciales (`Authorization` o

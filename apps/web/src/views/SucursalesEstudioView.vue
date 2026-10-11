@@ -35,6 +35,8 @@ interface Opciones {
     logo_url: string | null;
     ciudad?: string | null;
     pais?: string | null;
+    // ¿Aparece en el directorio? «Solo con enlace» se ve, pero no se indexa (ADR 0128).
+    en_directorio?: boolean;
     modalidad?: ModalidadServicio;
     capacidades?: Capacidades;
     perfil_config?: { modalidad?: ModalidadServicio };
@@ -91,6 +93,8 @@ async function cargar(): Promise<void> {
         producto,
       ),
       image: data.data.estudio.logo_url ?? undefined,
+      imageAlt: data.data.estudio.nombre,
+      index: data.data.estudio.en_directorio !== false,
     });
     // Con clases (o sin sede) no hay cita que agendar: su página. Con citas y una
     // sola sede, no hay nada que elegir: directo a agendar.

@@ -79,6 +79,8 @@ class EscaparateTenant
                 'tiene_citas' => $esCitas,
                 // ¿Publicó su aviso de privacidad para sus clientes? (enlace en su página).
                 'aviso_privacidad' => app(WaiversTenant::class)->avisoPrivacidad() !== null,
+                // ¿Aparece en el directorio? «Solo con enlace» se ve, pero no se indexa (ADR 0128).
+                'en_directorio' => $estudio->enDirectorio(),
             ],
             'sucursales' => $this->sucursales($lada),
             'instructores' => $this->instructores(),

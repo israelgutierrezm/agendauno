@@ -83,6 +83,8 @@ class PublicoCitasController
                 'lada' => app(RegionNegocioTenant::class)->lada(),
                 // ¿Publicó su aviso de privacidad? (se enlaza antes de pedir los datos).
                 'aviso_privacidad' => app(WaiversTenant::class)->avisoPrivacidad() !== null,
+                // ¿Aparece en el directorio? «Solo con enlace» se ve, pero no se indexa (ADR 0128).
+                'en_directorio' => $estudio->enDirectorio(),
             ],
             ...$this->opciones->listar(),
         ]]);

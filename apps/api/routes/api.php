@@ -74,6 +74,7 @@ use App\Modules\Tenancy\Http\Controllers\NotasPersonaTenantController;
 use App\Modules\Tenancy\Http\Controllers\OnboardingController;
 use App\Modules\Tenancy\Http\Controllers\OrdenesTenantController;
 use App\Modules\Tenancy\Http\Controllers\OrganizacionesTenantController;
+use App\Modules\Tenancy\Http\Controllers\PaginaNegocioSeoController;
 use App\Modules\Tenancy\Http\Controllers\PagoRentaController;
 use App\Modules\Tenancy\Http\Controllers\PagosTenantController;
 use App\Modules\Tenancy\Http\Controllers\ParametrosTenantController;
@@ -188,6 +189,13 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/metricas/visita-landing', [EmbudoPlataformaController::class, 'visita'])->middleware('throttle:publico')->name('api.v1.metricas.visita-landing');
     // Errores de la web y la app para el monitoreo (ADR 0080): sin sesión, con tope por IP.
     Route::post('/errores', ErroresClienteController::class)->middleware('throttle:30,1,errores-cliente')->name('api.v1.errores');
+
+    // La página pública de un negocio en su subdominio para buscadores y vistas previas
+    // (ADR 0128): nginx pide su cabecera HTML (SSI) al servir la aplicación, y su
+    // sitemap y su robots. El negocio sale del host; no abre su base de datos.
+    Route::get('/pagina-negocio/cabeza', [PaginaNegocioSeoController::class, 'cabeza'])->middleware('throttle:240,1,pagina-negocio')->name('api.v1.pagina-negocio.cabeza');
+    Route::get('/pagina-negocio/sitemap.xml', [PaginaNegocioSeoController::class, 'sitemap'])->middleware('throttle:240,1,pagina-negocio')->name('api.v1.pagina-negocio.sitemap');
+    Route::get('/pagina-negocio/robots.txt', [PaginaNegocioSeoController::class, 'robots'])->middleware('throttle:240,1,pagina-negocio')->name('api.v1.pagina-negocio.robots');
 
     // Entrar al superadmin (ADR 0126): correo, contraseña y token; luego el código por correo.
     Route::post('/plataforma/entrar', [AccesoPlataformaController::class, 'entrar'])->middleware('throttle:plataforma-acceso')->name('api.v1.plataforma.entrar');

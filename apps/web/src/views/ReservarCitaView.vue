@@ -78,6 +78,8 @@ interface Opciones {
     // ¿Publicó su aviso de privacidad para sus clientes?
     aviso_privacidad?: boolean;
     lada?: string | null;
+    // ¿Aparece en el directorio? «Solo con enlace» se ve, pero no se indexa (ADR 0128).
+    en_directorio?: boolean;
   };
   servicios: Servicio[];
   sucursales: Sucursal[];
@@ -458,6 +460,8 @@ async function cargar(): Promise<void> {
         "turnouno",
       ),
       image: data.data.estudio.logo_url ?? undefined,
+      imageAlt: data.data.estudio.nombre,
+      index: data.data.estudio.en_directorio !== false,
     });
     recordarNegocio({
       slug: data.data.estudio.slug,
