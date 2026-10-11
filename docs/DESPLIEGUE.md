@@ -7,7 +7,7 @@ Los archivos están en `infra/produccion/`; las decisiones, en los ADR 0048, 010
 
 | Servicio | Qué hace |
 |---|---|
-| `web` | nginx, la entrada de los dos dominios: la aplicación (`dist/app`, `app.html`), pasa `/api` y `/up` a PHP, sirve `/storage` (logos y fotos) y pasa la portada, las páginas por giro, el sitemap, el robots y `/assets-{producto}/` a la landing de su dominio (si la landing no tiene la página o no responde, la aplicación). Escucha solo en `127.0.0.1:8080` y, con Traefik, en su red. Manda las cabeceras de seguridad (HSTS, `X-Frame-Options`, `frame-ancestors`) y el HTML con `Cache-Control: no-cache` (tras publicar nadie se queda con uno viejo; `/assets/` lleva hash y caché de un año). |
+| `web` | nginx, la entrada de los dos dominios: la aplicación (`dist/app`, `app.html`), pasa `/api` y `/up` a PHP, sirve `/storage` (logos y fotos) y pasa la portada, las páginas por giro, el sitemap, el robots y `/assets-{producto}/` a la landing de su dominio (si la landing no tiene la página o no responde, la aplicación). En el subdominio de cada negocio, procesa `app.html` con SSI para que su página llegue con su cabecera, y pide a la API su sitemap y su robots (ADR 0128; si la API no responde, la cabecera genérica). Escucha solo en `127.0.0.1:8080` y, con Traefik, en su red. Manda las cabeceras de seguridad (HSTS, `X-Frame-Options`, `frame-ancestors`) y el HTML con `Cache-Control: no-cache` (tras publicar nadie se queda con uno viejo; `/assets/` lleva hash y caché de un año). |
 | `landing-agendauno`, `landing-turnouno` | La landing de cada producto (HTML completo pre-generado), cada una en su imagen (ADR 0112): se publican solas, sin tocar la aplicación ni la API. Solo las alcanza `web`. |
 | `api` | Laravel en PHP-FPM, con pool propio (`infra/produccion/php-fpm.conf`): hasta 24 peticiones a la vez, pensado para el servidor de 4 GB. Con otra memoria, ajusta `pm.max_children` (el archivo explica la cuenta). |
 | `worker` | Cola en Redis: correos transaccionales. Chequeo de salud: su latido (`agendauno:latido --verificar=cola`). |
@@ -189,6 +189,8 @@ cp web.env.example web.env
    - `https://DOMINIO` muestra la portada y `https://DOMINIO/registro` el registro;
    - `curl -sI https://DOMINIO` trae `strict-transport-security` y `x-frame-options`
      (el proxy no las quita);
+   - con un negocio publicado, `curl -s https://SLUG.DOMINIO/ | grep og:title` trae su
+     nombre y `https://SLUG.DOMINIO/robots.txt` su sitemap (ADR 0128);
    - `docker compose --env-file web.env exec -u www-data api php artisan agendauno:probar-correo tu@correo.com` llega;
    - `docker compose --env-file web.env logs -f worker scheduler` no muestra errores.
 5. Da de alta a los operadores del superadmin:

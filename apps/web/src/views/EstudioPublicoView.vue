@@ -133,6 +133,8 @@ interface Escaparate {
     nombre: string;
     // ¿Publicó su aviso de privacidad para sus clientes?
     aviso_privacidad?: boolean;
+    // ¿Aparece en el directorio? «Solo con enlace» se ve, pero no se indexa (ADR 0128).
+    en_directorio?: boolean;
     logo_url: string | null;
     portada_url?: string | null;
     color_marca?: string | null;
@@ -470,7 +472,9 @@ async function cargar(): Promise<void> {
       // La página del negocio vive en su subdominio.
       path: urlCanonicaEstudio(estudio.slug),
       image: estudio.portada_url ?? estudio.logo_url ?? undefined,
+      imageAlt: estudio.nombre,
       type: "profile",
+      index: estudio.en_directorio !== false,
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "LocalBusiness",

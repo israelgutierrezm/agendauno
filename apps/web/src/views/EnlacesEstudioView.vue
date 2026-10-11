@@ -30,6 +30,8 @@ interface Datos {
     nombre: string;
     logo_url: string | null;
     descripcion?: string | null;
+    // ¿Aparece en el directorio? «Solo con enlace» se ve, pero no se indexa (ADR 0128).
+    en_directorio?: boolean;
     redes?: Red[];
     whatsapp_url?: string | null;
     // Solo clases o solo citas (ADR 0104): lo dice el servidor, no las ofertas.
@@ -176,7 +178,9 @@ async function cargar(): Promise<void> {
         `Enlaces de ${data.data.estudio.nombre}.`,
       path: urlCanonicaEstudio(data.data.estudio.slug, "/enlaces"),
       image: data.data.estudio.logo_url ?? undefined,
+      imageAlt: data.data.estudio.nombre,
       type: "profile",
+      index: data.data.estudio.en_directorio !== false,
     });
   } catch {
     noDisponible.value = true;
