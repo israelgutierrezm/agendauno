@@ -329,6 +329,16 @@ onMounted(() => void cuenta.asegurar());
               cuenta.porPagar.value.length
             }}</span>
           </h2>
+          <!-- La pasarela del negocio está en pruebas (M07). -->
+          <p
+            v-if="cuenta.pagoEnLinea.value && cuenta.pagoEnLineaPrueba.value"
+            class="mt-2 text-sm"
+            role="status"
+            :style="{ color: 'var(--aviso)' }"
+            data-prueba="modo-prueba"
+          >
+            {{ $t("miCuentaExtra.modoPrueba") }}
+          </p>
           <ul
             v-if="cuenta.porPagar.value.length > 0"
             class="mt-3 divide-y divide-[var(--borde)] text-sm"
@@ -348,6 +358,22 @@ onMounted(() => void cuenta.asegurar());
                   dinero(o.total_minor, o.moneda)
                 }}</span>
               </div>
+              <!-- Ya inició un pago que espera confirmación: para no pagar dos veces. -->
+              <p
+                v-if="o.pago_en_proceso"
+                class="mt-2 text-xs"
+                role="status"
+                :style="{ color: 'var(--texto-suave)' }"
+                data-prueba="pago-en-proceso"
+              >
+                {{
+                  $t(
+                    o.pago_en_proceso.metodo === "oxxo"
+                      ? "miCuentaExtra.enProcesoOxxo"
+                      : "miCuentaExtra.enProceso",
+                  )
+                }}
+              </p>
               <div
                 v-if="cuenta.pagoEnLinea.value"
                 class="mt-2 flex flex-wrap items-center gap-3"

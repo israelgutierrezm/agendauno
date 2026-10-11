@@ -746,6 +746,41 @@ describe("portal del alumno", () => {
     w.unmount();
   });
 
+  it("pagos: dice si el cobro está en pruebas y si ya inició un pago en OXXO (M07)", async () => {
+    api.get.mockImplementation((url: string) => {
+      const ruta = url.replace("/api/v1/app/demo", "");
+      const extra =
+        ruta === "/mi/perfil"
+          ? {
+              ...(datos[ruta] as Record<string, unknown>),
+              pago_en_linea: true,
+              pago_en_linea_prueba: true,
+            }
+          : ruta === "/mi/ordenes/pendientes"
+            ? [
+                {
+                  ...(datos[ruta] as Record<string, unknown>[])[0],
+                  pago_en_proceso: {
+                    metodo: "oxxo",
+                    iniciado_en: "2030-01-08T12:00:00Z",
+                  },
+                },
+              ]
+            : (datos[ruta] ?? []);
+      return Promise.resolve({ data: { data: extra } });
+    });
+    const w = montar(MisPagosView);
+    await flushPromises();
+
+    expect(w.get('[data-prueba="modo-prueba"]').text()).toContain(
+      "no se cobra de verdad",
+    );
+    expect(w.get('[data-prueba="pago-en-proceso"]').text()).toContain(
+      "ficha para pagar en OXXO",
+    );
+    w.unmount();
+  });
+
   it("comprar: el recomendado primero, la fecha exacta si paga hoy y la clase de prueba solo si le toca", async () => {
     const producto = (extra: Record<string, unknown>) => ({
       tipo: "paquete",
