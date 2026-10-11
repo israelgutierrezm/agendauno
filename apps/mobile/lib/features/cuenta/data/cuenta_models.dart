@@ -542,10 +542,28 @@ class OpcionCita {
     this.fotoUrl,
     this.conPlan = false,
     this.sucursales,
+    this.region,
+    this.direccion,
+    this.mapaUrl,
   });
 
   final String id;
   final String nombre;
+
+  /// Sede: zona, dirección y cómo llegar (M06), para saber dónde será la cita.
+  final String? region;
+  final String? direccion;
+  final String? mapaUrl;
+
+  /// «Roma Norte · Av. Álvaro Obregón 123» (lo que haya).
+  String? get ubicacion {
+    final partes = [
+      region,
+      direccion,
+    ].whereType<String>().where((p) => p.trim().isNotEmpty).toList();
+    return partes.isEmpty ? null : partes.join(' · ');
+  }
+
   final int? duracionMinutos;
   final String? zonaHoraria;
 
@@ -579,6 +597,9 @@ class OpcionCita {
     sucursales: j['sucursales'] is List
         ? (j['sucursales'] as List).whereType<String>().toList()
         : null,
+    region: j['region'] as String?,
+    direccion: j['direccion'] as String?,
+    mapaUrl: j['mapa_url'] as String?,
   );
 }
 

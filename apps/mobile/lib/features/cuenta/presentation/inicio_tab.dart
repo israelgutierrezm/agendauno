@@ -54,7 +54,8 @@ class InicioTab extends ConsumerWidget {
     final esCitas = sesion?.esCitas ?? false;
     final usa = cuenta.portal;
     final tienePlan = cuenta.derechos.isNotEmpty;
-    final mapa = proxima?.esCita == true ? proxima?.mapaUrl : null;
+    // Cómo llegar a la sede de su próxima clase o cita (M06).
+    final mapa = proxima?.mapaUrl;
     final nombre = _primerNombre(sesion);
     final estudio = sesion?.estudioNombre;
 
