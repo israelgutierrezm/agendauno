@@ -17,7 +17,7 @@ final class ConceptoDeCobro
     public static function de(?OrdenTenant $orden): string
     {
         $nombres = $orden?->lineas
-            ->map(static fn (LineaOrdenTenant $l): ?string => $l->producto?->nombre)
+            ->map(static fn (LineaOrdenTenant $l): string => $l->nombre())
             ->filter()
             ->unique()
             ->implode(', ');

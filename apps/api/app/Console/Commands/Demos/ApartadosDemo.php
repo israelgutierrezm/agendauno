@@ -327,7 +327,7 @@ trait ApartadosDemo
             }
             // Lo que se compró (un plan) o el servicio de la cita. Lo cobrado ya trae IVA:
             // la factura lo separa.
-            $conceptos = $orden->lineas->map(static fn ($l): array => [(string) $l->producto?->nombre, (int) $l->cantidad, (int) $l->precio_unitario_minor])->all();
+            $conceptos = $orden->lineas->map(static fn ($l): array => [(string) $l->nombre(), (int) $l->cantidad, (int) $l->precio_unitario_minor])->all();
             if ($conceptos === [] && $orden->sesion?->oferta !== null) {
                 $conceptos = [[(string) $orden->sesion->oferta->nombre, 1, (int) $orden->total_minor]];
             }

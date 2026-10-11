@@ -23,6 +23,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property string|null $descripcion qué incluye, en una línea (para el público)
  * @property bool $destacado el que la página muestra primero
  * @property bool $primera_vez solo lo compra quien nunca vino (clase de prueba)
+ * @property bool $cobra_inscripcion al venderlo, se suma la inscripción si toca (B04)
+ * @property bool $cobra_anualidad quien lo tiene paga la anualidad del negocio (B04)
  */
 class ProductoTenant extends Model
 {
@@ -39,6 +41,8 @@ class ProductoTenant extends Model
         'unidades_por_ciclo', 'politica_rollover', 'rollover_max',
         // Para el público (plan de mejoras M03/B03).
         'descripcion', 'destacado', 'primera_vez',
+        // Cuotas del negocio (B04).
+        'cobra_inscripcion', 'cobra_anualidad',
     ];
 
     /**
@@ -55,6 +59,8 @@ class ProductoTenant extends Model
         'archivado' => 'boolean',
         'destacado' => 'boolean',
         'primera_vez' => 'boolean',
+        'cobra_inscripcion' => 'boolean',
+        'cobra_anualidad' => 'boolean',
         'politica_reset' => PoliticaReset::class,
         'politica_rollover' => PoliticaRollover::class,
         'unidades_por_ciclo' => 'integer',

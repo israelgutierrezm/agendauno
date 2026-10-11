@@ -198,7 +198,7 @@ class FichaMiembroTenantController
     private function presentarOrden(OrdenTenant $orden): array
     {
         $sesion = $orden->sesion;
-        $productos = $orden->lineas->map(static fn (LineaOrdenTenant $l): ?string => $l->producto?->nombre)->filter()->values();
+        $productos = $orden->lineas->map(static fn (LineaOrdenTenant $l): string => $l->nombre())->filter()->values();
 
         return [
             'id' => $orden->ulid,
@@ -206,6 +206,9 @@ class FichaMiembroTenantController
             'estado' => $orden->estado->value,
             'total_minor' => $orden->total_minor,
             'moneda' => $orden->moneda,
+            // Las cuotas que lleva (inscripción, anualidad, penalización; B04), para
+            // exentarlas por separado.
+            'cuotas' => $orden->lineas->map(static fn (LineaOrdenTenant $l): ?array => $l->comoCuota())->filter()->values()->all(),
             'metodo_pago' => $orden->metodo_pago,
             'pagada_en' => $orden->pagada_en?->toIso8601String(),
             // Qué se pagó: sus productos o, si es una cita, el servicio, con quién y cuándo.

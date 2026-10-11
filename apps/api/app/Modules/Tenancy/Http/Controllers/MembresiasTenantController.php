@@ -87,6 +87,9 @@ class MembresiasTenantController
             'descripcion' => ['nullable', 'string', 'max:300'],
             'destacado' => ['sometimes', 'boolean'],
             'primera_vez' => ['sometimes', 'boolean'],
+            // Cuotas del negocio (B04).
+            'cobra_inscripcion' => ['sometimes', 'boolean'],
+            'cobra_anualidad' => ['sometimes', 'boolean'],
         ]);
 
         $producto = $this->membresias->crearProducto(
@@ -112,6 +115,8 @@ class MembresiasTenantController
             'descripcion' => self::texto($validado['descripcion'] ?? null),
             'destacado' => (bool) ($validado['destacado'] ?? false),
             'primera_vez' => (bool) ($validado['primera_vez'] ?? false),
+            'cobra_inscripcion' => (bool) ($validado['cobra_inscripcion'] ?? false),
+            'cobra_anualidad' => (bool) ($validado['cobra_anualidad'] ?? false),
         ]);
 
         return response()->json(['data' => $this->presentarProducto($producto)], 201);
@@ -150,6 +155,8 @@ class MembresiasTenantController
             'descripcion' => ['sometimes', 'nullable', 'string', 'max:300'],
             'destacado' => ['sometimes', 'boolean'],
             'primera_vez' => ['sometimes', 'boolean'],
+            'cobra_inscripcion' => ['sometimes', 'boolean'],
+            'cobra_anualidad' => ['sometimes', 'boolean'],
         ]);
 
         $actor = $request->attributes->get('usuario_tenant');
@@ -157,7 +164,7 @@ class MembresiasTenantController
         abort_if($archiva && ! ($actor instanceof Usuario && $actor->puede('productos.eliminar')), 403);
 
         $atributos = [];
-        foreach (['nombre', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos', 'vigencia_cantidad', 'unidades_por_ciclo', 'rollover_max', 'archivado', 'destacado', 'primera_vez'] as $campo) {
+        foreach (['nombre', 'precio_minor', 'moneda', 'ilimitado', 'creditos_incluidos', 'vigencia_cantidad', 'unidades_por_ciclo', 'rollover_max', 'archivado', 'destacado', 'primera_vez', 'cobra_inscripcion', 'cobra_anualidad'] as $campo) {
             if ($request->has($campo)) {
                 $atributos[$campo] = $validado[$campo] ?? null;
             }
@@ -336,6 +343,8 @@ class MembresiasTenantController
             'descripcion' => $producto->descripcion,
             'destacado' => $producto->destacado,
             'primera_vez' => $producto->primera_vez,
+            'cobra_inscripcion' => $producto->cobra_inscripcion,
+            'cobra_anualidad' => $producto->cobra_anualidad,
             'politica_reset' => $producto->politica_reset->value,
             'unidades_por_ciclo' => $producto->unidades_por_ciclo,
             'politica_rollover' => $producto->politica_rollover->value,

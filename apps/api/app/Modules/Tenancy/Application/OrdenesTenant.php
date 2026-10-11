@@ -33,6 +33,7 @@ class OrdenesTenant
         private readonly GestionarPromocionesTenant $promociones,
         private readonly CobrarOrdenTenant $cobrar,
         private readonly MembresiasTenant $membresias,
+        private readonly CuotasTenant $cuotas,
     ) {}
 
     /**
@@ -40,9 +41,13 @@ class OrdenesTenant
      * renovación de lo que la persona ya tiene (su acuerdo sigue aunque el producto ya
      * no se ofrezca).
      *
+     * `$exencionInscripcion`: vender sin la inscripción que tocaría (B04); quien la
+     * exenta (con `cuotas.exentar`, lo revisa quien llama) y por qué quedan en la bitácora.
+     *
      * @param  list<array{producto: ProductoTenant, cantidad: int, beneficiario?: PersonaTenant|null}>  $items
+     * @param  array{actor: Usuario|null, motivo: string}|null  $exencionInscripcion
      */
-    public function crear(PersonaTenant $comprador, array $items, ?string $codigoPromo = null, ?int $sucursalId = null, bool $renovacion = false): OrdenTenant
+    public function crear(PersonaTenant $comprador, array $items, ?string $codigoPromo = null, ?int $sucursalId = null, bool $renovacion = false, ?array $exencionInscripcion = null): OrdenTenant
     {
         $moneda = $items[0]['producto']->moneda; // Una sola moneda por orden.
 
@@ -67,7 +72,7 @@ class OrdenesTenant
             }
         }
 
-        return DB::connection('tenant')->transaction(function () use ($comprador, $items, $moneda, $codigoPromo, $sucursalId): OrdenTenant {
+        return DB::connection('tenant')->transaction(function () use ($comprador, $items, $moneda, $codigoPromo, $sucursalId, $renovacion, $exencionInscripcion): OrdenTenant {
             $subtotal = 0;
 
             $orden = OrdenTenant::query()->create([
@@ -102,14 +107,59 @@ class OrdenesTenant
                 $promocionId = $promocion->getKey();
             }
 
+            // Inscripción (B04): al vender un plan que la cobra, si a quien lo recibe le
+            // toca (primera alta o reingreso). Se bloquea a la persona para que dos
+            // ventas a la vez no la cobren dos veces. No la toca la promoción.
+            $cuotas = $renovacion ? 0 : $this->sumarInscripciones($orden, $comprador, $items, $exencionInscripcion);
+
             $orden->update([
-                'total_minor' => $subtotal - $descuento,
+                'total_minor' => $subtotal - $descuento + $cuotas,
                 'descuento_minor' => $descuento,
                 'promocion_id' => $promocionId,
             ]);
 
             return $orden;
         });
+    }
+
+    /**
+     * Suma a la orden la inscripción de cada persona que la deba, si alguno de sus
+     * productos la cobra. Devuelve lo sumado.
+     *
+     * @param  list<array{producto: ProductoTenant, cantidad: int, beneficiario?: PersonaTenant|null}>  $items
+     * @param  array{actor: Usuario|null, motivo: string}|null  $exencion
+     */
+    private function sumarInscripciones(OrdenTenant $orden, PersonaTenant $comprador, array $items, ?array $exencion): int
+    {
+        $personas = [];
+        foreach ($items as $item) {
+            if ($item['producto']->cobra_inscripcion) {
+                $quien = $item['beneficiario'] ?? $comprador;
+                $personas[(int) $quien->getKey()] = $quien;
+            }
+        }
+
+        $total = 0;
+        foreach ($personas as $id => $persona) {
+            PersonaTenant::query()->whereKey($id)->lockForUpdate()->first();
+            if (! $this->cuotas->debeInscripcion($persona)) {
+                continue;
+            }
+            $linea = $this->cuotas->lineaDeInscripcion($persona);
+            if ($exencion !== null) {
+                app(RegistrarAuditoria::class)->registrar($exencion['actor'], 'cuota.exentada', 'orden', (string) $orden->ulid, [
+                    'concepto' => $linea['concepto'],
+                    'monto_minor' => $linea['subtotal_minor'],
+                    'persona_id' => $persona->ulid,
+                ], null, $exencion['motivo'] !== '' ? $exencion['motivo'] : null);
+
+                continue;
+            }
+            $orden->lineas()->create($linea);
+            $total += $linea['subtotal_minor'];
+        }
+
+        return $total;
     }
 
     /**

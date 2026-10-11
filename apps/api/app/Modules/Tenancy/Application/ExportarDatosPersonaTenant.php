@@ -72,7 +72,7 @@ class ExportarDatosPersonaTenant
                     'total' => $o->total_minor / 100,
                     'moneda' => $o->moneda,
                     'pagada' => $fecha($o->pagada_en),
-                    'conceptos' => $o->lineas->map(static fn ($l): ?string => $l->producto?->nombre)->filter()->values()->all(),
+                    'conceptos' => $o->lineas->map(static fn ($l): string => $l->nombre())->filter()->values()->all(),
                 ])->all(),
             // Lo que el equipo anotó de la persona (también son sus datos).
             'notas_del_negocio' => NotaPersonaTenant::query()->where('persona_id', $id)->orderBy('id')->get()

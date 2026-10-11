@@ -22,6 +22,7 @@ use App\Modules\Tenancy\Http\Controllers\CatalogoTenantController;
 use App\Modules\Tenancy\Http\Controllers\CheckinsTenantController;
 use App\Modules\Tenancy\Http\Controllers\ClimaEquipoTenantController;
 use App\Modules\Tenancy\Http\Controllers\CreditosTenantController;
+use App\Modules\Tenancy\Http\Controllers\CuotasTenantController;
 use App\Modules\Tenancy\Http\Controllers\DatosFiscalesTenantController;
 use App\Modules\Tenancy\Http\Controllers\DifusionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\DirectorioController;
@@ -688,6 +689,11 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/productos', [MembresiasTenantController::class, 'crearProducto'])->middleware(['puede:productos.gestionar', 'plan:paquetes'])->name('productos.store');
             // Editor completo de membresías (Etapa 2): editar plantilla / archivar-reactivar.
             Route::put('/productos/{producto}', [MembresiasTenantController::class, 'actualizarProducto'])->middleware('puede:productos.gestionar')->name('productos.update');
+            // Cuotas del negocio (B04): inscripción y anualidad; exentar una por cobrar.
+            Route::get('/cuotas', [CuotasTenantController::class, 'mostrar'])->middleware('puede:productos.ver')->name('cuotas.show');
+            Route::put('/cuotas', [CuotasTenantController::class, 'guardar'])->middleware('puede:productos.gestionar')->name('cuotas.update');
+            Route::post('/ordenes/{orden}/lineas/{linea}/exentar', [CuotasTenantController::class, 'exentar'])->middleware('puede:cuotas.exentar')->name('ordenes.lineas.exentar');
+            Route::get('/miembros/{persona}/cuotas', [CuotasTenantController::class, 'dePersona'])->middleware('puede:ordenes.gestionar')->name('miembros.cuotas');
             Route::post('/acuerdos', [MembresiasTenantController::class, 'vender'])->middleware(['puede:membresias.gestionar', 'plan:paquetes'])->name('acuerdos.store');
             // Dunning (R10): morosidad de la membresia ante fallo de cobro.
             Route::get('/dunning', [DunningTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('dunning.index');

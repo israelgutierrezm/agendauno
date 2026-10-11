@@ -8,6 +8,7 @@ use App\Modules\Tenancy\Application\FechasNegocioTenant;
 use App\Modules\Tenancy\Application\MovimientosDePagoTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Application\ResolverAccesoTenant;
+use App\Modules\Tenancy\Cuotas\ConceptoCuota;
 use App\Modules\Tenancy\Models\LineaOrdenTenant;
 use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
@@ -172,8 +173,8 @@ class ReporteTendenciasTenantController
             ->where('ordenes.moneda', $moneda)
             ->when($sedes !== null, fn ($q) => $q->whereIn('ordenes.sucursal_id', $sedes))
             ->whereBetween('ordenes.created_at', [$inicio, $fin])
-            ->groupBy('lineas_orden.producto_comercial_id')
-            ->selectRaw('lineas_orden.producto_comercial_id as pid, SUM(lineas_orden.subtotal_minor) as vendido, SUM(lineas_orden.cantidad) as unidades')
+            ->groupBy('lineas_orden.producto_comercial_id', 'lineas_orden.concepto')
+            ->selectRaw('lineas_orden.producto_comercial_id as pid, lineas_orden.concepto as concepto, SUM(lineas_orden.subtotal_minor) as vendido, SUM(lineas_orden.cantidad) as unidades')
             ->get();
 
         $nombres = ProductoTenant::query()
@@ -182,7 +183,10 @@ class ReporteTendenciasTenantController
 
         return $filas
             ->map(static fn ($f): array => [
-                'producto' => (string) ($nombres->get((int) $f->getAttribute('pid')) ?? '—'),
+                // Las cuotas (B04) se nombran por su concepto.
+                'producto' => (string) ($nombres->get((int) $f->getAttribute('pid'))
+                    ?? ConceptoCuota::tryFrom((string) $f->getAttribute('concepto'))?->etiqueta()
+                    ?? '—'),
                 'ventas_minor' => (int) $f->getAttribute('vendido'),
                 'unidades' => (int) $f->getAttribute('unidades'),
             ])
