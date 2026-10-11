@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/network/participante_en_uso.dart';
 import '../../auth/application/sesion_controller.dart';
 import 'corte_planes.dart';
 import 'cuenta_models.dart';
@@ -523,6 +524,9 @@ final cuentaRepositoryProvider = Provider<CuentaRepository?>((ref) {
   if (sesion == null) {
     return null;
   }
+
+  // Al pasar a la cuenta de una persona a cargo (o volver), todo se lee de nuevo.
+  ref.watch(participanteEnUsoProvider);
 
   return CuentaRepository(ref.watch(dioProvider), sesion.slug, sesion.moneda);
 });

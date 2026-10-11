@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
 import 'auth_token.dart';
+import 'participante_en_uso.dart';
 import 'sesion_revocada.dart';
 
 /// Shared Dio client for the app.
@@ -43,6 +44,12 @@ final dioProvider = Provider<Dio>((ref) {
           options.headers['Authorization'] = 'Bearer $token';
         }
 
+        // Actúa por una persona a su cargo (familias, ADR 0123): solo en su cuenta.
+        final participante = ref.read(participanteEnUsoProvider);
+        if (participante != null && esDeLaCuenta(options.path)) {
+          options.headers['X-Participante'] = participante;
+        }
+
         handler.next(options);
       },
       onError: (error, handler) {
@@ -50,6 +57,13 @@ final dioProvider = Provider<Dio>((ref) {
         // y vuelve al login con el aviso (no se queda en «No se pudo cargar»).
         if (esSesionRevocada(error, ref.read(authTokenProvider))) {
           ref.read(avisoSesionRevocadaProvider).avisar();
+        }
+        // Ya no puede actuar por esa persona: vuelve a su propia cuenta.
+        if (esParticipanteNoAutorizado(
+          error.response?.statusCode,
+          error.response?.data,
+        )) {
+          ref.read(participanteEnUsoProvider.notifier).elegir(null);
         }
         handler.next(error);
       },

@@ -12,6 +12,7 @@ import '../data/cuenta_models.dart';
 import '../data/eventos_cuenta.dart';
 import 'cuenta_widgets.dart';
 import 'pase_sheet.dart';
+import 'personas_a_cargo.dart';
 import 'tarjeta_principal.dart';
 
 /// Pestañas del portal del alumno (el orden de la barra de abajo).
@@ -72,6 +73,9 @@ class InicioTab extends ConsumerWidget {
           style: const TextStyle(color: TemaAgendaUno.textoSuave),
         ),
         const SizedBox(height: 16),
+
+        // Personas a su cargo: autorizar, ver su cuenta o retirar (ADR 0123).
+        const PersonasACargoCard(),
 
         // La tarjeta principal: siempre, con o sin reserva.
         TarjetaPrincipal(

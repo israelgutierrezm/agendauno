@@ -195,6 +195,7 @@ class Sesion {
     this.nivelPlan,
     this.funcionesSin = const [],
     this.estadoNegocio,
+    this.modulos = const [],
   });
 
   final String slug;
@@ -246,6 +247,12 @@ class Sesion {
 
   /// ¿El plan del negocio incluye esta función (p. ej. `venta_en_linea`)?
   bool tieneFuncion(String funcion) => !funcionesSin.contains(funcion);
+
+  /// Los módulos que el superadministrador encendió en el negocio (ADR 0123; p. ej.
+  /// `familias`). Apagados, el servidor niega sus rutas; la app no los ofrece.
+  final List<String> modulos;
+
+  bool tieneModulo(String modulo) => modulos.contains(modulo);
 
   /// Estado del negocio en la plataforma (`estudio.estado`: trialing, active,
   /// suspended…; null si el API no lo mandó).
@@ -339,6 +346,7 @@ class Sesion {
     'nivel_plan': nivelPlan,
     'funciones_sin': funcionesSin,
     'estado_negocio': estadoNegocio,
+    'modulos': modulos,
   };
 
   /// Restaura una sesión guardada (null si le falta lo esencial).
@@ -386,6 +394,7 @@ class Sesion {
       nivelPlan: datos['nivel_plan'] as String?,
       funcionesSin: _textos(datos['funciones_sin']),
       estadoNegocio: datos['estado_negocio'] as String?,
+      modulos: _textos(datos['modulos']),
     );
   }
 
@@ -437,6 +446,7 @@ class Sesion {
       nivelPlan: plan?['nivel'] as String?,
       funcionesSin: _textos(plan?['sin']),
       estadoNegocio: estudio?['estado'] as String?,
+      modulos: _textos(estudio?['modulos']),
     );
   }
 
@@ -501,6 +511,7 @@ class Sesion {
     nivelPlan: nivelPlan,
     funcionesSin: funcionesSin,
     estadoNegocio: estadoNegocio,
+    modulos: modulos,
   );
 
   /// La versión mínima tal como vino; sin ella, no se exige ninguna.
