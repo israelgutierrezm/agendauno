@@ -126,7 +126,7 @@ orden, del riesgo al alcance. Una rama y un PR por bloque, como antes.
 | Bloque | Contenido | Estado |
 |---|---|---|
 | 9 | M06 sucursales y cobertura: reprogramar no lleva un plan a otra sede ni fuera de su vigencia; el motivo nombra las sedes; «Todas las sedes incluidas» / «Solo en …»; tarjetas de sede con zona, dirección, foto y cómo llegar; la sede elegida en el calendario filtra los planes; la app dice dónde será la cita | Hecho |
-| 10 | M08 acciones del equipo: los indicadores del inicio abren el listado filtrado; cobrar y sustituir desde la sesión; un solo profesional sin filtros de equipo | Pendiente |
+| 10 | M08 acciones del equipo: cada indicador y pendiente del inicio abre su listado ya filtrado (renovaciones por estado y ventana, cobros en su sección, solicitudes nuevas, seguimientos); solicitudes de acceso y seguimientos abiertos en el inicio; cobrar una reserva pendiente desde la sesión (agenda y recepción); con una sola persona que atiende, sin filtro ni selector de equipo. La sustitución ya existía en la sesión | Hecho |
 | 11 | M07 cobros comprensibles: intentos de pago visibles, modo de prueba, pasarela lista solo con su confirmación de pagos, auditoría de reembolsos | Pendiente |
 | 12 | C02 y C08: primera operación real registrada, aviso del primer cobro y embudo de la plataforma | Pendiente |
 | 13 | B08 campañas: pausar, no duplicar, baja al enviar y fin del seguimiento al renovar | Pendiente |

@@ -12,11 +12,13 @@ use App\Modules\Tenancy\Asistencia\EstadoAsistencia;
 use App\Modules\Tenancy\EstadoDunning;
 use App\Modules\Tenancy\Models\AceptacionWaiverTenant;
 use App\Modules\Tenancy\Models\AuditoriaTenant;
+use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PersonaTenant;
 use App\Modules\Tenancy\Models\ProcesoDunningTenant;
 use App\Modules\Tenancy\Models\ReservaTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
+use App\Modules\Tenancy\Ordenes\EstadoOrden;
 use App\Modules\Tenancy\Reservas\CanalReserva;
 use App\Modules\Tenancy\Reservas\EstadoReserva;
 use App\Modules\Tenancy\Reservas\QuienCancela;
@@ -55,7 +57,7 @@ class ReservasTenantController
                 EstadoReserva::Confirmada->value, EstadoReserva::Ofrecida->value,
                 EstadoReserva::EnEspera->value, EstadoReserva::PendientePago->value,
             ])
-            ->with(['persona', 'sesion', 'asistencia'])
+            ->with(['persona', 'sesion.oferta', 'asistencia', 'orden'])
             ->orderBy('id')
             ->get();
 
@@ -362,6 +364,13 @@ class ReservasTenantController
             // Llegó tarde (cuenta como asistencia) y si la marcó el sistema al terminar.
             'retardo' => (bool) $reserva->asistencia?->retardo,
             'asistencia_automatica' => (bool) $reserva->asistencia?->automatica,
+            // Lo que falta pagar de esta reserva, para cobrarlo desde la sesión (M08).
+            'orden' => $reserva->orden instanceof OrdenTenant && $reserva->orden->estado === EstadoOrden::Pendiente ? [
+                'id' => $reserva->orden->ulid,
+                'total_minor' => (int) $reserva->orden->total_minor,
+                'moneda' => $reserva->orden->moneda,
+                'concepto' => $reserva->sesion?->oferta?->nombre,
+            ] : null,
         ];
     }
 }
