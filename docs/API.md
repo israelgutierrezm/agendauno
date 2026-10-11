@@ -343,6 +343,12 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## Respuestas privadas (M11)
+
+- Toda respuesta de la API a una petición con credenciales (`Authorization` o
+  `X-API-Key`) lleva `Cache-Control: no-store, private`, salvo la que declara su propia
+  caché (los calendarios `.ics`, con `max-age`). Todas llevan `X-Robots-Tag: noindex`.
+
 ## Embudo de la plataforma (C02, C08)
 
 - `POST /metricas/visita-landing` (público, `text/plain` con `{"producto"}`): una visita
