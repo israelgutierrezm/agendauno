@@ -344,6 +344,26 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   devuelven `cargados`. Cada carga queda en la bitácora con su resumen y duración
   (ADR 0125).
 
+## Presupuestos (negocios de citas, ADR 0127)
+
+- `GET /presupuestos?estado=&q=` (`presupuestos.ver`; `estado` admite `vencido`) y
+  `GET /presupuestos/{id}`.
+- `POST /presupuestos` y `PUT /presupuestos/{id}` (`presupuestos.gestionar`):
+  - el cliente va como `persona_id`, o como `nombre_contacto`, `email_contacto` y
+    `celular_contacto`;
+  - también admiten `sucursal_id`, `valido_hasta`, `descuento_minor` y `notas`;
+  - cada elemento de `lineas` lleva `tipo` (`servicio|producto|articulo|libre`),
+    `referencia`, `descripcion`, `cantidad`, `precio_unitario_minor` y
+    `descuento_minor`.
+- `DELETE /presupuestos/{id}` borra solo borradores.
+- `POST /presupuestos/{id}/enviar|aceptar|rechazar` (`rechazar` admite `motivo`).
+- `POST /presupuestos/{id}/convertir` (además `ordenes.gestionar`) devuelve la orden de
+  cobro.
+- `GET /presupuestos/catalogo` y `GET|PUT /presupuestos/configuracion` (`impuestos`,
+  `tasa_impuesto_bp`, `vigencia_dias`, `notas`).
+- Errores: `QUOTE_NOT_ALLOWED` con `meta.motivo` (`respondido`, `vencido`,
+  `no_aceptado`, `no_borrador`, `sin_correo`, `sin_cliente`, `sin_conceptos`…).
+
 ## Respuestas privadas (M11)
 
 - Toda respuesta de la API a una petición con credenciales (`Authorization` o

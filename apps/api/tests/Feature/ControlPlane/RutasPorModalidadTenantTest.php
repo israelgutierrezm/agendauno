@@ -93,6 +93,18 @@ function rutasExclusivasPorModalidad(): array
         'citas.dias' => 'citas',
         'citas.agendar' => 'citas',
         'reservas.historial' => 'citas',
+        'presupuestos.index' => 'citas',
+        'presupuestos.catalogo' => 'citas',
+        'presupuestos.configuracion' => 'citas',
+        'presupuestos.configuracion.guardar' => 'citas',
+        'presupuestos.store' => 'citas',
+        'presupuestos.show' => 'citas',
+        'presupuestos.update' => 'citas',
+        'presupuestos.destroy' => 'citas',
+        'presupuestos.enviar' => 'citas',
+        'presupuestos.aceptar' => 'citas',
+        'presupuestos.rechazar' => 'citas',
+        'presupuestos.convertir' => 'citas',
     ];
 }
 
@@ -117,6 +129,8 @@ function patronesDeRutasExclusivas(): array
         '/padron/' => 'clases',
         '/^(mi\.|agenda\.)?citas\./' => 'citas',
         '/^horarios-atencion\./' => 'citas',
+        // Presupuestos (ADR 0127).
+        '/^presupuestos\./' => 'citas',
         '/^disponibilidad\./' => 'citas',
     ];
 }
