@@ -69,7 +69,7 @@ async function enviar(): Promise<void> {
       <select
         id="giro-negocio"
         v-model="elegido"
-        class="tu-input w-auto"
+        class="tu-input w-full sm:w-80"
         data-prueba="giro"
       >
         <option v-for="g in giros" :key="g" :value="g">

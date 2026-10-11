@@ -11,7 +11,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="flex items-center justify-between gap-4 flex-wrap">
+  <div class="tu-encabezado flex items-center justify-between gap-4 flex-wrap">
     <div class="min-w-0">
       <h1
         class="text-2xl font-semibold tracking-tight leading-tight min-w-0 break-words"
