@@ -70,6 +70,10 @@ Schedule::command('agendauno:cobrar-suscripciones')->dailyAt('06:45')->withoutOv
 // cómo se paga; a quien paga a mano le abre la renovación para pagarla por adelantado.
 Schedule::command('agendauno:avisar-renovaciones')->dailyAt('15:00')->withoutOverlapping();
 
+// Cuotas del negocio (B04): a diario a las 07:00 de CDMX se generan las anualidades que
+// tocan (aniversario de la alta o fecha fija), por cobrar. No duplica si corre de nuevo.
+Schedule::command('agendauno:generar-cuotas')->dailyAt('13:00')->withoutOverlapping();
+
 // Cobro del SaaS (ADR 0019, 0032 y 0107): a diario a las 02:00 de CDMX se emiten los
 // cargos de los meses que ya cerraron en la zona de cada negocio (congelando su
 // medición) y los periodos de los planes de citas que empiezan (por adelantado); un
