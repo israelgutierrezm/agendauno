@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Application;
 
+use App\Modules\Tenancy\Membresias\CondicionesDePlan;
 use App\Modules\Tenancy\Membresias\TipoProducto;
 use App\Modules\Tenancy\Models\OrdenTenant;
 use App\Modules\Tenancy\Models\PagoTenant;
@@ -12,6 +13,7 @@ use App\Modules\Tenancy\Models\ProductoTenant;
 use App\Modules\Tenancy\Models\SesionTenant;
 use App\Modules\Tenancy\Models\Usuario;
 use App\Modules\Tenancy\Ordenes\EstadoOrden;
+use App\Modules\Tenancy\Ordenes\Exceptions\CondicionesNoAceptadas;
 use App\Modules\Tenancy\Ordenes\Exceptions\ExtraSinPaquete;
 use App\Modules\Tenancy\Ordenes\Exceptions\MonedaMixta;
 use App\Modules\Tenancy\Ordenes\Exceptions\OrdenNoLiquidable;
@@ -44,10 +46,15 @@ class OrdenesTenant
      * `$exencionInscripcion`: vender sin la inscripción que tocaría (B04); quien la
      * exenta (con `cuotas.exentar`, lo revisa quien llama) y por qué quedan en la bitácora.
      *
+     * `$aceptacion`: un plan con permanencia (B04) se compra aceptando sus condiciones
+     * (`via`: `cliente` en su cuenta, `negocio` si lo registra el equipo); se guardan en la
+     * línea con el texto, su versión, cuándo y quién.
+     *
      * @param  list<array{producto: ProductoTenant, cantidad: int, beneficiario?: PersonaTenant|null}>  $items
      * @param  array{actor: Usuario|null, motivo: string}|null  $exencionInscripcion
+     * @param  array{via: string, usuario: Usuario|null, ip: string|null}|null  $aceptacion
      */
-    public function crear(PersonaTenant $comprador, array $items, ?string $codigoPromo = null, ?int $sucursalId = null, bool $renovacion = false, ?array $exencionInscripcion = null): OrdenTenant
+    public function crear(PersonaTenant $comprador, array $items, ?string $codigoPromo = null, ?int $sucursalId = null, bool $renovacion = false, ?array $exencionInscripcion = null, ?array $aceptacion = null): OrdenTenant
     {
         $moneda = $items[0]['producto']->moneda; // Una sola moneda por orden.
 
@@ -65,6 +72,10 @@ class OrdenesTenant
             if ($item['producto']->moneda !== $moneda) {
                 throw new MonedaMixta('Una orden no puede mezclar monedas.');
             }
+            // Permanencia (B04): sin aceptar sus condiciones no se compra.
+            if (! $renovacion && $aceptacion === null && CondicionesDePlan::aplica($item['producto'])) {
+                throw new CondicionesNoAceptadas("«{$item['producto']->nombre}» tiene permanencia: acepta sus condiciones para comprarlo.");
+            }
             // Clases extra: quien las recibe debe tener un paquete vigente al cual sumarlas.
             $recibe = $item['beneficiario'] ?? $comprador;
             if ($item['producto']->tipo === TipoProducto::AddOn && $this->membresias->paqueteParaExtras($recibe) === null) {
@@ -72,7 +83,7 @@ class OrdenesTenant
             }
         }
 
-        return DB::connection('tenant')->transaction(function () use ($comprador, $items, $moneda, $codigoPromo, $sucursalId, $renovacion, $exencionInscripcion): OrdenTenant {
+        return DB::connection('tenant')->transaction(function () use ($comprador, $items, $moneda, $codigoPromo, $sucursalId, $renovacion, $exencionInscripcion, $aceptacion): OrdenTenant {
             $subtotal = 0;
 
             $orden = OrdenTenant::query()->create([
@@ -96,6 +107,9 @@ class OrdenesTenant
                     'cantidad' => $cantidad,
                     'precio_unitario_minor' => $producto->precio_minor,
                     'subtotal_minor' => $lineaSubtotal,
+                    // Las condiciones que aceptó (plan con permanencia; B04).
+                    'condiciones' => $aceptacion === null ? null
+                        : CondicionesDePlan::aceptadas($producto, $aceptacion['via'], $aceptacion['usuario'], $aceptacion['ip']),
                 ]);
             }
 

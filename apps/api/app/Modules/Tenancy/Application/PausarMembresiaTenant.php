@@ -194,6 +194,10 @@ class PausarMembresiaTenant
             // volvería al día de antes y saldría más corto).
             $acuerdo->dia_ancla = Aniversario::diaDe($acuerdo->proxima_cobro_en);
         }
+        // La permanencia cuenta meses pagados: se corre lo mismo que la pausa (B04).
+        if ($acuerdo->permanencia_hasta !== null) {
+            $acuerdo->permanencia_hasta = $acuerdo->permanencia_hasta->copy()->addDays($dias);
+        }
 
         $derechos = DerechoTenant::query()
             ->where('acuerdo_id', $acuerdo->getKey())

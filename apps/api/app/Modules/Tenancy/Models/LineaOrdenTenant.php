@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property ConceptoCuota|null $concepto
  * @property string|null $referencia
+ * @property array<string, mixed>|null $condiciones las que aceptó el cliente (plan con permanencia; B04)
  */
 class LineaOrdenTenant extends Model
 {
@@ -30,7 +31,7 @@ class LineaOrdenTenant extends Model
     protected $fillable = [
         'orden_id', 'producto_comercial_id', 'beneficiario_id',
         'cantidad', 'precio_unitario_minor', 'subtotal_minor',
-        'concepto', 'referencia',
+        'concepto', 'referencia', 'condiciones',
     ];
 
     /**
@@ -41,6 +42,7 @@ class LineaOrdenTenant extends Model
         'precio_unitario_minor' => 'integer',
         'subtotal_minor' => 'integer',
         'concepto' => ConceptoCuota::class,
+        'condiciones' => 'array',
     ];
 
     /**

@@ -116,6 +116,10 @@ class FichaMiembroTenantController
                 // Para pausar/reanudar desde la ficha.
                 'acuerdo_id' => $derecho->acuerdo?->ulid,
                 'pausa_hasta' => $derecho->acuerdo?->pausaAbierta?->hasta->toDateString(),
+                // Membresía que se renueva: se puede dar de baja (B04); su baja programada.
+                'recurrente' => $derecho->acuerdo?->dia_ancla !== null,
+                'permanencia_hasta' => $derecho->acuerdo?->permanencia_hasta?->toDateString(),
+                'baja_efectiva_el' => $derecho->acuerdo?->baja_efectiva_el?->toDateString(),
                 'proxima_cobro_en' => $derecho->acuerdo?->proxima_cobro_en?->toDateString(),
                 'ilimitado' => $derecho->ilimitado,
                 'saldo_creditos' => $saldo !== null ? intdiv($saldo, 1000) : null,

@@ -33,6 +33,7 @@ use App\Modules\Tenancy\Application\VentanaDeReservaTenant;
 use App\Modules\Tenancy\Application\WaiversTenant;
 use App\Modules\Tenancy\Application\WhatsAppTenant;
 use App\Modules\Tenancy\Http\SesionTenantPresenter;
+use App\Modules\Tenancy\Membresias\CondicionesDePlan;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\VigenciaProducto;
 use App\Modules\Tenancy\Models\ConfiguracionCuotasTenant;
@@ -858,6 +859,9 @@ class MiTenantController
                 'disponible' => ! $p->primera_vez || $primeraVez,
                 // Lo que se suma de inscripción si lo compra hoy (0 = nada).
                 'inscripcion_minor' => $p->cobra_inscripcion ? $inscripcion : 0,
+                // Permanencia (B04): las condiciones que acepta al comprarlo.
+                'permanencia_meses' => $p->permanencia_meses,
+                'condiciones' => CondicionesDePlan::texto($p),
             ])->all(),
         ]);
     }
@@ -933,6 +937,8 @@ class MiTenantController
             'items.*.producto_id' => ['required', 'string'],
             'items.*.cantidad' => ['required', 'integer', 'min:1'],
             'codigo_promo' => ['nullable', 'string', 'max:64'],
+            // Acepta las condiciones de un plan con permanencia (B04).
+            'acepta_condiciones' => ['sometimes', 'boolean'],
         ]);
 
         $items = [];
@@ -944,7 +950,16 @@ class MiTenantController
 
         // Sucursal (R19): la compra del alumno se atribuye a su sede de casa.
         $sucursalId = $persona->sucursal_id !== null ? (int) $persona->sucursal_id : null;
-        $orden = $this->ordenes->crear($persona, $items, $validado['codigo_promo'] ?? null, $sucursalId);
+        $actor = $request->attributes->get('usuario_tenant');
+        $orden = $this->ordenes->crear(
+            $persona,
+            $items,
+            $validado['codigo_promo'] ?? null,
+            $sucursalId,
+            aceptacion: ($validado['acepta_condiciones'] ?? false) === true
+                ? ['via' => 'cliente', 'usuario' => $actor instanceof Usuario ? $actor : null, 'ip' => $request->ip()]
+                : null,
+        );
 
         return response()->json(['data' => $this->presentarOrden($orden->refresh())], 201);
     }

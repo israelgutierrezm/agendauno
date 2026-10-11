@@ -270,6 +270,8 @@ class EscaparateTenant
                 'vigencia_cantidad' => $p->vigencia_cantidad,
                 // La fecha exacta: la vigencia corre desde el pago (M03).
                 'vence_si_compra_hoy' => VigenciaProducto::de($p)?->hasta($hoy),
+                // Permanencia mínima (B04), dicha antes de pedir acceso.
+                'permanencia_meses' => $p->permanencia_meses,
                 'unidades_por_ciclo' => $p->unidades_por_ciclo,
             ])->all();
     }

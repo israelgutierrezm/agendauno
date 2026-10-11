@@ -72,6 +72,8 @@ class OrdenesTenantController
             // Vender sin la inscripción que tocaría (B04): solo con `cuotas.exentar`.
             'exentar_inscripcion' => ['sometimes', 'boolean'],
             'motivo_exencion' => ['nullable', 'required_if:exentar_inscripcion,true', 'string', 'max:300'],
+            // El cliente aceptó las condiciones de un plan con permanencia (B04).
+            'acepta_condiciones' => ['sometimes', 'boolean'],
         ]);
 
         $comprador = PersonaTenant::query()->where('ulid', $validado['comprador_id'])->firstOrFail();
@@ -111,6 +113,9 @@ class OrdenesTenantController
             $validado['codigo_promo'] ?? null,
             $sucursalId,
             exencionInscripcion: $exentar ? ['actor' => $actor, 'motivo' => trim((string) ($validado['motivo_exencion'] ?? ''))] : null,
+            aceptacion: ($validado['acepta_condiciones'] ?? false) === true
+                ? ['via' => 'negocio', 'usuario' => $actor, 'ip' => $request->ip()]
+                : null,
         );
 
         return response()->json(['data' => $this->presentar($orden->refresh())], 201);

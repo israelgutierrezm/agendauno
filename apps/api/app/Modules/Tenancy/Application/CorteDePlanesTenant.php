@@ -112,6 +112,13 @@ class CorteDePlanesTenant
             ...$plan->coberturaSucursales(),
             'tipo' => $acuerdo?->producto?->tipo->value,
             'comprado' => $acuerdo?->fecha_inicio?->toDateString(),
+            // Se renueva (membresía): se puede dar de baja (B04). Su permanencia, lo
+            // pactado al contratar y su baja programada, si tiene.
+            'recurrente' => $acuerdo?->dia_ancla !== null,
+            'proximo_cobro' => $acuerdo?->proxima_cobro_en?->toDateString(),
+            'permanencia_hasta' => $acuerdo?->permanencia_hasta?->toDateString(),
+            'condiciones' => is_string($acuerdo?->condiciones['texto'] ?? null) ? $acuerdo->condiciones['texto'] : null,
+            'baja_efectiva_el' => $acuerdo?->baja_efectiva_el?->toDateString(),
             'desde' => $plan->valido_desde?->toDateString(),
             'hasta' => $plan->valido_hasta?->toDateString(),
             'estado' => $this->estadoEfectivo($plan, $hoy, $unidades['disponibles'], $unidades['apartadas']),

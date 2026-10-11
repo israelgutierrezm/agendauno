@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\Membresias\BajaAnticipada;
 use App\Modules\Tenancy\Membresias\PoliticaReset;
 use App\Modules\Tenancy\Membresias\PoliticaRollover;
 use App\Modules\Tenancy\Membresias\TipoProducto;
@@ -25,6 +26,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property bool $primera_vez solo lo compra quien nunca vino (clase de prueba)
  * @property bool $cobra_inscripcion al venderlo, se suma la inscripción si toca (B04)
  * @property bool $cobra_anualidad quien lo tiene paga la anualidad del negocio (B04)
+ * @property int|null $permanencia_meses permanencia mínima de una membresía (B04)
+ * @property BajaAnticipada|null $baja_anticipada qué paga si da de baja antes (B04)
+ * @property int|null $penalizacion_minor la penalización fija, si es por monto (B04)
  */
 class ProductoTenant extends Model
 {
@@ -43,6 +47,8 @@ class ProductoTenant extends Model
         'descripcion', 'destacado', 'primera_vez',
         // Cuotas del negocio (B04).
         'cobra_inscripcion', 'cobra_anualidad',
+        // Permanencia y baja anticipada (B04).
+        'permanencia_meses', 'baja_anticipada', 'penalizacion_minor',
     ];
 
     /**
@@ -61,6 +67,9 @@ class ProductoTenant extends Model
         'primera_vez' => 'boolean',
         'cobra_inscripcion' => 'boolean',
         'cobra_anualidad' => 'boolean',
+        'permanencia_meses' => 'integer',
+        'baja_anticipada' => BajaAnticipada::class,
+        'penalizacion_minor' => 'integer',
         'politica_reset' => PoliticaReset::class,
         'politica_rollover' => PoliticaRollover::class,
         'unidades_por_ciclo' => 'integer',

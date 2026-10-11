@@ -13,6 +13,7 @@ use App\Modules\Tenancy\Http\Controllers\AuthTenantController;
 use App\Modules\Tenancy\Http\Controllers\AutomatizacionesTenantController;
 use App\Modules\Tenancy\Http\Controllers\AvisoPrivacidadNegocioController;
 use App\Modules\Tenancy\Http\Controllers\AvisosPlataformaTenantController;
+use App\Modules\Tenancy\Http\Controllers\BajasMembresiaTenantController;
 use App\Modules\Tenancy\Http\Controllers\BloqueosAgendaTenantController;
 use App\Modules\Tenancy\Http\Controllers\CalendarioPublicoController;
 use App\Modules\Tenancy\Http\Controllers\CalendarioTenantController;
@@ -704,6 +705,9 @@ Route::prefix('v1')->group(function (): void {
             // Pausar (congelar) y reanudar una membresía o paquete.
             Route::post('/acuerdos/{acuerdo}/pausar', [PausasMembresiaTenantController::class, 'pausar'])->middleware('puede:membresias.gestionar')->name('acuerdos.pausar');
             Route::post('/acuerdos/{acuerdo}/reanudar', [PausasMembresiaTenantController::class, 'reanudar'])->middleware('puede:membresias.gestionar')->name('acuerdos.reanudar');
+            // Dar de baja una membresía (B04): la simulación y la baja.
+            Route::get('/acuerdos/{acuerdo}/baja', [BajasMembresiaTenantController::class, 'simular'])->middleware('puede:membresias.gestionar')->name('acuerdos.baja.simular');
+            Route::post('/acuerdos/{acuerdo}/baja', [BajasMembresiaTenantController::class, 'dar'])->middleware('puede:membresias.gestionar')->name('acuerdos.baja');
             Route::get('/miembros/{persona}/derechos', [MembresiasTenantController::class, 'derechos'])->middleware('puede:derechos.ver')->name('miembros.derechos.index');
             Route::get('/miembros/{persona}/planes', [MembresiasTenantController::class, 'planes'])->middleware('puede:derechos.ver')->name('miembros.planes');
             // Resumen operativo del miembro para Recepcion (P0): membresia, saldo, adeudo, alertas.

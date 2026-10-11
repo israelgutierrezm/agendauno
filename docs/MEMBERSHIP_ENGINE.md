@@ -98,6 +98,19 @@ and is consumed after it.
 - Members see a statement per plan (`GET /mi/planes`): included, extras, each use
   (attended, no-show, late cancel, upcoming), refunded, expired, available.
 
+## Fees, minimum term and cancellation (ADR 0121)
+
+- Fees (sign-up `inscripcion`, annual `anualidad`, early-cancellation penalty, a kept overdue
+  month) are order lines without a product: a `concepto` and, when generated, a unique
+  `referencia`. They are paid like any order and never grant entitlements.
+- A membership may require a minimum term (`permanencia_meses`) with an early-cancellation
+  rule (`sin_penalizacion`, `monto_fijo`, `meses_restantes`). It is sold only with the
+  accepted conditions (`acepta_condiciones`), which are frozen in the agreement.
+- Cancelling a membership (`BajaDeMembresiaTenant`) ends it at the end of the paid period
+  (today if overdue), stops renewals and auto-pay, caps its entitlements at that date,
+  cancels later bookings and records the calculation in `bajas_acuerdo`. A cycle never opens
+  after an entitlement's validity.
+
 ## Credit ledger
 
 Ledger entry examples:

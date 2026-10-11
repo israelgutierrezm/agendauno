@@ -229,6 +229,16 @@ pasará al reservar (ADR 0119): `resultado` (`reserva`, `lista_espera` o `no_dis
 `que_llevar`. Las reservas suman `plan`, `unidades`, `cancelacion` (null en lista de
 espera) y `que_llevar`; la vista previa de cancelar suma `plan_vencio`.
 
+Cuotas y permanencia (ADR 0121): `/mi/productos` suma `inscripcion_minor`,
+`permanencia_meses` y `condiciones`; `POST /mi/ordenes` y `POST /ordenes` aceptan
+`acepta_condiciones` (sin él, un plan con permanencia responde 422 `TERMS_NOT_ACCEPTED`) y
+caja, `exentar_inscripcion` + `motivo_exencion` (permiso `cuotas.exentar`). Las líneas de
+orden traen `concepto` (null en un producto). `GET/PUT /cuotas`, `GET
+/miembros/{persona}/cuotas`, `POST /ordenes/{orden}/lineas/{linea}/exentar` y `GET/POST
+/acuerdos/{acuerdo}/baja` (simulación y baja: `efectiva_el`, `en_permanencia`,
+`permanencia_hasta`, `modo`, `meses_restantes`, `precio_base_minor`, `penalizacion_minor`,
+`adeudo_minor`; al dar de baja, `motivo`, `exentar_penalizacion`, `conservar_adeudo`).
+
 Lugares numerados (ADR 0120): la vista previa trae `lugares` (`total`, `ocupados`; null si
 la clase no los numera), `POST /mi/reservas` acepta `lugar`, `GET
 /mi/sesiones/{sesion}/lugares` da `{total, ocupados, mio}` y `PUT
