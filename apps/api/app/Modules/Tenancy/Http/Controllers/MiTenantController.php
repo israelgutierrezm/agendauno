@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Application\CalcularDisponibilidadTenant;
 use App\Modules\Tenancy\Application\ClimaTenant;
 use App\Modules\Tenancy\Application\CobrarOrdenTenant;
 use App\Modules\Tenancy\Application\CorteDePlanesTenant;
+use App\Modules\Tenancy\Application\CuentaEnUsoTenant;
 use App\Modules\Tenancy\Application\CuotasTenant;
 use App\Modules\Tenancy\Application\CupoDeSesionTenant;
 use App\Modules\Tenancy\Application\DomiciliacionesTenant;
@@ -22,7 +23,6 @@ use App\Modules\Tenancy\Application\OpcionesCitaTenant;
 use App\Modules\Tenancy\Application\OrdenesTenant;
 use App\Modules\Tenancy\Application\ParametrosTenant;
 use App\Modules\Tenancy\Application\PaseAccesoTenant;
-use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
 use App\Modules\Tenancy\Application\PoliticaCancelacion;
 use App\Modules\Tenancy\Application\PortalDelClienteTenant;
 use App\Modules\Tenancy\Application\PresentarMovimientosCreditoTenant;
@@ -61,6 +61,7 @@ use App\Modules\Tenancy\Reservas\Exceptions\SesionNoReservable;
 use App\Modules\Tenancy\Reservas\QuienCancela;
 use App\Modules\Tenancy\TipoSesionTenant;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -89,7 +90,7 @@ class MiTenantController
         private readonly WaiversTenant $waivers,
         private readonly OrdenesTenant $ordenes,
         private readonly CobrarOrdenTenant $cobrarOrden,
-        private readonly PersonaDeUsuarioTenant $personas,
+        private readonly CuentaEnUsoTenant $cuenta,
         private readonly RegistroDePasarelasTenant $pasarelas,
         private readonly FormulariosDePersonaTenant $formularios,
         private readonly DomiciliacionesTenant $domiciliaciones,
@@ -699,11 +700,28 @@ class MiTenantController
     /**
      * Resuelve la persona del usuario autenticado; enlaza por correo la primera vez.
      */
+    /**
+     * Por quién actúa la cuenta: ella misma o, con `X-Participante`, una persona a su
+     * cargo con la autorización vigente (B05, {@see CuentaEnUsoTenant}).
+     */
     private function persona(Request $request): ?PersonaTenant
     {
-        $usuario = $request->attributes->get('usuario_tenant');
+        return $this->cuenta->persona($request);
+    }
 
-        return $usuario instanceof Usuario ? $this->personas->buscar($usuario) : null;
+    /**
+     * Sus órdenes: las que compró y, si la cuenta actúa por una persona a su cargo
+     * (B05), también las que se compraron para ella.
+     *
+     * @return Builder<OrdenTenant>
+     */
+    private function ordenesDe(Request $request, PersonaTenant $persona): Builder
+    {
+        $paraOtro = $this->cuenta->tutela($request) !== null;
+
+        return OrdenTenant::query()->where(fn (Builder $q) => $q
+            ->where('persona_id', $persona->getKey())
+            ->when($paraOtro, fn (Builder $q) => $q->orWhereHas('lineas', fn (Builder $l) => $l->where('beneficiario_id', $persona->getKey()))));
     }
 
     /**
@@ -883,15 +901,14 @@ class MiTenantController
             'excluir_pendientes' => ['sometimes', 'boolean'],
         ]);
 
-        $consulta = OrdenTenant::query()
-            ->where('persona_id', $persona->getKey())
+        $consulta = $this->ordenesDe($request, $persona)
             ->when($request->boolean('excluir_pendientes'), fn ($q) => $q->where('estado', '!=', EstadoOrden::Pendiente->value))
             ->orderByDesc('id');
         $porPagina = (int) ($filtros['per_page'] ?? 50);
         $total = (clone $consulta)->count();
         $ultima = max(1, (int) ceil($total / $porPagina));
         $pagina = min((int) ($filtros['page'] ?? 1), $ultima);
-        $ordenes = $consulta->with(['lineas.producto', 'sesion.oferta', 'sesion.instructor', 'sesion.sucursal'])
+        $ordenes = $consulta->with(['lineas.producto', 'lineas.beneficiario', 'sesion.oferta', 'sesion.instructor', 'sesion.sucursal'])
             ->forPage($pagina, $porPagina)->get();
 
         return response()->json([
@@ -911,10 +928,9 @@ class MiTenantController
             return response()->json(['data' => []]);
         }
 
-        $ordenes = OrdenTenant::query()
-            ->where('persona_id', $persona->getKey())
+        $ordenes = $this->ordenesDe($request, $persona)
             ->where('estado', EstadoOrden::Pendiente->value)
-            ->with(['lineas.producto', 'sesion.oferta', 'sesion.instructor', 'sesion.sucursal'])
+            ->with(['lineas.producto', 'lineas.beneficiario', 'sesion.oferta', 'sesion.instructor', 'sesion.sucursal'])
             ->orderByDesc('id')
             ->get();
 
@@ -941,18 +957,24 @@ class MiTenantController
             'acepta_condiciones' => ['sometimes', 'boolean'],
         ]);
 
+        // Para una persona a su cargo (B05): paga y acepta el responsable; los planes, sus
+        // créditos y sus reservas son del participante.
+        $titular = $this->cuenta->titular($request) ?? $persona;
+        $paraOtro = ! $titular->is($persona);
+
         $items = [];
         foreach ($validado['items'] as $item) {
             $producto = ProductoTenant::query()->where('ulid', $item['producto_id'])->firstOrFail();
-            // El alumno compra para sí: beneficiario = comprador (sin beneficiario explícito).
-            $items[] = ['producto' => $producto, 'cantidad' => (int) $item['cantidad'], 'beneficiario' => null];
+            // Para sí: beneficiario = comprador (sin beneficiario explícito).
+            $items[] = ['producto' => $producto, 'cantidad' => (int) $item['cantidad'], 'beneficiario' => $paraOtro ? $persona : null];
         }
 
-        // Sucursal (R19): la compra del alumno se atribuye a su sede de casa.
-        $sucursalId = $persona->sucursal_id !== null ? (int) $persona->sucursal_id : null;
+        // Sucursal (R19): la compra se atribuye a la sede de casa de quien la usa.
+        $sede = $persona->sucursal_id ?? $titular->sucursal_id;
+        $sucursalId = $sede !== null ? (int) $sede : null;
         $actor = $request->attributes->get('usuario_tenant');
         $orden = $this->ordenes->crear(
-            $persona,
+            $titular,
             $items,
             $validado['codigo_promo'] ?? null,
             $sucursalId,
@@ -975,7 +997,7 @@ class MiTenantController
         abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de miembro en este estudio.');
 
         $orden = OrdenTenant::query()->where('ulid', (string) $request->route('orden'))->firstOrFail();
-        abort_unless((int) $orden->persona_id === (int) $persona->getKey(), 403, 'Esta orden no es tuya.');
+        abort_unless($this->ordenesDe($request, $persona)->whereKey($orden->getKey())->exists(), 403, 'Esta orden no es tuya.');
 
         $validado = $request->validate([
             'proveedor' => ['nullable', 'string'],
@@ -1001,6 +1023,12 @@ class MiTenantController
         // Pago automático: al pagar se autoriza la tarjeta para cobrar sola la membresía
         // cada periodo. Solo para lo que se renueva y con una pasarela que lo admite.
         $domiciliar = $request->boolean('domiciliar');
+        // El pago automático de una persona a cargo se activa en el negocio (B05).
+        if ($domiciliar && $this->cuenta->tutela($request) !== null) {
+            throw ValidationException::withMessages([
+                'domiciliar' => ['El pago automático de una persona a tu cargo se activa en el negocio.'],
+            ]);
+        }
         if ($domiciliar) {
             // Es del plan Pro (ADR 0107); pagar sin él sigue igual.
             app(FuncionesPlan::class)->exigir($this->estudioDe($request), 'cobro_automatico');
@@ -1035,7 +1063,7 @@ class MiTenantController
      */
     private function presentarOrden(OrdenTenant $orden): array
     {
-        $orden->loadMissing(['lineas.producto', 'sesion.oferta', 'sesion.instructor', 'sesion.sucursal']);
+        $orden->loadMissing(['lineas.producto', 'lineas.beneficiario', 'sesion.oferta', 'sesion.instructor', 'sesion.sucursal']);
         $sesion = $orden->sesion;
         $productos = $orden->lineas->map(static fn (LineaOrdenTenant $l): string => $l->nombre())->filter()->values();
 
@@ -1067,6 +1095,10 @@ class MiTenantController
                 'concepto' => $l->concepto?->value,
                 'cantidad' => $l->cantidad,
                 'subtotal_minor' => $l->subtotal_minor,
+                // Para quién es, si no es para quien compró (una persona a su cargo; B05).
+                'para' => $l->beneficiario_id !== null && (int) $l->beneficiario_id !== (int) $orden->persona_id
+                    ? $l->beneficiario?->nombreCompleto()
+                    : null,
             ])->all(),
         ];
     }

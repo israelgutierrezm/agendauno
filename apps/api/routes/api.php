@@ -37,6 +37,7 @@ use App\Modules\Tenancy\Http\Controllers\ExpedienteTenantController;
 use App\Modules\Tenancy\Http\Controllers\FacturacionController;
 use App\Modules\Tenancy\Http\Controllers\FacturaRentaController;
 use App\Modules\Tenancy\Http\Controllers\FacturasTenantController;
+use App\Modules\Tenancy\Http\Controllers\FamiliasTenantController;
 use App\Modules\Tenancy\Http\Controllers\FichaMiembroTenantController;
 use App\Modules\Tenancy\Http\Controllers\FormulariosCaptacionTenantController;
 use App\Modules\Tenancy\Http\Controllers\FormulariosController;
@@ -63,6 +64,7 @@ use App\Modules\Tenancy\Http\Controllers\MiPagoAutomaticoTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiPrivacidadTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiReprogramarTenantController;
 use App\Modules\Tenancy\Http\Controllers\MisDocumentosTenantController;
+use App\Modules\Tenancy\Http\Controllers\MisParticipantesTenantController;
 use App\Modules\Tenancy\Http\Controllers\MiTenantController;
 use App\Modules\Tenancy\Http\Controllers\MovimientosPagoTenantController;
 use App\Modules\Tenancy\Http\Controllers\NotasPersonaTenantController;
@@ -192,6 +194,8 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/estudios/{estudio}/plan', [PlataformaEstudiosController::class, 'plan'])->name('estudios.plan');
         // Avisos por WhatsApp del negocio a sus clientes: solo los activa la plataforma (ADR 0083).
         Route::put('/estudios/{estudio}/whatsapp', [PlataformaEstudiosController::class, 'whatsapp'])->name('estudios.whatsapp');
+        // Módulos que se encienden por negocio (ADR 0123), apagados por omisión.
+        Route::put('/estudios/{estudio}/modulos', [PlataformaEstudiosController::class, 'modulos'])->name('estudios.modulos');
         // Clases o citas (excluyente): solo la plataforma la cambia, antes de operar (ADR 0104).
         Route::put('/estudios/{estudio}/modalidad', [PlataformaEstudiosController::class, 'modalidad'])->name('estudios.modalidad');
         // País del negocio (define cómo se le cobra la renta, ADR 0107): pasada la prueba, solo soporte.
@@ -366,6 +370,12 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/mi/documentos', [MisDocumentosTenantController::class, 'index'])->name('mi.documentos.index');
             Route::post('/mi/documentos', [MisDocumentosTenantController::class, 'subir'])->name('mi.documentos.subir');
             Route::get('/mi/documentos/{documento}', [MisDocumentosTenantController::class, 'ver'])->name('mi.documentos.ver');
+            // Familias (B05, ADR 0123): las personas a cargo de la cuenta y su autorización.
+            // Con el encabezado X-Participante, reservas, planes, pagos y documentos actúan por
+            // una de ellas (CuentaEnUsoTenant).
+            Route::get('/mi/participantes', [MisParticipantesTenantController::class, 'index'])->middleware('modulo:familias')->name('mi.participantes.index');
+            Route::post('/mi/participantes/{tutela}/autorizar', [MisParticipantesTenantController::class, 'autorizar'])->middleware('modulo:familias')->name('mi.participantes.autorizar');
+            Route::post('/mi/participantes/{tutela}/retirar', [MisParticipantesTenantController::class, 'retirar'])->middleware('modulo:familias')->name('mi.participantes.retirar');
             // Ciclo comercial del alumno (P0 #4): comprar packs/membresías y pagarlos en
             // línea desde su portal. El fulfillment (créditos) lo confirma el webhook.
             Route::get('/mi/productos', [MiTenantController::class, 'productos'])->name('mi.productos.index');
@@ -695,6 +705,13 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/cuotas', [CuotasTenantController::class, 'guardar'])->middleware('puede:productos.gestionar')->name('cuotas.update');
             Route::post('/ordenes/{orden}/lineas/{linea}/exentar', [CuotasTenantController::class, 'exentar'])->middleware('puede:cuotas.exentar')->name('ordenes.lineas.exentar');
             Route::get('/miembros/{persona}/cuotas', [CuotasTenantController::class, 'dePersona'])->middleware('puede:ordenes.gestionar')->name('miembros.cuotas');
+            // Familias y responsables (B05, ADR 0123).
+            Route::get('/familias', [FamiliasTenantController::class, 'configuracion'])->middleware(['puede:miembros.ver', 'modulo:familias'])->name('familias.show');
+            Route::put('/familias', [FamiliasTenantController::class, 'guardarConfiguracion'])->middleware(['puede:estudio.gestionar', 'modulo:familias'])->name('familias.update');
+            Route::get('/miembros/{persona}/familia', [FamiliasTenantController::class, 'deMiembro'])->middleware(['puede:miembros.ver', 'modulo:familias'])->name('miembros.familia');
+            Route::post('/miembros/{persona}/participantes', [FamiliasTenantController::class, 'vincular'])->middleware(['puede:miembros.gestionar', 'modulo:familias'])->name('miembros.participantes.store');
+            Route::post('/tutelas/{tutela}/autorizar', [FamiliasTenantController::class, 'autorizarEnMostrador'])->middleware(['puede:miembros.gestionar', 'modulo:familias'])->name('tutelas.autorizar');
+            Route::post('/tutelas/{tutela}/retirar', [FamiliasTenantController::class, 'retirar'])->middleware(['puede:miembros.gestionar', 'modulo:familias'])->name('tutelas.retirar');
             Route::post('/acuerdos', [MembresiasTenantController::class, 'vender'])->middleware(['puede:membresias.gestionar', 'plan:paquetes'])->name('acuerdos.store');
             // Dunning (R10): morosidad de la membresia ante fallo de cobro.
             Route::get('/dunning', [DunningTenantController::class, 'index'])->middleware('puede:facturacion.ver')->name('dunning.index');

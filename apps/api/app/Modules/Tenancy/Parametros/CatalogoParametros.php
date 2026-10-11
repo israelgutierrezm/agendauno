@@ -71,6 +71,10 @@ final class CatalogoParametros
             new DefinicionParametro('asistencia.no_asistio_al_terminar', 'Asistencia', 'Al terminar, quien no tiene registro «no se presentó»',
                 'Si nadie registró la asistencia de alguien, al terminar la clase o cita queda como que no se presentó, con la política de inasistencias del negocio.', $sn, 1),
 
+            // Familias y responsables (ADR 0123).
+            new DefinicionParametro('familias.max_participantes', 'Familias', 'Participantes por responsable',
+                'Cuántas personas puede tener a su cargo un responsable (con la autorización pendiente o vigente).', $e, 6, 1, 20, 'personas'),
+
             // Sitio del negocio (ADR 0114).
             new DefinicionParametro('sitio.banners_maximos', 'Sitio del negocio', 'Banners en el sitio',
                 'Cuántos banners (promociones, avisos) puede tener la página del negocio.', $e, 5, 1, 20, 'banners'),

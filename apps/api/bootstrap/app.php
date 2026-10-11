@@ -10,6 +10,7 @@ use App\Modules\Tenancy\Http\Middleware\AutenticarPlataforma;
 use App\Modules\Tenancy\Http\Middleware\AutenticarTenant;
 use App\Modules\Tenancy\Http\Middleware\FuncionDelPlan;
 use App\Modules\Tenancy\Http\Middleware\ModalidadRequerida;
+use App\Modules\Tenancy\Http\Middleware\ModuloRequerido;
 use App\Modules\Tenancy\Http\Middleware\PermisoTenant;
 use App\Modules\Tenancy\Http\Middleware\ResolverEstudio;
 use App\Support\Http\ApiExceptionRenderer;
@@ -57,6 +58,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'modalidad' => ModalidadRequerida::class,
             // Funciones que dependen del nivel de un negocio de citas (ADR 0107): plan:lealtad.
             'plan' => FuncionDelPlan::class,
+            // Módulos que el superadministrador enciende por negocio (ADR 0123): modulo:familias.
+            'modulo' => ModuloRequerido::class,
         ]);
 
         // Resolve the tenant (and its query scope) BEFORE route-model binding,
@@ -82,6 +85,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ThrottleRequestsWithRedis::class,
             ModalidadRequerida::class,
             FuncionDelPlan::class,
+            ModuloRequerido::class,
             AuthenticatesSessions::class,
             SubstituteBindings::class,
             Authorize::class,

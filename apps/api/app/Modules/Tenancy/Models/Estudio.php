@@ -9,6 +9,7 @@ use App\Modules\Tenancy\EstadoEstudio;
 use App\Modules\Tenancy\EstadoFacturacion;
 use App\Modules\Tenancy\ModalidadServicio;
 use App\Modules\Tenancy\ModoCobroSaas;
+use App\Modules\Tenancy\ModuloNegocio;
 use App\Modules\Tenancy\PerfilNegocio;
 use App\Modules\Tenancy\ProductoComercial;
 use App\Modules\Tenancy\TerminologiaNegocio;
@@ -28,6 +29,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $color_marca
  * @property array<string, string>|null $redes
  * @property bool $whatsapp_habilitado los avisos por WhatsApp a sus clientes; solo los activa el superadministrador (ADR 0083)
+ * @property list<string>|null $modulos los módulos que el superadministrador encendió (ADR 0123)
  * @property string|null $plan_nivel el nivel contratado de un negocio de citas (ADR 0107): individual, premium o pro
  * @property int|null $plan_profesionales los profesionales contratados
  * @property string $plan_periodicidad mensual o anual
@@ -71,6 +73,7 @@ class Estudio extends Model
         'contacto_whatsapp_verificado_en',
         'contacto_whatsapp_aceptado_en',
         'whatsapp_habilitado',
+        'modulos',
         'suspendido_por',
         'suspendido_en',
         'sin_suspension_hasta',
@@ -128,6 +131,7 @@ class Estudio extends Model
         'contacto_whatsapp_verificado_en' => 'datetime',
         'contacto_whatsapp_aceptado_en' => 'datetime',
         'whatsapp_habilitado' => 'boolean',
+        'modulos' => 'array',
         'suspendido_en' => 'datetime',
         'sin_suspension_hasta' => 'date',
     ];
@@ -157,6 +161,29 @@ class Estudio extends Model
     /**
      * ¿El estudio aparece en el directorio público?
      */
+    /** ¿El superadministrador encendió este módulo en el negocio? (ADR 0123) */
+    public function moduloHabilitado(ModuloNegocio $modulo): bool
+    {
+        return in_array($modulo->value, $this->modulos ?? [], true);
+    }
+
+    /**
+     * Los módulos encendidos que aún existen en el catálogo.
+     *
+     * @return list<string>
+     */
+    public function modulosHabilitados(): array
+    {
+        $encendidos = [];
+        foreach (ModuloNegocio::cases() as $modulo) {
+            if ($this->moduloHabilitado($modulo)) {
+                $encendidos[] = $modulo->value;
+            }
+        }
+
+        return $encendidos;
+    }
+
     public function enDirectorio(): bool
     {
         return $this->publicado && ! $this->privado && $this->estado->operativo();

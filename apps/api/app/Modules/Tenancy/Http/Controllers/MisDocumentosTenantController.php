@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Tenancy\Http\Controllers;
 
-use App\Modules\Tenancy\Application\PersonaDeUsuarioTenant;
+use App\Modules\Tenancy\Application\CuentaEnUsoTenant;
 use App\Modules\Tenancy\EstadoDocumento;
 use App\Modules\Tenancy\Models\Documento;
 use App\Modules\Tenancy\Models\Estudio;
@@ -25,7 +25,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class MisDocumentosTenantController
 {
-    public function __construct(private readonly PersonaDeUsuarioTenant $personas) {}
+    public function __construct(private readonly CuentaEnUsoTenant $cuenta) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -122,9 +122,9 @@ class MisDocumentosTenantController
 
     private function persona(Request $request): PersonaTenant
     {
-        $usuario = $request->attributes->get('usuario_tenant');
-        abort_unless($usuario instanceof Usuario, 401);
-        $persona = $this->personas->buscar($usuario);
+        abort_unless($request->attributes->get('usuario_tenant') instanceof Usuario, 401);
+        // Los suyos o los de una persona a su cargo (B05).
+        $persona = $this->cuenta->persona($request);
         abort_unless($persona instanceof PersonaTenant, 403, 'No tienes un perfil de alumno en este negocio.');
 
         return $persona;

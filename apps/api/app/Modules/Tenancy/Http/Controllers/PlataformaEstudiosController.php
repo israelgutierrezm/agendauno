@@ -21,6 +21,7 @@ use App\Modules\Tenancy\Models\CargoRenta;
 use App\Modules\Tenancy\Models\Estudio;
 use App\Modules\Tenancy\Models\FacturaPlataforma;
 use App\Modules\Tenancy\Models\MedicionUso;
+use App\Modules\Tenancy\ModuloNegocio;
 use App\Modules\Tenancy\PerfilNegocio;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -98,6 +99,8 @@ class PlataformaEstudiosController
             // Clases o citas solo cambia antes de operar (ADR 0104).
             'modalidad_cambiable' => $cambioModalidad->cambiable($modelo),
             'whatsapp_clientes' => self::whatsappClientes($modelo, $whatsapp),
+            // Módulos que se encienden por negocio (ADR 0123).
+            'modulos' => self::catalogoModulos($modelo),
             // Su plan de citas (ADR 0107), para verlo y cambiarlo desde soporte.
             'plan_citas' => $planes->aplica($modelo) && $gestor->baseDeDatosExiste($modelo) ? $planes->resumen($modelo) : null,
             'uso' => $uso,
@@ -315,6 +318,48 @@ class PlataformaEstudiosController
         }
 
         return response()->json(['data' => self::resumen($modelo->refresh())]);
+    }
+
+    /**
+     * Enciende o apaga un módulo en el negocio (ADR 0123). Solo el superadministrador:
+     * apagado, sus rutas responden 403 y la web y la app no lo muestran; lo que el
+     * negocio ya registró se conserva para cuando se vuelva a encender.
+     */
+    public function modulos(Request $request, string $estudio): JsonResponse
+    {
+        $modelo = Estudio::query()->where('slug', $estudio)->firstOrFail();
+        $validado = $request->validate([
+            'modulo' => ['required', Rule::enum(ModuloNegocio::class)],
+            'habilitado' => ['required', 'boolean'],
+        ]);
+        $modulo = ModuloNegocio::from($validado['modulo']);
+        $habilitado = (bool) $validado['habilitado'];
+
+        if ($modelo->moduloHabilitado($modulo) !== $habilitado) {
+            $actuales = $modelo->modulosHabilitados();
+            $modelo->forceFill(['modulos' => $habilitado
+                ? [...$actuales, $modulo->value]
+                : array_values(array_diff($actuales, [$modulo->value])),
+            ])->save();
+            Log::info('plataforma.estudio.modulo', ['estudio' => $modelo->slug, 'modulo' => $modulo->value, 'habilitado' => $habilitado]);
+        }
+
+        return response()->json(['data' => self::catalogoModulos($modelo)]);
+    }
+
+    /**
+     * El catálogo de módulos con cuáles tiene encendidos el negocio.
+     *
+     * @return list<array{clave: string, etiqueta: string, descripcion: string, habilitado: bool}>
+     */
+    private static function catalogoModulos(Estudio $estudio): array
+    {
+        return array_map(static fn (ModuloNegocio $m): array => [
+            'clave' => $m->value,
+            'etiqueta' => $m->etiqueta(),
+            'descripcion' => $m->descripcion(),
+            'habilitado' => $estudio->moduloHabilitado($m),
+        ], ModuloNegocio::cases());
     }
 
     /**

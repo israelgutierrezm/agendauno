@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Listeners;
 
 use App\Modules\Tenancy\Application\EntregarPushTenant;
 use App\Modules\Tenancy\Application\EnviarMensajesTenant;
+use App\Modules\Tenancy\Application\FamiliasTenant;
 use App\Modules\Tenancy\Application\RegionNegocioTenant;
 use App\Modules\Tenancy\Comunicaciones\AvisosAlEquipo;
 use App\Modules\Tenancy\Comunicaciones\CanalComunicacion;
@@ -42,6 +43,7 @@ class GenerarComunicaciones
         private readonly EntregarPushTenant $push,
         private readonly ClienteWhatsApp $whatsapp,
         private readonly RegionNegocioTenant $region,
+        private readonly FamiliasTenant $familias,
     ) {}
 
     public function handle(EventoDeDominioTenant $evento): void
@@ -86,6 +88,18 @@ class GenerarComunicaciones
                 $this->avisarPorWhatsApp($plantilla, $persona, $contexto, $evento);
 
                 continue;
+            }
+
+            // Quien tiene a la persona a su cargo con autorización vigente también lo recibe,
+            // con el nombre de la persona al frente (B05). Solo correo y push: la bandeja y
+            // WhatsApp son de la persona misma.
+            if ($persona instanceof PersonaTenant && in_array($plantilla->canal, [CanalComunicacion::Email, CanalComunicacion::Push], true)) {
+                foreach ($this->familias->responsablesDe($persona) as $responsable) {
+                    $usuario = Usuario::query()->find($responsable->usuario_id);
+                    if ($usuario instanceof Usuario) {
+                        $this->avisarAUsuario($plantilla, $usuario, $persona, $contexto, $evento, 'Sobre '.$persona->nombreCompleto().': ');
+                    }
+                }
             }
 
             $destinatario = null;
@@ -133,6 +147,7 @@ class GenerarComunicaciones
         ?PersonaTenant $persona,
         array $contexto,
         EventoDeDominioTenant $evento,
+        string $prefijoAsunto = '',
     ): void {
         $destinatario = null;
         if ($plantilla->canal === CanalComunicacion::Email) {
@@ -156,7 +171,7 @@ class GenerarComunicaciones
             'plantilla_id' => $plantilla->getKey(),
             'canal' => $plantilla->canal->value,
             'destinatario' => $destinatario,
-            'asunto' => $this->render($plantilla->asunto, $contexto),
+            'asunto' => $prefijoAsunto.$this->render($plantilla->asunto, $contexto),
             'cuerpo' => $this->render($plantilla->cuerpo, $contexto),
             'estado' => EstadoMensaje::Encolado->value,
             'evento_ulid' => $evento->eventoUlid,
