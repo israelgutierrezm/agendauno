@@ -157,7 +157,9 @@ function alternarCompacto(): void {
 async function salir(): Promise<void> {
   menuPerfil.value = false;
   await sesion.cerrarSesion();
-  void router.push({ name: "inicio" });
+  // Una carga nueva de la página: nada de lo que se vio en esta sesión (listas,
+  // fichas, cuentas de otros) queda en la memoria de la pestaña (M11).
+  window.location.assign(router.resolve({ name: "inicio" }).href);
 }
 
 onMounted(() => {

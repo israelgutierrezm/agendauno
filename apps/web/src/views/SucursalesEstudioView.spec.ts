@@ -56,6 +56,22 @@ beforeEach(() => {
 });
 
 describe("entrada pública del negocio", () => {
+  it("su dirección canónica es la del subdominio del negocio y lleva su marca (M12)", async () => {
+    mocks.get.mockResolvedValue(
+      escaparate("citas", [
+        { id: "s1", nombre: "Roma" },
+        { id: "s2", nombre: "Condesa" },
+      ]),
+    );
+    montar();
+    await flushPromises();
+
+    expect(
+      document.querySelector('link[rel="canonical"]')?.getAttribute("href"),
+    ).toBe("https://casa-navaja.turnouno.mx/sucursales/casa-navaja");
+    expect(document.title).toBe("Casa Navaja | Sucursales en TurnoUno");
+  });
+
   it("un negocio de clases va a su página, aunque tenga varias sedes", async () => {
     mocks.get.mockResolvedValue(
       escaparate("clases", [

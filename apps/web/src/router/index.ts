@@ -9,6 +9,7 @@ import { preciosPublicos } from "@/marketing/preciosPublicos";
 import { PRODUCTO_COMERCIAL, seoParaRuta } from "@/marketing/seoConfig";
 import { rutasComerciales } from "@/router/comerciales";
 import {
+  enSubdominioDeEstudio,
   salirA,
   slugDeContexto,
   urlEnSubdominioDelNegocio,
@@ -546,7 +547,17 @@ router.beforeEach(async (to) => {
   await sesion.verificarSesion();
 
   if (to.meta.requiereSesion === true && !sesion.autenticado) {
-    return { name: "entrar" };
+    // Sin perder a dónde iba: un enlace a una pantalla privada vuelve a ella al entrar
+    // (M11). Fuera del subdominio, también de qué negocio.
+    return {
+      name: "entrar",
+      query: {
+        ...(sesion.slug !== null && !enSubdominioDeEstudio()
+          ? { estudio: sesion.slug }
+          : {}),
+        ...(to.fullPath !== "/" ? { volver: to.fullPath } : {}),
+      },
+    };
   }
   // Cada pantalla privada tiene su regla en lib/acceso (sin regla, no se entra).
   // Cubre la URL escrita a mano: el menú solo ofrece lo permitido. Sin permiso se

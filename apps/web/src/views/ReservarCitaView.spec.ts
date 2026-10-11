@@ -234,6 +234,17 @@ beforeEach(() => {
 });
 
 describe("agenda pública por pasos", () => {
+  it("su dirección canónica vive en el subdominio del negocio, con la marca de citas (M12)", async () => {
+    const vista = montar();
+    await flushPromises();
+
+    expect(
+      document.querySelector('link[rel="canonical"]')?.getAttribute("href"),
+    ).toBe("https://demo.turnouno.mx/agendar/demo");
+    expect(document.title).toBe("Agenda en Negocio de prueba | TurnoUno");
+    vista.unmount();
+  });
+
   it("busca sin distinguir acentos y filtra catálogos grandes por categoría", async () => {
     const op = opciones(1);
     op.data.data.servicios = Array.from({ length: 6 }, (_, i) => ({

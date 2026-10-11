@@ -5,6 +5,7 @@ import { RouterLink, useRoute } from "vue-router";
 
 import DocumentoLegalContenido from "@/components/DocumentoLegalContenido.vue";
 import { api, noEncontrado } from "@/lib/api";
+import { PRODUCTOS, productoActual } from "@/lib/producto";
 import { updateSeo } from "@/lib/seo";
 import { slugDeContexto, urlCanonicaEstudio } from "@/lib/tenant";
 
@@ -39,7 +40,7 @@ async function cargar(): Promise<void> {
     );
     aviso.value = data.data;
     updateSeo({
-      title: `${data.data.titulo} · ${data.data.negocio} | AgendaUno`,
+      title: `${data.data.titulo} · ${data.data.negocio} | ${PRODUCTOS[productoActual()].nombre}`,
       description: `Cómo trata ${data.data.negocio} los datos personales de sus clientes.`,
       path: urlCanonicaEstudio(
         slug.value,
