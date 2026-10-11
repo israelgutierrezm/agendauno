@@ -300,6 +300,22 @@ del otro tipo responde 422 `VALIDATION_FAILED`.
   movimientos de caja) es «Cita» solo si la sesión es una cita; la clase de pago suelto
   es «Clase».
 
+## Seguimiento y embudo (ADR 0122)
+
+- `GET /tareas?tipo=seguimiento`: solo las de seguimiento. Cada tarea suma `persona_id`
+  (ulid), `celular`, `motivo` (`primera_asistencia`, `plan_por_vencer`, `plan_vencido`,
+  `sin_asistir`, `compro_sin_reservar`), `resultado` y `contactado_en`.
+- `POST /tareas/{tarea}/resultado` (`tareas.gestionar`): `resultado` (`contactado`,
+  `renovo`, `no_respondio`, `no_desea_contacto`, `requiere_atencion`) y `nota` opcional
+  (hasta 500). Completa la tarea; `no_desea_contacto` apaga `recibe_promociones`.
+- `GET /reportes/embudo?desde&hasta` (`facturacion.ver`, plan `reportes_avanzados`; por
+  omisión los últimos 30 días, hasta un año): `sitio_a_solicitud` {`visitas`,
+  `solicitudes`}, `solicitud_a_compra` {`solicitudes`, `compraron`},
+  `compra_a_asistencia` {`compradores_nuevos`, `asistieron`}, `renovacion`
+  {`por_renovar`, `renovadas`} y `tiempo_respuesta` {`solicitudes`, `atendidas`,
+  `mediana_horas`}.
+- `GET /escaparate` cuenta la visita del día (una por visitante, sin guardar quién).
+
 ## Sitio del negocio (ADR 0114)
 
 Para quien configura el negocio (`estudio.gestionar`), bajo `/api/v1/app/{slug}` (o el

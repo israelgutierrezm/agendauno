@@ -88,6 +88,17 @@ final class CatalogoParametros
                 'Días antes de su vencimiento. Aplica en la ficha del alumno, el radar de retención y las difusiones.', $e, 14, 1, 90, 'días'),
             new DefinicionParametro('membresias.dias_vencida_recuperable', 'Membresías', 'Una membresía vencida se sigue buscando durante',
                 'Días después de vencer, en el radar de retención y las difusiones.', $e, 14, 1, 365, 'días'),
+
+            // Seguimiento (plan de mejoras M09/C06/C05): tareas para el equipo por señales
+            // que el sistema verifica, sin repetirlas.
+            new DefinicionParametro('seguimiento.activo', 'Seguimiento', 'Crear tareas de seguimiento',
+                'Cada día: su primera clase, plan por vencer o vencido, días sin asistir y quien compró y no ha reservado. Si lo apagas, no se crean.', $sn, 1),
+            new DefinicionParametro('seguimiento.dias_sin_asistir', 'Seguimiento', 'Seguimiento por inasistencia a los',
+                'Días desde su última clase, con un plan en vigor.', $e, 21, 7, 180, 'días'),
+            new DefinicionParametro('seguimiento.dias_sin_reservar', 'Seguimiento', 'Seguimiento a quien compró y no ha reservado a los',
+                'Días desde que pagó su plan sin reservar ninguna clase.', $e, 3, 1, 30, 'días'),
+            new DefinicionParametro('seguimiento.dias_entre_contactos', 'Seguimiento', 'No repetir un seguimiento por el mismo motivo antes de',
+                'Días desde el anterior con esa persona.', $e, 30, 1, 365, 'días'),
             new DefinicionParametro('membresias.max_dias_pausa', 'Membresías', 'Una pausa puede durar hasta',
                 'Días.', $e, 180, 1, 365, 'días'),
 

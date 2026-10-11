@@ -6,6 +6,7 @@ namespace App\Modules\Tenancy\Http\Controllers;
 
 use App\Modules\Tenancy\Application\EscaparateTenant;
 use App\Modules\Tenancy\Application\SitioWebTenant;
+use App\Modules\Tenancy\Application\VisitasPaginaTenant;
 use App\Modules\Tenancy\Models\Estudio;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,12 +18,19 @@ use Illuminate\Http\Request;
  */
 class EscaparateController
 {
-    public function __invoke(Request $request, EscaparateTenant $escaparate, SitioWebTenant $sitio): JsonResponse
+    public function __invoke(Request $request, EscaparateTenant $escaparate, SitioWebTenant $sitio, VisitasPaginaTenant $visitas): JsonResponse
     {
         $estudio = $request->attributes->get('estudio');
         abort_unless($estudio instanceof Estudio, 404);
         // El escaparate es la cara pública: solo con la página abierta.
         abort_unless($estudio->paginaPublica(), 404);
+        // Cuenta la visita del día para el embudo (C08), sin guardar quién; si falla, la
+        // página se muestra igual.
+        try {
+            $visitas->registrar($estudio, $request->ip(), $request->userAgent());
+        } catch (\Throwable $e) {
+            report($e);
+        }
 
         return response()->json(['data' => $escaparate->datos(
             $estudio,

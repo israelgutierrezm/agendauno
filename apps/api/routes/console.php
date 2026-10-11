@@ -74,6 +74,10 @@ Schedule::command('agendauno:avisar-renovaciones')->dailyAt('15:00')->withoutOve
 // tocan (aniversario de la alta o fecha fija), por cobrar. No duplica si corre de nuevo.
 Schedule::command('agendauno:generar-cuotas')->dailyAt('13:00')->withoutOverlapping();
 
+// Seguimiento (M09/C06/C05): a diario a las 08:00 de CDMX, una tarea por cada señal nueva
+// (primera clase, plan por vencer o vencido, días sin asistir, compró y no reservó).
+Schedule::command('agendauno:generar-seguimientos')->dailyAt('14:00')->withoutOverlapping();
+
 // Cobro del SaaS (ADR 0019, 0032 y 0107): a diario a las 02:00 de CDMX se emiten los
 // cargos de los meses que ya cerraron en la zona de cada negocio (congelando su
 // medición) y los periodos de los planes de citas que empiezan (por adelantado); un
